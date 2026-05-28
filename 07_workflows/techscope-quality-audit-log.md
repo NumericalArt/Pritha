@@ -149,3 +149,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `multi-module-cli`, `contract-validation-module`
 - Open questions: wire `index.mjs` to `contract.mjs` immediately or continue extracting command modules first?
 - Notes: First safe modularization step only. The old CLI path remains stable as a thin wrapper; implementation moved under `scripts/agents-mother/index.mjs`; `contract.mjs` is testable but the full Phase 9 extraction is not complete yet. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 9b — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from Phase 9a final gate
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-9b-agents-mother-test-module-report.md`
+- AM-CANDIDATE patterns: `inspection-module`, `no-report-test-mode`, `shared-project-command-runner`
+- Open questions: extract scaffold templates first, or move handoff/operations next because they already depend on the inspection layer?
+- Notes: Extracted `scripts/agents-mother/test.mjs` and preserved wrapper/direct CLI behavior for `test . --no-report`. Techscope root classification remains `agent-project` and result remains `complete`. Full Phase 9 remains partial until scaffold and remaining command modules are extracted. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
