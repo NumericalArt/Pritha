@@ -1,0 +1,19 @@
+{
+  "name": "techscope",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "smoke": "node scripts/smoke-test.mjs",
+    "test": "node scripts/smoke-test.mjs",
+    "check": "node scripts/golden-checks.mjs",
+    "check:embeddings": "node scripts/golden-checks.mjs --with-embeddings",
+    "health": "node scripts/healthcheck.mjs",
+    "interfaces": "node scripts/interface-status.mjs --json",
+    "memory": "node scripts/memory-status.mjs --json",
+    "tools": "node scripts/tools-status.mjs --json",
+    "operations": "node scripts/operations-status.mjs --json"
+  }
+}

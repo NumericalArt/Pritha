@@ -60,7 +60,7 @@ Status: active
 
 - Agents tracked: 3
 - Contracts: 3
-- Reports: 29
+- Reports: 31
 - Research reports: 1
 
 ## Agents
@@ -69,16 +69,18 @@ Status: active
 | --- | --- | --- | --- | --- | --- | --- |
 | FESPA26 | voice-first Codex-native workbench for processing FESPA 2026 booth media, notes, links and files into a bilingual mobile | hybrid, with Codex-native sidecar. | web. / Telegram none. | local Mac. | manual. | contracts:1 scaffold:0 test:3 handoff:1 ops:3 deploy:0 evolve:1 |
 | Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:0 handoff:0 ops:1 deploy:2 evolve:2 |
-| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:8 handoff:0 ops:6 deploy:0 evolve:0 |
+| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:7 deploy:0 evolve:0 |
 
 ## Recent Reports
 
+- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-4-dogfooding-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-3-shared-lib-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-2-operations-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-1-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-0-baseline-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-pre-phase-0-reconciliation-report.md
 - 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report.md
+- 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-6.md
 - 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-5.md
 - 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-4.md
 - 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-3.md
@@ -101,7 +103,6 @@ Status: active
 - 2026-05-18 agent-test-report/failed: 11_agents/reports/2026-05-18-techscope-agent-test-report.md
 - 2026-05-18 agent-test-report/complete: 11_agents/reports/2026-05-18-techscope-agent-test-report-3.md
 - 2026-05-18 agent-test-report/failed: 11_agents/reports/2026-05-18-techscope-agent-test-report-2.md
-- 2026-05-18 agent-operations-report/partial: 11_agents/reports/2026-05-18-techscope-agent-operations-report.md
 
 ## Evolution Rules
 

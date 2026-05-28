@@ -71,6 +71,7 @@ function runSql(sql) {
     input: sql,
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],
+    maxBuffer: 50 * 1024 * 1024,
   });
 }
 

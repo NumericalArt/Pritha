@@ -83,3 +83,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `scripts-lib-package`, `shared-frontmatter-parser`, `shared-env-loader`, `legacy-compatible-slug-options`
 - Open questions: should generated child-agent scripts get scaffold-local `scripts/lib/*` after Phase 5 snapshot tests?
 - Notes: Runtime scripts now share root/frontmatter/env/date/slug helpers. Generated child-agent template snippets in `agents-mother.mjs` remain standalone until snapshot coverage exists. Final `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 4 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-4-dogfooding-report.md`
+- AM-CANDIDATE patterns: `smoke-test-template`, `status-mjs-family`, `self-inspection-manifest`, `minimal-package-json`, `buffered-derived-index-rebuild`
+- Open questions: should `Deployment plan: not-applicable` remain acceptable until deployment automation is introduced?
+- Notes: Techscope now has smoke/status scripts and minimal `package.json`. `agents-mother test .` returns complete; deployment automation is intentionally not part of Phase 4. Final `node scripts/golden-checks.mjs --with-embeddings` passed.
