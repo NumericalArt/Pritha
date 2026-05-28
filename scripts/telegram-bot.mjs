@@ -22,7 +22,10 @@ const QUEUE_DIR = path.join(ROOT, ".queue", "telegram-intake");
 const CODEX_REVIEW_DIR = path.join(ROOT, ".queue", "codex-media-review");
 const DEFAULT_ALLOWED_USER_IDS = ["6208460904"];
 const POLL_TIMEOUT_SECONDS = 30;
-const RETRY_DELAY_MS = 3000;
+const RETRY_DELAY_MS = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_INITIAL_MS || 3000);
+const MAX_RETRY_DELAY_MS = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_MAX_MS || 60000);
+const RETRY_JITTER_RATIO = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_JITTER_RATIO || 0.25);
+const ERROR_LOG_INTERVAL_MS = Number(process.env.TECHSCOPE_TELEGRAM_ERROR_LOG_INTERVAL_MS || 60000);
 const MAX_JOB_ATTEMPTS = 2;
 const QUEUE_STATUSES = ["pending", "processing", "awaiting_codex", "complete", "done", "failed"];
 let workerRunning = false;
@@ -75,6 +78,16 @@ function runCommand(command, args) {
     throw new Error(`${command} ${args.join(" ")} failed${output ? `:\n${output}` : ""}`);
   }
   return output;
+}
+
+class TelegramApiError extends Error {
+  constructor(message, options = {}) {
+    super(message);
+    this.name = "TelegramApiError";
+    this.retryAfterSeconds = options.retryAfterSeconds || 0;
+    this.status = options.status || 0;
+    this.method = options.method || "";
+  }
 }
 
 function requireToken() {
@@ -491,9 +504,21 @@ async function telegram(method, payload = {}) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    throw new TelegramApiError(`Telegram API ${method} failed: ${response.status} ${response.statusText}`, {
+      method,
+      status: response.status,
+    });
+  }
   if (!data.ok) {
-    throw new Error(`Telegram API ${method} failed: ${data.description || response.statusText}`);
+    throw new TelegramApiError(`Telegram API ${method} failed: ${data.description || response.statusText}`, {
+      method,
+      status: response.status,
+      retryAfterSeconds: Number(data.parameters?.retry_after || 0),
+    });
   }
   return data.result;
 }
@@ -585,7 +610,16 @@ async function handleUpdate(update, users) {
 async function poll() {
   const users = allowedUserIds();
   let offset = Number(process.env.TECHSCOPE_TELEGRAM_OFFSET || 0);
-  await telegram("deleteWebhook", { drop_pending_updates: false });
+  let failureCount = 0;
+  let lastErrorMessage = "";
+  let suppressedErrors = 0;
+  let lastErrorLogAt = 0;
+  try {
+    await telegram("deleteWebhook", { drop_pending_updates: false });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Telegram deleteWebhook warning: ${message}; continuing with long polling retry loop.`);
+  }
   console.log(`Techscope Telegram bot polling. Allowed users: ${[...users].join(", ")}`);
   recoverProcessingJobs();
   kickQueueWorker();
@@ -601,9 +635,36 @@ async function poll() {
         offset = update.update_id + 1;
         await handleUpdate(update, users);
       }
+      if (failureCount > 0) {
+        console.error(`Telegram polling recovered after ${failureCount} failed attempt(s).`);
+      }
+      failureCount = 0;
+      lastErrorMessage = "";
+      suppressedErrors = 0;
+      lastErrorLogAt = 0;
     } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      failureCount += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      const nowMs = Date.now();
+      const shouldLog =
+        message !== lastErrorMessage ||
+        lastErrorLogAt === 0 ||
+        nowMs - lastErrorLogAt >= ERROR_LOG_INTERVAL_MS;
+      if (shouldLog) {
+        const suffix = suppressedErrors > 0 ? `; suppressed ${suppressedErrors} repeated error(s)` : "";
+        console.error(`Telegram polling error: ${message}${suffix}`);
+        lastErrorMessage = message;
+        suppressedErrors = 0;
+        lastErrorLogAt = nowMs;
+      } else {
+        suppressedErrors += 1;
+      }
+
+      const retryAfterMs = Number(error?.retryAfterSeconds || 0) * 1000;
+      const exponentialMs = Math.min(MAX_RETRY_DELAY_MS, RETRY_DELAY_MS * (2 ** Math.min(failureCount - 1, 8)));
+      const baseDelayMs = retryAfterMs || exponentialMs;
+      const jitterMs = Math.floor(Math.random() * Math.max(0, baseDelayMs * RETRY_JITTER_RATIO));
+      await new Promise((resolve) => setTimeout(resolve, baseDelayMs + jitterMs));
     }
   }
 }

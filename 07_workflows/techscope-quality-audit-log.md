@@ -61,3 +61,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-aware-launchd-template`, `portable-tool-discovery`
 - Open questions: should Phase 2 add a plist rendering helper or keep launchd rendering manual?
 - Notes: Runtime grep for `/Users/jkl` is clean across `scripts launchd interfaces memory tools operations`; historical Markdown keeps old paths only as migration context. Final gate passed both from project root and from `/tmp` with `TECHSCOPE_ROOT=/Users/jkl/Techscope`.
+
+## Phase 2 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-2-operations-report.md`
+- AM-CANDIDATE patterns: `incident-as-operations-report`, `external-fetch-backoff`, `repo-cruft-cleanup`, `non-fatal-startup-network-warning`
+- Open questions: should stale `awaiting_codex` media review items become warnings or quality-gate failures in Phase 8?
+- Notes: Telegram log sample before fix showed 150 repeated `fetch failed` lines; polling now has exponential backoff, jitter, retry-after handling and repeated-error aggregation. Web was smoke-tested on `127.0.0.1:3307` without installing launchd. Final `node scripts/golden-checks.mjs --with-embeddings` passed.
