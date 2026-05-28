@@ -160,3 +160,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `inspection-module`, `no-report-test-mode`, `shared-project-command-runner`
 - Open questions: extract scaffold templates first, or move handoff/operations next because they already depend on the inspection layer?
 - Notes: Extracted `scripts/agents-mother/test.mjs` and preserved wrapper/direct CLI behavior for `test . --no-report`. Techscope root classification remains `agent-project` and result remains `complete`. Full Phase 9 remains partial until scaffold and remaining command modules are extracted. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 9c — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from Phase 9b final gate
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-9c-agents-mother-scaffold-module-report.md`
+- AM-CANDIDATE patterns: `snapshot-guarded-scaffold-extraction`, `scaffold-module-boundary`, `direct-generator-export-test`
+- Open questions: extract handoff and operations together, or move deployment/evolve/registry first to reduce the entrypoint tail?
+- Notes: Extracted `scripts/agents-mother/scaffold/index.mjs` and preserved `scaffold` command behavior through snapshot coverage. Added a direct module export test for `generatedAgentFiles`. Full Phase 9 remains partial until remaining command modules are extracted. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.

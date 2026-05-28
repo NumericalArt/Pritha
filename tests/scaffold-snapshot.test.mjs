@@ -4,6 +4,8 @@ import { execFileSync } from "node:child_process";
 import { cpSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { contractData } from "../scripts/agents-mother/contract.mjs";
+import { generatedAgentFiles } from "../scripts/agents-mother/scaffold/index.mjs";
 
 function listFiles(root) {
   const out = [];
@@ -50,4 +52,13 @@ test("Agents Mother scaffold output matches the frozen file-list snapshot", () =
     encoding: "utf8",
   });
   assert.match(smoke, /Smoke test passed/);
+});
+
+test("scaffold module exposes generated agent files directly", () => {
+  const data = contractData("tests/fixtures/contracts/valid-agent-contract.md");
+  const files = generatedAgentFiles(data);
+  const paths = files.map((file) => file.path).sort();
+  assert.ok(paths.includes("AGENTS.md"));
+  assert.ok(paths.includes("scripts/smoke-test.mjs"));
+  assert.ok(paths.includes("operations/manifest.json"));
 });
