@@ -193,3 +193,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `cli-rename-with-alias`, `brand-layer-separation`, `lineage-vocabulary`
 - Open questions: should Phase 11 create a separate English OSS README first, or translate the current Russian README in place?
 - Notes: Added Pritha alias-first CLI (`scripts/pritha.mjs`), kept `scripts/agents-mother.mjs` as compatibility shim with deprecation note, added `create/publish/lineage` aliases, documented vocabulary in standard/workflow/template, and wrote a secure handoff note outside the repo. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 11 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from Phase 10 final gate
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-11-oss-doc-pack-report.md`
+- AM-CANDIDATE patterns: `oss-doc-pack`, `english-first-readme`, `getting-started-10-min`
+- Open questions: should Phase 12 wizard create the first Seed directly, or stop after generating and validating `.env` plus prerequisites?
+- Notes: Rewrote README as English Pritha landing page, preserved Russian README as `README.ru.md`, added MIT license, contributing/security/changelog/code-of-conduct, GitHub templates, English docs pack, and removed the real Telegram user id from `.env.example`. Fresh clone simulation initially exposed missing memory bootstrap in `quality-gate`; fixed by adding `rebuild-memory` before unit/self-inspection. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.

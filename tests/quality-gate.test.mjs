@@ -16,6 +16,7 @@ test("quality-gate exposes a serialized dry-run contract", () => {
     [
       "env-doctor",
       "validate-memory",
+      "rebuild-memory",
       "smoke-test",
       "unit-tests",
       "agents-mother-test",
@@ -56,6 +57,6 @@ test("quality-gate self-test profile omits heavier Agents Mother inspection", ()
   assert.equal(payload.profile, "self-test");
   assert.deepEqual(
     payload.checks.map((check) => check.id),
-    ["env-doctor", "validate-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
+    ["env-doctor", "validate-memory", "rebuild-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
   );
 });

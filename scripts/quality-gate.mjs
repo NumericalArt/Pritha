@@ -101,6 +101,7 @@ const unitTestFiles = listTestFiles(path.join(ROOT, "tests"));
 const allCheckSpecs = [
   ["env-doctor", "Environment doctor", "node", ["scripts/env-doctor.mjs", ...(strictEnv ? ["--strict"] : [])]],
   ["validate-memory", "Markdown memory validation", "node", ["scripts/validate-memory.mjs"]],
+  ["rebuild-memory", "Memory rebuild", "node", ["scripts/rebuild-memory.mjs"], { timeoutMs: 180000 }],
   ["smoke-test", "Smoke test", "node", ["scripts/smoke-test.mjs"]],
   ["unit-tests", "Unit tests", "node", ["--test", ...unitTestFiles], { timeoutMs: 180000 }],
   ["agents-mother-test", "Agents Mother self-inspection", "node", ["scripts/agents-mother.mjs", "test", ".", "--no-report"]],
@@ -109,7 +110,7 @@ const allCheckSpecs = [
 
 const profileChecks = {
   full: allCheckSpecs.map((spec) => spec[0]),
-  "self-test": ["env-doctor", "validate-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
+  "self-test": ["env-doctor", "validate-memory", "rebuild-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
 };
 
 if (!profileChecks[profile]) {
