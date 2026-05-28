@@ -1,0 +1,31 @@
+{
+  "agent": "Techscope",
+  "generated_by": "TechScope canonical-root migration",
+  "primary_interface": "Codex project",
+  "telegram_mode": "intake-channel",
+  "adapters": [
+    {
+      "name": "codex-thread",
+      "mode": "primary-workbench",
+      "status": "active"
+    },
+    {
+      "name": "telegram",
+      "mode": "intake-channel",
+      "status": "active",
+      "script": "scripts/telegram-bot.mjs"
+    },
+    {
+      "name": "web",
+      "mode": "read/search-ui",
+      "status": "active",
+      "url": "http://127.0.0.1:3000"
+    },
+    {
+      "name": "obsidian",
+      "mode": "vault-ui",
+      "status": "active"
+    }
+  ],
+  "noise_policy": "Telegram replies should be concise and human-readable; internal pipeline details stay in logs and artifacts."
+}

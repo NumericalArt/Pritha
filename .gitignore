@@ -1,0 +1,35 @@
+# macOS / editor noise
+.DS_Store
+**/.DS_Store
+Untitled*.canvas
+2026-05-15.md
+
+# Secrets and local environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Runtime state
+.logs/
+.tools/
+.queue/
+.techscope-setup.json
+.obsidian/
+
+# Derived memory artifacts
+.memory/*.sqlite
+.memory/last-rebuild.sql
+
+# Raw source material is not part of the public/source-of-truth snapshot.
+01_sources/raw/
+
+# Dependencies / caches
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local backups
+*.bak
+*.tmp

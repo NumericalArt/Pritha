@@ -1,0 +1,23 @@
+{
+  "agent": "Techscope",
+  "generated_by": "TechScope canonical-root migration",
+  "deployment_target": "Mac mini",
+  "deployment_profile": "mac-mini-service",
+  "service_mode": "launchd",
+  "autostart": "launchd-on-approval",
+  "autostart_policy": "Techscope Web and Telegram bot are allowed to run as launchd services from /Users/jkl/Techscope. New agents must not inherit this automatically.",
+  "service_label": "com.techscope",
+  "start_command": "launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.techscope.web.plist && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.techscope.telegram-bot.plist",
+  "stop_command": "launchctl bootout gui/$(id -u)/com.techscope.web; launchctl bootout gui/$(id -u)/com.techscope.telegram-bot",
+  "healthcheck_command": "curl -fsS http://127.0.0.1:3000/ >/dev/null && node scripts/telegram-bot.mjs poll-once --dry-run >/dev/null",
+  "log_path": ".logs/",
+  "launchd_template": "launchd/com.techscope.web.plist",
+  "proactivity": {
+    "mode": "queue-watcher",
+    "trigger_sources": "Telegram getUpdates polling, manual Codex thread work, local scripts",
+    "schedule": "none",
+    "heartbeat_interval": "Telegram long polling timeout 30s",
+    "idle_behavior": "Stay resident as launchd service; process queued intake only when messages arrive.",
+    "user_interruption_policy": "User can stop launchd services or ask Codex to pause work."
+  }
+}

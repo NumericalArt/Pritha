@@ -1,0 +1,24 @@
+{
+  "agent": "Techscope",
+  "generated_by": "TechScope canonical-root migration",
+  "profile": "markdown-first-with-derived-indexes",
+  "source_of_truth": "Markdown artifacts in 00_inbox, 01_sources, 02_briefs, 03_reviews, 04_standards, 05_decisions, 07_workflows, 10_wiki and 11_agents",
+  "derived_indexes": [
+    ".memory/techscope.sqlite",
+    "sentence-transformer embeddings in .memory/techscope.sqlite",
+    "10_wiki generated pages"
+  ],
+  "directories": [
+    "00_inbox",
+    "01_sources/notes",
+    "01_sources/signals",
+    "02_briefs",
+    "03_reviews",
+    "04_standards",
+    "05_decisions",
+    "07_workflows",
+    "10_wiki",
+    "11_agents"
+  ],
+  "raw_material_policy": "01_sources/raw is preserved but not treated as curated source of truth until summarized into notes, signals, briefs or assessments."
+}

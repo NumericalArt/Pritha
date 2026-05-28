@@ -1,0 +1,334 @@
+#!/usr/bin/env node
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+const ROOT = process.cwd();
+const SIGNAL_DIR = path.join(ROOT, "01_sources", "signals");
+
+const TECH_TERMS = [
+  "agent", "agents", "агент", "llm", "mcp", "rag", "codex", "claude", "cursor",
+  "prompt", "промпт", "tool", "tools", "инструмент", "api", "sdk", "workflow",
+  "architecture", "архитект", "security", "безопас", "eval", "test", "тест",
+  "ci", "lint", "guardrail", "context", "контекст", "memory", "память",
+  "database", "embedding", "oauth", "auth", "schema", "error", "ошиб",
+  "retry", "timeout", "observability", "лог", "metric", "trace", "review",
+  "qa", "sandbox", "browser", "devtools", "source", "standard", "decision",
+];
+
+const NOISE_PATTERNS = [
+  /подписывай/i,
+  /ставьте лайк/i,
+  /оставьте комментар/i,
+  /до скорых встреч/i,
+  /scan this qr/i,
+  /give it up/i,
+  /welcome to the stage/i,
+  /good morning/i,
+  /thank you/i,
+  /ссылка в описании/i,
+  /залетайте/i,
+  /реклам/i,
+];
+
+function usage() {
+  console.log(`Usage:
+  node scripts/extract-signal.mjs <artifact-path>
+
+Creates/updates 01_sources/signals/YYYY-MM-DD-topic-signal.md`);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function slug(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/https?:\/\//g, "")
+    .replace(/[^a-z0-9а-яё]+/giu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90) || "artifact";
+}
+
+function relPath(filePath) {
+  return path.relative(ROOT, filePath).split(path.sep).join("/");
+}
+
+function parseScalar(value) {
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+  if (trimmed === "[]") return [];
+  if (trimmed === "{}") return {};
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    const inner = trimmed.slice(1, -1).trim();
+    if (!inner) return [];
+    return inner.split(",").map((item) => item.trim().replace(/^["']|["']$/g, ""));
+  }
+  return trimmed.replace(/^["']|["']$/g, "");
+}
+
+function parseFrontmatter(text) {
+  if (!text.startsWith("---\n")) return { data: {}, body: text };
+  const end = text.indexOf("\n---\n", 4);
+  if (end === -1) return { data: {}, body: text };
+  const raw = text.slice(4, end);
+  const body = text.slice(end + 5);
+  const lines = raw.split(/\r?\n/);
+  const data = {};
+  let currentKey = null;
+  let currentNestedKey = null;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const topMatch = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
+    if (topMatch) {
+      currentKey = topMatch[1];
+      currentNestedKey = null;
+      data[currentKey] = parseScalar(topMatch[2] ?? "");
+      continue;
+    }
+    const nestedMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
+    if (nestedMatch && currentKey) {
+      if (!data[currentKey] || Array.isArray(data[currentKey]) || typeof data[currentKey] !== "object") data[currentKey] = {};
+      currentNestedKey = nestedMatch[1];
+      data[currentKey][currentNestedKey] = parseScalar(nestedMatch[2] ?? "");
+      continue;
+    }
+    const listMatch = line.match(/^\s{2,4}-\s*(.*)$/);
+    if (listMatch && currentKey) {
+      const value = parseScalar(listMatch[1]);
+      if (currentNestedKey && data[currentKey] && typeof data[currentKey] === "object" && !Array.isArray(data[currentKey])) {
+        if (!Array.isArray(data[currentKey][currentNestedKey])) data[currentKey][currentNestedKey] = [];
+        data[currentKey][currentNestedKey].push(value);
+      } else {
+        if (!Array.isArray(data[currentKey])) data[currentKey] = [];
+        data[currentKey].push(value);
+      }
+    }
+  }
+
+  return { data, body };
+}
+
+function array(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  if (value === undefined || value === null || value === "") return [];
+  return [String(value)];
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean).map(String))];
+}
+
+function yamlList(values) {
+  const list = unique(values);
+  if (list.length === 0) return "[]";
+  return `\n${list.map((item) => `  - ${String(item).replace(/\n/g, " ")}`).join("\n")}`;
+}
+
+function extractTitle(body, fallback) {
+  const match = body.match(/^#\s+(.+)$/m);
+  return match ? match[1].trim().replace(/^(Intake|Brief|Assessment|Source Note):\s*/i, "") : fallback;
+}
+
+function compact(text, limit = 700) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  const clipped = normalized.slice(0, limit);
+  const boundary = clipped.lastIndexOf(" ");
+  return `${clipped.slice(0, boundary > 100 ? boundary : limit).trim()}...`;
+}
+
+function sectionMap(body) {
+  const lines = body.split(/\r?\n/);
+  const sections = new Map();
+  let heading = "intro";
+  let buffer = [];
+  function flush() {
+    const text = buffer.join("\n").trim();
+    if (text) sections.set(heading, text);
+    buffer = [];
+  }
+  for (const line of lines) {
+    const match = line.match(/^##\s+(.+)$/);
+    if (match) {
+      flush();
+      heading = match[1].trim();
+    } else {
+      buffer.push(line);
+    }
+  }
+  flush();
+  return sections;
+}
+
+function splitCandidates(body) {
+  const sections = sectionMap(body);
+  const candidates = [];
+  for (const [heading, text] of sections.entries()) {
+    const preferred = /summary|key|claim|technical|recommendation|risk|caveat|security|evidence|implication|details|source summary|takeaways|message text/i.test(heading);
+    const lines = text
+      .split(/\r?\n|(?<=[.!?])\s+/)
+      .map((line) => line.replace(/^[-*]\s*/, "").trim())
+      .filter(Boolean);
+    for (const line of lines) {
+      if (line.length < 35) continue;
+      candidates.push({ heading, text: line, preferred });
+    }
+  }
+  return candidates;
+}
+
+function scoreCandidate(item) {
+  const lower = item.text.toLowerCase();
+  if (NOISE_PATTERNS.some((pattern) => pattern.test(item.text))) return -10;
+  let score = item.preferred ? 2 : 0;
+  for (const term of TECH_TERMS) {
+    if (lower.includes(term.toLowerCase())) score += 1;
+  }
+  if (/[A-Z][A-Za-z0-9_-]{2,}|`[^`]+`|https?:\/\//.test(item.text)) score += 1;
+  if (/must|should|нужно|долж|важн|риск|ошиб|failure|guardrail|eval|test|security/i.test(item.text)) score += 2;
+  if (item.text.length > 900) score -= 1;
+  return score;
+}
+
+function topSignals(body, limit = 14) {
+  return splitCandidates(body)
+    .map((item) => ({ ...item, score: scoreCandidate(item) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((item) => compact(item.text, 420));
+}
+
+function extractTools(data, body) {
+  const explicit = array(data.tools);
+  const found = TECH_TERMS
+    .filter((term) => /^[a-z0-9-]+$/i.test(term))
+    .filter((term) => body.toLowerCase().includes(term.toLowerCase()));
+  return unique([...explicit, ...found]).slice(0, 20);
+}
+
+function candidateRules(signals) {
+  return signals
+    .filter((line) => /must|should|нужно|долж|prefer|require|avoid|необходимо|важно/i.test(line))
+    .slice(0, 8);
+}
+
+function verificationTasks(data, body) {
+  const tasks = [];
+  const sources = array(data.sources);
+  if (sources.some((source) => source.startsWith("http"))) tasks.push("Проверить первоисточники и даты публикации внешних ссылок.");
+  if (/mcp/i.test(body)) tasks.push("Сверить claims с official MCP specification and client docs.");
+  if (/openai|codex/i.test(body)) tasks.push("Сверить claims с official OpenAI docs/source materials.");
+  if (/security|безопас|oauth|auth|prompt injection/i.test(body)) tasks.push("Проверить security implications отдельно перед стандартом.");
+  return unique(tasks).slice(0, 8);
+}
+
+function outputPath(data, title) {
+  const base = `${today()}-${slug(data.id || title)}-signal`;
+  return path.join(SIGNAL_DIR, `${base}.md`);
+}
+
+function renderSignal({ data, body, inputRel, title, outPath }) {
+  const signals = topSignals(body);
+  const tools = extractTools(data, body);
+  const rules = candidateRules(signals);
+  const verifications = verificationTasks(data, body);
+  const topics = unique([...array(data.topics), "signal-extraction"]).slice(0, 20);
+  const sourceLinks = unique([inputRel, ...array(data.sources)]);
+  const quality = signals.length >= 8 ? "high" : signals.length >= 4 ? "medium" : "low";
+
+  return `---
+id: ${path.basename(outPath, ".md")}
+type: signal
+status: extracted
+created: ${today()}
+updated: ${today()}
+topics:${yamlList(topics)}
+tools:${yamlList(tools)}
+sources:${yamlList(sourceLinks)}
+related:
+  sources:
+    - ${inputRel}
+generated_from:
+  - ${inputRel}
+signal_quality: ${quality}
+extraction_mode: heuristic-draft
+refinement_status: needs-codex-refinement
+harness: 07_workflows/prompts/signal-extraction-harness.md
+---
+
+# Signal: ${title}
+
+Date: ${today()}
+Status: extracted
+Signal quality: ${quality}
+Extraction mode: heuristic-draft
+Refinement status: needs-codex-refinement
+
+## Core signal
+
+${signals.length ? signals.slice(0, 10).map((item) => `- ${item}`).join("\n") : "- Signal is weak; manual extraction required."}
+
+## Technical details
+
+${signals.slice(10, 16).length ? signals.slice(10, 16).map((item) => `- ${item}`).join("\n") : "- No additional technical details extracted automatically."}
+
+## Agent design implications
+
+- Проверить, можно ли превратить signal в правила для \`AGENTS.md\`, skills, MCP tools, reviewer agents, evals или workflows.
+- Использовать этот signal как сжатый вход для assessment/review, но возвращаться к sources для финальных решений.
+
+## Candidate rules
+
+${rules.length ? rules.map((item) => `- ${item}`).join("\n") : "- Candidate rules require manual review."}
+
+## Noise removed
+
+- Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
+- Full source text/transcript is not copied into this signal.
+
+## Verification required
+
+${verifications.length ? verifications.map((item) => `- ${item}`).join("\n") : "- Проверить исходный материал перед promotion to standard."}
+
+## Codex refinement required
+
+- Пройти harness \`07_workflows/prompts/signal-extraction-harness.md\` в этом Techscope thread.
+- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
+- Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
+- После ручного Codex-pass обновить \`status: refined\`, \`extraction_mode: codex-assisted\`, \`refinement_status: codex-refined\`.
+
+## Source links
+
+${sourceLinks.map((item) => `- ${item}`).join("\n")}
+`;
+}
+
+function main() {
+  const input = process.argv[2];
+  if (!input) throw new Error("Missing artifact path.");
+  const fullPath = path.resolve(ROOT, input);
+  if (!fullPath.startsWith(ROOT + path.sep)) throw new Error("Input path must be inside workspace.");
+  if (!existsSync(fullPath)) throw new Error(`Input not found: ${input}`);
+  const inputRel = relPath(fullPath);
+  const raw = readFileSync(fullPath, "utf8");
+  const { data, body } = parseFrontmatter(raw);
+  const title = extractTitle(body, data.id || path.basename(inputRel, ".md"));
+  mkdirSync(SIGNAL_DIR, { recursive: true });
+  const outPath = outputPath(data, title);
+  writeFileSync(outPath, renderSignal({ data, body, inputRel, title, outPath }));
+  console.log(`Signal: ${relPath(outPath)}`);
+  console.log("Codex refinement required: 07_workflows/prompts/signal-extraction-harness.md");
+}
+
+try {
+  main();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  usage();
+  process.exit(1);
+}

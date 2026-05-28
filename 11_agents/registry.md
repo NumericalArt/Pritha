@@ -1,0 +1,107 @@
+---
+id: agents-mother-registry
+type: agent-registry
+status: active
+created: 2026-05-18
+updated: 2026-05-28
+topics:
+  - agent-engineering
+  - agent-factory
+  - registry
+tools:
+  - Codex
+  - AGENTS.md
+  - Agents Mother
+agent_platforms:
+  - Codex
+model_context:
+  - unknown
+runtime_environment:
+  - local-project
+config_surfaces:
+  - AGENTS.md
+  - scripts
+portability: codex-native
+sources:
+  - 11_agents/contracts/
+  - 11_agents/research/
+  - 11_agents/reports/
+  - 07_workflows/agents-mother.md
+  - 07_workflows/agents-mother-roadmap.md
+related:
+  workflows:
+    - 07_workflows/agents-mother.md
+    - 07_workflows/agents-mother-roadmap.md
+  agent_contracts: []
+  scaffold_reports: []
+  agent_test_reports: []
+  agent_handoff_reports: []
+  agent_operations_reports: []
+  agent_deployment_reports: []
+  agent_post_creation_reviews: []
+supersedes: []
+superseded_by: []
+freshness_status: current
+source_published: unknown
+source_updated: 2026-05-28
+source_version: generated registry 2026-05-28
+retrieved: 2026-05-28
+verified: 2026-05-28
+valid_for: current TechScope Agents Mother lifecycle
+temporal_status: current
+---
+
+# Agents Mother Registry
+
+Date: 2026-05-28
+Status: active
+
+## Summary
+
+- Agents tracked: 3
+- Contracts: 3
+- Reports: 26
+- Research reports: 1
+
+## Agents
+
+| Agent | Mission | Runtime | Interface | Deployment | Proactivity | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| FESPA26 | voice-first Codex-native workbench for processing FESPA 2026 booth media, notes, links and files into a bilingual mobile | hybrid, with Codex-native sidecar. | web. / Telegram none. | local Mac. | manual. | contracts:1 scaffold:0 test:3 handoff:1 ops:3 deploy:0 evolve:1 |
+| Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:0 handoff:0 ops:1 deploy:2 evolve:2 |
+| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:8 handoff:0 ops:3 deploy:0 evolve:0 |
+
+## Recent Reports
+
+- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-0-baseline-report.md
+- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-pre-phase-0-reconciliation-report.md
+- 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report.md
+- 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-5.md
+- 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-4.md
+- 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-3.md
+- 2026-05-28 agent-test-report/complete: 11_agents/reports/2026-05-28-techscope-agent-test-report-2.md
+- 2026-05-26 agent-post-creation-review/accepted: 11_agents/reports/2026-05-26-funny-teacher-v1-agent-post-creation-review.md
+- 2026-05-26 agent-operations-report/complete: 11_agents/reports/2026-05-26-funny-teacher-learning-memory-operations-report.md
+- 2026-05-26 agent-deployment-report/complete: 11_agents/reports/2026-05-26-funny-teacher-launchd-deployment-report.md
+- 2026-05-26 agent-post-creation-review/accepted: 11_agents/reports/2026-05-26-funny-teacher-agent-user-interaction-review.md
+- 2026-05-25 scaffold-report/complete: 11_agents/reports/2026-05-25-funny-teacher-agent-scaffold-report.md
+- 2026-05-25 agent-deployment-report/complete: 11_agents/reports/2026-05-25-funny-teacher-agent-deployment-report.md
+- 2026-05-25 agent-test-report/complete: 11_agents/reports/2026-05-25-fespa26-agent-test-report.md
+- 2026-05-25 agent-post-creation-review/draft: 11_agents/reports/2026-05-25-fespa26-agent-post-creation-review.md
+- 2026-05-25 agent-operations-report/complete: 11_agents/reports/2026-05-25-fespa26-agent-operations-report.md
+- 2026-05-19 agent-test-report/partial: 11_agents/reports/2026-05-19-fespa26-agent-test-report.md
+- 2026-05-19 agent-test-report/complete: 11_agents/reports/2026-05-19-fespa26-agent-test-report-2.md
+- 2026-05-19 agent-scaffold-report/complete: 11_agents/reports/2026-05-19-fespa26-agent-scaffold-report.md
+- 2026-05-19 agent-operations-report/partial: 11_agents/reports/2026-05-19-fespa26-agent-operations-report.md
+- 2026-05-19 agent-operations-report/complete: 11_agents/reports/2026-05-19-fespa26-agent-operations-report-2.md
+- 2026-05-19 agent-handoff-report/complete: 11_agents/reports/2026-05-19-fespa26-agent-handoff-report.md
+- 2026-05-18 agent-test-report/failed: 11_agents/reports/2026-05-18-techscope-agent-test-report.md
+- 2026-05-18 agent-test-report/complete: 11_agents/reports/2026-05-18-techscope-agent-test-report-3.md
+- 2026-05-18 agent-test-report/failed: 11_agents/reports/2026-05-18-techscope-agent-test-report-2.md
+- 2026-05-18 agent-operations-report/partial: 11_agents/reports/2026-05-18-techscope-agent-operations-report.md
+
+## Evolution Rules
+
+- Registry is generated from contracts and reports; do not use it as the sole source for standards.
+- Promote a pattern to `04_standards/` only after a post-creation review shows repeated successful evidence.
+- Failed or superseded patterns remain visible in reports and reviews.
