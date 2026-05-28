@@ -38,23 +38,32 @@ const AUTOSTART_MODES = new Set(["disabled", "optional", "launchd-on-approval", 
 const PROACTIVE_MODES = new Set(["none", "manual", "scheduled", "heartbeat", "event-driven", "queue-watcher", "hybrid"]);
 const RUNTIME_PLACEMENT_PROFILES = new Set(["deterministic-first", "frontier-first", "local-first", "hybrid", "unknown"]);
 const STATUS_VALUES = new Set(["draft", "accepted", "superseded"]);
+const INVOKED_SCRIPT = path.basename(process.argv[1] || "pritha.mjs");
+const CLI_COMMAND = INVOKED_SCRIPT.includes("pritha") ? "node scripts/pritha.mjs" : "node scripts/agents-mother.mjs";
+const CLI_PRODUCT = INVOKED_SCRIPT.includes("pritha") ? "Pritha" : "Pritha (Agents Mother compatibility alias)";
 
 function usage() {
   console.log(`Usage:
-  node scripts/agents-mother.mjs help
-  node scripts/agents-mother.mjs questions
-  node scripts/agents-mother.mjs interview [--name <name>] [--mission <text>] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
-  node scripts/agents-mother.mjs init --name <name> --mission <text> [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
-  node scripts/agents-mother.mjs research <contract-path> [--limit 12]
-  node scripts/agents-mother.mjs scaffold <contract-path> [--output <folder>]
-  node scripts/agents-mother.mjs test <project-path>
-  node scripts/agents-mother.mjs handoff <project-path>
-  node scripts/agents-mother.mjs operations <project-path>
-  node scripts/agents-mother.mjs deploy <project-path> [plan|status|install|uninstall] [--yes]
-  node scripts/agents-mother.mjs evolve <project-path> [--notes <text>]
-  node scripts/agents-mother.mjs registry
-  node scripts/agents-mother.mjs validate <contract-path>
-  node scripts/agents-mother.mjs list
+  ${CLI_COMMAND} help
+  ${CLI_COMMAND} questions
+  ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
+  ${CLI_COMMAND} init --name <name> --mission <text> [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
+  ${CLI_COMMAND} research <contract-path> [--limit 12]
+  ${CLI_COMMAND} scaffold <contract-path> [--output <folder>]
+  ${CLI_COMMAND} test <project-path>
+  ${CLI_COMMAND} handoff <project-path>
+  ${CLI_COMMAND} operations <project-path>
+  ${CLI_COMMAND} deploy <project-path> [plan|status|install|uninstall] [--yes]
+  ${CLI_COMMAND} evolve <project-path> [--notes <text>]
+  ${CLI_COMMAND} registry
+  ${CLI_COMMAND} validate <contract-path>
+  ${CLI_COMMAND} list
+
+Pritha aliases:
+  ${CLI_COMMAND} create --name <name> --mission <text>       # alias for init
+  ${CLI_COMMAND} create <contract-path> --output <folder>    # alias for scaffold
+  ${CLI_COMMAND} publish <project-path>                      # trial: test --no-report
+  ${CLI_COMMAND} lineage                                     # alias for registry
 
 Layer 2 status:
   interview asks questions; init creates a non-interactive draft agent-contract in 11_agents/contracts/
@@ -77,7 +86,7 @@ Layer 9 status:
   deploy automates plan/status/install/uninstall with explicit confirmation for mutations
 
 Layer 10 status:
-  evolve captures lessons learned; registry rebuilds the Agents Mother lifecycle index`);
+  evolve captures lessons learned; registry rebuilds the ${CLI_PRODUCT} lineage registry`);
 }
 
 function parseArgs(argv) {
@@ -1114,6 +1123,15 @@ async function main() {
     await interview({ ...options, "no-input": true });
     return;
   }
+  if (command === "create") {
+    const target = options._[0];
+    if (target && target.endsWith(".md")) {
+      scaffoldContract(target, options);
+    } else {
+      await interview({ ...options, "no-input": true });
+    }
+    return;
+  }
   if (command === "research") {
     const target = options._[0];
     if (!target) throw new Error("Missing contract path.");
@@ -1150,13 +1168,19 @@ async function main() {
     deployProject(target, options);
     return;
   }
+  if (command === "publish") {
+    const target = options._[0];
+    if (!target) throw new Error("Missing project path.");
+    testProject(target, { ...options, "no-report": true });
+    return;
+  }
   if (command === "evolve") {
     const target = options._[0];
     if (!target) throw new Error("Missing project path.");
     evolveProject(target, options);
     return;
   }
-  if (command === "registry") {
+  if (command === "registry" || command === "lineage") {
     rebuildRegistry();
     return;
   }

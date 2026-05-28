@@ -9,6 +9,19 @@
 3. Попросите Codex разобрать материал.
 4. По итогам разбора Codex создаст brief, review, decision record или обновит стандарт.
 
+## Pritha: создание агентов
+
+Pritha — публичное имя слоя Agents Mother: spec-to-agent compiler, который создает новых специализированных агентов из описания задачи.
+
+```sh
+node scripts/pritha.mjs questions
+node scripts/pritha.mjs create --name "agent-name" --mission "mission"
+node scripts/pritha.mjs test ../agent-folder
+node scripts/pritha.mjs lineage
+```
+
+Старый путь `node scripts/agents-mother.mjs ...` сохранен как compatibility alias на один релиз.
+
 ## Структура
 
 - `00_inbox/`: новые тексты и ссылки до разбора.

@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-05-27
+updated: 2026-05-28
 template_for: agent-contract
 topics: []
 tools: []
@@ -45,6 +45,16 @@ Status: draft | accepted | superseded
 - Target user:
 - Success criteria:
 - Out of scope:
+
+## Pritha lineage metadata (optional)
+
+- Seed name:
+- Parent agent: Pritha
+- Lineage:
+- Traits:
+- Inheritance:
+- Mutation:
+- Trial criteria:
 
 ## Functional scope
 

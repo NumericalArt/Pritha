@@ -3,14 +3,15 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-05-27
-last_reviewed: 2026-05-27
+updated: 2026-05-28
+last_reviewed: 2026-05-28
 owner: Techscope/user
 topics:
   - agent-engineering
   - agent-factory
   - harness-engineering
   - agent-architecture
+  - pritha
 tools:
   - Codex
   - AGENTS.md
@@ -22,6 +23,7 @@ tools:
   - launchd
   - NemoClaw
   - OpenShell
+  - Pritha
 agent_platforms:
   - Codex
   - OpenAI Agents SDK
@@ -80,10 +82,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-05-27
-source_version: Techscope draft standard v2
+source_updated: 2026-05-28
+source_version: Techscope draft standard v3 + Pritha alias vocabulary
 retrieved: 2026-05-18
-verified: 2026-05-27
+verified: 2026-05-28
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -92,13 +94,29 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-28
 
 ## Rule
 
 Every new agent created by TechScope must start from an explicit `agent-contract` and must be delivered as a working, testable scaffold with a documented harness.
 
 TechScope may use its own architecture as a reference, but it must not clone itself blindly. The new agent's runtime, interface, memory, tools and security model must follow the contract.
+
+## Pritha naming and lineage vocabulary
+
+Pritha is the public name for the Agents Mother layer: the spec-to-agent compiler that creates and evolves child agents. The technical `agent-contract`, report types, `11_agents/` paths and validation schemas remain unchanged in v0.1.
+
+Use Pritha vocabulary as a narrative layer:
+
+- seed: the user-facing name for an agent specification;
+- descendant: a created child agent;
+- lineage: where the agent came from and which scaffold/reports shaped it;
+- traits: capabilities and stable behavior patterns;
+- inheritance: base safety, tool, memory and style policies inherited from Techscope/Pritha;
+- mutation: task-specific adaptation;
+- trial: evaluation before handoff or release.
+
+The compatibility rule is alias-first: new Pritha names may wrap existing Agents Mother commands, but old command paths must keep working until a separate migration decision removes them.
 
 ## Use when
 

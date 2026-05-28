@@ -182,3 +182,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `isolated-root-command-module-test`, `lifecycle-command-modules`, `legacy-entrypoint-thin-tail`
 - Open questions: extract interview/init/research in a future Phase 9e, or keep the current lifecycle-command module boundary until a real feature request needs it?
 - Notes: Extracted handoff, operations/deploy and registry/evolve/list command modules. Added isolated `TECHSCOPE_ROOT` tests so report-writing commands run without polluting real Techscope reports. Full isolated command matrix passed for questions, validate, list, registry, interview, init, research, scaffold, test, handoff, operations, deploy plan and evolve. Fixed a legacy `validate` regression by importing `printIssues` from `contract.mjs`. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 10 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from Phase 9d final gate
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-10-pritha-rebrand-report.md`
+- AM-CANDIDATE patterns: `cli-rename-with-alias`, `brand-layer-separation`, `lineage-vocabulary`
+- Open questions: should Phase 11 create a separate English OSS README first, or translate the current Russian README in place?
+- Notes: Added Pritha alias-first CLI (`scripts/pritha.mjs`), kept `scripts/agents-mother.mjs` as compatibility shim with deprecation note, added `create/publish/lineage` aliases, documented vocabulary in standard/workflow/template, and wrote a secure handoff note outside the repo. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.

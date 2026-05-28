@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-05-26
+updated: 2026-05-28
 topics:
   - agent-engineering
   - agent-factory
@@ -17,6 +17,7 @@ tools:
   - OpenAI Agents SDK
   - OpenAI Realtime API
   - gpt-realtime-2
+  - Pritha
 sources:
   - 03_reviews/2026-05-18-techscope-agents-mother-scenario-review.md
   - 04_standards/agent-creation-harness.md
@@ -50,13 +51,15 @@ supersedes: []
 superseded_by: []
 ---
 
-# Workflow: agents-mother
+# Workflow: agents-mother / Pritha
 
 Status: experimental
 
 ## Goal
 
 Use TechScope as an agent factory: design, validate, scaffold, test and hand off new working agents from a user request or jointly developed specification.
+
+Pritha is the public alias and product name for this layer. Existing `agents-mother` paths and artifact types remain valid for compatibility; new user-facing CLI/docs should prefer Pritha vocabulary.
 
 The default v1 target is a production-testable sibling project. The first
 implementation path is `codex-native + optional interface adapters`.
@@ -125,6 +128,15 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
 ## Current commands
 
 ```sh
+node scripts/pritha.mjs questions
+node scripts/pritha.mjs init --name "agent-name" --mission "mission"
+node scripts/pritha.mjs create --name "agent-name" --mission "mission"
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name
+node scripts/pritha.mjs test ../existing-or-generated-agent
+node scripts/pritha.mjs publish ../existing-or-generated-agent
+node scripts/pritha.mjs lineage
+
+# Compatibility aliases retained for v0.1:
 node scripts/agents-mother.mjs questions
 node scripts/agents-mother.mjs interview
 node scripts/agents-mother.mjs init --name "agent-name" --mission "mission"
@@ -139,6 +151,18 @@ node scripts/agents-mother.mjs registry
 node scripts/agents-mother.mjs validate 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/agents-mother.mjs list
 ```
+
+## Pritha lineage vocabulary
+
+- Seed: the user-facing specification for a new agent; technically this remains an `agent-contract`.
+- Descendant: a generated child agent project.
+- Lineage: the contract, scaffold report, test reports, handoff, operations and post-creation review chain.
+- Traits: reusable capabilities and harness patterns proven by lifecycle evidence.
+- Inheritance: base safety, memory, tool and operating rules carried into a descendant.
+- Mutation: adaptation of inherited rules to the user's specific task and runtime.
+- Trial: testing/evaluation before handoff or release.
+
+Do not rename frontmatter `type` values, directories or memory schema as part of Pritha v0.1. The rebrand is a compatibility alias and narrative layer first.
 
 ## Default scaffold profile
 

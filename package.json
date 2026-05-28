@@ -2,6 +2,9 @@
   "name": "techscope",
   "private": true,
   "type": "module",
+  "bin": {
+    "pritha": "scripts/pritha.mjs"
+  },
   "engines": {
     "node": ">=20"
   },
