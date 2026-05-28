@@ -70,6 +70,8 @@ Product identity, positioning, landing-page copy, short descriptions, slogans, r
 - Marketing claims must not outrun implementation. If GitHub release, live CI, hosted demos, connectors, MCP support or skills support are not actually available, public copy must say so.
 - The product story should reflect Pritha's real architecture: contract-selected modules, minimal sufficient harness, explicit setup/status checks, and no silent autostart or secret copying.
 - "Adopted pattern" means "available for Pritha to select by contract", not "installed into every generated agent".
+- Pritha-created agents remain evolvable after scaffold. The normal Codex-native continuation path is to open the descendant in Codex App and improve it through its own instructions, manifests, tests and memory.
+- Internet resources that do not directly belong to a descendant's domain are still useful as self-improvement inputs. They should be evaluated for possible improvements to harness, memory, tools, skills, MCP, evals, UX, safety or operations, not silently mixed into domain memory.
 
 ## Existing Knowledge And Freshness
 

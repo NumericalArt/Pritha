@@ -32,3 +32,9 @@ positioning, slogans and release copy should be backed by curated artifacts such
 as `02_briefs/2026-05-28-pritha-product-identity-self-knowledge-brief.md`.
 Those claims evolve through the same intake, review, decision and supersession
 rules as technical knowledge.
+
+Descendant agents use the same idea locally. If a descendant receives material
+that is not directly about its task domain, the material can still be useful as
+self-improvement evidence. It should be routed into the agent's own
+harness/memory/tooling review path instead of being merged into domain memory
+without context.
