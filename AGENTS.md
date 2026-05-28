@@ -96,6 +96,12 @@ node scripts/self-test.mjs
 
 `self-test` и `queue-health` являются ручными проверками по умолчанию. Не включать cron, heartbeat, launchd, background service или scheduled pulse без явного подтверждения пользователя и отдельного deployment/operations report. `queue-health` только сообщает stale/failed jobs и не меняет очередь автоматически.
 
+## GitHub publication and push
+
+Для первой публикации Pritha на GitHub и последующих push использовать `docs/github-publish-and-push.md` как source of truth. Перед обычным push в `main` минимум выполнить `node scripts/validate-memory.mjs`, `npm test --silent`, `node scripts/quality-gate.mjs` и `node scripts/pre-push-audit.mjs`. Перед release-действиями дополнительно выполнить `node scripts/golden-checks.mjs --with-embeddings` и `node scripts/github-release-status.mjs --online --strict`.
+
+Не пушить секреты, `.env.local`, `.memory/*.sqlite`, `.queue/`, `.logs/`, `.tools/`, `01_sources/raw/` или `secure-handoffs/`. Первый GitHub repo для Pritha создавать приватным, затем после CI, release tag, GitHub Release и fresh clone check переводить в public вручную.
+
 ## Экспертные роли
 
 Для сложных материалов агент должен мысленно или через доступных субагентов рассмотреть тему с разных углов. Базовые роли описаны в `06_subagents/`:

@@ -64,6 +64,9 @@ non-zero until every required external proof is present.
 
 ## GitHub Repository Setup
 
+For the durable checklist used by Pritha/Codex after v0.1, see
+`docs/github-publish-and-push.md`.
+
 1. Create the repo as private.
 2. Add the remote:
    ```sh

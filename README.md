@@ -62,6 +62,7 @@ node scripts/pritha.mjs test ../research-agent
 - [Using Pritha](docs/pritha.md)
 - [Memory](docs/memory.md)
 - [Operations](docs/operations.md)
+- [GitHub Publish And Push](docs/github-publish-and-push.md)
 - [Contributing Workflow](docs/contributing-workflow.md)
 - [Realtime](docs/realtime.md)
 - [Troubleshooting](docs/troubleshooting.md)

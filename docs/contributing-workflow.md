@@ -20,3 +20,22 @@
 ## PR Rule
 
 One phase or coherent change per pull request. Run quality checks and link the phase report.
+
+## Push Rule
+
+Use `docs/github-publish-and-push.md` as the source of truth for first GitHub
+publication and later pushes. At minimum, before pushing to `main` run:
+
+```sh
+node scripts/validate-memory.mjs
+npm test --silent
+node scripts/quality-gate.mjs
+node scripts/pre-push-audit.mjs
+```
+
+For release work, also run:
+
+```sh
+node scripts/golden-checks.mjs --with-embeddings
+node scripts/github-release-status.mjs --online --strict
+```

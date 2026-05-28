@@ -60,7 +60,7 @@ Status: active
 
 - Agents tracked: 4
 - Contracts: 4
-- Reports: 48
+- Reports: 49
 - Research reports: 1
 
 ## Agents
@@ -70,7 +70,7 @@ Status: active
 | FESPA26 | voice-first Codex-native workbench for processing FESPA 2026 booth media, notes, links and files into a bilingual mobile | hybrid, with Codex-native sidecar. | web. / Telegram none. | local Mac. | manual. | contracts:1 scaffold:0 test:3 handoff:1 ops:3 deploy:0 evolve:1 |
 | Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:0 handoff:0 ops:1 deploy:2 evolve:2 |
 | Pritha Claude Code Adapter | define a future adapter that can translate selected Pritha/Codex-native descendant scaffolds into Claude Code-compatible | environment-specific | CLI / Telegram none | none | none | contracts:1 scaffold:0 test:0 handoff:0 ops:0 deploy:0 evolve:0 |
-| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:23 deploy:0 evolve:1 |
+| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:24 deploy:0 evolve:1 |
 
 ## Recent Reports
 
@@ -103,7 +103,7 @@ Status: active
 - 2026-05-28 agent-post-creation-review/draft: 11_agents/reports/2026-05-28-techscope-agent-post-creation-review.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-pritha-realtime-tool-defaults-setup-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-pritha-module-readiness-and-tooling-clarification-report.md
-- 2026-05-26 agent-post-creation-review/accepted: 11_agents/reports/2026-05-26-funny-teacher-v1-agent-post-creation-review.md
+- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-pritha-github-publish-and-push-handoff-report.md
 
 ## Evolution Rules
 
