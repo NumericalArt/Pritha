@@ -204,3 +204,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `oss-doc-pack`, `english-first-readme`, `getting-started-10-min`
 - Open questions: should Phase 12 wizard create the first Seed directly, or stop after generating and validating `.env` plus prerequisites?
 - Notes: Rewrote README as English Pritha landing page, preserved Russian README as `README.ru.md`, added MIT license, contributing/security/changelog/code-of-conduct, GitHub templates, English docs pack, and removed the real Telegram user id from `.env.example`. Fresh clone simulation initially exposed missing memory bootstrap in `quality-gate`; fixed by adding `rebuild-memory` before unit/self-inspection. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 12 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from Phase 11 final gate
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-12-first-run-setup-report.md`
+- AM-CANDIDATE patterns: `first-run-setup-workflow`, `trigger-phrase-routing`, `completed-with-warnings-status`, `secrets-collector-pattern`, `minimal-default-config`
+- Open questions: should Phase 14 promote the setup wizard into every Pritha descendant scaffold by default?
+- Notes: Added first-run setup workflow, CLI fallback, status reader, schema, reusable dialog template, setup tests, trigger phrase rules, Realtime opt-in decision and Claude Code adapter placeholder contract. Minimal temp setup with real quality-gate completed successfully. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.

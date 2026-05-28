@@ -64,6 +64,28 @@
 - Если данных недостаточно, оформлять вопрос как open question, а не как вывод.
 - Сохранять результат так, чтобы через несколько месяцев было понятно, почему решение было принято.
 
+## Trigger phrases и first-run setup
+
+Если пользователь открывает свежий checkout и пишет `запусти проект`, `setup`, `first run`, `bootstrap` или `start`, действовать по workflow `07_workflows/first-run-setup.md`. CLI fallback:
+
+```sh
+node scripts/setup.mjs
+```
+
+Если пользователь пишет `проверь проект`, `self test` или `health`, запускать или предлагать:
+
+```sh
+node scripts/self-test.mjs
+```
+
+Если пользователь пишет `создай агента`, `new agent` или `interview`, переходить к Pritha interview:
+
+```sh
+node scripts/pritha.mjs interview
+```
+
+Если последний `.techscope-setup.json` имеет `status: completed-with-warnings`, при следующем заходе в Codex thread проактивно предложить `node scripts/self-test.mjs` и коротко перечислить warnings. Не включать Telegram, Realtime, Tailscale, launchd, cron, heartbeat или другие долгоживущие процессы без явного подтверждения пользователя.
+
 ## Операционная самопроверка
 
 При запросе пользователя о состоянии проекта, при работе над `scripts/`, `launchd/`, `.githooks/`, `operations/`, memory/indexing infrastructure или если `.memory/last-self-test.json` старше 7 дней, предлагать или запускать:
