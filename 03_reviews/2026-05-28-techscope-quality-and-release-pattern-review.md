@@ -58,11 +58,13 @@ Status: accepted
 
 ## Question
 
-Which AM-CANDIDATE patterns from the Techscope quality and release roadmap should become Pritha default scaffold behavior, which should remain documentation, and which need more evidence before promotion?
+Which AM-CANDIDATE patterns from the Techscope quality and release roadmap should become selectable Pritha scaffold modules, which should remain documentation, and which need more evidence before promotion?
 
 ## Recommendation Summary
 
-Promote only patterns that reduce real repeated failure modes in child agents without adding hidden background behavior, secret leakage risk or heavy dependencies. The strongest default scaffold candidates are:
+Promote only patterns that reduce real repeated failure modes in child agents without adding hidden background behavior, secret leakage risk or heavy dependencies. Promotion means "available for contract-driven composition", not "copied into every future agent". Each descendant should receive only the harness, memory, data, skills, MCP, tool, interface, eval and operations modules selected by its contract.
+
+The strongest selectable scaffold candidates are:
 
 - quality and health: `smoke-test-template`, `status-mjs-family`, `env-doctor-mjs`, `quality-gate-mjs`, `self-test-mjs`, `queue-health-mjs`;
 - project portability: `PROJECT_ROOT-env`, `path-portability-check`, `minimal-package-json`, `scripts-lib-package`;
@@ -144,11 +146,11 @@ Do not automatically promote any pattern that installs hooks, starts services, c
 | 13 | `secure-handoff-folder` | Kept private handoff outside repo | adopt-in-scaffold | Strong safety pattern. |
 | 13 | `local-path-scrub` | Removed machine/user leakage from public snapshot | adopt-in-scaffold | Required before release/publish. |
 
-## First-Run Setup As Default Scaffold Module?
+## First-Run Setup As Selectable Scaffold Module?
 
-Recommendation: adopt conditionally, not universally.
+Recommendation: adopt as a selectable module and enable conditionally, not universally.
 
-Every Pritha descendant scaffold should declare whether it has a first-run setup surface. Agents with any of the following should receive a real setup module by default: secrets, external APIs, Telegram/email/browser connectors, Realtime voice, local model dependencies, launchd/service deployment, or non-obvious memory/index requirements.
+Every Pritha descendant scaffold should declare whether it has a first-run setup surface. Agents with any of the following should receive a real setup module by contract default: secrets, external APIs, Telegram/email/browser connectors, Realtime voice, local model dependencies, launchd/service deployment, or non-obvious memory/index requirements.
 
 Tiny agents with no secrets and no external dependencies can receive only `setup/manifest.schema.json`, `.env.example`, and `scripts/setup-status.mjs`, without an interactive setup wizard.
 
@@ -195,7 +197,7 @@ This review is based on internal roadmap evidence, not external technology claim
 
 No standards or scaffold templates are changed by this review alone. Next actions:
 
-1. Create explicit decisions for each promoted scaffold group before changing Pritha defaults.
-2. Implement default scaffold modules in small slices: health/status first, setup second, release hygiene third.
+1. Create explicit decisions for each promoted scaffold group before changing Pritha's selectable module catalog.
+2. Implement scaffold modules in small slices: health/status first, setup second, release hygiene third.
 3. Keep background proactivity and deployment automation behind explicit `agent-contract` fields.
 4. Re-run `pritha evolve .` after this review to capture the roadmap as a lifecycle lesson.

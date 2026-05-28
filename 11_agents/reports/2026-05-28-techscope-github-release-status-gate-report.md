@@ -61,10 +61,24 @@ Added a non-mutating release status gate for the remaining external part of the 
 
 - `origin` remote is configured as `git@github.com:NumArt/pritha.git`.
 - Local tag `v0.1.0` is present.
-- GitHub CLI is not installed.
+- GitHub CLI is installed in `~/.local/bin`, but `gh auth status` reports no authenticated GitHub host yet.
 - GitHub connector can inspect existing repositories, but no `NumArt/pritha` repository was found.
 - The secure-handoff SSH key is present locally but is not authorized on GitHub yet: `Permission denied (publickey)`.
 - Live CI, branch protection, GitHub Release and public fresh-clone proof remain pending external evidence.
+
+## Installed Release Tools
+
+- `gh 2.93.0`
+- `gitleaks 8.30.1`
+- `trufflehog 3.95.3`
+- `ripgrep 15.1.0`
+- `ffmpeg 7.1` through the existing `imageio-ffmpeg` package
+- `codex-cli 0.135.0`
+
+Additional secret-scan checks:
+
+- `gitleaks git --redact --no-banner .` scanned 21 commits and found no leaks.
+- `trufflehog git file://<TECHSCOPE_ROOT> --only-verified --no-update --json` returned 0 verified findings.
 
 ## Why This Helps
 

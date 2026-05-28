@@ -17,6 +17,9 @@ test("setup-status reports a missing setup state without failing", () => {
     assert.equal(payload.schema, "techscope-setup-state-v1");
     assert.equal(payload.status, "not-configured");
     assert.equal(payload.statePath, missingState);
+    assert.equal(payload.modules.harness.status, "configured");
+    assert.equal(payload.modules.memory.status, "configured");
+    assert.equal(payload.modules.data.status, "configured");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -27,4 +30,5 @@ test("setup manifest schema describes the v1 state contract", () => {
   assert.equal(schema.properties.schema.const, "techscope-setup-state-v1");
   assert.ok(schema.required.includes("sections"));
   assert.ok(schema.properties.status.enum.includes("completed-with-warnings"));
+  assert.ok(schema.properties.modules.properties.harness);
 });

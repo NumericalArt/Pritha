@@ -29,3 +29,20 @@ node scripts/agents-mother.mjs <command>
 - `publish <project-path>`: run a no-report trial check.
 - `lineage`: rebuild the registry.
 - `handoff`, `operations`, `deploy`, `evolve`: lifecycle commands for generated agents.
+
+## Contract-Selected Modules
+
+Pritha does not copy every useful Techscope pattern into every descendant. It
+builds each agent from the modules selected by the Seed/contract: harness,
+memory, data, skills, MCP, tools, evals, interfaces and operations. Optional
+modules remain absent unless the contract needs them.
+
+Setup and status commands must state module readiness. For Techscope itself:
+
+```sh
+node scripts/setup-status.mjs --json
+```
+
+reports `harness`, `memory`, `data`, `skills` and `mcp` readiness. Future
+descendants should expose the same style of module-readiness result for their
+selected modules.

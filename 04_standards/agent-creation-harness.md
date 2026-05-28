@@ -102,6 +102,8 @@ Every new agent created by TechScope must start from an explicit `agent-contract
 
 TechScope may use its own architecture as a reference, but it must not clone itself blindly. The new agent's runtime, interface, memory, tools and security model must follow the contract.
 
+Pritha descendants are assembled from contract-selected modules, not from one universal bundle. Every future agent should receive the harness, memory, data, skills, MCP servers, interface adapters, tools, evals and operations modules that its contract actually needs, and no more. A pattern marked `adopt-in-scaffold` means "available for Pritha to select and compose", not "automatically copied into every descendant".
+
 ## Pritha naming and lineage vocabulary
 
 Pritha is the public name for the Agents Mother layer: the spec-to-agent compiler that creates and evolves child agents. The technical `agent-contract`, report types, `11_agents/` paths and validation schemas remain unchanged in v0.1.
@@ -162,11 +164,13 @@ The compatibility rule is alias-first: new Pritha names may wrap existing Agents
 - Generate a `scaffold-report` after files are created and tests are run.
 - After the first meaningful working version, create a post-creation review and preserve the user interaction path that shaped the agent.
 - Index contracts and scaffold reports into TechScope memory.
+- At the end of setup/init, verify and state module readiness for the selected agent: harness, memory, data layer, skills, MCP, tools, interfaces, operations and any selected external connectors. Missing optional modules are reported as skipped; missing selected modules are reported as failed or pending-auth.
 
 ## Harness inventory
 
 Each created agent must document:
 
+- selected modules: which parts of harness, memory, data, skills, MCP, tools, evals, interfaces and operations are included and why;
 - information boundaries: what the model sees, what remains hidden, how context is compressed;
 - runtime boundary: where the agent runs, what the host controls, where secrets
   live, and what network/filesystem policy applies;

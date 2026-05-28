@@ -66,6 +66,7 @@ Commands run sequentially to avoid SQLite writer contention:
 | `node scripts/agents-mother.mjs test . --no-report` | pass | classification `agent-project`, result `complete`; legacy wrapper still works with deprecation note. |
 | `node scripts/self-test.mjs --json` | pass | self-test status `pass`. |
 | `node scripts/github-release-status.mjs --json` | pending-external | local release docs/workflows are present; origin remote, tag, live CI/release and fresh public clone proof remain missing. |
+| `node scripts/setup-status.mjs --json` | pass | module readiness reports harness, memory and data configured; skills and MCP configured externally. |
 
 ## Success Criteria Audit
 
@@ -91,7 +92,7 @@ Commands run sequentially to avoid SQLite writer contention:
 To mark the full roadmap complete, the following external evidence is still required:
 
 1. Create or connect GitHub remote `NumArt/pritha`.
-2. Add the secure-handoff public key to GitHub account SSH keys or repository deploy keys with write access, or configure another authenticated push path.
+2. Add the secure-handoff public key to GitHub account SSH keys or repository deploy keys with write access, run `gh auth login`, or configure another authenticated push path.
 3. Push branch `main` to GitHub after final pre-push scan.
 4. Inspect live GitHub Actions runs for `quality-gate`, `memory-validate` and `setup-wizard-smoke`.
 5. Configure branch protection and required status checks.

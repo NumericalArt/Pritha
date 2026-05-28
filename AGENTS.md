@@ -183,7 +183,9 @@ Techscope может создавать и развивать новых аге�
 
 Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Techscope.
 
-Интерфейсы, память, инструменты и operations новых агентов должны быть модульными. Каждый scaffold получает manifest-файлы для соответствующих слоев; тяжелые слои памяти вроде SQLite, embeddings, graph DB или external vector store добавляются только если это следует из `agent-contract`.
+Интерфейсы, память, данные, skills, MCP, инструменты и operations новых агентов должны быть модульными. Pritha собирает каждого будущего агента из минимально достаточного набора модулей, выбранных контрактом: нужные части harness, memory, data layer, skills, MCP servers, tools, evals, interface adapters и operations добавляются, ненужные не копируются. Каждый scaffold получает manifest-файлы для соответствующих выбранных слоев; тяжелые слои памяти вроде SQLite, embeddings, graph DB или external vector store добавляются только если это следует из `agent-contract`.
+
+В конце setup/init нового агента Pritha должна проверить и явно констатировать readiness выбранных модулей: harness, memory, data, skills, MCP, tools, interfaces, operations и внешние коннекторы. Не выбранные модули помечаются как `skipped`; выбранные, но неработающие - как `failed` или `pending-auth`.
 
 Операционный слой новых агентов должен быть явным и настраиваемым. Автозапуск может быть выбран в контракте как `optional`, `launchd-on-approval` или `external`, но Techscope не устанавливает и не включает его автоматически. Любой `launchd`, `launchctl`, cloud deployment или долгоживущий процесс требует отдельного явного подтверждения пользователя.
 

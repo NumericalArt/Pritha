@@ -7,6 +7,7 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { moduleReadiness } from "./lib/module-readiness.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const DEFAULT_STATE_PATH = path.join(ROOT, ".techscope-setup.json");
@@ -236,7 +237,11 @@ function buildEnv(config) {
 
 function statePayload(config, envWrite, quality, statusOverride = null) {
   const sections = connectorStatuses(config);
+  const modules = moduleReadiness(ROOT);
   sections.environment = { status: "configured", detail: "env-doctor executed before quality gate" };
+  for (const [name, readiness] of Object.entries(modules)) {
+    sections[`module.${name}`] = readiness;
+  }
   sections.secrets = {
     status: envWrite.changed ? "configured" : "configured-externally",
     detail: envWrite.backup ? `backup created: ${safeRelative(envWrite.backup)}` : "no backup needed",
@@ -249,6 +254,7 @@ function statePayload(config, envWrite, quality, statusOverride = null) {
     updated: new Date().toISOString(),
     root: ROOT,
     interfaces: config.interfaces,
+    modules,
     sections,
     warnings: quality.ok ? [] : [
       "Quality gate returned red. Run `node scripts/self-test.mjs` after fixing the listed checks.",

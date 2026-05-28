@@ -130,6 +130,15 @@ checks.push(check(
 
 const ghPath = commandExists("gh");
 checks.push(check("github-cli", ghPath ? "pass" : "missing", ghPath || "GitHub CLI is not installed", false));
+if (ghPath) {
+  const ghAuth = run("gh", ["auth", "status"], { timeout: 15000 });
+  checks.push(check(
+    "github-cli-auth",
+    ghAuth.ok ? "pass" : "warn",
+    ghAuth.ok ? "GitHub CLI is authenticated" : (ghAuth.stderr || ghAuth.stdout || "GitHub CLI is not authenticated"),
+    false,
+  ));
+}
 
 const localTag = run("git", ["rev-parse", "-q", "--verify", "refs/tags/v0.1.0"]);
 checks.push(check("local-v0.1.0-tag", localTag.ok ? "pass" : "missing", localTag.ok ? localTag.stdout : "local tag v0.1.0 not found"));

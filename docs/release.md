@@ -42,6 +42,11 @@ trufflehog filesystem .
 If these tools are not installed, do not add them as project dependencies just
 for CI. Run them locally or through a separate security workstation.
 
+On this Mac mini, release helper tools were installed into `~/.local/bin`:
+`gh`, `gitleaks`, `trufflehog`, `rg` and an `ffmpeg` wrapper backed by
+`imageio-ffmpeg`. `gh auth login` is still required before using GitHub CLI
+operations unless SSH/deploy-key authentication is configured separately.
+
 ## Release Status Gate
 
 Use the release status script before and after configuring the GitHub remote:
@@ -64,19 +69,25 @@ non-zero until every required external proof is present.
    ```sh
    git remote add origin git@github.com:<owner>/pritha.git
    ```
-3. Push `main`.
-4. Confirm GitHub Actions are green.
-5. Configure branch protection or ruleset for `main`:
+3. Authenticate:
+   ```sh
+   gh auth login
+   ssh -T git@github.com
+   ```
+   Either route is acceptable as long as it can push to the repository.
+4. Push `main`.
+5. Confirm GitHub Actions are green.
+6. Configure branch protection or ruleset for `main`:
    - require pull request before merge;
    - require at least one approval;
    - require status checks from `Quality Gate`;
    - require branches to be up to date before merge;
    - block force pushes and deletions.
-6. Keep path-filtered workflows such as `Memory Validate` and
+7. Keep path-filtered workflows such as `Memory Validate` and
    `Setup Wizard Smoke` as useful checks, but do not make them the only required
    status check unless GitHub rules are configured to avoid pending skipped
    checks.
-7. Flip public only after a clean clone from GitHub passes the getting-started
+8. Flip public only after a clean clone from GitHub passes the getting-started
    flow.
 
 ## CI

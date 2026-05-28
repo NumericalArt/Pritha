@@ -33,6 +33,8 @@ test("setup CLI writes private env and idempotent state", () => {
     assert.equal(firstPayload.schema, "techscope-setup-state-v1");
     assert.equal(firstPayload.status, "completed");
     assert.equal(firstPayload.sections.codex.status, "configured");
+    assert.equal(firstPayload.modules.harness.status, "configured");
+    assert.equal(firstPayload.sections["module.harness"].status, "configured");
 
     const envPath = path.join(dir, ".env.local");
     assert.match(readFileSync(envPath, "utf8"), /^TECHSCOPE_ROOT=/m);

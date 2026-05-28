@@ -260,3 +260,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `external-release-status-gate`
 - Open questions: should the handoff public key be added as a NumArt account key or as a write-enabled deploy key after creating `NumArt/pritha`?
 - Notes: Added `scripts/github-release-status.mjs`, `npm run release-status`, tests and release docs. The command makes the remaining external roadmap proof explicit: remote, tag, live CI, branch protection, GitHub Release and fresh public clone. Follow-up check configured `origin` as `git@github.com:NumArt/pritha.git`, created local tag `v0.1.0`, fixed GitHub SSH host key verification, and confirmed the handoff SSH key is not authorized yet (`Permission denied (publickey)`).
+
+## Module Readiness And Tooling Clarification — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from external release status gate
+- Phase-specific checks: pass
+- Golden checks after: pending final gate
+- Report: `11_agents/reports/2026-05-28-pritha-module-readiness-and-tooling-clarification-report.md`
+- AM-CANDIDATE patterns: `contract-selected-module-catalog`, `module-readiness-status`, `product-identity-self-knowledge`
+- Open questions: none for local implementation; GitHub authentication remains external.
+- Notes: Clarified that Pritha descendants use only contract-selected modules, not all Techscope patterns. Added module readiness for harness, memory, data, skills and MCP in setup/status. Added Pritha product identity as curated self-knowledge. Installed local tools `gh`, `gitleaks`, `trufflehog`, `rg`, `ffmpeg` and `codex`.

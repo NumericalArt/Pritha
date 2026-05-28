@@ -130,7 +130,7 @@ Status: draft
 - Tool boundaries are documented before adding external capabilities.
 - Deployment, proactivity and service behavior are represented as an operations manifest.
 - Smoke test gives a cheap acceptance gate for scaffold changes.
-- Health/status/setup/release hygiene patterns should be promoted through explicit decisions before changing default scaffold templates.
+- Health/status/setup/release hygiene patterns should be promoted through explicit decisions before changing the selectable scaffold-module catalog.
 
 ## Failed Assumptions
 
@@ -139,7 +139,7 @@ Status: draft
 ## Reusable Standard Candidates
 
 - Consider promoting generated manifest triad plus smoke test as a reusable minimum scaffold pattern after one more successful agent.
-- Consider promoting the Phase 14 default scaffold group after explicit decisions: smoke/status/env-doctor/quality-gate/self-test, root portability, contract validation, setup for secret-bearing agents, and release scrub.
+- Consider promoting the Phase 14 selectable scaffold-module group after explicit decisions: smoke/status/env-doctor/quality-gate/self-test, root portability, contract validation, setup for secret-bearing agents, and release scrub.
 
 ## Outdated Or Risky Patterns
 

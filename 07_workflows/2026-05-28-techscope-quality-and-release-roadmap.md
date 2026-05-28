@@ -176,7 +176,7 @@ pritha lineage research-agent   # происхождение/genealogy
 1. **Поддерживать** — без регрессий в intake pipeline, memory indexing, Telegram bot, web UI, Agents Mother.
 2. **Самопроверять** — единая команда «зелёный/красный», проактивное самотестирование с явным контрактом.
 3. **Опубликовать как open-source** на GitHub так, чтобы любой другой пользователь смог склонировать репозиторий, прочитать `README` и за 10 минут запустить базовый pipeline.
-4. **Эволюционировать через Agents Mother (Pritha)** — успешные паттерны из roadmap проходят явный pattern review и при подтверждении становятся частью default scaffold для дочерних агентов.
+4. **Эволюционировать через Agents Mother (Pritha)** — успешные паттерны из roadmap проходят явный pattern review и при подтверждении становятся частью каталога scaffold-модулей, из которых Pritha собирает дочерних агентов по контракту.
 5. **Опубликовать под именем Pritha** — ребрендинг «Agents Mother» → **Pritha** как часть архитектуры (lineage / traits / inheritance), с чистым английским репозиторием и безопасным handoff через `secure-handoffs/`.
 
 ## Принципы
@@ -1038,7 +1038,7 @@ AM-pattern candidates: `first-run-setup-workflow`, `connector-selection-dialog`,
 
 ### AM-pattern harvest hint
 
-`first-run-setup-workflow` — сильный кандидат для Pritha default scaffold. Каждый ребёнок-агент (descendant), у которого больше одного коннектора или внешний API, должен получать аналогичный wizard. Шаблон `08_templates/first-run-setup-dialog.md` рассчитан именно на это переиспользование. Промоция в scaffold — только через Phase 14 pattern review.
+`first-run-setup-workflow` — сильный кандидат для Pritha selectable scaffold module. Каждый ребёнок-агент (descendant), у которого больше одного коннектора или внешний API, должен получать аналогичный wizard по контракту. Шаблон `08_templates/first-run-setup-dialog.md` рассчитан именно на это переиспользование. Промоция в scaffold-модуль — только через Phase 14 pattern review.
 
 Также из принятых решений становятся кандидатами:
 
@@ -1111,7 +1111,7 @@ AM-pattern candidates: все `AM-CANDIDATE`, накопленные в phase re
 
 ### Goal
 
-Закрыть roadmap evidence-driven и явно решить, какие паттерны Techscope переносит в Pritha (Agents Mother) default scaffold.
+Закрыть roadmap evidence-driven и явно решить, какие паттерны Techscope переносит в Pritha (Agents Mother) selectable scaffold-module catalog.
 
 ### Deliverables
 
@@ -1119,7 +1119,7 @@ AM-pattern candidates: все `AM-CANDIDATE`, накопленные в phase re
   - таблица всех `AM-CANDIDATE` из phase reports;
   - evidence (phase reports, test results, реальный pain в Techscope, который этот паттерн закрыл);
   - recommendation по каждому: `adopt-in-scaffold` | `document-only` | `reject` | `needs-experiment`.
-  - отдельная секция «First-run setup as default scaffold module?» — решение про Phase 12 wizard.
+  - отдельная секция «First-run setup as selectable scaffold module?» — решение про Phase 12 wizard.
 - `pritha evolve . --notes "quality and release roadmap patterns from 2026-05-28"` (старый `agents-mother.mjs evolve` — alias).
 - `pritha registry` — обновлённый `11_agents/registry.md` (House / Genealogy).
 - `07_workflows/techscope-quality-audit-log.md` — все фазы помечены complete.
@@ -1224,7 +1224,7 @@ File naming: `11_agents/reports/YYYY-MM-DD-techscope-quality-phase-N-report.md`.
 
 ## Pattern candidacy summary
 
-Все паттерны, собираемые в течение roadmap, проходят следующие фильтры **до** попадания в Agents Mother default scaffold:
+Все паттерны, собираемые в течение roadmap, проходят следующие фильтры **до** попадания в Agents Mother selectable scaffold-module catalog:
 
 1. **Local proof** — паттерн реально применён в Techscope и закрыл конкретную проблему (есть evidence в phase report).
 2. **Test coverage** — критичная логика паттерна покрыта unit-test-ом или snapshot-ом.

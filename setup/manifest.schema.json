@@ -16,6 +16,17 @@
     "updated": { "type": "string" },
     "root": { "type": "string" },
     "interfaces": { "type": "object" },
+    "modules": {
+      "type": "object",
+      "properties": {
+        "harness": { "$ref": "#/$defs/moduleStatus" },
+        "memory": { "$ref": "#/$defs/moduleStatus" },
+        "data": { "$ref": "#/$defs/moduleStatus" },
+        "skills": { "$ref": "#/$defs/moduleStatus" },
+        "mcp": { "$ref": "#/$defs/moduleStatus" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/moduleStatus" }
+    },
     "sections": {
       "type": "object",
       "additionalProperties": {
@@ -35,5 +46,18 @@
       "items": { "type": "string" }
     },
     "maskedEnv": { "type": "object" }
+  },
+  "$defs": {
+    "moduleStatus": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["configured", "configured-externally", "skipped", "pending", "failed", "pending-auth"]
+        },
+        "detail": { "type": "string" }
+      }
+    }
   }
 }

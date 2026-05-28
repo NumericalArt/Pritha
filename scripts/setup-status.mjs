@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { moduleReadiness } from "./lib/module-readiness.mjs";
 
 const root = resolveTechscopeRoot();
 const argv = process.argv.slice(2);
@@ -20,13 +21,19 @@ const payload = existsSync(statePath)
       root,
       statePath,
       sections: {},
+      modules: moduleReadiness(root),
       warnings: ["Run: node scripts/setup.mjs"],
     };
+
+if (!payload.modules) payload.modules = moduleReadiness(root);
 
 if (args.has("--json")) {
   console.log(JSON.stringify(payload, null, 2));
 } else {
   console.log(`Pritha setup: ${payload.status}`);
+  for (const [name, moduleStatus] of Object.entries(payload.modules || {})) {
+    console.log(`- module.${name}: ${moduleStatus.status}${moduleStatus.detail ? ` (${moduleStatus.detail})` : ""}`);
+  }
   for (const [name, section] of Object.entries(payload.sections || {})) {
     console.log(`- ${name}: ${section.status}${section.detail ? ` (${section.detail})` : ""}`);
   }

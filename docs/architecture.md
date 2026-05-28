@@ -24,3 +24,11 @@ Pritha is a Codex-native agent factory inside Techscope.
 ## Safety Model
 
 Pritha keeps raw input away from direct tool control. Standards and decisions must be based on curated artifacts, not raw transcripts or unchecked links.
+
+## Self-Knowledge And Product Identity
+
+Pritha's product identity is part of the Markdown knowledge base. Public claims,
+positioning, slogans and release copy should be backed by curated artifacts such
+as `02_briefs/2026-05-28-pritha-product-identity-self-knowledge-brief.md`.
+Those claims evolve through the same intake, review, decision and supersession
+rules as technical knowledge.
