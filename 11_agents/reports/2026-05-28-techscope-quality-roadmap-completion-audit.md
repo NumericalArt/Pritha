@@ -48,8 +48,9 @@ Local execution of phases 0-14 is complete and verified. The only roadmap-level 
 
 This report intentionally does not mark the full roadmap as complete because the authoritative evidence for those external criteria is missing in the current state:
 
-- `git remote -v` returns no remote.
+- `origin` is configured as `git@github.com:NumArt/pritha.git`, but remote access is not authenticated yet.
 - `gh` is not installed in the local environment.
+- The local release tag `v0.1.0` exists, but remote tag proof is missing.
 - No live GitHub Actions run, public repository, branch protection or release can be inspected from this workspace.
 
 ## Final Local Verification
@@ -89,12 +90,13 @@ Commands run sequentially to avoid SQLite writer contention:
 
 To mark the full roadmap complete, the following external evidence is still required:
 
-1. Create or connect GitHub remote `pritha`.
-2. Push branch `main` to GitHub after final pre-push scan.
-3. Inspect live GitHub Actions runs for `quality-gate`, `memory-validate` and `setup-wizard-smoke`.
-4. Configure branch protection and required status checks.
-5. Create tag/release `v0.1.0`.
-6. Verify a fresh clone from the remote follows `docs/getting-started.md` and reaches `node scripts/quality-gate.mjs` green.
+1. Create or connect GitHub remote `NumArt/pritha`.
+2. Add the secure-handoff public key to GitHub account SSH keys or repository deploy keys with write access, or configure another authenticated push path.
+3. Push branch `main` to GitHub after final pre-push scan.
+4. Inspect live GitHub Actions runs for `quality-gate`, `memory-validate` and `setup-wizard-smoke`.
+5. Configure branch protection and required status checks.
+6. Push tag `v0.1.0` and create GitHub Release `v0.1.0`.
+7. Verify a fresh clone from the remote follows `docs/getting-started.md` and reaches `node scripts/quality-gate.mjs` green.
 
 Use `node scripts/github-release-status.mjs --online --strict` as the final non-mutating status gate after the remote exists.
 

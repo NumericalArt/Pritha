@@ -59,10 +59,11 @@ Added a non-mutating release status gate for the remaining external part of the 
 
 ## Current External State
 
-- `origin` remote is not configured.
-- Local tag `v0.1.0` is not present.
+- `origin` remote is configured as `git@github.com:NumArt/pritha.git`.
+- Local tag `v0.1.0` is present.
 - GitHub CLI is not installed.
-- GitHub connector can inspect existing repositories, but no `numart/pritha` repository was found.
+- GitHub connector can inspect existing repositories, but no `NumArt/pritha` repository was found.
+- The secure-handoff SSH key is present locally but is not authorized on GitHub yet: `Permission denied (publickey)`.
 - Live CI, branch protection, GitHub Release and public fresh-clone proof remain pending external evidence.
 
 ## Why This Helps
@@ -78,7 +79,7 @@ The strict online mode should remain red until a real GitHub remote exists and t
 
 ## Next Step
 
-Create or connect the real GitHub repository, then rerun:
+Create or connect the real GitHub repository, add the handoff public key to the GitHub account or repository deploy keys, then rerun:
 
 ```sh
 node scripts/pre-push-audit.mjs

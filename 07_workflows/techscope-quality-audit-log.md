@@ -258,5 +258,5 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - Golden checks after: pending final gate
 - Report: `11_agents/reports/2026-05-28-techscope-github-release-status-gate-report.md`
 - AM-CANDIDATE patterns: `external-release-status-gate`
-- Open questions: who owns the GitHub repository `pritha`, and should the first publication use the current local history or a clean exported snapshot?
-- Notes: Added `scripts/github-release-status.mjs`, `npm run release-status`, tests and release docs. The command makes the remaining external roadmap proof explicit: remote, tag, live CI, branch protection, GitHub Release and fresh public clone.
+- Open questions: should the handoff public key be added as a NumArt account key or as a write-enabled deploy key after creating `NumArt/pritha`?
+- Notes: Added `scripts/github-release-status.mjs`, `npm run release-status`, tests and release docs. The command makes the remaining external roadmap proof explicit: remote, tag, live CI, branch protection, GitHub Release and fresh public clone. Follow-up check configured `origin` as `git@github.com:NumArt/pritha.git`, created local tag `v0.1.0`, fixed GitHub SSH host key verification, and confirmed the handoff SSH key is not authorized yet (`Permission denied (publickey)`).
