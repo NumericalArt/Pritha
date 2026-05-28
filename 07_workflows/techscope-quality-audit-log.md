@@ -249,3 +249,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: none; this entry audits roadmap completion evidence
 - Open questions: external GitHub publication remains pending because no remote is configured and no live CI/release state is available.
 - Notes: Local execution of phases 0-14 is complete. The full roadmap objective remains not fully proven until GitHub remote `pritha`, branch protection, live CI, release tag and public fresh-clone verification are completed.
+
+## External Release Status Gate — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from completion audit
+- Phase-specific checks: pass
+- Golden checks after: pending final gate
+- Report: `11_agents/reports/2026-05-28-techscope-github-release-status-gate-report.md`
+- AM-CANDIDATE patterns: `external-release-status-gate`
+- Open questions: who owns the GitHub repository `pritha`, and should the first publication use the current local history or a clean exported snapshot?
+- Notes: Added `scripts/github-release-status.mjs`, `npm run release-status`, tests and release docs. The command makes the remaining external roadmap proof explicit: remote, tag, live CI, branch protection, GitHub Release and fresh public clone.

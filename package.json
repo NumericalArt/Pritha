@@ -23,6 +23,7 @@
     "memory": "node scripts/memory-status.mjs --json",
     "tools": "node scripts/tools-status.mjs --json",
     "operations": "node scripts/operations-status.mjs --json",
-    "pre-push-audit": "node scripts/pre-push-audit.mjs"
+    "pre-push-audit": "node scripts/pre-push-audit.mjs",
+    "release-status": "node scripts/github-release-status.mjs"
   }
 }

@@ -64,6 +64,7 @@ Commands run sequentially to avoid SQLite writer contention:
 | `node scripts/pre-push-audit.mjs --json` | pass | `failed: 0`; local absolute paths `0`; Telegram IDs `0`; known warnings only for long-token candidates and missing optional secret scanners. |
 | `node scripts/agents-mother.mjs test . --no-report` | pass | classification `agent-project`, result `complete`; legacy wrapper still works with deprecation note. |
 | `node scripts/self-test.mjs --json` | pass | self-test status `pass`. |
+| `node scripts/github-release-status.mjs --json` | pending-external | local release docs/workflows are present; origin remote, tag, live CI/release and fresh public clone proof remain missing. |
 
 ## Success Criteria Audit
 
@@ -94,6 +95,8 @@ To mark the full roadmap complete, the following external evidence is still requ
 4. Configure branch protection and required status checks.
 5. Create tag/release `v0.1.0`.
 6. Verify a fresh clone from the remote follows `docs/getting-started.md` and reaches `node scripts/quality-gate.mjs` green.
+
+Use `node scripts/github-release-status.mjs --online --strict` as the final non-mutating status gate after the remote exists.
 
 ## Decision
 

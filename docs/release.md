@@ -42,22 +42,41 @@ trufflehog filesystem .
 If these tools are not installed, do not add them as project dependencies just
 for CI. Run them locally or through a separate security workstation.
 
+## Release Status Gate
+
+Use the release status script before and after configuring the GitHub remote:
+
+```sh
+npm run release-status
+node scripts/github-release-status.mjs --json
+node scripts/github-release-status.mjs --online --strict
+```
+
+The default mode is safe and non-mutating. It reports local readiness plus the
+remaining external proof: origin remote, remote `main`, tag `v0.1.0`, live CI,
+branch protection, GitHub Release and fresh public clone. `--strict` exits
+non-zero until every required external proof is present.
+
 ## GitHub Repository Setup
 
 1. Create the repo as private.
-2. Push `main`.
-3. Confirm GitHub Actions are green.
-4. Configure branch protection or ruleset for `main`:
+2. Add the remote:
+   ```sh
+   git remote add origin git@github.com:<owner>/pritha.git
+   ```
+3. Push `main`.
+4. Confirm GitHub Actions are green.
+5. Configure branch protection or ruleset for `main`:
    - require pull request before merge;
    - require at least one approval;
    - require status checks from `Quality Gate`;
    - require branches to be up to date before merge;
    - block force pushes and deletions.
-5. Keep path-filtered workflows such as `Memory Validate` and
+6. Keep path-filtered workflows such as `Memory Validate` and
    `Setup Wizard Smoke` as useful checks, but do not make them the only required
    status check unless GitHub rules are configured to avoid pending skipped
    checks.
-6. Flip public only after a clean clone from GitHub passes the getting-started
+7. Flip public only after a clean clone from GitHub passes the getting-started
    flow.
 
 ## CI
