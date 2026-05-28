@@ -116,3 +116,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `prerequisites-md`, `env-doctor-mjs`, `python-requirements-pinned`, `non-blocking-env-warning`
 - Open questions: should strict Python 3.10+ become a blocking release gate in Phase 7 or Phase 8?
 - Notes: Env doctor passes on the current Mac mini with warnings for Python 3.10 recommended baseline, missing Codex CLI, missing `rg` and missing system `ffmpeg`. `mlx_whisper` is discovered from Python user scripts even when not on `PATH`. Memory-writing gates must be run sequentially; concurrent rebuilds can lock SQLite.
+
+## Phase 7 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-7-quality-gate-report.md`
+- AM-CANDIDATE patterns: `quality-gate-mjs`, `audit-report-generator`, `phase-report-template`, `optional-githooks-precommit`
+- Open questions: should Phase 8 self-test reuse quality-gate profiles or stay separate?
+- Notes: `quality-gate.mjs` runs env-doctor, validate-memory, smoke-test, unit tests, Agents Mother self-inspection and Telegram dry-run sequentially. Intentional `--simulate-fail=smoke-test` regression fails with a clear check-level reason. `.githooks/pre-commit` is documented but not installed. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.

@@ -1,0 +1,48 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+
+test("quality-gate exposes a serialized dry-run contract", () => {
+  const result = spawnSync("node", ["scripts/quality-gate.mjs", "--dry-run", "--json"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.schema, "techscope-quality-gate-v1");
+  assert.equal(payload.status, "planned");
+  assert.equal(payload.failed, 0);
+  assert.deepEqual(
+    payload.checks.map((check) => check.id),
+    [
+      "env-doctor",
+      "validate-memory",
+      "smoke-test",
+      "unit-tests",
+      "agents-mother-test",
+      "telegram-dry-run",
+    ],
+  );
+  assert.ok(payload.checks.every((check) => check.status === "planned"));
+});
+
+test("quality-gate simulated failure returns a clear failing check", () => {
+  const result = spawnSync("node", ["scripts/quality-gate.mjs", "--json", "--simulate-fail=smoke-test"], {
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.status, "fail");
+  assert.equal(payload.failed, 1);
+  const failed = payload.checks.find((check) => check.id === "smoke-test");
+  assert.equal(failed.status, "fail");
+  assert.match(failed.stderr, /simulated failure for smoke-test/);
+});
+
+test("quality-gate markdown output includes a summary table", () => {
+  const result = spawnSync("node", ["scripts/quality-gate.mjs", "--dry-run", "--markdown"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /# Techscope Quality Gate: planned/);
+  assert.match(result.stdout, /\| Status \| Check \| Command \| Duration \|/);
+});

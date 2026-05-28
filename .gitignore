@@ -20,6 +20,7 @@ Untitled*.canvas
 # Derived memory artifacts
 .memory/*.sqlite
 .memory/last-rebuild.sql
+.memory/reports/
 
 # Raw source material is not part of the public/source-of-truth snapshot.
 01_sources/raw/
