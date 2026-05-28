@@ -11,6 +11,7 @@
     "test:unit": "node --test tests/**/*.test.mjs",
     "check": "node scripts/golden-checks.mjs",
     "check:embeddings": "node scripts/golden-checks.mjs --with-embeddings",
+    "env": "node scripts/env-doctor.mjs",
     "health": "node scripts/healthcheck.mjs",
     "interfaces": "node scripts/interface-status.mjs --json",
     "memory": "node scripts/memory-status.mjs --json",

@@ -41,7 +41,7 @@ function run(name, command, commandArgs, options = {}) {
   return {
     name,
     command: [command, ...commandArgs].join(" "),
-    status: result.status === 0 ? "pass" : "fail",
+    status: result.status === 0 ? "pass" : options.nonBlocking ? "warning" : "fail",
     exitCode: result.status ?? 1,
     durationMs: Date.now() - started,
     stdout: String(result.stdout || "").trim(),
@@ -54,6 +54,7 @@ const checks = [
   run("Markdown integrity", "node", ["scripts/validate-memory.mjs"]),
   run("Memory rebuild", "node", ["scripts/rebuild-memory.mjs"]),
   run("Memory stats", "node", ["scripts/query-memory.mjs", "stats"]),
+  run("Environment doctor", "node", ["scripts/env-doctor.mjs"], { nonBlocking: true }),
   run("Agents Mother self-inspection", "node", ["scripts/agents-mother.mjs", "test", ".", "--no-report"]),
   run("Telegram dry-run", "node", ["scripts/telegram-bot.mjs", "poll-once", "--dry-run"]),
   run("Telegram queue status", "node", ["scripts/telegram-bot.mjs", "queue-status"]),
@@ -82,10 +83,12 @@ checks.push(run(
 ));
 
 const failed = checks.filter((check) => check.status === "fail");
+const warnings = checks.filter((check) => check.status === "warning");
 const payload = {
   root: ROOT,
   status: dryRun ? "planned" : failed.length === 0 ? "pass" : "fail",
   failed: failed.length,
+  warnings: warnings.length,
   checks,
 };
 
@@ -97,7 +100,7 @@ if (jsonMode) {
   for (const check of checks) {
     const suffix = check.status === "skipped" || check.status === "planned" ? ` (${check.notes})` : ` (${check.durationMs}ms)`;
     console.log(`- ${check.status.toUpperCase()} ${check.name}${suffix}`);
-    if (check.status === "fail") {
+    if (check.status === "fail" || check.status === "warning") {
       if (check.stdout) console.log(`  stdout: ${check.stdout.split("\n").slice(-4).join(" | ")}`);
       if (check.stderr) console.log(`  stderr: ${check.stderr.split("\n").slice(-4).join(" | ")}`);
       if (check.error) console.log(`  error: ${check.error}`);

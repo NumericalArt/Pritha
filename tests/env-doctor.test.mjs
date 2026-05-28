@@ -1,0 +1,25 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+
+test("env-doctor exposes machine-readable dependency status", () => {
+  const result = spawnSync("node", ["scripts/env-doctor.mjs", "--json"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.status, "pass");
+  assert.equal(payload.failed, 0);
+  assert.ok(Array.isArray(payload.checks));
+  assert.ok(payload.checks.some((check) => check.id === "node" && check.level === "critical"));
+  assert.ok(payload.checks.some((check) => check.id === "sentence-transformers" && check.level === "critical"));
+});
+
+test("env-doctor fails with an actionable message when a critical dependency is missing", () => {
+  const result = spawnSync("node", ["scripts/env-doctor.mjs", "--simulate-missing=sqlite3"], {
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /FAIL sqlite3 CLI/);
+  assert.match(result.stdout, /Install sqlite3 CLI/);
+});

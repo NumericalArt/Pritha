@@ -39,7 +39,12 @@ function run(name, command, args, options = {}) {
     env: { ...process.env, TECHSCOPE_ROOT: root },
     timeout: options.timeoutMs || 60000,
   });
-  add(name, result.status === 0, (result.stdout || result.stderr || "").trim());
+  const detail = (result.stdout || result.stderr || "").trim();
+  if (options.nonBlocking) {
+    add(name, true, result.status === 0 ? detail : `non-blocking warning: ${detail}`);
+    return;
+  }
+  add(name, result.status === 0, detail);
 }
 
 add("TECHSCOPE_ROOT", existsSync(root), root);
@@ -69,6 +74,7 @@ for (const relPath of [
 }
 
 run("memory stats", "node", ["scripts/query-memory.mjs", "stats"]);
+run("env doctor", "node", ["scripts/env-doctor.mjs"], { nonBlocking: true });
 run("telegram dry-run", "node", ["scripts/telegram-bot.mjs", "poll-once", "--dry-run"]);
 
 for (const relPath of [

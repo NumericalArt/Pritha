@@ -67,6 +67,34 @@ function commandPath(command) {
   return result.status === 0 ? result.stdout.trim() : "";
 }
 
+function pythonScriptPath(command) {
+  const script = `
+import os
+import site
+import sysconfig
+command = ${JSON.stringify(command)}
+candidates = []
+value = sysconfig.get_path("scripts")
+if value:
+    candidates.append(os.path.join(value, command))
+try:
+    candidates.append(os.path.join(site.USER_BASE, "bin", command))
+except Exception:
+    pass
+for candidate in candidates:
+    if os.path.exists(candidate):
+        print(candidate)
+        raise SystemExit(0)
+raise SystemExit(1)
+`;
+  const result = spawnSync(PYTHON, ["-c", script], {
+    cwd: ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0 ? result.stdout.trim().split(/\r?\n/)[0] : "";
+}
+
 function imageioFfmpegPath() {
   if (process.env.IMAGEIO_FFMPEG_BIN) return process.env.IMAGEIO_FFMPEG_BIN;
   const output = run(PYTHON, ["-c", "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"], { capture: true });
@@ -75,9 +103,9 @@ function imageioFfmpegPath() {
 
 function ensureTooling() {
   run(PYTHON, ["-m", "yt_dlp", "--version"], { capture: true });
-  const mlxWhisper = process.env.MLX_WHISPER_BIN || commandPath("mlx_whisper");
+  const mlxWhisper = process.env.MLX_WHISPER_BIN || commandPath("mlx_whisper") || pythonScriptPath("mlx_whisper");
   if (!mlxWhisper) {
-    throw new Error("mlx_whisper not found in PATH. Install with: python3 -m pip install --user mlx-whisper");
+    throw new Error("mlx_whisper not found. Install with: python3 -m pip install --user mlx-whisper");
   }
   const ffmpeg = imageioFfmpegPath();
   if (!existsSync(ffmpeg)) {

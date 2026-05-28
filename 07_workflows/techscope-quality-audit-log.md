@@ -105,3 +105,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `node-test-harness`, `frontmatter-fixtures`, `scaffold-snapshot-tests`, `golden-checks-dry-run-contract`
 - Open questions: Phase 9 should add deeper module-level tests after Agents Mother modularization.
 - Notes: Added Node built-in tests for shared helpers, paths, golden-checks dry-run, contract validation and scaffold snapshot. Intentionally broken snapshot failed as expected, then was restored. Final `node scripts/golden-checks.mjs --with-embeddings` and `npm test --silent` passed.
+
+## Phase 6 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-6-env-doctor-report.md`
+- AM-CANDIDATE patterns: `prerequisites-md`, `env-doctor-mjs`, `python-requirements-pinned`, `non-blocking-env-warning`
+- Open questions: should strict Python 3.10+ become a blocking release gate in Phase 7 or Phase 8?
+- Notes: Env doctor passes on the current Mac mini with warnings for Python 3.10 recommended baseline, missing Codex CLI, missing `rg` and missing system `ffmpeg`. `mlx_whisper` is discovered from Python user scripts even when not on `PATH`. Memory-writing gates must be run sequentially; concurrent rebuilds can lock SQLite.
