@@ -11,20 +11,21 @@ const ROOT = process.env.TECHSCOPE_ROOT
 
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
+const dryRun = args.has("--dry-run");
 const withEmbeddings = args.has("--with-embeddings") || process.env.TECHSCOPE_GOLDEN_EMBEDDINGS === "1";
 
 function run(name, command, commandArgs, options = {}) {
   const started = Date.now();
-  if (options.skip) {
+  if (dryRun || options.skip) {
     return {
       name,
       command: [command, ...commandArgs].join(" "),
-      status: "skipped",
+      status: dryRun ? "planned" : "skipped",
       exitCode: 0,
       durationMs: 0,
       stdout: "",
       stderr: "",
-      notes: options.reason || "skipped",
+      notes: dryRun ? "dry-run" : options.reason || "skipped",
     };
   }
 
@@ -83,7 +84,7 @@ checks.push(run(
 const failed = checks.filter((check) => check.status === "fail");
 const payload = {
   root: ROOT,
-  status: failed.length === 0 ? "pass" : "fail",
+  status: dryRun ? "planned" : failed.length === 0 ? "pass" : "fail",
   failed: failed.length,
   checks,
 };
@@ -94,7 +95,7 @@ if (jsonMode) {
   console.log(`Techscope golden checks: ${payload.status}`);
   console.log(`Root: ${ROOT}`);
   for (const check of checks) {
-    const suffix = check.status === "skipped" ? ` (${check.notes})` : ` (${check.durationMs}ms)`;
+    const suffix = check.status === "skipped" || check.status === "planned" ? ` (${check.notes})` : ` (${check.durationMs}ms)`;
     console.log(`- ${check.status.toUpperCase()} ${check.name}${suffix}`);
     if (check.status === "fail") {
       if (check.stdout) console.log(`  stdout: ${check.stdout.split("\n").slice(-4).join(" | ")}`);

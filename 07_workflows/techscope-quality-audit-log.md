@@ -94,3 +94,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `smoke-test-template`, `status-mjs-family`, `self-inspection-manifest`, `minimal-package-json`, `buffered-derived-index-rebuild`
 - Open questions: should `Deployment plan: not-applicable` remain acceptable until deployment automation is introduced?
 - Notes: Techscope now has smoke/status scripts and minimal `package.json`. `agents-mother test .` returns complete; deployment automation is intentionally not part of Phase 4. Final `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 5 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-5-test-layer-report.md`
+- AM-CANDIDATE patterns: `node-test-harness`, `frontmatter-fixtures`, `scaffold-snapshot-tests`, `golden-checks-dry-run-contract`
+- Open questions: Phase 9 should add deeper module-level tests after Agents Mother modularization.
+- Notes: Added Node built-in tests for shared helpers, paths, golden-checks dry-run, contract validation and scaffold snapshot. Intentionally broken snapshot failed as expected, then was restored. Final `node scripts/golden-checks.mjs --with-embeddings` and `npm test --silent` passed.

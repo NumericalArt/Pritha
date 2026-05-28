@@ -7,7 +7,8 @@
   },
   "scripts": {
     "smoke": "node scripts/smoke-test.mjs",
-    "test": "node scripts/smoke-test.mjs",
+    "test": "npm run check && npm run test:unit",
+    "test:unit": "node --test tests/**/*.test.mjs",
     "check": "node scripts/golden-checks.mjs",
     "check:embeddings": "node scripts/golden-checks.mjs --with-embeddings",
     "health": "node scripts/healthcheck.mjs",
