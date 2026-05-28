@@ -7,17 +7,17 @@ updated: 2026-05-16
 topics: [coding-agents, agent-evals, test-first-development, harness-engineering, acceptance-criteria, dx, security]
 tools: [codex, superpowers, markdown, npm, lint, ci]
 sources:
-  - 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-  - 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
   - https://t.me/tosoltaime/42
   - https://openai.com/index/harness-engineering/
 related:
   signals:
-    - 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
+    - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
   intakes:
-    - 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+    - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
   briefs:
     - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   standards:

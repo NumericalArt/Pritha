@@ -9,16 +9,16 @@ tools: [Codbash, Claude Code, Codex CLI, Cursor, OpenCode, Kiro, Kilo, Copilot C
 source_type: telegram
 source_url: https://t.me/iwann_tai/16
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-17-telegram-photo.md
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-18-telegram-photo.md
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-19-telegram-photo.md
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-20-telegram-photo.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про/01-photo.jpg
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-17-telegram-photo/01-photo.jpg
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-18-telegram-photo/01-photo.jpg
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-19-telegram-photo/01-photo.jpg
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-20-telegram-photo/01-photo.jpg
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-18-telegram-photo.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-19-telegram-photo.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-20-telegram-photo.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про/01-photo.jpg
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-17-telegram-photo/01-photo.jpg
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-18-telegram-photo/01-photo.jpg
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-19-telegram-photo/01-photo.jpg
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-20-telegram-photo/01-photo.jpg
   - https://github.com/vakovalskii/codbash
   - https://github.com/vakovalskii/codbash/releases/tag/v7.0.0
 related:

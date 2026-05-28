@@ -36,12 +36,12 @@ config_surfaces:
   - scripts
 portability: adapter-needed
 sources:
-  - /Users/jkl/FESPA26
-  - /Users/jkl/FESPA26/README.md
-  - /Users/jkl/FESPA26/AGENTS.md
-  - /Users/jkl/FESPA26/docs/current-architecture.md
-  - /Users/jkl/FESPA26/docs/codex-cli-enrichment.md
-  - /Users/jkl/FESPA26/docs/harness-architecture.md
+  - <SIBLING_AGENT_ROOT>/FESPA26
+  - <SIBLING_AGENT_ROOT>/FESPA26/README.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/AGENTS.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/current-architecture.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-cli-enrichment.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/harness-architecture.md
 related:
   workflows:
     - 07_workflows/agents-mother.md
@@ -173,7 +173,7 @@ Status: accepted, retrospective
 
 ## Scaffold Requirements
 
-- Target folder: `/Users/jkl/FESPA26`.
+- Target folder: `<SIBLING_AGENT_ROOT>/FESPA26`.
 - Files generated/observed: `AGENTS.md`, `README.md`, `.env.example`, `interfaces/`, `memory/`, `tools/`, `operations/`, `scripts/`, Next.js app files.
 - Dependencies: Next.js 16, React 19, OpenAI Realtime API through fetch/WebRTC, SQLite, Codex CLI.
 - Setup commands: install dependencies, configure `.env.local`, run local dev server.

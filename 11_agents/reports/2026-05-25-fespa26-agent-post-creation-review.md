@@ -31,17 +31,17 @@ config_surfaces:
   - operations/manifest.json
 portability: codex-native
 sources:
-  - /Users/jkl/FESPA26
-  - /Users/jkl/FESPA26/hooks/use-realtime-call.ts
-  - /Users/jkl/FESPA26/lib/openai/realtime-config.ts
-  - /Users/jkl/FESPA26/lib/openai/realtime-tools.ts
-  - /Users/jkl/FESPA26/lib/realtime/instructions.ts
-  - /Users/jkl/FESPA26/app/api/realtime/tool/route.ts
-  - /Users/jkl/FESPA26/app/api/realtime/orchestrate/route.ts
-  - /Users/jkl/FESPA26/lib/chat/process-agent-message.ts
-  - /Users/jkl/FESPA26/lib/conductor/index.ts
-  - /Users/jkl/FESPA26/lib/agent/codex-cli-runtime.ts
-  - /Users/jkl/FESPA26/scripts/lib/fespa-jobs-core.mjs
+  - <SIBLING_AGENT_ROOT>/FESPA26
+  - <SIBLING_AGENT_ROOT>/FESPA26/hooks/use-realtime-call.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/openai/realtime-config.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/openai/realtime-tools.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/realtime/instructions.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/tool/route.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/orchestrate/route.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/chat/process-agent-message.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/conductor/index.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/agent/codex-cli-runtime.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/scripts/lib/fespa-jobs-core.mjs
   - 11_agents/reports/2026-05-25-fespa26-agent-operations-report.md
   - 11_agents/reports/2026-05-25-fespa26-agent-test-report.md
   - 07_workflows/agents-mother.md
@@ -78,7 +78,7 @@ Status: draft, documentation refreshed 2026-05-25
 
 ## Summary
 
-- Project path: /Users/jkl/FESPA26
+- Project path: <SIBLING_AGENT_ROOT>/FESPA26
 - Classification: agent-project
 - Related lifecycle reports: 2
 - User notes: Первый агент Agents Mother. Нужно зафиксировать текущую архитектуру FESPA26 и reusable voice-control pattern на GPT-realtime-2 + Codex CLI sidecar.

@@ -15,14 +15,14 @@ config_surfaces: [skills, memory, wiki, daily-notes, telegram-gateway, codex-cli
 portability: adapter-needed
 sources:
   - https://www.youtube.com/watch?v=ysQ1T3Xkub8
-  - 00_inbox/telegram/2026-05-18-telegram-6208460904-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
+  - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
   - 01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/curator
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime
   - https://github.com/NousResearch/hermes-agent/releases/tag/v2026.5.16
 related:
   intakes:
-    - 00_inbox/telegram/2026-05-18-telegram-6208460904-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
+    - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
   signals:
     - 01_sources/signals/2026-05-18-youtube-transcript-мои-примеры-использования-агентов-hermes-signal.md
   briefs:
@@ -54,7 +54,7 @@ Status: processed
 - Channel: ALEKSEI ULIANOV | AI-АГЕНТЫ
 - Published: 2026-05-04
 - Duration: 50:02
-- Telegram intake: `00_inbox/telegram/2026-05-18-telegram-6208460904-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md`
+- Telegram intake: `00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md`
 - Transcript: `01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md`
 
 ## What the source contributes

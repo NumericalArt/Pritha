@@ -6,6 +6,7 @@ import process from "node:process";
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
 const strictMode = args.has("--strict") || process.env.TECHSCOPE_ENV_DOCTOR_STRICT === "1";
+const isDarwin = process.platform === "darwin";
 const simulatedMissing = new Set(
   [...args]
     .filter((arg) => arg.startsWith("--simulate-missing="))
@@ -107,10 +108,10 @@ except Exception:
 `;
 }
 
-function checkPythonPackage(id, label, moduleName, distributionName, hint) {
+function checkPythonPackage(id, label, moduleName, distributionName, hint, level = "critical") {
   const result = run("python3", ["-c", pythonSnippet(moduleName, distributionName)], { id });
   const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
-  add(id, label, "critical", result.status === 0, output || `${moduleName} not found`, hint);
+  add(id, label, level, result.status === 0, output || `${moduleName} not found`, hint);
 }
 
 function discoverPythonScript(scriptName) {
@@ -149,10 +150,12 @@ function checkMlxWhisperExecutable() {
   add(
     "mlx-whisper-bin",
     "mlx_whisper executable",
-    "critical",
+    isDarwin ? "critical" : "warning",
     Boolean(fromPythonScripts),
     fromPythonScripts || "not found in PATH or Python scripts directory",
-    "Install with `python3 -m pip install --user mlx-whisper` and add Python user bin to PATH, or set MLX_WHISPER_BIN.",
+    isDarwin
+      ? "Install with `python3 -m pip install --user mlx-whisper` and add Python user bin to PATH, or set MLX_WHISPER_BIN."
+      : "mlx-whisper is a local macOS transcription helper; Linux CI may skip it.",
   );
 }
 
@@ -204,7 +207,10 @@ checkPythonPackage(
   "Python package mlx-whisper",
   "mlx_whisper",
   "mlx-whisper",
-  "Install with `python3 -m pip install --user -r requirements.txt`.",
+  isDarwin
+    ? "Install with `python3 -m pip install --user -r requirements.txt`."
+    : "mlx-whisper is a local macOS transcription helper; Linux CI may skip it.",
+  isDarwin ? "critical" : "warning",
 );
 checkMlxWhisperExecutable();
 checkOptionalTools();

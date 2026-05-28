@@ -46,8 +46,8 @@ sources:
   - 03_reviews/2026-05-15-mcp-server-pitfalls-assessment.md
   - https://habr.com/ru/companies/bitrix/articles/1009150/
   - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
-  - 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-  - 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
   - https://t.me/tosoltaime/42
@@ -67,13 +67,13 @@ sources:
   - 04_standards/agent-shell-evaluation.md
   - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
   - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-53-telegram-photo/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
   - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
   - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
   - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
   - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
 related:
@@ -179,8 +179,8 @@ This generated page tracks security as a topic in the Techscope knowledge base. 
 - 03_reviews/2026-05-15-mcp-server-pitfalls-assessment.md
 - https://habr.com/ru/companies/bitrix/articles/1009150/
 - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
-- 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-- 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+- 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+- 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
 - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
 - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
 - https://t.me/tosoltaime/42
@@ -200,13 +200,13 @@ This generated page tracks security as a topic in the Techscope knowledge base. 
 - 04_standards/agent-shell-evaluation.md
 - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
 - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-- 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-53-telegram-photo/01-photo.jpg
+- 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
+- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
 - https://openai.com/index/work-with-codex-from-anywhere/
 - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
 - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-- 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+- 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
+- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
 - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
 - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
 

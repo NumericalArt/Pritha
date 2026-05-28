@@ -8,14 +8,14 @@ topics: [codex-remote-access, codex-desktop, remote-connections, ssh, vps, mobil
 tools: [codex, codex-desktop, chatgpt-mobile, ssh, vps, macos, telegram-bot]
 sources:
   - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
   - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
   - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
 related:
   intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
+    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
   notes:
     - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
   assessments:

@@ -49,8 +49,8 @@ sources:
   - 03_reviews/2026-05-15-mcp-server-pitfalls-assessment.md
   - https://habr.com/ru/companies/bitrix/articles/1009150/
   - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
-  - 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-  - 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
   - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
   - https://t.me/tosoltaime/42
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
@@ -155,8 +155,8 @@ This generated page tracks harness-engineering as a topic in the Techscope knowl
 - 03_reviews/2026-05-15-mcp-server-pitfalls-assessment.md
 - https://habr.com/ru/companies/bitrix/articles/1009150/
 - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
-- 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-- 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+- 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+- 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
 - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
 - https://t.me/tosoltaime/42
 - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md

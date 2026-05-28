@@ -16,8 +16,8 @@ test("resolveTechscopeRoot honors TECHSCOPE_ROOT", () => {
 
 test("resolveSiblingAgentPath places agents beside root by default", () => {
   assert.equal(
-    resolveSiblingAgentPath("ChildAgent", { root: "/Users/example/Techscope" }),
-    path.join("/Users/example", "ChildAgent"),
+    resolveSiblingAgentPath("ChildAgent", { root: "/tmp/example/Techscope" }),
+    path.join("/tmp/example", "ChildAgent"),
   );
 });
 

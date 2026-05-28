@@ -170,7 +170,7 @@ Status: draft
 
 ## Scaffold requirements
 
-- Target folder: /Users/jkl/FESPA26
+- Target folder: <SIBLING_AGENT_ROOT>/FESPA26
 - Files to generate: AGENTS.md, README.md, .env.example, Next.js app, API routes, memory schema, Codex runtime wrapper, ingest scripts, smoke tests, operations notes and user training guide.
 - Dependencies: Next.js, React, TypeScript, Zod, SQLite via Node runtime, OpenAI Realtime API over WebRTC, Codex CLI via local binary.
 - Setup commands: npm install; cp .env.example .env.local; configure OPENAI_API_KEY and CODEX_BIN.

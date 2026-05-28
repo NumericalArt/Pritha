@@ -34,13 +34,13 @@ sources:
   - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
   - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
   - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-53-telegram-photo/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
   - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
   - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
   - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
   - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
@@ -52,8 +52,8 @@ sources:
   - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
   - https://www.anthropic.com/engineering/building-effective-agents
   - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
-  - 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-  - 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
   - https://t.me/tosoltaime/42
@@ -76,8 +76,8 @@ sources:
   - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
   - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
   - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
   - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
 related:
   wiki_pages:

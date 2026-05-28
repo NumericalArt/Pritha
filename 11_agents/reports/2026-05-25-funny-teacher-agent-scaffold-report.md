@@ -65,7 +65,7 @@ Status: complete
 ## Summary
 
 - Agent name: Funny Teacher
-- Target folder: `/Users/jkl/FunnyTeacher`
+- Target folder: `<SIBLING_AGENT_ROOT>/FunnyTeacher`
 - Contract: `11_agents/contracts/2026-05-25-funny-teacher-agent-contract.md`
 - Runtime: local Next.js web app with Codex-native project instructions.
 - Primary interface: Web Voice Only.
@@ -75,7 +75,7 @@ Status: complete
 
 ## Implemented
 
-- Created independent project scaffold in `/Users/jkl/FunnyTeacher`.
+- Created independent project scaffold in `<SIBLING_AGENT_ROOT>/FunnyTeacher`.
 - Added `AGENTS.md`, `README.md`, `.env.example`, docs, interface/memory/tools/operations manifests.
 - Added Next.js app with YouTube URL input, embedded video area, bottom voice controls and EN/RU switch.
 - Added lesson API:

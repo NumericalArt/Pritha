@@ -26,7 +26,7 @@ config_surfaces:
   - operations/manifest.json
 portability: codex-native
 sources:
-  - /Users/jkl/FESPA26
+  - <SIBLING_AGENT_ROOT>/FESPA26
   - 07_workflows/agents-mother.md
   - 04_standards/agent-creation-harness.md
 related:
@@ -57,7 +57,7 @@ Status: complete
 
 ## Quick Start
 
-- Project path: /Users/jkl/FESPA26
+- Project path: <SIBLING_AGENT_ROOT>/FESPA26
 - Classification: agent-project
 - Open the folder in Codex.
 - Run:
@@ -124,5 +124,5 @@ node scripts/smoke-test.mjs
 
 ## Next Steps
 
-- Run `node scripts/agents-mother.mjs test "/Users/jkl/FESPA26"` from TechScope when the project changes.
+- Run `node scripts/agents-mother.mjs test "<SIBLING_AGENT_ROOT>/FESPA26"` from TechScope when the project changes.
 - Discuss whether the next improvement should target interface, memory, tools, evals, operations or user training.

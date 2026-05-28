@@ -1,0 +1,101 @@
+---
+id: 2026-05-17-2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключа-signal
+type: signal
+status: refined
+created: 2026-05-17
+updated: 2026-05-17
+topics:
+  - telegram
+  - inbox
+  - signal-extraction
+tools:
+  - telegram-bot
+  - agent
+  - agents
+  - llm
+  - codex
+  - claude
+  - workflow
+  - review
+  - source
+sources:
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+  - https://t.me/llm_under_hood/835
+  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg
+  - https://openai.com/index/work-with-codex-from-anywhere/
+related:
+  sources:
+    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+generated_from:
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+signal_quality: high
+extraction_mode: codex-assisted
+refinement_status: codex-refined
+harness: 07_workflows/prompts/signal-extraction-harness.md
+---
+
+# Signal: 2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться
+
+Date: 2026-05-17
+Status: refined
+Signal quality: high
+Extraction mode: codex-assisted
+Refinement status: codex-refined
+
+## Core signal
+
+- Codex mobile access to local sessions may replace ad hoc Telegram bridges for controlling active Codex work.
+- Official OpenAI source confirms that Codex in the ChatGPT mobile app can connect to machines where Codex is running: laptop, Mac mini, devbox or managed remote environment.
+- The useful split for Techscope: use Codex mobile for active agent control; use Telegram bot for knowledge intake and media capture.
+- The screenshot shows an active local Codex task with `Work locally`, project sidebar, permission/model controls and live work progress.
+- Host availability matters: for reliable mobile control, use Mac mini/VM or prevent laptop sleep.
+- Local files, credentials and permissions staying on the host machine is the key advantage over cloud-container-only work.
+
+## Technical details
+
+- Official OpenAI article says mobile can show live outputs such as screenshots, terminal output, diffs, tests and approvals.
+- OpenAI describes a secure relay layer rather than direct public exposure of the local host.
+- The screenshot task references analytics infrastructure: Vector, ClickHouse and Grafana dashboards, which makes it a real long-running local development task rather than a toy demo.
+
+## Agent design implications
+
+- Reevaluate whether Techscope needs Telegram as a remote-control bridge.
+- Keep Telegram focused on intake: forwarded posts, links, screenshots, voice/video and queueing into Markdown.
+- Consider Codex mobile plus Mac mini as the primary always-on control plane for local agent work.
+- Add host sleep/network requirements to future Mac mini operation rules.
+
+## Candidate rules
+
+- Prefer official Codex mobile for controlling active local Codex sessions when available.
+- Do not expose local agent hosts directly to the public internet for mobile access.
+- Keep Telegram bot as knowledge intake, not as the primary command/control channel for Codex sessions.
+- For long-running local Codex work, use Mac mini/VM or ensure the laptop cannot sleep.
+
+## Noise removed
+
+- Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
+- Full source text/transcript is not copied into this signal.
+
+## Verification required
+
+- Test on our own Mac mini/Codex setup.
+- Verify availability in the current ChatGPT mobile app account.
+- Check approval prompts, screenshots, diffs and terminal updates from phone.
+- Review security model: account auth, trusted devices, relay, permission mode and local secrets.
+- Recheck official Codex docs before turning this into an operations standard.
+
+## Codex refinement required
+
+- Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
+- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
+- Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
+- После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
+
+## Source links
+
+- 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+- https://t.me/llm_under_hood/835
+- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json
+- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg
+- https://openai.com/index/work-with-codex-from-anywhere/

@@ -120,7 +120,7 @@ Logs:
 The project currently lives under:
 
 ```text
-/Users/jkl/Techscope
+<TECHSCOPE_ROOT>
 ```
 
 macOS TCC privacy can block background LaunchAgents from reading files in `~/Documents`. Manual foreground runs work, but launchd may fail with:
@@ -131,7 +131,7 @@ Operation not permitted
 
 Recommended fix:
 
-1. Move the project to a non-TCC path, for example `/Users/jkl/Techscope`.
+1. Move the project to a non-TCC path, for example `<TECHSCOPE_ROOT>`.
 2. Update paths in:
    - `launchd/com.techscope.web.plist`
    - `scripts/run-techscope-web.sh`

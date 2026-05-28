@@ -36,17 +36,17 @@ config_surfaces:
   - queue scripts
 portability: adapter-needed
 sources:
-  - /Users/jkl/FESPA26/hooks/use-realtime-call.ts
-  - /Users/jkl/FESPA26/lib/openai/realtime-config.ts
-  - /Users/jkl/FESPA26/lib/openai/realtime-tools.ts
-  - /Users/jkl/FESPA26/lib/realtime/instructions.ts
-  - /Users/jkl/FESPA26/app/api/realtime/tool/route.ts
-  - /Users/jkl/FESPA26/app/api/realtime/orchestrate/route.ts
-  - /Users/jkl/FESPA26/lib/chat/process-agent-message.ts
-  - /Users/jkl/FESPA26/lib/agent/codex-cli-runtime.ts
-  - /Users/jkl/FESPA26/docs/current-architecture.md
-  - /Users/jkl/FESPA26/docs/harness-architecture.md
-  - /Users/jkl/FESPA26/docs/codex-cli-enrichment.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/hooks/use-realtime-call.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/openai/realtime-config.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/openai/realtime-tools.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/realtime/instructions.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/tool/route.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/orchestrate/route.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/chat/process-agent-message.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/agent/codex-cli-runtime.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/current-architecture.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/harness-architecture.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-cli-enrichment.md
   - 11_agents/contracts/2026-05-25-fespa26-agent-contract.md
   - 11_agents/reports/2026-05-25-fespa26-agent-post-creation-review.md
 related:

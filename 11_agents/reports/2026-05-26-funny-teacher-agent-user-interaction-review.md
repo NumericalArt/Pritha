@@ -26,11 +26,11 @@ runtime_environment:
 config_surfaces:
   - 07_workflows/agents-mother.md
   - 08_templates/agent-post-creation-review.md
-  - /Users/jkl/FunnyTeacher/docs/creation-review.md
+  - <SIBLING_AGENT_ROOT>/FunnyTeacher/docs/creation-review.md
 portability: portable
 sources:
   - Techscope user thread 2026-05-25 to 2026-05-26
-  - /Users/jkl/FunnyTeacher/docs/creation-review.md
+  - <SIBLING_AGENT_ROOT>/FunnyTeacher/docs/creation-review.md
   - 11_agents/contracts/2026-05-25-funny-teacher-agent-contract.md
 related:
   agent_contracts:

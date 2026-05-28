@@ -43,9 +43,9 @@ sources:
   - 11_agents/reports/2026-05-25-funny-teacher-agent-scaffold-report.md
   - 11_agents/reports/2026-05-26-funny-teacher-launchd-deployment-report.md
   - 11_agents/reports/2026-05-26-funny-teacher-learning-memory-operations-report.md
-  - /Users/jkl/FunnyTeacher/docs/v1-successful-version.md
-  - /Users/jkl/FunnyTeacher/docs/architecture.md
-  - /Users/jkl/FunnyTeacher/docs/operator-guide.md
+  - <SIBLING_AGENT_ROOT>/FunnyTeacher/docs/v1-successful-version.md
+  - <SIBLING_AGENT_ROOT>/FunnyTeacher/docs/architecture.md
+  - <SIBLING_AGENT_ROOT>/FunnyTeacher/docs/operator-guide.md
 related:
   agent_contracts:
     - 11_agents/contracts/2026-05-25-funny-teacher-agent-contract.md
@@ -79,7 +79,7 @@ Status: accepted
 
 ## Summary
 
-- Project path: `/Users/jkl/FunnyTeacher`
+- Project path: `<SIBLING_AGENT_ROOT>/FunnyTeacher`
 - Classification: first successful Agents Mother language-learning voice agent
 - Access: `https://ivans-mac-mini.tail691439.ts.net:3034`
 - Service: launchd label `com.local.funny-teacher`

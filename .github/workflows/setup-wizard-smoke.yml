@@ -1,0 +1,52 @@
+name: Setup Wizard Smoke
+
+on:
+  pull_request:
+    paths:
+      - ".env.example"
+      - "07_workflows/first-run-setup.md"
+      - "scripts/setup*.mjs"
+      - "setup/**"
+      - "tests/fixtures/setup-minimal.json"
+
+permissions:
+  contents: read
+
+jobs:
+  setup-wizard-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Node dependencies
+        run: npm install --ignore-scripts
+
+      - name: Install portable Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            sentence-transformers==5.1.2 \
+            imageio-ffmpeg==0.6.0 \
+            yt-dlp==2025.10.14
+
+      - name: Run setup wizard in a clean temp state
+        run: |
+          tmp="$(mktemp -d)"
+          node scripts/setup.mjs \
+            --non-interactive \
+            --config tests/fixtures/setup-minimal.json \
+            --state "$tmp/.techscope-setup.json" \
+            --env "$tmp/.env.local"
+          node scripts/setup-status.mjs --state "$tmp/.techscope-setup.json" --json

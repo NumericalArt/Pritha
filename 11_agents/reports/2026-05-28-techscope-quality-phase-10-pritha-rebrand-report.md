@@ -59,7 +59,7 @@ Created:
 - `scripts/pritha.mjs`
 - `05_decisions/2026-05-28-pritha-rebrand.md`
 - `tests/pritha-alias.test.mjs`
-- `/Users/jkl/secure-handoffs/2026-05-28-pritha-repo-note.md` (outside repo)
+- `<SECURE_HANDOFFS_DIR>/2026-05-28-pritha-repo-note.md` (outside repo)
 
 Updated:
 

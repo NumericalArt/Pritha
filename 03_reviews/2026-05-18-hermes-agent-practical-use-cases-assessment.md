@@ -20,7 +20,7 @@ sources:
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime
 related:
   intakes:
-    - 00_inbox/telegram/2026-05-18-telegram-6208460904-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
+    - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
   notes:
     - 01_sources/notes/2026-05-18-hermes-agent-practical-use-cases-source-note.md
   briefs:

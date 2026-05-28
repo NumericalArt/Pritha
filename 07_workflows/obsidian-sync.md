@@ -19,14 +19,14 @@ related:
 
 ## Goal
 
-Подключить `/Users/jkl/Techscope` как Obsidian vault и синхронизировать Markdown-базу на MacBook и iPhone через Obsidian Sync.
+Подключить `<TECHSCOPE_ROOT>` как Obsidian vault и синхронизировать Markdown-базу на MacBook и iPhone через Obsidian Sync.
 
 ## Primary device
 
 Primary vault:
 
 ```text
-/Users/jkl/Techscope
+<TECHSCOPE_ROOT>
 ```
 
 Primary device:
@@ -62,7 +62,7 @@ Reason:
 3. Select:
 
 ```text
-/Users/jkl/Techscope
+<TECHSCOPE_ROOT>
 ```
 
 4. Log in to Obsidian account.
@@ -166,7 +166,7 @@ After setup:
 - Confirm Techscope Web sees it after:
 
 ```sh
-cd /Users/jkl/Techscope
+cd <TECHSCOPE_ROOT>
 node scripts/rebuild-memory.mjs
 python3 scripts/embed-memory.py
 ```

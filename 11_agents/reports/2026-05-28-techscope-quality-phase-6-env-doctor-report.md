@@ -111,7 +111,7 @@ Phase-specific checks:
 
 Fresh clone simulation:
 
-- `git clone /Users/jkl/Techscope /tmp/techscope-phase6-clone.../Techscope`
+- `git clone <TECHSCOPE_ROOT> /tmp/techscope-phase6-clone.../Techscope`
   -> success after the Phase 6 commit.
 - `node scripts/env-doctor.mjs` inside the clean clone -> pass with the same
   4 environment warnings as the source checkout.

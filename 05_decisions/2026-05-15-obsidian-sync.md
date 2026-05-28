@@ -30,7 +30,7 @@ Use Obsidian Sync for Markdown vault synchronization across Mac mini, MacBook an
 Mac mini remains the primary operational host:
 
 ```text
-/Users/jkl/Techscope
+<TECHSCOPE_ROOT>
 ```
 
 Obsidian Sync remote vault:

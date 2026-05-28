@@ -22,6 +22,7 @@
     "interfaces": "node scripts/interface-status.mjs --json",
     "memory": "node scripts/memory-status.mjs --json",
     "tools": "node scripts/tools-status.mjs --json",
-    "operations": "node scripts/operations-status.mjs --json"
+    "operations": "node scripts/operations-status.mjs --json",
+    "pre-push-audit": "node scripts/pre-push-audit.mjs"
   }
 }

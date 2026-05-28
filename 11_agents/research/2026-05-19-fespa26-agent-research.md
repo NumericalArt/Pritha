@@ -31,13 +31,13 @@ sources:
   - 04_standards/agent-creation-harness.md
   - 04_standards/agent-environment-compatibility.md
   - 04_standards/agent-tool-integration-selection.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
   - 02_briefs/2026-05-16-openai-realtime-audio-models-voice-agents-brief.md
   - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
   - 07_workflows/media-intake-processing.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-signal.md
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-signal.md
   - 03_reviews/2026-05-18-hermes-agent-practical-use-cases-assessment.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
   - 04_standards/signal-extraction.md
   - 10_wiki/pages/topic-ai-agents.md
   - 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
@@ -90,7 +90,7 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 
 ### 1. Signal: Codex mobile/desktop remote connection setup
 
-- Path: 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
+- Path: 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
 - Type/status: signal/refined
 - Heading: Codex refinement notes
 - Relevance note: ## Codex refinement notes  - Codex media review completed in Techscope thread on 2026-05-17. - Result should feed future `agent-shell-evaluation` and Codex mobile/remote workflow notes.
@@ -116,9 +116,9 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 - Heading: Workflow: media-intake-processing
 - Relevance note: # Workflow: media-intake-processing
 
-### 5. Signal: 2026-05-17-telegram-6208460904-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про
+### 5. Signal: 2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про
 
-- Path: 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-signal.md
+- Path: 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-signal.md
 - Type/status: signal/refined
 - Heading: Technical details
 - Relevance note: ## Technical details  - GitHub README confirms support for Claude Code, Codex CLI, Cursor, OpenCode, Kiro, Kilo and Copilot Chat. - Supported actions include preview/search/live status/convert/handoff/launch depending on agent. - Data sources include local session directories such as `~/.claude/`, `~/.codex/`, Cursor agent transcripts and other local stores. - Screenshots show installed-agent detection and GitHub onb
@@ -132,7 +132,7 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 
 ### 7. Signal: Codex remote access, VPS and synchronized connections
 
-- Path: 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
+- Path: 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
 - Type/status: signal/refined
 - Heading: Codex refinement notes
 - Relevance note: ## Codex refinement notes  - Codex media review completed in Techscope thread on 2026-05-17. - Useful input for future `codex-remote-hosts` workflow and `agent-shell-evaluation`.

@@ -9,8 +9,8 @@ tools: [codex, codex-desktop, chatgpt-mobile, ssh, macos, iphone, telegram-bot]
 sources:
   - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
   - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-53-telegram-photo/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
 related:
   briefs:

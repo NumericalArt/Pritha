@@ -10,15 +10,15 @@ source_type: telegram-photo
 source_url: https://t.me/oestick/503
 source_published: 2026-05-17
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
   - https://t.me/oestick/503
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
   - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
   - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
 related:
   signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
+    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
   briefs:
     - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
 ---

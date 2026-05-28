@@ -12,7 +12,7 @@ sources:
   - https://github.com/vakovalskii/codbash/releases/tag/v7.0.0
 related:
   intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-6208460904-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
+    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
   reviews:
     - 03_reviews/2026-05-17-codbash-agent-session-browser-assessment.md
   standards:

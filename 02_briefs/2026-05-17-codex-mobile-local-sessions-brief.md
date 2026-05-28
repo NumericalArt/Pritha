@@ -11,7 +11,7 @@ sources:
   - https://openai.com/index/work-with-codex-from-anywhere/
 related:
   intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-6208460904-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
   reviews:
     - 03_reviews/2026-05-17-codex-mobile-local-sessions-assessment.md
   standards:

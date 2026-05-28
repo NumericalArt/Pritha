@@ -10,14 +10,14 @@ source_type: telegram-photo
 source_url: https://t.me/oestick/504
 source_published: 2026-05-17
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-53-telegram-photo.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
   - https://t.me/oestick/504
-  - 01_sources/raw/telegram/2026-05-17-telegram-6208460904-53-telegram-photo.json
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-53-telegram-photo/01-photo.jpg
+  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.json
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
 related:
   signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
+    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
   briefs:
     - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
 ---

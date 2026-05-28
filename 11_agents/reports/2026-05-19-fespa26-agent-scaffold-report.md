@@ -35,7 +35,7 @@ portability: codex-native
 sources:
   - 11_agents/contracts/2026-05-19-fespa26-agent-contract.md
   - 11_agents/research/2026-05-19-fespa26-agent-research.md
-  - /Users/jkl/FESPA26
+  - <SIBLING_AGENT_ROOT>/FESPA26
 related:
   agent_contracts:
     - 11_agents/contracts/2026-05-19-fespa26-agent-contract.md
@@ -63,7 +63,7 @@ Status: complete
 
 ## Summary
 
-- Project path: `/Users/jkl/FESPA26`
+- Project path: `<SIBLING_AGENT_ROOT>/FESPA26`
 - Scaffold type: custom Agents Mother scaffold based on the proven `fast_talk` Realtime/Codex architecture.
 - Primary interface: Web UI.
 - Runtime: `gpt-realtime-2` voice dispatcher plus Codex CLI sidecar.

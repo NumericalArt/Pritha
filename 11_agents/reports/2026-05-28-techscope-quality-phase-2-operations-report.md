@@ -76,13 +76,13 @@ Fix:
 
 Current web error log still contains historical entries from the old root:
 
-- `/Users/jkl/Documents/New project/scripts/run-techscope-web.sh`: 4 lines.
+- `<ARCHIVED_TECHSCOPE_ROOT>/scripts/run-techscope-web.sh`: 4 lines.
 
 Fix/verification:
 
 - Phase 1 already replaced launchd files with portable templates.
 - Phase 2 verified the portable web runner manually:
-  - `HOST=127.0.0.1 PORT=3307 TECHSCOPE_ROOT=/Users/jkl/Techscope scripts/run-techscope-web.sh`
+  - `HOST=127.0.0.1 PORT=3307 TECHSCOPE_ROOT=<TECHSCOPE_ROOT> scripts/run-techscope-web.sh`
   - `curl -fsS http://127.0.0.1:3307/`
   - `curl -fsS http://127.0.0.1:3307/api/stats`
 - No launchd install/reload was performed.

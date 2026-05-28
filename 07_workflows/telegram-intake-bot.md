@@ -58,7 +58,7 @@ Use local environment variables:
 
 ```sh
 TECHSCOPE_TELEGRAM_BOT_TOKEN=...
-TECHSCOPE_TELEGRAM_ALLOWED_USER_IDS=6208460904
+TECHSCOPE_TELEGRAM_ALLOWED_USER_IDS=telegram-user
 ```
 
 Keep secrets in `.env.local`. Do not commit bot tokens into Markdown, scripts or launchd plists.

@@ -25,7 +25,7 @@ const INBOX_DIR = path.join(ROOT, "00_inbox", "telegram");
 const RAW_DIR = path.join(ROOT, "01_sources", "raw", "telegram");
 const QUEUE_DIR = path.join(ROOT, ".queue", "telegram-intake");
 const CODEX_REVIEW_DIR = path.join(ROOT, ".queue", "codex-media-review");
-const DEFAULT_ALLOWED_USER_IDS = ["6208460904"];
+const DEFAULT_ALLOWED_USER_IDS = [];
 const POLL_TIMEOUT_SECONDS = 30;
 const RETRY_DELAY_MS = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_INITIAL_MS || 3000);
 const MAX_RETRY_DELAY_MS = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_MAX_MS || 60000);
@@ -50,7 +50,7 @@ function usage() {
 
 Environment:
   TECHSCOPE_TELEGRAM_BOT_TOKEN=<telegram bot token>
-  TECHSCOPE_TELEGRAM_ALLOWED_USER_IDS=6208460904`);
+  TECHSCOPE_TELEGRAM_ALLOWED_USER_IDS=<telegram-user-id>`);
 }
 
 function runCommand(command, args) {

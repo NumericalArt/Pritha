@@ -371,7 +371,7 @@ Lesson lifecycle statuses:
 
 ## Scaffold Requirements
 
-- Target folder: `/Users/jkl/FunnyTeacher` unless user chooses another path.
+- Target folder: `<SIBLING_AGENT_ROOT>/FunnyTeacher` unless user chooses another path.
 - Files to generate:
   - `AGENTS.md`;
   - `README.md`;
@@ -424,7 +424,7 @@ Lesson lifecycle statuses:
 
 ## Open Questions Before Scaffold
 
-- Confirm exact generated folder name: `/Users/jkl/FunnyTeacher` or another spelling.
+- Confirm exact generated folder name: `<SIBLING_AGENT_ROOT>/FunnyTeacher` or another spelling.
 - Which sample YouTube URL or fixture transcript should be used in automated tests, if real YouTube access is unavailable in CI/local test mode?
 - Should v1 use OpenAI API models directly for lesson extraction, Codex CLI, or both?
 - Should voice practice use `gpt-realtime-2` by default, or should we research the current best Realtime model before scaffold?

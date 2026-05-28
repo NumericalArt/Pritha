@@ -26,7 +26,7 @@ config_surfaces:
   - scripts
 portability: codex-native
 sources:
-  - /Users/jkl/Techscope
+  - <TECHSCOPE_ROOT>
   - 07_workflows/agents-mother.md
   - 07_workflows/agents-mother-roadmap.md
   - 04_standards/agent-creation-harness.md
@@ -59,14 +59,14 @@ Status: partial
 
 ## Summary
 
-- Project path: /Users/jkl/Techscope
+- Project path: <TECHSCOPE_ROOT>
 - Classification: agent-project
 - Deployment target: Mac mini
 - Deployment profile: mac-mini-service
 - Service mode: launchd
 - Autostart: launchd-on-approval
 - Proactive mode: queue-watcher
-- Autostart policy: Techscope Web and Telegram bot are allowed to run as launchd services from /Users/jkl/Techscope. New agents must not inherit this automatically.
+- Autostart policy: Techscope Web and Telegram bot are allowed to run as launchd services from <TECHSCOPE_ROOT>. New agents must not inherit this automatically.
 - Result: partial
 
 ## Checks
@@ -77,7 +77,7 @@ Status: partial
 | Deployment target | pass | Mac mini |
 | Deployment profile | pass | mac-mini-service |
 | Service mode | pass | launchd |
-| Autostart mode | pass | launchd-on-approval; Techscope Web and Telegram bot are allowed to run as launchd services from /Users/jkl/Techscope. New agents must not inherit this automatically. |
+| Autostart mode | pass | launchd-on-approval; Techscope Web and Telegram bot are allowed to run as launchd services from <TECHSCOPE_ROOT>. New agents must not inherit this automatically. |
 | Start command | pass | launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.techscope.web.plist && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.techscope.telegram-bot.plist |
 | Stop command | pass | launchctl bootout gui/$(id -u)/com.techscope.web; launchctl bootout gui/$(id -u)/com.techscope.telegram-bot |
 | Healthcheck command | pass | curl -fsS http://127.0.0.1:3000/ >/dev/null && node scripts/telegram-bot.mjs poll-once --dry-run >/dev/null |
@@ -112,5 +112,5 @@ Status: partial
 ## Next Steps
 
 - Fix any failed or missing checks before treating this agent as a service.
-- Run `node scripts/agents-mother.mjs test "/Users/jkl/Techscope"` after operations changes.
+- Run `node scripts/agents-mother.mjs test "<TECHSCOPE_ROOT>"` after operations changes.
 - Create or update the agent contract if service mode or autostart policy changes.

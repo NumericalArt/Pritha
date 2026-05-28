@@ -79,13 +79,13 @@ templates with explicit placeholders.
 - Markdown validation after edits:
   - `node scripts/validate-memory.mjs` -> pass for 393 Markdown files.
 - Runtime path audit:
-  - `grep -rn "/Users/jkl" scripts launchd interfaces memory tools operations` -> no matches.
+  - `grep -rn "<USER_HOME>" scripts launchd interfaces memory tools operations` -> no matches.
 - Healthcheck:
   - `node scripts/healthcheck.mjs` -> pass.
-  - `TECHSCOPE_ROOT=/Users/jkl/Techscope node /Users/jkl/Techscope/scripts/healthcheck.mjs` from `/tmp` -> pass.
+  - `TECHSCOPE_ROOT=<TECHSCOPE_ROOT> node <TECHSCOPE_ROOT>/scripts/healthcheck.mjs` from `/tmp` -> pass.
 - Portable golden check:
-  - `TECHSCOPE_ROOT=/Users/jkl/Techscope node /Users/jkl/Techscope/scripts/golden-checks.mjs` from `/tmp` -> pass.
-  - `TECHSCOPE_ROOT=/Users/jkl/Techscope node /Users/jkl/Techscope/scripts/golden-checks.mjs --with-embeddings` from `/tmp` -> pass.
+  - `TECHSCOPE_ROOT=<TECHSCOPE_ROOT> node <TECHSCOPE_ROOT>/scripts/golden-checks.mjs` from `/tmp` -> pass.
+  - `TECHSCOPE_ROOT=<TECHSCOPE_ROOT> node <TECHSCOPE_ROOT>/scripts/golden-checks.mjs --with-embeddings` from `/tmp` -> pass.
 - Agents Mother self-inspection:
   - `node scripts/agents-mother.mjs test . --no-report` -> complete.
 - launchd validation:

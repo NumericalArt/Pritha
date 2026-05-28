@@ -69,8 +69,8 @@ sources:
   - https://www.youtube.com/watch?v=am_oeAoUhew
   - https://openai.com/index/harness-engineering/
   - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
-  - 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-  - 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
   - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
   - https://t.me/tosoltaime/42
   - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
@@ -88,13 +88,13 @@ sources:
   - 04_standards/agent-shell-evaluation.md
   - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
   - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-53-telegram-photo/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
   - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
   - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
   - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
   - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
@@ -247,8 +247,8 @@ This generated page tracks codex as a tool in the Techscope knowledge base. Use 
 - https://www.youtube.com/watch?v=am_oeAoUhew
 - https://openai.com/index/harness-engineering/
 - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
-- 01_sources/signals/2026-05-16-2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex-signal.md
-- 00_inbox/telegram/2026-05-16-telegram-6208460904-9-как-использовать-superpowers-в-codex.md
+- 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+- 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
 - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
 - https://t.me/tosoltaime/42
 - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
@@ -266,13 +266,13 @@ This generated page tracks codex as a tool in the Techscope knowledge base. Use 
 - 04_standards/agent-shell-evaluation.md
 - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
 - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-- 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-53-telegram-photo-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-53-telegram-photo/01-photo.jpg
+- 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
+- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
 - https://openai.com/index/work-with-codex-from-anywhere/
 - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
 - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
-- 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+- 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
+- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
 - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
 - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
 - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md

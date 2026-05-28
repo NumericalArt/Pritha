@@ -64,19 +64,19 @@ This avoids the repeated failure mode where Tailscale Serve remains configured b
 
 - LaunchAgent label: `com.local.funny-teacher`
 - Plist path: `~/Library/LaunchAgents/com.local.funny-teacher.plist`
-- Working directory: `/Users/jkl/FunnyTeacher`
-- Program: `/Users/jkl/.local/bin/npm run start`
+- Working directory: `<SIBLING_AGENT_ROOT>/FunnyTeacher`
+- Program: `<USER_HOME>/.local/bin/npm run start`
 - Port: `3033`
 - Local URL: `http://127.0.0.1:3033`
 - Tailscale URL: `https://ivans-mac-mini.tail691439.ts.net:3034`
 - Logs:
-  - `/Users/jkl/FunnyTeacher/logs/launchd.out.log`
-  - `/Users/jkl/FunnyTeacher/logs/launchd.err.log`
+  - `<SIBLING_AGENT_ROOT>/FunnyTeacher/logs/launchd.out.log`
+  - `<SIBLING_AGENT_ROOT>/FunnyTeacher/logs/launchd.err.log`
 - Restart policy: launchd `KeepAlive=true`
 
 ## Commands
 
-In `/Users/jkl/FunnyTeacher`:
+In `<SIBLING_AGENT_ROOT>/FunnyTeacher`:
 
 ```sh
 npm run deploy:plan

@@ -68,7 +68,7 @@ Result:
 
 ```text
 Techscope golden checks: pass
-Root: /Users/jkl/Techscope
+Root: <TECHSCOPE_ROOT>
 - PASS Markdown integrity
 - PASS Memory rebuild
 - PASS Memory stats
@@ -163,7 +163,7 @@ node scripts/agents-mother.mjs test . --no-report
 Result:
 
 ```text
-Project: /Users/jkl/Techscope
+Project: <TECHSCOPE_ROOT>
 Classification: agent-project
 Result: complete
 Report: skipped (--no-report)
@@ -196,15 +196,15 @@ Report: skipped (--no-report)
 Executable/runtime path mismatches to address in Phase 1:
 
 ```text
-scripts/techscope_web.py: ROOT = Path("/Users/jkl/Techscope")
-scripts/techscope_web.py: HOME = "/Users/jkl"
-scripts/transcribe-youtube.mjs: hardcoded /Users/jkl Python paths
-scripts/run-techscope-web.sh: cd "/Users/jkl/Techscope"
-scripts/run-techscope-web.sh: hardcoded /Users/jkl PATH entries
-scripts/run-techscope-telegram-bot.sh: cd /Users/jkl/Techscope
-launchd/com.techscope.telegram-bot.plist: hardcoded /Users/jkl/Techscope and HOME
-launchd/com.techscope.web.plist: hardcoded /Users/jkl/Techscope and HOME
-operations/manifest.json: autostart policy references /Users/jkl/Techscope
+scripts/techscope_web.py: ROOT = Path("<TECHSCOPE_ROOT>")
+scripts/techscope_web.py: HOME = "<USER_HOME>"
+scripts/transcribe-youtube.mjs: hardcoded <USER_HOME> Python paths
+scripts/run-techscope-web.sh: cd "<TECHSCOPE_ROOT>"
+scripts/run-techscope-web.sh: hardcoded <USER_HOME> PATH entries
+scripts/run-techscope-telegram-bot.sh: cd <TECHSCOPE_ROOT>
+launchd/com.techscope.telegram-bot.plist: hardcoded <TECHSCOPE_ROOT> and HOME
+launchd/com.techscope.web.plist: hardcoded <TECHSCOPE_ROOT> and HOME
+operations/manifest.json: autostart policy references <TECHSCOPE_ROOT>
 ```
 
 Instruction/history path references in `AGENTS.md` are intentional until Phase 1 creates env-first canonical-root wording.
@@ -239,7 +239,7 @@ Modified:
 
 ## Regressions observed
 
-- `scripts/golden-checks.mjs` initially resolved root as `/Users/jkl`; fixed by deriving root from `fileURLToPath(import.meta.url)`.
+- `scripts/golden-checks.mjs` initially resolved root as `<USER_HOME>`; fixed by deriving root from `fileURLToPath(import.meta.url)`.
 - Parallel golden-check invocations can contend on SQLite rebuild. Golden checks should run sequentially.
 - Repeated `agents-mother test .` used to create duplicate report ids; fixed by deriving report id from the unique report filename and adding `--no-report`.
 

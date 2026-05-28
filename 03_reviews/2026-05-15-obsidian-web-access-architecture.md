@@ -136,7 +136,7 @@ Tailscale Serve for private access from MacBook and phone
 
 ```text
 Mac mini
-  /Users/jkl/Techscope
+  <TECHSCOPE_ROOT>
     Markdown vault
     .memory/techscope.sqlite
     scripts/rebuild-memory.mjs

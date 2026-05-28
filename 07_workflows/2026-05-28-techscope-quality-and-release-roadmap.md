@@ -278,7 +278,7 @@ AM-pattern candidates: `audit-baseline-report`, `golden-checks-manifest`, `audit
   - queue snapshot;
   - результат `agents-mother test .`;
   - список scripts с line counts;
-  - известные path mismatches (`/Users/jkl/*` ↔ актуальный root);
+  - известные path mismatches (`<USER_HOME>/*` ↔ актуальный root);
   - hash основных утилитарных функций (для будущего DRY-merge).
 - `07_workflows/techscope-quality-audit-log.md` — append-only журнал прохождения фаз.
 
@@ -309,7 +309,7 @@ AM-pattern candidates: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-awa
 
 ### Goal
 
-Устранить hardcoded `/Users/jkl/Techscope` в скриптах, launchd-юнитах и манифестах. Сделать проект переносимым между машинами, пользователями и форками.
+Устранить hardcoded `<TECHSCOPE_ROOT>` в скриптах, launchd-юнитах и манифестах. Сделать проект переносимым между машинами, пользователями и форками.
 
 ### Deliverables
 
@@ -332,7 +332,7 @@ AM-pattern candidates: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-awa
 - `node scripts/healthcheck.mjs` → pass.
 - `node scripts/agents-mother.mjs test .` → pass без N/A по структуре.
 - launchd-плейсхолдеры валидны (`plutil -lint`), но **не устанавливать** автоматически.
-- `grep -rn "/Users/jkl" scripts launchd interfaces memory tools operations` — пустой результат для каталогов исполняемого кода. (Артефакты в `03_reviews/`, `05_decisions/`, `11_agents/reports/` могут сохранять исторический контекст.)
+- `grep -rn "<USER_HOME>" scripts launchd interfaces memory tools operations` — пустой результат для каталогов исполняемого кода. (Артефакты в `03_reviews/`, `05_decisions/`, `11_agents/reports/` могут сохранять исторический контекст.)
 
 ### Rollback
 
@@ -1211,13 +1211,13 @@ File naming: `11_agents/reports/YYYY-MM-DD-techscope-quality-phase-N-report.md`.
 - [ ] `node scripts/quality-gate.mjs` — единая зелёная проверка, используемая локально и в CI.
 - [ ] Techscope проходит собственный `agents-mother test .` **без** critical N/A.
 - [ ] Shared `scripts/lib/*`; нет копий парсеров; agents-mother modularized.
-- [ ] Portable root — никаких hardcoded `/Users/jkl/*` в исполняемом коде.
+- [ ] Portable root — никаких hardcoded `<USER_HOME>/*` в исполняемом коде.
 - [ ] `tests/` покрывают frontmatter, slug, paths, contract validation, scaffold snapshot.
 - [ ] Self-test + queue-health документированы; proactivity — explicit decision.
 - [ ] **Pritha rebrand** выполнен: `pritha` CLI работает, старый `agents-mother.mjs` — deprecation shim; snapshot-тесты scaffold зелёные; `type`-значения frontmatter не сломаны.
 - [ ] First-run setup wizard работает и в Codex thread (по фразе «запусти проект»), и в headless CLI (`scripts/setup.mjs --non-interactive`).
 - [ ] Публичный репозиторий **`pritha`** — **на английском**, с зелёным CI, README + LICENSE + CONTRIBUTING + SECURITY; имя Pritha консистентно.
-- [ ] **Нет утечек**: ни локальных путей (`/Users/...`), ни секретов, ни runtime-state в git history; `secure-handoffs/` — вне репозитория.
+- [ ] **Нет утечек**: ни локальных путей (`<USER_HOME>/...`), ни секретов, ни runtime-state в git history; `secure-handoffs/` — вне репозитория.
 - [ ] Чистый clone проходит сценарий «10-second start»: `git clone … && open -a Codex .` → «запусти проект» → quality-gate green без правок руками.
 - [ ] `03_reviews/...-pattern-review.md` существует; решения по AM-promotion приняты явно.
 - [ ] Audit log заполнен по каждой фазе.

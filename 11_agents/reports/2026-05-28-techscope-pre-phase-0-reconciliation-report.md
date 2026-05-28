@@ -16,8 +16,8 @@ tools:
   - validate-memory
   - rebuild-memory
 sources:
-  - /Users/jkl/Techscope
-  - /Users/jkl/Documents/New project
+  - <TECHSCOPE_ROOT>
+  - <ARCHIVED_TECHSCOPE_ROOT>
   - 05_decisions/2026-05-18-techscope-canonical-root.md
   - 07_workflows/2026-05-28-techscope-quality-and-release-roadmap.md
 related:
@@ -50,20 +50,20 @@ Prepared canonical Techscope root for Phase 0 of the quality/release roadmap.
 The canonical workspace remains:
 
 ```text
-/Users/jkl/Techscope
+<TECHSCOPE_ROOT>
 ```
 
 The old workspace remains archive/source-only:
 
 ```text
-/Users/jkl/Documents/New project
+<ARCHIVED_TECHSCOPE_ROOT>
 ```
 
 No runtime state, secrets, `.env.local`, `.queue`, `.logs` or SQLite database files were copied from the archive folder.
 
 ## Changes made
 
-- Copied missing curated Markdown artifacts from `/Users/jkl/Documents/New project` into `/Users/jkl/Techscope`.
+- Copied missing curated Markdown artifacts from `<ARCHIVED_TECHSCOPE_ROOT>` into `<TECHSCOPE_ROOT>`.
 - Copied missing FESPA26 and Funny Teacher lifecycle reports and contracts.
 - Copied missing standards created after the original migration:
   - `agent-runtime-placement`
@@ -93,7 +93,7 @@ No runtime state, secrets, `.env.local`, `.queue`, `.logs` or SQLite database fi
 
 ## Verification results
 
-Commands run from `/Users/jkl/Techscope`:
+Commands run from `<TECHSCOPE_ROOT>`:
 
 ```text
 node --check scripts/agents-mother.mjs
@@ -123,7 +123,7 @@ These are intentionally not fixed in preflight because the roadmap assigns them 
 
 - Git is not initialized yet.
 - `scripts/golden-checks.mjs` does not exist yet.
-- Hardcoded `/Users/jkl/Techscope` paths still exist in scripts and launchd files.
+- Hardcoded `<TECHSCOPE_ROOT>` paths still exist in scripts and launchd files.
 - Repo cruft such as `.DS_Store`, `Untitled*.canvas` and `2026-05-15.md` still exists.
 - Telegram queue has one `awaiting_codex` / pending media-review item.
 - Embeddings may need rebuild after the final Phase 0 baseline command.
@@ -134,10 +134,10 @@ These are intentionally not fixed in preflight because the roadmap assigns them 
 Ready to start Phase 0 from canonical root:
 
 ```text
-/Users/jkl/Techscope
+<TECHSCOPE_ROOT>
 ```
 
-Do not run Phase 0 from `/Users/jkl/Documents/New project`.
+Do not run Phase 0 from `<ARCHIVED_TECHSCOPE_ROOT>`.
 
 ## AM-CANDIDATE patterns
 

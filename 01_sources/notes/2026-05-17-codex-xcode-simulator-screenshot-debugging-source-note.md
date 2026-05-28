@@ -10,14 +10,14 @@ source_type: telegram-photo
 source_url: https://t.me/airanez/217
 source_published: 2026-05-17
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
   - https://t.me/airanez/217
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
   - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
 related:
   signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-6208460904-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
+    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
   briefs:
     - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
 ---

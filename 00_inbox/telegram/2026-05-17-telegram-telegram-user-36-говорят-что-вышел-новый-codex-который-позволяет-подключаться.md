@@ -1,0 +1,67 @@
+---
+id: 2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться
+type: intake
+status: new
+created: 2026-05-17
+updated: 2026-05-17
+topics: [telegram, inbox]
+tools: [telegram-bot]
+source_type: telegram
+source_url: https://t.me/llm_under_hood/835
+sources:
+  - https://t.me/llm_under_hood/835
+  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json
+related: {}
+telegram:
+  user_id: telegram-user
+  chat_id: telegram-user
+  message_id: 36
+  forwarded_from: LLM под капотом #835
+---
+
+# Intake: 2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться
+
+Date added: 2026-05-17
+Type: telegram
+Source: https://t.me/llm_under_hood/835
+Status: new
+
+## Why this may matter
+
+- Forwarded to Techscope for later expert assessment.
+
+## Telegram metadata
+
+- User: telegram-user
+- Chat: telegram-user
+- Message: 36
+- Forwarded from: LLM под капотом #835
+- Date: 2026-05-17T11:35:57.000Z
+- Media: photo: AgACAgIAAxkBAAMkagmoHcy2ARddOTLPZ8mXkt53qXsAAhMVaxt4oDBIecMUB3CMTdQBAAMCAAN5AAM7BA
+
+## Raw material or link
+
+- https://t.me/llm_under_hood/835
+- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json`
+
+## Message text
+
+Говорят, что вышел новый Codex, который позволяет подключаться к локальным сессиям c мобильного. Как Claude Dispatch. 
+
+Это в теории позволит обойти все костыли в виде telegram bridges.
+
+Но это пока не про меня. Ибо текущий Codex накатывает на сервера BitGN большой апдейт аналитики (Vector + ClickHouse + Grafana Dashboards), и пока он не закончит, ставить новую версию некрасиво.
+
+Update: действительно работает. Я подключился к локальной сессии кодекса с мобильника. Теперь смогу гонять хоть разработку, хоть задачи в базе знаний с мобильника. Это удобнее облачного кодекса в контейнерах. Главное, не давать ноуту засыпать (есть такая галка в Codex) или вынести все на VM/MacMini.
+
+Ваш, @llm_under_hood 🤗
+
+## Initial questions
+
+- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
+- Нужна ли проверка первоисточника?
+- Стоит ли превратить это в brief, review, experiment или archive?
+
+## Expected output
+
+brief | review | experiment | archive

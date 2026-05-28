@@ -9,8 +9,8 @@ tools: [Codex, ChatGPT mobile app, Codex desktop app, secure relay, Mac mini, Te
 source_type: telegram
 source_url: https://t.me/llm_under_hood/835
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-6208460904-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg
   - https://openai.com/index/work-with-codex-from-anywhere/
 related:
   briefs:

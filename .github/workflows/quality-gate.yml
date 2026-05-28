@@ -1,0 +1,53 @@
+name: Quality Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    name: quality-gate / node-${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 20
+          - 22
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Node dependencies
+        run: npm install --ignore-scripts
+
+      - name: Install portable Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            sentence-transformers==5.1.2 \
+            imageio-ffmpeg==0.6.0 \
+            yt-dlp==2025.10.14
+
+      - name: Environment doctor
+        run: node scripts/env-doctor.mjs
+
+      - name: Quality gate
+        run: node scripts/quality-gate.mjs

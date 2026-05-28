@@ -38,7 +38,7 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - Report: `11_agents/reports/2026-05-28-techscope-pre-phase-0-reconciliation-report.md`
 - AM-CANDIDATE patterns: `canonical-root-reconciliation`, `archive-source-only-folder`, `pre-phase-readiness-report`
 - Open questions: none
-- Notes: `/Users/jkl/Techscope` is canonical. `/Users/jkl/Documents/New project` is archive/source-only.
+- Notes: `<TECHSCOPE_ROOT>` is canonical. `<ARCHIVED_TECHSCOPE_ROOT>` is archive/source-only.
 
 ## Phase 0 — 2026-05-28
 
@@ -60,7 +60,7 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - Report: `11_agents/reports/2026-05-28-techscope-quality-phase-1-report.md`
 - AM-CANDIDATE patterns: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-aware-launchd-template`, `portable-tool-discovery`
 - Open questions: should Phase 2 add a plist rendering helper or keep launchd rendering manual?
-- Notes: Runtime grep for `/Users/jkl` is clean across `scripts launchd interfaces memory tools operations`; historical Markdown keeps old paths only as migration context. Final gate passed both from project root and from `/tmp` with `TECHSCOPE_ROOT=/Users/jkl/Techscope`.
+- Notes: Runtime grep for `<USER_HOME>` is clean across `scripts launchd interfaces memory tools operations`; historical Markdown keeps old paths only as migration context. Final gate passed both from project root and from `/tmp` with `TECHSCOPE_ROOT=<TECHSCOPE_ROOT>`.
 
 ## Phase 2 — 2026-05-28
 
@@ -215,3 +215,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `first-run-setup-workflow`, `trigger-phrase-routing`, `completed-with-warnings-status`, `secrets-collector-pattern`, `minimal-default-config`
 - Open questions: should Phase 14 promote the setup wizard into every Pritha descendant scaffold by default?
 - Notes: Added first-run setup workflow, CLI fallback, status reader, schema, reusable dialog template, setup tests, trigger phrase rules, Realtime opt-in decision and Claude Code adapter placeholder contract. Minimal temp setup with real quality-gate completed successfully. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 13 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from Phase 12 final gate
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-13-github-ci-release-prep-report.md`
+- AM-CANDIDATE patterns: `github-quality-workflow`, `markdown-validate-workflow`, `setup-wizard-ci-smoke`, `secure-handoff-folder`, `local-path-scrub`
+- Open questions: should Pritha publish from current history, a fresh clean export, or a history-rewritten branch?
+- Notes: Added GitHub Actions workflows, Dependabot, release docs, pre-push audit, Linux CI env-doctor compatibility and public snapshot scrub. Remote GitHub operations were not executed without explicit user confirmation. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.

@@ -10,7 +10,7 @@ source_type: youtube
 source_url: https://www.youtube.com/watch?v=Xxuxg8PcBvc
 source_published: 2026-04-14
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-6208460904-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.md
+  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.md
   - 01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md
   - https://www.youtube.com/watch?v=Xxuxg8PcBvc
   - https://openai.com/index/harness-engineering/
