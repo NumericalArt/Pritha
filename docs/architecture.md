@@ -2,6 +2,11 @@
 
 Pritha is a Codex-native agent factory inside Techscope.
 
+Another useful shorthand: Pritha is a harness for an agent that builds the
+harness of a new agent. The lineage language is deliberately genetic: a Seed
+is transformed into a Descendant through inherited policies, task-specific
+mutation and trial checks before handoff.
+
 ## Layers
 
 - Intake: raw text, links, media and source notes.
@@ -38,3 +43,7 @@ that is not directly about its task domain, the material can still be useful as
 self-improvement evidence. It should be routed into the agent's own
 harness/memory/tooling review path instead of being merged into domain memory
 without context.
+
+The public v0.1 implementation is Codex-native. A Claude Code adapter/version
+is tracked as a future compatibility path, not as an implemented runtime in
+this release candidate.

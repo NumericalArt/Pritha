@@ -102,7 +102,7 @@ function reportSummaryFromFile(file) {
   const relPath = path.relative(ROOT, file);
   const projectPath = bodyValue(text, "Project path") || bodyValue(text, "Target folder") || "";
   const nameFromTitle = title.replace(/^Agent\s+(Scaffold|Test|Handoff|Operations|Deployment)\s+Report:\s*/i, "").trim();
-  const name = nameFromTitle || path.basename(file, ".md");
+  const name = bodyValue(text, "Agent name") || nameFromTitle || path.basename(file, ".md");
   return {
     kind: "report",
     path: relPath,
@@ -436,4 +436,3 @@ ${lessons.outdated.map((item) => `- ${item}`).join("\n")}
 - Run \`node scripts/agents-mother.mjs registry\` after future lifecycle reports.
 `;
 }
-

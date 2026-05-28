@@ -2,6 +2,11 @@
 
 Pritha is the preferred CLI surface.
 
+Conceptually, Pritha is a harness for an agent that builds the harness of a new
+agent. It uses a genetic lineage model: a Seed carries the specification,
+Descendants inherit base policies, mutation adapts the scaffold to the task,
+and trial checks decide whether the result is ready for handoff.
+
 ```sh
 node scripts/pritha.mjs help
 node scripts/pritha.mjs questions
@@ -55,3 +60,15 @@ node scripts/setup-status.mjs --json
 reports `harness`, `memory`, `data`, `skills` and `mcp` readiness. Future
 descendants should expose the same style of module-readiness result for their
 selected modules.
+
+If a Seed selects realtime voice control, the default realtime tool surface is
+internet access, agent memory access and Codex CLI sidecar access. Setup must
+record readiness for those tools so voice is not treated as complete when its
+supporting tool surface is missing.
+
+## Compatibility Roadmap
+
+Pritha v0.1 is Codex-native. A Claude Code version is coming through a future
+adapter path that translates selected Pritha/Codex-native project surfaces into
+Claude Code-compatible guidance without replacing `AGENTS.md` as the Pritha
+source of truth.

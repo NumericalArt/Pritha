@@ -167,6 +167,7 @@ The compatibility rule is alias-first: new Pritha names may wrap existing Agents
 - After the first meaningful working version, create a post-creation review and preserve the user interaction path that shaped the agent.
 - Index contracts and scaffold reports into TechScope memory.
 - At the end of setup/init, verify and state module readiness for the selected agent: harness, memory, data layer, skills, MCP, tools, interfaces, operations and any selected external connectors. Missing optional modules are reported as skipped; missing selected modules are reported as failed or pending-auth.
+- If realtime voice control is selected, initialize the default realtime tool surface unless the contract explicitly opts out: internet access, agent memory access and Codex CLI sidecar access. Treat these as selected realtime-interface modules; setup must report their readiness and must not silently mark the voice interface as ready when memory or Codex CLI access is missing.
 - Preserve an evolution path through the agent's native interface. For Codex-native descendants, document how to continue development in Codex App and how to route non-domain learning materials into agent self-improvement review rather than task memory.
 
 ## Harness inventory

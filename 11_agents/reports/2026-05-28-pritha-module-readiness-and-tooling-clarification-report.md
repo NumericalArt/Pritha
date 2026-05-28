@@ -45,6 +45,8 @@ temporal_status: current
 Date: 2026-05-28
 Status: complete
 
+- Agent name: Techscope
+
 ## Summary
 
 Clarified three product/architecture rules before finishing the GitHub release work:

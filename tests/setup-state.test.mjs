@@ -30,5 +30,6 @@ test("setup manifest schema describes the v1 state contract", () => {
   assert.equal(schema.properties.schema.const, "techscope-setup-state-v1");
   assert.ok(schema.required.includes("sections"));
   assert.ok(schema.properties.status.enum.includes("completed-with-warnings"));
+  assert.ok(schema.properties.realtime.properties.tools.properties.codexCli);
   assert.ok(schema.properties.modules.properties.harness);
 });

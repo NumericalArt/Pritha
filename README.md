@@ -4,6 +4,8 @@
 
 Pritha is an open-source, Codex-native spec-to-agent compiler. It helps you turn a task description into a working agent project with instructions, memory boundaries, tool policy, tests, handoff notes and lifecycle reports.
 
+In other words: Pritha is a harness for an agent that builds the harness of a new agent. Its lineage model is intentionally genetic: Seeds become Descendants through inheritance, mutation and trial. A Claude Code version is coming as a future adapter; v0.1 remains Codex-native.
+
 Techscope is the internal knowledge base around Pritha: it collects technology signals, reviews agent-engineering patterns, and promotes only proven ideas into reusable standards.
 
 > Existing `agents-mother` commands still work as compatibility aliases. New public-facing commands should use `pritha`.

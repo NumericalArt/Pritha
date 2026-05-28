@@ -16,6 +16,22 @@
     "updated": { "type": "string" },
     "root": { "type": "string" },
     "interfaces": { "type": "object" },
+    "realtime": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string" },
+        "tools": {
+          "type": "object",
+          "properties": {
+            "internet": { "type": "boolean" },
+            "memory": { "type": "boolean" },
+            "codexCli": { "type": "boolean" }
+          },
+          "additionalProperties": { "type": "boolean" }
+        }
+      }
+    },
     "modules": {
       "type": "object",
       "properties": {
