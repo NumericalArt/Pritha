@@ -5,8 +5,9 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "127.0.0.1";

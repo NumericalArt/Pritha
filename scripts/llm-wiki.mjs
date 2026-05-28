@@ -11,8 +11,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { parseFrontmatter } from "./lib/frontmatter.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { now, today } from "./lib/date.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const WIKI_DIR = path.join(ROOT, "10_wiki");
 const PAGES_DIR = path.join(WIKI_DIR, "pages");
 const INDEX_PATH = path.join(WIKI_DIR, "index.md");
@@ -51,14 +54,6 @@ const STOPWORDS = new Set([
   "они",
 ]);
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function now() {
-  return new Date().toISOString();
-}
-
 function sha(value) {
   return createHash("sha256").update(String(value)).digest("hex");
 }
@@ -78,68 +73,6 @@ function asciiSlug(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || `item-${sha(value).slice(0, 10)}`;
-}
-
-function parseScalar(value) {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-  if (trimmed === "[]") return [];
-  if (trimmed === "{}") return {};
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    const inner = trimmed.slice(1, -1).trim();
-    if (!inner) return [];
-    return inner.split(",").map((item) => item.trim().replace(/^["']|["']$/g, ""));
-  }
-  return trimmed.replace(/^["']|["']$/g, "");
-}
-
-function parseFrontmatter(text) {
-  if (!text.startsWith("---\n")) return { data: {}, body: text };
-  const end = text.indexOf("\n---\n", 4);
-  if (end === -1) return { data: {}, body: text };
-
-  const raw = text.slice(4, end);
-  const body = text.slice(end + 5);
-  const lines = raw.split(/\r?\n/);
-  const data = {};
-  let currentKey = null;
-  let currentNestedKey = null;
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    const topMatch = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (topMatch) {
-      currentKey = topMatch[1];
-      currentNestedKey = null;
-      data[currentKey] = parseScalar(topMatch[2] ?? "");
-      continue;
-    }
-
-    const nestedMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (nestedMatch && currentKey) {
-      if (!data[currentKey] || Array.isArray(data[currentKey]) || typeof data[currentKey] !== "object") {
-        data[currentKey] = {};
-      }
-      currentNestedKey = nestedMatch[1];
-      data[currentKey][currentNestedKey] = parseScalar(nestedMatch[2] ?? "");
-      continue;
-    }
-
-    const listMatch = line.match(/^\s{2,4}-\s*(.*)$/);
-    if (listMatch && currentKey) {
-      const value = parseScalar(listMatch[1]);
-      if (currentNestedKey && data[currentKey] && typeof data[currentKey] === "object" && !Array.isArray(data[currentKey])) {
-        if (!Array.isArray(data[currentKey][currentNestedKey])) data[currentKey][currentNestedKey] = [];
-        data[currentKey][currentNestedKey].push(value);
-      } else {
-        if (!Array.isArray(data[currentKey])) data[currentKey] = [];
-        data[currentKey].push(value);
-      }
-    }
-  }
-
-  return { data, body };
 }
 
 function array(value) {

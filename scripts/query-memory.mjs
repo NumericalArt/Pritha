@@ -2,8 +2,9 @@
 
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
 
 function sqlString(value) {

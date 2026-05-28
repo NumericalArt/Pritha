@@ -2,8 +2,12 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { parseFrontmatter, yamlList } from "./lib/frontmatter.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { slug as makeSlug } from "./lib/slug.mjs";
+import { today } from "./lib/date.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const SIGNAL_DIR = path.join(ROOT, "01_sources", "signals");
 
 const TECH_TERMS = [
@@ -38,94 +42,14 @@ function usage() {
 Creates/updates 01_sources/signals/YYYY-MM-DD-topic-signal.md`);
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function slug(value) {
-  return String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/https?:\/\//g, "")
-    .replace(/[^a-z0-9а-яё]+/giu, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 90) || "artifact";
-}
-
 function relPath(filePath) {
   return path.relative(ROOT, filePath).split(path.sep).join("/");
-}
-
-function parseScalar(value) {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-  if (trimmed === "[]") return [];
-  if (trimmed === "{}") return {};
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    const inner = trimmed.slice(1, -1).trim();
-    if (!inner) return [];
-    return inner.split(",").map((item) => item.trim().replace(/^["']|["']$/g, ""));
-  }
-  return trimmed.replace(/^["']|["']$/g, "");
-}
-
-function parseFrontmatter(text) {
-  if (!text.startsWith("---\n")) return { data: {}, body: text };
-  const end = text.indexOf("\n---\n", 4);
-  if (end === -1) return { data: {}, body: text };
-  const raw = text.slice(4, end);
-  const body = text.slice(end + 5);
-  const lines = raw.split(/\r?\n/);
-  const data = {};
-  let currentKey = null;
-  let currentNestedKey = null;
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const topMatch = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (topMatch) {
-      currentKey = topMatch[1];
-      currentNestedKey = null;
-      data[currentKey] = parseScalar(topMatch[2] ?? "");
-      continue;
-    }
-    const nestedMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (nestedMatch && currentKey) {
-      if (!data[currentKey] || Array.isArray(data[currentKey]) || typeof data[currentKey] !== "object") data[currentKey] = {};
-      currentNestedKey = nestedMatch[1];
-      data[currentKey][currentNestedKey] = parseScalar(nestedMatch[2] ?? "");
-      continue;
-    }
-    const listMatch = line.match(/^\s{2,4}-\s*(.*)$/);
-    if (listMatch && currentKey) {
-      const value = parseScalar(listMatch[1]);
-      if (currentNestedKey && data[currentKey] && typeof data[currentKey] === "object" && !Array.isArray(data[currentKey])) {
-        if (!Array.isArray(data[currentKey][currentNestedKey])) data[currentKey][currentNestedKey] = [];
-        data[currentKey][currentNestedKey].push(value);
-      } else {
-        if (!Array.isArray(data[currentKey])) data[currentKey] = [];
-        data[currentKey].push(value);
-      }
-    }
-  }
-
-  return { data, body };
 }
 
 function array(value) {
   if (Array.isArray(value)) return value.filter(Boolean).map(String);
   if (value === undefined || value === null || value === "") return [];
   return [String(value)];
-}
-
-function unique(values) {
-  return [...new Set(values.filter(Boolean).map(String))];
-}
-
-function yamlList(values) {
-  const list = unique(values);
-  if (list.length === 0) return "[]";
-  return `\n${list.map((item) => `  - ${String(item).replace(/\n/g, " ")}`).join("\n")}`;
 }
 
 function extractTitle(body, fallback) {
@@ -228,7 +152,7 @@ function verificationTasks(data, body) {
 }
 
 function outputPath(data, title) {
-  const base = `${today()}-${slug(data.id || title)}-signal`;
+  const base = `${today()}-${makeSlug(data.id || title, { stripUrls: true, allowCyrillic: true, maxLength: 90, fallback: "artifact" })}-signal`;
   return path.join(SIGNAL_DIR, `${base}.md`);
 }
 

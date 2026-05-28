@@ -14,8 +14,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { loadEnv } from "./lib/env.mjs";
+import { yamlList, yamlString } from "./lib/frontmatter.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { slug as makeSlug } from "./lib/slug.mjs";
+import { now, today } from "./lib/date.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const INBOX_DIR = path.join(ROOT, "00_inbox", "telegram");
 const RAW_DIR = path.join(ROOT, "01_sources", "raw", "telegram");
 const QUEUE_DIR = path.join(ROOT, ".queue", "telegram-intake");
@@ -29,25 +34,6 @@ const ERROR_LOG_INTERVAL_MS = Number(process.env.TECHSCOPE_TELEGRAM_ERROR_LOG_IN
 const MAX_JOB_ATTEMPTS = 2;
 const QUEUE_STATUSES = ["pending", "processing", "awaiting_codex", "complete", "done", "failed"];
 let workerRunning = false;
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) return;
-  const text = readFileSync(filePath, "utf8");
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-    if (!match) continue;
-    const key = match[1];
-    const value = match[2].trim().replace(/^["']|["']$/g, "");
-    if (process.env[key] === undefined) process.env[key] = value;
-  }
-}
-
-function loadEnv() {
-  loadEnvFile(path.join(ROOT, ".env"));
-  loadEnvFile(path.join(ROOT, ".env.local"));
-}
 
 function usage() {
   console.log(`Usage:
@@ -103,35 +89,6 @@ function allowedUserIds() {
   return new Set(raw.split(",").map((item) => item.trim()).filter(Boolean));
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function now() {
-  return new Date().toISOString();
-}
-
-function slug(value) {
-  return String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/https?:\/\//g, "")
-    .replace(/[^a-z0-9а-яё]+/giu, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "telegram-message";
-}
-
-function yamlString(value) {
-  if (value === undefined || value === null || value === "") return "";
-  return String(value).replace(/\n/g, " ");
-}
-
-function yamlList(values) {
-  const list = [...new Set(values.filter(Boolean).map(String))];
-  if (list.length === 0) return "[]";
-  return `\n${list.map((item) => `  - ${yamlString(item)}`).join("\n")}`;
-}
-
 function cleanText(value) {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
@@ -147,7 +104,7 @@ function messageText(message) {
 }
 
 function titleFromText(text, message) {
-  if (text) return slug(text.split(/\r?\n/)[0]);
+  if (text) return makeSlug(text.split(/\r?\n/)[0], { stripUrls: true, allowCyrillic: true, maxLength: 60, fallback: "telegram-message" });
   if (message.photo) return "telegram-photo";
   if (message.video) return "telegram-video";
   if (message.document) return `telegram-document-${message.document.file_name || message.document.file_unique_id || message.message_id}`;

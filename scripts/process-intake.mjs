@@ -8,8 +8,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { loadEnv } from "./lib/env.mjs";
+import { indentedYamlList, parseFrontmatter, yamlList } from "./lib/frontmatter.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { slug as makeSlug } from "./lib/slug.mjs";
+import { today } from "./lib/date.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const REVIEWS_DIR = path.join(ROOT, "03_reviews");
 const TELEGRAM_MEDIA_DIR = path.join(ROOT, "01_sources", "raw", "telegram-media");
 const FETCH_TIMEOUT_MS = 10000;
@@ -55,120 +60,14 @@ function usage() {
 Creates an assessment draft in 03_reviews/ and optionally processes YouTube links.`);
 }
 
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) return;
-  const text = readFileSync(filePath, "utf8");
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-    if (!match) continue;
-    const key = match[1];
-    const value = match[2].trim().replace(/^["']|["']$/g, "");
-    if (process.env[key] === undefined) process.env[key] = value;
-  }
-}
-
-function loadEnv() {
-  loadEnvFile(path.join(ROOT, ".env"));
-  loadEnvFile(path.join(ROOT, ".env.local"));
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function slug(value) {
-  return String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/https?:\/\//g, "")
-    .replace(/[^a-z0-9а-яё]+/giu, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "intake";
-}
-
 function relPath(filePath) {
   return path.relative(ROOT, filePath).split(path.sep).join("/");
-}
-
-function parseScalar(value) {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-  if (trimmed === "[]") return [];
-  if (trimmed === "{}") return {};
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    const inner = trimmed.slice(1, -1).trim();
-    if (!inner) return [];
-    return inner.split(",").map((item) => item.trim().replace(/^["']|["']$/g, ""));
-  }
-  return trimmed.replace(/^["']|["']$/g, "");
-}
-
-function parseFrontmatter(text) {
-  if (!text.startsWith("---\n")) return { data: {}, body: text };
-  const end = text.indexOf("\n---\n", 4);
-  if (end === -1) return { data: {}, body: text };
-  const raw = text.slice(4, end);
-  const body = text.slice(end + 5);
-  const lines = raw.split(/\r?\n/);
-  const data = {};
-  let currentKey = null;
-  let currentNestedKey = null;
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const topMatch = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (topMatch) {
-      currentKey = topMatch[1];
-      currentNestedKey = null;
-      data[currentKey] = parseScalar(topMatch[2] ?? "");
-      continue;
-    }
-    const nestedMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (nestedMatch && currentKey) {
-      if (!data[currentKey] || Array.isArray(data[currentKey]) || typeof data[currentKey] !== "object") data[currentKey] = {};
-      currentNestedKey = nestedMatch[1];
-      data[currentKey][currentNestedKey] = parseScalar(nestedMatch[2] ?? "");
-      continue;
-    }
-    const listMatch = line.match(/^\s{2,4}-\s*(.*)$/);
-    if (listMatch && currentKey) {
-      const parsed = parseScalar(listMatch[1]);
-      if (currentNestedKey && data[currentKey] && typeof data[currentKey] === "object" && !Array.isArray(data[currentKey])) {
-        if (!Array.isArray(data[currentKey][currentNestedKey])) data[currentKey][currentNestedKey] = [];
-        data[currentKey][currentNestedKey].push(parsed);
-      } else {
-        if (!Array.isArray(data[currentKey])) data[currentKey] = [];
-        data[currentKey].push(parsed);
-      }
-    }
-  }
-
-  return { data, body };
 }
 
 function array(value) {
   if (Array.isArray(value)) return value.filter(Boolean).map(String);
   if (value === undefined || value === null || value === "") return [];
   return [String(value)];
-}
-
-function unique(values) {
-  return [...new Set(values.filter(Boolean).map(String))];
-}
-
-function yamlList(values) {
-  const list = unique(values);
-  if (list.length === 0) return "[]";
-  return `\n${list.map((item) => `  - ${String(item).replace(/\n/g, " ")}`).join("\n")}`;
-}
-
-function indentedYamlList(values, spaces = 4) {
-  const list = unique(values);
-  if (list.length === 0) return " []";
-  const pad = " ".repeat(spaces);
-  return `\n${list.map((item) => `${pad}- ${String(item).replace(/\n/g, " ")}`).join("\n")}`;
 }
 
 function extractTitle(body, fallback) {
@@ -292,7 +191,7 @@ async function downloadTelegramMedia(data, body, intakeRel) {
   for (let i = 0; i < mediaItems.length; i += 1) {
     const item = mediaItems[i];
     try {
-      const base = `${String(i + 1).padStart(2, "0")}-${slug(item.kind)}`;
+      const base = `${String(i + 1).padStart(2, "0")}-${makeSlug(item.kind, { stripUrls: true, allowCyrillic: true, maxLength: 80, fallback: "intake" })}`;
       const outPath = await downloadTelegramFile(item.fileId, destinationDir, base, item.fallbackExt);
       downloaded.push({
         kind: item.kind,
@@ -424,7 +323,7 @@ function extractSignal(artifactPath) {
 }
 
 function assessmentPath(intakeData, title) {
-  const base = `${today()}-${slug(intakeData.id || title).replace(/^intake-?/, "")}-auto-assessment`;
+  const base = `${today()}-${makeSlug(intakeData.id || title, { stripUrls: true, allowCyrillic: true, maxLength: 80, fallback: "intake" }).replace(/^intake-?/, "")}-auto-assessment`;
   return path.join(REVIEWS_DIR, `${base}.md`);
 }
 

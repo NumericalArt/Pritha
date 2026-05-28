@@ -4,8 +4,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { parseFrontmatter } from "./lib/frontmatter.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { slug } from "./lib/slug.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const MEMORY_DIR = path.join(ROOT, ".memory");
 const DB_PATH = path.join(MEMORY_DIR, "techscope.sqlite");
 const SCHEMA_PATH = path.join(MEMORY_DIR, "schema.sql");
@@ -53,14 +56,6 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function slug(value) {
-  return String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9а-яё]+/giu, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 function sqlString(value) {
   if (value === null || value === undefined || value === "") return "NULL";
   return `'${String(value).replaceAll("'", "''")}'`;
@@ -92,70 +87,6 @@ function listMarkdownFiles(dir) {
     }
   }
   return out;
-}
-
-function parseScalar(value) {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-  if (trimmed === "[]" ) return [];
-  if (trimmed === "{}" ) return {};
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    const inner = trimmed.slice(1, -1).trim();
-    if (!inner) return [];
-    return inner.split(",").map((item) => item.trim().replace(/^["']|["']$/g, ""));
-  }
-  return trimmed.replace(/^["']|["']$/g, "");
-}
-
-function parseFrontmatter(text) {
-  if (!text.startsWith("---\n")) return { data: {}, body: text };
-  const end = text.indexOf("\n---\n", 4);
-  if (end === -1) return { data: {}, body: text };
-
-  const raw = text.slice(4, end);
-  const body = text.slice(end + 5);
-  const lines = raw.split(/\r?\n/);
-  const data = {};
-  let currentKey = null;
-  let currentNestedKey = null;
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    const topMatch = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (topMatch) {
-      currentKey = topMatch[1];
-      currentNestedKey = null;
-      const value = topMatch[2] ?? "";
-      data[currentKey] = parseScalar(value);
-      continue;
-    }
-
-    const nestedMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (nestedMatch && currentKey) {
-      if (!data[currentKey] || Array.isArray(data[currentKey]) || typeof data[currentKey] !== "object") {
-        data[currentKey] = {};
-      }
-      currentNestedKey = nestedMatch[1];
-      const value = nestedMatch[2] ?? "";
-      data[currentKey][currentNestedKey] = parseScalar(value);
-      continue;
-    }
-
-    const listMatch = line.match(/^\s{2,4}-\s*(.*)$/);
-    if (listMatch && currentKey) {
-      const value = parseScalar(listMatch[1]);
-      if (currentNestedKey && data[currentKey] && typeof data[currentKey] === "object" && !Array.isArray(data[currentKey])) {
-        if (!Array.isArray(data[currentKey][currentNestedKey])) data[currentKey][currentNestedKey] = [];
-        data[currentKey][currentNestedKey].push(value);
-      } else {
-        if (!Array.isArray(data[currentKey])) data[currentKey] = [];
-        data[currentKey].push(value);
-      }
-    }
-  }
-
-  return { data, body };
 }
 
 function extractTitle(body, fallback) {
@@ -210,7 +141,7 @@ function tokenEstimate(text) {
 }
 
 function entityId(type, name) {
-  const cleanSlug = slug(name);
+  const cleanSlug = slug(name, { allowCyrillic: true, fallback: "" });
   const suffix = sha256(`${type}:${name}`).slice(0, 10);
   return `${type}:${cleanSlug ? `${cleanSlug}-` : ""}${suffix}`;
 }

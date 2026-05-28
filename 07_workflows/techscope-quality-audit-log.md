@@ -72,3 +72,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `incident-as-operations-report`, `external-fetch-backoff`, `repo-cruft-cleanup`, `non-fatal-startup-network-warning`
 - Open questions: should stale `awaiting_codex` media review items become warnings or quality-gate failures in Phase 8?
 - Notes: Telegram log sample before fix showed 150 repeated `fetch failed` lines; polling now has exponential backoff, jitter, retry-after handling and repeated-error aggregation. Web was smoke-tested on `127.0.0.1:3307` without installing launchd. Final `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 3 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-3-shared-lib-report.md`
+- AM-CANDIDATE patterns: `scripts-lib-package`, `shared-frontmatter-parser`, `shared-env-loader`, `legacy-compatible-slug-options`
+- Open questions: should generated child-agent scripts get scaffold-local `scripts/lib/*` after Phase 5 snapshot tests?
+- Notes: Runtime scripts now share root/frontmatter/env/date/slug helpers. Generated child-agent template snippets in `agents-mother.mjs` remain standalone until snapshot coverage exists. Final `node scripts/golden-checks.mjs --with-embeddings` passed.

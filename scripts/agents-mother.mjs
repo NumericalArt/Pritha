@@ -5,8 +5,12 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { parseFrontmatterData, yamlList } from "./lib/frontmatter.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { slug as makeSlug } from "./lib/slug.mjs";
+import { today } from "./lib/date.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const CONTRACT_DIR = path.join(ROOT, "11_agents", "contracts");
 const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
 const RESEARCH_DIR = path.join(ROOT, "11_agents", "research");
@@ -82,30 +86,8 @@ function parseArgs(argv) {
   return out;
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function transliterate(value) {
-  const map = {
-    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
-    к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
-    х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
-  };
-  return String(value).replace(/[а-яё]/giu, (char) => {
-    const lower = char.toLowerCase();
-    const mapped = map[lower] ?? "";
-    return char === lower ? mapped : mapped.toUpperCase();
-  });
-}
-
-function slug(value, fallback = "agent") {
-  const clean = transliterate(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return clean || fallback;
-}
+const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
+const readFrontmatter = (text) => parseFrontmatterData(text) || {};
 
 function ensureDirs() {
   mkdirSync(CONTRACT_DIR, { recursive: true });
@@ -327,12 +309,6 @@ function operationProfileFor(data) {
     heartbeatInterval: scalar(data.heartbeatInterval, proactiveMode === "heartbeat" ? "TBD" : "not-applicable"),
     idleBehavior: scalar(data.idleBehavior, "sleep until trigger"),
   };
-}
-
-function yamlList(items) {
-  const list = Array.isArray(items) && items.length > 0 ? items : [];
-  if (list.length === 0) return "[]";
-  return `\n${list.map((item) => `  - ${String(item).replaceAll("\n", " ")}`).join("\n")}`;
 }
 
 function sqlString(value) {
@@ -701,29 +677,6 @@ async function interview(options) {
   }
 }
 
-function parseFrontmatter(text) {
-  if (!text.startsWith("---\n")) return {};
-  const end = text.indexOf("\n---\n", 4);
-  if (end === -1) return {};
-  const raw = text.slice(4, end);
-  const data = {};
-  let currentKey = null;
-  for (const line of raw.split(/\r?\n/)) {
-    const top = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
-    if (top) {
-      currentKey = top[1];
-      data[currentKey] = (top[2] || "").trim();
-      continue;
-    }
-    const item = line.match(/^\s+-\s*(.*)$/);
-    if (item && currentKey) {
-      if (!Array.isArray(data[currentKey])) data[currentKey] = [];
-      data[currentKey].push(item[1].trim());
-    }
-  }
-  return data;
-}
-
 function bodyValue(text, label) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = text.match(new RegExp(`^- ${escaped}:\\s*(.*)$`, "mi"));
@@ -756,7 +709,7 @@ function validateContract(contractPath, options = { print: true }) {
   }
 
   const text = readFileSync(fullPath, "utf8");
-  const fm = parseFrontmatter(text);
+  const fm = readFrontmatter(text);
   if (fm.type !== "agent-contract") issues.push('frontmatter "type" must be agent-contract');
   if (!STATUS_VALUES.has(fm.status)) issues.push(`status must be one of: ${Array.from(STATUS_VALUES).join(", ")}`);
 
@@ -834,7 +787,7 @@ function contractData(contractPath) {
   const fullPath = path.resolve(ROOT, contractPath);
   if (!existsSync(fullPath)) throw new Error(`Contract not found: ${contractPath}`);
   const text = readFileSync(fullPath, "utf8");
-  const fm = parseFrontmatter(text);
+  const fm = readFrontmatter(text);
   return {
     fullPath,
     relPath: path.relative(ROOT, fullPath),
@@ -3317,7 +3270,7 @@ function listContracts() {
   }
   for (const file of files) {
     const text = readFileSync(file, "utf8");
-    const fm = parseFrontmatter(text);
+    const fm = readFrontmatter(text);
     const name = bodyValue(text, "Agent name") || path.basename(file, ".md");
     console.log(`${fm.status || "unknown"}\t${path.relative(ROOT, file)}\t${name}`);
   }
@@ -3344,7 +3297,7 @@ function markdownTitle(text, fallback) {
 
 function contractSummaryFromFile(file) {
   const text = readFileSync(file, "utf8");
-  const fm = parseFrontmatter(text);
+  const fm = readFrontmatter(text);
   const name = bodyValue(text, "Agent name") || markdownTitle(text, path.basename(file, ".md"));
   return {
     kind: "contract",
@@ -3365,7 +3318,7 @@ function contractSummaryFromFile(file) {
 
 function reportSummaryFromFile(file) {
   const text = readFileSync(file, "utf8");
-  const fm = parseFrontmatter(text);
+  const fm = readFrontmatter(text);
   const title = markdownTitle(text, path.basename(file, ".md"));
   const relPath = path.relative(ROOT, file);
   const projectPath = bodyValue(text, "Project path") || bodyValue(text, "Target folder") || "";
@@ -3392,7 +3345,7 @@ function collectAgentLifecycle() {
     .map(reportSummaryFromFile);
   const research = listMarkdownFilesFlat(RESEARCH_DIR).map((file) => {
     const text = readFileSync(file, "utf8");
-    const fm = parseFrontmatter(text);
+    const fm = readFrontmatter(text);
     return {
       path: path.relative(ROOT, file),
       id: fm.id || path.basename(file, ".md"),
