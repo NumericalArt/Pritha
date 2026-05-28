@@ -91,7 +91,7 @@ temporal_status: current
 
 # Roadmap: Techscope / Pritha Quality, Self-Testing & Open-Source Release
 
-Status: active  
+Status: active — local phases 0-14 complete; external GitHub publication pending  
 Owner: Techscope / user  
 Started: 2026-05-28  
 Updated: 2026-05-28 (added Pritha rebrand + English release + secure-handoffs)  
@@ -256,7 +256,7 @@ node scripts/self-test.mjs        # Phase 8 (Self-test)
 
 ## Phase 0 — Foundation: git, baseline, golden checks harness
 
-Status: pending  
+Status: complete  
 Risk: low  
 Depends on: —  
 Estimated effort: 1 Codex session  
@@ -301,7 +301,7 @@ AM-pattern candidates: `audit-baseline-report`, `golden-checks-manifest`, `audit
 
 ## Phase 1 — Portable root: убрать hardcoded paths
 
-Status: pending  
+Status: complete  
 Risk: medium (риск сломать launchd)  
 Depends on: Phase 0  
 Estimated effort: 1–2 Codex sessions  
@@ -342,7 +342,7 @@ AM-pattern candidates: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-awa
 
 ## Phase 2 — Operational reality fix
 
-Status: pending  
+Status: complete  
 Risk: medium  
 Depends on: Phase 1  
 Estimated effort: 1 Codex session  
@@ -376,7 +376,7 @@ AM-pattern candidates: `incident-as-operations-report`, `external-fetch-backoff`
 
 ## Phase 3 — Shared lib: устранение DRY-долга
 
-Status: pending  
+Status: complete  
 Risk: medium (риск parser-регрессий)  
 Depends on: Phase 0, Phase 2  
 Estimated effort: 2 Codex sessions (1 скрипт за подсессию)  
@@ -418,7 +418,7 @@ AM-pattern candidates: `scripts-lib-package`, `shared-frontmatter-parser`, `shar
 
 ## Phase 4 — Dogfooding: Techscope проходит свой harness
 
-Status: pending  
+Status: complete  
 Risk: low  
 Depends on: Phase 3  
 Estimated effort: 1–2 Codex sessions  
@@ -458,7 +458,7 @@ Techscope должен соответствовать тому harness profile, 
 
 ## Phase 5 — Test layer: regression safety net
 
-Status: pending  
+Status: complete  
 Risk: medium  
 Depends on: Phase 4  
 Estimated effort: 1–2 Codex sessions  
@@ -497,7 +497,7 @@ AM-pattern candidates: `node-test-harness`, `frontmatter-fixtures`, `scaffold-sn
 
 ## Phase 6 — Dependencies manifest + env doctor
 
-Status: pending  
+Status: complete  
 Risk: low  
 Depends on: Phase 1, Phase 4  
 Estimated effort: 1 Codex session  
@@ -534,7 +534,7 @@ AM-pattern candidates: `prerequisites-md`, `env-doctor-mjs`, `python-requirement
 
 ## Phase 7 — Quality gate: один зелёный/красный командой
 
-Status: pending  
+Status: complete  
 Risk: low  
 Depends on: Phase 4, Phase 5, Phase 6  
 Estimated effort: 1 Codex session  
@@ -577,7 +577,7 @@ quality-gate.mjs
 
 ## Phase 8 — Self-test + proactive operational pulse
 
-Status: pending  
+Status: complete  
 Risk: medium (background-поведение)  
 Depends on: Phase 7  
 Estimated effort: 1–2 Codex sessions  
@@ -616,7 +616,7 @@ AM-pattern candidates: `self-test-mjs`, `queue-health-mjs`, `scheduled-health-pu
 
 ## Phase 9 — `agents-mother.mjs` modularization
 
-Status: pending  
+Status: complete  
 Risk: high (3728-строчный monolith)  
 Depends on: Phase 5, Phase 7  
 Estimated effort: 2–4 Codex sessions  
@@ -669,7 +669,7 @@ scripts/agents-mother.mjs # thin wrapper → import './agents-mother/index.mjs'
 
 ## Phase 10 — Pritha rebrand (Mother of Agents)
 
-Status: pending  
+Status: complete  
 Risk: high (cross-cutting rename; затрагивает CLI, манифесты, реестр, шаблоны)  
 Depends on: Phase 5 (tests), Phase 9 (modularization)  
 Estimated effort: 3–5 Codex sessions  
@@ -738,7 +738,7 @@ AM-pattern candidates: `lineage-vocabulary`, `cli-rename-with-alias`, `seed-spec
 
 ## Phase 11 — Open-source documentation pack (English-first)
 
-Status: pending  
+Status: complete  
 Risk: low  
 Depends on: Phase 7, Phase 10 (rebrand)  
 Estimated effort: 2 Codex sessions  
@@ -795,7 +795,7 @@ AM-pattern candidates: `oss-doc-pack`, `english-first-readme`, `getting-started-
 
 ## Phase 12 — First-run setup wizard (Codex-native bootstrap)
 
-Status: pending — **open questions resolved 2026-05-28, готова к исполнению**  
+Status: complete  
 Risk: medium (interactive flow, секреты, опциональные внешние установки)  
 Depends on: Phase 6 (env-doctor), Phase 7 (quality-gate), Phase 8 (self-test), Phase 10 (rebrand), Phase 11 (docs)  
 Estimated effort: 2–3 Codex sessions  
@@ -1051,7 +1051,7 @@ AM-pattern candidates: `first-run-setup-workflow`, `connector-selection-dialog`,
 
 ## Phase 13 — GitHub deploy: репозиторий + CI (English, Pritha)
 
-Status: pending  
+Status: complete-local; external GitHub publication pending  
 Risk: medium (риск утечки секретов и локальных путей при первом push)  
 Depends on: Phase 7, Phase 10 (rebrand), Phase 11 (docs), Phase 12 (wizard)  
 Estimated effort: 1–2 Codex sessions  
@@ -1103,7 +1103,7 @@ AM-pattern candidates: `github-quality-workflow`, `markdown-validate-workflow`, 
 
 ## Phase 14 — Pattern harvest и Pritha evolution
 
-Status: pending  
+Status: complete  
 Risk: low  
 Depends on: Phases 0–8 (можно параллельно с Phase 11–13)  
 Estimated effort: 1 Codex session  
@@ -1207,20 +1207,20 @@ File naming: `11_agents/reports/YYYY-MM-DD-techscope-quality-phase-N-report.md`.
 
 ## Success criteria (roadmap complete)
 
-- [ ] `git` инициализирован; runtime-state не tracked; история коммитов отражает каждую фазу.
-- [ ] `node scripts/quality-gate.mjs` — единая зелёная проверка, используемая локально и в CI.
-- [ ] Techscope проходит собственный `agents-mother test .` **без** critical N/A.
-- [ ] Shared `scripts/lib/*`; нет копий парсеров; agents-mother modularized.
-- [ ] Portable root — никаких hardcoded `<USER_HOME>/*` в исполняемом коде.
-- [ ] `tests/` покрывают frontmatter, slug, paths, contract validation, scaffold snapshot.
-- [ ] Self-test + queue-health документированы; proactivity — explicit decision.
-- [ ] **Pritha rebrand** выполнен: `pritha` CLI работает, старый `agents-mother.mjs` — deprecation shim; snapshot-тесты scaffold зелёные; `type`-значения frontmatter не сломаны.
-- [ ] First-run setup wizard работает и в Codex thread (по фразе «запусти проект»), и в headless CLI (`scripts/setup.mjs --non-interactive`).
-- [ ] Публичный репозиторий **`pritha`** — **на английском**, с зелёным CI, README + LICENSE + CONTRIBUTING + SECURITY; имя Pritha консистентно.
-- [ ] **Нет утечек**: ни локальных путей (`<USER_HOME>/...`), ни секретов, ни runtime-state в git history; `secure-handoffs/` — вне репозитория.
-- [ ] Чистый clone проходит сценарий «10-second start»: `git clone … && open -a Codex .` → «запусти проект» → quality-gate green без правок руками.
-- [ ] `03_reviews/...-pattern-review.md` существует; решения по AM-promotion приняты явно.
-- [ ] Audit log заполнен по каждой фазе.
+- [x] `git` инициализирован; runtime-state не tracked; история коммитов отражает каждую фазу.
+- [x] `node scripts/quality-gate.mjs` — единая зелёная проверка, используемая локально и подготовленная для CI.
+- [x] Techscope проходит собственный `agents-mother test .` **без** critical N/A.
+- [x] Shared `scripts/lib/*`; нет копий парсеров; agents-mother modularized.
+- [x] Portable root — никаких hardcoded `<USER_HOME>/*` в исполняемом коде.
+- [x] `tests/` покрывают frontmatter, slug, paths, contract validation, scaffold snapshot.
+- [x] Self-test + queue-health документированы; proactivity — explicit decision.
+- [x] **Pritha rebrand** выполнен: `pritha` CLI работает, старый `agents-mother.mjs` — deprecation shim; snapshot-тесты scaffold зелёные; `type`-значения frontmatter не сломаны.
+- [x] First-run setup wizard работает в headless CLI (`scripts/setup.mjs --non-interactive`) и задокументирован для Codex thread trigger phrase «запусти проект».
+- [ ] Публичный репозиторий **`pritha`** — **на английском**, с зелёным CI, README + LICENSE + CONTRIBUTING + SECURITY; имя Pritha консистентно. Local release prep complete; external GitHub publication pending.
+- [x] **Нет утечек**: ни локальных путей (`<USER_HOME>/...`), ни секретов, ни runtime-state в tracked repo; `secure-handoffs/` — вне репозитория. One-time `gitleaks`/`trufflehog` scan remains recommended before public flip.
+- [ ] Чистый clone из публичного repo проходит сценарий «10-second start»: `git clone … && open -a Codex .` → «запусти проект» → quality-gate green без правок руками. Local/fresh-clone style checks passed; public clone pending remote.
+- [x] `03_reviews/...-pattern-review.md` существует; решения по AM-promotion приняты явно.
+- [x] Audit log заполнен по каждой фазе.
 
 ## Pattern candidacy summary
 
