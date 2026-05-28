@@ -93,4 +93,4 @@ Also installed the missing local release/dev tools into `~/.local/bin`.
 
 ## Remaining External GitHub State
 
-`gh` is installed but not authenticated yet. The dedicated secure-handoff SSH key is still not accepted by GitHub. The remaining external release work is unchanged: create/connect `NumArt/pritha`, authorize push, push `main` and `v0.1.0`, verify live CI, branch protection, GitHub Release and fresh public clone.
+`gh` is installed but not authenticated yet. The dedicated secure-handoff SSH key is now accepted by GitHub when explicitly selected through local Git SSH configuration. The remaining external release work is: replace the initial GitHub repository commit with the local Pritha history, push `main` and `v0.1.0`, verify live CI, branch protection, GitHub Release and fresh public clone.

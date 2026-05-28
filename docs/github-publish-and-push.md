@@ -8,7 +8,7 @@ remaining external step that local Pritha checks cannot complete by themselves.
 
 Current target:
 
-- Owner: `NumArt`
+- Owner: `NumericalArt`
 - Repository: `pritha`
 - Visibility: create as private first, make public only after verification.
 - Default branch: `main`
@@ -17,7 +17,7 @@ Current target:
 On GitHub:
 
 1. Open [github.com/new](https://github.com/new).
-2. Owner: `NumArt`.
+2. Owner: `NumericalArt`.
 3. Repository name: `pritha`.
 4. Visibility: `Private`.
 5. Do not initialize with README, `.gitignore` or license. The local repository
@@ -80,7 +80,7 @@ git tag --points-at HEAD
 
 Expected:
 
-- remote `origin` points to `git@github.com:NumArt/pritha.git`;
+- remote `origin` points to `git@github.com:NumericalArt/Pritha.git`;
 - branch is `main`;
 - `v0.1.0` points at the current release commit.
 
@@ -97,8 +97,10 @@ Then check the remote:
 node scripts/github-release-status.mjs --online --strict
 ```
 
-This may still fail until GitHub Actions, branch protection and release objects
-exist. That is expected during the first publication.
+This verifies that remote `main` matches local `HEAD` and remote `v0.1.0`
+matches the local tag. It may still fail until GitHub Actions, branch
+protection and release objects exist. That is expected during the first
+publication.
 
 ## GitHub Actions
 
@@ -162,7 +164,7 @@ Fresh clone check:
 
 ```sh
 tmp="$(mktemp -d)"
-git clone git@github.com:NumArt/pritha.git "$tmp/pritha"
+git clone git@github.com:NumericalArt/Pritha.git "$tmp/pritha"
 cd "$tmp/pritha"
 node scripts/setup.mjs --non-interactive --config tests/fixtures/setup-minimal.json
 node scripts/quality-gate.mjs
@@ -198,12 +200,15 @@ secure handoff folders or `.env.local`.
 
 ## Current External Blocker
 
-As of 2026-05-28, local Pritha is ready, but GitHub publication still requires
-external GitHub authorization:
+As of 2026-05-28, local Pritha is ready and SSH authentication works with the
+dedicated handoff key:
 
-- `origin` is configured as `git@github.com:NumArt/pritha.git`;
+- `origin` is configured as `git@github.com:NumericalArt/Pritha.git`;
 - local `main` and local tag `v0.1.0` exist;
 - `gh` is installed but not authenticated;
-- the secure handoff SSH key has not yet been authorized on GitHub.
+- the remote repository exists and currently contains a GitHub-created initial
+  `LICENSE` commit.
 
-The next human action is to create `NumArt/pritha` and authorize SSH or `gh`.
+The next human action is to approve replacing the initial remote commit with the
+local Pritha history using `git push --force-with-lease origin main`, then push
+`v0.1.0`.

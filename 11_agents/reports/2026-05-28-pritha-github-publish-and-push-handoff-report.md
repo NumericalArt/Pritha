@@ -60,13 +60,13 @@ Added a durable GitHub publication and future push checklist for Pritha.
 
 ## Human GitHub Actions Still Required
 
-- Create `NumArt/pritha` as a private repository.
-- Add the Mac mini SSH public key to GitHub or authenticate `gh`.
+- Approve replacing the initial GitHub-created `LICENSE` commit with local Pritha history.
 - Push `main` and tag `v0.1.0`.
 - Verify CI, configure `main` protection, create GitHub Release and only then
   make the repository public.
 
 ## Current Status
 
-Local Pritha remains ready. The external blocker is GitHub authorization and
-repository creation.
+Local Pritha remains ready. SSH authentication works with the dedicated handoff
+key. The external blocker is explicit approval to replace the initial remote
+commit and then verify GitHub CI/release state.

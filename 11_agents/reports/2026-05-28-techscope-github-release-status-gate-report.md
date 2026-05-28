@@ -59,11 +59,11 @@ Added a non-mutating release status gate for the remaining external part of the 
 
 ## Current External State
 
-- `origin` remote is configured as `git@github.com:NumArt/pritha.git`.
+- `origin` remote is configured as `git@github.com:NumericalArt/Pritha.git`.
 - Local tag `v0.1.0` is present.
 - GitHub CLI is installed in `~/.local/bin`, but `gh auth status` reports no authenticated GitHub host yet.
-- GitHub connector can inspect existing repositories, but no `NumArt/pritha` repository was found.
-- The secure-handoff SSH key is present locally but is not authorized on GitHub yet: `Permission denied (publickey)`.
+- `NumericalArt/Pritha` now exists and contains an initial GitHub-created `LICENSE` commit.
+- The secure-handoff SSH key is present locally and authenticates to GitHub when selected explicitly. Local Git has been configured with `core.sshCommand` for this key.
 - Live CI, branch protection, GitHub Release and public fresh-clone proof remain pending external evidence.
 
 ## Installed Release Tools

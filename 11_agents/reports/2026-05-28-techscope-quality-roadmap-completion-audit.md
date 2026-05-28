@@ -48,10 +48,11 @@ Local execution of phases 0-14 is complete and verified. The only roadmap-level 
 
 This report intentionally does not mark the full roadmap as complete because the authoritative evidence for those external criteria is missing in the current state:
 
-- `origin` is configured as `git@github.com:NumArt/pritha.git`, but remote access is not authenticated yet.
-- `gh` is not installed in the local environment.
+- `origin` is configured as `git@github.com:NumericalArt/Pritha.git`, and SSH authentication works with the dedicated handoff key.
+- `gh` is installed but not authenticated.
 - The local release tag `v0.1.0` exists, but remote tag proof is missing.
-- No live GitHub Actions run, public repository, branch protection or release can be inspected from this workspace.
+- The remote repository exists but currently contains a GitHub-created initial `LICENSE` commit, not the local Pritha history.
+- No live GitHub Actions run, branch protection or release can be inspected from this workspace yet.
 
 ## Final Local Verification
 
@@ -91,8 +92,8 @@ Commands run sequentially to avoid SQLite writer contention:
 
 To mark the full roadmap complete, the following external evidence is still required:
 
-1. Create or connect GitHub remote `NumArt/pritha`.
-2. Add the secure-handoff public key to GitHub account SSH keys or repository deploy keys with write access, run `gh auth login`, or configure another authenticated push path.
+1. Replace the initial remote `LICENSE` commit with the local Pritha history, after explicit user approval for `--force-with-lease`.
+2. Optionally run `gh auth login` if GitHub Release creation should be automated through GitHub CLI.
 3. Push branch `main` to GitHub after final pre-push scan.
 4. Inspect live GitHub Actions runs for `quality-gate`, `memory-validate` and `setup-wizard-smoke`.
 5. Configure branch protection and required status checks.

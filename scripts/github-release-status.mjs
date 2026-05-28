@@ -49,6 +49,17 @@ function parseRemote(remoteUrl) {
   return { owner: match[1], repo: match[2], fullName: `${match[1]}/${match[2]}` };
 }
 
+function firstHash(output) {
+  return String(output || "").trim().split(/\s+/)[0] || "";
+}
+
+function remoteTagHash(output) {
+  const lines = String(output || "").trim().split("\n").filter(Boolean);
+  const peeled = lines.find((line) => line.includes("refs/tags/v0.1.0^{}"));
+  const exact = lines.find((line) => /\srefs\/tags\/v0\.1\.0$/.test(line));
+  return firstHash(peeled || exact || "");
+}
+
 function prePushAuditCheck() {
   if (skipPrePushAudit) {
     return check("pre-push-audit", "skipped", "skipped by --skip-pre-push-audit", false);
@@ -123,7 +134,7 @@ checks.push(check(
 ));
 checks.push(check(
   "remote-repo-name",
-  remote?.repo === "pritha" ? "pass" : remote ? "warn" : "missing",
+  remote?.repo?.toLowerCase() === "pritha" ? "pass" : remote ? "warn" : "missing",
   remote ? `detected ${remote.fullName}` : "origin remote is not configured",
   false,
 ));
@@ -144,14 +155,34 @@ const localTag = run("git", ["rev-parse", "-q", "--verify", "refs/tags/v0.1.0"])
 checks.push(check("local-v0.1.0-tag", localTag.ok ? "pass" : "missing", localTag.ok ? localTag.stdout : "local tag v0.1.0 not found"));
 
 if (onlineMode && remote) {
+  const localHead = run("git", ["rev-parse", "HEAD"]);
   const remoteMain = run("git", ["ls-remote", "--heads", "origin", "main"], { timeout: 60000 });
   checks.push(check("remote-main-branch", remoteMain.stdout ? "pass" : "missing", remoteMain.stdout || remoteMain.stderr || "remote main not found"));
+  const remoteMainHash = firstHash(remoteMain.stdout);
+  checks.push(check(
+    "remote-main-matches-head",
+    remoteMainHash && localHead.ok && remoteMainHash === localHead.stdout ? "pass" : "fail",
+    remoteMainHash
+      ? `remote=${remoteMainHash}; local=${localHead.stdout || "unknown"}`
+      : "remote main hash unavailable",
+  ));
 
   const remoteTag = run("git", ["ls-remote", "--tags", "origin", "v0.1.0"], { timeout: 60000 });
   checks.push(check("remote-v0.1.0-tag", remoteTag.stdout ? "pass" : "missing", remoteTag.stdout || remoteTag.stderr || "remote tag v0.1.0 not found"));
+  const localTagCommit = run("git", ["rev-parse", "v0.1.0^{}"]);
+  const remoteTagCommit = remoteTagHash(remoteTag.stdout);
+  checks.push(check(
+    "remote-v0.1.0-matches-local",
+    remoteTagCommit && localTagCommit.ok && remoteTagCommit === localTagCommit.stdout ? "pass" : "fail",
+    remoteTagCommit
+      ? `remote=${remoteTagCommit}; local=${localTagCommit.stdout || "unknown"}`
+      : "remote v0.1.0 tag hash unavailable",
+  ));
 } else {
   checks.push(check("remote-main-branch", "not-checked", onlineMode ? "origin remote is missing" : "run with --online after configuring origin", true));
+  checks.push(check("remote-main-matches-head", "not-checked", onlineMode ? "origin remote is missing" : "run with --online after configuring origin", true));
   checks.push(check("remote-v0.1.0-tag", "not-checked", onlineMode ? "origin remote is missing" : "run with --online after configuring origin", true));
+  checks.push(check("remote-v0.1.0-matches-local", "not-checked", onlineMode ? "origin remote is missing" : "run with --online after configuring origin", true));
 }
 
 checks.push(check(
