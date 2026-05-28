@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-techscope-canonical-root
 type: decision
-status: active
+status: superseded
 created: 2026-05-18
 updated: 2026-05-18
 topics: [techscope, project-architecture, agents-mother, launchd, migration]
@@ -25,7 +25,8 @@ related:
     - 11_agents/reports/2026-05-18-techscope-agent-test-report-3.md
     - 11_agents/reports/2026-05-18-techscope-agent-operations-report.md
 supersedes: []
-superseded_by: []
+superseded_by:
+  - 05_decisions/2026-05-28-techscope-portable-root.md
 freshness_status: current
 source_published: unknown
 source_updated: 2026-05-18
@@ -39,7 +40,7 @@ temporal_status: current
 # Decision: Techscope canonical root
 
 Date: 2026-05-18
-Status: active
+Status: superseded by `05_decisions/2026-05-28-techscope-portable-root.md`
 
 ## Decision
 

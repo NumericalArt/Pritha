@@ -3,13 +3,12 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
-const ROOT = process.cwd();
+const ROOT = resolveTechscopeRoot();
 const DEFAULT_MODEL = "mlx-community/whisper-small-mlx";
 const DEFAULT_LANGUAGE = "ru";
 const PYTHON = "python3";
-const MLX_WHISPER = "/Users/jkl/Library/Python/3.9/bin/mlx_whisper";
-const IMAGEIO_FFMPEG = "/Users/jkl/Library/Python/3.9/lib/python/site-packages/imageio_ffmpeg/binaries/ffmpeg-macos-aarch64-v7.1";
 const TOOL_BIN = path.join(ROOT, ".tools", "bin");
 const TOOL_FFMPEG = path.join(TOOL_BIN, "ffmpeg");
 
@@ -59,18 +58,36 @@ function run(command, args, options = {}) {
   return result.stdout || "";
 }
 
+function commandPath(command) {
+  const result = spawnSync("command", ["-v", command], {
+    shell: true,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function imageioFfmpegPath() {
+  if (process.env.IMAGEIO_FFMPEG_BIN) return process.env.IMAGEIO_FFMPEG_BIN;
+  const output = run(PYTHON, ["-c", "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"], { capture: true });
+  return output.trim();
+}
+
 function ensureTooling() {
   run(PYTHON, ["-m", "yt_dlp", "--version"], { capture: true });
-  if (!existsSync(MLX_WHISPER)) {
-    throw new Error(`mlx_whisper not found at ${MLX_WHISPER}. Install with: python3 -m pip install --user mlx-whisper`);
+  const mlxWhisper = process.env.MLX_WHISPER_BIN || commandPath("mlx_whisper");
+  if (!mlxWhisper) {
+    throw new Error("mlx_whisper not found in PATH. Install with: python3 -m pip install --user mlx-whisper");
   }
-  if (!existsSync(IMAGEIO_FFMPEG)) {
+  const ffmpeg = imageioFfmpegPath();
+  if (!existsSync(ffmpeg)) {
     throw new Error(`imageio ffmpeg binary not found. Install with: python3 -m pip install --user imageio-ffmpeg`);
   }
   mkdirSync(TOOL_BIN, { recursive: true });
   if (!existsSync(TOOL_FFMPEG)) {
-    execFileSync("ln", ["-sf", IMAGEIO_FFMPEG, TOOL_FFMPEG]);
+    execFileSync("ln", ["-sf", ffmpeg, TOOL_FFMPEG]);
   }
+  return { mlxWhisper, ffmpeg };
 }
 
 function getMetadata(url) {
@@ -128,7 +145,7 @@ ${segmentLines.join("\n")}
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  ensureTooling();
+  const tooling = ensureTooling();
 
   const meta = getMetadata(args.url);
   const outDir = path.join(ROOT, "01_sources", "raw", `youtube-${meta.id}`);
@@ -163,7 +180,7 @@ function main() {
   }
 
   if (!existsSync(wavPath) || args.force) {
-    run(IMAGEIO_FFMPEG, [
+    run(tooling.ffmpeg, [
       "-y",
       "-i",
       videoPath,
@@ -179,7 +196,7 @@ function main() {
   }
 
   if (!existsSync(jsonPath) || args.force) {
-    run(MLX_WHISPER, [
+    run(tooling.mlxWhisper, [
       "--model",
       args.model,
       "--language",
@@ -218,4 +235,3 @@ try {
   usage();
   process.exit(1);
 }
-

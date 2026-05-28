@@ -15,15 +15,19 @@
 
 ## Рабочий каталог и расположение агентов
 
-Канонический корень Techscope: `/Users/jkl/Techscope`.
+Канонический корень Techscope определяется env-first:
 
-Папка `/Users/jkl/Documents/New project` не является рабочим корнем Techscope. Если там остаются старые или экспериментальные файлы, считать их архивом/источником для ручного merge, а не местом работы сервисов.
+1. `TECHSCOPE_ROOT`, если переменная окружения задана.
+2. Git root текущего checkout.
+3. Текущий рабочий каталог как fallback.
 
-Все новые агенты, создаваемые Techscope Agents Mother, должны размещаться соседними папками в `/Users/jkl/<agent-name>`, если пользователь явно не указал другой путь. Это позволяет держать Techscope и созданных агентов на одном уровне:
+Не зашивать абсолютные user-specific пути в исполняемые скрипты, launchd-шаблоны, manifest-файлы и generated scaffold. Исторические Markdown-артефакты могут содержать старые пути как контекст миграций, но не должны быть источником runtime-конфигурации.
 
-- `/Users/jkl/Techscope` — агент-копилка и фабрика агентов;
-- `/Users/jkl/<agent-name>` — отдельный создаваемый или анализируемый агент;
-- `/Users/jkl/Techscope-migration-backups/` — резервные копии миграций.
+Все новые агенты, создаваемые Techscope Agents Mother, должны размещаться соседними папками рядом с корнем Techscope, если пользователь явно не указал другой путь. Это позволяет держать Techscope и созданных агентов на одном уровне:
+
+- `<parent-of-TECHSCOPE_ROOT>/Techscope` — агент-копилка и фабрика агентов;
+- `<parent-of-TECHSCOPE_ROOT>/<agent-name>` — отдельный создаваемый или анализируемый агент;
+- `<parent-of-TECHSCOPE_ROOT>/Techscope-migration-backups/` — резервные копии миграций.
 
 Не копировать в новых агентов секреты, `.env`, токены, приватные credentials, пользовательские данные, `.queue`, `.memory`, `.logs` или внутреннее состояние Techscope без отдельного явного решения.
 
@@ -143,7 +147,7 @@ Techscope может создавать и развивать новых аге�
 
 Если новый агент принимает внешние сообщения, email, Telegram-посты, ссылки, сайты, YouTube-транскрипты, файлы, скриншоты или другой некурированный ввод, контракт обязан определить `untrusted_input_policy`: источники, риск-уровень, лимиты токенов/медиа/стоимости, карантин, scanner/validation слой, запрет прямого влияния raw input на tools/memory и human approval gates.
 
-Предпочтительный путь реализации для v1: `codex-native` агент в соседней папке `/Users/jkl/<agent-name>` с опциональным Telegram-интерфейсом. Telegram считается interface adapter, а не обязательной частью каждого агента.
+Предпочтительный путь реализации для v1: `codex-native` агент в соседней папке `<parent-of-TECHSCOPE_ROOT>/<agent-name>` с опциональным Telegram-интерфейсом. Telegram считается interface adapter, а не обязательной частью каждого агента.
 
 Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Techscope.
 

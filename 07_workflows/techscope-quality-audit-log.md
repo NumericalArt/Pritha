@@ -50,3 +50,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `audit-baseline-report`, `golden-checks-manifest`, `audit-log-append-only`, `non-mutating-self-inspection`
 - Open questions: none
 - Notes: `scripts/agents-mother.mjs test` now supports `--no-report` so golden checks do not mutate memory reports. Final Phase 0 gate passed with `node scripts/golden-checks.mjs --with-embeddings`.
+
+## Phase 1 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-1-report.md`
+- AM-CANDIDATE patterns: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-aware-launchd-template`, `portable-tool-discovery`
+- Open questions: should Phase 2 add a plist rendering helper or keep launchd rendering manual?
+- Notes: Runtime grep for `/Users/jkl` is clean across `scripts launchd interfaces memory tools operations`; historical Markdown keeps old paths only as migration context. Final gate passed both from project root and from `/tmp` with `TECHSCOPE_ROOT=/Users/jkl/Techscope`.

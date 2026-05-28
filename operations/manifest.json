@@ -5,11 +5,11 @@
   "deployment_profile": "mac-mini-service",
   "service_mode": "launchd",
   "autostart": "launchd-on-approval",
-  "autostart_policy": "Techscope Web and Telegram bot are allowed to run as launchd services from /Users/jkl/Techscope. New agents must not inherit this automatically.",
+  "autostart_policy": "Techscope Web and Telegram bot may run as launchd services from TECHSCOPE_ROOT after explicit approval. New agents must not inherit this automatically.",
   "service_label": "com.techscope",
   "start_command": "launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.techscope.web.plist && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.techscope.telegram-bot.plist",
   "stop_command": "launchctl bootout gui/$(id -u)/com.techscope.web; launchctl bootout gui/$(id -u)/com.techscope.telegram-bot",
-  "healthcheck_command": "curl -fsS http://127.0.0.1:3000/ >/dev/null && node scripts/telegram-bot.mjs poll-once --dry-run >/dev/null",
+  "healthcheck_command": "node scripts/healthcheck.mjs",
   "log_path": ".logs/",
   "launchd_template": "launchd/com.techscope.web.plist",
   "proactivity": {

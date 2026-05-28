@@ -10,7 +10,24 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 
-ROOT = Path("/Users/jkl/Techscope")
+def resolve_root():
+    if os.environ.get("TECHSCOPE_ROOT"):
+        return Path(os.environ["TECHSCOPE_ROOT"]).expanduser().resolve()
+    try:
+        output = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        if output:
+            return Path(output).resolve()
+    except Exception:
+        pass
+    return Path.cwd().resolve()
+
+
+ROOT = resolve_root()
 DB_PATH = ROOT / ".memory" / "techscope.sqlite"
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "3000"))
@@ -191,7 +208,7 @@ class Handler(BaseHTTPRequestHandler):
                     cwd=ROOT,
                     text=True,
                     capture_output=True,
-                    env={**os.environ, "HOME": "/Users/jkl"},
+                    env=os.environ.copy(),
                     timeout=60,
                 )
                 return send_text(self, result.stdout if result.returncode == 0 else result.stderr, status=200 if result.returncode == 0 else 500)
@@ -220,4 +237,3 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"Techscope Web Python: http://{HOST}:{PORT}", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
-
