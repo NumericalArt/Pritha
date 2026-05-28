@@ -60,7 +60,7 @@ Status: active
 
 - Agents tracked: 3
 - Contracts: 3
-- Reports: 38
+- Reports: 39
 - Research reports: 1
 
 ## Agents
@@ -69,10 +69,11 @@ Status: active
 | --- | --- | --- | --- | --- | --- | --- |
 | FESPA26 | voice-first Codex-native workbench for processing FESPA 2026 booth media, notes, links and files into a bilingual mobile | hybrid, with Codex-native sidecar. | web. / Telegram none. | local Mac. | manual. | contracts:1 scaffold:0 test:3 handoff:1 ops:3 deploy:0 evolve:1 |
 | Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:0 handoff:0 ops:1 deploy:2 evolve:2 |
-| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:14 deploy:0 evolve:0 |
+| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:15 deploy:0 evolve:0 |
 
 ## Recent Reports
 
+- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-9d-agents-mother-command-modules-report.md
 - 2026-05-28 agent-operations-report/partial: 11_agents/reports/2026-05-28-techscope-quality-phase-9c-agents-mother-scaffold-module-report.md
 - 2026-05-28 agent-operations-report/partial: 11_agents/reports/2026-05-28-techscope-quality-phase-9b-agents-mother-test-module-report.md
 - 2026-05-28 agent-operations-report/partial: 11_agents/reports/2026-05-28-techscope-quality-phase-9a-agents-mother-entry-contract-report.md
@@ -102,7 +103,6 @@ Status: active
 - 2026-05-25 agent-post-creation-review/draft: 11_agents/reports/2026-05-25-fespa26-agent-post-creation-review.md
 - 2026-05-25 agent-operations-report/complete: 11_agents/reports/2026-05-25-fespa26-agent-operations-report.md
 - 2026-05-19 agent-test-report/partial: 11_agents/reports/2026-05-19-fespa26-agent-test-report.md
-- 2026-05-19 agent-test-report/complete: 11_agents/reports/2026-05-19-fespa26-agent-test-report-2.md
 
 ## Evolution Rules
 

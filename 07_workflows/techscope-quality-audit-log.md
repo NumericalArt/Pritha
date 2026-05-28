@@ -171,3 +171,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `snapshot-guarded-scaffold-extraction`, `scaffold-module-boundary`, `direct-generator-export-test`
 - Open questions: extract handoff and operations together, or move deployment/evolve/registry first to reduce the entrypoint tail?
 - Notes: Extracted `scripts/agents-mother/scaffold/index.mjs` and preserved `scaffold` command behavior through snapshot coverage. Added a direct module export test for `generatedAgentFiles`. Full Phase 9 remains partial until remaining command modules are extracted. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 9d — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: inherited from Phase 9c final gate
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-9d-agents-mother-command-modules-report.md`
+- AM-CANDIDATE patterns: `isolated-root-command-module-test`, `lifecycle-command-modules`, `legacy-entrypoint-thin-tail`
+- Open questions: extract interview/init/research in a future Phase 9e, or keep the current lifecycle-command module boundary until a real feature request needs it?
+- Notes: Extracted handoff, operations/deploy and registry/evolve/list command modules. Added isolated `TECHSCOPE_ROOT` tests so report-writing commands run without polluting real Techscope reports. Full isolated command matrix passed for questions, validate, list, registry, interview, init, research, scaffold, test, handoff, operations, deploy plan and evolve. Fixed a legacy `validate` regression by importing `printIssues` from `contract.mjs`. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
