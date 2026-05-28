@@ -16,6 +16,8 @@ const jsonMode = args.has("--json");
 const markdownMode = args.has("--markdown");
 const dryRun = args.has("--dry-run");
 const strictEnv = args.has("--strict-env");
+const profileIndex = argv.indexOf("--profile");
+const profile = profileIndex >= 0 ? argv[profileIndex + 1] || "full" : "full";
 const simulatedFailures = new Set(
   argv
     .filter((arg) => arg.startsWith("--simulate-fail="))
@@ -96,40 +98,34 @@ function run(id, name, command, commandArgs, options = {}) {
 }
 
 const unitTestFiles = listTestFiles(path.join(ROOT, "tests"));
-const checks = [
-  run(
-    "env-doctor",
-    "Environment doctor",
-    "node",
-    ["scripts/env-doctor.mjs", ...(strictEnv ? ["--strict"] : [])],
-  ),
-  run("validate-memory", "Markdown memory validation", "node", ["scripts/validate-memory.mjs"]),
-  run("smoke-test", "Smoke test", "node", ["scripts/smoke-test.mjs"]),
-  run(
-    "unit-tests",
-    "Unit tests",
-    "node",
-    ["--test", ...unitTestFiles],
-    { timeoutMs: 180000 },
-  ),
-  run(
-    "agents-mother-test",
-    "Agents Mother self-inspection",
-    "node",
-    ["scripts/agents-mother.mjs", "test", ".", "--no-report"],
-  ),
-  run(
-    "telegram-dry-run",
-    "Telegram dry-run",
-    "node",
-    ["scripts/telegram-bot.mjs", "poll-once", "--dry-run"],
-  ),
+const allCheckSpecs = [
+  ["env-doctor", "Environment doctor", "node", ["scripts/env-doctor.mjs", ...(strictEnv ? ["--strict"] : [])]],
+  ["validate-memory", "Markdown memory validation", "node", ["scripts/validate-memory.mjs"]],
+  ["smoke-test", "Smoke test", "node", ["scripts/smoke-test.mjs"]],
+  ["unit-tests", "Unit tests", "node", ["--test", ...unitTestFiles], { timeoutMs: 180000 }],
+  ["agents-mother-test", "Agents Mother self-inspection", "node", ["scripts/agents-mother.mjs", "test", ".", "--no-report"]],
+  ["telegram-dry-run", "Telegram dry-run", "node", ["scripts/telegram-bot.mjs", "poll-once", "--dry-run"]],
 ];
+
+const profileChecks = {
+  full: allCheckSpecs.map((spec) => spec[0]),
+  "self-test": ["env-doctor", "validate-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
+};
+
+if (!profileChecks[profile]) {
+  console.error(`Unknown quality gate profile: ${profile}`);
+  process.exit(1);
+}
+
+const checks = allCheckSpecs
+  .filter((spec) => profileChecks[profile].includes(spec[0]))
+  .map((spec) => run(...spec));
 
 const failed = checks.filter((check) => check.status === "fail");
 const payload = {
   schema: "techscope-quality-gate-v1",
   root: ROOT,
+  profile,
   status: dryRun ? "planned" : failed.length === 0 ? "pass" : "fail",
   createdAt: new Date().toISOString(),
   dryRun,

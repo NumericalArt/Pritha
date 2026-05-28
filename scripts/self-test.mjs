@@ -1,0 +1,168 @@
+#!/usr/bin/env node
+
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import process from "node:process";
+
+const ROOT = process.env.TECHSCOPE_ROOT
+  ? path.resolve(process.env.TECHSCOPE_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+const argv = process.argv.slice(2);
+const args = new Set(argv);
+const jsonMode = args.has("--json");
+const dryRun = args.has("--dry-run");
+const noWrite = args.has("--no-write") || dryRun;
+const baselinePath = path.join(ROOT, ".memory", "last-self-test.json");
+
+function runJson(command, commandArgs, options = {}) {
+  const result = spawnSync(command, commandArgs, {
+    cwd: ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: options.timeoutMs || 180000,
+    maxBuffer: options.maxBuffer || 20 * 1024 * 1024,
+    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+  });
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      status: result.status || 1,
+      stdout: String(result.stdout || "").trim(),
+      stderr: String(result.stderr || "").trim(),
+      json: null,
+    };
+  }
+  try {
+    return {
+      ok: true,
+      status: 0,
+      stdout: String(result.stdout || "").trim(),
+      stderr: String(result.stderr || "").trim(),
+      json: JSON.parse(result.stdout),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 1,
+      stdout: String(result.stdout || "").trim(),
+      stderr: error instanceof Error ? error.message : String(error),
+      json: null,
+    };
+  }
+}
+
+function stats() {
+  if (dryRun) {
+    return { documents: 0, chunks: 0, entities: 0, relations: 0, embeddings: 0 };
+  }
+  const result = spawnSync("node", ["scripts/query-memory.mjs", "stats"], {
+    cwd: ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 60000,
+    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || "query-memory stats failed");
+  }
+  const out = String(result.stdout || "");
+  const values = {};
+  for (const line of out.split(/\r?\n/)) {
+    const match = line.trim().match(/^(documents|chunks|entities|relations|embeddings)\s+(\d+)$/);
+    if (match) values[match[1]] = Number(match[2]);
+  }
+  return values;
+}
+
+function previousBaseline() {
+  if (!existsSync(baselinePath)) return null;
+  try {
+    return JSON.parse(readFileSync(baselinePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function runSelfTest() {
+  const quality = dryRun
+    ? runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--dry-run", "--json"])
+    : runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--json"], { timeoutMs: 240000 });
+  const queue = runJson("node", ["scripts/queue-health.mjs", "--json"]);
+  const currentStats = stats();
+  const previous = previousBaseline();
+
+  const regressions = [];
+  const expectedQualityStatus = dryRun ? "planned" : "pass";
+  if (!quality.ok || quality.json?.status !== expectedQualityStatus) {
+    regressions.push({
+      id: "quality-gate",
+      severity: "critical",
+      message: "self-test quality-gate profile failed",
+    });
+  }
+  if (!dryRun && previous?.memory_stats?.documents != null && currentStats.documents < previous.memory_stats.documents) {
+    regressions.push({
+      id: "document-count-drop",
+      severity: "critical",
+      message: `document count dropped from ${previous.memory_stats.documents} to ${currentStats.documents}`,
+    });
+  }
+  const failedJobs = queue.json?.failed || [];
+  if (failedJobs.length > 0) {
+    regressions.push({
+      id: "queue-failed-jobs",
+      severity: "critical",
+      message: `queue has ${failedJobs.length} failed job(s)`,
+    });
+  }
+
+  const payload = {
+    schema: "techscope-self-test-v1",
+    root: ROOT,
+    status: regressions.length === 0 ? "pass" : "fail",
+    created_at: new Date().toISOString(),
+    dry_run: dryRun,
+    memory_stats: currentStats,
+    previous_memory_stats: previous?.memory_stats || null,
+    quality_gate: quality.json || { status: "fail", stdout: quality.stdout, stderr: quality.stderr },
+    queue_health: queue.json || { status: "fail", stdout: queue.stdout, stderr: queue.stderr },
+    regressions,
+  };
+
+  if (!noWrite) {
+    mkdirSync(path.dirname(baselinePath), { recursive: true });
+    writeFileSync(baselinePath, `${JSON.stringify(payload, null, 2)}\n`);
+  }
+  return payload;
+}
+
+const payload = runSelfTest();
+
+if (jsonMode) {
+  console.log(JSON.stringify(payload, null, 2));
+} else {
+  console.log(`Techscope self-test: ${payload.status}`);
+  console.log(`Root: ${payload.root}`);
+  console.log(`Quality profile: ${payload.quality_gate.profile || "self-test"} / ${payload.quality_gate.status}`);
+  console.log(`Memory documents: ${payload.memory_stats.documents}`);
+  console.log(`Queue failed jobs: ${(payload.queue_health.failed || []).length}`);
+  console.log(`Queue stale items: ${(payload.queue_health.stale || []).length}`);
+  if (payload.previous_memory_stats) {
+    console.log(`Previous documents: ${payload.previous_memory_stats.documents}`);
+  } else {
+    console.log("Previous baseline: none");
+  }
+  for (const regression of payload.regressions) {
+    console.log(`- FAIL ${regression.id}: ${regression.message}`);
+  }
+  if (!noWrite) {
+    console.log(`Baseline written: ${path.relative(ROOT, baselinePath)}`);
+  }
+}
+
+if (payload.status !== "pass") {
+  process.exitCode = 1;
+}

@@ -46,3 +46,16 @@ test("quality-gate markdown output includes a summary table", () => {
   assert.match(result.stdout, /# Techscope Quality Gate: planned/);
   assert.match(result.stdout, /\| Status \| Check \| Command \| Duration \|/);
 });
+
+test("quality-gate self-test profile omits heavier Agents Mother inspection", () => {
+  const result = spawnSync("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--dry-run", "--json"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.profile, "self-test");
+  assert.deepEqual(
+    payload.checks.map((check) => check.id),
+    ["env-doctor", "validate-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
+  );
+});

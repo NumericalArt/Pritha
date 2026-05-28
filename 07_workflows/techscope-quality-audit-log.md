@@ -127,3 +127,14 @@ Append-only log for `07_workflows/2026-05-28-techscope-quality-and-release-roadm
 - AM-CANDIDATE patterns: `quality-gate-mjs`, `audit-report-generator`, `phase-report-template`, `optional-githooks-precommit`
 - Open questions: should Phase 8 self-test reuse quality-gate profiles or stay separate?
 - Notes: `quality-gate.mjs` runs env-doctor, validate-memory, smoke-test, unit tests, Agents Mother self-inspection and Telegram dry-run sequentially. Intentional `--simulate-fail=smoke-test` regression fails with a clear check-level reason. `.githooks/pre-commit` is documented but not installed. Final `node scripts/quality-gate.mjs`, `npm test --silent` and `node scripts/golden-checks.mjs --with-embeddings` passed.
+
+## Phase 8 — 2026-05-28
+
+- Codex thread: current roadmap execution thread
+- Baseline golden checks: pass
+- Phase-specific checks: pass
+- Golden checks after: pass
+- Report: `11_agents/reports/2026-05-28-techscope-quality-phase-8-self-test-report.md`
+- AM-CANDIDATE patterns: `self-test-mjs`, `queue-health-mjs`, `scheduled-health-pulse`, `proactive-self-test-contract`
+- Open questions: should stale `awaiting_codex` jobs become future warnings in quality-gate?
+- Notes: Self-test is manual by default and writes `.memory/last-self-test.json`; queue-health is read-only and reports 2 stale informational items with 0 failed jobs. A launchd template was added but not installed. Final `node scripts/quality-gate.mjs`, `npm test --silent`, `node scripts/golden-checks.mjs --with-embeddings` and `node scripts/self-test.mjs --json` passed.

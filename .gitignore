@@ -21,6 +21,7 @@ Untitled*.canvas
 .memory/*.sqlite
 .memory/last-rebuild.sql
 .memory/reports/
+.memory/last-self-test.json
 
 # Raw source material is not part of the public/source-of-truth snapshot.
 01_sources/raw/
