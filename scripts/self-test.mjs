@@ -54,6 +54,23 @@ function runJson(command, commandArgs, options = {}) {
   }
 }
 
+function runCommand(command, commandArgs, options = {}) {
+  const result = spawnSync(command, commandArgs, {
+    cwd: ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: options.timeoutMs || 180000,
+    maxBuffer: options.maxBuffer || 20 * 1024 * 1024,
+    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+  });
+  return {
+    ok: result.status === 0,
+    status: result.status ?? 1,
+    stdout: String(result.stdout || "").trim(),
+    stderr: String(result.stderr || "").trim(),
+  };
+}
+
 function stats() {
   if (dryRun) {
     return { documents: 0, chunks: 0, entities: 0, relations: 0, embeddings: 0 };
@@ -86,10 +103,29 @@ function previousBaseline() {
   }
 }
 
+function sanitizeText(value) {
+  let text = value;
+  if (ROOT) text = text.split(ROOT).join("<TECHSCOPE_ROOT>");
+  if (process.env.HOME) text = text.split(process.env.HOME).join("<USER_HOME>");
+  return text;
+}
+
+function sanitizePayload(value) {
+  if (typeof value === "string") return sanitizeText(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizePayload(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizePayload(item)]));
+  }
+  return value;
+}
+
 function runSelfTest() {
   const quality = dryRun
     ? runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--dry-run", "--json"])
     : runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--json"], { timeoutMs: 240000 });
+  const embeddingsRestore = !dryRun
+    ? runCommand("python3", ["scripts/embed-memory.py"], { timeoutMs: 600000 })
+    : { ok: true, status: 0, stdout: "", stderr: "", skipped: true };
   const queue = runJson("node", ["scripts/queue-health.mjs", "--json"]);
   const currentStats = stats();
   const previous = previousBaseline();
@@ -101,6 +137,13 @@ function runSelfTest() {
       id: "quality-gate",
       severity: "critical",
       message: "self-test quality-gate profile failed",
+    });
+  }
+  if (!embeddingsRestore.ok) {
+    regressions.push({
+      id: "embeddings-restore",
+      severity: "critical",
+      message: "self-test rebuilt memory but failed to restore embeddings",
     });
   }
   if (!dryRun && previous?.memory_stats?.documents != null && currentStats.documents < previous.memory_stats.documents) {
@@ -119,7 +162,7 @@ function runSelfTest() {
     });
   }
 
-  const payload = {
+  const payload = sanitizePayload({
     schema: "techscope-self-test-v1",
     root: ROOT,
     status: regressions.length === 0 ? "pass" : "fail",
@@ -128,9 +171,10 @@ function runSelfTest() {
     memory_stats: currentStats,
     previous_memory_stats: previous?.memory_stats || null,
     quality_gate: quality.json || { status: "fail", stdout: quality.stdout, stderr: quality.stderr },
+    embeddings_restore: embeddingsRestore,
     queue_health: queue.json || { status: "fail", stdout: queue.stdout, stderr: queue.stderr },
     regressions,
-  };
+  });
 
   if (!noWrite) {
     mkdirSync(path.dirname(baselinePath), { recursive: true });

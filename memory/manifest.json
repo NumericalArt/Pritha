@@ -1,13 +1,18 @@
 {
   "agent": "Techscope",
   "generated_by": "TechScope canonical-root migration",
-  "profile": "markdown-first-with-derived-indexes",
-  "source_of_truth": "Markdown artifacts in 00_inbox, 01_sources, 02_briefs, 03_reviews, 04_standards, 05_decisions, 07_workflows, 10_wiki and 11_agents",
-  "derived_indexes": [
+  "profile": "portable-full-memory-snapshot",
+  "canonical_authored_knowledge": "Markdown artifacts in 00_inbox, 01_sources, 02_briefs, 03_reviews, 04_standards, 05_decisions, 07_workflows, 10_wiki and 11_agents",
+  "portable_snapshot": [
     ".memory/techscope.sqlite",
     "sentence-transformer embeddings in .memory/techscope.sqlite",
+    "SQLite FTS and relations in .memory/techscope.sqlite",
+    ".memory/schema.sql",
+    ".memory/last-rebuild.sql",
+    ".memory/last-self-test.json",
     "10_wiki generated pages"
   ],
+  "source_of_truth": "Markdown is canonical authored knowledge; .memory is a committed portability/cache layer that must remain rebuildable.",
   "directories": [
     "00_inbox",
     "01_sources/notes",
@@ -20,5 +25,5 @@
     "10_wiki",
     "11_agents"
   ],
-  "raw_material_policy": "01_sources/raw is preserved but not treated as curated source of truth until summarized into notes, signals, briefs or assessments."
+  "raw_material_policy": "01_sources/raw text, JSON, transcripts, PDFs and small supporting images are part of the portable Git snapshot. Heavy audio/video media are local-only until a Git LFS/archive policy is selected. Raw material is not treated as curated source of truth until summarized into notes, signals, briefs or assessments."
 }

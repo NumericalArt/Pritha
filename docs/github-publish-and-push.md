@@ -193,10 +193,17 @@ git status --short --ignored
 node scripts/validate-memory.mjs
 npm test --silent
 node scripts/quality-gate.mjs
+node scripts/golden-checks.mjs --with-embeddings
 node scripts/pre-push-audit.mjs
 git add <changed files>
 git commit -m "<short clear message>"
 git push origin main
+```
+
+When memory changed, include the portable snapshot files in the commit:
+
+```sh
+git add .memory/techscope.sqlite .memory/schema.sql .memory/last-rebuild.sql .memory/last-self-test.json .memory/README.md
 ```
 
 This direct push is the default update workflow until `gh` is authenticated and
@@ -206,12 +213,17 @@ missing `gh` auth.
 For release work, additionally run:
 
 ```sh
-node scripts/golden-checks.mjs --with-embeddings
 node scripts/github-release-status.mjs --online --strict
 ```
 
-Do not push ignored runtime state, secrets, local databases, Telegram raw files,
-secure handoff folders or `.env.local`.
+GitHub is the portable Pritha memory snapshot. Push curated Markdown,
+`.memory/` and portable raw artifacts, including `techscope.sqlite`, SQLite
+FTS/relations, embeddings, schema, rebuild SQL, the self-test baseline, raw
+JSON, transcripts, text, PDFs and small supporting images. Do not push secrets,
+`.env.local`, `.queue/`, `.logs/`, `.tools/` or secure handoff folders. Heavy
+raw audio/video media (`mp4`, `wav`, `mov`, `mkv`, `webm`, `mp3`, `m4a`,
+`avi`, `flac`) stays outside the default Git snapshot until a Git LFS/archive
+policy is selected.
 
 ## Current GitHub CLI State
 

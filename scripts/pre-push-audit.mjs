@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
@@ -71,15 +71,40 @@ function compact(matches, limit = 80) {
 }
 
 const files = trackedFiles();
-const secretHistory = git(["log", "--all", "--oneline", "--", ".env", ".env.local", "*.sqlite", "*.token", "secrets/*"]);
+const rawMediaPattern = /^01_sources\/raw\/.*\.(mp4|wav|mov|mkv|webm|mp3|m4a|avi|flac)$/i;
+const maxRegularFileBytes = 95 * 1024 * 1024;
+const requiredMemorySnapshotFiles = [
+  ".memory/README.md",
+  ".memory/schema.sql",
+  ".memory/techscope.sqlite",
+  ".memory/last-rebuild.sql",
+  ".memory/last-self-test.json",
+];
+const secretHistory = git(["log", "--all", "--oneline", "--", ".env", ".env.local", "*.token", "secrets/*", "secure-handoffs/*"]);
 const forbiddenTracked = files.filter((file) =>
   file === ".env" ||
   file === ".env.local" ||
-  file.endsWith(".sqlite") ||
   file.endsWith(".token") ||
   file.startsWith("secrets/") ||
+  file.startsWith(".queue/") ||
+  file.startsWith(".logs/") ||
+  file.startsWith(".tools/") ||
   file.startsWith("secure-handoffs/"),
 );
+const forbiddenRawMedia = files.filter((file) => rawMediaPattern.test(file));
+const oversizedTrackedFiles = files.filter((file) => {
+  try {
+    return statSync(path.join(ROOT, file)).size > maxRegularFileBytes;
+  } catch {
+    return false;
+  }
+});
+const missingMemorySnapshot = requiredMemorySnapshotFiles.filter((file) => !existsSync(path.join(ROOT, file)));
+const untrackedMemorySnapshot = requiredMemorySnapshotFiles.filter((file) => existsSync(path.join(ROOT, file)) && !files.includes(file));
+const ignoredMemorySnapshot = requiredMemorySnapshotFiles.filter((file) => {
+  const result = git(["check-ignore", "-q", "--", file]);
+  return result.status === 0;
+});
 const localPathMatches = textFilesWithMatches(files, /\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+/g);
 const longTokenCandidates = textFilesWithMatches(files, /[A-Za-z0-9_-]{40,}/g);
 const telegramIdMatches = textFilesWithMatches(files, /\b\d{9,12}\b/g).filter((match) =>
@@ -101,6 +126,38 @@ const checks = [
     id: "forbidden-tracked-files",
     status: forbiddenTracked.length ? "fail" : "pass",
     detail: forbiddenTracked.length ? forbiddenTracked.join("\n") : "no forbidden tracked files",
+  },
+  {
+    id: "raw-audio-video-media",
+    status: forbiddenRawMedia.length ? "fail" : "pass",
+    detail: forbiddenRawMedia.length ? forbiddenRawMedia.join("\n") : "no raw audio/video media tracked",
+  },
+  {
+    id: "oversized-tracked-files",
+    status: oversizedTrackedFiles.length ? "fail" : "pass",
+    detail: oversizedTrackedFiles.length
+      ? oversizedTrackedFiles.map((file) => {
+          const size = statSync(path.join(ROOT, file)).size;
+          return `${file} (${Math.round(size / 1024 / 1024)} MiB)`;
+        }).join("\n")
+      : "no tracked file exceeds 95 MiB",
+  },
+  {
+    id: "portable-memory-snapshot",
+    status: missingMemorySnapshot.length || ignoredMemorySnapshot.length ? "fail" : "pass",
+    detail: missingMemorySnapshot.length || ignoredMemorySnapshot.length
+      ? [
+          missingMemorySnapshot.length ? `missing required files: ${missingMemorySnapshot.join(", ")}` : "",
+          ignoredMemorySnapshot.length ? `ignored by gitignore: ${ignoredMemorySnapshot.join(", ")}` : "",
+        ].filter(Boolean).join("\n")
+      : "required .memory snapshot files exist and are not ignored",
+  },
+  {
+    id: "portable-memory-tracking",
+    status: untrackedMemorySnapshot.length ? "warn" : "pass",
+    detail: untrackedMemorySnapshot.length
+      ? `add before commit: ${untrackedMemorySnapshot.join(", ")}`
+      : "portable .memory snapshot files are tracked",
   },
   {
     id: "local-absolute-paths",
@@ -137,7 +194,7 @@ const checks = [
 const failed = checks.filter((check) => check.status === "fail");
 const warnings = checks.filter((check) => check.status === "warn" || check.status === "missing");
 const payload = {
-  schema: "pritha-pre-push-audit-v1",
+  schema: "pritha-pre-push-audit-v2",
   root: ROOT,
   status: failed.length === 0 ? "pass" : "fail",
   strict: strictMode,

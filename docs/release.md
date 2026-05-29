@@ -17,17 +17,25 @@ sibling `secure-handoffs/` directory, outside this repository.
 Run:
 
 ```sh
-node scripts/pre-push-audit.mjs
-node scripts/quality-gate.mjs
+node scripts/validate-memory.mjs
 npm test --silent
+node scripts/quality-gate.mjs
 node scripts/golden-checks.mjs --with-embeddings
+node scripts/pre-push-audit.mjs
 ```
 
 Then perform a manual review of:
 
 - `.env.example` contains no real secrets.
-- `.env`, `.env.local`, `.memory/*.sqlite`, `.queue/`, `.logs/`, `.tools/`,
-  `01_sources/raw/` and `secure-handoffs/` are not tracked.
+- `.memory/` is tracked as the portable memory snapshot, including SQLite,
+  FTS/relations, embeddings, schema, rebuild SQL and the self-test baseline.
+- `01_sources/raw/` text, JSON, transcripts, PDFs and small supporting images
+  are tracked as portable raw source state.
+- `.env`, `.env.local`, `.queue/`, `.logs/`, `.tools/` and
+  `secure-handoffs/` are not tracked.
+- Heavy raw audio/video media (`mp4`, `wav`, `mov`, `mkv`, `webm`, `mp3`,
+  `m4a`, `avi`, `flac`) is not tracked until a Git LFS/archive policy is
+  selected.
 - No local absolute paths or private identifiers remain in the public snapshot.
 - `LICENSE`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md` and `CHANGELOG.md`
   are present.

@@ -36,8 +36,9 @@ temporal_status: current
 # Techscope Prerequisites
 
 This file records the external runtime dependencies needed to run Techscope
-locally. Markdown remains the source of truth; databases and indexes are
-derived and can be rebuilt when these dependencies are present.
+locally. Markdown remains the canonical authored knowledge; `.memory/` is a
+committed portable snapshot of SQLite, FTS, relations and embeddings that can
+also be rebuilt when these dependencies are present.
 
 ## Required
 

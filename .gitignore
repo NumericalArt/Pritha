@@ -17,14 +17,18 @@ Untitled*.canvas
 .techscope-setup.json
 .obsidian/
 
-# Derived memory artifacts
-.memory/*.sqlite
-.memory/last-rebuild.sql
-.memory/reports/
-.memory/last-self-test.json
-
-# Raw source material is not part of the public/source-of-truth snapshot.
-01_sources/raw/
+# Raw source text, transcripts, JSON, PDFs and small images are part of the
+# portable snapshot. Heavy audio/video media stay local unless Git LFS/archive
+# policy is selected.
+01_sources/raw/**/*.mp4
+01_sources/raw/**/*.wav
+01_sources/raw/**/*.mov
+01_sources/raw/**/*.mkv
+01_sources/raw/**/*.webm
+01_sources/raw/**/*.mp3
+01_sources/raw/**/*.m4a
+01_sources/raw/**/*.avi
+01_sources/raw/**/*.flac
 
 # Dependencies / caches
 node_modules/

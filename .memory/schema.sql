@@ -1,5 +1,6 @@
 -- Techscope memory sidecar schema.
--- Markdown files are the source of truth. This database is rebuildable.
+-- Authored Markdown is canonical. This committed database is rebuildable and
+-- is part of Pritha's portable memory snapshot.
 
 PRAGMA foreign_keys = ON;
 
@@ -89,4 +90,3 @@ CREATE TABLE IF NOT EXISTS index_runs (
   chunks_changed INTEGER DEFAULT 0,
   error TEXT
 );
-

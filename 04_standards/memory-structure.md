@@ -3,17 +3,19 @@ id: memory-structure
 type: standard
 status: active
 created: 2026-05-15
-updated: 2026-05-15
-last_reviewed: 2026-05-15
+updated: 2026-05-29
+last_reviewed: 2026-05-29
 owner: Techscope/user
 topics: [memory, markdown, frontmatter, indexing]
 tools: [markdown, sqlite, obsidian]
 sources:
   - 05_decisions/2026-05-15-memory-architecture.md
+  - 05_decisions/2026-05-29-pritha-portable-memory-snapshot.md
   - 07_workflows/memory-implementation-roadmap.md
 related:
   decisions:
     - 05_decisions/2026-05-15-memory-architecture.md
+    - 05_decisions/2026-05-29-pritha-portable-memory-snapshot.md
   workflows:
     - 07_workflows/memory-indexing.md
 supersedes: []
@@ -23,16 +25,16 @@ supersedes: []
 
 Status: active
 Owner: Techscope/user
-Last reviewed: 2026-05-15
+Last reviewed: 2026-05-29
 
 ## Rule
 
-Каждый значимый артефакт памяти должен быть Markdown-файлом с YAML frontmatter. Markdown остается source of truth, а SQLite, FTS, embeddings и graph-like relations являются производными индексами.
+Каждый значимый authored-артефакт памяти должен быть Markdown-файлом с YAML frontmatter. Для Pritha GitHub snapshot переносит не только Markdown, но и рабочее состояние памяти: `.memory/techscope.sqlite`, FTS, relations, embeddings, schema, rebuild SQL, self-test baseline and portable raw sources. SQLite, FTS, embeddings и graph-like relations должны оставаться пересоздаваемыми из Markdown, но они коммитятся как portability/cache layer. Raw JSON, transcripts, text, PDFs and small supporting images are portable; heavy raw audio/video media stays local until a Git LFS/archive policy is selected.
 
 ## Use when
 
 - Создается intake, brief, assessment, review, decision, standard или workflow.
-- Материал должен быть доступен для Obsidian, Codex и SQLite index.
+- Материал должен быть доступен для Obsidian, Codex, SQLite index и переносимого GitHub snapshot.
 - Из материала нужно извлекать темы, инструменты, источники и связи.
 
 ## Avoid when
@@ -50,7 +52,7 @@ Last reviewed: 2026-05-15
 - `sources` должны ссылаться на исходные материалы или внутренние документы.
 - `related` должен связывать артефакт с briefs, reviews, decisions, standards и workflows.
 - Для новых файлов использовать шаблоны из `08_templates/`.
-- После серии изменений запускать `node scripts/validate-memory.mjs` и `node scripts/rebuild-memory.mjs`.
+- После серии изменений запускать `node scripts/validate-memory.mjs`, `node scripts/rebuild-memory.mjs` и перед push `node scripts/golden-checks.mjs --with-embeddings`.
 
 ## Identifier policy
 
@@ -84,3 +86,4 @@ related:
 ## Related decisions
 
 - `05_decisions/2026-05-15-memory-architecture.md`
+- `05_decisions/2026-05-29-pritha-portable-memory-snapshot.md`
