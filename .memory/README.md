@@ -1,13 +1,18 @@
 # Techscope Memory
 
-This directory is reserved for generated memory indexes.
+This directory contains the portable working memory snapshot for Pritha.
 
-The Markdown files in the repository are the source of truth. Files in `.memory/` are derived artifacts and may be deleted and rebuilt.
+The Markdown files in the repository are the canonical authored knowledge.
+Files in `.memory/` are generated and rebuildable, but they are also committed
+so another checkout can keep the same SQLite, FTS, relations, embeddings and
+baseline state without recomputing everything first.
 
-Planned artifacts:
+Tracked artifacts:
 
 - `techscope.sqlite`: SQLite sidecar index.
 - `schema.sql`: database schema.
+- `last-rebuild.sql`: SQL snapshot used for debugging rebuild output.
+- `last-self-test.json`: latest operational self-test baseline.
 - `exports/`: optional generated exports for other projects or agents.
 
 ## Current commands
@@ -79,13 +84,14 @@ The readable transcript is written to:
 
 ## Notes
 
-The current implementation has no embeddings yet. It supports:
+The current implementation supports:
 
 - frontmatter metadata indexing;
 - Markdown chunking by headings;
 - SQLite FTS5 full-text search;
 - topic/tool/source entities;
 - typed relations from frontmatter.
+- local chunk embeddings stored in `techscope.sqlite`.
 
 ## Local Embeddings
 
@@ -115,6 +121,7 @@ sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
 
 Notes:
 
-- Embeddings are derived artifacts stored in `.memory/techscope.sqlite`.
+- Embeddings are generated artifacts stored in `.memory/techscope.sqlite`.
 - Run `node scripts/rebuild-memory.mjs` before `python3 scripts/embed-memory.py` after Markdown changes.
+- Before pushing, run `node scripts/golden-checks.mjs --with-embeddings` so the committed SQLite snapshot contains fresh embeddings.
 - The current search computes cosine similarity locally over SQLite-stored vectors.

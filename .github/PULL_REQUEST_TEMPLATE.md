@@ -10,7 +10,9 @@
 - [ ] `npm test --silent` passes.
 - [ ] Phase/report artifact added when applicable.
 - [ ] AM-CANDIDATE patterns marked when applicable.
-- [ ] No `.env*`, `.queue/`, `.memory/*.sqlite`, `.logs/`, tokens or local-only paths committed.
+- [ ] `.memory/` portable snapshot is current when memory changed.
+- [ ] Raw text/JSON/transcripts/small supporting files are included when relevant; raw audio/video media is not committed.
+- [ ] No `.env*`, `.queue/`, `.logs/`, `.tools/`, tokens, secure handoffs or local-only paths committed.
 
 ## Verification
 

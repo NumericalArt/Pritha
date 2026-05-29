@@ -44,7 +44,7 @@ node scripts/pritha.mjs test ../research-agent
 
 ## Add Knowledge
 
-Place new material in `00_inbox/`, then create a brief, assessment, decision or standard. Markdown files are the source of truth.
+Place new material in `00_inbox/`, then create a brief, assessment, decision or standard. Markdown carries the authored knowledge; `.memory/` carries the portable SQLite/embeddings snapshot.
 
 ## Verify
 

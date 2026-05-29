@@ -98,9 +98,9 @@ node scripts/self-test.mjs
 
 ## GitHub publication and push
 
-Для первой публикации Pritha на GitHub и последующих push использовать `docs/github-publish-and-push.md` как source of truth. Перед обычным push в `main` минимум выполнить `node scripts/validate-memory.mjs`, `npm test --silent`, `node scripts/quality-gate.mjs` и `node scripts/pre-push-audit.mjs`. Перед release-действиями дополнительно выполнить `node scripts/golden-checks.mjs --with-embeddings` и `node scripts/github-release-status.mjs --online --strict`.
+Для первой публикации Pritha на GitHub и последующих push использовать `docs/github-publish-and-push.md` как source of truth. Перед обычным push в `main` минимум выполнить `node scripts/validate-memory.mjs`, `npm test --silent`, `node scripts/quality-gate.mjs`, `node scripts/golden-checks.mjs --with-embeddings` и `node scripts/pre-push-audit.mjs`, чтобы GitHub получил переносимый снимок Markdown + SQLite + embeddings + relations. Перед release-действиями дополнительно выполнить `node scripts/github-release-status.mjs --online --strict`.
 
-Не пушить секреты, `.env.local`, `.memory/*.sqlite`, `.queue/`, `.logs/`, `.tools/`, `01_sources/raw/` или `secure-handoffs/`. Первый GitHub repo для Pritha создавать приватным, затем после CI, release tag, GitHub Release и fresh clone check переводить в public вручную.
+Пушить curated Markdown, `.memory/` и переносимые raw-артефакты Pritha: `techscope.sqlite`, embeddings, schema, rebuild SQL, baseline self-test, raw JSON, transcripts, text, PDFs and small supporting images. Не пушить секреты, `.env.local`, `.queue/`, `.logs/`, `.tools/` или `secure-handoffs/`. Тяжелые audio/video raw media (`mp4`, `wav`, `mov`, `mkv`, `webm`, `mp3`, `m4a`, `avi`, `flac`) не входят в обычный Git snapshot и требуют отдельного Git LFS/archive решения. Первый GitHub repo для Pritha создавать приватным, затем после CI, release tag, GitHub Release и fresh clone check переводить в public вручную.
 
 ## Экспертные роли
 
@@ -148,7 +148,7 @@ node scripts/self-test.mjs
 - `supersedes`: какие старые артефакты новый материал заменяет или уточняет.
 - `superseded_by`: каким новым артефактом заменен старый материал.
 
-Markdown-файлы являются source of truth. Любая база данных, vector index или graph index считаются производными артефактами и должны быть пересоздаваемы из Markdown.
+Markdown-файлы являются canonical authored knowledge, но GitHub snapshot Pritha должен переносить всё рабочее состояние памяти: Markdown, `.memory/techscope.sqlite`, FTS, relations, embeddings, schema, rebuild SQL и baseline self-test. SQLite/vector/graph-like индексы должны оставаться пересоздаваемыми из Markdown, но не считаются локальным мусором и должны попадать в репозиторий как portability/cache layer.
 
 ## Generated LLM Wiki Layer
 

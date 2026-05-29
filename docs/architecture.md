@@ -11,7 +11,7 @@ mutation and trial checks before handoff.
 
 - Intake: raw text, links, media and source notes.
 - Curation: briefs, reviews, assessments, standards and decisions.
-- Memory: Markdown source of truth plus rebuildable SQLite/embeddings indexes.
+- Memory: authored Markdown plus committed, rebuildable `.memory/` snapshot with SQLite, FTS, relations and embeddings.
 - Pritha: seed interview, validation, research, scaffold, test, handoff, operations and lineage.
 - Generated descendants: sibling agent projects with their own manifests and scripts.
 
