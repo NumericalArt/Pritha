@@ -110,7 +110,7 @@ Realtime voice -> narrow server tool -> Codex deep-task transport -> durable mem
 
 ## Evidence
 
-- `node scripts/pritha.mjs test /Users/jkl/FESPA26`: complete; report saved as `11_agents/reports/2026-05-29-fespa26-agent-test-report.md`.
+- `node scripts/pritha.mjs test <SIBLING_AGENT_ROOT>/FESPA26`: complete; report saved as `11_agents/reports/2026-05-29-fespa26-agent-test-report.md`.
 - `npm run smoke --silent`: pass.
 - `npm run tools --silent`: pass.
 - `npm run operations --silent`: pass.

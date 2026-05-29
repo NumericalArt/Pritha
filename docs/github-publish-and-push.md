@@ -28,6 +28,16 @@ On GitHub:
 
 Preferred route for this Mac mini is SSH.
 
+Current operational policy:
+
+- Use direct SSH `git push origin main` as the primary update path.
+- Do not spend time trying GitHub CLI / PR / release commands while `gh` is not
+  authenticated.
+- Do not run `gh auth status` as a blocking prerequisite for ordinary pushes.
+- Revisit this policy after the operator explicitly authenticates `gh`; at that
+  point PR/release automation can be re-enabled through a separate update to
+  this document.
+
 Add the public SSH key to GitHub:
 
 1. Open GitHub Settings.
@@ -47,7 +57,7 @@ ssh -T git@github.com
 git ls-remote --heads origin main
 ```
 
-Alternative route:
+Deferred alternative route:
 
 ```sh
 gh auth login
@@ -55,7 +65,8 @@ gh auth status
 ```
 
 Either SSH or `gh` auth is acceptable for push, but `gh` auth is useful for
-creating releases and checking repository state from the CLI.
+creating releases and checking repository state from the CLI. Until `gh` is
+authenticated, ordinary updates should not attempt the CLI route.
 
 ## First Push
 
@@ -188,6 +199,10 @@ git commit -m "<short clear message>"
 git push origin main
 ```
 
+This direct push is the default update workflow until `gh` is authenticated and
+this document is revised. Do not create a branch or PR only to work around
+missing `gh` auth.
+
 For release work, additionally run:
 
 ```sh
@@ -198,17 +213,15 @@ node scripts/github-release-status.mjs --online --strict
 Do not push ignored runtime state, secrets, local databases, Telegram raw files,
 secure handoff folders or `.env.local`.
 
-## Current External Blocker
+## Current GitHub CLI State
 
-As of 2026-05-28, local Pritha is ready and SSH authentication works with the
-dedicated handoff key:
+As of 2026-05-29, SSH push works and direct `main` updates are the normal path:
 
 - `origin` is configured as `git@github.com:NumericalArt/Pritha.git`;
-- local `main` and local tag `v0.1.0` exist;
-- `gh` is installed but not authenticated;
-- the remote repository exists and currently contains a GitHub-created initial
-  `LICENSE` commit.
+- local `main` pushes to `origin/main`;
+- `gh` is installed but not authenticated yet;
+- PR/release automation through GitHub CLI is deferred until the operator runs
+  `gh auth login`.
 
-The next human action is to approve replacing the initial remote commit with the
-local Pritha history using `git push --force-with-lease origin main`, then push
-`v0.1.0`.
+When `gh` is authenticated, update this document before changing the default
+workflow.

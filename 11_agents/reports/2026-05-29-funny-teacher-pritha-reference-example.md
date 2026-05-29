@@ -98,7 +98,7 @@ This artifact does not copy Funny Teacher runtime state into Techscope. It recor
 
 ## Verification
 
-- `node scripts/pritha.mjs test /Users/jkl/FunnyTeacher`: complete; report saved as `11_agents/reports/2026-05-29-funny-teacher-agent-test-report.md`.
+- `node scripts/pritha.mjs test <SIBLING_AGENT_ROOT>/FunnyTeacher`: complete; report saved as `11_agents/reports/2026-05-29-funny-teacher-agent-test-report.md`.
 - `npm test --silent`: pass, 3 tests.
 - `npm run build --silent`: pass.
 - `npm run health --silent`: pass.

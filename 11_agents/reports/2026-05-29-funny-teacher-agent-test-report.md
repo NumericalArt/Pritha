@@ -27,7 +27,7 @@ config_surfaces:
   - operations/manifest.json
 portability: codex-native
 sources:
-  - /Users/jkl/FunnyTeacher
+  - <SIBLING_AGENT_ROOT>/FunnyTeacher
   - 07_workflows/agents-mother.md
   - 04_standards/agent-creation-harness.md
 related:
@@ -57,7 +57,7 @@ Status: complete
 
 ## Summary
 
-- Project path: /Users/jkl/FunnyTeacher
+- Project path: <SIBLING_AGENT_ROOT>/FunnyTeacher
 - Agent name: Funny Teacher
 - Classification: agent-project
 - Agent detected: yes
@@ -92,7 +92,7 @@ Status: complete
 | Memory status | pass | Agent: Funny Teacher Memory profile: sqlite-plus-semantic Database: data/funny-teacher.sqlite (exists) Semantic index: semantic_chunks table Fallback search: lexical scoring when embeddings or API key are unavailable |
 | Tools status | not-applicable | No tools-status command found. |
 | Operations status | pass | Agent: Funny Teacher Deployment target: local Mac or Mac mini via trusted local/Tailscale access Service mode: launchd Autostart: launchd-on-approval Start: npm run start Local upstream: http://127.0.0.1:3033 Tailscale URL: https://ivans-mac-mini.tail691439.ts |
-| Deployment plan | pass | Agent: Funny Teacher Service label: com.local.funny-teacher LaunchAgent: /Users/jkl/Library/LaunchAgents/com.local.funny-teacher.plist Local upstream: http://127.0.0.1:3033 Tailscale URL: https://ivans-mac-mini.tail691439.ts.net:3034 Start command: npm run sta |
+| Deployment plan | pass | Agent: Funny Teacher Service label: com.local.funny-teacher LaunchAgent: ~/Library/LaunchAgents/com.local.funny-teacher.plist Local upstream: http://127.0.0.1:3033 Tailscale URL: https://ivans-mac-mini.tail691439.ts.net:3034 Start command: npm run sta |
 | Telegram dry-run | not-applicable | Telegram adapter not detected. |
 
 ## Recommendations
