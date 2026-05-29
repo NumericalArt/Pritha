@@ -1,20 +1,23 @@
 ---
 id: realtime-voice-control-for-codex-agents
 type: standard
-status: draft
+status: active
 created: 2026-05-25
-updated: 2026-05-25
-last_reviewed: 2026-05-25
+updated: 2026-05-29
+last_reviewed: 2026-05-29
 owner: Techscope/user
 topics:
   - agent-engineering
   - voice-agents
   - realtime
+  - codex-app
+  - codex-cli
   - codex-sidecar
   - harness-engineering
 tools:
   - OpenAI Realtime API
   - gpt-realtime-2
+  - Codex App
   - Codex CLI
   - WebRTC
   - SQLite
@@ -33,122 +36,184 @@ config_surfaces:
   - realtime instructions
   - tool schemas
   - server routes
+  - codex task service
   - queue scripts
+  - operations manifest
 portability: adapter-needed
 sources:
-  - <SIBLING_AGENT_ROOT>/FESPA26/hooks/use-realtime-call.ts
-  - <SIBLING_AGENT_ROOT>/FESPA26/lib/openai/realtime-config.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/current-architecture.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-in-the-loop.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-cli-enrichment.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/harness-architecture.md
   - <SIBLING_AGENT_ROOT>/FESPA26/lib/openai/realtime-tools.ts
   - <SIBLING_AGENT_ROOT>/FESPA26/lib/realtime/instructions.ts
   - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/tool/route.ts
-  - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/orchestrate/route.ts
-  - <SIBLING_AGENT_ROOT>/FESPA26/lib/chat/process-agent-message.ts
-  - <SIBLING_AGENT_ROOT>/FESPA26/lib/agent/codex-cli-runtime.ts
-  - <SIBLING_AGENT_ROOT>/FESPA26/docs/current-architecture.md
-  - <SIBLING_AGENT_ROOT>/FESPA26/docs/harness-architecture.md
-  - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-cli-enrichment.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/codex-task/service.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/codex-task/factory.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/codex-task/adapters/codex-app-server-client.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/codex-task/adapters/codex-session-contract-client.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/codex-task/adapters/codex-auto-client.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/lib/codex-task/voice-codex-registry.ts
   - 11_agents/contracts/2026-05-25-fespa26-agent-contract.md
   - 11_agents/reports/2026-05-25-fespa26-agent-post-creation-review.md
+  - 11_agents/reports/2026-05-26-funny-teacher-v1-agent-post-creation-review.md
+  - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
+  - 11_agents/reports/2026-05-29-fespa26-agent-test-report.md
+  - 11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md
+  - 05_decisions/2026-05-29-realtime-voice-control-universal-pattern.md
 related:
-  decisions: []
+  decisions:
+    - 05_decisions/2026-05-29-realtime-voice-control-universal-pattern.md
   reviews:
     - 11_agents/reports/2026-05-25-fespa26-agent-post-creation-review.md
+    - 11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md
+    - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
   briefs: []
   reports:
-    - 11_agents/reports/2026-05-25-fespa26-agent-test-report.md
-    - 11_agents/reports/2026-05-25-fespa26-agent-operations-report.md
+    - 11_agents/reports/2026-05-29-fespa26-agent-test-report.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: unknown
-source_updated: 2026-05-25
-source_version: FESPA26 local implementation inspected 2026-05-25
-retrieved: 2026-05-25
-verified: 2026-05-25
-valid_for: Codex-native local agents with web voice UI and explicit server-side tools
+source_updated: 2026-05-29
+source_version: FESPA26 local implementation inspected 2026-05-29
+retrieved: 2026-05-29
+verified: 2026-05-29
+valid_for: Codex-native agents with realtime voice UI, explicit server-side tools and deep-work transport
 temporal_status: version-bound
 ---
 
 # Standard: Realtime Voice Control For Codex Agents
 
-Status: draft
+Status: active
 Owner: Techscope/user
-Last reviewed: 2026-05-25
+Last reviewed: 2026-05-29
 
 ## Rule
 
-For voice-controlled Codex agents, separate the live voice model from the heavy agent brain.
+For voice-controlled Codex agents, separate live speech, deterministic actions and deep work.
 
-Use the Realtime model as a low-latency dispatcher and conversational interface. Put durable work, verification, file/media processing, code changes and publication decisions behind deterministic server tools, a queue and a Codex CLI sidecar.
+Use the Realtime model as the low-latency voice dispatcher. Put durable actions behind narrow server tools. Route complex tasks through a Codex transport layer: Codex App/thread for foreground deep work when available, Codex CLI/queue for fallback, automation or worker execution.
+
+This is a reusable Pritha pattern. FESPA26 is the event/media/feed example; Funny Teacher is the language-learning example. The reusable part is the boundary, not the domain UI.
 
 ## Use When
 
 - The agent needs fast spoken interaction.
-- The agent must process files, media, links, sources or local project state.
-- The operator needs quick voice commands while heavy work can run asynchronously.
-- The same agent has both conversational UX and durable artifacts such as cards, reports, decisions or memory.
+- The user must trigger file, media, web, memory, code or publication workflows from voice.
+- The system needs durable artifacts such as reports, feed cards, lesson records, memory entries, decisions or task logs.
+- Complex work can take longer than a natural voice turn.
+- The operator needs an explicit handoff between "I heard you" and "Codex is solving it".
 
 ## Avoid When
 
-- The task is pure transcription or simple chat with no durable actions.
+- The task is pure transcription or simple voice chat with no durable actions.
 - There is no trusted server boundary for secrets and tools.
-- The voice model would need to perform destructive actions directly.
-- The deployment cannot tolerate WebRTC/microphone browser constraints.
+- The voice model would need to perform destructive, public or filesystem actions directly.
+- The deployment cannot tolerate microphone, WebRTC or secure-context constraints.
+- The project has no way to show pending deep-task status or recover from failed transport.
 
 ## Required Practices
 
-- Keep the OpenAI API key on the server. The browser receives only ephemeral Realtime session credentials.
-- Let the browser own microphone capture, remote audio playback and data-channel event handling.
+- Keep the OpenAI API key on the server. The browser receives only ephemeral Realtime credentials.
+- Let the browser own microphone capture, remote audio playback, Realtime data-channel handling and local transcript display.
 - Keep Realtime instructions concise and operational.
 - Define domain-specific tools with narrow arguments and server-side validation.
-- Route public, destructive or long-running actions through explicit gates and queued jobs.
-- Use Codex CLI as a sidecar for slow or high-context work, not as the direct realtime speaker.
-- For realtime enrichment, run Codex in `read-only`, `approval_policy=never`, ephemeral mode and return a short insert.
-- For durable queue jobs, use task-specific prompts and machine-readable output contracts.
-- Store turns, memory, sources and job status in local durable state.
-- Make tool responses human-readable, but record the real result in structured state.
-- Fail closed: if Codex is unavailable or malformed output is returned, keep the voice session alive and mark the queued work failed or skipped.
+- Treat Realtime tools as intent routers, not broad powers.
+- Store durable results in local memory or a domain repository; tool responses are only summaries.
+- Route public, destructive, expensive or long-running actions through explicit gates.
+- Use Codex App/thread as the preferred transport for complex foreground tasks when the operator expects Codex to solve the task in the current working context.
+- Use Codex CLI as a fallback, autonomous queue worker or local sidecar where Codex App transport is unavailable or the task is intentionally backgrounded.
+- Keep task payloads structured: request id, task type, user intent, safe ids/metadata, constraints and expected response schema.
+- Strip secrets, tokens, credentials and unnecessary raw media from Codex task payloads.
+- Validate Codex outputs before applying them. Accept only known statuses and expected JSON/data shapes.
+- Fail closed: if Codex App, Codex CLI or output validation fails, keep the voice session alive and record the failed/pending task.
+- Keep publication, deletion, deployment, service install and broad system changes behind explicit operator approval.
 
-## Reference Flow
+## Universal Architecture
 
-1. Browser requests a Realtime session from the server.
-2. Server creates an ephemeral session with selected model, voice, transcription, turn detection and tool definitions.
-3. Browser opens WebRTC and an `oai-events` data channel.
-4. Realtime model speaks with the user and emits tool calls when action is needed.
-5. Browser forwards function calls to a server tool route and returns `function_call_output` to Realtime.
-6. Server tools save sources, read state, queue Codex jobs, update drafts or enforce approval gates.
-7. Finalized dialogue turns are deduplicated and chunked.
-8. The chunk is sent to a conductor as `realtime_chunk`.
-9. Codex sidecar optionally returns a short enrichment fragment.
-10. Browser injects the fragment back into Realtime with `session.update`.
-11. Queue runner processes heavier jobs sequentially and updates durable memory/feed artifacts.
+```text
+Browser voice UI
+  -> Realtime session and data channel
+  -> server realtime tool route
+  -> deterministic domain tools and repository writes
+  -> CodexTaskService for complex tasks
+     -> Codex App/thread transport when available
+     -> contract-file handoff when foreground Codex must decide
+     -> Codex CLI/auto transport or local queue fallback
+  -> durable memory, job state and operator-visible status
+```
+
+The important lanes:
+
+- `voice lane`: low-latency conversation, clarification and short status.
+- `tool lane`: validated local reads/writes and approval gates.
+- `deep-task lane`: Codex App/thread or Codex CLI solves high-context tasks.
+- `queue lane`: background jobs, retries, stale-lock recovery and structured results.
+- `artifact lane`: reports, feed cards, memory entries, lessons or code changes.
+
+## FESPA26 Reference Flow
+
+FESPA26 applies the pattern to event reporting and media processing:
+
+1. Operator speaks through a browser Realtime call.
+2. Realtime chooses a narrow server tool such as `save_fespa_source`, `queue_codex_card_update`, `search_sources`, `analyze_uploaded_media`, `queue_translation_pass` or `queue_codex_system_task`.
+3. Server tool validates intent, separates feed/publication material from system-change commands and writes source/feed/job state to SQLite.
+4. Deep tasks go through `CodexTaskService`.
+5. Default provider is `codex-app-server`; other supported transports are `codex-auto`, `codex-session` and `codex-app-http`.
+6. When the active runtime setting chooses CLI, or when Codex App is unavailable and fallback is enabled, the task is captured in the local Codex CLI queue.
+7. The queue runner processes feed/media/search/card jobs read-only and system-change jobs with workspace-write sandbox.
+8. Publication remains a separate explicit confirmation gate.
+
+FESPA26-specific domain memory:
+
+- `fespa_sources`
+- `fespa_feed_items`
+- `fespa_jobs`
+- `fespa_publications`
+- `fespa_tool_events`
+- `fespa_job_targets`
+
+This makes FESPA26 a reusable example for event agents: collect field material, update memory, process media/sources, generate reviewed reportage cards and publish only after approval.
+
+## Funny Teacher Reference Flow
+
+Funny Teacher applies the same boundary to a learning domain:
+
+1. Realtime is the live teacher.
+2. Server tools search lesson memory, record attempts and set outcomes.
+3. SQLite stores lessons, attempts, weak points and completions.
+4. User-selected memory focus and explicit reset keep retrieval controllable.
+
+Funny Teacher confirms that the pattern is not limited to event/media work. It is reusable wherever voice UX must control durable memory and task-specific tools.
 
 ## Agent Environment Compatibility
 
 - Agent platforms: Codex-native agents with optional OpenAI Realtime voice layer.
 - Model context: observed with `gpt-realtime-2` and cheap-mode `gpt-realtime-mini`.
-- Runtime environment: local Next.js web UI, server API routes, local Codex CLI.
-- Config surfaces: `AGENTS.md`, realtime instructions, tool schemas, server tool route, queue scripts, operations manifest.
+- Runtime environment: local Next.js web UI, server API routes, local SQLite, Codex App/CLI transports.
+- Config surfaces: `AGENTS.md`, realtime instructions, tool schemas, server routes, codex task service, queue scripts, operations manifest.
 - Portability: adapter-needed.
-- Codex adaptation: keep Codex prompts separate for realtime enrichment vs durable queue jobs.
-- Environment-specific caveats: browser microphone permissions, WebRTC availability, Realtime regional availability, Codex CLI auth and ephemeral support.
+- Codex adaptation: keep voice prompts, deterministic tool contracts, Codex App task prompts and Codex CLI queue prompts separate.
+- Environment-specific caveats: browser microphone permissions, WebRTC availability, Realtime session format, Codex App app-server protocol, Codex CLI auth and sandbox behavior.
 
 ## Temporal Validity
 
 - Source published: unknown.
-- Source updated: 2026-05-25.
-- Source version: FESPA26 local implementation inspected 2026-05-25.
-- Retrieved: 2026-05-25.
-- Verified: 2026-05-25.
-- Valid for: local Codex agents with web voice UI.
+- Source updated: 2026-05-29.
+- Source version: FESPA26 local implementation inspected 2026-05-29.
+- Retrieved: 2026-05-29.
+- Verified: 2026-05-29.
+- Valid for: Codex-native agents with realtime voice UI, explicit server tools and deep-work transport.
 - Freshness status: current.
 - Temporal status: version-bound.
-- Recheck when: OpenAI Realtime API session/call format changes, Codex CLI `exec --ephemeral` behavior changes, or a second voice agent reuses this pattern.
+- Recheck when: OpenAI Realtime session/call format changes, Codex App app-server transport changes, Codex CLI `exec --ephemeral` or sandbox behavior changes, or a third voice agent exposes a contradictory boundary.
 
 ## Examples
 
-- FESPA26 uses `gpt-realtime-2` for spoken operator control, server-side realtime tools for local state mutations, and Codex CLI jobs for feed synthesis, media analysis, source search and system changes.
+- FESPA26: voice-controlled event/media/reportage agent. Realtime handles operator dialogue; server tools update FESPA memory and feed state; Codex App/CLI handles source search, media analysis, card updates, translation, follow-up checklists and system changes.
+- Funny Teacher: voice-controlled learning agent. Realtime handles teaching dialogue; server tools manage lesson memory and outcomes.
 
 ## Related Decisions
 
-- No formal decision record yet. This is a draft standard candidate based on the first Agents Mother implementation evidence.
+- `05_decisions/2026-05-29-realtime-voice-control-universal-pattern.md`

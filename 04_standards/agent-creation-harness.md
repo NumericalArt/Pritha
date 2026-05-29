@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-05-28
-last_reviewed: 2026-05-28
+updated: 2026-05-29
+last_reviewed: 2026-05-29
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -61,6 +61,7 @@ sources:
   - https://docs.langchain.com/oss/python/langgraph/durable-execution
   - 11_agents/reports/2026-05-26-funny-teacher-v1-agent-post-creation-review.md
   - 11_agents/reports/2026-05-26-funny-teacher-agent-user-interaction-review.md
+  - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
   - 03_reviews/2026-05-26-openclaw-hacked-agent-security-assessment.md
   - 04_standards/agent-runtime-placement.md
   - 04_standards/agent-team-operating-model.md
@@ -82,10 +83,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-05-28
-source_version: Techscope draft standard v3 + Pritha alias vocabulary
+source_updated: 2026-05-29
+source_version: Techscope draft standard v4 + Funny Teacher reference example
 retrieved: 2026-05-18
-verified: 2026-05-28
+verified: 2026-05-29
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -94,7 +95,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-05-28
+Last reviewed: 2026-05-29
 
 ## Rule
 
@@ -201,10 +202,10 @@ Each created agent must document:
 ## Temporal validity
 
 - Source published: 2026-05-18 user scenario and current external docs.
-- Source updated: 2026-05-26.
-- Source version: Techscope draft standard v1 plus Funny Teacher lifecycle evidence.
+- Source updated: 2026-05-29.
+- Source version: Techscope draft standard v4 plus Funny Teacher reference evidence.
 - Retrieved: 2026-05-18.
-- Verified: 2026-05-26.
+- Verified: 2026-05-29.
 - Valid for: TechScope agent creation workflow from 2026-05-18 onward.
 - Freshness status: current.
 - Temporal status: current.
@@ -216,6 +217,7 @@ Each created agent must document:
 - A personal operations agent may be Codex-native with Telegram as the primary chat interface and a one-user allowlist.
 - A service agent may use an API runtime, but still starts from an `agent-contract` and receives a scaffold report after tests.
 - A voice learning agent should preserve interaction history because lesson UX, memory controls and reset behavior often emerge only after real mobile testing.
+- Funny Teacher is the current reference example for a Pritha-made voice learning agent: use its post-creation review before copying any pattern, and preserve its lesson that selected memory focus needs an explicit reset.
 
 ## Related decisions
 

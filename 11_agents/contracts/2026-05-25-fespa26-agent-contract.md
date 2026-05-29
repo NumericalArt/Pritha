@@ -3,7 +3,7 @@ id: 2026-05-25-fespa26-agent-contract
 type: agent-contract
 status: accepted
 created: 2026-05-25
-updated: 2026-05-25
+updated: 2026-05-29
 topics:
   - agent-engineering
   - voice-agents
@@ -11,6 +11,7 @@ topics:
   - codex-sidecar
   - fespa26
 tools:
+  - Codex App
   - Codex CLI
   - OpenAI Realtime API
   - gpt-realtime-2
@@ -41,6 +42,7 @@ sources:
   - <SIBLING_AGENT_ROOT>/FESPA26/AGENTS.md
   - <SIBLING_AGENT_ROOT>/FESPA26/docs/current-architecture.md
   - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-cli-enrichment.md
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-in-the-loop.md
   - <SIBLING_AGENT_ROOT>/FESPA26/docs/harness-architecture.md
 related:
   workflows:
@@ -49,15 +51,16 @@ related:
   standards:
     - 04_standards/agent-creation-harness.md
 supersedes: []
-superseded_by: []
-freshness_status: current
+superseded_by:
+  - 11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md
+freshness_status: changed
 source_published: unknown
-source_updated: 2026-05-25
-source_version: observed local project state 2026-05-25
+source_updated: 2026-05-29
+source_version: observed local project state 2026-05-25; voice-control update inspected 2026-05-29
 retrieved: 2026-05-25
-verified: 2026-05-25
-valid_for: FESPA26 local project state inspected on 2026-05-25
-temporal_status: current
+verified: 2026-05-29
+valid_for: FESPA26 initial contract plus architecture notes superseded by 2026-05-29 report
+temporal_status: version-bound
 ---
 
 # Agent Project Contract: FESPA26
@@ -79,7 +82,8 @@ Status: accepted, retrospective
 
 - Web UI with Voice, Feed and Settings tabs.
 - Voice interaction through OpenAI Realtime.
-- Codex CLI sidecar for heavier reasoning, media/feed synthesis, source search and system-change tasks.
+- Codex App/thread transport for complex foreground tasks where available.
+- Codex CLI sidecar and local queue as fallback or worker transport for heavier reasoning, media/feed synthesis, source search and system-change tasks.
 - SQLite operational memory for sources, feed items, jobs, sessions, turns and L1/L2 memory.
 - Local upload handling for text, URLs, images, PDFs, video/audio and files.
 - Sequential job queue with stale-lock-aware local lock.
@@ -157,7 +161,8 @@ Status: accepted, retrospective
 | Capability | Default Boundary | Notes |
 | --- | --- | --- |
 | OpenAI Realtime | server API + browser WebRTC | Voice session, transcript events and tool-call dispatch. |
-| Codex CLI | local sidecar | Heavy analysis, feed synthesis, verification and system tasks through `codex exec --ephemeral`. |
+| Codex App/thread | foreground Codex transport | Complex voice-triggered work through a structured Codex task boundary. |
+| Codex CLI | local sidecar / fallback queue | Heavy analysis, feed synthesis, verification and system tasks through `codex exec --ephemeral` when selected or used as fallback. |
 | SQLite | local persistence | Operational source of truth. |
 | Next.js API | app boundary | Session minting, SDP proxying, tool execution, ingest and feed APIs. |
 | Tailscale | network boundary | Remote access to local web UI. |
@@ -190,7 +195,21 @@ Status: accepted, retrospective
 - Current primary sources checked: local FESPA26 code and docs.
 - Trusted secondary sources checked: none for this retrospective contract.
 - Alternatives considered: Telegram interface deferred; launchd service deferred; embeddings deferred.
-- Decision rationale: keep v1 local, inspectable, fast for voice, and use Codex only when heavier reasoning or code/file work is needed.
+- Decision rationale: keep v1 local, inspectable, fast for voice, and use Codex transports only when heavier reasoning or code/file work is needed.
+
+## Architecture Update 2026-05-29
+
+Current FESPA26 voice control is documented in `11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md`.
+
+The updated boundary is:
+
+- Realtime for live speech and intent dispatch.
+- Server tools for deterministic validation, memory writes, feed edits and gates.
+- `CodexTaskService` for complex work.
+- Codex App/thread as preferred foreground transport.
+- Codex CLI/local queue as fallback or worker transport.
+
+This makes FESPA26 the Pritha reference for event/reportage agents: intake source material, update operational memory, process media and sources, form reviewed feed cards and publish only after explicit approval.
 
 ## Acceptance Checklist
 

@@ -3,7 +3,7 @@ id: 2026-05-25-fespa26-agent-post-creation-review
 type: agent-post-creation-review
 status: draft
 created: 2026-05-25
-updated: 2026-05-25
+updated: 2026-05-29
 topics:
   - agent-engineering
   - agent-factory
@@ -37,6 +37,7 @@ sources:
   - <SIBLING_AGENT_ROOT>/FESPA26/lib/openai/realtime-tools.ts
   - <SIBLING_AGENT_ROOT>/FESPA26/lib/realtime/instructions.ts
   - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/tool/route.ts
+  - <SIBLING_AGENT_ROOT>/FESPA26/docs/codex-in-the-loop.md
   - <SIBLING_AGENT_ROOT>/FESPA26/app/api/realtime/orchestrate/route.ts
   - <SIBLING_AGENT_ROOT>/FESPA26/lib/chat/process-agent-message.ts
   - <SIBLING_AGENT_ROOT>/FESPA26/lib/conductor/index.ts
@@ -60,15 +61,16 @@ related:
     - 07_workflows/agents-mother.md
     - 07_workflows/agents-mother-roadmap.md
 supersedes: []
-superseded_by: []
-freshness_status: current
+superseded_by:
+  - 11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md
+freshness_status: changed
 source_published: unknown
-source_updated: unknown
-source_version: post-creation review 2026-05-25
+source_updated: 2026-05-29
+source_version: post-creation review 2026-05-25; voice-control architecture updated 2026-05-29
 retrieved: 2026-05-25
-verified: 2026-05-25
-valid_for: current local project state
-temporal_status: current
+verified: 2026-05-29
+valid_for: historical 2026-05-25 FESPA26 state; superseded for voice-control transport details
+temporal_status: version-bound
 ---
 
 # Agent Post-Creation Review: FESPA26
@@ -177,3 +179,9 @@ This pattern is portable to future agents if the domain tools are replaced. The 
 - Keep FESPA26 docs synchronized when realtime tools, queue semantics, ports or memory tables change. The first cleanup was completed on 2026-05-25.
 - Build the next agent using the voice-control standard candidate when voice is requested.
 - Run `node scripts/agents-mother.mjs registry` after future lifecycle reports.
+
+## Update 2026-05-29
+
+This review is superseded for voice-control transport details by `11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md`.
+
+The current architecture uses Realtime as the live dispatcher, deterministic server tools for durable state changes, Codex App/thread as the preferred complex-task transport, and Codex CLI/local queue as fallback or worker transport. FESPA26 should now be treated as the Pritha event/reportage example: source intake, operational memory update, Codex processing, reviewed feed cards and explicit publication.

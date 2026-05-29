@@ -26,8 +26,11 @@ sources:
   - 04_standards/realtime-voice-control-for-codex-agents.md
   - 11_agents/contracts/2026-05-25-fespa26-agent-contract.md
   - 11_agents/reports/2026-05-25-fespa26-agent-post-creation-review.md
+  - 11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md
   - 11_agents/reports/2026-05-26-funny-teacher-v1-agent-post-creation-review.md
   - 11_agents/reports/2026-05-26-funny-teacher-agent-user-interaction-review.md
+  - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
+  - 05_decisions/2026-05-29-realtime-voice-control-universal-pattern.md
   - 03_reviews/2026-05-26-openclaw-hacked-agent-security-assessment.md
   - 04_standards/agent-runtime-placement.md
   - 04_standards/agent-harness-evaluation.md
@@ -65,12 +68,22 @@ The default v1 target is a production-testable sibling project. The first
 implementation path is `codex-native + optional interface adapters`.
 
 FESPA26 is the first successful external agent captured in this lifecycle. It is
-not a template to copy blindly, but it provides the first evidence-backed voice
-pattern: `Realtime dispatcher + deterministic server tools + Codex sidecar`.
+not a template to copy blindly, but it provides the first evidence-backed event
+and reportage agent pattern: `event material -> source memory -> Codex
+processing -> reviewed feed card -> explicit publication`. Its current voice
+architecture also upgrades the reusable voice-control pattern to `Realtime
+dispatcher + deterministic server tools + Codex App/thread transport + Codex
+CLI/queue fallback`.
 
 Funny Teacher is the first successful language-learning voice agent. It adds
 evidence for `Realtime teacher + durable SQLite lesson memory + semantic
 retrieval + explicit selected-memory-focus/reset controls`.
+
+Funny Teacher is also the canonical Pritha feedback-loop example: the useful
+agent shape emerged through user corrections, mobile testing, memory UX
+questions, idempotency fixes and version fixation, not from the initial scaffold
+alone. Use `11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md`
+when comparing a future voice or learning agent against proven lineage evidence.
 
 ## Core rule
 
@@ -292,7 +305,7 @@ send/publish data without passing through the chosen intake/security boundary.
 ## Voice Agent Decision Point
 
 If the user wants a voice interface, do not treat the Realtime model as the whole
-agent. Start from the draft standard:
+agent. Start from the active standard:
 
 ```text
 04_standards/realtime-voice-control-for-codex-agents.md
@@ -303,8 +316,10 @@ Default voice architecture candidate:
 - Realtime model: low-latency speech, concise answers and tool-call dispatch.
 - Server tools: deterministic validation, state changes, queueing and approval
   gates.
-- Codex CLI sidecar: slower synthesis, verification, file/media work, code
-  changes and short realtime enrichment.
+- Codex App/thread transport: preferred foreground route for complex tasks that
+  need Codex context and structured output.
+- Codex CLI/queue fallback: worker or fallback route for synthesis,
+  verification, media/file work, code changes and background jobs.
 - Durable memory: explicit local or external state chosen by the contract.
 
 The contract must still decide:
@@ -313,7 +328,8 @@ The contract must still decide:
 - which model is used for Realtime;
 - what tools the voice model can call;
 - which actions require confirmation;
-- whether heavy work is queued, synchronous or disabled;
+- whether heavy work goes through Codex App/thread, contract-file handoff,
+  Codex CLI, queue worker, synchronous tools or is disabled;
 - how transcripts and media are retained.
 
 ## Existing project inspection
@@ -396,13 +412,10 @@ post-creation review for small agents. It must capture:
 
 Do not promote a pattern into `04_standards/` from one lucky run. Promotion needs evidence from lifecycle reports and an explicit review/decision.
 
-FESPA26 evidence currently supports keeping
-`realtime-voice-control-for-codex-agents.md` in `draft`. Promote it to `active`
-only after at least one more voice agent reuses the dispatcher/sidecar boundary
-successfully or FESPA26 receives production-grade deployment evidence. Funny
-Teacher now supplies that second-domain voice evidence, but promotion should
-still check whether its smaller Realtime/server-tool boundary is enough for the
-standard or whether a Codex sidecar remains domain-specific.
+The realtime voice-control standard is active as of 2026-05-29 because FESPA26
+and Funny Teacher confirm the shared boundary in two domains. Keep it
+version-bound: recheck when Realtime APIs, Codex App transport or Codex CLI
+sandbox behavior changes.
 
 ## Completion criteria
 
