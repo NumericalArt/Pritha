@@ -2,14 +2,14 @@
   "schema": "techscope-self-test-v1",
   "root": "<TECHSCOPE_ROOT>",
   "status": "pass",
-  "created_at": "2026-05-29T23:45:47.918Z",
+  "created_at": "2026-05-30T00:26:28.218Z",
   "dry_run": false,
   "memory_stats": {
-    "documents": 435,
-    "chunks": 4157,
-    "entities": 1094,
-    "relations": 11126,
-    "embeddings": 4007
+    "documents": 438,
+    "chunks": 4176,
+    "entities": 1100,
+    "relations": 11180,
+    "embeddings": 4026
   },
   "previous_memory_stats": {
     "documents": 435,
@@ -23,7 +23,7 @@
     "root": "<TECHSCOPE_ROOT>",
     "profile": "self-test",
     "status": "pass",
-    "createdAt": "2026-05-29T23:45:36.788Z",
+    "createdAt": "2026-05-30T00:26:16.831Z",
     "dryRun": false,
     "failed": 0,
     "checks": [
@@ -33,7 +33,7 @@
         "command": "node scripts/env-doctor.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 225,
+        "durationMs": 221,
         "stdout": "Techscope env doctor: pass (1 warning)\n- PASS Node.js >= 20: current 24.15.0\n- PASS sqlite3 CLI: 3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)\n- PASS Python >= 3.9 compatibility floor: Python 3.9.6\n- WARN Python >= 3.10 recommended baseline: Python 3.9.6\n  hint: New Techscope setups should use Python 3.10+; current 3.9 support is transitional.\n- PASS Python package sentence-transformers: 5.1.2\n- PASS Python package imageio-ffmpeg: 0.6.0\n- PASS Python package yt-dlp: 2025.10.14\n- PASS Python package mlx-whisper: 0.4.3\n- PASS mlx_whisper executable: <USER_HOME>/Library/Python/3.9/bin/mlx_whisper\n- PASS Codex CLI: <USER_HOME>/.local/bin/codex\n- PASS ripgrep: <USER_HOME>/.local/bin/rg\n- PASS system ffmpeg: <USER_HOME>/.local/bin/ffmpeg",
         "stderr": ""
       },
@@ -43,8 +43,8 @@
         "command": "node scripts/validate-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 46,
-        "stdout": "Memory validation passed for 435 Markdown files.",
+        "durationMs": 49,
+        "stdout": "Memory validation passed for 438 Markdown files.",
         "stderr": ""
       },
       {
@@ -53,8 +53,8 @@
         "command": "node scripts/rebuild-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 647,
-        "stdout": "Indexed 435 documents, 4157 chunks.\nDatabase: .memory/techscope.sqlite",
+        "durationMs": 603,
+        "stdout": "Indexed 438 documents, 4176 chunks.\nDatabase: .memory/techscope.sqlite",
         "stderr": ""
       },
       {
@@ -63,18 +63,18 @@
         "command": "node scripts/smoke-test.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 71,
-        "stdout": "PASS AGENTS.md: required file\nPASS README.md: required file\nPASS .env.example: required file\nPASS interfaces/manifest.json: required file\nPASS memory/manifest.json: required file\nPASS tools/manifest.json: required file\nPASS operations/manifest.json: required file\nPASS scripts/golden-checks.mjs: required file\nPASS scripts/validate-memory.mjs: required file\nPASS scripts/rebuild-memory.mjs: required file\nPASS scripts/query-memory.mjs: required file\nPASS scripts/telegram-bot.mjs: required file\nPASS scripts/agents-mother.mjs: required file\nPASS scripts/smoke-test.mjs: status/smoke script\nPASS scripts/interface-status.mjs: status/smoke script\nPASS scripts/memory-status.mjs: status/smoke script\nPASS scripts/tools-status.mjs: status/smoke script\nPASS scripts/operations-status.mjs: status/smoke script\nPASS scripts/healthcheck.mjs: status/smoke script\nPASS scripts/smoke-test.mjs executable: executable bit\nPASS scripts/golden-checks.mjs executable: executable bit\nPASS scripts/healthcheck.mjs executable: executable bit\nPASS interfaces/manifest.json JSON\nPASS memory/manifest.json JSON\nPASS tools/manifest.json JSON\nPASS operations/manifest.json JSON\nPASS validate-memory: Memory validation passed for 435 Markdown files.\nSmoke test passed.",
+        "durationMs": 69,
+        "stdout": "PASS AGENTS.md: required file\nPASS README.md: required file\nPASS .env.example: required file\nPASS interfaces/manifest.json: required file\nPASS memory/manifest.json: required file\nPASS tools/manifest.json: required file\nPASS operations/manifest.json: required file\nPASS scripts/golden-checks.mjs: required file\nPASS scripts/validate-memory.mjs: required file\nPASS scripts/rebuild-memory.mjs: required file\nPASS scripts/query-memory.mjs: required file\nPASS scripts/telegram-bot.mjs: required file\nPASS scripts/agents-mother.mjs: required file\nPASS scripts/smoke-test.mjs: status/smoke script\nPASS scripts/interface-status.mjs: status/smoke script\nPASS scripts/memory-status.mjs: status/smoke script\nPASS scripts/tools-status.mjs: status/smoke script\nPASS scripts/operations-status.mjs: status/smoke script\nPASS scripts/healthcheck.mjs: status/smoke script\nPASS scripts/smoke-test.mjs executable: executable bit\nPASS scripts/golden-checks.mjs executable: executable bit\nPASS scripts/healthcheck.mjs executable: executable bit\nPASS interfaces/manifest.json JSON\nPASS memory/manifest.json JSON\nPASS tools/manifest.json JSON\nPASS operations/manifest.json JSON\nPASS validate-memory: Memory validation passed for 438 Markdown files.\nSmoke test passed.",
         "stderr": ""
       },
       {
         "id": "unit-tests",
         "name": "Unit tests",
-        "command": "node --test tests/agents-mother-command-modules.test.mjs tests/agents-mother-contract.test.mjs tests/agents-mother-test-module.test.mjs tests/env-doctor.test.mjs tests/frontmatter.test.mjs tests/github-release-status.test.mjs tests/golden-checks.test.mjs tests/paths.test.mjs tests/pritha-alias.test.mjs tests/quality-gate.test.mjs tests/queue-health.test.mjs tests/scaffold-snapshot.test.mjs tests/self-test.test.mjs tests/setup-cli.test.mjs tests/setup-state.test.mjs tests/slug.test.mjs tests/trigger-phrases.test.mjs",
+        "command": "node --test tests/agents-mother-command-modules.test.mjs tests/agents-mother-contract.test.mjs tests/agents-mother-test-module.test.mjs tests/env-doctor.test.mjs tests/frontmatter.test.mjs tests/github-release-status.test.mjs tests/golden-checks.test.mjs tests/paths.test.mjs tests/pritha-alias.test.mjs tests/quality-gate.test.mjs tests/queue-health.test.mjs tests/scaffold-snapshot.test.mjs tests/self-test.test.mjs tests/setup-cli.test.mjs tests/setup-state.test.mjs tests/slug.test.mjs tests/trigger-phrases.test.mjs tests/voice-control-kit.test.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 1933,
-        "stdout": "✔ remaining Agents Mother command modules run against an isolated root (283.742625ms)\n✔ valid fixture contract passes Agents Mother validation (35.394042ms)\n✔ invalid fixture contract fails with actionable messages (34.849083ms)\n✔ contract module validates fixture contracts directly (1.749208ms)\n✔ contract module extracts structured contract data (0.457875ms)\n✔ Agents Mother test module detects the TechScope harness (0.674792ms)\n✔ test module reads optional JSON manifests safely (0.082542ms)\n✔ Agents Mother test command still supports no-report mode through wrapper and direct entrypoint (1274.670833ms)\n✔ env-doctor exposes machine-readable dependency status (296.892333ms)\n✔ env-doctor fails with an actionable message when a critical dependency is missing (245.026959ms)\n✔ parseFrontmatter preserves body and parses nested lists (0.992958ms)\n✔ parseFrontmatterData returns null when frontmatter is absent (0.056ms)\n✔ yamlList emits project-compatible block lists (0.07ms)\n✔ github-release-status exposes a machine-readable external release contract (241.6995ms)\n✔ github-release-status strict mode fails while external release proof is incomplete (198.869583ms)\n✔ golden-checks exposes a machine-readable dry-run contract (31.945583ms)\n✔ resolveTechscopeRoot honors TECHSCOPE_ROOT (0.352125ms)\n✔ resolveSiblingAgentPath places agents beside root by default (0.071666ms)\n✔ resolveSiblingAgentPath supports explicit override (0.045375ms)\n✔ Pritha entrypoint preserves Agents Mother test behavior (661.208083ms)\n✔ legacy Agents Mother wrapper remains compatible and prints a deprecation note (616.192458ms)\n✔ Pritha aliases expose create, publish and lineage surfaces (592.864458ms)\n✔ quality-gate exposes a serialized dry-run contract (35.812709ms)\n✔ quality-gate simulated failure returns a clear failing check (1694.184917ms)\n✔ quality-gate markdown output includes a summary table (27.021625ms)\n✔ quality-gate self-test profile omits heavier Agents Mother inspection (23.845292ms)\n✔ queue-health reports stale queue items without failing (31.877625ms)\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n✔ Agents Mother scaffold output matches the frozen file-list snapshot (112.21725ms)\n✔ scaffold module exposes generated agent files directly (1.895875ms)\n✔ self-test exposes a dry-run JSON contract without writing baseline (99.279ms)\n✔ setup CLI writes private env and idempotent state (71.120792ms)\n✔ setup CLI configures default realtime tools when voice is selected (87.748ms)\n✔ setup-status reports a missing setup state without failing (38.386333ms)\n✔ setup manifest schema describes the v1 state contract (0.172417ms)\n✔ transliterate maps Cyrillic for ASCII ids (0.630167ms)\n✔ slug can preserve Cyrillic for legacy filenames (0.132375ms)\n✔ slug fallback is explicit (0.053084ms)\n✔ setup trigger phrases route to the first-run workflow (0.516708ms)\n✔ operational trigger phrases route to health and Pritha commands (0.570208ms)\nℹ tests 39\nℹ suites 0\nℹ pass 39\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1911.054583",
+        "durationMs": 1938,
+        "stdout": "✔ remaining Agents Mother command modules run against an isolated root (282.785792ms)\n✔ valid fixture contract passes Agents Mother validation (45.60175ms)\n✔ invalid fixture contract fails with actionable messages (37.153791ms)\n✔ contract module validates fixture contracts directly (1.140958ms)\n✔ contract module extracts structured contract data (0.396292ms)\n✔ Agents Mother test module detects the TechScope harness (0.693209ms)\n✔ test module reads optional JSON manifests safely (0.081709ms)\n✔ Agents Mother test command still supports no-report mode through wrapper and direct entrypoint (1279.026208ms)\n✔ env-doctor exposes machine-readable dependency status (297.413084ms)\n✔ env-doctor fails with an actionable message when a critical dependency is missing (247.050041ms)\n✔ parseFrontmatter preserves body and parses nested lists (0.942291ms)\n✔ parseFrontmatterData returns null when frontmatter is absent (0.057333ms)\n✔ yamlList emits project-compatible block lists (0.071375ms)\n✔ github-release-status exposes a machine-readable external release contract (207.282375ms)\n✔ github-release-status strict mode fails while external release proof is incomplete (171.643333ms)\n✔ golden-checks exposes a machine-readable dry-run contract (36.070458ms)\n✔ resolveTechscopeRoot honors TECHSCOPE_ROOT (0.556125ms)\n✔ resolveSiblingAgentPath places agents beside root by default (0.106375ms)\n✔ resolveSiblingAgentPath supports explicit override (0.059291ms)\n✔ Pritha entrypoint preserves Agents Mother test behavior (660.718292ms)\n✔ legacy Agents Mother wrapper remains compatible and prints a deprecation note (617.129208ms)\n✔ Pritha aliases expose create, publish and lineage surfaces (594.891625ms)\n✔ quality-gate exposes a serialized dry-run contract (38.7525ms)\n✔ quality-gate simulated failure returns a clear failing check (1707.790167ms)\n✔ quality-gate markdown output includes a summary table (24.351958ms)\n✔ quality-gate self-test profile omits heavier Agents Mother inspection (23.693583ms)\n✔ queue-health reports stale queue items without failing (36.185042ms)\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n✔ Agents Mother scaffold output matches the frozen file-list snapshot (112.535292ms)\n✔ scaffold module exposes generated agent files directly (1.962333ms)\n✔ scaffold adds realtime voice reference files when voice is selected (0.2635ms)\n✔ self-test exposes a dry-run JSON contract without writing baseline (100.308667ms)\n✔ setup CLI writes private env and idempotent state (70.45525ms)\n✔ setup CLI configures default realtime tools when voice is selected (86.736916ms)\n✔ setup-status reports a missing setup state without failing (34.388292ms)\n✔ setup manifest schema describes the v1 state contract (0.181917ms)\n✔ transliterate maps Cyrillic for ASCII ids (0.623625ms)\n✔ slug can preserve Cyrillic for legacy filenames (0.132083ms)\n✔ slug fallback is explicit (0.048166ms)\n✔ setup trigger phrases route to the first-run workflow (0.487166ms)\n✔ operational trigger phrases route to health and Pritha commands (0.555125ms)\n✔ voice-control-kit exposes the FESPA26 reference plan (27.737ms)\n✔ voice-control-kit copies the reference pack into a child interface folder (36.062083ms)\n✔ Pritha voice-kit alias delegates to the kit command (59.217416ms)\nℹ tests 43\nℹ suites 0\nℹ pass 43\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1916.605042",
         "stderr": ""
       },
       {
@@ -83,7 +83,7 @@
         "command": "node scripts/telegram-bot.mjs poll-once --dry-run",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 22,
+        "durationMs": 24,
         "stdout": "{\n  \"mode\": \"dry-run\",\n  \"root\": \"<TECHSCOPE_ROOT>\",\n  \"allowed_users\": [],\n  \"telegram_intake\": {\n    \"pending\": 0,\n    \"processing\": 0,\n    \"awaiting_codex\": 1,\n    \"complete\": 7,\n    \"done\": 12,\n    \"failed\": 0\n  },\n  \"codex_media_review\": {\n    \"pending\": 1,\n    \"done\": 5\n  }\n}",
         "stderr": ""
       }
@@ -92,15 +92,15 @@
   "embeddings_restore": {
     "ok": true,
     "status": 0,
-    "stdout": "Loading model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\nEmbedding 4007 chunks...\nStored 4007 embeddings in .memory/techscope.sqlite",
-    "stderr": "<USER_HOME>/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020\n  warnings.warn(\n\rBatches:   0%|          | 0/126 [00:00<?, ?it/s]\rBatches:   1%|          | 1/126 [00:00<00:17,  7.22it/s]\rBatches:   2%|▏         | 3/126 [00:00<00:09, 12.84it/s]\rBatches:   4%|▍         | 5/126 [00:00<00:08, 15.08it/s]\rBatches:   6%|▌         | 7/126 [00:00<00:07, 16.39it/s]\rBatches:   7%|▋         | 9/126 [00:00<00:06, 17.17it/s]\rBatches:   9%|▊         | 11/126 [00:00<00:06, 17.66it/s]\rBatches:  10%|█         | 13/126 [00:00<00:06, 18.04it/s]\rBatches:  12%|█▏        | 15/126 [00:00<00:06, 18.32it/s]\rBatches:  13%|█▎        | 17/126 [00:01<00:05, 18.47it/s]\rBatches:  15%|█▌        | 19/126 [00:01<00:05, 18.60it/s]\rBatches:  17%|█▋        | 21/126 [00:01<00:05, 18.69it/s]\rBatches:  18%|█▊        | 23/126 [00:01<00:05, 18.73it/s]\rBatches:  20%|█▉        | 25/126 [00:01<00:05, 18.42it/s]\rBatches:  21%|██▏       | 27/126 [00:01<00:05, 18.51it/s]\rBatches:  23%|██▎       | 29/126 [00:01<00:05, 18.55it/s]\rBatches:  25%|██▍       | 31/126 [00:01<00:05, 18.60it/s]\rBatches:  26%|██▌       | 33/126 [00:01<00:04, 18.71it/s]\rBatches:  28%|██▊       | 35/126 [00:01<00:04, 18.72it/s]\rBatches:  29%|██▉       | 37/126 [00:02<00:04, 18.73it/s]\rBatches:  31%|███       | 39/126 [00:02<00:04, 18.87it/s]\rBatches:  33%|███▎      | 41/126 [00:02<00:04, 18.93it/s]\rBatches:  34%|███▍      | 43/126 [00:02<00:04, 18.97it/s]\rBatches:  36%|███▌      | 45/126 [00:02<00:04, 19.01it/s]\rBatches:  37%|███▋      | 47/126 [00:02<00:04, 19.03it/s]\rBatches:  39%|███▉      | 49/126 [00:02<00:04, 17.81it/s]\rBatches:  40%|████      | 51/126 [00:02<00:04, 18.24it/s]\rBatches:  42%|████▏     | 53/126 [00:02<00:03, 18.48it/s]\rBatches:  44%|████▎     | 55/126 [00:03<00:04, 17.50it/s]\rBatches:  45%|████▌     | 57/126 [00:03<00:04, 17.02it/s]\rBatches:  48%|████▊     | 60/126 [00:03<00:03, 18.50it/s]\rBatches:  49%|████▉     | 62/126 [00:03<00:03, 18.28it/s]\rBatches:  51%|█████     | 64/126 [00:03<00:03, 18.17it/s]\rBatches:  52%|█████▏    | 66/126 [00:03<00:03, 18.55it/s]\rBatches:  55%|█████▍    | 69/126 [00:03<00:02, 19.49it/s]\rBatches:  57%|█████▋    | 72/126 [00:03<00:02, 20.26it/s]\rBatches:  60%|█████▉    | 75/126 [00:04<00:02, 21.27it/s]\rBatches:  62%|██████▏   | 78/126 [00:04<00:02, 23.41it/s]\rBatches:  64%|██████▍   | 81/126 [00:04<00:01, 23.88it/s]\rBatches:  67%|██████▋   | 85/126 [00:04<00:01, 25.57it/s]\rBatches:  70%|██████▉   | 88/126 [00:04<00:01, 25.95it/s]\rBatches:  72%|███████▏  | 91/126 [00:04<00:01, 25.69it/s]\rBatches:  75%|███████▍  | 94/126 [00:04<00:01, 25.51it/s]\rBatches:  77%|███████▋  | 97/126 [00:04<00:01, 25.81it/s]\rBatches:  80%|████████  | 101/126 [00:04<00:00, 29.45it/s]\rBatches:  83%|████████▎ | 105/126 [00:05<00:00, 31.00it/s]\rBatches:  87%|████████▋ | 110/126 [00:05<00:00, 34.65it/s]\rBatches:  91%|█████████▏| 115/126 [00:05<00:00, 37.06it/s]\rBatches:  96%|█████████▌| 121/126 [00:05<00:00, 40.02it/s]\rBatches:  99%|█████████▉| 125/126 [00:05<00:00, 37.66it/s]\rBatches: 100%|██████████| 126/126 [00:05<00:00, 22.43it/s]"
+    "stdout": "Loading model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\nEmbedding 4026 chunks...\nStored 4026 embeddings in .memory/techscope.sqlite",
+    "stderr": "<USER_HOME>/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020\n  warnings.warn(\n\rBatches:   0%|          | 0/126 [00:00<?, ?it/s]\rBatches:   1%|          | 1/126 [00:00<00:17,  7.08it/s]\rBatches:   2%|▏         | 3/126 [00:00<00:09, 12.69it/s]\rBatches:   4%|▍         | 5/126 [00:00<00:08, 14.89it/s]\rBatches:   6%|▌         | 7/126 [00:00<00:07, 16.24it/s]\rBatches:   7%|▋         | 9/126 [00:00<00:06, 17.07it/s]\rBatches:   9%|▊         | 11/126 [00:00<00:06, 17.51it/s]\rBatches:  10%|█         | 13/126 [00:00<00:06, 17.74it/s]\rBatches:  12%|█▏        | 15/126 [00:00<00:06, 18.02it/s]\rBatches:  13%|█▎        | 17/126 [00:01<00:06, 18.16it/s]\rBatches:  15%|█▌        | 19/126 [00:01<00:05, 18.31it/s]\rBatches:  17%|█▋        | 21/126 [00:01<00:05, 18.37it/s]\rBatches:  18%|█▊        | 23/126 [00:01<00:05, 18.53it/s]\rBatches:  20%|█▉        | 25/126 [00:01<00:05, 18.16it/s]\rBatches:  21%|██▏       | 27/126 [00:01<00:05, 18.36it/s]\rBatches:  23%|██▎       | 29/126 [00:01<00:05, 18.51it/s]\rBatches:  25%|██▍       | 31/126 [00:01<00:05, 18.51it/s]\rBatches:  26%|██▌       | 33/126 [00:01<00:05, 18.57it/s]\rBatches:  28%|██▊       | 35/126 [00:01<00:04, 18.64it/s]\rBatches:  29%|██▉       | 37/126 [00:02<00:04, 18.70it/s]\rBatches:  31%|███       | 39/126 [00:02<00:04, 18.64it/s]\rBatches:  33%|███▎      | 41/126 [00:02<00:04, 18.71it/s]\rBatches:  34%|███▍      | 43/126 [00:02<00:04, 18.75it/s]\rBatches:  36%|███▌      | 45/126 [00:02<00:04, 18.79it/s]\rBatches:  37%|███▋      | 47/126 [00:02<00:04, 18.80it/s]\rBatches:  39%|███▉      | 49/126 [00:02<00:04, 17.87it/s]\rBatches:  40%|████      | 51/126 [00:02<00:04, 17.48it/s]\rBatches:  42%|████▏     | 53/126 [00:02<00:04, 17.21it/s]\rBatches:  44%|████▎     | 55/126 [00:03<00:04, 16.57it/s]\rBatches:  45%|████▌     | 57/126 [00:03<00:04, 16.87it/s]\rBatches:  48%|████▊     | 60/126 [00:03<00:03, 18.30it/s]\rBatches:  49%|████▉     | 62/126 [00:03<00:03, 18.46it/s]\rBatches:  51%|█████     | 64/126 [00:03<00:03, 18.56it/s]\rBatches:  52%|█████▏    | 66/126 [00:03<00:03, 18.60it/s]\rBatches:  54%|█████▍    | 68/126 [00:03<00:03, 18.81it/s]\rBatches:  56%|█████▋    | 71/126 [00:03<00:02, 19.08it/s]\rBatches:  59%|█████▊    | 74/126 [00:04<00:02, 20.36it/s]\rBatches:  61%|██████    | 77/126 [00:04<00:02, 21.70it/s]\rBatches:  63%|██████▎   | 80/126 [00:04<00:02, 22.91it/s]\rBatches:  66%|██████▌   | 83/126 [00:04<00:01, 22.09it/s]\rBatches:  68%|██████▊   | 86/126 [00:04<00:01, 23.03it/s]\rBatches:  71%|███████▏  | 90/126 [00:04<00:01, 24.52it/s]\rBatches:  74%|███████▍  | 93/126 [00:04<00:01, 25.76it/s]\rBatches:  76%|███████▌  | 96/126 [00:04<00:01, 25.80it/s]\rBatches:  79%|███████▊  | 99/126 [00:05<00:01, 26.84it/s]\rBatches:  82%|████████▏ | 103/126 [00:05<00:00, 29.32it/s]\rBatches:  86%|████████▌ | 108/126 [00:05<00:00, 33.78it/s]\rBatches:  89%|████████▉ | 112/126 [00:05<00:00, 33.58it/s]\rBatches:  92%|█████████▏| 116/126 [00:05<00:00, 34.64it/s]\rBatches:  97%|█████████▋| 122/126 [00:05<00:00, 38.45it/s]\rBatches: 100%|██████████| 126/126 [00:05<00:00, 38.82it/s]\rBatches: 100%|██████████| 126/126 [00:05<00:00, 21.98it/s]"
   },
   "queue_health": {
     "schema": "techscope-queue-health-v1",
     "root": "<TECHSCOPE_ROOT>",
     "status": "pass",
     "stale_days_threshold": 7,
-    "created_at": "2026-05-29T23:45:47.888Z",
+    "created_at": "2026-05-30T00:26:28.186Z",
     "queues": [
       {
         "id": "telegram-intake",
@@ -129,7 +129,7 @@
         "path": ".queue/telegram-intake/awaiting_codex/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
         "updated_at": "2026-05-19T18:32:04.876Z",
         "created_at": "2026-05-19T18:31:50.241Z",
-        "age_days": 10.22
+        "age_days": 10.25
       },
       {
         "queue": "codex-media-review",
@@ -138,7 +138,7 @@
         "path": ".queue/codex-media-review/pending/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
         "updated_at": "2026-05-19T18:32:04.876Z",
         "created_at": "2026-05-19T18:32:04.876Z",
-        "age_days": 10.22
+        "age_days": 10.25
       }
     ],
     "failed": []

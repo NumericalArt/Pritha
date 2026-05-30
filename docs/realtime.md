@@ -12,6 +12,28 @@ Pritha can create descendants that use voice interfaces, but realtime voice is n
 - Codex sidecar handles project editing and deeper implementation work.
 - Lesson/session memory is saved as curated artifacts.
 
+## FESPA26 Reference Kit
+
+Pritha carries a source-level reference implementation extracted from FESPA26:
+
+```sh
+node scripts/voice-control-kit.mjs plan
+node scripts/voice-control-kit.mjs list
+node scripts/voice-control-kit.mjs copy --target ../child-agent
+```
+
+The same command is available through Pritha:
+
+```sh
+node scripts/pritha.mjs voice-kit plan
+```
+
+The pack lives at
+`11_agents/reference-implementations/fespa26-voice-control/` and includes
+Realtime session/call routes, browser data-channel handling, tool schemas,
+instructions, Codex App/CLI/session adapters and tests. Treat it as an
+adaptation source, not a blind copy.
+
 ## Setup Readiness
 
 Realtime voice is only ready when its selected tool surface is ready. Pritha

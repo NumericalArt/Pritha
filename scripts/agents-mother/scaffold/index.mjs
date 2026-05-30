@@ -43,6 +43,7 @@ function yamlScalar(value) {
 function normalizeInterfaceName(value) {
   const text = String(value || "").trim().toLowerCase();
   if (!text || text === "none") return "";
+  if (/(realtime|voice|speech|microphone|audio|голос)/iu.test(text)) return "realtime-voice";
   if (text.includes("telegram")) return "telegram";
   if (text.includes("codex")) return "codex-project";
   if (text.includes("cli")) return "cli";
@@ -60,7 +61,20 @@ function selectedInterfaces(data) {
     if (name) names.add(name);
   }
   if (data.telegramMode && data.telegramMode !== "none") names.add("telegram");
+  if (usesRealtimeVoice(data)) names.add("realtime-voice");
   return [...names].sort();
+}
+
+function usesRealtimeVoice(data) {
+  const text = [
+    data.primaryInterface,
+    data.secondaryInterfaces,
+    data.interfaceMode,
+    data.coreFunctions?.join(" "),
+    data.criticalWorkflows?.join(" "),
+    data.toolSystem,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return /(realtime|voice|speech|microphone|audio|голос|микрофон)/iu.test(text);
 }
 
 function memoryProfileFor(data) {
@@ -111,6 +125,7 @@ function toolProfilesFor(data) {
   if (/(mcp|api|oauth|service|openai agents sdk)/.test(text)) profiles.add("mcp-api");
   if (/(browser|web|visual|rendered|manual)/.test(text)) profiles.add("browser-manual");
   if (data.telegramMode && data.telegramMode !== "none") profiles.add("telegram-adapter");
+  if (usesRealtimeVoice(data)) profiles.add("realtime-voice-codex");
   return [...profiles].sort();
 }
 
@@ -140,6 +155,11 @@ function toolProfileDetails(name) {
       boundary: "interface adapter",
       purpose: "Telegram ingress, queueing and human-readable responses.",
       risk: "Requires token isolation, allowlist and queue/retry policy.",
+    },
+    "realtime-voice-codex": {
+      boundary: "voice interface + server tools + Codex sidecar",
+      purpose: "Live voice UX, narrow realtime tools and deep-task routing through Codex App/CLI/session transport.",
+      risk: "Requires microphone/cost approval, server-side API key isolation, tool gates and failure handling.",
     },
   };
   return details[name] || {
@@ -261,8 +281,16 @@ export function generatedAgentFiles(data) {
     adapters: interfaces.map((name) => ({
       name,
       enabled: true,
-      required_secrets: name === "telegram" ? ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_USER_IDS"] : [],
-      status_command: name === "telegram" ? "node scripts/telegram-bot.mjs queue-status" : "node scripts/interface-status.mjs",
+      required_secrets: name === "telegram"
+        ? ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_USER_IDS"]
+        : name === "realtime-voice"
+          ? ["OPENAI_API_KEY"]
+          : [],
+      status_command: name === "telegram"
+        ? "node scripts/telegram-bot.mjs queue-status"
+        : name === "realtime-voice"
+          ? "node scripts/interface-status.mjs # plus realtime transport readiness"
+          : "node scripts/interface-status.mjs",
     })),
   };
   const memoryManifest = {
@@ -537,6 +565,61 @@ ${name === "cli"
 - Contract primary interface: ${scalar(data.primaryInterface, "Codex project")}
 - Telegram mode: ${scalar(data.telegramMode, "none")}
 - Runtime family: ${scalar(data.runtimeFamily, "codex-native")}
+`,
+    });
+  }
+
+  if (usesRealtimeVoice(data)) {
+    files.push({
+      path: "interfaces/realtime-voice/pattern-manifest.json",
+      content: `${JSON.stringify({
+        profile: "realtime-voice-codex",
+        status: "documented-placeholder",
+        selected_by_contract: true,
+        pritha_reference: "11_agents/reference-implementations/fespa26-voice-control",
+        workflow: "07_workflows/realtime-voice-control-kit.md",
+        standard: "04_standards/realtime-voice-control-for-codex-agents.md",
+        copy_command_from_pritha_root: `node scripts/voice-control-kit.mjs copy --target ../${agentSlug}`,
+        required_readiness: [
+          "realtime credentials",
+          "server-side tool route",
+          "memory/search tool if selected",
+          "Codex App/CLI/session transport if selected",
+          "operator confirmation gates",
+        ],
+      }, null, 2)}
+`,
+    });
+    files.push({
+      path: "interfaces/realtime-voice/FESPA26_REFERENCE.md",
+      content: `# Realtime Voice Interface
+
+Status: documented-placeholder
+
+This agent contract selected a voice/realtime interface. Start from Pritha's
+FESPA26 reference implementation only after adapting the domain tools and
+safety gates.
+
+## Pritha Reference
+
+- Standard: \`04_standards/realtime-voice-control-for-codex-agents.md\`
+- Workflow: \`07_workflows/realtime-voice-control-kit.md\`
+- Code pack: \`11_agents/reference-implementations/fespa26-voice-control/\`
+
+From the Pritha root:
+
+\`\`\`sh
+node scripts/voice-control-kit.mjs plan
+node scripts/voice-control-kit.mjs copy --target ../${agentSlug}
+\`\`\`
+
+## Required Adaptation
+
+- Replace reference tool names with this agent's domain tools.
+- Keep \`OPENAI_API_KEY\` server-side and issue only ephemeral Realtime credentials.
+- Route complex work through Codex App, Codex CLI, a session contract or a validated queue.
+- Require explicit operator confirmation for destructive, public or deployment actions.
+- Record readiness for realtime, memory, Codex transport, tools, interfaces and operations.
 `,
     });
   }
@@ -1536,4 +1619,3 @@ export function scaffoldContract(contractPath, options = {}) {
     process.exitCode = 1;
   }
 }
-

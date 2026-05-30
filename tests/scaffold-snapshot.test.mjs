@@ -62,3 +62,24 @@ test("scaffold module exposes generated agent files directly", () => {
   assert.ok(paths.includes("scripts/smoke-test.mjs"));
   assert.ok(paths.includes("operations/manifest.json"));
 });
+
+test("scaffold adds realtime voice reference files when voice is selected", () => {
+  const files = generatedAgentFiles({
+    text: "",
+    agentName: "Voice Child",
+    primaryMission: "Voice controlled child agent",
+    targetUser: "operator",
+    primaryInterface: "web realtime voice",
+    secondaryInterfaces: "",
+    telegramMode: "none",
+    runtimeFamily: "codex-native",
+    memoryModel: "Markdown-first",
+    coreFunctions: ["voice control"],
+    criticalWorkflows: ["operator speaks and Codex handles deep task"],
+  });
+  const paths = files.map((file) => file.path);
+  assert.ok(paths.includes("interfaces/realtime-voice/README.md"));
+  assert.ok(paths.includes("interfaces/realtime-voice/FESPA26_REFERENCE.md"));
+  assert.ok(paths.includes("interfaces/realtime-voice/pattern-manifest.json"));
+  assert.equal(new Set(paths).size, paths.length);
+});

@@ -55,6 +55,7 @@ function usage() {
   ${CLI_COMMAND} operations <project-path>
   ${CLI_COMMAND} deploy <project-path> [plan|status|install|uninstall] [--yes]
   ${CLI_COMMAND} evolve <project-path> [--notes <text>]
+  ${CLI_COMMAND} voice-kit [plan|list|copy --target <child-agent>]
   ${CLI_COMMAND} registry
   ${CLI_COMMAND} validate <contract-path>
   ${CLI_COMMAND} list
@@ -1113,6 +1114,13 @@ async function main() {
   }
   if (command === "questions") {
     questions();
+    return;
+  }
+  if (command === "voice-kit") {
+    execFileSync("node", ["scripts/voice-control-kit.mjs", ...process.argv.slice(3)], {
+      cwd: ROOT,
+      stdio: "inherit",
+    });
     return;
   }
   if (command === "interview") {
