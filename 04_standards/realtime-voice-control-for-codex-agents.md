@@ -3,8 +3,8 @@ id: realtime-voice-control-for-codex-agents
 type: standard
 status: active
 created: 2026-05-25
-updated: 2026-05-29
-last_reviewed: 2026-05-29
+updated: 2026-05-30
+last_reviewed: 2026-05-30
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -60,6 +60,9 @@ sources:
   - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
   - 11_agents/reports/2026-05-29-fespa26-agent-test-report.md
   - 11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md
+  - 11_agents/reference-implementations/fespa26-voice-control/manifest.json
+  - 07_workflows/realtime-voice-control-kit.md
+  - 11_agents/reports/2026-05-30-fespa26-voice-control-pattern-ingestion-report.md
   - 05_decisions/2026-05-29-realtime-voice-control-universal-pattern.md
 related:
   decisions:
@@ -68,6 +71,7 @@ related:
     - 11_agents/reports/2026-05-25-fespa26-agent-post-creation-review.md
     - 11_agents/reports/2026-05-29-fespa26-voice-control-and-feed-memory-update.md
     - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
+    - 11_agents/reports/2026-05-30-fespa26-voice-control-pattern-ingestion-report.md
   briefs: []
   reports:
     - 11_agents/reports/2026-05-29-fespa26-agent-test-report.md
@@ -75,10 +79,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: unknown
-source_updated: 2026-05-29
-source_version: FESPA26 local implementation inspected 2026-05-29
-retrieved: 2026-05-29
-verified: 2026-05-29
+source_updated: 2026-05-30
+source_version: FESPA26 local implementation inspected 2026-05-30; Pritha reference pack v1
+retrieved: 2026-05-30
+verified: 2026-05-30
 valid_for: Codex-native agents with realtime voice UI, explicit server-side tools and deep-work transport
 temporal_status: version-bound
 ---
@@ -87,7 +91,7 @@ temporal_status: version-bound
 
 Status: active
 Owner: Techscope/user
-Last reviewed: 2026-05-29
+Last reviewed: 2026-05-30
 
 ## Rule
 
@@ -96,6 +100,8 @@ For voice-controlled Codex agents, separate live speech, deterministic actions a
 Use the Realtime model as the low-latency voice dispatcher. Put durable actions behind narrow server tools. Route complex tasks through a Codex transport layer: Codex App/thread for foreground deep work when available, Codex CLI/queue for fallback, automation or worker execution.
 
 This is a reusable Pritha pattern. FESPA26 is the event/media/feed example; Funny Teacher is the language-learning example. The reusable part is the boundary, not the domain UI.
+
+Pritha carries the source-level FESPA26 reference pack at `11_agents/reference-implementations/fespa26-voice-control/`. Use `node scripts/voice-control-kit.mjs plan` for discovery and `node scripts/voice-control-kit.mjs copy --target ../child-agent` only when the descendant contract explicitly selects browser Realtime voice plus Codex deep-task transport.
 
 ## Use When
 
@@ -129,6 +135,7 @@ This is a reusable Pritha pattern. FESPA26 is the event/media/feed example; Funn
 - Validate Codex outputs before applying them. Accept only known statuses and expected JSON/data shapes.
 - Fail closed: if Codex App, Codex CLI or output validation fails, keep the voice session alive and record the failed/pending task.
 - Keep publication, deletion, deployment, service install and broad system changes behind explicit operator approval.
+- When constructing descendants, add a `realtime-voice` interface placeholder if the contract mentions voice/realtime. Copy the FESPA26 reference code only after adapting domain tools, env prefixes, repositories and confirmation gates.
 
 ## Universal Architecture
 
