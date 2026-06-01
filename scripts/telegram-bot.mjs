@@ -4,6 +4,7 @@ import {
   spawnSync,
 } from "node:child_process";
 
+import { randomUUID } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -19,10 +20,10 @@ import { yamlList, yamlString } from "./lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { now, today } from "./lib/date.mjs";
+import { createAnonymousSourceId, inferSourceClass } from "./lib/privacy.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const INBOX_DIR = path.join(ROOT, "00_inbox", "telegram");
-const RAW_DIR = path.join(ROOT, "01_sources", "raw", "telegram");
 const QUEUE_DIR = path.join(ROOT, ".queue", "telegram-intake");
 const CODEX_REVIEW_DIR = path.join(ROOT, ".queue", "codex-media-review");
 const DEFAULT_ALLOWED_USER_IDS = [];
@@ -155,10 +156,10 @@ function mediaSummary(message) {
 
 function artifactPaths(message, text) {
   const date = today();
-  const base = `${date}-telegram-${message.chat.id}-${message.message_id}-${titleFromText(text, message)}`;
+  const opaque = randomUUID().replace(/-/g, "").slice(0, 16);
+  const base = `${date}-telegram-${opaque}`;
   return {
     mdPath: path.join(INBOX_DIR, `${base}.md`),
-    rawPath: path.join(RAW_DIR, `${base}.json`),
   };
 }
 
@@ -384,13 +385,14 @@ async function sendShortFailure(chatId, job, message) {
 
 function renderIntake(message, rawUpdate) {
   const text = messageText(message);
-  const sourceUrl = telegramSourceUrl(message);
-  const forwardedFrom = forwardDescription(message);
-  const media = mediaSummary(message);
-  const { mdPath, rawPath } = artifactPaths(message, text);
-  const relRaw = path.relative(ROOT, rawPath).split(path.sep).join("/");
-  const sourceItems = [sourceUrl, relRaw].filter(Boolean);
+  const { mdPath } = artifactPaths(message, text);
   const artifactId = path.basename(mdPath, ".md");
+  const anonymousSourceId = createAnonymousSourceId("source");
+  const sourceClass = inferSourceClass({
+    relPath: "telegram",
+    text: `${message.photo ? "image" : ""} ${message.video ? "video" : ""} ${message.audio || message.voice ? "audio" : ""} ${message.document ? "document" : ""} ${text ? "text" : ""}`,
+    data: {},
+  });
 
   const body = `---
 id: ${artifactId}
@@ -401,44 +403,37 @@ updated: ${today()}
 topics: [telegram, inbox]
 tools: [telegram-bot]
 source_type: telegram
-source_url: ${yamlString(sourceUrl)}
-sources:${yamlList(sourceItems)}
-related: {}
-telegram:
-  user_id: ${message.from?.id || ""}
-  chat_id: ${message.chat?.id || ""}
-  message_id: ${message.message_id || ""}
-  forwarded_from: ${yamlString(forwardedFrom)}
+sources:
+  - ${anonymousSourceId}
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_class: ${sourceClass}
+ingested_at: ${now()}
+processed_at: ${now()}
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: ${anonymousSourceId}
 ---
 
-# Intake: ${artifactId}
+# Intake: ${anonymousSourceId}
 
 Date added: ${today()}
 Type: telegram
-Source: ${sourceUrl || "telegram message"}
 Status: new
+Source class: ${sourceClass}
+Retention: source-purged
 
 ## Why this may matter
 
 - Forwarded to Techscope for later expert assessment.
 
-## Telegram metadata
+## Neutral intake facts
 
-- User: ${message.from?.id || ""}
-- Chat: ${message.chat?.id || ""}
-- Message: ${message.message_id || ""}
-- Forwarded from: ${forwardedFrom || "not forwarded or hidden"}
-- Date: ${message.date ? new Date(message.date * 1000).toISOString() : now()}
-${media.length ? `- Media: ${media.join("; ")}` : "- Media: none"}
-
-## Raw material or link
-
-${sourceUrl ? `- ${sourceUrl}` : "- No public Telegram source URL available."}
-- Raw update: \`${relRaw}\`
-
-## Message text
-
-${text || "_No text or caption. See Telegram metadata and raw update._"}
+- Source class: ${sourceClass}
+- Ingested at: ${now()}
+- Raw payload, text, source URL, Telegram identifiers, file identifiers and original filenames are not retained in tracked memory.
 
 ## Initial questions
 
@@ -451,7 +446,7 @@ ${text || "_No text or caption. See Telegram metadata and raw update._"}
 brief | review | experiment | archive
 `;
 
-  return { mdPath, rawPath, body, raw: JSON.stringify(rawUpdate, null, 2) };
+  return { mdPath, body };
 }
 
 async function telegram(method, payload = {}) {
@@ -490,13 +485,11 @@ async function reply(chatId, text) {
 
 async function saveMessage(update, message) {
   mkdirSync(INBOX_DIR, { recursive: true });
-  mkdirSync(RAW_DIR, { recursive: true });
 
   const rendered = renderIntake(message, update);
   if (existsSync(rendered.mdPath)) {
     return { status: "exists", mdPath: rendered.mdPath };
   }
-  writeFileSync(rendered.rawPath, `${rendered.raw}\n`);
   writeFileSync(rendered.mdPath, rendered.body);
   return { status: "saved", mdPath: rendered.mdPath };
 }
@@ -540,7 +533,7 @@ async function handleUpdate(update, users) {
 
   const text = messageText(message);
   if (text === "/start" || text === "/help") {
-    await reply(chatId, "Techscope готов принимать материалы.\n\nПрисылай пост, ссылку, фото, видео или голосовое. Я сохраню источник и проведу полный пайплайн: ссылки, медиа-транскрипция, экспертная оценка, signal draft и индексация. Медиа считается готовым только после Codex-разбора.\n\nКоманды:\n/help\n/queue\n/reindex");
+    await reply(chatId, "Techscope готов принимать материалы.\n\nПрисылай пост, ссылку, фото, видео или голосовое. Я проведу privacy-preserving intake: raw/provenance не сохраняются в Git-памяти, durable layer получает только processed knowledge и neutral metadata.\n\nКоманды:\n/help\n/queue\n/reindex");
     return;
   }
   if (text === "/reindex") {
@@ -734,7 +727,6 @@ async function getMe() {
 
 async function pollOnce({ dryRun = false } = {}) {
   mkdirSync(INBOX_DIR, { recursive: true });
-  mkdirSync(RAW_DIR, { recursive: true });
   ensureQueueDirs();
   ensureCodexReviewDirs();
   if (dryRun) {

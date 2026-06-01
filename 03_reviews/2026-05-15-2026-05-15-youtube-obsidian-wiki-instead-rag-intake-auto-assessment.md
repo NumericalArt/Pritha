@@ -3,24 +3,39 @@ id: 2026-05-15-2026-05-15-youtube-obsidian-wiki-instead-rag-intake-auto-assessme
 type: assessment
 status: draft
 created: 2026-05-15
-updated: 2026-05-15
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-  - https://www.youtube.com/watch?v=2ZHHzfMSeWc
-  - 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
-  - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
+  - source-1bb21abb-bb21-4799-8b8c-7f811e2d8909
 related:
-  intakes:
-    - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.437Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-1bb21abb-bb21-4799-8b8c-7f811e2d8909
 recommendation: brief
 ---
 
-# Assessment: Intake: youtube-obsidian-wiki-instead-rag
+# Assessment: source-1bb21abb-bb21-4799-8b8c-7f811e2d8909
+
+Date: 2026-05-15
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-15
 Status: draft
@@ -35,15 +50,6 @@ Recommendation: brief
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-- YouTube: https://www.youtube.com/watch?v=2ZHHzfMSeWc - Local raw transcript: `01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md` - Local ASR output directory: `01_sources/raw/youtube-2ZHHzfMSeWc/`
-
-## Link processing
-
-- https://www.youtube.com/watch?v=2ZHHzfMSeWc — ok 200; title: Карпатый Wiki Вместо RAG — Полный Obsidian Сетап Для Новичка - YouTube
-- https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f — ok 200; title: llm-wiki · GitHub
 
 ## YouTube processing
 

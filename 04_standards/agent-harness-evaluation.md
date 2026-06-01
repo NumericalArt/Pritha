@@ -24,7 +24,7 @@ tools:
 sources:
   - 02_briefs/2026-05-27-local-harness-benchmark-brief.md
   - 03_reviews/2026-05-27-local-agent-harness-benchmark-assessment.md
-  - https://www.youtube.com/watch?v=bXRQsQmgAYo
+  - anonymous incoming video source (purged)
   - https://github.com/Zux1U/microbench_16
   - https://docs.vllm.ai/en/latest/
   - https://github.com/ggml-org/llama.cpp

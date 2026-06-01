@@ -3,35 +3,50 @@ id: 2026-05-17-medium-harness-engineering-six-layer-signal
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
-topics: [harness-engineering, ai-agents, context-engineering, agent-memory, evaluation, observability, tool-use, recovery, techscope]
-tools: [medium, codex, anthropic, openai, langchain]
+updated: 2026-06-01
+topics:
+  - harness-engineering
+  - ai-agents
+  - context-engineering
+  - agent-memory
+  - evaluation
+  - observability
+  - tool-use
+  - recovery
+  - techscope
+tools:
+  - medium
+  - codex
+  - anthropic
+  - openai
+  - langchain
 sources:
-  - 00_inbox/texts/2026-05-17-medium-harness-engineering-screenshots-intake.md
-  - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
-  - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
-  - https://openai.com/index/harness-engineering/
-  - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
-  - https://www.anthropic.com/engineering/building-effective-agents
+  - source-d7ff3d01-a757-42b0-add0-1ffea5e26620
 related:
-  intakes:
-    - 00_inbox/texts/2026-05-17-medium-harness-engineering-screenshots-intake.md
-  notes:
-    - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
-  briefs:
-    - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
-  assessments:
-    - 03_reviews/2026-05-17-medium-harness-engineering-six-layer-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.430Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-d7ff3d01-a757-42b0-add0-1ffea5e26620
 generated_from:
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+  - source-d7ff3d01-a757-42b0-add0-1ffea5e26620
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: six-layer harness engineering model
+# Signal: source-d7ff3d01-a757-42b0-add0-1ffea5e26620
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -101,7 +116,6 @@ Refinement status: codex-refined
 ## Verification required
 
 - Verify exact article URL if needed; this pass only found Medium list/activity confirmations.
-- Do not accept `Context Anxiety`/`Context Reflect` labels as Anthropic-official without a primary source using those exact terms.
 - Compare the six-layer model against OpenAI and Anthropic primary sources before promoting it to an active standard.
 - Run a local Techscope harness-layer audit to test whether the model exposes real gaps.
 
@@ -109,12 +123,3 @@ Refinement status: codex-refined
 
 - Refined from 19 user-provided screenshots in the Techscope thread.
 - Strong candidate for a `agent-harness-architecture` review or standard after audit.
-
-## Source links
-
-- 00_inbox/texts/2026-05-17-medium-harness-engineering-screenshots-intake.md
-- 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
-- https://openai.com/index/harness-engineering/
-- https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
-- https://www.anthropic.com/engineering/building-effective-agents
-

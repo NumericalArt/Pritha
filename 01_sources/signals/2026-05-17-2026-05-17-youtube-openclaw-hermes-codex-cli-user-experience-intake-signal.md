@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-inta
 type: signal
 status: extracted
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - youtube
   - openclaw
@@ -28,20 +28,32 @@ tools:
   - source
   - standard
 sources:
-  - 00_inbox/links/2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake.md
-  - https://www.youtube.com/watch?v=L-HAzfFWSto
+  - source-adf31a54-b2bc-41ed-b12b-14e7b78b42a4
 related:
-  sources:
-    - 00_inbox/links/2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.430Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-adf31a54-b2bc-41ed-b12b-14e7b78b42a4
 generated_from:
-  - 00_inbox/links/2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake.md
+  - source-adf31a54-b2bc-41ed-b12b-14e7b78b42a4
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: youtube-openclaw-hermes-codex-cli-user-experience
+# Signal: source-adf31a54-b2bc-41ed-b12b-14e7b78b42a4
+
+Date: 2026-05-17
+Status: extracted
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: extracted
@@ -56,15 +68,11 @@ Refinement status: needs-codex-refinement
 - Title: OpenClaw, Hermes и Codex CLI: какой AI-агент выбрать сейчас
 - Что из этого может стать recommendation для будущих agents или standards?
 - # Intake: youtube-openclaw-hermes-codex-cli-user-experience
-- Source: https://www.youtube.com/watch?v=L-HAzfFWSto
 - Это не взгляд профессионального разработчика, а опыт продвинутого пользователя AI-агентов.
 - Channel: ALEKSEI ULIANOV | AI-АГЕНТЫ
 - Какие реальные pain points у продвинутого не-IT пользователя при выборе OpenClaw/Hermes/Codex CLI?
-- source-note | brief | assessment | review | experiment | archive
 
 ## Technical details
-
-- URL: https://www.youtube.com/watch?v=L-HAzfFWSto
 
 ## Agent design implications
 
@@ -78,21 +86,13 @@ Refinement status: needs-codex-refinement
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
 - Проверить первоисточники и даты публикации внешних ссылок.
-- Сверить claims с official OpenAI docs/source materials.
 
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/links/2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake.md
-- https://www.youtube.com/watch?v=L-HAzfFWSto

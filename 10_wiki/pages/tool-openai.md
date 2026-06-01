@@ -37,7 +37,7 @@ sources:
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
   - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-  - 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=am_oeAoUhew
   - https://openai.com/index/harness-engineering/
   - 02_briefs/2026-05-16-openai-realtime-audio-models-voice-agents-brief.md
@@ -45,13 +45,13 @@ sources:
   - 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
   - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
   - 03_reviews/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-auto-assessment.md
-  - 01_sources/raw/youtube-JOu8v6CBjkE/JOu8v6CBjkE-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=JOu8v6CBjkE
   - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
   - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
   - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+  - raw-source-purged
   - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
   - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
   - https://www.anthropic.com/engineering/building-effective-agents
@@ -131,7 +131,7 @@ This generated page tracks openai as a tool in the Techscope knowledge base. Use
 - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
 - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
 - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-- 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=am_oeAoUhew
 - https://openai.com/index/harness-engineering/
 - 02_briefs/2026-05-16-openai-realtime-audio-models-voice-agents-brief.md
@@ -139,13 +139,13 @@ This generated page tracks openai as a tool in the Techscope knowledge base. Use
 - 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
 - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
 - 03_reviews/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-auto-assessment.md
-- 01_sources/raw/youtube-JOu8v6CBjkE/JOu8v6CBjkE-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=JOu8v6CBjkE
 - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
 - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
 - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
 - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-- 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+- raw-source-purged
 - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
 - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
 - https://www.anthropic.com/engineering/building-effective-agents

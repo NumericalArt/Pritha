@@ -3,63 +3,41 @@ id: 2026-05-17-telegram-telegram-user-52-все-новостные-каналы-
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/oestick/503
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/oestick/503
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 52
-  forwarded_from: AI и грабли #503
+  - source-5c918c65-9606-48f7-9e23-eff88c0d7179
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.421Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-5c918c65-9606-48f7-9e23-eff88c0d7179
 ---
 
-# Intake: 2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-
+# Intake: source-5c918c65-9606-48f7-9e23-eff88c0d7179
 
-Date added: 2026-05-17
-Type: telegram
-Source: https://t.me/oestick/503
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 52
-- Forwarded from: AI и грабли #503
-- Date: 2026-05-17T16:50:20.000Z
-- Media: photo: AgACAgIAAxkBAAM0agnxzE1gd1Xr1Teaa-XdQfAMjT8AAsMTaxstlTBI5maLAR8w7vcBAAMCAAN5AAM7BA
-
-## Raw material or link
-
-- https://t.me/oestick/503
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.json`
-
-## Message text
-
-Все новостные каналы пишут про нативный диспатчер от openai, но никто не пишет про другую фичу – теперь можно подключаться не только к десктопу, но и к VPS
-
-Codex теперь полностью впитал в себя все функции OpenClaw. Ожидаемо.
-
-P.s. В идеале, осталось дождаться, когда в мобилку завезут password-less подключение – на десктопе уже есть
-
-UPD: завезли, нужно просто на десктопе включить синхронизацию всех удаленных подключений – они автоматически появятся на мобилке
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

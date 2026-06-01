@@ -30,14 +30,14 @@ tools:
 sources:
   - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
   - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-  - 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=2ZHHzfMSeWc
   - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
   - https://community.obsidian.md/plugins/karpathywiki
   - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
   - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
   - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=L-HAzfFWSto
   - https://github.com/NousResearch/hermes-agent
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime
@@ -100,14 +100,14 @@ This generated page tracks mlx-whisper as a tool in the Techscope knowledge base
 
 - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
 - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-- 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=2ZHHzfMSeWc
 - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 - https://community.obsidian.md/plugins/karpathywiki
 - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
 - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
 - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-- 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=L-HAzfFWSto
 - https://github.com/NousResearch/hermes-agent
 - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime

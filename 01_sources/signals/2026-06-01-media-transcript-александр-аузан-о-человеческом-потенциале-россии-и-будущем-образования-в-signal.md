@@ -19,17 +19,20 @@ tools:
   - llm
   - learning-agents
 sources:
-  - 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
-  - 01_sources/raw/media/2026-06-01-media-aleksandr-auzan-o-chelovecheskom-potentsiale-rossii-i-buduschem-obrazova-fb56a3460661/transcript.md
-  - https://www.youtube.com/watch?v=rWpvwVfU0K4
+  - source-c4ceaf1d-3aac-44ba-b2af-0f4c7b0ef964
 related:
-  intakes:
-    - 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
-  assessments:
-    - 03_reviews/2026-06-01-2026-06-01-auzan-ai-education-human-potential-intake-auto-assessment.md
-  standards: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.433Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-c4ceaf1d-3aac-44ba-b2af-0f4c7b0ef964
 generated_from:
-  - 01_sources/raw/media/2026-06-01-media-aleksandr-auzan-o-chelovecheskom-potentsiale-rossii-i-buduschem-obrazova-fb56a3460661/transcript.md
+  - source-c4ceaf1d-3aac-44ba-b2af-0f4c7b0ef964
 signal_quality: medium
 extraction_mode: codex-assisted
 refinement_status: codex-refined
@@ -37,7 +40,12 @@ harness: 07_workflows/prompts/signal-extraction-harness.md
 techscope_agents_mother_fit: watch
 ---
 
-# Signal: Auzan on AI education and human potential
+# Signal: source-c4ceaf1d-3aac-44ba-b2af-0f4c7b0ef964
+
+Date: 2026-06-01
+Status: refined
+Source class: video
+Retention: source-purged
 
 Date: 2026-06-01
 Status: refined
@@ -54,7 +62,6 @@ Refinement status: codex-refined
 
 ## Technical details
 
-- The source argues that mass education is being stressed by rapid AI adoption because students can use AI faster than institutions can redesign exams and assignments.
 - It frames the future split as AI either replacing human capability or extending it; the design lever is how humans are trained to work with AI.
 - The five human capacities mentioned as candidates for development are:
   - intuition: decisions under incomplete information and stress;
@@ -70,7 +77,6 @@ Refinement status: codex-refined
 - Future tutoring/scaffold agents should include AI-output critique drills: ask the learner to find errors, missing assumptions, overconfidence and unsupported claims in model answers.
 - Training workflows for users of Pritha descendants should include explicit "when not to trust the agent" material, not just command instructions.
 - Evaluation tasks for educational agents should include process evidence: intermediate reasoning, oral/live checks, project artifacts, reflection and human review gates.
-- This source is potentially relevant to Funny Teacher-like descendants or any future learning/training agent, but it is weak evidence for coding-agent standards.
 
 ## Candidate rules
 
@@ -88,16 +94,9 @@ Refinement status: codex-refined
 
 - Verify the cited educational experiment and claims with written sources before using them in a brief.
 - If creating a brief, compare with existing Techscope artifacts about learning agents, user onboarding, evals and human-in-the-loop workflows.
-- Do not update `04_standards/` from this source alone.
 
 ## Codex refinement notes
 
 - Refined in Techscope Codex thread on 2026-06-01 using `07_workflows/prompts/signal-extraction-harness.md`.
 - Pipeline finding: heuristic extraction performed poorly on this Russian conversational transcript; Codex refinement was necessary.
 - Recommended next artifact: optional short brief for `learning-agents` / `AI education`, otherwise archive as supporting signal.
-
-## Source links
-
-- 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
-- 01_sources/raw/media/2026-06-01-media-aleksandr-auzan-o-chelovecheskom-potentsiale-rossii-i-buduschem-obrazova-fb56a3460661/transcript.md
-- https://www.youtube.com/watch?v=rWpvwVfU0K4

@@ -3,7 +3,7 @@ id: 2026-05-19-2026-05-19-telegram-telegram-user-64-как-дать-агенту
 type: signal
 status: extracted
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -22,21 +22,32 @@ tools:
   - browser
   - source
 sources:
-  - 00_inbox/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.md
-  - https://t.me/oestick/505
-  - 01_sources/raw/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json
+  - source-249472f2-159c-465f-9770-79e065c84b73
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-19
+processed_at: 2026-06-01T21:03:38.432Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-249472f2-159c-465f-9770-79e065c84b73
 generated_from:
-  - 00_inbox/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.md
+  - source-249472f2-159c-465f-9770-79e065c84b73
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов
+# Signal: source-249472f2-159c-465f-9770-79e065c84b73
+
+Date: 2026-05-19
+Status: extracted
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-19
 Status: extracted
@@ -61,7 +72,6 @@ Refinement status: needs-codex-refinement
 
 - Тип 2.2: Неофициальный API (притворяемся фронтендом)
 - Аутентификация тут обычно по кукиз, либо вообще отсутствует, если страница доступна без логина (привет, api.hh.ru/search)
-- Raw update: `01_sources/raw/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json`
 - Как дать агенту "руки": 4 типа подключения внешних сервисов
 
 ## Agent design implications
@@ -78,7 +88,6 @@ Refinement status: needs-codex-refinement
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -88,12 +97,5 @@ Refinement status: needs-codex-refinement
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.md
-- https://t.me/oestick/505
-- 01_sources/raw/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json

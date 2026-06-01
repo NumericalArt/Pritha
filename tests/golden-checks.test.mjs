@@ -12,6 +12,7 @@ test("golden-checks exposes a machine-readable dry-run contract", () => {
   assert.ok(Array.isArray(payload.checks));
   assert.ok(payload.checks.length >= 6);
   assert.ok(payload.checks.every((check) => check.status === "planned"));
+  assert.ok(payload.checks.some((check) => check.name === "Privacy retention audit"));
   assert.ok(payload.checks.some((check) => check.name === "Markdown integrity"));
   assert.ok(payload.checks.some((check) => check.command === "node scripts/agents-mother.mjs test . --no-report"));
 });

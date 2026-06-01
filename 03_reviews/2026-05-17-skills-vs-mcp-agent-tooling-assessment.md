@@ -3,32 +3,46 @@ id: 2026-05-17-skills-vs-mcp-agent-tooling-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [agent-skills, mcp, coding-agents, agent-architecture, tool-use, security, context-engineering]
-tools: [Agent Skills, MCP, Codex, Claude Code, Playwright, GitHub CLI, OpenAI Docs MCP, Shell tool]
+updated: 2026-06-01
+topics:
+  - agent-skills
+  - mcp
+  - coding-agents
+  - agent-architecture
+  - tool-use
+  - security
+  - context-engineering
+tools:
+  - Agent Skills
+  - MCP
+  - Codex
+  - Claude Code
+  - Playwright
+  - GitHub CLI
+  - OpenAI Docs MCP
+  - Shell tool
 sources:
-  - 00_inbox/links/2026-05-17-youtube-skills-vs-mcp-agent-tooling-intake.md
-  - 01_sources/notes/2026-05-17-skills-vs-mcp-source-note.md
-  - 02_briefs/2026-05-17-skills-vs-mcp-agent-tooling-brief.md
-  - 01_sources/raw/youtube-6PA0lcAQgYI/6PA0lcAQgYI-whisper-small.md
-  - https://agentskills.io/home
-  - https://github.com/openai/skills
-  - https://developers.openai.com/learn/docs-mcp
-  - https://developers.openai.com/api/docs/guides/tools-shell
-  - https://modelcontextprotocol.io/specification/2025-06-18
+  - source-4ca8d7f9-8618-4b1a-bbf6-22ec9e336df6
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-skills-vs-mcp-agent-tooling-intake.md
-  briefs:
-    - 02_briefs/2026-05-17-skills-vs-mcp-agent-tooling-brief.md
-  reviews: []
-  decisions: []
-  standards:
-    - 04_standards/expert-information-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.444Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-4ca8d7f9-8618-4b1a-bbf6-22ec9e336df6
 recommendation: standard
 ---
 
-# Assessment: Skills vs MCP for agent tooling
+# Assessment: source-4ca8d7f9-8618-4b1a-bbf6-22ec9e336df6
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -36,11 +50,8 @@ Recommendation: standard
 
 ## One-paragraph read
 
-This is a high-value source for Techscope because it gives a crisp operational distinction: Skills are best for reusable process knowledge and local executable workflows, while MCP is best for standardized external-service integration and centralized tool boundaries. The video's title is intentionally provocative, but the actual conclusion is balanced and useful: Skills do not kill MCP; they reduce unnecessary MCP usage and pair well with MCP where the server provides access and the skill provides procedure.
-
 ## Why it matters
 
-- We are actively designing agents that need Telegram ingestion, source processing, web lookup, local scripts, Obsidian/Markdown memory and future coding workflows.
 - Bad default choice here creates long-term drag: too many MCP servers can bloat context and operations; too many ad hoc skills/scripts can create security and consistency problems.
 - This material can become a reusable decision matrix for every future agent project.
 
@@ -80,8 +91,6 @@ The video is secondary, but the main claims align with primary sources: Agent Sk
 ## Practicality
 
 Score: 5/5
-
-Immediately actionable. We can apply it to Techscope's own tooling: YouTube transcription, Telegram ingestion, source extraction, browser checks, GitHub workflows and documentation lookup.
 
 ## Leverage
 
@@ -128,4 +137,3 @@ Promote to a draft standard after one small local experiment. Proposed standard 
 ## Next artifact
 
 standard
-

@@ -3,25 +3,45 @@ id: 2026-05-17-codex-xcode-simulator-screenshot-debugging-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex, xcode, ios-simulator, screenshots, ui-debugging, mobile-app-development, coding-agents, dx]
-tools: [codex, xcode, ios-simulator, iphone, macos, telegram-bot]
+updated: 2026-06-01
+topics:
+  - codex
+  - xcode
+  - ios-simulator
+  - screenshots
+  - ui-debugging
+  - mobile-app-development
+  - coding-agents
+  - dx
+tools:
+  - codex
+  - xcode
+  - ios-simulator
+  - iphone
+  - macos
+  - telegram-bot
 sources:
-  - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
-  - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
-  - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
+  - source-e4b67f8b-ff06-4c86-99c6-3248fa660120
 related:
-  briefs:
-    - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
   workflows:
-    - 07_workflows/codex-assisted-media-review.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.442Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-e4b67f8b-ff06-4c86-99c6-3248fa660120
 recommendation: experiment
 ---
 
-# Assessment: Codex Xcode Simulator screenshot debugging
+# Assessment: source-e4b67f8b-ff06-4c86-99c6-3248fa660120
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -44,4 +64,3 @@ Recommendation: experiment
 ## Next artifact
 
 experiment
-

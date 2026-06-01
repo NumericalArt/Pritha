@@ -3,46 +3,54 @@ id: 2026-05-17-codex-remote-vps-connections-source-note
 type: source-note
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex-remote-access, codex-desktop, remote-connections, ssh, vps, mobile-agent-control, coding-agents, security]
-tools: [telegram-bot, codex, codex-desktop, chatgpt-mobile, ssh, vps, macos]
-source_type: telegram-photo
-source_url: https://t.me/oestick/503
-source_published: 2026-05-17
+updated: 2026-06-01
+topics:
+  - codex-remote-access
+  - codex-desktop
+  - remote-connections
+  - ssh
+  - vps
+  - mobile-agent-control
+  - coding-agents
+  - security
+tools:
+  - telegram-bot
+  - codex
+  - codex-desktop
+  - chatgpt-mobile
+  - ssh
+  - vps
+  - macos
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
-  - https://t.me/oestick/503
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
-  - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
-  - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
+  - source-a73914ec-aa85-4350-9781-8c821ae4cab1
 related:
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  briefs:
-    - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.423Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-a73914ec-aa85-4350-9781-8c821ae4cab1
+source_published: 2026-05-17
 ---
 
-# Source Note: Codex remote VPS connections
+# Intake: source-a73914ec-aa85-4350-9781-8c821ae4cab1
 
-Date added: 2026-05-17
-Source date: 2026-05-17
-Source: https://t.me/oestick/503
+Date: 2026-05-17
 Status: draft
+Source class: telegram
+Retention: source-purged
 
-## What this source is
+## Processed status
 
-Telegram-forwarded post from `AI и грабли #503` claiming that Codex remote access can now connect not only to desktop but also to VPS/remote hosts, and that remote connections can sync to mobile after desktop setup.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-The screenshot shows mobile `Connections` with a connected Codex Desktop host and `Add connection`.
+## Follow-up
 
-## Verified context
-
-OpenAI's 2026-05-14 release notes and article confirm remote access from ChatGPT mobile, switching across connected hosts, live context from the underlying host and support for connected remote environments.
-
-## Caveats
-
-- "Codex fully absorbed all OpenClaw functions" is a community opinion, not a verified fact.
-- Passwordless and automatic sync behavior need local account/plan testing.
-- VPS usage changes security posture compared with local Mac mini.
-
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

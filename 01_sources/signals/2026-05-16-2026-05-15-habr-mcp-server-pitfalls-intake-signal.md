@@ -3,7 +3,7 @@ id: 2026-05-16-2026-05-15-habr-mcp-server-pitfalls-intake-signal
 type: signal
 status: extracted
 created: 2026-05-16
-updated: 2026-05-16
+updated: 2026-06-01
 topics:
   - habr
   - mcp
@@ -28,20 +28,32 @@ tools:
   - source
   - standard
 sources:
-  - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
-  - https://habr.com/ru/companies/bitrix/articles/1009150/
+  - source-13bc4e08-6c3b-4ba9-815e-3bec530ea479
 related:
-  sources:
-    - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-16
+processed_at: 2026-06-01T21:03:38.426Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-13bc4e08-6c3b-4ba9-815e-3bec530ea479
 generated_from:
-  - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
+  - source-13bc4e08-6c3b-4ba9-815e-3bec530ea479
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: habr-mcp-server-pitfalls
+# Signal: source-13bc4e08-6c3b-4ba9-815e-3bec530ea479
+
+Date: 2026-05-16
+Status: extracted
+Source class: video
+Retention: source-purged
 
 Date: 2026-05-16
 Status: extracted
@@ -55,12 +67,10 @@ Refinement status: needs-codex-refinement
 - Материал содержит набор concrete pitfalls, которые можно превратить в checklist или standard для MCP tool design.
 - Какие правила MCP tool design стоит зафиксировать как стандарт?
 - Какие риски особенно важны для наших будущих агентов?
-- Source: https://habr.com/ru/companies/bitrix/articles/1009150/
 - Статья описывает практические проблемы разработки MCP-серверов.
 - Title: Что может пойти и обязательно пойдет не так при написании MCP-сервера
 - Author: vasilyev / команда AI Битрикс24
 - Как соотнести рекомендации с OpenAI harness engineering и нашими текущими workflows?
-- Habr: https://habr.com/ru/companies/bitrix/articles/1009150/
 
 ## Technical details
 
@@ -78,22 +88,14 @@ Refinement status: needs-codex-refinement
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
 - Проверить первоисточники и даты публикации внешних ссылок.
 - Сверить claims с official MCP specification and client docs.
-- Сверить claims с official OpenAI docs/source materials.
 - Проверить security implications отдельно перед стандартом.
 
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Раскрыть practical MCP rules через связанный brief/source note, потому что intake-level signal содержит мало technical detail.
 - После refinement обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
-- https://habr.com/ru/companies/bitrix/articles/1009150/

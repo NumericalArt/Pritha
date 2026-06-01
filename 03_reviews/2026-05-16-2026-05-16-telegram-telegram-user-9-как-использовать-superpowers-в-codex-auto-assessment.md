@@ -3,26 +3,39 @@ id: 2026-05-16-2026-05-16-telegram-telegram-user-9-как-использоват
 type: assessment
 status: draft
 created: 2026-05-16
-updated: 2026-05-16
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
-  - https://t.me/tosoltaime/42
-  - 01_sources/raw/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.json
-  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+  - source-4581022f-dfc0-4ade-af51-edd7bd74cb4b
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
-  signals:
-    - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-16
+processed_at: 2026-06-01T21:03:38.438Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-4581022f-dfc0-4ade-af51-edd7bd74cb4b
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex
+# Assessment: source-4581022f-dfc0-4ade-af51-edd7bd74cb4b
+
+Date: 2026-05-16
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-16
 Status: draft
@@ -37,14 +50,6 @@ Recommendation: brief
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-- https://t.me/tosoltaime/42 - Raw update: `01_sources/raw/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.json` Как использовать Superpowers в Codex. 1. В Codex /using superpowers брейнштормишь идею: понятная спека, scope MVP, user flows, ограничения и критерии готовности. 2. Дальше тесты лучше готовить с другой моделью, которая думает как независимый QA/product reviewer, а не как исполнитель кода. Просим внешнюю модель найти: - happy path - плохие входные данные - security / prompt injection - UX-краевые случаи - acceptance criteria - eval examples 3. Потом возвращаем эти тесты в Codex, желательно как файлы: docs/evals/ , tests/ , fixtures/ , acceptance.md 4. После этого Codex сначала делает план на основании спеки и тестов: какие файлы создать, какие модули нужны, какие проверки должны пройти и в каком порядке реализовывать. 5. Затем Codex реализует код так, чтобы тесты проходили: сначала тест падает, потом пишется код, потом тест становится зелёным. 6. В конце Codex проверяет результат не словами, а командами: npm test , npm run lint , smoke checks, eval run Формула: Spec → External tests/evals → Codex plan → failing tests → implementation → passing tests → verification Главный принцип: Codex не должен сам себе придумывать проверку после того, как уже написал ответ.
-
-## Link processing
-
-- https://t.me/tosoltaime/42 — ok 200; title: Telegram: View @tosoltaime
 
 ## YouTube processing
 

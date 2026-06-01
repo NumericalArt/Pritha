@@ -3,7 +3,7 @@ id: 2026-05-19-fespa26-agent-research
 type: review
 status: draft
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-06-01
 topics:
   - agent-engineering
   - agent-factory
@@ -13,6 +13,21 @@ tools:
   - Codex
   - AGENTS.md
   - CLI
+sources:
+  - source-a955e012-349b-405d-b473-44dd295d586e
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-19
+processed_at: 2026-06-01T21:03:38.466Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-a955e012-349b-405d-b473-44dd295d586e
 agent_platforms:
   - Codex
 model_context:
@@ -24,37 +39,6 @@ config_surfaces:
   - workflows
   - scripts
 portability: codex-native
-sources:
-  - 11_agents/contracts/2026-05-19-fespa26-agent-contract.md
-  - 07_workflows/agents-mother.md
-  - 07_workflows/agents-mother-roadmap.md
-  - 04_standards/agent-creation-harness.md
-  - 04_standards/agent-environment-compatibility.md
-  - 04_standards/agent-tool-integration-selection.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-  - 02_briefs/2026-05-16-openai-realtime-audio-models-voice-agents-brief.md
-  - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
-  - 07_workflows/media-intake-processing.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-signal.md
-  - 03_reviews/2026-05-18-hermes-agent-practical-use-cases-assessment.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 04_standards/signal-extraction.md
-  - 10_wiki/pages/topic-ai-agents.md
-  - 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
-  - 01_sources/notes/2026-05-17-openclaw-architecture-source-note.md
-  - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-related:
-  agent_contracts:
-    - 11_agents/contracts/2026-05-19-fespa26-agent-contract.md
-  standards:
-    - 04_standards/agent-creation-harness.md
-    - 04_standards/agent-environment-compatibility.md
-    - 04_standards/agent-tool-integration-selection.md
-  workflows:
-    - 07_workflows/agents-mother.md
-    - 07_workflows/agents-mother-roadmap.md
-supersedes: []
-superseded_by: []
 freshness_status: uncertain
 source_published: 2026-05-19
 source_updated: 2026-05-19
@@ -65,7 +49,12 @@ valid_for: pre-scaffold architecture validation
 temporal_status: unknown
 ---
 
-# Review: FESPA26 agent architecture research
+# Artifact: source-a955e012-349b-405d-b473-44dd295d586e
+
+Date: 2026-05-19
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-19
 Status: draft
@@ -100,7 +89,6 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 - Path: 02_briefs/2026-05-16-openai-realtime-audio-models-voice-agents-brief.md
 - Type/status: brief/draft
 - Heading: Why it matters for Techscope
-- Relevance note: ## Why it matters for Techscope  Voice can become an intake and action interface for agents:  - voice notes and meetings can feed source artifacts; - live transcripts can become raw material for signal extraction; - support or CRM agents can act through tools while keeping the user informed; - multilingual voice agents may become practical for support, education and media workflows.  The biggest design implication: v
 
 ### 3. Intake: youtube-openai-three-audio-models-api
 
@@ -128,7 +116,6 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 - Path: 03_reviews/2026-05-18-hermes-agent-practical-use-cases-assessment.md
 - Type/status: assessment/processed
 - Heading: One-paragraph read
-- Relevance note: ## One-paragraph read  This is a strong practical UX source. It does not prove Hermes is the best runtime, but it shows what a useful personal/business agent setup looks like in the hands of a motivated operator: role-specific agents, shared wiki, daily notes, scheduled reports, skill curation, Telegram control, and a Codex CLI bridge for long technical work. For Techscope, this should feed Agents Mother design rathe
 
 ### 7. Signal: Codex remote access, VPS and synchronized connections
 
@@ -142,36 +129,20 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 - Path: 04_standards/signal-extraction.md
 - Type/status: standard/active
 - Heading: Telegram media
-- Relevance note: ## Telegram media  Все входящие из Telegram проходят тот же pipeline. Telegram bot может создать только intake, link processing, media download, heuristic signal and assessment.  Если Telegram media содержит фото, скриншот, UI, диаграмму, видео, аудио, документ или другой материал с потенциальной пользой, это штатный случай для Codex-assisted media review:  - media file хранится в `01_sources/raw/telegram-media/`; - 
 
 ### 9. Wiki Page: topic: ai-agents
 
 - Path: 10_wiki/pages/topic-ai-agents.md
 - Type/status: wiki-page/generated
 - Heading: Evidence sources
-- Relevance note: ## Evidence sources  - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md - https://www.youtube.com/watch?v=L-HAzfFWSto - https://g
 
-### 10. Source Note: OpenAI realtime audio models
-
-- Path: 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
-- Type/status: source-note/processed
 - Heading: Key ideas for Techscope
 - Relevance note: ## Key ideas for Techscope  - Voice agents need more than natural audio: they need context management, recovery behavior, tool transparency, user-facing preambles and safety guardrails. - Realtime voice agents can keep conversation active while reasoning and calling tools in the background. - Preambles are a UX and safety mechanism: they tell the user what the agent is doing during latency or tool calls. - Live trans
-
-### 11. Source Note: OpenClaw architecture primary-source snapshot
-
-- Path: 01_sources/notes/2026-05-17-openclaw-architecture-source-note.md
-- Type/status: source-note/processed
-- Heading: Source-quality notes
-- Relevance note: ## Source-quality notes  - Strong evidence: official README, repository metadata, docs and security policy. - Moderate evidence: npm registry and npm downloads API. - Weak/ignored evidence for this pass: SEO articles, news articles, mirrors and secondary explainers. These may be useful later only for ecosystem perception or security controversy review.
 
 ### 12. Signal: six-layer harness engineering model
 
 - Path: 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
 - Type/status: signal/refined
-- Heading: Source links
-- Relevance note: ## Source links  - 00_inbox/texts/2026-05-17-medium-harness-engineering-screenshots-intake.md - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/ - https://openai.com/index/harness-engineering/ - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents - https://www.anthropic.com/engineering/building-effective-agents
-
 
 ## Standards and workflow basis
 
@@ -200,7 +171,6 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 - Path: 07_workflows/agents-mother-roadmap.md
 - Basis: Build TechScope into a full agent creation environment: it should interview the user, design a new agent, validate the architecture against TechScope memory and current sources, generate a working sibling project, test it, hand it off, and feed the results back into TechScope knowledge. Default target: production-testable agents, not paper-only specifications.
 
-
 ## External verification checklist
 
 - [ ] Verify current Codex/AGENTS.md behavior and any target runtime docs before scaffold.
@@ -218,7 +188,6 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 ## Risks and open questions
 
 - Contract validation issues: none blocking from structural validator
-- Source freshness is pending until external verification is completed.
 - Scaffold should not start if runtime docs, Telegram behavior or dependency versions are uncertain.
 
 ## Next step

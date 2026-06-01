@@ -16,6 +16,7 @@
     "check:embeddings": "node scripts/golden-checks.mjs --with-embeddings",
     "env": "node scripts/env-doctor.mjs",
     "quality": "node scripts/quality-gate.mjs",
+    "privacy": "node scripts/privacy-audit.mjs --strict",
     "self-test": "node scripts/self-test.mjs",
     "queue-health": "node scripts/queue-health.mjs",
     "health": "node scripts/healthcheck.mjs",

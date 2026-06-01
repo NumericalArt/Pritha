@@ -1,4 +1,33 @@
-# Копилка технологий
+---
+id: README.ru
+type: artifact
+status: processed
+created: 2026-06-01
+updated: 2026-06-01
+topics:
+  - privacy-preserving-intake
+tools:[]
+sources:
+  - source-1fb8f396-750f-4ca6-99c8-80249ed52fb8
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.467Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-1fb8f396-750f-4ca6-99c8-80249ed52fb8
+---
+
+# Artifact: source-1fb8f396-750f-4ca6-99c8-80249ed52fb8
+
+Date: 2026-06-01
+Status: processed
+Source class: video
+Retention: source-purged
 
 Рабочая среда для сбора, анализа и превращения интересных технологических материалов в практические стандарты для будущих проектов.
 
@@ -82,13 +111,11 @@ node scripts/query-memory.mjs open
 Локальная транскрибация media:
 
 ```sh
-node scripts/transcribe-media.mjs ./01_sources/raw/input/video.mp4 --language ru
 ```
 
 Результат смотреть в:
 
 ```text
-01_sources/raw/media/<media-id>/transcript.md
 ```
 
 Локальные embeddings:

@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-15-telegram-telegram-user-6-насколько-полез
 type: signal
 status: superseded
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -17,22 +17,33 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.md
-  - https://t.me/iwann_tai/6
-  - 01_sources/raw/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.json
+  - source-79d39048-f749-4f8d-858e-fb5776afcfdd
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.427Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-79d39048-f749-4f8d-858e-fb5776afcfdd
 generated_from:
-  - 00_inbox/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.md
+  - source-79d39048-f749-4f8d-858e-fb5776afcfdd
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: superseded
-superseded_reason: service-message-no-technical-signal
 harness: 07_workflows/prompts/signal-extraction-harness.md
+superseded_reason: service-message-no-technical-signal
 ---
 
-# Signal: 2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал
+# Signal: source-79d39048-f749-4f8d-858e-fb5776afcfdd
+
+Date: 2026-05-17
+Status: superseded
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: superseded
@@ -60,7 +71,6 @@ Refinement status: superseded
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -69,9 +79,3 @@ Refinement status: superseded
 ## Codex refinement required
 
 - Closed as superseded/no-op during Telegram backlog cleanup on 2026-05-17.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.md
-- https://t.me/iwann_tai/6
-- 01_sources/raw/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.json

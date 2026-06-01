@@ -3,27 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-19-telegram-photo-auto-assessme
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-19-telegram-photo.md
-  - https://t.me/iwann_tai/19
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-19-telegram-photo.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-19-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-19-telegram-photo/01-photo.jpg
+  - source-e93d7fb7-1b01-4100-a67e-4c6ac6fb0e56
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-19-telegram-photo.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-19-telegram-photo-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.440Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-e93d7fb7-1b01-4100-a67e-4c6ac6fb0e56
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-19-telegram-photo
+# Assessment: source-e93d7fb7-1b01-4100-a67e-4c6ac6fb0e56
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -39,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/iwann_tai/19 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-19-telegram-photo.json` _No text or caption. See Telegram metadata and raw update._
-
-## Link processing
-
-- https://t.me/iwann_tai/19 — ok 200; title: Telegram: Contact @iwann_tai
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- photo — saved: `01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-19-telegram-photo/01-photo.jpg`
 
 ## Signal extraction
 

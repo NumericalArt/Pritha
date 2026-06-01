@@ -58,14 +58,14 @@ tools:
 sources:
   - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
   - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-  - 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=2ZHHzfMSeWc
   - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
   - https://community.obsidian.md/plugins/karpathywiki
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
   - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-  - 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=am_oeAoUhew
   - https://openai.com/index/harness-engineering/
   - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
@@ -76,7 +76,7 @@ sources:
   - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
   - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
   - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=L-HAzfFWSto
   - https://github.com/NousResearch/hermes-agent
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime
@@ -89,17 +89,17 @@ sources:
   - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
   - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
   - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
+  - raw-source-purged
   - https://openai.com/index/work-with-codex-from-anywhere/
   - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
   - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
   - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - raw-source-purged
   - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
   - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
   - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+  - raw-source-purged
   - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
   - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
   - https://www.anthropic.com/engineering/building-effective-agents
@@ -236,14 +236,14 @@ This generated page tracks codex as a tool in the Techscope knowledge base. Use 
 
 - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
 - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-- 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=2ZHHzfMSeWc
 - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 - https://community.obsidian.md/plugins/karpathywiki
 - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
 - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
 - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-- 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=am_oeAoUhew
 - https://openai.com/index/harness-engineering/
 - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
@@ -254,7 +254,7 @@ This generated page tracks codex as a tool in the Techscope knowledge base. Use 
 - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
 - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
 - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-- 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=L-HAzfFWSto
 - https://github.com/NousResearch/hermes-agent
 - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime
@@ -267,17 +267,17 @@ This generated page tracks codex as a tool in the Techscope knowledge base. Use 
 - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
 - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
 - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
+- raw-source-purged
 - https://openai.com/index/work-with-codex-from-anywhere/
 - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
 - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
 - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+- raw-source-purged
 - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
 - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
 - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
 - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-- 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+- raw-source-purged
 - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
 - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
 - https://www.anthropic.com/engineering/building-effective-agents

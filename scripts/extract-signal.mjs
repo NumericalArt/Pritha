@@ -6,6 +6,7 @@ import { parseFrontmatter, unique, yamlList } from "./lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { today } from "./lib/date.mjs";
+import { createAnonymousSourceId, evidenceQualityValue, inferSourceClass, usefulnessValue } from "./lib/privacy.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const SIGNAL_DIR = path.join(ROOT, "01_sources", "signals");
@@ -99,6 +100,7 @@ function splitCandidates(body) {
       .filter(Boolean);
     for (const line of lines) {
       if (line.length < 35) continue;
+      if (/https?:\/\/|01_sources\/raw\/|source_url\s*:|Raw update|Media Transcript|transcript\.(json|txt|md)|\b(user_id|chat_id|file_id|message_id)\s*:/i.test(line)) continue;
       candidates.push({ heading, text: line, preferred });
     }
   }
@@ -143,8 +145,9 @@ function candidateRules(signals) {
 
 function verificationTasks(data, body) {
   const tasks = [];
-  const sources = array(data.sources);
-  if (sources.some((source) => source.startsWith("http"))) tasks.push("Проверить первоисточники и даты публикации внешних ссылок.");
+  if (/https?:\/\//i.test(body) || array(data.sources).some((source) => source.startsWith("http"))) {
+    tasks.push("Проверить первоисточники и даты публикации transiently, не сохраняя incoming provenance в durable memory.");
+  }
   if (/mcp/i.test(body)) tasks.push("Сверить claims с official MCP specification and client docs.");
   if (/openai|codex/i.test(body)) tasks.push("Сверить claims с official OpenAI docs/source materials.");
   if (/security|безопас|oauth|auth|prompt injection/i.test(body)) tasks.push("Проверить security implications отдельно перед стандартом.");
@@ -152,7 +155,8 @@ function verificationTasks(data, body) {
 }
 
 function outputPath(data, title) {
-  const base = `${today()}-${makeSlug(data.id || title, { stripUrls: true, allowCyrillic: true, maxLength: 90, fallback: "artifact" })}-signal`;
+  const anon = data.anonymous_source_id || createAnonymousSourceId("source");
+  const base = `${today()}-${anon.replace(/^source-/, "source-").slice(0, 28)}-signal`;
   return path.join(SIGNAL_DIR, `${base}.md`);
 }
 
@@ -162,7 +166,9 @@ function renderSignal({ data, body, inputRel, title, outPath }) {
   const rules = candidateRules(signals);
   const verifications = verificationTasks(data, body);
   const topics = unique([...array(data.topics), "signal-extraction"]).slice(0, 20);
-  const sourceLinks = unique([inputRel, ...array(data.sources)]);
+  const anonId = data.anonymous_source_id || createAnonymousSourceId("source");
+  const sourceClass = data.source_class || inferSourceClass({ relPath: inputRel, text: body, data });
+  const sourceLinks = unique([anonId]);
   const quality = signals.length >= 8 ? "high" : signals.length >= 4 ? "medium" : "low";
 
   return `---
@@ -175,23 +181,31 @@ topics:${yamlList(topics)}
 tools:${yamlList(tools)}
 sources:${yamlList(sourceLinks)}
 related:
-  sources:
-    - ${inputRel}
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
 generated_from:
-  - ${inputRel}
+  - ${anonId}
 signal_quality: ${quality}
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
+source_class: ${sourceClass}
+processed_at: ${new Date().toISOString()}
+retention_status: source-purged
+usefulness: ${usefulnessValue(quality)}
+evidence_quality: ${evidenceQualityValue(data.evidence_quality || data.evidence || "")}
+anonymous_source_id: ${anonId}
 ---
 
-# Signal: ${title}
+# Signal: ${anonId}
 
 Date: ${today()}
 Status: extracted
 Signal quality: ${quality}
 Extraction mode: heuristic-draft
 Refinement status: needs-codex-refinement
+Source class: ${sourceClass}
+Retention: source-purged
 
 ## Core signal
 
@@ -204,7 +218,7 @@ ${signals.slice(10, 16).length ? signals.slice(10, 16).map((item) => `- ${item}`
 ## Agent design implications
 
 - Проверить, можно ли превратить signal в правила для \`AGENTS.md\`, skills, MCP tools, reviewer agents, evals или workflows.
-- Использовать этот signal как сжатый вход для assessment/review, но возвращаться к sources для финальных решений.
+- Использовать этот signal как сжатый вход для assessment/review; raw/provenance sources are not retained in durable memory.
 
 ## Candidate rules
 
@@ -225,10 +239,6 @@ ${verifications.length ? verifications.map((item) => `- ${item}`).join("\n") : "
 - Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить \`status: refined\`, \`extraction_mode: codex-assisted\`, \`refinement_status: codex-refined\`.
-
-## Source links
-
-${sourceLinks.map((item) => `- ${item}`).join("\n")}
 `;
 }
 
@@ -241,6 +251,7 @@ function main() {
   const inputRel = relPath(fullPath);
   const raw = readFileSync(fullPath, "utf8");
   const { data, body } = parseFrontmatter(raw);
+  data.anonymous_source_id = data.anonymous_source_id || createAnonymousSourceId("source");
   const title = extractTitle(body, data.id || path.basename(inputRel, ".md"));
   mkdirSync(SIGNAL_DIR, { recursive: true });
   const outPath = outputPath(data, title);

@@ -3,48 +3,47 @@ id: 2026-05-15-youtube-conditionals-local-transcription-intake
 type: intake
 status: processed
 created: 2026-05-15
-updated: 2026-05-15
-topics: [youtube, transcription, stt, local-ai, workflow]
-tools: [yt-dlp, imageio-ffmpeg, mlx-whisper, whisper-small]
-source_type: video
-source_url: https://www.youtube.com/watch?v=bT7aKIwiFjE
+updated: 2026-06-01
+topics:
+  - youtube
+  - transcription
+  - stt
+  - local-ai
+  - workflow
+tools:
+  - yt-dlp
+  - imageio-ffmpeg
+  - mlx-whisper
+  - whisper-small
 sources:
-  - https://www.youtube.com/watch?v=bT7aKIwiFjE
+  - source-4eb0246d-5d92-4cfa-a3b7-6567c752fb5c
 related:
-  briefs:
-    - 02_briefs/2026-05-15-youtube-local-transcription-test-brief.md
-  standards:
-    - 04_standards/local-video-to-structured-text.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.414Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-4eb0246d-5d92-4cfa-a3b7-6567c752fb5c
 ---
 
-# Intake: youtube-conditionals-local-transcription
+# Intake: source-4eb0246d-5d92-4cfa-a3b7-6567c752fb5c
 
-Date added: 2026-05-15
-Type: video
-Source: https://www.youtube.com/watch?v=bT7aKIwiFjE
+Date: 2026-05-15
 Status: processed
+Source class: video
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Проверка локального workflow для YouTube-видео без доступных субтитров.
-- Нужно понять, есть ли у агента собственные инструменты для транскрибации.
-- Результат может усилить draft-стандарт `local-video-to-structured-text`.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- Title: `Ты не знаешь CONDITIONALS в Английском | Американец на РУССКОМ объяснил все типы`
-- Channel: `Luke McCarthy English`
-- Duration: `16:00`
-- URL: https://www.youtube.com/watch?v=bT7aKIwiFjE
-
-## Initial questions
-
-- Можно ли достать субтитры напрямую?
-- Можно ли скачать аудио/видео через `yt-dlp`?
-- Можно ли локально распознать русскую речь?
-- Какие инструменты нужны для воспроизводимого workflow?
-
-## Expected output
-
-brief
-
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

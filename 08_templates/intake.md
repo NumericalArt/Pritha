@@ -7,38 +7,35 @@ updated: YYYY-MM-DD
 template_for: intake
 topics: []
 tools: []
-source_type: text | link | video | channel | documentation | idea
-source_url:
-source_published: YYYY-MM-DD | unknown
-source_updated: YYYY-MM-DD | unknown
-source_version: version | release | commit | spec-date | unknown
-retrieved: YYYY-MM-DD
-verified: YYYY-MM-DD | pending
-temporal_status: current | version-bound | stale | unknown
-sources: []
+source_type: text | article | video | audio | image | document | telegram | mixed | unknown
+source_class: text | article | video | audio | image | document | telegram | mixed | unknown
+ingested_at: YYYY-MM-DDTHH:MM:SSZ
+processed_at: YYYY-MM-DDTHH:MM:SSZ | pending
+retention_status: source-purged
+usefulness: low | medium | high
+evidence_quality: low | medium | high | uncertain
+anonymous_source_id: source-uuid
+sources:
+  - source-uuid
 related: {}
 ---
 
 # Intake: short-title
 
 Date added: YYYY-MM-DD
-Type: text | link | video | channel | documentation | idea
-Source:
-Source published:
-Source updated:
-Source version:
-Retrieved:
-Verified:
-Temporal status:
+Type: text | article | video | audio | image | document | telegram | mixed | unknown
+Anonymous source:
+Retention:
 Status: new
 
 ## Why this may matter
 
 -
 
-## Raw material or link
+## Processed status
 
--
+- Raw source content and direct provenance are not retained in tracked memory.
+- Durable memory stores only neutral metadata and processed knowledge.
 
 ## Initial questions
 

@@ -26,7 +26,7 @@ sources:
   - 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
   - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
   - 03_reviews/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-auto-assessment.md
-  - 01_sources/raw/youtube-JOu8v6CBjkE/JOu8v6CBjkE-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=JOu8v6CBjkE
   - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
 related:
@@ -75,7 +75,7 @@ This generated page tracks transcription as a topic in the Techscope knowledge b
 - 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
 - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
 - 03_reviews/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-auto-assessment.md
-- 01_sources/raw/youtube-JOu8v6CBjkE/JOu8v6CBjkE-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=JOu8v6CBjkE
 - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
 

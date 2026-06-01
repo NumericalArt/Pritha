@@ -24,7 +24,7 @@ related:
 
 Превращать автоматический `signal` draft в пригодную для Techscope смысловую выжимку без внешних LLM-сервисов. Содержательная работа выполняется Codex-агентом прямо в текущем Techscope thread.
 
-This workflow is about curating working memory, not about polishing transcripts. Raw transcripts stay in `01_sources/raw/` as evidence. The durable knowledge artifact is the refined `signal` and, when useful, the follow-up `assessment`, `brief`, `review`, `decision` or `standard`.
+This workflow is about curating working memory, not about polishing transcripts. Raw transcripts are transient extraction artifacts and are purged after processed knowledge is created. The durable knowledge artifact is the refined `signal` and, when useful, the follow-up `assessment`, `brief`, `review`, `decision` or `standard`.
 
 ## When to run
 

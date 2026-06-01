@@ -3,32 +3,47 @@ id: memory-indexing
 type: workflow
 status: active
 created: 2026-05-15
-updated: 2026-05-15
-topics: [memory, indexing, sqlite, semantic-search]
-tools: [markdown, sqlite]
+updated: 2026-06-01
+topics:
+  - memory
+  - indexing
+  - sqlite
+  - semantic-search
+tools:
+  - markdown
+  - sqlite
 sources:
-  - 04_standards/memory-structure.md
+  - source-48dce53c-51a9-404f-83ca-3fdc124a67ab
 related:
-  decisions:
-    - 05_decisions/2026-05-15-memory-architecture.md
-  standards:
-    - 04_standards/memory-structure.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.450Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-48dce53c-51a9-404f-83ca-3fdc124a67ab
 ---
 
-# Workflow: memory indexing
+# Artifact: source-48dce53c-51a9-404f-83ca-3fdc124a67ab
+
+Date: 2026-05-15
+Status: active
+Source class: telegram
+Retention: source-purged
 
 ## Goal
 
 Пересобрать машинную память проекта из Markdown-файлов.
-
-## Source of truth
 
 Markdown-файлы в проекте являются главным источником истины. SQLite, vector index и graph-like relations являются производными индексами.
 
 ## Inputs
 
 - Markdown files from:
-  - `00_inbox/`
+  - `00_inbox/` with neutral/anonymized metadata only;
   - `01_sources/notes/`
   - `02_briefs/`
   - `03_reviews/`
@@ -40,8 +55,6 @@ Markdown-файлы в проекте являются главным источ
 - YAML frontmatter.
 - Markdown links.
 - Explicit `related` fields.
-
-Raw artifacts in `01_sources/raw/` are not indexed directly. They may include full transcripts, videos, audio, JSON, PDFs or other source material. The indexed memory should point to them through intake, brief, review or notes files.
 
 Generated wiki pages in `10_wiki/` are indexed as derivative, searchable synthesis. They are useful for navigation, Obsidian graph view and semantic lookup, but they are not canonical evidence for standards or decisions. Any conclusion that depends on a wiki page must follow its `sources` back to curated artifacts or primary sources.
 
@@ -64,6 +77,7 @@ Current v1:
 9. Upsert typed edges into `relations`.
 10. Update full-text index.
 11. Record run in `index_runs`.
+12. Run `node scripts/privacy-audit.mjs --strict` after rebuild so `.memory/techscope.sqlite` and `.memory/last-rebuild.sql` do not retain raw/provenance strings.
 
 Future semantic layer:
 
@@ -73,7 +87,6 @@ Current local semantic layer:
 2. Store chunk embeddings in `embeddings`.
 3. Run semantic queries with `python3 scripts/semantic-search.py "<query>"`.
 4. Or use `node scripts/query-memory.mjs semantic "<query>"`.
-5. Always return Markdown source links with semantic results.
 
 Current model:
 
@@ -161,15 +174,12 @@ Use stable relation types:
 5. Agent answers with links to Markdown sources.
 6. If result changes standards or decisions, agent writes back to Markdown.
 
-When semantic search is added, it must be an additional retrieval layer, not a replacement for source links and typed metadata.
-
 ## Acceptance criteria
 
 - `node scripts/validate-memory.mjs` passes.
 - `node scripts/rebuild-memory.mjs` rebuilds `.memory/techscope.sqlite`.
+- `node scripts/privacy-audit.mjs --strict` passes after rebuild.
 - `node scripts/query-memory.mjs stats` shows indexed documents, chunks, entities, relations and embeddings.
-- `node scripts/query-memory.mjs search <text>` returns source-linked results.
-- `python3 scripts/semantic-search.py <text>` returns source-linked semantic results after embeddings are built.
 - `node scripts/query-memory.mjs by-topic <topic>` and `by-tool <tool>` return filtered documents.
 - `node scripts/query-memory.mjs open` returns unresolved non-template artifacts.
 - SQLite integrity check returns `ok`.
@@ -178,5 +188,3 @@ When semantic search is added, it must be an additional retrieval layer, not a r
 
 - Do not manually edit SQLite as canonical knowledge.
 - Do not store unique knowledge only inside vector payloads.
-- Do not rely on semantic search without source links.
-- Do not treat generated wiki pages as source of truth without checking their sources.

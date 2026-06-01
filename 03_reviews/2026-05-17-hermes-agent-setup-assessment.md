@@ -3,40 +3,71 @@ id: 2026-05-17-hermes-agent-setup-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [hermes-agent, setup, deployment, telegram, gateway, vps, docker, security, agent-operations]
-tools: [Hermes Agent, OpenClaw, Telegram, BotFather, Docker, OpenRouter, Anthropic, OpenAI, Hostinger]
-agent_platforms: [Hermes Agent, OpenClaw, Codex]
-model_context: [OpenRouter, Anthropic, OpenAI, local-models, provider-routing]
-runtime_environment: [vps, docker, terminal, cli, messaging-gateway, telegram, mac-mini]
-config_surfaces: [.env, config.yaml, hermes-setup, hermes-model, hermes-gateway, telegram-bot-token, provider-api-keys, skills]
-portability: adapter-needed
+updated: 2026-06-01
+topics:
+  - hermes-agent
+  - setup
+  - deployment
+  - telegram
+  - gateway
+  - vps
+  - docker
+  - security
+  - agent-operations
+tools:
+  - Hermes Agent
+  - OpenClaw
+  - Telegram
+  - BotFather
+  - Docker
+  - OpenRouter
+  - Anthropic
+  - OpenAI
+  - Hostinger
 sources:
-  - 00_inbox/links/2026-05-17-youtube-hermes-agent-setup-openclaw-killer-intake.md
-  - 01_sources/notes/2026-05-17-hermes-agent-setup-source-note.md
-  - 02_briefs/2026-05-17-hermes-agent-setup-brief.md
-  - 01_sources/raw/youtube-3jNp14bJpgs/3jNp14bJpgs-whisper-small.md
-  - https://hermes-agent.nousresearch.com/docs/getting-started/installation/
-  - https://hermes-agent.nousresearch.com/docs/getting-started/quickstart/
-  - https://hermes-agent.nousresearch.com/docs/user-guide/messaging
-  - https://hermes-agent.nousresearch.com/docs/user-guide/configuration/
-  - https://hermes-agent.nousresearch.com/docs/user-guide/security
-  - https://github.com/NousResearch/hermes-agent/releases/tag/v2026.5.16
+  - source-157f2a9f-2193-4b79-9b30-f6555d646167
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-hermes-agent-setup-openclaw-killer-intake.md
-  briefs:
-    - 02_briefs/2026-05-17-hermes-agent-setup-brief.md
-    - 02_briefs/2026-05-17-hermes-agent-architecture-brief.md
-  reviews:
-    - 03_reviews/2026-05-17-hermes-agent-architecture-assessment.md
-    - 03_reviews/2026-05-17-openclaw-agent-architecture-assessment.md
-  decisions: []
-  standards:
-    - 04_standards/agent-environment-compatibility.md
-    - 04_standards/agent-tool-integration-selection.md
-supersedes: []
-superseded_by: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.442Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-157f2a9f-2193-4b79-9b30-f6555d646167
+recommendation: experiment
+agent_platforms:
+  - Hermes Agent
+  - OpenClaw
+  - Codex
+model_context:
+  - OpenRouter
+  - Anthropic
+  - OpenAI
+  - local-models
+  - provider-routing
+runtime_environment:
+  - vps
+  - docker
+  - terminal
+  - cli
+  - messaging-gateway
+  - telegram
+  - mac-mini
+config_surfaces:
+  - .env
+  - config.yaml
+  - hermes-setup
+  - hermes-model
+  - hermes-gateway
+  - telegram-bot-token
+  - provider-api-keys
+  - skills
+portability: adapter-needed
 freshness_status: changed
 source_published: 2026-04-15
 source_updated: unknown
@@ -45,10 +76,14 @@ retrieved: 2026-05-17
 verified: 2026-05-17
 valid_for: deployment pattern and setup checklist; exact commands require current official docs
 temporal_status: version-bound
-recommendation: experiment
 ---
 
-# Assessment: Hermes Agent setup and Telegram gateway
+# Assessment: source-157f2a9f-2193-4b79-9b30-f6555d646167
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -82,7 +117,6 @@ Should Techscope treat this Hermes setup video as useful knowledge for future au
 - Codex adaptation:
   - Keep Techscope Telegram ingestion separate from Hermes gateway until a controlled experiment proves value.
   - Borrow the setup sequence and safety checklist, not the vendor-specific workflow.
-  - Treat Hermes skills/memory as comparative architecture, not as source of truth for Techscope.
 - Environment-specific caveats:
   - Hostinger one-click install is not a general Hermes standard.
   - Telegram gateway behavior and command approvals are Hermes-specific and must be re-tested in current versions.
@@ -97,9 +131,6 @@ Should Techscope treat this Hermes setup video as useful knowledge for future au
   - `04_standards/agent-environment-compatibility.md`
   - `04_standards/agent-tool-integration-selection.md`
 - Relationship to existing knowledge: refines
-- Source published: 2026-04-15
-- Source updated: unknown
-- Source version: video references Hermes Agent around v0.9.0; checked against Hermes Agent v0.14.0 docs and release observed 2026-05-17
 - Retrieved: 2026-05-17
 - Verified: 2026-05-17
 - Valid for: deployment pattern and setup checklist; exact commands require current official docs

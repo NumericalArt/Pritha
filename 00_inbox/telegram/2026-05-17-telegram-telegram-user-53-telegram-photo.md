@@ -3,57 +3,41 @@ id: 2026-05-17-telegram-telegram-user-53-telegram-photo
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/oestick/504
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/oestick/504
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 53
-  forwarded_from: AI и грабли #504
+  - source-92a0f135-d0cb-4512-bd55-c41ade0e6b0a
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.421Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-92a0f135-d0cb-4512-bd55-c41ade0e6b0a
 ---
 
-# Intake: 2026-05-17-telegram-telegram-user-53-telegram-photo
+# Intake: source-92a0f135-d0cb-4512-bd55-c41ade0e6b0a
 
-Date added: 2026-05-17
-Type: telegram
-Source: https://t.me/oestick/504
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 53
-- Forwarded from: AI и грабли #504
-- Date: 2026-05-17T16:50:20.000Z
-- Media: photo: AgACAgIAAxkBAAM1agnxzMIDpd1udkIIOMHJP77UwhgAAsETaxstlTBIeNOSI_RzYesBAAMCAAN5AAM7BA
-
-## Raw material or link
-
-- https://t.me/oestick/504
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.json`
-
-## Message text
-
-_No text or caption. See Telegram metadata and raw update._
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

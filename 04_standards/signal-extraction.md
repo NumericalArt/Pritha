@@ -31,7 +31,7 @@ Last reviewed: 2026-05-16
 
 Автоматический extractor создает только `heuristic-draft`. Для материалов, которые могут повлиять на программирование, LLM agents, coding agents, agent harnesses, standards or decisions, обязательный следующий шаг - Codex-assisted refinement прямо в Techscope thread, без внешних LLM-сервисов.
 
-Codex-assisted refinement нужен не для хранения "хорошего транскрипта". Транскрипт является raw evidence. Цель refinement - не допустить, чтобы ASR-шум, timestamp-фрагменты, source metadata или слабая эвристика попали в рабочую память как curated knowledge.
+Codex-assisted refinement нужен не для хранения "хорошего транскрипта". Транскрипт является transient extraction artifact and must be purged after processed knowledge is created. Цель refinement - не допустить, чтобы ASR-шум, timestamp-фрагменты, source metadata или слабая эвристика попали в рабочую память как curated knowledge.
 
 ## Purpose
 
@@ -47,7 +47,7 @@ Signal artifact нужен не как красивое summary, а как ра�
 - security/DX risks;
 - eval ideas;
 - candidate rules for agents;
-- primary-source links and verification tasks.
+- official primary-source links and verification tasks when they are stable reference material, not incoming-material provenance.
 
 ## Remove
 
@@ -62,12 +62,12 @@ Signal artifact нужен не как красивое summary, а как ра�
 ## Pipeline position
 
 ```text
-raw media -> intake -> source note/transcript -> signal -> assessment -> brief/review/standard
+incoming material -> transient processing -> neutral intake -> signal -> assessment -> brief/review/standard
 ```
 
-Assessment should use signal notes as compressed input while keeping links to raw/source artifacts for verification.
+Assessment should use signal notes as compressed input while keeping only anonymous source ids and neutral metadata for incoming materials.
 
-Raw transcripts and raw media are evidence trail, not authored working memory. Searchable working memory should rely on curated Markdown artifacts: `signal`, `assessment`, `brief`, `review`, `decision` and `standard`.
+Raw transcripts, raw media and direct incoming provenance are not authored working memory and are not retained in tracked memory. Searchable working memory should rely on curated Markdown artifacts: `signal`, `assessment`, `brief`, `review`, `decision` and `standard`.
 
 ## Signal lifecycle
 
@@ -86,7 +86,7 @@ Raw transcripts and raw media are evidence trail, not authored working memory. S
 
 Codex refinement должен:
 
-- сравнить signal draft с source artifact;
+- compare the signal draft with transient/approved source material when available, without retaining raw/provenance breadcrumbs;
 - оставить только переносимые technical claims, practices, risks and agent-design implications;
 - добавить verification tasks and primary-source needs;
 - сопоставить материал с существующими Techscope standards/decisions/reviews;
@@ -106,12 +106,12 @@ For low-impact material with a clean heuristic signal, a spot check is acceptabl
 
 ## Telegram media
 
-Все входящие из Telegram проходят тот же pipeline. Telegram bot может создать только intake, link processing, media download, heuristic signal and assessment.
+Все входящие из Telegram проходят тот же pipeline. Telegram bot может создать только neutral intake, transient link/media processing, heuristic signal and assessment.
 
 Если Telegram media содержит фото, скриншот, UI, диаграмму, видео, аудио, документ или другой материал с потенциальной пользой, это штатный случай для Codex-assisted media review:
 
-- media file хранится в `01_sources/raw/telegram-media/`;
-- задание создается в `.queue/codex-media-review/pending/`;
+- media file is held only in untracked temp/quarantine storage while it is needed;
+- задание создается в `.queue/codex-media-review/pending/` without tracked raw paths;
 - Telegram intake переводится в `awaiting_codex` and не считается завершенным;
 - Codex в текущем Techscope thread открывает media, извлекает technical signal, проверяет контекст and updates artifacts;
 - результат фиксируется как refined signal, source note, brief or assessment.

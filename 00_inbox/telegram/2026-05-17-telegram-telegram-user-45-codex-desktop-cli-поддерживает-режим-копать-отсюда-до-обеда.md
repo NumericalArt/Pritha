@@ -3,72 +3,41 @@ id: 2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддержива�
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/llm_under_hood/838
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/llm_under_hood/838
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 45
-  forwarded_from: LLM под капотом #838
+  - source-fb1c07b0-3d82-4673-a121-1ac924acb60e
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.421Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-fb1c07b0-3d82-4673-a121-1ac924acb60e
 ---
 
-# Intake: 2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда
+# Intake: source-fb1c07b0-3d82-4673-a121-1ac924acb60e
 
-Date added: 2026-05-17
-Type: telegram
-Source: https://t.me/llm_under_hood/838
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 45
-- Forwarded from: LLM под капотом #838
-- Date: 2026-05-17T12:52:04.000Z
-- Media: none
-
-## Raw material or link
-
-- https://t.me/llm_under_hood/838
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.json`
-
-## Message text
-
-Codex Desktop / CLI поддерживает режим "копать отсюда до обеда"
-
-Для этого нужно в ~/.codex/config.toml включить такой флаг:
-
-
-[features]
-goals = true
-
-
-и потом можно запускать задачу с режимом /goal и уходить заниматься своими делами. Например:
-
-/goal А предложи-ка мне простые способы изменить задачи t01-t20 в ECOM1 так, чтобы задача оставалась честной, но агенты на базе Codex CLI спотыкались, уходили в штопор и просто путались. Можешь изменять код задачи и запускать локального codex агента столько, сколько понадобится. Как сделаешь - напиши мне краткую сводку, посмотрим, что из этого можно добавить в реальные задачи.
-
-Спасибо за подсказку @AigizK!
-
-Ваш, @llm_under_hood 🤗
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

@@ -3,27 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-к
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
-  - https://t.me/oestick/503
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+  - source-04059a1f-65af-4825-bb87-57f374b4e900
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.441Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-04059a1f-65af-4825-bb87-57f374b4e900
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-
+# Assessment: source-04059a1f-65af-4825-bb87-57f374b4e900
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -39,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/oestick/503 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.json` Все новостные каналы пишут про нативный диспатчер от openai, но никто не пишет про другую фичу – теперь можно подключаться не только к десктопу, но и к VPS Codex теперь полностью впитал в себя все функции OpenClaw. Ожидаемо. P.s. В идеале, осталось дождаться, когда в мобилку завезут password-less подключение – на десктопе уже есть UPD: завезли, нужно просто на десктопе включить синхронизацию всех удаленных подключений – они автоматически появятся на мобилке
-
-## Link processing
-
-- https://t.me/oestick/503 — ok 200; title: Telegram: View @oestick
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- photo — saved: `01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg`
 
 ## Signal extraction
 
@@ -68,7 +68,6 @@ For Telegram and other forwarded media this step is especially important: forwar
 ## Related Techscope memory
 
 ```text
-type status path heading snippet ---------- ---------- ------------------------------------------------------------------------------------------------------------ ----------------------------------- -------------------------------------------------------------------------------------------------------- signal refined 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2-signal.md Verification required ... official [OpenAI] docs/source materials. - Find primary sources for named [tools] before ... signal superseded 01_sources/signals/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-signal.md Core signal ## Core signal - This should be checked against the official [OpenAI] source before ... brief draft 02_briefs/2026-05-15-mcp-server-pitfalls-brief.md Relationship to harness engineering ## Relationship to harness engineering This article complements [OpenAI] harness engineering: - Harness engineering ... wiki-page generated 10_wiki/pages/concept-realtime.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/tool-agents-sdk.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/tool-gpt-realtime-2.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/tool-gpt-realtime-translate.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/tool-gpt-realtime-whisper.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/tool-realtime-api.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/topic-agent-ux.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/topic-audio-models.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models ... wiki-page generated 10_wiki/pages/topic-openai.md Current synthesis ## Current synthesis - From `02_briefs/2026-05-16-[openai]-realtime-audio-models...
 ```
 
 ## Technical claims

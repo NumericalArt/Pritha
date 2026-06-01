@@ -3,33 +3,50 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умее�
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex, xcode, ios-simulator, screenshots, ui-debugging, mobile-app-development, coding-agents, dx]
-tools: [telegram-bot, codex, xcode, ios-simulator, iphone, macos]
+updated: 2026-06-01
+topics:
+  - codex
+  - xcode
+  - ios-simulator
+  - screenshots
+  - ui-debugging
+  - mobile-app-development
+  - coding-agents
+  - dx
+tools:
+  - telegram-bot
+  - codex
+  - xcode
+  - ios-simulator
+  - iphone
+  - macos
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
-  - https://t.me/airanez/217
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.json
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
-  - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
+  - source-f6f4ae38-ccc1-4c0e-b595-bd2141b23acd
 related:
-  notes:
-    - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
-  briefs:
-    - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
-  assessments:
-    - 03_reviews/2026-05-17-codex-xcode-simulator-screenshot-debugging-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.430Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-f6f4ae38-ccc1-4c0e-b595-bd2141b23acd
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - source-f6f4ae38-ccc1-4c0e-b595-bd2141b23acd
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: Codex-assisted iOS Simulator screenshot debugging
+# Signal: source-f6f4ae38-ccc1-4c0e-b595-bd2141b23acd
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -90,10 +107,3 @@ Refinement status: codex-refined
 
 - Codex media review completed in Techscope thread on 2026-05-17.
 - Useful for future `ios-agent-ui-debugging` workflow.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
-- https://openai.com/index/work-with-codex-from-anywhere/
-- https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac

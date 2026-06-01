@@ -3,26 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-45-codex-desktop-cli-подде
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.md
-  - https://t.me/llm_under_hood/838
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-об-signal.md
+  - source-8f84c8e5-5972-413c-acc8-f915ede4080c
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-об-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.440Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-8f84c8e5-5972-413c-acc8-f915ede4080c
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда
+# Assessment: source-8f84c8e5-5972-413c-acc8-f915ede4080c
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -38,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/llm_under_hood/838 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.json` Codex Desktop / CLI поддерживает режим "копать отсюда до обеда" Для этого нужно в ~/.codex/config.toml включить такой флаг: [features] goals = true и потом можно запускать задачу с режимом /goal и уходить заниматься своими делами. Например: /goal А предложи-ка мне простые способы изменить задачи t01-t20 в ECOM1 так, чтобы задача оставалась честной, но агенты на базе Codex CLI спотыкались, уходили в штопор и просто путались. Можешь изменять код задачи и запускать локального codex агента столько, сколько понадобится. Как сделаешь - напиши мне краткую сводку, посмотрим, что из этого можно добавить в реальные задачи. Спасибо за подсказку @AigizK! Ваш, @llm_under_hood 🤗
-
-## Link processing
-
-- https://t.me/llm_under_hood/838 — ok 200; title: Telegram: View @llm_under_hood
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- No Telegram media attachments found.
 
 ## Signal extraction
 

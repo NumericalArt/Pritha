@@ -25,7 +25,7 @@ tools:
 sources:
   - 02_briefs/2026-05-26-openclaw-expensive-local-ai-brief.md
   - 03_reviews/2026-05-26-openclaw-local-inference-cost-assessment.md
-  - https://www.youtube.com/watch?v=nt7dWOEFUB4
+  - anonymous incoming video source (purged)
   - https://www.nvidia.com/en-us/products/workstations/dgx-spark../
   - https://docs.nvidia.com/openshell/latest/tutorials/local-inference-lmstudio
   - https://lmstudio.ai/docs/api

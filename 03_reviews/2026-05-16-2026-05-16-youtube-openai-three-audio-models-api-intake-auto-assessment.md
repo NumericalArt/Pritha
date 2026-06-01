@@ -3,29 +3,39 @@ id: 2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-auto-asse
 type: assessment
 status: draft
 created: 2026-05-16
-updated: 2026-05-16
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
-  - https://www.youtube.com/watch?v=JOu8v6CBjkE
-  - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
-  - 01_sources/signals/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-signal.md
-  - 01_sources/signals/2026-05-16-youtube-transcript-we-re-introducing-three-audio-models-in-the-api-signal.md
-  - 01_sources/raw/youtube-JOu8v6CBjkE/JOu8v6CBjkE-whisper-small.md
+  - source-d300bfc2-6e03-4da6-a97a-17d2614e88da
 related:
-  intakes:
-    - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
-  signals:
-    - 01_sources/signals/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-signal.md
-    - 01_sources/signals/2026-05-16-youtube-transcript-we-re-introducing-three-audio-models-in-the-api-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-16
+processed_at: 2026-06-01T21:03:38.438Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-d300bfc2-6e03-4da6-a97a-17d2614e88da
 recommendation: brief
 ---
 
-# Assessment: Intake: youtube-openai-three-audio-models-api
+# Assessment: source-d300bfc2-6e03-4da6-a97a-17d2614e88da
+
+Date: 2026-05-16
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-16
 Status: draft
@@ -41,18 +51,7 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- YouTube: https://www.youtube.com/watch?v=JOu8v6CBjkE - Title: We’re introducing three audio models in the API - Channel: OpenAI - Published: 2026-05-07 - Duration: 4:04 - Official source: https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
-
-## Link processing
-
-- https://www.youtube.com/watch?v=JOu8v6CBjkE — ok 200; title: We’re introducing three audio models in the API - YouTube
-- https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/ — failed
-
 ## YouTube processing
-
-- https://www.youtube.com/watch?v=JOu8v6CBjkE — transcribed (en): `01_sources/raw/youtube-JOu8v6CBjkE/JOu8v6CBjkE-whisper-small.md`
 
 ## Signal extraction
 

@@ -3,26 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-15-это-пример-орга
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.md
-  - https://t.me/iwann_tai/15
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-signal.md
+  - source-afee37d5-b814-49c3-b494-94cc1af71cc9
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.439Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-afee37d5-b814-49c3-b494-94cc1af71cc9
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-
+# Assessment: source-afee37d5-b814-49c3-b494-94cc1af71cc9
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -38,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/iwann_tai/15 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.json` Это пример организации работы с агентами. Важно разобрать по частям и пунктам и понять архитектуру. Но!! нужно учесть, что это немного устаревший и олд фэшн подход, много детерминированности в выборах и установках, в конце концов агент почти всё должен делать сам, может только задать несколько наводящих вопросов.. и да диплой этих агннтов у него это тоже только пример
-
-## Link processing
-
-- https://t.me/iwann_tai/15 — ok 200; title: Telegram: Contact @iwann_tai
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- No Telegram media attachments found.
 
 ## Signal extraction
 

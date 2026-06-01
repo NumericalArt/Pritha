@@ -3,30 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuev
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.md
-  - https://t.me/iwann_tai/39
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh-signal.md
-  - 01_sources/signals/2026-05-17-youtube-transcript-rethinking-ai-agents-the-rise-of-harness-engineering-signal.md
-  - https://youtu.be/Xxuxg8PcBvc?is=YuEVWP-nMweHGegh
-  - 01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md
+  - source-48c12552-cc73-4487-b3f0-2e672b9fafe0
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh-signal.md
-    - 01_sources/signals/2026-05-17-youtube-transcript-rethinking-ai-agents-the-rise-of-harness-engineering-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.440Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-48c12552-cc73-4487-b3f0-2e672b9fafe0
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh
+# Assessment: source-48c12552-cc73-4487-b3f0-2e672b9fafe0
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -42,22 +51,7 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/iwann_tai/39 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.json` https://youtu.be/Xxuxg8PcBvc?is=YuEVWP-nMweHGegh
-
-## Link processing
-
-- https://t.me/iwann_tai/39 — ok 200; title: Telegram: Contact @iwann_tai
-- https://youtu.be/Xxuxg8PcBvc?is=YuEVWP-nMweHGegh — ok 200; title: Rethinking AI Agents: The Rise of Harness Engineering - YouTube
-
 ## YouTube processing
-
-- https://youtu.be/Xxuxg8PcBvc?is=YuEVWP-nMweHGegh — transcribed (en): `01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md`
-
-## Telegram media
-
-- No Telegram media attachments found.
 
 ## Signal extraction
 

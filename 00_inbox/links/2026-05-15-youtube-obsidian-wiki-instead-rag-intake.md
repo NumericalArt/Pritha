@@ -3,52 +3,51 @@ id: 2026-05-15-youtube-obsidian-wiki-instead-rag-intake
 type: intake
 status: processed
 created: 2026-05-15
-updated: 2026-05-15
-topics: [youtube, obsidian, llm-wiki, rag, knowledge-base, agent-memory]
-tools: [youtube, yt-dlp, mlx-whisper, obsidian, markdown, codex, claude-code]
-source_type: video
-source_url: https://www.youtube.com/watch?v=2ZHHzfMSeWc
+updated: 2026-06-01
+topics:
+  - youtube
+  - obsidian
+  - llm-wiki
+  - rag
+  - knowledge-base
+  - agent-memory
+tools:
+  - youtube
+  - yt-dlp
+  - mlx-whisper
+  - obsidian
+  - markdown
+  - codex
+  - claude-code
 sources:
-  - https://www.youtube.com/watch?v=2ZHHzfMSeWc
-  - 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
-  - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
+  - source-7cc7ea86-7b99-4afb-b7c4-b6d74d1cbc50
 related:
-  briefs:
-    - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
-  reviews:
-    - 03_reviews/2026-05-15-youtube-obsidian-wiki-instead-rag-assessment.md
-  standards:
-    - 04_standards/memory-structure.md
-  decisions:
-    - 05_decisions/2026-05-15-memory-architecture.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.415Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-7cc7ea86-7b99-4afb-b7c4-b6d74d1cbc50
 ---
 
-# Intake: youtube-obsidian-wiki-instead-rag
+# Intake: source-7cc7ea86-7b99-4afb-b7c4-b6d74d1cbc50
 
-Date added: 2026-05-15
-Type: video
-Source: https://www.youtube.com/watch?v=2ZHHzfMSeWc
+Date: 2026-05-15
 Status: processed
+Source class: video
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Видео разбирает LLM Wiki / Karpathy knowledge base pattern: raw sources, generated wiki, schema rules, ingest/query/lint.
-- Тема напрямую совпадает с направлением Techscope: долговременная память для агента, Markdown как source of truth, Obsidian UI и индексы поверх файлов.
-- Может подсказать следующий эксперимент: добавить слой agent-maintained wiki pages поверх наших intake/brief/review/decision/standard.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- YouTube: https://www.youtube.com/watch?v=2ZHHzfMSeWc
-- Local raw transcript: `01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md`
-- Local ASR output directory: `01_sources/raw/youtube-2ZHHzfMSeWc/`
-
-## Initial questions
-
-- Должны ли мы оставить текущую архитектуру Markdown + SQLite embeddings или добавить отдельный `wiki/` слой, который агент будет компилировать из source artifacts?
-- Где граница между human-authored artifacts и agent-maintained wiki pages?
-- Нужно ли вводить команды `ingest`, `query`, `lint` как формальный Techscope workflow?
-- Как не размножить галлюцинации, если LLM будет переписывать производные wiki-страницы?
-
-## Expected output
-
-brief | review | experiment
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

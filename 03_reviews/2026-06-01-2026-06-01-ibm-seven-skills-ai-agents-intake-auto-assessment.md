@@ -4,27 +4,38 @@ type: assessment
 status: draft
 created: 2026-06-01
 updated: 2026-06-01
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
-  - https://www.youtube.com/watch?v=mtiOK2QG9Q0
-  - 01_sources/signals/2026-06-01-2026-06-01-ibm-seven-skills-ai-agents-intake-signal.md
-  - 01_sources/signals/2026-06-01-media-transcript-the-7-skills-you-need-to-build-ai-agents-signal.md
-  - 01_sources/raw/media/2026-06-01-media-the-7-skills-you-need-to-build-ai-agents-5c70407aa9f9/transcript.md
+  - source-2ac6afff-e9c3-42cf-a469-06f75a4a60de
 related:
-  intakes:
-    - 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
-  signals:
-    - 01_sources/signals/2026-06-01-2026-06-01-ibm-seven-skills-ai-agents-intake-signal.md
-    - 01_sources/signals/2026-06-01-media-transcript-the-7-skills-you-need-to-build-ai-agents-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.446Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-2ac6afff-e9c3-42cf-a469-06f75a4a60de
 recommendation: brief
 ---
 
-# Assessment: Intake: IBM seven skills for AI agents
+# Assessment: source-2ac6afff-e9c3-42cf-a469-06f75a4a60de
+
+Date: 2026-06-01
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-06-01
 Status: draft
@@ -39,22 +50,6 @@ Recommendation: brief
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит media sources или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-- Title: The 7 Skills You Need to Build AI Agents - Channel: IBM Technology - Published: 2026-04-14 - Duration: 14:36 - URL: https://www.youtube.com/watch?v=mtiOK2QG9Q0 - Description excerpt from metadata: skills needed for AI jobs are shifting from prompt engineering to full agent engineering, including system design, retrieval, reliability and security.
-
-## Link processing
-
-- https://www.youtube.com/watch?v=mtiOK2QG9Q0 — ok 200; title: The 7 Skills You Need to Build AI Agents - YouTube
-
-## Media transcription
-
-- https://www.youtube.com/watch?v=mtiOK2QG9Q0 — transcribed (en): `01_sources/raw/media/2026-06-01-media-the-7-skills-you-need-to-build-ai-agents-5c70407aa9f9/transcript.md`
-
-## Telegram media
-
-- No raw Telegram update linked.
 
 ## Signal extraction
 
@@ -78,7 +73,6 @@ type status path heading snippet --------- --------- ---------------------------
 
 - Требует ручного или агентного извлечения claims из исходного материала.
 - Если ссылки доступны, первоисточники должны быть проверены перед рекомендацией `decision` или `standard`.
-- Если media transcript создан, анализировать нужно derived brief/assessment, а не вставлять полный transcript в индексируемую память.
 
 ## Programming relevance
 

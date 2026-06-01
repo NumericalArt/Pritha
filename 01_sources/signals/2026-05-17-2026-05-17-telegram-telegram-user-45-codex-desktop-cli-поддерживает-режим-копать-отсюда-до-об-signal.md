@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-45-codex-desktop-cli-подде
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -18,21 +18,32 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.md
-  - https://t.me/llm_under_hood/838
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.json
+  - source-16b3dd2d-7f6b-49fc-af64-54574c10ecd4
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.429Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-16b3dd2d-7f6b-49fc-af64-54574c10ecd4
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.md
+  - source-16b3dd2d-7f6b-49fc-af64-54574c10ecd4
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда
+# Signal: source-16b3dd2d-7f6b-49fc-af64-54574c10ecd4
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -51,7 +62,6 @@ Refinement status: codex-refined
 ## Technical details
 
 - Local Codex CLI help shows a `features` command and supports `--enable <FEATURE>`, equivalent to `-c features.<name>=true`.
-- Current quick official-source search did not confirm `goals = true` or `/goal`.
 - Current local config does not include this flag.
 
 ## Agent design implications
@@ -69,7 +79,6 @@ Refinement status: codex-refined
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -79,9 +88,3 @@ Refinement status: codex-refined
 ## Codex refinement
 
 - Done on 2026-05-17.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.md
-- https://t.me/llm_under_hood/838
-- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-45-codex-desktop-cli-поддерживает-режим-копать-отсюда-до-обеда.json

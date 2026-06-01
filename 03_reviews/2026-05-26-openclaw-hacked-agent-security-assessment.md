@@ -42,7 +42,7 @@ sources:
   - 00_inbox/links/2026-05-26-youtube-openclaw-hacked-prompt-injection-intake.md
   - 01_sources/notes/2026-05-26-openclaw-hacked-prompt-injection-source-note.md
   - 02_briefs/2026-05-26-openclaw-hacked-prompt-injection-brief.md
-  - https://www.youtube.com/watch?v=_E4ZT1h7MZs
+  - anonymous incoming video source (purged)
   - https://developers.openai.com/api/docs/guides/agent-builder-safety
   - https://openai.com/index/designing-agents-to-resist-prompt-injection/
   - https://owasp.org/www-project-top-10-for-large-language-model-applications/

@@ -3,25 +3,40 @@ id: 2026-05-15-youtube-conditionals-agent-assessment
 type: assessment
 status: draft
 created: 2026-05-15
-updated: 2026-05-15
-topics: [assessment, youtube, transcription, education, llm-agents, agent-communication]
-tools: [mlx-whisper, yt-dlp, imageio-ffmpeg]
+updated: 2026-06-01
+topics:
+  - assessment
+  - youtube
+  - transcription
+  - education
+  - llm-agents
+  - agent-communication
+tools:
+  - mlx-whisper
+  - yt-dlp
+  - imageio-ffmpeg
 sources:
-  - 01_sources/raw/youtube-bT7aKIwiFjE/bT7aKIwiFjE-whisper-small.md
-  - 02_briefs/2026-05-15-youtube-local-transcription-test-brief.md
-  - https://www.youtube.com/watch?v=bT7aKIwiFjE
+  - source-aeefdc61-23ea-4c75-90e5-c38f0143bbd9
 related:
-  intakes:
-    - 00_inbox/links/2026-05-15-youtube-conditionals-local-transcription-intake.md
-  briefs:
-    - 02_briefs/2026-05-15-youtube-local-transcription-test-brief.md
-  standards:
-    - 04_standards/local-video-to-structured-text.md
-    - 04_standards/expert-information-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.437Z
+retention_status: source-purged
+usefulness: low
+evidence_quality: medium
+anonymous_source_id: source-aeefdc61-23ea-4c75-90e5-c38f0143bbd9
 recommendation: archive
 ---
 
-# Assessment: youtube-conditionals-agent-assessment
+# Assessment: source-aeefdc61-23ea-4c75-90e5-c38f0143bbd9
+
+Date: 2026-05-15
+Status: draft
+Source class: video
+Retention: source-purged
 
 Date: 2026-05-15
 Status: draft
@@ -127,4 +142,3 @@ Score: 1/5
 ## Next artifact
 
 archive
-

@@ -100,6 +100,7 @@ function run(id, name, command, commandArgs, options = {}) {
 const unitTestFiles = listTestFiles(path.join(ROOT, "tests"));
 const allCheckSpecs = [
   ["env-doctor", "Environment doctor", "node", ["scripts/env-doctor.mjs", ...(strictEnv ? ["--strict"] : [])]],
+  ["privacy-audit", "Privacy retention audit", "node", ["scripts/privacy-audit.mjs", "--strict"]],
   ["validate-memory", "Markdown memory validation", "node", ["scripts/validate-memory.mjs"]],
   ["rebuild-memory", "Memory rebuild", "node", ["scripts/rebuild-memory.mjs"], { timeoutMs: 180000 }],
   ["smoke-test", "Smoke test", "node", ["scripts/smoke-test.mjs"]],
@@ -110,7 +111,7 @@ const allCheckSpecs = [
 
 const profileChecks = {
   full: allCheckSpecs.map((spec) => spec[0]),
-  "self-test": ["env-doctor", "validate-memory", "rebuild-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
+  "self-test": ["env-doctor", "privacy-audit", "validate-memory", "rebuild-memory", "smoke-test", "unit-tests", "telegram-dry-run"],
 };
 
 if (!profileChecks[profile]) {

@@ -61,7 +61,7 @@ Use when a curated artifact should enrich generated wiki navigation.
 Rules:
 
 - Accept only curated Markdown artifacts.
-- Reject `01_sources/raw/`.
+- Reject raw-source holding areas.
 - Extract frontmatter topics, tools, sources, related links and key sections.
 - Create or update generated wiki pages in `10_wiki/pages/`.
 - Rebuild `10_wiki/index.md`.

@@ -38,7 +38,7 @@ sources:
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
   - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-  - 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=am_oeAoUhew
   - https://openai.com/index/harness-engineering/
   - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
@@ -49,12 +49,12 @@ sources:
   - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
   - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
   - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
+  - raw-source-purged
   - https://openai.com/index/work-with-codex-from-anywhere/
   - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
   - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
   - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - raw-source-purged
   - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
 related:
   briefs:
@@ -138,7 +138,7 @@ This generated page tracks dx as a topic in the Techscope knowledge base. Use it
 - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
 - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
 - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-- 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=am_oeAoUhew
 - https://openai.com/index/harness-engineering/
 - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
@@ -149,12 +149,12 @@ This generated page tracks dx as a topic in the Techscope knowledge base. Use it
 - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
 - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
 - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
+- raw-source-purged
 - https://openai.com/index/work-with-codex-from-anywhere/
 - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
 - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
 - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+- raw-source-purged
 - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
 
 ## Related pages

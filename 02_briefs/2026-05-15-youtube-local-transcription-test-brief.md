@@ -3,23 +3,41 @@ id: 2026-05-15-youtube-local-transcription-test-brief
 type: brief
 status: draft
 created: 2026-05-15
-updated: 2026-05-15
-topics: [youtube, transcription, stt, local-ai, workflow]
-tools: [yt-dlp, imageio-ffmpeg, mlx-whisper, whisper-small]
+updated: 2026-06-01
+topics:
+  - youtube
+  - transcription
+  - stt
+  - local-ai
+  - workflow
+tools:
+  - yt-dlp
+  - imageio-ffmpeg
+  - mlx-whisper
+  - whisper-small
 sources:
-  - 00_inbox/links/2026-05-15-youtube-conditionals-local-transcription-intake.md
-  - https://www.youtube.com/watch?v=bT7aKIwiFjE
+  - source-ec060b22-5b16-4caa-aab1-a6ab69a2e617
 related:
-  intakes:
-    - 00_inbox/links/2026-05-15-youtube-conditionals-local-transcription-intake.md
-  standards:
-    - 04_standards/local-video-to-structured-text.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.433Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-ec060b22-5b16-4caa-aab1-a6ab69a2e617
 ---
 
-# Brief: youtube-local-transcription-test
+# Artifact: source-ec060b22-5b16-4caa-aab1-a6ab69a2e617
 
 Date: 2026-05-15
-Source: `https://www.youtube.com/watch?v=bT7aKIwiFjE`
+Status: draft
+Source class: video
+Retention: source-purged
+
+Date: 2026-05-15
 Status: draft
 
 ## Summary
@@ -32,12 +50,9 @@ YouTube URL -> yt-dlp mp4 download -> ffmpeg audio extraction -> mlx-whisper ASR
 
 Результат пригоден как подтверждение, что на Mac можно собрать рабочий локальный pipeline без AI Studio и без ручной загрузки аудио в веб-интерфейс.
 
-## Source metadata
-
 - Title: `Ты не знаешь CONDITIONALS в Английском | Американец на РУССКОМ объяснил все типы`
 - Channel: `Luke McCarthy English`
 - Duration: `16:00`
-- URL: https://www.youtube.com/watch?v=bT7aKIwiFjE
 
 ## Tooling used
 
@@ -48,12 +63,6 @@ YouTube URL -> yt-dlp mp4 download -> ffmpeg audio extraction -> mlx-whisper ASR
 - Language hint: `ru`.
 
 ## Raw artifacts
-
-- Downloaded video: `01_sources/raw/youtube-bT7aKIwiFjE/bT7aKIwiFjE.mp4`
-- Extracted audio: `01_sources/raw/youtube-bT7aKIwiFjE/bT7aKIwiFjE.wav`
-- Transcript JSON: `01_sources/raw/youtube-bT7aKIwiFjE/bT7aKIwiFjE-whisper-small.json`
-- Transcript TXT: `01_sources/raw/youtube-bT7aKIwiFjE/bT7aKIwiFjE-whisper-small.txt`
-- Transcript MD: `01_sources/raw/youtube-bT7aKIwiFjE/bT7aKIwiFjE-whisper-small.md`
 
 ## Result
 

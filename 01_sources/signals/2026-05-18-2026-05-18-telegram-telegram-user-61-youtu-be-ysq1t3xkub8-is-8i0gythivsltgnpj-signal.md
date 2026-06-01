@@ -3,7 +3,7 @@ id: 2026-05-18-2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0g
 type: signal
 status: extracted
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -17,21 +17,32 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
-  - https://t.me/iwann_tai/61
-  - 01_sources/raw/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.json
+  - source-9e062471-21cf-4b1c-bfeb-9727eb056452
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-18
+processed_at: 2026-06-01T21:03:38.431Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-9e062471-21cf-4b1c-bfeb-9727eb056452
 generated_from:
-  - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
+  - source-9e062471-21cf-4b1c-bfeb-9727eb056452
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj
+# Signal: source-9e062471-21cf-4b1c-bfeb-9727eb056452
+
+Date: 2026-05-18
+Status: extracted
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-18
 Status: extracted
@@ -42,11 +53,8 @@ Refinement status: needs-codex-refinement
 ## Core signal
 
 - Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- https://youtu.be/ysQ1T3Xkub8?is=8I0GythivSLTgnPj
-- Raw update: `01_sources/raw/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.json`
 - # Intake: 2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj
 - Forwarded to Techscope for later expert assessment.
-- Forwarded from: not forwarded or hidden
 - Стоит ли превратить это в brief, review, experiment или archive?
 - brief | review | experiment | archive
 
@@ -66,7 +74,6 @@ Refinement status: needs-codex-refinement
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -75,12 +82,5 @@ Refinement status: needs-codex-refinement
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
-- https://t.me/iwann_tai/61
-- 01_sources/raw/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.json

@@ -3,34 +3,51 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-к
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex-remote-access, codex-desktop, remote-connections, ssh, vps, mobile-agent-control, coding-agents, security]
-tools: [telegram-bot, codex, codex-desktop, chatgpt-mobile, ssh, vps, macos]
+updated: 2026-06-01
+topics:
+  - codex-remote-access
+  - codex-desktop
+  - remote-connections
+  - ssh
+  - vps
+  - mobile-agent-control
+  - coding-agents
+  - security
+tools:
+  - telegram-bot
+  - codex
+  - codex-desktop
+  - chatgpt-mobile
+  - ssh
+  - vps
+  - macos
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
-  - https://t.me/oestick/503
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.json
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
-  - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
-  - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
+  - source-002f95fa-363f-4141-8469-6cc8ad0bcadf
 related:
-  notes:
-    - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-  briefs:
-    - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
-  assessments:
-    - 03_reviews/2026-05-17-codex-remote-vps-connections-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.430Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-002f95fa-363f-4141-8469-6cc8ad0bcadf
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+  - source-002f95fa-363f-4141-8469-6cc8ad0bcadf
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: Codex remote access, VPS and synchronized connections
+# Signal: source-002f95fa-363f-4141-8469-6cc8ad0bcadf
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -41,7 +58,6 @@ Refinement status: codex-refined
 ## Core signal
 
 - Telegram post claims Codex remote access now goes beyond desktop connection and can connect to VPS/remote hosts; screenshot shows the mobile `Connections` UI with a connected `Codex Desktop` host and `Add connection`.
-- Official OpenAI source dated 2026-05-14 supports the core claim: Codex remote access from ChatGPT mobile can switch between connected hosts while Codex runs on an underlying Mac host or connected remote environment.
 - OpenAI's public article also says Codex Desktop detects hosts from SSH config and lets users create projects/run threads inside remote machines.
 - The post's stronger claim "Codex fully absorbed all OpenClaw functions" is not accepted as fact. Store it as a hypothesis/community opinion requiring comparison.
 - The passwordless/synchronized remote connections claim is plausible from release-note language around remote connections and workspace access, but needs local verification before being used as a standard.
@@ -93,11 +109,3 @@ Refinement status: codex-refined
 
 - Codex media review completed in Techscope thread on 2026-05-17.
 - Useful input for future `codex-remote-hosts` workflow and `agent-shell-evaluation`.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
-- https://openai.com/index/work-with-codex-from-anywhere/
-- https://help.openai.com/en/articles/6825453-chatgpt-release-notes
-- https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes

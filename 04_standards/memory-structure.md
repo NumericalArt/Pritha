@@ -3,8 +3,8 @@ id: memory-structure
 type: standard
 status: active
 created: 2026-05-15
-updated: 2026-05-29
-last_reviewed: 2026-05-29
+updated: 2026-06-01
+last_reviewed: 2026-06-01
 owner: Techscope/user
 topics: [memory, markdown, frontmatter, indexing]
 tools: [markdown, sqlite, obsidian]
@@ -29,7 +29,7 @@ Last reviewed: 2026-05-29
 
 ## Rule
 
-Каждый значимый authored-артефакт памяти должен быть Markdown-файлом с YAML frontmatter. Для Pritha GitHub snapshot переносит не только Markdown, но и рабочее состояние памяти: `.memory/techscope.sqlite`, FTS, relations, embeddings, schema, rebuild SQL, self-test baseline and portable raw sources. SQLite, FTS, embeddings и graph-like relations должны оставаться пересоздаваемыми из Markdown, но они коммитятся как portability/cache layer. Raw JSON, transcripts, text, PDFs and small supporting images are portable; heavy raw audio/video media stays local until a Git LFS/archive policy is selected.
+Каждый значимый authored-артефакт памяти должен быть Markdown-файлом с YAML frontmatter. Для Pritha GitHub snapshot переносит не только Markdown, но и очищенное рабочее состояние памяти: `.memory/techscope.sqlite`, FTS, relations, embeddings, schema, rebuild SQL and self-test baseline. SQLite, FTS, embeddings и graph-like relations должны оставаться пересоздаваемыми из Markdown, но они коммитятся как portability/cache layer. Raw JSON, transcripts, downloaded text/PDF/image source artifacts, original media and incoming-material provenance are not portable Git state.
 
 ## Use when
 
@@ -49,10 +49,10 @@ Last reviewed: 2026-05-29
 - `status` должен отражать состояние: `new`, `processed`, `draft`, `proposed`, `accepted`, `active`, `deprecated`, `rejected`, `archived`.
 - `topics` должны описывать предметную область.
 - `tools` должны содержать технологии, библиотеки, модели, сервисы и CLI.
-- `sources` должны ссылаться на исходные материалы или внутренние документы.
+- `sources` для incoming-material artifacts должны использовать anonymous source ids или curated internal documents, not raw paths, incoming source URLs, original filenames or platform identifiers. Official docs/spec/reference URLs may remain in standards/reviews when they are stable reference material rather than incoming-material provenance.
 - `related` должен связывать артефакт с briefs, reviews, decisions, standards и workflows.
 - Для новых файлов использовать шаблоны из `08_templates/`.
-- После серии изменений запускать `node scripts/validate-memory.mjs`, `node scripts/rebuild-memory.mjs` и перед push `node scripts/golden-checks.mjs --with-embeddings`.
+- После серии изменений запускать `node scripts/privacy-audit.mjs --strict`, `node scripts/validate-memory.mjs`, `node scripts/rebuild-memory.mjs` и перед push `node scripts/golden-checks.mjs --with-embeddings`.
 
 ## Identifier policy
 

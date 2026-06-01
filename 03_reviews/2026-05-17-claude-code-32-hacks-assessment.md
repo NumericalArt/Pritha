@@ -3,40 +3,63 @@ id: 2026-05-17-claude-code-32-hacks-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [claude-code, coding-agents, agent-workflows, context-management, subagents, hooks, mcp, frontend-qa, security]
-tools: [Claude Code, CLAUDE.md, Agent Skills, MCP, Context7, Chrome DevTools, git worktrees]
-agent_platforms: [Claude Code]
-model_context: [Claude Opus, Claude Haiku]
-runtime_environment: [cli, terminal, desktop-app, browser, mobile-remote-control, vps]
-config_surfaces: [CLAUDE.md, skills, subagents, hooks, mcp, permissions, statusline, worktrees]
-portability: adapter-needed
+updated: 2026-06-01
+topics:
+  - claude-code
+  - coding-agents
+  - agent-workflows
+  - context-management
+  - subagents
+  - hooks
+  - mcp
+  - frontend-qa
+  - security
+tools:
+  - Claude Code
+  - CLAUDE.md
+  - Agent Skills
+  - MCP
+  - Context7
+  - Chrome DevTools
+  - git worktrees
 sources:
-  - 00_inbox/links/2026-05-17-youtube-claude-code-32-hacks-intake.md
-  - 01_sources/notes/2026-05-17-claude-code-32-hacks-source-note.md
-  - 02_briefs/2026-05-17-claude-code-32-hacks-brief.md
-  - 01_sources/raw/youtube-jqoFP9QapXI/jqoFP9QapXI-whisper-small.md
-  - https://code.claude.com/docs/en/slash-commands
-  - https://code.claude.com/docs/en/commands
-  - https://code.claude.com/docs/en/statusline
-  - https://code.claude.com/docs/en/sub-agents
-  - https://code.claude.com/docs/en/hooks
-  - https://code.claude.com/docs/en/worktrees
-  - https://context7.com/docs/overview
-  - https://arxiv.org/abs/2604.14228
+  - source-a28d79a5-31e2-4aa7-92ad-f6ac42b9ba7b
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-claude-code-32-hacks-intake.md
-  briefs:
-    - 02_briefs/2026-05-17-claude-code-32-hacks-brief.md
-  reviews:
-    - 03_reviews/2026-05-17-agent-environment-configuration-portability.md
-  decisions: []
-  standards:
-    - 04_standards/agent-environment-compatibility.md
-    - 04_standards/agent-tool-integration-selection.md
-supersedes: []
-superseded_by: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: video
+source_class: video
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.441Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-a28d79a5-31e2-4aa7-92ad-f6ac42b9ba7b
+recommendation: experiment
+agent_platforms:
+  - Claude Code
+model_context:
+  - Claude Opus
+  - Claude Haiku
+runtime_environment:
+  - cli
+  - terminal
+  - desktop-app
+  - browser
+  - mobile-remote-control
+  - vps
+config_surfaces:
+  - CLAUDE.md
+  - skills
+  - subagents
+  - hooks
+  - mcp
+  - permissions
+  - statusline
+  - worktrees
+portability: adapter-needed
 freshness_status: current
 source_published: 2026-04-27
 source_updated: unknown
@@ -45,18 +68,20 @@ retrieved: 2026-05-17
 verified: 2026-05-17
 valid_for: Claude Code workflow practice as of 2026-05-17; Codex adaptation requires mapping
 temporal_status: current
-recommendation: experiment
 ---
 
-# Assessment: Claude Code 32 hacks
+# Assessment: source-a28d79a5-31e2-4aa7-92ad-f6ac42b9ba7b
+
+Date: 2026-05-17
+Status: draft
+Source class: video
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
 Recommendation: experiment
 
 ## One-paragraph read
-
-This is a useful but noisy Claude Code-specific source. It contains several high-value agent workflow patterns that align with Techscope's direction: context hygiene, plan-first work, self-checking todos, subagents for bounded parallel work, skills for repeatable procedures, worktrees for isolation, narrow tool surfaces and explicit permissions. It should not become a standard directly because many details depend on Claude Code's runtime, but it is strong enough to drive Codex-focused experiments.
 
 ## Why it matters
 
@@ -107,9 +132,6 @@ We are designing agents that ingest media, evaluate sources, use local scripts, 
   - Context7 docs
   - arXiv Claude Code design-space paper
 - Freshness status: current
-- Source published: 2026-04-27
-- Source updated: unknown
-- Source version: video-jqoFP9QapXI; Claude Code docs observed 2026-05-17
 - Retrieved: 2026-05-17
 - Verified: 2026-05-17
 - Valid for: Claude Code workflow practice as of 2026-05-17; Codex adaptation requires mapping
@@ -138,8 +160,6 @@ Good practices here reduce back-and-forth and make agent sessions more predictab
 ## Evidence quality
 
 Score: 3/5
-
-The video is practical and many items match official docs, but it is a secondary promotional source and some details are unverified or version-sensitive.
 
 ## Practicality
 

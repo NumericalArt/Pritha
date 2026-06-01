@@ -26,7 +26,7 @@ sources:
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
   - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-  - 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=am_oeAoUhew
   - https://openai.com/index/harness-engineering/
 related:
@@ -73,7 +73,7 @@ This generated page tracks playwright as a tool in the Techscope knowledge base.
 - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
 - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
 - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-- 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=am_oeAoUhew
 - https://openai.com/index/harness-engineering/
 

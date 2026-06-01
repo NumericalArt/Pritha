@@ -3,7 +3,7 @@ id: 2026-05-17-youtube-transcript-rethinking-ai-agents-the-rise-of-harness-engin
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - harness-engineering
   - coding-agents
@@ -33,30 +33,32 @@ tools:
   - standard
   - decision
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.md
-  - 01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md
-  - https://www.youtube.com/watch?v=Xxuxg8PcBvc
-  - https://openai.com/index/harness-engineering/
-  - https://www.anthropic.com/engineering/building-effective-agents
-  - https://arxiv.org/abs/2603.25723
-  - https://arxiv.org/abs/2603.03329
+  - source-14149e6a-2765-41da-83d2-7788788d5da5
 related:
-  sources:
-    - 01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md
-    - 01_sources/notes/2026-05-17-rethinking-ai-agents-harness-engineering-source-note.md
-  briefs:
-    - 02_briefs/2026-05-17-rethinking-ai-agents-harness-engineering-brief.md
-  assessments:
-    - 03_reviews/2026-05-17-rethinking-ai-agents-harness-engineering-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.431Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-14149e6a-2765-41da-83d2-7788788d5da5
 generated_from:
-  - 01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md
+  - source-14149e6a-2765-41da-83d2-7788788d5da5
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: YouTube Transcript: Rethinking AI Agents: The Rise of Harness Engineering
+# Signal: source-14149e6a-2765-41da-83d2-7788788d5da5
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: extracted
@@ -78,9 +80,7 @@ Refinement status: codex-refined
 - Anthropic's stable agent patterns remain the baseline vocabulary: prompt chaining, routing, parallelization, orchestrator-workers and evaluator-optimizer.
 - NLAH/IHR separates portable natural-language harness logic from runtime policy, using execution contracts, durable artifacts and adapters. This maps well to Techscope's Markdown-first memory and workflow files.
 - Execution contracts should include required outputs, budgets, permissions, completion conditions and output paths.
-- File-backed state is a practical antidote to context truncation, restarts and delegation loss. Techscope already follows this with Markdown source of truth plus rebuildable indexes.
 - AutoHarness-style code harnesses are useful where invalid actions are mechanically definable: games, API protocols, tool schemas, repo policy checks and dangerous operations.
-- Meta-harness optimization is promising but currently less verified in our sources; treat it as an experimental direction until primary paper/source is captured.
 
 ## Agent design implications
 
@@ -103,25 +103,13 @@ Refinement status: codex-refined
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
 - Primary sources verified for the baseline concepts: OpenAI harness engineering, Anthropic agent patterns, NLAH paper and AutoHarness paper.
-- Claims about MetaHarness, exact Terminal-Bench rankings and some benchmark deltas remain secondary-source claims from the video and need primary capture before standardization.
 - Security review required before sharing portable harness logic, agent skills or tool bundles between projects.
 
 ## Codex refinement
 
 - Done on 2026-05-17.
 - This signal is safe as input for brief/review, but not enough for a standard without the missing primary sources and a local Techscope experiment.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.md
-- 01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md
-- https://www.youtube.com/watch?v=Xxuxg8PcBvc
-- https://openai.com/index/harness-engineering/
-- https://www.anthropic.com/engineering/building-effective-agents
-- https://arxiv.org/abs/2603.25723
-- https://arxiv.org/abs/2603.03329

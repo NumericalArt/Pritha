@@ -3,57 +3,52 @@ id: 2026-05-17-medium-harness-engineering-screenshots-intake
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [harness-engineering, ai-agents, context-engineering, agent-memory, evaluation, observability, tool-use, recovery]
-tools: [medium, codex, anthropic, openai, langchain]
-source_type: screenshot
-source_url: local-attachments://2026-05-17-harness-engineering-screenshots
-source_published: 2026-04-06
+updated: 2026-06-01
+topics:
+  - harness-engineering
+  - ai-agents
+  - context-engineering
+  - agent-memory
+  - evaluation
+  - observability
+  - tool-use
+  - recovery
+tools:
+  - medium
+  - codex
+  - anthropic
+  - openai
+  - langchain
 sources:
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
-  - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
-  - https://openai.com/index/harness-engineering/
-  - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
-  - https://www.anthropic.com/engineering/building-effective-agents
-related: {}
+  - source-51790f19-2c6f-413f-a60e-b69e87bfcdb4
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.421Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-51790f19-2c6f-413f-a60e-b69e87bfcdb4
+source_published: 2026-04-06
 ---
 
-# Intake: medium-harness-engineering-screenshots
+# Intake: source-51790f19-2c6f-413f-a60e-b69e87bfcdb4
 
-Date added: 2026-05-17
-Type: screenshot
-Source: local screenshots of Medium article
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-The screenshots capture a Medium article arguing that production agent reliability comes from harness architecture rather than prompt/model tuning alone.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-This is directly relevant to Techscope because we are designing:
+## Follow-up
 
-- Telegram/media intake pipelines;
-- Codex-assisted refinement;
-- memory/index/wiki layers;
-- queue completion semantics;
-- validation and recovery rules;
-- future coding-agent harnesses.
-
-## Raw material or link
-
-- Raw images: `01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/`
-- Article title from screenshots: `Harness Engineering: Understand this will make your AI Agent performs better than 80% of others.`
-- Author from screenshots: `Nick T. (Ph.D.)`
-- Publication date from screenshots: `2026-04-06`
-- Publication: `Artificial Intelligence in Plain English`
-
-## Initial questions
-
-- Which parts duplicate existing Techscope harness-engineering knowledge?
-- Which parts should strengthen current standards or candidate standards?
-- Are claims about Anthropic/OpenAI supported by primary sources?
-- What can become an actionable rule for Techscope agents?
-
-## Expected output
-
-brief | review | standard
-
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

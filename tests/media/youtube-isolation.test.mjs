@@ -23,6 +23,7 @@ const excluded = [
   "02_briefs" + path.sep,
   "03_reviews" + path.sep,
   "10_wiki" + path.sep,
+  path.join("scripts", "lib", "privacy.mjs"),
 ];
 
 function filesForIsolationCheck() {

@@ -3,7 +3,7 @@ id: 2026-05-26-youtube-openclaw-hacked-prompt-injection-intake
 type: intake
 status: processed
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-01
 topics:
   - prompt-injection
   - agent-security
@@ -16,54 +16,41 @@ tools:
   - Claude Opus 4.6
   - Gmail
   - Greptile
-source_type: video
-source_url: https://www.youtube.com/watch?v=_E4ZT1h7MZs
+sources:
+  - source-cfd21cc7-6603-41cc-9c66-7db82bfa7fd2
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-26
+processed_at: 2026-06-01T21:03:38.418Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-cfd21cc7-6603-41cc-9c66-7db82bfa7fd2
 source_published: 2026-04-03
 source_updated: 2026-04-03
 source_version: YouTube video _E4ZT1h7MZs
 retrieved: 2026-05-26
 verified: 2026-05-26
 temporal_status: current
-sources:
-  - https://www.youtube.com/watch?v=_E4ZT1h7MZs
-  - 01_sources/raw/youtube-_E4ZT1h7MZs/_E4ZT1h7MZs-whisper-small.md
-related:
-  notes:
-    - 01_sources/notes/2026-05-26-openclaw-hacked-prompt-injection-source-note.md
-  briefs:
-    - 02_briefs/2026-05-26-openclaw-hacked-prompt-injection-brief.md
-  reviews:
-    - 03_reviews/2026-05-26-openclaw-hacked-agent-security-assessment.md
 ---
 
-# Intake: YouTube OpenClaw Hacked Prompt Injection Test
+# Intake: source-cfd21cc7-6603-41cc-9c66-7db82bfa7fd2
 
-Date added: 2026-05-26
-Type: video
-Source: Matthew Berman, "I was hacked..."
-Source published: 2026-04-03
-Source updated: 2026-04-03
-Source version: YouTube video `_E4ZT1h7MZs`
-Retrieved: 2026-05-26
-Verified: 2026-05-26
-Temporal status: current
+Date: 2026-05-26
 Status: processed
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-The video stress-tests a personal AI/OpenClaw-style system that reads email and can touch sensitive data. It is relevant to Agents Mother because future agents will often ingest untrusted Telegram posts, emails, websites, files and YouTube/media transcripts.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- YouTube: https://www.youtube.com/watch?v=_E4ZT1h7MZs
-- Local raw transcript: `01_sources/raw/youtube-_E4ZT1h7MZs/_E4ZT1h7MZs-whisper-small.md`
-
-## Initial questions
-
-- Which security patterns are actually reusable?
-- Which parts are only content-creator drama or sponsorship?
-- Should Agents Mother require a standard untrusted-input boundary for new agents?
-
-## Expected output
-
-brief, assessment, draft standard candidate
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

@@ -74,10 +74,11 @@ Run the full local gate:
 
 ```sh
 node scripts/validate-memory.mjs
+node scripts/privacy-audit.mjs --strict
 npm test --silent
 node scripts/quality-gate.mjs
 node scripts/golden-checks.mjs --with-embeddings
-node scripts/pre-push-audit.mjs
+node scripts/pre-push-audit.mjs --strict
 node scripts/github-release-status.mjs
 ```
 
@@ -191,10 +192,11 @@ For ordinary work after publication:
 ```sh
 git status --short --ignored
 node scripts/validate-memory.mjs
+node scripts/privacy-audit.mjs --strict
 npm test --silent
 node scripts/quality-gate.mjs
 node scripts/golden-checks.mjs --with-embeddings
-node scripts/pre-push-audit.mjs
+node scripts/pre-push-audit.mjs --strict
 git add <changed files>
 git commit -m "<short clear message>"
 git push origin main
@@ -216,14 +218,14 @@ For release work, additionally run:
 node scripts/github-release-status.mjs --online --strict
 ```
 
-GitHub is the portable Pritha memory snapshot. Push curated Markdown,
-`.memory/` and portable raw artifacts, including `techscope.sqlite`, SQLite
-FTS/relations, embeddings, schema, rebuild SQL, the self-test baseline, raw
-JSON, transcripts, text, PDFs and small supporting images. Do not push secrets,
-`.env.local`, `.queue/`, `.logs/`, `.tools/` or secure handoff folders. Heavy
-raw audio/video media (`mp4`, `wav`, `mov`, `mkv`, `webm`, `mp3`, `m4a`,
-`avi`, `flac`) stays outside the default Git snapshot until a Git LFS/archive
-policy is selected.
+GitHub is the portable Pritha memory snapshot. Push curated Markdown and
+cleaned `.memory/` portability/cache artifacts, including `techscope.sqlite`,
+SQLite FTS/relations, embeddings, schema, rebuild SQL and the self-test
+baseline. Do not push raw JSON, transcripts, downloaded text/PDF/image source
+artifacts, original media, incoming-material source URLs, secrets,
+`.env.local`, `.queue/`, `.logs/`, `.tools/` or secure handoff folders. Any
+future need to retain raw material requires a separate secure storage decision
+outside the Git-tracked Techscope repository.
 
 ## Current GitHub CLI State
 

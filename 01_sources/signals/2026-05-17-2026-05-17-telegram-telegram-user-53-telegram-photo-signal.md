@@ -3,34 +3,51 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex-mobile, codex-desktop, remote-connections, ssh, mobile-agent-control, coding-agents, dx, security]
-tools: [telegram-bot, codex, codex-desktop, chatgpt-mobile, ssh, macos, iphone]
+updated: 2026-06-01
+topics:
+  - codex-mobile
+  - codex-desktop
+  - remote-connections
+  - ssh
+  - mobile-agent-control
+  - coding-agents
+  - dx
+  - security
+tools:
+  - telegram-bot
+  - codex
+  - codex-desktop
+  - chatgpt-mobile
+  - ssh
+  - macos
+  - iphone
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
-  - https://t.me/oestick/504
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.json
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
+  - source-fe77d956-2f29-4ddb-9981-de43f76e5aec
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
-  notes:
-    - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-  briefs:
-    - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
-  assessments:
-    - 03_reviews/2026-05-17-codex-mobile-desktop-remote-connection-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.430Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-fe77d956-2f29-4ddb-9981-de43f76e5aec
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
+  - source-fe77d956-2f29-4ddb-9981-de43f76e5aec
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: Codex mobile/desktop remote connection setup
+# Signal: source-fe77d956-2f29-4ddb-9981-de43f76e5aec
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -43,7 +60,6 @@ Refinement status: codex-refined
 - Telegram photo shows a mobile UI for `Connections` with an existing `Codex Desktop` connection to `Nikolays-MacBook-Pro.local` and an `Add SSH Host` sheet.
 - This is relevant to Techscope because Codex mobile/desktop remote control changes the ergonomics of long-running coding-agent work: the user can supervise, unblock and approve work from phone instead of staying at the Mac.
 - The screenshot supports a near-term workflow pattern: Mac mini/MacBook remains the trusted execution host; phone becomes a control and approval surface.
-- Official OpenAI source from 2026-05-14 confirms Codex in the ChatGPT mobile app can connect to machines where Codex is running, keep files/credentials/permissions on that machine, and stream state, screenshots, terminal output, diffs, tests and approvals to the phone.
 - Remote SSH is generally available according to OpenAI's 2026-05-14 article; this makes SSH host setup a first-class Codex workflow, not just an improvised workaround.
 
 ## Technical details
@@ -53,7 +69,6 @@ Refinement status: codex-refined
   - add flow: `Add SSH Host`;
   - fields: icon, display name, host, port `22`, username, password;
   - mobile device context: iPhone screenshot.
-- Official source claims to verify against current app behavior:
   - Codex mobile is in preview in ChatGPT mobile app on iOS/Android;
   - Codex Desktop can connect to laptops, Mac mini, devboxes or remote environments;
   - trusted machines stay reachable through a secure relay layer;
@@ -69,7 +84,6 @@ Refinement status: codex-refined
 
 ## Candidate rules
 
-- For Codex mobile/remote workflows, keep source files and secrets on the trusted host; use the phone only as supervision/control surface.
 - Do not treat mobile control as a replacement for queue completion semantics. A task is complete only after artifacts, validation, index and queue status are closed.
 - Any SSH host added to Codex should have least-privilege credentials and clear naming; avoid broad shared admin accounts.
 - For user-facing bot updates, write short human-readable summaries suitable for mobile, not raw logs.
@@ -77,7 +91,6 @@ Refinement status: codex-refined
 ## Noise removed
 
 - Decorative mobile UI elements and battery/time indicators are not part of the technical signal.
-- The Telegram post had no caption; interpretation is based on screenshot content plus official OpenAI source verification.
 
 ## Verification required
 
@@ -89,9 +102,3 @@ Refinement status: codex-refined
 
 - Codex media review completed in Techscope thread on 2026-05-17.
 - Result should feed future `agent-shell-evaluation` and Codex mobile/remote workflow notes.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
-- https://openai.com/index/work-with-codex-from-anywhere/

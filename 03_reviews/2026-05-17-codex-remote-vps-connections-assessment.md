@@ -3,26 +3,46 @@ id: 2026-05-17-codex-remote-vps-connections-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex-remote-access, codex-desktop, remote-connections, ssh, vps, mobile-agent-control, coding-agents, security]
-tools: [codex, codex-desktop, chatgpt-mobile, ssh, vps, macos, telegram-bot]
+updated: 2026-06-01
+topics:
+  - codex-remote-access
+  - codex-desktop
+  - remote-connections
+  - ssh
+  - vps
+  - mobile-agent-control
+  - coding-agents
+  - security
+tools:
+  - codex
+  - codex-desktop
+  - chatgpt-mobile
+  - ssh
+  - vps
+  - macos
+  - telegram-bot
 sources:
-  - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
-  - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
-  - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
-  - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
+  - source-fb4cb81f-a257-47e9-86c0-d2d8b8ff8601
 related:
-  briefs:
-    - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
-  standards:
-    - 04_standards/agent-shell-evaluation.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.442Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-fb4cb81f-a257-47e9-86c0-d2d8b8ff8601
 recommendation: experiment
 ---
 
-# Assessment: Codex remote VPS connections
+# Assessment: source-fb4cb81f-a257-47e9-86c0-d2d8b8ff8601
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft

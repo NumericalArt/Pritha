@@ -3,28 +3,46 @@ id: 2026-05-17-codex-xcode-simulator-screenshot-debugging-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex, xcode, ios-simulator, screenshots, ui-debugging, mobile-app-development, coding-agents, dx]
-tools: [codex, xcode, ios-simulator, iphone, macos, telegram-bot]
+updated: 2026-06-01
+topics:
+  - codex
+  - xcode
+  - ios-simulator
+  - screenshots
+  - ui-debugging
+  - mobile-app-development
+  - coding-agents
+  - dx
+tools:
+  - codex
+  - xcode
+  - ios-simulator
+  - iphone
+  - macos
+  - telegram-bot
 sources:
-  - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
-  - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
+  - source-6383f1c8-cf91-44af-ba3c-4662b8575a34
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
-  notes:
-    - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
-  assessments:
-    - 03_reviews/2026-05-17-codex-xcode-simulator-screenshot-debugging-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.435Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-6383f1c8-cf91-44af-ba3c-4662b8575a34
 ---
 
-# Brief: Codex Xcode Simulator screenshot debugging
+# Artifact: source-6383f1c8-cf91-44af-ba3c-4662b8575a34
 
 Date: 2026-05-17
-Source: https://t.me/airanez/217
+Status: draft
+Source class: telegram
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
@@ -62,4 +80,3 @@ Create an experiment later: `ios-simulator-screenshot-loop`:
 ## Next step
 
 experiment | workflow
-

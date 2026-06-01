@@ -3,30 +3,46 @@ id: 2026-05-17-skills-vs-mcp-agent-tooling-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [agent-skills, mcp, coding-agents, context-engineering, tool-use, workflow-standardization]
-tools: [Agent Skills, MCP, Codex, Claude Code, Playwright, GitHub CLI, OpenAI Docs MCP, Shell tool]
+updated: 2026-06-01
+topics:
+  - agent-skills
+  - mcp
+  - coding-agents
+  - context-engineering
+  - tool-use
+  - workflow-standardization
+tools:
+  - Agent Skills
+  - MCP
+  - Codex
+  - Claude Code
+  - Playwright
+  - GitHub CLI
+  - OpenAI Docs MCP
+  - Shell tool
 sources:
-  - 00_inbox/links/2026-05-17-youtube-skills-vs-mcp-agent-tooling-intake.md
-  - 01_sources/notes/2026-05-17-skills-vs-mcp-source-note.md
-  - 01_sources/raw/youtube-6PA0lcAQgYI/6PA0lcAQgYI-whisper-small.md
-  - https://agentskills.io/home
-  - https://github.com/openai/skills
-  - https://developers.openai.com/learn/docs-mcp
-  - https://modelcontextprotocol.io/specification/2025-06-18
+  - source-f71ffbdf-62d1-436b-b9ff-81e6307fd74c
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-skills-vs-mcp-agent-tooling-intake.md
-  reviews:
-    - 03_reviews/2026-05-17-skills-vs-mcp-agent-tooling-assessment.md
-  decisions: []
-  standards: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.436Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-f71ffbdf-62d1-436b-b9ff-81e6307fd74c
 ---
 
-# Brief: Skills vs MCP for agent tooling
+# Artifact: source-f71ffbdf-62d1-436b-b9ff-81e6307fd74c
 
 Date: 2026-05-17
-Source: YouTube transcript plus primary-source checks
+Status: draft
+Source class: video
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
@@ -52,7 +68,6 @@ The useful conclusion is not "Skills killed MCP". Skills and MCP solve adjacent 
 
 ## Risks and caveats
 
-- A skill can silently become a supply-chain risk if it bundles scripts from an untrusted source.
 - MCP servers can also be risky: tool descriptions, data access and command execution need consent and authorization.
 - Skills are not guaranteed to trigger unless their metadata/description is good.
 - Agents can skip steps in a skill; critical workflows need checklists, assertions or executable harnesses.
@@ -71,4 +86,3 @@ Adopt this as a candidate standard for Techscope:
 ## Next step
 
 Create a draft standard: "agent tool integration selection: skills vs MCP vs CLI". The standard should include a decision matrix, security checklist and migration recipe.
-

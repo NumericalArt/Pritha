@@ -31,20 +31,32 @@ tools:
   - source
   - standard
 sources:
-  - 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
-  - https://www.youtube.com/watch?v=mtiOK2QG9Q0
+  - source-e478e860-2b41-45fe-a165-399f70e1098f
 related:
-  sources:
-    - 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.432Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-e478e860-2b41-45fe-a165-399f70e1098f
 generated_from:
-  - 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
+  - source-e478e860-2b41-45fe-a165-399f70e1098f
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: IBM seven skills for AI agents
+# Signal: source-e478e860-2b41-45fe-a165-399f70e1098f
+
+Date: 2026-06-01
+Status: extracted
+Source class: video
+Retention: source-purged
 
 Date: 2026-06-01
 Status: extracted
@@ -58,16 +70,13 @@ Refinement status: needs-codex-refinement
 - The material may be useful as a concise outside taxonomy for Techscope/Agents Mother standards: what skills and checks should future agent scaffolds make explicit.
 - Description excerpt from metadata: skills needed for AI jobs are shifting from prompt engineering to full agent engineering, including system design, retrieval, reliability and security.
 - Does the video add any concrete production-agent practice beyond current Techscope rules for harness, memory, evals, security and runtime placement?
-- Should this become a brief, an assessment update or only a supporting source for existing agent-engineering standards?
 - # Intake: IBM seven skills for AI agents
 - Because this is a vendor educational video, claims should be separated into general engineering advice, IBM framing and potentially reusable Techscope rules.
 - Title: The 7 Skills You Need to Build AI Agents
 - Which of the seven skills map directly to Techscope's existing agent standards?
-- Source: https://www.youtube.com/watch?v=mtiOK2QG9Q0
 
 ## Technical details
 
-- URL: https://www.youtube.com/watch?v=mtiOK2QG9Q0
 - signal | assessment | brief | review | archive
 
 ## Agent design implications
@@ -78,13 +87,11 @@ Refinement status: needs-codex-refinement
 ## Candidate rules
 
 - The material may be useful as a concise outside taxonomy for Techscope/Agents Mother standards: what skills and checks should future agent scaffolds make explicit.
-- Should this become a brief, an assessment update or only a supporting source for existing agent-engineering standards?
 - Because this is a vendor educational video, claims should be separated into general engineering advice, IBM framing and potentially reusable Techscope rules.
 
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -94,11 +101,5 @@ Refinement status: needs-codex-refinement
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
-- https://www.youtube.com/watch?v=mtiOK2QG9Q0

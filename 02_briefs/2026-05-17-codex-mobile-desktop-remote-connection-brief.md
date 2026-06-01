@@ -3,29 +3,47 @@ id: 2026-05-17-codex-mobile-desktop-remote-connection-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex-mobile, codex-desktop, remote-connections, ssh, mobile-agent-control, coding-agents, dx, security]
-tools: [codex, codex-desktop, chatgpt-mobile, ssh, macos, iphone, telegram-bot]
+updated: 2026-06-01
+topics:
+  - codex-mobile
+  - codex-desktop
+  - remote-connections
+  - ssh
+  - mobile-agent-control
+  - coding-agents
+  - dx
+  - security
+tools:
+  - codex
+  - codex-desktop
+  - chatgpt-mobile
+  - ssh
+  - macos
+  - iphone
+  - telegram-bot
 sources:
-  - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
+  - source-5b71202a-56cd-4cf3-89bb-8094bc6b626e
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
-  notes:
-    - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
-  assessments:
-    - 03_reviews/2026-05-17-codex-mobile-desktop-remote-connection-assessment.md
-  standards:
-    - 04_standards/agent-shell-evaluation.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.434Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-5b71202a-56cd-4cf3-89bb-8094bc6b626e
 ---
 
-# Brief: Codex mobile/desktop remote connection
+# Artifact: source-5b71202a-56cd-4cf3-89bb-8094bc6b626e
 
 Date: 2026-05-17
-Source: https://t.me/oestick/504
+Status: draft
+Source class: telegram
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
@@ -64,4 +82,3 @@ Keep this as a significant signal for the Techscope agent environment:
 ## Next step
 
 experiment | workflow
-

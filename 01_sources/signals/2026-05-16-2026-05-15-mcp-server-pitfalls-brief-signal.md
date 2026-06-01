@@ -3,7 +3,7 @@ id: 2026-05-16-2026-05-15-mcp-server-pitfalls-brief-signal
 type: signal
 status: extracted
 created: 2026-05-16
-updated: 2026-05-16
+updated: 2026-06-01
 topics:
   - mcp
   - tool-design
@@ -35,23 +35,32 @@ tools:
   - database
   - auth
 sources:
-  - 02_briefs/2026-05-15-mcp-server-pitfalls-brief.md
-  - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
-  - 01_sources/notes/2026-05-15-habr-mcp-server-pitfalls-source-note.md
-  - 03_reviews/2026-05-15-mcp-server-pitfalls-assessment.md
-  - https://habr.com/ru/companies/bitrix/articles/1009150/
+  - source-c4ae562c-e9c1-4f4e-b9e9-dea3e1bcbf40
 related:
-  sources:
-    - 02_briefs/2026-05-15-mcp-server-pitfalls-brief.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-16
+processed_at: 2026-06-01T21:03:38.426Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-c4ae562c-e9c1-4f4e-b9e9-dea3e1bcbf40
 generated_from:
-  - 02_briefs/2026-05-15-mcp-server-pitfalls-brief.md
+  - source-c4ae562c-e9c1-4f4e-b9e9-dea3e1bcbf40
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: mcp-server-pitfalls
+# Signal: source-c4ae562c-e9c1-4f4e-b9e9-dea3e1bcbf40
+
+Date: 2026-05-16
+Status: extracted
+Source class: video
+Retention: source-purged
 
 Date: 2026-05-16
 Status: extracted
@@ -95,13 +104,11 @@ Refinement status: needs-codex-refinement
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
 - Проверить первоисточники и даты публикации внешних ссылок.
 - Сверить claims с official MCP specification and client docs.
-- Сверить claims с official OpenAI docs/source materials.
 - Проверить security implications отдельно перед стандартом.
 
 ## Codex refinement required
@@ -109,11 +116,3 @@ Refinement status: needs-codex-refinement
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
 - Сверить, какие rules уже достаточно зрелые для `mcp-tool-design` review/standard candidate.
 - После refinement обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 02_briefs/2026-05-15-mcp-server-pitfalls-brief.md
-- 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
-- 01_sources/notes/2026-05-15-habr-mcp-server-pitfalls-source-note.md
-- 03_reviews/2026-05-15-mcp-server-pitfalls-assessment.md
-- https://habr.com/ru/companies/bitrix/articles/1009150/

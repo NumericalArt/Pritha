@@ -42,7 +42,7 @@ sources:
   - 00_inbox/links/2026-05-27-youtube-local-harness-benchmark-intake.md
   - 01_sources/notes/2026-05-27-local-harness-benchmark-source-note.md
   - 02_briefs/2026-05-27-local-harness-benchmark-brief.md
-  - https://www.youtube.com/watch?v=bXRQsQmgAYo
+  - anonymous incoming video source (purged)
   - https://github.com/Zux1U/microbench_16
   - https://docs.vllm.ai/en/latest/
   - https://github.com/ggml-org/llama.cpp

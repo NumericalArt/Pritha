@@ -3,30 +3,45 @@ id: 2026-05-17-medium-harness-engineering-six-layer-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [harness-engineering, ai-agents, context-engineering, agent-memory, evaluation, observability, tool-use, recovery, techscope]
-tools: [medium, codex, anthropic, openai, langchain]
+updated: 2026-06-01
+topics:
+  - harness-engineering
+  - ai-agents
+  - context-engineering
+  - agent-memory
+  - evaluation
+  - observability
+  - tool-use
+  - recovery
+  - techscope
+tools:
+  - medium
+  - codex
+  - anthropic
+  - openai
+  - langchain
 sources:
-  - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
-  - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
-  - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
-  - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
-  - https://openai.com/index/harness-engineering/
-  - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
-  - https://www.anthropic.com/engineering/building-effective-agents
+  - source-80b4c718-35d8-4fe5-ad25-734b9d80f357
 related:
-  briefs:
-    - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
-  standards:
-    - 04_standards/agent-shell-evaluation.md
-  reviews:
-    - 03_reviews/2026-05-17-agent-shell-evaluation-review.md
-    - 03_reviews/2026-05-17-rethinking-ai-agents-harness-engineering-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.442Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-80b4c718-35d8-4fe5-ad25-734b9d80f357
 recommendation: review
 ---
 
-# Assessment: Medium harness engineering six-layer model
+# Assessment: source-80b4c718-35d8-4fe5-ad25-734b9d80f357
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft

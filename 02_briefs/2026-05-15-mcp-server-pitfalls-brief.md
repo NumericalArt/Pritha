@@ -11,7 +11,7 @@ sources:
   - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
   - 01_sources/notes/2026-05-15-habr-mcp-server-pitfalls-source-note.md
   - 03_reviews/2026-05-15-mcp-server-pitfalls-assessment.md
-  - https://habr.com/ru/companies/bitrix/articles/1009150/
+  - anonymous incoming article source (purged)
 related:
   signals:
     - 01_sources/signals/2026-05-16-2026-05-15-mcp-server-pitfalls-brief-signal.md
@@ -28,7 +28,7 @@ related:
 # Brief: mcp-server-pitfalls
 
 Date: 2026-05-15
-Source: https://habr.com/ru/companies/bitrix/articles/1009150/
+Source: anonymous incoming source (purged)
 Status: draft
 
 ## Summary

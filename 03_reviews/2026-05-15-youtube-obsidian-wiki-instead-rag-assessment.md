@@ -3,34 +3,47 @@ id: 2026-05-15-youtube-obsidian-wiki-instead-rag-assessment
 type: assessment
 status: draft
 created: 2026-05-15
-updated: 2026-05-15
-topics: [assessment, youtube, obsidian, llm-wiki, rag, knowledge-base, agent-memory, coding-agents]
-tools: [yt-dlp, mlx-whisper, obsidian, markdown, codex, claude-code, sqlite, embeddings]
+updated: 2026-06-01
+topics:
+  - assessment
+  - youtube
+  - obsidian
+  - llm-wiki
+  - rag
+  - knowledge-base
+  - agent-memory
+  - coding-agents
+tools:
+  - yt-dlp
+  - mlx-whisper
+  - obsidian
+  - markdown
+  - codex
+  - claude-code
+  - sqlite
+  - embeddings
 sources:
-  - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-  - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
-  - 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
-  - https://www.youtube.com/watch?v=2ZHHzfMSeWc
-  - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
-  - https://community.obsidian.md/plugins/karpathywiki
+  - source-a2c2b8f8-6ba1-4680-a88b-08819c2959e2
 related:
-  intakes:
-    - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-  briefs:
-    - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
-  reviews:
-    - 03_reviews/2026-05-15-knowledge-memory-database-architecture.md
-  decisions:
-    - 05_decisions/2026-05-15-memory-architecture.md
-    - 05_decisions/2026-05-15-local-embeddings.md
-    - 05_decisions/2026-05-15-obsidian-sync.md
-  standards:
-    - 04_standards/memory-structure.md
-    - 04_standards/expert-information-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.438Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-a2c2b8f8-6ba1-4680-a88b-08819c2959e2
 recommendation: experiment
 ---
 
-# Assessment: youtube-obsidian-wiki-instead-rag
+# Assessment: source-a2c2b8f8-6ba1-4680-a88b-08819c2959e2
+
+Date: 2026-05-15
+Status: draft
+Source class: video
+Retention: source-purged
 
 Date: 2026-05-15
 Status: draft
@@ -38,13 +51,10 @@ Recommendation: experiment
 
 ## One-paragraph read
 
-Материал про LLM Wiki вместо простого RAG: агент берет raw sources, компилирует из них связанную Markdown wiki, поддерживает индекс и лог, а затем отвечает на вопросы через чтение этой wiki, а не через одноразовый поиск по чанкам. Для Techscope это очень релевантно: мы уже выбрали Markdown as source of truth, Obsidian UI, SQLite sidecar index and embeddings. Видео не требует ломать текущую архитектуру, но хорошо подсвечивает недостающий workflow-слой: agent-maintained concept pages plus explicit `ingest/query/lint` operations.
-
 ## Why it matters
 
 - Это прямой материал про agent memory, knowledge base design and Obsidian-centered workflow.
 - Он совпадает с нашей текущей траекторией, но добавляет ясную операционную модель: `ingest`, `query`, `lint`.
-- Он помогает развести роли: raw source, human-reviewed knowledge artifact, agent-maintained synthesis, machine index.
 - Он дает проверяемую гипотезу: для небольших и средних исследовательских доменов связанная wiki может давать агенту лучшее понимание, чем поиск по отдельным chunks.
 - Он показывает, что Obsidian может быть не только UI для человека, но и средой инспекции агентной памяти.
 
@@ -96,8 +106,6 @@ Score: 5/5
 ## Risk
 
 Score: 3/5
-
-Основной риск не инфраструктурный, а эпистемический: агент может скомпилировать убедительную, но ошибочную wiki-страницу. Поэтому нельзя делать generated wiki source of truth. Нужны source links, log, review status and lint checks.
 
 ## Expert lenses
 

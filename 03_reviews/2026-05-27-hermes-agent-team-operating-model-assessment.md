@@ -38,7 +38,7 @@ sources:
   - 00_inbox/links/2026-05-27-youtube-hermes-agent-team-operating-model-intake.md
   - 01_sources/notes/2026-05-27-hermes-agent-team-operating-model-source-note.md
   - 02_briefs/2026-05-27-hermes-agent-team-operating-model-brief.md
-  - https://www.youtube.com/watch?v=ysQ1T3Xkub8
+  - anonymous incoming video source (purged)
   - https://github.com/NousResearch/hermes-agent/blob/main/RELEASE_v0.12.0.md
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/cron/
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/delegation/
