@@ -3,50 +3,50 @@ id: 2026-05-18-techscope-agents-mother-scenario-intake
 type: intake
 status: new
 created: 2026-05-18
-updated: 2026-05-18
-topics: [agents-mother, agent-factory, harness-engineering, agent-scaffolding, codex, techscope]
-tools: [codex, markdown, openai-agents-sdk, codex-cli, claude-code, langgraph]
-source_type: idea
-source_url: local-thread://techscope-agents-mother
+updated: 2026-06-01
+topics:
+  - agents-mother
+  - agent-factory
+  - harness-engineering
+  - agent-scaffolding
+  - codex
+  - techscope
+tools:
+  - codex
+  - markdown
+  - openai-agents-sdk
+  - codex-cli
+  - claude-code
+  - langgraph
 sources:
-  - AGENTS.md
-  - 04_standards/agent-shell-evaluation.md
-  - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
-  - https://developers.openai.com/api/docs/guides/agents
-  - https://github.com/openai/codex
-  - https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf
-  - https://www.anthropic.com/engineering/building-effective-agents
-  - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
-  - https://www.langchain.com/blog/runtime-behind-production-deep-agents
+  - source-58a713f2-4916-4e83-8234-ef1785a2c814
 related:
-  standards:
-    - 04_standards/agent-shell-evaluation.md
-  briefs:
-    - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-18
+processed_at: 2026-06-01T21:03:38.422Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-58a713f2-4916-4e83-8234-ef1785a2c814
 ---
 
-# Intake: Techscope Agents Mother
+# Intake: source-58a713f2-4916-4e83-8234-ef1785a2c814
 
-Date added: 2026-05-18
-Type: idea
-Source: user scenario
+Date: 2026-05-18
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-Techscope should gain a new scenario: create new agents from user-provided or collaboratively refined technical specifications.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-The new agent should be created in a sibling folder near Techscope, with its own harness, memory, tools, docs, tests and onboarding. Techscope may reuse its own architecture, but should adapt it to the target agent instead of copying 1:1.
+## Follow-up
 
-## Initial questions
-
-- What agent type is being created: Codex project agent, CLI agent, API agent, local-model agent, Telegram/web agent, hybrid?
-- What interface should the new agent expose?
-- What memory/state model is required?
-- What tools and permissions are required?
-- What validation, tests, queues and recovery rules prove the agent works?
-
-## Expected output
-
-review | implementation-plan | workflow
-
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

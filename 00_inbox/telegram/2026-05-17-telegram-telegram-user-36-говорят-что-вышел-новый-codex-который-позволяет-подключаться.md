@@ -3,65 +3,41 @@ id: 2026-05-17-telegram-telegram-user-36-говорят-что-вышел-нов
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/llm_under_hood/835
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/llm_under_hood/835
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 36
-  forwarded_from: LLM под капотом #835
+  - source-1401ac99-829e-482a-9903-54223be54f87
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.420Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-1401ac99-829e-482a-9903-54223be54f87
 ---
 
-# Intake: 2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться
+# Intake: source-1401ac99-829e-482a-9903-54223be54f87
 
-Date added: 2026-05-17
-Type: telegram
-Source: https://t.me/llm_under_hood/835
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 36
-- Forwarded from: LLM под капотом #835
-- Date: 2026-05-17T11:35:57.000Z
-- Media: photo: AgACAgIAAxkBAAMkagmoHcy2ARddOTLPZ8mXkt53qXsAAhMVaxt4oDBIecMUB3CMTdQBAAMCAAN5AAM7BA
-
-## Raw material or link
-
-- https://t.me/llm_under_hood/835
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json`
-
-## Message text
-
-Говорят, что вышел новый Codex, который позволяет подключаться к локальным сессиям c мобильного. Как Claude Dispatch. 
-
-Это в теории позволит обойти все костыли в виде telegram bridges.
-
-Но это пока не про меня. Ибо текущий Codex накатывает на сервера BitGN большой апдейт аналитики (Vector + ClickHouse + Grafana Dashboards), и пока он не закончит, ставить новую версию некрасиво.
-
-Update: действительно работает. Я подключился к локальной сессии кодекса с мобильника. Теперь смогу гонять хоть разработку, хоть задачи в базе знаний с мобильника. Это удобнее облачного кодекса в контейнерах. Главное, не давать ноуту засыпать (есть такая галка в Codex) или вынести все на VM/MacMini.
-
-Ваш, @llm_under_hood 🤗
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

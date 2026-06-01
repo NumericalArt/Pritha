@@ -3,23 +3,39 @@ id: 2026-05-15-2026-05-15-telegram-telegram-user-6-насколько-полез
 type: assessment
 status: draft
 created: 2026-05-15
-updated: 2026-05-15
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.md
-  - https://t.me/iwann_tai/6
-  - 01_sources/raw/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.json
+  - source-498e778b-f745-43d3-aee1-ea95812e3d84
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.437Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-498e778b-f745-43d3-aee1-ea95812e3d84
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал
+# Assessment: source-498e778b-f745-43d3-aee1-ea95812e3d84
+
+Date: 2026-05-15
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-15
 Status: draft
@@ -34,14 +50,6 @@ Recommendation: brief
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-- https://t.me/iwann_tai/6 - Raw update: `01_sources/raw/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.json` Насколько полезным был этот материал?
-
-## Link processing
-
-- https://t.me/iwann_tai/6 — ok 200; title: Telegram: Contact @iwann_tai
 
 ## YouTube processing
 

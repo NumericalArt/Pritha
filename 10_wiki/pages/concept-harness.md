@@ -24,7 +24,7 @@ sources:
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
   - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
   - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+  - raw-source-purged
   - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
   - https://openai.com/index/harness-engineering/
   - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
@@ -73,7 +73,7 @@ This generated page tracks harness as a concept in the Techscope knowledge base.
 - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
 - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
 - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-- 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+- raw-source-purged
 - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
 - https://openai.com/index/harness-engineering/
 - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents

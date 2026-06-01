@@ -3,32 +3,65 @@ id: 2026-05-18-hermes-agent-practical-use-cases-brief
 type: brief
 status: processed
 created: 2026-05-18
-updated: 2026-05-18
-topics: [hermes-agent, role-agents, practical-agent-use-cases, telegram-agents, agents-mother, agent-memory, skills, codex-cli]
-tools: [Hermes Agent, Codex CLI, Telegram, Obsidian, Google Meet, Agent Skills, MCP, Google AI Studio]
-agent_platforms: [Hermes Agent, Codex]
-model_context: [model-agnostic Hermes providers, OpenAI/Codex CLI, Google AI Studio]
-runtime_environment: [telegram, cli, mac-mini, macbook, obsidian, google-meet, codex-cli]
-config_surfaces: [skills, memory, wiki, daily-notes, telegram-gateway, codex-cli-bridge, curator, scheduled-reports]
-portability: adapter-needed
+updated: 2026-06-01
+topics:
+  - hermes-agent
+  - role-agents
+  - practical-agent-use-cases
+  - telegram-agents
+  - agents-mother
+  - agent-memory
+  - skills
+  - codex-cli
+tools:
+  - Hermes Agent
+  - Codex CLI
+  - Telegram
+  - Obsidian
+  - Google Meet
+  - Agent Skills
+  - MCP
+  - Google AI Studio
 sources:
-  - https://www.youtube.com/watch?v=ysQ1T3Xkub8
-  - 01_sources/notes/2026-05-18-hermes-agent-practical-use-cases-source-note.md
-  - 01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md
-  - https://hermes-agent.nousresearch.com/docs/user-guide/features/curator
-  - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime
+  - source-82f18a97-472f-4a5c-a189-f87f1e3e27dd
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
-  notes:
-    - 01_sources/notes/2026-05-18-hermes-agent-practical-use-cases-source-note.md
-  reviews:
-    - 03_reviews/2026-05-18-hermes-agent-practical-use-cases-assessment.md
-    - 03_reviews/2026-05-17-openclaw-hermes-codex-cli-advanced-user-assessment.md
-  standards:
-    - 04_standards/agent-shell-evaluation.md
-supersedes: []
-superseded_by: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-18
+processed_at: 2026-06-01T21:03:38.436Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-82f18a97-472f-4a5c-a189-f87f1e3e27dd
+agent_platforms:
+  - Hermes Agent
+  - Codex
+model_context:
+  - model-agnostic Hermes providers
+  - OpenAI/Codex CLI
+  - Google AI Studio
+runtime_environment:
+  - telegram
+  - cli
+  - mac-mini
+  - macbook
+  - obsidian
+  - google-meet
+  - codex-cli
+config_surfaces:
+  - skills
+  - memory
+  - wiki
+  - daily-notes
+  - telegram-gateway
+  - codex-cli-bridge
+  - curator
+  - scheduled-reports
+portability: adapter-needed
 freshness_status: current
 source_published: 2026-05-04
 source_updated: unknown
@@ -39,10 +72,14 @@ valid_for: lived-experience Hermes/Codex agent-team patterns as of 2026-05-18
 temporal_status: version-bound
 ---
 
-# Brief: Hermes practical role-agent system
+# Artifact: source-82f18a97-472f-4a5c-a189-f87f1e3e27dd
 
 Date: 2026-05-18
-Source: Telegram-forwarded YouTube video and official Hermes docs checks
+Status: processed
+Source class: telegram
+Retention: source-purged
+
+Date: 2026-05-18
 Status: processed
 
 ## Summary
@@ -69,7 +106,6 @@ The video is useful because it shows how an advanced operator turns Hermes into 
 
 ## Evidence
 
-- The source is an operator walkthrough with concrete use cases and visible workflow descriptions.
 - Official Hermes docs confirm Curator and Codex App-Server Runtime as real features, while correcting some operational details.
 - The strongest evidence is qualitative UX signal, not measured performance.
 
@@ -85,9 +121,6 @@ The video is useful because it shows how an advanced operator turns Hermes into 
   - Hermes Codex App-Server Runtime docs
   - Hermes v0.14.0 release context
 - Freshness status: current.
-- Source published: 2026-05-04.
-- Source updated: unknown.
-- Source version: video references Hermes Agent v0.12.0; checked against v0.14.0 docs/release on 2026-05-18.
 - Retrieved: 2026-05-18.
 - Verified: 2026-05-18.
 - Valid for: lived-experience Hermes/Codex agent-team patterns as of 2026-05-18.
@@ -96,15 +129,12 @@ The video is useful because it shows how an advanced operator turns Hermes into 
 
 ## Risks and caveats
 
-- The source is one user's setup and may overfit to Hermes, personal habits and non-standard skills.
 - Several use cases process sensitive data: travel documents, finance statements, personal images, meetings and business channels.
 - Directly connecting agents to Telegram/Google/CRM/GitHub requires scoped credentials, allowlists and audit logs.
 - Codex CLI bridge claims should be tested locally before becoming a standard.
 - Skill portability between agents is useful, but a skill moved across runtimes can carry wrong assumptions.
 
 ## Recommendation
-
-Use this source as a practical UX input for Agents Mother. Add the following design pressure to future agent contracts: role, recurring pain, interface, memory boundary, skill set, handoff map, scheduled outputs, security boundary and concise reporting.
 
 Do not promote to standard yet. First, create an experiment with one generated role-agent that uses these ideas in a controlled folder.
 

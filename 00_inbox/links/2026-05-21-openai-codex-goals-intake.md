@@ -3,7 +3,7 @@ id: 2026-05-21-openai-codex-goals-intake
 type: intake
 status: new
 created: 2026-05-21
-updated: 2026-05-21
+updated: 2026-06-01
 topics:
   - codex
   - goals
@@ -14,50 +14,43 @@ tools:
   - Codex
   - Codex Goals
   - AGENTS.md
-source_type: documentation
-source_url: https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex
+sources:
+  - source-03e44633-53b6-4273-9e28-dbdf11d05b5e
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: document
+source_class: document
+ingested_at: 2026-05-21
+processed_at: 2026-06-01T21:03:38.417Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-03e44633-53b6-4273-9e28-dbdf11d05b5e
 source_published: 2026-05-09
 source_updated: 2026-05-09
 source_version: OpenAI Cookbook page, observed 2026-05-21
 retrieved: 2026-05-21
 verified: 2026-05-21
 temporal_status: current
-sources:
-  - https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex
-related: {}
-supersedes: []
-superseded_by: []
 ---
 
-# Intake: OpenAI Codex Goals
+# Intake: source-03e44633-53b6-4273-9e28-dbdf11d05b5e
 
-Date added: 2026-05-21
-Type: documentation
-Source: https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex
-Source published: 2026-05-09
-Source updated: 2026-05-09
-Source version: OpenAI Cookbook page, observed 2026-05-21
-Retrieved: 2026-05-21
-Verified: 2026-05-21
-Temporal status: current
+Date: 2026-05-21
 Status: new
+Source class: document
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Official OpenAI guidance introduces Codex Goals as persistent, thread-scoped objectives with completion criteria.
-- This directly matches Techscope's need for long-running agent work: queue cleanup, benchmarks, research audits, project creation, media processing and multi-step repair loops.
-- It can strengthen Agents Mother by making long tasks evidence-bound instead of relying on repeated user prompts like "continue".
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex
-
-## Initial questions
-
-- Should Techscope require Goals for complex implementation runs and research audits?
-- How should Goals relate to AGENTS.md rules, workflows and standards?
-- What should be the default Goal template for Agents Mother project creation?
-
-## Expected output
-
-assessment | standard
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

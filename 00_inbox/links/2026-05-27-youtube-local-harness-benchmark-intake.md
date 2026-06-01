@@ -3,7 +3,7 @@ id: 2026-05-27-youtube-local-harness-benchmark-intake
 type: intake
 status: processed
 created: 2026-05-27
-updated: 2026-05-27
+updated: 2026-06-01
 topics:
   - agent-harness
   - local-models
@@ -19,61 +19,41 @@ tools:
   - llama.cpp
   - Qwen
   - Gemma
+sources:
+  - source-1b3a2b82-0940-4d39-b456-9341c8fa7019
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
 source_type: video
-source_url: https://www.youtube.com/watch?v=bXRQsQmgAYo
+source_class: video
+ingested_at: 2026-05-27
+processed_at: 2026-06-01T21:03:38.418Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-1b3a2b82-0940-4d39-b456-9341c8fa7019
 source_published: 2026-05-26
 source_updated: 2026-05-26
 source_version: YouTube video
 retrieved: 2026-05-27
 verified: 2026-05-27
 temporal_status: current
-sources:
-  - https://www.youtube.com/watch?v=bXRQsQmgAYo
-  - 01_sources/raw/youtube-bXRQsQmgAYo/bXRQsQmgAYo-whisper-small.md
-  - https://github.com/Zux1U/microbench_16
-related:
-  briefs:
-    - 02_briefs/2026-05-27-local-harness-benchmark-brief.md
-  reviews:
-    - 03_reviews/2026-05-27-local-agent-harness-benchmark-assessment.md
 ---
 
-# Intake: Local Harness Benchmark
+# Intake: source-1b3a2b82-0940-4d39-b456-9341c8fa7019
 
-Date added: 2026-05-27
-Type: video
-Source: https://www.youtube.com/watch?v=bXRQsQmgAYo
-Source published: 2026-05-26
-Source updated: 2026-05-26
-Source version: YouTube video
-Retrieved: 2026-05-27
-Verified: 2026-05-27
-Temporal status: current
+Date: 2026-05-27
 Status: processed
+Source class: video
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-The video compares OpenCode, Pi, Hermes and OpenClaw with local models on a
-small benchmark and an applied n8n-like prototype task. The lasting signal is
-not the exact winner, because models, harness versions and local inference
-backends change quickly. The useful pattern is how to evaluate a harness under
-controlled conditions before using it in an agent project.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- YouTube: `СРАВНЕНИЕ топовых Harness на локальных моделях:Opencode, Pi, Hermes, OpenClaw`
-- Channel: ServerFlow AI Lab - R&D в области ИИ и LLM
-- Duration: 10:23
-- Local transcript: `01_sources/raw/youtube-bXRQsQmgAYo/bXRQsQmgAYo-whisper-small.md`
-- Benchmark repo from description: https://github.com/Zux1U/microbench_16
-
-## Initial questions
-
-- Which benchmark design practices should Agents Mother reuse?
-- How should we treat harness/model ranking claims that age quickly?
-- What should be required before choosing OpenCode, Pi, Hermes, OpenClaw or any
-  other harness for a new agent?
-
-## Expected output
-
-brief
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

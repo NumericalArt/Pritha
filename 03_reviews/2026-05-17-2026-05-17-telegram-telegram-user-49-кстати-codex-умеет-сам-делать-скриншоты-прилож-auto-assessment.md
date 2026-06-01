@@ -3,27 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умее�
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
-  - https://t.me/airanez/217
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - source-e5502e39-abcb-4d43-a3b2-12f1de4aa10f
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.441Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-e5502e39-abcb-4d43-a3b2-12f1de4aa10f
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо
+# Assessment: source-e5502e39-abcb-4d43-a3b2-12f1de4aa10f
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -39,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/airanez/217 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.json` Кстати, Codex умеет сам делать скриншоты приложений на телефоне (см. скрин) Очень нравится эта функция - сильно экономит время и упрощает дебаг! Как я понял, это за счёт интеграции с Xcode, но самое интересное, что я ничего дополнительно не устанавливал Claude Code скрины сам не делает) И ещё Remote Access наконец-то завезли, сижу тестирую Поделитесь впечатлениями от удалённого использования Codex с телефона! И как у вас сейчас ситуация с Coding agents - чем в основном пользуетесь? AI RANEZ
-
-## Link processing
-
-- https://t.me/airanez/217 — ok 200; title: Telegram: View @airanez
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- photo — saved: `01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg`
 
 ## Signal extraction
 

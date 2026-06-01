@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-12-харнесы-умираю�
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -24,21 +24,32 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.md
-  - https://t.me/neuraldeep/2130
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.json
+  - source-8a4b13e7-965c-48be-a132-2f355d3e6ad4
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.428Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-8a4b13e7-965c-48be-a132-2f355d3e6ad4
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.md
+  - source-8a4b13e7-965c-48be-a132-2f355d3e6ad4
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2
+# Signal: source-8a4b13e7-965c-48be-a132-2f355d3e6ad4
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -57,9 +68,7 @@ Refinement status: codex-refined
 
 ## Technical details
 
-- Source is a Telegram discussion digest, not a primary technical source.
 - It names several candidate tools/ideas: LLMorpheus, Meta ACH, cross-model review Claude + Codex, Get Shit Done/convergency planning across multiple CLIs.
-- Claims about specific tools require separate source capture before use in standards.
 
 ## Agent design implications
 
@@ -78,21 +87,13 @@ Refinement status: codex-refined
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
 - Проверить первоисточники и даты публикации внешних ссылок.
 - Сверить claims с official MCP specification and client docs.
-- Сверить claims с official OpenAI docs/source materials.
 - Find primary sources for named tools before adding them to standards.
 
 ## Codex refinement
 
 - Done on 2026-05-17 during Telegram backlog cleanup.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.md
-- https://t.me/neuraldeep/2130
-- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.json

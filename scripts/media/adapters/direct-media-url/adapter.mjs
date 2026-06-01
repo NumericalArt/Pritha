@@ -47,7 +47,7 @@ export async function prepareSource(source, context) {
     sourcePath: "",
     originalMediaPath: downloadedPath,
     originalExtension: ext,
-    cleanupPaths: [],
+    cleanupPaths: [downloadedPath],
     metadata: {},
   };
 }

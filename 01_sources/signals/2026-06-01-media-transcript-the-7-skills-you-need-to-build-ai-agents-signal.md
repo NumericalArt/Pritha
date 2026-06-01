@@ -23,28 +23,32 @@ tools:
   - tool-schemas
   - observability
 sources:
-  - 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
-  - 01_sources/raw/media/2026-06-01-media-the-7-skills-you-need-to-build-ai-agents-5c70407aa9f9/transcript.md
-  - https://www.youtube.com/watch?v=mtiOK2QG9Q0
+  - source-c478b03e-91f5-4ca0-abdc-6b35ee49c7d8
 related:
-  intakes:
-    - 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
-  assessments:
-    - 03_reviews/2026-06-01-2026-06-01-ibm-seven-skills-ai-agents-intake-auto-assessment.md
-  standards:
-    - 04_standards/agent-creation-harness.md
-    - 04_standards/agent-tool-integration-selection.md
-    - 04_standards/agent-untrusted-input-security.md
-    - 04_standards/agent-harness-evaluation.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.433Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-c478b03e-91f5-4ca0-abdc-6b35ee49c7d8
 generated_from:
-  - 01_sources/raw/media/2026-06-01-media-the-7-skills-you-need-to-build-ai-agents-5c70407aa9f9/transcript.md
+  - source-c478b03e-91f5-4ca0-abdc-6b35ee49c7d8
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: IBM seven skills for AI agents
+# Signal: source-c478b03e-91f5-4ca0-abdc-6b35ee49c7d8
+
+Date: 2026-06-01
+Status: refined
+Source class: video
+Retention: source-purged
 
 Date: 2026-06-01
 Status: refined
@@ -55,10 +59,8 @@ Refinement status: codex-refined
 ## Core signal
 
 - The useful framing is that production agent work is closer to systems engineering than prompt writing. The video's seven-skill stack maps to system design, tool/contract design, retrieval, reliability, security/safety, evaluation/observability and product thinking.
-- This mostly confirms Techscope's current standards rather than introducing a new architecture. It is a good external supporting source for Pritha's contract-first agent creation model.
 - The strongest practical point is tool contract discipline: vague schemas let the model invent arguments, while strict types, required fields, examples and validation reduce unsafe or nonsensical tool calls.
 - The second strong point is debugging discipline: when an agent fails, trace retrieval, tool selection, schema clarity, tool inputs and outputs before tweaking prompts.
-- The source is an educational/vendor video, so it should support a brief or standard update only after comparison with primary docs and local evidence.
 
 ## Technical details
 
@@ -75,7 +77,6 @@ Refinement status: codex-refined
 - Pritha contracts should continue to ask for tool boundary, runtime placement, untrusted input policy, eval plan, observability/readiness and escalation behavior before scaffold generation.
 - Future agent scaffolds should include at least one tool-schema review step: "would a new engineer know exactly what this tool expects and returns?"
 - Media/intake reviews should treat "improve the prompt" as only one hypothesis. The default root-cause checklist should include retrieval quality, tool schema, permission boundary, state and observability.
-- This source supports existing Techscope direction but does not justify a new standard by itself.
 
 ## Candidate rules
 
@@ -91,7 +92,6 @@ Refinement status: codex-refined
 
 ## Verification required
 
-- Compare with IBM documentation or related written material if this becomes more than a supporting source.
 - Check whether any proposed standard update is already covered by `agent-creation-harness`, `agent-tool-integration-selection`, `agent-untrusted-input-security` or `agent-harness-evaluation`.
 - For retrieval claims, prefer primary RAG/system docs or local eval evidence before adding prescriptive chunking/reranking rules.
 
@@ -99,9 +99,3 @@ Refinement status: codex-refined
 
 - Refined in Techscope Codex thread on 2026-06-01 using `07_workflows/prompts/signal-extraction-harness.md`.
 - Recommendation: create a short brief only if we want a compact "agent engineering skill stack" reference. No immediate standard change required.
-
-## Source links
-
-- 00_inbox/links/2026-06-01-ibm-seven-skills-ai-agents-intake.md
-- 01_sources/raw/media/2026-06-01-media-the-7-skills-you-need-to-build-ai-agents-5c70407aa9f9/transcript.md
-- https://www.youtube.com/watch?v=mtiOK2QG9Q0

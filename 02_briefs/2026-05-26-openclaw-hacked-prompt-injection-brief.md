@@ -3,7 +3,7 @@ id: 2026-05-26-openclaw-hacked-prompt-injection-brief
 type: brief
 status: draft
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-01
 topics:
   - prompt-injection
   - agent-security
@@ -17,6 +17,21 @@ tools:
   - Gmail
   - OpenAI Agent Builder
   - OWASP LLM Top 10
+sources:
+  - source-511135b7-653f-4147-90c2-b515bc79b59b
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-26
+processed_at: 2026-06-01T21:03:38.436Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-511135b7-653f-4147-90c2-b515bc79b59b
 agent_platforms:
   - Codex
   - OpenClaw
@@ -38,25 +53,6 @@ config_surfaces:
   - queue policy
   - operations manifest
 portability: portable
-sources:
-  - 00_inbox/links/2026-05-26-youtube-openclaw-hacked-prompt-injection-intake.md
-  - 01_sources/notes/2026-05-26-openclaw-hacked-prompt-injection-source-note.md
-  - https://www.youtube.com/watch?v=_E4ZT1h7MZs
-  - https://developers.openai.com/api/docs/guides/agent-builder-safety
-  - https://openai.com/index/designing-agents-to-resist-prompt-injection/
-  - https://owasp.org/www-project-top-10-for-large-language-model-applications/
-  - https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/computer-use-tool
-related:
-  intakes:
-    - 00_inbox/links/2026-05-26-youtube-openclaw-hacked-prompt-injection-intake.md
-  reviews:
-    - 03_reviews/2026-05-26-openclaw-hacked-agent-security-assessment.md
-  decisions: []
-  standards:
-    - 04_standards/agent-creation-harness.md
-    - 04_standards/agent-untrusted-input-security.md
-supersedes: []
-superseded_by: []
 freshness_status: current
 source_published: 2026-04-03
 source_updated: 2026-04-03
@@ -67,10 +63,14 @@ valid_for: Agents Mother security design for agents ingesting untrusted external
 temporal_status: current
 ---
 
-# Brief: OpenClaw Hacked Prompt Injection Test
+# Artifact: source-511135b7-653f-4147-90c2-b515bc79b59b
 
 Date: 2026-05-26
-Source: Matthew Berman YouTube video plus official OpenAI/Anthropic/OWASP checks
+Status: draft
+Source class: telegram
+Retention: source-purged
+
+Date: 2026-05-26
 Status: draft
 
 ## Summary
@@ -113,9 +113,6 @@ The video is a useful adversarial demo for personal agents that read external me
 - Relationship to existing knowledge: refines.
 - Official/current sources checked: OpenAI, Anthropic, OWASP.
 - Freshness status: current.
-- Source published: 2026-04-03.
-- Source updated: 2026-04-03.
-- Source version: YouTube video plus docs checked 2026-05-26.
 - Retrieved: 2026-05-26.
 - Verified: 2026-05-26.
 - Valid for: personal agents and Agents Mother-created agents ingesting untrusted external content.

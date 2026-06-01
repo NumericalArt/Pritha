@@ -3,28 +3,39 @@ id: 2026-05-17-2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-inta
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/links/2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake.md
-  - https://www.youtube.com/watch?v=L-HAzfFWSto
-  - 01_sources/signals/2026-05-17-2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake-signal.md
-  - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+  - source-06d85b39-ea9f-45ba-9af8-50f1bccbc3dc
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake-signal.md
-    - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.441Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-06d85b39-ea9f-45ba-9af8-50f1bccbc3dc
 recommendation: brief
 ---
 
-# Assessment: Intake: youtube-openclaw-hermes-codex-cli-user-experience
+# Assessment: source-06d85b39-ea9f-45ba-9af8-50f1bccbc3dc
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -40,21 +51,7 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- Title: OpenClaw, Hermes и Codex CLI: какой AI-агент выбрать сейчас - Channel: ALEKSEI ULIANOV | AI-АГЕНТЫ - Published: 2026-04-28 - Duration: 1:31:55 - URL: https://www.youtube.com/watch?v=L-HAzfFWSto
-
-## Link processing
-
-- https://www.youtube.com/watch?v=L-HAzfFWSto — ok 200; title: OpenClaw, Hermes и Codex CLI: какой AI-агент выбрать сейчас - YouTube
-
 ## YouTube processing
-
-- https://www.youtube.com/watch?v=L-HAzfFWSto — transcribed (ru): `01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md`
-
-## Telegram media
-
-- No raw Telegram update linked.
 
 ## Signal extraction
 

@@ -51,6 +51,7 @@ function run(name, command, commandArgs, options = {}) {
 }
 
 const checks = [
+  run("Privacy retention audit", "node", ["scripts/privacy-audit.mjs", "--strict"]),
   run("Markdown integrity", "node", ["scripts/validate-memory.mjs"]),
   run("Memory rebuild", "node", ["scripts/rebuild-memory.mjs"]),
   run("Memory stats", "node", ["scripts/query-memory.mjs", "stats"]),

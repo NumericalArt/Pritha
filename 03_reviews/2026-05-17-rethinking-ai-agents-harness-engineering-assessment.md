@@ -3,42 +3,50 @@ id: 2026-05-17-rethinking-ai-agents-harness-engineering-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [harness-engineering, coding-agents, agent-architecture, agent-evals, agent-safety, techscope]
-tools: [codex, claude, agents, workflows, evals, memory, guardrails]
+updated: 2026-06-01
+topics:
+  - harness-engineering
+  - coding-agents
+  - agent-architecture
+  - agent-evals
+  - agent-safety
+  - techscope
+tools:
+  - codex
+  - claude
+  - agents
+  - workflows
+  - evals
+  - memory
+  - guardrails
 sources:
-  - 02_briefs/2026-05-17-rethinking-ai-agents-harness-engineering-brief.md
-  - 01_sources/notes/2026-05-17-rethinking-ai-agents-harness-engineering-source-note.md
-  - 01_sources/signals/2026-05-17-youtube-transcript-rethinking-ai-agents-the-rise-of-harness-engineering-signal.md
-  - 01_sources/raw/youtube-Xxuxg8PcBvc/Xxuxg8PcBvc-whisper-small.md
-  - https://www.youtube.com/watch?v=Xxuxg8PcBvc
-  - https://openai.com/index/harness-engineering/
-  - https://www.anthropic.com/engineering/building-effective-agents
-  - https://arxiv.org/abs/2603.25723
-  - https://arxiv.org/abs/2603.03329
+  - source-4dd453ed-fe34-47d6-bc86-7c4fbf84cd5a
 related:
-  briefs:
-    - 02_briefs/2026-05-17-rethinking-ai-agents-harness-engineering-brief.md
-    - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
-  notes:
-    - 01_sources/notes/2026-05-17-rethinking-ai-agents-harness-engineering-source-note.md
-  signals:
-    - 01_sources/signals/2026-05-17-youtube-transcript-rethinking-ai-agents-the-rise-of-harness-engineering-signal.md
   workflows:
-    - 07_workflows/telegram-intake-bot.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.444Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-4dd453ed-fe34-47d6-bc86-7c4fbf84cd5a
 recommendation: experiment
 ---
 
-# Assessment: rethinking-ai-agents-harness-engineering
+# Assessment: source-4dd453ed-fe34-47d6-bc86-7c4fbf84cd5a
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
 Recommendation: experiment
 
 ## One-paragraph read
-
-Материал полезен и хорошо ложится на миссию Techscope. Он не дает готового стандарта, но усиливает направление: проектировать агента через явный harness, а не через набор разрозненных prompts and scripts. Самая практичная польза - превратить наши workflow, queues, validation scripts, source-of-truth Markdown and completion semantics в осознанный agent harness и начать его измерять.
 
 ## Why it matters
 
@@ -115,8 +123,6 @@ Score: 3/5
 Проверять portable harness artifacts как executable supply chain: prompts, skills, MCP servers, scripts, tool schemas and permissions.
 
 ### Evidence
-
-Добрать primary source по MetaHarness and Terminal-Bench claims перед использованием их как strong evidence.
 
 ### Product Pragmatism
 

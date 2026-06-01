@@ -12,7 +12,7 @@ runtime_environment: [cli, vps, ssh, messaging-gateway, codex-cli, background-ag
 config_surfaces: [slash-commands, config.yaml, skills, toolsets, mcp, gateway, OpenAI-compatible local proxy, provider-auth]
 portability: adapter-needed
 sources:
-  - https://www.youtube.com/watch?v=9oOZ3PB6n4Y
+  - anonymous incoming video source (purged)
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/goals
   - https://github.com/NousResearch/hermes-agent/releases/tag/v2026.5.16
   - https://github.com/openai/codex/releases/tag/rust-v0.128.0

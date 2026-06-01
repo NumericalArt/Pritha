@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-33-codex-находка-код�
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -19,21 +19,32 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.md
-  - https://t.me/iwann_tai/33
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.json
+  - source-dc46cb35-8fe2-4cbf-a340-9e03d67e0153
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.429Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-dc46cb35-8fe2-4cbf-a340-9e03d67e0153
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.md
+  - source-dc46cb35-8fe2-4cbf-a340-9e03d67e0153
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи
+# Signal: source-dc46cb35-8fe2-4cbf-a340-9e03d67e0153
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -57,7 +68,6 @@ Refinement status: codex-refined
 ## Agent design implications
 
 - Add a future rule category: clarification policy. Define when agents should ask, continue, or make a conservative assumption.
-- For Telegram/media pipelines, avoid asking for routine processing; ask only when source access, privacy, destructive action or ambiguous scope blocks progress.
 - For coding agents, interactive questions are useful before irreversible edits, unclear product choices or high-cost experiments.
 
 ## Candidate rules
@@ -69,7 +79,6 @@ Refinement status: codex-refined
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -79,9 +88,3 @@ Refinement status: codex-refined
 ## Codex refinement
 
 - Done on 2026-05-17 during Telegram backlog cleanup.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.md
-- https://t.me/iwann_tai/33
-- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.json

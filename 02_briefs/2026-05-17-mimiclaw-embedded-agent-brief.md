@@ -3,35 +3,75 @@ id: 2026-05-17-mimiclaw-embedded-agent-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [mimiclaw, mimiclaw, openclaw, embedded-agents, edge-ai-agents, esp32-s3, freertos, telegram, hardware-agents, memory]
-tools: [MimiClaw, OpenClaw, ESP32-S3, ESP-IDF, FreeRTOS, Telegram, Anthropic, OpenAI, SPIFFS, NVS, WebSocket]
-agent_platforms: [MimiClaw, OpenClaw, Codex]
-model_context: [Anthropic, OpenAI, cloud-llm, no-local-model-out-of-box]
-runtime_environment: [esp32-s3, bare-metal, freertos, microcontroller, telegram, websocket, serial-cli, ota]
-config_surfaces: [mimi_secrets.h, serial-cli, nvs, spiffs, SOUL.md, USER.md, MEMORY.md, HEARTBEAT.md, cron.json, SKILL.md]
-portability: adapter-needed
+updated: 2026-06-01
+topics:
+  - mimiclaw
+  - mimiclaw
+  - openclaw
+  - embedded-agents
+  - edge-ai-agents
+  - esp32-s3
+  - freertos
+  - telegram
+  - hardware-agents
+  - memory
+tools:
+  - MimiClaw
+  - OpenClaw
+  - ESP32-S3
+  - ESP-IDF
+  - FreeRTOS
+  - Telegram
+  - Anthropic
+  - OpenAI
+  - SPIFFS
+  - NVS
+  - WebSocket
 sources:
-  - 00_inbox/links/2026-05-17-mimiclaw-embedded-openclaw-intake.md
-  - 01_sources/notes/2026-05-17-mimiclaw-source-note.md
-  - 01_sources/raw/youtube-eXErSrxDnq0/eXErSrxDnq0-whisper-small.md
-  - https://mimiclaw.io
-  - https://github.com/memovai/mimiclaw
-  - https://github.com/memovai/mimiclaw/releases/tag/v0.1.1
-  - https://raw.githubusercontent.com/memovai/mimiclaw/main/docs/ARCHITECTURE.md
-  - https://raw.githubusercontent.com/memovai/mimiclaw/main/docs/TODO.md
+  - source-b6066dd1-b25a-4a42-a4f6-6377cc8fd5c3
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-mimiclaw-embedded-openclaw-intake.md
-  reviews:
-    - 03_reviews/2026-05-17-mimiclaw-embedded-agent-assessment.md
-    - 03_reviews/2026-05-17-openclaw-agent-architecture-assessment.md
-  decisions: []
-  standards:
-    - 04_standards/agent-environment-compatibility.md
-    - 04_standards/agent-tool-integration-selection.md
-supersedes: []
-superseded_by: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.435Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-b6066dd1-b25a-4a42-a4f6-6377cc8fd5c3
+agent_platforms:
+  - MimiClaw
+  - OpenClaw
+  - Codex
+model_context:
+  - Anthropic
+  - OpenAI
+  - cloud-llm
+  - no-local-model-out-of-box
+runtime_environment:
+  - esp32-s3
+  - bare-metal
+  - freertos
+  - microcontroller
+  - telegram
+  - websocket
+  - serial-cli
+  - ota
+config_surfaces:
+  - mimi_secrets.h
+  - serial-cli
+  - nvs
+  - spiffs
+  - SOUL.md
+  - USER.md
+  - MEMORY.md
+  - HEARTBEAT.md
+  - cron.json
+  - SKILL.md
+portability: adapter-needed
 freshness_status: current
 source_published: 2026-02-04
 source_updated: 2026-04-21
@@ -42,10 +82,14 @@ valid_for: MimiClaw architecture snapshot as of 2026-05-17
 temporal_status: version-bound
 ---
 
-# Brief: MimiClaw embedded agent architecture
+# Artifact: source-b6066dd1-b25a-4a42-a4f6-6377cc8fd5c3
 
 Date: 2026-05-17
-Source: MimiClaw site, GitHub, release, docs, video transcript
+Status: draft
+Source class: telegram
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
@@ -65,7 +109,6 @@ For Techscope, MimiClaw is valuable as a boundary-case architecture. It shows wh
 
 ## Agent environment profile
 
-- Agent platforms: MimiClaw as source platform; OpenClaw/Nanobot as architectural lineage; Codex as adaptation target.
 - Model context: Anthropic/OpenAI cloud APIs out of the box; local models are not supported out of the box.
 - Runtime environment: ESP32-S3, ESP-IDF, FreeRTOS, Telegram, WebSocket, serial CLI, OTA, SPIFFS/NVS.
 - Config surfaces: `mimi_secrets.h`, serial CLI, NVS, SPIFFS files, `SOUL.md`, `USER.md`, `MEMORY.md`, `HEARTBEAT.md`, `cron.json`, `SKILL.md`.
@@ -97,9 +140,6 @@ For Techscope, MimiClaw is valuable as a boundary-case architecture. It shows wh
   - architecture docs
   - TODO/feature-gap tracker
 - Freshness status: current
-- Source published: 2026-02-04
-- Source updated: 2026-04-21
-- Source version: GitHub main observed 2026-05-17; latest release v0.1.1 published 2026-03-17; video published 2026-02-22
 - Retrieved: 2026-05-17
 - Verified: 2026-05-17
 - Valid for: MimiClaw architecture snapshot as of 2026-05-17

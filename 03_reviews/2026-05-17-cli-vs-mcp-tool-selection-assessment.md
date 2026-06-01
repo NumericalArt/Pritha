@@ -3,32 +3,40 @@ id: 2026-05-17-cli-vs-mcp-tool-selection-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [mcp, cli, coding-agents, tool-use, context-engineering, agent-architecture, security]
-tools: [MCP, CLI, Git, GitHub MCP Server, curl, grep, cat, Fetcher MCP]
+updated: 2026-06-01
+topics:
+  - mcp
+  - cli
+  - coding-agents
+  - tool-use
+  - context-engineering
+  - agent-architecture
+  - security
+tools:
+  - MCP
+  - CLI
+  - Git
+  - GitHub MCP Server
+  - curl
+  - grep
+  - cat
+  - Fetcher MCP
 sources:
-  - 00_inbox/links/2026-05-17-youtube-cli-vs-mcp-tool-selection-intake.md
-  - 01_sources/notes/2026-05-17-cli-vs-mcp-tool-selection-source-note.md
-  - 02_briefs/2026-05-17-cli-vs-mcp-tool-selection-brief.md
-  - 01_sources/raw/youtube-g9JIUM0MHgQ/g9JIUM0MHgQ-whisper-small.md
-  - https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
-  - https://modelcontextprotocol.io/specification/draft/basic/authorization
-  - https://github.com/github/github-mcp-server
-  - https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/configure-toolsets
-  - https://www.ibm.com/think/topics/model-context-protocol
+  - source-4509b6d4-0d0a-4a78-a9e7-5699c246d280
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-cli-vs-mcp-tool-selection-intake.md
-  briefs:
-    - 02_briefs/2026-05-17-cli-vs-mcp-tool-selection-brief.md
-    - 02_briefs/2026-05-17-skills-vs-mcp-agent-tooling-brief.md
-  reviews:
-    - 03_reviews/2026-05-17-skills-vs-mcp-agent-tooling-assessment.md
-  decisions: []
-  standards:
-    - 04_standards/agent-tool-integration-selection.md
-supersedes: []
-superseded_by: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.442Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-4509b6d4-0d0a-4a78-a9e7-5699c246d280
+recommendation: standard
 freshness_status: current
 source_published: 2026-05-04
 source_updated: unknown
@@ -37,10 +45,14 @@ retrieved: 2026-05-17
 verified: 2026-05-17
 valid_for: Agent tool selection guidance as of 2026-05-17
 temporal_status: current
-recommendation: standard
 ---
 
-# Assessment: CLI vs MCP tool selection
+# Assessment: source-4509b6d4-0d0a-4a78-a9e7-5699c246d280
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -48,11 +60,7 @@ Recommendation: standard
 
 ## One-paragraph read
 
-This is a strong practical source for Techscope. It gives a clean routing rule for coding agents: use CLI when the task is a local, deterministic developer operation already well served by mature commands; use MCP when the agent needs a managed abstraction, rendered content, authentication, governance or auditability. It confirms our previous Skills/MCP conclusions and adds CLI as the third explicit option in the decision matrix.
-
 ## Why it matters
-
-Techscope is building agent harnesses that will repeatedly choose between shell scripts, skills, MCP servers, browser tools and service APIs. A wrong default creates either context bloat and integration sprawl, or unsafe shell-heavy agents. This source helps us encode the choice as a reusable architecture rule.
 
 ## Technical claims
 
@@ -80,9 +88,6 @@ Techscope is building agent harnesses that will repeatedly choose between shell 
   - GitHub Docs for configuring MCP toolsets
   - IBM MCP explainer
 - Freshness status: current
-- Source published: 2026-05-04
-- Source updated: unknown
-- Source version: video-g9JIUM0MHgQ; MCP spec 2025-06-18; MCP draft observed 2026-05-17; GitHub MCP docs observed 2026-05-17
 - Retrieved: 2026-05-17
 - Verified: 2026-05-17
 - Valid for: Agent tool selection guidance as of 2026-05-17

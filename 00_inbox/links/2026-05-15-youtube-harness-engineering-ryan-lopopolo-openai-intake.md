@@ -3,43 +3,48 @@ id: 2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake
 type: intake
 status: new
 created: 2026-05-15
-updated: 2026-05-15
-topics: [youtube, agents, harness-engineering, software-engineering, ai-engineering, coding-agents]
-tools: [youtube, yt-dlp, mlx-whisper, openai]
-source_type: video
-source_url: https://www.youtube.com/watch?v=am_oeAoUhew
+updated: 2026-06-01
+topics:
+  - youtube
+  - agents
+  - harness-engineering
+  - software-engineering
+  - ai-engineering
+  - coding-agents
+tools:
+  - youtube
+  - yt-dlp
+  - mlx-whisper
+  - openai
 sources:
-  - https://www.youtube.com/watch?v=am_oeAoUhew
-related: {}
+  - source-4417c8cb-eded-4fca-ad2b-df63f1f06073
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.415Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-4417c8cb-eded-4fca-ad2b-df63f1f06073
 ---
 
-# Intake: youtube-harness-engineering-ryan-lopopolo-openai
+# Intake: source-4417c8cb-eded-4fca-ad2b-df63f1f06073
 
-Date added: 2026-05-15
-Type: video
-Source: https://www.youtube.com/watch?v=am_oeAoUhew
+Date: 2026-05-15
 Status: new
+Source class: video
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Видео называется "Harness Engineering: How to Build Software When Humans Steer, Agents Execute".
-- Тема напрямую связана с созданием LLM/coding agents, agent workflows and software engineering around agents.
-- Потенциально может дать правила для настройки агентов, harness layer, проверки результатов, делегирования и человеко-агентного workflow.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- YouTube: https://www.youtube.com/watch?v=am_oeAoUhew
-- Title: Harness Engineering: How to Build Software When Humans Steer, Agents Execute — Ryan Lopopolo, OpenAI
-- Channel: AI Engineer
-- Duration: 46:20
-
-## Initial questions
-
-- Что автор называет harness engineering?
-- Какие инженерные правила можно извлечь для наших coding agents?
-- Как разделяются роли humans steer и agents execute?
-- Есть ли рекомендации, которые стоит превратить в Techscope standard или decision?
-
-## Expected output
-
-brief | review | experiment | standard
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

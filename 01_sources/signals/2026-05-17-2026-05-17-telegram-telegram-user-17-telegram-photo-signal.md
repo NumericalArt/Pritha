@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-17-telegram-photo-signal
 type: signal
 status: superseded
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -18,24 +18,35 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.md
-  - https://t.me/iwann_tai/17
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.json
+  - source-d9af09bf-47b1-487a-87b3-8a47e6ee1816
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.md
-generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.md
-signal_quality: high
-extraction_mode: heuristic-draft
-refinement_status: superseded
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
 superseded_by:
   - 01_sources/notes/2026-05-17-codbash-agent-session-browser-source-note.md
   - 02_briefs/2026-05-17-codbash-agent-session-browser-brief.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.428Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-d9af09bf-47b1-487a-87b3-8a47e6ee1816
+generated_from:
+  - source-d9af09bf-47b1-487a-87b3-8a47e6ee1816
+signal_quality: high
+extraction_mode: heuristic-draft
+refinement_status: superseded
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-17-telegram-telegram-user-17-telegram-photo
+# Signal: source-d9af09bf-47b1-487a-87b3-8a47e6ee1816
+
+Date: 2026-05-17
+Status: superseded
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: superseded
@@ -46,9 +57,7 @@ Refinement status: superseded
 ## Core signal
 
 - Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- See Telegram metadata and raw update._
 - Media: photo: AgACAgIAAxkBAAMRagmdPo1Fxu9zAwg8n1pl25ZkJb8AAvEUaxvXKzFIa7mE_cjV8C0BAAMCAAN5AAM7BA
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.json`
 - # Intake: 2026-05-17-telegram-telegram-user-17-telegram-photo
 - Forwarded to Techscope for later expert assessment.
 - Стоит ли превратить это в brief, review, experiment или archive?
@@ -70,7 +79,6 @@ Refinement status: superseded
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -79,9 +87,3 @@ Refinement status: superseded
 ## Codex refinement required
 
 - Superseded by grouped Codbash media review artifacts.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.md
-- https://t.me/iwann_tai/17
-- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-17-telegram-photo.json

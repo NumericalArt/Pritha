@@ -70,17 +70,14 @@ node scripts/query-memory.mjs recent
 node scripts/query-memory.mjs open
 ```
 
-Transcribe a YouTube video locally:
+Transcribe media locally:
 
 ```sh
-node scripts/transcribe-youtube.mjs https://www.youtube.com/watch?v=bT7aKIwiFjE
+node scripts/transcribe-media.mjs <media-source> --json
 ```
 
-The readable transcript is written to:
-
-```text
-01_sources/raw/youtube-<video-id>/<video-id>-whisper-small.md
-```
+Media transcription uses an untracked temporary workspace and retains only
+neutral status metadata plus processed knowledge.
 
 ## Notes
 

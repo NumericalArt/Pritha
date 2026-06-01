@@ -313,6 +313,7 @@ COMMIT;
   const tmpSql = path.join(MEMORY_DIR, "last-rebuild.sql");
   writeFileSync(tmpSql, sql);
   runSql(sql);
+  runSql("VACUUM;");
 
   console.log(`Indexed ${files.length} documents, ${chunksChanged} chunks.`);
   console.log(`Database: ${path.relative(ROOT, DB_PATH)}`);

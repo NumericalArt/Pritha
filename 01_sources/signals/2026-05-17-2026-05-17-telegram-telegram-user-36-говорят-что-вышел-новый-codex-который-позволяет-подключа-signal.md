@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-36-говорят-что-выш
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -19,23 +19,32 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
-  - https://t.me/llm_under_hood/835
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
+  - source-4d673c05-b538-4cef-bf90-97fadcd11287
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.429Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-4d673c05-b538-4cef-bf90-97fadcd11287
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
+  - source-4d673c05-b538-4cef-bf90-97fadcd11287
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться
+# Signal: source-4d673c05-b538-4cef-bf90-97fadcd11287
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -46,7 +55,6 @@ Refinement status: codex-refined
 ## Core signal
 
 - Codex mobile access to local sessions may replace ad hoc Telegram bridges for controlling active Codex work.
-- Official OpenAI source confirms that Codex in the ChatGPT mobile app can connect to machines where Codex is running: laptop, Mac mini, devbox or managed remote environment.
 - The useful split for Techscope: use Codex mobile for active agent control; use Telegram bot for knowledge intake and media capture.
 - The screenshot shows an active local Codex task with `Work locally`, project sidebar, permission/model controls and live work progress.
 - Host availability matters: for reliable mobile control, use Mac mini/VM or prevent laptop sleep.
@@ -75,7 +83,6 @@ Refinement status: codex-refined
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -88,14 +95,5 @@ Refinement status: codex-refined
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
-- https://t.me/llm_under_hood/835
-- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json
-- 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg
-- https://openai.com/index/work-with-codex-from-anywhere/

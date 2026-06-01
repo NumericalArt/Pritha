@@ -3,26 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-33-codex-находка-код�
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.md
-  - https://t.me/iwann_tai/33
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в--signal.md
+  - source-9fef3d79-8b36-4c59-b161-57b5d305d16d
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в--signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.440Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-9fef3d79-8b36-4c59-b161-57b5d305d16d
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи
+# Assessment: source-9fef3d79-8b36-4c59-b161-57b5d305d16d
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -38,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/iwann_tai/33 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.json` #codex находка - кодекс может задавать вопросы не только в режиме планирования /plan если в файле ~/.codex/config.toml в раздел [features] добавить default_mode_request_user_input = true то кодекс сможет задавать интерактивные вопросы не только в режиме планирования /plan чтобы задать вопрос работает tool request_user_input
-
-## Link processing
-
-- https://t.me/iwann_tai/33 — ok 200; title: Telegram: Contact @iwann_tai
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- No Telegram media attachments found.
 
 ## Signal extraction
 

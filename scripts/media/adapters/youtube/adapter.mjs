@@ -60,7 +60,7 @@ export async function prepareSource(source, context) {
     sourcePath: "",
     originalMediaPath: downloadedPath,
     originalExtension: ".mp4",
-    cleanupPaths: [],
+    cleanupPaths: [downloadedPath],
     metadata: {},
   };
 }

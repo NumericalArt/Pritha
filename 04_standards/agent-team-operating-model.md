@@ -21,7 +21,7 @@ tools:
 sources:
   - 02_briefs/2026-05-27-hermes-agent-team-operating-model-brief.md
   - 03_reviews/2026-05-27-hermes-agent-team-operating-model-assessment.md
-  - https://www.youtube.com/watch?v=ysQ1T3Xkub8
+  - anonymous incoming video source (purged)
   - https://github.com/NousResearch/hermes-agent/blob/main/RELEASE_v0.12.0.md
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/cron/
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/delegation/

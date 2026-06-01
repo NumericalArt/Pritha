@@ -3,7 +3,7 @@ id: 2026-05-29-pritha-portable-memory-snapshot
 type: decision
 status: accepted
 created: 2026-05-29
-updated: 2026-05-29
+updated: 2026-06-01
 topics: [memory, github, portability, sqlite, embeddings]
 tools: [git, github, sqlite, sentence-transformers]
 sources:
@@ -17,7 +17,8 @@ related:
     - 05_decisions/2026-05-15-memory-architecture.md
     - 05_decisions/2026-05-15-local-embeddings.md
 supersedes: []
-superseded_by: []
+superseded_by:
+  - 04_standards/source-retention-and-anonymization.md
 freshness_status: current
 source_published: 2026-05-29
 source_updated: 2026-05-29
@@ -66,11 +67,12 @@ can leave embeddings empty until the embedding step runs again.
 Do not commit secrets, `.env.local`, `.queue/`, `.logs/`, `.tools/` or
 `secure-handoffs/`.
 
-`01_sources/raw/` is included for text, JSON, transcripts, PDFs and small
-supporting images. Heavy audio/video files (`mp4`, `wav`, `mov`, `mkv`,
-`webm`, `mp3`, `m4a`, `avi`, `flac`) are local-only because they quickly exceed
-reasonable Git/GitHub limits. Raw media needs a separate Git LFS/archive
-decision before it is published.
+This decision is superseded for raw/source material by
+`04_standards/source-retention-and-anonymization.md`. The portable snapshot now
+includes authored Markdown and cleaned `.memory` cache artifacts only. Raw JSON,
+transcripts, downloaded documents/images, original media and incoming-material
+provenance are not portable Git state. Any raw-source retention needs a separate
+secure storage decision outside the normal repository snapshot.
 
 ## Consequences
 
@@ -88,7 +90,8 @@ Costs and risks:
 - every memory-changing push should refresh embeddings before commit;
 - SQLite can contain copied text from curated artifacts, so secret scanning and
   intake discipline remain important;
-- heavy raw audio/video still needs a separate portability path.
+- raw/source retention now needs a separate secure storage path outside the
+  normal repository snapshot.
 
 ## Review date
 

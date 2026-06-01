@@ -3,26 +3,53 @@ id: 2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-а�
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
-topics: [openclaw, hermes, codex-cli, ai-agents, user-experience, non-professional-users, agent-memory, llm-wiki, telegram-agents]
-tools: [youtube, yt-dlp, mlx-whisper, openclaw, hermes, codex, obsidian, telegram]
+updated: 2026-06-01
+topics:
+  - openclaw
+  - hermes
+  - codex-cli
+  - ai-agents
+  - user-experience
+  - non-professional-users
+  - agent-memory
+  - llm-wiki
+  - telegram-agents
+tools:
+  - youtube
+  - yt-dlp
+  - mlx-whisper
+  - openclaw
+  - hermes
+  - codex
+  - obsidian
+  - telegram
 sources:
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
-  - https://www.youtube.com/watch?v=L-HAzfFWSto
+  - source-1c203034-918b-49a8-bca5-3464fc156892
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake.md
-  assessments:
-    - 03_reviews/2026-05-17-2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake-auto-assessment.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.431Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-1c203034-918b-49a8-bca5-3464fc156892
 generated_from:
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+  - source-1c203034-918b-49a8-bca5-3464fc156892
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: advanced-user comparison of OpenClaw, Hermes and Codex CLI
+# Signal: source-1c203034-918b-49a8-bca5-3464fc156892
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -36,12 +63,10 @@ Refinement status: codex-refined
 - Главная повторяющаяся тема: пользователю нужен не "самый умный живой собеседник", а стабильный рабочий контур, который не пухнет, не теряет контекст и умеет выполнять длинные задачи.
 - Автор разделяет агентские оболочки по "толщине harness": более богатая оболочка дает персональность и удобство, но чаще приносит context bloat, расход токенов, нестабильность и сложность поддержки.
 - Практический критерий выбора для Techscope: agent runtime нужно оценивать не только по качеству ответа, но и по холодному старту, объему подтягиваемого контекста, прозрачности используемых skills/tools и восстановлению после restart.
-- Сильный сигнал в пользу file-backed wiki memory: автор независимо приходит к паттерну, близкому к нашему `10_wiki/`: raw/source слой отдельно, сгенерированная Markdown wiki отдельно, index/log and rules для агентов.
 - Для не-технических пользователей важен business-facing interface: Telegram/бот-посредник, понятные папки с файлами, CRM/API integrations, отчеты, заявки и manager-assist workflows, а не просьба "запусти команды по инструкции".
 
 ## Technical details
 
-- Source date: YouTube live published 2026-04-28; processed in Techscope on 2026-05-17.
 - User class: advanced AI-agent user, not a professional coder. Use as UX/adoption evidence, not as primary technical proof.
 - Test prompt used by author: compare agents on debugging an unstable agent system with memory loss, context drift, token overuse and non-programmer operator constraints.
 - Observed evaluation dimensions from transcript:
@@ -71,13 +96,10 @@ Refinement status: codex-refined
   - rollback/recovery after bad memory writes;
   - cost predictability;
   - security and permission isolation.
-- For Techscope intake, do not store raw transcript as primary memory. Store refined signal, source note, brief and assessment; keep raw transcript in `01_sources/raw/`.
 - For business-facing agents, prefer a thin, reliable interface around a well-understood runtime over a feature-heavy autonomous shell unless the shell's memory, permissions and logs are auditable.
-- Any "wiki is source of truth" claim must be adapted to Techscope's safer rule: raw/curated artifacts are source of truth; generated wiki is synthesis/navigation until reviewed.
 
 ## Candidate rules
 
-- For every evaluated agent shell, record `runtime`, `model/provider`, `memory model`, `tool surface`, `permissions`, `cold-start context`, `long-task behavior`, `operator audience` and `source date`.
 - For non-coder use cases, the acceptable interface is "drop material / ask in Telegram / receive concise result"; command-line repair instructions are implementation detail.
 - Generated skills and wiki pages must have provenance and review status before they affect standards or decisions.
 - If an agent grows persistent memory automatically, require lint for stale facts, contradictions, orphan pages, and token-heavy pages.
@@ -100,8 +122,3 @@ Refinement status: codex-refined
 
 - Refined in Techscope Codex thread on 2026-05-17.
 - Promoted to brief/review candidates; do not promote directly to standards.
-
-## Source links
-
-- 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
-- https://www.youtube.com/watch?v=L-HAzfFWSto

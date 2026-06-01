@@ -3,30 +3,39 @@ id: 2026-05-18-2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0g
 type: assessment
 status: draft
 created: 2026-05-18
-updated: 2026-05-18
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
-  - https://t.me/iwann_tai/61
-  - 01_sources/raw/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.json
-  - 01_sources/signals/2026-05-18-2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj-signal.md
-  - 01_sources/signals/2026-05-18-youtube-transcript-мои-примеры-использования-агентов-hermes-signal.md
-  - https://youtu.be/ysQ1T3Xkub8?is=8I0GythivSLTgnPj
-  - 01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md
+  - source-2ef12d80-7026-4583-937e-2c3b03789355
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.md
-  signals:
-    - 01_sources/signals/2026-05-18-2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj-signal.md
-    - 01_sources/signals/2026-05-18-youtube-transcript-мои-примеры-использования-агентов-hermes-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-18
+processed_at: 2026-06-01T21:03:38.444Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-2ef12d80-7026-4583-937e-2c3b03789355
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj
+# Assessment: source-2ef12d80-7026-4583-937e-2c3b03789355
+
+Date: 2026-05-18
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-18
 Status: draft
@@ -42,22 +51,7 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/iwann_tai/61 - Raw update: `01_sources/raw/telegram/2026-05-18-telegram-telegram-user-61-youtu-be-ysq1t3xkub8-is-8i0gythivsltgnpj.json` https://youtu.be/ysQ1T3Xkub8?is=8I0GythivSLTgnPj
-
-## Link processing
-
-- https://t.me/iwann_tai/61 — ok 200; title: Telegram: Contact @iwann_tai
-- https://youtu.be/ysQ1T3Xkub8?is=8I0GythivSLTgnPj — ok 200; title: Мои ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ агентов HERMES - YouTube
-
 ## YouTube processing
-
-- https://youtu.be/ysQ1T3Xkub8?is=8I0GythivSLTgnPj — transcribed (ru): `01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md`
-
-## Telegram media
-
-- No Telegram media attachments found.
 
 ## Signal extraction
 

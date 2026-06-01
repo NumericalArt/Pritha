@@ -269,7 +269,7 @@ AM-pattern candidates: `audit-baseline-report`, `golden-checks-manifest`, `audit
 ### Deliverables
 
 - `git init` + первый коммит со всем рабочим состоянием Markdown + scripts.
-- Аудит `.gitignore`: подтвердить, что `.memory/*.sqlite`, `.memory/last-rebuild.sql`, `.logs/`, `.tools/`, `.queue/`, `.env*` (кроме `.env.example`), `01_sources/raw/`, `node_modules/`, `__pycache__/`, `.DS_Store`, `Untitled*.canvas` — игнорируются.
+- Аудит `.gitignore`: подтвердить, что local-only runtime/cache/queue/env folders and raw-source holding areas are ignored, while the explicitly approved cleaned `.memory` portability snapshot remains tracked.
 - `scripts/golden-checks.mjs` — единая обёртка с двумя режимами:
   - `--json` — машинный вывод;
   - default — человеко-читаемый отчёт + ненулевой exit при провале.

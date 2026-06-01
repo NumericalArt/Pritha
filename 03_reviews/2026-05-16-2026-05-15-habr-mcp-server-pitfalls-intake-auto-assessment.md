@@ -3,25 +3,39 @@ id: 2026-05-16-2026-05-15-habr-mcp-server-pitfalls-intake-auto-assessment
 type: assessment
 status: draft
 created: 2026-05-16
-updated: 2026-05-16
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
-  - https://habr.com/ru/companies/bitrix/articles/1009150/
-  - 01_sources/signals/2026-05-16-2026-05-15-habr-mcp-server-pitfalls-intake-signal.md
+  - source-888baec6-761e-4a5d-ae06-709ad86381fa
 related:
-  intakes:
-    - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
-  signals:
-    - 01_sources/signals/2026-05-16-2026-05-15-habr-mcp-server-pitfalls-intake-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-16
+processed_at: 2026-06-01T21:03:38.438Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-888baec6-761e-4a5d-ae06-709ad86381fa
 recommendation: brief
 ---
 
-# Assessment: Intake: habr-mcp-server-pitfalls
+# Assessment: source-888baec6-761e-4a5d-ae06-709ad86381fa
+
+Date: 2026-05-16
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-16
 Status: draft
@@ -36,14 +50,6 @@ Recommendation: brief
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-- Habr: https://habr.com/ru/companies/bitrix/articles/1009150/ - Title: Что может пойти и обязательно пойдет не так при написании MCP-сервера - Author: vasilyev / команда AI Битрикс24 - Published: 2026-03-16 inferred from Habr current-year display
-
-## Link processing
-
-- https://habr.com/ru/companies/bitrix/articles/1009150/ — ok 200; title: Что может пойти и обязательно пойдет не так при написании MCP-сервера &#x2F; Хабр
 
 ## YouTube processing
 

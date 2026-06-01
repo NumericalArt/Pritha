@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-epro
 type: signal
 status: refined
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -21,21 +21,32 @@ tools:
   - qa
   - source
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
-  - https://t.me/iwann_tai/16
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.json
+  - source-c814e427-a7e0-40de-b9af-0b1c47a6eab6
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.428Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-c814e427-a7e0-40de-b9af-0b1c47a6eab6
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
+  - source-c814e427-a7e0-40de-b9af-0b1c47a6eab6
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про
+# Signal: source-c814e427-a7e0-40de-b9af-0b1c47a6eab6
+
+Date: 2026-05-17
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: refined
@@ -78,7 +89,6 @@ Refinement status: codex-refined
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -90,12 +100,5 @@ Refinement status: codex-refined
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
-- https://t.me/iwann_tai/16
-- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.json

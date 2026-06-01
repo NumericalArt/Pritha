@@ -3,7 +3,7 @@ id: 2026-05-16-2026-05-16-telegram-telegram-user-9-как-использоват
 type: signal
 status: refined
 created: 2026-05-16
-updated: 2026-05-16
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -31,21 +31,32 @@ tools:
   - qa
   - source
 sources:
-  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
-  - https://t.me/tosoltaime/42
-  - 01_sources/raw/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.json
+  - source-218ada86-fc34-44a1-b610-9c7ddb31a6a5
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-16
+processed_at: 2026-06-01T21:03:38.427Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-218ada86-fc34-44a1-b610-9c7ddb31a6a5
 generated_from:
-  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
+  - source-218ada86-fc34-44a1-b610-9c7ddb31a6a5
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex
+# Signal: source-218ada86-fc34-44a1-b610-9c7ddb31a6a5
+
+Date: 2026-05-16
+Status: refined
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-16
 Status: refined
@@ -93,7 +104,6 @@ Refinement status: codex-refined
 ## Verification required
 
 - Проверить, что термин `Superpowers` относится к конкретной Codex feature/workflow and whether it has official docs.
-- Сверить с OpenAI harness engineering source note before creating a standard.
 - Найти или создать examples of `docs/evals/`, `acceptance.md` and smoke checks in future real projects.
 - Security lens required before adopting this as a standard for prompt-injection-sensitive workflows.
 
@@ -101,9 +111,3 @@ Refinement status: codex-refined
 
 - Refined in Techscope thread using `07_workflows/prompts/signal-extraction-harness.md`.
 - Strong recommendation: promote to brief/review if we decide to formalize test-first coding-agent workflow.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
-- https://t.me/tosoltaime/42
-- 01_sources/raw/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.json

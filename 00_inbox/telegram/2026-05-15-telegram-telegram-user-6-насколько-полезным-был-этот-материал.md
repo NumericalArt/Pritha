@@ -3,57 +3,41 @@ id: 2026-05-15-telegram-telegram-user-6-насколько-полезным-бы
 type: intake
 status: new
 created: 2026-05-15
-updated: 2026-05-15
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/iwann_tai/6
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/iwann_tai/6
-  - 01_sources/raw/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 6
-  forwarded_from: 
+  - source-642c056c-65fe-411e-b29d-dc8ddc897db8
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.419Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-642c056c-65fe-411e-b29d-dc8ddc897db8
 ---
 
-# Intake: 2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал
+# Intake: source-642c056c-65fe-411e-b29d-dc8ddc897db8
 
-Date added: 2026-05-15
-Type: telegram
-Source: https://t.me/iwann_tai/6
+Date: 2026-05-15
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 6
-- Forwarded from: not forwarded or hidden
-- Date: 2026-05-15T22:54:52.000Z
-- Media: none
-
-## Raw material or link
-
-- https://t.me/iwann_tai/6
-- Raw update: `01_sources/raw/telegram/2026-05-15-telegram-telegram-user-6-насколько-полезным-был-этот-материал.json`
-
-## Message text
-
-Насколько полезным был этот материал?
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

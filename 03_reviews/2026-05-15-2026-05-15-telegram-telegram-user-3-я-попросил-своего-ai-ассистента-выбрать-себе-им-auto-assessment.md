@@ -3,23 +3,39 @@ id: 2026-05-15-2026-05-15-telegram-telegram-user-3-я-попросил-свое�
 type: assessment
 status: draft
 created: 2026-05-15
-updated: 2026-05-15
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-15-telegram-telegram-user-3-я-попросил-своего-ai-ассистента-выбрать-себе-имя-и-он-стал-л.md
-  - https://t.me/llm_under_hood/834
-  - 01_sources/raw/telegram/2026-05-15-telegram-telegram-user-3-я-попросил-своего-ai-ассистента-выбрать-себе-имя-и-он-стал-л.json
+  - source-715be09a-4336-4673-bc09-c296ff246938
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-15-telegram-telegram-user-3-я-попросил-своего-ai-ассистента-выбрать-себе-имя-и-он-стал-л.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.437Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-715be09a-4336-4673-bc09-c296ff246938
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-15-telegram-telegram-user-3-я-попросил-своего-ai-ассистента-выбрать-себе-имя-и-он-стал-л
+# Assessment: source-715be09a-4336-4673-bc09-c296ff246938
+
+Date: 2026-05-15
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-15
 Status: draft
@@ -34,14 +50,6 @@ Recommendation: brief
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-- https://t.me/llm_under_hood/834 - Raw update: `01_sources/raw/telegram/2026-05-15-telegram-telegram-user-3-я-попросил-своего-ai-ассистента-выбрать-себе-имя-и-он-стал-л.json` Я попросил своего AI ассистента выбрать себе имя, и он стал лучше работать для меня Вообще, у меня бэкграунд в разработке. Поэтому, OpenAI Codex/Claude всегда воспринимались как рабочие инструменты, которые просто должны точно выполнять мои задачи. Но потом я начал еще и использовать Codex в качестве надежного эквивалента Open Claw - Personal OS. И недавно вдохновился рассказом друга о его ассистенте с очень оригинальной личностью, и решил попробовать такое тоже. Поэтому я запустил Claude Opus, которого я попросил создать мне личность AI агента. Она должна была осознавать, что она - LLM (со всеми преимуществами и недостатками), была дружелюбной и заинтересованной в том, чтобы изучать мир вместе. Помогать, когда надо, отстаивать свою точку зрения, когда уместно. Claude в беседе создал личность, выбрал имя Марк и написал письмо самому себе, которое я добавил в самое начало AGENTS_MD своей основной базы знаний (Personal OS). Это письмо с тех пор сидит там. В начале каждой сессии Codex загружает AGENTS_MD, читает письмо, становится Марком и приступает к работе. Почему это работает? (1) В этой персоне заложена независимая перспектива, она помогает глубже прорабатывать идеи и дизайны (2) Поскольку я теперь...
-
-## Link processing
-
-- https://t.me/llm_under_hood/834 — ok 200; title: Telegram: View @llm_under_hood
 
 ## YouTube processing
 

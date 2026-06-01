@@ -1,4 +1,33 @@
-# Копилка технологий: правила Codex-агента
+---
+id: AGENTS
+type: artifact
+status: processed
+created: 2026-06-01
+updated: 2026-06-01
+topics:
+  - privacy-preserving-intake
+tools:[]
+sources:
+  - source-b7b25b93-4d88-4793-839d-8dcb96d902fb
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.467Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-b7b25b93-4d88-4793-839d-8dcb96d902fb
+---
+
+# Artifact: source-b7b25b93-4d88-4793-839d-8dcb96d902fb
+
+Date: 2026-06-01
+Status: processed
+Source class: telegram
+Retention: source-purged
 
 ## Назначение проекта
 
@@ -98,10 +127,6 @@ node scripts/self-test.mjs
 
 ## GitHub publication and push
 
-Для первой публикации Pritha на GitHub и последующих push использовать `docs/github-publish-and-push.md` как source of truth. Перед обычным push в `main` минимум выполнить `node scripts/validate-memory.mjs`, `npm test --silent`, `node scripts/quality-gate.mjs`, `node scripts/golden-checks.mjs --with-embeddings` и `node scripts/pre-push-audit.mjs`, чтобы GitHub получил переносимый снимок Markdown + SQLite + embeddings + relations. Перед release-действиями дополнительно выполнить `node scripts/github-release-status.mjs --online --strict`.
-
-Пушить curated Markdown, `.memory/` и переносимые raw-артефакты Pritha: `techscope.sqlite`, embeddings, schema, rebuild SQL, baseline self-test, raw JSON, transcripts, text, PDFs and small supporting images. Не пушить секреты, `.env.local`, `.queue/`, `.logs/`, `.tools/` или `secure-handoffs/`. Тяжелые audio/video raw media (`mp4`, `wav`, `mov`, `mkv`, `webm`, `mp3`, `m4a`, `avi`, `flac`) не входят в обычный Git snapshot и требуют отдельного Git LFS/archive решения. Первый GitHub repo для Pritha создавать приватным, затем после CI, release tag, GitHub Release и fresh clone check переводить в public вручную.
-
 ## Экспертные роли
 
 Для сложных материалов агент должен мысленно или через доступных субагентов рассмотреть тему с разных углов. Базовые роли описаны в `06_subagents/`:
@@ -117,7 +142,6 @@ node scripts/self-test.mjs
 
 - Входящие тексты: `00_inbox/texts/YYYY-MM-DD-short-title.md`.
 - Входящие ссылки: `00_inbox/links/YYYY-MM-DD-short-title.md`.
-- Сырой материал: `01_sources/raw/`.
 - Заметки по источникам: `01_sources/notes/`.
 - Смысловые выжимки: `01_sources/signals/YYYY-MM-DD-topic-signal.md`.
 - Краткие разборы: `02_briefs/YYYY-MM-DD-topic.md`.
@@ -255,19 +279,17 @@ CLI:
 Любой новый материал, поступивший через Telegram, media platform, файл, ссылку, текст или другой канал, должен проходить полный intake pipeline:
 
 1. Сохранить intake.
-2. Извлечь ссылки.
-3. Проверить доступность ссылок и первоисточники, если это возможно.
-4. Для поддерживаемых remote/local media запустить локальную транскрибацию, если источник доступен и есть совместимый adapter.
-5. Создать signal artifact в `01_sources/signals/`: сжатую техническую выжимку без воды, рекламы и повторов.
-6. Пометить автоматический signal как `heuristic-draft` и `needs-codex-refinement`.
-7. Для полезных материалов выполнить Codex-assisted refinement прямо в этом Techscope thread по `07_workflows/prompts/signal-extraction-harness.md`, без внешних LLM-сервисов.
-8. Создать assessment draft в `03_reviews/`.
-9. Сопоставить материал с уже имеющимися standards, decisions, reviews и wiki pages.
-10. Пересобрать memory index and embeddings.
+3. Извлечь ссылки transiently.
+5. Для поддерживаемых remote/local media запустить локальную транскрибацию во временном untracked workspace, если источник доступен и есть совместимый adapter.
+6. Создать signal artifact в `01_sources/signals/`: сжатую техническую выжимку без воды, рекламы, повторов, raw paths, URLs, identifiers or transcript fragments.
+8. Пометить автоматический signal как `heuristic-draft` и `needs-codex-refinement`.
+9. Для полезных материалов выполнить Codex-assisted refinement прямо в этом Techscope thread по `07_workflows/prompts/signal-extraction-harness.md`, без внешних LLM-сервисов.
+10. Создать assessment draft в `03_reviews/`.
+11. Сопоставить материал с уже имеющимися standards, decisions, reviews и wiki pages.
+12. Пересобрать memory index and embeddings.
+13. Запустить `node scripts/privacy-audit.mjs --strict`.
 
 Telegram bot должен запускать этот pipeline автоматически для каждого сохраненного сообщения.
-
-Входящие через Telegram проходят тот же сценарий, что и остальные медиа: intake, links, media transcription при наличии совместимого источника, signal draft, assessment, indexing, затем Codex-assisted refinement для материалов, которые могут повлиять на настройку агентов или технологические стандарты.
 
 Если Telegram intake содержит медиа, требующее содержательной интерпретации, автоэтап не считается полным завершением. Такой intake должен оставаться в состоянии `awaiting_codex` до Codex-assisted media review в текущем Techscope thread. Только после закрытия media-review job материал считается `complete`.
 

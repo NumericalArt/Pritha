@@ -4,58 +4,56 @@ type: intake
 status: new
 created: 2026-06-01
 updated: 2026-06-01
-topics: [youtube, ai-education, human-potential, skills, ai-literacy, future-of-work]
-tools: [youtube, yt-dlp, transcribe-media, mlx-whisper, rbc-investments]
+topics:
+  - youtube
+  - ai-education
+  - human-potential
+  - skills
+  - ai-literacy
+  - future-of-work
+tools:
+  - youtube
+  - yt-dlp
+  - transcribe-media
+  - mlx-whisper
+  - rbc-investments
+sources:
+  - source-59a3dd01-847e-44f1-aa54-96640ace67ee
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
 source_type: video
-source_url: https://www.youtube.com/watch?v=rWpvwVfU0K4
+source_class: video
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.418Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-59a3dd01-847e-44f1-aa54-96640ace67ee
 source_published: 2026-05-23
 source_updated: unknown
 source_version: unknown
 retrieved: 2026-06-01
 verified: 2026-06-01
 temporal_status: current
-sources:
-  - https://www.youtube.com/watch?v=rWpvwVfU0K4
-related: {}
-supersedes: []
-superseded_by: []
 ---
 
-# Intake: Auzan on AI education and human potential
+# Intake: source-59a3dd01-847e-44f1-aa54-96640ace67ee
 
-Date added: 2026-06-01
-Type: video
-Source: https://www.youtube.com/watch?v=rWpvwVfU0K4
-Source published: 2026-05-23
-Source updated: unknown
-Source version: unknown
-Retrieved: 2026-06-01
-Verified: 2026-06-01
-Temporal status: current
+Date: 2026-06-01
 Status: new
+Source class: video
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Материал касается того, как ИИ меняет обучение, навыки и человеческий потенциал; это может быть полезно для проектирования обучающих и knowledge-work агентов.
-- Для Techscope важны не общие социальные тезисы, а переносимые выводы: какие навыки, интерфейсы, memory/workflow patterns или критерии обучения стоит учитывать в future agents.
-- Источник публичный и экспертно-популярный, но не техническая документация; claims нужно отделять от мнений и не превращать напрямую в стандарты.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- Title: Александр Аузан - о человеческом потенциале России и будущем образования в эпоху ИИ
-- Channel: РБК Инвестиции
-- Published: 2026-05-23
-- Duration: 16:09
-- URL: https://www.youtube.com/watch?v=rWpvwVfU0K4
-- Supplied short link was normalized to canonical video id `rWpvwVfU0K4`.
-- Description excerpt from metadata: как нейросети меняют обучение и какие навыки станут важнее в эпоху ИИ.
-
-## Initial questions
-
-- Есть ли в материале практические выводы для agent engineering, developer education или learning-agent design?
-- Подтверждает ли видео текущие стандарты Techscope по обучающим агентам, памяти, evals или human-in-the-loop?
-- Нужно ли сохранить это как brief про AI education/skills или достаточно refined signal + assessment?
-
-## Expected output
-
-signal | assessment | brief | review | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

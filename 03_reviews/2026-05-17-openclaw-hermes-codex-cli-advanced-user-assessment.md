@@ -3,36 +3,48 @@ id: 2026-05-17-openclaw-hermes-codex-cli-advanced-user-assessment
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [openclaw, hermes, codex-cli, ai-agents, user-experience, non-professional-users, agent-memory, llm-wiki, telegram-agents, business-agents]
-tools: [openclaw, hermes, codex, obsidian, telegram, crm, youtube]
+updated: 2026-06-01
+topics:
+  - openclaw
+  - hermes
+  - codex-cli
+  - ai-agents
+  - user-experience
+  - non-professional-users
+  - agent-memory
+  - llm-wiki
+  - telegram-agents
+  - business-agents
+tools:
+  - openclaw
+  - hermes
+  - codex
+  - obsidian
+  - telegram
+  - crm
+  - youtube
 sources:
-  - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
-  - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
-  - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
-  - https://www.youtube.com/watch?v=L-HAzfFWSto
-  - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
-  - https://github.com/NousResearch/hermes-agent
-  - https://hermes-agent.nousresearch.com/docs/user-guide/features/codex-app-server-runtime
-  - https://github.com/openai/codex
-  - https://openai.com/index/introducing-the-codex-app/
-  - https://arxiv.org/abs/2603.07670
+  - source-4449d273-0546-4980-bfcd-5666302ce399
 related:
-  briefs:
-    - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
-  notes:
-    - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
-  signals:
-    - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
   workflows:
-    - 07_workflows/telegram-intake-bot.md
-    - 07_workflows/media-intake-processing.md
-    - 07_workflows/llm-wiki-layer.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.444Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-4449d273-0546-4980-bfcd-5666302ce399
 recommendation: review
 ---
 
-# Assessment: advanced-user comparison of OpenClaw, Hermes and Codex CLI
+# Assessment: source-4449d273-0546-4980-bfcd-5666302ce399
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -55,7 +67,6 @@ Recommendation: review
 - Agent shell complexity directly affects token cost and failure modes.
 - Transparent skills/tools are valuable because users can see whether an agent is doing relevant work.
 - Business-facing agents need intermediary bots and limited surfaces, not raw terminal instructions.
-- Generated wiki memory should be compiled and maintained, but standards/decisions must still cite source artifacts.
 
 ## Programming relevance
 
@@ -103,8 +114,6 @@ Risks: overfitting to one user's setup, promotional ecosystem noise, unclear Ope
 
 ### Architecture
 
-Use a layered model: source artifacts, refined signals, wiki synthesis, runtime-specific agent harnesses. Keep runtimes interchangeable where possible, but do not pretend their memory/tool/plugin semantics are identical.
-
 ### Security
 
 Telegram control, CRM access and self-improving skills require allowlists, scoped credentials, logs, human approval for destructive actions and memory linting. Do not accept "works for me" as safety evidence.
@@ -118,8 +127,6 @@ For coders, Codex CLI/app remains the primary Techscope environment. For non-cod
 Adopt the rubric now; defer actual runtime migration experiments until a concrete use case needs Hermes/OpenClaw. Keep our current Codex-centered harness as the baseline.
 
 ### Research Scout
-
-Track dates and versions. Compare this source against official docs and community reports from the same time window because agent ecosystems change very quickly.
 
 ### Standards Editor
 

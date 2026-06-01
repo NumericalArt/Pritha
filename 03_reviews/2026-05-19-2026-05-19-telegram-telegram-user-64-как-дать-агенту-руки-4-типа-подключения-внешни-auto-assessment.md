@@ -3,28 +3,39 @@ id: 2026-05-19-2026-05-19-telegram-telegram-user-64-как-дать-агенту
 type: assessment
 status: draft
 created: 2026-05-19
-updated: 2026-05-19
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.md
-  - https://t.me/oestick/505
-  - 01_sources/raw/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json
-  - 01_sources/signals/2026-05-19-2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов-signal.md
-  - 01_sources/raw/telegram-media/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов/01-document.mp4
-  - 01_sources/raw/telegram-media/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов/02-animation.mp4
+  - source-ad07e432-20a4-4f09-adcb-ca92a06b52f6
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.md
-  signals:
-    - 01_sources/signals/2026-05-19-2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-19
+processed_at: 2026-06-01T21:03:38.445Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-ad07e432-20a4-4f09-adcb-ca92a06b52f6
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов
+# Assessment: source-ad07e432-20a4-4f09-adcb-ca92a06b52f6
+
+Date: 2026-05-19
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-19
 Status: draft
@@ -40,22 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/oestick/505 - Raw update: `01_sources/raw/telegram/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json` Как дать агенту "руки": 4 типа подключения внешних сервисов Заметил, что стал объяснять эту штуку на воркшопах даже не технарям — с тех пор как Claude Code и Сodex перестали быть инструментами для разработчиков и превратились в агентские среды общего назначения. Почему это важно? Ну вот хотите вы посмотреть анализ рынка ИИ вакансий (скоро выложу) – просите агента сходить на hh и собрать инфу. Он открывает ваш хром и идет вручную кликать по вакансиям, выжирая лимиты за 10 минут. Или наоборот, парсите телеграм-каналы, а он пытается написать юзербота, который залогинится под вашим аккаунтом (что в какой-то момент приведет к его блокировке). Короче: в мире, где возможности агента ограничены набором его коннекторов к внешнему миру – понимать типы этих коннекторов и области их применения – база. ——— Начну с двух противоположностей (на видео выше именно они) ——— Тип 1: Ручное управление браузером (aka browser use) Место подключения: Фронтенд Поведение: агент ведет себя как пользователь – смотрит на страницу (через текстовый снэпшот или скриншот) и "думает" перед каждым следующим действием. Плюсы: ⦁ Можно подстраиваться под неожиданные изменения UI, не нужен детерминизм. ⦁ Почти не распознается бот-детекторами, потому что...
-
-## Link processing
-
-- https://t.me/oestick/505 — ok 200; title: Telegram: View @oestick
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- document (agents.mp4) — saved: `01_sources/raw/telegram-media/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов/01-document.mp4`
-- animation (agents.mp4) — saved: `01_sources/raw/telegram-media/2026-05-19-telegram-telegram-user-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов/02-animation.mp4`
 
 ## Signal extraction
 

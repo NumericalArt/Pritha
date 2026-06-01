@@ -3,34 +3,46 @@ id: 2026-05-17-medium-harness-engineering-six-layer-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [harness-engineering, ai-agents, context-engineering, agent-memory, evaluation, observability, tool-use, recovery, techscope]
-tools: [medium, codex, anthropic, openai, langchain]
+updated: 2026-06-01
+topics:
+  - harness-engineering
+  - ai-agents
+  - context-engineering
+  - agent-memory
+  - evaluation
+  - observability
+  - tool-use
+  - recovery
+  - techscope
+tools:
+  - medium
+  - codex
+  - anthropic
+  - openai
+  - langchain
 sources:
-  - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
-  - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
-  - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
-  - https://openai.com/index/harness-engineering/
-  - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
-  - https://www.anthropic.com/engineering/building-effective-agents
+  - source-0c073793-e305-419d-9237-4394a7682c50
 related:
-  intakes:
-    - 00_inbox/texts/2026-05-17-medium-harness-engineering-screenshots-intake.md
-  notes:
-    - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
-  signals:
-    - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  assessments:
-    - 03_reviews/2026-05-17-medium-harness-engineering-six-layer-assessment.md
-  standards:
-    - 04_standards/agent-shell-evaluation.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: image
+source_class: image
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.435Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-0c073793-e305-419d-9237-4394a7682c50
 ---
 
-# Brief: Medium harness engineering six-layer model
+# Artifact: source-0c073793-e305-419d-9237-4394a7682c50
 
 Date: 2026-05-17
-Source: local screenshots, Medium article dated 2026-04-06
+Status: draft
+Source class: image
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
@@ -58,7 +70,6 @@ Status: draft
 
 - The article is secondary and partly rhetorical.
 - Numerical claims about task success improvement are not evidence until reproduced.
-- Some labels attributed to Anthropic need exact primary-source verification.
 - The six-layer model is useful as a design lens, not a complete implementation recipe.
 
 ## Recommendation
@@ -73,4 +84,3 @@ Accept as a strong signal and use it to perform a Techscope harness-layer audit:
 ## Next step
 
 review | standard-draft | experiment
-

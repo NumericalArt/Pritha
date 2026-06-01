@@ -3,26 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-12-харнесы-умираю�
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.md
-  - https://t.me/neuraldeep/2130
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2-signal.md
+  - source-772e1006-2d3c-4aae-84d3-22fa5cacd361
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.439Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-772e1006-2d3c-4aae-84d3-22fa5cacd361
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2
+# Assessment: source-772e1006-2d3c-4aae-84d3-22fa5cacd361
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -38,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/neuraldeep/2130 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-12-харнесы-умирают-часть-2.json` Харнесы умирают? Часть 2 Собрал коменты через ллм и чутка обработал После моего наброса накидали в комментах много чего полезного, собираю в одно место Главное что унес Pavel Zloi разнес идею что что-то умирает Хайп спадает а технология остается и сидит на своей задаче Так было с RAG, агентами, MCP, скиллами, теперь с харнесом Все живо просто эволюционировало ElKornacio ткнул что современный харнес это не про тулинг а про упакованный процесс У него имплементация 15-20% времени, ревью и рефакторинг 50-60% и это факт с которым не поспорить Узкое горлышко не написать код а проверить Мой пост был именно про основу кода, ревью и тесты отдельная история и там автоматизация нужна Mike Shevchenko принес три категории харнеса Экзоскелет который двигает руками модели умирает Память identity и recall между сессиями не умирает Инструменты shell браузер поиск точно не умирает Vladimir дал простой критерий Харнес нужен если экономит время на план дебаг следить за дурилкой Если больше ковыряешься чем экономишь значит что-то не так Kirill B про лень задать вопрос агенту Это не лень а неготовность брать ответственность за результат Проще пнуть мейнтейнера чем принести пуллреквест Записал себе Полезности из коментов забрал в сохраненки Mutation testing через LLM...
-
-## Link processing
-
-- https://t.me/neuraldeep/2130 — ok 200; title: Telegram: View @neuraldeep
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- No Telegram media attachments found.
 
 ## Signal extraction
 

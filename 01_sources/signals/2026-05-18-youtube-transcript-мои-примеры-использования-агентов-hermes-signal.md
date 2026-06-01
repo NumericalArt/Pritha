@@ -3,26 +3,39 @@ id: 2026-05-18-youtube-transcript-мои-примеры-использовани
 type: signal
 status: extracted
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-06-01
 topics:
   - signal-extraction
 tools:
   - api
   - source
 sources:
-  - 01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md
+  - source-05711647-58f7-499d-aca7-737697674eec
 related:
-  sources:
-    - 01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-18
+processed_at: 2026-06-01T21:03:38.432Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-05711647-58f7-499d-aca7-737697674eec
 generated_from:
-  - 01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md
+  - source-05711647-58f7-499d-aca7-737697674eec
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: YouTube Transcript: Мои ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ агентов HERMES
+# Signal: source-05711647-58f7-499d-aca7-737697674eec
+
+Date: 2026-05-18
+Status: extracted
+Source class: video
+Retention: source-purged
 
 Date: 2026-05-18
 Status: extracted
@@ -69,7 +82,6 @@ Refinement status: needs-codex-refinement
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -78,10 +90,5 @@ Refinement status: needs-codex-refinement
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 01_sources/raw/youtube-ysQ1T3Xkub8/ysQ1T3Xkub8-whisper-small.md

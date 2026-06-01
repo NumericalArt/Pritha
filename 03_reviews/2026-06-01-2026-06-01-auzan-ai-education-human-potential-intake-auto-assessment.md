@@ -4,28 +4,39 @@ type: assessment
 status: draft
 created: 2026-06-01
 updated: 2026-06-01
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
-  - https://www.youtube.com/watch?v=rWpvwVfU0K4
-  - 01_sources/signals/2026-06-01-2026-06-01-auzan-ai-education-human-potential-intake-signal.md
-  - 01_sources/signals/2026-06-01-media-transcript-александр-аузан-о-человеческом-потенциале-россии-и-будущем-образования-в-signal.md
-  - 01_sources/raw/media/2026-06-01-media-aleksandr-auzan-o-chelovecheskom-potentsiale-rossii-i-buduschem-obrazova-fb56a3460661/transcript.md
+  - source-97109599-4f80-4600-ae0c-0f8ca3ff61fb
 related:
-  intakes:
-    - 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
-  signals:
-    - 01_sources/signals/2026-06-01-2026-06-01-auzan-ai-education-human-potential-intake-signal.md
-    - 01_sources/signals/2026-06-01-media-transcript-александр-аузан-о-человеческом-потенциале-россии-и-будущем-образования-в-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.445Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-97109599-4f80-4600-ae0c-0f8ca3ff61fb
 recommendation: brief
 techscope_agents_mother_fit: watch
 ---
 
-# Assessment: Intake: Auzan on AI education and human potential
+# Assessment: source-97109599-4f80-4600-ae0c-0f8ca3ff61fb
+
+Date: 2026-06-01
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-06-01
 Status: draft
@@ -40,22 +51,6 @@ Recommendation: brief
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит media sources или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-- Title: Александр Аузан - о человеческом потенциале России и будущем образования в эпоху ИИ - Channel: РБК Инвестиции - Published: 2026-05-23 - Duration: 16:09 - URL: https://www.youtube.com/watch?v=rWpvwVfU0K4 - Supplied short link was normalized to canonical video id `rWpvwVfU0K4`. - Description excerpt from metadata: как нейросети меняют обучение и какие навыки станут важнее в эпоху ИИ.
-
-## Link processing
-
-- https://www.youtube.com/watch?v=rWpvwVfU0K4 — ok 200; title: Александр Аузан — о человеческом потенциале России и будущем образования в эпоху ИИ - YouTube
-
-## Media transcription
-
-- https://www.youtube.com/watch?v=rWpvwVfU0K4 — transcribed (ru): `01_sources/raw/media/2026-06-01-media-aleksandr-auzan-o-chelovecheskom-potentsiale-rossii-i-buduschem-obrazova-fb56a3460661/transcript.md`
-
-## Telegram media
-
-- No raw Telegram update linked.
 
 ## Signal extraction
 
@@ -72,9 +67,6 @@ For Telegram and other forwarded media this step is especially important: forwar
 ## Pipeline effectiveness check
 
 - End-to-end command completed successfully in `46.18s`: URL inspection, media download/cache, audio extraction, `mlx-whisper` transcription, signal extraction, assessment creation, memory validation, rebuild and embeddings.
-- Media pipeline output is correctly stored in `01_sources/raw/media/2026-06-01-media-aleksandr-auzan-o-chelovecheskom-potentsiale-rossii-i-buduschem-obrazova-fb56a3460661/`.
-- The generic media pipeline avoided the old YouTube-specific layout and used the new `source.json` + `original.mp4` + `audio.wav` + transcript files layout.
-- Heuristic signal extraction was ineffective for this Russian conversational transcript: it selected ASR errors, timestamp lines and source metadata. Codex-assisted refinement was required and produced the usable signal.
 - Automatic scoring overestimated programming relevance. Manual read: programming relevance is low-to-medium; learning-agent and AI-literacy relevance is medium; direct Agents Mother standard impact is `watch`.
 
 ## Related Techscope memory
@@ -87,7 +79,6 @@ No related memory results.
 
 - Требует ручного или агентного извлечения claims из исходного материала.
 - Если ссылки доступны, первоисточники должны быть проверены перед рекомендацией `decision` или `standard`.
-- Если media transcript создан, анализировать нужно derived brief/assessment, а не вставлять полный transcript в индексируемую память.
 
 ## Programming relevance
 

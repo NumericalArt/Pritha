@@ -3,7 +3,7 @@ id: 2026-05-31-openai-harness-engineering-article-intake
 type: intake
 status: processed
 created: 2026-05-31
-updated: 2026-05-31
+updated: 2026-06-01
 topics:
   - harness-engineering
   - codex
@@ -18,57 +18,43 @@ tools:
   - Chrome DevTools
   - CI
   - observability
-source_type: documentation
-source_url: https://openai.com/ru-RU/index/harness-engineering/
+sources:
+  - source-443c21d6-bfb8-44a5-8b47-c7da38837e36
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: document
+source_class: document
+ingested_at: 2026-05-31
+processed_at: 2026-06-01T21:03:38.418Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-443c21d6-bfb8-44a5-8b47-c7da38837e36
 source_published: 2026-02-11
 source_updated: unknown
 source_version: OpenAI article observed 2026-05-31, Russian localized page
 retrieved: 2026-05-31
 verified: 2026-05-31
 temporal_status: current
-sources:
-  - https://openai.com/ru-RU/index/harness-engineering/
-related:
-  source_notes:
-    - 01_sources/notes/2026-05-31-openai-harness-engineering-article-source-note.md
-  signals:
-    - 01_sources/signals/2026-05-31-openai-harness-engineering-agent-readable-repo-signal.md
-  assessments:
-    - 03_reviews/2026-05-31-openai-harness-engineering-agent-readable-repo-assessment.md
-  previous:
-    - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
-    - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
-supersedes: []
-superseded_by: []
 ---
 
-# Intake: OpenAI harness engineering article
+# Intake: source-443c21d6-bfb8-44a5-8b47-c7da38837e36
 
-Date added: 2026-05-31
-Type: documentation
-Source: https://openai.com/ru-RU/index/harness-engineering/
-Source published: 2026-02-11
-Source updated: unknown
-Source version: OpenAI article observed 2026-05-31, Russian localized page
-Retrieved: 2026-05-31
-Verified: 2026-05-31
-Temporal status: current
+Date: 2026-05-31
 Status: processed
+Source class: document
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-Official OpenAI article by Ryan Lopopolo on harness engineering for Codex and agent-first software development. It directly informs Techscope/Pritha standards for agent-readable repositories, AGENTS.md scope, repository-local knowledge, mechanical guardrails, UI/observability verification and agent autonomy boundaries.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- https://openai.com/ru-RU/index/harness-engineering/
-
-## Initial questions
-
-- Which claims refine the existing Techscope harness-engineering brief from 2026-05-15?
-- Which parts should be adopted into `agent-creation-harness` now?
-- Which claims are OpenAI-internal experience rather than immediately generalizable practice?
-
-## Expected output
-
-assessment
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

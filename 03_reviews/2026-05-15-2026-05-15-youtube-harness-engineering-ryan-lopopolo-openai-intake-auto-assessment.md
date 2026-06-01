@@ -3,23 +3,39 @@ id: 2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intak
 type: assessment
 status: draft
 created: 2026-05-15
-updated: 2026-05-15
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
-  - https://www.youtube.com/watch?v=am_oeAoUhew
-  - 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+  - source-3bba9e82-4fd4-4398-a2cf-ac18cf18a161
 related:
-  intakes:
-    - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-15
+processed_at: 2026-06-01T21:03:38.437Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: medium
+anonymous_source_id: source-3bba9e82-4fd4-4398-a2cf-ac18cf18a161
 recommendation: brief
 ---
 
-# Assessment: Intake: youtube-harness-engineering-ryan-lopopolo-openai
+# Assessment: source-3bba9e82-4fd4-4398-a2cf-ac18cf18a161
+
+Date: 2026-05-15
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-15
 Status: draft
@@ -35,17 +51,7 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- YouTube: https://www.youtube.com/watch?v=am_oeAoUhew - Title: Harness Engineering: How to Build Software When Humans Steer, Agents Execute — Ryan Lopopolo, OpenAI - Channel: AI Engineer - Duration: 46:20
-
-## Link processing
-
-- https://www.youtube.com/watch?v=am_oeAoUhew — ok 200; title: Harness Engineering: How to Build Software When Humans Steer, Agents Execute — Ryan Lopopolo, OpenAI - YouTube
-
 ## YouTube processing
-
-- https://www.youtube.com/watch?v=am_oeAoUhew — transcribed (en): `01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md`
 
 ## Related Techscope memory
 

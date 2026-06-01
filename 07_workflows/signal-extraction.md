@@ -41,11 +41,11 @@ This command creates a heuristic draft. For meaningful material, continue with:
 
 - intake;
 - source note;
-- transcript-derived Markdown;
+- processed transcript-derived summary;
 - article note;
 - assessment draft.
 
-Raw transcripts stay in `01_sources/raw/`; signal notes go to `01_sources/signals/` and are indexed.
+Raw transcripts are not retained in tracked memory; signal notes go to `01_sources/signals/` and are indexed.
 
 ## Output
 
@@ -75,7 +75,7 @@ refinement_status: codex-refined
 - Keep technical signal, not full prose.
 - Remove intros, marketing, calls to subscribe, biographies, repeated examples and vague motivation.
 - Preserve tool names, constraints, failure modes, security issues, eval ideas and implementation details.
-- Always link back to source artifacts.
+- Link back only to anonymous source ids, curated internal artifacts or official reference sources; do not write raw paths, incoming URLs, transcript paths or platform identifiers.
 - Signal is not a standard. It is compressed evidence for assessment, brief, review and future standards.
 - Do not use external LLM services for refinement; Codex performs the expert extraction in this thread.
 - Telegram signals use the same rules as every other media channel.

@@ -1,13 +1,7 @@
-import { slug as makeSlug } from "../../lib/slug.mjs";
+import { randomUUID } from "node:crypto";
 import { today } from "../../lib/date.mjs";
-import { hashText } from "./hash.mjs";
 
-export function createMediaId({ title, input, date = today() }) {
-  const titleSlug = makeSlug(title || input || "media", {
-    stripUrls: true,
-    allowCyrillic: false,
-    maxLength: 72,
-    fallback: "media",
-  });
-  return `${date}-media-${titleSlug}-${hashText(input || title || Date.now(), 12)}`;
+export function createMediaId({ date = today(), testId = process.env.PRITHA_PRIVACY_TEST_ID || "" } = {}) {
+  const opaque = testId || randomUUID().replace(/-/g, "").slice(0, 16);
+  return `${date}-media-${opaque}`;
 }

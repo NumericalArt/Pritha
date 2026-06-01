@@ -33,7 +33,7 @@ sources:
   - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
   - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
   - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=L-HAzfFWSto
   - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
   - https://github.com/NousResearch/hermes-agent
@@ -47,7 +47,7 @@ sources:
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
   - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
   - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+  - raw-source-purged
   - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
   - https://openai.com/index/harness-engineering/
   - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
@@ -127,7 +127,7 @@ This generated page tracks ai-agents as a topic in the Techscope knowledge base.
 - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
 - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
 - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-- 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=L-HAzfFWSto
 - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 - https://github.com/NousResearch/hermes-agent
@@ -141,7 +141,7 @@ This generated page tracks ai-agents as a topic in the Techscope knowledge base.
 - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
 - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
 - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-- 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+- raw-source-purged
 - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
 - https://openai.com/index/harness-engineering/
 - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents

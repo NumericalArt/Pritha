@@ -41,7 +41,7 @@ sources:
   - 00_inbox/links/2026-05-26-youtube-openclaw-expensive-local-ai-intake.md
   - 01_sources/notes/2026-05-26-openclaw-expensive-local-ai-source-note.md
   - 02_briefs/2026-05-26-openclaw-expensive-local-ai-brief.md
-  - https://www.youtube.com/watch?v=nt7dWOEFUB4
+  - anonymous incoming video source (purged)
   - https://www.nvidia.com/en-us/products/workstations/dgx-spark../
   - https://docs.nvidia.com/openshell/latest/tutorials/local-inference-lmstudio
   - https://lmstudio.ai/docs/api

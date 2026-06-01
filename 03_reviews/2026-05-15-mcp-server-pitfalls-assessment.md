@@ -9,7 +9,7 @@ tools: [mcp, oauth, claude-desktop, cursor, continue, vscode]
 sources:
   - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md
   - 01_sources/notes/2026-05-15-habr-mcp-server-pitfalls-source-note.md
-  - https://habr.com/ru/companies/bitrix/articles/1009150/
+  - anonymous incoming article source (purged)
 related:
   intakes:
     - 00_inbox/links/2026-05-15-habr-mcp-server-pitfalls-intake.md

@@ -3,45 +3,52 @@ id: 2026-05-17-youtube-openclaw-hermes-codex-cli-user-experience-intake
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [youtube, openclaw, hermes, codex-cli, user-experience, non-professional-users, ai-agents]
-tools: [youtube, yt-dlp, mlx-whisper, codex, openclaw, hermes]
-source_type: video
-source_url: https://www.youtube.com/watch?v=L-HAzfFWSto
-source_published: 2026-04-28
+updated: 2026-06-01
+topics:
+  - youtube
+  - openclaw
+  - hermes
+  - codex-cli
+  - user-experience
+  - non-professional-users
+  - ai-agents
+tools:
+  - youtube
+  - yt-dlp
+  - mlx-whisper
+  - codex
+  - openclaw
+  - hermes
 sources:
-  - https://www.youtube.com/watch?v=L-HAzfFWSto
-related: {}
+  - source-00946cf6-47f8-40ec-8625-ad10999a61a9
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.417Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-00946cf6-47f8-40ec-8625-ad10999a61a9
+source_published: 2026-04-28
 ---
 
-# Intake: youtube-openclaw-hermes-codex-cli-user-experience
+# Intake: source-00946cf6-47f8-40ec-8625-ad10999a61a9
 
-Date added: 2026-05-17
-Type: video
-Source: https://www.youtube.com/watch?v=L-HAzfFWSto
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Это не взгляд профессионального разработчика, а опыт продвинутого пользователя AI-агентов.
-- Такой источник полезен для понимания adoption friction: что понятно, что ломается, что кажется практичным, где не-кодеры упираются в настройку, память, Telegram/CRM/business workflows.
-- Материал можно сравнить с другими пользовательскими/полупрофессиональными отзывами из сети, отделяя живой опыт от hype и маркетинга.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- Title: OpenClaw, Hermes и Codex CLI: какой AI-агент выбрать сейчас
-- Channel: ALEKSEI ULIANOV | AI-АГЕНТЫ
-- Published: 2026-04-28
-- Duration: 1:31:55
-- URL: https://www.youtube.com/watch?v=L-HAzfFWSto
-
-## Initial questions
-
-- Какие реальные pain points у продвинутого не-IT пользователя при выборе OpenClaw/Hermes/Codex CLI?
-- Какие agent-design выводы переносимы в Techscope: memory, Telegram control, Obsidian/wiki, business workflows, autonomy boundaries?
-- Где опыт автора совпадает или расходится с другими пользовательскими отзывами и официальными источниками?
-- Что из этого может стать recommendation для будущих agents или standards?
-
-## Expected output
-
-source-note | brief | assessment | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

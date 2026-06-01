@@ -3,7 +3,7 @@ id: 2026-05-31-openai-harness-engineering-agent-readable-repo-signal
 type: signal
 status: refined
 created: 2026-05-31
-updated: 2026-05-31
+updated: 2026-06-01
 topics:
   - harness-engineering
   - codex
@@ -19,22 +19,20 @@ tools:
   - CI
   - observability
 sources:
-  - https://openai.com/ru-RU/index/harness-engineering/
-  - 01_sources/notes/2026-05-31-openai-harness-engineering-article-source-note.md
+  - source-4786f9f6-5080-40cd-825a-e293a240efaa
 related:
-  intakes:
-    - 00_inbox/links/2026-05-31-openai-harness-engineering-article-intake.md
-  source_notes:
-    - 01_sources/notes/2026-05-31-openai-harness-engineering-article-source-note.md
-  assessments:
-    - 03_reviews/2026-05-31-openai-harness-engineering-agent-readable-repo-assessment.md
-  briefs:
-    - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
-  standards:
-    - 04_standards/agent-creation-harness.md
-    - 04_standards/memory-structure.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-31
+processed_at: 2026-06-01T21:03:38.432Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-4786f9f6-5080-40cd-825a-e293a240efaa
 generated_from:
-  - https://openai.com/ru-RU/index/harness-engineering/
+  - source-4786f9f6-5080-40cd-825a-e293a240efaa
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
@@ -45,7 +43,12 @@ retrieved: 2026-05-31
 verified: 2026-05-31
 ---
 
-# Signal: agent-readable repository harness
+# Signal: source-4786f9f6-5080-40cd-825a-e293a240efaa
+
+Date: 2026-05-31
+Status: refined
+Source class: video
+Retention: source-purged
 
 Date: 2026-05-31
 Status: refined
@@ -54,8 +57,6 @@ Extraction mode: codex-assisted
 Refinement status: codex-refined
 
 ## Core signal
-
-For coding agents, the repository is no longer just source code. It is the harness: the agent-readable operating environment where requirements, architecture, plans, quality rules, feedback loops, observability and recovery paths must live in durable, discoverable forms.
 
 The strongest reusable rule is: make the repository a system of record that the agent can navigate, validate and modify. `AGENTS.md` should be a small routing map. Deep knowledge belongs in structured Markdown docs, plans, standards, tests, linters, scripts and observability surfaces that Codex can actually read and use.
 
@@ -104,7 +105,3 @@ The strongest reusable rule is: make the repository a system of record that the 
 
 - Refined in Techscope Codex thread on 2026-05-31.
 - Relationship to existing knowledge: confirms and sharpens `agent-creation-harness`, `memory-structure` and earlier harness-engineering brief.
-
-## Source links
-
-- https://openai.com/ru-RU/index/harness-engineering/

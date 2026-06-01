@@ -3,57 +3,41 @@ id: 2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgeg
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/iwann_tai/39
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/iwann_tai/39
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 39
-  forwarded_from: 
+  - source-f960a959-cc2e-43be-b224-f6f91f95164d
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.420Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-f960a959-cc2e-43be-b224-f6f91f95164d
 ---
 
-# Intake: 2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh
+# Intake: source-f960a959-cc2e-43be-b224-f6f91f95164d
 
-Date added: 2026-05-17
-Type: telegram
-Source: https://t.me/iwann_tai/39
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 39
-- Forwarded from: not forwarded or hidden
-- Date: 2026-05-17T12:21:07.000Z
-- Media: none
-
-## Raw material or link
-
-- https://t.me/iwann_tai/39
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-39-youtu-be-xxuxg8pcbvc-is-yuevwp-nmwehgegh.json`
-
-## Message text
-
-https://youtu.be/Xxuxg8PcBvc?is=YuEVWP-nMweHGegh
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

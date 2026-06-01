@@ -3,46 +3,52 @@ id: 2026-05-16-youtube-openai-three-audio-models-api-intake
 type: intake
 status: new
 created: 2026-05-16
-updated: 2026-05-16
-topics: [youtube, openai, audio-models, realtime, transcription, translation, voice-agents]
-tools: [openai, youtube, yt-dlp, mlx-whisper, gpt-realtime-2, gpt-realtime-translate, gpt-realtime-whisper]
-source_type: video
-source_url: https://www.youtube.com/watch?v=JOu8v6CBjkE
+updated: 2026-06-01
+topics:
+  - youtube
+  - openai
+  - audio-models
+  - realtime
+  - transcription
+  - translation
+  - voice-agents
+tools:
+  - openai
+  - youtube
+  - yt-dlp
+  - mlx-whisper
+  - gpt-realtime-2
+  - gpt-realtime-translate
+  - gpt-realtime-whisper
 sources:
-  - https://www.youtube.com/watch?v=JOu8v6CBjkE
-  - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
-related: {}
+  - source-2095ffa3-c137-4ca0-bc63-bef4dc0ddb62
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-05-16
+processed_at: 2026-06-01T21:03:38.415Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-2095ffa3-c137-4ca0-bc63-bef4dc0ddb62
 ---
 
-# Intake: youtube-openai-three-audio-models-api
+# Intake: source-2095ffa3-c137-4ca0-bc63-bef4dc0ddb62
 
-Date added: 2026-05-16
-Type: video
-Source: https://www.youtube.com/watch?v=JOu8v6CBjkE
+Date: 2026-05-16
 Status: new
+Source class: video
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- OpenAI announced new realtime/audio models in the API on 2026-05-07.
-- Voice, realtime transcription, translation and speech agents may affect future Techscope agent design.
-- This should be checked against the official OpenAI source before becoming a recommendation.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Raw material or link
+## Follow-up
 
-- YouTube: https://www.youtube.com/watch?v=JOu8v6CBjkE
-- Title: We’re introducing three audio models in the API
-- Channel: OpenAI
-- Published: 2026-05-07
-- Duration: 4:04
-- Official source: https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
-
-## Initial questions
-
-- Что именно дают новые realtime/audio модели для agent workflows?
-- Можно ли использовать эти модели для voice-first agents, live transcription, translation or support tools?
-- Какие privacy, latency, cost and reliability risks нужно учесть перед внедрением?
-- Нужен ли Techscope standard для voice/audio agent interfaces?
-
-## Expected output
-
-brief | review | experiment
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

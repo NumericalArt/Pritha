@@ -13,10 +13,10 @@ import { indentedYamlList, parseFrontmatter, unique, yamlList } from "./lib/fron
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { today } from "./lib/date.mjs";
+import { createAnonymousSourceId, evidenceQualityValue, inferSourceClass, usefulnessValue } from "./lib/privacy.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REVIEWS_DIR = path.join(ROOT, "03_reviews");
-const TELEGRAM_MEDIA_DIR = path.join(ROOT, "01_sources", "raw", "telegram-media");
 const FETCH_TIMEOUT_MS = 10000;
 
 const TECH_KEYWORDS = [
@@ -173,46 +173,10 @@ async function downloadTelegramFile(fileId, destinationDir, basename, fallbackEx
 }
 
 async function downloadTelegramMedia(data, body, intakeRel) {
-  const rawRel = findRawTelegramPath(data, body);
-  if (!rawRel) return { downloaded: [], skipped: "No raw Telegram update linked." };
-  const rawPath = path.join(ROOT, rawRel);
-  if (!existsSync(rawPath)) return { downloaded: [], skipped: `Raw Telegram update not found: ${rawRel}` };
-  const update = JSON.parse(readFileSync(rawPath, "utf8"));
-  const message = telegramMessageFromUpdate(update);
-  const mediaItems = telegramMediaItems(message);
-  if (mediaItems.length === 0) return { downloaded: [], skipped: "No Telegram media attachments found." };
-  if (!process.env.TECHSCOPE_TELEGRAM_BOT_TOKEN) {
-    return { downloaded: [], skipped: "Telegram token unavailable; media file_id preserved in raw update only." };
-  }
-
-  const destinationDir = path.join(TELEGRAM_MEDIA_DIR, path.basename(intakeRel, ".md"));
-  mkdirSync(destinationDir, { recursive: true });
-  const downloaded = [];
-  for (let i = 0; i < mediaItems.length; i += 1) {
-    const item = mediaItems[i];
-    try {
-      const base = `${String(i + 1).padStart(2, "0")}-${makeSlug(item.kind, { stripUrls: true, allowCyrillic: true, maxLength: 80, fallback: "intake" })}`;
-      const outPath = await downloadTelegramFile(item.fileId, destinationDir, base, item.fallbackExt);
-      downloaded.push({
-        kind: item.kind,
-        fileName: item.fileName,
-        mimeType: item.mimeType,
-        path: relPath(outPath),
-        ok: true,
-        error: "",
-      });
-    } catch (error) {
-      downloaded.push({
-        kind: item.kind,
-        fileName: item.fileName,
-        mimeType: item.mimeType,
-        path: "",
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-  return { downloaded, skipped: "" };
+  return {
+    downloaded: [],
+    skipped: "Tracked Telegram media download is disabled by privacy-preserving intake policy.",
+  };
 }
 
 function run(command, args, options = {}) {
@@ -317,11 +281,18 @@ function transcribeMediaSources(sources, options = {}) {
     try {
       const output = run("node", ["scripts/transcribe-media.mjs", source, "--language", language, "--json"], { timeout: 30 * 60 * 1000 });
       const payload = parseJsonPayload(output);
-      processed.push({ source, ok: true, output, md: payload.transcript_md || "", language });
+      processed.push({
+        ok: true,
+        output,
+        anonymous_source_id: payload.anonymous_source_id || "",
+        source_class: payload.source_class || "unknown",
+        retention_status: payload.retention_status || "source-purged",
+        language,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("No compatible media adapter found for this source.")) continue;
-      processed.push({ source, ok: false, output: message, md: "" });
+      processed.push({ ok: false, output: message, anonymous_source_id: "", source_class: "unknown", retention_status: "source-purged" });
     }
   }
   return processed;
@@ -332,8 +303,9 @@ function extractSignal(artifactPath) {
   return output.match(/Signal:\s+(.+)$/m)?.[1]?.trim() || "";
 }
 
-function assessmentPath(intakeData, title) {
-  const base = `${today()}-${makeSlug(intakeData.id || title, { stripUrls: true, allowCyrillic: true, maxLength: 80, fallback: "intake" }).replace(/^intake-?/, "")}-auto-assessment`;
+function assessmentPath(intakeData) {
+  const anon = intakeData.anonymous_source_id || createAnonymousSourceId("source");
+  const base = `${today()}-${anon.replace(/^source-/, "source-").slice(0, 28)}-auto-assessment`;
   return path.join(REVIEWS_DIR, `${base}.md`);
 }
 
@@ -361,37 +333,19 @@ function memorySearch(text, excludeRel = "") {
 }
 
 function renderAssessment({ outPath, intakeRel, intakeData, body, urls, urlInspections, mediaProcessed, telegramMedia, signalPaths, scores, relatedMemory }) {
-  const title = extractTitle(body, intakeData.id || path.basename(intakeRel, ".md"));
   const artifactId = path.basename(outPath, ".md");
-  const messageText = extractSection(body, ["Message text", "Raw material or link"]) || body;
+  const anonId = intakeData.anonymous_source_id || createAnonymousSourceId("source");
+  const sourceClass = intakeData.source_class || inferSourceClass({ relPath: intakeRel, text: body, data: intakeData });
   const sources = unique([
-    intakeRel,
-    ...array(intakeData.sources),
+    anonId,
     ...signalPaths,
-    ...urls,
-    ...mediaProcessed.map((item) => item.md).filter(Boolean),
-    ...telegramMedia.downloaded.map((item) => item.path).filter(Boolean),
   ]);
-
-  const urlLines = urlInspections.length
-    ? urlInspections.map((item) => {
-        const status = item.ok ? `ok ${item.status}` : `failed${item.error ? `: ${item.error}` : ""}`;
-        const titleText = item.title ? `; title: ${item.title}` : "";
-        return `- ${item.url} — ${status}${titleText}`;
-      }).join("\n")
-    : "- No links found.";
 
   const mediaLines = mediaProcessed.length
     ? mediaProcessed.map((item) => item.ok
-      ? `- ${item.source} — transcribed (${item.language || "unknown"}): \`${item.md || "raw transcript generated"}\``
-      : `- ${item.source} — transcription failed: ${compact(item.output, 300)}`).join("\n")
+      ? `- Media source class ${item.source_class || "unknown"} was transcribed transiently and purged. Anonymous source: ${item.anonymous_source_id || "not retained"}.`
+      : `- Media transcription failed during transient processing: ${compact(item.output, 240)}`).join("\n")
     : "- No compatible media sources processed.";
-
-  const telegramMediaLines = telegramMedia.downloaded.length
-    ? telegramMedia.downloaded.map((item) => item.ok
-      ? `- ${item.kind}${item.fileName ? ` (${item.fileName})` : ""} — saved: \`${item.path}\``
-      : `- ${item.kind}${item.fileName ? ` (${item.fileName})` : ""} — download failed: ${compact(item.error, 240)}`).join("\n")
-    : `- ${telegramMedia.skipped || "No Telegram media attachments processed."}`;
 
   return `---
 id: ${artifactId}
@@ -403,46 +357,41 @@ topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
 tools: [telegram-bot, process-intake, markdown]
 sources:${yamlList(sources)}
 related:
-  intakes:
-    - ${intakeRel}
   signals:${indentedYamlList(signalPaths)}
   workflows:
     - 07_workflows/expert-information-assessment.md
     - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
 recommendation: ${scores.recommendation}
+source_class: ${sourceClass}
+processed_at: ${new Date().toISOString()}
+retention_status: source-purged
+usefulness: ${usefulnessValue(scores.recommendation)}
+evidence_quality: ${evidenceQualityValue(urls.length ? "uncertain" : "low")}
+anonymous_source_id: ${anonId}
 ---
 
-# Assessment: ${title}
+# Assessment: ${anonId}
 
 Date: ${today()}
 Status: draft
 Recommendation: ${scores.recommendation}
+Source class: ${sourceClass}
+Retention: source-purged
 
 ## One-paragraph read
 
-Автоматическая первичная экспертная оценка intake-материала. Материал сохранен как \`${intakeRel}\`, извлечены ссылки, доступные URL проверены технически, совместимые media sources обработаны локальным pipeline при возможности. Эта оценка является draft: перед стандартом или решением нужен человеческий/агентный консилиум по expert lenses и проверка первоисточников.
+Автоматическая первичная экспертная оценка intake-материала в privacy-preserving режиме. Raw content, direct source URLs, original filenames, Telegram identifiers and transcript artifacts are not retained in tracked memory. Эта оценка является draft: перед стандартом или решением нужен человеческий/агентный консилиум по expert lenses.
 
 ## Why it matters
 
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
-- Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
-- Если материал содержит media sources или внешние ссылки, они становятся частью evidence trail.
-
-## Extracted material
-
-${compact(messageText, 1400) || "_No text extracted from intake._"}
-
-## Link processing
-
-${urlLines}
+- Автоматический pass создает processed knowledge draft без сохранения raw/provenance breadcrumbs.
+- Если материал содержит media sources или внешние ссылки, они используются только transiently; durable memory keeps neutral metadata and processed conclusions.
 
 ## Media transcription
 
 ${mediaLines}
-
-## Telegram media
-
-${telegramMediaLines}
 
 ## Signal extraction
 
@@ -452,7 +401,7 @@ ${signalPaths.length ? signalPaths.map((item) => `- ${item}`).join("\n") : "- No
 
 ${signalPaths.length ? "- Required. The created signal artifacts are heuristic drafts and must be refined in this Techscope Codex thread with `07_workflows/prompts/signal-extraction-harness.md` before promotion to brief, review, decision or standard." : "- Required after a signal artifact is created."}
 
-For Telegram and other forwarded media this step is especially important: forwarded text often mixes useful signal, commentary, ads, missing links and incomplete context.
+For Telegram and other forwarded media this step is especially important: forwarded text often mixes useful signal, commentary, ads, missing context and privacy-sensitive provenance.
 
 ## Related Techscope memory
 
@@ -463,8 +412,8 @@ ${compact(relatedMemory, 2400)}
 ## Technical claims
 
 - Требует ручного или агентного извлечения claims из исходного материала.
-- Если ссылки доступны, первоисточники должны быть проверены перед рекомендацией \`decision\` или \`standard\`.
-- Если media transcript создан, анализировать нужно derived brief/assessment, а не вставлять полный transcript в индексируемую память.
+- Если ссылки были доступны transiently, первоисточники нужно проверять отдельно перед рекомендацией \`decision\` или \`standard\`, не сохраняя incoming provenance.
+- Если media transcript создан transiently, анализировать нужно derived brief/assessment, а не вставлять полный transcript в индексируемую память.
 
 ## Programming relevance
 
@@ -556,6 +505,7 @@ async function processIntake(inputPath, options) {
   const raw = readFileSync(fullPath, "utf8");
   const { data, body } = parseFrontmatter(raw);
   if (!data.id || !data.type) throw new Error("Input must have YAML frontmatter with id and type.");
+  data.anonymous_source_id = data.anonymous_source_id || createAnonymousSourceId("source");
   const urls = extractUrls(`${raw}\n${array(data.sources).join("\n")}\n${data.source_url || ""}`);
   const urlInspections = [];
   for (const url of urls.slice(0, 12)) {
@@ -568,8 +518,8 @@ async function processIntake(inputPath, options) {
   const signalPaths = unique([
     extractSignal(intakeRel),
     ...mediaProcessed
-      .filter((item) => item.ok && item.md)
-      .map((item) => extractSignal(item.md)),
+      .filter((item) => item.ok && item.anonymous_source_id)
+      .map(() => ""),
   ]);
   mkdirSync(REVIEWS_DIR, { recursive: true });
   const title = extractTitle(body, data.id || path.basename(intakeRel, ".md"));
@@ -605,7 +555,7 @@ async function processIntake(inputPath, options) {
   }
   if (mediaProcessed.length) {
     for (const item of mediaProcessed) {
-      console.log(`${item.ok ? "Media processed" : "Media failed"}: ${item.source}${item.md ? ` -> ${item.md}` : ""}`);
+      console.log(`${item.ok ? "Media processed" : "Media failed"}: ${item.anonymous_source_id || "anonymous"}`);
     }
   }
   if (telegramMedia.downloaded.length) {

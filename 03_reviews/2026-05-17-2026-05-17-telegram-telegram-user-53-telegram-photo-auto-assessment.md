@@ -3,27 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-auto-assessme
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
-  - https://t.me/oestick/504
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
+  - source-193a4104-0690-4cbe-8254-6f035267fea7
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.441Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-193a4104-0690-4cbe-8254-6f035267fea7
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-53-telegram-photo
+# Assessment: source-193a4104-0690-4cbe-8254-6f035267fea7
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -39,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/oestick/504 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-53-telegram-photo.json` _No text or caption. See Telegram metadata and raw update._
-
-## Link processing
-
-- https://t.me/oestick/504 — ok 200; title: Telegram: View @oestick
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- photo — saved: `01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg`
 
 ## Signal extraction
 

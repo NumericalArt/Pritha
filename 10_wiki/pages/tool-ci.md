@@ -26,7 +26,7 @@ sources:
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
   - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-  - 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=am_oeAoUhew
   - https://openai.com/index/harness-engineering/
   - 03_reviews/2026-05-16-test-first-agent-workflow-review.md
@@ -90,7 +90,7 @@ This generated page tracks ci as a tool in the Techscope knowledge base. Use it 
 - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
 - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
 - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-- 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=am_oeAoUhew
 - https://openai.com/index/harness-engineering/
 - 03_reviews/2026-05-16-test-first-agent-workflow-review.md

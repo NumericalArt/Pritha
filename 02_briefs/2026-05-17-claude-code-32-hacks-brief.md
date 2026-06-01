@@ -3,36 +3,61 @@ id: 2026-05-17-claude-code-32-hacks-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [claude-code, coding-agents, agent-workflows, context-management, subagents, hooks, mcp, frontend-qa]
-tools: [Claude Code, CLAUDE.md, Agent Skills, MCP, Context7, Chrome DevTools, git worktrees]
-agent_platforms: [Claude Code]
-model_context: [Claude Opus, Claude Haiku]
-runtime_environment: [cli, terminal, desktop-app, browser, mobile-remote-control, vps]
-config_surfaces: [CLAUDE.md, skills, subagents, hooks, mcp, permissions, statusline, worktrees]
-portability: adapter-needed
+updated: 2026-06-01
+topics:
+  - claude-code
+  - coding-agents
+  - agent-workflows
+  - context-management
+  - subagents
+  - hooks
+  - mcp
+  - frontend-qa
+tools:
+  - Claude Code
+  - CLAUDE.md
+  - Agent Skills
+  - MCP
+  - Context7
+  - Chrome DevTools
+  - git worktrees
 sources:
-  - 00_inbox/links/2026-05-17-youtube-claude-code-32-hacks-intake.md
-  - 01_sources/notes/2026-05-17-claude-code-32-hacks-source-note.md
-  - 01_sources/raw/youtube-jqoFP9QapXI/jqoFP9QapXI-whisper-small.md
-  - https://code.claude.com/docs/en/slash-commands
-  - https://code.claude.com/docs/en/commands
-  - https://code.claude.com/docs/en/statusline
-  - https://code.claude.com/docs/en/sub-agents
-  - https://code.claude.com/docs/en/hooks
-  - https://code.claude.com/docs/en/worktrees
-  - https://context7.com/docs/overview
+  - source-8290e9f4-3f49-4732-980b-ae3e86f471fd
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-claude-code-32-hacks-intake.md
-  reviews:
-    - 03_reviews/2026-05-17-claude-code-32-hacks-assessment.md
-  decisions: []
-  standards:
-    - 04_standards/agent-environment-compatibility.md
-    - 04_standards/agent-tool-integration-selection.md
-supersedes: []
-superseded_by: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: video
+source_class: video
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.434Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-8290e9f4-3f49-4732-980b-ae3e86f471fd
+agent_platforms:
+  - Claude Code
+model_context:
+  - Claude Opus
+  - Claude Haiku
+runtime_environment:
+  - cli
+  - terminal
+  - desktop-app
+  - browser
+  - mobile-remote-control
+  - vps
+config_surfaces:
+  - CLAUDE.md
+  - skills
+  - subagents
+  - hooks
+  - mcp
+  - permissions
+  - statusline
+  - worktrees
+portability: adapter-needed
 freshness_status: current
 source_published: 2026-04-27
 source_updated: unknown
@@ -43,17 +68,19 @@ valid_for: Claude Code workflow practice as of 2026-05-17; Codex adaptation requ
 temporal_status: current
 ---
 
-# Brief: Claude Code 32 hacks
+# Artifact: source-8290e9f4-3f49-4732-980b-ae3e86f471fd
 
 Date: 2026-05-17
-Source: YouTube transcript plus Claude Code/Context7 primary-source checks
+Status: draft
+Source class: video
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
 
 The useful signal is not the full list of "32 hacks" as a checklist. The useful signal is a compact operating model for coding agents: keep long-lived context small, plan before editing, bake verification into the task list, use isolated workers for parallel exploration, use worktrees for parallel code changes, prefer narrow tools over broad tool surfaces, and make permissions explicit.
-
-For Techscope, this is highly relevant, but mostly as `adapter-needed`: the source is Claude Code-specific, while our primary implementation environment is Codex.
 
 ## Key claims
 
@@ -94,9 +121,6 @@ For Techscope, this is highly relevant, but mostly as `adapter-needed`: the sour
   - Context7 docs
   - arXiv Claude Code design-space paper
 - Freshness status: current
-- Source published: 2026-04-27
-- Source updated: unknown
-- Source version: video-jqoFP9QapXI; Claude Code docs observed 2026-05-17
 - Retrieved: 2026-05-17
 - Verified: 2026-05-17
 - Valid for: Claude Code workflow practice as of 2026-05-17; Codex adaptation requires mapping
@@ -115,7 +139,6 @@ For Techscope, this is highly relevant, but mostly as `adapter-needed`: the sour
 
 Convert the strongest portable practices into Techscope experiments:
 
-- `context-hygiene`: concise `AGENTS.md`, routed docs, source-of-truth Markdown.
 - `plan-verify-execute`: plan first, todo verification steps, browser/screenshot checks for frontend.
 - `parallel-agent-isolation`: use worktrees or disjoint workspaces for concurrent coding agents.
 - `tool-surface-minimization`: prefer narrow CLI/API/skill before broad MCP.

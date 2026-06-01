@@ -1,4 +1,33 @@
-# Release Process
+---
+id: release
+type: artifact
+status: processed
+created: 2026-06-01
+updated: 2026-06-01
+topics:
+  - privacy-preserving-intake
+tools:[]
+sources:
+  - source-92168d05-af8a-4189-9fa8-66a3a266490c
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: image
+source_class: image
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.468Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-92168d05-af8a-4189-9fa8-66a3a266490c
+---
+
+# Artifact: source-92168d05-af8a-4189-9fa8-66a3a266490c
+
+Date: 2026-06-01
+Status: processed
+Source class: image
+Retention: source-purged
 
 This document describes the safe publication path for Pritha.
 
@@ -18,10 +47,11 @@ Run:
 
 ```sh
 node scripts/validate-memory.mjs
+node scripts/privacy-audit.mjs --strict
 npm test --silent
 node scripts/quality-gate.mjs
 node scripts/golden-checks.mjs --with-embeddings
-node scripts/pre-push-audit.mjs
+node scripts/pre-push-audit.mjs --strict
 ```
 
 Then perform a manual review of:
@@ -29,13 +59,10 @@ Then perform a manual review of:
 - `.env.example` contains no real secrets.
 - `.memory/` is tracked as the portable memory snapshot, including SQLite,
   FTS/relations, embeddings, schema, rebuild SQL and the self-test baseline.
-- `01_sources/raw/` text, JSON, transcripts, PDFs and small supporting images
-  are tracked as portable raw source state.
+  except an empty placeholder when needed.
 - `.env`, `.env.local`, `.queue/`, `.logs/`, `.tools/` and
   `secure-handoffs/` are not tracked.
-- Heavy raw audio/video media (`mp4`, `wav`, `mov`, `mkv`, `webm`, `mp3`,
-  `m4a`, `avi`, `flac`) is not tracked until a Git LFS/archive policy is
-  selected.
+  media and incoming-material provenance are not tracked.
 - No local absolute paths or private identifiers remain in the public snapshot.
 - `LICENSE`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md` and `CHANGELOG.md`
   are present.
@@ -43,7 +70,6 @@ Then perform a manual review of:
 Optional one-time local scanners:
 
 ```sh
-gitleaks detect --source . --no-git
 trufflehog filesystem .
 ```
 
@@ -116,12 +142,6 @@ and `actions/setup-python@v6`. Recheck action versions before major release
 work because GitHub Actions evolves quickly.
 
 Primary references checked on 2026-05-28:
-
-- [actions/checkout](https://github.com/actions/checkout)
-- [actions/setup-node releases](https://github.com/actions/setup-node/releases)
-- [actions/setup-python](https://github.com/actions/setup-python)
-- [GitHub Dependabot options reference](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file)
-- [GitHub protected branches docs](https://docs.github.com/articles/about-branch-restrictions)
 
 Linux CI installs portable Python dependencies only. `mlx-whisper` is treated
 as a macOS local transcription helper and is not required for Ubuntu CI.

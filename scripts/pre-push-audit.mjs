@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { containsForbiddenText, isForbiddenRawPath, isMemorySnapshotPath, isPrivacyTextTarget } from "./lib/privacy.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const args = new Set(process.argv.slice(2));
@@ -92,6 +93,7 @@ const forbiddenTracked = files.filter((file) =>
   file.startsWith("secure-handoffs/"),
 );
 const forbiddenRawMedia = files.filter((file) => rawMediaPattern.test(file));
+const forbiddenRawSources = files.filter((file) => isForbiddenRawPath(file));
 const oversizedTrackedFiles = files.filter((file) => {
   try {
     return statSync(path.join(ROOT, file)).size > maxRegularFileBytes;
@@ -110,6 +112,16 @@ const longTokenCandidates = textFilesWithMatches(files, /[A-Za-z0-9_-]{40,}/g);
 const telegramIdMatches = textFilesWithMatches(files, /\b\d{9,12}\b/g).filter((match) =>
   /telegram|allowed_users|user_id|chat_id/i.test(match.text) || /telegram/i.test(match.file),
 );
+const privacyContentMatches = files.flatMap((file) => {
+  if (!isPrivacyTextTarget(file) && !isMemorySnapshotPath(file) && !file.endsWith(".md")) return [];
+  const fullPath = path.join(ROOT, file);
+  if (!existsSync(fullPath)) return [];
+  try {
+    return containsForbiddenText(file, readFileSync(fullPath, "utf8"));
+  } catch {
+    return [];
+  }
+});
 
 const optionalScanners = {
   gitleaks: commandExists("gitleaks"),
@@ -128,9 +140,19 @@ const checks = [
     detail: forbiddenTracked.length ? forbiddenTracked.join("\n") : "no forbidden tracked files",
   },
   {
+    id: "raw-source-artifacts",
+    status: forbiddenRawSources.length ? "fail" : "pass",
+    detail: forbiddenRawSources.length ? forbiddenRawSources.join("\n") : "no raw source/transcript/media artifacts tracked",
+  },
+  {
     id: "raw-audio-video-media",
     status: forbiddenRawMedia.length ? "fail" : "pass",
     detail: forbiddenRawMedia.length ? forbiddenRawMedia.join("\n") : "no raw audio/video media tracked",
+  },
+  {
+    id: "privacy-retention-patterns",
+    status: privacyContentMatches.length ? "fail" : "pass",
+    detail: compact(privacyContentMatches),
   },
   {
     id: "oversized-tracked-files",
@@ -166,12 +188,12 @@ const checks = [
   },
   {
     id: "long-token-candidates",
-    status: longTokenCandidates.length ? "warn" : "pass",
+    status: longTokenCandidates.length ? "info" : "pass",
     detail: compact(longTokenCandidates),
   },
   {
     id: "telegram-id-candidates",
-    status: telegramIdMatches.length ? "warn" : "pass",
+    status: telegramIdMatches.length ? "info" : "pass",
     detail: compact(telegramIdMatches),
   },
   {

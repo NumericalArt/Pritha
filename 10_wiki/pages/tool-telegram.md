@@ -26,7 +26,7 @@ sources:
   - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
   - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
   - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=L-HAzfFWSto
   - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
   - https://github.com/NousResearch/hermes-agent
@@ -78,7 +78,7 @@ This generated page tracks telegram as a tool in the Techscope knowledge base. U
 - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
 - 01_sources/notes/2026-05-17-openclaw-hermes-codex-cli-advanced-user-source-note.md
 - 01_sources/signals/2026-05-17-youtube-transcript-openclaw-hermes-и-codex-cli-какой-ai-агент-выбрать-сейчас-signal.md
-- 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+- raw-source-purged
 - https://www.youtube.com/watch?v=L-HAzfFWSto
 - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 - https://github.com/NousResearch/hermes-agent

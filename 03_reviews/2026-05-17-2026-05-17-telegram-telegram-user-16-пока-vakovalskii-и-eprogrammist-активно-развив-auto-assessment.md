@@ -3,29 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-epro
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
-  - https://t.me/iwann_tai/16
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-signal.md
-  - https://hub.neuraldeep.ru
-  - https://github.com/vakovalskii/codbash
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про/01-photo.jpg
+  - source-a7cae0a3-d719-4f9f-aba8-9aba24565846
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.439Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-a7cae0a3-d719-4f9f-aba8-9aba24565846
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про
+# Assessment: source-a7cae0a3-d719-4f9f-aba8-9aba24565846
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -41,23 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/iwann_tai/16 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про.json` Пока @VaKovaLskii и @eprogrammist активно развивают крутой продукт https://hub.neuraldeep.ru , я не дам вам забыть Codbash, и я по чуть его развиваю, так как пользуюсь им каждый день, итак, в ближайшем релизе https://github.com/vakovalskii/codbash 🚀 Codbash — что нового С последнего релиза вкладка «Projects» превратилась в полноценный launcher для AI-агентов, появилась поддержка новых агентов и куча мелких улучшений. ✨ Главное: запуск агентов — в один клик Projects теперь — это две вкладки: - Projects — карточки ваших проектов с кнопками ▶ New (новая сессия) и ⟳ Last (продолжить последнюю). Можно выбрать агента «на разок» через ⏷, не меняя дефолт. - History — привычный список сессий, ничего не потерялось, просто переехало. Добавлять проекты теперь проще: - Кнопка «+ Add Project» с тремя вкладками: локальный путь, ваши репозитории GitHub, репозитории где вы контрибьютор. - Можно прямо из дашборда клонировать репо с GitHub одним кликом — он попадёт в ~/code/<repo> и сразу появится в списке. - Если запустить агента в новом git-репозитории под $HOME, проект сам добавится в Projects. Настройка дефолтного агента: В ⚙ Settings можно выбрать, какой агент будет запускаться по ▶ New по умолчанию. Список показывает только...
-
-## Link processing
-
-- https://t.me/iwann_tai/16 — ok 200; title: Telegram: Contact @iwann_tai
-- https://hub.neuraldeep.ru — ok 200; title: Neuraldeep — OSS Agentic Agency: внедрение AI-агентов в бизнес
-- https://github.com/vakovalskii/codbash — ok 200; title: GitHub - vakovalskii/codbash: Termius-style browser dashboard for Claude Code &amp; Codex sessions. View, search, resume, tag, and manage all your AI coding sessions. · GitHub
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- photo — saved: `01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-16-пока-vakovalskii-и-eprogrammist-активно-развивают-крутой-про/01-photo.jpg`
 
 ## Signal extraction
 

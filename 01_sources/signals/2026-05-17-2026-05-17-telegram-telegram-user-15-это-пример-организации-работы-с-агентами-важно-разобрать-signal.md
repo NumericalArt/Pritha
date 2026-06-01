@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-15-это-пример-орга
 type: signal
 status: superseded
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -17,22 +17,33 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.md
-  - https://t.me/iwann_tai/15
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.json
+  - source-4dbc77b0-e379-4346-b2d0-ededbf5b7e01
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.428Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-4dbc77b0-e379-4346-b2d0-ededbf5b7e01
 generated_from:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.md
+  - source-4dbc77b0-e379-4346-b2d0-ededbf5b7e01
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: superseded
-superseded_reason: incomplete-pointer-without-source-material
 harness: 07_workflows/prompts/signal-extraction-harness.md
+superseded_reason: incomplete-pointer-without-source-material
 ---
 
-# Signal: 2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-
+# Signal: source-4dbc77b0-e379-4346-b2d0-ededbf5b7e01
+
+Date: 2026-05-17
+Status: superseded
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: superseded
@@ -41,8 +52,6 @@ Extraction mode: heuristic-draft
 Refinement status: superseded
 
 ## Core signal
-
-- No standalone source architecture was included in this Telegram message. The useful meta-signal is already covered by broader harness-engineering materials: deterministic old-style agent orchestration should be treated skeptically and compared with simpler autonomous/Codex-first workflows.
 
 ## Technical details
 
@@ -55,7 +64,6 @@ Refinement status: superseded
 
 ## Candidate rules
 
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.json`
 - Важно разобрать по частям и пунктам и понять архитектуру.
 - нужно учесть, что это немного устаревший и олд фэшн подход, много детерминированности в выборах и установках, в конце концов агент почти всё должен делать сам, может только задать несколько наводящих вопросов..
 - # Intake: 2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-
@@ -63,7 +71,6 @@ Refinement status: superseded
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -72,9 +79,3 @@ Refinement status: superseded
 ## Codex refinement required
 
 - Closed as superseded/incomplete during Telegram backlog cleanup on 2026-05-17.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.md
-- https://t.me/iwann_tai/15
-- 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-15-это-пример-организации-работы-с-агентами-важно-разобрать-по-.json

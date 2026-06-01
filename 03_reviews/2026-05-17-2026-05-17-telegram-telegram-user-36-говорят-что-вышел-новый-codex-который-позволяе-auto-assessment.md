@@ -3,27 +3,39 @@ id: 2026-05-17-2026-05-17-telegram-telegram-user-36-говорят-что-выш
 type: assessment
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [assessment, intake-processing, telegram, media-intake, llm-agents]
-tools: [telegram-bot, process-intake, markdown]
+updated: 2026-06-01
+topics:
+  - assessment
+  - intake-processing
+  - telegram
+  - media-intake
+  - llm-agents
+tools:
+  - telegram-bot
+  - process-intake
+  - markdown
 sources:
-  - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
-  - https://t.me/llm_under_hood/835
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключа-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg
+  - source-61814508-720e-4377-a8c0-44ff57e29535
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.md
-  signals:
-    - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключа-signal.md
   workflows:
-    - 07_workflows/expert-information-assessment.md
-    - 07_workflows/media-intake-processing.md
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.440Z
+retention_status: source-purged
+usefulness: high
+evidence_quality: uncertain
+anonymous_source_id: source-61814508-720e-4377-a8c0-44ff57e29535
 recommendation: brief
 ---
 
-# Assessment: Intake: 2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться
+# Assessment: source-61814508-720e-4377-a8c0-44ff57e29535
+
+Date: 2026-05-17
+Status: draft
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: draft
@@ -39,21 +51,9 @@ Recommendation: brief
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
 - Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
 
-## Extracted material
-
-- https://t.me/llm_under_hood/835 - Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться.json` Говорят, что вышел новый Codex, который позволяет подключаться к локальным сессиям c мобильного. Как Claude Dispatch. Это в теории позволит обойти все костыли в виде telegram bridges. Но это пока не про меня. Ибо текущий Codex накатывает на сервера BitGN большой апдейт аналитики (Vector + ClickHouse + Grafana Dashboards), и пока он не закончит, ставить новую версию некрасиво. Update: действительно работает. Я подключился к локальной сессии кодекса с мобильника. Теперь смогу гонять хоть разработку, хоть задачи в базе знаний с мобильника. Это удобнее облачного кодекса в контейнерах. Главное, не давать ноуту засыпать (есть такая галка в Codex) или вынести все на VM/MacMini. Ваш, @llm_under_hood 🤗
-
-## Link processing
-
-- https://t.me/llm_under_hood/835 — ok 200; title: Telegram: View @llm_under_hood
-
 ## YouTube processing
 
 - No YouTube links processed.
-
-## Telegram media
-
-- photo — saved: `01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-36-говорят-что-вышел-новый-codex-который-позволяет-подключаться/01-photo.jpg`
 
 ## Signal extraction
 

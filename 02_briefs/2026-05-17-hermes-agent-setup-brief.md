@@ -3,35 +3,71 @@ id: 2026-05-17-hermes-agent-setup-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [hermes-agent, setup, deployment, telegram, gateway, vps, docker, security, skills, memory]
-tools: [Hermes Agent, OpenClaw, Telegram, BotFather, Docker, OpenRouter, Anthropic, OpenAI, Hostinger]
-agent_platforms: [Hermes Agent, OpenClaw, Codex]
-model_context: [OpenRouter, Anthropic, OpenAI, local-models, provider-routing]
-runtime_environment: [vps, docker, terminal, cli, messaging-gateway, telegram, mac-mini]
-config_surfaces: [.env, config.yaml, hermes-setup, hermes-model, hermes-gateway, telegram-bot-token, provider-api-keys, skills]
-portability: adapter-needed
+updated: 2026-06-01
+topics:
+  - hermes-agent
+  - setup
+  - deployment
+  - telegram
+  - gateway
+  - vps
+  - docker
+  - security
+  - skills
+  - memory
+tools:
+  - Hermes Agent
+  - OpenClaw
+  - Telegram
+  - BotFather
+  - Docker
+  - OpenRouter
+  - Anthropic
+  - OpenAI
+  - Hostinger
 sources:
-  - 00_inbox/links/2026-05-17-youtube-hermes-agent-setup-openclaw-killer-intake.md
-  - 01_sources/notes/2026-05-17-hermes-agent-setup-source-note.md
-  - 01_sources/raw/youtube-3jNp14bJpgs/3jNp14bJpgs-whisper-small.md
-  - https://hermes-agent.nousresearch.com/docs/getting-started/installation/
-  - https://hermes-agent.nousresearch.com/docs/getting-started/quickstart/
-  - https://hermes-agent.nousresearch.com/docs/user-guide/messaging
-  - https://hermes-agent.nousresearch.com/docs/user-guide/configuration/
-  - https://hermes-agent.nousresearch.com/docs/user-guide/security
+  - source-db6a0d73-ccfa-4c09-bddf-7332366126d2
 related:
-  intakes:
-    - 00_inbox/links/2026-05-17-youtube-hermes-agent-setup-openclaw-killer-intake.md
-  reviews:
-    - 03_reviews/2026-05-17-hermes-agent-setup-assessment.md
-    - 03_reviews/2026-05-17-hermes-agent-architecture-assessment.md
-  decisions: []
-  standards:
-    - 04_standards/agent-environment-compatibility.md
-    - 04_standards/agent-tool-integration-selection.md
-supersedes: []
-superseded_by: []
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+supersedes:[]
+superseded_by:[]
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.435Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-db6a0d73-ccfa-4c09-bddf-7332366126d2
+agent_platforms:
+  - Hermes Agent
+  - OpenClaw
+  - Codex
+model_context:
+  - OpenRouter
+  - Anthropic
+  - OpenAI
+  - local-models
+  - provider-routing
+runtime_environment:
+  - vps
+  - docker
+  - terminal
+  - cli
+  - messaging-gateway
+  - telegram
+  - mac-mini
+config_surfaces:
+  - .env
+  - config.yaml
+  - hermes-setup
+  - hermes-model
+  - hermes-gateway
+  - telegram-bot-token
+  - provider-api-keys
+  - skills
+portability: adapter-needed
 freshness_status: changed
 source_published: 2026-04-15
 source_updated: unknown
@@ -42,10 +78,14 @@ valid_for: deployment pattern and setup checklist; exact commands require curren
 temporal_status: version-bound
 ---
 
-# Brief: Hermes Agent setup and Telegram gateway
+# Artifact: source-db6a0d73-ccfa-4c09-bddf-7332366126d2
 
 Date: 2026-05-17
-Source: Wes Roth video, local transcript, official Hermes docs
+Status: draft
+Source class: telegram
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
@@ -65,7 +105,6 @@ For Techscope, the main value is not the Hostinger path itself. The value is the
 
 ## Agent environment profile
 
-- Agent platforms: Hermes Agent as source platform; Codex as adaptation target; OpenClaw as comparison target.
 - Model context: OpenRouter, direct provider keys, local/self-hosted models as future path.
 - Runtime environment: VPS, Docker, terminal, CLI, messaging gateway, Telegram; Mac mini is a plausible Techscope-hosted analog.
 - Config surfaces: `.env`, `config.yaml`, `hermes setup`, `hermes model`, `hermes gateway`, provider keys, Telegram bot token, skills.
@@ -96,9 +135,6 @@ For Techscope, the main value is not the Hostinger path itself. The value is the
   - Hermes security docs
   - Hermes latest release
 - Freshness status: changed
-- Source published: 2026-04-15
-- Source updated: unknown
-- Source version: video references Hermes Agent around v0.9.0; checked against Hermes Agent v0.14.0 docs and release observed 2026-05-17
 - Retrieved: 2026-05-17
 - Verified: 2026-05-17
 - Valid for: deployment pattern and setup checklist; exact commands require current official docs

@@ -26,20 +26,32 @@ tools:
   - review
   - source
 sources:
-  - 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
-  - https://www.youtube.com/watch?v=rWpvwVfU0K4
+  - source-12ab2ef7-c930-45fc-960f-8bb2865b4105
 related:
-  sources:
-    - 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: video
+source_class: video
+ingested_at: 2026-06-01
+processed_at: 2026-06-01T21:03:38.432Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: medium
+anonymous_source_id: source-12ab2ef7-c930-45fc-960f-8bb2865b4105
 generated_from:
-  - 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
+  - source-12ab2ef7-c930-45fc-960f-8bb2865b4105
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: needs-codex-refinement
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: Auzan on AI education and human potential
+# Signal: source-12ab2ef7-c930-45fc-960f-8bb2865b4105
+
+Date: 2026-06-01
+Status: extracted
+Source class: video
+Retention: source-purged
 
 Date: 2026-06-01
 Status: extracted
@@ -52,13 +64,11 @@ Refinement status: needs-codex-refinement
 - Для Techscope важны не общие социальные тезисы, а переносимые выводы: какие навыки, интерфейсы, memory/workflow patterns или критерии обучения стоит учитывать в future agents.
 - Подтверждает ли видео текущие стандарты Techscope по обучающим агентам, памяти, evals или human-in-the-loop?
 - Description excerpt from metadata: как нейросети меняют обучение и какие навыки станут важнее в эпоху ИИ.
-- Source: https://www.youtube.com/watch?v=rWpvwVfU0K4
 - Источник публичный и экспертно-популярный, но не техническая документация; claims нужно отделять от мнений и не превращать напрямую в стандарты.
 - Нужно ли сохранить это как brief про AI education/skills или достаточно refined signal + assessment?
 - # Intake: Auzan on AI education and human potential
 - Материал касается того, как ИИ меняет обучение, навыки и человеческий потенциал; это может быть полезно для проектирования обучающих и knowledge-work агентов.
 - Title: Александр Аузан - о человеческом потенциале России и будущем образования в эпоху ИИ
-- URL: https://www.youtube.com/watch?v=rWpvwVfU0K4
 
 ## Technical details
 
@@ -79,7 +89,6 @@ Refinement status: needs-codex-refinement
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
@@ -88,11 +97,5 @@ Refinement status: needs-codex-refinement
 ## Codex refinement required
 
 - Пройти harness `07_workflows/prompts/signal-extraction-harness.md` в этом Techscope thread.
-- Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить `status: refined`, `extraction_mode: codex-assisted`, `refinement_status: codex-refined`.
-
-## Source links
-
-- 00_inbox/links/2026-06-01-auzan-ai-education-human-potential-intake.md
-- https://www.youtube.com/watch?v=rWpvwVfU0K4

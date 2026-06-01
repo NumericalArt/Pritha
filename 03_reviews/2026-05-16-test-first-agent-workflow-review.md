@@ -11,7 +11,7 @@ sources:
   - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
   - 02_briefs/2026-05-15-harness-engineering-codex-agents-brief.md
   - 01_sources/notes/2026-05-15-openai-harness-engineering-source-note.md
-  - https://t.me/tosoltaime/42
+  - anonymous incoming telegram source (purged)
   - https://openai.com/index/harness-engineering/
 related:
   signals:

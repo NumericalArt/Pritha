@@ -3,31 +3,47 @@ id: 2026-05-17-codex-remote-vps-connections-brief
 type: brief
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-topics: [codex-remote-access, codex-desktop, remote-connections, ssh, vps, mobile-agent-control, coding-agents, security]
-tools: [codex, codex-desktop, chatgpt-mobile, ssh, vps, macos, telegram-bot]
+updated: 2026-06-01
+topics:
+  - codex-remote-access
+  - codex-desktop
+  - remote-connections
+  - ssh
+  - vps
+  - mobile-agent-control
+  - coding-agents
+  - security
+tools:
+  - codex
+  - codex-desktop
+  - chatgpt-mobile
+  - ssh
+  - vps
+  - macos
+  - telegram-bot
 sources:
-  - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-  - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
-  - https://openai.com/index/work-with-codex-from-anywhere/
-  - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
-  - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
+  - source-cb67b026-5ee5-4fb0-b73d-53d9a1e499d1
 related:
-  intakes:
-    - 00_inbox/telegram/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-.md
-  notes:
-    - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
-  assessments:
-    - 03_reviews/2026-05-17-codex-remote-vps-connections-assessment.md
-  standards:
-    - 04_standards/agent-shell-evaluation.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.435Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-cb67b026-5ee5-4fb0-b73d-53d9a1e499d1
 ---
 
-# Brief: Codex remote VPS connections
+# Artifact: source-cb67b026-5ee5-4fb0-b73d-53d9a1e499d1
 
 Date: 2026-05-17
-Source: https://t.me/oestick/503
+Status: draft
+Source class: telegram
+Retention: source-purged
+
+Date: 2026-05-17
 Status: draft
 
 ## Summary
@@ -61,4 +77,3 @@ Add `remote-host topology` to `agent-shell-evaluation` and test a minimal remote
 ## Next step
 
 experiment | workflow
-

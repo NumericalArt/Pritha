@@ -3,71 +3,41 @@ id: 2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-д
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/airanez/217
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/airanez/217
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 49
-  forwarded_from: AI RANEZ #217
+  - source-7a2e95dc-6b50-4ae1-9655-7329853cbc29
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.421Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-7a2e95dc-6b50-4ae1-9655-7329853cbc29
 ---
 
-# Intake: 2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо
+# Intake: source-7a2e95dc-6b50-4ae1-9655-7329853cbc29
 
-Date added: 2026-05-17
-Type: telegram
-Source: https://t.me/airanez/217
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 49
-- Forwarded from: AI RANEZ #217
-- Date: 2026-05-17T16:09:32.000Z
-- Media: photo: AgACAgIAAxkBAAMxagnoPGyQ_6HYRgfcs0CWK8FGyNIAAhAeaxtUQFFItLzJsqYJFoIBAAMCAAN3AAM7BA
-
-## Raw material or link
-
-- https://t.me/airanez/217
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо.json`
-
-## Message text
-
-Кстати, Codex умеет сам делать скриншоты приложений на телефоне (см. скрин)
-
-Очень нравится эта функция - сильно экономит время и упрощает дебаг! 
-
-Как я понял, это за счёт интеграции с Xcode, но самое интересное, что я ничего дополнительно не устанавливал
-
-Claude Code скрины сам не делает)
-
-И ещё Remote Access наконец-то завезли, сижу тестирую 
-
-Поделитесь впечатлениями от удалённого использования Codex с телефона! 
-
-И как у вас сейчас ситуация с Coding agents - чем в основном пользуетесь? 
- 
-AI RANEZ
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

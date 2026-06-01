@@ -3,70 +3,41 @@ id: 2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-мо�
 type: intake
 status: new
 created: 2026-05-17
-updated: 2026-05-17
-topics: [telegram, inbox]
-tools: [telegram-bot]
-source_type: telegram
-source_url: https://t.me/iwann_tai/33
+updated: 2026-06-01
+topics:
+  - telegram
+  - inbox
+tools:
+  - telegram-bot
 sources:
-  - https://t.me/iwann_tai/33
-  - 01_sources/raw/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.json
-related: {}
-telegram:
-  user_id: telegram-user
-  chat_id: telegram-user
-  message_id: 33
-  forwarded_from: Eugene Zakharov
+  - source-b7f1b062-5931-46f1-b46a-efb9af5704bc
+related:
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.420Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-b7f1b062-5931-46f1-b46a-efb9af5704bc
 ---
 
-# Intake: 2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи
+# Intake: source-b7f1b062-5931-46f1-b46a-efb9af5704bc
 
-Date added: 2026-05-17
-Type: telegram
-Source: https://t.me/iwann_tai/33
+Date: 2026-05-17
 Status: new
+Source class: telegram
+Retention: source-purged
 
-## Why this may matter
+## Processed status
 
-- Forwarded to Techscope for later expert assessment.
+- Raw source content and direct provenance were removed from tracked memory.
+- The durable memory record keeps only neutral metadata and processed knowledge.
+- Curated ideas, patterns, standards, decisions and assessments remain in related authored artifacts when available.
 
-## Telegram metadata
+## Follow-up
 
-- User: telegram-user
-- Chat: telegram-user
-- Message: 33
-- Forwarded from: Eugene Zakharov
-- Date: 2026-05-17T10:52:13.000Z
-- Media: none
-
-## Raw material or link
-
-- https://t.me/iwann_tai/33
-- Raw update: `01_sources/raw/telegram/2026-05-17-telegram-telegram-user-33-codex-находка-кодекс-может-задавать-вопросы-не-только-в-режи.json`
-
-## Message text
-
-#codex находка - кодекс может задавать вопросы не только в режиме планирования /plan
-
-если в файле 
-~/.codex/config.toml
-
-в раздел 
-[features]
-
-добавить 
-default_mode_request_user_input = true
-
-то кодекс сможет задавать интерактивные вопросы не только в режиме планирования /plan
-
-чтобы задать вопрос работает tool request_user_input
-
-## Initial questions
-
-- Насколько это полезно для программирования, LLM-агентов, coding agents или agent workflows?
-- Нужна ли проверка первоисточника?
-- Стоит ли превратить это в brief, review, experiment или archive?
-
-## Expected output
-
-brief | review | experiment | archive
+- Use processed briefs, reviews, decisions and standards as the durable evidence layer.
+- Do not reconstruct or request the original source unless a separate secure storage decision exists.

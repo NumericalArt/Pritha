@@ -3,7 +3,7 @@ id: 2026-05-17-2026-05-16-telegram-telegram-user-9-как-использоват
 type: signal
 status: superseded
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-01
 topics:
   - telegram
   - inbox
@@ -24,23 +24,34 @@ tools:
   - qa
   - source
 sources:
-  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
-  - https://t.me/tosoltaime/42
-  - 01_sources/raw/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.json
+  - source-a4610722-b764-4d09-b092-b7c27ed71f5c
 related:
-  sources:
-    - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
+  workflows:
+    - 07_workflows/privacy-preserving-intake.md
+superseded_by:
+  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
+source_type: telegram
+source_class: telegram
+ingested_at: 2026-05-17
+processed_at: 2026-06-01T21:03:38.428Z
+retention_status: source-purged
+usefulness: medium
+evidence_quality: uncertain
+anonymous_source_id: source-a4610722-b764-4d09-b092-b7c27ed71f5c
 generated_from:
-  - 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
+  - source-a4610722-b764-4d09-b092-b7c27ed71f5c
 signal_quality: high
 extraction_mode: heuristic-draft
 refinement_status: superseded
-superseded_by:
-  - 01_sources/signals/2026-05-16-2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex-signal.md
 harness: 07_workflows/prompts/signal-extraction-harness.md
 ---
 
-# Signal: 2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex
+# Signal: source-a4610722-b764-4d09-b092-b7c27ed71f5c
+
+Date: 2026-05-17
+Status: superseded
+Source class: telegram
+Retention: source-purged
 
 Date: 2026-05-17
 Status: superseded
@@ -63,10 +74,8 @@ Refinement status: superseded
 
 ## Technical details
 
-- Raw update: `01_sources/raw/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.json`
 - # Intake: 2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex
 - Forwarded to Techscope for later expert assessment.
-- Forwarded from: Tosol Taimeframes #42
 
 ## Agent design implications
 
@@ -81,20 +90,12 @@ Refinement status: superseded
 ## Noise removed
 
 - Вступления, повторы, рекламные блоки, stage banter and generic motivation are intentionally excluded.
-- Full source text/transcript is not copied into this signal.
 
 ## Verification required
 
 - Проверить первоисточники и даты публикации внешних ссылок.
-- Сверить claims с official OpenAI docs/source materials.
 - Проверить security implications отдельно перед стандартом.
 
 ## Codex refinement required
 
 - Superseded by earlier refined Superpowers/Codex signal.
-
-## Source links
-
-- 00_inbox/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.md
-- https://t.me/tosoltaime/42
-- 01_sources/raw/telegram/2026-05-16-telegram-telegram-user-9-как-использовать-superpowers-в-codex.json

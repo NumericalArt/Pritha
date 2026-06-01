@@ -24,10 +24,10 @@ node scripts/query-memory.mjs semantic "agent factory"
 ## Rules
 
 - Keep generated indexes rebuildable from Markdown.
-- Commit `.memory/` as the portable memory snapshot for Pritha.
+- Commit cleaned `.memory/` as the portable memory snapshot for Pritha.
 - Curated artifacts must have frontmatter.
-- Raw JSON, transcripts, text, PDFs and small supporting images are portable
-  raw source state.
-- Heavy raw audio/video media stays local until a Git LFS/archive policy is
-  selected.
-- Raw sources stay raw; standards and decisions require curated evidence.
+- Raw JSON, transcripts, downloaded text/PDF/image source artifacts and original
+  media are not portable Git state.
+- Durable memory stores processed knowledge and neutral metadata only.
+- `node scripts/privacy-audit.mjs --strict` must pass after rebuild and before
+  push.

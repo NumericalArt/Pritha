@@ -15,7 +15,7 @@ sources:
   - 07_workflows/llm-wiki-layer.md
   - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
   - 00_inbox/links/2026-05-15-youtube-obsidian-wiki-instead-rag-intake.md
-  - 01_sources/raw/youtube-2ZHHzfMSeWc/2ZHHzfMSeWc-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=2ZHHzfMSeWc
   - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
   - https://community.obsidian.md/plugins/karpathywiki
@@ -29,24 +29,24 @@ sources:
   - 01_sources/notes/2026-05-16-openai-realtime-audio-models-source-note.md
   - 00_inbox/links/2026-05-16-youtube-openai-three-audio-models-api-intake.md
   - 03_reviews/2026-05-16-2026-05-16-youtube-openai-three-audio-models-api-intake-auto-assessment.md
-  - 01_sources/raw/youtube-JOu8v6CBjkE/JOu8v6CBjkE-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=JOu8v6CBjkE
   - https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api/
   - 02_briefs/2026-05-17-codex-mobile-desktop-remote-connection-brief.md
   - 01_sources/notes/2026-05-17-codex-mobile-desktop-remote-connection-source-note.md
   - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-53-telegram-photo-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-53-telegram-photo/01-photo.jpg
+  - raw-source-purged
   - https://openai.com/index/work-with-codex-from-anywhere/
   - 02_briefs/2026-05-17-codex-remote-vps-connections-brief.md
   - 01_sources/notes/2026-05-17-codex-remote-vps-connections-source-note.md
   - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-ope-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-52-все-новостные-каналы-пишут-про-нативный-диспатчер-от-openai-/01-photo.jpg
+  - raw-source-purged
   - https://help.openai.com/en/articles/6825453-chatgpt-release-notes
   - https://help.openai.com/en/articles/10128477-chatgpt-enterprise-edu-release-notes
   - 02_briefs/2026-05-17-medium-harness-engineering-six-layer-brief.md
   - 01_sources/notes/2026-05-17-medium-harness-engineering-six-layer-source-note.md
   - 01_sources/signals/2026-05-17-medium-harness-engineering-six-layer-signal.md
-  - 01_sources/raw/thread-media/2026-05-17-harness-engineering-screenshots/
+  - raw-source-purged
   - https://medium.com/%40bollen_en_kersen/list/ai-engineering-302c79906afa
   - https://openai.com/index/harness-engineering/
   - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
@@ -59,7 +59,7 @@ sources:
   - https://t.me/tosoltaime/42
   - 00_inbox/links/2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake.md
   - 03_reviews/2026-05-15-2026-05-15-youtube-harness-engineering-ryan-lopopolo-openai-intake-auto-assessment.md
-  - 01_sources/raw/youtube-am_oeAoUhew/am_oeAoUhew-whisper-small.md
+  - raw-source-purged
   - https://www.youtube.com/watch?v=am_oeAoUhew
   - 03_reviews/2026-05-17-agent-shell-evaluation-review.md
   - 03_reviews/2026-05-17-openclaw-hermes-codex-cli-advanced-user-assessment.md
@@ -73,11 +73,11 @@ sources:
   - https://openai.com/index/introducing-the-codex-app/
   - https://arxiv.org/abs/2603.07670
   - 04_standards/agent-shell-evaluation.md
-  - 01_sources/raw/youtube-L-HAzfFWSto/L-HAzfFWSto-whisper-small.md
+  - raw-source-purged
   - 02_briefs/2026-05-17-codex-xcode-simulator-screenshot-debugging-brief.md
   - 01_sources/notes/2026-05-17-codex-xcode-simulator-screenshot-debugging-source-note.md
   - 01_sources/signals/2026-05-17-2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-те-signal.md
-  - 01_sources/raw/telegram-media/2026-05-17-telegram-telegram-user-49-кстати-codex-умеет-сам-делать-скриншоты-приложений-на-телефо/01-photo.jpg
+  - raw-source-purged
   - https://support.apple.com/guide/simulator/take-screenshots-or-record-video-devd49e021cc/mac
 related:
   wiki_pages:
