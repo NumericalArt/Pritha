@@ -4,7 +4,7 @@ type: standard
 status: active
 created: 2026-05-31
 updated: 2026-05-31
-last_reviewed: 2026-05-31
+last_reviewed: 2026-06-01
 owner: Techscope/user
 topics:
   - tailscale
@@ -39,6 +39,7 @@ sources:
   - 11_agents/reports/2026-05-25-funny-teacher-agent-deployment-report.md
   - 11_agents/reports/2026-05-26-funny-teacher-launchd-deployment-report.md
   - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
+  - 11_agents/reports/2026-06-01-fespa26-funny-teacher-tailscale-serve-recovery-report.md
 related:
   decisions:
     - 05_decisions/2026-05-15-obsidian-web-access.md
@@ -51,10 +52,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-15
-source_updated: 2026-05-31
-source_version: FESPA26/Funny Teacher/Techscope Web Tailscale access pattern v1
+source_updated: 2026-06-01
+source_version: FESPA26/Funny Teacher/Techscope Web Tailscale access pattern v1.1
 retrieved: 2026-05-31
-verified: 2026-05-31
+verified: 2026-06-01
 valid_for: single-operator local agents exposed only to trusted devices in the same tailnet
 temporal_status: version-bound
 ---
@@ -63,7 +64,7 @@ temporal_status: version-bound
 
 Status: active
 Owner: Techscope/user
-Last reviewed: 2026-05-31
+Last reviewed: 2026-06-01
 
 ## Rule
 
@@ -150,6 +151,9 @@ An agent using this pattern should report:
 - If launchd is used, the deployment report must record plist path, label, start command, local URL, Tailscale URL, logs and uninstall command.
 - Tailscale Serve can be configured while the upstream is down, but that state should be reported as incomplete because it produces 502-style failures.
 - The operator guide should say which URL to open from the phone.
+- Host self-access to a Tailscale URL is only a hairpin check. For phone or laptop workflows, readiness requires confirmation from the target device or an equivalent peer-access check.
+- When multiple services share Tailscale Serve and peer access breaks, first restore the known-good reference service with the smallest Serve config, then add other services one at a time on separate HTTPS ports.
+- If local upstream health is good and `tailscale ping` to peers works but browsers on peers cannot connect, reset Serve and consider a host-side Tailscale restart before changing application code.
 
 ## Security boundaries
 
@@ -181,10 +185,10 @@ For browser voice agents, Tailscale HTTPS is the preferred phone access path bec
 ## Temporal validity
 
 - Source published: 2026-05-15.
-- Source updated: 2026-05-31.
-- Source version: FESPA26/Funny Teacher/Techscope Web Tailscale access pattern v1.
+- Source updated: 2026-06-01.
+- Source version: FESPA26/Funny Teacher/Techscope Web Tailscale access pattern v1.1.
 - Retrieved: 2026-05-31.
-- Verified: 2026-05-31.
+- Verified: 2026-06-01.
 - Valid for: single-operator local agents exposed only to trusted devices in the same tailnet.
 - Freshness status: current.
 - Temporal status: version-bound.
