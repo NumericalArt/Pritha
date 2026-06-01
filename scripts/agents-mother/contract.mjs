@@ -9,6 +9,10 @@ export const SERVICE_MODES = new Set(["none", "manual", "launchd", "external"]);
 export const AUTOSTART_MODES = new Set(["disabled", "optional", "launchd-on-approval", "external"]);
 export const PROACTIVE_MODES = new Set(["none", "manual", "scheduled", "heartbeat", "event-driven", "queue-watcher", "hybrid"]);
 export const RUNTIME_PLACEMENT_PROFILES = new Set(["deterministic-first", "frontier-first", "local-first", "hybrid", "unknown"]);
+export const SKILL_NEEDS = new Set(["auto", "none", "selected"]);
+export const SKILL_SOURCES = new Set(["local-only", "trusted-only", "external-with-approval"]);
+export const SKILL_INSTALL_MODES = new Set(["recommend", "vendor", "link", "runtime-install"]);
+export const SKILL_MUTATION_POLICIES = new Set(["read-only", "patch-with-approval", "agent-managed"]);
 export const STATUS_VALUES = new Set(["draft", "accepted", "superseded"]);
 
 export function bodyValue(text, label) {
@@ -61,6 +65,10 @@ export function validateContract(contractPath, options = {}) {
   const serviceMode = bodyValue(text, "Service mode");
   const autostart = bodyValue(text, "Autostart");
   const proactiveMode = bodyValue(text, "Proactive mode");
+  const skillNeeds = bodyValue(text, "Skill needs");
+  const allowedSkillSources = bodyValue(text, "Allowed skill sources");
+  const skillInstallMode = bodyValue(text, "Skill install mode");
+  const skillMutationPolicy = bodyValue(text, "Skill mutation policy");
   const requiredLabels = [
     "Agent name",
     "Primary mission",
@@ -102,6 +110,18 @@ export function validateContract(contractPath, options = {}) {
   if (proactiveMode && !PROACTIVE_MODES.has(proactiveMode)) {
     issues.push(`invalid Proactive mode "${proactiveMode}". Expected: ${Array.from(PROACTIVE_MODES).join(", ")}`);
   }
+  if (skillNeeds && !SKILL_NEEDS.has(skillNeeds)) {
+    issues.push(`invalid Skill needs "${skillNeeds}". Expected: ${Array.from(SKILL_NEEDS).join(", ")}`);
+  }
+  if (allowedSkillSources && !SKILL_SOURCES.has(allowedSkillSources)) {
+    issues.push(`invalid Allowed skill sources "${allowedSkillSources}". Expected: ${Array.from(SKILL_SOURCES).join(", ")}`);
+  }
+  if (skillInstallMode && !SKILL_INSTALL_MODES.has(skillInstallMode)) {
+    issues.push(`invalid Skill install mode "${skillInstallMode}". Expected: ${Array.from(SKILL_INSTALL_MODES).join(", ")}`);
+  }
+  if (skillMutationPolicy && !SKILL_MUTATION_POLICIES.has(skillMutationPolicy)) {
+    issues.push(`invalid Skill mutation policy "${skillMutationPolicy}". Expected: ${Array.from(SKILL_MUTATION_POLICIES).join(", ")}`);
+  }
   if (telegram && telegram !== "none") {
     const secrets = bodyValue(text, "Secrets required");
     const auth = bodyValue(text, "User authorization model");
@@ -142,13 +162,42 @@ export function contractData(contractPath, options = {}) {
     runtimeFamily: bodyValue(text, "Runtime family"),
     runtimePlacementProfile: bodyValue(text, "Runtime placement profile"),
     primaryInterface: bodyValue(text, "Primary interface"),
+    secondaryInterfaces: bodyValue(text, "Secondary interfaces"),
     telegramMode: bodyValue(text, "Telegram mode"),
+    expectedHosting: bodyValue(text, "Expected hosting"),
+    deploymentTarget: bodyValue(text, "Deployment target"),
+    deploymentProfile: bodyValue(text, "Deployment profile"),
     serviceMode: bodyValue(text, "Service mode") || "none",
     autostart: bodyValue(text, "Autostart") || "disabled",
+    startCommand: bodyValue(text, "Start command"),
+    stopCommand: bodyValue(text, "Stop command"),
+    healthcheckCommand: bodyValue(text, "Healthcheck command"),
+    logPath: bodyValue(text, "Log path"),
+    restartPolicy: bodyValue(text, "Restart policy"),
     proactiveMode: bodyValue(text, "Proactive mode") || "none",
+    triggerSources: bodyValue(text, "Trigger sources"),
+    schedule: bodyValue(text, "Schedule"),
+    heartbeatInterval: bodyValue(text, "Heartbeat interval"),
+    idleBehavior: bodyValue(text, "Idle behavior"),
+    userInterruptionPolicy: bodyValue(text, "User interruption policy"),
+    skillNeeds: bodyValue(text, "Skill needs") || "auto",
+    allowedSkillSources: bodyValue(text, "Allowed skill sources") || "local-only",
+    skillInstallMode: bodyValue(text, "Skill install mode") || "recommend",
+    skillMutationPolicy: bodyValue(text, "Skill mutation policy") || "read-only",
+    memoryModel: bodyValue(text, "Memory model"),
+    indexingSearchNeeds: bodyValue(text, "Indexing/search needs"),
+    toolSystem: bodyValue(text, "Tool system"),
+    inputDataTypes: bodyValue(text, "Input data types"),
+    sensitiveData: bodyValue(text, "Sensitive data"),
     targetFolder: bodyValue(text, "Target folder"),
+    filesToGenerate: bodyValue(text, "Files to generate"),
+    dependencies: bodyValue(text, "Dependencies"),
+    setupCommands: bodyValue(text, "Setup commands"),
+    runCommands: bodyValue(text, "Run commands"),
     testsHealthchecks: bodyValue(text, "Tests/healthchecks"),
     userTrainingGuide: bodyValue(text, "User training guide"),
+    allowedNetworkAccess: bodyValue(text, "Allowed network access"),
+    secretsRequired: bodyValue(text, "Secrets required"),
     coreFunctions: sectionItems(text, "V1 core functions"),
     criticalWorkflows: sectionItems(text, "Critical user workflows"),
   };

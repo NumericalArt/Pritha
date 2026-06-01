@@ -20,9 +20,15 @@ scripts/deploy-service.mjs
 scripts/interface-status.mjs
 scripts/memory-status.mjs
 scripts/operations-status.mjs
+scripts/skills-status.mjs
 scripts/smoke-test.mjs
 scripts/tools-status.mjs
+skills/README.md
+skills/candidates.json
+skills/lock.json
+skills/manifest.json
 tools/README.md
 tools/cli-script/README.md
 tools/manifest.json
+tools/skill-pack/README.md
 tools/workflow/README.md

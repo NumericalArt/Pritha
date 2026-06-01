@@ -3,7 +3,7 @@ id: telegram-intake-bot
 type: workflow
 status: active
 created: 2026-05-15
-updated: 2026-05-17
+updated: 2026-06-01
 topics: [telegram, intake, automation, knowledge-capture, queue, media-intake]
 tools: [telegram-bot, node, markdown, process-intake, extract-signal, codex, launchd]
 sources:
@@ -86,7 +86,7 @@ The Markdown intake is queued in:
 The worker processes queued Markdown intakes sequentially with:
 
 ```sh
-node scripts/process-intake.mjs <intake-path> --transcribe-youtube --reindex
+node scripts/process-intake.mjs <intake-path> --transcribe-media --reindex
 ```
 
 For batches with multiple queued intakes, the worker processes every intake first and then runs one shared validation/rebuild/embedding pass.
@@ -121,7 +121,7 @@ Replies must be short and human-readable:
 
 - acknowledge that the material was accepted and queued;
 - say what will be done in plain language;
-- after processing, summarize substance: links, YouTube transcript, media files, signals and assessment;
+- after processing, summarize substance: links, media transcription, media files, signals and assessment;
 - distinguish clearly between `auto stage finished` and `fully processed`;
 - mention when media has been queued for Codex review in the current Techscope thread;
 - avoid raw command output unless there is an error that requires action.

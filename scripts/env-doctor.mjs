@@ -163,7 +163,7 @@ function checkOptionalTools() {
   const optional = [
     ["codex", "Codex CLI", "Install or sign into Codex if this machine will run Codex-native agent tasks."],
     ["rg", "ripgrep", "Install ripgrep for fast source search: brew install ripgrep."],
-    ["ffmpeg", "system ffmpeg", "Optional because imageio-ffmpeg provides the binary used by transcribe-youtube."],
+    ["ffmpeg", "system ffmpeg", "Optional because imageio-ffmpeg provides the binary used by media transcription."],
   ];
   for (const [command, label, hint] of optional) {
     const found = commandExists(command);
@@ -193,13 +193,6 @@ checkPythonPackage(
   "Python package imageio-ffmpeg",
   "imageio_ffmpeg",
   "imageio-ffmpeg",
-  "Install with `python3 -m pip install --user -r requirements.txt`.",
-);
-checkPythonPackage(
-  "yt-dlp",
-  "Python package yt-dlp",
-  "yt_dlp",
-  "yt-dlp",
   "Install with `python3 -m pip install --user -r requirements.txt`.",
 );
 checkPythonPackage(

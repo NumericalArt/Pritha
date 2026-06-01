@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-05-29
-last_reviewed: 2026-05-29
+updated: 2026-05-31
+last_reviewed: 2026-05-31
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -68,10 +68,13 @@ sources:
   - 04_standards/agent-harness-evaluation.md
   - 02_briefs/2026-05-27-nvidia-nemoclaw-sandboxed-agent-runtime-brief.md
   - 03_reviews/2026-05-27-nvidia-nemoclaw-sandboxed-agent-runtime-assessment.md
+  - https://openai.com/ru-RU/index/harness-engineering/
+  - 03_reviews/2026-05-31-openai-harness-engineering-agent-readable-repo-assessment.md
 related:
   decisions: []
   reviews:
     - 03_reviews/2026-05-18-techscope-agents-mother-scenario-review.md
+    - 03_reviews/2026-05-31-openai-harness-engineering-agent-readable-repo-assessment.md
   briefs: []
   workflows:
     - 07_workflows/agents-mother.md
@@ -83,10 +86,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-05-29
-source_version: Techscope draft standard v4 + Funny Teacher reference example
+source_updated: 2026-05-31
+source_version: Techscope draft standard v5 + Funny Teacher reference example + OpenAI harness engineering article recheck
 retrieved: 2026-05-18
-verified: 2026-05-29
+verified: 2026-05-31
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -95,7 +98,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-05-29
+Last reviewed: 2026-05-31
 
 ## Rule
 
@@ -106,6 +109,8 @@ TechScope may use its own architecture as a reference, but it must not clone its
 Pritha descendants are assembled from contract-selected modules, not from one universal bundle. Every future agent should receive the harness, memory, data, skills, MCP servers, interface adapters, tools, evals and operations modules that its contract actually needs, and no more. A pattern marked `adopt-in-scaffold` means "available for Pritha to select and compose", not "automatically copied into every descendant".
 
 The initial scaffold is a starting point, not the final boundary of the agent. A descendant can always be evolved through its native interface, especially Codex App/Codex thread for Codex-native agents, plus any other interface selected in its contract. When a descendant receives an internet resource that is not directly relevant to its domain mission, it should treat the resource as meta-improvement input rather than domain memory: evaluate whether the material improves the agent's harness, memory, tools, skills, MCP, UX, evals, safety or operations, then record a brief/review/decision locally or send a distilled lesson back to Pritha/Techscope.
+
+OpenAI's 2026-02-11 harness-engineering article strengthens the default Pritha rule: a created agent's repository is the agent-readable operating environment. `AGENTS.md` should be a concise map and contract entrypoint; deeper knowledge belongs in versioned docs, standards, workflows, plans, tests, scripts and reports that future Codex sessions can discover, validate and update.
 
 ## Pritha naming and lineage vocabulary
 
@@ -167,6 +172,11 @@ The compatibility rule is alias-first: new Pritha names may wrap existing Agents
 - Generate a `scaffold-report` after files are created and tests are run.
 - After the first meaningful working version, create a post-creation review and preserve the user interaction path that shaped the agent.
 - Index contracts and scaffold reports into TechScope memory.
+- Keep `AGENTS.md` concise and map-like. Do not turn it into a monolithic manual; route detailed architecture, operations, security, QA, memory and product guidance to versioned repo-local artifacts.
+- Treat repo-local knowledge as the system of record for future agents. If a rule, decision, product constraint or repeated correction matters, encode it in Markdown, tests, scripts, linters, skills, workflows or another discoverable project artifact.
+- Make verification surfaces agent-readable where scope justifies it: healthchecks, smoke tests, browser checks, screenshots, logs, metrics, traces and actionable failure messages.
+- Convert repeated review comments and user corrections into durable docs, templates, checks, skills or workflow changes instead of relying on memory of prior conversations.
+- For long-lived or high-throughput agent-generated projects, plan periodic cleanup/doc-gardening so drift, stale docs, inconsistent patterns and low-quality generated artifacts are corrected incrementally.
 - At the end of setup/init, verify and state module readiness for the selected agent: harness, memory, data layer, skills, MCP, tools, interfaces, operations and any selected external connectors. Missing optional modules are reported as skipped; missing selected modules are reported as failed or pending-auth.
 - If realtime voice control is selected, initialize the default realtime tool surface unless the contract explicitly opts out: internet access, agent memory access and Codex CLI sidecar access. Treat these as selected realtime-interface modules; setup must report their readiness and must not silently mark the voice interface as ready when memory or Codex CLI access is missing.
 - Preserve an evolution path through the agent's native interface. For Codex-native descendants, document how to continue development in Codex App and how to route non-domain learning materials into agent self-improvement review rather than task memory.
@@ -188,6 +198,7 @@ Each created agent must document:
 - evaluation and observability: tests, healthchecks, logs, traces and review points;
 - constraints, validation and recovery: forbidden actions, schema checks, fallback paths and rollback rules.
 - user interaction review: initial request, clarifying questions, user feedback, failed assumptions and product decisions that emerged during real testing.
+- agent legibility: the maps, docs, checks, logs, UI/browser verification paths and remediation messages that let future agent runs understand and safely change the project.
 
 ## Agent environment compatibility
 
@@ -202,10 +213,10 @@ Each created agent must document:
 ## Temporal validity
 
 - Source published: 2026-05-18 user scenario and current external docs.
-- Source updated: 2026-05-29.
-- Source version: Techscope draft standard v4 plus Funny Teacher reference evidence.
+- Source updated: 2026-05-31.
+- Source version: Techscope draft standard v5 plus Funny Teacher reference evidence and OpenAI harness-engineering article recheck.
 - Retrieved: 2026-05-18.
-- Verified: 2026-05-29.
+- Verified: 2026-05-31.
 - Valid for: TechScope agent creation workflow from 2026-05-18 onward.
 - Freshness status: current.
 - Temporal status: current.

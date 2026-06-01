@@ -284,8 +284,8 @@ function parseProcessingOutput(output) {
   const signals = lines
     .filter((line) => line.startsWith("Signal draft:"))
     .map((line) => line.replace(/^Signal draft:\s*/, "").trim());
-  const youtube = lines.filter((line) => line.startsWith("YouTube processed:")).length;
-  const youtubeFailed = lines.filter((line) => line.startsWith("YouTube failed:")).length;
+  const transcriptions = lines.filter((line) => line.startsWith("Media processed:")).length;
+  const transcriptionFailed = lines.filter((line) => line.startsWith("Media failed:")).length;
   const media = lines.filter((line) => line.startsWith("Telegram media saved:")).length;
   const mediaFailed = lines.filter((line) => line.startsWith("Telegram media failed:")).length;
   const mediaItems = lines
@@ -295,7 +295,7 @@ function parseProcessingOutput(output) {
       return match ? { kind: match[1].trim(), path: match[2].trim() } : null;
     })
     .filter(Boolean);
-  return { assessment, signals, youtube, youtubeFailed, media, mediaFailed, mediaItems };
+  return { assessment, signals, transcriptions, transcriptionFailed, media, mediaFailed, mediaItems };
 }
 
 function enqueueCodexMediaReview(job, parsed) {
@@ -322,8 +322,8 @@ function enqueueCodexMediaReview(job, parsed) {
 
 function humanSummary(parsed, job) {
   const parts = [];
-  if (parsed.youtube) parts.push(`YouTube: ${parsed.youtube} транскрипт`);
-  if (parsed.youtubeFailed) parts.push(`YouTube: ${parsed.youtubeFailed} ошибка`);
+  if (parsed.transcriptions) parts.push(`медиа-транскрипция: ${parsed.transcriptions} готово`);
+  if (parsed.transcriptionFailed) parts.push(`ошибки транскрибации: ${parsed.transcriptionFailed}`);
   if (parsed.media) parts.push(`медиа: ${parsed.media} файл`);
   if (parsed.mediaFailed) parts.push(`медиа: ${parsed.mediaFailed} ошибка`);
   if (parsed.signals.length) parts.push(`сигналы: ${parsed.signals.length}`);
@@ -514,7 +514,7 @@ async function processSavedIntake(chatId, mdPath) {
   const rel = path.relative(ROOT, mdPath).split(path.sep).join("/");
   const job = enqueueIntake(mdPath, chatId);
   if (job.status === "pending") {
-    await reply(chatId, `Принял материал и поставил в очередь полного разбора.\n\nСделаю: ссылки, доступные медиа, YouTube-транскрипт при наличии, первичную оценку, signal draft, индексацию. Если есть медиа, оно не считается готовым до Codex-разбора.\n\nИсточник: ${rel}`);
+    await reply(chatId, `Принял материал и поставил в очередь полного разбора.\n\nСделаю: ссылки, доступные медиа-транскрипции при наличии совместимых источников, первичную оценку, signal draft, индексацию. Если есть медиа, оно не считается готовым до Codex-разбора.\n\nИсточник: ${rel}`);
   } else if (job.status === "complete") {
     await reply(chatId, `Этот материал уже полностью обработан.\n\nИсточник: ${rel}`);
   } else if (job.status === "awaiting_codex") {
@@ -540,7 +540,7 @@ async function handleUpdate(update, users) {
 
   const text = messageText(message);
   if (text === "/start" || text === "/help") {
-    await reply(chatId, "Techscope готов принимать материалы.\n\nПрисылай пост, ссылку, фото, видео или голосовое. Я сохраню источник и проведу полный пайплайн: ссылки, медиа, YouTube, экспертная оценка, signal draft и индексация. Медиа считается готовым только после Codex-разбора.\n\nКоманды:\n/help\n/queue\n/reindex");
+    await reply(chatId, "Techscope готов принимать материалы.\n\nПрисылай пост, ссылку, фото, видео или голосовое. Я сохраню источник и проведу полный пайплайн: ссылки, медиа-транскрипция, экспертная оценка, signal draft и индексация. Медиа считается готовым только после Codex-разбора.\n\nКоманды:\n/help\n/queue\n/reindex");
     return;
   }
   if (text === "/reindex") {
@@ -651,7 +651,7 @@ async function processJobFile(filePath, { reindex = true } = {}) {
     const output = runCommand("node", [
       "scripts/process-intake.mjs",
       job.intake,
-      "--transcribe-youtube",
+      "--transcribe-media",
       ...(reindex ? ["--reindex"] : []),
     ]);
     const parsed = parseProcessingOutput(output);

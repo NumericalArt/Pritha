@@ -138,6 +138,18 @@ Status: draft | accepted | superseded
 - Idle behavior:
 - User interruption policy:
 
+## Skills and procedural memory
+
+- Skill needs: auto | none | selected
+- Allowed skill sources: local-only | trusted-only | external-with-approval
+- Skill install mode: recommend | vendor | link | runtime-install
+- Skill mutation policy: read-only | patch-with-approval | agent-managed
+- Installed skills:
+- Candidate skills:
+- External skill approval:
+- Skill update policy:
+- Skill audit command:
+
 ## Harness inventory
 
 - Information boundaries:
@@ -207,6 +219,7 @@ Status: draft | accepted | superseded
 - [ ] Runtime placement selected per task class.
 - [ ] Interface mode selected.
 - [ ] Telegram need explicitly decided.
+- [ ] Skills policy selected.
 - [ ] Harness inventory complete.
 - [ ] Security model documented.
 - [ ] Tests/healthchecks defined.

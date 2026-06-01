@@ -3,9 +3,9 @@ id: media-intake-processing
 type: workflow
 status: active
 created: 2026-05-15
-updated: 2026-05-17
-topics: [media-intake, assessment, telegram, youtube, source-verification, agents, queue]
-tools: [telegram-bot, process-intake, extract-signal, codex, yt-dlp, mlx-whisper, markdown]
+updated: 2026-06-01
+topics: [media-intake, assessment, telegram, source-verification, agents, queue]
+tools: [telegram-bot, process-intake, extract-signal, codex, transcribe-media, mlx-whisper, markdown]
 sources:
   - AGENTS.md
   - 04_standards/expert-information-assessment.md
@@ -13,7 +13,7 @@ related:
   workflows:
     - 07_workflows/expert-information-assessment.md
     - 07_workflows/telegram-intake-bot.md
-    - 07_workflows/youtube-transcription.md
+    - 07_workflows/media-transcription.md
     - 07_workflows/codex-assisted-signal-extraction.md
     - 07_workflows/codex-assisted-media-review.md
   standards:
@@ -24,7 +24,7 @@ related:
 
 ## Goal
 
-Любой входящий материал из Telegram, YouTube, ссылок, файлов, текстов или другого медиа должен проходить не только сохранение и индексацию, но и первичную экспертную оценку относительно миссии Techscope.
+Любой входящий материал из Telegram, ссылок, файлов, текстов или другого медиа должен проходить не только сохранение и индексацию, но и первичную экспертную оценку относительно миссии Techscope.
 
 ## Rule
 
@@ -34,7 +34,7 @@ related:
 2. Поставить intake в persistent queue, если источник пришел через Telegram или другой автоматический канал.
 3. Извлечь ссылки.
 4. Проверить доступность ссылок, если это возможно.
-5. Для YouTube запустить локальную транскрибацию, если видео доступно.
+5. Для поддерживаемых remote/local media запустить локальную транскрибацию, если источник доступен и есть совместимый adapter.
 6. Для Telegram media скачать доступные файлы в `01_sources/raw/telegram-media/`.
 7. Создать heuristic `signal` draft в `01_sources/signals/`.
 8. Пометить signal как `needs-codex-refinement`.
@@ -49,7 +49,7 @@ related:
 ## Command
 
 ```sh
-node scripts/process-intake.mjs <intake-path> --transcribe-youtube --reindex
+node scripts/process-intake.mjs <intake-path> --transcribe-media --reindex
 ```
 
 Telegram queue worker:
@@ -104,9 +104,18 @@ The assessment may recommend:
 
 ## Completion semantics
 
-`auto_completed_at` means that scripts saved the material, inspected links, downloaded available media, processed YouTube links where possible, created assessment/signal drafts and rebuilt the index.
+`auto_completed_at` means that scripts saved the material, inspected links, downloaded available media, processed compatible media sources where possible, created assessment/signal drafts and rebuilt the index.
 
-`completed_at` means the full required pipeline is closed. For media intakes this requires Codex-assisted interpretation, verification and artifact refinement first.
+`completed_at` means the full required pipeline is closed. For media intakes this requires the useful working-memory artifacts to be curated first. In Techscope v1 this is a Codex-assisted pass performed in the current Techscope thread, not a background Codex worker.
+
+Codex-assisted refinement is not for preserving a "better transcript". The transcript is raw evidence. The refinement step exists to prevent noisy ASR output, source metadata, timestamps or weak heuristic extraction from entering curated working memory as if it were knowledge.
+
+If the heuristic signal is already clean and the material is low-risk/low-impact, a spot check may be enough. Full Codex refinement is required when:
+
+- the heuristic signal contains ASR errors, timestamps, source metadata or random fragments;
+- the material may become a brief, review, decision or standard;
+- the material affects agent design, safety, memory, evals, tools or user workflows;
+- automatic scoring appears inconsistent with the actual content.
 
 Telegram replies must reflect this distinction. "Готово" is allowed only for a fully completed intake.
 
@@ -114,9 +123,10 @@ Telegram replies must reflect this distinction. "Готово" is allowed only f
 
 - Автоматический assessment является draft, не финальным решением.
 - Автоматический signal является heuristic draft, не финальной экспертной выжимкой.
-- Содержательный refinement выполняется Codex-агентом в Techscope thread по `07_workflows/prompts/signal-extraction-harness.md`, без внешних LLM-сервисов.
+- Содержательный refinement выполняется Codex-агентом в текущем Techscope thread по `07_workflows/prompts/signal-extraction-harness.md`, без внешних LLM-сервисов. Это workflow-стадия, а не автоматический worker внутри `process-intake`.
 - Media с потенциальной пользой проходят Codex-assisted media review по `07_workflows/codex-assisted-media-review.md`.
 - Внешние claims не принимать без первоисточника.
 - Полные transcripts и raw artifacts хранить только в `01_sources/raw/`.
+- Raw transcript не является рабочей памятью. В рабочую память идут curated artifacts: `signal`, `assessment`, `brief`, `review`, `decision` and `standard`.
 - Telegram media хранить как raw artifacts; signal/assessment должны ссылаться на них, но не встраивать бинарные данные или длинные raw fragments.
 - Если материал может повлиять на настройку агентов, зафиксировать это как recommendation для будущего agent standard, prompt rule, workflow или decision.

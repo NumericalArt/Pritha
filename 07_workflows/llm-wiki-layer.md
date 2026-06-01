@@ -7,17 +7,13 @@ updated: 2026-05-15
 topics: [llm-wiki, generated-knowledge, agent-memory, obsidian, rag, workflow]
 tools: [markdown, obsidian, codex]
 sources:
-  - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
-  - 03_reviews/2026-05-15-youtube-obsidian-wiki-instead-rag-assessment.md
+  - 04_standards/signal-extraction.md
   - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 related:
-  briefs:
-    - 02_briefs/2026-05-15-youtube-obsidian-wiki-instead-rag-brief.md
-  reviews:
-    - 03_reviews/2026-05-15-youtube-obsidian-wiki-instead-rag-assessment.md
   decisions:
     - 05_decisions/2026-05-15-memory-architecture.md
   standards:
+    - 04_standards/signal-extraction.md
     - 04_standards/memory-structure.md
   workflows:
     - 07_workflows/memory-indexing.md

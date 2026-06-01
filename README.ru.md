@@ -79,16 +79,16 @@ node scripts/query-memory.mjs by-type standard
 node scripts/query-memory.mjs open
 ```
 
-Локальная транскрибация YouTube:
+Локальная транскрибация media:
 
 ```sh
-node scripts/transcribe-youtube.mjs https://www.youtube.com/watch?v=bT7aKIwiFjE
+node scripts/transcribe-media.mjs ./01_sources/raw/input/video.mp4 --language ru
 ```
 
 Результат смотреть в:
 
 ```text
-01_sources/raw/youtube-<video-id>/<video-id>-whisper-small.md
+01_sources/raw/media/<media-id>/transcript.md
 ```
 
 Локальные embeddings:
@@ -96,6 +96,6 @@ node scripts/transcribe-youtube.mjs https://www.youtube.com/watch?v=bT7aKIwiFjE
 ```sh
 node scripts/rebuild-memory.mjs
 python3 scripts/embed-memory.py
-python3 scripts/semantic-search.py "локальная транскрибация youtube"
-node scripts/query-memory.mjs semantic "локальная транскрибация youtube"
+python3 scripts/semantic-search.py "локальная транскрибация media"
+node scripts/query-memory.mjs semantic "локальная транскрибация media"
 ```
