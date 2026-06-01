@@ -23,6 +23,7 @@ import { scaffoldContract } from "./scaffold/index.mjs";
 import { handoffProject } from "./handoff.mjs";
 import { deployProject, operationsProject } from "./operations.mjs";
 import { evolveProject, listContracts, rebuildRegistry } from "./registry.mjs";
+import { auditProjectSkills, printSkillSelection, printSkillsStatus, selectSkillsForContract, skillRowForManifest } from "./skills.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const CONTRACT_DIR = path.join(ROOT, "11_agents", "contracts");
@@ -37,6 +38,10 @@ const SERVICE_MODES = new Set(["none", "manual", "launchd", "external"]);
 const AUTOSTART_MODES = new Set(["disabled", "optional", "launchd-on-approval", "external"]);
 const PROACTIVE_MODES = new Set(["none", "manual", "scheduled", "heartbeat", "event-driven", "queue-watcher", "hybrid"]);
 const RUNTIME_PLACEMENT_PROFILES = new Set(["deterministic-first", "frontier-first", "local-first", "hybrid", "unknown"]);
+const SKILL_NEEDS = new Set(["auto", "none", "selected"]);
+const SKILL_SOURCES = new Set(["local-only", "trusted-only", "external-with-approval"]);
+const SKILL_INSTALL_MODES = new Set(["recommend", "vendor", "link", "runtime-install"]);
+const SKILL_MUTATION_POLICIES = new Set(["read-only", "patch-with-approval", "agent-managed"]);
 const STATUS_VALUES = new Set(["draft", "accepted", "superseded"]);
 const INVOKED_SCRIPT = path.basename(process.argv[1] || "pritha.mjs");
 const CLI_COMMAND = INVOKED_SCRIPT.includes("pritha") ? "node scripts/pritha.mjs" : "node scripts/agents-mother.mjs";
@@ -55,6 +60,7 @@ function usage() {
   ${CLI_COMMAND} operations <project-path>
   ${CLI_COMMAND} deploy <project-path> [plan|status|install|uninstall] [--yes]
   ${CLI_COMMAND} evolve <project-path> [--notes <text>]
+  ${CLI_COMMAND} skills status|select|audit [target] [--json]
   ${CLI_COMMAND} voice-kit [plan|list|copy --target <child-agent>]
   ${CLI_COMMAND} registry
   ${CLI_COMMAND} validate <contract-path>
@@ -373,6 +379,10 @@ function contractMarkdown(data) {
   const serviceMode = normalizeServiceMode(data.serviceMode || data.service || "none");
   const autostart = normalizeAutostartMode(data.autostart || "disabled", serviceMode);
   const proactiveMode = normalizeProactiveMode(data.proactiveMode || "none");
+  const skillNeeds = scalar(data.skillNeeds, "auto");
+  const allowedSkillSources = scalar(data.allowedSkillSources, "local-only");
+  const skillInstallMode = scalar(data.skillInstallMode, "recommend");
+  const skillMutationPolicy = scalar(data.skillMutationPolicy, "read-only");
   const runtimePlacementProfile = normalizeRuntimePlacementProfile(data.runtimePlacementProfile, runtimeFamily);
   const multiModelRoutingRequested = scalar(data.multiModelRoutingRequested, "only-if-needed");
   const localInferenceRequired = scalar(data.localInferenceRequired, runtimeFamily === "local-model" ? "required" : runtimeFamily === "hybrid" ? "optional" : "later");
@@ -514,6 +524,18 @@ ${bulletList(data.criticalWorkflows)}
 - Idle behavior: ${scalar(data.idleBehavior, "sleep until trigger")}
 - User interruption policy: ${scalar(data.userInterruptionPolicy, "do not interrupt unless configured by user")}
 
+## Skills and procedural memory
+
+- Skill needs: ${skillNeeds}
+- Allowed skill sources: ${allowedSkillSources}
+- Skill install mode: ${skillInstallMode}
+- Skill mutation policy: ${skillMutationPolicy}
+- Installed skills: ${scalar(data.installedSkills, "none yet; research step may recommend local reviewed skills")}
+- Candidate skills: ${scalar(data.candidateSkills, "to be filled by research")}
+- External skill approval: ${scalar(data.externalSkillApproval, "explicit approval required before any external skill is vendored, linked or runtime-installed")}
+- Skill update policy: ${scalar(data.skillUpdatePolicy, "read-only for scaffold v1; update through Pritha audit")}
+- Skill audit command: ${scalar(data.skillAuditCommand, "node scripts/skills-status.mjs")}
+
 ## Harness inventory
 
 - Information boundaries: ${scalar(data.informationBoundaries)}
@@ -633,6 +655,10 @@ async function interview(options) {
       data.schedule = await ask(rl, "Schedule", options.schedule || "not-applicable");
       data.heartbeatInterval = await ask(rl, "Heartbeat interval", options.heartbeat || "not-applicable");
       data.idleBehavior = await ask(rl, "Idle behavior", options.idle || "sleep until trigger");
+      data.skillNeeds = await ask(rl, "Skill needs (auto|none|selected)", options["skill-needs"] || "auto");
+      data.allowedSkillSources = await ask(rl, "Allowed skill sources (local-only|trusted-only|external-with-approval)", options["skill-sources"] || "local-only");
+      data.skillInstallMode = await ask(rl, "Skill install mode (recommend|vendor|link|runtime-install)", options["skill-install"] || "recommend");
+      data.skillMutationPolicy = await ask(rl, "Skill mutation policy (read-only|patch-with-approval|agent-managed)", options["skill-mutation"] || "read-only");
       data.inputDataTypes = await ask(rl, "Input data types", options.inputs || "text");
       data.storedData = await ask(rl, "Stored data", options.stored || "Markdown artifacts");
       data.sensitiveData = await ask(rl, "Sensitive data", options.sensitive || "unknown");
@@ -677,6 +703,10 @@ async function interview(options) {
     data.schedule = options.schedule || "not-applicable";
     data.heartbeatInterval = options.heartbeat || "not-applicable";
     data.idleBehavior = options.idle || "sleep until trigger";
+    data.skillNeeds = options["skill-needs"] || "auto";
+    data.allowedSkillSources = options["skill-sources"] || "local-only";
+    data.skillInstallMode = options["skill-install"] || "recommend";
+    data.skillMutationPolicy = options["skill-mutation"] || "read-only";
     data.inputDataTypes = options.inputs || "text";
     data.storedData = options.stored || "Markdown artifacts";
     data.sensitiveData = options.sensitive || "unknown";
@@ -744,6 +774,10 @@ function validateContract(contractPath, options = { print: true }) {
   const serviceMode = bodyValue(text, "Service mode");
   const autostart = bodyValue(text, "Autostart");
   const proactiveMode = bodyValue(text, "Proactive mode");
+  const skillNeeds = bodyValue(text, "Skill needs");
+  const allowedSkillSources = bodyValue(text, "Allowed skill sources");
+  const skillInstallMode = bodyValue(text, "Skill install mode");
+  const skillMutationPolicy = bodyValue(text, "Skill mutation policy");
   const requiredLabels = [
     "Agent name",
     "Primary mission",
@@ -784,6 +818,18 @@ function validateContract(contractPath, options = { print: true }) {
   }
   if (proactiveMode && !PROACTIVE_MODES.has(proactiveMode)) {
     issues.push(`invalid Proactive mode "${proactiveMode}". Expected: ${Array.from(PROACTIVE_MODES).join(", ")}`);
+  }
+  if (skillNeeds && !SKILL_NEEDS.has(skillNeeds)) {
+    issues.push(`invalid Skill needs "${skillNeeds}". Expected: ${Array.from(SKILL_NEEDS).join(", ")}`);
+  }
+  if (allowedSkillSources && !SKILL_SOURCES.has(allowedSkillSources)) {
+    issues.push(`invalid Allowed skill sources "${allowedSkillSources}". Expected: ${Array.from(SKILL_SOURCES).join(", ")}`);
+  }
+  if (skillInstallMode && !SKILL_INSTALL_MODES.has(skillInstallMode)) {
+    issues.push(`invalid Skill install mode "${skillInstallMode}". Expected: ${Array.from(SKILL_INSTALL_MODES).join(", ")}`);
+  }
+  if (skillMutationPolicy && !SKILL_MUTATION_POLICIES.has(skillMutationPolicy)) {
+    issues.push(`invalid Skill mutation policy "${skillMutationPolicy}". Expected: ${Array.from(SKILL_MUTATION_POLICIES).join(", ")}`);
   }
   if (telegram && telegram !== "none") {
     const secrets = bodyValue(text, "Secrets required");
@@ -836,6 +882,10 @@ function contractData(contractPath) {
     logPath: bodyValue(text, "Log path"),
     restartPolicy: bodyValue(text, "Restart policy"),
     proactiveMode: bodyValue(text, "Proactive mode") || "none",
+    skillNeeds: bodyValue(text, "Skill needs") || "auto",
+    allowedSkillSources: bodyValue(text, "Allowed skill sources") || "local-only",
+    skillInstallMode: bodyValue(text, "Skill install mode") || "recommend",
+    skillMutationPolicy: bodyValue(text, "Skill mutation policy") || "read-only",
     triggerSources: bodyValue(text, "Trigger sources"),
     schedule: bodyValue(text, "Schedule"),
     heartbeatInterval: bodyValue(text, "Heartbeat interval"),
@@ -855,6 +905,7 @@ function contractData(contractPath) {
     userTrainingGuide: bodyValue(text, "User training guide"),
     envExampleVariables: bodyValue(text, "`.env.example` variables"),
     secretsRequired: bodyValue(text, "Secrets required"),
+    allowedNetworkAccess: bodyValue(text, "Allowed network access"),
     userAuthorizationModel: bodyValue(text, "User authorization model"),
     coreFunctions: sectionItems(text, "V1 core functions"),
     criticalWorkflows: sectionItems(text, "Critical user workflows"),
@@ -926,7 +977,7 @@ function recommendationFor(data) {
   return notes;
 }
 
-function researchMarkdown(data, memoryResults, knownDocs, options = {}) {
+function researchMarkdown(data, memoryResults, knownDocs, skillSelection, options = {}) {
   const date = today();
   const agentSlug = slug(data.agentName);
   const title = `${data.agentName || agentSlug} agent architecture research`;
@@ -938,7 +989,12 @@ function researchMarkdown(data, memoryResults, knownDocs, options = {}) {
     "04_standards/agent-environment-compatibility.md",
     "04_standards/agent-tool-integration-selection.md",
   ];
-  const allSources = [...new Set([...resultSources, ...memoryResults.map((row) => row.path)])].slice(0, 40);
+  const skillSources = [
+    ...skillSelection.installed,
+    ...skillSelection.candidates,
+    ...skillSelection.blocked,
+  ].flatMap((row) => [row.skill.relPath, ...row.skill.sourcePaths]);
+  const allSources = [...new Set([...resultSources, ...memoryResults.map((row) => row.path), ...skillSources])].slice(0, 50);
   const sourceYaml = allSources.map((source) => `  - ${source}`).join("\n");
   const relatedStandards = [
     "04_standards/agent-creation-harness.md",
@@ -1037,6 +1093,33 @@ ${knownDocs.map((doc) => `### ${doc.title}
 
 ${externalChecksFor(data).map((item) => `- [ ] ${item}`).join("\n")}
 
+## Skill candidates
+
+Policy: needs=\`${skillSelection.policy.skillNeeds}\`; sources=\`${skillSelection.policy.allowedSkillSources}\`; install=\`${skillSelection.policy.skillInstallMode}\`; mutation=\`${skillSelection.policy.skillMutationPolicy}\`.
+
+| Skill | Source | Fit | Trust | Risk | Recommendation |
+| --- | --- | ---: | --- | --- | --- |
+${[
+  ...skillSelection.installed,
+  ...skillSelection.candidates,
+  ...skillSelection.blocked,
+].length === 0 ? "| none | n/a | 0 | n/a | n/a | none |" : [
+  ...skillSelection.installed,
+  ...skillSelection.candidates,
+  ...skillSelection.blocked,
+].map((row) => {
+  const item = skillRowForManifest(row, row.recommendation === "blocked" ? "blocked" : "not-installed");
+  return `| ${item.name} | ${item.source} | ${item.fit_score} | ${item.trust_level} | ${item.risk_level} | ${item.recommendation} |`;
+}).join("\n")}
+
+## Skill decisions required
+
+${skillSelection.policy.skillInstallMode === "vendor"
+  ? "- [ ] Review recommended local skills before scaffold vendors them."
+  : "- [ ] Keep recommended skills candidate-only unless the contract selects `Skill install mode: vendor`."}
+- [ ] Do not install external skills until explicit approval and audit workflow exists.
+- [ ] Keep generated wiki pages as references only, never as direct skill provenance.
+
 ## Architecture recommendation
 
 ${recommendationFor(data).map((item) => `- ${item}`).join("\n")}
@@ -1071,6 +1154,7 @@ function researchContract(contractPath, options = {}) {
     "agent harness scaffold tool memory security evaluation",
   ].filter(Boolean).join(" ");
   const memoryResults = searchMemory(query, limit);
+  const skillSelection = selectSkillsForContract(data);
   const knownDocs = readKnownDocs([
     "04_standards/agent-creation-harness.md",
     "04_standards/agent-environment-compatibility.md",
@@ -1079,9 +1163,10 @@ function researchContract(contractPath, options = {}) {
     "07_workflows/agents-mother-roadmap.md",
   ]);
   const outPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-research.md`));
-  writeFileSync(outPath, researchMarkdown(data, memoryResults, knownDocs, { validationIssues }));
+  writeFileSync(outPath, researchMarkdown(data, memoryResults, knownDocs, skillSelection, { validationIssues }));
   console.log(`Research report: ${path.relative(ROOT, outPath)}`);
   console.log(`Local memory matches: ${memoryResults.length}`);
+  console.log(`Skill candidates: ${skillSelection.installed.length + skillSelection.candidates.length}; blocked: ${skillSelection.blocked.length}`);
   if (validationIssues.length > 0) {
     console.log("Contract still has validation issues:");
     for (const issue of validationIssues) console.log(`- ${issue}`);
@@ -1101,7 +1186,8 @@ function questions() {
 7. Data/security: inputs, stored data, sensitive data, secrets, network/filesystem access.
 8. Deployment: target environment, deployment profile, service mode and autostart policy.
 9. Proactivity: manual, scheduled, heartbeat, event-driven, queue-watcher or hybrid; triggers and interruption policy.
-10. Scaffold: target folder, generated files, dependencies, setup/run commands, tests and training guide.`);
+10. Skills: needs, allowed sources, install mode and mutation policy.
+11. Scaffold: target folder, generated files, dependencies, setup/run commands, tests and training guide.`);
 }
 
 async function main() {
@@ -1122,6 +1208,27 @@ async function main() {
       stdio: "inherit",
     });
     return;
+  }
+  if (command === "skills") {
+    const subcommand = options._[0] || "status";
+    if (subcommand === "status") {
+      printSkillsStatus({ json: Boolean(options.json) });
+      return;
+    }
+    if (subcommand === "select") {
+      const target = options._[1];
+      if (!target) throw new Error("Missing contract path.");
+      printSkillSelection(contractData(target), { json: Boolean(options.json) });
+      return;
+    }
+    if (subcommand === "audit") {
+      const target = options._[1];
+      if (!target) throw new Error("Missing project path.");
+      const result = auditProjectSkills(target, { json: Boolean(options.json) });
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    throw new Error(`Unknown skills command: ${subcommand}`);
   }
   if (command === "interview") {
     await interview(options);

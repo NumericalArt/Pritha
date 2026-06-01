@@ -134,8 +134,8 @@ Embeddings:
 
 ```sh
 python3 scripts/embed-memory.py
-python3 scripts/semantic-search.py "локальная транскрибация youtube"
-node scripts/query-memory.mjs semantic "локальная транскрибация youtube"
+python3 scripts/semantic-search.py "локальная транскрибация media"
+node scripts/query-memory.mjs semantic "локальная транскрибация media"
 ```
 
 ## Relation policy

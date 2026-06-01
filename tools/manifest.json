@@ -15,7 +15,7 @@
     {
       "name": "media-intake",
       "tools": [
-        "scripts/transcribe-youtube.mjs",
+        "scripts/transcribe-media.mjs",
         "scripts/process-intake.mjs",
         "scripts/extract-signal.mjs"
       ],

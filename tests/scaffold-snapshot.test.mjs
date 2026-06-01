@@ -61,6 +61,8 @@ test("scaffold module exposes generated agent files directly", () => {
   assert.ok(paths.includes("AGENTS.md"));
   assert.ok(paths.includes("scripts/smoke-test.mjs"));
   assert.ok(paths.includes("operations/manifest.json"));
+  assert.ok(paths.includes("skills/manifest.json"));
+  assert.ok(paths.includes("scripts/skills-status.mjs"));
 });
 
 test("scaffold adds realtime voice reference files when voice is selected", () => {
@@ -82,4 +84,34 @@ test("scaffold adds realtime voice reference files when voice is selected", () =
   assert.ok(paths.includes("interfaces/realtime-voice/FESPA26_REFERENCE.md"));
   assert.ok(paths.includes("interfaces/realtime-voice/pattern-manifest.json"));
   assert.equal(new Set(paths).size, paths.length);
+});
+
+test("scaffold vendors reviewed local skills only when contract selects vendor mode", () => {
+  const files = generatedAgentFiles({
+    text: "",
+    agentName: "Telegram Intake Agent",
+    primaryMission: "Triage Telegram intake into Markdown memory and evidence briefs",
+    targetUser: "operator",
+    successCriteria: "Telegram materials become reviewed Markdown artifacts",
+    primaryInterface: "Telegram",
+    telegramMode: "primary-chat",
+    runtimeFamily: "codex-native",
+    memoryModel: "Markdown-first",
+    toolSystem: "filesystem markdown skills",
+    skillInstallMode: "vendor",
+    skillNeeds: "auto",
+    allowedSkillSources: "local-only",
+    skillMutationPolicy: "read-only",
+    secretsRequired: "Telegram bot token",
+    allowedNetworkAccess: "Telegram Bot API only",
+    coreFunctions: ["Telegram intake triage", "Evidence classification", "Markdown memory update"],
+    criticalWorkflows: ["Receive Telegram post and create a source note"],
+  });
+  const paths = files.map((file) => file.path);
+  assert.ok(paths.includes("skills/telegram-intake-triage/SKILL.md"));
+  assert.ok(paths.includes("skills/evidence-classification/SKILL.md"));
+  assert.ok(paths.includes("skills/markdown-memory-update/SKILL.md"));
+  const manifest = JSON.parse(files.find((file) => file.path === "skills/manifest.json").content);
+  assert.equal(manifest.policy.install_mode, "vendor");
+  assert.ok(manifest.installed.length >= 3);
 });

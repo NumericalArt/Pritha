@@ -9,12 +9,12 @@ test("transliterate maps Cyrillic for ASCII ids", () => {
 });
 
 test("slug can preserve Cyrillic for legacy filenames", () => {
-  assert.equal(slug("https://youtu.be/Тест и Codex!", {
+  assert.equal(slug("https://example.com/Тест и Codex!", {
     stripUrls: true,
     allowCyrillic: true,
     maxLength: 80,
     fallback: "item",
-  }), "youtu-be-тест-и-codex");
+  }), "example-com-тест-и-codex");
 });
 
 test("slug fallback is explicit", () => {

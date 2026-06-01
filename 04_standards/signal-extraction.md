@@ -3,8 +3,8 @@ id: signal-extraction
 type: standard
 status: active
 created: 2026-05-15
-updated: 2026-05-17
-last_reviewed: 2026-05-17
+updated: 2026-06-01
+last_reviewed: 2026-06-01
 owner: Techscope/user
 topics: [signal-extraction, knowledge-processing, media-intake, agent-design]
 tools: [markdown, extract-signal, process-intake, codex]
@@ -30,6 +30,8 @@ Last reviewed: 2026-05-16
 Каждый значимый входящий материал должен получить `signal` artifact: сжатую техническую выжимку, очищенную от воды, рекламы, повторов и нерелевантных фрагментов.
 
 Автоматический extractor создает только `heuristic-draft`. Для материалов, которые могут повлиять на программирование, LLM agents, coding agents, agent harnesses, standards or decisions, обязательный следующий шаг - Codex-assisted refinement прямо в Techscope thread, без внешних LLM-сервисов.
+
+Codex-assisted refinement нужен не для хранения "хорошего транскрипта". Транскрипт является raw evidence. Цель refinement - не допустить, чтобы ASR-шум, timestamp-фрагменты, source metadata или слабая эвристика попали в рабочую память как curated knowledge.
 
 ## Purpose
 
@@ -65,6 +67,8 @@ raw media -> intake -> source note/transcript -> signal -> assessment -> brief/r
 
 Assessment should use signal notes as compressed input while keeping links to raw/source artifacts for verification.
 
+Raw transcripts and raw media are evidence trail, not authored working memory. Searchable working memory should rely on curated Markdown artifacts: `signal`, `assessment`, `brief`, `review`, `decision` and `standard`.
+
 ## Signal lifecycle
 
 - `status: extracted` + `extraction_mode: heuristic-draft` + `refinement_status: needs-codex-refinement`: создан машинный черновик.
@@ -87,6 +91,18 @@ Codex refinement должен:
 - добавить verification tasks and primary-source needs;
 - сопоставить материал с существующими Techscope standards/decisions/reviews;
 - не использовать внешние LLM-сервисы.
+
+Codex refinement in Techscope v1 is a workflow stage performed by the active Codex thread, not an automatic worker inside `process-intake`. `process-intake` may create the draft and set `refinement_status: needs-codex-refinement`; the actual curated rewrite happens when Codex reads the source artifact and updates the signal.
+
+Full refinement is mandatory when:
+
+- heuristic signal quality is visibly poor;
+- ASR produced noisy text;
+- the draft includes timestamps, source metadata or random fragments;
+- the material may be promoted to brief, review, decision or standard;
+- the material affects agent design, safety, memory, evals, tools or user workflows.
+
+For low-impact material with a clean heuristic signal, a spot check is acceptable.
 
 ## Telegram media
 

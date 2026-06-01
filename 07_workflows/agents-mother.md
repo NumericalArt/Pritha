@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-05-28
+updated: 2026-05-30
 topics:
   - agent-engineering
   - agent-factory
@@ -35,6 +35,7 @@ sources:
   - 04_standards/agent-runtime-placement.md
   - 04_standards/agent-harness-evaluation.md
   - 04_standards/agent-team-operating-model.md
+  - 04_standards/agent-skill-pack-lifecycle.md
 related:
   standards:
     - 04_standards/agent-creation-harness.md
@@ -45,11 +46,13 @@ related:
     - 04_standards/agent-runtime-placement.md
     - 04_standards/agent-harness-evaluation.md
     - 04_standards/agent-team-operating-model.md
+    - 04_standards/agent-skill-pack-lifecycle.md
   templates:
     - 08_templates/agent-project-contract.md
     - 08_templates/agent-scaffold-report.md
   workflows:
     - 07_workflows/agents-mother-roadmap.md
+    - 07_workflows/agent-skill-pack-selection.md
 supersedes: []
 superseded_by: []
 ---
@@ -104,9 +107,10 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - whether the user explicitly wants different models for different task
      classes, or whether multi-model routing should be avoided for v1;
    - untrusted input sources, quarantine rules, token/media budget caps and approval gates;
+   - skill needs, allowed skill sources, install mode and mutation policy;
    - acceptance tests and training expectations.
 3. Create an `agent-contract` from `08_templates/agent-project-contract.md`.
-4. Search TechScope memory for related agent patterns, standards, briefs, reviews and decisions.
+4. Search TechScope memory for related agent patterns, standards, briefs, reviews, decisions and local skill candidates.
 5. Verify volatile architecture choices through current primary sources and trusted secondary sources.
 6. Record an architecture recommendation:
    - selected runtime family;
@@ -115,6 +119,7 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - harness inventory;
    - security and permission model;
    - untrusted-input risk tier and scanner/quarantine path;
+   - skill candidates, trust/risk score and activation decision;
    - testing and observability model.
 7. Scaffold the new agent in a sibling folder unless the contract explicitly chooses another location.
 8. Generate minimum project files:
@@ -123,6 +128,7 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - `.env.example`;
    - workflow notes;
    - scripts or app entrypoints;
+   - skill pack manifest, candidates and audit/status command;
    - smoke test or healthcheck;
    - user training guide.
 9. If Telegram is selected, include a Telegram adapter profile:
@@ -145,6 +151,9 @@ node scripts/pritha.mjs questions
 node scripts/pritha.mjs init --name "agent-name" --mission "mission"
 node scripts/pritha.mjs create --name "agent-name" --mission "mission"
 node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name
+node scripts/pritha.mjs skills status
+node scripts/pritha.mjs skills select 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
+node scripts/pritha.mjs skills audit ../existing-or-generated-agent
 node scripts/pritha.mjs test ../existing-or-generated-agent
 node scripts/pritha.mjs publish ../existing-or-generated-agent
 node scripts/pritha.mjs lineage
@@ -281,7 +290,7 @@ only when it reduces context/tool sprawl or matches real user workflows.
 
 ## Untrusted Input Decision Point
 
-If a new agent reads external messages, email, websites, YouTube transcripts,
+If a new agent reads external messages, email, websites, media transcripts,
 uploads, screenshots, repository text or other user-forwarded media, apply:
 
 ```text

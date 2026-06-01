@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { resolveTechscopeRoot } from "../../lib/paths.mjs";
 import { slug as makeSlug } from "../../lib/slug.mjs";
 import { today } from "../../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, RUNTIME_PLACEMENT_PROFILES, SERVICE_MODES, bodyValue, contractData, sectionItems, validateContract } from "../contract.mjs";
+import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "../skills.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
@@ -122,6 +123,8 @@ function memoryProfileDetails(profile) {
 function toolProfilesFor(data) {
   const text = `${data.toolSystem || ""} ${data.primaryInterface || ""} ${data.telegramMode || ""}`.toLowerCase();
   const profiles = new Set(["cli-script", "workflow"]);
+  const skillPolicy = skillPolicyFor(data);
+  if (skillPolicy.skillNeeds !== "none") profiles.add("skill-pack");
   if (/(mcp|api|oauth|service|openai agents sdk)/.test(text)) profiles.add("mcp-api");
   if (/(browser|web|visual|rendered|manual)/.test(text)) profiles.add("browser-manual");
   if (data.telegramMode && data.telegramMode !== "none") profiles.add("telegram-adapter");
@@ -140,6 +143,11 @@ function toolProfileDetails(name) {
       boundary: "skill/workflow",
       purpose: "Project procedure and agent operating discipline.",
       risk: "Overlong workflow text can create context noise; keep rules concise.",
+    },
+    "skill-pack": {
+      boundary: "codex-skill",
+      purpose: "Reviewed reusable procedural knowledge loaded on demand from local SKILL.md files.",
+      risk: "Skills can become stale or unsafe; keep provenance, hashes, candidates and mutation policy explicit.",
     },
     "mcp-api": {
       boundary: "MCP/API",
@@ -272,6 +280,13 @@ export function generatedAgentFiles(data) {
   const memoryDetails = memoryProfileDetails(memoryProfile);
   const toolProfiles = toolProfilesFor(data);
   const operationProfile = operationProfileFor(data);
+  const skillSelection = selectSkillsForContract(data);
+  const skillPolicy = skillSelection.policy;
+  const installedSkillRows = skillSelection.installed.map((row) => skillRowForManifest(row, "installed"));
+  const candidateSkillRows = [
+    ...skillSelection.candidates.map((row) => skillRowForManifest(row, "not-installed")),
+    ...skillSelection.blocked.map((row) => skillRowForManifest(row, "blocked")),
+  ];
   const interfaceManifest = {
     version: 1,
     generated_by: "TechScope Agents Mother",
@@ -314,6 +329,32 @@ export function generatedAgentFiles(data) {
     agent: agentName,
     profiles: toolProfiles.map((name) => ({ name, ...toolProfileDetails(name) })),
     default_rule: "Choose the narrowest reliable tool boundary before adding capabilities.",
+  };
+  const skillsManifest = {
+    version: 1,
+    generated_by: "Pritha",
+    agent: agentName,
+    policy: {
+      skill_needs: skillPolicy.skillNeeds,
+      external_skills: skillPolicy.allowedSkillSources === "local-only" ? "disabled" : "approval-required",
+      install_mode: skillPolicy.skillInstallMode,
+      agent_mutation: skillPolicy.skillMutationPolicy,
+      generated_wiki_allowed: false,
+    },
+    installed: installedSkillRows,
+    candidates: candidateSkillRows,
+  };
+  const skillsLock = {
+    version: 1,
+    generated_by: "Pritha",
+    agent: agentName,
+    installed: installedSkillRows.map((row) => ({
+      name: row.name,
+      version: row.version,
+      source: row.source,
+      hash: row.hash,
+      source_paths: row.source_paths,
+    })),
   };
   const operationsManifest = {
     version: 1,
@@ -416,6 +457,14 @@ ${telegramEnabled ? "Telegram is enabled by contract. Use the adapter only with 
 - Memory profile is documented in \`memory/manifest.json\`.
 - Tool boundaries are documented in \`tools/manifest.json\`.
 - Add heavier memory or external tools only after updating the contract.
+
+## Skills
+
+- Skill policy and provenance live in \`skills/manifest.json\`.
+- Before using an installed skill, read its \`SKILL.md\`, check \`When to Use\`, follow \`Pitfalls\` and complete \`Verification\`.
+- Do not use entries from \`skills/candidates.json\` as active instructions.
+- Do not modify skills unless the contract allows skill mutation.
+- External skills require explicit approval before vendoring, linking or runtime installation.
 `,
   });
 
@@ -438,6 +487,7 @@ node scripts/agent-cli.mjs help
 node scripts/interface-status.mjs
 node scripts/memory-status.mjs
 node scripts/tools-status.mjs
+node scripts/skills-status.mjs
 node scripts/operations-status.mjs
 \`\`\`
 
@@ -457,6 +507,7 @@ node scripts/telegram-bot.mjs healthcheck
 - \`interfaces/README.md\`: interface contract and adapter notes.
 - \`memory/manifest.json\`: memory profile and boundaries.
 - \`tools/manifest.json\`: tool profiles and boundaries.
+- \`skills/manifest.json\`: reviewed installed skills, candidate skills, hashes and mutation policy.
 - \`operations/manifest.json\`: deployment target, service profile, proactivity, autostart policy, healthcheck and log path.
 - \`docs/user-training-guide.md\`: first user exercise and handoff notes.
 - \`scripts/smoke-test.mjs\`: structure and configuration smoke test.
@@ -474,6 +525,7 @@ node scripts/telegram-bot.mjs healthcheck
 - Memory model: ${scalar(data.memoryModel, "Markdown-first")}
 - Memory profile: ${memoryProfile}
 - Tool profiles: ${toolProfiles.join(", ")}
+- Skill policy: needs=${skillPolicy.skillNeeds}; sources=${skillPolicy.allowedSkillSources}; install=${skillPolicy.skillInstallMode}; mutation=${skillPolicy.skillMutationPolicy}
 - Deployment target: ${operationProfile.deploymentTarget}
 - Deployment profile: ${operationProfile.deploymentProfile}
 - Service mode: ${operationProfile.serviceMode}
@@ -503,6 +555,7 @@ LOG_LEVEL=info
     "interfaces": "node scripts/interface-status.mjs",
     "memory": "node scripts/memory-status.mjs",
     "tools": "node scripts/tools-status.mjs",
+    "skills": "node scripts/skills-status.mjs",
     "operations": "node scripts/operations-status.mjs",
     "deploy:plan": "node scripts/deploy-service.mjs plan",
     "deploy:status": "node scripts/deploy-service.mjs status",
@@ -731,6 +784,65 @@ ${toolProfiles.map((name) => {
 
 Status: scaffolded profile. Add concrete commands or integrations only after the contract calls for them.
 `,
+    });
+  }
+
+  files.push({
+    path: "skills/manifest.json",
+    content: `${JSON.stringify(skillsManifest, null, 2)}
+`,
+  });
+
+  files.push({
+    path: "skills/candidates.json",
+    content: `${JSON.stringify({
+      version: 1,
+      generated_by: "Pritha",
+      policy: skillsManifest.policy,
+      candidates: candidateSkillRows,
+    }, null, 2)}
+`,
+  });
+
+  files.push({
+    path: "skills/lock.json",
+    content: `${JSON.stringify(skillsLock, null, 2)}
+`,
+  });
+
+  files.push({
+    path: "skills/README.md",
+    content: `# Skills
+
+Skills are reviewed procedural knowledge for this agent. Use \`skills/manifest.json\` as the source of truth.
+
+## Policy
+
+- Skill needs: \`${skillPolicy.skillNeeds}\`
+- Allowed sources: \`${skillPolicy.allowedSkillSources}\`
+- Install mode: \`${skillPolicy.skillInstallMode}\`
+- Mutation policy: \`${skillPolicy.skillMutationPolicy}\`
+- Generated wiki pages allowed as direct provenance: \`false\`
+
+## Rules
+
+- Read an installed skill's \`SKILL.md\` before using it.
+- Check \`When to Use\`, \`Pitfalls\` and \`Verification\`.
+- Treat \`skills/candidates.json\` as recommendations only.
+- Do not install, link, runtime-install or modify external skills without explicit approval.
+
+## Commands
+
+\`\`\`sh
+node scripts/skills-status.mjs
+\`\`\`
+`,
+  });
+
+  for (const row of skillSelection.installed) {
+    files.push({
+      path: `skills/${row.skill.name}/SKILL.md`,
+      content: readFileSync(row.skill.path, "utf8"),
     });
   }
 
@@ -988,6 +1100,61 @@ for (const profile of manifest.profiles || []) {
   });
 
   files.push({
+    path: "scripts/skills-status.mjs",
+    content: `#!/usr/bin/env node
+
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+const ROOT = process.cwd();
+const manifestPath = path.join(ROOT, "skills", "manifest.json");
+const candidatesPath = path.join(ROOT, "skills", "candidates.json");
+const lockPath = path.join(ROOT, "skills", "lock.json");
+
+function sha256(text) {
+  return \`sha256:\${createHash("sha256").update(text).digest("hex")}\`;
+}
+
+const issues = [];
+for (const relPath of ["skills/manifest.json", "skills/candidates.json", "skills/lock.json", "skills/README.md"]) {
+  if (!existsSync(path.join(ROOT, relPath))) issues.push(\`missing \${relPath}\`);
+}
+
+const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : { installed: [], candidates: [] };
+const candidates = existsSync(candidatesPath) ? JSON.parse(readFileSync(candidatesPath, "utf8")) : { candidates: [] };
+const lock = existsSync(lockPath) ? JSON.parse(readFileSync(lockPath, "utf8")) : { installed: [] };
+
+for (const entry of manifest.installed || []) {
+  const skillPath = path.join(ROOT, "skills", entry.name, "SKILL.md");
+  if (!existsSync(skillPath)) {
+    issues.push(\`missing installed skill: skills/\${entry.name}/SKILL.md\`);
+    continue;
+  }
+  const actual = sha256(readFileSync(skillPath, "utf8"));
+  if (entry.hash && entry.hash !== actual) issues.push(\`hash drift for \${entry.name}\`);
+}
+
+const locked = new Map((lock.installed || []).map((entry) => [entry.name, entry.hash]));
+for (const entry of manifest.installed || []) {
+  if (locked.get(entry.name) !== entry.hash) issues.push(\`lock mismatch for \${entry.name}\`);
+}
+
+if (issues.length > 0) {
+  console.error("Skill status failed:");
+  for (const issue of issues) console.error(\`- \${issue}\`);
+  process.exit(1);
+}
+
+console.log(\`Agent: \${manifest.agent || "unknown"}\`);
+console.log(\`Skill policy: needs=\${manifest.policy?.skill_needs || "unknown"}; install=\${manifest.policy?.install_mode || "unknown"}; mutation=\${manifest.policy?.agent_mutation || "unknown"}\`);
+console.log(\`Installed skills: \${(manifest.installed || []).length}\`);
+for (const entry of manifest.installed || []) console.log(\`- \${entry.name}: \${entry.version}; \${entry.trust_level}; \${entry.risk_level}\`);
+console.log(\`Candidate skills: \${(candidates.candidates || []).length}\`);
+`,
+  });
+
+  files.push({
     path: "scripts/operations-status.mjs",
     content: `#!/usr/bin/env node
 
@@ -1208,6 +1375,10 @@ const required = [
   "memory/README.md",
   "tools/manifest.json",
   "tools/README.md",
+  "skills/manifest.json",
+  "skills/candidates.json",
+  "skills/lock.json",
+  "skills/README.md",
   "operations/manifest.json",
   "operations/README.md",
   "07_workflows/agent-operating-workflow.md",
@@ -1216,6 +1387,7 @@ const required = [
   "scripts/interface-status.mjs",
   "scripts/memory-status.mjs",
   "scripts/tools-status.mjs",
+  "scripts/skills-status.mjs",
   "scripts/operations-status.mjs",
   "scripts/deploy-service.mjs"
 ];
@@ -1537,6 +1709,7 @@ Status: ${smokeResult.ok ? "complete" : "failed"}
 - Deployment profile: ${operationProfile.deploymentProfile}
 - Memory profile: ${memoryProfileFor(data)}
 - Tool profiles: ${toolProfilesFor(data).join(", ")}
+- Skill policy: needs=${skillPolicyFor(data).skillNeeds}; sources=${skillPolicyFor(data).allowedSkillSources}; install=${skillPolicyFor(data).skillInstallMode}; mutation=${skillPolicyFor(data).skillMutationPolicy}
 - Service mode: ${operationProfile.serviceMode}
 - Autostart: ${operationProfile.autostart}
 - Proactive mode: ${operationProfile.proactiveMode}
@@ -1563,6 +1736,7 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 | Healthcheck | pending | Run command from README after configuration |
 | Telegram adapter test | ${telegramApplicable ? "pending" : "not-applicable"} | ${telegramApplicable ? "Fill .env and run npm run telegram:healthcheck" : "Telegram not selected"} |
 | Operations status | pending | \`node scripts/operations-status.mjs\` |
+| Skills status | pending | \`node scripts/skills-status.mjs\` |
 | Documentation review | pass | README and training guide generated |
 
 ## Handoff
@@ -1570,6 +1744,7 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 - How to run: \`node scripts/agent-cli.mjs status\`
 - How to test: \`node scripts/smoke-test.mjs\`
 - How to inspect operations: \`node scripts/operations-status.mjs\`
+- How to inspect skills: \`node scripts/skills-status.mjs\`
 - How to stop: no long-running process is started by scaffold
 - How to inspect logs: see \`logs/\`
 - First user exercise: follow \`docs/user-training-guide.md\`

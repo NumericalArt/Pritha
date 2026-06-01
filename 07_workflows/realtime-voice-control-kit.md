@@ -3,16 +3,20 @@ id: realtime-voice-control-kit
 type: workflow
 status: active
 created: 2026-05-30
-updated: 2026-05-30
+updated: 2026-05-31
 topics: [voice-control, realtime, agent-scaffold, pritha, codex-sidecar]
 tools: [OpenAI Realtime API, Codex App, Codex CLI, Next.js, WebRTC]
 sources:
   - 11_agents/reference-implementations/fespa26-voice-control/README.md
   - 11_agents/reference-implementations/fespa26-voice-control/manifest.json
   - 04_standards/realtime-voice-control-for-codex-agents.md
+  - 04_standards/realtime-voice-control-ui.md
+  - 04_standards/tailscale-private-device-access-for-local-agents.md
 related:
   standards:
     - 04_standards/realtime-voice-control-for-codex-agents.md
+    - 04_standards/realtime-voice-control-ui.md
+    - 04_standards/tailscale-private-device-access-for-local-agents.md
   decisions:
     - 05_decisions/2026-05-29-realtime-voice-control-universal-pattern.md
   reports:
@@ -21,10 +25,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-30
-source_updated: 2026-05-30
-source_version: fespa26-voice-control-reference-v1
+source_updated: 2026-05-31
+source_version: fespa26-voice-control-reference-v1 + voice-ui-v1 + tailscale-device-access-v1
 retrieved: 2026-05-30
-verified: 2026-05-30
+verified: 2026-05-31
 valid_for: Pritha fresh clone setup and descendant scaffold planning
 temporal_status: current
 ---
@@ -78,9 +82,13 @@ node scripts/pritha.mjs voice-kit copy --target ../child-agent
    Realtime.
 6. Route complex work through a Codex task service with a strict JSON result
    contract.
-7. Add tests for instructions, tool schema, result validation, final-turn
+7. Add the v1 voice UI control surface: start/stop, mute, reconnect, status,
+   transcript, context reset, task status and confirmation gates.
+8. If phone or second-device access is selected, configure the Tailscale
+   private device-access pattern as an operations module.
+9. Add tests for instructions, tool schema, result validation, final-turn
    parsing and transport fallback.
-8. Record module readiness for `interfaces.realtime`, `tools.realtime`,
+10. Record module readiness for `interfaces.realtime`, `tools.realtime`,
    `memory`, `codexTransport`, `operations` and selected external connectors.
 
 ## Scaffold Rule
@@ -90,6 +98,12 @@ or `голос`, Pritha should add a `realtime-voice` interface placeholder and 
 to the FESPA26 reference pack. Do not copy the full FESPA implementation into a
 child by default unless the contract calls for a browser Realtime UI and Codex
 deep-task lane.
+
+When the contract selects browser Realtime voice, Pritha should also link
+`04_standards/realtime-voice-control-ui.md` as the default initial UI template.
+When the contract mentions phone, mobile browser, second-device access or
+Tailscale, Pritha should separately evaluate
+`04_standards/tailscale-private-device-access-for-local-agents.md`.
 
 ## Safety Gates
 

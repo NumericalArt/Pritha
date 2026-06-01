@@ -2,7 +2,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { parseFrontmatter, yamlList } from "./lib/frontmatter.mjs";
+import { parseFrontmatter, unique, yamlList } from "./lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { today } from "./lib/date.mjs";

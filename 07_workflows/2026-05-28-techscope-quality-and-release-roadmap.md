@@ -511,7 +511,7 @@ AM-pattern candidates: `prerequisites-md`, `env-doctor-mjs`, `python-requirement
 
 - `requirements.txt` (Python, pinned versions):
   - `sentence-transformers`,
-  - `imageio-ffmpeg` (для `transcribe-youtube.mjs`),
+  - `imageio-ffmpeg` (для `transcribe-media.mjs`),
   - `openai-whisper` или альтернатива.
 - `docs/prerequisites.md`:
   - Node ≥ 20,

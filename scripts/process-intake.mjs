@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./lib/env.mjs";
-import { indentedYamlList, parseFrontmatter, yamlList } from "./lib/frontmatter.mjs";
+import { indentedYamlList, parseFrontmatter, unique, yamlList } from "./lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { today } from "./lib/date.mjs";
@@ -55,9 +55,9 @@ const TECH_KEYWORDS = [
 
 function usage() {
   console.log(`Usage:
-  node scripts/process-intake.mjs <intake-path> [--transcribe-youtube] [--reindex]
+  node scripts/process-intake.mjs <intake-path> [--transcribe-media] [--reindex]
 
-Creates an assessment draft in 03_reviews/ and optionally processes YouTube links.`);
+Creates an assessment draft in 03_reviews/ and optionally processes compatible media sources.`);
 }
 
 function relPath(filePath) {
@@ -215,19 +215,6 @@ async function downloadTelegramMedia(data, body, intakeRel) {
   return { downloaded, skipped: "" };
 }
 
-function isYoutubeUrl(url) {
-  return /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)/i.test(url);
-}
-
-function inferYoutubeLanguage(url) {
-  try {
-    const title = run("python3", ["-m", "yt_dlp", "--print", "%(title)s", url], { timeout: 60 * 1000 });
-    return /[а-яё]/iu.test(title) ? "ru" : "en";
-  } catch {
-    return "en";
-  }
-}
-
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: ROOT,
@@ -289,11 +276,10 @@ async function inspectUrl(url) {
 function inferScores(text, urls) {
   const lower = text.toLowerCase();
   const keywordHits = TECH_KEYWORDS.filter((keyword) => lower.includes(keyword)).length;
-  const hasYoutube = urls.some(isYoutubeUrl);
   const hasLinks = urls.length > 0;
   const relevance = Math.min(5, keywordHits >= 6 ? 5 : keywordHits >= 3 ? 4 : keywordHits >= 1 ? 3 : hasLinks ? 2 : 1);
   const agentFit = Math.min(5, /agent|агент|llm|rag|mcp|codex|cursor|claude|prompt|промпт|memory|память/i.test(text) ? 4 : relevance >= 4 ? 3 : 1);
-  const evidence = hasYoutube || hasLinks ? 3 : 1;
+  const evidence = hasLinks ? 3 : 1;
   const practicality = relevance >= 4 ? 3 : 2;
   const leverage = agentFit >= 4 ? 4 : relevance >= 4 ? 3 : 2;
   const risk = hasLinks ? 2 : 1;
@@ -302,16 +288,40 @@ function inferScores(text, urls) {
   return { relevance, agentFit, evidence, practicality, leverage, risk, recommendation };
 }
 
-function transcribeYoutubeLinks(urls) {
+function candidateMediaSources(urls) {
+  return unique(urls);
+}
+
+function parseJsonPayload(output) {
+  const text = String(output || "").trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(text.slice(start, end + 1));
+    }
+    throw new Error("No JSON payload found in command output.");
+  }
+}
+
+function inferMediaLanguage(text) {
+  return /[а-яё]/iu.test(text) ? "ru" : "en";
+}
+
+function transcribeMediaSources(sources, options = {}) {
   const processed = [];
-  for (const url of urls.filter(isYoutubeUrl)) {
+  const language = options.language || inferMediaLanguage(options.text || "");
+  for (const source of sources) {
     try {
-      const language = inferYoutubeLanguage(url);
-      const output = run("node", ["scripts/transcribe-youtube.mjs", url, "--language", language], { timeout: 30 * 60 * 1000 });
-      const md = output.match(/MD:\s+(.+)$/m)?.[1]?.trim() || "";
-      processed.push({ url, ok: true, output, md, language });
+      const output = run("node", ["scripts/transcribe-media.mjs", source, "--language", language, "--json"], { timeout: 30 * 60 * 1000 });
+      const payload = parseJsonPayload(output);
+      processed.push({ source, ok: true, output, md: payload.transcript_md || "", language });
     } catch (error) {
-      processed.push({ url, ok: false, output: error instanceof Error ? error.message : String(error), md: "" });
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("No compatible media adapter found for this source.")) continue;
+      processed.push({ source, ok: false, output: message, md: "" });
     }
   }
   return processed;
@@ -350,7 +360,7 @@ function memorySearch(text, excludeRel = "") {
   }
 }
 
-function renderAssessment({ outPath, intakeRel, intakeData, body, urls, urlInspections, youtubeProcessed, telegramMedia, signalPaths, scores, relatedMemory }) {
+function renderAssessment({ outPath, intakeRel, intakeData, body, urls, urlInspections, mediaProcessed, telegramMedia, signalPaths, scores, relatedMemory }) {
   const title = extractTitle(body, intakeData.id || path.basename(intakeRel, ".md"));
   const artifactId = path.basename(outPath, ".md");
   const messageText = extractSection(body, ["Message text", "Raw material or link"]) || body;
@@ -359,7 +369,7 @@ function renderAssessment({ outPath, intakeRel, intakeData, body, urls, urlInspe
     ...array(intakeData.sources),
     ...signalPaths,
     ...urls,
-    ...youtubeProcessed.map((item) => item.md).filter(Boolean),
+    ...mediaProcessed.map((item) => item.md).filter(Boolean),
     ...telegramMedia.downloaded.map((item) => item.path).filter(Boolean),
   ]);
 
@@ -371,11 +381,11 @@ function renderAssessment({ outPath, intakeRel, intakeData, body, urls, urlInspe
       }).join("\n")
     : "- No links found.";
 
-  const youtubeLines = youtubeProcessed.length
-    ? youtubeProcessed.map((item) => item.ok
-      ? `- ${item.url} — transcribed (${item.language || "unknown"}): \`${item.md || "raw transcript generated"}\``
-      : `- ${item.url} — transcription failed: ${compact(item.output, 300)}`).join("\n")
-    : "- No YouTube links processed.";
+  const mediaLines = mediaProcessed.length
+    ? mediaProcessed.map((item) => item.ok
+      ? `- ${item.source} — transcribed (${item.language || "unknown"}): \`${item.md || "raw transcript generated"}\``
+      : `- ${item.source} — transcription failed: ${compact(item.output, 300)}`).join("\n")
+    : "- No compatible media sources processed.";
 
   const telegramMediaLines = telegramMedia.downloaded.length
     ? telegramMedia.downloaded.map((item) => item.ok
@@ -410,13 +420,13 @@ Recommendation: ${scores.recommendation}
 
 ## One-paragraph read
 
-Автоматическая первичная экспертная оценка intake-материала. Материал сохранен как \`${intakeRel}\`, извлечены ссылки, доступные URL проверены технически, YouTube-ссылки обработаны локальным pipeline при возможности. Эта оценка является draft: перед стандартом или решением нужен человеческий/агентный консилиум по expert lenses и проверка первоисточников.
+Автоматическая первичная экспертная оценка intake-материала. Материал сохранен как \`${intakeRel}\`, извлечены ссылки, доступные URL проверены технически, совместимые media sources обработаны локальным pipeline при возможности. Эта оценка является draft: перед стандартом или решением нужен человеческий/агентный консилиум по expert lenses и проверка первоисточников.
 
 ## Why it matters
 
 - Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass предотвращает потерю ссылок и сразу связывает intake с assessment.
-- Если материал содержит YouTube или внешние ссылки, они становятся частью evidence trail.
+- Если материал содержит media sources или внешние ссылки, они становятся частью evidence trail.
 
 ## Extracted material
 
@@ -426,9 +436,9 @@ ${compact(messageText, 1400) || "_No text extracted from intake._"}
 
 ${urlLines}
 
-## YouTube processing
+## Media transcription
 
-${youtubeLines}
+${mediaLines}
 
 ## Telegram media
 
@@ -454,7 +464,7 @@ ${compact(relatedMemory, 2400)}
 
 - Требует ручного или агентного извлечения claims из исходного материала.
 - Если ссылки доступны, первоисточники должны быть проверены перед рекомендацией \`decision\` или \`standard\`.
-- Если YouTube transcript создан, анализировать нужно derived brief/assessment, а не вставлять полный transcript в индексируемую память.
+- Если media transcript создан, анализировать нужно derived brief/assessment, а не вставлять полный transcript в индексируемую память.
 
 ## Programming relevance
 
@@ -551,11 +561,13 @@ async function processIntake(inputPath, options) {
   for (const url of urls.slice(0, 12)) {
     urlInspections.push(await inspectUrl(url));
   }
-  const youtubeProcessed = options.transcribeYoutube ? transcribeYoutubeLinks(urls) : [];
+  const mediaProcessed = options.transcribeMedia ? transcribeMediaSources(candidateMediaSources(urls), {
+    text: `${raw}\n${urlInspections.map((item) => item.title).join(" ")}`,
+  }) : [];
   const telegramMedia = await downloadTelegramMedia(data, body, intakeRel);
   const signalPaths = unique([
     extractSignal(intakeRel),
-    ...youtubeProcessed
+    ...mediaProcessed
       .filter((item) => item.ok && item.md)
       .map((item) => extractSignal(item.md)),
   ]);
@@ -572,7 +584,7 @@ async function processIntake(inputPath, options) {
     body,
     urls,
     urlInspections,
-    youtubeProcessed,
+    mediaProcessed,
     telegramMedia,
     signalPaths,
     scores,
@@ -591,9 +603,9 @@ async function processIntake(inputPath, options) {
     for (const signalPath of signalPaths) console.log(`Signal draft: ${signalPath}`);
     console.log("Codex refinement required: 07_workflows/prompts/signal-extraction-harness.md");
   }
-  if (youtubeProcessed.length) {
-    for (const item of youtubeProcessed) {
-      console.log(`${item.ok ? "YouTube processed" : "YouTube failed"}: ${item.url}${item.md ? ` -> ${item.md}` : ""}`);
+  if (mediaProcessed.length) {
+    for (const item of mediaProcessed) {
+      console.log(`${item.ok ? "Media processed" : "Media failed"}: ${item.source}${item.md ? ` -> ${item.md}` : ""}`);
     }
   }
   if (telegramMedia.downloaded.length) {
@@ -605,9 +617,9 @@ async function processIntake(inputPath, options) {
 }
 
 function parseArgs(argv) {
-  const args = { inputPath: "", transcribeYoutube: false, reindex: false };
+  const args = { inputPath: "", transcribeMedia: false, reindex: false };
   for (const arg of argv) {
-    if (arg === "--transcribe-youtube") args.transcribeYoutube = true;
+    if (arg === "--transcribe-media") args.transcribeMedia = true;
     else if (arg === "--reindex") args.reindex = true;
     else if (!args.inputPath) args.inputPath = arg;
     else throw new Error(`Unknown argument: ${arg}`);
