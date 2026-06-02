@@ -20,6 +20,16 @@ signal_quality: low | medium | high
 extraction_mode: heuristic-draft | codex-assisted
 refinement_status: needs-codex-refinement | codex-refined | human-reviewed | superseded
 harness: 07_workflows/prompts/signal-extraction-harness.md
+memory_domain: source-material
+memory_domains:
+  - source-material
+subject:
+  kind: signal
+  id: topic
+privacy: public
+retention: source-purged
+review_status: draft
+confidence: medium
 ---
 
 # Signal: topic

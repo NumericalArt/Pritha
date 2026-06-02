@@ -3,8 +3,8 @@ id: agent-shell-evaluation
 type: standard
 status: draft
 created: 2026-05-17
-updated: 2026-05-17
-last_reviewed: 2026-05-17
+updated: 2026-06-02
+last_reviewed: 2026-06-02
 owner: Techscope/user
 topics: [agent-shell-evaluation, ai-agents, coding-agents, codex-cli, codex-app, hermes, openclaw, claude-code, gemini-cli, user-experience, agent-memory, security]
 tools: [codex, hermes, openclaw, claude-code, gemini-cli, obsidian, telegram, markdown]
@@ -18,10 +18,12 @@ sources:
   - https://github.com/openai/codex
   - https://openai.com/index/introducing-the-codex-app/
   - https://arxiv.org/abs/2603.07670
+  - 03_reviews/2026-06-02-codex-surfaces-enterprise-deployment-source-batch-review.md
 related:
   reviews:
     - 03_reviews/2026-05-17-agent-shell-evaluation-review.md
     - 03_reviews/2026-05-17-openclaw-hermes-codex-cli-advanced-user-assessment.md
+    - 03_reviews/2026-06-02-codex-surfaces-enterprise-deployment-source-batch-review.md
   briefs:
     - 02_briefs/2026-05-17-openclaw-hermes-codex-cli-advanced-user-brief.md
   workflows:
@@ -35,13 +37,19 @@ supersedes: []
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-05-17
+Last reviewed: 2026-06-02
 
 ## Rule
 
 При сравнении агентских сред нельзя оценивать только "качество ответа" или популярность инструмента. Нужно фиксировать runtime, дату, модель/provider, memory model, tool surface, permission model, context overhead, operator profile, evidence class and local fit.
 
 Этот стандарт пока draft. Он задает рабочую рубрику, но не является окончательным выбором между Codex, Hermes, OpenClaw, Claude Code, Gemini CLI or future runtimes.
+
+Для Codex отдельно фиксировать surface, а не только название продукта. Codex
+может означать CLI, desktop app, IDE extension, cloud task, app-server,
+MCP-server worker, MCP client, workspace agent or Bedrock-backed provider path.
+Эти поверхности имеют разные operator profiles, sandboxing, auth, cloud/local
+boundaries, feature availability and governance model.
 
 ## Use when
 
@@ -64,6 +72,7 @@ Last reviewed: 2026-05-17
 | Field | Required meaning |
 | --- | --- |
 | Runtime identity | exact product/repo/surface/version/date checked |
+| Surface profile | CLI, app, IDE, cloud, app-server, MCP worker, workspace agent, Bedrock-backed provider or mixed |
 | Operator profile | coder, semi-technical, non-coder, business user |
 | Primary task fit | coding, research, ops, CRM, media intake, personal assistant |
 | Harness thickness | default context, tools, persona, memory and plugins |
@@ -73,6 +82,7 @@ Last reviewed: 2026-05-17
 | Write policy | who/what can write memory, skills, wiki, standards or decisions |
 | Tool transparency | logs, visible tool calls, replayability, traces |
 | Permission model | approvals, sandbox, allowlists, credential scope |
+| Provider boundary | direct OpenAI, ChatGPT sign-in, API key, local provider, AWS Bedrock or other enterprise provider |
 | Long-task behavior | progress, resume, timeout, recovery, queue semantics |
 | Portability | ability to move skills, instructions, memory and workflows |
 | Cost predictability | token cost, subscription/API model, rate limits |

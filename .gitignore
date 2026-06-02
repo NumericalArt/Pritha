@@ -14,12 +14,13 @@ Untitled*.canvas
 .logs/
 .tools/
 .queue/
+.private/
+.memory-private/
 .techscope-setup.json
 .obsidian/
 
-# Raw source text, transcripts, JSON, PDFs and small images are part of the
-# portable snapshot. Heavy audio/video media stay local unless Git LFS/archive
-# policy is selected.
+# Raw source artifacts, transcripts and media stay out of the portable snapshot.
+# Keep only processed knowledge and neutral metadata in tracked memory.
 01_sources/raw/**/*.mp4
 01_sources/raw/**/*.wav
 01_sources/raw/**/*.mov

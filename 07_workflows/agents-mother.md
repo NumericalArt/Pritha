@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-05-30
+updated: 2026-06-01
 topics:
   - agent-engineering
   - agent-factory
@@ -36,6 +36,7 @@ sources:
   - 04_standards/agent-harness-evaluation.md
   - 04_standards/agent-team-operating-model.md
   - 04_standards/agent-skill-pack-lifecycle.md
+  - 04_standards/agent-mcp-connector-lifecycle.md
 related:
   standards:
     - 04_standards/agent-creation-harness.md
@@ -47,12 +48,14 @@ related:
     - 04_standards/agent-harness-evaluation.md
     - 04_standards/agent-team-operating-model.md
     - 04_standards/agent-skill-pack-lifecycle.md
+    - 04_standards/agent-mcp-connector-lifecycle.md
   templates:
     - 08_templates/agent-project-contract.md
     - 08_templates/agent-scaffold-report.md
   workflows:
     - 07_workflows/agents-mother-roadmap.md
     - 07_workflows/agent-skill-pack-selection.md
+    - 07_workflows/agent-mcp-connector-selection.md
 supersedes: []
 superseded_by: []
 ---
@@ -100,6 +103,16 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - core v1 functions and deferred functions;
    - runtime family: Codex-native, CLI, API, local model, hybrid or environment-specific;
    - interaction interface: Telegram, CLI, web, API, Codex project or mixed;
+   - interface experience: chat/thread, operator console, workflow UI, embedded
+     chat app, event-stream UI, MCP App/UI widget, declarative generated UI or
+     realtime voice UI;
+   - UI framework and AI UI layer only when a user-facing web/app interface is
+     selected; do not infer them from backend agent frameworks;
+   - 3D visual layer only when the user-facing workflow needs scene inspection,
+     spatial simulation, 3D explanation, avatar/state visualization or 3D
+     artifact creation;
+   - Codex account/rate-limit telemetry only when the Codex surface profile is
+     app-server or another app-server-backed integration;
    - team mode: single agent, coordinator plus workers, specialist team or external harness team;
    - data, memory, tools, permissions, secrets and operational constraints;
    - runtime placement: deterministic code, local model, small hosted model,
@@ -108,18 +121,35 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
      classes, or whether multi-model routing should be avoided for v1;
    - untrusted input sources, quarantine rules, token/media budget caps and approval gates;
    - skill needs, allowed skill sources, install mode and mutation policy;
+   - MCP needs, allowed connector sources, auth policy, toolset scope and side-effect policy;
    - acceptance tests and training expectations.
 3. Create an `agent-contract` from `08_templates/agent-project-contract.md`.
-4. Search TechScope memory for related agent patterns, standards, briefs, reviews, decisions and local skill candidates.
+4. Search TechScope memory by domain:
+   - first, `agent-building-knowledge` for standards, workflows and reusable
+     architecture patterns;
+   - second, `pritha-self` for current capabilities and limitations;
+   - third, `child-agents` for comparable lifecycle evidence and successful
+     patterns, not templates to copy;
+   - optionally, `user-model` local-private preferences only when available and
+     permitted.
 5. Verify volatile architecture choices through current primary sources and trusted secondary sources.
 6. Record an architecture recommendation:
    - selected runtime family;
    - selected interface adapters;
+   - interface experience profile, user controls, state model, rendering trust
+     boundary and fallback;
+   - UI framework choice and message/state contract when a web/workflow UI is
+     selected;
+   - 3D renderer/framework, scene state contract, asset policy, performance
+     target and fallback when a 3D visual layer is selected;
+   - Codex account/rate-limit telemetry mode, bucket/field display and privacy
+     boundary when an app-server-backed UI is selected;
    - harness evaluation plan when a non-Codex or local-model harness is being considered;
    - harness inventory;
    - security and permission model;
    - untrusted-input risk tier and scanner/quarantine path;
    - skill candidates, trust/risk score and activation decision;
+   - MCP connector candidates, auth/readiness state, toolset scope and activation decision;
    - testing and observability model.
 7. Scaffold the new agent in a sibling folder unless the contract explicitly chooses another location.
 8. Generate minimum project files:
@@ -129,6 +159,7 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - workflow notes;
    - scripts or app entrypoints;
    - skill pack manifest, candidates and audit/status command;
+   - MCP manifest, candidates and status command when MCP is selected;
    - smoke test or healthcheck;
    - user training guide.
 9. If Telegram is selected, include a Telegram adapter profile:
@@ -230,6 +261,12 @@ Generated agents receive explicit memory and tool manifests:
 - `external-or-specialized`: documented external/vector/graph integration placeholder.
 
 Tool profiles are selected from the contract and can include `cli-script`, `workflow`, `mcp-api`, `browser-manual` and `telegram-adapter`.
+
+MCP is an optional connector module, not a default property of every descendant.
+When selected, use `04_standards/agent-mcp-connector-lifecycle.md` and
+`07_workflows/agent-mcp-connector-selection.md`. External MCP servers should be
+recommended, reviewed, scoped and marked for readiness; they should not be
+installed silently or exposed with broad toolsets.
 
 ## Runtime Placement Decision Point
 
@@ -376,6 +413,11 @@ Generated agents must make service behavior explicit even when they are not serv
 - Deployment mutations require `--yes` and produce an `agent-deployment-report`.
 - Before scaffold, ask where the agent will actually be deployed: local Mac, Mac mini, VPS, cloud, embedded/user device, external runtime or nowhere yet.
 - Before scaffold, ask whether the agent should be proactive: none/manual, scheduled chrono/cron, heartbeat/pulse, event-driven webhook, queue watcher or hybrid.
+- If any proactive mode other than `none` or `manual` is selected, apply
+  `04_standards/agent-proactivity-scheduling.md`: record scheduler owner,
+  schedule/timezone, concurrency policy, missed-run policy, retry/backoff,
+  memory write policy, monitoring, alert channel and kill switch before
+  scaffold marks operations ready.
 - Do not add a background pulse, queue watcher, scheduler or notification loop unless the contract explicitly selects it.
 
 Use:

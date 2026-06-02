@@ -47,20 +47,6 @@ function commandString(command, commandArgs) {
 
 function run(id, name, command, commandArgs, options = {}) {
   const started = Date.now();
-  if (dryRun) {
-    return {
-      id,
-      name,
-      command: commandString(command, commandArgs),
-      status: "planned",
-      exitCode: 0,
-      durationMs: 0,
-      stdout: "",
-      stderr: "",
-      notes: "dry-run",
-    };
-  }
-
   if (simulatedFailures.has(id)) {
     return {
       id,
@@ -72,6 +58,20 @@ function run(id, name, command, commandArgs, options = {}) {
       stdout: "",
       stderr: `simulated failure for ${id}`,
       notes: "simulated failure",
+    };
+  }
+
+  if (dryRun) {
+    return {
+      id,
+      name,
+      command: commandString(command, commandArgs),
+      status: "planned",
+      exitCode: 0,
+      durationMs: 0,
+      stdout: "",
+      stderr: "",
+      notes: "dry-run",
     };
   }
 
@@ -128,7 +128,7 @@ const payload = {
   schema: "techscope-quality-gate-v1",
   root: ROOT,
   profile,
-  status: dryRun ? "planned" : failed.length === 0 ? "pass" : "fail",
+  status: failed.length > 0 ? "fail" : dryRun ? "planned" : "pass",
   createdAt: new Date().toISOString(),
   dryRun,
   failed: failed.length,

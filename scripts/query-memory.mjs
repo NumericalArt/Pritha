@@ -40,6 +40,8 @@ if (command === "help") {
 Filters:
   node scripts/query-memory.mjs by-topic <topic>
   node scripts/query-memory.mjs by-tool <tool>
+  node scripts/query-memory.mjs by-domain <domain>
+  node scripts/query-memory.mjs by-subject <kind> <id>
   node scripts/query-memory.mjs by-status <status>
   node scripts/query-memory.mjs by-type <type>
   node scripts/query-memory.mjs semantic <text>
@@ -91,21 +93,44 @@ ORDER BY relation_type, target_type, target_id;
   process.exit(0);
 }
 
-if (command === "by-topic" || command === "by-tool") {
+if (command === "by-topic" || command === "by-tool" || command === "by-domain") {
   if (!arg) {
-    console.error(`Missing ${command === "by-topic" ? "topic" : "tool"} name.`);
+    const label = command === "by-topic" ? "topic" : command === "by-tool" ? "tool" : "domain";
+    console.error(`Missing ${label} name.`);
     process.exit(1);
   }
-  const entityType = command === "by-topic" ? "topic" : "tool";
+  const entityType = command === "by-topic" ? "topic" : command === "by-tool" ? "tool" : "memory-domain";
+  const relationType = command === "by-domain" ? "IN_DOMAIN" : "MENTIONS";
   console.log(runSql(`
 SELECT d.type, d.status, d.path, d.title
 FROM relations r
 JOIN documents d ON d.id = r.source_id
 JOIN entities e ON e.id = r.target_id
 WHERE r.source_type = 'document'
-  AND r.relation_type = 'MENTIONS'
+  AND r.relation_type = ${sqlString(relationType)}
   AND r.target_type = ${sqlString(entityType)}
   AND lower(e.name) = lower(${sqlString(arg)})
+ORDER BY d.type, d.path;
+`));
+  process.exit(0);
+}
+
+if (command === "by-subject") {
+  const parts = process.argv.slice(3);
+  if (parts.length < 2) {
+    console.error("Missing subject kind and id.");
+    process.exit(1);
+  }
+  const subjectName = `${parts[0]}:${parts.slice(1).join(" ")}`;
+  console.log(runSql(`
+SELECT d.type, d.status, d.path, d.title
+FROM relations r
+JOIN documents d ON d.id = r.source_id
+JOIN entities e ON e.id = r.target_id
+WHERE r.source_type = 'document'
+  AND r.relation_type = 'ABOUT_SUBJECT'
+  AND r.target_type = 'subject'
+  AND lower(e.name) = lower(${sqlString(subjectName)})
 ORDER BY d.type, d.path;
 `));
   process.exit(0);

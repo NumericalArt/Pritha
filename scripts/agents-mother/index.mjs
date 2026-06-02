@@ -927,6 +927,27 @@ LIMIT ${Number(limit) || 12};
 `);
 }
 
+function searchMemoryByDomain(query, domain, limit) {
+  const match = ftsQuery(query);
+  if (!match || !domain) return [];
+  return runSqlJson(`
+SELECT d.type, d.status, d.path, d.title, c.heading, substr(replace(c.text, char(10), ' '), 1, 420) AS snippet
+FROM chunks_fts
+JOIN chunks c ON c.id = chunks_fts.chunk_id
+JOIN documents d ON d.id = chunks_fts.document_id
+JOIN relations r ON r.source_id = d.id
+JOIN entities e ON e.id = r.target_id
+WHERE chunks_fts MATCH ${sqlString(match)}
+  AND r.source_type = 'document'
+  AND r.relation_type = 'IN_DOMAIN'
+  AND r.target_type = 'memory-domain'
+  AND lower(e.name) = lower(${sqlString(domain)})
+  AND d.type != 'template'
+ORDER BY rank
+LIMIT ${Number(limit) || 8};
+`);
+}
+
 function readKnownDocs(paths) {
   return paths
     .filter((relPath) => existsSync(path.join(ROOT, relPath)))
@@ -977,7 +998,18 @@ function recommendationFor(data) {
   return notes;
 }
 
-function researchMarkdown(data, memoryResults, knownDocs, skillSelection, options = {}) {
+function formatMemoryRows(rows) {
+  if (rows.length === 0) return "- No domain-specific matches found.";
+  return rows.map((row, index) => `### ${index + 1}. ${row.title || row.path}
+
+- Path: ${row.path}
+- Type/status: ${row.type}/${row.status}
+- Heading: ${row.heading || "n/a"}
+- Relevance note: ${row.snippet || ""}
+`).join("\n");
+}
+
+function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSelection, options = {}) {
   const date = today();
   const agentSlug = slug(data.agentName);
   const title = `${data.agentName || agentSlug} agent architecture research`;
@@ -994,12 +1026,15 @@ function researchMarkdown(data, memoryResults, knownDocs, skillSelection, option
     ...skillSelection.candidates,
     ...skillSelection.blocked,
   ].flatMap((row) => [row.skill.relPath, ...row.skill.sourcePaths]);
-  const allSources = [...new Set([...resultSources, ...memoryResults.map((row) => row.path), ...skillSources])].slice(0, 50);
+  const domainSources = Object.values(domainResults).flat().map((row) => row.path);
+  const allSources = [...new Set([...resultSources, ...memoryResults.map((row) => row.path), ...domainSources, ...skillSources])].slice(0, 50);
   const sourceYaml = allSources.map((source) => `  - ${source}`).join("\n");
   const relatedStandards = [
     "04_standards/agent-creation-harness.md",
     "04_standards/agent-environment-compatibility.md",
     "04_standards/agent-tool-integration-selection.md",
+    "04_standards/memory-domains.md",
+    "04_standards/pritha-self-model.md",
   ];
 
   return `---
@@ -1081,6 +1116,27 @@ ${memoryResults.length === 0 ? "- No local memory matches found. Rebuild memory 
 - Relevance note: ${row.snippet || ""}
 `).join("\n")}
 
+## Domain-aware memory findings
+
+### Agent-building knowledge
+
+Use these as standards, workflows and reusable patterns for the new contract.
+
+${formatMemoryRows(domainResults.agentBuildingKnowledge || [])}
+
+### Pritha self
+
+Use these to understand current Pritha capabilities and constraints.
+
+${formatMemoryRows(domainResults.prithaSelf || [])}
+
+### Child-agent lifecycle evidence
+
+Use these only as evidence of successful or failed patterns. Do not clone a
+past child agent by default.
+
+${formatMemoryRows(domainResults.childAgents || [])}
+
 ## Standards and workflow basis
 
 ${knownDocs.map((doc) => `### ${doc.title}
@@ -1159,13 +1215,22 @@ function researchContract(contractPath, options = {}) {
     "04_standards/agent-creation-harness.md",
     "04_standards/agent-environment-compatibility.md",
     "04_standards/agent-tool-integration-selection.md",
+    "04_standards/memory-domains.md",
+    "04_standards/pritha-self-model.md",
     "07_workflows/agents-mother.md",
     "07_workflows/agents-mother-roadmap.md",
   ]);
+  const domainLimit = Math.max(4, Math.floor(limit / 2));
+  const domainResults = {
+    agentBuildingKnowledge: searchMemoryByDomain(query, "agent-building-knowledge", domainLimit),
+    prithaSelf: searchMemoryByDomain(query, "pritha-self", domainLimit),
+    childAgents: searchMemoryByDomain(query, "child-agents", domainLimit),
+  };
   const outPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-research.md`));
-  writeFileSync(outPath, researchMarkdown(data, memoryResults, knownDocs, skillSelection, { validationIssues }));
+  writeFileSync(outPath, researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSelection, { validationIssues }));
   console.log(`Research report: ${path.relative(ROOT, outPath)}`);
   console.log(`Local memory matches: ${memoryResults.length}`);
+  console.log(`Domain matches: agent-building=${domainResults.agentBuildingKnowledge.length}; pritha-self=${domainResults.prithaSelf.length}; child-agents=${domainResults.childAgents.length}`);
   console.log(`Skill candidates: ${skillSelection.installed.length + skillSelection.candidates.length}; blocked: ${skillSelection.blocked.length}`);
   if (validationIssues.length > 0) {
     console.log("Contract still has validation issues:");

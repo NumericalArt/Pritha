@@ -156,12 +156,14 @@ node scripts/self-test.mjs
 - Операционные отчеты агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-operations-report.md`.
 - Отчеты о deployment-действиях агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-deployment-report.md`.
 - Post-creation reviews агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-post-creation-review.md`.
+- Профили child agents: `11_agents/profiles/agent-id.md`.
 - Реестр созданных агентов: `11_agents/registry.md`.
+- Маркетинговые тексты Pritha: `12_marketing/pritha/*.md`.
 
 Каждый новый Markdown-артефакт должен начинаться с YAML frontmatter по шаблонам из `08_templates/`. Минимальные поля:
 
 - `id`: стабильный идентификатор.
-- `type`: `intake`, `brief`, `assessment`, `review`, `decision`, `standard`, `workflow`, `agent-contract`, `scaffold-report`, `agent-test-report`, `agent-handoff-report`, `agent-operations-report`, `agent-deployment-report`, `agent-post-creation-review`, `agent-registry`, `signal`, `wiki-page` или `template`.
+- `type`: `intake`, `brief`, `assessment`, `review`, `decision`, `standard`, `workflow`, `agent-contract`, `scaffold-report`, `agent-test-report`, `agent-handoff-report`, `agent-operations-report`, `agent-deployment-report`, `agent-post-creation-review`, `agent-registry`, `child-agent-profile`, `signal`, `wiki-page`, `marketing-section`, `marketing-copy` или `template`.
 - `status`: текущее состояние.
 - `created`: дата создания.
 - `updated`: дата последнего изменения.
@@ -171,8 +173,13 @@ node scripts/self-test.mjs
 - `related`: связанные intake, briefs, assessments, reviews, decisions, standards или workflows.
 - `supersedes`: какие старые артефакты новый материал заменяет или уточняет.
 - `superseded_by`: каким новым артефактом заменен старый материал.
+- `memory_domain` / `memory_domains`: семантический домен памяти по стандарту `04_standards/memory-domains.md`, если применимо.
+- `subject`: объект с `kind` и `id`, если артефакт явно относится к Pritha, child agent, стандарту, workflow, marketing narrative или другому устойчивому субъекту.
+- `privacy`, `retention`, `review_status`, `confidence`: использовать для новых curated artifacts, когда важно зафиксировать границы доступа, долговечность и степень уверенности.
 
 Markdown-файлы являются canonical authored knowledge, но GitHub snapshot Pritha должен переносить всё рабочее состояние памяти: Markdown, `.memory/techscope.sqlite`, FTS, relations, embeddings, schema, rebuild SQL и baseline self-test. SQLite/vector/graph-like индексы должны оставаться пересоздаваемыми из Markdown, но не считаются локальным мусором и должны попадать в репозиторий как portability/cache layer.
+
+`privacy: local-private` и primary `memory_domain: user-model` не должны попадать в tracked Markdown или `.memory/techscope.sqlite`; для этого использовать `.private/user-memory/` и `.memory-private/`, которые не коммитятся.
 
 ## Generated LLM Wiki Layer
 
@@ -193,10 +200,15 @@ Techscope может создавать и развивать новых аге�
 
 - workflow `07_workflows/agents-mother.md`;
 - стандарт `04_standards/agent-creation-harness.md`;
+- стандарт `04_standards/memory-domains.md`;
+- стандарт `04_standards/pritha-self-model.md`;
 - стандарт `04_standards/agent-runtime-placement.md`;
 - стандарт `04_standards/agent-team-operating-model.md`;
 - стандарт `04_standards/agent-untrusted-input-security.md`;
 - стандарт `04_standards/agent-harness-evaluation.md`;
+- стандарт `04_standards/agent-skill-pack-lifecycle.md`;
+- стандарт `04_standards/agent-interface-experience.md`;
+- workflow `07_workflows/agent-skill-pack-selection.md`;
 - шаблон `08_templates/agent-project-contract.md`;
 - шаблон `08_templates/agent-scaffold-report.md`;
 - шаблон `08_templates/agent-operations-report.md`;
@@ -214,6 +226,8 @@ Techscope может создавать и развивать новых аге�
 Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Techscope.
 
 Интерфейсы, память, данные, skills, MCP, инструменты и operations новых агентов должны быть модульными. Pritha собирает каждого будущего агента из минимально достаточного набора модулей, выбранных контрактом: нужные части harness, memory, data layer, skills, MCP servers, tools, evals, interface adapters и operations добавляются, ненужные не копируются. Каждый scaffold получает manifest-файлы для соответствующих выбранных слоев; тяжелые слои памяти вроде SQLite, embeddings, graph DB или external vector store добавляются только если это следует из `agent-contract`.
+
+При research/init нового child agent Pritha не должна начинать с копирования или подробного изучения уже существующих child agents. Сначала использовать контракт, `agent-building-knowledge` standards/workflows и `pritha-self` capabilities/limitations. `child-agents` profiles/reports использовать только как evidence успешных или неудачных паттернов, которые нужно проверить на fit с новым контрактом.
 
 В конце setup/init нового агента Pritha должна проверить и явно констатировать readiness выбранных модулей: harness, memory, data, skills, MCP, tools, interfaces, operations и внешние коннекторы. Не выбранные модули помечаются как `skipped`; выбранные, но неработающие - как `failed` или `pending-auth`.
 

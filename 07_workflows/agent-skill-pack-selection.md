@@ -3,40 +3,71 @@ id: agent-skill-pack-selection
 type: workflow
 status: draft
 created: 2026-05-30
-updated: 2026-05-30
+updated: 2026-06-02
 topics: [agent-skills, pritha, scaffold, procedural-memory]
 tools: [Pritha, Codex, Agent Skills]
 sources:
   - 04_standards/agent-skill-pack-lifecycle.md
   - 04_standards/agent-tool-integration-selection.md
+  - 03_reviews/2026-06-02-agent-skills-source-batch-review.md
 related:
   standards:
     - 04_standards/agent-skill-pack-lifecycle.md
     - 04_standards/agent-tool-integration-selection.md
+  reviews:
+    - 03_reviews/2026-06-02-agent-skills-source-batch-review.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-30
-source_updated: 2026-05-30
-source_version: workflow v1
+source_updated: 2026-06-02
+source_version: workflow v2 + Agent Skills source batch
 retrieved: 2026-05-30
-verified: 2026-05-30
+verified: 2026-06-02
 valid_for: Pritha contract, research and scaffold flow
 temporal_status: current
+memory_domain: agent-building-knowledge
+memory_domains:
+  - agent-building-knowledge
+  - governance
+subject:
+  kind: workflow
+  id: agent-skill-pack-selection
+privacy: public
+retention: durable
+review_status: draft
+confidence: high
 ---
 
 # Workflow: Agent Skill Pack Selection
 
 ## Steps
 
-1. Capture skill policy in the agent contract: needs, allowed sources, install mode and mutation policy.
-2. During research, search local Techscope memory and the local Pritha skill catalog.
-3. Score candidates for task, interface, memory, tool, security, evidence and maintenance fit.
-4. Block generated-only, unknown, dangerous, secret-dependent or policy-incompatible skills.
-5. Show recommended, optional, candidate and blocked skills in the research report.
-6. During scaffold, create `skills/manifest.json`, `skills/candidates.json`, `skills/lock.json`, `skills/README.md` and `scripts/skills-status.mjs`.
-7. Vendor only reviewed local skills when the contract explicitly selects `Skill install mode: vendor`.
-8. Keep external skills candidate-only until an approval and audit workflow is implemented.
+1. Capture skill policy in the agent contract: needs, allowed sources, install mode, mutation policy, script policy, network policy, source pinning and eval policy.
+2. During research, search local Techscope memory and the local Pritha skill catalog before external catalogs.
+3. For external discovery, prefer official or vendor repositories and catalogs only as candidate sources. Do not treat discovery as approval.
+4. Inspect each candidate's `SKILL.md`, references, scripts, dependency manifests, assets, network calls, filesystem writes and required secrets.
+5. Pin any external candidate to a tag, commit or tree SHA before vendoring or linking.
+6. Score candidates for task, interface, memory, tool, security, evidence, eval readiness and maintenance fit.
+7. Block generated-only, unknown, unpinned, dangerous, secret-dependent, network-policy-incompatible or policy-incompatible skills.
+8. Show recommended, optional, candidate and blocked skills in the research report with trust, risk, source pinning and eval status.
+9. During scaffold, create `skills/manifest.json`, `skills/candidates.json`, `skills/lock.json`, `skills/README.md` and `scripts/skills-status.mjs`.
+10. Vendor only reviewed local skills or explicitly approved external skills when the contract selects `Skill install mode: vendor`.
+11. Keep external skills candidate-only until approval, pinning, review and eval conditions pass.
+
+## Interview Fields
+
+Ask or derive:
+
+- Does this agent need skills at all?
+- Are external skill sources allowed, or local-only?
+- May skill scripts run, or are skills instruction-only?
+- May a skill use network access or MCP?
+- Should skills be recommended, vendored, linked or installed by runtime?
+- What approval is required before enabling a candidate?
+- What source pinning policy is required?
+- What eval or smoke test proves the skill works?
+- If the runtime uses a local/small model, how will skill selection be tested?
 
 ## Verification
 
@@ -44,3 +75,4 @@ temporal_status: current
 - `node scripts/pritha.mjs skills select <contract-path>`
 - In a child scaffold: `node scripts/skills-status.mjs`
 - Full Pritha regression: `npm test --silent`
+- Privacy/supply-chain gate: `node scripts/privacy-audit.mjs --strict`
