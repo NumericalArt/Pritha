@@ -19,6 +19,7 @@ const INCLUDE_DIRS = [
   "08_templates",
   "10_wiki",
   "11_agents",
+  "12_marketing",
 ];
 
 const REQUIRED_BY_TYPE = {
@@ -38,6 +39,9 @@ const REQUIRED_BY_TYPE = {
   "agent-deployment-report": ["id", "type", "status", "created", "updated", "topics", "tools", "sources", "related"],
   "agent-post-creation-review": ["id", "type", "status", "created", "updated", "topics", "tools", "sources", "related"],
   "agent-registry": ["id", "type", "status", "created", "updated", "topics", "tools", "sources", "related"],
+  "child-agent-profile": ["id", "type", "status", "created", "updated", "topics", "tools", "sources", "related"],
+  "marketing-section": ["id", "type", "status", "created", "updated", "topics", "tools", "sources", "related"],
+  "marketing-copy": ["id", "type", "status", "created", "updated", "topics", "tools", "sources", "related"],
   signal: [
     "id",
     "type",
@@ -114,6 +118,28 @@ for (const file of files) {
 
   if (type === "wiki-page" && data.status === "active") {
     issues.push(`${relPath}: wiki-page status must not be "active"; generated wiki pages are derivative artifacts`);
+  }
+
+  const memoryDomains = [
+    ...(data.memory_domain ? [data.memory_domain] : []),
+    ...(Array.isArray(data.memory_domains) ? data.memory_domains : []),
+  ].map(String);
+
+  if (data.privacy === "local-private") {
+    issues.push(`${relPath}: privacy local-private must not be stored in tracked public memory; use .private/user-memory/`);
+  }
+
+  if (data.memory_domain === "user-model") {
+    issues.push(`${relPath}: memory_domain user-model must not be stored in tracked public memory; use .private/user-memory/`);
+  }
+
+  if (data.memory_domains !== undefined && !Array.isArray(data.memory_domains)) {
+    issues.push(`${relPath}: "memory_domains" must be a list`);
+  }
+
+  if (data.subject !== undefined) {
+    const validSubject = data.subject && typeof data.subject === "object" && !Array.isArray(data.subject) && data.subject.kind && data.subject.id;
+    if (!validSubject) issues.push(`${relPath}: "subject" must contain nested kind and id`);
   }
 
   if (type === "signal") {

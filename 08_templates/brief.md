@@ -28,6 +28,16 @@ retrieved: YYYY-MM-DD
 verified: YYYY-MM-DD | pending
 valid_for: version/date range | unknown
 temporal_status: current | version-bound | stale | unknown
+memory_domain: agent-building-knowledge
+memory_domains:
+  - agent-building-knowledge
+subject:
+  kind: brief
+  id: topic
+privacy: public
+retention: durable
+review_status: draft
+confidence: medium
 ---
 
 # Brief: topic

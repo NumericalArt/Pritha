@@ -3,8 +3,8 @@ id: agent-runtime-placement
 type: standard
 status: draft
 created: 2026-05-26
-updated: 2026-05-27
-last_reviewed: 2026-05-27
+updated: 2026-06-02
+last_reviewed: 2026-06-02
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -36,10 +36,14 @@ sources:
   - 03_reviews/2026-05-27-nvidia-nemoclaw-sandboxed-agent-runtime-assessment.md
   - https://docs.nvidia.com/nemoclaw/latest/about/how-it-works
   - https://docs.nvidia.com/nemoclaw/latest/reference/architecture
+  - 03_reviews/2026-06-02-agent-harness-engineering-source-batch-review.md
+  - 03_reviews/2026-06-02-codex-surfaces-enterprise-deployment-source-batch-review.md
 related:
   decisions: []
   reviews:
     - 03_reviews/2026-05-26-openclaw-local-inference-cost-assessment.md
+    - 03_reviews/2026-06-02-agent-harness-engineering-source-batch-review.md
+    - 03_reviews/2026-06-02-codex-surfaces-enterprise-deployment-source-batch-review.md
   briefs:
     - 02_briefs/2026-05-26-openclaw-expensive-local-ai-brief.md
   workflows:
@@ -48,10 +52,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-04-13
-source_updated: 2026-05-27
-source_version: Techscope draft standard v2; official runtime/provider/NemoClaw docs checked 2026-05-27
+source_updated: 2026-06-02
+source_version: Techscope draft standard v4; official runtime/provider/NemoClaw docs plus 2026 harness and Codex/AWS source batches
 retrieved: 2026-05-26
-verified: 2026-05-27
+verified: 2026-06-02
 valid_for: Agents Mother contracts and new agent architecture from 2026-05-26 onward
 temporal_status: current
 ---
@@ -60,7 +64,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-05-27
+Last reviewed: 2026-06-02
 
 ## Rule
 
@@ -116,12 +120,25 @@ The default pattern is hybrid:
 - Do not preserve model names or prices as standing rules. Preserve only the
   reason for choosing a class of runtime.
 - Record fallback runtime and failure behavior.
+- Record harness assumptions for each runtime class: expected context size,
+  tool-call behavior, schema strictness, retry policy, compaction behavior and
+  required verification surfaces.
+- Record provider boundary when enterprise governance matters: direct OpenAI,
+  ChatGPT sign-in, API key, AWS Bedrock, local provider, managed service or
+  mixed. Provider choice changes auth, feature availability, logs, cost
+  ownership, region support and compliance posture.
 - Record privacy level and whether data may leave the local environment.
 - Record where routing runs: inside the agent process, host-side gateway, local proxy, remote service or manual operator path.
 - For sandboxed agents, prefer an in-sandbox stable inference endpoint with host-side provider/model routing and host-side credentials.
 - Record cost budget and whether usage is expected to be bursty or repeated.
+- If AWS Bedrock or another enterprise provider path is selected, record region,
+  identity boundary, feature gaps versus first-party hosted surfaces, audit log
+  location, procurement owner and readiness check.
 - Record eval fixtures before moving a task from frontier model to local/small
   model.
+- Treat a model change as a harness compatibility change. Re-run representative
+  evals and update prompts, tool schemas, context ordering or verification
+  surfaces when the new model behaves differently.
 - Keep routing config explicit and testable.
 - Do not route untrusted external input directly to tools or memory just because
   the model is local.
@@ -165,6 +182,9 @@ Every relevant `agent-contract` should include:
 - `provider_fallbacks`;
 - `privacy_routing_rules`;
 - `model_budget_policy`;
+- `provider_boundary`;
+- `enterprise_governance_required`;
+- `enterprise_provider_notes`;
 - `runtime_eval_fixtures`;
 - `route_healthcheck`;
 - `route_change_log`.
@@ -190,11 +210,11 @@ runtime_placement:
 ## Temporal validity
 
 - Source published: 2026-04-13.
-- Source updated: 2026-05-26.
-- Source version: Techscope draft standard v2; official runtime/provider/NemoClaw
-  docs checked 2026-05-27.
+- Source updated: 2026-06-02.
+- Source version: Techscope draft standard v4; official runtime/provider/NemoClaw
+  docs plus 2026 harness and Codex/AWS source batches.
 - Retrieved: 2026-05-26.
-- Verified: 2026-05-27.
+- Verified: 2026-06-02.
 - Valid for: Agents Mother contracts and new agent architecture from 2026-05-26
   onward.
 - Freshness status: current.

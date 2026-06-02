@@ -29,6 +29,16 @@ retrieved: YYYY-MM-DD
 verified: YYYY-MM-DD | pending
 valid_for: version/date range | unknown
 temporal_status: current | version-bound | stale | unknown
+memory_domain: governance
+memory_domains:
+  - governance
+subject:
+  kind: standard
+  id: topic
+privacy: public
+retention: durable
+review_status: draft
+confidence: medium
 ---
 
 # Standard: topic

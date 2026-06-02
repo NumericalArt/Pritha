@@ -24,6 +24,16 @@ verified: YYYY-MM-DD | pending
 valid_for: version/date range | unknown
 temporal_status: current | version-bound | stale | unknown
 review_date: YYYY-MM-DD
+memory_domain: governance
+memory_domains:
+  - governance
+subject:
+  kind: decision
+  id: topic
+privacy: public
+retention: durable
+review_status: proposed
+confidence: medium
 ---
 
 # Decision: topic

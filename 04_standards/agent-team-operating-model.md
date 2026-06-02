@@ -3,8 +3,8 @@ id: agent-team-operating-model
 type: standard
 status: draft
 created: 2026-05-27
-updated: 2026-05-27
-last_reviewed: 2026-05-27
+updated: 2026-06-02
+last_reviewed: 2026-06-02
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -25,10 +25,13 @@ sources:
   - https://github.com/NousResearch/hermes-agent/blob/main/RELEASE_v0.12.0.md
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/cron/
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/delegation/
+  - 04_standards/agent-proactivity-scheduling.md
+  - 03_reviews/2026-06-02-agent-scheduling-heartbeat-source-batch-review.md
 related:
   decisions: []
   reviews:
     - 03_reviews/2026-05-27-hermes-agent-team-operating-model-assessment.md
+    - 03_reviews/2026-06-02-agent-scheduling-heartbeat-source-batch-review.md
   briefs:
     - 02_briefs/2026-05-27-hermes-agent-team-operating-model-brief.md
   workflows:
@@ -37,10 +40,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-04
-source_updated: 2026-05-27
-source_version: Techscope draft standard v1; Hermes docs checked 2026-05-27
+source_updated: 2026-06-02
+source_version: Techscope draft standard v2; Hermes docs plus proactivity scheduling source batch
 retrieved: 2026-05-27
-verified: 2026-05-27
+verified: 2026-06-02
 valid_for: Agents Mother role/team design from 2026-05-27 onward
 temporal_status: current
 ---
@@ -49,7 +52,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-05-27
+Last reviewed: 2026-06-02
 
 ## Rule
 
@@ -94,6 +97,10 @@ context/tool sprawl.
 - Define scheduled jobs separately from conversational tasks.
 - Require self-contained prompts and explicit skills/toolsets for scheduled
   jobs.
+- Apply `agent-proactivity-scheduling` for every scheduled role, heartbeat,
+  standing order or proactive notification stream. Team-mode agents need
+  scheduler ownership, missed-run alerts, notification policy and memory write
+  boundaries before scheduled work is enabled.
 - Preserve daily/weekly summaries only when they produce action, decisions or
   memory value.
 - Define a notification policy: what can interrupt the user, what is batched,
@@ -134,10 +141,11 @@ Future `agent-contract` files should answer:
 ## Temporal validity
 
 - Source published: 2026-05-04.
-- Source updated: 2026-05-27.
-- Source version: Techscope draft standard v1; Hermes docs checked 2026-05-27.
+- Source updated: 2026-06-02.
+- Source version: Techscope draft standard v2; Hermes docs plus proactivity
+  scheduling source batch.
 - Retrieved: 2026-05-27.
-- Verified: 2026-05-27.
+- Verified: 2026-06-02.
 - Valid for: Agents Mother role/team design from 2026-05-27 onward.
 - Freshness status: current.
 - Temporal status: current.

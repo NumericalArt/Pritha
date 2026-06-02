@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-05-28
+updated: 2026-06-02
 template_for: agent-contract
 topics: []
 tools: []
@@ -31,6 +31,17 @@ retrieved: YYYY-MM-DD
 verified: YYYY-MM-DD | pending
 valid_for: version/date range | unknown
 temporal_status: current | version-bound | stale | unknown
+memory_domain: child-agents
+memory_domains:
+  - child-agents
+  - agent-building-knowledge
+subject:
+  kind: child-agent
+  id: agent-name
+privacy: public
+retention: durable
+review_status: draft
+confidence: medium
 ---
 
 # Agent Project Contract: agent-name
@@ -73,8 +84,32 @@ Status: draft | accepted | superseded
 ## Runtime and interface
 
 - Runtime family: codex-native | cli | api | local-model | hybrid | environment-specific
+- Codex surface profile: none | cli-local | app-supervised | cloud-task | ide-attached | app-server | sdk-orchestrated | workspace-agent | bedrock-backed | mixed | unknown
 - Primary interface: Codex project | Telegram | CLI | web | API | mixed
 - Secondary interfaces:
+- Interface experience profile: chat-or-codex-thread | operator-console | workflow-ui | embedded-chat-app | event-stream-ui | mcp-app-ui | declarative-generated-ui | realtime-voice-ui | mixed | unknown
+- Interface user controls: approve | reject | cancel | pause | retry | edit-state | reset-context | none | unknown
+- Interface state model: ephemeral | thread-scoped | task-scoped | durable | unknown
+- Interface rendering boundary: host-owned | iframe-sandboxed | native-component-catalog | custom-web | none | unknown
+- UI framework: existing | React | Next.js | Svelte | Vue | Angular | Solid | Flutter | native-mobile | custom | none | unknown
+- AI UI layer: none | Vercel AI SDK UI | AG-UI | MCP Apps | A2UI | OpenAI Apps SDK | custom | unknown
+- UI message/state contract:
+- Typed tool component plan:
+- 3D visual layer: none | Three.js | React Three Fiber | custom | unknown
+- 3D renderer: none | WebGLRenderer | WebGPURenderer | mixed | unknown
+- 3D purpose: inspect | simulate | explain | dashboard | avatar | creative-artifact | other | none | unknown
+- 3D scene state contract:
+- 3D asset/source policy:
+- 3D performance/mobile target:
+- 3D MCP/debug connector: none | candidate | selected | blocked | unknown
+- 3D fallback:
+- Codex account/rate-limit telemetry: none | app-server-read | app-server-subscribe | external | unknown
+- Codex telemetry bucket/limitId:
+- Codex telemetry displayed fields:
+- Codex telemetry unavailable-data behavior:
+- Codex telemetry privacy boundary:
+- Interface side-effect policy: no-side-effects | approval-required | allowed-by-contract | unknown
+- Interface fallback: text-summary | CLI-status | manual | none | unknown
 - Telegram mode: none | primary-chat | intake-channel | notifications-only | operator-control
 - Expected hosting: local Mac | Mac mini service | VPS | cloud | embedded | unknown
 
@@ -96,6 +131,9 @@ Status: draft | accepted | superseded
 ## Runtime placement
 
 - Runtime placement profile: deterministic-first | frontier-first | local-first | hybrid | unknown
+- Provider boundary: direct-openai | chatgpt-sign-in | api-key | aws-bedrock | local-provider | managed-service | mixed | unknown
+- Enterprise governance required: no | yes | unknown
+- Enterprise provider notes:
 - Multi-model routing requested: no | yes | only-if-needed
 - Local inference required: no | optional | required | later
 - Local inference adapter: none | LM Studio | Ollama | vLLM | custom | unknown
@@ -132,9 +170,22 @@ Status: draft | accepted | superseded
 ## Proactivity
 
 - Proactive mode: none | manual | scheduled | heartbeat | event-driven | queue-watcher | hybrid
+- Scheduler owner: none | user-managed-chatgpt | host-cron | launchd | kubernetes-cronjob | cloudflare-agent | openclaw-gateway | temporal-schedule | trigger-dev | external | unknown
 - Trigger sources:
 - Schedule:
+- Timezone:
 - Heartbeat interval:
+- Concurrency policy: forbid-overlap | allow-overlap | replace | queue | unknown
+- Missed-run policy:
+- Retry/backoff policy:
+- Max runtime:
+- Idempotency/dedupe key:
+- Background memory write policy: disabled | processed-only | approval-required | allowed-by-contract
+- Background untrusted-input policy:
+- Run status/log path:
+- Missed-run monitor:
+- Alert channel:
+- Kill switch / pause command:
 - Idle behavior:
 - User interruption policy:
 
@@ -144,11 +195,30 @@ Status: draft | accepted | superseded
 - Allowed skill sources: local-only | trusted-only | external-with-approval
 - Skill install mode: recommend | vendor | link | runtime-install
 - Skill mutation policy: read-only | patch-with-approval | agent-managed
+- Skill script policy: instruction-only | scripts-with-approval | scripts-allowed-by-contract
+- Skill network policy: no-network | approval-required | allowed-by-contract
+- Skill source pinning: none | tag | commit | tree-sha | lockfile
+- Skill eval policy: smoke-only | trigger-evals | full-behavior-evals | none-with-justification
 - Installed skills:
 - Candidate skills:
 - External skill approval:
+- Skill trusted catalogs:
 - Skill update policy:
 - Skill audit command:
+
+## MCP connectors
+
+- MCP needs: auto | none | selected
+- Allowed MCP sources: local-only | trusted-only | external-with-approval
+- MCP install mode: recommend | configure | runtime-install
+- MCP auth policy: no-secrets-in-repo | user-local | managed-service | unknown
+- MCP toolset policy: narrow-only | read-only-preferred | custom
+- MCP side-effect policy: read-only | approval-required | allowed-by-contract
+- Selected MCP connectors:
+- Candidate MCP connectors:
+- Pending MCP auth:
+- MCP readiness command:
+- MCP audit/update policy:
 
 ## Harness inventory
 
@@ -164,6 +234,9 @@ Status: draft | accepted | superseded
 
 ## Data, memory and sources
 
+- Memory domains selected:
+- Primary memory domain:
+- Subject kind/id:
 - Input data types:
 - Stored data:
 - Sensitive data:
@@ -220,6 +293,7 @@ Status: draft | accepted | superseded
 - [ ] Interface mode selected.
 - [ ] Telegram need explicitly decided.
 - [ ] Skills policy selected.
+- [ ] MCP policy selected or explicitly skipped.
 - [ ] Harness inventory complete.
 - [ ] Security model documented.
 - [ ] Tests/healthchecks defined.

@@ -28,7 +28,7 @@ test("quality-gate exposes a serialized dry-run contract", () => {
 });
 
 test("quality-gate simulated failure returns a clear failing check", () => {
-  const result = spawnSync("node", ["scripts/quality-gate.mjs", "--json", "--simulate-fail=smoke-test"], {
+  const result = spawnSync("node", ["scripts/quality-gate.mjs", "--dry-run", "--json", "--simulate-fail=smoke-test"], {
     encoding: "utf8",
   });
   assert.notEqual(result.status, 0);

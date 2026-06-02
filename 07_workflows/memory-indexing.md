@@ -137,6 +137,8 @@ Filters:
 ```sh
 node scripts/query-memory.mjs by-topic memory
 node scripts/query-memory.mjs by-tool sqlite
+node scripts/query-memory.mjs by-domain pritha-self
+node scripts/query-memory.mjs by-subject system pritha
 node scripts/query-memory.mjs by-status draft
 node scripts/query-memory.mjs by-type standard
 node scripts/query-memory.mjs recent
@@ -180,7 +182,7 @@ Use stable relation types:
 - `node scripts/rebuild-memory.mjs` rebuilds `.memory/techscope.sqlite`.
 - `node scripts/privacy-audit.mjs --strict` passes after rebuild.
 - `node scripts/query-memory.mjs stats` shows indexed documents, chunks, entities, relations and embeddings.
-- `node scripts/query-memory.mjs by-topic <topic>` and `by-tool <tool>` return filtered documents.
+- `node scripts/query-memory.mjs by-topic <topic>`, `by-tool <tool>`, `by-domain <domain>` and `by-subject <kind> <id>` return filtered documents.
 - `node scripts/query-memory.mjs open` returns unresolved non-template artifacts.
 - SQLite integrity check returns `ok`.
 

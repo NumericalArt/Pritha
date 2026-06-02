@@ -26,6 +26,7 @@ const INCLUDE_DIRS = [
   "08_templates",
   "10_wiki",
   "11_agents",
+  "12_marketing",
 ];
 
 const RELATION_TYPES = new Set([
@@ -233,6 +234,14 @@ VALUES (${sqlString(chunk.text)}, ${sqlString(chunk.heading)}, ${sqlString(id)},
   const topics = Array.isArray(data.topics) ? data.topics : [];
   const tools = Array.isArray(data.tools) ? data.tools : [];
   const sources = Array.isArray(data.sources) ? data.sources : [];
+  const domains = [
+    ...(data.memory_domain ? [data.memory_domain] : []),
+    ...(Array.isArray(data.memory_domains) ? data.memory_domains : []),
+  ].filter(Boolean);
+  const privacy = data.privacy || "";
+  const reviewStatus = data.review_status || "";
+  const subjectKind = data.subject && typeof data.subject === "object" && !Array.isArray(data.subject) ? data.subject.kind : "";
+  const subjectId = data.subject && typeof data.subject === "object" && !Array.isArray(data.subject) ? data.subject.id : "";
 
   for (const topic of topics) {
     sql += upsertEntitySql("topic", topic, now);
@@ -247,6 +256,27 @@ VALUES (${sqlString(chunk.text)}, ${sqlString(chunk.heading)}, ${sqlString(id)},
   for (const source of sources) {
     sql += upsertEntitySql("source", source, now);
     sql += upsertRelationSql("document", id, "DERIVED_FROM", "source", entityId("source", source), id, now);
+  }
+
+  for (const domain of [...new Set(domains.map(String))]) {
+    sql += upsertEntitySql("memory-domain", domain, now);
+    sql += upsertRelationSql("document", id, "IN_DOMAIN", "memory-domain", entityId("memory-domain", domain), id, now);
+  }
+
+  if (privacy) {
+    sql += upsertEntitySql("privacy", privacy, now);
+    sql += upsertRelationSql("document", id, "HAS_PRIVACY", "privacy", entityId("privacy", privacy), id, now);
+  }
+
+  if (reviewStatus) {
+    sql += upsertEntitySql("review-status", reviewStatus, now);
+    sql += upsertRelationSql("document", id, "HAS_REVIEW_STATUS", "review-status", entityId("review-status", reviewStatus), id, now);
+  }
+
+  if (subjectKind && subjectId) {
+    const subjectName = `${subjectKind}:${subjectId}`;
+    sql += upsertEntitySql("subject", subjectName, now);
+    sql += upsertRelationSql("document", id, "ABOUT_SUBJECT", "subject", entityId("subject", subjectName), id, now);
   }
 
   if (data.related && typeof data.related === "object" && !Array.isArray(data.related)) {
