@@ -1,0 +1,87 @@
+{
+  "schema_version": "pritha_child_agent_snapshot_v1",
+  "snapshot_id": "c6-ui-validation-snapshot",
+  "agent_id": "fespa26",
+  "agent_name": "FESPA26",
+  "agent_version": "v1",
+  "created_at": "2026-06-05T06:11:58.897Z",
+  "created_by": "pritha",
+  "description": "C6/C7 end-to-end metadata-only snapshot verification",
+  "source_profile": "11_agents/profiles/fespa26.md",
+  "source_contract": "11_agents/contracts/2026-05-25-fespa26-agent-contract.md",
+  "agent_folder": "../FESPA26",
+  "restore": {
+    "mode": "metadata-only",
+    "requires_confirmation": true,
+    "target": "../FESPA26",
+    "overwrite_existing_folder": false
+  },
+  "privacy": {
+    "secrets_included": false,
+    "private_memory_included": false,
+    "runtime_queues_included": false,
+    "logs_included": false
+  },
+  "contents": {
+    "includes": [
+      "../FESPA26/AGENTS.md",
+      "../FESPA26/README.md",
+      "../FESPA26/.env.example",
+      "../FESPA26/package.json",
+      "../FESPA26/interfaces/manifest.json",
+      "../FESPA26/memory/manifest.json",
+      "../FESPA26/tools/manifest.json",
+      "../FESPA26/operations/manifest.json"
+    ],
+    "excludes": [
+      ".env",
+      ".env.local",
+      ".memory-private/",
+      ".queue/",
+      ".logs/",
+      "logs/",
+      "node_modules/",
+      ".next/",
+      "runtime caches",
+      "private user memory"
+    ]
+  },
+  "checks": [
+    {
+      "id": "profile",
+      "label": "Canonical profile",
+      "status": "pass",
+      "detail": "11_agents/profiles/fespa26.md"
+    },
+    {
+      "id": "contract",
+      "label": "Source contract",
+      "status": "pass",
+      "detail": "11_agents/contracts/2026-05-25-fespa26-agent-contract.md"
+    },
+    {
+      "id": "folder",
+      "label": "Child folder",
+      "status": "pass",
+      "detail": "../FESPA26"
+    },
+    {
+      "id": "operations",
+      "label": "Operations manifest",
+      "status": "pass",
+      "detail": "operations/manifest.json ready"
+    },
+    {
+      "id": "health",
+      "label": "Latest health probe",
+      "status": "pass",
+      "detail": "http://127.0.0.1:3027/api/health"
+    },
+    {
+      "id": "snapshot-store",
+      "label": "Snapshot metadata store",
+      "status": "warn",
+      "detail": ".snapshots/child-agents/fespa26 is not present; planner will not create it"
+    }
+  ]
+}

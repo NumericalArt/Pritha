@@ -3,7 +3,7 @@ id: signal-2026-06-02-threejs-3d-agent-interface-source-batch
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - threejs
   - react-three-fiber
@@ -20,13 +20,7 @@ tools:
   - TSL
   - MCP
 sources:
-  - https://threejs.org/docs/llms.txt
-  - https://threejs.org/docs/llms-full.txt
-  - https://threejs.org/manual/#en/webgpurenderer
-  - https://playbooks.com/skills/anthemflynn/ccmp/react-three-fiber
-  - https://mcp-marketplace.io/server/io-github-dmitriygolub-threejs-devtools
-  - https://discourse.threejs.org/t/hello3dmcp-ai-driven-3d-interactive-app/89133
-  - https://meditations.metavert.io/p/when-ai-learns-to-paint-threejs-and
+  - source-threejs-3d-agent-interface-batch-2026-06-02
 related:
   standards:
     - 04_standards/agent-interface-experience.md

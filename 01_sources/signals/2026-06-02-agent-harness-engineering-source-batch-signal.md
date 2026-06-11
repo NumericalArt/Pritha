@@ -3,7 +3,7 @@ id: 2026-06-02-agent-harness-engineering-source-batch-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - harness-engineering
   - agent-evals
@@ -20,16 +20,7 @@ tools:
   - Cursor
   - arXiv
 sources:
-  - https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
-  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
-  - https://openai.com/index/unrolling-the-codex-agent-loop/
-  - https://openai.com/index/harness-engineering/
-  - https://www.langchain.com/blog/improving-deep-agents-with-harness-engineering
-  - https://www.langchain.com/blog/the-anatomy-of-an-agent-harness
-  - https://arxiv.org/abs/2603.28052
-  - https://martinfowler.com/articles/harness-engineering.html
-  - https://cursor.com/blog/continually-improving-agent-harness
-  - https://arxiv.org/abs/2605.18747
+  - source-harness-batch-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-agent-harness-engineering-source-batch-review.md

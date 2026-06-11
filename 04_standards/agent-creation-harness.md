@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-06-07
+last_reviewed: 2026-06-07
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -75,6 +75,8 @@ sources:
   - 03_reviews/2026-06-02-agent-scheduling-heartbeat-source-batch-review.md
   - 03_reviews/2026-06-02-agent-skills-source-batch-review.md
   - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
+  - 03_reviews/2026-06-07-yandex-ai-safe-agent-security-assessment.md
+  - 04_standards/agent-ai-safe-security-checklist.md
 related:
   decisions: []
   reviews:
@@ -85,6 +87,7 @@ related:
     - 03_reviews/2026-06-02-agent-scheduling-heartbeat-source-batch-review.md
     - 03_reviews/2026-06-02-agent-skills-source-batch-review.md
     - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
+    - 03_reviews/2026-06-07-yandex-ai-safe-agent-security-assessment.md
   briefs: []
   workflows:
     - 07_workflows/agents-mother.md
@@ -93,14 +96,15 @@ related:
     - 04_standards/agent-team-operating-model.md
     - 04_standards/agent-harness-evaluation.md
     - 04_standards/agent-proactivity-scheduling.md
+    - 04_standards/agent-ai-safe-security-checklist.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-06-02
-source_version: Techscope draft standard v10 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch
+source_updated: 2026-06-07
+source_version: Techscope draft standard v11 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist
 retrieved: 2026-05-18
-verified: 2026-06-02
+verified: 2026-06-07
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -109,7 +113,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-02
+Last reviewed: 2026-06-07
 
 ## Rule
 
@@ -146,6 +150,12 @@ The agentic UI source batch adds an interface-layer rule: UI is a harness
 boundary, not decoration. Rich UI is selected only when a workflow needs user
 visibility, state editing, progress, cancellation, approvals, visual comparison
 or interactive widgets. Chat-only remains the default for simple work.
+
+The AI-SAFE source adds a cross-layer security pass for child agents. Before
+scaffold readiness is marked complete, Pritha should review selected modules
+across interface, reasoning/planning, knowledge, tools/execution and
+infrastructure/orchestration. This is a vendor-neutral threat-modeling check,
+not a dependency on a cloud provider.
 
 ## Pritha naming and lineage vocabulary
 
@@ -190,6 +200,9 @@ The compatibility rule is alias-first: new Pritha names may wrap existing Agents
 - Record runtime placement per task class: deterministic code, local model,
   small hosted model, frontier hosted model, Codex sidecar or human/manual.
 - Record untrusted input sources, risk tier, quarantine policy, token/media budget caps and human approval gates.
+- Record an AI-SAFE security profile for non-trivial agents using
+  `agent-ai-safe-security-checklist`: interface, reasoning/planning, knowledge,
+  tools/execution and infrastructure/orchestration controls.
 - Record runtime isolation profile: no isolation, process-only, project-folder,
   container, sandbox or remote sandbox. For always-on, external-facing or
   permission-heavy agents, explicitly justify if sandboxing is not used.
@@ -285,13 +298,13 @@ Each created agent must document:
 ## Temporal validity
 
 - Source published: 2026-05-18 user scenario and current external docs.
-- Source updated: 2026-06-02.
-- Source version: Techscope draft standard v10 plus Funny Teacher reference
+- Source updated: 2026-06-07.
+- Source version: Techscope draft standard v11 plus Funny Teacher reference
   evidence, OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv
   harness source batch, Codex surfaces/AWS batch, scheduling/heartbeat batch and
-  Agent Skills and agentic UI source batches.
+  Agent Skills, agentic UI and AI-SAFE child-agent checklist source batches.
 - Retrieved: 2026-05-18.
-- Verified: 2026-06-02.
+- Verified: 2026-06-07.
 - Valid for: TechScope agent creation workflow from 2026-05-18 onward.
 - Freshness status: current.
 - Temporal status: current.

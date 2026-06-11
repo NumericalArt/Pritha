@@ -3,7 +3,7 @@ id: 2026-06-02-agent-scheduling-heartbeat-source-batch-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - agent-scheduling
   - cron
@@ -22,16 +22,7 @@ tools:
   - Trigger.dev
   - Better Stack
 sources:
-  - https://help.openai.com/en/articles/10291617-scheduled-tasks-in-chatgpt
-  - https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
-  - https://developers.cloudflare.com/agents/api-reference/schedule-tasks/
-  - https://arxiv.org/abs/2603.23064
-  - https://docs.openclaw.ai/cron/
-  - https://docs.openclaw.ai/automation/cron-vs-heartbeat
-  - https://temporal.io/blog/of-course-you-can-build-dynamic-ai-agents-with-temporal
-  - https://temporal.io/blog/orchestrating-ambient-agents-with-temporal
-  - https://trigger.dev/docs/tasks/scheduled
-  - https://betterstack.com/community/guides/monitoring/what-is-cron-monitoring/
+  - source-agent-scheduling-heartbeat-batch-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-agent-scheduling-heartbeat-source-batch-review.md

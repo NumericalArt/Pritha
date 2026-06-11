@@ -3,7 +3,7 @@ id: 2026-06-02-codex-surfaces-enterprise-deployment-source-batch-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - codex
   - codex-cli
@@ -23,18 +23,7 @@ tools:
   - Docker MCP Toolkit
   - Amazon Bedrock
 sources:
-  - https://openai.com/index/introducing-o3-and-o4-mini/
-  - https://openai.com/index/introducing-codex/
-  - https://developers.openai.com/cookbook/examples/codex/codex_mcp_agents_sdk/building_consistent_workflows_codex_cli_agents_sdk
-  - https://www.docker.com/blog/connect-codex-to-mcp-servers-mcp-toolkit/
-  - https://openai.com/index/unrolling-the-codex-agent-loop/
-  - https://openai.com/index/introducing-the-codex-app/
-  - https://openai.com/index/harness-engineering/
-  - https://openai.com/index/codex-for-almost-everything/
-  - https://openai.com/index/introducing-workspace-agents-in-chatgpt/
-  - https://openai.com/index/openai-frontier-models-and-codex-are-now-available-on-aws/
-  - https://www.aboutamazon.com/news/aws/bedrock-openai-models
-  - https://developers.openai.com/codex/codex-manual.md
+  - source-codex-surfaces-batch-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-codex-surfaces-enterprise-deployment-source-batch-review.md

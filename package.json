@@ -25,6 +25,9 @@
     "tools": "node scripts/tools-status.mjs --json",
     "operations": "node scripts/operations-status.mjs --json",
     "voice-kit": "node scripts/voice-control-kit.mjs",
+    "control-center": "npm --prefix interfaces/control-center run dev",
+    "control-center:build": "npm --prefix interfaces/control-center run build",
+    "control-center:start": "npm --prefix interfaces/control-center run start",
     "pre-push-audit": "node scripts/pre-push-audit.mjs",
     "release-status": "node scripts/github-release-status.mjs"
   }

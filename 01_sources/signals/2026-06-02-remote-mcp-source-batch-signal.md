@@ -3,7 +3,7 @@ id: 2026-06-02-remote-mcp-source-batch-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - mcp
   - remote-mcp
@@ -21,20 +21,7 @@ tools:
   - GitHub MCP Registry
   - Zapier MCP
 sources:
-  - https://www.anthropic.com/news/model-context-protocol
-  - https://blog.cloudflare.com/remote-model-context-protocol-servers-mcp/
-  - https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks
-  - https://www.docker.com/blog/introducing-docker-mcp-catalog-and-toolkit/
-  - https://blog.cloudflare.com/mcp-demo-day/
-  - https://cloud.google.com/blog/topics/developers-practitioners/use-google-adk-and-mcp-with-an-external-server
-  - https://openai.com/index/new-tools-and-features-in-the-responses-api/
-  - https://zapier.com/blog/zapier-mcp-openai-responses-api/
-  - https://github.blog/ai-and-ml/generative-ai/how-to-find-install-and-manage-mcp-servers-with-the-github-mcp-registry/
-  - https://www.anthropic.com/engineering/code-execution-with-mcp
-  - https://registry.modelcontextprotocol.io/docs
-  - https://modelcontextprotocol.io/registry/terms-of-service
-  - https://platform.openai.com/docs/guides/tools-remote-mcp
-  - https://developers.cloudflare.com/agents/model-context-protocol/
+  - source-remote-mcp-batch-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-remote-mcp-source-batch-review.md

@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-06-01
+updated: 2026-06-07
 topics:
   - agent-engineering
   - agent-factory
@@ -37,6 +37,7 @@ sources:
   - 04_standards/agent-team-operating-model.md
   - 04_standards/agent-skill-pack-lifecycle.md
   - 04_standards/agent-mcp-connector-lifecycle.md
+  - 04_standards/agent-ai-safe-security-checklist.md
 related:
   standards:
     - 04_standards/agent-creation-harness.md
@@ -49,6 +50,7 @@ related:
     - 04_standards/agent-team-operating-model.md
     - 04_standards/agent-skill-pack-lifecycle.md
     - 04_standards/agent-mcp-connector-lifecycle.md
+    - 04_standards/agent-ai-safe-security-checklist.md
   templates:
     - 08_templates/agent-project-contract.md
     - 08_templates/agent-scaffold-report.md
@@ -120,6 +122,8 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - whether the user explicitly wants different models for different task
      classes, or whether multi-model routing should be avoided for v1;
    - untrusted input sources, quarantine rules, token/media budget caps and approval gates;
+   - AI-SAFE security profile: interface, reasoning/planning, knowledge,
+     execution/tools and infrastructure/orchestration controls;
    - skill needs, allowed skill sources, install mode and mutation policy;
    - MCP needs, allowed connector sources, auth policy, toolset scope and side-effect policy;
    - acceptance tests and training expectations.
@@ -147,6 +151,7 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - harness evaluation plan when a non-Codex or local-model harness is being considered;
    - harness inventory;
    - security and permission model;
+   - AI-SAFE layer review status for selected modules;
    - untrusted-input risk tier and scanner/quarantine path;
    - skill candidates, trust/risk score and activation decision;
    - MCP connector candidates, auth/readiness state, toolset scope and activation decision;
@@ -347,6 +352,27 @@ The contract must explicitly choose:
 
 External content must not directly select tools, mutate memory, spend budget or
 send/publish data without passing through the chosen intake/security boundary.
+
+## AI-SAFE Security Review Decision Point
+
+For every non-trivial child agent, apply:
+
+```text
+04_standards/agent-ai-safe-security-checklist.md
+```
+
+The contract should record a layer-by-layer security profile:
+
+- interface/input-output controls;
+- reasoning and planning controls;
+- knowledge, memory and RAG controls;
+- execution, tool, MCP and skill controls;
+- infrastructure, operations, scheduling and multi-agent controls.
+
+Use `minimal` only for small local/manual agents with no external input, no
+durable memory, no privileged tools, no deployment and no proactivity. Selected
+but unready layers must be marked `selected-pending`, `selected-blocked` or
+`unknown`, not silently treated as ready.
 
 ## Voice Agent Decision Point
 

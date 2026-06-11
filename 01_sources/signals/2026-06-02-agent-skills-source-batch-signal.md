@@ -3,7 +3,7 @@ id: 2026-06-02-agent-skills-source-batch-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - agent-skills
   - procedural-memory
@@ -21,22 +21,7 @@ tools:
   - LangChain
   - MCP
 sources:
-  - https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
-  - https://agentskills.io/specification
-  - https://arxiv.org/abs/2510.26328
-  - https://github.blog/changelog/2025-12-18-github-copilot-now-supports-agent-skills/
-  - https://developers.openai.com/codex/skills
-  - https://developers.openai.com/blog/eval-skills
-  - https://devblogs.microsoft.com/foundry/dotnet-ai-skills-executor-azure-openai-mcp/
-  - https://arxiv.org/abs/2602.16653
-  - https://www.langchain.com/blog/langchain-skills
-  - https://developers.openai.com/blog/skills-agents-sdk
-  - https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/
-  - https://github.com/anthropics/skills
-  - https://github.com/openai/skills
-  - https://github.com/github/awesome-copilot
-  - https://github.com/langchain-ai/langchain-skills
-  - https://github.com/google/skills
+  - source-agent-skills-batch-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-agent-skills-source-batch-review.md

@@ -22,6 +22,20 @@
       "url": "http://127.0.0.1:3000"
     },
     {
+      "name": "pritha-voice-control",
+      "mode": "experimental-realtime-voice-ui",
+      "status": "experimental",
+      "script": "scripts/pritha-voice-control.mjs",
+      "url": "http://127.0.0.1:3401"
+    },
+    {
+      "name": "pritha-control-center",
+      "mode": "local-control-center",
+      "status": "experimental",
+      "script": "npm --prefix interfaces/control-center run dev",
+      "url": "http://127.0.0.1:3420"
+    },
+    {
       "name": "obsidian",
       "mode": "vault-ui",
       "status": "active"

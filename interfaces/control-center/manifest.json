@@ -1,0 +1,26 @@
+{
+  "id": "pritha-control-center",
+  "type": "interface",
+  "status": "experimental",
+  "created": "2026-06-04",
+  "updated": "2026-06-04",
+  "owner": "Techscope/Pritha",
+  "purpose": "Local web control center for Pritha and child agents: agents overview, voice control surface, settings-lite and read-only developer diagnostics.",
+  "runtime": {
+    "framework": "Next.js",
+    "entrypoint": "npm --prefix interfaces/control-center run dev",
+    "default_host": "127.0.0.1",
+    "default_port": 3000
+  },
+  "routes": ["/agents", "/voice", "/settings", "/dev"],
+  "privacy_boundary": {
+    "browser_must_not_receive": ["OPENAI_API_KEY", "private Codex outputs", "raw voice transcripts"],
+    "tracked_policy": "Do not commit real Tailscale URLs, tailnet names, device hostnames or local secrets."
+  },
+  "mvp_policy": {
+    "cron": "not-enabled",
+    "heartbeat": "not-enabled",
+    "launchd": "not-enabled",
+    "durable_actions": "confirmation-required-after-backend"
+  }
+}

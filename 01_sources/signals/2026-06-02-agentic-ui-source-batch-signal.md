@@ -3,7 +3,7 @@ id: 2026-06-02-agentic-ui-source-batch-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - agentic-ui
   - generative-ui
@@ -21,14 +21,7 @@ tools:
   - A2UI
   - ChatGPT Apps
 sources:
-  - https://www.nngroup.com/articles/service-design-evolve-ai-agents/
-  - https://www.copilotkit.ai/blog/introducing-ag-ui-the-protocol-where-agents-meet-users/
-  - https://shopify.engineering/mcp-ui-breaking-the-text-wall
-  - https://openai.com/index/introducing-apps-in-chatgpt/
-  - https://developers.googleblog.com/introducing-a2ui-an-open-project-for-agent-driven-interfaces/
-  - https://developers.googleblog.com/search/?author=Google+A2UI+Team
-  - https://modelcontextprotocol.io/docs/extensions/apps
-  - https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/
+  - source-agentic-ui-batch-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md

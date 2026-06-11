@@ -3,7 +3,7 @@ id: 2026-06-01-agent-connectivity-progressive-discovery-signal
 type: signal
 status: refined
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-11
 topics:
   - agent-connectivity
   - mcp
@@ -21,10 +21,6 @@ tools:
   - tool_search
 sources:
   - source-2635f0f7-bb58-4ec7-8c7e-6a344049208b
-  - https://modelcontextprotocol.io/development/roadmap
-  - https://modelcontextprotocol.io/community/skills-over-mcp/charter
-  - https://modelcontextprotocol.io/seps/2575-stateless-mcp
-  - https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1649
 related:
   workflows:
     - 07_workflows/privacy-preserving-intake.md
