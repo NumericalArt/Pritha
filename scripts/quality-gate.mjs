@@ -16,6 +16,7 @@ const jsonMode = args.has("--json");
 const markdownMode = args.has("--markdown");
 const dryRun = args.has("--dry-run");
 const strictEnv = args.has("--strict-env");
+const githubAnnotations = args.has("--github-annotations") || process.env.GITHUB_ACTIONS === "true";
 const profileIndex = argv.indexOf("--profile");
 const profile = profileIndex >= 0 ? argv[profileIndex + 1] || "full" : "full";
 const simulatedFailures = new Set(
@@ -141,6 +142,37 @@ function compact(text, max = 360) {
   return `${clean.slice(0, max - 3).trim()}...`;
 }
 
+function githubEscape(value, property = false) {
+  let text = String(value || "")
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
+  if (property) {
+    text = text.replaceAll(":", "%3A").replaceAll(",", "%2C");
+  }
+  return text;
+}
+
+function failureText(check) {
+  const lines = [
+    `${check.name} failed with exit code ${check.exitCode}.`,
+    `Command: ${check.command}`,
+  ];
+  if (check.stderr) lines.push(`stderr: ${compact(check.stderr, 1400)}`);
+  if (check.stdout) lines.push(`stdout: ${compact(check.stdout, 1400)}`);
+  if (check.error) lines.push(`error: ${check.error}`);
+  return lines.join("\n");
+}
+
+function printGitHubAnnotations() {
+  if (!githubAnnotations) return;
+  for (const check of failed) {
+    const title = githubEscape(`Quality gate failed: ${check.name}`, true);
+    const message = githubEscape(failureText(check));
+    console.error(`::error title=${title}::${message}`);
+  }
+}
+
 function printMarkdown() {
   console.log(`# Techscope Quality Gate: ${payload.status}`);
   console.log();
@@ -174,6 +206,8 @@ function printHuman() {
     const suffix = check.status === "planned" ? ` (${check.notes})` : ` (${check.durationMs}ms)`;
     console.log(`- ${check.status.toUpperCase()} ${check.name}${suffix}`);
     if (check.status === "fail") {
+      console.log(`  command: ${check.command}`);
+      console.log(`  exit: ${check.exitCode}`);
       if (check.stderr) console.log(`  stderr: ${check.stderr.split("\n").slice(-4).join(" | ")}`);
       if (check.stdout) console.log(`  stdout: ${check.stdout.split("\n").slice(-4).join(" | ")}`);
       if (check.error) console.log(`  error: ${check.error}`);
@@ -190,5 +224,6 @@ if (jsonMode) {
 }
 
 if (failed.length > 0) {
+  printGitHubAnnotations();
   process.exitCode = 1;
 }

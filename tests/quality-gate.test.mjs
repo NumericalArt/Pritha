@@ -40,6 +40,23 @@ test("quality-gate simulated failure returns a clear failing check", () => {
   assert.match(failed.stderr, /simulated failure for smoke-test/);
 });
 
+test("quality-gate emits GitHub annotations without breaking JSON output", () => {
+  const result = spawnSync("node", [
+    "scripts/quality-gate.mjs",
+    "--dry-run",
+    "--json",
+    "--github-annotations",
+    "--simulate-fail=smoke-test",
+  ], {
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.failed, 1);
+  assert.match(result.stderr, /::error title=Quality gate failed%3A Smoke test::/);
+  assert.match(result.stderr, /Command: node scripts\/smoke-test\.mjs/);
+});
+
 test("quality-gate markdown output includes a summary table", () => {
   const result = spawnSync("node", ["scripts/quality-gate.mjs", "--dry-run", "--markdown"], {
     encoding: "utf8",
