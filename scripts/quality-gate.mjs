@@ -142,6 +142,12 @@ function compact(text, max = 360) {
   return `${clean.slice(0, max - 3).trim()}...`;
 }
 
+function compactTail(text, max = 1400) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  return `...${clean.slice(-(max - 3)).trim()}`;
+}
+
 function githubEscape(value, property = false) {
   let text = String(value || "")
     .replaceAll("%", "%25")
@@ -158,8 +164,8 @@ function failureText(check) {
     `${check.name} failed with exit code ${check.exitCode}.`,
     `Command: ${check.command}`,
   ];
-  if (check.stderr) lines.push(`stderr: ${compact(check.stderr, 1400)}`);
-  if (check.stdout) lines.push(`stdout: ${compact(check.stdout, 1400)}`);
+  if (check.stderr) lines.push(`stderr tail: ${compactTail(check.stderr)}`);
+  if (check.stdout) lines.push(`stdout tail: ${compactTail(check.stdout)}`);
   if (check.error) lines.push(`error: ${check.error}`);
   return lines.join("\n");
 }
