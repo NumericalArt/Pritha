@@ -148,6 +148,31 @@ function compactTail(text, max = 1400) {
   return `...${clean.slice(-(max - 3)).trim()}`;
 }
 
+function failureContext(text, maxLines = 18) {
+  const lines = String(text || "").split(/\r?\n/);
+  const indexes = [];
+  lines.forEach((line, index) => {
+    if (/^\s*not ok\b/.test(line)
+      || /AssertionError|Error \[|ERR_|failureType|✖/.test(line)) {
+      indexes.push(index);
+    }
+  });
+  if (indexes.length === 0) return "";
+
+  const selected = [];
+  const seen = new Set();
+  for (const index of indexes.slice(0, 3)) {
+    const start = Math.max(0, index - 3);
+    const end = Math.min(lines.length, index + maxLines);
+    for (let i = start; i < end; i += 1) {
+      if (seen.has(i)) continue;
+      seen.add(i);
+      selected.push(lines[i]);
+    }
+  }
+  return selected.join("\n").trim();
+}
+
 function githubEscape(value, property = false) {
   let text = String(value || "")
     .replaceAll("%", "%25")
@@ -164,8 +189,12 @@ function failureText(check) {
     `${check.name} failed with exit code ${check.exitCode}.`,
     `Command: ${check.command}`,
   ];
-  if (check.stderr) lines.push(`stderr tail: ${compactTail(check.stderr)}`);
-  if (check.stdout) lines.push(`stdout tail: ${compactTail(check.stdout)}`);
+  const stderrContext = failureContext(check.stderr);
+  const stdoutContext = failureContext(check.stdout);
+  if (stderrContext) lines.push(`stderr failure context: ${compactTail(stderrContext, 2000)}`);
+  else if (check.stderr) lines.push(`stderr tail: ${compactTail(check.stderr)}`);
+  if (stdoutContext) lines.push(`stdout failure context: ${compactTail(stdoutContext, 2600)}`);
+  else if (check.stdout) lines.push(`stdout tail: ${compactTail(check.stdout)}`);
   if (check.error) lines.push(`error: ${check.error}`);
   return lines.join("\n");
 }
