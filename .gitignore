@@ -16,6 +16,7 @@ Untitled*.canvas
 .queue/
 .private/
 .memory-private/
+data/logs/
 .techscope-setup.json
 .obsidian/
 
@@ -33,6 +34,8 @@ Untitled*.canvas
 
 # Dependencies / caches
 node_modules/
+.next/
+*.tsbuildinfo
 __pycache__/
 *.py[cod]
 .pytest_cache/

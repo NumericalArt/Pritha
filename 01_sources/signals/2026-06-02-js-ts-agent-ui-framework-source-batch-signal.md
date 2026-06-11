@@ -3,7 +3,7 @@ id: 2026-06-02-js-ts-agent-ui-framework-source-batch-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - agentic-ui
   - frontend-frameworks
@@ -21,13 +21,7 @@ tools:
   - Angular
   - SolidJS
 sources:
-  - https://developer.microsoft.com/blog/langchainjs-for-beginners
-  - https://vercel.com/blog/ai-sdk-6
-  - https://ai-sdk.dev/docs/ai-sdk-ui/overview
-  - https://ai-sdk.dev/docs/ai-sdk-ui/chatbot
-  - https://developers.googleblog.com/introducing-agent-development-kit-for-typescript-build-ai-agents-with-the-power-of-a-code-first-approach/
-  - https://openai.github.io/openai-agents-js/
-  - https://mastra.ai/blog/choosing-a-js-agent-framework
+  - source-js-ts-agent-ui-framework-batch-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-js-ts-agent-ui-framework-source-batch-review.md

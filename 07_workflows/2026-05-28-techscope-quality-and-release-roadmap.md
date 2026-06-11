@@ -91,11 +91,11 @@ temporal_status: current
 
 # Roadmap: Techscope / Pritha Quality, Self-Testing & Open-Source Release
 
-Status: active — local phases 0-14 complete; external GitHub publication pending  
-Owner: Techscope / user  
-Started: 2026-05-28  
-Updated: 2026-05-28 (added Pritha rebrand + English release + secure-handoffs)  
-Runtime: Codex thread + local scripts + GitHub Actions  
+Status: active — local phases 0-14 complete; external GitHub publication pending
+Owner: Techscope / user
+Started: 2026-05-28
+Updated: 2026-05-28 (added Pritha rebrand + English release + secure-handoffs)
+Runtime: Codex thread + local scripts + GitHub Actions
 Supersedes: `07_workflows/2026-05-28-techscope-quality-audit-roadmap.md`
 
 ## Product identity (Pritha)
@@ -256,10 +256,10 @@ node scripts/self-test.mjs        # Phase 8 (Self-test)
 
 ## Phase 0 — Foundation: git, baseline, golden checks harness
 
-Status: complete  
-Risk: low  
-Depends on: —  
-Estimated effort: 1 Codex session  
+Status: complete
+Risk: low
+Depends on: —
+Estimated effort: 1 Codex session
 AM-pattern candidates: `audit-baseline-report`, `golden-checks-manifest`, `audit-log-append-only`
 
 ### Goal
@@ -301,10 +301,10 @@ AM-pattern candidates: `audit-baseline-report`, `golden-checks-manifest`, `audit
 
 ## Phase 1 — Portable root: убрать hardcoded paths
 
-Status: complete  
-Risk: medium (риск сломать launchd)  
-Depends on: Phase 0  
-Estimated effort: 1–2 Codex sessions  
+Status: complete
+Risk: medium (риск сломать launchd)
+Depends on: Phase 0
+Estimated effort: 1–2 Codex sessions
 AM-pattern candidates: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-aware-launchd-template`
 
 ### Goal
@@ -342,10 +342,10 @@ AM-pattern candidates: `TECHSCOPE_ROOT-env`, `path-portability-check`, `home-awa
 
 ## Phase 2 — Operational reality fix
 
-Status: complete  
-Risk: medium  
-Depends on: Phase 1  
-Estimated effort: 1 Codex session  
+Status: complete
+Risk: medium
+Depends on: Phase 1
+Estimated effort: 1 Codex session
 AM-pattern candidates: `incident-as-operations-report`, `external-fetch-backoff`, `repo-cruft-cleanup`
 
 ### Goal
@@ -376,10 +376,10 @@ AM-pattern candidates: `incident-as-operations-report`, `external-fetch-backoff`
 
 ## Phase 3 — Shared lib: устранение DRY-долга
 
-Status: complete  
-Risk: medium (риск parser-регрессий)  
-Depends on: Phase 0, Phase 2  
-Estimated effort: 2 Codex sessions (1 скрипт за подсессию)  
+Status: complete
+Risk: medium (риск parser-регрессий)
+Depends on: Phase 0, Phase 2
+Estimated effort: 2 Codex sessions (1 скрипт за подсессию)
 AM-pattern candidates: `scripts-lib-package`, `shared-frontmatter-parser`, `shared-env-loader`
 
 ### Goal
@@ -418,10 +418,10 @@ AM-pattern candidates: `scripts-lib-package`, `shared-frontmatter-parser`, `shar
 
 ## Phase 4 — Dogfooding: Techscope проходит свой harness
 
-Status: complete  
-Risk: low  
-Depends on: Phase 3  
-Estimated effort: 1–2 Codex sessions  
+Status: complete
+Risk: low
+Depends on: Phase 3
+Estimated effort: 1–2 Codex sessions
 AM-pattern candidates: `smoke-test-template`, `*-status-mjs-family`, `self-inspection-manifest`, `minimal-package-json`
 
 ### Goal
@@ -458,10 +458,10 @@ Techscope должен соответствовать тому harness profile, 
 
 ## Phase 5 — Test layer: regression safety net
 
-Status: complete  
-Risk: medium  
-Depends on: Phase 4  
-Estimated effort: 1–2 Codex sessions  
+Status: complete
+Risk: medium
+Depends on: Phase 4
+Estimated effort: 1–2 Codex sessions
 AM-pattern candidates: `node-test-harness`, `frontmatter-fixtures`, `scaffold-snapshot-tests`
 
 ### Goal
@@ -497,10 +497,10 @@ AM-pattern candidates: `node-test-harness`, `frontmatter-fixtures`, `scaffold-sn
 
 ## Phase 6 — Dependencies manifest + env doctor
 
-Status: complete  
-Risk: low  
-Depends on: Phase 1, Phase 4  
-Estimated effort: 1 Codex session  
+Status: complete
+Risk: low
+Depends on: Phase 1, Phase 4
+Estimated effort: 1 Codex session
 AM-pattern candidates: `prerequisites-md`, `env-doctor-mjs`, `python-requirements-pinned`
 
 ### Goal
@@ -534,10 +534,10 @@ AM-pattern candidates: `prerequisites-md`, `env-doctor-mjs`, `python-requirement
 
 ## Phase 7 — Quality gate: один зелёный/красный командой
 
-Status: complete  
-Risk: low  
-Depends on: Phase 4, Phase 5, Phase 6  
-Estimated effort: 1 Codex session  
+Status: complete
+Risk: low
+Depends on: Phase 4, Phase 5, Phase 6
+Estimated effort: 1 Codex session
 AM-pattern candidates: `quality-gate-mjs`, `audit-report-generator`, `phase-report-template`
 
 ### Goal
@@ -577,10 +577,10 @@ quality-gate.mjs
 
 ## Phase 8 — Self-test + proactive operational pulse
 
-Status: complete  
-Risk: medium (background-поведение)  
-Depends on: Phase 7  
-Estimated effort: 1–2 Codex sessions  
+Status: complete
+Risk: medium (background-поведение)
+Depends on: Phase 7
+Estimated effort: 1–2 Codex sessions
 AM-pattern candidates: `self-test-mjs`, `queue-health-mjs`, `scheduled-health-pulse`, `proactive-self-test-contract`
 
 ### Design constraints
@@ -616,10 +616,10 @@ AM-pattern candidates: `self-test-mjs`, `queue-health-mjs`, `scheduled-health-pu
 
 ## Phase 9 — `agents-mother.mjs` modularization
 
-Status: complete  
-Risk: high (3728-строчный monolith)  
-Depends on: Phase 5, Phase 7  
-Estimated effort: 2–4 Codex sessions  
+Status: complete
+Risk: high (3728-строчный monolith)
+Depends on: Phase 5, Phase 7
+Estimated effort: 2–4 Codex sessions
 AM-pattern candidates: `multi-module-cli`, `scaffold-template-modules`, `contract-validation-module`
 
 ### Goal
@@ -669,10 +669,10 @@ scripts/agents-mother.mjs # thin wrapper → import './agents-mother/index.mjs'
 
 ## Phase 10 — Pritha rebrand (Mother of Agents)
 
-Status: complete  
-Risk: high (cross-cutting rename; затрагивает CLI, манифесты, реестр, шаблоны)  
-Depends on: Phase 5 (tests), Phase 9 (modularization)  
-Estimated effort: 3–5 Codex sessions  
+Status: complete
+Risk: high (cross-cutting rename; затрагивает CLI, манифесты, реестр, шаблоны)
+Depends on: Phase 5 (tests), Phase 9 (modularization)
+Estimated effort: 3–5 Codex sessions
 AM-pattern candidates: `lineage-vocabulary`, `cli-rename-with-alias`, `seed-spec-format`, `genealogy-registry`, `brand-layer-separation`
 
 ### Goal
@@ -738,10 +738,10 @@ AM-pattern candidates: `lineage-vocabulary`, `cli-rename-with-alias`, `seed-spec
 
 ## Phase 11 — Open-source documentation pack (English-first)
 
-Status: complete  
-Risk: low  
-Depends on: Phase 7, Phase 10 (rebrand)  
-Estimated effort: 2 Codex sessions  
+Status: complete
+Risk: low
+Depends on: Phase 7, Phase 10 (rebrand)
+Estimated effort: 2 Codex sessions
 AM-pattern candidates: `oss-doc-pack`, `english-first-readme`, `getting-started-10-min`
 
 ### Goal
@@ -795,10 +795,10 @@ AM-pattern candidates: `oss-doc-pack`, `english-first-readme`, `getting-started-
 
 ## Phase 12 — First-run setup wizard (Codex-native bootstrap)
 
-Status: complete  
-Risk: medium (interactive flow, секреты, опциональные внешние установки)  
-Depends on: Phase 6 (env-doctor), Phase 7 (quality-gate), Phase 8 (self-test), Phase 10 (rebrand), Phase 11 (docs)  
-Estimated effort: 2–3 Codex sessions  
+Status: complete
+Risk: medium (interactive flow, секреты, опциональные внешние установки)
+Depends on: Phase 6 (env-doctor), Phase 7 (quality-gate), Phase 8 (self-test), Phase 10 (rebrand), Phase 11 (docs)
+Estimated effort: 2–3 Codex sessions
 AM-pattern candidates: `first-run-setup-workflow`, `connector-selection-dialog`, `setup-manifest`, `secrets-collector-pattern`, `tailscale-integration-detection`, `codex-cli-integration-check`, `trigger-phrase-routing`, `minimal-default-config`, `realtime-voice-opt-in`, `completed-with-warnings-status`
 
 ### Resolved decisions (locked 2026-05-28)
@@ -1051,10 +1051,10 @@ AM-pattern candidates: `first-run-setup-workflow`, `connector-selection-dialog`,
 
 ## Phase 13 — GitHub deploy: репозиторий + CI (English, Pritha)
 
-Status: complete-local; external GitHub publication pending  
-Risk: medium (риск утечки секретов и локальных путей при первом push)  
-Depends on: Phase 7, Phase 10 (rebrand), Phase 11 (docs), Phase 12 (wizard)  
-Estimated effort: 1–2 Codex sessions  
+Status: complete-local; external GitHub publication pending
+Risk: medium (риск утечки секретов и локальных путей при первом push)
+Depends on: Phase 7, Phase 10 (rebrand), Phase 11 (docs), Phase 12 (wizard)
+Estimated effort: 1–2 Codex sessions
 AM-pattern candidates: `github-quality-workflow`, `markdown-validate-workflow`, `release-please-config`, `setup-wizard-ci-smoke`, `secure-handoff-folder`, `local-path-scrub`
 
 ### Secure handoff (обязательно)
@@ -1103,10 +1103,10 @@ AM-pattern candidates: `github-quality-workflow`, `markdown-validate-workflow`, 
 
 ## Phase 14 — Pattern harvest и Pritha evolution
 
-Status: complete  
-Risk: low  
-Depends on: Phases 0–8 (можно параллельно с Phase 11–13)  
-Estimated effort: 1 Codex session  
+Status: complete
+Risk: low
+Depends on: Phases 0–8 (можно параллельно с Phase 11–13)
+Estimated effort: 1 Codex session
 AM-pattern candidates: все `AM-CANDIDATE`, накопленные в phase reports
 
 ### Goal

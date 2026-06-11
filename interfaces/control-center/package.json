@@ -1,0 +1,27 @@
+{
+  "name": "pritha-control-center",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname ${PRITHA_CONTROL_CENTER_HOST:-127.0.0.1} --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
+    "build": "next build",
+    "start": "next start --hostname ${PRITHA_CONTROL_CENTER_HOST:-127.0.0.1} --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lucide-react": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}

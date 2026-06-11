@@ -1,0 +1,2520 @@
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import type {
+  CapabilityStatus,
+  ControlCenterAgentControl,
+  ControlCenterCommandReadiness,
+  ControlCenterAgent,
+  ControlCenterCapabilities,
+  ControlCenterDiagnostics,
+  ControlCenterFleetManualAuditResult,
+  ControlCenterOperatorAction,
+  ControlCenterOperatorActionCheck,
+  ControlCenterOperatorActivityEntry,
+  ControlCenterOperatorActivityResponse,
+  ControlCenterOperatorActionPlan,
+  ControlCenterOperatorActionResult,
+  ControlCenterPreRestoreContract,
+  ControlCenterRestorePlan,
+  ControlCenterRollbackPlan,
+  ControlCenterSnapshotAuditEntry,
+  ControlCenterSnapshotAuditResponse,
+  ControlCenterSnapshotCreateRequest,
+  ControlCenterSnapshotCreateResult,
+  ControlCenterSnapshotCompare,
+  ControlCenterSnapshotPlan,
+  ControlCenterSnapshotRetentionPlan,
+  ControlCenterSnapshotRetentionRequest,
+  ControlCenterSnapshotRetentionResult,
+  ControlCenterSnapshotValidation,
+  ControlCenterStatus,
+} from "./types";
+import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
+
+type RegistryRecord = {
+  name: string;
+  mission: string;
+  runtime: string;
+  interface: string;
+  deployment: string;
+  proactivity: string;
+  evidence: string;
+};
+
+type OperationsCommand =
+  | string
+  | {
+      command?: string;
+      argv?: string[];
+      control_center_managed?: boolean;
+    };
+
+type OperationsManifest = {
+  agent?: string;
+  display_name?: string;
+  version?: string | number;
+  agent_version?: string | number;
+  app_version?: string | number;
+  assigned_version?: string | number;
+  service_mode?: string;
+  autostart?: string;
+  control_center_managed?: boolean;
+  start_command?: OperationsCommand;
+  stop_command?: OperationsCommand;
+  run_command?: OperationsCommand;
+  worker_command?: OperationsCommand;
+  schedule_command?: OperationsCommand;
+  local_upstream_url?: string;
+  health_url?: string;
+  healthcheck_command?: string;
+  external_url?: string;
+  tool_server?: boolean;
+  adapter_type?: string;
+  job_runner_command?: string;
+  job_runner_mode?: string;
+  proactivity?: {
+    mode?: string;
+    schedule?: string;
+  };
+};
+
+type LifecycleMetadata = ControlCenterAgent["lifecycle"] & {
+  version: string;
+  versionStatus: ControlCenterAgent["versionStatus"];
+  versionSource?: string;
+};
+
+type SnapshotRecord = {
+  id: string;
+  created?: string;
+  path: string;
+  schemaVersion?: string;
+  restoreMode?: string;
+};
+
+type SnapshotJson = {
+  schema_version?: string;
+  snapshot_id?: string;
+  id?: string;
+  agent_id?: string;
+  agent_name?: string;
+  created_at?: string;
+  created?: string;
+  source_profile?: string;
+  source_contract?: string;
+  agent_folder?: string;
+  restore?: {
+    mode?: string;
+    requires_confirmation?: boolean;
+    target?: string;
+    overwrite_existing_folder?: boolean;
+  };
+  privacy?: {
+    secrets_included?: boolean;
+    private_memory_included?: boolean;
+    runtime_queues_included?: boolean;
+    logs_included?: boolean;
+  };
+  contents?: {
+    includes?: unknown;
+    excludes?: unknown;
+    hashes?: unknown;
+  };
+};
+
+type SnapshotCompareOptions = {
+  base?: string;
+  target?: string;
+};
+
+type SnapshotRetentionCandidate = SnapshotRecord & {
+  absolutePath: string;
+  removalPath: string;
+  reason: string;
+};
+
+type OperatorActionAuditEntry = {
+  id: string;
+  timestamp: string;
+  actor: "pritha-control-center";
+  agentId: string;
+  agentName: string;
+  action: ControlCenterOperatorAction;
+  result: "passed" | "warnings" | "failed" | "planned-only";
+  target: string;
+  checks: {
+    passed: number;
+    warnings: number;
+    failed: number;
+  };
+};
+
+const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
+const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
+
+function resolveTechscopeRoot() {
+  if (process.env.TECHSCOPE_ROOT) return path.resolve(process.env.TECHSCOPE_ROOT);
+
+  let cursor = process.cwd();
+  for (let i = 0; i < 8; i += 1) {
+    if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "11_agents"))) return cursor;
+    const next = path.dirname(cursor);
+    if (next === cursor) break;
+    cursor = next;
+  }
+
+  return process.cwd();
+}
+
+function slug(value: string) {
+  return value
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function compactKey(value: string) {
+  return slug(value).replace(/-/g, "");
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeVersion(value: string | number | undefined | null) {
+  if (value === undefined || value === null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (!/^v?\d+(?:\.\d+){0,2}$/i.test(raw)) return null;
+  return raw.toLowerCase().startsWith("v") ? raw : `v${raw}`;
+}
+
+function relativePath(root: string, absolutePath: string) {
+  return path.relative(root, absolutePath).replace(/\\/g, "/");
+}
+
+function isPathInside(parent: string, child: string) {
+  const relative = path.relative(parent, child);
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function snapshotAuditLogPath(root: string) {
+  return path.join(root, ".snapshots", "audit", "child-agent-snapshot-actions.jsonl");
+}
+
+function snapshotAuditLogRelativePath(root: string) {
+  return relativePath(root, snapshotAuditLogPath(root));
+}
+
+function operatorActionAuditLogPath(root: string) {
+  return path.join(root, ".snapshots", "audit", "child-agent-operator-actions.jsonl");
+}
+
+function operatorActionAuditLogRelativePath(root: string) {
+  return relativePath(root, operatorActionAuditLogPath(root));
+}
+
+function firstLanIPv4() {
+  const interfaces = os.networkInterfaces();
+  for (const entries of Object.values(interfaces)) {
+    for (const entry of entries || []) {
+      if (entry.family === "IPv4" && !entry.internal) return entry.address;
+    }
+  }
+  return undefined;
+}
+
+function tailscaleSelfDnsName() {
+  const result = spawnSync("tailscale", ["status", "--json"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5_000,
+  });
+  if (result.status !== 0 || !result.stdout.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(result.stdout) as { Self?: { DNSName?: string } };
+    return parsed.Self?.DNSName?.replace(/\.$/, "");
+  } catch {
+    return undefined;
+  }
+}
+
+function tailscaleServeConfigured(tailscaleUrl: string) {
+  const result = spawnSync("tailscale", ["serve", "status"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5_000,
+  });
+  if (result.status !== 0) return false;
+  return result.stdout.includes(tailscaleUrl) && result.stdout.includes(`http://127.0.0.1:${APP_PORT}`);
+}
+
+function accessLinks() {
+  const lanIp = firstLanIPv4();
+  const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || tailscaleSelfDnsName();
+  const tailscaleUrl = dnsName ? `https://${dnsName}:${APP_PORT}` : undefined;
+  const serveConfigured = tailscaleUrl ? tailscaleServeConfigured(tailscaleUrl) : false;
+  return {
+    localhost: `http://127.0.0.1:${APP_PORT}`,
+    lanUrl: lanIp ? `http://${lanIp}:${APP_PORT}` : undefined,
+    tailscaleUrl,
+    tailscaleVoiceUrl: tailscaleUrl ? `${tailscaleUrl}/voice` : undefined,
+    tailscaleServeConfigured: serveConfigured,
+  };
+}
+
+function markdownFiles(root: string, segments: string[]) {
+  const directory = path.join(root, ...segments);
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory)
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => path.join(directory, entry))
+    .sort((a, b) => path.basename(b).localeCompare(path.basename(a)));
+}
+
+function fileMatchesAgent(filePath: string, agentName: string) {
+  const name = path.basename(filePath, ".md");
+  const agentSlug = slug(agentName);
+  const agentCompact = compactKey(agentName);
+  const fileSlug = slug(name);
+  const fileCompact = compactKey(name);
+  return fileSlug.includes(agentSlug) || fileCompact.includes(agentCompact);
+}
+
+function readText(filePath: string) {
+  try {
+    return readFileSync(filePath, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function frontmatter(text: string) {
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  return match?.[1] || "";
+}
+
+function scalarValue(text: string, key: string) {
+  const match = text.match(new RegExp(`^${escapeRegExp(key)}:\\s*(.+)$`, "im"));
+  return match?.[1]?.trim().replace(/^["']|["']$/g, "");
+}
+
+function numberValue(text: string, key: string) {
+  const raw = scalarValue(text, key);
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function bodyFieldValue(text: string, field: string) {
+  const match = text.match(new RegExp(`^-\\s*${escapeRegExp(field)}:\\s*(.+)$`, "im"));
+  return match?.[1]?.trim().replace(/`/g, "");
+}
+
+function explicitVersionFromText(text: string, agentName: string) {
+  const versionPattern = "\\bv\\d+(?:\\.\\d+){0,2}\\b";
+  const agentPattern = escapeRegExp(agentName);
+  const front = frontmatter(text);
+  const candidates = [
+    scalarValue(front, "assigned_version"),
+    scalarValue(front, "agent_version"),
+    scalarValue(front, "version"),
+    bodyFieldValue(text, "Assigned version"),
+    bodyFieldValue(text, "Agent version"),
+    bodyFieldValue(text, "Version"),
+  ];
+
+  for (const candidate of candidates) {
+    const version = normalizeVersion(candidate);
+    if (version) return version;
+  }
+
+  const evidenceLines = [
+    scalarValue(front, "source_version"),
+    scalarValue(front, "valid_for"),
+    ...text.split(/\r?\n/).filter((line) => new RegExp(agentPattern, "i").test(line) && new RegExp(versionPattern, "i").test(line)),
+  ].filter(Boolean) as string[];
+
+  for (const line of evidenceLines) {
+    const version = line.match(new RegExp(versionPattern, "i"))?.[0];
+    if (version) return normalizeVersion(version);
+  }
+
+  return null;
+}
+
+function findProfile(root: string, agent: RegistryRecord) {
+  const profiles = markdownFiles(root, ["11_agents", "profiles"]);
+  return profiles.find((file) => fileMatchesAgent(file, agent.name)) || null;
+}
+
+function findContract(root: string, agent: RegistryRecord) {
+  const contracts = markdownFiles(root, ["11_agents", "contracts"]).filter((file) => fileMatchesAgent(file, agent.name));
+  return contracts[0] || null;
+}
+
+function findReports(root: string, agent: RegistryRecord) {
+  return markdownFiles(root, ["11_agents", "reports"])
+    .filter((file) => fileMatchesAgent(file, agent.name))
+    .slice(0, 8);
+}
+
+function resolveProfilePath(root: string, value: string | undefined) {
+  if (!value) return null;
+  return path.isAbsolute(value) ? value : path.join(root, value);
+}
+
+function resolveRelativePath(root: string, value: string | undefined) {
+  if (!value) return null;
+  return path.isAbsolute(value) ? value : path.join(root, value);
+}
+
+function metadataPathForSnapshot(root: string, storePath: string, snapshotId: string) {
+  return path.join(resolveRelativePath(root, storePath) || path.join(root, ".snapshots", "child-agents"), snapshotId, "snapshot.json");
+}
+
+function profileSnapshotStore(agent: ControlCenterAgent) {
+  return agent.lifecycle.snapshots.storePath || `.snapshots/child-agents/${agent.id}`;
+}
+
+function defaultSnapshotId(date = new Date()) {
+  return date.toISOString().replace(/[:.]/g, "-");
+}
+
+function safeSnapshotId(value: string | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes("..") || trimmed.includes("/") || trimmed.includes("\\")) return null;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function projectRelativeAgentFolder(agent: ControlCenterAgent) {
+  const folderName = agent.folder.name || agent.name.replace(/\s+/g, "");
+  return `../${folderName}`;
+}
+
+function snapshotIncludeCandidates(root: string, agent: ControlCenterAgent) {
+  if (!agent.folder.name) return [];
+  const folderPath = path.join(root, "..", agent.folder.name);
+  const candidates = [
+    "AGENTS.md",
+    "README.md",
+    ".env.example",
+    "package.json",
+    "interfaces/manifest.json",
+    "memory/manifest.json",
+    "tools/manifest.json",
+    "operations/manifest.json",
+  ];
+
+  return candidates
+    .map((candidate) => ({ candidate, absolutePath: path.join(folderPath, candidate) }))
+    .filter((candidate) => existsSync(candidate.absolutePath))
+    .map((candidate) => `${projectRelativeAgentFolder(agent)}/${candidate.candidate}`);
+}
+
+function snapshotPlanStatus(agent: ControlCenterAgent): ControlCenterAgent["lifecycle"]["snapshotPlan"] {
+  if (agent.folder.status !== "present") {
+    return {
+      status: "unavailable",
+      endpoint: `/api/agents/${agent.id}/snapshot-plan`,
+      reason: "Cannot plan a snapshot for a missing child-agent folder",
+    };
+  }
+  if (agent.lifecycle.profile.status !== "ready") {
+    return {
+      status: "unavailable",
+      endpoint: `/api/agents/${agent.id}/snapshot-plan`,
+      reason: "Cannot plan a snapshot without a canonical child-agent profile",
+    };
+  }
+  return {
+    status: "manual_only",
+    endpoint: `/api/agents/${agent.id}/snapshot-plan`,
+    reason: "Read-only snapshot draft can be generated; writing requires a future confirmation gate",
+  };
+}
+
+function snapshotValidationStatus(agent: ControlCenterAgent): ControlCenterAgent["lifecycle"]["snapshotValidation"] {
+  if (agent.lifecycle.snapshots.status === "unavailable") {
+    return {
+      status: "unavailable",
+      endpoint: `/api/agents/${agent.id}/snapshot-validation`,
+      valid: false,
+      issueCount: 1,
+      checkedFiles: 0,
+      reason: agent.lifecycle.snapshots.reason || "Snapshot metadata store is not present",
+    };
+  }
+
+  return {
+    status: "ready",
+    endpoint: `/api/agents/${agent.id}/snapshot-validation`,
+    valid: true,
+    issueCount: 0,
+    checkedFiles: agent.lifecycle.snapshots.count,
+    reason: agent.lifecycle.snapshots.count ? "Snapshot metadata files can be validated" : "Snapshot metadata store is empty",
+  };
+}
+
+function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = ""): ControlCenterAgent["lifecycle"]["snapshots"] {
+  const profileStore = resolveProfilePath(root, scalarValue(profileFrontmatter, "snapshot_store") || undefined);
+  const retention = numberValue(profileFrontmatter, "snapshot_retention");
+  const candidates = [
+    ...(profileStore ? [profileStore] : []),
+    path.join(root, ".snapshots", "child-agents", agentId),
+    path.join(root, ".snapshots", "child-agents", compactKey(agentId)),
+  ];
+  const store = candidates.find((candidate) => existsSync(candidate));
+  if (!store) {
+    return {
+      status: "unavailable",
+      count: 0,
+      retention,
+      storePath: profileStore ? relativePath(root, profileStore) : undefined,
+      reason: "Snapshot metadata store is not present",
+    };
+  }
+
+  const snapshots: SnapshotRecord[] = [];
+  for (const entry of readdirSync(store)) {
+    const entryPath = path.join(store, entry);
+    const stat = statSync(entryPath);
+    const metadataPath = stat.isDirectory() ? path.join(entryPath, "snapshot.json") : entryPath;
+    if (!metadataPath.endsWith(".json") || !existsSync(metadataPath)) continue;
+    const metadata = readJson<{
+      id?: string;
+      snapshot_id?: string;
+      created?: string;
+      created_at?: string;
+      schema_version?: string;
+      restore?: {
+        mode?: string;
+      };
+    }>(metadataPath);
+    snapshots.push({
+      id: metadata?.snapshot_id || metadata?.id || path.basename(entryPath, ".json"),
+      created: metadata?.created || metadata?.created_at || stat.mtime.toISOString(),
+      path: relativePath(root, metadataPath),
+      schemaVersion: metadata?.schema_version,
+      restoreMode: metadata?.restore?.mode,
+    });
+  }
+
+  snapshots.sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
+
+  return {
+    status: "ready",
+    count: snapshots.length,
+    retention,
+    storePath: relativePath(root, store),
+    latestId: snapshots[0]?.id,
+    latestCreated: snapshots[0]?.created,
+    reason: snapshots.length ? undefined : "Snapshot metadata store is empty",
+    items: snapshots,
+  };
+}
+
+function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: OperationsManifest | null, folderPresent: boolean): LifecycleMetadata {
+  const profilePath = findProfile(root, agent);
+  const profileText = profilePath ? readText(profilePath) : "";
+  const profileFront = frontmatter(profileText);
+  const contractPath = findContract(root, agent);
+  const reportPaths = findReports(root, agent);
+  const readableVersionSources = [
+    ...(profilePath ? [profilePath] : []),
+    ...reportPaths,
+    ...(contractPath ? [contractPath] : []),
+  ];
+
+  let version: string | null = normalizeVersion(manifest?.assigned_version || manifest?.agent_version || manifest?.app_version);
+  let versionSource = version ? "operations/manifest.json" : undefined;
+
+  for (const file of readableVersionSources) {
+    if (version) break;
+    const candidate = explicitVersionFromText(file === profilePath ? profileText : readText(file), agent.name);
+    if (candidate) {
+      version = candidate;
+      versionSource = relativePath(root, file);
+    }
+  }
+
+  const snapshots = snapshotsForAgent(root, slug(agent.name), profileFront);
+  const hasRollbackCapableSnapshot = snapshots.items?.some((item) => item.restoreMode && item.restoreMode !== "metadata-only") || false;
+  const rollback =
+    hasRollbackCapableSnapshot
+      ? {
+          status: "ready" as const,
+          planAvailable: true,
+          reason: "Rollback-capable snapshot metadata is available; rollback still requires confirmation endpoint",
+        }
+      : snapshots.count > 0
+        ? {
+            status: "unavailable" as const,
+            planAvailable: false,
+            reason: "Only metadata-only snapshots are available; rollback is not enabled",
+          }
+      : {
+          status: "unavailable" as const,
+          planAvailable: false,
+          reason: snapshots.reason || "No snapshots available for rollback",
+        };
+  const restorePlan =
+    !folderPresent && contractPath
+      ? {
+          status: "ready" as const,
+          endpoint: `/api/agents/${slug(agent.name)}/restore-plan`,
+          reason: "Missing folder can be reconstructed from contract and lifecycle reports after confirmation",
+        }
+      : folderPresent
+        ? {
+            status: "unavailable" as const,
+            reason: "Folder is present; restore is not applicable",
+          }
+        : {
+            status: "unavailable" as const,
+            reason: "No contract found for guided restore",
+        };
+  const baseLifecycle = {
+    profile: profilePath
+      ? { status: "ready" as const, path: relativePath(root, profilePath) }
+      : { status: "unavailable" as const, reason: "No child agent profile found" },
+    contract: contractPath
+      ? { status: "ready" as const, path: relativePath(root, contractPath) }
+      : { status: "unavailable" as const, reason: "No agent contract found" },
+    reports: {
+      status: reportPaths.length ? ("ready" as const) : ("unavailable" as const),
+      count: reportPaths.length,
+      latest: reportPaths[0] ? relativePath(root, reportPaths[0]) : undefined,
+      paths: reportPaths.map((file) => relativePath(root, file)),
+    },
+    snapshots,
+    rollback,
+    restorePlan,
+  };
+  const agentForLifecycleStatus = {
+    id: slug(agent.name),
+    name: agent.name,
+    folder: { status: folderPresent ? ("present" as const) : ("missing" as const) },
+    lifecycle: baseLifecycle,
+  } as ControlCenterAgent;
+
+  return {
+    version: version || "v?",
+    versionStatus: version ? "ready" : "unavailable",
+    versionSource,
+    ...baseLifecycle,
+    snapshotPlan: snapshotPlanStatus(agentForLifecycleStatus),
+    snapshotValidation: snapshotValidationStatus(agentForLifecycleStatus),
+  };
+}
+
+function readJson<T>(filePath: string): T | null {
+  try {
+    if (!existsSync(filePath)) return null;
+    return JSON.parse(readFileSync(filePath, "utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+function auditEntryId(timestamp: string, agentId: string, action: string) {
+  return `${timestamp.replace(/[:.]/g, "-")}-${agentId}-${action}`;
+}
+
+function appendSnapshotAuditEntry(root: string, entry: ControlCenterSnapshotAuditEntry) {
+  const logPath = snapshotAuditLogPath(root);
+  mkdirSync(path.dirname(logPath), { recursive: true });
+  appendFileSync(logPath, `${JSON.stringify(entry)}\n`, "utf8");
+}
+
+function appendOperatorActionAuditEntry(root: string, entry: OperatorActionAuditEntry) {
+  const logPath = operatorActionAuditLogPath(root);
+  mkdirSync(path.dirname(logPath), { recursive: true });
+  appendFileSync(logPath, `${JSON.stringify(entry)}\n`, "utf8");
+}
+
+function readOperatorActionAuditEntries(root: string, limit = 12): { entries: ControlCenterOperatorActivityEntry[]; corruptLines: number; exists: boolean } {
+  const logPath = operatorActionAuditLogPath(root);
+  if (!existsSync(logPath)) return { entries: [], corruptLines: 0, exists: false };
+
+  let corruptLines = 0;
+  const entries = readText(logPath)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-250)
+    .flatMap((line) => {
+      try {
+        const entry = JSON.parse(line) as OperatorActionAuditEntry;
+        return [
+          {
+            id: entry.id,
+            timestamp: entry.timestamp,
+            agentId: entry.agentId,
+            agentName: entry.agentName,
+            action: entry.action,
+            result: entry.result,
+            target: entry.target,
+            checks: entry.checks,
+          },
+        ];
+      } catch {
+        corruptLines += 1;
+        return [];
+      }
+    })
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, limit);
+
+  return { entries, corruptLines, exists: true };
+}
+
+function readSnapshotAuditEntries(root: string, agent: ControlCenterAgent, limit = 20) {
+  const logPath = snapshotAuditLogPath(root);
+  const entries: ControlCenterSnapshotAuditEntry[] = [];
+  if (existsSync(logPath)) {
+    const lines = readText(logPath)
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(-250);
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as ControlCenterSnapshotAuditEntry;
+        if (entry.agentId === agent.id) entries.push(entry);
+      } catch {
+        // Corrupt audit lines are ignored here and surfaced as a warning by the reader.
+      }
+    }
+  }
+
+  const explicitTargets = new Set(entries.map((entry) => entry.target));
+  const derivedEntries = snapshotItems(agent)
+    .filter((item) => !explicitTargets.has(item.path))
+    .map<ControlCenterSnapshotAuditEntry>((item) => ({
+      id: `derived-${agent.id}-${item.id}`,
+      timestamp: item.created || new Date(0).toISOString(),
+      actor: "pritha-control-center",
+      agentId: agent.id,
+      agentName: agent.name,
+      action: "snapshot-create",
+      mode: "derived",
+      result: "derived",
+      target: item.path,
+      source: "snapshot-metadata",
+      details: {
+        snapshotId: item.id,
+        note: "Snapshot metadata existed before the operator audit log was enabled.",
+      },
+    }));
+
+  return [...entries, ...derivedEntries].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, limit);
+}
+
+function parseTableLine(line: string) {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function parseRegistry(root: string) {
+  const registryPath = path.join(root, "11_agents", "registry.md");
+  if (!existsSync(registryPath)) return { registryPath, records: [] as RegistryRecord[] };
+
+  const text = readFileSync(registryPath, "utf8");
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === "## Agents");
+  if (start === -1) return { registryPath, records: [] as RegistryRecord[] };
+
+  const tableLines = lines.slice(start + 1).filter((line) => line.trim().startsWith("|"));
+  const rows = tableLines.slice(2);
+  const records = rows
+    .map(parseTableLine)
+    .filter((cells) => cells.length >= 7)
+    .map(([name, mission, runtime, iface, deployment, proactivity, evidence]) => ({
+      name,
+      mission,
+      runtime,
+      interface: iface,
+      deployment,
+      proactivity,
+      evidence,
+    }));
+
+  return { registryPath, records };
+}
+
+function siblingFolders(root: string) {
+  const parent = path.dirname(root);
+  try {
+    return readdirSync(parent)
+      .map((entry) => {
+        const absolutePath = path.join(parent, entry);
+        return { name: entry, absolutePath };
+      })
+      .filter((entry) => {
+        try {
+          return statSync(entry.absolutePath).isDirectory() && !entry.name.startsWith(".");
+        } catch {
+          return false;
+        }
+      });
+  } catch {
+    return [];
+  }
+}
+
+function findSiblingFolder(root: string, agentName: string) {
+  const expected = compactKey(agentName);
+  const folders = siblingFolders(root);
+  return folders.find((folder) => compactKey(folder.name) === expected) || null;
+}
+
+function localHealthUrls(manifest: OperationsManifest | null) {
+  const urls = new Set<string>();
+  if (manifest?.health_url) urls.add(manifest.health_url);
+  if (manifest?.local_upstream_url) {
+    const base = manifest.local_upstream_url.replace(/\/$/, "");
+    urls.add(`${base}/api/health`);
+    urls.add(`${base}/health`);
+    urls.add(base);
+  }
+  return [...urls].filter((url) => /^http:\/\/(127\.0\.0\.1|localhost):\d+/.test(url));
+}
+
+async function probeHealth(manifest: OperationsManifest | null) {
+  const urls = localHealthUrls(manifest);
+  if (urls.length === 0) return { status: "unknown" as const, detail: "No local health URL available" };
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+        signal: AbortSignal.timeout(650),
+      });
+      if (response.ok) return { status: "ok" as const, checkedUrl: url, detail: `HTTP ${response.status}` };
+    } catch {
+      // Try the next health candidate.
+    }
+  }
+
+  return { status: "failed" as const, checkedUrl: urls[0], detail: "Local endpoint did not respond" };
+}
+
+function operationsStatus(manifest: OperationsManifest | null): CapabilityStatus {
+  if (!manifest) return "not_installed";
+  if (
+    !manifest.start_command &&
+    !manifest.stop_command &&
+    !manifest.run_command &&
+    !manifest.worker_command &&
+    !manifest.schedule_command &&
+    !manifest.job_runner_command &&
+    !manifest.local_upstream_url
+  ) {
+    return "failed";
+  }
+  return "ready";
+}
+
+function commandText(command: OperationsCommand | undefined) {
+  if (!command) return "";
+  if (typeof command === "string") return command;
+  return command.command || command.argv?.join(" ") || "";
+}
+
+function classifyCommandReadiness(command: OperationsCommand | undefined): ControlCenterCommandReadiness {
+  if (!command) return "missing";
+  if (typeof command !== "string") {
+    return command.control_center_managed && (command.command || command.argv?.length) ? "structured_executable" : "legacy_declared";
+  }
+
+  const text = command.toLowerCase();
+  if (/\bctrl-?c\b/.test(text) || /\bterminate\b/.test(text) || /\bmanual\b/.test(text) || /\bor\b/.test(text)) {
+    return "human_instruction";
+  }
+  return "legacy_declared";
+}
+
+function readinessLabel(readiness: ControlCenterCommandReadiness) {
+  if (readiness === "structured_executable") return "structured executable";
+  if (readiness === "human_instruction") return "human instruction";
+  if (readiness === "legacy_declared") return "legacy declared";
+  return "missing";
+}
+
+function isLocalUrl(url: string | undefined) {
+  return !url || /^http:\/\/(127\.0\.0\.1|localhost):\d+/.test(url);
+}
+
+function isExternalDeployment(record: RegistryRecord, manifest: OperationsManifest | null) {
+  const deployment = `${record.deployment} ${manifest?.external_url || ""}`.toLowerCase();
+  return /\b(vps|cloud|external|remote|hosted)\b/.test(deployment) || !isLocalUrl(manifest?.health_url);
+}
+
+function hasAgentHarness(folder: { absolutePath: string } | null) {
+  return Boolean(folder && (existsSync(path.join(folder.absolutePath, "AGENTS.md")) || existsSync(path.join(folder.absolutePath, "CLAUDE.md"))));
+}
+
+function hasScheduledWork(record: RegistryRecord, manifest: OperationsManifest | null) {
+  const text = `${record.proactivity} ${manifest?.proactivity?.mode || ""} ${manifest?.proactivity?.schedule || ""} ${manifest?.job_runner_mode || ""}`.toLowerCase();
+  return Boolean(manifest?.schedule_command || manifest?.job_runner_command || /\b(cron|schedule|scheduled|queue-watcher|heartbeat)\b/.test(text));
+}
+
+function classifyRuntime(
+  record: RegistryRecord,
+  folder: { absolutePath: string } | null,
+  manifest: OperationsManifest | null,
+  lifecycle: LifecycleMetadata,
+): ControlCenterAgentControl["runtimeKind"] {
+  if (isExternalDeployment(record, manifest)) return "external_service";
+  if (!folder && (lifecycle.profile.status === "ready" || lifecycle.contract.status === "ready")) return "scaffold";
+  if (manifest?.local_upstream_url) return "web_service";
+  if (manifest?.tool_server || /\bmcp\b|\btool\b/.test(record.interface.toLowerCase())) return "tool_server";
+  if (manifest?.adapter_type || /\btelegram\b|\bvoice adapter\b|\bemail\b/.test(record.interface.toLowerCase())) return "interface_adapter";
+  if (hasScheduledWork(record, manifest) && !manifest?.local_upstream_url) return "scheduled_job";
+  if (manifest?.worker_command || manifest?.run_command || manifest?.job_runner_command) return "cli_worker";
+  if (hasAgentHarness(folder) || /\bcodex\b/.test(`${record.runtime} ${record.interface}`.toLowerCase())) return "codex_project";
+  return "unknown";
+}
+
+function controlOwnership(runtimeKind: ControlCenterAgentControl["runtimeKind"], folderPresent: boolean, manifest: OperationsManifest | null): ControlCenterAgentControl["ownership"] {
+  if (runtimeKind === "external_service") return "external";
+  if (!folderPresent || runtimeKind === "scaffold") return "none";
+  if (manifest?.control_center_managed) return "managed";
+  if (manifest?.local_upstream_url || manifest?.start_command || manifest?.stop_command) return "adoptable";
+  return "unmanaged";
+}
+
+function agentUiState(folderPresent: boolean, manifest: OperationsManifest | null, healthStatus: "ok" | "failed" | "unknown" | "not_checked") {
+  if (!folderPresent) return { state: "missing" as const, activity: "unknown" as const };
+  if (!manifest || operationsStatus(manifest) === "failed") return { state: "needs-check" as const, activity: "unknown" as const };
+  return { state: "alive" as const, activity: healthStatus === "ok" ? ("active" as const) : ("inactive" as const) };
+}
+
+function buildAgentControl(
+  record: RegistryRecord,
+  folder: { absolutePath: string } | null,
+  manifest: OperationsManifest | null,
+  lifecycle: LifecycleMetadata,
+  state: ControlCenterAgent["ui"]["state"],
+  activity: ControlCenterAgent["ui"]["activity"],
+): ControlCenterAgentControl {
+  const runtimeKind = classifyRuntime(record, folder, manifest, lifecycle);
+  const commandReadiness = {
+    start: classifyCommandReadiness(manifest?.start_command),
+    stop: classifyCommandReadiness(manifest?.stop_command),
+  };
+  const ownership = controlOwnership(runtimeKind, Boolean(folder), manifest);
+  const base = {
+    runtimeKind,
+    ownership,
+    executionMode: "plan_only" as const,
+    commandReadiness,
+  };
+
+  if (state === "missing" || runtimeKind === "scaffold") {
+    return {
+      ...base,
+      primaryCardAction: "restore_plan",
+      planAction: "restore",
+      label: "Restore Plan",
+      reason: "Folder is missing or scaffold-only; restore remains a read-only plan.",
+    };
+  }
+  if (state === "needs-check") {
+    return {
+      ...base,
+      primaryCardAction: "run_check",
+      planAction: "check",
+      executionMode: "manual_only",
+      label: "Run Check",
+      reason: "Operations metadata needs review before runtime controls can be planned.",
+    };
+  }
+  if (runtimeKind === "codex_project") {
+    return {
+      ...base,
+      primaryCardAction: "run_check",
+      planAction: "check",
+      executionMode: "manual_only",
+      label: "Run Check",
+      reason: "Codex-native project agents use diagnostics or Codex tasks, not generic Start/Stop.",
+    };
+  }
+  if (runtimeKind === "scheduled_job") {
+    return {
+      ...base,
+      primaryCardAction: "run_now",
+      planAction: "check",
+      executionMode: "manual_only",
+      label: "Run Now",
+      reason: "Scheduled agents should expose run/pause/resume controls instead of generic Start/Stop.",
+    };
+  }
+  if (runtimeKind === "web_service" && activity === "active") {
+    return {
+      ...base,
+      primaryCardAction: "stop_plan",
+      planAction: "stop",
+      label: "Stop Plan",
+      reason: "A local service is active, but C.11 only exposes a read-only stop plan.",
+    };
+  }
+  if (runtimeKind === "web_service") {
+    return {
+      ...base,
+      primaryCardAction: "start_plan",
+      planAction: "start",
+      label: "Start Plan",
+      reason: "A local service manifest exists, but C.11 only exposes a read-only start plan.",
+    };
+  }
+  return {
+    ...base,
+    primaryCardAction: "run_check",
+    planAction: "check",
+    executionMode: "manual_only",
+    label: "Run Check",
+    reason: "Runtime class is unknown or unmanaged; only diagnostics are enabled.",
+  };
+}
+
+function legacyPlanAction(control: ControlCenterAgentControl): ControlCenterAgent["ui"]["primaryAction"] {
+  return control.planAction || "check";
+}
+
+function issueText(folderPresent: boolean, manifest: OperationsManifest | null, healthStatus: "ok" | "failed" | "unknown" | "not_checked") {
+  if (!folderPresent) return "Folder not found";
+  if (!manifest) return "Operations manifest not installed";
+  if (operationsStatus(manifest) === "failed") return "Manifest is missing required operation fields";
+  if (healthStatus === "failed") return "Healthcheck endpoint unavailable";
+  if (healthStatus === "unknown") return "No local health endpoint";
+  return undefined;
+}
+
+async function buildAgent(root: string, record: RegistryRecord): Promise<ControlCenterAgent> {
+  const folder = findSiblingFolder(root, record.name);
+  const manifest = folder ? readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")) : null;
+  const health = folder ? await probeHealth(manifest) : { status: "not_checked" as const, detail: "Missing folder" };
+  const uiState = agentUiState(Boolean(folder), manifest, health.status);
+  const operations = operationsStatus(manifest);
+  const localUrl = manifest?.local_upstream_url;
+  const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
+  const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity);
+
+  return {
+    id: slug(record.name),
+    name: record.name,
+    mission: record.mission,
+    runtime: record.runtime,
+    interface: record.interface,
+    deployment: record.deployment,
+    proactivity: record.proactivity,
+    evidence: record.evidence,
+    version: lifecycle.version,
+    versionStatus: lifecycle.versionStatus,
+    versionSource: lifecycle.versionSource,
+    folder: folder
+      ? {
+          status: "present",
+          name: folder.name,
+          relativePath: path.relative(root, folder.absolutePath),
+        }
+      : { status: "missing" },
+    operations: {
+      status: operations,
+      serviceMode: manifest?.service_mode,
+      autostart: manifest?.autostart,
+      startAvailable: Boolean(manifest?.start_command),
+      stopAvailable: Boolean(manifest?.stop_command),
+      localUrl,
+      healthcheckCommand: manifest?.healthcheck_command,
+      issue: operations === "failed" ? "Manifest is missing required operation fields" : undefined,
+    },
+    health,
+    url: localUrl
+      ? { status: "available", local: localUrl }
+      : { status: "unavailable", reason: folder ? "No local URL in operations manifest" : "Missing folder" },
+    ui: {
+      ...uiState,
+      primaryAction: legacyPlanAction(control),
+      actionEnabled: false,
+      actionDisabledReason: control.reason,
+      issueText: issueText(Boolean(folder), manifest, health.status),
+      updateStatus: "none",
+    },
+    control,
+    lifecycle,
+  };
+}
+
+function snapshotsStatus(root: string): CapabilityStatus {
+  return existsSync(path.join(root, ".snapshots", "child-agents")) ? "ready" : "unavailable";
+}
+
+type VoiceRuntimeStatus = ReturnType<typeof getPrithaRealtimeStatus>;
+
+function voiceRealtimeCapability(voiceRuntime: VoiceRuntimeStatus): CapabilityStatus {
+  return voiceRuntime.openai_key_configured ? "ready" : "pending_auth";
+}
+
+function capabilities(root: string, registryReady: boolean, agents: ControlCenterAgent[], voiceRuntime: VoiceRuntimeStatus): ControlCenterCapabilities {
+  const anyOperationsReady = agents.some((agent) => agent.operations.status === "ready");
+  const anyRestorePlan = agents.some((agent) => agent.lifecycle.restorePlan.status === "ready");
+  const anyRollbackPlan = agents.some((agent) => agent.lifecycle.rollback.planAvailable);
+  const memoryToolReady = voiceRuntime.memory.sqlite || voiceRuntime.memory.sqlite_cli;
+  return {
+    agents_registry: registryReady ? "ready" : "not_installed",
+    sibling_scan: "ready",
+    operations_manifest: anyOperationsReady ? "ready" : "not_installed",
+    start_stop: "planned",
+    restore: anyRestorePlan ? "manual_only" : "planned",
+    snapshots: snapshotsStatus(root),
+    rollback: anyRollbackPlan ? "manual_only" : "unavailable",
+    update_suggestions: "planned",
+    voice_realtime: voiceRealtimeCapability(voiceRuntime),
+    voice_tools: memoryToolReady ? "ready" : "failed",
+    codex_bridge: voiceRuntime.codex.available ? "ready" : "manual_only",
+    codex_limits: "unavailable",
+    api_usage: "unavailable",
+    proactivity: "manual_only",
+    cron_adapter: "not_installed",
+    phone_access_lan: "unavailable",
+    phone_access_tailscale: "pending_auth",
+    developer_diagnostics: "ready",
+  };
+}
+
+function latestReports(root: string) {
+  const reportsDir = path.join(root, "11_agents", "reports");
+  if (!existsSync(reportsDir)) return [];
+  return readdirSync(reportsDir)
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => {
+      const absolutePath = path.join(reportsDir, entry);
+      const stat = statSync(absolutePath);
+      return {
+        title: entry,
+        path: path.relative(root, absolutePath),
+        updated: stat.mtime.toISOString(),
+        type: entry.includes("self-test")
+          ? "self_test"
+          : entry.includes("evolution") || entry.includes("post-creation")
+            ? "evolution"
+            : entry.includes("audit")
+              ? "audit"
+              : entry.includes("recovery")
+                ? "recovery"
+                : "registry",
+      };
+    })
+    .sort((a, b) => b.updated.localeCompare(a.updated))
+    .slice(0, 8);
+}
+
+export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
+  const root = resolveTechscopeRoot();
+  const registry = parseRegistry(root);
+  const allAgents = await Promise.all(registry.records.map((record) => buildAgent(root, record)));
+  const childAgents = allAgents.filter((agent) => agent.name !== "Techscope");
+  const voiceRuntime = getPrithaRealtimeStatus();
+  const caps = capabilities(root, registry.records.length > 0, childAgents, voiceRuntime);
+  const access = accessLinks();
+  const warnings = childAgents.flatMap((agent) => (agent.ui.issueText ? [`${agent.name}: ${agent.ui.issueText}`] : []));
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    root,
+    registryPath: registry.registryPath,
+    capabilities: caps,
+    pritha: {
+      status: caps.agents_registry === "ready" && caps.developer_diagnostics === "ready" ? "ready" : "failed",
+      summary: caps.agents_registry === "ready" ? "Registry and read-only diagnostics available" : "Registry unavailable",
+    },
+    counts: {
+      registryAgents: allAgents.length,
+      childAgents: childAgents.length,
+      alive: childAgents.filter((agent) => agent.ui.state === "alive").length,
+      missing: childAgents.filter((agent) => agent.ui.state === "missing").length,
+      needsCheck: childAgents.filter((agent) => agent.ui.state === "needs-check").length,
+      active: childAgents.filter((agent) => agent.ui.activity === "active").length,
+    },
+    access: {
+      localhost: access.localhost,
+      lan: access.lanUrl ? "ready" : "unavailable",
+      lanUrl: access.lanUrl,
+      tailscale: access.tailscaleServeConfigured ? "ready" : access.tailscaleUrl ? "pending_auth" : "unavailable",
+      tailscaleUrl: access.tailscaleUrl,
+      tailscaleVoiceUrl: access.tailscaleVoiceUrl,
+      tailscaleServeConfigured: access.tailscaleServeConfigured,
+      qr: access.tailscaleVoiceUrl ? "ready" : "unavailable",
+    },
+    proactivity: {
+      status: "manual_only",
+      mode: "manual",
+      cronAdapter: "not_installed",
+      manualChecks: "manual_only",
+    },
+    voice: {
+      realtime: voiceRealtimeCapability(voiceRuntime),
+      tools: voiceRuntime.memory.sqlite || voiceRuntime.memory.sqlite_cli ? "ready" : "failed",
+      codexBridge: voiceRuntime.codex.available ? "ready" : "manual_only",
+    },
+    childAgents,
+    allRegistryAgents: allAgents,
+    latestReports: latestReports(root),
+    operatorActivity: readOperatorActionAuditEntries(root, 8).entries,
+    warnings,
+  };
+}
+
+export async function getControlCenterAgent(agentId: string) {
+  const status = await getControlCenterStatus();
+  return {
+    status,
+    agent: status.childAgents.find((item) => item.id === agentId) || status.allRegistryAgents.find((item) => item.id === agentId) || null,
+  };
+}
+
+export async function getAgentRestorePlan(agentId: string): Promise<ControlCenterRestorePlan | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+
+  const folderName = agent.folder.name || agent.name.replace(/\s+/g, "");
+  const reportSources = agent.lifecycle.reports.paths.slice(0, 5);
+  const selectedModules = [
+    agent.lifecycle.contract.status === "ready" ? "contract" : null,
+    agent.lifecycle.reports.count ? "lifecycle-reports" : null,
+    agent.runtime || null,
+    agent.interface || null,
+    agent.operations.status === "ready" ? "operations-manifest" : null,
+  ].filter(Boolean) as string[];
+  const restoreReady = agent.lifecycle.restorePlan.status === "ready";
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      folderStatus: agent.folder.status,
+    },
+    status: agent.lifecycle.restorePlan.status,
+    actionEnabled: false,
+    requiresConfirmation: true,
+    target: {
+      folderName,
+      relativeToTechscope: `../${folderName}`,
+      willCreateFolder: agent.folder.status === "missing",
+      willOverwriteExistingFolder: false,
+    },
+    sources: {
+      contract: agent.lifecycle.contract.path,
+      latestReports: reportSources,
+      profile: agent.lifecycle.profile.path,
+    },
+    selectedModules,
+    steps: restoreReady
+      ? [
+          "Review contract and latest lifecycle reports",
+          "Prepare target sibling folder scaffold",
+          "Recreate selected harness, interface, memory and operations modules",
+          "Run healthcheck/self-test before marking restored",
+        ]
+      : ["No restore action is available for the current lifecycle state"],
+    risks: restoreReady
+      ? [
+          "Restore would recreate code from authored knowledge, not from a complete filesystem backup",
+          "Secrets, .env files, private memory, logs and runtime queues must not be copied automatically",
+          "A separate confirmation gate is required before any write action",
+        ]
+      : ["Restore is read-only here and cannot mutate the project"],
+    warnings: [
+      agent.lifecycle.restorePlan.reason || "Restore plan is informational only",
+      "This endpoint does not create folders, install services, start processes or copy secrets",
+    ],
+  };
+}
+
+function commandCheck(id: string, label: string, readiness: ControlCenterCommandReadiness, command: OperationsCommand | undefined): ControlCenterOperatorActionCheck {
+  const text = commandText(command);
+  const labelText = readinessLabel(readiness);
+  const detail =
+    readiness === "structured_executable"
+      ? "Structured executable command is declared; executor remains disabled in C.11"
+      : readiness === "human_instruction"
+        ? `${labelText} in operations manifest, not an executable contract${text ? `: ${text}` : ""}`
+        : readiness === "legacy_declared"
+          ? `${labelText} command string is declared for planning only${text ? `: ${text}` : ""}`
+          : "Command is not declared in operations manifest";
+  return {
+    id,
+    label,
+    status: readiness === "structured_executable" ? "pass" : "warn",
+    detail,
+  };
+}
+
+function baseOperatorChecks(agent: ControlCenterAgent): ControlCenterOperatorActionCheck[] {
+  return [
+    {
+      id: "folder",
+      label: "Child folder",
+      status: agent.folder.status === "present" ? "pass" : "fail",
+      detail: agent.folder.name ? `../${agent.folder.name}` : "Folder missing",
+    },
+    {
+      id: "operations",
+      label: "Operations manifest",
+      status: agent.operations.status === "ready" ? "pass" : agent.operations.status === "failed" ? "fail" : "warn",
+      detail: agent.operations.status === "ready" ? "operations/manifest.json ready" : agent.operations.issue || String(agent.operations.status),
+    },
+    {
+      id: "health",
+      label: "Health probe",
+      status: agent.health.status === "ok" ? "pass" : agent.health.status === "failed" ? "fail" : "warn",
+      detail: agent.health.checkedUrl || agent.health.detail || String(agent.health.status),
+    },
+    {
+      id: "profile",
+      label: "Canonical profile",
+      status: agent.lifecycle.profile.status === "ready" ? "pass" : "warn",
+      detail: agent.lifecycle.profile.path || agent.lifecycle.profile.reason || "Profile unavailable",
+    },
+    {
+      id: "contract",
+      label: "Source contract",
+      status: agent.lifecycle.contract.status === "ready" ? "pass" : "warn",
+      detail: agent.lifecycle.contract.path || agent.lifecycle.contract.reason || "Contract unavailable",
+    },
+  ];
+}
+
+function operatorActionPhrase(agent: ControlCenterAgent, action: ControlCenterOperatorAction) {
+  return `${action.toUpperCase()} ${agent.id}`;
+}
+
+function controlForAction(agent: ControlCenterAgent, action: ControlCenterOperatorAction): ControlCenterAgentControl {
+  if (agent.control.planAction === action) return agent.control;
+  if (action === "check") {
+    return {
+      ...agent.control,
+      primaryCardAction: "run_check",
+      planAction: "check",
+      executionMode: "manual_only",
+      label: "Run Check",
+      reason: "Manual check reads metadata and probes health without mutating runtime state.",
+    };
+  }
+  if (action === "start") {
+    return {
+      ...agent.control,
+      primaryCardAction: "start_plan",
+      planAction: "start",
+      executionMode: "plan_only",
+      label: "Start Plan",
+      reason: "Start is available only as a read-only plan in C.11.",
+    };
+  }
+  if (action === "stop") {
+    return {
+      ...agent.control,
+      primaryCardAction: "stop_plan",
+      planAction: "stop",
+      executionMode: "plan_only",
+      label: "Stop Plan",
+      reason: "Stop is available only as a read-only plan in C.11.",
+    };
+  }
+  return {
+    ...agent.control,
+    primaryCardAction: "restore_plan",
+    planAction: "restore",
+    executionMode: "plan_only",
+    label: "Restore Plan",
+    reason: "Restore is available only as a read-only plan in C.11.",
+  };
+}
+
+function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCenterAgent, action: ControlCenterOperatorAction): ControlCenterOperatorActionPlan {
+  const planControl = controlForAction(agent, action);
+  const checks =
+    action === "restore"
+      ? baseOperatorChecks(agent).map((check) =>
+          check.id === "folder"
+            ? {
+                id: check.id,
+                label: check.label,
+                status: agent.folder.status === "missing" ? ("pass" as const) : ("warn" as const),
+                detail:
+                  agent.folder.status === "missing"
+                    ? "Folder is missing; guided restore can be planned"
+                    : "Folder is present; restore would require a separate replacement policy",
+              }
+            : check,
+        )
+      : baseOperatorChecks(agent);
+  const localUrl = agent.url.local;
+  const healthUrl = agent.health.checkedUrl || (localUrl ? `${localUrl.replace(/\/$/, "")}/api/health` : undefined);
+  const actionCommandReadiness =
+    action === "start" ? agent.control.commandReadiness.start : action === "stop" ? agent.control.commandReadiness.stop : "missing";
+  const commandAvailable =
+    action === "start"
+      ? actionCommandReadiness === "structured_executable"
+      : action === "stop"
+        ? actionCommandReadiness === "structured_executable"
+        : action === "restore"
+          ? agent.lifecycle.restorePlan.status === "ready"
+          : Boolean(agent.operations.healthcheckCommand || healthUrl);
+
+  if (action === "start") checks.push(commandCheck("start-command", "Start command", agent.control.commandReadiness.start, undefined));
+  if (action === "stop") checks.push(commandCheck("stop-command", "Stop command", agent.control.commandReadiness.stop, undefined));
+  if (action === "restore") {
+    checks.push({
+      id: "restore-plan",
+      label: "Restore plan",
+      status: agent.lifecycle.restorePlan.status === "ready" ? "pass" : "fail",
+      detail: agent.lifecycle.restorePlan.reason || "Restore plan unavailable",
+    });
+  }
+
+  const failedChecks = checks.filter((check) => check.status === "fail");
+  const actionBackendMissing =
+    action === "start"
+      ? "Start backend is planned-only; Control Center will not start a process yet"
+      : action === "stop"
+        ? "Stop backend is planned-only; Control Center will not stop a process yet"
+        : action === "restore"
+          ? "Restore backend is planned-only; Control Center will not create folders yet"
+          : "";
+  const plannedOnlyBlockers = action === "check" ? [] : [actionBackendMissing];
+  const blockers = action === "check" ? [] : [...plannedOnlyBlockers, ...failedChecks.map((check) => `${check.label}: ${check.detail}`)];
+  const planStatus: CapabilityStatus =
+    action === "check"
+      ? "manual_only"
+      : blockers.length > plannedOnlyBlockers.length
+        ? "unavailable"
+        : "planned";
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      folderStatus: agent.folder.status,
+    },
+    action,
+    status: planStatus,
+    actionEnabled: action === "check",
+    requiresConfirmation: action !== "check",
+    confirmation:
+      action === "check"
+        ? undefined
+        : {
+            requiredPhrase: operatorActionPhrase(agent, action),
+            accepted: false,
+          },
+    target: {
+      kind: action === "check" ? "healthcheck" : action === "restore" ? "restore" : "process",
+      commandAvailable,
+      localUrl,
+      healthUrl,
+      willStartProcess: false,
+      willStopProcess: false,
+      willCreateFolder: false,
+      willOverwriteExistingFolder: false,
+    },
+    control: planControl,
+    checks,
+    steps:
+      action === "check"
+        ? [
+            "Read child-agent profile, contract and operations manifest",
+            "Probe local health endpoint when configured",
+            "Return structured diagnostics and append operator audit entry on execution",
+          ]
+        : [
+            "Review plan, preflight checks and blockers",
+            "Keep this action disabled until a confirmation-gated deterministic backend exists",
+            "Use Dev diagnostics or Codex for remediation or manifest upgrade planning",
+          ],
+    blockers,
+    risks:
+      action === "check"
+        ? ["Health probes can report stale local state if the child-agent server is changing while the check runs"]
+        : ["This action would mutate runtime state in a future milestone and therefore remains disabled here"],
+    warnings: [
+      action === "check"
+        ? "Manual check does not start, stop, restore, install, remove or schedule anything."
+        : "Plan-only action. No process, folder, service, snapshot or memory mutation is available from this endpoint.",
+    ],
+  };
+}
+
+export async function getAgentOperatorActionPlan(agentId: string, action: ControlCenterOperatorAction): Promise<ControlCenterOperatorActionPlan | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+  return buildOperatorActionPlan(status, agent, action);
+}
+
+function buildManualCheckResult(status: ControlCenterStatus, agent: ControlCenterAgent, generatedAt: string): ControlCenterOperatorActionResult {
+  const plan = buildOperatorActionPlan(status, agent, "check");
+  const passed = plan.checks.filter((check) => check.status === "pass").length;
+  const warnings = plan.checks.filter((check) => check.status === "warn").length;
+  const failed = plan.checks.filter((check) => check.status === "fail").length;
+  const resultStatus: ControlCenterOperatorActionResult["status"] = failed ? "failed" : warnings ? "warnings" : "passed";
+  const entryId = auditEntryId(generatedAt, agent.id, "operator-check");
+
+  return {
+    ok: true,
+    generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    action: "check",
+    status: resultStatus,
+    actionEnabled: false,
+    audit: {
+      path: operatorActionAuditLogRelativePath(status.root),
+      entryId,
+    },
+    checks: plan.checks,
+    summary: {
+      passed,
+      warnings,
+      failed,
+    },
+    warnings: [
+      "Manual check completed without mutating agent runtime state.",
+      "No start, stop, restore, install, uninstall, launchd or scheduled action was executed.",
+    ],
+    errors: [],
+  };
+}
+
+function appendManualCheckAudit(status: ControlCenterStatus, result: ControlCenterOperatorActionResult) {
+  const agent = status.childAgents.find((item) => item.id === result.agent.id) || status.allRegistryAgents.find((item) => item.id === result.agent.id);
+  appendOperatorActionAuditEntry(status.root, {
+    id: result.audit.entryId,
+    timestamp: result.generatedAt,
+    actor: "pritha-control-center",
+    agentId: result.agent.id,
+    agentName: result.agent.name,
+    action: "check",
+    result: result.status,
+    target: agent?.health.checkedUrl || agent?.url.local || agent?.folder.relativePath || result.agent.id,
+    checks: result.summary,
+  });
+}
+
+export async function runAgentManualCheck(agentId: string): Promise<ControlCenterOperatorActionResult | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+  const result = buildManualCheckResult(status, agent, new Date().toISOString());
+  appendManualCheckAudit(status, result);
+  return result;
+}
+
+export async function runFleetManualAudit(): Promise<ControlCenterFleetManualAuditResult> {
+  const status = await getControlCenterStatus();
+  const generatedAt = new Date().toISOString();
+  const results = status.childAgents.map((agent) => buildManualCheckResult(status, agent, generatedAt));
+
+  for (const result of results) appendManualCheckAudit(status, result);
+
+  const failed = results.filter((result) => result.status === "failed").length;
+  const warnings = results.filter((result) => result.status === "warnings").length;
+  const passed = results.filter((result) => result.status === "passed").length;
+  const auditStatus: ControlCenterFleetManualAuditResult["status"] = failed ? "failed" : warnings ? "warnings" : "passed";
+
+  return {
+    ok: true,
+    generatedAt,
+    action: "fleet-manual-audit",
+    status: auditStatus,
+    actionEnabled: false,
+    audit: {
+      path: operatorActionAuditLogRelativePath(status.root),
+      entryIds: results.map((result) => result.audit.entryId),
+    },
+    summary: {
+      agents: results.length,
+      passed,
+      warnings,
+      failed,
+    },
+    results,
+    warnings: [
+      "Fleet manual audit completed without mutating agent runtime state.",
+      "No start, stop, restore, install, uninstall, launchd or scheduled action was executed.",
+    ],
+    errors: [],
+  };
+}
+
+export async function getOperatorActivity(limit = 12): Promise<ControlCenterOperatorActivityResponse> {
+  const status = await getControlCenterStatus();
+  const activity = readOperatorActionAuditEntries(status.root, limit);
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    status: activity.exists || activity.entries.length ? "ready" : "unavailable",
+    actionEnabled: false,
+    logPath: operatorActionAuditLogRelativePath(status.root),
+    entries: activity.entries,
+    warnings: [
+      ...(activity.exists ? [] : ["Operator action audit log has not been created yet."]),
+      ...(activity.corruptLines ? [`${activity.corruptLines} operator audit log lines could not be parsed.`] : []),
+    ],
+  };
+}
+
+export async function getAgentSnapshots(agentId: string) {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    snapshots: agent.lifecycle.snapshots,
+  };
+}
+
+export async function getAgentSnapshotRetention(agentId: string): Promise<ControlCenterSnapshotRetentionPlan | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+  return buildSnapshotRetentionPlan(status, agent);
+}
+
+export async function enforceAgentSnapshotRetention(
+  agentId: string,
+  request: ControlCenterSnapshotRetentionRequest = {},
+): Promise<ControlCenterSnapshotRetentionResult | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+
+  const dryRun = request.dryRun !== false;
+  const plan = buildSnapshotRetentionPlan(status, agent, request.confirmationPhrase);
+  const retention = retentionCandidates(status, agent);
+  const errors = [...plan.errors];
+  const warnings = [...plan.warnings];
+  const pruned: ControlCenterSnapshotRetentionResult["pruned"] = [];
+
+  if (!dryRun && !plan.confirmation.accepted) errors.push(`confirmationPhrase must be exactly: ${plan.confirmation.requiredPhrase}`);
+  if (!dryRun && !retention.storeAbsolutePath) errors.push("Snapshot metadata store is unavailable.");
+
+  if (dryRun || errors.length > 0) {
+    return {
+      ...plan,
+      ok: errors.length === 0,
+      action: "snapshot-retention",
+      mode: dryRun ? "dry-run" : "write",
+      status: errors.length ? "failed" : plan.status,
+      pruned,
+      errors,
+      warnings: [
+        ...warnings,
+        dryRun ? "Dry-run only; no snapshot metadata was pruned." : "Retention write was blocked before filesystem mutation.",
+      ],
+    };
+  }
+
+  for (const candidate of retention.candidates) {
+    if (!retention.storeAbsolutePath || !isPathInside(retention.storeAbsolutePath, candidate.removalPath)) {
+      errors.push(`Refusing to prune outside snapshot store: ${candidate.path}`);
+      continue;
+    }
+    if (!existsSync(candidate.removalPath)) {
+      warnings.push(`Candidate already absent: ${candidate.path}`);
+      continue;
+    }
+    try {
+      rmSync(candidate.removalPath, { recursive: true, force: false });
+      pruned.push({ id: candidate.id, path: candidate.path });
+    } catch (error) {
+      errors.push(`${candidate.path}: ${error instanceof Error ? error.message : "Failed to prune snapshot metadata"}`);
+    }
+  }
+
+  const generatedAt = new Date().toISOString();
+  const refreshed = await getControlCenterAgent(agentId);
+  const refreshedPlan = refreshed.agent
+    ? buildSnapshotRetentionPlan(
+        {
+          ...refreshed.status,
+          generatedAt,
+        },
+        refreshed.agent,
+        request.confirmationPhrase,
+      )
+    : plan;
+  const result: ControlCenterSnapshotRetentionResult = {
+    ...refreshedPlan,
+    ok: errors.length === 0,
+    generatedAt,
+    action: "snapshot-retention",
+    mode: "write",
+    status: errors.length ? "failed" : "ready",
+    pruned,
+    errors,
+    warnings: [
+      ...warnings,
+      pruned.length ? "Only metadata-only snapshot metadata was pruned." : "No retention candidates were pruned.",
+      "Agent folders, secrets, private memory, queues, logs and runtime caches were not touched.",
+    ],
+  };
+
+  appendSnapshotAuditEntry(status.root, {
+    id: auditEntryId(generatedAt, agent.id, "snapshot-retention-prune"),
+    timestamp: generatedAt,
+    actor: "pritha-control-center",
+    agentId: agent.id,
+    agentName: agent.name,
+    action: "snapshot-retention-prune",
+    mode: "write",
+    result: errors.length ? "failed" : "ok",
+    target: agent.lifecycle.snapshots.storePath || `.snapshots/child-agents/${agent.id}`,
+    source: "audit-log",
+    details: {
+      pruned,
+      retention: result.retention,
+    },
+  });
+
+  return result;
+}
+
+export async function getAgentSnapshotAudit(agentId: string, limit = 20): Promise<ControlCenterSnapshotAuditResponse | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+  const logPath = snapshotAuditLogPath(status.root);
+  const entries = readSnapshotAuditEntries(status.root, agent, limit);
+  const derivedCount = entries.filter((entry) => entry.source === "snapshot-metadata").length;
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    status: existsSync(logPath) || entries.length ? "ready" : "unavailable",
+    actionEnabled: false,
+    logPath: snapshotAuditLogRelativePath(status.root),
+    entries,
+    warnings: [
+      ...(existsSync(logPath) ? [] : ["Audit log file has not been created by a post-C.8 write action yet."]),
+      ...(derivedCount ? [`${derivedCount} entries are derived from snapshot metadata, not explicit operator audit lines.`] : []),
+    ],
+  };
+}
+
+function snapshotPlanChecks(root: string, agent: ControlCenterAgent, storePath: string): ControlCenterSnapshotPlan["checks"] {
+  const storeAbsolutePath = resolveRelativePath(root, storePath);
+  return [
+    {
+      id: "profile",
+      label: "Canonical profile",
+      status: agent.lifecycle.profile.status === "ready" ? "pass" : "fail",
+      detail: agent.lifecycle.profile.path || agent.lifecycle.profile.reason || "Profile unavailable",
+    },
+    {
+      id: "contract",
+      label: "Source contract",
+      status: agent.lifecycle.contract.status === "ready" ? "pass" : "warn",
+      detail: agent.lifecycle.contract.path || agent.lifecycle.contract.reason || "Contract unavailable",
+    },
+    {
+      id: "folder",
+      label: "Child folder",
+      status: agent.folder.status === "present" ? "pass" : "fail",
+      detail: agent.folder.name ? `../${agent.folder.name}` : "Folder missing",
+    },
+    {
+      id: "operations",
+      label: "Operations manifest",
+      status: agent.operations.status === "ready" ? "pass" : "warn",
+      detail: agent.operations.status === "ready" ? "operations/manifest.json ready" : agent.operations.issue || String(agent.operations.status),
+    },
+    {
+      id: "health",
+      label: "Latest health probe",
+      status: agent.health.status === "ok" ? "pass" : "warn",
+      detail: agent.health.checkedUrl || agent.health.detail || String(agent.health.status),
+    },
+    {
+      id: "snapshot-store",
+      label: "Snapshot metadata store",
+      status: storeAbsolutePath && existsSync(storeAbsolutePath) ? "pass" : "warn",
+      detail: storeAbsolutePath && existsSync(storeAbsolutePath) ? storePath : `${storePath} is not present; planner will not create it`,
+    },
+  ];
+}
+
+export async function getAgentSnapshotPlan(agentId: string): Promise<ControlCenterSnapshotPlan | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+
+  return buildAgentSnapshotPlan(status, agent);
+}
+
+function buildAgentSnapshotPlan(status: ControlCenterStatus, agent: ControlCenterAgent, options: { snapshotId?: string; description?: string } = {}): ControlCenterSnapshotPlan {
+  const snapshotId = safeSnapshotId(options.snapshotId) || defaultSnapshotId(new Date(status.generatedAt));
+  const storePath = profileSnapshotStore(agent);
+  const metadataPath = relativePath(status.root, metadataPathForSnapshot(status.root, storePath, snapshotId));
+  const storeAbsolutePath = resolveRelativePath(status.root, storePath);
+  const checks = snapshotPlanChecks(status.root, agent, storePath);
+  const canDraft = agent.lifecycle.snapshotPlan.status === "manual_only";
+  const includes = snapshotIncludeCandidates(status.root, agent);
+  const agentFolder = projectRelativeAgentFolder(agent);
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      folderStatus: agent.folder.status,
+    },
+    status: agent.lifecycle.snapshotPlan.status,
+    actionEnabled: false,
+    requiresConfirmation: true,
+    target: {
+      snapshotId,
+      storePath,
+      metadataPath,
+      willCreateStore: storeAbsolutePath ? !existsSync(storeAbsolutePath) : true,
+      willOverwriteExistingSnapshot: false,
+    },
+    draft: canDraft
+      ? {
+          schema_version: SNAPSHOT_SCHEMA_VERSION,
+          snapshot_id: snapshotId,
+          agent_id: agent.id,
+          agent_name: agent.name,
+          agent_version: agent.versionStatus === "ready" ? agent.version : undefined,
+          created_at: status.generatedAt,
+          created_by: "pritha",
+          description: options.description || "Read-only snapshot metadata draft generated by Pritha Control Center.",
+          source_profile: agent.lifecycle.profile.path,
+          source_contract: agent.lifecycle.contract.path,
+          agent_folder: agentFolder,
+          restore: {
+            mode: "metadata-only",
+            requires_confirmation: true,
+            target: agentFolder,
+            overwrite_existing_folder: false,
+          },
+          privacy: {
+            secrets_included: false,
+            private_memory_included: false,
+            runtime_queues_included: false,
+            logs_included: false,
+          },
+          contents: {
+            includes,
+            excludes: [
+              ".env",
+              ".env.local",
+              ".memory-private/",
+              ".queue/",
+              ".logs/",
+              "logs/",
+              "node_modules/",
+              ".next/",
+              "runtime caches",
+              "private user memory",
+            ],
+          },
+          checks,
+        }
+      : undefined,
+    checks,
+    risks: [
+      "This is metadata planning only; no snapshot directory or file is created.",
+      "A future write-capable snapshot action must require explicit confirmation.",
+      "Snapshot metadata is not a byte-for-byte backup unless a future snapshot writer records concrete contents.",
+    ],
+    warnings: [
+      agent.lifecycle.snapshotPlan.reason || "Snapshot planner is read-only.",
+      "Secrets, private memory, queues, logs and runtime caches must remain excluded unless a separate retention decision allows them.",
+    ],
+  };
+}
+
+export async function createAgentSnapshot(agentId: string, request: ControlCenterSnapshotCreateRequest = {}): Promise<ControlCenterSnapshotCreateResult | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+
+  const dryRun = request.dryRun !== false;
+  const confirmationPhrase = `CREATE SNAPSHOT ${agent.id}`;
+  const plan = buildAgentSnapshotPlan(status, agent, {
+    snapshotId: request.snapshotId,
+    description: request.description,
+  });
+  const failChecks = plan.checks.filter((check) => check.status === "fail");
+  const errors: string[] = [];
+  const warnings = [...plan.warnings];
+  const confirmationAccepted = request.confirmationPhrase === confirmationPhrase;
+  const metadataAbsolutePath = path.join(status.root, plan.target.metadataPath);
+  const draftJson = plan.draft ? `${JSON.stringify(plan.draft, null, 2)}\n` : "";
+
+  if (request.snapshotId && !safeSnapshotId(request.snapshotId)) errors.push("snapshotId must be a safe filename segment");
+  if (plan.status !== "manual_only") errors.push(plan.warnings[0] || "Snapshot create is unavailable for this agent");
+  for (const check of failChecks) errors.push(`${check.label}: ${check.detail}`);
+  if (!dryRun && !confirmationAccepted) errors.push(`confirmationPhrase must be exactly: ${confirmationPhrase}`);
+  if (!dryRun && existsSync(metadataAbsolutePath)) errors.push(`Snapshot metadata already exists: ${plan.target.metadataPath}`);
+
+  if (dryRun || errors.length > 0) {
+    return {
+      ok: errors.length === 0,
+      generatedAt: status.generatedAt,
+      agent: {
+        id: agent.id,
+        name: agent.name,
+      },
+      action: "snapshot-create",
+      mode: dryRun ? "dry-run" : "write",
+      status: errors.length ? "failed" : plan.status,
+      actionEnabled: false,
+      requiresConfirmation: true,
+      confirmation: {
+        requiredPhrase: confirmationPhrase,
+        accepted: confirmationAccepted,
+      },
+      target: plan.target,
+      draft: plan.draft,
+      checks: plan.checks,
+      errors,
+      warnings: [
+        ...warnings,
+        dryRun ? "Dry-run only; no snapshot metadata was written." : "Write was blocked before filesystem mutation.",
+      ],
+    };
+  }
+
+  mkdirSync(path.dirname(metadataAbsolutePath), { recursive: true });
+  writeFileSync(metadataAbsolutePath, draftJson, { flag: "wx" });
+  appendSnapshotAuditEntry(status.root, {
+    id: auditEntryId(status.generatedAt, agent.id, "snapshot-create"),
+    timestamp: status.generatedAt,
+    actor: "pritha-control-center",
+    agentId: agent.id,
+    agentName: agent.name,
+    action: "snapshot-create",
+    mode: "write",
+    result: "ok",
+    target: plan.target.metadataPath,
+    source: "audit-log",
+    details: {
+      snapshotId: plan.target.snapshotId,
+      bytes: Buffer.byteLength(draftJson, "utf8"),
+      restoreMode: "metadata-only",
+    },
+  });
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    action: "snapshot-create",
+    mode: "write",
+    status: "ready",
+    actionEnabled: false,
+    requiresConfirmation: true,
+    confirmation: {
+      requiredPhrase: confirmationPhrase,
+      accepted: true,
+    },
+    target: plan.target,
+    draft: plan.draft,
+    wrote: {
+      metadataPath: plan.target.metadataPath,
+      bytes: Buffer.byteLength(draftJson, "utf8"),
+    },
+    checks: plan.checks,
+    errors: [],
+    warnings: [
+      "Snapshot metadata was written. No agent files, secrets, logs, queues or runtime caches were copied.",
+      "Rollback remains disabled for metadata-only snapshots.",
+    ],
+  };
+}
+
+function snapshotMetadataFiles(root: string, agent: ControlCenterAgent) {
+  const storePath = profileSnapshotStore(agent);
+  const storeAbsolutePath = resolveRelativePath(root, storePath);
+  if (!storeAbsolutePath || !existsSync(storeAbsolutePath)) {
+    return { storePath, storeAbsolutePath, files: [] as string[], exists: false };
+  }
+
+  const files = readdirSync(storeAbsolutePath)
+    .flatMap((entry) => {
+      const entryPath = path.join(storeAbsolutePath, entry);
+      const stat = statSync(entryPath);
+      const metadataPath = stat.isDirectory() ? path.join(entryPath, "snapshot.json") : entryPath;
+      return metadataPath.endsWith(".json") && existsSync(metadataPath) ? [metadataPath] : [];
+    })
+    .sort((a, b) => b.localeCompare(a));
+
+  return { storePath, storeAbsolutePath, files, exists: true };
+}
+
+function snapshotItems(agent: ControlCenterAgent) {
+  return agent.lifecycle.snapshots.items || [];
+}
+
+function findSnapshotItem(agent: ControlCenterAgent, snapshotId: string | undefined) {
+  const items = snapshotItems(agent);
+  if (!items.length) return null;
+  if (!snapshotId || snapshotId === "latest") return items[0] || null;
+  return items.find((item) => item.id === snapshotId) || null;
+}
+
+function snapshotRetentionPhrase(agent: ControlCenterAgent) {
+  return `PRUNE SNAPSHOTS ${agent.id}`;
+}
+
+function snapshotRemovalPath(metadataPath: string) {
+  return path.basename(metadataPath) === "snapshot.json" ? path.dirname(metadataPath) : metadataPath;
+}
+
+function retentionCandidates(status: ControlCenterStatus, agent: ControlCenterAgent) {
+  const snapshots = snapshotItems(agent);
+  const storeAbsolutePath = agent.lifecycle.snapshots.storePath ? resolveRelativePath(status.root, agent.lifecycle.snapshots.storePath) : null;
+  const retention = agent.lifecycle.snapshots.retention;
+  const configured = typeof retention === "number" && retention >= 0;
+  const overflow = configured ? Math.max(0, snapshots.length - retention) : 0;
+  const protectedRecords: ControlCenterSnapshotRetentionPlan["protected"] = [];
+  const candidates: SnapshotRetentionCandidate[] = [];
+
+  if (!storeAbsolutePath || !configured || overflow <= 0) {
+    return { configured, retention, overflow, candidates, protectedRecords, storeAbsolutePath };
+  }
+
+  snapshots.forEach((item, index) => {
+    const absolutePath = path.join(status.root, item.path);
+    const removalPath = snapshotRemovalPath(absolutePath);
+    const underStore = isPathInside(storeAbsolutePath, removalPath);
+    const isOverflow = index >= retention;
+    const isMetadataOnly = item.restoreMode === "metadata-only";
+    const record = {
+      id: item.id,
+      path: item.path,
+      reason: !isOverflow
+        ? "Within retention window"
+        : !isMetadataOnly
+          ? "Restore-capable or unknown snapshot is protected from metadata pruning"
+          : !underStore
+            ? "Snapshot path is outside the configured store"
+            : "Older metadata-only snapshot exceeds retention",
+    };
+
+    if (isOverflow && isMetadataOnly && underStore) {
+      candidates.push({
+        ...item,
+        absolutePath,
+        removalPath,
+        reason: record.reason,
+      });
+      return;
+    }
+
+    protectedRecords.push(record);
+  });
+
+  return { configured, retention, overflow, candidates, protectedRecords, storeAbsolutePath };
+}
+
+function buildSnapshotRetentionPlan(status: ControlCenterStatus, agent: ControlCenterAgent, confirmationPhrase = ""): ControlCenterSnapshotRetentionPlan {
+  const retention = retentionCandidates(status, agent);
+  const requiredPhrase = snapshotRetentionPhrase(agent);
+  const accepted = confirmationPhrase === requiredPhrase;
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  const retentionStatus =
+    !retention.configured ? "not_configured" : retention.overflow > 0 ? "over_limit" : ("within_limit" as const);
+
+  if (agent.lifecycle.snapshots.status === "unavailable") warnings.push(agent.lifecycle.snapshots.reason || "Snapshot metadata store is not present.");
+  if (!retention.configured) warnings.push("Snapshot retention is not configured in the child-agent profile.");
+  if (retention.overflow > 0 && retention.candidates.length === 0) {
+    warnings.push("Snapshots exceed retention, but no metadata-only candidate is safe to prune automatically.");
+  }
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    status: retention.candidates.length ? "manual_only" : retention.configured ? "ready" : "unavailable",
+    actionEnabled: false,
+    requiresConfirmation: true,
+    confirmation: {
+      requiredPhrase,
+      accepted,
+    },
+    retention: {
+      status: retentionStatus,
+      configured: retention.retention,
+      count: agent.lifecycle.snapshots.count,
+      overflow: retention.overflow,
+      storePath: agent.lifecycle.snapshots.storePath,
+    },
+    candidates: retention.candidates.map((item) => ({
+      id: item.id,
+      created: item.created,
+      path: item.path,
+      restoreMode: item.restoreMode,
+      reason: item.reason,
+    })),
+    protected: retention.protectedRecords,
+    warnings,
+    errors,
+  };
+}
+
+function readSnapshotJson(filePath: string): { json?: SnapshotJson; error?: string } {
+  try {
+    return { json: JSON.parse(readFileSync(filePath, "utf8")) as SnapshotJson };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Invalid JSON" };
+  }
+}
+
+function flattenJson(value: unknown, prefix = "", output = new Map<string, unknown>()) {
+  if (Array.isArray(value)) {
+    output.set(prefix, value.map((item) => (typeof item === "object" && item !== null ? JSON.stringify(item) : item)).join("\n"));
+    return output;
+  }
+
+  if (value && typeof value === "object") {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      flattenJson(child, prefix ? `${prefix}.${key}` : key, output);
+    }
+    return output;
+  }
+
+  output.set(prefix, value);
+  return output;
+}
+
+function isIgnoredSnapshotComparePath(pathKey: string) {
+  return (
+    pathKey === "snapshot_id" ||
+    pathKey === "id" ||
+    pathKey === "created_at" ||
+    pathKey === "created" ||
+    pathKey === "created_by" ||
+    pathKey === "description" ||
+    pathKey === "checks"
+  );
+}
+
+function compareSnapshotJson(base: unknown, target: unknown): ControlCenterSnapshotCompare["differences"] {
+  const baseMap = flattenJson(base);
+  const targetMap = flattenJson(target);
+  const paths = [...new Set([...baseMap.keys(), ...targetMap.keys()])].filter((pathKey) => !isIgnoredSnapshotComparePath(pathKey)).sort();
+  const differences: ControlCenterSnapshotCompare["differences"] = [];
+
+  for (const pathKey of paths) {
+    const baseHas = baseMap.has(pathKey);
+    const targetHas = targetMap.has(pathKey);
+    if (!baseHas && targetHas) {
+      differences.push({ path: pathKey, type: "added", target: targetMap.get(pathKey) });
+      continue;
+    }
+    if (baseHas && !targetHas) {
+      differences.push({ path: pathKey, type: "removed", base: baseMap.get(pathKey) });
+      continue;
+    }
+    const baseValue = baseMap.get(pathKey);
+    const targetValue = targetMap.get(pathKey);
+    if (JSON.stringify(baseValue) !== JSON.stringify(targetValue)) differences.push({ path: pathKey, type: "changed", base: baseValue, target: targetValue });
+  }
+
+  return differences;
+}
+
+export async function getAgentSnapshotCompare(agentId: string, options: SnapshotCompareOptions = {}): Promise<ControlCenterSnapshotCompare | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+
+  const base = findSnapshotItem(agent, options.base);
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  if (!base) errors.push("No base snapshot metadata is available for comparison");
+
+  const baseJson = base ? readSnapshotJson(path.join(status.root, base.path)) : {};
+  if (baseJson.error) errors.push(`${base?.path}: ${baseJson.error}`);
+
+  let target: ControlCenterSnapshotCompare["target"] = { id: "draft", kind: "draft" };
+  let targetJson: unknown = buildAgentSnapshotPlan(status, agent).draft;
+  if (options.target && options.target !== "draft") {
+    const targetItem = findSnapshotItem(agent, options.target);
+    if (!targetItem) {
+      errors.push(`Target snapshot not found: ${options.target}`);
+    } else {
+      const readTarget = readSnapshotJson(path.join(status.root, targetItem.path));
+      if (readTarget.error) errors.push(`${targetItem.path}: ${readTarget.error}`);
+      target = { id: targetItem.id, kind: "snapshot", path: targetItem.path };
+      targetJson = readTarget.json;
+    }
+  }
+
+  if (!targetJson) errors.push("Target snapshot draft is unavailable");
+
+  const differences = errors.length || !baseJson.json || !targetJson ? [] : compareSnapshotJson(baseJson.json, targetJson);
+  const changed = differences.filter((item) => item.type === "changed").length;
+  const added = differences.filter((item) => item.type === "added").length;
+  const removed = differences.filter((item) => item.type === "removed").length;
+
+  if (!differences.length && !errors.length) warnings.push("No meaningful metadata drift detected.");
+
+  return {
+    ok: errors.length === 0,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    status: errors.length ? "unavailable" : "ready",
+    actionEnabled: false,
+    base: base ? { id: base.id, path: base.path } : undefined,
+    target,
+    ignoredFields: ["snapshot_id", "id", "created_at", "created", "created_by", "description", "checks"],
+    differences,
+    summary: {
+      changed,
+      added,
+      removed,
+    },
+    errors,
+    warnings,
+  };
+}
+
+function validateSnapshotMetadataFile(root: string, agent: ControlCenterAgent, filePath: string): ControlCenterSnapshotValidation["files"][number] {
+  const relative = relativePath(root, filePath);
+  const { json, error } = readSnapshotJson(filePath);
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!json) {
+    return {
+      path: relative,
+      status: "invalid",
+      errors: [error || "Invalid JSON"],
+      warnings,
+    };
+  }
+
+  if (json.schema_version !== SNAPSHOT_SCHEMA_VERSION) errors.push(`schema_version must be ${SNAPSHOT_SCHEMA_VERSION}`);
+  if (!json.snapshot_id && !json.id) errors.push("snapshot_id is required");
+  if (json.agent_id !== agent.id) errors.push(`agent_id must be ${agent.id}`);
+  if (json.agent_name !== agent.name) errors.push(`agent_name must be ${agent.name}`);
+  if (!json.created_at && !json.created) errors.push("created_at is required");
+  if (json.source_profile !== agent.lifecycle.profile.path) errors.push(`source_profile must be ${agent.lifecycle.profile.path || "defined"}`);
+  if (!json.source_contract) errors.push("source_contract is required");
+  if (json.source_contract && !existsSync(path.join(root, json.source_contract))) warnings.push(`source_contract does not exist in Techscope: ${json.source_contract}`);
+  if (!json.agent_folder) errors.push("agent_folder is required");
+  if (json.restore?.requires_confirmation !== true) errors.push("restore.requires_confirmation must be true");
+  if (json.restore?.overwrite_existing_folder !== false) errors.push("restore.overwrite_existing_folder must be false");
+  if (!json.restore?.target) errors.push("restore.target is required");
+  if (json.privacy?.secrets_included !== false) errors.push("privacy.secrets_included must be false");
+  if (json.privacy?.private_memory_included !== false) errors.push("privacy.private_memory_included must be false");
+  if (json.privacy?.runtime_queues_included !== false) errors.push("privacy.runtime_queues_included must be false");
+  if (json.privacy?.logs_included !== false) errors.push("privacy.logs_included must be false");
+
+  return {
+    path: relative,
+    status: errors.length ? "invalid" : "valid",
+    snapshotId: json.snapshot_id || json.id,
+    schemaVersion: json.schema_version,
+    createdAt: json.created_at || json.created,
+    errors,
+    warnings,
+  };
+}
+
+export async function getAgentSnapshotValidation(agentId: string): Promise<ControlCenterSnapshotValidation | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+
+  const metadata = snapshotMetadataFiles(status.root, agent);
+  if (!metadata.exists) {
+    return {
+      ok: true,
+      generatedAt: status.generatedAt,
+      agent: {
+        id: agent.id,
+        name: agent.name,
+      },
+      status: "unavailable",
+      actionEnabled: false,
+      valid: false,
+      store: {
+        path: metadata.storePath,
+        exists: false,
+        fileCount: 0,
+      },
+      files: [],
+      errors: [],
+      warnings: ["Snapshot metadata store is not present; there are no snapshot files to validate."],
+    };
+  }
+
+  const files = metadata.files.map((filePath) => validateSnapshotMetadataFile(status.root, agent, filePath));
+  const errors = files.flatMap((file) => file.errors.map((message) => `${file.path}: ${message}`));
+  const warnings = [
+    ...(files.length ? [] : ["Snapshot metadata store is empty."]),
+    ...files.flatMap((file) => file.warnings.map((message) => `${file.path}: ${message}`)),
+  ];
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    status: errors.length ? "failed" : "ready",
+    actionEnabled: false,
+    valid: errors.length === 0,
+    store: {
+      path: metadata.storePath,
+      exists: true,
+      fileCount: files.length,
+    },
+    files,
+    errors,
+    warnings,
+  };
+}
+
+export async function getAgentRollbackPlan(agentId: string): Promise<ControlCenterRollbackPlan | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    status: agent.lifecycle.rollback.status,
+    actionEnabled: false,
+    requiresConfirmation: true,
+    snapshots: agent.lifecycle.snapshots,
+    reason: agent.lifecycle.rollback.reason,
+  };
+}
+
+export async function getAgentPreRestoreContract(agentId: string, snapshotId?: string): Promise<ControlCenterPreRestoreContract | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+
+  const selectedSnapshot = findSnapshotItem(agent, snapshotId);
+  const snapshotJson = selectedSnapshot ? readSnapshotJson(path.join(status.root, selectedSnapshot.path)).json : undefined;
+  const validation = await getAgentSnapshotValidation(agentId);
+  const audit = await getAgentSnapshotAudit(agentId, 20);
+  const hasExplicitAudit = Boolean(audit?.entries.some((entry) => entry.source === "audit-log" && entry.target === selectedSnapshot?.path));
+  const hasContentManifest = Boolean(snapshotJson?.contents?.includes);
+  const hasContentHashes = Boolean(snapshotJson?.contents?.hashes);
+  const restoreMode = selectedSnapshot?.restoreMode || snapshotJson?.restore?.mode;
+  const requirements: ControlCenterPreRestoreContract["requirements"] = [
+    {
+      id: "snapshot-selected",
+      label: "Snapshot selected",
+      status: selectedSnapshot ? "pass" : "fail",
+      detail: selectedSnapshot ? selectedSnapshot.path : "No snapshot metadata is available",
+    },
+    {
+      id: "restore-mode",
+      label: "Restore-capable mode",
+      status: restoreMode && restoreMode !== "metadata-only" ? "pass" : "fail",
+      detail: restoreMode || "No restore mode recorded",
+    },
+    {
+      id: "validation",
+      label: "Snapshot validation",
+      status: validation?.valid ? "pass" : "fail",
+      detail: validation?.valid ? "Snapshot metadata validation is clean" : validation?.errors[0] || validation?.warnings[0] || "Validation unavailable",
+    },
+    {
+      id: "content-manifest",
+      label: "Content manifest",
+      status: hasContentManifest && hasContentHashes ? "pass" : "fail",
+      detail: hasContentManifest
+        ? hasContentHashes
+          ? "Snapshot records content manifest and hashes"
+          : "Snapshot records included paths but no byte-level content hashes"
+        : "Metadata-only snapshot does not contain a restorable content manifest",
+    },
+    {
+      id: "privacy",
+      label: "Privacy exclusions",
+      status:
+        snapshotJson?.privacy?.secrets_included === false &&
+        snapshotJson.privacy.private_memory_included === false &&
+        snapshotJson.privacy.runtime_queues_included === false &&
+        snapshotJson.privacy.logs_included === false
+          ? "pass"
+          : "fail",
+      detail: "Secrets, private memory, queues and logs must be explicitly excluded",
+    },
+    {
+      id: "overwrite-policy",
+      label: "Overwrite policy",
+      status: snapshotJson?.restore?.overwrite_existing_folder === false ? "pass" : "fail",
+      detail: "Restore must not overwrite an existing child-agent folder automatically",
+    },
+    {
+      id: "audit",
+      label: "Operator audit",
+      status: hasExplicitAudit ? "pass" : audit?.entries.length ? "warn" : "fail",
+      detail: hasExplicitAudit ? "Explicit audit log entry exists for the selected snapshot" : "Only derived or missing audit evidence is available",
+    },
+  ];
+  const blockers = requirements.filter((requirement) => requirement.status === "fail").map((requirement) => `${requirement.label}: ${requirement.detail}`);
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    status: blockers.length ? "planned" : "manual_only",
+    actionEnabled: false,
+    restoreEnabled: false,
+    selectedSnapshot: selectedSnapshot
+      ? {
+          id: selectedSnapshot.id,
+          path: selectedSnapshot.path,
+          restoreMode,
+        }
+      : undefined,
+    requirements,
+    confirmationGates: [
+      {
+        id: "prepare",
+        phrase: `PREPARE RESTORE ${agent.id}`,
+        status: "future",
+      },
+      {
+        id: "execute",
+        phrase: selectedSnapshot ? `RESTORE ${agent.id} FROM ${selectedSnapshot.id}` : `RESTORE ${agent.id} FROM <snapshot-id>`,
+        status: "future",
+      },
+    ],
+    blockers,
+    warnings: [
+      "This contract is read-only and does not create restore-capable snapshots.",
+      "A restore executor, byte-level content manifest and operator approval flow are still required before restore can be enabled.",
+    ],
+  };
+}
+
+function moduleList(status: ControlCenterStatus): ControlCenterDiagnostics["modules"] {
+  return [
+    { id: "harness", label: "Harness", status: "ready" },
+    { id: "memory", label: "Memory", status: existsSync(path.join(status.root, ".memory")) ? "ready" : "unavailable" },
+    { id: "tools", label: "Tools", status: existsSync(path.join(status.root, "tools", "manifest.json")) ? "ready" : "unavailable" },
+    { id: "interfaces", label: "Interfaces", status: "ready" },
+    { id: "operations", label: "Operations", status: existsSync(path.join(status.root, "operations", "manifest.json")) ? "ready" : "unavailable" },
+    { id: "voice", label: "Voice", status: status.voice.realtime },
+    { id: "proactivity", label: "Proactivity", status: status.proactivity.status },
+    { id: "connectors", label: "Connectors", status: "unavailable" },
+  ];
+}
+
+function agentToRegistryRow(agent: ControlCenterAgent): ControlCenterDiagnostics["registry"][number] {
+  return {
+    id: agent.id,
+    agent: agent.name,
+    version: agent.version,
+    versionSource: agent.versionSource,
+    mission: agent.mission,
+    interface: agent.interface,
+    deployment: agent.deployment,
+    status: agent.ui.state === "needs-check" ? "needs_check" : agent.ui.state,
+    updated: agent.health.checkedUrl ? "checked now" : "not checked",
+  };
+}
+
+function agentToFolderRow(agent: ControlCenterAgent): ControlCenterDiagnostics["folders"][number] {
+  return {
+    path: agent.folder.name ? `${agent.folder.name}/` : `${agent.id}/`,
+    status: agent.folder.status === "missing" ? "not_found" : agent.operations.status === "ready" ? "ok" : "manifest_issue",
+    updated: agent.health.status === "ok" ? "checked now" : undefined,
+  };
+}
+
+export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagnostics> {
+  const status = await getControlCenterStatus();
+  const voiceRuntime = getPrithaRealtimeStatus();
+  const reports = status.latestReports.map((report) => ({
+    path: report.path,
+    title: report.title,
+    updated: new Date(report.updated).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+    type: report.type as "self_test" | "evolution" | "audit" | "recovery" | "registry",
+  }));
+
+  return {
+    status,
+    modules: moduleList(status),
+    registry: status.allRegistryAgents.map(agentToRegistryRow),
+    folders: status.childAgents.map(agentToFolderRow),
+    logs: [
+      { time: new Date().toLocaleTimeString("en-US", { hour12: false }), level: "INFO", message: "Control Center diagnostics read completed" },
+      { time: new Date().toLocaleTimeString("en-US", { hour12: false }), level: "INFO", message: `Registry agents: ${status.counts.registryAgents}; child agents: ${status.counts.childAgents}` },
+      { time: new Date().toLocaleTimeString("en-US", { hour12: false }), level: status.warnings.length ? "WARN" : "INFO", message: status.warnings.length ? `${status.warnings.length} warnings detected` : "No read-only warnings detected" },
+    ],
+    warnings: status.warnings.length ? status.warnings : ["Cron adapter is not installed. Proactivity remains manual-only."],
+    environment: {
+      platform: `${os.type()} ${os.release()} (${os.arch()})`,
+      node: process.version,
+      appPort: APP_PORT,
+      dataPath: ".pritha/data",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      git: "unavailable",
+    },
+    voiceDiagnostics: {
+      connection: status.voice.realtime === "ready" ? "good" : "unknown",
+      model: voiceRuntime.model,
+      turnDetection: "semantic_vad",
+      lastSession: "unknown",
+    },
+    memoryIndex: {
+      status: existsSync(path.join(status.root, ".memory", "techscope.sqlite")) ? "up_to_date" : "unknown",
+      documents: 0,
+      chunks: 0,
+      lastUpdated: "unknown",
+    },
+    reports,
+  };
+}

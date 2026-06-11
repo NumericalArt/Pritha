@@ -3,7 +3,7 @@ id: 2026-06-02-codex-app-server-rate-limit-telemetry-signal
 type: signal
 status: refined
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-06-11
 topics:
   - codex-app-server
   - rate-limits
@@ -14,7 +14,7 @@ tools:
   - Codex
   - Codex App Server
 sources:
-  - https://developers.openai.com/codex/app-server
+  - source-codex-app-server-rate-limit-telemetry-2026-06-02
 related:
   reviews:
     - 03_reviews/2026-06-02-codex-app-server-rate-limit-telemetry-review.md

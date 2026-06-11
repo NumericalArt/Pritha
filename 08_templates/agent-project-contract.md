@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-06-02
+updated: 2026-06-07
 template_for: agent-contract
 topics: []
 tools: []
@@ -18,7 +18,8 @@ related:
   briefs: []
   reviews: []
   decisions: []
-  standards: []
+  standards:
+    - 04_standards/agent-ai-safe-security-checklist.md
   workflows:
     - 07_workflows/agents-mother.md
 supersedes: []
@@ -266,6 +267,20 @@ Status: draft | accepted | superseded
 - Credential storage boundary:
 - Risk notes:
 
+## AI-SAFE security profile
+
+- AI-SAFE profile: minimal | standard | high-risk | not-applicable | unknown
+- AI-SAFE review status: draft | reviewed | blocked | deferred
+- Interface / input-output controls:
+- Reasoning and planning controls:
+- Knowledge / memory / RAG controls:
+- Execution / tools / MCP / skills controls:
+- Infrastructure / operations / orchestration controls:
+- AI-SAFE selected layers:
+- AI-SAFE skipped layers:
+- AI-SAFE open risks:
+- AI-SAFE recheck sources:
+
 ## Scaffold requirements
 
 - Target folder:
@@ -296,5 +311,6 @@ Status: draft | accepted | superseded
 - [ ] MCP policy selected or explicitly skipped.
 - [ ] Harness inventory complete.
 - [ ] Security model documented.
+- [ ] AI-SAFE security profile completed or explicitly marked minimal/not-applicable.
 - [ ] Tests/healthchecks defined.
 - [ ] Handoff/training plan defined.
