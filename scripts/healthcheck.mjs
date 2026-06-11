@@ -7,6 +7,8 @@ import process from "node:process";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const root = resolveTechscopeRoot();
+const platform = process.env.TECHSCOPE_HEALTHCHECK_PLATFORM || process.platform;
+const isDarwin = platform === "darwin";
 const checks = [];
 
 function add(name, ok, detail = "") {
@@ -81,7 +83,11 @@ for (const relPath of [
   "launchd/com.techscope.web.plist",
   "launchd/com.techscope.telegram-bot.plist",
 ]) {
-  run(`plutil ${relPath}`, "plutil", ["-lint", path.join(root, relPath)]);
+  if (isDarwin) {
+    run(`plutil ${relPath}`, "plutil", ["-lint", path.join(root, relPath)]);
+  } else {
+    add(`plutil ${relPath}`, true, `skipped on ${platform}; launchd plist lint is macOS-specific`);
+  }
 }
 
 const failed = checks.filter((check) => !check.ok);
