@@ -27,8 +27,10 @@ const excluded = [
 ];
 
 function filesForIsolationCheck() {
-  const result = spawnSync("rg", [
-    "--files",
+  const result = spawnSync("git", [
+    "ls-files",
+    "-z",
+    "--",
     "scripts",
     "07_workflows",
     "08_templates",
@@ -40,7 +42,7 @@ function filesForIsolationCheck() {
   ], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return result.stdout
-    .split(/\r?\n/)
+    .split("\0")
     .filter(Boolean)
     .filter((file) => !excluded.some((prefix) => file.split(path.sep).join(path.sep).startsWith(prefix)))
     .filter((file) => file !== path.join("tests", "media", "you" + "tube-isolation.test.mjs"));
