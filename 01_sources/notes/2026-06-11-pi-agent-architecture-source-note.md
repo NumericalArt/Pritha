@@ -81,11 +81,11 @@ Retention: source-purged
 ## Public references checked
 
 - YouTube metadata via oEmbed: `PI Architecture EXPLAINED | Agent Loop, Tools, TUI and More`, Alejandro AO.
-- Written version: `https://alejandro-ao.com/pi-architecture/`, published 2026-06-05.
-- Official website and docs entrypoint: `https://pi.dev/`.
-- Official repository: `https://github.com/earendil-works/pi`, shallow clone checked at commit `406a2214aa1dce746a1902605daf04e6727349dc` from 2026-06-10.
+- Written version: Alejandro AO Pi Architecture article, published 2026-06-05.
+- Official website and docs entrypoint: Pi official docs.
+- Official repository: earendil-works/pi, shallow clone checked at commit 406a2214aa1dce746a1902605daf04e6727349dc from 2026-06-10.
 - Official package metadata: `@earendil-works/pi-coding-agent` version `0.79.1`, modified/published on 2026-06-09.
-- Official migration note: `https://pi.dev/news/2026/5/7/pi-has-a-new-home`.
+- Official migration note: Pi new-home announcement from 2026-05-07.
 - Background primary/near-primary context: Mario Zechner's Pi article, Mario's MCP/CLI article, and Armin Ronacher's Pi/OpenClaw article.
 
 ## Verification summary
