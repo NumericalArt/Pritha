@@ -1969,16 +1969,16 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
     "",
   ].join("\n");
   await writeFile(artifactPath, body, "utf8");
-  const validation = runMemoryCommand("node", ["scripts/validate-memory.mjs"]);
-  const rebuild = validation.ok ? runMemoryCommand("node", ["scripts/rebuild-memory.mjs"]) : null;
+  const checks = await validateAndRebuildMemory();
   const result = {
-    ok: validation.ok && Boolean(rebuild?.ok),
+    ok: checks.ok,
     saved: true,
     decision: classified.decision,
     path: rootRelative(root, artifactPath),
     event_count: events.length,
-    validation,
-    rebuild,
+    validation: checks.validation,
+    rebuild: checks.rebuild,
+    embeddings: checks.embeddings,
   };
   await writeFile(indexPath, `${JSON.stringify({ ...result, updated_at: now.toISOString() }, null, 2)}\n`, "utf8");
   await logPrivateEvent("voice_session_memory_saved", { session_id: sessionId, path: result.path, decision: classified.decision, ok: result.ok });
