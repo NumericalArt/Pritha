@@ -22,9 +22,6 @@ tools:
   - JSONL
 sources:
   - source-42905ea0-d653-4825-9d86-9f9cd2d5db39
-  - https://alejandro-ao.com/pi-architecture/
-  - https://github.com/earendil-works/pi
-  - https://pi.dev/
 related:
   intakes:
     - 00_inbox/links/2026-06-11-pi-agent-architecture-intake.md
@@ -110,11 +107,3 @@ Pi is useful for Pritha not primarily as a tool to install, but as a concrete re
 ## Codex refinement required
 
 Completed in this thread. Promote the signal into a reusable standard without turning Pi into the default runtime.
-
-## Source links
-
-- https://alejandro-ao.com/pi-architecture/
-- https://github.com/earendil-works/pi
-- https://pi.dev/
-- https://pi.dev/news/2026/5/7/pi-has-a-new-home
-- https://www.npmjs.com/package/@earendil-works/pi-coding-agent
