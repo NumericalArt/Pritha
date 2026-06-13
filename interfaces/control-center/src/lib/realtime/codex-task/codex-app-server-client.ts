@@ -442,11 +442,26 @@ function parseCodexJson(raw: string) {
   try {
     return JSON.parse(trimmed);
   } catch {
-    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1]?.trim();
-    if (fenced) return JSON.parse(fenced);
-    const objectStart = trimmed.indexOf("{");
-    const objectEnd = trimmed.lastIndexOf("}");
-    if (objectStart >= 0 && objectEnd > objectStart) return JSON.parse(trimmed.slice(objectStart, objectEnd + 1));
+    const fencedMatches = [...trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/gi)]
+      .map((match) => match[1]?.trim())
+      .filter(Boolean)
+      .reverse();
+    for (const fenced of fencedMatches) {
+      try {
+        return JSON.parse(fenced as string);
+      } catch {
+        continue;
+      }
+    }
+
+    for (const candidate of extractJsonObjects(trimmed).reverse()) {
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        continue;
+      }
+    }
+
     return {
       status: "error",
       text: trimmed.slice(0, 2_000),
@@ -455,6 +470,50 @@ function parseCodexJson(raw: string) {
       warnings: [],
     };
   }
+}
+
+function extractJsonObjects(text: string) {
+  const objects: string[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (char === "\\") {
+        escaping = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      if (depth === 0) start = index;
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        objects.push(text.slice(start, index + 1));
+        start = -1;
+      }
+    }
+  }
+
+  return objects;
 }
 
 function errorResult(message: string) {
