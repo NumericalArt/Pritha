@@ -2356,6 +2356,19 @@ async function startCodexAppTask(task: Record<string, unknown>, paths: { resultP
     const finishedAt = new Date().toISOString();
     const status = statusForCodexAppError(error);
     const message = error instanceof Error ? error.message : "Codex App task failed";
+    const fallbackTask = {
+      ...task,
+      effective_transport: "codex-cli",
+      fallback_from: "codex-app",
+      fallback_reason: message,
+    };
+
+    if (String(task.fallback_transport || "") === "codex-cli" && codexAvailable().available) {
+      await appendFile(paths.stderrPath, `${finishedAt} Codex App transport failed: ${message}\n${finishedAt} Starting Codex CLI fallback for the same task.\n`, "utf8").catch(() => undefined);
+      await startCodexExec(fallbackTask, paths);
+      return;
+    }
+
     await writeFile(paths.resultPath, `Codex App transport failed.\n\n${compactText(message, 4_000)}\n`, "utf8").catch(() => undefined);
     await appendFile(paths.stderrPath, `${finishedAt} ${message}\n`, "utf8").catch(() => undefined);
     await writeFile(
@@ -2504,6 +2517,8 @@ async function startCodexExec(task: Record<string, unknown>, paths: { resultPath
       `${JSON.stringify(
         {
           status,
+          transport: "codex-cli",
+          fallback_from: typeof task.fallback_from === "string" ? task.fallback_from : undefined,
           code,
           signal,
           killed_by_timeout: killedByTimeout,
@@ -2674,6 +2689,54 @@ async function readJsonFile(filePath: string) {
   }
 }
 
+const TERMINAL_CODEX_TASK_STATUSES = new Set(["complete", "failed", "failed_timeout", "failed_empty_result"]);
+
+async function repairStaleCodexTaskStatus(
+  id: string,
+  request: Record<string, unknown> | null,
+  status: Record<string, unknown> | null,
+  paths: { statusPath: string; resultPath: string },
+  resultText: string,
+) {
+  const statusValue = String(status?.status || request?.status || "unknown");
+  if (statusValue !== "running") return { status, resultText, repaired: false };
+
+  const startedAt = String(status?.started_at || request?.created_at || "");
+  const startedMs = Date.parse(startedAt);
+  const timeoutMs = Number(status?.timeout_ms || request?.timeout_ms || codexEffectiveTimeoutMs());
+  const stale = Number.isFinite(startedMs) && Date.now() - startedMs > Math.max(1_000, timeoutMs) + 30_000;
+  const pid = status?.pid;
+  const livePid = pid ? processIsAlive(pid) : false;
+  if (!stale && (!pid || livePid)) return { status, resultText, repaired: false };
+
+  const repairedStatus = resultText.trim() ? "complete" : "failed_timeout";
+  const now = new Date().toISOString();
+  const nextResultText = resultText.trim()
+    ? resultText
+    : [
+        "Codex task did not produce a final result before the runner stopped or timed out.",
+        "",
+        `Task id: ${id}`,
+        `Previous status: ${statusValue}`,
+        `Started at: ${startedAt || "unknown"}`,
+        `Timeout ms: ${Number.isFinite(timeoutMs) ? timeoutMs : "unknown"}`,
+      ].join("\n");
+  if (!resultText.trim()) await writeFile(paths.resultPath, `${nextResultText}\n`, "utf8").catch(() => undefined);
+
+  const repaired = {
+    ...(status || {}),
+    status: repairedStatus,
+    repaired_stale_status: true,
+    previous_status: statusValue,
+    completed_at: String(status?.completed_at || now),
+    updated_at: now,
+    stale_reason: pid && !livePid ? "runner_pid_not_alive" : "timeout_elapsed_without_terminal_status",
+  };
+  await writeFile(paths.statusPath, `${JSON.stringify(repaired, null, 2)}\n`, "utf8").catch(() => undefined);
+  await logPrivateEvent("codex_task_stale_status_repaired", { task_id: id, status: repairedStatus, reason: repaired.stale_reason });
+  return { status: repaired, resultText: nextResultText, repaired: true };
+}
+
 async function codexTaskSummary(id: string) {
   const root = resolveTechscopeRoot();
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
@@ -2681,11 +2744,14 @@ async function codexTaskSummary(id: string) {
   const statusPath = path.join(taskDir, "status.json");
   const resultPath = path.join(taskDir, "result.md");
   const request = await readJsonFile(requestPath);
-  const status = await readJsonFile(statusPath);
-  const resultText = await readFile(resultPath, "utf8").catch(() => "");
+  const initialStatus = await readJsonFile(statusPath);
+  const initialResultText = await readFile(resultPath, "utf8").catch(() => "");
+  const repaired = await repairStaleCodexTaskStatus(id, request, initialStatus, { statusPath, resultPath }, initialResultText);
+  const status = repaired.status;
+  const resultText = repaired.resultText;
   const statusValue = String(status?.status || request?.status || "unknown");
   const stat = statSync(taskDir);
-  const complete = ["complete", "failed", "failed_timeout", "failed_empty_result"].includes(statusValue);
+  const complete = TERMINAL_CODEX_TASK_STATUSES.has(statusValue);
   const telemetry = taskTelemetryFromEvents(id);
   const handoffSent = lastPrivateEvent(telemetry, "codex_task_result_handoff_sent");
   const handoffSkipped = lastPrivateEvent(telemetry, "codex_task_result_handoff_skipped");
@@ -2761,12 +2827,15 @@ export async function getPrithaCodexTask(taskId: string) {
   const stdoutPath = path.join(taskDir, "stdout.log");
   const stderrPath = path.join(taskDir, "stderr.log");
   const request = await readJsonFile(requestPath);
-  const status = await readJsonFile(statusPath);
-  const resultText = await readFile(resultPath, "utf8").catch(() => "");
+  const initialStatus = await readJsonFile(statusPath);
+  const initialResultText = await readFile(resultPath, "utf8").catch(() => "");
+  const repaired = await repairStaleCodexTaskStatus(id, request, initialStatus, { statusPath, resultPath }, initialResultText);
+  const status = repaired.status;
+  const resultText = repaired.resultText;
   const stdoutText = await readFile(stdoutPath, "utf8").catch(() => "");
   const stderrText = await readFile(stderrPath, "utf8").catch(() => "");
   const statusValue = String(status?.status || request?.status || "unknown");
-  const complete = ["complete", "failed", "failed_timeout", "failed_empty_result"].includes(statusValue);
+  const complete = TERMINAL_CODEX_TASK_STATUSES.has(statusValue);
   const resultAvailable = Boolean(resultText.trim());
   const telemetry = taskTelemetryFromEvents(id);
 
