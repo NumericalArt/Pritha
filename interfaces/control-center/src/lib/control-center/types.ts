@@ -56,6 +56,50 @@ export type ControlCenterCardAction =
 
 export type ControlCenterCommandReadiness = "missing" | "legacy_declared" | "human_instruction" | "structured_executable";
 
+export type ControlCenterSecretProvider = "openai" | "telegram" | "anthropic" | "whatsapp" | "generic" | "codex_external";
+
+export type ControlCenterSecretValidationMethod = "format" | "manual" | "none";
+
+export type ControlCenterSecretBrowserExposure = "server_only" | "ephemeral_only" | "client_allowed" | "never";
+
+export type ControlCenterSecretReadiness = "configured" | "missing" | "optional" | "unavailable";
+
+export type ControlCenterSecretDefinition = {
+  name: string;
+  label: string;
+  provider: ControlCenterSecretProvider;
+  required: boolean;
+  validation: ControlCenterSecretValidationMethod;
+  storageTarget: string;
+  browserExposure: ControlCenterSecretBrowserExposure;
+  source: "operations_manifest" | "env_example" | "contract_inferred" | "default";
+  status: ControlCenterSecretReadiness;
+  configured: boolean;
+  maskedValue?: string;
+  lastUpdated?: string;
+  canWrite: boolean;
+  canRemove: boolean;
+  note?: string;
+};
+
+export type ControlCenterAgentCredentials = {
+  status: CapabilityStatus;
+  required: number;
+  configuredRequired: number;
+  missingRequired: number;
+  optional: number;
+  configuredOptional: number;
+  definitions: ControlCenterSecretDefinition[];
+  storage: {
+    status: CapabilityStatus;
+    target: string;
+    relativePath?: string;
+    mode?: string;
+    backupRelativePath?: string;
+  };
+  warnings: string[];
+};
+
 export type ControlCenterAgentControl = {
   runtimeKind: ControlCenterAgentRuntimeKind;
   ownership: "managed" | "adoptable" | "unmanaged" | "external" | "none";
@@ -181,6 +225,7 @@ export type ControlCenterAgent = {
       reason?: string;
     };
   };
+  credentials: ControlCenterAgentCredentials;
 };
 
 export type ControlCenterOperatorActionPlan = {
@@ -260,6 +305,54 @@ export type ControlCenterFleetManualAuditResult = {
   results: ControlCenterOperatorActionResult[];
   warnings: string[];
   errors: string[];
+};
+
+export type ControlCenterAgentCredentialsResponse = {
+  ok: boolean;
+  generatedAt: string;
+  agent: {
+    id: string;
+    name: string;
+    folderStatus: "present" | "missing";
+  };
+  credentials: ControlCenterAgentCredentials;
+};
+
+export type ControlCenterSecretMutationResult = {
+  ok: boolean;
+  generatedAt: string;
+  agent: {
+    id: string;
+    name: string;
+  };
+  secret: {
+    name: string;
+    status: ControlCenterSecretReadiness;
+    configured: boolean;
+    maskedValue?: string;
+  };
+  dryRun?: boolean;
+  storage: ControlCenterAgentCredentials["storage"];
+  warnings: string[];
+};
+
+export type ControlCenterSecretValidationResult = {
+  ok: boolean;
+  generatedAt: string;
+  agent: {
+    id: string;
+    name: string;
+  };
+  secret: {
+    name: string;
+    provider: ControlCenterSecretProvider;
+    validation: ControlCenterSecretValidationMethod;
+    status: "passed" | "warnings" | "failed";
+    configured: boolean;
+    maskedValue?: string;
+  };
+  checks: ControlCenterOperatorActionCheck[];
+  warnings: string[];
 };
 
 export type ControlCenterOperatorActivityEntry = {
@@ -568,6 +661,25 @@ export type ControlCenterStatus = {
   generatedAt: string;
   root: string;
   registryPath?: string;
+  app: {
+    version: string;
+    startedAt: string;
+    uptimeSeconds: number;
+  };
+  selfTest: {
+    status: "pass" | "fail" | "unknown";
+    createdAt?: string;
+    ageLabel: string;
+    failed: number;
+    memoryStats: {
+      documents: number;
+      chunks: number;
+      entities?: number;
+      relations?: number;
+      embeddings?: number;
+    };
+    qualityGateStatus?: string;
+  };
   capabilities: ControlCenterCapabilities;
   pritha: {
     status: CapabilityStatus;

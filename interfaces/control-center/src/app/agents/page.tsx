@@ -48,6 +48,15 @@ function toCardAgent(agent: ControlCenterAgent): AgentCardModel {
         : agent.lifecycle.rollback.status === "planned"
           ? "planned"
           : "unavailable",
+    credentials: {
+      status:
+        agent.credentials.status === "ready" || agent.credentials.status === "pending_auth"
+          ? agent.credentials.status
+          : "unavailable",
+      required: agent.credentials.required,
+      missingRequired: agent.credentials.missingRequired,
+      total: agent.credentials.definitions.length,
+    },
     iconType: iconForAgent(agent),
     actionEnabled: agent.ui.actionEnabled,
     actionDisabledReason: agent.ui.actionDisabledReason,

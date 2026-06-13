@@ -1,14 +1,20 @@
 import { MobileShell } from "./MobileShell";
 import { Sidebar } from "./Sidebar";
+import { PrithaRealtimeProvider } from "@/components/voice/usePrithaRealtime";
+import { getControlCenterStatus } from "@/lib/control-center/server";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const initialStatus = await getControlCenterStatus();
+
   return (
-    <>
-      <div className="desktop-shell">
-        <Sidebar />
-        <main className="desktop-main">{children}</main>
+    <PrithaRealtimeProvider>
+      <div className="app-shell">
+        <Sidebar initialStatus={initialStatus} />
+        <div className="content-shell">
+          <MobileShell />
+          <main className="app-main">{children}</main>
+        </div>
       </div>
-      <MobileShell>{children}</MobileShell>
-    </>
+    </PrithaRealtimeProvider>
   );
 }

@@ -5,12 +5,16 @@ import { AgentCard } from "./AgentCard";
 export function MobileAgents({
   agents,
   onAgentAction,
+  onAgentCredentials,
+  onCreatePlan,
   onManualAudit,
   manualAuditRunning = false,
   manualAuditResult,
 }: {
   agents: AgentCardModel[];
   onAgentAction?: (agent: AgentCardModel) => void;
+  onAgentCredentials?: (agent: AgentCardModel) => void;
+  onCreatePlan?: () => void;
   onManualAudit?: () => void;
   manualAuditRunning?: boolean;
   manualAuditResult?: ControlCenterFleetManualAuditResult;
@@ -53,10 +57,10 @@ export function MobileAgents({
       </div>
       <div className="mobile-agent-list">
         {agents.map((agent) => (
-          <AgentCard agent={agent} mobile key={agent.id} onAction={onAgentAction} />
+          <AgentCard agent={agent} mobile key={agent.id} onAction={onAgentAction} onCredentials={onAgentCredentials} />
         ))}
-        <button className="mobile-add-agent-card" type="button" disabled title="Create new agents in Codex or Voice">
-          + Add New Agent
+        <button className="mobile-add-agent-card" type="button" onClick={onCreatePlan} title="Open a safe Codex planning handoff">
+          + Create Plan
         </button>
       </div>
     </div>

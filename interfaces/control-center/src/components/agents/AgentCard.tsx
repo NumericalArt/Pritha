@@ -1,6 +1,8 @@
-import { CheckCircle2, ClipboardCheck, Copy, ExternalLink, HelpCircle, Play, RefreshCcw, RotateCcw, Square } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Copy, ExternalLink, HelpCircle, KeyRound, Play, RefreshCcw, RotateCcw, Square } from "lucide-react";
+import { useState } from "react";
 import type { AgentCardModel } from "@/data/mockAgents";
 import { getCardAction, getCardActionLabel, getCardActionTone } from "@/data/mockAgents";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { AgentIcon } from "./AgentIcon";
 
 function stateLabel(agent: AgentCardModel) {
@@ -60,20 +62,38 @@ function footer(agent: AgentCardModel) {
   return null;
 }
 
+function credentialLabel(agent: AgentCardModel) {
+  if (!agent.credentials || !agent.credentials.total) return "No definitions";
+  if (agent.credentials.status === "ready") return "Ready";
+  if (agent.credentials.missingRequired) return `${agent.credentials.missingRequired} missing`;
+  return "Unavailable";
+}
+
 export function AgentCard({
   agent,
   mobile = false,
   onAction,
+  onCredentials,
 }: {
   agent: AgentCardModel;
   mobile?: boolean;
   onAction?: (agent: AgentCardModel) => void;
+  onCredentials?: (agent: AgentCardModel) => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const cardAction = getCardAction(agent);
   const actionTone = getCardActionTone(agent);
   const actionLabel = getCardActionLabel(agent);
   const canShowUrl = agent.state === "alive" && Boolean(agent.url);
   const canOpenPlan = Boolean(onAction);
+  const canOpenCredentials = Boolean(onCredentials && agent.credentials?.total);
+
+  async function copyUrl() {
+    if (!agent.url) return;
+    const ok = await copyTextToClipboard(agent.url);
+    setCopied(ok);
+    if (ok) window.setTimeout(() => setCopied(false), 1400);
+  }
 
   return (
     <article className={`${mobile ? "mobile-agent-card" : "agent-card"}`} data-state={agent.state}>
@@ -123,6 +143,30 @@ export function AgentCard({
         </div>
       ) : null}
 
+      {agent.credentials?.total ? (
+        <button
+          className={`agent-credentials-button ${agent.credentials.status === "ready" ? "ready" : agent.credentials.missingRequired ? "missing" : "unavailable"}`}
+          type="button"
+          data-testid="agent-credentials-button"
+          data-agent-id={agent.id}
+          onClick={
+            canOpenCredentials
+              ? (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onCredentials?.(agent);
+                }
+              : undefined
+          }
+          disabled={!canOpenCredentials}
+          title={`Configure credentials for ${agent.name}`}
+        >
+          <KeyRound size={16} />
+          <span>Credentials</span>
+          <strong>{credentialLabel(agent)}</strong>
+        </button>
+      ) : null}
+
       <button
         className={`${mobile ? "mobile-agent-action" : "agent-action"} ${actionTone}`}
         type="button"
@@ -144,7 +188,7 @@ export function AgentCard({
           <a className="icon-button" href={agent.url} target="_blank" rel="noreferrer" aria-label={`Open URL for ${agent.name}`}>
             <ExternalLink size={17} />
           </a>
-          <button className="icon-button" type="button" aria-label={`Copy URL for ${agent.name}`}>
+          <button className="icon-button" type="button" aria-label={`Copy URL for ${agent.name}`} title={copied ? "Copied" : "Copy URL"} onClick={() => void copyUrl()}>
             <Copy size={17} />
           </button>
         </div>

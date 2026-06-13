@@ -61,14 +61,15 @@ function folderStatusLabel(status: FolderScanRow["status"]) {
 }
 
 function SystemReadinessPanel({ data }: DeveloperPageProps) {
+  const selfTest = data.status.selfTest;
   return (
     <section className="dev-panel readiness-panel">
       <div className="panel-heading-row">
         <h2>System Readiness (modules)</h2>
         <div className="panel-actions">
-          <span>Last self-test: 2h ago</span>
-          <button className="outline-button small" type="button" aria-disabled="true">
-            Run Self-test
+          <span title={selfTest.createdAt}>Last self-test: {selfTest.ageLabel}</span>
+          <button className="outline-button small" type="button" aria-disabled="true" title="Run from CLI: node scripts/self-test.mjs">
+            CLI Self-test
           </button>
         </div>
       </div>
@@ -257,6 +258,7 @@ function EnvironmentCard({ data }: DeveloperPageProps) {
 
 function VoiceDiagnosticsCard({ data }: DeveloperPageProps) {
   const voice = data.voiceDiagnostics;
+  const connectionLabel = voice.connection === "good" ? "Good" : voice.connection === "degraded" ? "Degraded" : voice.connection === "bad" ? "Bad" : "Unknown";
   return (
     <section className="side-card dev-side-card">
       <div className="card-title-row">
@@ -271,7 +273,7 @@ function VoiceDiagnosticsCard({ data }: DeveloperPageProps) {
       <dl className="compact-dl">
         <div>
           <dt>Realtime Connection</dt>
-          <dd className="good">Good</dd>
+          <dd className={voice.connection === "good" ? "good" : ""}>{connectionLabel}</dd>
         </div>
         <div>
           <dt>Model</dt>
@@ -296,6 +298,7 @@ function VoiceDiagnosticsCard({ data }: DeveloperPageProps) {
 
 function MemoryIndexCard({ data }: DeveloperPageProps) {
   const memory = data.memoryIndex;
+  const statusLabel = memory.status === "up_to_date" ? "Up to date" : memory.status[0].toUpperCase() + memory.status.slice(1).replace(/_/g, " ");
   return (
     <section className="side-card dev-side-card">
       <div className="card-title-row">
@@ -310,7 +313,7 @@ function MemoryIndexCard({ data }: DeveloperPageProps) {
       <dl className="compact-dl">
         <div>
           <dt>Status</dt>
-          <dd className="good">Up to date</dd>
+          <dd className={memory.status === "up_to_date" ? "good" : ""}>{statusLabel}</dd>
         </div>
         <div>
           <dt>Documents</dt>
@@ -331,7 +334,7 @@ function MemoryIndexCard({ data }: DeveloperPageProps) {
 
 function LatestReportsCard({ data }: DeveloperPageProps) {
   return (
-    <section className="side-card dev-side-card latest-reports-card">
+    <section className="side-card dev-side-card latest-reports-card" id="latest-reports">
       <div className="card-title-row">
         <h2>
           <ScrollText size={17} />
@@ -362,7 +365,7 @@ export function DeveloperPage({ data }: DeveloperPageProps) {
   return (
     <>
       <div className="dev-desktop-content">
-        <PageHeader title="Developer (Read-only)" subtitle="Diagnostics and internal state for advanced users." variant="dev" showCodexButton />
+        <PageHeader title="Developer (Read-only)" subtitle="Diagnostics and internal state for advanced users." variant="dev" showCodexButton status={data.status} />
         <div className="dev-layout">
           <main className="dev-main">
             <SystemReadinessPanel data={data} />

@@ -1,8 +1,10 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, RefreshCcw, Search, ShieldCheck, Waves } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, RefreshCcw, Search, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlCenterFleetManualAuditResult, ControlCenterOperatorActivityEntry, ControlCenterStatus } from "@/lib/control-center/types";
+import { PrithaStarScene } from "@/components/voice/PrithaStarScene";
 
 export function AgentsRightRail({
   status,
@@ -25,15 +27,15 @@ export function AgentsRightRail({
     <aside className="right-rail">
       <section className="side-card pritha-status-card">
         <h2>Pritha Status</h2>
-        <div className="status-orb" aria-hidden="true">
-          <span />
+        <div className="status-star-shell" aria-hidden="true">
+          <PrithaStarScene phase={ready ? "idle" : "error"} />
         </div>
         <div className="ready-line">
           <span className={`dot ${ready ? "green" : "orange"}`} />
           {ready ? "Ready" : "Needs setup"}
         </div>
         <p>{status.pritha.summary}</p>
-        <button className="rail-button" type="button">View Details</button>
+        <Link className="rail-button" href="/dev">Open Diagnostics</Link>
       </section>
 
       <section className="side-card">
@@ -56,7 +58,7 @@ export function AgentsRightRail({
               ))
             : null}
         </div>
-        <button className="rail-button" type="button">View All Reports</button>
+        <Link className="rail-button" href="/dev">View All Reports</Link>
       </section>
 
       <section className="side-card">
@@ -72,7 +74,6 @@ export function AgentsRightRail({
             <Search size={17} />
             {manualAuditRunning ? "Running Audit" : "Run Manual Audit"}
           </button>
-          <button type="button"><Waves size={17} />Open Voice</button>
           <button type="button" disabled title="Update suggestion backend is planned"><RefreshCcw size={17} />Check for Updates</button>
         </div>
       </section>

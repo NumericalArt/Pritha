@@ -17,8 +17,17 @@ Desktop `/` resolves to `/agents`; mobile `/` resolves to `/voice`.
 
 ## Run
 
+For local UI development:
+
 ```sh
 npm --prefix interfaces/control-center run dev
+```
+
+For the Pritha Tailscale link or any non-local browser access, use the
+production server on the same port:
+
+```sh
+npm --prefix interfaces/control-center run serve
 ```
 
 Default local URL:
@@ -29,6 +38,11 @@ http://127.0.0.1:3420/agents
 
 The app defaults to `3420` to avoid colliding with the existing Techscope web UI
 on `3000`.
+
+Do not expose `next dev` through Tailscale. The dev client can render the page
+while failing to hydrate React event handlers behind HTTPS proxying; production
+`build` + `start` keeps filters, credentials drawers, Voice controls and the
+Three.js web active.
 
 Optional local env:
 

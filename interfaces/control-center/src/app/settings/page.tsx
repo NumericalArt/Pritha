@@ -7,5 +7,5 @@ export const fetchCache = "force-no-store";
 
 export default async function SettingsPage() {
   const status = await getControlCenterStatus();
-  return <SettingsControlPage access={status.access} />;
+  return <SettingsControlPage access={status.access} status={status} />;
 }

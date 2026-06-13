@@ -1,33 +1,46 @@
-import { Bot, Mic, Orbit, UsersRound } from "lucide-react";
+import { Bot, Mic, Orbit } from "lucide-react";
 import type { ComponentType } from "react";
+import type { CapabilityStatus, ControlCenterStatus } from "@/lib/control-center/types";
 
 type Segment = {
   icon: ComponentType<{ size?: number }>;
   title: string;
   value: string;
-  valueTone?: "ready" | "connected" | "off";
+  valueTone?: "ready" | "connected" | "warn" | "failed" | "off";
   dot?: "green" | "orange" | "red";
 };
 
-export function StatusStrip({ variant = "agents", agentTotal }: { variant?: "agents" | "voice" | "dev"; agentTotal?: number }) {
-  const baseSegments: Segment[] = [
-    { icon: Bot, title: "Pritha", value: "Ready", valueTone: "ready", dot: "green" },
-    variant === "agents"
-      ? { icon: Mic, title: "Voice", value: "Off", valueTone: "off" }
-      : { icon: Bot, title: "Codex", value: "Planned", valueTone: "off" },
-    { icon: Orbit, title: "Proactivity", value: "Off", valueTone: "off" },
+function capabilitySegment(status: CapabilityStatus | undefined, labels: Partial<Record<CapabilityStatus, string>> = {}) {
+  if (!status) return { value: "Checking", valueTone: "off" as const };
+  if (status === "ready") return { value: labels.ready || "Ready", valueTone: "ready" as const, dot: "green" as const };
+  if (status === "manual_only") return { value: labels.manual_only || "Manual", valueTone: "warn" as const, dot: "orange" as const };
+  if (status === "pending_auth") return { value: labels.pending_auth || "Needs setup", valueTone: "warn" as const, dot: "orange" as const };
+  if (status === "failed") return { value: labels.failed || "Failed", valueTone: "failed" as const, dot: "red" as const };
+  if (status === "disabled") return { value: labels.disabled || "Off", valueTone: "off" as const };
+  if (status === "not_installed") return { value: labels.not_installed || "Not installed", valueTone: "warn" as const, dot: "orange" as const };
+  if (status === "unavailable") return { value: labels.unavailable || "Unavailable", valueTone: "off" as const };
+  return { value: labels.planned || "Planned", valueTone: "off" as const };
+}
+
+export function StatusStrip({
+  status,
+}: {
+  status?: ControlCenterStatus;
+}) {
+  const pritha = capabilitySegment(status?.pritha.status, { failed: "Needs setup" });
+  const codex = capabilitySegment(status?.voice.codexBridge ?? status?.capabilities.codex_bridge, { manual_only: "Manual" });
+  const voice = capabilitySegment(status?.voice.realtime ?? status?.capabilities.voice_realtime, { pending_auth: "Needs key", ready: "Ready" });
+  const proactivity = capabilitySegment(status?.proactivity.status ?? status?.capabilities.proactivity, {
+    manual_only: "Manual",
+    not_installed: "Off",
+    planned: "Planned",
+  });
+  const segments: Segment[] = [
+    { icon: Bot, title: "Pritha", ...pritha },
+    { icon: Bot, title: "Codex", ...codex },
+    { icon: Mic, title: "Voice", ...voice },
+    { icon: Orbit, title: "Proactivity", ...proactivity },
   ];
-  const segments: Segment[] =
-    variant === "dev"
-      ? [
-          baseSegments[0],
-          baseSegments[1],
-          { icon: Mic, title: "Voice", value: "Off", valueTone: "off" },
-          baseSegments[2],
-        ]
-      : variant === "agents"
-        ? [...baseSegments, { icon: UsersRound, title: "Agents", value: typeof agentTotal === "number" ? `${agentTotal} total` : "From registry", valueTone: "off" }]
-        : baseSegments;
 
   return (
     <div className="status-strip" aria-label="Pritha status">

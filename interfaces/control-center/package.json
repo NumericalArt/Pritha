@@ -6,22 +6,27 @@
   "scripts": {
     "dev": "next dev --hostname ${PRITHA_CONTROL_CENTER_HOST:-127.0.0.1} --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
     "build": "next build",
+    "serve": "npm run build && npm run start",
     "start": "next start --hostname ${PRITHA_CONTROL_CENTER_HOST:-127.0.0.1} --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "three": "^0.184.0"
   },
   "overrides": {
     "postcss": "8.5.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/three": "^0.184.1",
     "typescript": "latest"
   }
 }

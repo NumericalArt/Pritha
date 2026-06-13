@@ -1,9 +1,11 @@
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import type {
   CapabilityStatus,
+  ControlCenterAgentCredentials,
+  ControlCenterAgentCredentialsResponse,
   ControlCenterAgentControl,
   ControlCenterCommandReadiness,
   ControlCenterAgent,
@@ -19,6 +21,13 @@ import type {
   ControlCenterPreRestoreContract,
   ControlCenterRestorePlan,
   ControlCenterRollbackPlan,
+  ControlCenterSecretBrowserExposure,
+  ControlCenterSecretDefinition,
+  ControlCenterSecretMutationResult,
+  ControlCenterSecretProvider,
+  ControlCenterSecretReadiness,
+  ControlCenterSecretValidationMethod,
+  ControlCenterSecretValidationResult,
   ControlCenterSnapshotAuditEntry,
   ControlCenterSnapshotAuditResponse,
   ControlCenterSnapshotCreateRequest,
@@ -51,6 +60,18 @@ type OperationsCommand =
       control_center_managed?: boolean;
     };
 
+type OperationsCredentialDefinition = {
+  name?: string;
+  variable?: string;
+  label?: string;
+  provider?: ControlCenterSecretProvider;
+  required?: boolean;
+  validation?: ControlCenterSecretValidationMethod;
+  storage_target?: string;
+  browser_exposure?: ControlCenterSecretBrowserExposure;
+  note?: string;
+};
+
 type OperationsManifest = {
   agent?: string;
   display_name?: string;
@@ -78,6 +99,7 @@ type OperationsManifest = {
     mode?: string;
     schedule?: string;
   };
+  credentials?: OperationsCredentialDefinition[];
 };
 
 type LifecycleMetadata = ControlCenterAgent["lifecycle"] & {
@@ -153,6 +175,7 @@ type OperatorActionAuditEntry = {
 
 const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
+const APP_STARTED_AT = new Date();
 
 function resolveTechscopeRoot() {
   if (process.env.TECHSCOPE_ROOT) return path.resolve(process.env.TECHSCOPE_ROOT);
@@ -243,27 +266,166 @@ function tailscaleSelfDnsName() {
   }
 }
 
-function tailscaleServeConfigured(tailscaleUrl: string) {
+function tailscaleServeStatusOutput() {
   const result = spawnSync("tailscale", ["serve", "status"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 5_000,
   });
-  if (result.status !== 0) return false;
-  return result.stdout.includes(tailscaleUrl) && result.stdout.includes(`http://127.0.0.1:${APP_PORT}`);
+  if (result.status !== 0) return "";
+  return result.stdout;
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function tailscaleServeEndpointBlock(tailscaleUrl: string, serveStatus: string) {
+  const pattern = new RegExp(`${escapeRegex(tailscaleUrl)}(?: \\(tailnet only\\))?\\n[\\s\\S]*?(?=\\n\\n|$)`);
+  return serveStatus.match(pattern)?.[0] || "";
+}
+
+function tailscaleServeConfigured(tailscaleUrl: string, serveStatus = tailscaleServeStatusOutput()) {
+  return tailscaleServeEndpointBlock(tailscaleUrl, serveStatus).includes(`http://127.0.0.1:${APP_PORT}`);
+}
+
+function canonicalTailscaleServeConfigured(dnsName: string, serveStatus: string) {
+  const canonicalUrl = `https://${dnsName}`;
+  return tailscaleServeEndpointBlock(canonicalUrl, serveStatus).includes(`http://127.0.0.1:${APP_PORT}`);
 }
 
 function accessLinks() {
   const lanIp = firstLanIPv4();
   const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || tailscaleSelfDnsName();
-  const tailscaleUrl = dnsName ? `https://${dnsName}:${APP_PORT}` : undefined;
-  const serveConfigured = tailscaleUrl ? tailscaleServeConfigured(tailscaleUrl) : false;
+  const serveStatus = dnsName ? tailscaleServeStatusOutput() : "";
+  const explicitTailscaleUrl = dnsName ? `https://${dnsName}:${APP_PORT}` : undefined;
+  const canonicalTailscaleUrl = dnsName ? `https://${dnsName}` : undefined;
+  const canonicalConfigured = dnsName ? canonicalTailscaleServeConfigured(dnsName, serveStatus) : false;
+  const explicitConfigured = explicitTailscaleUrl ? tailscaleServeConfigured(explicitTailscaleUrl, serveStatus) : false;
+  const tailscaleUrl = canonicalConfigured ? canonicalTailscaleUrl : explicitTailscaleUrl;
+  const serveConfigured = canonicalConfigured || explicitConfigured;
   return {
     localhost: `http://127.0.0.1:${APP_PORT}`,
     lanUrl: lanIp ? `http://${lanIp}:${APP_PORT}` : undefined,
     tailscaleUrl,
     tailscaleVoiceUrl: tailscaleUrl ? `${tailscaleUrl}/voice` : undefined,
     tailscaleServeConfigured: serveConfigured,
+  };
+}
+
+function appStatus() {
+  const pkg = readJson<{ version?: string }>(path.join(process.cwd(), "package.json"));
+  return {
+    version: pkg?.version ? `v${pkg.version}` : "v?",
+    startedAt: APP_STARTED_AT.toISOString(),
+    uptimeSeconds: Math.max(0, Math.floor((Date.now() - APP_STARTED_AT.getTime()) / 1000)),
+  };
+}
+
+type SelfTestBaseline = {
+  schema?: string;
+  status?: "pass" | "fail";
+  created_at?: string;
+  memory_stats?: {
+    documents?: number;
+    chunks?: number;
+    entities?: number;
+    relations?: number;
+    embeddings?: number;
+  };
+  quality_gate?: {
+    status?: string;
+    failed?: number;
+  };
+};
+
+type MemoryStats = ControlCenterStatus["selfTest"]["memoryStats"];
+
+function relativeAgeLabel(value?: string) {
+  if (!value) return "Never";
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return "Unknown";
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return "now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function emptyMemoryStats(): MemoryStats {
+  return {
+    documents: 0,
+    chunks: 0,
+  };
+}
+
+function sqliteMemoryStats(root: string): MemoryStats | null {
+  const databasePath = path.join(root, ".memory", "techscope.sqlite");
+  if (!existsSync(databasePath)) return null;
+  const result = spawnSync(
+    "sqlite3",
+    [
+      "-json",
+      databasePath,
+      `
+SELECT 'documents' AS name, COUNT(*) AS count FROM documents
+UNION ALL SELECT 'chunks', COUNT(*) FROM chunks
+UNION ALL SELECT 'entities', COUNT(*) FROM entities
+UNION ALL SELECT 'relations', COUNT(*) FROM relations
+UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
+`,
+    ],
+    {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 5_000,
+    },
+  );
+  if (result.status !== 0 || !result.stdout.trim()) return null;
+  try {
+    const rows = JSON.parse(result.stdout) as Array<{ name?: string; count?: number }>;
+    return {
+      documents: Number(rows.find((row) => row.name === "documents")?.count || 0),
+      chunks: Number(rows.find((row) => row.name === "chunks")?.count || 0),
+      entities: Number(rows.find((row) => row.name === "entities")?.count || 0),
+      relations: Number(rows.find((row) => row.name === "relations")?.count || 0),
+      embeddings: Number(rows.find((row) => row.name === "embeddings")?.count || 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
+  const baseline = readJson<SelfTestBaseline>(path.join(root, ".memory", "last-self-test.json"));
+  const sqliteStats = sqliteMemoryStats(root);
+  const baselineStats = baseline?.memory_stats;
+  const memoryStats = sqliteStats || {
+    documents: Number(baselineStats?.documents || 0),
+    chunks: Number(baselineStats?.chunks || 0),
+    entities: Number(baselineStats?.entities || 0),
+    relations: Number(baselineStats?.relations || 0),
+    embeddings: Number(baselineStats?.embeddings || 0),
+  };
+
+  if (baseline?.schema !== "techscope-self-test-v1") {
+    return {
+      status: "unknown",
+      ageLabel: "Never",
+      failed: 0,
+      memoryStats: sqliteStats || emptyMemoryStats(),
+    };
+  }
+
+  return {
+    status: baseline.status || "unknown",
+    createdAt: baseline.created_at,
+    ageLabel: relativeAgeLabel(baseline.created_at),
+    failed: Number(baseline.quality_gate?.failed || 0),
+    memoryStats,
+    qualityGateStatus: baseline.quality_gate?.status,
   };
 }
 
@@ -621,6 +783,367 @@ function readJson<T>(filePath: string): T | null {
   } catch {
     return null;
   }
+}
+
+function isSecretName(value: string) {
+  return /^[A-Z_][A-Z0-9_]{1,100}$/.test(value);
+}
+
+function providerForSecretName(name: string): ControlCenterSecretProvider {
+  if (name.startsWith("OPENAI_")) return "openai";
+  if (name.startsWith("TELEGRAM_")) return "telegram";
+  if (name.startsWith("ANTHROPIC_")) return "anthropic";
+  if (name.startsWith("WHATSAPP_")) return "whatsapp";
+  if (name.startsWith("CODEX_")) return "codex_external";
+  return "generic";
+}
+
+function isCredentialLikeName(name: string) {
+  if (!isSecretName(name)) return false;
+  if (name.startsWith("CODEX_")) return false;
+  return /(?:API_KEY|BOT_TOKEN|ACCESS_TOKEN|AUTH_TOKEN|CLIENT_SECRET|WEBHOOK_SECRET|SECRET|PASSWORD|TOKEN)$/.test(name);
+}
+
+function defaultSecretLabel(name: string) {
+  const acronyms: Record<string, string> = {
+    API: "API",
+    ID: "ID",
+    URL: "URL",
+    OPENAI: "OpenAI",
+    TELEGRAM: "Telegram",
+    ANTHROPIC: "Anthropic",
+    WHATSAPP: "WhatsApp",
+  };
+  return name
+    .split("_")
+    .map((part) => acronyms[part] || part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function defaultSecretValidation(provider: ControlCenterSecretProvider): ControlCenterSecretValidationMethod {
+  if (provider === "codex_external") return "manual";
+  if (provider === "generic") return "none";
+  return "format";
+}
+
+function defaultBrowserExposure(provider: ControlCenterSecretProvider): ControlCenterSecretBrowserExposure {
+  return provider === "openai" ? "ephemeral_only" : "server_only";
+}
+
+function defaultRequiredForSecret(name: string) {
+  if (name === "OPENAI_API_KEY") return true;
+  return /(?:API_KEY|BOT_TOKEN|ACCESS_TOKEN|AUTH_TOKEN|CLIENT_SECRET|WEBHOOK_SECRET)$/.test(name);
+}
+
+type SecretDefinitionBase = Omit<ControlCenterSecretDefinition, "status" | "configured" | "maskedValue" | "lastUpdated" | "canWrite" | "canRemove">;
+
+function secretDefinitionFromManifest(definition: OperationsCredentialDefinition): SecretDefinitionBase | null {
+  const name = (definition.name || definition.variable || "").trim().toUpperCase();
+  if (!isSecretName(name)) return null;
+  const provider = definition.provider || providerForSecretName(name);
+  return {
+    name,
+    label: definition.label || defaultSecretLabel(name),
+    provider,
+    required: definition.required ?? defaultRequiredForSecret(name),
+    validation: definition.validation || defaultSecretValidation(provider),
+    storageTarget: definition.storage_target || ".env.local",
+    browserExposure: definition.browser_exposure || defaultBrowserExposure(provider),
+    source: "operations_manifest",
+    note: definition.note,
+  };
+}
+
+function envExampleSecretNames(folderPath: string) {
+  const envExamplePath = path.join(folderPath, ".env.example");
+  if (!existsSync(envExamplePath)) return [];
+  return readText(envExamplePath)
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=/)?.[1])
+    .filter((name): name is string => Boolean(name && isCredentialLikeName(name)));
+}
+
+function secretDefinitionFromEnvExample(name: string): SecretDefinitionBase {
+  const provider = providerForSecretName(name);
+  return {
+    name,
+    label: defaultSecretLabel(name),
+    provider,
+    required: defaultRequiredForSecret(name),
+    validation: defaultSecretValidation(provider),
+    storageTarget: ".env.local",
+    browserExposure: defaultBrowserExposure(provider),
+    source: "env_example",
+  };
+}
+
+function mergeSecretDefinitions(folderPath: string, manifest: OperationsManifest | null) {
+  const definitions = new Map<string, SecretDefinitionBase>();
+  for (const definition of manifest?.credentials || []) {
+    const normalized = secretDefinitionFromManifest(definition);
+    if (normalized) definitions.set(normalized.name, normalized);
+  }
+  for (const name of envExampleSecretNames(folderPath)) {
+    if (!definitions.has(name)) definitions.set(name, secretDefinitionFromEnvExample(name));
+  }
+  return [...definitions.values()].sort((a, b) => Number(b.required) - Number(a.required) || a.name.localeCompare(b.name));
+}
+
+function unquoteEnvValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    const body = trimmed.slice(1, -1);
+    return trimmed.startsWith('"') ? body.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\") : body;
+  }
+  return trimmed.replace(/\s+#.*$/, "");
+}
+
+function parseEnvValues(text: string) {
+  const values = new Map<string, string>();
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);
+    if (match) values.set(match[1], unquoteEnvValue(match[2]));
+  }
+  return values;
+}
+
+function quoteEnvValue(value: string) {
+  if (/^[A-Za-z0-9_./:@+=,-]+$/.test(value)) return value;
+  return JSON.stringify(value);
+}
+
+function upsertEnvValue(text: string, name: string, value: string) {
+  const lines = text ? text.split(/\r?\n/) : [];
+  let found = false;
+  const nextLines = lines.map((line) => {
+    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=/);
+    if (match?.[1] !== name) return line;
+    found = true;
+    return `${name}=${quoteEnvValue(value)}`;
+  });
+
+  if (!found) {
+    if (nextLines.length && nextLines[nextLines.length - 1] !== "") nextLines.push("");
+    if (!nextLines.includes("# Managed by Pritha Control Center credentials drawer")) {
+      nextLines.push("# Managed by Pritha Control Center credentials drawer");
+    }
+    nextLines.push(`${name}=${quoteEnvValue(value)}`);
+  }
+
+  return `${nextLines.join("\n").replace(/\n+$/, "")}\n`;
+}
+
+function removeEnvValue(text: string, name: string) {
+  return `${text
+    .split(/\r?\n/)
+    .filter((line) => line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=/)?.[1] !== name)
+    .join("\n")
+    .replace(/\n+$/, "")}\n`;
+}
+
+function envLocalPath(folderPath: string) {
+  return path.join(folderPath, ".env.local");
+}
+
+function envBackupDir(folderPath: string) {
+  return path.join(folderPath, ".env.local.backups");
+}
+
+function ensurePrivateGitExclude(folderPath: string) {
+  const excludePath = path.join(folderPath, ".git", "info", "exclude");
+  if (!existsSync(path.dirname(excludePath))) return;
+  const entry = ".env.local.backups/";
+  const current = readText(excludePath);
+  if (current.split(/\r?\n/).includes(entry)) return;
+  appendFileSync(excludePath, `${current.endsWith("\n") || !current ? "" : "\n"}${entry}\n`, "utf8");
+}
+
+function writePrivateFileAtomic(filePath: string, text: string) {
+  const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.tmp-${process.pid}-${Date.now()}`);
+  writeFileSync(temporaryPath, text, { encoding: "utf8", mode: 0o600 });
+  chmodSync(temporaryPath, 0o600);
+  renameSync(temporaryPath, filePath);
+  chmodSync(filePath, 0o600);
+}
+
+function writeEnvBackup(folderPath: string) {
+  const filePath = envLocalPath(folderPath);
+  if (!existsSync(filePath)) return undefined;
+  ensurePrivateGitExclude(folderPath);
+  const backupDir = envBackupDir(folderPath);
+  mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+  chmodSync(backupDir, 0o700);
+  const backupName = `.env.local.${new Date().toISOString().replace(/[:.]/g, "-")}.bak`;
+  const backupPath = path.join(backupDir, backupName);
+  writeFileSync(backupPath, readFileSync(filePath, "utf8"), { encoding: "utf8", mode: 0o600 });
+  chmodSync(backupPath, 0o600);
+
+  const backups = readdirSync(backupDir)
+    .filter((entry) => entry.startsWith(".env.local.") && entry.endsWith(".bak"))
+    .sort()
+    .reverse();
+  for (const oldBackup of backups.slice(5)) rmSync(path.join(backupDir, oldBackup), { force: true });
+  return backupPath;
+}
+
+function maskSecretValue(value: string | undefined) {
+  if (!value) return undefined;
+  const suffix = value.slice(-4);
+  return suffix ? `••••${suffix}` : "••••";
+}
+
+function credentialStorage(root: string, folderPath: string): ControlCenterAgentCredentials["storage"] {
+  const filePath = envLocalPath(folderPath);
+  const backupPath = envBackupDir(folderPath);
+  if (!existsSync(filePath)) {
+    return {
+      status: "manual_only",
+      target: ".env.local",
+      relativePath: relativePath(root, filePath),
+      backupRelativePath: relativePath(root, backupPath),
+    };
+  }
+  const stat = statSync(filePath);
+  return {
+    status: "ready",
+    target: ".env.local",
+    relativePath: relativePath(root, filePath),
+    mode: `0${(stat.mode & 0o777).toString(8)}`,
+    backupRelativePath: relativePath(root, backupPath),
+  };
+}
+
+function credentialsForAgent(root: string, folder: { absolutePath: string } | null, manifest: OperationsManifest | null): ControlCenterAgentCredentials {
+  if (!folder) {
+    return {
+      status: "unavailable",
+      required: 0,
+      configuredRequired: 0,
+      missingRequired: 0,
+      optional: 0,
+      configuredOptional: 0,
+      definitions: [],
+      storage: {
+        status: "unavailable",
+        target: ".env.local",
+      },
+      warnings: ["Child-agent folder is missing; credentials cannot be configured."],
+    };
+  }
+
+  const definitionBases = mergeSecretDefinitions(folder.absolutePath, manifest);
+  const filePath = envLocalPath(folder.absolutePath);
+  const envValues = existsSync(filePath) ? parseEnvValues(readText(filePath)) : new Map<string, string>();
+  const lastUpdated = existsSync(filePath) ? statSync(filePath).mtime.toISOString() : undefined;
+  const storage = credentialStorage(root, folder.absolutePath);
+  const definitions: ControlCenterSecretDefinition[] = definitionBases.map((definition) => {
+    const value = envValues.get(definition.name);
+    const configured = Boolean(value);
+    const status: ControlCenterSecretReadiness = configured ? "configured" : definition.required ? "missing" : "optional";
+    return {
+      ...definition,
+      status,
+      configured,
+      maskedValue: maskSecretValue(value),
+      lastUpdated: configured ? lastUpdated : undefined,
+      canWrite: definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
+      canRemove: configured && definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
+      note:
+        definition.note ||
+        (definition.provider === "codex_external"
+          ? "Codex App/CLI auth is configured outside child-agent secret storage."
+          : definition.browserExposure === "ephemeral_only"
+            ? "Keep this server-side; browsers should receive only ephemeral credentials."
+            : undefined),
+    };
+  });
+
+  const required = definitions.filter((definition) => definition.required).length;
+  const configuredRequired = definitions.filter((definition) => definition.required && definition.configured).length;
+  const optional = definitions.filter((definition) => !definition.required).length;
+  const configuredOptional = definitions.filter((definition) => !definition.required && definition.configured).length;
+  const missingRequired = required - configuredRequired;
+
+  return {
+    status: missingRequired ? "pending_auth" : definitions.length ? "ready" : "unavailable",
+    required,
+    configuredRequired,
+    missingRequired,
+    optional,
+    configuredOptional,
+    definitions,
+    storage,
+    warnings: definitions.length ? [] : ["No credential definitions were found in operations manifest or .env.example."],
+  };
+}
+
+function resolveAgentFolderPath(status: ControlCenterStatus, agent: ControlCenterAgent) {
+  if (agent.folder.status !== "present" || !agent.folder.relativePath) return null;
+  const folderPath = path.resolve(status.root, agent.folder.relativePath);
+  const allowedParent = path.dirname(status.root);
+  if (folderPath !== status.root && (folderPath === allowedParent || isPathInside(allowedParent, folderPath))) return folderPath;
+  return null;
+}
+
+function findCredential(agent: ControlCenterAgent, name: string) {
+  const normalized = name.trim().toUpperCase();
+  if (!isSecretName(normalized)) return null;
+  return agent.credentials.definitions.find((definition) => definition.name === normalized) || null;
+}
+
+function safeSecretInput(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes("\0") || /[\r\n]/.test(trimmed) || trimmed.length > 4096) return null;
+  return trimmed;
+}
+
+function validateSecretFormat(definition: ControlCenterSecretDefinition, value: string | undefined): ControlCenterOperatorActionCheck[] {
+  if (!value) {
+    return [
+      {
+        id: "configured",
+        label: "Configured value",
+        status: "fail",
+        detail: "Secret is not configured.",
+      },
+    ];
+  }
+
+  const checks: ControlCenterOperatorActionCheck[] = [
+    {
+      id: "configured",
+      label: "Configured value",
+      status: "pass",
+      detail: "A value is present in the private agent store.",
+    },
+  ];
+
+  if (definition.validation === "none" || definition.validation === "manual") {
+    checks.push({
+      id: "validation-method",
+      label: "Validation method",
+      status: "warn",
+      detail: "No provider-safe automated validation is configured.",
+    });
+    return checks;
+  }
+
+  const patterns: Partial<Record<ControlCenterSecretProvider, RegExp>> = {
+    openai: /^sk-[A-Za-z0-9_-]{16,}$/,
+    telegram: /^\d+:[A-Za-z0-9_-]{20,}$/,
+    anthropic: /^sk-ant-[A-Za-z0-9_-]{16,}$/,
+    whatsapp: /^[A-Za-z0-9_.:-]{20,}$/,
+  };
+  const pattern = patterns[definition.provider];
+  checks.push({
+    id: "format",
+    label: "Format",
+    status: pattern && !pattern.test(value) ? "fail" : "pass",
+    detail: pattern ? "Provider key shape checked locally; no network request was made." : "Generic secret accepted; no provider pattern is available.",
+  });
+  return checks;
 }
 
 function auditEntryId(timestamp: string, agentId: string, action: string) {
@@ -1013,6 +1536,7 @@ async function buildAgent(root: string, record: RegistryRecord): Promise<Control
   const localUrl = manifest?.local_upstream_url;
   const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
   const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity);
+  const credentials = credentialsForAgent(root, folder, manifest);
 
   return {
     id: slug(record.name),
@@ -1057,6 +1581,7 @@ async function buildAgent(root: string, record: RegistryRecord): Promise<Control
     },
     control,
     lifecycle,
+    credentials,
   };
 }
 
@@ -1132,6 +1657,7 @@ export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
   const voiceRuntime = getPrithaRealtimeStatus();
   const caps = capabilities(root, registry.records.length > 0, childAgents, voiceRuntime);
   const access = accessLinks();
+  const selfTest = selfTestStatus(root);
   const warnings = childAgents.flatMap((agent) => (agent.ui.issueText ? [`${agent.name}: ${agent.ui.issueText}`] : []));
 
   return {
@@ -1139,6 +1665,8 @@ export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
     generatedAt: new Date().toISOString(),
     root,
     registryPath: registry.registryPath,
+    app: appStatus(),
+    selfTest,
     capabilities: caps,
     pritha: {
       status: caps.agents_registry === "ready" && caps.developer_diagnostics === "ready" ? "ready" : "failed",
@@ -1160,7 +1688,7 @@ export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
       tailscaleUrl: access.tailscaleUrl,
       tailscaleVoiceUrl: access.tailscaleVoiceUrl,
       tailscaleServeConfigured: access.tailscaleServeConfigured,
-      qr: access.tailscaleVoiceUrl ? "ready" : "unavailable",
+      qr: access.tailscaleServeConfigured && access.tailscaleVoiceUrl ? "ready" : "unavailable",
     },
     proactivity: {
       status: "manual_only",
@@ -1186,6 +1714,152 @@ export async function getControlCenterAgent(agentId: string) {
   return {
     status,
     agent: status.childAgents.find((item) => item.id === agentId) || status.allRegistryAgents.find((item) => item.id === agentId) || null,
+  };
+}
+
+export async function getAgentCredentials(agentId: string): Promise<ControlCenterAgentCredentialsResponse | null> {
+  const status = await getControlCenterStatus();
+  const agent = status.childAgents.find((item) => item.id === agentId);
+  if (!agent) return null;
+
+  return {
+    ok: true,
+    generatedAt: status.generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      folderStatus: agent.folder.status,
+    },
+    credentials: agent.credentials,
+  };
+}
+
+export async function setAgentCredentialSecret(
+  agentId: string,
+  name: string,
+  value: unknown,
+  options: { dryRun?: boolean } = {},
+): Promise<ControlCenterSecretMutationResult | null> {
+  const status = await getControlCenterStatus();
+  const agent = status.childAgents.find((item) => item.id === agentId);
+  if (!agent) return null;
+  const definition = findCredential(agent, name);
+  if (!definition) throw new Error("unknown_secret");
+  if (!definition.canWrite) throw new Error("secret_not_writable");
+  const secretValue = safeSecretInput(value);
+  if (!secretValue) throw new Error("invalid_secret_value");
+  const folderPath = resolveAgentFolderPath(status, agent);
+  if (!folderPath) throw new Error("agent_folder_unavailable");
+
+  const filePath = envLocalPath(folderPath);
+  if (!options.dryRun) {
+    const current = existsSync(filePath) ? readText(filePath) : "";
+    writeEnvBackup(folderPath);
+    writePrivateFileAtomic(filePath, upsertEnvValue(current, definition.name, secretValue));
+  }
+
+  const refreshed = options.dryRun ? agent : (await getControlCenterAgent(agentId)).agent;
+  const refreshedDefinition = refreshed ? findCredential(refreshed, definition.name) : null;
+  const generatedAt = new Date().toISOString();
+  return {
+    ok: true,
+    generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    secret: {
+      name: definition.name,
+      status: options.dryRun ? "configured" : refreshedDefinition?.status || "configured",
+      configured: true,
+      maskedValue: options.dryRun ? maskSecretValue(secretValue) : refreshedDefinition?.maskedValue,
+    },
+    dryRun: options.dryRun || undefined,
+    storage: options.dryRun ? agent.credentials.storage : refreshed?.credentials.storage || agent.credentials.storage,
+    warnings: options.dryRun
+      ? ["Dry run completed; no .env.local file was written."]
+      : ["Secret was written to the child agent private .env.local store. The value is not returned by this API."],
+  };
+}
+
+export async function removeAgentCredentialSecret(
+  agentId: string,
+  name: string,
+  options: { dryRun?: boolean } = {},
+): Promise<ControlCenterSecretMutationResult | null> {
+  const status = await getControlCenterStatus();
+  const agent = status.childAgents.find((item) => item.id === agentId);
+  if (!agent) return null;
+  const definition = findCredential(agent, name);
+  if (!definition) throw new Error("unknown_secret");
+  if (!definition.storageTarget || definition.storageTarget !== ".env.local") throw new Error("secret_not_removable");
+  const folderPath = resolveAgentFolderPath(status, agent);
+  if (!folderPath) throw new Error("agent_folder_unavailable");
+
+  const filePath = envLocalPath(folderPath);
+  if (!options.dryRun && existsSync(filePath)) {
+    const current = readText(filePath);
+    writeEnvBackup(folderPath);
+    writePrivateFileAtomic(filePath, removeEnvValue(current, definition.name));
+  }
+
+  const refreshed = options.dryRun ? agent : (await getControlCenterAgent(agentId)).agent;
+  const refreshedDefinition = refreshed ? findCredential(refreshed, definition.name) : null;
+  const generatedAt = new Date().toISOString();
+  return {
+    ok: true,
+    generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    secret: {
+      name: definition.name,
+      status: options.dryRun ? "missing" : refreshedDefinition?.status || (definition.required ? "missing" : "optional"),
+      configured: false,
+      maskedValue: undefined,
+    },
+    dryRun: options.dryRun || undefined,
+    storage: options.dryRun ? agent.credentials.storage : refreshed?.credentials.storage || agent.credentials.storage,
+    warnings: options.dryRun
+      ? ["Dry run completed; no .env.local file was changed."]
+      : ["Secret was removed from the child agent private .env.local store. No secret value was written to audit logs."],
+  };
+}
+
+export async function validateAgentCredentialSecret(agentId: string, name: string): Promise<ControlCenterSecretValidationResult | null> {
+  const status = await getControlCenterStatus();
+  const agent = status.childAgents.find((item) => item.id === agentId);
+  if (!agent) return null;
+  const definition = findCredential(agent, name);
+  if (!definition) throw new Error("unknown_secret");
+  const folderPath = resolveAgentFolderPath(status, agent);
+  if (!folderPath) throw new Error("agent_folder_unavailable");
+
+  const filePath = envLocalPath(folderPath);
+  const values = existsSync(filePath) ? parseEnvValues(readText(filePath)) : new Map<string, string>();
+  const value = values.get(definition.name);
+  const checks = validateSecretFormat(definition, value);
+  const failed = checks.some((check) => check.status === "fail");
+  const warnings = checks.some((check) => check.status === "warn");
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    secret: {
+      name: definition.name,
+      provider: definition.provider,
+      validation: definition.validation,
+      status: failed ? "failed" : warnings ? "warnings" : "passed",
+      configured: Boolean(value),
+      maskedValue: maskSecretValue(value),
+    },
+    checks,
+    warnings: ["Validation is local and provider-safe; no secret value was sent over the network."],
   };
 }
 
@@ -2511,9 +3185,9 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
     },
     memoryIndex: {
       status: existsSync(path.join(status.root, ".memory", "techscope.sqlite")) ? "up_to_date" : "unknown",
-      documents: 0,
-      chunks: 0,
-      lastUpdated: "unknown",
+      documents: status.selfTest.memoryStats.documents,
+      chunks: status.selfTest.memoryStats.chunks,
+      lastUpdated: status.selfTest.createdAt ? status.selfTest.ageLabel : "unknown",
     },
     reports,
   };
