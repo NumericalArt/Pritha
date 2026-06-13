@@ -2,7 +2,6 @@ import {
   Clock3,
   Database,
   Globe2,
-  HardDrive,
   Home,
   Info,
   Laptop,
@@ -14,11 +13,33 @@ import {
   TimerReset,
 } from "lucide-react";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { settingsMock, type CapabilityStatus } from "@/data/mockControlCenter";
-import type { ControlCenterStatus } from "@/lib/control-center/types";
+import { LanguageDropdown } from "@/components/primitives/LanguageDropdown";
+import { VoiceSettingsSection } from "@/components/settings/VoiceSettingsSection";
+import type { CapabilityStatus, ControlCenterStatus } from "@/lib/control-center/types";
 
 function statusText(status: CapabilityStatus) {
   return status.replace(/_/g, " ");
+}
+
+function formatUptime(seconds: number | undefined) {
+  if (seconds == null || seconds < 0) return "starting";
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function capabilityTone(status: CapabilityStatus | "pass" | "fail" | "unknown") {
+  if (status === "ready" || status === "pass") return "good";
+  return "";
+}
+
+function memoryIndexLabel(status?: ControlCenterStatus) {
+  const stats = status?.selfTest.memoryStats;
+  if (!stats?.documents && !stats?.chunks) return "Unknown";
+  return `${stats.documents.toLocaleString("en-US")} docs / ${stats.chunks.toLocaleString("en-US")} chunks`;
 }
 
 function SettingsTabs() {
@@ -46,17 +67,15 @@ function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title
   );
 }
 
-function LanguageSection() {
+function LanguageSection({ id = "settings-language" }: { id?: string }) {
   return (
     <section className="settings-section">
       <div className="settings-section-row">
         <SectionHeader icon={<Globe2 size={22} />} title="Language" subtitle="Interface language" />
-        <div className="language-toggle-large">
-          <button className="active" type="button">
-            English
-          </button>
-          <button type="button">Русский</button>
-        </div>
+        <label className="settings-select-label">
+          <span>Default</span>
+          <LanguageDropdown id={id} ariaLabel="Default interface language" />
+        </label>
       </div>
       <div className="info-note">
         <Info size={17} />
@@ -68,6 +87,7 @@ function LanguageSection() {
 
 type AccessProps = {
   access?: ControlCenterStatus["access"];
+  status?: ControlCenterStatus;
 };
 
 function AccessSection({ access }: AccessProps) {
@@ -152,8 +172,8 @@ function DataStorageSection() {
   );
 }
 
-function SummaryCard() {
-  const summary = settingsMock.summary;
+function SummaryCard({ status }: { status?: ControlCenterStatus }) {
+  const selfTest = status?.selfTest;
   return (
     <section className="side-card summary-card">
       <h2>Pritha Summary</h2>
@@ -163,69 +183,63 @@ function SummaryCard() {
             <ShieldCheck size={16} />
             Version
           </dt>
-          <dd>{summary.version}</dd>
+          <dd>{status?.app.version || "v?"}</dd>
         </div>
         <div>
           <dt>
             <Info size={16} />
             Status
           </dt>
-          <dd className="good">Ready</dd>
+          <dd className={capabilityTone(status?.pritha.status || "unknown")}>{status?.pritha.status === "ready" ? "Ready" : "Needs setup"}</dd>
         </div>
         <div>
           <dt>
             <Clock3 size={16} />
             Uptime
           </dt>
-          <dd>{summary.uptime}</dd>
+          <dd>{formatUptime(status?.app.uptimeSeconds)}</dd>
         </div>
         <div>
           <dt>
             <Database size={16} />
             Memory Index
           </dt>
-          <dd>Up to date</dd>
+          <dd>{memoryIndexLabel(status)}</dd>
         </div>
         <div>
           <dt>
             <TimerReset size={16} />
             Last Self-test
           </dt>
-          <dd>{summary.lastSelfTest}</dd>
+          <dd className={capabilityTone(selfTest?.status || "unknown")} title={selfTest?.createdAt}>
+            {selfTest?.ageLabel || "Never"}
+          </dd>
         </div>
       </dl>
-      <button className="outline-button full" type="button" aria-disabled="true">
+      <button className="outline-button full" type="button" aria-disabled="true" title="Run from CLI: node scripts/self-test.mjs">
         <Play size={16} />
-        Run Self-test
+        Self-test is CLI-only
       </button>
     </section>
   );
 }
 
-function LimitsCard() {
-  const limits = settingsMock.limits;
-  const hasBudget = typeof limits.budgetUsedPercent === "number";
-
+function LimitsCard({ status }: { status?: ControlCenterStatus }) {
   return (
     <section className="side-card limits-card">
-      <h2>Limits Overview</h2>
+      <h2>Capability Overview</h2>
       <div className="limit-row">
-        <span>Codex Limits <Info size={14} /></span>
-        <strong>{statusText(limits.codexLimits)}</strong>
+        <span>Codex Bridge <Info size={14} /></span>
+        <strong>{status ? statusText(status.voice.codexBridge) : "unknown"}</strong>
       </div>
       <div className="limit-row">
-        <span>API Usage <Info size={14} /></span>
-        <strong>{statusText(limits.apiUsage)}</strong>
+        <span>OpenAI Realtime <Info size={14} /></span>
+        <strong>{status ? statusText(status.voice.realtime) : "unknown"}</strong>
       </div>
       <div className="limit-row budget">
         <span>Budget <Info size={14} /></span>
-        <strong>{hasBudget ? `${limits.budgetUsedPercent}% used` : "Manual / unavailable"}</strong>
+        <strong>Manual / unavailable</strong>
       </div>
-      {hasBudget ? (
-        <div className="limit-progress">
-          <span className="limit-progress-fill" style={{ width: `${limits.budgetUsedPercent}%` }} />
-        </div>
-      ) : null}
       <button className="outline-button full" type="button">
         Open Limits Settings
       </button>
@@ -233,64 +247,71 @@ function LimitsCard() {
   );
 }
 
-function ProactivityCard() {
+function ProactivityCard({ status }: { status?: ControlCenterStatus }) {
+  const proactivity = status?.proactivity;
+  const statusLabel = proactivity ? statusText(proactivity.status) : "unknown";
+  const cronLabel = proactivity?.cronAdapter === "not_installed" ? "Cron adapter not installed" : `Cron adapter ${proactivity ? statusText(proactivity.cronAdapter) : "unknown"}`;
+  const modeLabel = proactivity?.mode === "manual" ? "Manual-only" : proactivity?.mode === "planned" ? "Planned" : "Disabled";
+
   return (
     <section className="side-card proactivity-card">
       <div className="card-title-row">
         <h2>Proactivity</h2>
-        <span className="inline-status orange">Off</span>
+        <span className="inline-status orange">{modeLabel}</span>
       </div>
       <div className="proactivity-box">
         <Clock3 size={34} />
         <div>
-          <strong>Cron adapter not installed</strong>
-          <span>Proactivity is disabled.</span>
+          <strong>{cronLabel}</strong>
+          <span>Proactivity status: {statusLabel}.</span>
         </div>
       </div>
-      <button className="outline-button full" type="button" aria-disabled="true">
+      <button className="outline-button full" type="button" aria-disabled="true" title="Proactivity configuration is planned">
         Configure Draft
       </button>
       <div className="manual-action-row">
         <span>Manual Actions</span>
-        <button className="outline-button" type="button" aria-disabled="true">
+        <button className="outline-button" type="button" aria-disabled="true" title="Manual checks live on the Agents page">
           <Play size={16} />
-          Run Manual Check
+          Agents page
         </button>
       </div>
     </section>
   );
 }
 
-export function SettingsControlPage({ access }: AccessProps) {
+export function SettingsControlPage({ access, status }: AccessProps) {
   return (
     <>
       <div className="settings-desktop-content">
-        <PageHeader title="Settings" subtitle="Configure Pritha to work the way you want." variant="voice" showCodexButton />
+        <PageHeader title="Settings" subtitle="Configure Pritha to work the way you want." variant="voice" showCodexButton status={status} />
         <div className="settings-layout">
           <main className="settings-main">
             <SettingsTabs />
-            <LanguageSection />
+            <LanguageSection id="settings-language" />
             <AccessSection access={access} />
             <AppearanceSection />
+            <VoiceSettingsSection />
             <DataStorageSection />
           </main>
           <aside className="settings-rail">
-            <SummaryCard />
-            <LimitsCard />
-            <ProactivityCard />
+            <SummaryCard status={status} />
+            <LimitsCard status={status} />
+            <ProactivityCard status={status} />
           </aside>
         </div>
       </div>
       <div className="mobile-settings-screen">
         <h1 className="mobile-page-title">Settings</h1>
         <SettingsTabs />
-        <LanguageSection />
+        <LanguageSection id="mobile-settings-language" />
         <AccessSection access={access} />
         <AppearanceSection />
+        <VoiceSettingsSection />
         <DataStorageSection />
-        <SummaryCard />
-        <LimitsCard />
-        <ProactivityCard />
+        <SummaryCard status={status} />
+        <LimitsCard status={status} />
+        <ProactivityCard status={status} />
       </div>
     </>
   );

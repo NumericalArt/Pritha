@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { readStickyContextSetting, STICKY_CONTEXT_CHANGED_EVENT, STICKY_CONTEXT_STORAGE_KEY } from "./voicePreferences";
 
 export type RealtimePhase = "idle" | "connecting" | "listening" | "speaking" | "working" | "error";
 
@@ -9,6 +10,40 @@ export type VoiceTranscriptItem = {
   role: "user" | "assistant" | "tool" | "system";
   text: string;
   timestamp: string;
+};
+
+export type VoiceSessionEvent = {
+  id: string;
+  kind: "user" | "assistant" | "tool" | "task" | "system";
+  text: string;
+  timestamp: string;
+  taskId?: string;
+  status?: string;
+};
+
+export type CodexTaskState = {
+  id: string;
+  title: string;
+  status: string;
+  summary: string;
+  progress: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  resultPath?: string;
+  statusPath?: string;
+  resultExcerpt?: string;
+  handoffStatus?: "pending" | "sent" | "skipped";
+  handoffReason?: string;
+};
+
+export type SessionMemoryPromotionState = {
+  status: "idle" | "checking" | "saved" | "skipped" | "failed";
+  decision?: string;
+  reason?: string;
+  path?: string;
+  eventCount?: number;
+  error?: string;
 };
 
 export type PrithaRealtimeStatus = {
@@ -71,16 +106,6 @@ type RealtimeEvent = {
   };
 };
 
-type ActiveCodexTask = {
-  title: string;
-  status: string;
-  summary: string;
-  progress: number;
-  resultPath?: string;
-  statusPath?: string;
-  resultExcerpt?: string;
-};
-
 type CodexTaskSnapshot = {
   ok: boolean;
   task_id?: string;
@@ -88,12 +113,52 @@ type CodexTaskSnapshot = {
   complete?: boolean;
   result_available?: boolean;
   result_excerpt?: string;
+  request?: {
+    created_at?: string;
+    task?: string;
+    task_type?: string;
+  };
+  handoff_status?: "pending" | "sent" | "skipped";
+  handoff_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+  task?: string;
+  task_type?: string;
+  telemetry?: Array<{
+    kind?: string;
+    reason?: string;
+    status?: string;
+    timestamp?: string;
+  }>;
   paths?: {
+    request?: string;
     status?: string;
     result?: string;
   };
   error?: string;
 };
+
+type CodexTaskListPayload = {
+  ok: boolean;
+  tasks?: CodexTaskSnapshot[];
+  error?: string;
+};
+
+type SessionMemoryPromotionPayload = {
+  ok: boolean;
+  saved?: boolean;
+  decision?: string;
+  reason?: string;
+  path?: string;
+  event_count?: number;
+  error?: string;
+};
+
+const SESSION_STORAGE_KEY = "pritha.voice.session.v1";
+const MAX_SESSION_EVENTS = 120;
+const MAX_VISIBLE_TASKS = 5;
+const MAX_STICKY_CONTEXT_EVENTS = 10;
+const MAX_STICKY_CONTEXT_TASKS = 5;
 
 function nowTime() {
   return new Date().toLocaleTimeString("en-US", { hour12: false });
@@ -103,9 +168,26 @@ function itemId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function usePrithaRealtime() {
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function loadSessionEvents() {
+  if (typeof window === "undefined") return [];
+  const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as { events?: VoiceSessionEvent[] };
+    return Array.isArray(parsed.events) ? parsed.events.slice(-MAX_SESSION_EVENTS) : [];
+  } catch {
+    return [];
+  }
+}
+
+function usePrithaRealtimeController() {
   const [phase, setPhase] = useState<RealtimePhase>("idle");
   const [isMuted, setIsMuted] = useState(false);
+  const [micGain, setMicGainState] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<PrithaRealtimeStatus | null>(null);
   const [transcript, setTranscript] = useState<VoiceTranscriptItem[]>([
@@ -119,11 +201,19 @@ export function usePrithaRealtime() {
   const [toolStatus, setToolStatus] = useState<string>("No tool calls yet.");
   const [remoteAudioReady, setRemoteAudioReady] = useState(false);
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
-  const [activeTask, setActiveTask] = useState<ActiveCodexTask | null>(null);
+  const [codexTasks, setCodexTasks] = useState<CodexTaskState[]>([]);
+  const [sessionEvents, setSessionEvents] = useState<VoiceSessionEvent[]>([]);
+  const [stickyContextEnabled, setStickyContextEnabled] = useState(true);
+  const [sessionMemoryPromotion, setSessionMemoryPromotion] = useState<SessionMemoryPromotionState>({ status: "idle" });
 
+  const sessionIdRef = useRef(`voice-${itemId()}`);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const processedStreamRef = useRef<MediaStream | null>(null);
   const localTrackRef = useRef<MediaStreamTrack | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const micGainRef = useRef(1);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const eventsChannelRef = useRef<RTCDataChannel | null>(null);
   const assistantDraftRef = useRef("");
@@ -134,20 +224,9 @@ export function usePrithaRealtime() {
   const handledToolCallsRef = useRef(new Set<string>());
   const codexTaskPollTimersRef = useRef(new Map<string, number>());
   const reportedCodexTaskResultsRef = useRef(new Set<string>());
-
-  const addTranscript = useCallback((role: VoiceTranscriptItem["role"], text: string) => {
-    const compact = text.replace(/\s+/g, " ").trim();
-    if (!compact) return;
-    setTranscript((items) => [
-      ...items.slice(-40),
-      {
-        id: itemId(),
-        role,
-        text: compact,
-        timestamp: nowTime(),
-      },
-    ]);
-  }, []);
+  const sessionLoggedCodexTaskResultsRef = useRef(new Set<string>());
+  const memoryPromotionAttemptCountRef = useRef(0);
+  const lastStickyContextSentRef = useRef("");
 
   const logClientEvent = useCallback((kind: string, payload: Record<string, unknown> = {}) => {
     void fetch("/api/realtime/event", {
@@ -157,9 +236,125 @@ export function usePrithaRealtime() {
     }).catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setStickyContextEnabled(readStickyContextSetting(true));
+    const storageKey = `${SESSION_STORAGE_KEY}:id`;
+    const existingId = window.sessionStorage.getItem(storageKey);
+    if (existingId) {
+      sessionIdRef.current = existingId;
+    } else {
+      window.sessionStorage.setItem(storageKey, sessionIdRef.current);
+    }
+    const recoveredEvents = loadSessionEvents();
+    if (recoveredEvents.length) {
+      memoryPromotionAttemptCountRef.current = recoveredEvents.length;
+      for (const event of recoveredEvents) {
+        if (event.kind === "task" && event.taskId) sessionLoggedCodexTaskResultsRef.current.add(event.taskId);
+      }
+      setSessionEvents(recoveredEvents);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const refreshStickyContextSetting = () => setStickyContextEnabled(readStickyContextSetting(true));
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === STICKY_CONTEXT_STORAGE_KEY) refreshStickyContextSetting();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(STICKY_CONTEXT_CHANGED_EVENT, refreshStickyContextSetting);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(STICKY_CONTEXT_CHANGED_EVENT, refreshStickyContextSetting);
+    };
+  }, []);
+
+  const appendSessionEvent = useCallback(
+    (kind: VoiceSessionEvent["kind"], text: string, extra: Omit<Partial<VoiceSessionEvent>, "id" | "kind" | "text" | "timestamp"> = {}) => {
+      const compact = text.replace(/\s+/g, " ").trim();
+      if (!compact) return;
+      const event: VoiceSessionEvent = {
+        id: itemId(),
+        kind,
+        text: compact.slice(0, 3_000),
+        timestamp: nowTime(),
+        ...extra,
+      };
+      setSessionEvents((items) => {
+        const next = [...items, event].slice(-MAX_SESSION_EVENTS);
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(
+            SESSION_STORAGE_KEY,
+            JSON.stringify({
+              session_id: sessionIdRef.current,
+              updated_at: nowIso(),
+              events: next,
+            }),
+          );
+        }
+        return next;
+      });
+      logClientEvent("voice_session_event", {
+        session_id: sessionIdRef.current,
+        kind,
+        text: compact.slice(0, 1_000),
+        task_id: extra.taskId,
+        status: extra.status,
+      });
+    },
+    [logClientEvent],
+  );
+
+  const addTranscript = useCallback(
+    (role: VoiceTranscriptItem["role"], text: string) => {
+      const compact = text.replace(/\s+/g, " ").trim();
+      if (!compact) return;
+      setTranscript((items) => [
+        ...items.slice(-40),
+        {
+          id: itemId(),
+          role,
+          text: compact,
+          timestamp: nowTime(),
+        },
+      ]);
+      appendSessionEvent(role === "system" ? "system" : role, compact);
+    },
+    [appendSessionEvent],
+  );
+
+  const upsertCodexTask = useCallback((task: Partial<CodexTaskState> & { id: string }) => {
+    const timestamp = nowIso();
+    setCodexTasks((tasks) => {
+      const existing = tasks.find((item) => item.id === task.id);
+      const nextTask: CodexTaskState = {
+        id: task.id,
+        title: task.title || task.id,
+        status: task.status || existing?.status || "queued",
+        summary: task.summary || existing?.summary || "Codex task queued.",
+        progress: typeof task.progress === "number" ? task.progress : existing?.progress || 0,
+        createdAt: task.createdAt || existing?.createdAt || timestamp,
+        updatedAt: timestamp,
+        completedAt: task.completedAt || existing?.completedAt,
+        resultPath: task.resultPath || existing?.resultPath,
+        statusPath: task.statusPath || existing?.statusPath,
+        resultExcerpt: task.resultExcerpt || existing?.resultExcerpt,
+        handoffStatus: task.handoffStatus || existing?.handoffStatus,
+        handoffReason: task.handoffReason || existing?.handoffReason,
+      };
+      return [nextTask, ...tasks.filter((item) => item.id !== task.id)].slice(0, MAX_VISIBLE_TASKS);
+    });
+  }, []);
+
   const loadStatus = useCallback(async () => {
     const response = await fetch("/api/realtime/status", { cache: "no-store" });
-    const payload = (await response.json()) as PrithaRealtimeStatus;
+    const payload = (await response.json().catch(() => ({}))) as PrithaRealtimeStatus & SessionErrorPayload;
+    if (!response.ok) {
+      throw new Error(payload.error || `Realtime status failed with status ${response.status}`);
+    }
     setStatus(payload);
     return payload;
   }, []);
@@ -179,9 +374,18 @@ export function usePrithaRealtime() {
       localTrackRef.current.stop();
       localTrackRef.current = null;
     }
+    if (processedStreamRef.current) {
+      processedStreamRef.current.getTracks().forEach((track) => track.stop());
+      processedStreamRef.current = null;
+    }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+      gainNodeRef.current = null;
     }
     if (eventsChannelRef.current) {
       eventsChannelRef.current.close();
@@ -249,7 +453,8 @@ export function usePrithaRealtime() {
   }, []);
 
   const applyCodexTaskSnapshot = useCallback(
-    (snapshot: CodexTaskSnapshot) => {
+    (snapshot: CodexTaskSnapshot, options: { recordSessionEvent?: boolean } = {}) => {
+      const recordSessionEvent = options.recordSessionEvent !== false;
       if (!snapshot.ok || !snapshot.task_id) {
         setToolStatus(JSON.stringify(snapshot, null, 2));
         return false;
@@ -260,30 +465,157 @@ export function usePrithaRealtime() {
       const failed = statusText.startsWith("failed");
       const resultText = snapshot.result_excerpt?.trim();
       const progress = terminal ? 100 : snapshot.result_available ? 75 : statusText === "running" ? 45 : 15;
+      const handoffSkipped = snapshot.telemetry?.find((event) => event.kind === "codex_task_result_handoff_skipped");
+      const handoffSent = snapshot.telemetry?.find((event) => event.kind === "codex_task_result_handoff_sent");
+      const handoffStatus = snapshot.handoff_status || (handoffSent ? "sent" : handoffSkipped ? "skipped" : undefined);
+      const handoffReason = snapshot.handoff_reason || handoffSkipped?.reason;
       const summary = terminal
         ? resultText || (failed ? "Codex task failed. Open task logs for details." : "Codex task completed.")
         : snapshot.paths?.status
           ? `Codex task ${statusText}. Status: ${snapshot.paths.status}`
           : `Codex task ${statusText}.`;
 
-      setActiveTask({
-        title: snapshot.task_id,
+      upsertCodexTask({
+        id: snapshot.task_id,
+        title: snapshot.task ? snapshot.task.slice(0, 80) : snapshot.request?.task ? snapshot.request.task.slice(0, 80) : snapshot.task_id,
         status: statusText,
         summary,
         progress,
         resultPath: snapshot.paths?.result,
         statusPath: snapshot.paths?.status,
         resultExcerpt: resultText,
+        createdAt: snapshot.created_at || snapshot.request?.created_at,
+        handoffStatus,
+        handoffReason,
+        completedAt: terminal ? nowIso() : undefined,
       });
       setToolStatus(JSON.stringify(snapshot, null, 2));
 
-      if (terminal) {
+      if (recordSessionEvent && terminal && snapshot.task_id && !sessionLoggedCodexTaskResultsRef.current.has(snapshot.task_id)) {
+        sessionLoggedCodexTaskResultsRef.current.add(snapshot.task_id);
         addTranscript("tool", `Codex task ${statusText}: ${resultText ? resultText.slice(0, 900) : snapshot.task_id}`);
+        appendSessionEvent("task", `Codex task ${snapshot.task_id} ${statusText}${resultText ? `: ${resultText.slice(0, 900)}` : ""}`, {
+          taskId: snapshot.task_id,
+          status: statusText,
+        });
       }
       return terminal;
     },
-    [addTranscript],
+    [addTranscript, appendSessionEvent, upsertCodexTask],
   );
+
+  const refreshCodexTask = useCallback(
+    async (taskId: string, apply = true) => {
+      const safeTaskId = taskId.trim();
+      if (!safeTaskId) return null;
+      const response = await fetch(`/api/realtime/codex-task/${encodeURIComponent(safeTaskId)}`, { cache: "no-store" });
+      const snapshot = (await response.json().catch(() => ({ ok: false, error: "task status returned non-json" }))) as CodexTaskSnapshot;
+      if (apply) applyCodexTaskSnapshot(snapshot);
+      return snapshot;
+    },
+    [applyCodexTaskSnapshot],
+  );
+
+  const loadRecentCodexTasks = useCallback(async () => {
+    const response = await fetch("/api/realtime/codex-task?limit=5", { cache: "no-store" });
+    const payload = (await response.json().catch(() => ({ ok: false, error: "task list returned non-json" }))) as CodexTaskListPayload;
+    if (!payload.ok) return payload;
+    for (const task of payload.tasks || []) {
+      applyCodexTaskSnapshot({ ...task, ok: true }, { recordSessionEvent: false });
+    }
+    return payload;
+  }, [applyCodexTaskSnapshot]);
+
+  useEffect(() => {
+    void loadRecentCodexTasks().catch(() => undefined);
+  }, [loadRecentCodexTasks]);
+
+  const buildStickyContext = useCallback(
+    (reason: string) => {
+      const recentEvents = sessionEvents.slice(-MAX_STICKY_CONTEXT_EVENTS);
+      const visibleTasks = codexTasks.slice(0, MAX_STICKY_CONTEXT_TASKS);
+      const activeTasks = visibleTasks.filter((task) => task.status !== "complete" && !task.status.startsWith("failed"));
+      const lines = [
+        "Sticky Voice Context is enabled for this Pritha Control Center session.",
+        `Session id: ${sessionIdRef.current}`,
+        `Update reason: ${reason}`,
+        "Use this as pinned context for the live operator dialogue. Prefer the operator's newest direct instruction over older context.",
+        `Session journal events: ${sessionEvents.length}`,
+        `Visible Codex tasks: ${visibleTasks.length}; active Codex tasks: ${activeTasks.length}`,
+      ];
+
+      if (visibleTasks.length) {
+        lines.push("", "Codex task state:");
+        for (const task of visibleTasks) {
+          const result = task.resultExcerpt || task.summary;
+          lines.push(
+            `- ${task.id}: ${task.status}, progress ${task.progress}%, handoff ${task.handoffStatus || "pending"}${result ? `, result ${result.slice(0, 420)}` : ""}`,
+          );
+        }
+      }
+
+      if (recentEvents.length) {
+        lines.push("", "Recent voice session events:");
+        for (const event of recentEvents) {
+          lines.push(`- ${event.timestamp} ${event.kind}${event.taskId ? ` ${event.taskId}` : ""}: ${event.text.slice(0, 420)}`);
+        }
+      }
+
+      return lines.join("\n").slice(0, 6_000);
+    },
+    [codexTasks, sessionEvents],
+  );
+
+  const sendStickyContext = useCallback(
+    (reason: string) => {
+      if (!stickyContextEnabled) return false;
+      const channel = eventsChannelRef.current;
+      if (!channel || channel.readyState !== "open") return false;
+      const text = buildStickyContext(reason);
+      if (!text.trim() || lastStickyContextSentRef.current === text) return false;
+      lastStickyContextSentRef.current = text;
+      channel.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: `Sticky Context Update:\n${text}` }],
+          },
+        }),
+      );
+      logClientEvent("sticky_context_sent", {
+        session_id: sessionIdRef.current,
+        reason,
+        event_count: sessionEvents.length,
+        task_count: codexTasks.length,
+      });
+      return true;
+    },
+    [buildStickyContext, codexTasks.length, logClientEvent, sessionEvents.length, stickyContextEnabled],
+  );
+
+  const resetVoiceContext = useCallback(() => {
+    lastStickyContextSentRef.current = "";
+    const channel = eventsChannelRef.current;
+    const text = "Reset Sticky Voice Context for this live voice session. Do not rely on earlier pinned context unless the operator restates it.";
+    appendSessionEvent("system", "Sticky Voice Context reset requested.");
+    logClientEvent("sticky_context_reset", { session_id: sessionIdRef.current, channel_state: channel?.readyState || "missing" });
+
+    if (!channel || channel.readyState !== "open") return false;
+    channel.send(
+      JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text }],
+        },
+      }),
+    );
+    requestResponse("sticky_context_reset");
+    return true;
+  }, [appendSessionEvent, logClientEvent, requestResponse]);
 
   const startCodexTaskPolling = useCallback(
     (taskId: string) => {
@@ -302,8 +634,8 @@ export function usePrithaRealtime() {
       const poll = async () => {
         if (stopped) return;
         attempts += 1;
-        const response = await fetch(`/api/realtime/codex-task/${encodeURIComponent(safeTaskId)}`, { cache: "no-store" });
-        const snapshot = (await response.json().catch(() => ({ ok: false, error: "task status returned non-json" }))) as CodexTaskSnapshot;
+        const snapshot = await refreshCodexTask(safeTaskId, false);
+        if (!snapshot) return;
         const terminal = applyCodexTaskSnapshot(snapshot);
         if (terminal && snapshot.task_id && !reportedCodexTaskResultsRef.current.has(snapshot.task_id)) {
           reportedCodexTaskResultsRef.current.add(snapshot.task_id);
@@ -342,12 +674,23 @@ export function usePrithaRealtime() {
               result_chars: resultText.length,
               response_queued: responseBusy,
             });
+            upsertCodexTask({
+              id: snapshot.task_id,
+              handoffStatus: "sent",
+            });
+            sendStickyContext("codex_task_complete");
           } else {
+            const reason = resultText ? `channel_${channelState}` : "empty_result";
             logClientEvent("codex_task_result_handoff_skipped", {
               task_id: snapshot.task_id,
               status: snapshot.status || "unknown",
-              reason: resultText ? `channel_${channelState}` : "empty_result",
+              reason,
               channel_state: channelState,
+            });
+            upsertCodexTask({
+              id: snapshot.task_id,
+              handoffStatus: "skipped",
+              handoffReason: reason,
             });
           }
         }
@@ -364,7 +707,7 @@ export function usePrithaRealtime() {
         setToolStatus(err instanceof Error ? err.message : "Could not poll Codex task");
       });
     },
-    [applyCodexTaskSnapshot, clearCodexTaskPolling, logClientEvent, requestResponse],
+    [applyCodexTaskSnapshot, clearCodexTaskPolling, logClientEvent, refreshCodexTask, requestResponse, sendStickyContext, upsertCodexTask],
   );
 
   const runToolCall = useCallback(
@@ -390,20 +733,22 @@ export function usePrithaRealtime() {
 
       if (item.name === "run_codex_task") {
         const taskId = typeof output.task_id === "string" ? output.task_id : "";
-        setActiveTask({
-          title: taskId || "Codex task",
+        if (taskId) upsertCodexTask({
+          id: taskId,
+          title: taskId,
           status: String(output.status || output.mode || "queued"),
           summary: String(output.operator_note || "Codex handoff created."),
           progress: output.status === "running" ? 35 : 10,
           resultPath: typeof output.result_path === "string" ? output.result_path : undefined,
           statusPath: typeof output.status_path === "string" ? output.status_path : undefined,
+          handoffStatus: "pending",
         });
         if (taskId) startCodexTaskPolling(taskId);
       }
 
       return output;
     },
-    [addTranscript, startCodexTaskPolling],
+    [addTranscript, startCodexTaskPolling, upsertCodexTask],
   );
 
   const processPendingToolCalls = useCallback(async () => {
@@ -521,6 +866,11 @@ export function usePrithaRealtime() {
     const t0 = performance.now();
 
     try {
+      const runtimeStatus = await loadStatus();
+      if (!runtimeStatus.openai_key_configured) {
+        throw new Error("OPENAI_API_KEY is not configured for the control-center server.");
+      }
+
       const sessionResponse = await fetch("/api/realtime/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -539,13 +889,37 @@ export function usePrithaRealtime() {
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
-      const track = stream.getAudioTracks()[0];
-      if (!track) throw new Error("No local audio track available.");
+      const inputTrack = stream.getAudioTracks()[0];
+      if (!inputTrack) throw new Error("No local audio track available.");
+
+      let track = inputTrack;
+      let streamForPeer = stream;
+      const AudioContextCtor =
+        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextCtor) {
+        const audioContext = new AudioContextCtor();
+        const source = audioContext.createMediaStreamSource(stream);
+        const gain = audioContext.createGain();
+        const destination = audioContext.createMediaStreamDestination();
+        gain.gain.value = micGainRef.current;
+        source.connect(gain);
+        gain.connect(destination);
+        const processedTrack = destination.stream.getAudioTracks()[0];
+        if (processedTrack) {
+          track = processedTrack;
+          streamForPeer = destination.stream;
+          processedStreamRef.current = destination.stream;
+          audioContextRef.current = audioContext;
+          gainNodeRef.current = gain;
+        } else {
+          void audioContext.close().catch(() => undefined);
+        }
+      }
       localTrackRef.current = track;
 
       const peerConnection = new RTCPeerConnection();
       peerConnectionRef.current = peerConnection;
-      peerConnection.addTrack(track, stream);
+      peerConnection.addTrack(track, streamForPeer);
       peerConnection.onconnectionstatechange = () => {
         if (peerConnection.connectionState === "connected") setPhase("listening");
         if (peerConnection.connectionState === "failed" || peerConnection.connectionState === "disconnected") {
@@ -567,7 +941,8 @@ export function usePrithaRealtime() {
       eventsChannelRef.current = channel;
       channel.onopen = () => {
         setPhase("listening");
-        setToolStatus("Realtime data channel connected. Tools: search_pritha_memory, run_codex_task.");
+        setToolStatus("Realtime data channel connected. Tools: search_pritha_memory, deep_pritha_memory, run_codex_task.");
+        sendStickyContext("realtime_connected");
       };
       channel.onmessage = (event) => handleRealtimeEvent(String(event.data));
       channel.onclose = () => {
@@ -598,7 +973,7 @@ export function usePrithaRealtime() {
       setError(message);
       addTranscript("tool", message);
     }
-  }, [addTranscript, closeConnection, handleRealtimeEvent, phase]);
+  }, [addTranscript, closeConnection, handleRealtimeEvent, loadStatus, phase, sendStickyContext]);
 
   const stop = useCallback(() => {
     closeConnection();
@@ -611,6 +986,14 @@ export function usePrithaRealtime() {
     localTrackRef.current.enabled = !nextMuted;
     setIsMuted(nextMuted);
   }, [isMuted]);
+
+  const setMicGain = useCallback((value: number) => {
+    const next = Math.max(0, Math.min(value, 2));
+    micGainRef.current = next;
+    setMicGainState(next);
+    const node = gainNodeRef.current;
+    if (node) node.gain.setTargetAtTime(next, node.context.currentTime, 0.01);
+  }, []);
 
   const sendTextMessage = useCallback(
     (text: string) => {
@@ -639,6 +1022,69 @@ export function usePrithaRealtime() {
     setTranscript([]);
   }, []);
 
+  const sendSessionRecap = useCallback(() => {
+    const events = sessionEvents.slice(-12);
+    if (!events.length) return false;
+    const recap = events
+      .map((event) => `- ${event.timestamp} ${event.kind}${event.taskId ? ` ${event.taskId}` : ""}: ${event.text}`)
+      .join("\n");
+    return sendTextMessage(`Краткий контекст текущей voice-сессии:\n${recap}`);
+  }, [sendTextMessage, sessionEvents]);
+
+  const promoteSessionMemory = useCallback(
+    async (reason = "manual") => {
+      if (!sessionEvents.length) return null;
+      setSessionMemoryPromotion({ status: "checking", eventCount: sessionEvents.length });
+      const response = await fetch("/api/realtime/session-memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionIdRef.current,
+          reason,
+          events: sessionEvents,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({ ok: false, error: "session memory returned non-json" }))) as SessionMemoryPromotionPayload;
+      const next: SessionMemoryPromotionState = payload.ok
+        ? {
+            status: payload.saved ? "saved" : "skipped",
+            decision: payload.decision,
+            reason: payload.reason,
+            path: payload.path,
+            eventCount: payload.event_count || sessionEvents.length,
+          }
+        : {
+            status: "failed",
+            error: payload.error || `Session memory failed with status ${response.status}`,
+            eventCount: sessionEvents.length,
+          };
+      setSessionMemoryPromotion(next);
+      logClientEvent("voice_session_memory_promotion", {
+        session_id: sessionIdRef.current,
+        trigger: reason,
+        status: next.status,
+        decision: next.decision,
+        path: next.path,
+        event_count: next.eventCount,
+      });
+      return payload;
+    },
+    [logClientEvent, sessionEvents],
+  );
+
+  useEffect(() => {
+    if (sessionEvents.length < 4) return;
+    if (sessionEvents.length - memoryPromotionAttemptCountRef.current < 6 && memoryPromotionAttemptCountRef.current !== 0) return;
+    memoryPromotionAttemptCountRef.current = sessionEvents.length;
+    void promoteSessionMemory("automatic").catch((err) => {
+      setSessionMemoryPromotion({
+        status: "failed",
+        error: err instanceof Error ? err.message : "automatic session memory failed",
+        eventCount: sessionEvents.length,
+      });
+    });
+  }, [promoteSessionMemory, sessionEvents.length]);
+
   useEffect(() => {
     return () => {
       clearCodexTaskPolling();
@@ -649,19 +1095,52 @@ export function usePrithaRealtime() {
   return {
     phase,
     isMuted,
+    micGain,
     error,
     status,
     transcript,
+    sessionEvents,
+    sessionId: sessionIdRef.current,
+    stickyContextEnabled,
+    sessionMemoryPromotion,
     toolStatus,
     remoteAudioReady,
     lastLatencyMs,
-    activeTask,
+    codexTasks,
     bindRemoteAudioElement,
     loadStatus,
+    loadRecentCodexTasks,
+    refreshCodexTask,
     start,
     stop,
     toggleMute,
+    setMicGain,
     sendTextMessage,
+    sendSessionRecap,
+    sendStickyContext,
+    resetVoiceContext,
+    promoteSessionMemory,
     clearTranscript,
   };
+}
+
+export type PrithaRealtimeController = ReturnType<typeof usePrithaRealtimeController>;
+
+const PrithaRealtimeContext = createContext<PrithaRealtimeController | null>(null);
+
+export function PrithaRealtimeProvider({ children }: { children: ReactNode }) {
+  const controller = usePrithaRealtimeController();
+
+  return createElement(
+    PrithaRealtimeContext.Provider,
+    { value: controller },
+    createElement("audio", { ref: controller.bindRemoteAudioElement, autoPlay: true, hidden: true }),
+    children,
+  );
+}
+
+export function usePrithaRealtime() {
+  const controller = useContext(PrithaRealtimeContext);
+  if (!controller) throw new Error("usePrithaRealtime must be used inside PrithaRealtimeProvider.");
+  return controller;
 }

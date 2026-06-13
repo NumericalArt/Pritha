@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import type { ControlCenterStatus } from "@/lib/control-center/types";
 import { StatusStrip } from "./StatusStrip";
 
 type PageHeaderProps = {
@@ -7,20 +8,29 @@ type PageHeaderProps = {
   count?: number;
   variant?: "agents" | "voice" | "dev";
   showCodexButton?: boolean;
+  showCountPill?: boolean;
+  status?: ControlCenterStatus;
 };
 
-export function PageHeader({ title, subtitle, count, variant = "agents", showCodexButton = false }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  subtitle,
+  count,
+  showCodexButton = false,
+  showCountPill = true,
+  status,
+}: PageHeaderProps) {
   return (
     <header className="page-header">
       <div>
         <div className="page-title-row">
           <h1 className="page-title">{title}</h1>
-          {typeof count === "number" ? <span className="count-pill">{count}</span> : null}
+          {showCountPill && typeof count === "number" ? <span className="count-pill">{count}</span> : null}
         </div>
         <p className="page-kicker">{subtitle}</p>
       </div>
       <div className="header-actions">
-        <StatusStrip variant={variant} agentTotal={count} />
+        <StatusStrip status={status} />
         {showCodexButton ? (
           <button className="open-codex-button" type="button">
             Open in Codex

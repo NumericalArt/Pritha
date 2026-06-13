@@ -20,6 +20,12 @@ export type AgentCardModel = {
   lifecycleTone?: "ok" | "muted" | "update";
   restorePlanStatus?: "ready" | "unavailable" | "planned";
   rollbackStatus?: "ready" | "unavailable" | "planned";
+  credentials?: {
+    status: "ready" | "pending_auth" | "unavailable";
+    required: number;
+    missingRequired: number;
+    total: number;
+  };
   iconType: AgentIconType;
   actionEnabled?: boolean;
   actionDisabledReason?: string;

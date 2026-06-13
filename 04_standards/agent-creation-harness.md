@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-06-07
-last_reviewed: 2026-06-07
+updated: 2026-06-11
+last_reviewed: 2026-06-11
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -77,6 +77,8 @@ sources:
   - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
   - 03_reviews/2026-06-07-yandex-ai-safe-agent-security-assessment.md
   - 04_standards/agent-ai-safe-security-checklist.md
+  - 03_reviews/2026-06-11-pi-agent-architecture-assessment.md
+  - 04_standards/agent-minimal-core-extension-surface.md
 related:
   decisions: []
   reviews:
@@ -88,6 +90,7 @@ related:
     - 03_reviews/2026-06-02-agent-skills-source-batch-review.md
     - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
     - 03_reviews/2026-06-07-yandex-ai-safe-agent-security-assessment.md
+    - 03_reviews/2026-06-11-pi-agent-architecture-assessment.md
   briefs: []
   workflows:
     - 07_workflows/agents-mother.md
@@ -97,14 +100,15 @@ related:
     - 04_standards/agent-harness-evaluation.md
     - 04_standards/agent-proactivity-scheduling.md
     - 04_standards/agent-ai-safe-security-checklist.md
+    - 04_standards/agent-minimal-core-extension-surface.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-06-07
-source_version: Techscope draft standard v11 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist
+source_updated: 2026-06-11
+source_version: Techscope draft standard v12 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment
 retrieved: 2026-05-18
-verified: 2026-06-07
+verified: 2026-06-11
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -156,6 +160,13 @@ scaffold readiness is marked complete, Pritha should review selected modules
 across interface, reasoning/planning, knowledge, tools/execution and
 infrastructure/orchestration. This is a vendor-neutral threat-modeling check,
 not a dependency on a cloud provider.
+
+The Pi architecture assessment adds a minimal-core rule: a child agent should
+separate stable core runtime responsibilities from optional capability modules.
+Tools, skills, MCP connectors, memory layers, UI widgets, subagents, schedulers,
+model routers and package systems are selected by contract and recorded with
+trust/readiness metadata. Pi is evidence for the pattern, not Pritha's default
+runtime.
 
 ## Pritha naming and lineage vocabulary
 
@@ -236,6 +247,9 @@ The compatibility rule is alias-first: new Pritha names may wrap existing Agents
 - Apply `agent-harness-evaluation` before choosing OpenCode, Pi, Hermes,
   OpenClaw or any other non-Codex/local-model harness as the foundation for a new
   agent.
+- Apply `agent-minimal-core-extension-surface` when defining the scaffold module
+  boundary: record core runtime, extension surface, selected modules, skipped
+  modules, trust levels, activation mode, permissions, readiness and evals.
 - Apply `agent-environment-compatibility` before borrowing patterns from non-Codex tools.
 - Generate a `scaffold-report` after files are created and tests are run.
 - After the first meaningful working version, create a post-creation review and preserve the user interaction path that shaped the agent.

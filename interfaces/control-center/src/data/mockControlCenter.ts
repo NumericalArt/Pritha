@@ -71,61 +71,6 @@ export const voiceMock: VoiceMockState = {
   },
 };
 
-export type CapabilityStatus =
-  | "ready"
-  | "disabled"
-  | "manual_only"
-  | "planned"
-  | "not_installed"
-  | "unavailable"
-  | "pending_auth"
-  | "failed";
-
-export type SettingsState = {
-  language: "en" | "ru";
-  theme: "dark" | "system" | "light";
-  accessMode: "localhost" | "lan" | "tailscale" | "qr";
-  snapshotRetention: 1 | 2 | 3;
-  summary: {
-    version: string;
-    status: CapabilityStatus;
-    uptime: string;
-    memoryIndex: "up_to_date" | "stale" | "failed" | "unknown";
-    lastSelfTest: string;
-  };
-  limits: {
-    codexLimits: CapabilityStatus;
-    apiUsage: CapabilityStatus;
-    budgetUsedPercent?: number;
-  };
-  proactivity: {
-    status: "off" | "manual" | "planned";
-    cronAdapter: CapabilityStatus;
-  };
-};
-
-export const settingsMock: SettingsState = {
-  language: "en",
-  theme: "dark",
-  accessMode: "localhost",
-  snapshotRetention: 2,
-  summary: {
-    version: "v0.3.0",
-    status: "ready",
-    uptime: "2h 13m",
-    memoryIndex: "up_to_date",
-    lastSelfTest: "2 hours ago",
-  },
-  limits: {
-    codexLimits: "unavailable",
-    apiUsage: "unavailable",
-  },
-  proactivity: {
-    status: "off",
-    cronAdapter: "not_installed",
-  },
-};
-
 export type DevCapabilityStatus = "ready" | "not_installed" | "none" | "failed" | "unknown";
 
 export type DevModule = {

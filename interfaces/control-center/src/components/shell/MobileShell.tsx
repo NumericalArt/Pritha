@@ -6,7 +6,7 @@ import { Menu, SlidersHorizontal } from "lucide-react";
 import { mobileNavItems } from "@/lib/routes";
 import { PrithaLogoPlaceholder } from "@/components/primitives/PrithaLogoPlaceholder";
 
-export function MobileShell({ children }: { children: React.ReactNode }) {
+export function MobileShell() {
   const pathname = usePathname();
   const isVoice = pathname.startsWith("/voice") || pathname === "/";
 
@@ -24,7 +24,6 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
           {isVoice ? <SlidersHorizontal size={20} /> : <Menu size={20} />}
         </button>
       </header>
-      <main className="mobile-page">{children}</main>
       <nav className="mobile-bottom-nav" aria-label="Mobile primary">
         {mobileNavItems.map((item) => {
           const Icon = item.icon;
