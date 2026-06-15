@@ -43,3 +43,6 @@ __pycache__/
 # Local backups
 *.bak
 *.tmp
+
+# Test artifacts
+interfaces/control-center/test-results/

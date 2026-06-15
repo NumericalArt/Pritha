@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
@@ -17,7 +18,8 @@ function gitRootFromCwd(cwd) {
 export function resolveTechscopeRoot(options = {}) {
   const cwd = options.cwd ? path.resolve(options.cwd) : process.cwd();
   if (process.env.TECHSCOPE_ROOT) {
-    return path.resolve(process.env.TECHSCOPE_ROOT);
+    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
+    if (existsSync(envRoot)) return envRoot;
   }
   return gitRootFromCwd(cwd) || cwd;
 }

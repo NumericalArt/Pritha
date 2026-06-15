@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 
-const ROOT = process.env.TECHSCOPE_ROOT
-  ? path.resolve(process.env.TECHSCOPE_ROOT)
-  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ENV_ROOT = process.env.TECHSCOPE_ROOT ? path.resolve(process.env.TECHSCOPE_ROOT) : "";
+const ROOT = ENV_ROOT && existsSync(ENV_ROOT) ? ENV_ROOT : DEFAULT_ROOT;
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);

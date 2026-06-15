@@ -19,6 +19,7 @@ import { PrithaStarScene } from "./PrithaStarScene";
 import {
   usePrithaRealtime,
   type CodexTaskState,
+  type MicGainRuntimeState,
   type PrithaRealtimeStatus,
   type RealtimePhase,
   type SessionMemoryPromotionState,
@@ -30,13 +31,22 @@ type CodexTaskDetail = {
   task_id?: string;
   status?: string;
   complete?: boolean;
+  phase?: string;
+  elapsed_ms?: number;
+  last_activity_at?: string;
+  last_activity?: string;
+  stale?: boolean;
+  operator_brief?: string;
+  voice_handoff_required?: boolean;
   request?: Record<string, unknown> | null;
   status_detail?: Record<string, unknown> | null;
+  approval?: Record<string, unknown> | null;
   telemetry?: Array<Record<string, unknown>>;
   result_available?: boolean;
   result_excerpt?: string;
   stdout_excerpt?: string;
   stderr_excerpt?: string;
+  progress_timeline?: Array<Record<string, unknown>>;
   paths?: Record<string, string>;
   error?: string;
 };
@@ -105,10 +115,21 @@ function formatTaskElapsed(createdAt: string, completedAt?: string) {
 }
 
 function taskStatusTone(task: CodexTaskState) {
+  if (task.stale) return "orange";
   if (task.status.startsWith("failed")) return "orange";
+  if (task.status === "decision_required" || task.approval?.status === "pending") return "orange";
+  if (task.status === "rejected" || task.approval?.status === "rejected") return "orange";
   if (task.status === "complete") return "green";
   if (task.status === "running") return "blue";
   return "";
+}
+
+function taskNeedsApproval(task: CodexTaskState) {
+  return task.status === "decision_required" || task.approval?.status === "pending";
+}
+
+function taskIsTerminal(task: CodexTaskState) {
+  return task.status === "complete" || task.status === "rejected" || task.status.startsWith("failed");
 }
 
 function VoiceWave({ mobile = false }: { mobile?: boolean }) {
@@ -156,6 +177,7 @@ function ContextCard({
 }) {
   const tools = activeToolNames(status);
   const memoryReady = Boolean(status?.memory.sqlite && status.memory.sqlite_cli);
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   return (
     <section className={mobile ? "mobile-info-card" : "side-card voice-context-card"}>
@@ -182,10 +204,34 @@ function ContextCard({
           <span className="tool-count">{tools.length} active</span>
         </div>
       </div>
-      <button className="rail-link-button" type="button" disabled={!stickyContextEnabled} onClick={onResetVoiceContext}>
-        Reset Voice Context
-        <span>⌄</span>
-      </button>
+      {confirmingReset ? (
+        <div className="reset-confirmation">
+          <p>Reset current voice context for this session?</p>
+          <div>
+            <button
+              className="decline-button"
+              type="button"
+              onClick={() => setConfirmingReset(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="approve-button"
+              type="button"
+              onClick={() => {
+                if (onResetVoiceContext()) setConfirmingReset(false);
+              }}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className="rail-link-button" type="button" disabled={!stickyContextEnabled} onClick={() => setConfirmingReset(true)}>
+          Reset Voice Context
+          <span>⌄</span>
+        </button>
+      )}
     </section>
   );
 }
@@ -195,13 +241,19 @@ function TaskListCard({
   toolStatus,
   onOpenTask,
   onRefreshTask,
+  onBriefTask,
+  onApproveTask,
+  onRejectTask,
 }: {
   tasks: CodexTaskState[];
   toolStatus: string;
   onOpenTask: (taskId: string) => void;
   onRefreshTask: (taskId: string) => void;
+  onBriefTask: (taskId: string) => void;
+  onApproveTask: (taskId: string) => void;
+  onRejectTask: (taskId: string) => void;
 }) {
-  const activeCount = tasks.filter((task) => task.status !== "complete" && !task.status.startsWith("failed")).length;
+  const activeCount = tasks.filter((task) => !taskIsTerminal(task)).length;
 
   return (
     <section className="side-card task-list-card">
@@ -224,6 +276,17 @@ function TaskListCard({
                 <span>{task.progress}%</span>
               </div>
               <p>{task.resultExcerpt || task.summary}</p>
+              <div className="task-phase-row">
+                <span>{task.phase ? `phase: ${task.phase}` : "phase: unknown"}</span>
+                {task.stale ? <strong>possibly stale</strong> : null}
+              </div>
+              {task.lastActivity ? <div className="task-row-note neutral">Last activity: {task.lastActivity}</div> : null}
+              {taskNeedsApproval(task) ? (
+                <div className="task-approval-note">
+                  <strong>{task.approval?.action_type || "Approval required"}</strong>
+                  <span>{task.approval?.summary || "Approve this task before Codex starts."}</span>
+                </div>
+              ) : null}
               <div className="task-row-meta">
                 <span>{formatTaskElapsed(task.createdAt, task.completedAt)}</span>
                 <span>{task.handoffStatus ? `handoff: ${task.handoffStatus}` : "handoff: pending"}</span>
@@ -236,6 +299,21 @@ function TaskListCard({
                 <button className="secondary-button compact" type="button" onClick={() => onRefreshTask(task.id)}>
                   Refresh
                 </button>
+                <button className="outline-button compact" type="button" onClick={() => onBriefTask(task.id)}>
+                  Brief
+                </button>
+                {taskNeedsApproval(task) ? (
+                  <>
+                    <button className="decline-button compact" type="button" onClick={() => onRejectTask(task.id)}>
+                      <X size={16} />
+                      Reject
+                    </button>
+                    <button className="approve-button compact" type="button" onClick={() => onApproveTask(task.id)}>
+                      <Check size={16} />
+                      Approve
+                    </button>
+                  </>
+                ) : null}
               </div>
             </article>
           ))}
@@ -287,11 +365,19 @@ function TaskDetailDrawer({
             <div className="drawer-kv">
               <span>Status</span>
               <strong>{detail.status || "unknown"}</strong>
+              <span>Phase</span>
+              <strong>{detail.phase || "unknown"}</strong>
               <span>Complete</span>
               <strong>{detail.complete ? "yes" : "no"}</strong>
               <span>Result</span>
               <strong>{detail.result_available ? "available" : "not yet"}</strong>
+              <span>Last activity</span>
+              <strong>{detail.last_activity_at || "unknown"}</strong>
             </div>
+            <section>
+              <h3>Operator Brief</h3>
+              <pre>{detail.operator_brief || detail.last_activity || "No brief available yet."}</pre>
+            </section>
             <section>
               <h3>Request</h3>
               <pre>{formatJson(detail.request)}</pre>
@@ -300,6 +386,12 @@ function TaskDetailDrawer({
               <h3>Status Detail</h3>
               <pre>{formatJson(detail.status_detail)}</pre>
             </section>
+            {detail.approval ? (
+              <section>
+                <h3>Approval</h3>
+                <pre>{formatJson(detail.approval)}</pre>
+              </section>
+            ) : null}
             <section>
               <h3>Result Excerpt</h3>
               <pre>{detail.result_excerpt || "No result excerpt yet."}</pre>
@@ -331,6 +423,18 @@ function TaskDetailDrawer({
                     {event.reason ? <em>{String(event.reason)}</em> : null}
                   </div>
                 )) : <p className="drawer-muted">No telemetry events for this task yet.</p>}
+              </div>
+            </section>
+            <section>
+              <h3>Progress Timeline</h3>
+              <div className="drawer-event-list">
+                {detail.progress_timeline?.length ? detail.progress_timeline.slice(-12).map((event, index) => (
+                  <div key={`${event.phase || "progress"}-${index}`}>
+                    <strong>{String(event.phase || "progress")}</strong>
+                    <span>{String(event.timestamp || "")}</span>
+                    {event.message ? <em>{String(event.message)}</em> : null}
+                  </div>
+                )) : <p className="drawer-muted">No progress events for this task yet.</p>}
               </div>
             </section>
           </div>
@@ -529,49 +633,84 @@ function PasteCommandPanel({ sendText, phase }: { sendText: (text: string) => bo
   );
 }
 
-function MicGainControl({ value, active, onChange }: { value: number; active: boolean; onChange: (value: number) => void }) {
+function MicInputLevelControl({
+  value,
+  active,
+  runtime,
+  onChange,
+}: {
+  value: number;
+  active: boolean;
+  runtime: MicGainRuntimeState;
+  onChange: (value: number) => void;
+}) {
   function updateValue(event: ChangeEvent<HTMLInputElement> | FormEvent<HTMLInputElement>) {
     onChange(Number(event.currentTarget.value));
   }
 
+  const statusText = !runtime.available
+    ? "Unavailable on this device"
+    : active && runtime.active
+      ? "Live attenuation"
+      : "Saved for next start";
+
   return (
-    <label className="mic-gain-control">
-      <span>Mic sensitivity</span>
+    <label className="mic-gain-control" title={runtime.fallbackReason || runtime.audioContextState || undefined}>
+      <span>Voice input level</span>
       <input
-        aria-label="Microphone sensitivity"
+        aria-label="Voice input level"
         type="range"
         min="0"
-        max="2"
-        step="0.05"
+        max="100"
+        step="1"
         value={value}
         onInput={updateValue}
         onChange={updateValue}
       />
-      <strong>{Math.round(value * 100)}%</strong>
-      <small>{active ? "Live mic gain" : "Saved for next start"}</small>
+      <strong>{Math.round(value)}%</strong>
+      <small>{statusText}</small>
     </label>
   );
 }
 
-function DecisionCard() {
+function DecisionCard({
+  task,
+  onApproveTask,
+  onRejectTask,
+  onOpenTask,
+}: {
+  task?: CodexTaskState;
+  onApproveTask: (taskId: string) => void;
+  onRejectTask: (taskId: string) => void;
+  onOpenTask: (taskId: string) => void;
+}) {
+  const pending = task && taskNeedsApproval(task);
   return (
     <section className="side-card decision-card">
       <div className="card-title-row">
         <h2>Decision Gate</h2>
-        <span className="inline-status">Idle</span>
+        <span className={`inline-status ${pending ? "orange" : ""}`}>{pending ? "Waiting" : "Idle"}</span>
       </div>
-      <p>Voice confirmation gates are reserved for deletion and service install. No pending decision.</p>
+      {pending ? (
+        <div className="decision-summary">
+          <strong>{task.approval?.action_type || "Codex approval required"}</strong>
+          <p>{task.approval?.summary || task.summary}</p>
+          {task.approval?.reasons?.length ? <small>{task.approval.reasons.join(", ")}</small> : null}
+        </div>
+      ) : (
+        <p>No pending decision.</p>
+      )}
       <div className="decision-buttons">
-        <button className="approve-button" type="button" disabled>
-          <Check size={18} />
-          Approve
-        </button>
-        <button className="decline-button" type="button" disabled>
+        <button className="decline-button" type="button" disabled={!pending} onClick={() => task ? onRejectTask(task.id) : undefined}>
           <X size={18} />
           Decline
         </button>
+        <button className="approve-button" type="button" disabled={!pending} onClick={() => task ? onApproveTask(task.id) : undefined}>
+          <Check size={18} />
+          Approve
+        </button>
       </div>
-      <button className="rail-link-button" type="button" disabled>
+      <button className="rail-link-button" type="button" disabled={!task} onClick={() => task ? onOpenTask(task.id) : undefined}>
         View Details
         <span>⌄</span>
       </button>
@@ -636,22 +775,24 @@ function VoiceSessionPanel({
   elapsedSec,
   status,
   isMuted,
-  micGain,
+  micInputLevel,
+  micGainRuntime,
   error,
   onPrimary,
   onMute,
-  onMicGainChange,
+  onMicInputLevelChange,
   mobile = false,
 }: {
   phase: RealtimePhase;
   elapsedSec: number;
   status: PrithaRealtimeStatus | null;
   isMuted: boolean;
-  micGain: number;
+  micInputLevel: number;
+  micGainRuntime: MicGainRuntimeState;
   error: string | null;
   onPrimary: () => void;
   onMute: () => void;
-  onMicGainChange: (value: number) => void;
+  onMicInputLevelChange: (value: number) => void;
   mobile?: boolean;
 }) {
   const model = status?.model || "gpt-realtime-2";
@@ -686,7 +827,7 @@ function VoiceSessionPanel({
             {isMuted ? "Unmute" : "Mute"}
           </button>
         </div>
-        <MicGainControl value={micGain} active={gainActive} onChange={onMicGainChange} />
+        <MicInputLevelControl value={micInputLevel} active={gainActive} runtime={micGainRuntime} onChange={onMicInputLevelChange} />
       </section>
     );
   }
@@ -720,7 +861,7 @@ function VoiceSessionPanel({
           {primaryButtonLabel(phase, status)}
         </button>
       </div>
-      <MicGainControl value={micGain} active={gainActive} onChange={onMicGainChange} />
+      <MicInputLevelControl value={micInputLevel} active={gainActive} runtime={micGainRuntime} onChange={onMicInputLevelChange} />
     </section>
   );
 }
@@ -744,7 +885,9 @@ function MobileStatusChips({ status }: { status: PrithaRealtimeStatus | null }) 
         <strong className={`mobile-status-value ${codexReady ? "" : "muted"}`}>{status ? (codexReady ? "Connected" : "Queue") : "Checking"}</strong>
       </div>
       <div className="mobile-status-chip">
-        <span className="mobile-status-title">Realtime</span>
+        <span className="mobile-status-title">
+          Realtime <span className={`dot ${realtimeReady ? "green" : status ? "orange" : ""}`} />
+        </span>
         <strong className={`mobile-status-value ${realtimeReady ? "" : "muted"}`}>{status ? (realtimeReady ? "Ready" : "Key") : "Checking"}</strong>
       </div>
     </div>
@@ -773,6 +916,7 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [sessionRecallOpen, setSessionRecallOpen] = useState(false);
   const isActive = phaseIsActive(realtime.phase);
+  const pendingDecisionTask = realtime.codexTasks.find((task) => taskNeedsApproval(task));
   const primaryAction = useMemo(
     () => () => {
       if (isActive) realtime.stop();
@@ -807,6 +951,27 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
     if (taskDetail?.task_id === taskId || snapshot?.task_id === taskDetail?.task_id) await openTaskDetails(taskId);
   }
 
+  async function briefVisibleTask(taskId: string) {
+    await realtime.refreshCodexTask(taskId).catch(() => null);
+    realtime.sendStickyContext(`codex_task_brief:${taskId}`);
+  }
+
+  async function decideCodexTask(taskId: string, action: "approve" | "reject") {
+    const response = await fetch(`/api/realtime/codex-task/${encodeURIComponent(taskId)}/approval`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const result = (await response.json().catch(() => ({ ok: false, error: "approval returned non-json" }))) as CodexTaskDetail;
+    if (response.ok) {
+      await realtime.refreshCodexTask(taskId);
+      if (action === "approve") realtime.watchCodexTask(taskId);
+      if (taskDetail?.task_id === taskId || result.task_id === taskDetail?.task_id) setTaskDetail(result);
+    } else {
+      setTaskDetail(result);
+    }
+  }
+
   return (
     <>
       {isMobile ? (
@@ -817,15 +982,24 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
             elapsedSec={elapsedSec}
             status={realtime.status}
             isMuted={realtime.isMuted}
-            micGain={realtime.micGain}
+            micInputLevel={realtime.micInputLevel}
+            micGainRuntime={realtime.micGainRuntime}
             error={realtime.error}
             onPrimary={primaryAction}
             onMute={realtime.toggleMute}
-            onMicGainChange={realtime.setMicGain}
+            onMicInputLevelChange={realtime.setMicInputLevel}
             mobile
           />
           <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
-          <TaskListCard tasks={realtime.codexTasks} toolStatus={realtime.toolStatus} onOpenTask={openTaskDetails} onRefreshTask={(taskId) => void refreshVisibleTask(taskId)} />
+          <TaskListCard
+            tasks={realtime.codexTasks}
+            toolStatus={realtime.toolStatus}
+            onOpenTask={openTaskDetails}
+            onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
+            onBriefTask={(taskId) => void briefVisibleTask(taskId)}
+            onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+            onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+          />
           <SessionCard
             events={realtime.sessionEvents}
             phase={realtime.phase}
@@ -841,7 +1015,12 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
             onResetVoiceContext={realtime.resetVoiceContext}
             mobile
           />
-          <DecisionCard />
+          <DecisionCard
+            task={pendingDecisionTask}
+            onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+            onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+            onOpenTask={openTaskDetails}
+          />
         </div>
       ) : (
         <div className="voice-desktop-content">
@@ -853,16 +1032,25 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
                 elapsedSec={elapsedSec}
                 status={realtime.status}
                 isMuted={realtime.isMuted}
-                micGain={realtime.micGain}
+                micInputLevel={realtime.micInputLevel}
+                micGainRuntime={realtime.micGainRuntime}
                 error={realtime.error}
                 onPrimary={primaryAction}
                 onMute={realtime.toggleMute}
-                onMicGainChange={realtime.setMicGain}
+                onMicInputLevelChange={realtime.setMicInputLevel}
               />
               <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
             </main>
             <aside className="voice-rail">
-              <TaskListCard tasks={realtime.codexTasks} toolStatus={realtime.toolStatus} onOpenTask={openTaskDetails} onRefreshTask={(taskId) => void refreshVisibleTask(taskId)} />
+              <TaskListCard
+                tasks={realtime.codexTasks}
+                toolStatus={realtime.toolStatus}
+                onOpenTask={openTaskDetails}
+                onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
+                onBriefTask={(taskId) => void briefVisibleTask(taskId)}
+                onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+                onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+              />
               <SessionCard
                 events={realtime.sessionEvents}
                 phase={realtime.phase}
@@ -887,7 +1075,12 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
                 sessionEventCount={realtime.sessionEvents.length}
                 onResetVoiceContext={realtime.resetVoiceContext}
               />
-              <DecisionCard />
+              <DecisionCard
+                task={pendingDecisionTask}
+                onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+                onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+                onOpenTask={openTaskDetails}
+              />
             </aside>
           </div>
         </div>

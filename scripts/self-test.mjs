@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 
-const ROOT = process.env.TECHSCOPE_ROOT
-  ? path.resolve(process.env.TECHSCOPE_ROOT)
-  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ENV_ROOT = process.env.TECHSCOPE_ROOT ? path.resolve(process.env.TECHSCOPE_ROOT) : "";
+const ROOT = ENV_ROOT && existsSync(ENV_ROOT) ? ENV_ROOT : DEFAULT_ROOT;
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);
@@ -127,10 +127,30 @@ function runSelfTest() {
     ? runCommand("python3", ["scripts/embed-memory.py"], { timeoutMs: 600000 })
     : { ok: true, status: 0, stdout: "", stderr: "", skipped: true };
   const queue = runJson("node", ["scripts/queue-health.mjs", "--json"]);
+  const launchdRoot = runCommand("node", ["scripts/launchd-root-audit.mjs", "status", "--json"], { timeoutMs: 60000 });
   const currentStats = stats();
   const previous = previousBaseline();
 
   const regressions = [];
+  const warnings = [];
+  let launchdRootAudit = null;
+  if (launchdRoot.stdout) {
+    try {
+      launchdRootAudit = JSON.parse(launchdRoot.stdout);
+    } catch {
+      launchdRootAudit = { ok: false, error: "launchd root audit returned invalid JSON", stderr: launchdRoot.stderr };
+    }
+  } else {
+    launchdRootAudit = { ok: false, error: launchdRoot.stderr || "launchd root audit returned no output" };
+  }
+  if (!launchdRootAudit?.ok) {
+    warnings.push({
+      id: "launchd-root-drift",
+      severity: "warning",
+      message: "launchd loaded state or plist root differs from the current Pritha root",
+      detail: launchdRootAudit,
+    });
+  }
   const expectedQualityStatus = dryRun ? "planned" : "pass";
   if (!quality.ok || quality.json?.status !== expectedQualityStatus) {
     regressions.push({
@@ -173,6 +193,8 @@ function runSelfTest() {
     quality_gate: quality.json || { status: "fail", stdout: quality.stdout, stderr: quality.stderr },
     embeddings_restore: embeddingsRestore,
     queue_health: queue.json || { status: "fail", stdout: queue.stdout, stderr: queue.stderr },
+    launchd_root_audit: launchdRootAudit,
+    warnings,
     regressions,
   });
 

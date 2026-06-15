@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-06-07
+updated: 2026-06-15
 template_for: agent-contract
 topics: []
 tools: []
@@ -57,6 +57,8 @@ Status: draft | accepted | superseded
 - Target user:
 - Success criteria:
 - Out of scope:
+- Target folder: sibling of Pritha | explicit path | existing project
+- Contract status before scaffold: draft | accepted | superseded
 
 ## Pritha lineage metadata (optional)
 
@@ -110,6 +112,7 @@ Status: draft | accepted | superseded
 - Codex telemetry unavailable-data behavior:
 - Codex telemetry privacy boundary:
 - Interface side-effect policy: no-side-effects | approval-required | allowed-by-contract | unknown
+- Voice/Codex approval gate: none | risky-actions-only | all-writes | unknown
 - Interface fallback: text-summary | CLI-status | manual | none | unknown
 - Telegram mode: none | primary-chat | intake-channel | notifications-only | operator-control
 - Expected hosting: local Mac | Mac mini service | VPS | cloud | embedded | unknown
@@ -232,6 +235,7 @@ Status: draft | accepted | superseded
 - Constraints, validation and recovery:
 - Human approval gates:
 - Completion criteria:
+- Harness evolution protocol: inspect local project/contract, consult Pritha memory, verify current docs when needed, implement minimal change with tests
 
 ## Data, memory and sources
 
@@ -245,6 +249,10 @@ Status: draft | accepted | superseded
 - Indexing/search needs:
 - External verification needs:
 - Source freshness requirements:
+- Pritha memory research required: yes | no-with-reason
+- Pritha memory research report:
+- Current-docs verification required: yes | no-with-reason
+- Current-docs verification status: pending | complete | not-applicable
 
 ## Tools and integrations
 
@@ -294,6 +302,9 @@ Status: draft | accepted | superseded
 ## Research basis
 
 - Related TechScope artifacts:
+- Pritha memory searches performed:
+- Pritha standards/workflows/decisions used:
+- Comparable child-agent evidence used:
 - Current primary sources checked:
 - Trusted secondary sources checked:
 - Alternatives considered:
@@ -302,6 +313,9 @@ Status: draft | accepted | superseded
 ## Acceptance checklist
 
 - [ ] Contract reviewed with user.
+- [ ] Contract status is `accepted` before production scaffold.
+- [ ] Pritha memory research completed or explicitly waived with reason.
+- [ ] Current primary sources checked for volatile choices or marked not-applicable.
 - [ ] Runtime family selected.
 - [ ] Runtime isolation profile selected or explicitly marked unnecessary.
 - [ ] Runtime placement selected per task class.

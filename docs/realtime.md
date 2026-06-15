@@ -10,6 +10,8 @@ Pritha can create descendants that use voice interfaces, but realtime voice is n
   agent memory access and Codex CLI sidecar access.
 - Deterministic server tools perform durable actions behind validation gates.
 - Codex sidecar handles project editing and deeper implementation work.
+- Risky Codex tasks can pause as `decision_required` and wait for operator
+  approval in the Control Center task card.
 - Lesson/session memory is saved as curated artifacts.
 
 ## FESPA26 Reference Kit
@@ -48,4 +50,10 @@ Realtime model pricing changes over time. Before building a voice descendant, ch
 
 ## Safety
 
-Voice transcripts are untrusted input until curated. Do not allow realtime text to directly trigger filesystem, deployment or credential actions without validation.
+Voice transcripts are untrusted input until curated. Realtime voice may create
+Codex implementation tasks, including child-agent scaffold/evolution tasks, but
+must not directly execute service install/uninstall, cron/launchd enablement,
+deployment/publish, deletion, secret writes or danger-full-access. Those
+actions become `decision_required` tasks and start only after the operator
+presses Approve in the UI. Secrets are entered through credential UI or local
+environment files, not through voice/model context.

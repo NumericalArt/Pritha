@@ -1,5 +1,5 @@
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import type {
@@ -57,6 +57,17 @@ type OperationsCommand =
   | {
       command?: string;
       argv?: string[];
+      cwd?: string;
+      env_allowlist?: string[];
+      timeout_ms?: number;
+      success_exit_codes?: number[];
+      background?: boolean;
+      readiness?: {
+        kind?: "health_url" | "pid" | "none";
+        url?: string;
+        pid_file?: string;
+        timeout_ms?: number;
+      };
       control_center_managed?: boolean;
     };
 
@@ -164,7 +175,7 @@ type OperatorActionAuditEntry = {
   agentId: string;
   agentName: string;
   action: ControlCenterOperatorAction;
-  result: "passed" | "warnings" | "failed" | "planned-only";
+  result: "passed" | "warnings" | "failed" | "planned-only" | "blocked" | "pending_confirmation" | "executing" | "running" | "stopped" | "degraded";
   target: string;
   checks: {
     passed: number;
@@ -178,7 +189,10 @@ const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
 
 function resolveTechscopeRoot() {
-  if (process.env.TECHSCOPE_ROOT) return path.resolve(process.env.TECHSCOPE_ROOT);
+  if (process.env.TECHSCOPE_ROOT) {
+    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
+    if (existsSync(envRoot)) return envRoot;
+  }
 
   let cursor = process.cwd();
   for (let i = 0; i < 8; i += 1) {
@@ -326,6 +340,11 @@ type SelfTestBaseline = {
   schema?: string;
   status?: "pass" | "fail";
   created_at?: string;
+  warnings?: Array<{
+    id?: string;
+    severity?: string;
+    message?: string;
+  }>;
   memory_stats?: {
     documents?: number;
     chunks?: number;
@@ -416,6 +435,7 @@ function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
       ageLabel: "Never",
       failed: 0,
       memoryStats: sqliteStats || emptyMemoryStats(),
+      warnings: [],
     };
   }
 
@@ -426,7 +446,38 @@ function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
     failed: Number(baseline.quality_gate?.failed || 0),
     memoryStats,
     qualityGateStatus: baseline.quality_gate?.status,
+    warnings: Array.isArray(baseline.warnings)
+      ? baseline.warnings
+          .map((warning) => ({
+            id: String(warning.id || ""),
+            severity: String(warning.severity || "warning"),
+            message: String(warning.message || "").trim(),
+          }))
+          .filter((warning) => warning.message)
+      : [],
   };
+}
+
+function launchdRootWarnings(root: string) {
+  const auditScript = path.join(/* turbopackIgnore: true */ root, "scripts", "launchd-root-audit.mjs");
+  const result = spawnSync(process.execPath, [auditScript, "status", "--json"], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 30_000,
+    env: { ...process.env, TECHSCOPE_ROOT: root },
+  });
+  const text = String(result.stdout || "").trim();
+  if (!text) return result.status === 0 ? [] : [`Launchd root audit unavailable: ${String(result.stderr || "no output").trim()}`];
+  try {
+    const payload = JSON.parse(text) as { ok?: boolean; jobs?: Array<{ label?: string; status?: string }> };
+    if (payload.ok) return [];
+    return (payload.jobs || [])
+      .filter((job) => job.status && job.status !== "ok")
+      .map((job) => `Launchd root drift: ${job.label || "unknown"} is ${job.status}`);
+  } catch {
+    return [`Launchd root audit returned invalid JSON: ${String(result.stderr || "").trim()}`];
+  }
 }
 
 function markdownFiles(root: string, segments: string[]) {
@@ -1354,13 +1405,13 @@ function operationsStatus(manifest: OperationsManifest | null): CapabilityStatus
 function commandText(command: OperationsCommand | undefined) {
   if (!command) return "";
   if (typeof command === "string") return command;
-  return command.command || command.argv?.join(" ") || "";
+  return command.argv?.join(" ") || command.command || "";
 }
 
 function classifyCommandReadiness(command: OperationsCommand | undefined): ControlCenterCommandReadiness {
   if (!command) return "missing";
   if (typeof command !== "string") {
-    return command.control_center_managed && (command.command || command.argv?.length) ? "structured_executable" : "legacy_declared";
+    return command.control_center_managed && Array.isArray(command.argv) && command.argv.length ? "structured_executable" : "legacy_declared";
   }
 
   const text = command.toLowerCase();
@@ -1375,6 +1426,93 @@ function readinessLabel(readiness: ControlCenterCommandReadiness) {
   if (readiness === "human_instruction") return "human instruction";
   if (readiness === "legacy_declared") return "legacy declared";
   return "missing";
+}
+
+type StructuredOperationsCommand = Extract<OperationsCommand, { argv?: string[] }>;
+
+function hasShellMetacharacter(value: string) {
+  return /[;&|<>`$\\\n\r]/.test(value);
+}
+
+function safeExecutionText(value: unknown, maxChars = 1_500) {
+  const text = String(value || "")
+    .replace(/(?:sk|pk|rk)-[A-Za-z0-9_-]{12,}/g, "[redacted-key]")
+    .replace(/([A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=)[^\s]+/gi, "$1[redacted]")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
+}
+
+function countChecks(checks: ControlCenterOperatorActionCheck[]) {
+  return {
+    passed: checks.filter((check) => check.status === "pass").length,
+    warnings: checks.filter((check) => check.status === "warn").length,
+    failed: checks.filter((check) => check.status === "fail").length,
+  };
+}
+
+function processIsAlive(pid: unknown) {
+  const value = Number(pid);
+  if (!Number.isInteger(value) || value <= 0) return false;
+  try {
+    process.kill(value, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validateStructuredOperationsCommand(params: {
+  root: string;
+  folderPath: string;
+  manifest: OperationsManifest | null;
+  agent: ControlCenterAgent;
+  action: Extract<ControlCenterOperatorAction, "start" | "stop">;
+}) {
+  const command = params.action === "start" ? params.manifest?.start_command : params.manifest?.stop_command;
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (params.agent.control.ownership !== "managed") errors.push("Agent is not control_center_managed.");
+  if (!command || typeof command === "string" || !Array.isArray(command.argv) || !command.argv.length) {
+    errors.push(`${params.action} command is not a structured argv command.`);
+    return { ok: false, errors, warnings, command: null as StructuredOperationsCommand | null, cwd: params.folderPath, env: {} as Record<string, string>, timeoutMs: 30_000 };
+  }
+  if (!command.control_center_managed) errors.push(`${params.action} command is not marked control_center_managed.`);
+  if (command.command) warnings.push("Legacy command field is ignored; only argv is executable.");
+
+  const argv = command.argv.map((item) => String(item || "").trim());
+  if (argv.some((item) => !item)) errors.push("argv contains an empty item.");
+  for (const item of argv) {
+    if (hasShellMetacharacter(item)) errors.push(`argv item contains forbidden shell metacharacters: ${item}`);
+  }
+
+  const cwdValue = String(command.cwd || ".").trim() || ".";
+  if (hasShellMetacharacter(cwdValue)) errors.push("cwd contains forbidden shell metacharacters.");
+  const cwd = path.resolve(params.folderPath, cwdValue);
+  const relative = path.relative(params.folderPath, cwd);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) errors.push("cwd must stay inside the child-agent folder.");
+  if (!existsSync(cwd)) errors.push("cwd does not exist.");
+
+  const env: Record<string, string> = {};
+  const allowlist = Array.isArray(command.env_allowlist) ? command.env_allowlist.map((item) => String(item || "").trim()).filter(Boolean) : [];
+  for (const name of allowlist) {
+    if (!/^[A-Z_][A-Z0-9_]{0,100}$/.test(name)) {
+      errors.push(`Invalid env allowlist name: ${name}`);
+      continue;
+    }
+    if (process.env[name] !== undefined) env[name] = process.env[name];
+  }
+
+  if (params.action === "start" && command.background) {
+    const readiness = command.readiness;
+    const hasHealth = Boolean(readiness?.kind === "health_url" && (readiness.url || params.manifest?.health_url || params.manifest?.local_upstream_url));
+    const hasPid = Boolean(readiness?.kind === "pid" && readiness.pid_file);
+    if (!hasHealth && !hasPid) errors.push("background start requires readiness.kind health_url or pid.");
+  }
+
+  const timeoutMs = Number.isFinite(Number(command.timeout_ms)) ? Math.max(1_000, Math.min(Number(command.timeout_ms), 120_000)) : 30_000;
+  return { ok: errors.length === 0, errors, warnings, command: { ...command, argv }, cwd, env, timeoutMs };
 }
 
 function isLocalUrl(url: string | undefined) {
@@ -1492,7 +1630,7 @@ function buildAgentControl(
       primaryCardAction: "stop_plan",
       planAction: "stop",
       label: "Stop Plan",
-      reason: "A local service is active, but C.11 only exposes a read-only stop plan.",
+      reason: "A local service is active; stop requires a managed structured command and explicit confirmation.",
     };
   }
   if (runtimeKind === "web_service") {
@@ -1501,7 +1639,7 @@ function buildAgentControl(
       primaryCardAction: "start_plan",
       planAction: "start",
       label: "Start Plan",
-      reason: "A local service manifest exists, but C.11 only exposes a read-only start plan.",
+      reason: "A local service manifest exists; start requires a managed structured command and explicit confirmation.",
     };
   }
   return {
@@ -1597,6 +1735,11 @@ function voiceRealtimeCapability(voiceRuntime: VoiceRuntimeStatus): CapabilitySt
 
 function capabilities(root: string, registryReady: boolean, agents: ControlCenterAgent[], voiceRuntime: VoiceRuntimeStatus): ControlCenterCapabilities {
   const anyOperationsReady = agents.some((agent) => agent.operations.status === "ready");
+  const anyStartStopExecutable = agents.some(
+    (agent) =>
+      agent.control.ownership === "managed" &&
+      (agent.control.commandReadiness.start === "structured_executable" || agent.control.commandReadiness.stop === "structured_executable"),
+  );
   const anyRestorePlan = agents.some((agent) => agent.lifecycle.restorePlan.status === "ready");
   const anyRollbackPlan = agents.some((agent) => agent.lifecycle.rollback.planAvailable);
   const memoryToolReady = voiceRuntime.memory.sqlite || voiceRuntime.memory.sqlite_cli;
@@ -1604,7 +1747,7 @@ function capabilities(root: string, registryReady: boolean, agents: ControlCente
     agents_registry: registryReady ? "ready" : "not_installed",
     sibling_scan: "ready",
     operations_manifest: anyOperationsReady ? "ready" : "not_installed",
-    start_stop: "planned",
+    start_stop: anyStartStopExecutable ? "manual_only" : "planned",
     restore: anyRestorePlan ? "manual_only" : "planned",
     snapshots: snapshotsStatus(root),
     rollback: anyRollbackPlan ? "manual_only" : "unavailable",
@@ -1658,7 +1801,12 @@ export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
   const caps = capabilities(root, registry.records.length > 0, childAgents, voiceRuntime);
   const access = accessLinks();
   const selfTest = selfTestStatus(root);
-  const warnings = childAgents.flatMap((agent) => (agent.ui.issueText ? [`${agent.name}: ${agent.ui.issueText}`] : []));
+  const launchdWarnings = launchdRootWarnings(root);
+  const warnings = [
+    ...childAgents.flatMap((agent) => (agent.ui.issueText ? [`${agent.name}: ${agent.ui.issueText}`] : [])),
+    ...(selfTest.warnings || []).map((warning) => `Self-test: ${warning.message}`),
+    ...launchdWarnings,
+  ];
 
   return {
     ok: true,
@@ -1928,7 +2076,7 @@ function commandCheck(id: string, label: string, readiness: ControlCenterCommand
   const labelText = readinessLabel(readiness);
   const detail =
     readiness === "structured_executable"
-      ? "Structured executable command is declared; executor remains disabled in C.11"
+      ? "Structured executable command is declared; execution is confirmation-gated."
       : readiness === "human_instruction"
         ? `${labelText} in operations manifest, not an executable contract${text ? `: ${text}` : ""}`
         : readiness === "legacy_declared"
@@ -2000,7 +2148,7 @@ function controlForAction(agent: ControlCenterAgent, action: ControlCenterOperat
       planAction: "start",
       executionMode: "plan_only",
       label: "Start Plan",
-      reason: "Start is available only as a read-only plan in C.11.",
+      reason: "Start is available as a plan unless the current state and structured managed command allow execution.",
     };
   }
   if (action === "stop") {
@@ -2010,7 +2158,7 @@ function controlForAction(agent: ControlCenterAgent, action: ControlCenterOperat
       planAction: "stop",
       executionMode: "plan_only",
       label: "Stop Plan",
-      reason: "Stop is available only as a read-only plan in C.11.",
+      reason: "Stop is available as a plan unless the current state and structured managed command allow execution.",
     };
   }
   return {
@@ -2019,7 +2167,7 @@ function controlForAction(agent: ControlCenterAgent, action: ControlCenterOperat
     planAction: "restore",
     executionMode: "plan_only",
     label: "Restore Plan",
-    reason: "Restore is available only as a read-only plan in C.11.",
+    reason: "Restore is available only as a read-only plan until a dedicated restore executor is implemented.",
   };
 }
 
@@ -2065,23 +2213,45 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
     });
   }
 
-  const failedChecks = checks.filter((check) => check.status === "fail");
+  const failedChecks = checks.filter((check) => {
+    if (check.status !== "fail") return false;
+    if (action === "start" && check.id === "health" && agent.control.runtimeKind === "web_service") {
+      return false;
+    }
+    return true;
+  });
+  const startStopAction = action === "start" || action === "stop";
+  const runtimeBlockers =
+    startStopAction
+      ? [
+          agent.control.ownership !== "managed" ? "Agent is not control_center_managed; start/stop execution is disabled." : "",
+          actionCommandReadiness !== "structured_executable" ? `${action.toUpperCase()} requires a structured executable argv command in operations/manifest.json.` : "",
+          agent.control.runtimeKind === "external_service" ? "External services cannot be started or stopped by Control Center." : "",
+          agent.control.runtimeKind === "scaffold" || agent.folder.status !== "present" ? "Agent folder is missing or scaffold-only." : "",
+        ].filter(Boolean)
+      : [];
   const actionBackendMissing =
-    action === "start"
-      ? "Start backend is planned-only; Control Center will not start a process yet"
-      : action === "stop"
-        ? "Stop backend is planned-only; Control Center will not stop a process yet"
-        : action === "restore"
-          ? "Restore backend is planned-only; Control Center will not create folders yet"
-          : "";
-  const plannedOnlyBlockers = action === "check" ? [] : [actionBackendMissing];
-  const blockers = action === "check" ? [] : [...plannedOnlyBlockers, ...failedChecks.map((check) => `${check.label}: ${check.detail}`)];
+    action === "restore" ? "Restore backend is planned-only; Control Center will not create folders yet" : "";
+  const plannedOnlyBlockers = actionBackendMissing ? [actionBackendMissing] : [];
+  const blockers = action === "check" ? [] : [...runtimeBlockers, ...plannedOnlyBlockers, ...failedChecks.map((check) => `${check.label}: ${check.detail}`)];
+  const startStopEnabled = startStopAction && blockers.length === 0;
   const planStatus: CapabilityStatus =
     action === "check"
       ? "manual_only"
-      : blockers.length > plannedOnlyBlockers.length
+      : startStopEnabled
+        ? "manual_only"
+        : blockers.length > plannedOnlyBlockers.length
         ? "unavailable"
         : "planned";
+  const effectiveControl: ControlCenterAgentControl =
+    startStopEnabled
+      ? {
+          ...planControl,
+          executionMode: "executable",
+          label: action === "start" ? "Start" : "Stop",
+          reason: "Structured managed command is available behind manual confirmation.",
+        }
+      : planControl;
 
   return {
     ok: true,
@@ -2093,7 +2263,7 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
     },
     action,
     status: planStatus,
-    actionEnabled: action === "check",
+    actionEnabled: action === "check" || startStopEnabled,
     requiresConfirmation: action !== "check",
     confirmation:
       action === "check"
@@ -2107,12 +2277,12 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
       commandAvailable,
       localUrl,
       healthUrl,
-      willStartProcess: false,
-      willStopProcess: false,
+      willStartProcess: action === "start" && startStopEnabled,
+      willStopProcess: action === "stop" && startStopEnabled,
       willCreateFolder: false,
       willOverwriteExistingFolder: false,
     },
-    control: planControl,
+    control: effectiveControl,
     checks,
     steps:
       action === "check"
@@ -2123,18 +2293,22 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
           ]
         : [
             "Review plan, preflight checks and blockers",
-            "Keep this action disabled until a confirmation-gated deterministic backend exists",
-            "Use Dev diagnostics or Codex for remediation or manifest upgrade planning",
+            startStopEnabled ? `Enter the required confirmation phrase to ${action} the managed agent runtime` : "Resolve blockers before execution is enabled",
+            startStopEnabled ? "Control Center executes only the structured argv command without a shell" : "Use Dev diagnostics or Codex for remediation or manifest upgrade planning",
           ],
     blockers,
     risks:
       action === "check"
         ? ["Health probes can report stale local state if the child-agent server is changing while the check runs"]
-        : ["This action would mutate runtime state in a future milestone and therefore remains disabled here"],
+        : startStopEnabled
+          ? ["This action mutates local runtime state and is gated by explicit operator confirmation."]
+          : ["This action would mutate runtime state and remains disabled until the managed structured contract is complete."],
     warnings: [
       action === "check"
         ? "Manual check does not start, stop, restore, install, remove or schedule anything."
-        : "Plan-only action. No process, folder, service, snapshot or memory mutation is available from this endpoint.",
+        : startStopEnabled
+          ? "Confirmation-gated action. No shell strings, secrets, launchd install, cron enablement or external service mutation is allowed."
+          : "Plan-only action. No process, folder, service, snapshot or memory mutation is available from this endpoint.",
     ],
   };
 }
@@ -2189,9 +2363,9 @@ function appendManualCheckAudit(status: ControlCenterStatus, result: ControlCent
     actor: "pritha-control-center",
     agentId: result.agent.id,
     agentName: result.agent.name,
-    action: "check",
+    action: result.action,
     result: result.status,
-    target: agent?.health.checkedUrl || agent?.url.local || agent?.folder.relativePath || result.agent.id,
+    target: result.execution?.command?.join(" ") || agent?.health.checkedUrl || agent?.url.local || agent?.folder.relativePath || result.agent.id,
     checks: result.summary,
   });
 }
@@ -2200,6 +2374,299 @@ export async function runAgentManualCheck(agentId: string): Promise<ControlCente
   const { status, agent } = await getControlCenterAgent(agentId);
   if (!agent) return null;
   const result = buildManualCheckResult(status, agent, new Date().toISOString());
+  appendManualCheckAudit(status, result);
+  return result;
+}
+
+function blockedOperatorActionResult(params: {
+  status: ControlCenterStatus;
+  agent: ControlCenterAgent;
+  action: Extract<ControlCenterOperatorAction, "start" | "stop">;
+  plan: ControlCenterOperatorActionPlan;
+  generatedAt: string;
+  errors: string[];
+  warnings?: string[];
+  resultStatus?: ControlCenterOperatorActionResult["status"];
+}): ControlCenterOperatorActionResult {
+  const checks = params.plan.checks;
+  const summary = countChecks(checks);
+  return {
+    ok: true,
+    generatedAt: params.generatedAt,
+    agent: {
+      id: params.agent.id,
+      name: params.agent.name,
+    },
+    action: params.action,
+    status: params.resultStatus || "blocked",
+    actionEnabled: false,
+    audit: {
+      path: operatorActionAuditLogRelativePath(params.status.root),
+      entryId: auditEntryId(params.generatedAt, params.agent.id, `operator-${params.action}`),
+    },
+    checks,
+    summary,
+    warnings: params.warnings || params.plan.warnings,
+    errors: params.errors,
+    execution: {
+      status: params.resultStatus === "pending_confirmation" ? "pending_confirmation" : "blocked",
+      target: params.plan.target.kind,
+    },
+  };
+}
+
+function operationManifestForAgent(root: string, agent: ControlCenterAgent) {
+  const folder = findSiblingFolder(root, agent.name);
+  if (!folder) return { folder: null, manifest: null };
+  return {
+    folder,
+    manifest: readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")),
+  };
+}
+
+async function waitForRuntimeReadiness(params: {
+  manifest: OperationsManifest | null;
+  command: StructuredOperationsCommand;
+  cwd: string;
+  pid?: number;
+  timeoutMs: number;
+}) {
+  const started = Date.now();
+  const readiness = params.command.readiness;
+  const url = readiness?.url || params.manifest?.health_url || (params.manifest?.local_upstream_url ? `${params.manifest.local_upstream_url.replace(/\/$/, "")}/api/health` : undefined);
+  const canCheckPid = Boolean(readiness?.kind === "pid" && readiness.pid_file);
+  const canCheckHealth = Boolean(url);
+  const canCheckProcess = Boolean(params.pid);
+  if (!canCheckPid && !canCheckHealth && !canCheckProcess) {
+    return { status: "unknown" as const, detail: "No readiness source declared for this command.", checkedUrl: url };
+  }
+  while (Date.now() - started <= params.timeoutMs) {
+    if (readiness?.kind === "pid" && readiness.pid_file) {
+      const pidFile = path.resolve(params.cwd, readiness.pid_file);
+      const relative = path.relative(params.cwd, pidFile);
+      if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
+        try {
+          const pid = Number(readFileSync(pidFile, "utf8").trim());
+          if (processIsAlive(pid)) return { status: "ok" as const, detail: `pid ${pid} is alive` };
+        } catch {
+          // The process may not have written its pid file yet.
+        }
+      }
+    } else if (url) {
+      const probe = await probeHealth({ ...params.manifest, health_url: url });
+      if (probe.status === "ok") return probe;
+    } else if (params.pid && processIsAlive(params.pid)) {
+      return { status: "ok" as const, detail: `pid ${params.pid} is alive` };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+  return { status: "failed" as const, detail: "Readiness did not pass before timeout", checkedUrl: url };
+}
+
+async function executeStructuredAgentCommand(params: {
+  action: Extract<ControlCenterOperatorAction, "start" | "stop">;
+  manifest: OperationsManifest | null;
+  command: StructuredOperationsCommand;
+  cwd: string;
+  env: Record<string, string>;
+  timeoutMs: number;
+}) {
+  const argv = params.command.argv || [];
+  const successExitCodes = Array.isArray(params.command.success_exit_codes) ? params.command.success_exit_codes : [0];
+  if (params.command.background && params.action === "start") {
+    const child = spawn(argv[0], argv.slice(1), {
+      cwd: params.cwd,
+      env: { ...process.env, ...params.env },
+      detached: true,
+      stdio: "ignore",
+      shell: false,
+    });
+    const spawnError = await new Promise<Error | null>((resolve) => {
+      const timer = setTimeout(() => resolve(null), 100);
+      child.once("error", (error) => {
+        clearTimeout(timer);
+        resolve(error instanceof Error ? error : new Error(String(error)));
+      });
+    });
+    if (spawnError) {
+      return {
+        status: "failed" as const,
+        exitCode: null,
+        signal: null,
+        pid: child.pid,
+        stdout: "",
+        stderr: safeExecutionText(spawnError.message),
+        readiness: {
+          status: "failed" as const,
+          detail: "Process failed to spawn.",
+        },
+      };
+    }
+    child.unref();
+    const readiness = await waitForRuntimeReadiness({
+      manifest: params.manifest,
+      command: params.command,
+      cwd: params.cwd,
+      pid: child.pid,
+      timeoutMs: Math.min(Number(params.command.readiness?.timeout_ms || params.timeoutMs), params.timeoutMs),
+    });
+    return {
+      status: readiness.status === "ok" ? ("running" as const) : ("degraded" as const),
+      exitCode: null,
+      signal: null,
+      pid: child.pid,
+      stdout: "",
+      stderr: "",
+      readiness,
+    };
+  }
+
+  const result = spawnSync(argv[0], argv.slice(1), {
+    cwd: params.cwd,
+    env: { ...process.env, ...params.env },
+    encoding: "utf8",
+    timeout: params.timeoutMs,
+    shell: false,
+  });
+  const exitOk = result.status !== null && successExitCodes.includes(result.status);
+  const stderr = safeExecutionText(result.stderr || result.error?.message || "");
+  const readiness =
+    params.action === "start"
+      ? await waitForRuntimeReadiness({ manifest: params.manifest, command: params.command, cwd: params.cwd, timeoutMs: Math.min(params.timeoutMs, 8_000) })
+      : await probeHealth(params.manifest);
+  const status =
+    params.action === "stop"
+      ? exitOk && params.manifest?.health_url && readiness.status === "ok"
+        ? "failed"
+        : exitOk
+          ? "stopped"
+          : "failed"
+      : exitOk && (readiness.status === "ok" || readiness.status === "unknown" || !params.manifest?.health_url)
+        ? "running"
+        : exitOk
+          ? "degraded"
+          : "failed";
+
+  return {
+    status: status as "running" | "stopped" | "failed" | "degraded",
+    exitCode: result.status,
+    signal: result.signal,
+    stdout: safeExecutionText(result.stdout),
+    stderr,
+    readiness,
+  };
+}
+
+export async function runAgentRuntimeAction(
+  agentId: string,
+  action: Extract<ControlCenterOperatorAction, "start" | "stop">,
+  confirmation: string,
+): Promise<ControlCenterOperatorActionResult | null> {
+  const { status, agent } = await getControlCenterAgent(agentId);
+  if (!agent) return null;
+  const generatedAt = new Date().toISOString();
+  const plan = buildOperatorActionPlan(status, agent, action);
+  const requiredPhrase = plan.confirmation?.requiredPhrase || operatorActionPhrase(agent, action);
+
+  if (!plan.actionEnabled) {
+    const result = blockedOperatorActionResult({
+      status,
+      agent,
+      action,
+      plan,
+      generatedAt,
+      errors: plan.blockers.length ? plan.blockers : ["Action is not executable for this agent."],
+    });
+    appendManualCheckAudit(status, result);
+    return result;
+  }
+
+  if (confirmation.trim() !== requiredPhrase) {
+    const result = blockedOperatorActionResult({
+      status,
+      agent,
+      action,
+      plan,
+      generatedAt,
+      resultStatus: "pending_confirmation",
+      errors: [`Confirmation phrase mismatch. Required phrase: ${requiredPhrase}`],
+      warnings: ["No runtime command was executed."],
+    });
+    appendManualCheckAudit(status, result);
+    return result;
+  }
+
+  const { folder, manifest } = operationManifestForAgent(status.root, agent);
+  if (!folder) {
+    const result = blockedOperatorActionResult({ status, agent, action, plan, generatedAt, errors: ["Child-agent folder is missing."] });
+    appendManualCheckAudit(status, result);
+    return result;
+  }
+  const validation = validateStructuredOperationsCommand({
+    root: status.root,
+    folderPath: folder.absolutePath,
+    manifest,
+    agent,
+    action,
+  });
+  if (!validation.ok || !validation.command) {
+    const result = blockedOperatorActionResult({
+      status,
+      agent,
+      action,
+      plan,
+      generatedAt,
+      errors: validation.errors,
+      warnings: validation.warnings.length ? validation.warnings : ["No runtime command was executed."],
+    });
+    appendManualCheckAudit(status, result);
+    return result;
+  }
+
+  const execution = await executeStructuredAgentCommand({
+    action,
+    manifest,
+    command: validation.command,
+    cwd: validation.cwd,
+    env: validation.env,
+    timeoutMs: validation.timeoutMs,
+  });
+  const checks = plan.checks;
+  const summary = countChecks(checks);
+  const result: ControlCenterOperatorActionResult = {
+    ok: execution.status !== "failed",
+    generatedAt,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+    },
+    action,
+    status: execution.status,
+    actionEnabled: false,
+    audit: {
+      path: operatorActionAuditLogRelativePath(status.root),
+      entryId: auditEntryId(generatedAt, agent.id, `operator-${action}`),
+    },
+    checks,
+    summary,
+    warnings: [
+      ...validation.warnings,
+      "Runtime action used a structured argv command without shell execution.",
+      "Secrets and long process output were redacted before returning to the UI.",
+    ],
+    errors: execution.status === "failed" ? [execution.stderr || execution.readiness.detail || `Command failed for ${action}.`] : [],
+    execution: {
+      status: execution.status,
+      target: "process",
+      command: validation.command.argv,
+      exitCode: execution.exitCode,
+      signal: execution.signal,
+      pid: execution.pid,
+      stdout: execution.stdout,
+      stderr: execution.stderr,
+      readiness: execution.readiness,
+    },
+  };
   appendManualCheckAudit(status, result);
   return result;
 }
