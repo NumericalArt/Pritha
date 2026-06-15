@@ -95,7 +95,11 @@ when comparing a future voice or learning agent against proven lineage evidence.
 
 ## Core rule
 
-Do not scaffold a new agent directly from a vague idea. First create an `agent-contract`, validate it against TechScope memory and current sources, then generate a working scaffold with tests and a handoff guide.
+Do not scaffold a new agent directly from a vague idea. First create an
+`agent-contract`, validate it against TechScope/Pritha memory and current
+sources, accept the contract, then generate a working scaffold with tests and a
+handoff guide. A draft contract may be scaffolded only with an explicit
+experimental `--allow-draft-scaffold` override.
 
 ## Workflow
 
@@ -137,6 +141,8 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - optionally, `user-model` local-private preferences only when available and
      permitted.
 5. Verify volatile architecture choices through current primary sources and trusted secondary sources.
+   If no volatile external choice is present, record why external verification
+   is not needed.
 6. Record an architecture recommendation:
    - selected runtime family;
    - selected interface adapters;
@@ -156,8 +162,9 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - skill candidates, trust/risk score and activation decision;
    - MCP connector candidates, auth/readiness state, toolset scope and activation decision;
    - testing and observability model.
-7. Scaffold the new agent in a sibling folder unless the contract explicitly chooses another location.
-8. Generate minimum project files:
+7. Mark the contract `accepted` before production scaffold.
+8. Scaffold the new agent in a sibling folder unless the contract explicitly chooses another location.
+9. Generate minimum project files:
    - `AGENTS.md` or runtime-native equivalent;
    - `README.md`;
    - `.env.example`;
@@ -167,18 +174,18 @@ Do not scaffold a new agent directly from a vague idea. First create an `agent-c
    - MCP manifest, candidates and status command when MCP is selected;
    - smoke test or healthcheck;
    - user training guide.
-9. If Telegram is selected, include a Telegram adapter profile:
+10. If Telegram is selected, include a Telegram adapter profile:
    - one-user or multi-user mode;
    - queue for incoming updates;
    - text/link/media handling policy;
    - concise human-readable replies;
    - processing log;
    - token and user id only through environment variables.
-10. Run tests and healthchecks.
-11. Create a `scaffold-report` from `08_templates/agent-scaffold-report.md`.
-12. After the first meaningful working version, create an `agent-post-creation-review`.
-13. Record a user interaction review: initial prompt, clarifications, user feedback, failed assumptions and product decisions discovered during the build.
-14. Rebuild TechScope memory indexes so the new contract and reports become searchable.
+11. Run tests and healthchecks.
+12. Create a `scaffold-report` from `08_templates/agent-scaffold-report.md`.
+13. After the first meaningful working version, create an `agent-post-creation-review`.
+14. Record a user interaction review: initial prompt, clarifications, user feedback, failed assumptions and product decisions discovered during the build.
+15. Rebuild TechScope memory indexes so the new contract and reports become searchable.
 
 ## Current commands
 
@@ -209,6 +216,36 @@ node scripts/agents-mother.mjs registry
 node scripts/agents-mother.mjs validate 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/agents-mother.mjs list
 ```
+
+Experimental scaffold overrides:
+
+```sh
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name --allow-draft-scaffold
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name --allow-missing-research
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name --allow-pending-external-verification
+```
+
+Use these only for explicit experiments, not production descendant readiness.
+
+## Voice Control transport
+
+When the request comes through Pritha Voice Control, child-agent creation and
+evolution still use the same Codex task path as a Codex thread. Do not downgrade
+voice tasks to read-only just because the transport is voice.
+
+Risky actions are held at a UI decision gate before execution:
+
+- service install/uninstall;
+- scheduler, cron, launchd, heartbeat or queue-watcher enablement;
+- deployment, publish, release or GitHub push;
+- deletion or destructive migration;
+- credential or secret writes;
+- `danger-full-access` sandbox.
+
+The task card must show Approve and Reject. Approve starts the saved Codex task;
+Reject records a terminal rejection. Secret values must be entered through the
+child-agent credential UI or local `.env` flow, not spoken into the Realtime
+session.
 
 ## Pritha lineage vocabulary
 

@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-06-11
-last_reviewed: 2026-06-11
+updated: 2026-06-15
+last_reviewed: 2026-06-15
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -106,7 +106,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
 source_updated: 2026-06-11
-source_version: Techscope draft standard v12 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment
+source_version: Techscope draft standard v13 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update
 retrieved: 2026-05-18
 verified: 2026-06-11
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
@@ -128,6 +128,19 @@ TechScope may use its own architecture as a reference, but it must not clone its
 Pritha descendants are assembled from contract-selected modules, not from one universal bundle. Every future agent should receive the harness, memory, data, skills, MCP servers, interface adapters, tools, evals and operations modules that its contract actually needs, and no more. A pattern marked `adopt-in-scaffold` means "available for Pritha to select and compose", not "automatically copied into every descendant".
 
 The initial scaffold is a starting point, not the final boundary of the agent. A descendant can always be evolved through its native interface, especially Codex App/Codex thread for Codex-native agents, plus any other interface selected in its contract. When a descendant receives an internet resource that is not directly relevant to its domain mission, it should treat the resource as meta-improvement input rather than domain memory: evaluate whether the material improves the agent's harness, memory, tools, skills, MCP, UX, evals, safety or operations, then record a brief/review/decision locally or send a distilled lesson back to Pritha/Techscope.
+
+Scaffold readiness is gated: the contract must be `accepted`, Pritha memory
+research must be checked for relevant standards/workflows/decisions/reports,
+and volatile external choices must be verified against current primary sources
+before production scaffold decisions. A draft scaffold is allowed only as an
+explicit experiment and must not be presented as a ready descendant.
+
+Every generated child harness must carry the same evolution rule. For any
+future change to instructions, memory, tools, skills, MCP, interfaces,
+operations, deployment, proactivity, security, model routing, evals, tests or
+recovery behavior, the child agent should first inspect its own project and
+contract, then consult Pritha memory, then verify current documentation where
+needed, then implement the narrowest change with verification.
 
 OpenAI's 2026-02-11 harness-engineering article strengthens the default Pritha rule: a created agent's repository is the agent-readable operating environment. `AGENTS.md` should be a concise map and contract entrypoint; deeper knowledge belongs in versioned docs, standards, workflows, plans, tests, scripts and reports that future Codex sessions can discover, validate and update.
 
@@ -184,6 +197,20 @@ Use Pritha vocabulary as a narrative layer:
 
 The compatibility rule is alias-first: new Pritha names may wrap existing Agents Mother commands, but old command paths must keep working until a separate migration decision removes them.
 
+## Voice and Codex approval gates
+
+Pritha Voice Control and Codex thread should expose the same development
+capabilities for child-agent creation and evolution. Voice is not a read-only
+transport. Instead, risky operations move into an explicit UI decision gate:
+service install/uninstall, scheduler/cron/launchd enablement, deployment or
+publishing, deletion, credential/secret writes and danger-full-access sandbox.
+
+The gate is execution-blocking, not specification-blocking. The Codex task is
+created, visible in the task queue and auditable, but the sidecar does not start
+until the operator presses Approve. Reject records a terminal rejected status.
+Secrets are never collected through voice/model context; use the child-agent
+credential UI or placeholder docs.
+
 ## Use when
 
 - designing a new agent from user requirements;
@@ -202,6 +229,10 @@ The compatibility rule is alias-first: new Pritha names may wrap existing Agents
 ## Required practices
 
 - Create an `agent-contract` before generating project files.
+- Require `status: accepted` before production scaffold; use
+  `--allow-draft-scaffold` only for an explicit experimental scaffold.
+- Run Pritha memory research before scaffold and record whether current
+  external documentation verification is complete or pending.
 - Prefer `codex-native + optional Telegram` as the first scaffold path unless the contract chooses another runtime.
 - Record runtime family, interface mode, target folder, hosting expectation, memory model, tool boundaries and tests.
 - Record Codex surface profile when Codex is involved: CLI, app, IDE, cloud,

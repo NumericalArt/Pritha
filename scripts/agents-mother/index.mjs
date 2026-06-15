@@ -54,7 +54,7 @@ function usage() {
   ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} init --name <name> --mission <text> [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} research <contract-path> [--limit 12]
-  ${CLI_COMMAND} scaffold <contract-path> [--output <folder>]
+  ${CLI_COMMAND} scaffold <contract-path> [--output <folder>] [--allow-draft-scaffold] [--allow-missing-research] [--allow-pending-external-verification]
   ${CLI_COMMAND} test <project-path>
   ${CLI_COMMAND} handoff <project-path>
   ${CLI_COMMAND} operations <project-path>

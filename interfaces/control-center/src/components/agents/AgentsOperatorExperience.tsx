@@ -45,6 +45,7 @@ type PanelState = {
   result?: ControlCenterOperatorActionResult;
   loading: boolean;
   running: boolean;
+  confirmation: string;
   error?: string;
 };
 
@@ -86,6 +87,13 @@ function actionLabel(action: ControlCenterOperatorAction) {
   return "Check";
 }
 
+function actionProgressLabel(action: ControlCenterOperatorAction) {
+  if (action === "start") return "Starting...";
+  if (action === "stop") return "Stopping...";
+  if (action === "restore") return "Restoring...";
+  return "Checking...";
+}
+
 function ActionIcon({ action }: { action: ControlCenterOperatorAction }) {
   if (action === "start") return <Play size={18} fill="currentColor" />;
   if (action === "stop") return <Square size={15} fill="currentColor" />;
@@ -99,6 +107,11 @@ function CheckIcon({ status }: { status: "pass" | "warn" | "fail" }) {
 }
 
 function resultText(result: ControlCenterOperatorActionResult) {
+  if (result.execution) {
+    const readiness = result.execution.readiness ? `; readiness: ${result.execution.readiness.status}` : "";
+    const exit = result.execution.exitCode !== undefined && result.execution.exitCode !== null ? `; exit ${result.execution.exitCode}` : "";
+    return `${actionLabel(result.action)} ${result.status}${exit}${readiness}`;
+  }
   return `${result.status}: ${result.summary.passed} pass / ${result.summary.warnings} warn / ${result.summary.failed} fail`;
 }
 
@@ -154,7 +167,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   const router = useRouter();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<ControlCenterOperatorAction>("check");
-  const [panel, setPanel] = useState<PanelState>({ loading: false, running: false });
+  const [panel, setPanel] = useState<PanelState>({ loading: false, running: false, confirmation: "" });
   const [agentView, setAgentView] = useState<AgentView>("active");
   const [createPlanOpen, setCreatePlanOpen] = useState(false);
   const [createPlanCopyStatus, setCreatePlanCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
@@ -176,12 +189,12 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   function openAction(agent: AgentCardModel) {
     setSelectedAgentId(agent.id);
     setSelectedAction(getPrimaryAction(agent));
-    setPanel({ loading: true, running: false });
+    setPanel({ loading: true, running: false, confirmation: "" });
   }
 
   function closeAction() {
     setSelectedAgentId(null);
-    setPanel({ loading: false, running: false });
+    setPanel({ loading: false, running: false, confirmation: "" });
   }
 
   function openCredentials(agent: AgentCardModel) {
@@ -195,12 +208,12 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   }
 
   async function loadPlan(agentId: string, action: ControlCenterOperatorAction) {
-    setPanel((current) => ({ ...current, loading: true, error: undefined, result: undefined }));
+    setPanel((current) => ({ ...current, loading: true, error: undefined, result: undefined, confirmation: "" }));
     try {
       const plan = await fetchJson<ControlCenterOperatorActionPlan>(`/api/agents/${agentId}/actions/${action}/plan`);
-      setPanel({ plan, loading: false, running: false });
+      setPanel({ plan, loading: false, running: false, confirmation: "" });
     } catch (error) {
-      setPanel({ loading: false, running: false, error: error instanceof Error ? error.message : "Action plan unavailable" });
+      setPanel({ loading: false, running: false, confirmation: "", error: error instanceof Error ? error.message : "Action plan unavailable" });
     }
   }
 
@@ -215,6 +228,23 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
       router.refresh();
     } catch (error) {
       setPanel((current) => ({ ...current, running: false, error: error instanceof Error ? error.message : "Manual check failed" }));
+    }
+  }
+
+  async function runRuntimeAction() {
+    if (!selectedAgent || (selectedAction !== "start" && selectedAction !== "stop")) return;
+    setPanel((current) => ({ ...current, running: true, error: undefined }));
+    try {
+      const result = await fetchJson<ControlCenterOperatorActionResult>(`/api/agents/${selectedAgent.id}/actions/${selectedAction}`, {
+        method: "POST",
+        body: JSON.stringify({ confirmation: panel.confirmation }),
+      });
+      setPanel((current) => ({ ...current, result, running: false }));
+      router.refresh();
+      await loadPlan(selectedAgent.id, selectedAction);
+      setPanel((current) => ({ ...current, result }));
+    } catch (error) {
+      setPanel((current) => ({ ...current, running: false, error: error instanceof Error ? error.message : `${actionLabel(selectedAction)} failed` }));
     }
   }
 
@@ -358,6 +388,10 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   }, [credentialsAgentId]);
 
   const selectedActionLabel = panel.plan?.control.label || (selectedAgent ? getCardActionLabel(selectedAgent) : actionLabel(selectedAction));
+  const runtimeAction = selectedAction === "start" || selectedAction === "stop";
+  const requiredPhrase = runtimeAction ? panel.plan?.confirmation?.requiredPhrase || "" : "";
+  const confirmationMatches = Boolean(requiredPhrase && panel.confirmation.trim() === requiredPhrase);
+  const runtimeActionEnabled = Boolean(runtimeAction && panel.plan?.actionEnabled && confirmationMatches && !panel.running);
 
   return (
     <>
@@ -534,14 +568,55 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
               ) : null}
             </section>
 
+            {runtimeAction ? (
+              <section className="operator-action-section operator-confirmation-card">
+                <h3>Manual Confirmation</h3>
+                <div className="operator-confirmation-copy">
+                  <span>Required phrase</span>
+                  <strong>{requiredPhrase || "Unavailable until plan loads"}</strong>
+                </div>
+                <label className="operator-confirmation-input">
+                  <span>Type exact phrase to {selectedAction}</span>
+                  <input
+                    value={panel.confirmation}
+                    onChange={(event) => setPanel((current) => ({ ...current, confirmation: event.target.value }))}
+                    placeholder={requiredPhrase || "Action unavailable"}
+                    spellCheck={false}
+                    autoComplete="off"
+                    disabled={!panel.plan?.actionEnabled || panel.running}
+                  />
+                </label>
+                {!panel.plan?.actionEnabled ? (
+                  <small>Resolve blockers before execution is enabled.</small>
+                ) : !confirmationMatches ? (
+                  <small>Execution stays disabled until the phrase matches exactly.</small>
+                ) : (
+                  <small>Ready to execute the structured command without shell expansion.</small>
+                )}
+              </section>
+            ) : null}
+
             <div className="operator-action-footer">
               <button className="outline-button compact" type="button" onClick={closeAction}>
                 Close
               </button>
-              <button className="primary-action-button compact" type="button" disabled={panel.running} onClick={() => void runManualCheck()}>
-                <ClipboardCheck size={16} />
-                {panel.running ? "Checking..." : "Run Manual Check"}
-              </button>
+              {runtimeAction ? (
+                <div className="operator-footer-actions">
+                  <button className="outline-button compact" type="button" disabled={panel.running} onClick={() => void runManualCheck()}>
+                    <ClipboardCheck size={16} />
+                    Check
+                  </button>
+                  <button className="primary-action-button compact" type="button" disabled={!runtimeActionEnabled} onClick={() => void runRuntimeAction()}>
+                    <ActionIcon action={selectedAction} />
+                    {panel.running ? actionProgressLabel(selectedAction) : actionLabel(selectedAction)}
+                  </button>
+                </div>
+              ) : (
+                <button className="primary-action-button compact" type="button" disabled={panel.running} onClick={() => void runManualCheck()}>
+                  <ClipboardCheck size={16} />
+                  {panel.running ? "Checking..." : "Run Manual Check"}
+                </button>
+              )}
             </div>
           </aside>
         </div>

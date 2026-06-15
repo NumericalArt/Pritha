@@ -37,8 +37,20 @@ export type PrithaCodexTaskResult = {
 export type PrithaCodexTaskRunOptions = {
   timeoutMs: number;
   userId: string;
+  onProgress?: (event: PrithaCodexTaskProgressEvent) => void | Promise<void>;
 };
 
 export type PrithaCodexTaskClient = {
   runTask(payload: PrithaCodexTaskPayload, options: PrithaCodexTaskRunOptions): Promise<unknown>;
+};
+
+export type PrithaCodexTaskProgressEvent = {
+  timestamp?: string;
+  phase: string;
+  level?: "info" | "warning" | "error" | "heartbeat" | "complete";
+  message?: string;
+  status?: string;
+  transport?: string;
+  elapsed_ms?: number;
+  [key: string]: unknown;
 };

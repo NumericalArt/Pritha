@@ -79,9 +79,22 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     const startedAt = Date.now();
     let target: { threadId: string; threadName: string } | null = null;
     let turnId = "";
+    const emitProgress = async (phase: string, message: string, extra: Record<string, unknown> = {}) => {
+      await options.onProgress?.({
+        timestamp: new Date().toISOString(),
+        phase,
+        level: "info",
+        message,
+        status: "running",
+        transport: "codex-app",
+        elapsed_ms: Date.now() - startedAt,
+        ...extra,
+      });
+    };
 
     try {
       await connection.start(options.timeoutMs);
+      await emitProgress("codex_app_started", "Codex App sidecar process started.");
       await connection.request(
         "initialize",
         {
@@ -98,8 +111,13 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         },
         remainingMs(startedAt, options.timeoutMs),
       );
+      await emitProgress("codex_app_initialized", "Codex App sidecar initialized.");
 
       target = await this.resolveControlThread(connection, remainingMs(startedAt, options.timeoutMs));
+      await emitProgress("thread_resolved", "Codex App control thread resolved.", {
+        thread_id: target.threadId,
+        thread_name: target.threadName,
+      });
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
 
       const turnResponse = (await connection.request(
@@ -120,13 +138,24 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
 
       turnId = String(turnResponse.turn?.id || "");
       if (!turnId) throw new Error("Codex app-server did not return a turn id");
+      await emitProgress("turn_started", "Codex App turn started; waiting for completion.", { turn_id: turnId });
 
       const completed = await connection.waitForTurnCompleted(target.threadId, turnId, remainingMs(startedAt, options.timeoutMs));
+      await emitProgress("turn_completed", "Codex App turn completed.", { turn_id: turnId, level: "complete", status: "complete" });
       const text = extractAssistantText(completed) || connection.agentTextForTurn(turnId);
       const result = parseCodexJson(text);
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("completed", payload, target.threadName, result, Date.now() - startedAt), remainingMs(startedAt, options.timeoutMs));
       return { ...result, transport: "codex-app" };
     } catch (error) {
+      await options.onProgress?.({
+        timestamp: new Date().toISOString(),
+        phase: "failed",
+        level: "error",
+        message: error instanceof Error ? error.message : "Codex App task failed.",
+        status: "failed",
+        transport: "codex-app",
+        elapsed_ms: Date.now() - startedAt,
+      });
       if (target) {
         await this.injectThreadReport(connection, target.threadId, buildTaskReport("failed", payload, target.threadName, error, Date.now() - startedAt), Math.min(5_000, remainingMs(startedAt, options.timeoutMs)));
       }

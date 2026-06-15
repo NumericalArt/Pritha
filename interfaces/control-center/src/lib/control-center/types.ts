@@ -269,8 +269,8 @@ export type ControlCenterOperatorActionResult = {
     id: string;
     name: string;
   };
-  action: "check";
-  status: "passed" | "warnings" | "failed";
+  action: ControlCenterOperatorAction;
+  status: "passed" | "warnings" | "failed" | "blocked" | "pending_confirmation" | "executing" | "running" | "stopped" | "degraded";
   actionEnabled: false;
   audit: {
     path: string;
@@ -284,6 +284,21 @@ export type ControlCenterOperatorActionResult = {
   };
   warnings: string[];
   errors: string[];
+  execution?: {
+    status: "blocked" | "pending_confirmation" | "executing" | "running" | "stopped" | "failed" | "degraded";
+    target: "process" | "healthcheck" | "restore" | "none";
+    command?: string[];
+    exitCode?: number | null;
+    signal?: string | null;
+    pid?: number;
+    stdout?: string;
+    stderr?: string;
+    readiness?: {
+      status: "ok" | "failed" | "unknown";
+      detail: string;
+      checkedUrl?: string;
+    };
+  };
 };
 
 export type ControlCenterFleetManualAuditResult = {
@@ -361,7 +376,7 @@ export type ControlCenterOperatorActivityEntry = {
   agentId: string;
   agentName: string;
   action: ControlCenterOperatorAction | "fleet-manual-audit";
-  result: "passed" | "warnings" | "failed" | "planned-only";
+  result: "passed" | "warnings" | "failed" | "planned-only" | "blocked" | "pending_confirmation" | "executing" | "running" | "stopped" | "degraded";
   target: string;
   checks: {
     passed: number;
@@ -679,6 +694,11 @@ export type ControlCenterStatus = {
       embeddings?: number;
     };
     qualityGateStatus?: string;
+    warnings?: Array<{
+      id?: string;
+      severity?: string;
+      message: string;
+    }>;
   };
   capabilities: ControlCenterCapabilities;
   pritha: {

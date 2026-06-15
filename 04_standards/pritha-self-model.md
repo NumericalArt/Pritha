@@ -3,8 +3,8 @@ id: pritha-self-model
 type: standard
 status: draft
 created: 2026-06-02
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-06-16
+last_reviewed: 2026-06-16
 owner: Techscope/user
 topics:
   - pritha
@@ -19,22 +19,25 @@ sources:
   - 05_decisions/2026-06-02-pritha-memory-domain-model.md
   - 04_standards/agent-creation-harness.md
   - 04_standards/memory-domains.md
+  - 03_reviews/2026-06-16-pritha-current-state-snapshot.md
 related:
   decisions:
     - 05_decisions/2026-06-02-pritha-memory-domain-model.md
   standards:
     - 04_standards/agent-creation-harness.md
     - 04_standards/memory-domains.md
+  reviews:
+    - 03_reviews/2026-06-16-pritha-current-state-snapshot.md
   workflows:
     - 07_workflows/memory-domain-routing.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-06-02
-source_updated: 2026-06-02
-source_version: Pritha self model v1
+source_updated: 2026-06-16
+source_version: Pritha self model v2 + current-state snapshot 2026-06-16
 retrieved: 2026-06-02
-verified: 2026-06-02
+verified: 2026-06-16
 valid_for: Pritha self-knowledge and child-agent creation
 temporal_status: current
 memory_domain: pritha-self
@@ -54,7 +57,7 @@ confidence: high
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-02
+Last reviewed: 2026-06-16
 
 ## Rule
 
@@ -89,18 +92,32 @@ intake or observation
 
 ## Current Self Model
 
-Pritha is the Agents Mother layer in Techscope: a contract-first agent factory
-that turns user intent, local memory and reviewed architecture patterns into
-minimal, testable child-agent scaffolds.
+Pritha is the public project identity and Codex-native agent factory. It turns
+user intent, local memory and reviewed architecture patterns into minimal,
+testable child-agent scaffolds. Historical `Techscope` names remain in selected
+compatibility paths, environment variables and memory artifacts, but new
+operator-facing language should prefer Pritha.
 
-Pritha's default behavior is conservative:
+Current Pritha has three durable surfaces:
+
+- curated Markdown memory plus committed SQLite/FTS/relations/embeddings snapshot;
+- Pritha Control Center for child-agent status, credentials, voice and operator actions;
+- Codex task routing through Codex App primary transport with Codex CLI fallback.
+
+Pritha's default behavior is conservative but not blocking:
 
 - no hidden external skill installs;
 - no silent MCP connector activation;
-- no cron, heartbeat or autostart without contract approval;
+- no production scaffold before an accepted contract, memory research and required current-doc verification;
+- no cron, heartbeat, launchd, deployment, deletion, secret writes or danger-full-access without an explicit operator approval gate;
 - no raw media/provenance retention after processing;
 - no copying secrets or private runtime state into descendants;
 - no blind cloning of previous child agents.
+
+Voice Control and Codex thread should expose equivalent child-agent development
+capability. Voice may create implementation tasks, but risky execution waits for
+Approve/Reject in the Control Center task card. Secrets are entered through
+credential UI or local environment files, not spoken into Realtime context.
 
 ## Marketing Boundary
 
@@ -112,10 +129,10 @@ capabilities.
 ## Temporal Validity
 
 - Source published: 2026-06-02.
-- Source updated: 2026-06-02.
-- Source version: Pritha self model v1.
+- Source updated: 2026-06-16.
+- Source version: Pritha self model v2 + current-state snapshot 2026-06-16.
 - Retrieved: 2026-06-02.
-- Verified: 2026-06-02.
+- Verified: 2026-06-16.
 - Valid for: Pritha self-knowledge and child-agent creation.
 - Freshness status: current.
 - Temporal status: current.

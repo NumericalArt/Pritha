@@ -3,7 +3,7 @@ id: template-agent-scaffold-report
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-06-15
 template_for: scaffold-report
 topics: []
 tools: []
@@ -44,6 +44,8 @@ Status: draft | complete | failed | superseded
 - Runtime family:
 - Interfaces:
 - Telegram mode:
+- Research report:
+- External verification:
 - Result:
 
 ## Generated structure
@@ -65,6 +67,8 @@ Status: draft | complete | failed | superseded
 | Smoke test | pending |  |
 | Healthcheck | pending |  |
 | Telegram adapter test | not-applicable |  |
+| Pritha memory research | pending | Link to `11_agents/research/...` or explain why not applicable |
+| External verification | pending | Current primary docs checked for volatile choices or marked not-applicable |
 | Documentation review | pending |  |
 
 ## Handoff

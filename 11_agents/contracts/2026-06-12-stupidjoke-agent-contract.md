@@ -3,7 +3,7 @@ id: 2026-06-12-stupidjoke-agent-contract
 type: agent-contract
 status: accepted
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-13
 topics:
   - child-agents
   - humor-agent
@@ -54,9 +54,9 @@ superseded_by: []
 freshness_status: current
 source_published: unknown
 source_updated: 2026-06-12
-source_version: initial realtime voice operator task
+source_version: initial realtime voice operator task plus 2026-06-13 external-adapter extension constraints
 retrieved: 2026-06-12
-verified: 2026-06-12
+verified: 2026-06-13
 valid_for: StupidJoke v0.1.0 minimal scaffold
 temporal_status: current
 memory_domain: child-agents
@@ -90,7 +90,8 @@ Status: accepted
 - Primary mission: provide a small, safe, low-stakes joke agent that can ingest user-provided joke fixtures, reject unsafe material, and answer realtime voice requests with short silly jokes.
 - Target user: the local operator using Pritha Control Center voice/Codex sidecar.
 - Success criteria: the sibling scaffold runs a deterministic healthcheck, validates `user_import` fixtures, filters unsafe joke material, normalizes realtime events, and produces a safe short joke response without secrets or background services.
-- Out of scope for v1: public joke publishing, multi-user moderation, Telegram, launchd/autostart, web deployment, third-party joke APIs, persistent private user memory, and automated outbound messaging.
+- Out of scope for current v1 runtime: public joke publishing, multi-user moderation, Telegram, enabled launchd/autostart/cron, web deployment, third-party joke APIs, persistent private user memory, and automated outbound messaging.
+- Contract extension allowed for future work: an optional external joke-collection adapter and scheduled runs, including cron, may be designed only under the strict conditions in "Optional External Adapter And Scheduled Runs". This extension is not implementation approval and does not enable service mode.
 
 ## Assumptions And Open Questions
 
@@ -118,7 +119,8 @@ Status: accepted
 - Codex deep-task transport for long joke-writing or corpus-cleaning jobs.
 - SQLite or vector memory.
 - Telegram adapter.
-- Scheduled joke reminders or proactive notifications.
+- Optional external joke-collection adapter.
+- Scheduled joke collection or reminders.
 - Service installation, launchd, cron, heartbeat, or queue watcher.
 
 ### Critical User Workflows
@@ -186,6 +188,7 @@ Status: accepted
 - Healthcheck command: `npm run health`.
 - Log path: runtime logs are ignored; no logs are part of the scaffold.
 - Restart policy: manual.
+- Service-mode gate: service mode, autostart, launchd, cron, heartbeat, queue watcher, or periodic scheduled execution may be enabled only after a separate operator confirmation, a separate implementation/deployment step, and an agent-deployment-report or operations report documenting install/uninstall, stop behavior, monitoring, and rollback.
 
 ## Proactivity
 
@@ -200,6 +203,36 @@ Status: accepted
 - Kill switch / pause command: stop the active CLI/dev process.
 - Idle behavior: wait for operator action.
 - User interruption policy: realtime handler should stop speaking when the operator cancels or interrupts.
+
+### Optional External Adapter And Scheduled Runs
+
+This contract permits a future design for an external joke-collection adapter and planned runs, including cron, only as a deferred extension. The current v1 scaffold remains manual-only and does not install or enable any service.
+
+Required conditions before implementation:
+
+- Operator confirmation must explicitly approve the adapter interface, data source, runtime placement, schedule owner, schedule interval, and whether cron/service mode is allowed.
+- The safety filter is mandatory and cannot be disabled, bypassed, downgraded, or made optional. All externally collected joke text must pass strict schema validation and `src/safety-filter.mjs` before use or promotion.
+- Trusted control data must remain separate from untrusted text, links, files, messages, transcripts, and external metadata. Untrusted input cannot choose tools, alter instructions, change schedules, write memory, publish output, or affect approval gates.
+- Secrets must never be stored in the repository. API keys, tokens, cookies, credentials, and `.env` values must stay on the protected server-side or local operator side with explicit secret-boundary documentation.
+- The adapter must define input size limits, rate limits, timeout limits, retry limits, storage limits, cost/network limits, and maximum scheduled frequency.
+- Tests must cover accept fixtures, reject/review fixtures, prompt injection, malformed records, personal data, unsafe content, adapter failure, timeout, duplicate input, rate limiting, and safe fallback.
+- Monitoring must track validation failures, rejected inputs, adapter errors, timeout/retry exhaustion, stale schedules, and fallback activation without logging secrets or unsafe raw text unnecessarily.
+- Failure handling must be fail-closed: if the adapter, scheduler, network, model, filter, storage, or monitor fails, the agent must reject or defer the candidate and keep deterministic safe fallback behavior.
+- Enabling service mode, autostart, launchd, cron, heartbeat, or queue watcher requires a separate deployment step with explicit operator confirmation; planning text alone is not permission to install or start background processes.
+
+Adapter event boundary:
+
+```json
+{"id":"ext_001","created_at":"2026-06-13T00:00:00.000Z","source":"external-adapter","adapter_id":"manual-import-v1","event_type":"external.joke.candidate","trusted_control":{"collection_id":"demo","schedule_id":"manual","locale":"en","max_words":40},"untrusted_text":"candidate joke text","metadata":{"source_label":"operator-approved source"},"expected_action":"accept"}
+```
+
+Allowed future adapter event types must be explicitly whitelisted before implementation. Initial candidates: `external.joke.candidate`, `external.collection.started`, `external.collection.completed`, `external.collection.failed`, and `operator.cancelled`.
+
+Responsibility boundary:
+
+- External adapter: fetch or receive candidate text, attach source metadata, enforce collection limits, and emit normalized candidate events.
+- StupidJoke core: validate event shape, separate trusted/untrusted fields, run safety filtering, choose accept/reject/review, and provide safe fallback.
+- Operator/deployment layer: store secrets, approve schedules, install or remove service mode, monitor errors, and stop the adapter.
 
 ## Skills, MCP, And Tools
 
@@ -229,6 +262,7 @@ Status: accepted
 - Constraints, validation and recovery: fail closed on malformed or unsafe input; provide safe fallback.
 - Human approval gates: required before external API use, publication, deletion, deployment, or service install.
 - Completion criteria: writable sibling project exists and `npm run health`, `npm run smoke`, and `npm test` pass.
+- Future adapter acceptance criteria: contract addendum or implementation plan documents interface, event format, limits, tests, monitoring, fail-closed behavior, and operator-approved deployment gates before any service/cron activation.
 
 ## Data, Memory, And Sources
 
@@ -277,10 +311,11 @@ Allowed `event_type` for v1: `session.started`, `session.ended`, `voice.joke.req
 - Runtime isolation profile: project-folder.
 - Network policy tier: no-network initially.
 - Credential storage boundary: no credentials in repo; future credentials user-local only.
+- Future external adapter boundary: network access and credentials require explicit operator approval and must stay outside tracked files.
 
 ### Safety Filter Requirements
 
-The minimal safety filter must fail closed and block or mark for review:
+The safety filter is mandatory for the current scaffold and any future external adapter. It must fail closed and block or mark for review:
 
 - sexual content involving minors or age ambiguity;
 - sexual coercion, explicit sexual content, or fetish content;
@@ -304,6 +339,7 @@ Allowed humor style for v1: short, silly, family-safe, non-targeted, and clearly
 - Knowledge / memory / RAG controls: raw import stays in `user_import`; only safe examples can be promoted later.
 - Execution / tools / MCP / skills controls: no MCP and no external tools in minimal v1.
 - Infrastructure / operations / orchestration controls: no service install, no autostart, no background queue.
+- Future scheduling controls: cron or service execution is allowed only as a separately approved deployment phase with documented limits, monitoring, stop behavior, and fail-closed fallback.
 - AI-SAFE selected layers: interface controls, deterministic validation, safety filter.
 - AI-SAFE skipped layers: MCP, skills, deployment, external publication.
 - AI-SAFE open risks: deterministic keyword scanner is conservative but incomplete; future hosted generation needs additional evals.
@@ -369,3 +405,4 @@ Allowed humor style for v1: short, silly, family-safe, non-targeted, and clearly
 - [x] Handoff/training plan defined.
 - [x] Sibling project scaffold created in writable session.
 - [x] Smoke tests run inside sibling project.
+- [x] 2026-06-13 contract extension documents strict conditions for optional external adapter and scheduled runs without enabling service mode.

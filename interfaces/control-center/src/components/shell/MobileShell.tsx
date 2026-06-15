@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, SlidersHorizontal } from "lucide-react";
 import { mobileNavItems } from "@/lib/routes";
 import { PrithaLogoPlaceholder } from "@/components/primitives/PrithaLogoPlaceholder";
 
 export function MobileShell() {
   const pathname = usePathname();
-  const isVoice = pathname.startsWith("/voice") || pathname === "/";
 
   return (
     <div className="mobile-shell">
@@ -20,9 +18,6 @@ export function MobileShell() {
             <span className="mobile-brand-subtitle">Control Center</span>
           </span>
         </Link>
-        <button className="mobile-header-button" type="button" aria-label={isVoice ? "Voice controls" : "Open menu"}>
-          {isVoice ? <SlidersHorizontal size={20} /> : <Menu size={20} />}
-        </button>
       </header>
       <nav className="mobile-bottom-nav" aria-label="Mobile primary">
         {mobileNavItems.map((item) => {

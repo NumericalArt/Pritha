@@ -44,7 +44,13 @@ Retention: source-purged
 
 ## Рабочий каталог и расположение агентов
 
-Канонический корень Techscope определяется env-first:
+Канонический публичный корень проекта - Pritha. Историческое имя Techscope
+остается допустимым для внутренних путей, переменных, памяти, knowledge-base,
+старых отчетов и совместимых CLI-команд. GitHub/local checkout для текущей
+линейки должен называться `NumericalArt/Pritha`, если нет отдельного
+миграционного blocker.
+
+Канонический runtime-корень определяется env-first:
 
 1. `TECHSCOPE_ROOT`, если переменная окружения задана.
 2. Git root текущего checkout.
@@ -52,11 +58,14 @@ Retention: source-purged
 
 Не зашивать абсолютные user-specific пути в исполняемые скрипты, launchd-шаблоны, manifest-файлы и generated scaffold. Исторические Markdown-артефакты могут содержать старые пути как контекст миграций, но не должны быть источником runtime-конфигурации.
 
-Все новые агенты, создаваемые Techscope Agents Mother, должны размещаться соседними папками рядом с корнем Techscope, если пользователь явно не указал другой путь. Это позволяет держать Techscope и созданных агентов на одном уровне:
+Все новые агенты, создаваемые Pritha, должны размещаться соседними папками рядом с корнем Pritha/Techscope, если пользователь явно не указал другой путь. Это позволяет держать Pritha и созданных агентов на одном уровне:
 
-- `<parent-of-TECHSCOPE_ROOT>/Techscope` — агент-копилка и фабрика агентов;
+- `<parent-of-TECHSCOPE_ROOT>/Pritha` — агент-копилка и фабрика агентов;
 - `<parent-of-TECHSCOPE_ROOT>/<agent-name>` — отдельный создаваемый или анализируемый агент;
 - `<parent-of-TECHSCOPE_ROOT>/Techscope-migration-backups/` — резервные копии миграций.
+
+Если checkout еще называется `Techscope`, это считается миграционным состоянием
+совместимости, а не новым публичным именем проекта.
 
 Не копировать в новых агентов секреты, `.env`, токены, приватные credentials, пользовательские данные, `.queue`, `.memory`, `.logs` или внутреннее состояние Techscope без отдельного явного решения.
 
@@ -196,6 +205,13 @@ Markdown-файлы являются canonical authored knowledge, но GitHub s
 
 Techscope может создавать и развивать новых агентов по техническому заданию пользователя. Перед созданием нового агента обязательно оформить `agent-contract`: назначение, пользователь, функции v1, отложенные функции, runtime family, интерфейс, deployment target, модель проактивности, память, инструменты, права доступа, секреты, тесты, критерии готовности и план обучения пользователя.
 
+Scaffold допускается только из `agent-contract` со статусом `accepted`.
+Экспериментальный scaffold из `draft` возможен только с явным
+`--allow-draft-scaffold` и должен быть помечен как исключение. Перед scaffold
+нужно выполнить Pritha memory research по контракту; если выбранные API,
+runtime, модели, deployment или внешние интеграции могли измениться, нужно
+проверить первичную документацию и отразить это в scaffold report.
+
 Для такого сценария использовать:
 
 - workflow `07_workflows/agents-mother.md`;
@@ -225,6 +241,12 @@ Techscope может создавать и развивать новых аге�
 
 Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Techscope.
 
+Каждый generated child `AGENTS.md` должен содержать harness evolution protocol:
+при любой доработке harness сначала проверять локальный проект и контракт,
+затем искать релевантные standards/workflows/decisions/reports в памяти
+Pritha, затем при необходимости проверять свежую официальную документацию, и
+только потом вносить минимальное изменение с тестами.
+
 Интерфейсы, память, данные, skills, MCP, инструменты и operations новых агентов должны быть модульными. Pritha собирает каждого будущего агента из минимально достаточного набора модулей, выбранных контрактом: нужные части harness, memory, data layer, skills, MCP servers, tools, evals, interface adapters и operations добавляются, ненужные не копируются. Каждый scaffold получает manifest-файлы для соответствующих выбранных слоев; тяжелые слои памяти вроде SQLite, embeddings, graph DB или external vector store добавляются только если это следует из `agent-contract`.
 
 При research/init нового child agent Pritha не должна начинать с копирования или подробного изучения уже существующих child agents. Сначала использовать контракт, `agent-building-knowledge` standards/workflows и `pritha-self` capabilities/limitations. `child-agents` profiles/reports использовать только как evidence успешных или неудачных паттернов, которые нужно проверить на fit с новым контрактом.
@@ -238,6 +260,16 @@ Techscope может создавать и развивать новых аге�
 Минимальный scaffold не является финальным пределом агента. Любой descendant можно дальше достраивать через его нативный интерфейс, прежде всего через Codex App/Codex thread, а также через выбранные в контракте интерфейсы. Если агент получает ссылку, статью, video/audio material, GitHub repo или другой интернет-ресурс, который не относится напрямую к его предметной задаче, он не должен автоматически смешивать этот материал с предметной памятью. Такой ресурс нужно обработать как meta-improvement input: оценить, может ли он улучшить harness, память, tools, skills, MCP, UX, evals, safety или operations самого агента; затем оформить review/brief/decision внутри памяти агента или передать выводы обратно в Pritha/Techscope как кандидат для улучшения будущих агентов.
 
 Операционный слой новых агентов должен быть явным и настраиваемым. Автозапуск может быть выбран в контракте как `optional`, `launchd-on-approval` или `external`, но Techscope не устанавливает и не включает его автоматически. Любой `launchd`, `launchctl`, cloud deployment или долгоживущий процесс требует отдельного явного подтверждения пользователя.
+
+Для транспорта Pritha Voice Control + Codex ограничения должны совпадать с
+Codex thread по возможностям разработки. Voice не должен превращать
+реализацию, scaffold или настройку child agent в read-only режим. Рискованные
+действия - service install/uninstall, scheduler/cron/launchd enablement,
+deployment/publish, deletion, credential/secret writes, danger-full-access -
+должны переводиться в UI decision gate на карточке Codex task. Без нажатия
+Approve задача не запускается; Reject завершает ее как отклоненную. Секретные
+значения не передаются голосом и не записываются из model context: использовать
+credential UI child agent или `.env.example` placeholders.
 
 При проектировании нового агента обязательно обсудить, где он будет развернут: локальный Mac, Mac mini, VPS, cloud, embedded/user device, внешний runtime или пока нигде. От этого зависят permissions, секреты, network boundary, логирование, healthcheck, backup и способ остановки агента.
 

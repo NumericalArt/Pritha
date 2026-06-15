@@ -17,6 +17,8 @@ const COLORS = {
 
 const WEB_STRAND_WIDTH = 0.018;
 const CALM_SWAY_MULTIPLIER = 4.0;
+const IDLE_SWAY_RANGE_MULTIPLIER = 2.0;
+const REALTIME_ROOT_PULSE_AMPLITUDE = 0.018 * 2.0;
 const NODE_DIAMETER_MULTIPLIER = 4.0;
 const DIRECTION_COUNT = 16;
 const LONG_RADIUS = 3.68;
@@ -109,6 +111,7 @@ function updateDynamicNodes(
 ) {
   const realtimePulse = phasePulseActive(state);
   const activeBoost = realtimePulse ? 1.18 : 1;
+  const idleSwayBoost = realtimePulse ? 1 : IDLE_SWAY_RANGE_MULTIPLIER;
   const workBoost = state === "working" ? 1.16 : 1;
 
   for (let i = 0; i < baseNodes.length; i += 1) {
@@ -127,12 +130,12 @@ function updateDynamicNodes(
     const waveA = Math.sin(t * 0.82 * workBoost + meta.direction * 0.67 + meta.ring * 1.8);
     const waveB = Math.cos(t * 0.56 * workBoost + meta.direction * 0.41 - meta.ring * 1.2);
     const mobility = (1.16 - meta.frac * 0.42) * (meta.isLong ? 1.0 : 0.92);
-    const tangentSway = 0.03 * CALM_SWAY_MULTIPLIER * mobility * waveA * activeBoost;
+    const tangentSway = 0.03 * CALM_SWAY_MULTIPLIER * idleSwayBoost * mobility * waveA * activeBoost;
     const endpointBreath =
       meta.ring === RINGS.length - 1
-        ? (meta.isLong ? 0.072 : 0.052) * Math.sin(t * 0.72 * workBoost + meta.direction * 0.71) * activeBoost
+        ? (meta.isLong ? 0.072 : 0.052) * idleSwayBoost * Math.sin(t * 0.72 * workBoost + meta.direction * 0.71) * activeBoost
         : 0;
-    const radialSway = (0.014 * CALM_SWAY_MULTIPLIER * mobility * waveB + endpointBreath) * activeBoost;
+    const radialSway = (0.014 * CALM_SWAY_MULTIPLIER * idleSwayBoost * mobility * waveB + endpointBreath) * activeBoost;
 
     out.copy(base).addScaledVector(tangent, tangentSway).addScaledVector(radial, radialSway);
   }
@@ -288,7 +291,7 @@ function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: Realti
     frame = requestAnimationFrame(animate);
     const t = (performance.now() - startTime) / 1000;
     const state = phaseRef.current;
-    const rootScale = phasePulseActive(state) ? 1 + 0.018 * Math.sin(t * 2.1) : 1;
+    const rootScale = phasePulseActive(state) ? 1 + REALTIME_ROOT_PULSE_AMPLITUDE * Math.sin(t * 2.1) : 1;
     updateDynamicNodes(baseNodes, dynamicNodes, nodeMeta, t, state);
     context.clearRect(0, 0, width, height);
     context.save();
@@ -531,7 +534,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
       const t = (performance.now() - startTime) / 1000;
       const state = phaseRef.current;
       const realtimePulse = phasePulseActive(state);
-      root.scale.setScalar(realtimePulse ? 1 + 0.018 * Math.sin(t * 2.1) : 1);
+      root.scale.setScalar(realtimePulse ? 1 + REALTIME_ROOT_PULSE_AMPLITUDE * Math.sin(t * 2.1) : 1);
       updateWeb(t);
       renderer.render(scene, camera);
     }

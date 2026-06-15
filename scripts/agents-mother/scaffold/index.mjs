@@ -9,6 +9,7 @@ import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "..
 
 const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
+const RESEARCH_DIR = path.join(ROOT, "11_agents", "research");
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 
 function ensureDirs() {
@@ -248,6 +249,299 @@ function operationProfileFor(data) {
   };
 }
 
+function extractBodyComment(fn) {
+  const source = fn.toString();
+  const start = source.indexOf("/*");
+  const end = source.lastIndexOf("*/");
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("Missing embedded script body.");
+  }
+  return `${source.slice(start + 2, end).trimStart()}\n`;
+}
+
+const CONTROL_CENTER_RUNTIME_SCRIPT = extractBodyComment(function controlCenterRuntimeScriptSource() {/*
+#!/usr/bin/env node
+
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+const ROOT = process.cwd();
+const action = process.argv[2] || "status";
+const manifestPath = path.join(ROOT, "operations", "manifest.json");
+
+if (!["status", "start", "stop"].includes(action)) {
+  console.error("Usage: node scripts/control-center-runtime.mjs status|start|stop");
+  process.exit(2);
+}
+
+if (!existsSync(manifestPath)) {
+  console.error("Missing operations/manifest.json");
+  process.exit(1);
+}
+
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const runtime = manifest.control_center_runtime || {};
+const manager = runtime.manager || "none";
+
+function run(bin, args, options = {}) {
+  try {
+    const output = execFileSync(bin, args, {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: options.timeout || 30000,
+      env: { ...process.env, ...(runtime.env || {}) },
+    }).trim();
+    return { ok: true, output };
+  } catch (error) {
+    const output = [error.stdout, error.stderr, error.message].filter(Boolean).join("\n").trim();
+    if (options.allowFail) return { ok: false, output };
+    console.error(output || error.message);
+    process.exit(1);
+  }
+}
+
+function screenSessionExists(session) {
+  if (!session) return false;
+  const result = run(runtime.screen_bin || "screen", ["-ls"], { allowFail: true });
+  if (!result.output) return false;
+  return result.output.split(/\r?\n/).some((line) => line.includes(`.${session}`) || line.trim() === session);
+}
+
+function fallbackProcessSpec() {
+  const spec = runtime.fallback_stop_process;
+  if (!spec || typeof spec !== "object") return null;
+  const port = Number(spec.port);
+  const commandContains = Array.isArray(spec.command_contains) ? spec.command_contains.map(String).filter(Boolean) : [];
+  if (!Number.isInteger(port) || port <= 0 || commandContains.length === 0) return null;
+  return {
+    port,
+    commandContains,
+    cwd: path.resolve(ROOT, String(spec.cwd || ".")),
+    signal: String(spec.signal || "SIGTERM"),
+    timeoutMs: Number(spec.timeout_ms || runtime.stop_timeout_ms || 10000),
+  };
+}
+
+function listeningPids(port) {
+  const result = run("lsof", ["-nP", `-tiTCP:${port}`, "-sTCP:LISTEN"], { allowFail: true });
+  return result.output
+    .split(/\s+/)
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0);
+}
+
+function processCommand(pid) {
+  return run("ps", ["-p", String(pid), "-o", "command="], { allowFail: true }).output.trim();
+}
+
+function processCwd(pid) {
+  const result = run("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], { allowFail: true });
+  const line = result.output.split(/\r?\n/).find((entry) => entry.startsWith("n"));
+  return line ? line.slice(1).trim() : "";
+}
+
+function matchingFallbackPids() {
+  const spec = fallbackProcessSpec();
+  if (!spec) return [];
+  return listeningPids(spec.port).filter((pid) => {
+    const cwd = processCwd(pid);
+    const command = processCommand(pid);
+    return cwd === spec.cwd && spec.commandContains.every((token) => command.includes(token));
+  });
+}
+
+async function stopFallbackProcesses(reason) {
+  const spec = fallbackProcessSpec();
+  if (!spec) return false;
+  const pids = matchingFallbackPids();
+  if (pids.length === 0) return false;
+  console.log(`${reason}; stopping matching fallback process pid(s): ${pids.join(", ")}`);
+  for (const pid of pids) {
+    try {
+      process.kill(pid, spec.signal);
+    } catch (error) {
+      console.error(`Failed to signal pid ${pid}: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+  }
+  const health = await waitForHealth("down", spec.timeoutMs);
+  if (health.status === "ok") {
+    console.error(`Fallback process stop requested but health is still ok: ${health.url || "unknown url"}`);
+    process.exit(1);
+  }
+  console.log(`Stopped fallback process pid(s): ${pids.join(", ")}`);
+  return true;
+}
+
+function runPrestart() {
+  const argv = runtime.prestart_argv;
+  if (!Array.isArray(argv) || argv.length === 0) return;
+  console.log(`Running prestart: ${argv.join(" ")}`);
+  run(argv[0], argv.slice(1), { timeout: Number(runtime.prestart_timeout_ms || 120000) });
+}
+
+function launchdTarget() {
+  const uid = process.getuid ? process.getuid() : "";
+  const label = runtime.launchd_label || manifest.service_label;
+  return {
+    domain: uid === "" ? "" : `gui/${uid}`,
+    label,
+    target: uid === "" ? label : `gui/${uid}/${label}`,
+    plist: String(runtime.launch_agent_path || manifest.launch_agent_path || "").replace(/^~[/]/, `${process.env.HOME || ""}/`),
+  };
+}
+
+async function probeHealth() {
+  const url = runtime.health_url || manifest.health_url || (manifest.local_upstream_url ? `${String(manifest.local_upstream_url).replace(/[/]$/, "")}/api/health` : "");
+  if (!url || typeof fetch !== "function") return { status: "unknown", detail: "No health URL or fetch unavailable." };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+    return { status: response.ok ? "ok" : "failed", detail: `HTTP ${response.status}`, url };
+  } catch (error) {
+    return { status: "failed", detail: error instanceof Error ? error.message : "health probe failed", url };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function waitForHealth(expected, timeoutMs = 10000) {
+  const started = Date.now();
+  let last = await probeHealth();
+  while (Date.now() - started <= timeoutMs) {
+    last = await probeHealth();
+    if (expected === "up" && last.status === "ok") return last;
+    if (expected === "down" && last.status !== "ok") return last;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return last;
+}
+
+async function printStatus() {
+  console.log(`Agent: ${manifest.agent || manifest.id || "unknown"}`);
+  console.log(`Manager: ${manager}`);
+  if (manager === "screen") console.log(`Screen session: ${runtime.screen_session || "missing"}; exists=${screenSessionExists(runtime.screen_session)}`);
+  if (manager === "launchd") {
+    const target = launchdTarget();
+    const status = run("launchctl", ["print", target.target], { allowFail: true });
+    console.log(`Launchd target: ${target.target}; loaded=${status.ok}`);
+  }
+  const health = await probeHealth();
+  console.log(`Health: ${health.status}; ${health.detail}`);
+}
+
+async function startScreen() {
+  const session = runtime.screen_session;
+  const argv = runtime.start_argv;
+  if (!session || !Array.isArray(argv) || argv.length === 0) {
+    console.error("screen manager requires control_center_runtime.screen_session and start_argv.");
+    process.exit(1);
+  }
+  if (screenSessionExists(session)) {
+    console.log(`Screen session already exists: ${session}`);
+    return;
+  }
+  const currentHealth = await probeHealth();
+  if (currentHealth.status === "ok") {
+    console.error(`Health is ok but managed screen session is missing: ${currentHealth.url || "unknown url"}`);
+    process.exit(1);
+  }
+  runPrestart();
+  run(runtime.screen_bin || "screen", ["-dmS", session, ...argv]);
+  const health = await waitForHealth("up", Number(runtime.readiness_timeout_ms || 10000));
+  if (health.status !== "ok") {
+    console.error(`Started screen session but health did not pass: ${health.detail}`);
+    process.exit(1);
+  }
+  console.log(`Started screen session: ${session}`);
+}
+
+async function stopScreen() {
+  const session = runtime.screen_session;
+  if (!session) {
+    console.error("screen manager requires control_center_runtime.screen_session.");
+    process.exit(1);
+  }
+  if (!screenSessionExists(session)) {
+    const health = await probeHealth();
+    if (health.status === "ok") {
+      if (await stopFallbackProcesses("Screen session is missing while health is ok")) return;
+      console.error(`Screen session is not running but health is still ok: ${health.url || "unknown url"}`);
+      process.exit(1);
+    }
+    console.log(`Screen session is not running: ${session}`);
+    return;
+  }
+  run(runtime.screen_bin || "screen", ["-S", session, "-X", "quit"], { allowFail: true });
+  const health = await waitForHealth("down", Number(runtime.stop_timeout_ms || 10000));
+  if (health.status === "ok") {
+    if (await stopFallbackProcesses("Screen stop left health ok")) return;
+    console.error(`Stopped screen session but health is still ok: ${health.url || "unknown url"}`);
+    process.exit(1);
+  }
+  console.log(`Stopped screen session: ${session}`);
+}
+
+async function startLaunchd() {
+  const target = launchdTarget();
+  if (!target.label || !target.plist) {
+    console.error("launchd manager requires service_label/launchd_label and launch_agent_path.");
+    process.exit(1);
+  }
+  runPrestart();
+  const loaded = run("launchctl", ["print", target.target], { allowFail: true }).ok;
+  if (!loaded) {
+    if (!existsSync(target.plist)) {
+      console.error(`LaunchAgent plist is missing: ${target.plist}`);
+      process.exit(1);
+    }
+    run("launchctl", ["bootstrap", target.domain, target.plist]);
+  }
+  run("launchctl", ["enable", target.target], { allowFail: true });
+  run("launchctl", ["kickstart", "-k", target.target], { allowFail: true });
+  const health = await waitForHealth("up", Number(runtime.readiness_timeout_ms || 15000));
+  if (health.status !== "ok") {
+    console.error(`Launchd start did not become healthy: ${health.detail}`);
+    process.exit(1);
+  }
+  console.log(`Started launchd target: ${target.target}`);
+}
+
+async function stopLaunchd() {
+  const target = launchdTarget();
+  if (!target.label) {
+    console.error("launchd manager requires service_label/launchd_label.");
+    process.exit(1);
+  }
+  run("launchctl", ["bootout", target.target], { allowFail: true });
+  if (target.domain && target.plist) run("launchctl", ["bootout", target.domain, target.plist], { allowFail: true });
+  const health = await waitForHealth("down", Number(runtime.stop_timeout_ms || 10000));
+  if (health.status === "ok") {
+    console.error(`Launchd stop requested but health is still ok: ${health.url || "unknown url"}`);
+    process.exit(1);
+  }
+  console.log(`Stopped launchd target: ${target.target}`);
+}
+
+if (action === "status") {
+  await printStatus();
+} else if (manager === "screen" && action === "start") {
+  await startScreen();
+} else if (manager === "screen" && action === "stop") {
+  await stopScreen();
+} else if (manager === "launchd" && action === "start") {
+  await startLaunchd();
+} else if (manager === "launchd" && action === "stop") {
+  await stopLaunchd();
+} else {
+  console.error(`Control Center runtime manager is not executable: ${manager}`);
+  process.exit(1);
+}
+*/});
+
 function resolveTargetPath(data, options = {}) {
   const requested = scalar(options.output || data.targetFolder || `../${slug(data.agentName)}`);
   return path.resolve(ROOT, requested);
@@ -269,6 +563,26 @@ function writeProjectFile(projectRoot, relPath, content) {
   if (existsSync(fullPath)) throw new Error(`Refusing to overwrite existing file: ${fullPath}`);
   writeFileSync(fullPath, content);
   return relPath;
+}
+
+function contractStatus(data) {
+  return String(data.fm?.status || "").trim().toLowerCase();
+}
+
+function researchReportStatus(data) {
+  const agentSlug = slug(data.agentName);
+  if (!existsSync(RESEARCH_DIR)) return { status: "missing", path: "" };
+  const files = readdirSync(RESEARCH_DIR)
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => path.join(RESEARCH_DIR, entry))
+    .sort((a, b) => path.basename(b).localeCompare(path.basename(a)));
+  for (const filePath of files) {
+    const text = readFileSync(filePath, "utf8");
+    if ((data.relPath && text.includes(data.relPath)) || path.basename(filePath).includes(agentSlug)) {
+      return { status: "found", path: path.relative(ROOT, filePath) };
+    }
+  }
+  return { status: "missing", path: "" };
 }
 
 export function generatedAgentFiles(data) {
@@ -364,9 +678,42 @@ export function generatedAgentFiles(data) {
     deployment_profile: operationProfile.deploymentProfile,
     service_mode: operationProfile.serviceMode,
     autostart: operationProfile.autostart,
+    control_center_managed: false,
     autostart_policy: "configurable; never install or enable autostart from scaffold without explicit user approval",
-    start_command: operationProfile.startCommand,
-    stop_command: operationProfile.stopCommand,
+    control_center_contract: {
+      version: 1,
+      command_shape: "structured-argv",
+      executor: "scripts/control-center-runtime.mjs",
+      default_execution: "disabled-until-managed-runtime-is-explicitly-approved",
+      legacy_strings_executable: false,
+      planned_start_command: operationProfile.startCommand,
+      planned_stop_command: operationProfile.stopCommand,
+    },
+    control_center_runtime: {
+      manager: "none",
+      service_boundary: "not-managed-by-control-center",
+      prestart_argv: [],
+      start_argv: [],
+      health_url: null,
+      readiness_timeout_ms: 10000,
+      stop_timeout_ms: 10000,
+    },
+    start_command: {
+      argv: ["node", "scripts/control-center-runtime.mjs", "start"],
+      cwd: ".",
+      control_center_managed: false,
+      timeout_ms: 30000,
+      success_exit_codes: [0],
+      description: "Structured Control Center entrypoint. Disabled until control_center_managed is explicitly approved.",
+    },
+    stop_command: {
+      argv: ["node", "scripts/control-center-runtime.mjs", "stop"],
+      cwd: ".",
+      control_center_managed: false,
+      timeout_ms: 30000,
+      success_exit_codes: [0],
+      description: "Structured Control Center entrypoint. Disabled until control_center_managed is explicitly approved.",
+    },
     healthcheck_command: operationProfile.healthcheckCommand,
     log_path: operationProfile.logPath,
     restart_policy: operationProfile.restartPolicy,
@@ -457,6 +804,20 @@ ${telegramEnabled ? "Telegram is enabled by contract. Use the adapter only with 
 - Memory profile is documented in \`memory/manifest.json\`.
 - Tool boundaries are documented in \`tools/manifest.json\`.
 - Add heavier memory or external tools only after updating the contract.
+
+## Harness Evolution Protocol
+
+When changing this agent's harness, do not rely only on local guesses or generic model knowledge.
+
+A harness change includes changes to instructions, memory, tools, skills, MCP, interfaces, operations, deployment, proactivity, security, model routing, evals, tests, or recovery behavior.
+
+Required order:
+
+1. Inspect this child agent's current project state and contract.
+2. Consult Pritha memory for relevant standards, workflows, prior decisions, and child-agent lifecycle evidence.
+3. If the affected technology may have changed, verify current primary documentation.
+4. Only then design and implement the harness change.
+5. Record the decision or result in this agent's local memory/report, and send reusable lessons back to Pritha when they may improve future agents.
 
 ## Skills
 
@@ -557,6 +918,9 @@ LOG_LEVEL=info
     "tools": "node scripts/tools-status.mjs",
     "skills": "node scripts/skills-status.mjs",
     "operations": "node scripts/operations-status.mjs",
+    "control-center:status": "node scripts/control-center-runtime.mjs status",
+    "control-center:start": "node scripts/control-center-runtime.mjs start",
+    "control-center:stop": "node scripts/control-center-runtime.mjs stop",
     "deploy:plan": "node scripts/deploy-service.mjs plan",
     "deploy:status": "node scripts/deploy-service.mjs status",
     "deploy:install": "node scripts/deploy-service.mjs install",
@@ -874,14 +1238,17 @@ ${operationProfile.healthcheckCommand}
 - Scaffold never starts long-running processes.
 - Scaffold never installs autostart.
 - Autostart is configurable through the contract, but enabling it requires an explicit user-approved deployment step.
-- Keep healthcheck, start, stop and log paths documented before treating this as a service.
+- Control Center start/stop use structured argv only. Legacy command strings are planning evidence, not executable input.
+- Keep healthcheck, runtime manager, start argv, stop behavior and log paths documented before treating this as a service.
 - Deployment automation is available through \`node scripts/deploy-service.mjs plan|status|install|uninstall\`.
 - \`install\` and \`uninstall\` require \`--yes\` and refuse incompatible service/autostart modes.
 
 ## Current Profile
 
-- Start command: \`${operationProfile.startCommand}\`
-- Stop command: \`${operationProfile.stopCommand}\`
+- Control Center managed: \`false\`
+- Runtime manager: \`none\`
+- Planned start command: \`${operationProfile.startCommand}\`
+- Planned stop command: \`${operationProfile.stopCommand}\`
 - Healthcheck command: \`${operationProfile.healthcheckCommand}\`
 - Log path: \`${operationProfile.logPath}\`
 - Restart policy: ${operationProfile.restartPolicy}
@@ -1155,6 +1522,11 @@ console.log(\`Candidate skills: \${(candidates.candidates || []).length}\`);
   });
 
   files.push({
+    path: "scripts/control-center-runtime.mjs",
+    content: CONTROL_CENTER_RUNTIME_SCRIPT,
+  });
+
+  files.push({
     path: "scripts/operations-status.mjs",
     content: `#!/usr/bin/env node
 
@@ -1168,14 +1540,25 @@ if (!existsSync(manifestPath)) {
 }
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+function commandSummary(command) {
+  if (!command) return "not defined";
+  if (typeof command === "string") return \`\${command} (legacy/planning only)\`;
+  if (Array.isArray(command.argv)) {
+    return \`\${command.argv.join(" ")}; managed=\${command.control_center_managed === true}\`;
+  }
+  return JSON.stringify(command);
+}
+
 console.log(\`Agent: \${manifest.agent}\`);
 console.log(\`Deployment target: \${manifest.deployment_target || "unknown"}\`);
 console.log(\`Deployment profile: \${manifest.deployment_profile || "unknown"}\`);
 console.log(\`Service mode: \${manifest.service_mode}\`);
 console.log(\`Autostart: \${manifest.autostart}\`);
 console.log(\`Autostart policy: \${manifest.autostart_policy}\`);
-console.log(\`Start: \${manifest.start_command}\`);
-console.log(\`Stop: \${manifest.stop_command}\`);
+console.log(\`Control Center managed: \${manifest.control_center_managed === true}\`);
+console.log(\`Control Center runtime: \${manifest.control_center_runtime?.manager || "none"}\`);
+console.log(\`Start: \${commandSummary(manifest.start_command)}\`);
+console.log(\`Stop: \${commandSummary(manifest.stop_command)}\`);
 console.log(\`Healthcheck: \${manifest.healthcheck_command}\`);
 console.log(\`Logs: \${manifest.log_path}\`);
 if (manifest.proactivity) {
@@ -1242,6 +1625,15 @@ function run(commandName, args, options = {}) {
   }
 }
 
+function commandSummary(command) {
+  if (!command) return "not defined";
+  if (typeof command === "string") return \`\${command} (legacy/planning only)\`;
+  if (Array.isArray(command.argv)) {
+    return \`\${command.argv.join(" ")}; managed=\${command.control_center_managed === true}\`;
+  }
+  return JSON.stringify(command);
+}
+
 function renderTemplate() {
   if (!manifest.launchd_template) {
     console.error("No launchd template selected in operations/manifest.json");
@@ -1280,8 +1672,8 @@ function printPlan() {
   console.log(\`Service label: \${serviceLabel}\`);
   console.log(\`LaunchAgent path: \${launchAgentPath}\`);
   console.log(\`Healthcheck: \${manifest.healthcheck_command}\`);
-  console.log(\`Start: \${manifest.start_command}\`);
-  console.log(\`Stop: \${manifest.stop_command}\`);
+  console.log(\`Start: \${commandSummary(manifest.start_command)}\`);
+  console.log(\`Stop: \${commandSummary(manifest.stop_command)}\`);
   if (manifest.service_mode !== "launchd") {
     console.log("Plan:");
     console.log("- No launchd install is configured for this agent.");
@@ -1638,11 +2030,22 @@ export function runSmoke(projectRoot) {
   }
 }
 
+function externalVerificationStatus(data) {
+  const value = [
+    data.text,
+    data.externalVerificationNeeds,
+    data.sourceFreshnessRequirements,
+  ].join("\n").toLowerCase();
+  return /(checked|verified|complete|done|not-applicable|tests only|none for fixture)/.test(value) ? "complete" : "pending";
+}
+
 function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult) {
   const date = today();
   const agentSlug = slug(data.agentName);
   const telegramApplicable = data.telegramMode && data.telegramMode !== "none";
   const operationProfile = operationProfileFor(data);
+  const research = researchReportStatus(data);
+  const externalVerification = externalVerificationStatus(data);
   return `---
 id: ${date}-${agentSlug}-scaffold-report
 type: scaffold-report
@@ -1710,6 +2113,8 @@ Status: ${smokeResult.ok ? "complete" : "failed"}
 - Memory profile: ${memoryProfileFor(data)}
 - Tool profiles: ${toolProfilesFor(data).join(", ")}
 - Skill policy: needs=${skillPolicyFor(data).skillNeeds}; sources=${skillPolicyFor(data).allowedSkillSources}; install=${skillPolicyFor(data).skillInstallMode}; mutation=${skillPolicyFor(data).skillMutationPolicy}
+- Research report: ${research.status}${research.path ? ` (${research.path})` : ""}
+- External verification: ${externalVerification}
 - Service mode: ${operationProfile.serviceMode}
 - Autostart: ${operationProfile.autostart}
 - Proactive mode: ${operationProfile.proactiveMode}
@@ -1737,6 +2142,8 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 | Telegram adapter test | ${telegramApplicable ? "pending" : "not-applicable"} | ${telegramApplicable ? "Fill .env and run npm run telegram:healthcheck" : "Telegram not selected"} |
 | Operations status | pending | \`node scripts/operations-status.mjs\` |
 | Skills status | pending | \`node scripts/skills-status.mjs\` |
+| Pritha memory research | ${research.status} | ${research.path || "Run `node scripts/pritha.mjs research <contract>` before production scaffold decisions"} |
+| External verification | ${externalVerification} | Verify current docs before adding volatile APIs, runtimes, models or deployment behavior |
 | Documentation review | pass | README and training guide generated |
 
 ## Handoff
@@ -1769,6 +2176,17 @@ export function scaffoldContract(contractPath, options = {}) {
   if (issues.length > 0) {
     throw new Error(`Contract is not ready for scaffold:\n- ${issues.join("\n- ")}`);
   }
+  if (contractStatus(data) !== "accepted" && !options["allow-draft-scaffold"]) {
+    throw new Error(`Contract status must be accepted before scaffold. Current status: ${contractStatus(data) || "unknown"}. Use --allow-draft-scaffold only for an explicit experimental scaffold.`);
+  }
+  const research = researchReportStatus(data);
+  if (research.status !== "found" && !options["allow-missing-research"]) {
+    throw new Error("Pritha memory research must be completed before scaffold. Run `node scripts/pritha.mjs research <contract>` or use --allow-missing-research only for an explicit experimental scaffold.");
+  }
+  const externalVerification = externalVerificationStatus(data);
+  if (externalVerification !== "complete" && !options["allow-pending-external-verification"]) {
+    throw new Error("External verification is pending for volatile choices. Check current primary docs, update the contract, or use --allow-pending-external-verification only for an explicit experimental scaffold.");
+  }
   if (data.runtimeFamily !== "codex-native") {
     throw new Error(`Layer 4 scaffold currently supports codex-native only, got: ${data.runtimeFamily}`);
   }
@@ -1789,6 +2207,9 @@ export function scaffoldContract(contractPath, options = {}) {
   console.log(`Created files: ${createdFiles.length}`);
   console.log(`Smoke test: ${smokeResult.ok ? "pass" : "fail"}`);
   console.log(`Scaffold report: ${path.relative(ROOT, reportPath)}`);
+  if (contractStatus(data) !== "accepted") {
+    console.log(`Warning: scaffold created from ${contractStatus(data) || "unknown"} contract because --allow-draft-scaffold was set.`);
+  }
   if (!smokeResult.ok) {
     console.log(smokeResult.output);
     process.exitCode = 1;

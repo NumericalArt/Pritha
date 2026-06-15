@@ -2,6 +2,10 @@
 
 Pritha is the preferred CLI surface.
 
+The public repository/check-out name is Pritha. Historical `Techscope` names
+remain in compatibility paths, environment variables and memory artifacts until
+a separate migration removes them.
+
 Conceptually, Pritha is a harness for an agent that builds the harness of a new
 agent. It uses a genetic lineage model: a Seed carries the specification,
 Descendants inherit base policies, mutation adapts the scaffold to the task,
@@ -29,7 +33,8 @@ node scripts/agents-mother.mjs <command>
 
 - `questions`: print interview structure.
 - `create --name --mission`: create a Seed (`agent-contract`).
-- `create <contract-path>`: scaffold a descendant.
+- `create <contract-path>`: scaffold a descendant from an accepted contract
+  after Pritha memory research and any required current-docs verification.
 - `test <project-path>`: inspect an existing or generated agent.
 - `publish <project-path>`: run a no-report trial check.
 - `lineage`: rebuild the registry.
@@ -65,6 +70,13 @@ If a Seed selects realtime voice control, the default realtime tool surface is
 internet access, agent memory access and Codex CLI sidecar access. Setup must
 record readiness for those tools so voice is not treated as complete when its
 supporting tool surface is missing.
+
+Voice Control uses the same Codex task path as Codex thread for implementation
+work. Risky actions such as cron/launchd enablement, service install,
+deployment, deletion, secret writes or danger-full-access are held as pending
+Codex tasks until the operator approves or rejects them in the UI task card.
+Secret values should be entered through the child-agent credential UI, not
+spoken into the Realtime session.
 
 ## Compatibility Roadmap
 
