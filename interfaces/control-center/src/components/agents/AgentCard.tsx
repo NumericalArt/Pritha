@@ -1,8 +1,10 @@
 import { CheckCircle2, ClipboardCheck, Copy, ExternalLink, HelpCircle, KeyRound, Play, RefreshCcw, RotateCcw, Square } from "lucide-react";
 import { useState } from "react";
 import type { AgentCardModel } from "@/data/mockAgents";
+import { type AccessMode, agentUrlForAccessMode } from "@/lib/access-mode";
 import { getCardAction, getCardActionLabel, getCardActionTone } from "@/data/mockAgents";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import type { ControlCenterStatus } from "@/lib/control-center/types";
 import { AgentIcon } from "./AgentIcon";
 
 function stateLabel(agent: AgentCardModel) {
@@ -71,11 +73,15 @@ function credentialLabel(agent: AgentCardModel) {
 
 export function AgentCard({
   agent,
+  access,
+  accessMode,
   mobile = false,
   onAction,
   onCredentials,
 }: {
   agent: AgentCardModel;
+  access?: ControlCenterStatus["access"];
+  accessMode?: AccessMode;
   mobile?: boolean;
   onAction?: (agent: AgentCardModel) => void;
   onCredentials?: (agent: AgentCardModel) => void;
@@ -84,13 +90,14 @@ export function AgentCard({
   const cardAction = getCardAction(agent);
   const actionTone = getCardActionTone(agent);
   const actionLabel = getCardActionLabel(agent);
-  const canShowUrl = agent.state === "alive" && Boolean(agent.url);
+  const displayUrl = access && accessMode ? agentUrlForAccessMode(agent.url, access, accessMode) : agent.url;
+  const canShowUrl = agent.state === "alive" && Boolean(displayUrl);
   const canOpenPlan = Boolean(onAction);
   const canOpenCredentials = Boolean(onCredentials && agent.credentials?.total);
 
   async function copyUrl() {
-    if (!agent.url) return;
-    const ok = await copyTextToClipboard(agent.url);
+    if (!displayUrl) return;
+    const ok = await copyTextToClipboard(displayUrl);
     setCopied(ok);
     if (ok) window.setTimeout(() => setCopied(false), 1400);
   }
@@ -184,8 +191,8 @@ export function AgentCard({
 
       {canShowUrl ? (
         <div className={`${mobile ? "mobile-agent-url-row" : "agent-url-row"}`}>
-          <span>{agent.url?.replace("http://", mobile ? "" : "http://")}</span>
-          <a className="icon-button" href={agent.url} target="_blank" rel="noreferrer" aria-label={`Open URL for ${agent.name}`}>
+          <span>{displayUrl?.replace("http://", mobile ? "" : "http://")}</span>
+          <a className="icon-button" href={displayUrl} target="_blank" rel="noreferrer" aria-label={`Open URL for ${agent.name}`}>
             <ExternalLink size={17} />
           </a>
           <button className="icon-button" type="button" aria-label={`Copy URL for ${agent.name}`} title={copied ? "Copied" : "Copy URL"} onClick={() => void copyUrl()}>

@@ -1,9 +1,12 @@
 import type { AgentCardModel } from "@/data/mockAgents";
-import type { ControlCenterFleetManualAuditResult } from "@/lib/control-center/types";
+import type { AccessMode } from "@/lib/access-mode";
+import type { ControlCenterFleetManualAuditResult, ControlCenterStatus } from "@/lib/control-center/types";
 import { AgentCard } from "./AgentCard";
 
 export function MobileAgents({
   agents,
+  access,
+  accessMode,
   onAgentAction,
   onAgentCredentials,
   onCreatePlan,
@@ -12,6 +15,8 @@ export function MobileAgents({
   manualAuditResult,
 }: {
   agents: AgentCardModel[];
+  access?: ControlCenterStatus["access"];
+  accessMode?: AccessMode;
   onAgentAction?: (agent: AgentCardModel) => void;
   onAgentCredentials?: (agent: AgentCardModel) => void;
   onCreatePlan?: () => void;
@@ -57,7 +62,7 @@ export function MobileAgents({
       </div>
       <div className="mobile-agent-list">
         {agents.map((agent) => (
-          <AgentCard agent={agent} mobile key={agent.id} onAction={onAgentAction} onCredentials={onAgentCredentials} />
+          <AgentCard agent={agent} access={access} accessMode={accessMode} mobile key={agent.id} onAction={onAgentAction} onCredentials={onAgentCredentials} />
         ))}
         <button className="mobile-add-agent-card" type="button" onClick={onCreatePlan} title="Open a safe Codex planning handoff">
           + Create Plan
