@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AgentCardModel } from "@/data/mockAgents";
 import { getCardActionLabel, getPrimaryAction } from "@/data/mockAgents";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { ACCESS_MODE_CHANGED_EVENT, type AccessMode, preferredAccessMode, readStoredAccessMode } from "@/lib/access-mode";
 import type {
   ControlCenterCommandReadiness,
   ControlCenterAgentCredentialsResponse,
@@ -180,6 +181,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   const [manualAuditRunning, setManualAuditRunning] = useState(false);
   const [manualAuditResult, setManualAuditResult] = useState<ControlCenterFleetManualAuditResult | undefined>();
   const [manualAuditError, setManualAuditError] = useState<string | undefined>();
+  const [accessMode, setAccessMode] = useState<AccessMode>(() => preferredAccessMode(status.access));
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) || null, [agents, selectedAgentId]);
   const credentialsAgent = useMemo(() => agents.find((agent) => agent.id === credentialsAgentId) || null, [agents, credentialsAgentId]);
   const activeAgents = useMemo(() => agents.filter((agent) => agent.control?.runtimeKind !== "scaffold"), [agents]);
@@ -387,6 +389,17 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
     void loadCredentials(credentialsAgentId);
   }, [credentialsAgentId]);
 
+  useEffect(() => {
+    const syncAccessMode = () => setAccessMode(preferredAccessMode(status.access, readStoredAccessMode()));
+    syncAccessMode();
+    window.addEventListener("storage", syncAccessMode);
+    window.addEventListener(ACCESS_MODE_CHANGED_EVENT, syncAccessMode);
+    return () => {
+      window.removeEventListener("storage", syncAccessMode);
+      window.removeEventListener(ACCESS_MODE_CHANGED_EVENT, syncAccessMode);
+    };
+  }, [status.access]);
+
   const selectedActionLabel = panel.plan?.control.label || (selectedAgent ? getCardActionLabel(selectedAgent) : actionLabel(selectedAction));
   const runtimeAction = selectedAction === "start" || selectedAction === "stop";
   const requiredPhrase = runtimeAction ? panel.plan?.confirmation?.requiredPhrase || "" : "";
@@ -452,7 +465,14 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
                   </button>
                 </div>
               </div>
-              <AgentsGrid agents={visibleAgents} onAgentAction={openAction} onAgentCredentials={openCredentials} onCreatePlan={() => setCreatePlanOpen(true)} />
+              <AgentsGrid
+                agents={visibleAgents}
+                access={status.access}
+                accessMode={accessMode}
+                onAgentAction={openAction}
+                onAgentCredentials={openCredentials}
+                onCreatePlan={() => setCreatePlanOpen(true)}
+              />
             </section>
             <AgentsRightRail
               status={status}
@@ -466,6 +486,8 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
       </div>
       <MobileAgents
         agents={activeAgents}
+        access={status.access}
+        accessMode={accessMode}
         onAgentAction={openAction}
         onAgentCredentials={openCredentials}
         onCreatePlan={() => setCreatePlanOpen(true)}

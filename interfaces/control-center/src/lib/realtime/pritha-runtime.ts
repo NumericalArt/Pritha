@@ -5,6 +5,17 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { checkCodexAppServerAvailable, PrithaCodexAppServerClient } from "./codex-task/codex-app-server-client";
 import type { PrithaCodexTaskPayload, PrithaCodexTaskProgressEvent, PrithaCodexTaskResult, PrithaCodexTaskStatus, PrithaCodexTaskType } from "./codex-task/types";
+import {
+  buildVoiceBehaviorPromptSections,
+  DEFAULT_PRITHA_VOICE,
+  DEFAULT_VOICE_BEHAVIOR_PROFILE,
+  normalizePrithaVoice,
+  normalizeVoiceBehaviorProfile,
+  PRITHA_FEMININE_VOICE_OPTIONS,
+  VOICE_BEHAVIOR_PROFILE_OPTIONS,
+  type PrithaVoiceId,
+  type VoiceBehaviorProfile,
+} from "./voice-settings";
 
 type RealtimeToolDefinition = {
   type: "function";
@@ -93,6 +104,8 @@ type PrithaRuntimeSettings = {
   codexNetworkAccess: boolean;
   codexApproval: "never";
   codexTimeoutMs: number;
+  voiceBehaviorProfile: VoiceBehaviorProfile;
+  prithaVoice: PrithaVoiceId;
   updatedAt: string;
 };
 
@@ -158,7 +171,7 @@ type ChildAgentProject = {
 };
 
 const DEFAULT_MODEL = "gpt-realtime-2";
-const DEFAULT_VOICE = "marin";
+const DEFAULT_VOICE = DEFAULT_PRITHA_VOICE;
 const DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe";
 const DEFAULT_CODEX_TIMEOUT_MS = 300_000;
 const MAX_TOOL_TEXT = 8_000;
@@ -1545,6 +1558,7 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
 }
 
 export function buildRealtimeInstructions() {
+  const settings = getPrithaRuntimeSettings();
   return [
     "You are Pritha, a Codex-native agent factory and Techscope knowledge assistant.",
     "Speak with the operator in Russian unless they switch language.",
@@ -1571,10 +1585,12 @@ export function buildRealtimeInstructions() {
     "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, appears stale, or has been running for a long time. Keep updates short and do not interrupt the operator with frequent progress chatter.",
     "Do not ask for secrets or expose credentials. For credentials, route the operator to the child-agent credential UI. For publish, deletion, service install, launchd/cron or broad system changes, create a Codex task and let the UI decision gate collect approval.",
     "Realtime tools must not mutate curated Markdown directly except through confirmed deep_pritha_memory memory-write operations or through run_codex_task when its sandbox/write mode permits it. Keep edits narrowly scoped.",
-  ].join("\n");
+    buildVoiceBehaviorPromptSections(settings.voiceBehaviorProfile),
+  ].join("\n\n");
 }
 
 export function buildRealtimeSessionConfig() {
+  const runtimeSettings = getPrithaRuntimeSettings();
   return {
     type: "realtime",
     model: env("TECHSCOPE_VOICE_MODEL", env("OPENAI_REALTIME_MODEL", DEFAULT_MODEL)),
@@ -1591,7 +1607,7 @@ export function buildRealtimeSessionConfig() {
         },
       },
       output: {
-        voice: env("TECHSCOPE_VOICE_REALTIME_VOICE", env("OPENAI_REALTIME_VOICE", DEFAULT_VOICE)),
+        voice: runtimeSettings.prithaVoice,
       },
     },
   };
@@ -1801,6 +1817,12 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
     codexNetworkAccess: true,
     codexApproval: "never",
     codexTimeoutMs: codexTimeoutMs(),
+    voiceBehaviorProfile: normalizeVoiceBehaviorProfile(
+      env("PRITHA_REALTIME_BEHAVIOR_PROFILE", env("TECHSCOPE_VOICE_BEHAVIOR_PROFILE", DEFAULT_VOICE_BEHAVIOR_PROFILE)),
+    ),
+    prithaVoice: normalizePrithaVoice(
+      env("PRITHA_REALTIME_VOICE", env("TECHSCOPE_VOICE_REALTIME_VOICE", env("OPENAI_REALTIME_VOICE", DEFAULT_VOICE))),
+    ),
     updatedAt: new Date(0).toISOString(),
   };
 }
@@ -1821,6 +1843,8 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     codexNetworkAccess: typeof value.codexNetworkAccess === "boolean" ? value.codexNetworkAccess : defaults.codexNetworkAccess,
     codexApproval: "never",
     codexTimeoutMs: Number.isFinite(timeout) && timeout > 0 ? Math.max(10_000, Math.min(timeout, 3_600_000)) : defaults.codexTimeoutMs,
+    voiceBehaviorProfile: normalizeVoiceBehaviorProfile(value.voiceBehaviorProfile, defaults.voiceBehaviorProfile),
+    prithaVoice: normalizePrithaVoice(value.prithaVoice, defaults.prithaVoice),
     updatedAt: String(value.updatedAt || defaults.updatedAt),
   };
 }
@@ -1845,6 +1869,8 @@ export async function updatePrithaRuntimeSettings(patch: Partial<PrithaRuntimeSe
     codexSandbox: next.codexSandbox,
     codexNetworkAccess: next.codexNetworkAccess,
     codexTimeoutMs: next.codexTimeoutMs,
+    voiceBehaviorProfile: next.voiceBehaviorProfile,
+    prithaVoice: next.prithaVoice,
   });
   return next;
 }
@@ -3675,6 +3701,9 @@ export function getPrithaRealtimeStatus() {
     root,
     model: config.model,
     voice: config.audio.output.voice,
+    voice_behavior_profile: runtimeSettings.voiceBehaviorProfile,
+    voice_options: PRITHA_FEMININE_VOICE_OPTIONS,
+    behavior_profile_options: VOICE_BEHAVIOR_PROFILE_OPTIONS,
     transcription_model: config.audio.input.transcription.model,
     tools: config.tools.map((tool) => tool.name),
     openai_key_configured: Boolean(env("OPENAI_API_KEY")),

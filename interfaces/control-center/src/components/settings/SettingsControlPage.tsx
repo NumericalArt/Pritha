@@ -1,21 +1,38 @@
+"use client";
+
 import {
+  Check,
+  CheckCircle2,
   Clock3,
   Database,
   Globe2,
   Home,
   Info,
   Laptop,
+  Monitor,
   Moon,
   Play,
   QrCode,
   ShieldCheck,
   SlidersHorizontal,
+  Sun,
   TimerReset,
+  X,
 } from "lucide-react";
+import QRCode from "qrcode";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { LanguageDropdown } from "@/components/primitives/LanguageDropdown";
 import { VoiceSettingsSection } from "@/components/settings/VoiceSettingsSection";
 import type { CapabilityStatus, ControlCenterStatus } from "@/lib/control-center/types";
+import {
+  type AccessMode,
+  accessModeReady,
+  accessVoiceUrl,
+  preferredAccessMode,
+  readStoredAccessMode,
+  writeStoredAccessMode,
+} from "@/lib/access-mode";
 
 function statusText(status: CapabilityStatus) {
   return status.replace(/_/g, " ");
@@ -34,6 +51,54 @@ function formatUptime(seconds: number | undefined) {
 function capabilityTone(status: CapabilityStatus | "pass" | "fail" | "unknown") {
   if (status === "ready" || status === "pass") return "good";
   return "";
+}
+
+type ThemePreference = "dark" | "system" | "light";
+type ResolvedTheme = "dark" | "light";
+
+const THEME_STORAGE_KEY = "pritha-control-center-theme";
+const ENABLE_EXPERIMENTAL_LIGHT_THEME = false;
+const THEME_OPTIONS: Array<{
+  id: ThemePreference;
+  label: string;
+  detail: string;
+  icon: typeof Moon;
+}> = [
+  { id: "dark", label: "Dark", detail: "Deep control room", icon: Moon },
+  { id: "system", label: "System", detail: "Follow this device", icon: Monitor },
+  { id: "light", label: "Light", detail: "Bright operations", icon: Sun },
+];
+const VISIBLE_THEME_OPTIONS = ENABLE_EXPERIMENTAL_LIGHT_THEME ? THEME_OPTIONS : THEME_OPTIONS.filter((option) => option.id === "dark");
+
+function isThemePreference(value: string | null): value is ThemePreference {
+  return value === "dark" || value === "system" || value === "light";
+}
+
+function resolveTheme(preference: ThemePreference): ResolvedTheme {
+  if (!ENABLE_EXPERIMENTAL_LIGHT_THEME) return "dark";
+  if (preference !== "system") return preference;
+  if (typeof window === "undefined") return "dark";
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function applyThemePreference(preference: ThemePreference) {
+  const resolved = resolveTheme(preference);
+  if (typeof document !== "undefined") {
+    document.documentElement.dataset.themePreference = preference;
+    document.documentElement.dataset.theme = resolved;
+  }
+  return resolved;
+}
+
+function readStoredThemePreference(): ThemePreference {
+  if (typeof window === "undefined") return "dark";
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (!ENABLE_EXPERIMENTAL_LIGHT_THEME) return "dark";
+    return isThemePreference(stored) ? stored : "dark";
+  } catch {
+    return "dark";
+  }
 }
 
 function memoryIndexLabel(status?: ControlCenterStatus) {
@@ -90,15 +155,71 @@ type AccessProps = {
   status?: ControlCenterStatus;
 };
 
+function VoiceLinkModal({ mode, url, onClose }: { mode: AccessMode; url?: string; onClose: () => void }) {
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setQrDataUrl("");
+    setError("");
+    if (!url) return;
+    QRCode.toDataURL(url, { width: 240, margin: 2, color: { dark: "#111827", light: "#ffffff" } })
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setError("QR code unavailable");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  const localOnly = mode === "localhost";
+  return (
+    <div className="access-modal-overlay" role="presentation" onMouseDown={(event) => (event.target === event.currentTarget ? onClose() : undefined)}>
+      <div className="access-modal voice-link-modal" role="dialog" aria-modal="true" aria-label="Voice link QR code">
+        <div className="access-modal-header">
+          <h2>Voice Link</h2>
+          <button className="icon-button" type="button" aria-label="Close voice link" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="voice-link-qr-frame">
+          {qrDataUrl ? <img src={qrDataUrl} alt="QR code for Voice Link" /> : <span>{error || "Generating QR..."}</span>}
+        </div>
+        <p>{url || "Voice URL unavailable"}</p>
+        <div className={`voice-link-note ${localOnly ? "warn" : ""}`}>
+          {localOnly ? "Localhost works only on this Mac. Select LAN or Tailscale for a phone." : "Scan this with iPhone, Android, or another smartphone."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AccessSection({ access }: AccessProps) {
-  const selectedMode = access?.tailscale === "ready" ? "tailscale" : access?.lan === "ready" ? "lan" : "localhost";
-  const tailscaleVoiceUrl = access?.tailscaleVoiceUrl || access?.tailscaleUrl;
+  const [selectedMode, setSelectedMode] = useState<AccessMode>(() => (access ? preferredAccessMode(access) : "localhost"));
+  const [voiceLinkOpen, setVoiceLinkOpen] = useState(false);
+
+  useEffect(() => {
+    if (!access) return;
+    setSelectedMode(preferredAccessMode(access, readStoredAccessMode()));
+  }, [access]);
+
+  function chooseMode(mode: AccessMode) {
+    if (!access || !accessModeReady(access, mode)) return;
+    setSelectedMode(mode);
+    writeStoredAccessMode(mode);
+  }
+
+  const voiceMode = access && accessModeReady(access, "tailscale") ? "tailscale" : selectedMode;
+  const voiceUrl = access ? accessVoiceUrl(access, voiceMode) : undefined;
   const options = [
-    { id: "localhost", label: "Localhost (This device)", value: access?.localhost || "http://127.0.0.1:3420", href: access?.localhost, icon: Laptop },
-    { id: "lan", label: "LAN", value: access?.lanUrl || "Unavailable", href: access?.lanUrl, icon: Home },
-    { id: "tailscale", label: "Tailscale", value: tailscaleVoiceUrl || "Not configured", href: tailscaleVoiceUrl, icon: ShieldCheck },
-    { id: "qr", label: "Voice Link", value: tailscaleVoiceUrl ? "Open /voice on phone" : "Needs Tailscale", href: tailscaleVoiceUrl, icon: QrCode },
-  ];
+    { id: "localhost" as const, label: "Localhost", value: access?.localhost || "http://127.0.0.1:3420", icon: Laptop },
+    { id: "lan" as const, label: "LAN", value: access?.lanUrl || "Unavailable", icon: Home },
+    { id: "tailscale" as const, label: "Tailscale", value: access?.tailscaleUrl || "Not configured", icon: ShieldCheck },
+  ].map((option) => ({ ...option, ready: access ? accessModeReady(access, option.id) : false }));
 
   return (
     <section className="settings-section">
@@ -106,39 +227,107 @@ function AccessSection({ access }: AccessProps) {
       <div className="access-grid">
         {options.map((option) => {
           const Icon = option.icon;
-          const selected = option.id === selectedMode;
+          const selected = option.id === selectedMode && option.ready;
           return (
-            <a className={`access-option ${selected ? "selected" : ""}`} href={option.href} target={option.href ? "_blank" : undefined} rel={option.href ? "noreferrer" : undefined} key={option.id}>
+            <button
+              className={`access-option ${selected ? "selected" : ""} ${option.ready ? "ready" : "unavailable"}`}
+              type="button"
+              aria-pressed={selected}
+              disabled={!option.ready}
+              onClick={() => chooseMode(option.id)}
+              key={option.id}
+            >
               <Icon size={25} />
               <strong>{option.label}</strong>
               <span>{option.value}</span>
-              {selected ? <span className="selected-check">✓</span> : <span className="option-dot" />}
-            </a>
+              {option.ready ? (
+                <span className="ready-check ready" aria-label={`${option.label} connection ready`}>
+                  <CheckCircle2 size={18} />
+                </span>
+              ) : null}
+            </button>
           );
         })}
+        <button className={`access-option voice-link-action ${voiceUrl ? "ready" : "unavailable"}`} type="button" onClick={() => setVoiceLinkOpen(true)} disabled={!voiceUrl}>
+          <QrCode size={25} />
+          <strong>Voice Link</strong>
+          <span>{voiceUrl ? "Open /voice on phone" : "Select an available connection"}</span>
+        </button>
       </div>
       <div className="info-note">
         <Info size={17} />
-        For remote voice tests, use the Tailscale HTTPS /voice link on MacBook or iPhone.
+        The purple frame marks the default UI path. Green checks mark configured connection methods.
       </div>
+      {voiceLinkOpen ? <VoiceLinkModal mode={voiceMode} url={voiceUrl} onClose={() => setVoiceLinkOpen(false)} /> : null}
     </section>
   );
 }
 
 function AppearanceSection() {
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => readStoredThemePreference());
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(themePreference));
+
+  useEffect(() => {
+    setResolvedTheme(applyThemePreference(themePreference));
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
+    } catch {
+      // Theme selection is still applied for this session.
+    }
+
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const syncSystemTheme = () => {
+      if (themePreference === "system") setResolvedTheme(applyThemePreference(themePreference));
+    };
+    media.addEventListener("change", syncSystemTheme);
+    return () => media.removeEventListener("change", syncSystemTheme);
+  }, [themePreference]);
+
+  const activeOption = THEME_OPTIONS.find((option) => option.id === themePreference) || THEME_OPTIONS[0];
+  const appliedLabel = themePreference === "system" ? `System: ${resolvedTheme}` : activeOption.label;
+
   return (
-    <section className="settings-section compact-section">
-      <SectionHeader icon={<Moon size={23} />} title="Appearance" subtitle="Theme" />
-      <div className="theme-toggle">
-        <button className="active" type="button">
-          Dark
-        </button>
-        <button type="button" aria-disabled="true">
-          System
-        </button>
-        <button type="button" aria-disabled="true">
-          Light
-        </button>
+    <section className="settings-section appearance-section">
+      <div className="appearance-header-row">
+        <SectionHeader icon={<Moon size={23} />} title="Appearance" subtitle="Theme" />
+        <span className="appearance-applied" aria-live="polite">
+          Applied: {appliedLabel}
+        </span>
+      </div>
+      <div className="theme-toggle" role="radiogroup" aria-label="Theme">
+        {VISIBLE_THEME_OPTIONS.map((option) => {
+          const Icon = option.icon;
+          const selected = option.id === themePreference;
+          return (
+            <button
+              className={selected ? "active" : ""}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => setThemePreference(option.id)}
+              key={option.id}
+            >
+              <Icon size={16} />
+              <span>{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className={`theme-preview theme-preview-${resolvedTheme}`}>
+        <div className="theme-preview-window" aria-hidden="true">
+          <span className="theme-preview-sidebar" />
+          <span className="theme-preview-main">
+            <span className="theme-preview-bar" />
+            <span className="theme-preview-row strong" />
+            <span className="theme-preview-row" />
+            <span className="theme-preview-row short" />
+          </span>
+        </div>
+        <div>
+          <strong>{activeOption.detail}</strong>
+          <span>{themePreference === "system" ? `Pritha is following the current ${resolvedTheme} system appearance.` : `${activeOption.label} theme is active across the control surface.`}</span>
+        </div>
+        <Check size={18} />
       </div>
     </section>
   );

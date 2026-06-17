@@ -3,8 +3,8 @@ id: agent-interface-experience
 type: standard
 status: draft
 created: 2026-06-02
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-06-16
+last_reviewed: 2026-06-16
 owner: Pritha
 topics:
   - agentic-ui
@@ -13,6 +13,10 @@ topics:
   - generative-ui
   - service-design
   - agent-factory
+  - webgl
+  - 3d-interface
+  - canvas-accessibility
+  - model-loading
 tools:
   - Pritha
   - Codex
@@ -27,11 +31,22 @@ tools:
   - WebGLRenderer
   - WebGPURenderer
   - TSL
+  - Drei
+  - GLTFLoader
+  - DRACOLoader
+  - gltfjsx
+  - model-viewer
+  - PlayCanvas
+  - Babylon.js
+  - TresJS
+  - Threlte
+  - PixiJS
   - Codex App Server
 sources:
   - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
   - 03_reviews/2026-06-02-js-ts-agent-ui-framework-source-batch-review.md
   - 03_reviews/2026-06-02-threejs-3d-agent-interface-source-batch-review.md
+  - 03_reviews/2026-06-16-webgl-3d-interface-resource-batch-review.md
   - 03_reviews/2026-06-02-codex-app-server-rate-limit-telemetry-review.md
   - 04_standards/agent-creation-harness.md
   - 04_standards/agent-mcp-connector-lifecycle.md
@@ -41,6 +56,7 @@ related:
     - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
     - 03_reviews/2026-06-02-js-ts-agent-ui-framework-source-batch-review.md
     - 03_reviews/2026-06-02-threejs-3d-agent-interface-source-batch-review.md
+    - 03_reviews/2026-06-16-webgl-3d-interface-resource-batch-review.md
     - 03_reviews/2026-06-02-codex-app-server-rate-limit-telemetry-review.md
   standards:
     - 04_standards/agent-creation-harness.md
@@ -49,11 +65,11 @@ related:
 supersedes: []
 superseded_by: []
 freshness_status: current
-source_published: 2026-06-02
-source_updated: 2026-06-02
-source_version: Pritha agent interface experience v4 + Codex app-server telemetry batch
-retrieved: 2026-06-02
-verified: 2026-06-02
+source_published: 2022-01-05..2026-06-16
+source_updated: 2026-06-16
+source_version: Pritha agent interface experience v5 + WebGL 3D interface resource batch
+retrieved: 2026-06-16
+verified: 2026-06-16
 valid_for: Pritha-created child-agent interface selection and scaffolding
 temporal_status: current
 memory_domain: agent-building-knowledge
@@ -281,6 +297,73 @@ Renderer policy:
 - Record fallback behavior for browsers/devices that cannot render the chosen
   scene.
 
+Implementation policy:
+
+- Let CSS own the displayed canvas size. Resize the renderer drawing buffer from
+  the displayed size, update camera projection only when the display size
+  changes, and cap DPR or total pixel count when high-density screens would
+  create excessive GPU cost.
+- Use continuous rendering only for animation, simulation, games, live visual
+  dashboards or always-moving effects. Use on-demand rendering for product
+  viewers, catalogs, editors, static diagrams and other scenes that change only
+  after model load, controls, resize, data updates or user input.
+- For pages with several 3D cards, diagrams or sections, prefer one
+  renderer/canvas with virtual views or scissor rectangles. In React/R3F, use a
+  helper such as Drei `View` before creating many independent WebGL contexts.
+- Keep ordinary text, forms, labels and primary controls in DOM whenever
+  possible. Project 3D positions into CSS coordinates for labels, handle
+  occlusion/frustum visibility/z-order, and use Drei `Html` for R3F scene-linked
+  DOM content.
+- Use raycasting or framework pointer events for normal hover/click picking.
+  Assign stable object IDs/names for objects an agent can inspect or mutate.
+  Reserve GPU picking for cases where ordinary raycasting is inadequate and the
+  extra complexity is justified.
+- Keep scroll narratives DOM-first: HTML sections own the readable content, and
+  the scene or camera follows scroll state. Respect reduced-motion needs and
+  provide a non-3D summary.
+
+Model and asset policy:
+
+- Use glTF/GLB as the default real-model format for browser 3D. Use
+  `GLTFLoader` for Three.js and `useGLTF`/`gltfjsx` for React Three Fiber.
+- Add `DRACOLoader` only when compressed geometry meaningfully reduces payload
+  size after accounting for decoder size, decode latency and worker contention.
+  Reuse decoder instances and configure decoder paths explicitly.
+- Treat textures as part of the performance budget: choose appropriate
+  dimensions, mipmaps and compressed formats, and dispose bitmaps/textures,
+  geometries and materials when they are no longer needed.
+- Record asset license, source, optimization steps, expected payload size and
+  fallback if a model fails to load.
+
+Performance and accessibility policy:
+
+- Record target FPS, DPR/pixel cap, draw-call budget, model and texture size,
+  VRAM budget, mobile constraints and profiling tools.
+- Prefer batching, instancing, shared materials/geometries and visibility toggles
+  over frequent allocation, mount/unmount or duplicate model parsing.
+- In React Three Fiber, avoid `setState` inside `useFrame` and hot pointer
+  events. Use refs, deltas, cached loaders and immutable generated model
+  components for hot paths.
+- If the canvas is decorative, keep essential information outside it and mark or
+  describe the layer accordingly. If the canvas is informational or interactive,
+  provide accessible names, fallback content, keyboard-operable DOM controls,
+  screen-reader summaries or a non-3D alternative.
+- Use Babylon.js accessibility-tree ideas as a reference pattern for DOM
+  mirroring, not as proof that a canvas UI is accessible without verification.
+
+Library selection policy:
+
+- Use a model-viewer web component before custom Three.js when the need is only
+  embedded product/object/AR viewing with camera controls, poster/loading
+  behavior and responsive layout.
+- Use React Three Fiber for React/Next.js, TresJS for Vue/Nuxt and Threlte for
+  Svelte when the host framework should own component lifecycle and state.
+- Use PixiJS when the requirement is high-performance 2D WebGL/WebGPU graphics,
+  effects, interface animation or visualization rather than 3D.
+- Consider PlayCanvas or Babylon.js only when their engine/editor/UI,
+  web-component or accessibility model is a better fit than a thin Three.js
+  scene.
+
 If an MCP/devtools bridge is proposed for the scene, treat it as an optional
 debug or scene-inspection connector. It must go through MCP connector selection,
 scope narrowing and approval. Do not expose broad scene mutation tools by
@@ -296,7 +379,11 @@ For 3D interfaces, record:
 - asset source and licensing policy;
 - texture/model loading policy;
 - performance target: FPS, memory, asset size and mobile constraints;
+- canvas layout and DPR policy;
+- render loop policy: continuous, on-demand or mixed;
+- DOM/WebGL synchronization plan for labels, text and controls;
 - 3D MCP/debug connector: none, candidate, selected or blocked;
+- accessibility/fallback plan for canvas and 3D content;
 - screenshot/canvas verification plan;
 - non-3D fallback.
 
@@ -316,6 +403,13 @@ Block or downgrade rich UI when:
   explicit frontend adapter and user-facing reason.
 - a 3D layer is selected without a concrete user task, performance budget,
   fallback and rendering verification plan.
+- a full custom Three.js/R3F scene is selected when a simple model-viewer
+  component would satisfy the workflow.
+- a page creates many WebGL contexts for repeated cards/sections instead of a
+  single-context multi-view pattern.
+- meaningful UI text or controls exist only as canvas pixels without accessible
+  DOM/fallback coverage.
+- a static scene renders continuously without a power/performance reason.
 - account/rate-limit telemetry is selected without an app-server-backed
   integration or with a plan to read undocumented local auth/workspace state.
 

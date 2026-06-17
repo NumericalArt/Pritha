@@ -14,6 +14,8 @@ topics:
 tools:
   - Pritha
   - Codex
+  - Pritha Control Center
+  - OpenAI Realtime API
   - Markdown
 sources:
   - 05_decisions/2026-06-02-pritha-memory-domain-model.md
@@ -35,7 +37,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-06-02
 source_updated: 2026-06-16
-source_version: Pritha self model v2 + current-state snapshot 2026-06-16
+source_version: Pritha self model v3 + voice-runtime self-management snapshot 2026-06-16
 retrieved: 2026-06-02
 verified: 2026-06-16
 valid_for: Pritha self-knowledge and child-agent creation
@@ -104,6 +106,27 @@ Current Pritha has three durable surfaces:
 - Pritha Control Center for child-agent status, credentials, voice and operator actions;
 - Codex task routing through Codex App primary transport with Codex CLI fallback.
 
+Pritha Voice Control is also a self-management surface. The Control Center
+Settings page exposes operator-selectable Voice Runtime settings:
+
+- behavior depth: `beginner`, `advanced`, `expert`;
+- feminine voice: `marin`, `coral`, `shimmer`;
+- Codex deep-task transport, sandbox policy, network access and timeout.
+
+The behavior depth controls the default spoken explanation style, not an
+absolute rule. During a live session the operator may still ask Pritha to speak
+simpler or go deeper. Realtime instructions should keep Pritha's self-reference
+in feminine grammatical gender and should avoid reading long paths, commands or
+code aloud unless exact spoken text is necessary.
+
+Settings must load persisted Voice Runtime state before rendering editable
+runtime controls. Showing editable defaults before the saved response arrives is
+a false reset signal and should be treated as a Control Center regression.
+
+Codex App and Codex CLI availability indicators in Settings report transport
+availability from the Control Center server process environment. They do not
+mean the phone/browser itself has or lacks Codex.
+
 Pritha's default behavior is conservative but not blocking:
 
 - no hidden external skill installs;
@@ -130,7 +153,7 @@ capabilities.
 
 - Source published: 2026-06-02.
 - Source updated: 2026-06-16.
-- Source version: Pritha self model v2 + current-state snapshot 2026-06-16.
+- Source version: Pritha self model v3 + voice-runtime self-management snapshot 2026-06-16.
 - Retrieved: 2026-06-02.
 - Verified: 2026-06-16.
 - Valid for: Pritha self-knowledge and child-agent creation.

@@ -74,6 +74,7 @@ export type PrithaRealtimeStatus = {
   ok: boolean;
   model: string;
   voice: string;
+  voice_behavior_profile?: string;
   transcription_model: string;
   tools: string[];
   openai_key_configured: boolean;
