@@ -642,7 +642,7 @@ export type ControlCenterRestorePlan = {
   requiresConfirmation: true;
   target: {
     folderName: string;
-    relativeToTechscope: string;
+    relativeToPritha: string;
     willCreateFolder: boolean;
     willOverwriteExistingFolder: false;
   };

@@ -865,7 +865,8 @@ function defaultSecretLabel(name: string) {
     ANTHROPIC: "Anthropic",
     WHATSAPP: "WhatsApp",
   };
-  return name
+  const displayName = name.replace(/^TECHSCOPE_TELEGRAM_/, "TELEGRAM_").replace(/^TECHSCOPE_/, "");
+  return displayName
     .split("_")
     .map((part) => acronyms[part] || part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
@@ -1796,7 +1797,7 @@ export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
   const root = resolveTechscopeRoot();
   const registry = parseRegistry(root);
   const allAgents = await Promise.all(registry.records.map((record) => buildAgent(root, record)));
-  const childAgents = allAgents.filter((agent) => agent.name !== "Techscope");
+  const childAgents = allAgents.filter((agent) => agent.name !== "Techscope" && agent.name !== "Pritha");
   const voiceRuntime = getPrithaRealtimeStatus();
   const caps = capabilities(root, registry.records.length > 0, childAgents, voiceRuntime);
   const access = accessLinks();
@@ -1854,6 +1855,13 @@ export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
     latestReports: latestReports(root),
     operatorActivity: readOperatorActionAuditEntries(root, 8).entries,
     warnings,
+  };
+}
+
+export function controlCenterStatusForClient(status: ControlCenterStatus): ControlCenterStatus {
+  return {
+    ...status,
+    allRegistryAgents: [],
   };
 }
 
@@ -2039,7 +2047,7 @@ export async function getAgentRestorePlan(agentId: string): Promise<ControlCente
     requiresConfirmation: true,
     target: {
       folderName,
-      relativeToTechscope: `../${folderName}`,
+      relativeToPritha: `../${folderName}`,
       willCreateFolder: agent.folder.status === "missing",
       willOverwriteExistingFolder: false,
     },
@@ -3380,7 +3388,7 @@ function validateSnapshotMetadataFile(root: string, agent: ControlCenterAgent, f
   if (!json.created_at && !json.created) errors.push("created_at is required");
   if (json.source_profile !== agent.lifecycle.profile.path) errors.push(`source_profile must be ${agent.lifecycle.profile.path || "defined"}`);
   if (!json.source_contract) errors.push("source_contract is required");
-  if (json.source_contract && !existsSync(path.join(root, json.source_contract))) warnings.push(`source_contract does not exist in Techscope: ${json.source_contract}`);
+  if (json.source_contract && !existsSync(path.join(root, json.source_contract))) warnings.push(`source_contract does not exist in Pritha: ${json.source_contract}`);
   if (!json.agent_folder) errors.push("agent_folder is required");
   if (json.restore?.requires_confirmation !== true) errors.push("restore.requires_confirmation must be true");
   if (json.restore?.overwrite_existing_folder !== false) errors.push("restore.overwrite_existing_folder must be false");
@@ -3626,7 +3634,7 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
   }));
 
   return {
-    status,
+    status: controlCenterStatusForClient(status),
     modules: moduleList(status),
     registry: status.allRegistryAgents.map(agentToRegistryRow),
     folders: status.childAgents.map(agentToFolderRow),

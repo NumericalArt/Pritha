@@ -1,6 +1,6 @@
 import { AgentsOperatorExperience } from "@/components/agents/AgentsOperatorExperience";
 import type { AgentCardModel, AgentIconType } from "@/data/mockAgents";
-import { getControlCenterStatus } from "@/lib/control-center/server";
+import { controlCenterStatusForClient, getControlCenterStatus } from "@/lib/control-center/server";
 import type { ControlCenterAgent } from "@/lib/control-center/types";
 
 export const dynamic = "force-dynamic";
@@ -68,5 +68,5 @@ export default async function AgentsPage() {
   const status = await getControlCenterStatus();
   const agents = status.childAgents.map(toCardAgent);
 
-  return <AgentsOperatorExperience status={status} agents={agents} />;
+  return <AgentsOperatorExperience status={controlCenterStatusForClient(status)} agents={agents} />;
 }

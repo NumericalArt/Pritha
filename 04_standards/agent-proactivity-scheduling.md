@@ -3,20 +3,28 @@ id: agent-proactivity-scheduling
 type: standard
 status: draft
 created: 2026-06-02
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-06-20
+last_reviewed: 2026-06-20
 owner: Techscope/user
 topics:
   - agent-engineering
   - proactivity
   - scheduling
+  - agent-loops
   - cron
   - heartbeat
+  - hooks
+  - goal-loops
   - durable-execution
   - memory-safety
   - observability
 tools:
   - Pritha
+  - Codex
+  - Claude Code
+  - Agent Skills
+  - MCP
+  - Git worktree
   - ChatGPT Tasks
   - Kubernetes CronJob
   - Cloudflare Agents
@@ -36,9 +44,16 @@ sources:
   - https://temporal.io/blog/orchestrating-ambient-agents-with-temporal
   - https://trigger.dev/docs/tasks/scheduled
   - https://betterstack.com/community/guides/monitoring/what-is-cron-monitoring/
+  - 01_sources/notes/2026-06-20-ai-agent-loops-video-source-note.md
+  - 01_sources/notes/2026-06-20-addy-osmani-loop-engineering-source-note.md
+  - 03_reviews/2026-06-20-agent-loop-design-assessment.md
+  - https://developers.openai.com/codex/codex-manual.md
+  - https://docs.anthropic.com/en/docs/claude-code/overview
+  - https://docs.anthropic.com/en/docs/claude-code/hooks-guide
 related:
   reviews:
     - 03_reviews/2026-06-02-agent-scheduling-heartbeat-source-batch-review.md
+    - 03_reviews/2026-06-20-agent-loop-design-assessment.md
   standards:
     - 04_standards/agent-creation-harness.md
     - 04_standards/agent-team-operating-model.md
@@ -49,10 +64,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2023-11-23
-source_updated: 2026-06-02
-source_version: Pritha proactivity scheduling standard v1; source batch verified 2026-06-02
+source_updated: 2026-06-20
+source_version: Pritha proactivity scheduling standard v2; scheduling source batch verified 2026-06-02; loop-design sources verified 2026-06-20
 retrieved: 2026-06-02
-verified: 2026-06-02
+verified: 2026-06-20
 valid_for: Pritha-created agents with scheduled, heartbeat, queue-watcher or proactive behavior
 temporal_status: current
 ---
@@ -61,7 +76,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-02
+Last reviewed: 2026-06-20
 
 ## Rule
 
@@ -133,6 +148,31 @@ Every proactive or scheduled agent must record:
 - kill switch and pause/delete command;
 - human approval gates.
 
+## Loop Preflight
+
+Before any loop touches production, define and test the loop contract manually.
+
+Every loop must record:
+
+- trigger type: heartbeat, cron/scheduled, hook/event, goal, queue-watcher or
+  durable workflow;
+- purpose and expected artifact;
+- run context: local project, background worktree, cloud routine, thread
+  automation or external scheduler;
+- worktree/isolation policy;
+- selected skills or procedural memory;
+- selected plugins/connectors and their auth scope;
+- subagent policy: none, verifier-only, bounded parallel workers or specialist
+  team;
+- state store: Markdown file, task tracker, queue, database or other durable
+  memory outside the model context;
+- stop condition and blocked condition;
+- cost/token/tool budget per run;
+- human-readable run summary and review path.
+
+Do not schedule a loop until the same prompt or workflow has succeeded manually
+at least once with reviewable output.
+
 ## Memory Safety
 
 Heartbeat and scheduled jobs must not write directly to long-term memory from
@@ -173,6 +213,22 @@ Use heartbeat only for sensing:
 Heartbeat should run deterministic checks before model work and should stop
 cleanly when no work is needed.
 
+## Hooks And Goals
+
+Use hooks for lifecycle or event-driven enforcement where the trigger is clear:
+tool call, session event, external webhook, PR event or similar. Hooks should
+prefer deterministic checks before model work.
+
+Use goal loops only when completion can be verified by tests, artifacts,
+external state or an explicit blocker report. Goal loops need precise success
+criteria, boundaries, budgets and a pause/clear path. Weak goal criteria are a
+cost risk because the agent can keep iterating without producing better
+evidence.
+
+Use subagents inside loops only when they reduce context/tool sprawl or create
+a useful maker/checker split. Parallel subagents are not a default; they burn
+tokens and need bounded prompts plus summarized outputs.
+
 ## Durable Workflow Rule
 
 If the job is multi-step, externally stateful, expensive, failure-prone or needs
@@ -195,6 +251,14 @@ Every scheduled module should expose:
 For Pritha scaffolds, these can be placeholders until a scheduler is selected,
 but selected scheduler modules must not be marked ready without these surfaces.
 
+## Comprehension Debt
+
+A loop can produce code, tickets, reports or notifications faster than the user
+understands them. Every recurring loop must preserve a short human-readable run
+summary: what it checked, what it changed, what evidence passed, what remains
+open and what needs human judgment. Automated completion is not a substitute
+for ownership.
+
 ## Defaults
 
 - Proactive mode: `none` or `manual`.
@@ -208,19 +272,20 @@ but selected scheduler modules must not be marked ready without these surfaces.
 ## Temporal Validity
 
 - Source published: 2023-11-23 through 2026-05-22.
-- Source updated: 2026-06-02.
-- Source version: Pritha proactivity scheduling standard v1; source batch
-  verified 2026-06-02.
+- Source updated: 2026-06-20.
+- Source version: Pritha proactivity scheduling standard v2; scheduling source
+  batch verified 2026-06-02; loop-design sources verified 2026-06-20.
 - Retrieved: 2026-06-02.
-- Verified: 2026-06-02.
+- Verified: 2026-06-20.
 - Valid for: Pritha-created agents with scheduled, heartbeat, queue-watcher or
   proactive behavior.
 - Freshness status: current.
 - Temporal status: current.
-- Recheck when: ChatGPT Tasks, Kubernetes CronJob, Cloudflare Agents,
-  OpenClaw, Temporal, Trigger.dev or heartbeat-memory security research changes
-  scheduling semantics, persistence, concurrency, feature limits or memory
-  safety guidance.
+- Recheck when: Codex automations/goals/subagents, Claude Code routines/hooks,
+  ChatGPT Tasks, Kubernetes CronJob, Cloudflare Agents, OpenClaw, Temporal,
+  Trigger.dev or heartbeat-memory security research changes scheduling
+  semantics, persistence, concurrency, feature limits or memory safety
+  guidance.
 
 ## Related Decisions
 

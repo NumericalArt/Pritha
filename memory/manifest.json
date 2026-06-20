@@ -1,6 +1,6 @@
 {
-  "agent": "Techscope",
-  "generated_by": "TechScope canonical-root migration",
+  "agent": "Pritha",
+  "generated_by": "Pritha rename hygiene migration",
   "profile": "portable-full-memory-snapshot",
   "canonical_authored_knowledge": "Markdown artifacts in 00_inbox, 01_sources, 02_briefs, 03_reviews, 04_standards, 05_decisions, 07_workflows, 10_wiki and 11_agents",
   "portable_snapshot": [

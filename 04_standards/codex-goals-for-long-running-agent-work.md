@@ -3,8 +3,8 @@ id: codex-goals-for-long-running-agent-work
 type: standard
 status: draft
 created: 2026-05-21
-updated: 2026-05-21
-last_reviewed: 2026-05-21
+updated: 2026-06-20
+last_reviewed: 2026-06-20
 owner: Techscope/user
 topics:
   - codex
@@ -30,12 +30,17 @@ config_surfaces:
 portability: codex-native
 sources:
   - 00_inbox/links/2026-05-21-openai-codex-goals-intake.md
+  - 01_sources/notes/2026-06-20-openai-codex-goals-source-note.md
   - 03_reviews/2026-05-21-openai-codex-goals-assessment.md
   - https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex
+  - https://developers.openai.com/codex/codex-manual.md
+  - https://github.com/openai/openai-cookbook/commit/9b4e6279edd4dceb6b4b7da582482a7c882f7544
 related:
   decisions: []
   reviews:
     - 03_reviews/2026-05-21-openai-codex-goals-assessment.md
+  source_notes:
+    - 01_sources/notes/2026-06-20-openai-codex-goals-source-note.md
   briefs: []
   workflows:
     - 07_workflows/agents-mother.md
@@ -44,11 +49,11 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-09
-source_updated: 2026-05-09
-source_version: OpenAI Cookbook page, observed 2026-05-21; Codex Goals available from Codex 0.128.0 according to source
+source_updated: 2026-05-13
+source_version: OpenAI Cookbook page published 2026-05-09; source notebook commit 9b4e6279edd4dceb6b4b7da582482a7c882f7544 on 2026-05-13; Codex manual fetched 2026-06-20; Codex Goals available from Codex 0.128.0 according to source
 retrieved: 2026-05-21
-verified: 2026-05-21
-valid_for: Techscope Codex workflows on builds supporting Goals from 0.128.0 onward
+verified: 2026-06-20
+valid_for: Techscope Codex workflows on builds supporting Goals from 0.128.0 onward and current Codex app/IDE/CLI Goal mode docs checked on 2026-06-20
 temporal_status: current
 ---
 
@@ -56,13 +61,15 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-05-21
+Last reviewed: 2026-06-20
 
 ## Rule
 
 Use Codex Goals for long-running Codex work when the desired outcome is clear, evidence can verify completion, and the path to completion may require several turns of investigation or repair.
 
 A Goal is not a bigger prompt. It is a thread-scoped completion contract: outcome, evidence, constraints, boundaries, iteration policy and blocked stop condition.
+
+Goal state belongs to the active Codex thread. It is not global memory, not a replacement for `AGENTS.md`, and not a project-level standing instruction.
 
 ## Use when
 
@@ -82,6 +89,17 @@ A Goal is not a bigger prompt. It is a thread-scoped completion contract: outcom
 - the evidence source is unavailable and no proxy evidence standard is defined;
 - the work needs fresh user decisions at each step;
 - the Codex build does not support Goals.
+- the operating contract is longer than `/goal` should carry directly; put long instructions in a file and point the Goal at it.
+
+## Command surface and scope
+
+- Use `/goal <objective>` to set the current thread's Goal.
+- Use `/goal` to view the current Goal.
+- Use `/goal pause`, `/goal resume` and `/goal clear` to manage lifecycle from the CLI command surface.
+- In the Codex app, use the Goal progress controls above the composer when available.
+- If `/goal` is not visible, official Codex docs currently document `features.goals` in `config.toml` and `codex features enable goals` as enablement paths.
+- Goal objectives must be non-empty and, in the current CLI docs, no longer than 4,000 characters.
+- Use `/plan` first when the outcome needs shaping before activating a Goal.
 
 ## Required Goal shape
 
@@ -145,11 +163,11 @@ Do not mark a Goal complete because the output looks plausible. Completion requi
 ## Temporal validity
 
 - Source published: 2026-05-09.
-- Source updated: 2026-05-09.
-- Source version: OpenAI Cookbook page, observed 2026-05-21; Codex Goals available from Codex 0.128.0 according to source.
+- Source updated: 2026-05-13.
+- Source version: OpenAI Cookbook page published 2026-05-09; source notebook commit `9b4e6279edd4dceb6b4b7da582482a7c882f7544` on 2026-05-13; Codex manual fetched 2026-06-20; Codex Goals available from Codex 0.128.0 according to source.
 - Retrieved: 2026-05-21.
-- Verified: 2026-05-21.
-- Valid for: Techscope Codex workflows on builds supporting Goals from 0.128.0 onward.
+- Verified: 2026-06-20.
+- Valid for: Techscope Codex workflows on builds supporting Goals from 0.128.0 onward and current Codex app/IDE/CLI Goal mode docs checked on 2026-06-20.
 - Freshness status: current.
 - Temporal status: current.
 - Recheck when: Codex changes Goal command syntax, lifecycle behavior, budget handling, continuation policy or availability in app/CLI.
@@ -157,5 +175,6 @@ Do not mark a Goal complete because the output looks plausible. Completion requi
 ## Related artifacts
 
 - `00_inbox/links/2026-05-21-openai-codex-goals-intake.md`
+- `01_sources/notes/2026-06-20-openai-codex-goals-source-note.md`
 - `03_reviews/2026-05-21-openai-codex-goals-assessment.md`
 - `04_standards/agent-creation-harness.md`

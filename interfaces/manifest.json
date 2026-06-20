@@ -1,6 +1,6 @@
 {
-  "agent": "Techscope",
-  "generated_by": "TechScope canonical-root migration",
+  "agent": "Pritha",
+  "generated_by": "Pritha rename hygiene migration",
   "primary_interface": "Codex project",
   "telegram_mode": "intake-channel",
   "adapters": [

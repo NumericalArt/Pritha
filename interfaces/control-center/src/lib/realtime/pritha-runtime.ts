@@ -1156,7 +1156,7 @@ const FILESYSTEM_TEXT_EXTENSIONS = new Set([
 function prithaFilesystemRoots(): FileSystemRoot[] {
   const root = resolveTechscopeRoot();
   return [
-    { id: "pritha", name: "Pritha / Techscope", kind: "pritha", directory: root, aliases: ["pritha", "techscope", "прита"] },
+    { id: "pritha", name: "Pritha", kind: "pritha", directory: root, aliases: ["pritha", "techscope", "прита"] },
     ...knownSiblingChildAgentProjects(root).map((project) => ({
       id: project.name,
       name: project.name,
@@ -1395,7 +1395,7 @@ async function handlePrithaFiles(args: PrithaFilesArgs = {}) {
       operation,
       policy: {
         read_only: true,
-        allowed_roots: "Pritha/Techscope root and sibling child-agent folders with AGENTS.md",
+        allowed_roots: "Pritha root and sibling child-agent folders with AGENTS.md",
         excluded: Array.from(FILESYSTEM_EXCLUDED_NAMES),
         file_limits: "text files only, max 700KB per read, max_chars capped",
       },
@@ -1415,7 +1415,7 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
       type: "function",
       name: "search_pritha_memory",
       description:
-        "Read-only access to Pritha/Techscope memory. Use operation=status, search, recent, open, or read. Use this before answering questions about Pritha standards, decisions, workflows, child agents, prior experiments, or stored project knowledge.",
+        "Read-only access to Pritha memory. Use operation=status, search, recent, open, or read. Use this before answering questions about Pritha standards, decisions, workflows, child agents, prior experiments, or stored project knowledge.",
       parameters: {
         type: "object",
         properties: {
@@ -1432,7 +1432,7 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
       type: "function",
       name: "deep_pritha_memory",
       description:
-        "Deep Pritha/Techscope memory operations. Use for semantic or hybrid retrieval, entity/graph traversal, runtime/task log lookup, confirmed reindexing, confirmed embedding rebuilds, and confirmed curated memory writes. Ask the operator how deep to search when uncertain.",
+        "Deep Pritha memory operations. Use for semantic or hybrid retrieval, entity/graph traversal, runtime/task log lookup, confirmed reindexing, confirmed embedding rebuilds, and confirmed curated memory writes. Ask the operator how deep to search when uncertain.",
       parameters: {
         type: "object",
         properties: {
@@ -1475,7 +1475,7 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
       type: "function",
       name: "inspect_pritha_files",
       description:
-        "Fast read-only filesystem inspection for Pritha/Techscope and sibling child-agent projects. Use for listing available agent projects, viewing folder trees, reading safe text files, checking file metadata, and searching filenames or text content without starting a Codex task.",
+        "Fast read-only filesystem inspection for Pritha and sibling child-agent projects. Use for listing available agent projects, viewing folder trees, reading safe text files, checking file metadata, and searching filenames or text content without starting a Codex task.",
       parameters: {
         type: "object",
         properties: {
@@ -1485,7 +1485,7 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
           },
           project: {
             type: "string",
-            description: "Project id/name/alias. Use pritha or techscope for the main project, or a child-agent name such as FESPA26, FunnyTeacher, or StupidJoke.",
+            description: "Project id/name/alias. Use pritha for the main project, or a child-agent name such as FESPA26, FunnyTeacher, or StupidJoke.",
           },
           path: {
             type: "string",
@@ -1531,7 +1531,7 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
       type: "function",
       name: "run_codex_task",
       description:
-        "Start or queue a Codex sidecar task in the current Techscope environment. Use for implementation, repo inspection, deep analysis, review, or internet/current-source research. Do not claim the task is complete unless the returned status says complete.",
+        "Start or queue a Codex sidecar task in the current Pritha environment. Use for implementation, repo inspection, deep analysis, review, or internet/current-source research. Do not claim the task is complete unless the returned status says complete.",
       parameters: {
         type: "object",
         properties: {
@@ -1560,7 +1560,7 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
 export function buildRealtimeInstructions() {
   const settings = getPrithaRuntimeSettings();
   return [
-    "You are Pritha, a Codex-native agent factory and Techscope knowledge assistant.",
+    "You are Pritha, a Codex-native agent factory and knowledge assistant.",
     "Speak with the operator in Russian unless they switch language.",
     "This is an experimental realtime voice interface. Keep answers concise, calm and operational.",
     "You have exactly five tools: search_pritha_memory, deep_pritha_memory, inspect_pritha_files, inspect_codex_task and run_codex_task.",
@@ -1576,7 +1576,7 @@ export function buildRealtimeInstructions() {
     "Use run_codex_task for implementation, codebase changes, deep repo analysis, reviews, or internet/current-source research. If internet is needed, set requires_internet=true; Codex handles web access.",
     "run_codex_task has one public tool surface but routes internally through the configured deep task transport. Codex App is the default primary transport; Codex CLI is the v1 fallback. A future session-contract transport is reserved but not active.",
     "Voice Control and Codex thread have the same implementation path through run_codex_task. Risky actions are not hard-blocked by voice; the runtime will hold service install, scheduler enablement, deployment, deletion, credential writes or danger-full-access requests as decision_required until the operator approves them in the UI task card.",
-    "For creating a new child agent or scaffold project, call run_codex_task with task_type=agent_creation and write_mode=workspace_write after the operator clearly requests that creation. Child-agent projects may be created as sibling folders next to Techscope according to AGENTS.md. Do not copy secrets, .env, private memory, runtime queues, logs or credentials.",
+    "For creating a new child agent or scaffold project, call run_codex_task with task_type=agent_creation and write_mode=workspace_write after the operator clearly requests that creation. Child-agent projects may be created as sibling folders next to Pritha according to AGENTS.md. Do not copy secrets, .env, private memory, runtime queues, logs or credentials.",
     "For ordinary implementation tasks, set task_type=implementation and write_mode=workspace_write only when the operator asked for code/file changes. Use read_only for analysis, review, research and status checks.",
     "When the operator asks to continue implementation work on an existing or newly created child-agent project, include the exact project/folder name in the task, call run_codex_task with task_type=implementation and write_mode=workspace_write; the runtime will add the matching sibling AGENTS.md project as a writable Codex root.",
     "Do not claim Codex work is complete after starting or queueing a task. Report the task id, status and next operator-visible path.",
@@ -2392,14 +2392,14 @@ function buildCodexPrompt(task: Record<string, unknown>) {
     .join(", ");
   return [
     "You are the Codex sidecar for Pritha Control Center realtime voice.",
-    "Work in the current Techscope repository and follow AGENTS.md.",
+    "Work in the current Pritha repository and follow AGENTS.md.",
     "Return a concise non-empty final result for the voice operator. Do not expose secrets.",
     "If the task needs current internet facts, browse or use available network-capable tools through Codex.",
     "For write/system-change requests, make only narrowly scoped changes and report verification.",
-    "If task_type is agent_creation, you may create a new sibling child-agent project folder next to Techscope when the task asks for it. Use the parent directory from the task payload as the sibling-agent parent. Follow AGENTS.md, create the required contract/scaffold/report artifacts, and do not copy secrets, .env, private memory, queues, logs or credentials.",
+    "If task_type is agent_creation, you may create a new sibling child-agent project folder next to Pritha when the task asks for it. Use the parent directory from the task payload as the sibling-agent parent. Follow AGENTS.md, create the required contract/scaffold/report artifacts, and do not copy secrets, .env, private memory, queues, logs or credentials.",
     "Do not modify unrelated sibling projects in the sibling-agent parent. Use that parent only to create or update the child-agent project requested by the operator.",
     childAgentList
-      ? `Existing sibling child-agent projects with AGENTS.md: ${childAgentList}. If the task explicitly asks to work on one of them, use that sibling project and keep edits inside it unless the operator separately asks for Techscope or Control Center changes.`
+      ? `Existing sibling child-agent projects with AGENTS.md: ${childAgentList}. If the task explicitly asks to work on one of them, use that sibling project and keep edits inside it unless the operator separately asks for Pritha or Control Center changes.`
       : "If the task explicitly asks to work on an existing sibling child-agent project but no matching sibling AGENTS.md project is available, report the missing writable project as the blocker.",
     "If the active sandbox is read-only and the task needs writes, report the blocker instead of pretending the files were changed.",
     "Do not publish, delete, install services, change launchd/cron, or make broad deployment changes unless this task payload includes an approved UI decision gate.",
@@ -2441,10 +2441,10 @@ function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodex
     taskType: normalizeCodexTaskType(task.task_type),
     userIntent: compactText(task.task || "", 8_000),
     projectContext: {
-      project: "Techscope",
+      project: "Pritha",
       cwd: root,
       interface: "realtime",
-      focus: ["Pritha", "Techscope", "Control Center", "child agents", "memory", "voice control"],
+      focus: ["Pritha", "Control Center", "child agents", "memory", "voice control"],
     },
     data: {
       source: "pritha-control-center-realtime",
@@ -2458,7 +2458,7 @@ function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodex
     },
     constraints: [
       "Do not expose secrets, .env values, credentials, private memory, runtime queues, or unnecessary raw logs.",
-      "Use the existing Techscope and Pritha Control Center conventions.",
+      "Use the existing Pritha and Control Center conventions.",
       "For write/system-change tasks, make narrowly scoped changes and report changed files plus verification.",
       "For agent_creation tasks, create or update sibling child-agent projects only when explicitly requested by the operator.",
       String(task.requires_internet) === "true" || Boolean(task.requires_internet)
@@ -2986,9 +2986,9 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
       task.status === "decision_required"
         ? "Codex task is waiting for explicit approval in the Pritha UI task card."
         : effectiveTransport === "codex-app"
-        ? "Codex App sidecar started in the local Techscope environment."
+        ? "Codex App sidecar started in the local Pritha environment."
         : effectiveTransport === "codex-cli"
-          ? "Codex CLI sidecar started in the local Techscope environment."
+          ? "Codex CLI sidecar started in the local Pritha environment."
           : "Task captured in private local queue because Codex transports are unavailable or disabled.",
   };
 }

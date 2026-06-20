@@ -3,7 +3,7 @@
 Status: experimental.
 
 This is the new local web UI for Pritha. It is intentionally isolated from the
-legacy Techscope web UI and from the current voice experiment while the control
+legacy web UI and from the current voice experiment while the control
 center design is being rebuilt.
 
 ## Routes
@@ -36,7 +36,7 @@ Default local URL:
 http://127.0.0.1:3420/agents
 ```
 
-The app defaults to `3420` to avoid colliding with the existing Techscope web UI
+The app defaults to `3420` to avoid colliding with the existing legacy web UI
 on `3000`.
 
 Do not expose `next dev` through Tailscale. The dev client can render the page

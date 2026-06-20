@@ -8,7 +8,7 @@ export type PrithaCodexTaskPayload = {
   taskType: PrithaCodexTaskType;
   userIntent: string;
   projectContext: {
-    project: "Techscope";
+    project: "Pritha";
     cwd: string;
     interface: "realtime";
     focus: string[];

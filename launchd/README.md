@@ -1,7 +1,11 @@
-# Techscope launchd templates
+# Pritha launchd templates
 
 The plist files in this directory are portable templates. They intentionally
 contain placeholders instead of machine-specific paths.
+
+The current public project name is Pritha. Existing launchd labels and
+`TECHSCOPE_ROOT` placeholders remain as compatibility contracts for already
+installed local services.
 
 Before installing a service, copy the plist to `~/Library/LaunchAgents/` and
 replace:
