@@ -4,7 +4,7 @@
   "status": "experimental",
   "created": "2026-06-02",
   "updated": "2026-06-02",
-  "owner": "Techscope/Pritha",
+  "owner": "Pritha",
   "purpose": "Browser voice interface for talking with Pritha through OpenAI Realtime while exposing narrow memory and Codex handoff tools.",
   "runtime": {
     "server": "node",

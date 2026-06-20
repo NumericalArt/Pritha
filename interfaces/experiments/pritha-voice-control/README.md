@@ -10,7 +10,7 @@ OpenAI Realtime API through WebRTC and exposes only narrow server tools:
 - `read_pritha_artifact`
 - `queue_codex_task`
 
-The voice model can read Pritha/Techscope memory and can hand complex work to
+The voice model can read Pritha memory and can hand complex work to
 Codex. It does not receive direct filesystem, shell, deployment or web browsing
 power. Internet research is routed through Codex task handoff with
 `requires_internet=true`.

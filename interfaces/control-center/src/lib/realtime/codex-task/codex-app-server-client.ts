@@ -419,7 +419,7 @@ export function checkCodexAppServerAvailable(codexBin: string, cwd: string) {
 function buildPrompt(payload: PrithaCodexTaskPayload) {
   return [
     "You are the Codex App control thread for Pritha Control Center realtime voice.",
-    "Complete the task using the current Techscope workspace and the evidence in the payload.",
+    "Complete the task using the current Pritha workspace and the evidence in the payload.",
     "Return JSON only. The final response must match the provided output schema.",
     "Put task-specific structured payload into data.structuredJson as a JSON string.",
     "",
@@ -427,7 +427,7 @@ function buildPrompt(payload: PrithaCodexTaskPayload) {
     "- Do not expose secrets, tokens, credentials, private memory, runtime queues, or unnecessary raw logs.",
     "- For system_change and implementation tasks, make narrowly scoped code/config/documentation changes and report changed files plus verification.",
     "- For analysis, research, review, and read-only tasks, inspect without changing files unless the payload explicitly grants workspace write.",
-    "- For agent_creation tasks, sibling child-agent projects may be created next to Techscope only when requested by the operator.",
+    "- For agent_creation tasks, sibling child-agent projects may be created next to Pritha only when requested by the operator.",
     "- If evidence is insufficient, return status=error with a concise explanation and next required data.",
     "",
     "Output schema:",

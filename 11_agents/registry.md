@@ -47,7 +47,7 @@ source_updated: 2026-06-12
 source_version: generated registry 2026-06-12
 retrieved: 2026-06-12
 verified: 2026-06-12
-valid_for: current TechScope Agents Mother lifecycle
+valid_for: current Pritha Agents Mother lifecycle
 temporal_status: current
 ---
 
@@ -71,7 +71,7 @@ Status: active
 | Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:1 handoff:0 ops:1 deploy:2 evolve:3 |
 | Pritha Claude Code Adapter | define a future adapter that can translate selected Pritha/Codex-native descendant scaffolds into Claude Code-compatible | environment-specific | CLI / Telegram none | none | none | contracts:1 scaffold:0 test:0 handoff:0 ops:0 deploy:0 evolve:0 |
 | StupidJoke | provide a small, safe, low-stakes joke agent that can ingest user-provided joke fixtures, reject unsafe material, and an | codex-native | Codex project plus CLI healthcheck for v1. / Telegram none | local Mac. | manual | contracts:1 scaffold:2 test:1 handoff:0 ops:0 deploy:0 evolve:1 |
-| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:24 deploy:0 evolve:1 |
+| Pritha | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:24 deploy:0 evolve:1 |
 
 ## Recent Reports
 

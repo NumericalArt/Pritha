@@ -1,10 +1,10 @@
 import { MobileShell } from "./MobileShell";
 import { Sidebar } from "./Sidebar";
 import { PrithaRealtimeProvider } from "@/components/voice/usePrithaRealtime";
-import { getControlCenterStatus } from "@/lib/control-center/server";
+import { controlCenterStatusForClient, getControlCenterStatus } from "@/lib/control-center/server";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const initialStatus = await getControlCenterStatus();
+  const initialStatus = controlCenterStatusForClient(await getControlCenterStatus());
 
   return (
     <PrithaRealtimeProvider>

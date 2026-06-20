@@ -242,7 +242,7 @@ function codexTimeoutMs() {
 function buildCodexPrompt(task) {
   return [
     "You are the Codex sidecar for the Pritha voice-control experiment.",
-    "Work in the current Techscope repository and follow AGENTS.md.",
+    "Work in the current Pritha repository and follow AGENTS.md.",
     "Return a concise non-empty final result for the voice operator. Do not expose secrets.",
     "If the task needs current internet facts, browse or use available network-capable tools through Codex.",
     "For write/system-change requests, make only narrowly scoped changes and report verification.",
@@ -408,7 +408,7 @@ export function realtimeTools() {
       type: "function",
       name: "get_pritha_status",
       description:
-        "Read current Pritha/Techscope memory status, recent artifacts, open draft items, and voice experiment readiness. This is read-only.",
+        "Read current Pritha memory status, recent artifacts, open draft items, and voice experiment readiness. This is read-only.",
       parameters: {
         type: "object",
         properties: {
@@ -421,7 +421,7 @@ export function realtimeTools() {
       type: "function",
       name: "search_pritha_memory",
       description:
-        "Search Pritha/Techscope curated Markdown memory. Use this before answering questions about Pritha standards, decisions, agents, workflows, previous experiments, or stored knowledge. This is read-only.",
+        "Search Pritha curated Markdown memory. Use this before answering questions about Pritha standards, decisions, agents, workflows, previous experiments, or stored knowledge. This is read-only.",
       parameters: {
         type: "object",
         properties: {
@@ -436,7 +436,7 @@ export function realtimeTools() {
       type: "function",
       name: "read_pritha_artifact",
       description:
-        "Read one curated Techscope/Pritha artifact by document id or repository-relative path after memory search found it. This is read-only.",
+        "Read one curated Pritha artifact by document id or repository-relative path after memory search found it. This is read-only.",
       parameters: {
         type: "object",
         properties: {
@@ -450,7 +450,7 @@ export function realtimeTools() {
       type: "function",
       name: "queue_codex_task",
       description:
-        "Hand off a complex task to Codex in the current Techscope environment. Use for implementation, research with internet access, repo inspection, or deep analysis that should not be done inside the voice model. By default this writes a private task request; if TECHSCOPE_VOICE_CODEX_MODE=exec it starts a local Codex sidecar.",
+        "Hand off a complex task to Codex in the current Pritha environment. Use for implementation, research with internet access, repo inspection, or deep analysis that should not be done inside the voice model. By default this writes a private task request; if TECHSCOPE_VOICE_CODEX_MODE=exec it starts a local Codex sidecar.",
       parameters: {
         type: "object",
         properties: {
@@ -472,10 +472,10 @@ export function realtimeTools() {
 
 export function buildRealtimeInstructions() {
   return [
-    "You are Pritha, a Codex-native agent factory and Techscope knowledge assistant.",
+    "You are Pritha, a Codex-native agent factory and knowledge assistant.",
     "Speak with the operator in Russian unless they switch language.",
     "This is an experimental voice interface. Keep answers concise and conversational.",
-    "Use search_pritha_memory before answering questions about Pritha, Techscope memory, standards, decisions, workflows, previous agents, or stored project knowledge.",
+    "Use search_pritha_memory before answering questions about Pritha memory, standards, decisions, workflows, previous agents, or stored project knowledge.",
     "Use read_pritha_artifact when a search result needs exact details.",
     "Use queue_codex_task for implementation, codebase changes, deep repo analysis, or internet/current-source research. If internet is needed, set requires_internet=true; Codex handles the web side.",
     "Do not claim Codex work is complete after queueing or starting a task. Report the task id and status.",

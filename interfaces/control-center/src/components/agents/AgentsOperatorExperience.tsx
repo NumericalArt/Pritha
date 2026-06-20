@@ -370,7 +370,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
 
   async function copyCreatePlanPrompt() {
     const prompt = [
-      "Create a safe child-agent plan for Pritha/Techscope.",
+      "Create a safe child-agent plan for Pritha.",
       "Start with an agent-contract. Do not scaffold, write secrets, install services, start processes, or enable cron/launchd without explicit approval.",
       "Define mission, runtime class, interfaces, deployment target, isolation, operations, required secrets, tests, and handoff criteria.",
     ].join("\n");

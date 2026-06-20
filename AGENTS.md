@@ -58,7 +58,7 @@ Retention: source-purged
 
 Не зашивать абсолютные user-specific пути в исполняемые скрипты, launchd-шаблоны, manifest-файлы и generated scaffold. Исторические Markdown-артефакты могут содержать старые пути как контекст миграций, но не должны быть источником runtime-конфигурации.
 
-Все новые агенты, создаваемые Pritha, должны размещаться соседними папками рядом с корнем Pritha/Techscope, если пользователь явно не указал другой путь. Это позволяет держать Pritha и созданных агентов на одном уровне:
+Все новые агенты, создаваемые Pritha, должны размещаться соседними папками рядом с корнем Pritha, если пользователь явно не указал другой путь. Legacy `TECHSCOPE_ROOT` остается совместимым способом найти этот корень. Это позволяет держать Pritha и созданных агентов на одном уровне:
 
 - `<parent-of-TECHSCOPE_ROOT>/Pritha` — агент-копилка и фабрика агентов;
 - `<parent-of-TECHSCOPE_ROOT>/<agent-name>` — отдельный создаваемый или анализируемый агент;
@@ -67,7 +67,7 @@ Retention: source-purged
 Если checkout еще называется `Techscope`, это считается миграционным состоянием
 совместимости, а не новым публичным именем проекта.
 
-Не копировать в новых агентов секреты, `.env`, токены, приватные credentials, пользовательские данные, `.queue`, `.memory`, `.logs` или внутреннее состояние Techscope без отдельного явного решения.
+Не копировать в новых агентов секреты, `.env`, токены, приватные credentials, пользовательские данные, `.queue`, `.memory`, `.logs` или внутреннее состояние Pritha без отдельного явного решения.
 
 ## Главный рабочий цикл
 
@@ -77,7 +77,7 @@ Retention: source-purged
 4. При необходимости проверить свежесть и первоисточники через интернет.
 5. Сравнить материал с уже сохраненными артефактами по тем же topics/tools.
 6. Явно определить, подтверждает ли новая информация старые выводы, уточняет их, противоречит им или делает их устаревшими.
-7. Создать `signal` draft и для значимых материалов выполнить Codex-assisted refinement в текущем Techscope thread.
+7. Создать `signal` draft и для значимых материалов выполнить Codex-assisted refinement в текущем Pritha/Codex thread.
 8. Обсудить материал с релевантными экспертными ролями из `06_subagents/`.
 9. Сравнить идею с существующими стандартами в `04_standards/` и решениями в `05_decisions/`.
 10. Сформировать один из результатов:
@@ -203,7 +203,7 @@ Markdown-файлы являются canonical authored knowledge, но GitHub s
 
 ## Agents Mother
 
-Techscope может создавать и развивать новых агентов по техническому заданию пользователя. Перед созданием нового агента обязательно оформить `agent-contract`: назначение, пользователь, функции v1, отложенные функции, runtime family, интерфейс, deployment target, модель проактивности, память, инструменты, права доступа, секреты, тесты, критерии готовности и план обучения пользователя.
+Pritha может создавать и развивать новых агентов по техническому заданию пользователя. Перед созданием нового агента обязательно оформить `agent-contract`: назначение, пользователь, функции v1, отложенные функции, runtime family, интерфейс, deployment target, модель проактивности, память, инструменты, права доступа, секреты, тесты, критерии готовности и план обучения пользователя.
 
 Scaffold допускается только из `agent-contract` со статусом `accepted`.
 Экспериментальный scaffold из `draft` возможен только с явным
@@ -239,7 +239,7 @@ runtime, модели, deployment или внешние интеграции м�
 
 Предпочтительный путь реализации для v1: `codex-native` агент в соседней папке `<parent-of-TECHSCOPE_ROOT>/<agent-name>` с опциональным Telegram-интерфейсом. Telegram считается interface adapter, а не обязательной частью каждого агента.
 
-Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Techscope.
+Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Pritha.
 
 Каждый generated child `AGENTS.md` должен содержать harness evolution protocol:
 при любой доработке harness сначала проверять локальный проект и контракт,
@@ -257,9 +257,9 @@ Pritha, затем при необходимости проверять свеж
 
 Для быстрого переноса проверенного voice-control паттерна использовать FESPA26 reference pack: `node scripts/voice-control-kit.mjs plan`, `node scripts/voice-control-kit.mjs list`, `node scripts/voice-control-kit.mjs copy --target <agent-path>`. В descendants копировать полный кодовый pack только если контракт явно выбирает browser Realtime voice + Codex deep-task transport; иначе добавлять только `realtime-voice` placeholder и ссылки на стандарт/workflow.
 
-Минимальный scaffold не является финальным пределом агента. Любой descendant можно дальше достраивать через его нативный интерфейс, прежде всего через Codex App/Codex thread, а также через выбранные в контракте интерфейсы. Если агент получает ссылку, статью, video/audio material, GitHub repo или другой интернет-ресурс, который не относится напрямую к его предметной задаче, он не должен автоматически смешивать этот материал с предметной памятью. Такой ресурс нужно обработать как meta-improvement input: оценить, может ли он улучшить harness, память, tools, skills, MCP, UX, evals, safety или operations самого агента; затем оформить review/brief/decision внутри памяти агента или передать выводы обратно в Pritha/Techscope как кандидат для улучшения будущих агентов.
+Минимальный scaffold не является финальным пределом агента. Любой descendant можно дальше достраивать через его нативный интерфейс, прежде всего через Codex App/Codex thread, а также через выбранные в контракте интерфейсы. Если агент получает ссылку, статью, video/audio material, GitHub repo или другой интернет-ресурс, который не относится напрямую к его предметной задаче, он не должен автоматически смешивать этот материал с предметной памятью. Такой ресурс нужно обработать как meta-improvement input: оценить, может ли он улучшить harness, память, tools, skills, MCP, UX, evals, safety или operations самого агента; затем оформить review/brief/decision внутри памяти агента или передать выводы обратно в Pritha как кандидат для улучшения будущих агентов.
 
-Операционный слой новых агентов должен быть явным и настраиваемым. Автозапуск может быть выбран в контракте как `optional`, `launchd-on-approval` или `external`, но Techscope не устанавливает и не включает его автоматически. Любой `launchd`, `launchctl`, cloud deployment или долгоживущий процесс требует отдельного явного подтверждения пользователя.
+Операционный слой новых агентов должен быть явным и настраиваемым. Автозапуск может быть выбран в контракте как `optional`, `launchd-on-approval` или `external`, но Pritha не устанавливает и не включает его автоматически. Любой `launchd`, `launchctl`, cloud deployment или долгоживущий процесс требует отдельного явного подтверждения пользователя.
 
 Для транспорта Pritha Voice Control + Codex ограничения должны совпадать с
 Codex thread по возможностям разработки. Voice не должен превращать
@@ -316,7 +316,7 @@ CLI:
 - достойное эксперимента;
 - достойное стандарта.
 
-Каждая новая технология, архитектурный паттерн или workflow должны отдельно примеряться к самой Agents Mother/Techscope. В assessment нужно явно указать `Techscope/Agents Mother fit`: `adopt`, `experiment`, `watch` или `skip`, с причиной. Учитывать пользу для миссии Techscope, стоимость переделки, сложность эксплуатации, свежесть технологии, риск устаревания, доказательность и переносимость в будущих агентов. Интересная идея не внедряется автоматически: если она избыточна, слишком сложна, слабо подтверждена или неактуальна для текущей архитектуры, она сохраняется как знание без изменения Techscope.
+Каждая новая технология, архитектурный паттерн или workflow должны отдельно примеряться к самой Pritha/Agents Mother. В assessment нужно явно указать `Pritha/Agents Mother fit`: `adopt`, `experiment`, `watch` или `skip`, с причиной. Учитывать пользу для миссии Pritha, стоимость переделки, сложность эксплуатации, свежесть технологии, риск устаревания, доказательность и переносимость в будущих агентов. Интересная идея не внедряется автоматически: если она избыточна, слишком сложна, слабо подтверждена или неактуальна для текущей архитектуры, она сохраняется как знание без изменения Pritha.
 
 Особое внимание уделять применимости к agent engineering: tool use, memory, evals, retrieval, browser automation, coding workflows, CI/CD, safety, local-first workflows, orchestration, prompts, subagents и переносимым стандартам для будущих проектов.
 
@@ -329,7 +329,7 @@ CLI:
 5. Для поддерживаемых remote/local media запустить локальную транскрибацию во временном untracked workspace, если источник доступен и есть совместимый adapter.
 6. Создать signal artifact в `01_sources/signals/`: сжатую техническую выжимку без воды, рекламы, повторов, raw paths, URLs, identifiers or transcript fragments.
 8. Пометить автоматический signal как `heuristic-draft` и `needs-codex-refinement`.
-9. Для полезных материалов выполнить Codex-assisted refinement прямо в этом Techscope thread по `07_workflows/prompts/signal-extraction-harness.md`, без внешних LLM-сервисов.
+9. Для полезных материалов выполнить Codex-assisted refinement прямо в этом Pritha/Codex thread по `07_workflows/prompts/signal-extraction-harness.md`, без внешних LLM-сервисов.
 10. Создать assessment draft в `03_reviews/`.
 11. Сопоставить материал с уже имеющимися standards, decisions, reviews и wiki pages.
 12. Пересобрать memory index and embeddings.
@@ -337,7 +337,7 @@ CLI:
 
 Telegram bot должен запускать этот pipeline автоматически для каждого сохраненного сообщения.
 
-Если Telegram intake содержит медиа, требующее содержательной интерпретации, автоэтап не считается полным завершением. Такой intake должен оставаться в состоянии `awaiting_codex` до Codex-assisted media review в текущем Techscope thread. Только после закрытия media-review job материал считается `complete`.
+Если Telegram intake содержит медиа, требующее содержательной интерпретации, автоэтап не считается полным завершением. Такой intake должен оставаться в состоянии `awaiting_codex` до Codex-assisted media review в текущем Pritha/Codex thread. Только после закрытия media-review job материал считается `complete`.
 
 Экспертная оценка выполняется как консилиум expert lenses: Programming, Agent Engineering, DX, Security, Evidence и Product Pragmatism. Для сложных материалов дополнительно использовать роли из `06_subagents/`.
 
@@ -345,7 +345,7 @@ Telegram bot должен запускать этот pipeline автомати�
 
 ## Актуальность и замещение знаний
 
-Techscope должен вести живую карту знания, а не только накопительный архив. Для быстро меняющихся тем агент обязан фиксировать `source_published`, `source_updated`, `source_version`, `retrieved`, `verified` и `temporal_status`, если эти данные применимы.
+Pritha должна вести живую карту знания, а не только накопительный архив. Для быстро меняющихся тем агент обязан фиксировать `source_published`, `source_updated`, `source_version`, `retrieved`, `verified` и `temporal_status`, если эти данные применимы.
 
 Каждая новая порция информации должна сравниваться с уже сохраненными материалами по тем же `topics`, `tools` и близким semantic-запросам. Для софта, моделей, API, библиотек и протоколов нужно проверять свежие первоисточники: official docs, changelog, release notes, specs, repository, issue/PR discussions авторов технологии.
 
@@ -361,7 +361,7 @@ Techscope должен вести живую карту знания, а не т
 
 ## Совместимость агентских сред
 
-Techscope собирает знания о разных агентских средах: Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, Windsurf, Hermes Agent, OpenClaw и других. Нельзя автоматически переносить правила одной среды в другую.
+Pritha собирает знания о разных агентских средах: Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, Windsurf, Hermes Agent, OpenClaw и других. Нельзя автоматически переносить правила одной среды в другую.
 
 Для материалов про coding agents, LLM agents, agent tooling и agent configuration агент обязан фиксировать:
 
