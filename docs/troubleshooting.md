@@ -46,6 +46,61 @@ The default local URL is:
 http://127.0.0.1:3420/agents
 ```
 
+Check a running Control Center without mutating local runtime state:
+
+```sh
+npm run control-center:health
+node scripts/control-center-health.mjs --json
+```
+
+## Stale Control Center After Rebuild
+
+Symptoms:
+
+- `/api/health` returns `ok`, but `/voice`, `/agents` or `/settings` behaves as
+  if React did not hydrate.
+- the Voice page shows the static shell but no Three.js/WebGL star canvas;
+- Agents `Start Plan` / `Stop Plan` buttons do not open the operator plan;
+- Settings sections or Access & Connections controls look missing or inert;
+- a browser console or chunk scan shows `/_next/static/chunks/*.js` returning
+  `404`, `500` or `Internal Server Error`.
+
+This usually means an old `next start` process is still serving an in-memory
+build manifest after `.next` was rebuilt. It is a local runtime problem, not a
+Git history or UI source-code problem.
+
+Use read-only diagnosis first:
+
+```sh
+node scripts/control-center-health.mjs --json
+lsof -nP -iTCP:3420 -sTCP:LISTEN
+```
+
+If Codex is operating the project, killing or replacing the local Control
+Center process requires explicit user approval immediately before the action.
+After approval, stop only the PID that is listening on `127.0.0.1:3420`, then
+start a fresh foreground server:
+
+```sh
+kill <PID_FROM_LSOF>
+npm --prefix interfaces/control-center run start
+```
+
+For a fresh development server instead of the current production `.next` build:
+
+```sh
+node scripts/bootstrap.mjs start --profile control-center
+```
+
+After restart, rerun:
+
+```sh
+node scripts/control-center-health.mjs
+```
+
+The healthy result should report loaded pages and JavaScript chunks. Peer access
+from another trusted device remains a separate manual acceptance check.
+
 ## Python Dependencies
 
 Portable packages:

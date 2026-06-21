@@ -26,6 +26,13 @@ Bootstrap writes local settings to `.env.local` and non-secret setup state to
 `.techscope-setup.json`. Both are gitignored. The start command runs the
 Control Center in the foreground and does not install a service.
 
+In another terminal, you can verify the running UI without changing runtime
+state:
+
+```sh
+npm run control-center:health
+```
+
 ## Bootstrap Profiles
 
 - `minimal`: check Node.js, Git, Python, sqlite3 and authored memory.
@@ -81,5 +88,6 @@ Place new material in `00_inbox/`, then create a brief, assessment, decision or 
 ```sh
 node scripts/bootstrap.mjs verify --profile minimal
 node scripts/quality-gate.mjs
+npm run control-center:health
 node scripts/pritha.mjs lineage
 ```
