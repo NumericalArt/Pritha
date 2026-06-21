@@ -95,10 +95,14 @@ type CodexTaskApproval = {
 };
 
 type DeepTaskPrimaryTransport = "codex-app" | "codex-cli" | "codex-session";
+export type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
+export type CodexServiceTier = "standard" | "fast";
 
-type PrithaRuntimeSettings = {
+export type PrithaRuntimeSettings = {
   deepTaskPrimaryTransport: Extract<DeepTaskPrimaryTransport, "codex-app" | "codex-cli">;
   codexModel: string;
+  codexReasoningEffort: CodexReasoningEffort;
+  codexServiceTier: CodexServiceTier;
   codexWorkdir: string;
   codexSandbox: "auto" | "read-only" | "workspace-write" | "danger-full-access";
   codexNetworkAccess: boolean;
@@ -1811,7 +1815,9 @@ function runtimeSettingsPath() {
 function defaultRuntimeSettings(): PrithaRuntimeSettings {
   return {
     deepTaskPrimaryTransport: "codex-app",
-    codexModel: env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", "")),
+    codexModel: env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", "gpt-5.5")),
+    codexReasoningEffort: normalizeCodexReasoningEffort(env("PRITHA_REALTIME_CODEX_REASONING_EFFORT", "medium")),
+    codexServiceTier: normalizeCodexServiceTier(env("PRITHA_REALTIME_CODEX_SERVICE_TIER", "standard")),
     codexWorkdir: resolveTechscopeRoot(),
     codexSandbox: "auto",
     codexNetworkAccess: true,
@@ -1827,6 +1833,20 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
   };
 }
 
+export function normalizeCodexReasoningEffort(value: unknown, fallback: CodexReasoningEffort = "medium"): CodexReasoningEffort {
+  if (value === "low" || value === "medium" || value === "high" || value === "xhigh") return value;
+  if (value === "very_high") return "xhigh";
+  return fallback;
+}
+
+export function normalizeCodexServiceTier(value: unknown, fallback: CodexServiceTier = "standard"): CodexServiceTier {
+  return value === "fast" ? "fast" : fallback;
+}
+
+export function codexModelSupportsFastMode(model: string) {
+  return ["gpt-5.5", "gpt-5.4"].includes(model.trim());
+}
+
 function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
   const defaults = defaultRuntimeSettings();
   const value = typeof raw === "object" && raw !== null ? (raw as Partial<PrithaRuntimeSettings>) : {};
@@ -1838,6 +1858,8 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
   return {
     deepTaskPrimaryTransport: transport,
     codexModel: String(value.codexModel ?? defaults.codexModel ?? "").trim(),
+    codexReasoningEffort: normalizeCodexReasoningEffort(value.codexReasoningEffort, defaults.codexReasoningEffort),
+    codexServiceTier: normalizeCodexServiceTier(value.codexServiceTier, defaults.codexServiceTier),
     codexWorkdir: String(value.codexWorkdir || defaults.codexWorkdir),
     codexSandbox: sandbox,
     codexNetworkAccess: typeof value.codexNetworkAccess === "boolean" ? value.codexNetworkAccess : defaults.codexNetworkAccess,
@@ -1866,6 +1888,9 @@ export async function updatePrithaRuntimeSettings(patch: Partial<PrithaRuntimeSe
   await writeFile(runtimeSettingsPath(), `${JSON.stringify(next, null, 2)}\n`, "utf8");
   await logPrivateEvent("runtime_settings_updated", {
     deepTaskPrimaryTransport: next.deepTaskPrimaryTransport,
+    codexModel: next.codexModel,
+    codexReasoningEffort: next.codexReasoningEffort,
+    codexServiceTier: next.codexServiceTier,
     codexSandbox: next.codexSandbox,
     codexNetworkAccess: next.codexNetworkAccess,
     codexTimeoutMs: next.codexTimeoutMs,
@@ -2551,6 +2576,7 @@ async function startCodexAppTask(
     cwd: root,
     clientName: "pritha-voice-control",
     buildSandboxPolicy: () => codexAppSandboxPolicyForTask(task, sandbox, writableRoots),
+    getRuntimeSettings: () => getPrithaRuntimeSettings(),
   });
   const heartbeat = setInterval(() => {
     void progress({
@@ -2706,6 +2732,11 @@ async function startCodexExec(
   ];
   const writableRoots = codexWritableRootEntries(root, additionalWritableDirs);
   const config = ['approval_policy="never"'];
+  if (settings.codexReasoningEffort) config.push(`model_reasoning_effort="${settings.codexReasoningEffort}"`);
+  if (settings.codexServiceTier === "fast" && codexModelSupportsFastMode(settings.codexModel)) {
+    config.push('service_tier="fast"');
+    config.push("features.fast_mode=true");
+  }
   if (sandbox === "workspace-write") config.push(`sandbox_workspace_write.network_access=${settings.codexNetworkAccess ? "true" : "false"}`);
   if (sandbox === "read-only") config.push(`sandbox_read_only.network_access=${settings.codexNetworkAccess ? "true" : "false"}`);
 
