@@ -31,7 +31,7 @@ export function routeTriggerPhrase(text) {
     return {
       id: "first-run-setup",
       workflow: "07_workflows/first-run-setup.md",
-      command: "node scripts/setup.mjs",
+      command: "node scripts/bootstrap.mjs plan --profile minimal",
     };
   }
   if (/(^|\s)(проверь проект|self test|health)(\s|$)/iu.test(value)) {
@@ -218,7 +218,7 @@ async function interactiveConfig() {
     config.interfaces.realtime = realtime === "y" || realtime === "yes";
     if (config.interfaces.realtime) {
       console.log("Warning: always-on realtime can keep the microphone open and may continue billing during silence.");
-      console.log("Default realtime tools: internet access, Techscope memory search, Codex CLI sidecar.");
+      console.log("Default realtime tools: internet access, Pritha memory search, Codex CLI sidecar.");
       const confirm = (await rl.question("Continue with realtime always-on? [yes/switch-to-ptt/skip] ")).trim().toLowerCase();
       if (confirm === "skip") config.interfaces.realtime = false;
       if (confirm === "switch-to-ptt") config.realtime.mode = "push-to-talk";
@@ -242,7 +242,10 @@ function connectorStatuses(config) {
       detail: config.interfaces.realtime ? `mode=${config.realtime.mode}` : "not selected",
     },
     obsidian: { status: config.interfaces.obsidian ? "configured" : "skipped", detail: config.interfaces.obsidian ? config.obsidian.vaultPath : "not selected" },
-    tailscale: { status: "skipped", detail: "manual Tailscale setup only in v0.1" },
+    tailscale: {
+      status: "skipped",
+      detail: "optional; use node scripts/tailscale-setup.mjs plan/status for private device access",
+    },
     codexCli: { status: "skipped", detail: "not required for minimal setup" },
     firstAgent: { status: "pending", detail: config.firstAgent?.mode || "ask-later" },
   };
@@ -385,6 +388,11 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
     console.log(`Usage:
+  # Preferred fresh-clone entrypoint:
+  node scripts/bootstrap.mjs plan --profile minimal
+  node scripts/bootstrap.mjs --profile local --start control-center
+
+  # Lower-level setup-state wizard:
   node scripts/setup.mjs
   node scripts/setup.mjs --non-interactive --config tests/fixtures/setup-minimal.json
   node scripts/setup.mjs --reconfigure realtime

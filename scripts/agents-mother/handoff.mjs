@@ -218,7 +218,7 @@ ${exercise.map((item, index) => `${index + 1}. ${item}`).join("\n")}
 
 ## Operating Notes
 
-- Do not copy secrets into TechScope reports.
+- Do not copy secrets into Pritha reports.
 - Use test reports for diagnostics and this handoff report for user-facing operation.
 - If the project lacks an agent harness, create an agent-contract before changing files.
 - If Telegram is enabled, test dry-run queueing before using real updates.
@@ -237,8 +237,7 @@ ${recommendationForProject(detection, [
 
 ## Next Steps
 
-- Run \`node scripts/agents-mother.mjs test "${projectRoot}"\` from TechScope when the project changes.
+- Run \`node scripts/pritha.mjs test "${projectRoot}"\` from Pritha when the project changes.
 - Discuss whether the next improvement should target interface, memory, tools, evals, operations or user training.
 `;
 }
-

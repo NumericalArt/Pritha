@@ -189,9 +189,9 @@ function memoryProfileFor(data) {
   const indexText = String(data.indexingSearchNeeds || "").toLowerCase();
   const text = `${memoryText} ${indexText}`;
   if (/(external|qdrant|lancedb|neo4j|kuzu|graph|vector)/.test(text)) return "external-or-specialized";
-  if (/(embedding|semantic|семантичес|vector)/.test(text)) return "markdown-embeddings";
-  if (/(sqlite|index|fts|search|поиск)/.test(text)) return "markdown-sqlite";
-  if (/(none|minimal|нет|без памяти)/.test(memoryText)) return "minimal-markdown";
+  if (/(embedding|semantic|\u0441\u0435\u043c\u0430\u043d\u0442\u0438\u0447\u0435\u0441|vector)/.test(text)) return "markdown-embeddings";
+  if (/(sqlite|index|fts|search|\u043f\u043e\u0438\u0441\u043a)/.test(text)) return "markdown-sqlite";
+  if (/(none|minimal|\u043d\u0435\u0442|\u0431\u0435\u0437 \u043f\u0430\u043c\u044f\u0442\u0438)/.test(memoryText)) return "minimal-markdown";
   return "markdown-first";
 }
 
@@ -296,8 +296,8 @@ function normalizeProactiveMode(value) {
   if (!text || text === "none" || text.includes("manual")) return text.includes("manual") ? "manual" : "none";
   if (text.includes("queue")) return "queue-watcher";
   if (text.includes("event") || text.includes("webhook")) return "event-driven";
-  if (text.includes("heart") || text.includes("pulse") || text.includes("пульс")) return "heartbeat";
-  if (text.includes("cron") || text.includes("chrono") || text.includes("хронос") || text.includes("schedule")) return "scheduled";
+  if (text.includes("heart") || text.includes("pulse") || text.includes("\u043f\u0443\u043b\u044c\u0441")) return "heartbeat";
+  if (text.includes("cron") || text.includes("chrono") || text.includes("\u0445\u0440\u043e\u043d\u043e\u0441") || text.includes("schedule")) return "scheduled";
   if (text.includes("hybrid") || text.includes("mixed")) return "hybrid";
   if (PROACTIVE_MODES.has(text)) return text;
   return "manual";
@@ -360,7 +360,7 @@ function runSqlJson(sql) {
 function ftsQuery(text) {
   const terms = String(text)
     .toLowerCase()
-    .replace(/[^a-z0-9а-яё\s-]+/giu, " ")
+    .replace(/[^\p{L}0-9\s-]+/giu, " ")
     .split(/\s+/)
     .map((term) => term.trim())
     .filter((term) => term.length > 2)
@@ -555,7 +555,7 @@ ${bulletList(data.criticalWorkflows)}
 - Sensitive data: ${scalar(data.sensitiveData)}
 - Memory model: ${scalar(data.memoryModel, "Markdown-first")}
 - Indexing/search needs: ${scalar(data.indexingSearchNeeds, "none for v1 unless contract is updated")}
-- External verification needs: ${scalar(data.externalVerificationNeeds, "TechScope memory plus current official docs before scaffold")}
+- External verification needs: ${scalar(data.externalVerificationNeeds, "Pritha memory plus current official docs before scaffold")}
 - Source freshness requirements: ${scalar(data.sourceFreshnessRequirements, "verify volatile platform/API choices before scaffold")}
 
 ## Tools and integrations
@@ -563,7 +563,7 @@ ${bulletList(data.criticalWorkflows)}
 | Capability | Default boundary | Notes |
 | --- | --- | --- |
 | Project files and local checks | CLI/script | Default for Codex-native scaffold |
-| Agent operating procedure | skill/workflow | Encode repeatable TechScope rules |
+| Agent operating procedure | skill/workflow | Encode repeatable Pritha rules |
 | External services | MCP/API | Only when contract requires auth/service boundary |
 | Rendered or visual checks | browser/manual | Use when UI or dynamic pages matter |
 
@@ -588,7 +588,7 @@ ${bulletList(data.criticalWorkflows)}
 
 ## Research basis
 
-- Related TechScope artifacts: 07_workflows/agents-mother.md; 04_standards/agent-creation-harness.md; 04_standards/agent-runtime-placement.md; 04_standards/agent-environment-compatibility.md; 04_standards/agent-tool-integration-selection.md
+- Related Pritha artifacts: 07_workflows/agents-mother.md; 04_standards/agent-creation-harness.md; 04_standards/agent-runtime-placement.md; 04_standards/agent-environment-compatibility.md; 04_standards/agent-tool-integration-selection.md
 - Current primary sources checked: pending
 - Trusted secondary sources checked: pending
 - Alternatives considered: ${scalar(data.alternativesConsidered, "pending research step")}
@@ -994,7 +994,7 @@ function recommendationFor(data) {
     notes.push("Telegram: keep out of scaffold v1 unless the user explicitly selects it later.");
   }
   notes.push(`Memory: start from \`${data.memoryModel || "Markdown-first"}\`; add SQLite/embeddings only if v1 workflows need retrieval.`);
-  notes.push("Scaffold should remain minimal, testable and free of copied TechScope secrets.");
+  notes.push("Scaffold should remain minimal, testable and free of copied Pritha secrets.");
   return notes;
 }
 
@@ -1240,7 +1240,7 @@ function researchContract(contractPath, options = {}) {
 }
 
 function questions() {
-  console.log(`# Agents Mother interview outline
+  console.log(`# Pritha interview outline
 
 1. Purpose: agent name, mission, target user, success criteria, out of scope.
 2. Scope: v1 core functions, deferred functions, critical workflows.

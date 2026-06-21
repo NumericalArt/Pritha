@@ -1194,7 +1194,7 @@ function usePrithaRealtimeController() {
     const recap = events
       .map((event) => `- ${event.timestamp} ${event.kind}${event.taskId ? ` ${event.taskId}` : ""}: ${event.text}`)
       .join("\n");
-    return sendTextMessage(`Краткий контекст текущей voice-сессии:\n${recap}`);
+    return sendTextMessage(`Brief context for the current voice session:\n${recap}`);
   }, [sendTextMessage, sessionEvents]);
 
   const promoteSessionMemory = useCallback(

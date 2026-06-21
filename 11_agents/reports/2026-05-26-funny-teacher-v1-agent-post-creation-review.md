@@ -81,7 +81,7 @@ Status: accepted
 
 - Project path: `<SIBLING_AGENT_ROOT>/FunnyTeacher`
 - Classification: first successful Agents Mother language-learning voice agent
-- Access: `https://ivans-mac-mini.tail691439.ts.net:3034`
+- Access: `https://<TAILSCALE_HOST>:3034`
 - Service: launchd label `com.local.funny-teacher`
 - Result: working v1 fixed as a reusable reference, not a temporary prototype
 

@@ -68,7 +68,7 @@ This avoids the repeated failure mode where Tailscale Serve remains configured b
 - Program: `<USER_HOME>/.local/bin/npm run start`
 - Port: `3033`
 - Local URL: `http://127.0.0.1:3033`
-- Tailscale URL: `https://ivans-mac-mini.tail691439.ts.net:3034`
+- Tailscale URL: `https://<TAILSCALE_HOST>:3034`
 - Logs:
   - `<SIBLING_AGENT_ROOT>/FunnyTeacher/logs/launchd.out.log`
   - `<SIBLING_AGENT_ROOT>/FunnyTeacher/logs/launchd.err.log`
@@ -94,7 +94,7 @@ npm run deploy:uninstall
 | `npm run deploy:install` | pass |
 | `npm run deploy:status` | service loaded and running |
 | `curl http://127.0.0.1:3033/api/health` | `voiceConfigured: true` |
-| `curl https://ivans-mac-mini.tail691439.ts.net:3034/api/health` | `voiceConfigured: true` |
+| `curl https://<TAILSCALE_HOST>:3034/api/health` | `voiceConfigured: true` |
 | Tailscale URL page | HTTP 200 |
 
 ## Notes

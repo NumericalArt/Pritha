@@ -35,9 +35,9 @@ Task: `2026-06-12T22-30-35-565Z-e5ff7b9b`
 
 Status: blocked by writable-root boundary.
 
-The requested implementation targets `/Users/jkl/StupidJoke`, a sibling of the current Techscope checkout. The active sandbox allows writes inside `/Users/jkl/Techscope`, but not inside `/Users/jkl/StupidJoke`. No StupidJoke files were modified.
+The requested implementation targets `<SIBLING_AGENT_ROOT>/StupidJoke`, a sibling of the current Techscope checkout. The active sandbox allows writes inside `<LEGACY_TECHSCOPE_ROOT>`, but not inside `<SIBLING_AGENT_ROOT>/StupidJoke`. No StupidJoke files were modified.
 
-Baseline verification completed in `/Users/jkl/StupidJoke`:
+Baseline verification completed in `<SIBLING_AGENT_ROOT>/StupidJoke`:
 
 - `npm run health`: pass
 - `npm run smoke`: pass
@@ -45,20 +45,20 @@ Baseline verification completed in `/Users/jkl/StupidJoke`:
 
 Inspected target files:
 
-- `/Users/jkl/StupidJoke/AGENTS.md`
-- `/Users/jkl/StupidJoke/package.json`
-- `/Users/jkl/StupidJoke/README.md`
-- `/Users/jkl/StupidJoke/src/safety-filter.mjs`
-- `/Users/jkl/StupidJoke/src/realtime-events.mjs`
-- `/Users/jkl/StupidJoke/scripts/healthcheck.mjs`
-- `/Users/jkl/StupidJoke/scripts/smoke.mjs`
-- `/Users/jkl/StupidJoke/tests/safety-filter.test.mjs`
-- `/Users/jkl/StupidJoke/tests/realtime-events.test.mjs`
-- `/Users/jkl/StupidJoke/operations/manifest.json`
-- `/Users/jkl/StupidJoke/tools/manifest.json`
-- `/Users/jkl/StupidJoke/docs/IMPLEMENTATION_PLAN.md`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/AGENTS.md`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/package.json`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/README.md`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/src/safety-filter.mjs`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/src/realtime-events.mjs`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/scripts/healthcheck.mjs`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/scripts/smoke.mjs`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/tests/safety-filter.test.mjs`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/tests/realtime-events.test.mjs`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/operations/manifest.json`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/tools/manifest.json`
+- `<SIBLING_AGENT_ROOT>/StupidJoke/docs/IMPLEMENTATION_PLAN.md`
 
-Smallest useful next step: rerun with `/Users/jkl/StupidJoke` as the workspace root, or add `/Users/jkl/StupidJoke` to writable roots. The requested implementation should remain internal to the StupidJoke project and add:
+Smallest useful next step: rerun with `<SIBLING_AGENT_ROOT>/StupidJoke` as the workspace root, or add `<SIBLING_AGENT_ROOT>/StupidJoke` to writable roots. The requested implementation should remain internal to the StupidJoke project and add:
 
 - a Node internal scheduler defaulting to 10 minutes, with injectable timer/clock hooks for tests;
 - configuration for interval minutes and allowed source domains;

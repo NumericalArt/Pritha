@@ -1,12 +1,55 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import process from "node:process";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
 const strictMode = args.has("--strict") || process.env.TECHSCOPE_ENV_DOCTOR_STRICT === "1";
 const isDarwin = process.platform === "darwin";
+const ROOT = resolveTechscopeRoot();
+const argv = process.argv.slice(2);
+const profileIndex = argv.indexOf("--profile");
+const profile = profileIndex >= 0 ? argv[profileIndex + 1] || "" : "full";
+const profileConfig = {
+  minimal: {
+    pythonPackages: false,
+    macosTranscription: false,
+    controlCenter: false,
+    tailscale: false,
+  },
+  local: {
+    pythonPackages: true,
+    macosTranscription: true,
+    controlCenter: false,
+    tailscale: false,
+  },
+  "control-center": {
+    pythonPackages: true,
+    macosTranscription: true,
+    controlCenter: true,
+    tailscale: false,
+  },
+  "control-center-tailscale": {
+    pythonPackages: true,
+    macosTranscription: true,
+    controlCenter: true,
+    tailscale: true,
+  },
+  full: {
+    pythonPackages: true,
+    macosTranscription: true,
+    controlCenter: true,
+    tailscale: false,
+  },
+};
+if (!profileConfig[profile]) {
+  console.error(`Unknown env-doctor profile: ${profile}`);
+  process.exit(1);
+}
 const simulatedMissing = new Set(
   [...args]
     .filter((arg) => arg.startsWith("--simulate-missing="))
@@ -57,6 +100,45 @@ function checkNode() {
     versionAtLeast(actual, [20, 0, 0]),
     `current ${process.versions.node}`,
     "Install Node 20+ with the official installer, nvm, fnm, or Homebrew.",
+  );
+}
+
+function checkPackageManifestPins() {
+  const manifestPath = path.join(ROOT, "interfaces", "control-center", "package.json");
+  const lockPath = path.join(ROOT, "interfaces", "control-center", "package-lock.json");
+  if (!existsSync(manifestPath)) {
+    add(
+      "control-center-package",
+      "Control Center package manifest",
+      "critical",
+      false,
+      "interfaces/control-center/package.json not found",
+      "Restore the Control Center package manifest before running bootstrap.",
+    );
+    return;
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const floating = [];
+  for (const section of ["dependencies", "devDependencies", "optionalDependencies"]) {
+    for (const [name, version] of Object.entries(manifest[section] || {})) {
+      if (String(version).trim() === "latest") floating.push(`${section}.${name}=latest`);
+    }
+  }
+  add(
+    "control-center-package-lock",
+    "Control Center package-lock",
+    "critical",
+    existsSync(lockPath),
+    existsSync(lockPath) ? "interfaces/control-center/package-lock.json" : "missing",
+    "Run `npm --prefix interfaces/control-center install --package-lock-only --ignore-scripts`.",
+  );
+  add(
+    "control-center-pinned-deps",
+    "Control Center has no latest dependencies",
+    "critical",
+    floating.length === 0,
+    floating.length === 0 ? "no latest ranges found" : floating.join(", "),
+    "Pin install-critical dependencies to concrete versions and update package-lock.json.",
   );
 }
 
@@ -173,6 +255,14 @@ function checkOptionalTools() {
 
 checkNode();
 checkCommand(
+  "git",
+  "Git CLI",
+  "git",
+  ["--version"],
+  /^git version \d+\.\d+/,
+  "Install Git. On macOS, `xcode-select --install` installs Apple Command Line Tools.",
+);
+checkCommand(
   "sqlite3",
   "sqlite3 CLI",
   "sqlite3",
@@ -181,37 +271,64 @@ checkCommand(
   "Install sqlite3 CLI. On macOS it is usually available with Command Line Tools or Homebrew.",
 );
 checkPython();
-checkPythonPackage(
-  "sentence-transformers",
-  "Python package sentence-transformers",
-  "sentence_transformers",
-  "sentence-transformers",
-  "Install with `python3 -m pip install --user -r requirements.txt`.",
-);
-checkPythonPackage(
-  "imageio-ffmpeg",
-  "Python package imageio-ffmpeg",
-  "imageio_ffmpeg",
-  "imageio-ffmpeg",
-  "Install with `python3 -m pip install --user -r requirements.txt`.",
-);
-checkPythonPackage(
-  "mlx-whisper",
-  "Python package mlx-whisper",
-  "mlx_whisper",
-  "mlx-whisper",
-  isDarwin
-    ? "Install with `python3 -m pip install --user -r requirements.txt`."
-    : "mlx-whisper is a local macOS transcription helper; Linux CI may skip it.",
-  isDarwin ? "critical" : "warning",
-);
-checkMlxWhisperExecutable();
+if (profileConfig[profile].pythonPackages) {
+  checkPythonPackage(
+    "sentence-transformers",
+    "Python package sentence-transformers",
+    "sentence_transformers",
+    "sentence-transformers",
+    "Install with `python3 -m pip install --user -r requirements-core.txt`.",
+  );
+  checkPythonPackage(
+    "imageio-ffmpeg",
+    "Python package imageio-ffmpeg",
+    "imageio_ffmpeg",
+    "imageio-ffmpeg",
+    "Install with `python3 -m pip install --user -r requirements-core.txt`.",
+  );
+}
+if (profileConfig[profile].macosTranscription) {
+  checkPythonPackage(
+    "mlx-whisper",
+    "Python package mlx-whisper",
+    "mlx_whisper",
+    "mlx-whisper",
+    isDarwin
+      ? "Install with `python3 -m pip install --user -r requirements-macos.txt`."
+      : "mlx-whisper is a local macOS transcription helper; Linux CI may skip it.",
+    isDarwin ? "critical" : "warning",
+  );
+  checkMlxWhisperExecutable();
+}
+if (profileConfig[profile].controlCenter) {
+  checkCommand(
+    "npm",
+    "npm CLI",
+    "npm",
+    ["--version"],
+    /^\d+\.\d+\.\d+/,
+    "Install npm with Node.js 20+.",
+  );
+  checkPackageManifestPins();
+}
+if (profileConfig[profile].tailscale) {
+  const tailscale = commandExists("tailscale");
+  add(
+    "tailscale",
+    "Tailscale CLI",
+    "warning",
+    Boolean(tailscale),
+    tailscale || "tailscale not found",
+    "Install the Tailscale client only when private device access is explicitly selected.",
+  );
+}
 checkOptionalTools();
 
 const failed = checks.filter((check) => check.level === "critical" && !check.ok);
 const warnings = checks.filter((check) => check.level === "warning" && !check.ok);
 const payload = {
   status: failed.length > 0 ? "fail" : "pass",
+  profile,
   strict: strictMode,
   failed: failed.length,
   warnings: warnings.length,

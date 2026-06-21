@@ -336,7 +336,7 @@ Remove, merge or rename these until they are truthful:
 - `GET /api/realtime/status` on `127.0.0.1:3420`: key configured, Codex
   available, model `gpt-realtime-2`.
 - `GET /api/realtime/status` on
-  `https://ivans-mac-mini.tail691439.ts.net:3420`: key configured and Codex
+  `https://<TAILSCALE_HOST>:3420`: key configured and Codex
   available.
 - `POST /api/realtime/session`: returns model, voice, two tools and an
   ephemeral client secret; secret value was not printed.
@@ -364,7 +364,7 @@ Remove, merge or rename these until they are truthful:
   console errors.
 - Final post-fix QA on `2026-06-12`: desktop and mobile `/voice` on
   `127.0.0.1:3420` and
-  `https://ivans-mac-mini.tail691439.ts.net/voice` show `gpt-realtime-2`
+  `https://<TAILSCALE_HOST>/voice` show `gpt-realtime-2`
   ready, `Start Listening` enabled, one visible Three.js canvas, five recovered
   Codex task rows, no `Key missing`, no horizontal overflow and no fresh
   browser console errors.

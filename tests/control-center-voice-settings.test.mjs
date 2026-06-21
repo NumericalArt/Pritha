@@ -52,7 +52,7 @@ test("Control Center voice behavior prompt covers depth override, feminine gramm
     assert.match(beginner, /Translate Codex, runtime and programming terms into ordinary concepts/);
     assert.match(expert, /Default mode: expert/);
     assert.match(expert, /runtime, sandbox, tool schema, Codex transport, memory index, approval gate/);
-    assert.match(expert, /готова, проверила, создала, начала, нашла/);
+    assert.match(expert, /feminine grammatical self-reference/);
     assert.match(expert, /Do not read long file paths, shell commands, JSON, stack traces or code aloud/);
     assert.match(expert, /saved behavior profile is the default, not a hard lock/);
   } finally {

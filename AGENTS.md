@@ -3,7 +3,7 @@ id: AGENTS
 type: artifact
 status: processed
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-21
 topics:
   - privacy-preserving-intake
 tools:[]
@@ -107,7 +107,7 @@ Retention: source-purged
 Если пользователь открывает свежий checkout и пишет `запусти проект`, `setup`, `first run`, `bootstrap` или `start`, действовать по workflow `07_workflows/first-run-setup.md`. CLI fallback:
 
 ```sh
-node scripts/setup.mjs
+node scripts/bootstrap.mjs plan --profile minimal
 ```
 
 Если пользователь пишет `проверь проект`, `self test` или `health`, запускать или предлагать:
@@ -121,6 +121,16 @@ node scripts/self-test.mjs
 ```sh
 node scripts/pritha.mjs interview
 ```
+
+Если пользователь просит `tailscale`, `private access`, `phone access` или доступ к локальному Control Center с другого доверенного устройства, использовать `docs/tailscale-private-access.md` и `scripts/tailscale-setup.mjs`. По умолчанию Codex может выполнять только read-only команды:
+
+```sh
+node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs status --json
+node scripts/tailscale-setup.mjs auth-status
+```
+
+Не запускать реальные mutating Tailscale actions без separate explicit user approval непосредственно перед действием: `install --yes`, `serve --yes`, `off --yes`, `tailscale up`, auth-key команды, Funnel/public exposure, launchd/cron/service changes. Codex должен объяснить пользователю, что peer access считается непроверенным, пока Tailscale URL не открыт с телефона или другого trusted peer device. Реальные Tailscale URLs, tailnet names, device names и auth keys не записывать в tracked Markdown, reports, setup state intended for Git или `.memory`; использовать placeholders.
 
 Если последний `.techscope-setup.json` имеет `status: completed-with-warnings`, при следующем заходе в Codex thread проактивно предложить `node scripts/self-test.mjs` и коротко перечислить warnings. Не включать Telegram, Realtime, Tailscale, launchd, cron, heartbeat или другие долгоживущие процессы без явного подтверждения пользователя.
 

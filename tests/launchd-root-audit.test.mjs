@@ -46,8 +46,9 @@ test("launchd root audit detects loaded stale state after disk plist is fixed", 
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-root-"));
   const agentDir = mkdtempSync(path.join(os.tmpdir(), "pritha-launchagents-"));
   const binDir = mkdtempSync(path.join(os.tmpdir(), "pritha-fake-bin-"));
+  const staleRoot = path.join(os.tmpdir(), "pritha-old-root", "Techscope");
   writePlist(path.join(agentDir, "com.techscope.web.plist"), root);
-  fakeLaunchctl(binDir, "/Users/jkl/Techscope");
+  fakeLaunchctl(binDir, staleRoot);
 
   const result = spawnSync("node", [script, "status", "--json"], {
     cwd: path.resolve("."),
@@ -56,6 +57,7 @@ test("launchd root audit detects loaded stale state after disk plist is fixed", 
       ...process.env,
       PATH: `${binDir}:${process.env.PATH}`,
       TECHSCOPE_ROOT: root,
+      PRITHA_LAUNCHD_OLD_ROOT: staleRoot,
       PRITHA_LAUNCHD_AGENT_DIR: agentDir,
       PRITHA_LAUNCHD_LABELS: "com.techscope.web",
       PRITHA_LAUNCHD_AUDIT_PLATFORM: "darwin",
@@ -98,6 +100,7 @@ test("launchd reload retries bootstrap after bootout settles", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-root-"));
   const agentDir = mkdtempSync(path.join(os.tmpdir(), "pritha-launchagents-"));
   const binDir = mkdtempSync(path.join(os.tmpdir(), "pritha-fake-bin-"));
+  const staleRoot = path.join(os.tmpdir(), "pritha-old-root", "Techscope");
   const stateFile = path.join(binDir, "state.txt");
   const attemptsFile = path.join(binDir, "attempts.txt");
   writePlist(path.join(agentDir, "com.techscope.web.plist"), root);
@@ -118,8 +121,8 @@ if [ "$1" = "print" ]; then
     echo "stdout path = ${root}/.logs/out.log"
     exit 0
   fi
-  echo "working directory = /Users/jkl/Techscope"
-  echo "stdout path = /Users/jkl/Techscope/.logs/out.log"
+  echo "working directory = ${staleRoot}"
+  echo "stdout path = ${staleRoot}/.logs/out.log"
   exit 0
 fi
 if [ "$1" = "bootout" ]; then
@@ -149,6 +152,7 @@ exit 0
       ...process.env,
       PATH: `${binDir}:${process.env.PATH}`,
       TECHSCOPE_ROOT: root,
+      PRITHA_LAUNCHD_OLD_ROOT: staleRoot,
       PRITHA_LAUNCHD_AGENT_DIR: agentDir,
       PRITHA_LAUNCHD_LABELS: "com.techscope.web",
       PRITHA_LAUNCHD_AUDIT_PLATFORM: "darwin",

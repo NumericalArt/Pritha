@@ -78,14 +78,14 @@ Status: accepted
 
 ## Summary
 
-- Project path: `/Users/jkl/StupidJoke`
+- Project path: `<SIBLING_AGENT_ROOT>/StupidJoke`
 - Classification: minimal Codex-native child-agent scaffold.
 - Related lifecycle reports: contract, failed scaffold-prep report, scaffold completion report, and test report.
 - Result: working v0.1.0 scaffold with deterministic health, smoke, and Node tests.
 
 ## Evidence
 
-- Sibling project exists at `/Users/jkl/StupidJoke` according to the Techscope sibling-agent placement rule.
+- Sibling project exists at `<SIBLING_AGENT_ROOT>/StupidJoke` according to the Techscope sibling-agent placement rule.
 - `npm run health` passes with 20 required files, 3 joke fixtures, and 5 realtime fixtures.
 - `npm run smoke` passes.
 - `npm test` passes with 12 tests and 0 failures.
@@ -131,6 +131,6 @@ Status: accepted
 
 ## Next Steps
 
-- Use `/Users/jkl/StupidJoke` through Codex or local CLI.
+- Use `<SIBLING_AGENT_ROOT>/StupidJoke` through Codex or local CLI.
 - Add richer joke fixtures only through `fixtures/user_import`.
 - Do not add hosted Realtime, external APIs, Telegram, service install, scheduled jobs, or private memory until the contract is revised and approved.

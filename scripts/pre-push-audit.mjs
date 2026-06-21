@@ -108,6 +108,13 @@ const ignoredMemorySnapshot = requiredMemorySnapshotFiles.filter((file) => {
   return result.status === 0;
 });
 const localPathMatches = textFilesWithMatches(files, /\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+/g);
+const tailscaleHostnamePattern = new RegExp([
+  String.raw`(?:https?:\/\/)?[a-z0-9-]+\.tail[0-9a-z-]+\.ts\.net`,
+  "tail" + "691439",
+  "ivans" + "-mac" + "-mini",
+  String.raw`[a-z0-9-]+\.tailnet\.ts\.net`,
+].join("|"), "gi");
+const tailscaleHostMatches = textFilesWithMatches(files, tailscaleHostnamePattern);
 const longTokenCandidates = textFilesWithMatches(files, /[A-Za-z0-9_-]{40,}/g);
 const telegramIdMatches = textFilesWithMatches(files, /\b\d{9,12}\b/g).filter((match) =>
   /telegram|allowed_users|user_id|chat_id/i.test(match.text) || /telegram/i.test(match.file),
@@ -185,6 +192,11 @@ const checks = [
     id: "local-absolute-paths",
     status: localPathMatches.length ? "fail" : "pass",
     detail: compact(localPathMatches),
+  },
+  {
+    id: "tailscale-hostnames",
+    status: tailscaleHostMatches.length ? "fail" : "pass",
+    detail: compact(tailscaleHostMatches),
   },
   {
     id: "long-token-candidates",

@@ -197,7 +197,7 @@ topics:
 tools:
   - Codex
   - AGENTS.md
-  - Agents Mother
+    - Pritha
 agent_platforms:
   - Codex
 model_context:
@@ -229,11 +229,11 @@ source_updated: ${date}
 source_version: generated registry ${date}
 retrieved: ${date}
 verified: ${date}
-valid_for: current TechScope Agents Mother lifecycle
+valid_for: current Pritha lifecycle
 temporal_status: current
 ---
 
-# Agents Mother Registry
+# Pritha Registry
 
 Date: ${date}
 Status: active
@@ -304,7 +304,7 @@ function inferLessonsFromProject(projectRoot, detection, reports) {
   if (fileExists(projectRoot, "scripts/smoke-test.mjs")) useful.push("Smoke test gives a cheap acceptance gate for scaffold changes.");
   if (fileExists(projectRoot, "scripts/deploy-service.mjs")) useful.push("Deployment automation is separated from scaffold and mutation requires explicit confirmation.");
 
-  if (detection.classification === "project-without-agent-harness") failed.push("Project still lacks an agent harness; create an agent-contract before applying Agents Mother patterns.");
+  if (detection.classification === "project-without-agent-harness") failed.push("Project still lacks an agent harness; create an agent-contract before applying Pritha patterns.");
   if (!fileExists(projectRoot, "scripts/smoke-test.mjs")) failed.push("No smoke test found, so readiness claims are weak.");
   if (!fileExists(projectRoot, "operations/manifest.json")) failed.push("No operations manifest found, so deployment and proactivity are not governed.");
   if (reports.length === 0) failed.push("No lifecycle reports found for this project yet.");
@@ -340,7 +340,7 @@ export function evolveProject(projectPath, options = {}) {
 
 function agentPostCreationReviewMarkdown(projectRoot, projectName, detection, reports, lessons, options = {}) {
   const date = today();
-  const tools = ["Codex", "AGENTS.md", "Agents Mother"];
+  const tools = ["Codex", "AGENTS.md", "Pritha"];
   if (fileExists(projectRoot, "scripts/telegram-bot.mjs")) tools.push("Telegram");
   if (fileExists(projectRoot, "operations/manifest.json")) tools.push("operations");
   return `---

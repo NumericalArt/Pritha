@@ -8,12 +8,13 @@ import process from "node:process";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const DEFAULT_LABELS = ["com.techscope.web", "com.techscope.telegram-bot"];
-const OLD_ROOT_PATTERN = /\/Users\/jkl\/Techscope/g;
 const args = process.argv.slice(2);
 const command = args[0] || "status";
 const jsonMode = args.includes("--json");
 const yes = args.includes("--yes");
 const root = resolveTechscopeRoot();
+const oldRoot = process.env.PRITHA_LAUNCHD_OLD_ROOT || path.join(path.dirname(root), "Techscope");
+const OLD_ROOT_PATTERN = new RegExp(oldRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
 const platform = process.env.PRITHA_LAUNCHD_AUDIT_PLATFORM || process.platform;
 const isDarwin = platform === "darwin";
 const uid = typeof process.getuid === "function" ? process.getuid() : Number(process.env.UID || 0);
@@ -92,14 +93,14 @@ function loadedState(label) {
     };
   }
   const text = result.stdout;
-  const containsOldRoot = text.includes("/Users/jkl/Techscope");
+  const containsOldRoot = text.includes(oldRoot);
   return {
     status: containsOldRoot ? "loaded-stale" : "ok",
     contains_expected_root: text.includes(root),
     contains_old_root: containsOldRoot,
     excerpt: text
       .split(/\r?\n/)
-      .filter((line) => /path =|working directory|stdout path|stderr path|\/Users\/jkl\/(Techscope|Pritha)/.test(line))
+      .filter((line) => /path =|working directory|stdout path|stderr path/.test(line) || line.includes(oldRoot) || line.includes(root))
       .slice(0, 16),
   };
 }

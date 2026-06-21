@@ -1,35 +1,79 @@
 # Pritha
 
-**The AI agent that creates AI agents. From spec to specialist.**
+**A universal, trainable agent for creating and evolving AI agents.**
 
-Pritha is an open-source, Codex-native spec-to-agent compiler. It helps you turn a task description into a working agent project with instructions, memory boundaries, tool policy, tests, handoff notes and lifecycle reports.
+Pritha is an open-source, Codex-native agent factory. It helps you turn a task
+description into a working child-agent project with instructions, memory
+boundaries, tool policy, tests, handoff notes and lifecycle reports.
 
-In other words: Pritha is a harness for an agent that builds the harness of a new agent. Its lineage model is intentionally genetic: Seeds become Descendants through inheritance, mutation and trial. A Claude Code version is coming as a future adapter; v0.1 remains Codex-native.
+Pritha has two primary functions:
 
-Techscope is the internal knowledge base around Pritha: it collects technology signals, reviews agent-engineering patterns, and promotes only proven ideas into reusable standards.
+1. Improve its own knowledge base, tools and agent-creation capabilities through
+   reviewed memory updates, standards, workflows, tests and harness changes.
+2. Create new child agents and improve existing child agents through contracts,
+   Pritha memory research, scaffold generation, git-based version control,
+   tests, reports and handoff.
 
-> Existing `agents-mother` commands still work as compatibility aliases. New public-facing commands should use `pritha`.
+`Trainable` means curated, versioned, reviewable learning through Pritha memory
+and repository-local harness artifacts. It does not mean hidden autonomous
+self-modification, unreviewed skill installation, secret collection or
+background service activation.
 
-## 10-Second Start
+In other words: Pritha is a harness for an agent that builds the harness of a
+new agent. Its lineage model is intentionally genetic: Seeds become Descendants
+through inheritance, mutation and trial. A Claude Code version is coming as a
+future adapter; v0.1 remains Codex-native.
+
+> Existing `agents-mother` commands still work as compatibility aliases. New
+> public-facing commands should use `pritha`.
+
+## Quick Start
 
 ```sh
+node scripts/bootstrap.mjs plan --profile minimal
+node scripts/bootstrap.mjs verify --profile minimal
 node scripts/pritha.mjs questions
 node scripts/pritha.mjs test . --no-report
 ```
 
-## 10-Minute Start
+## Fresh Clone Bootstrap
 
 ```sh
-git clone <repo-url> pritha
+git clone https://github.com/NumericalArt/Pritha.git pritha
 cd pritha
-cp .env.example .env
-node scripts/env-doctor.mjs
-node scripts/quality-gate.mjs
-node scripts/pritha.mjs create --name "research-agent" --mission "Track and review research links"
-node scripts/pritha.mjs lineage
+node scripts/bootstrap.mjs --profile local --start control-center
 ```
 
-Then open the created seed in `11_agents/contracts/`, review it, and scaffold a descendant:
+The bootstrap command installs deterministic local dependencies for the chosen
+profile, writes local non-secret setup state, verifies the portable memory
+snapshot and starts the Control Center in the foreground. It does not install
+launchd, cron, Tailscale, durable services or credentials.
+
+Useful profile-specific commands:
+
+```sh
+node scripts/bootstrap.mjs plan --profile minimal
+node scripts/bootstrap.mjs install --profile local
+node scripts/bootstrap.mjs verify --profile control-center
+node scripts/bootstrap.mjs start --profile control-center
+```
+
+## Create Your First Child Agent
+
+Start with the interview outline:
+
+```sh
+node scripts/pritha.mjs questions
+```
+
+Create a draft Seed:
+
+```sh
+node scripts/pritha.mjs create --name "research-agent" --mission "Track and review research links"
+```
+
+Review the generated contract in `11_agents/contracts/`. After it is accepted,
+scaffold and test the descendant:
 
 ```sh
 node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md --output ../research-agent
@@ -40,10 +84,28 @@ node scripts/pritha.mjs test ../research-agent
 
 - `AGENTS.md` or runtime-native instructions.
 - `README.md` and `.env.example`.
+- Git-ready child-agent project structure.
 - Interface, memory, tools and operations manifests.
 - Smoke/status scripts.
 - Optional Telegram adapter when selected by the seed.
 - Handoff and lifecycle reports.
+
+## What Works After Clone
+
+Ready without secrets:
+
+- Bootstrap planning and minimal verification.
+- Markdown memory validation and portable memory snapshot checks.
+- Local contract creation, research, scaffold planning and project inspection.
+- Control Center local build/start after `npm ci` through bootstrap.
+
+Optional credentials or operator approval are still required for:
+
+- Hosted model API calls and Realtime voice.
+- Telegram or other messaging adapters.
+- GitHub publishing operations.
+- Tailscale private device access and Tailscale Serve.
+- Any launchd/service install or durable background process.
 
 ## Core Concepts
 
@@ -65,12 +127,13 @@ node scripts/pritha.mjs test ../research-agent
 - [GitHub Publish And Push](docs/github-publish-and-push.md)
 - [Contributing Workflow](docs/contributing-workflow.md)
 - [Realtime](docs/realtime.md)
+- [Tailscale Private Access](docs/tailscale-private-access.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Prerequisites](docs/prerequisites.md)
 
 ## Quality Gate
 
-Run the normal local gate:
+Run the normal local gate after implementation changes:
 
 ```sh
 node scripts/quality-gate.mjs
@@ -104,12 +167,16 @@ Do not commit secrets or runtime state:
 
 - `.env*`
 - `.queue/`
-- `.memory/*.sqlite`
 - `.logs/`
+- `.memory-private/`
+- `.private/`
 - local machine paths
 - Telegram tokens or user identifiers
 
-Markdown artifacts are the source of truth. SQLite, embeddings and graph/search indexes must be rebuildable from Markdown.
+Markdown artifacts are the source of truth. The portable `.memory/` snapshot,
+including `.memory/techscope.sqlite`, is intentionally tracked as a rebuildable
+cache layer for GitHub clone portability. Private user memory belongs outside
+the tracked snapshot.
 
 ## License
 

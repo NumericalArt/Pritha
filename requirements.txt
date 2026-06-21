@@ -1,3 +1,2 @@
-sentence-transformers==5.1.2
-imageio-ffmpeg==0.6.0
-mlx-whisper==0.4.3
+-r requirements-core.txt
+-r requirements-macos.txt
