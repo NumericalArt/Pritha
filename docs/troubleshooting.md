@@ -46,6 +46,22 @@ The default local URL is:
 http://127.0.0.1:3420/agents
 ```
 
+`localhost` and `127.0.0.1` are loopback addresses. They work only on the Mac
+running Control Center. A phone that scans a localhost QR code will try to open
+the phone's own localhost, not the Mac.
+
+For temporary trusted-LAN testing, Control Center must listen on a non-loopback
+host:
+
+```sh
+PRITHA_CONTROL_CENTER_HOST=0.0.0.0 \
+PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIGINS=<mac-lan-ip> \
+npm --prefix interfaces/control-center run dev
+```
+
+This exposes the UI to the local network. Prefer Tailscale for normal private
+phone access.
+
 Check a running Control Center without mutating local runtime state:
 
 ```sh
@@ -179,6 +195,26 @@ Do not put real secret values in Markdown, `.techscope-setup.json`, reports or
 Git history. Use `.env.local`, the Control Center credential UI or the child
 agent's documented private secret store.
 
+## Limits Panel
+
+The Settings `Usage Dashboard` button opens the external ChatGPT/Codex usage
+page:
+
+```text
+https://chatgpt.com/codex/settings/usage
+```
+
+It is a manual fallback for checking account usage when Pritha cannot read
+limits through the local Codex App Server. If Limits reports a protocol or
+`app-server` error, verify that `.env.local` uses the Codex.app bundled binary:
+
+```sh
+PRITHA_REALTIME_CODEX_BIN=/Applications/Codex.app/Contents/Resources/codex
+```
+
+Older Homebrew `codex-cli` binaries may not support the App Server protocol
+used by the read-only limits probe.
+
 ## Tailscale Private Access
 
 Read the current plan/status first:
@@ -186,6 +222,7 @@ Read the current plan/status first:
 ```sh
 node scripts/tailscale-setup.mjs plan --app control-center --port 3420
 node scripts/tailscale-setup.mjs status --json
+node scripts/tailscale-setup.mjs auth-status
 ```
 
 Serve and stop commands require explicit approval:

@@ -31,7 +31,7 @@ function formatUptime(seconds: number | undefined) {
 function voiceUrlForStatus(status: ControlCenterStatus | null) {
   if (!status) return undefined;
   if (status.access.tailscale === "ready" && status.access.tailscaleVoiceUrl) return status.access.tailscaleVoiceUrl;
-  if (status.access.lanUrl) return `${status.access.lanUrl}/voice`;
+  if (status.access.lan === "ready" && status.access.lanUrl) return `${status.access.lanUrl}/voice`;
   return `${status.access.localhost}/voice`;
 }
 
@@ -162,6 +162,7 @@ export function Sidebar({ initialStatus }: { initialStatus: ControlCenterStatus 
         <div>
           Uptime {formatUptime(status?.app.uptimeSeconds)} <span className={`dot ${status ? "green" : "orange"}`} />
         </div>
+        <div className="developer-brand">NumericalArt</div>
       </div>
 
       {accessOpen ? (

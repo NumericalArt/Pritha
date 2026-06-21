@@ -2,7 +2,7 @@
   "schema": "techscope-self-test-v1",
   "root": "<TECHSCOPE_ROOT>",
   "status": "pass",
-  "created_at": "2026-06-21T16:57:53.815Z",
+  "created_at": "2026-06-21T22:10:25.834Z",
   "dry_run": false,
   "memory_stats": {
     "documents": 553,
@@ -15,7 +15,7 @@
     "documents": 553,
     "chunks": 4940,
     "entities": 1680,
-    "relations": 13038,
+    "relations": 13031,
     "embeddings": 4766
   },
   "quality_gate": {
@@ -23,7 +23,7 @@
     "root": "<TECHSCOPE_ROOT>",
     "profile": "self-test",
     "status": "pass",
-    "createdAt": "2026-06-21T16:57:41.247Z",
+    "createdAt": "2026-06-21T22:10:11.880Z",
     "dryRun": false,
     "failed": 0,
     "checks": [
@@ -33,7 +33,7 @@
         "command": "node scripts/env-doctor.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 266,
+        "durationMs": 269,
         "stdout": "Techscope env doctor: pass (1 warning)\n- PASS Node.js >= 20: current 24.15.0\n- PASS Git CLI: git version 2.50.1 (Apple Git-155)\n- PASS sqlite3 CLI: 3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)\n- PASS Python >= 3.9 compatibility floor: Python 3.9.6\n- WARN Python >= 3.10 recommended baseline: Python 3.9.6\n  hint: New Techscope setups should use Python 3.10+; current 3.9 support is transitional.\n- PASS Python package sentence-transformers: 5.1.2\n- PASS Python package imageio-ffmpeg: 0.6.0\n- PASS Python package mlx-whisper: 0.4.3\n- PASS mlx_whisper executable: <USER_HOME>/Library/Python/3.9/bin/mlx_whisper\n- PASS npm CLI: 11.12.1\n- PASS Control Center package-lock: interfaces/control-center/package-lock.json\n- PASS Control Center has no latest dependencies: no latest ranges found\n- PASS Codex CLI: <USER_HOME>/.local/bin/codex\n- PASS ripgrep: <USER_HOME>/.local/bin/rg\n- PASS system ffmpeg: <USER_HOME>/.local/bin/ffmpeg",
         "stderr": ""
       },
@@ -43,7 +43,7 @@
         "command": "node scripts/privacy-audit.mjs --strict",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 292,
+        "durationMs": 377,
         "stdout": "Pritha privacy audit: pass\nRoot: <TECHSCOPE_ROOT>\n- no raw/provenance retention findings",
         "stderr": ""
       },
@@ -53,7 +53,7 @@
         "command": "node scripts/validate-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 46,
+        "durationMs": 45,
         "stdout": "Memory validation passed for 553 Markdown files.",
         "stderr": ""
       },
@@ -63,7 +63,7 @@
         "command": "node scripts/rebuild-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 832,
+        "durationMs": 854,
         "stdout": "Indexed 553 documents, 4940 chunks.\nDatabase: .memory/techscope.sqlite",
         "stderr": ""
       },
@@ -73,18 +73,18 @@
         "command": "node scripts/smoke-test.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 68,
+        "durationMs": 69,
         "stdout": "PASS AGENTS.md: required file\nPASS README.md: required file\nPASS .env.example: required file\nPASS interfaces/manifest.json: required file\nPASS memory/manifest.json: required file\nPASS tools/manifest.json: required file\nPASS operations/manifest.json: required file\nPASS scripts/golden-checks.mjs: required file\nPASS scripts/validate-memory.mjs: required file\nPASS scripts/rebuild-memory.mjs: required file\nPASS scripts/query-memory.mjs: required file\nPASS scripts/telegram-bot.mjs: required file\nPASS scripts/agents-mother.mjs: required file\nPASS scripts/smoke-test.mjs: status/smoke script\nPASS scripts/interface-status.mjs: status/smoke script\nPASS scripts/memory-status.mjs: status/smoke script\nPASS scripts/tools-status.mjs: status/smoke script\nPASS scripts/operations-status.mjs: status/smoke script\nPASS scripts/healthcheck.mjs: status/smoke script\nPASS scripts/smoke-test.mjs executable: executable bit\nPASS scripts/golden-checks.mjs executable: executable bit\nPASS scripts/healthcheck.mjs executable: executable bit\nPASS interfaces/manifest.json JSON\nPASS memory/manifest.json JSON\nPASS tools/manifest.json JSON\nPASS operations/manifest.json JSON\nPASS validate-memory: Memory validation passed for 553 Markdown files.\nSmoke test passed.",
         "stderr": ""
       },
       {
         "id": "unit-tests",
         "name": "Unit tests",
-        "command": "node --test tests/agents-mother-command-modules.test.mjs tests/agents-mother-contract.test.mjs tests/agents-mother-skills.test.mjs tests/agents-mother-test-module.test.mjs tests/bootstrap.test.mjs tests/control-center-codex-safety.test.mjs tests/control-center-voice-settings.test.mjs tests/env-doctor.test.mjs tests/frontmatter.test.mjs tests/github-release-status.test.mjs tests/golden-checks.test.mjs tests/healthcheck.test.mjs tests/launchd-root-audit.test.mjs tests/media/transcribe-media-output.test.mjs tests/media/youtube-isolation.test.mjs tests/paths.test.mjs tests/pritha-alias.test.mjs tests/pritha-voice-control.test.mjs tests/privacy-audit.test.mjs tests/public-install-docs.test.mjs tests/quality-gate.test.mjs tests/queue-health.test.mjs tests/scaffold-snapshot.test.mjs tests/self-test.test.mjs tests/setup-cli.test.mjs tests/setup-state.test.mjs tests/slug.test.mjs tests/tailscale-setup.test.mjs tests/trigger-phrases.test.mjs tests/voice-control-kit.test.mjs",
+        "command": "node --test tests/agents-mother-command-modules.test.mjs tests/agents-mother-contract.test.mjs tests/agents-mother-skills.test.mjs tests/agents-mother-test-module.test.mjs tests/bootstrap.test.mjs tests/control-center-codex-safety.test.mjs tests/control-center-health.test.mjs tests/control-center-voice-settings.test.mjs tests/env-doctor.test.mjs tests/frontmatter.test.mjs tests/github-release-status.test.mjs tests/golden-checks.test.mjs tests/healthcheck.test.mjs tests/launchd-root-audit.test.mjs tests/media/transcribe-media-output.test.mjs tests/media/youtube-isolation.test.mjs tests/paths.test.mjs tests/pritha-alias.test.mjs tests/pritha-voice-control.test.mjs tests/privacy-audit.test.mjs tests/public-install-docs.test.mjs tests/quality-gate.test.mjs tests/queue-health.test.mjs tests/scaffold-snapshot.test.mjs tests/self-test.test.mjs tests/setup-cli.test.mjs tests/setup-state.test.mjs tests/slug.test.mjs tests/tailscale-setup.test.mjs tests/trigger-phrases.test.mjs tests/voice-control-kit.test.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 2228,
-        "stdout": "✔ remaining Agents Mother command modules run against an isolated root (345.172833ms)\n✔ valid fixture contract passes Agents Mother validation (39.538791ms)\n✔ invalid fixture contract fails with actionable messages (38.58725ms)\n✔ contract module validates fixture contracts directly (1.373333ms)\n✔ contract module extracts structured contract data (0.859875ms)\n✔ Pritha local skill catalog is discoverable and valid (1.857417ms)\n✔ skill selector keeps default scaffold recommendation-only (2.24725ms)\n✔ skills CLI reports status (39.285833ms)\n✔ project skill audit catches missing installed skill files (0.62775ms)\n✔ Agents Mother test module detects the Pritha harness (0.708125ms)\n✔ test module reads optional JSON manifests safely (0.0845ms)\n✔ Agents Mother test command still supports no-report mode through wrapper and direct entrypoint (1445.000583ms)\n✔ bootstrap plan is machine-readable and non-mutating (40.046958ms)\n✔ bootstrap start target pulls in Control Center install and foreground start (32.865583ms)\n✔ bootstrap verify minimal performs read-only prerequisite checks (203.977417ms)\n✔ Control Center Codex write flag is read-only unless explicitly enabled (18.749042ms)\n✔ Control Center Realtime runtime gates every effective workspace-write task (0.380584ms)\n✔ Control Center voice settings normalize behavior profile and Pritha voice (21.378667ms)\n✔ Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene (4.96ms)\n✔ Control Center Realtime runtime uses behavior settings in instructions and selected Pritha voice in session config (0.318583ms)\n✔ env-doctor exposes machine-readable dependency status (415.733625ms)\n✔ env-doctor minimal profile skips install-heavy Python package checks (74.341541ms)\n✔ env-doctor fails with an actionable message when a critical dependency is missing (294.980417ms)\n✔ parseFrontmatter preserves body and parses nested lists (0.938542ms)\n✔ parseFrontmatterData returns null when frontmatter is absent (0.058917ms)\n✔ yamlList emits project-compatible block lists (0.072375ms)\n✔ github-release-status exposes a machine-readable external release contract (464.8825ms)\n✔ github-release-status strict mode fails while external release proof is incomplete (385.653042ms)\n✔ golden-checks exposes a machine-readable dry-run contract (34.665333ms)\n✔ healthcheck skips launchd plist lint on non-macOS runners (503.762875ms)\n✔ launchd root audit detects loaded stale state after disk plist is fixed (267.4635ms)\n✔ launchd root audit accepts fixed disk and loaded state (253.709625ms)\n✔ launchd reload retries bootstrap after bootout settles (672.609709ms)\n✔ transcribe-media purges temp artifacts and emits neutral status (45.803666ms)\n✔ platform-specific media strings stay inside the removable adapter (22.106625ms)\n✔ resolveTechscopeRoot honors TECHSCOPE_ROOT (0.636458ms)\n✔ resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT (20.430125ms)\n✔ resolveSiblingAgentPath places agents beside root by default (0.124917ms)\n✔ resolveSiblingAgentPath supports explicit override (0.055ms)\n✔ Pritha entrypoint preserves Agents Mother test behavior (768.328041ms)\n✔ legacy Agents Mother wrapper remains compatible and prints a deprecation note (629.817292ms)\n✔ Pritha aliases expose create, publish and lineage surfaces (642.862ms)\n✔ Pritha voice realtime config exposes narrow tools (0.691292ms)\n✔ Pritha voice memory search works through FTS (15.157042ms)\n✔ Pritha voice can read a curated artifact by id (22.502792ms)\n✔ Pritha voice Codex handoff writes only ignored private state by default (4.785834ms)\n✔ privacy helpers detect forbidden raw artifacts and incoming provenance (0.975125ms)\n✔ privacy helpers keep official reference URLs outside incoming artifacts (0.346333ms)\n✔ public install docs use bootstrap as the fresh-clone entrypoint (0.634125ms)\n✔ README defines Pritha as a universal trainable child-agent creator (0.150459ms)\n✔ quality-gate exposes a serialized dry-run contract (31.322417ms)\n✔ quality-gate simulated failure returns a clear failing check (36.038625ms)\n✔ quality-gate emits GitHub annotations without breaking JSON output (35.928291ms)\n✔ quality-gate markdown output includes a summary table (36.365833ms)\n✔ quality-gate self-test profile omits heavier Agents Mother inspection (59.04275ms)\n✔ queue-health reports stale queue items without failing (32.420208ms)\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n✔ Agents Mother scaffold output matches the frozen file-list snapshot (123.7125ms)\n✔ scaffold module exposes generated agent files directly (5.752209ms)\n✔ scaffold command blocks draft contracts unless explicitly allowed (127.458375ms)\n✔ scaffold adds realtime voice reference files when voice is selected (1.104042ms)\n✔ scaffold vendors reviewed local skills only when contract selects vendor mode (0.726209ms)\n✔ self-test exposes a dry-run JSON contract without writing baseline (146.9555ms)\n✔ setup CLI writes private env and idempotent state (70.960458ms)\n✔ setup CLI configures default realtime tools when voice is selected (106.561167ms)\n✔ setup-status reports a missing setup state without failing (31.725125ms)\n✔ setup manifest schema describes the v1 state contract (0.189542ms)\n✔ transliterate maps Cyrillic for ASCII ids (0.58825ms)\n✔ slug can preserve Cyrillic for legacy filenames (0.132875ms)\n✔ slug fallback is explicit (0.047917ms)\n✔ tailscale setup plan is safe when Tailscale is missing (63.838292ms)\n✔ tailscale setup status exposes readiness fields (302.676667ms)\n✔ tailscale setup serve requires explicit --yes (33.839042ms)\n✔ tailscale setup serve configures private Serve and writes setup state (341.717375ms)\n✔ Control Center Next config gets Tailscale dev origins from env (0.174292ms)\n✔ Codex-facing Tailscale operator protocol is documented (33.444167ms)\n✔ setup trigger phrases route to the first-run workflow (0.526083ms)\n✔ operational trigger phrases route to health and Pritha commands (0.591625ms)\n✔ voice-control-kit exposes the FESPA26 reference plan (31.906041ms)\n✔ voice-control-kit copies the reference pack into a child interface folder (36.12475ms)\n✔ Pritha voice-kit alias delegates to the kit command (61.934666ms)\nℹ tests 80\nℹ suites 0\nℹ pass 80\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2207.647084",
+        "durationMs": 2315,
+        "stdout": "✔ remaining Agents Mother command modules run against an isolated root (392.506417ms)\n✔ valid fixture contract passes Agents Mother validation (44.575875ms)\n✔ invalid fixture contract fails with actionable messages (47.89775ms)\n✔ contract module validates fixture contracts directly (3.179542ms)\n✔ contract module extracts structured contract data (0.94725ms)\n✔ Pritha local skill catalog is discoverable and valid (1.751417ms)\n✔ skill selector keeps default scaffold recommendation-only (3.270917ms)\n✔ skills CLI reports status (38.694792ms)\n✔ project skill audit catches missing installed skill files (0.697084ms)\n✔ Agents Mother test module detects the Pritha harness (0.751167ms)\n✔ test module reads optional JSON manifests safely (0.083125ms)\n✔ Agents Mother test command still supports no-report mode through wrapper and direct entrypoint (1491.358583ms)\n✔ bootstrap plan is machine-readable and non-mutating (39.765583ms)\n✔ bootstrap start target pulls in Control Center install and foreground start (39.358ms)\n✔ bootstrap verify minimal performs read-only prerequisite checks (228.972667ms)\n✔ Control Center Codex write flag is read-only unless explicitly enabled (19.407666ms)\n✔ Control Center Realtime runtime gates every effective workspace-write task (0.588667ms)\n✔ control-center health passes when rendered pages reference served JavaScript chunks (91.098417ms)\n✔ control-center health fails when rendered HTML points at a missing chunk (82.487292ms)\n✔ control-center health skips cleanly when the server is not running (47.73425ms)\n✔ Control Center voice settings normalize behavior profile and Pritha voice (20.950042ms)\n✔ Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene (4.608208ms)\n✔ Control Center Realtime runtime uses behavior settings in instructions and selected Pritha voice in session config (0.290458ms)\n✔ env-doctor exposes machine-readable dependency status (441.613041ms)\n✔ env-doctor minimal profile skips install-heavy Python package checks (76.756875ms)\n✔ env-doctor fails with an actionable message when a critical dependency is missing (293.171625ms)\n✔ parseFrontmatter preserves body and parses nested lists (0.970417ms)\n✔ parseFrontmatterData returns null when frontmatter is absent (0.060958ms)\n✔ yamlList emits project-compatible block lists (0.073209ms)\n✔ github-release-status exposes a machine-readable external release contract (509.208ms)\n✔ github-release-status strict mode fails while external release proof is incomplete (396.976541ms)\n✔ golden-checks exposes a machine-readable dry-run contract (32.010917ms)\n✔ healthcheck skips launchd plist lint on non-macOS runners (527.964542ms)\n✔ launchd root audit detects loaded stale state after disk plist is fixed (255.1905ms)\n✔ launchd root audit accepts fixed disk and loaded state (250.75375ms)\n✔ launchd reload retries bootstrap after bootout settles (794.362417ms)\n✔ transcribe-media purges temp artifacts and emits neutral status (52.588833ms)\n✔ platform-specific media strings stay inside the removable adapter (24.986541ms)\n✔ resolveTechscopeRoot honors TECHSCOPE_ROOT (0.640916ms)\n✔ resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT (13.892792ms)\n✔ resolveSiblingAgentPath places agents beside root by default (0.138458ms)\n✔ resolveSiblingAgentPath supports explicit override (0.055125ms)\n✔ Pritha entrypoint preserves Agents Mother test behavior (787.743333ms)\n✔ legacy Agents Mother wrapper remains compatible and prints a deprecation note (652.186417ms)\n✔ Pritha aliases expose create, publish and lineage surfaces (657.015125ms)\n✔ Pritha voice realtime config exposes narrow tools (0.681917ms)\n✔ Pritha voice memory search works through FTS (39.022708ms)\n✔ Pritha voice can read a curated artifact by id (26.780125ms)\n✔ Pritha voice Codex handoff writes only ignored private state by default (8.006625ms)\n✔ privacy helpers detect forbidden raw artifacts and incoming provenance (0.886208ms)\n✔ privacy helpers keep official reference URLs outside incoming artifacts (0.330333ms)\n✔ public install docs use bootstrap as the fresh-clone entrypoint (1.084375ms)\n✔ README defines Pritha as a universal trainable child-agent creator (0.23275ms)\n✔ quality-gate exposes a serialized dry-run contract (42.513ms)\n✔ quality-gate simulated failure returns a clear failing check (50.176375ms)\n✔ quality-gate emits GitHub annotations without breaking JSON output (37.380167ms)\n✔ quality-gate markdown output includes a summary table (58.697292ms)\n✔ quality-gate self-test profile omits heavier Agents Mother inspection (30.072875ms)\n✔ queue-health reports stale queue items without failing (37.848167ms)\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n✔ Agents Mother scaffold output matches the frozen file-list snapshot (155.11025ms)\n✔ scaffold module exposes generated agent files directly (4.366625ms)\n✔ scaffold command blocks draft contracts unless explicitly allowed (112.587542ms)\n✔ scaffold adds realtime voice reference files when voice is selected (1.014792ms)\n✔ scaffold vendors reviewed local skills only when contract selects vendor mode (0.684458ms)\n✔ self-test exposes a dry-run JSON contract without writing baseline (1282.587416ms)\n✔ setup CLI writes private env and idempotent state (89.178458ms)\n✔ setup CLI configures default realtime tools when voice is selected (94.247334ms)\n✔ setup-status reports a missing setup state without failing (43.952167ms)\n✔ setup manifest schema describes the v1 state contract (0.187167ms)\n✔ transliterate maps Cyrillic for ASCII ids (0.665625ms)\n✔ slug can preserve Cyrillic for legacy filenames (0.142042ms)\n✔ slug fallback is explicit (0.048666ms)\n✔ tailscale setup plan is safe when Tailscale is missing (49.145792ms)\n✔ tailscale setup status exposes readiness fields (411.635459ms)\n✔ tailscale setup serve requires explicit --yes (36.7635ms)\n✔ tailscale setup serve configures private Serve and writes setup state (311.699875ms)\n✔ Control Center Next config gets Tailscale dev origins from env (0.20475ms)\n✔ Codex-facing Tailscale operator protocol is documented (33.913542ms)\n✔ setup trigger phrases route to the first-run workflow (0.521333ms)\n✔ operational trigger phrases route to health and Pritha commands (0.598166ms)\n✔ voice-control-kit exposes the FESPA26 reference plan (28.448166ms)\n✔ voice-control-kit copies the reference pack into a child interface folder (39.719125ms)\n✔ Pritha voice-kit alias delegates to the kit command (59.952625ms)\nℹ tests 83\nℹ suites 0\nℹ pass 83\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2290.292",
         "stderr": ""
       },
       {
@@ -93,7 +93,7 @@
         "command": "node scripts/telegram-bot.mjs poll-once --dry-run",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 25,
+        "durationMs": 27,
         "stdout": "{\n  \"mode\": \"dry-run\",\n  \"root\": \"<TECHSCOPE_ROOT>\",\n  \"allowed_users\": [],\n  \"telegram_intake\": {\n    \"pending\": 0,\n    \"processing\": 0,\n    \"awaiting_codex\": 1,\n    \"complete\": 7,\n    \"done\": 12,\n    \"failed\": 0\n  },\n  \"codex_media_review\": {\n    \"pending\": 1,\n    \"done\": 5\n  }\n}",
         "stderr": ""
       }
@@ -103,14 +103,14 @@
     "ok": true,
     "status": 0,
     "stdout": "Loading model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\nEmbedding 4766 chunks...\nStored 4766 embeddings in .memory/techscope.sqlite",
-    "stderr": "<USER_HOME>/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020\n  warnings.warn(\n\rBatches:   0%|          | 0/149 [00:00<?, ?it/s]\rBatches:   1%|          | 1/149 [00:00<00:19,  7.72it/s]\rBatches:   2%|▏         | 3/149 [00:00<00:11, 12.97it/s]\rBatches:   3%|▎         | 5/149 [00:00<00:09, 14.88it/s]\rBatches:   5%|▍         | 7/149 [00:00<00:08, 15.88it/s]\rBatches:   6%|▌         | 9/149 [00:00<00:08, 16.57it/s]\rBatches:   7%|▋         | 11/149 [00:00<00:08, 17.11it/s]\rBatches:   9%|▊         | 13/149 [00:00<00:07, 17.37it/s]\rBatches:  10%|█         | 15/149 [00:00<00:07, 17.59it/s]\rBatches:  11%|█▏        | 17/149 [00:01<00:07, 17.84it/s]\rBatches:  13%|█▎        | 19/149 [00:01<00:07, 18.08it/s]\rBatches:  14%|█▍        | 21/149 [00:01<00:07, 18.15it/s]\rBatches:  15%|█▌        | 23/149 [00:01<00:06, 18.30it/s]\rBatches:  17%|█▋        | 25/149 [00:01<00:06, 18.31it/s]\rBatches:  18%|█▊        | 27/149 [00:01<00:06, 18.39it/s]\rBatches:  19%|█▉        | 29/149 [00:01<00:06, 18.50it/s]\rBatches:  21%|██        | 31/149 [00:01<00:06, 18.65it/s]\rBatches:  22%|██▏       | 33/149 [00:01<00:06, 18.45it/s]\rBatches:  23%|██▎       | 35/149 [00:02<00:06, 18.52it/s]\rBatches:  25%|██▍       | 37/149 [00:02<00:06, 18.52it/s]\rBatches:  26%|██▌       | 39/149 [00:02<00:05, 18.53it/s]\rBatches:  28%|██▊       | 41/149 [00:02<00:05, 18.60it/s]\rBatches:  29%|██▉       | 43/149 [00:02<00:05, 18.67it/s]\rBatches:  30%|███       | 45/149 [00:02<00:05, 18.74it/s]\rBatches:  32%|███▏      | 47/149 [00:02<00:05, 18.77it/s]\rBatches:  33%|███▎      | 49/149 [00:02<00:05, 18.84it/s]\rBatches:  34%|███▍      | 51/149 [00:02<00:05, 18.93it/s]\rBatches:  36%|███▌      | 53/149 [00:02<00:05, 18.85it/s]\rBatches:  37%|███▋      | 55/149 [00:03<00:04, 18.89it/s]\rBatches:  38%|███▊      | 57/149 [00:03<00:04, 18.94it/s]\rBatches:  40%|███▉      | 59/149 [00:03<00:04, 18.94it/s]\rBatches:  41%|████      | 61/149 [00:03<00:04, 18.15it/s]\rBatches:  42%|████▏     | 63/149 [00:03<00:04, 17.43it/s]\rBatches:  44%|████▎     | 65/149 [00:03<00:04, 17.65it/s]\rBatches:  45%|████▍     | 67/149 [00:03<00:04, 18.21it/s]\rBatches:  47%|████▋     | 70/149 [00:03<00:04, 18.25it/s]\rBatches:  48%|████▊     | 72/149 [00:03<00:04, 18.67it/s]\rBatches:  50%|█████     | 75/149 [00:04<00:03, 19.01it/s]\rBatches:  52%|█████▏    | 77/149 [00:04<00:03, 18.47it/s]\rBatches:  53%|█████▎    | 79/149 [00:04<00:03, 18.03it/s]\rBatches:  54%|█████▍    | 81/149 [00:04<00:03, 18.20it/s]\rBatches:  56%|█████▌    | 83/149 [00:04<00:03, 18.39it/s]\rBatches:  58%|█████▊    | 86/149 [00:04<00:03, 20.16it/s]\rBatches:  60%|█████▉    | 89/149 [00:04<00:02, 20.05it/s]\rBatches:  62%|██████▏   | 92/149 [00:04<00:02, 21.89it/s]\rBatches:  64%|██████▍   | 95/149 [00:05<00:02, 22.87it/s]\rBatches:  66%|██████▌   | 98/149 [00:05<00:02, 23.51it/s]\rBatches:  68%|██████▊   | 102/149 [00:05<00:01, 26.31it/s]\rBatches:  71%|███████   | 106/149 [00:05<00:01, 27.81it/s]\rBatches:  73%|███████▎  | 109/149 [00:05<00:01, 27.96it/s]\rBatches:  75%|███████▌  | 112/149 [00:05<00:01, 27.83it/s]\rBatches:  77%|███████▋  | 115/149 [00:05<00:01, 27.82it/s]\rBatches:  80%|███████▉  | 119/149 [00:05<00:01, 29.54it/s]\rBatches:  82%|████████▏ | 122/149 [00:06<00:00, 27.97it/s]\rBatches:  84%|████████▍ | 125/149 [00:06<00:00, 27.87it/s]\rBatches:  87%|████████▋ | 129/149 [00:06<00:00, 29.57it/s]\rBatches:  90%|████████▉ | 134/149 [00:06<00:00, 34.27it/s]\rBatches:  93%|█████████▎| 139/149 [00:06<00:00, 36.97it/s]\rBatches:  97%|█████████▋| 144/149 [00:06<00:00, 38.56it/s]\rBatches:  99%|█████████▉| 148/149 [00:06<00:00, 37.74it/s]\rBatches: 100%|██████████| 149/149 [00:06<00:00, 22.06it/s]"
+    "stderr": "<USER_HOME>/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020\n  warnings.warn(\n\rBatches:   0%|          | 0/149 [00:00<?, ?it/s]\rBatches:   1%|          | 1/149 [00:00<00:22,  6.50it/s]\rBatches:   2%|▏         | 3/149 [00:00<00:12, 11.92it/s]\rBatches:   3%|▎         | 5/149 [00:00<00:10, 14.25it/s]\rBatches:   5%|▍         | 7/149 [00:00<00:09, 15.54it/s]\rBatches:   6%|▌         | 9/149 [00:00<00:08, 16.31it/s]\rBatches:   7%|▋         | 11/149 [00:00<00:08, 16.90it/s]\rBatches:   9%|▊         | 13/149 [00:00<00:07, 17.35it/s]\rBatches:  10%|█         | 15/149 [00:00<00:07, 17.66it/s]\rBatches:  11%|█▏        | 17/149 [00:01<00:07, 17.83it/s]\rBatches:  13%|█▎        | 19/149 [00:01<00:07, 18.05it/s]\rBatches:  14%|█▍        | 21/149 [00:01<00:07, 18.10it/s]\rBatches:  15%|█▌        | 23/149 [00:01<00:06, 18.23it/s]\rBatches:  17%|█▋        | 25/149 [00:01<00:06, 18.29it/s]\rBatches:  18%|█▊        | 27/149 [00:01<00:06, 18.38it/s]\rBatches:  19%|█▉        | 29/149 [00:01<00:06, 18.36it/s]\rBatches:  21%|██        | 31/149 [00:01<00:06, 18.45it/s]\rBatches:  22%|██▏       | 33/149 [00:01<00:06, 17.85it/s]\rBatches:  23%|██▎       | 35/149 [00:02<00:06, 18.01it/s]\rBatches:  25%|██▍       | 37/149 [00:02<00:06, 18.15it/s]\rBatches:  26%|██▌       | 39/149 [00:02<00:06, 18.27it/s]\rBatches:  28%|██▊       | 41/149 [00:02<00:05, 18.37it/s]\rBatches:  29%|██▉       | 43/149 [00:02<00:05, 18.43it/s]\rBatches:  30%|███       | 45/149 [00:02<00:05, 18.50it/s]\rBatches:  32%|███▏      | 47/149 [00:02<00:05, 18.46it/s]\rBatches:  33%|███▎      | 49/149 [00:02<00:05, 18.52it/s]\rBatches:  34%|███▍      | 51/149 [00:02<00:05, 18.54it/s]\rBatches:  36%|███▌      | 53/149 [00:03<00:05, 18.62it/s]\rBatches:  37%|███▋      | 55/149 [00:03<00:05, 18.62it/s]\rBatches:  38%|███▊      | 57/149 [00:03<00:04, 18.67it/s]\rBatches:  40%|███▉      | 59/149 [00:03<00:04, 18.74it/s]\rBatches:  41%|████      | 61/149 [00:03<00:04, 17.93it/s]\rBatches:  42%|████▏     | 63/149 [00:03<00:05, 17.15it/s]\rBatches:  44%|████▎     | 65/149 [00:03<00:04, 16.92it/s]\rBatches:  45%|████▍     | 67/149 [00:03<00:04, 16.86it/s]\rBatches:  46%|████▋     | 69/149 [00:03<00:04, 17.14it/s]\rBatches:  48%|████▊     | 71/149 [00:04<00:04, 16.08it/s]\rBatches:  49%|████▉     | 73/149 [00:04<00:04, 15.79it/s]\rBatches:  50%|█████     | 75/149 [00:04<00:04, 16.27it/s]\rBatches:  52%|█████▏    | 77/149 [00:04<00:04, 15.87it/s]\rBatches:  53%|█████▎    | 79/149 [00:04<00:04, 15.78it/s]\rBatches:  54%|█████▍    | 81/149 [00:04<00:04, 15.58it/s]\rBatches:  56%|█████▌    | 83/149 [00:04<00:04, 16.16it/s]\rBatches:  58%|█████▊    | 86/149 [00:04<00:03, 18.13it/s]\rBatches:  60%|█████▉    | 89/149 [00:05<00:03, 18.72it/s]\rBatches:  62%|██████▏   | 92/149 [00:05<00:02, 20.63it/s]\rBatches:  64%|██████▍   | 95/149 [00:05<00:02, 21.22it/s]\rBatches:  66%|██████▌   | 98/149 [00:05<00:02, 21.58it/s]\rBatches:  68%|██████▊   | 101/149 [00:05<00:02, 23.42it/s]\rBatches:  70%|██████▉   | 104/149 [00:05<00:01, 24.05it/s]\rBatches:  72%|███████▏  | 108/149 [00:05<00:01, 26.09it/s]\rBatches:  74%|███████▍  | 111/149 [00:05<00:01, 26.49it/s]\rBatches:  77%|███████▋  | 114/149 [00:06<00:01, 26.66it/s]\rBatches:  79%|███████▉  | 118/149 [00:06<00:01, 28.28it/s]\rBatches:  81%|████████  | 121/149 [00:06<00:01, 27.75it/s]\rBatches:  84%|████████▍ | 125/149 [00:06<00:00, 27.87it/s]\rBatches:  87%|████████▋ | 129/149 [00:06<00:00, 28.58it/s]\rBatches:  90%|████████▉ | 134/149 [00:06<00:00, 33.25it/s]\rBatches:  93%|█████████▎| 139/149 [00:06<00:00, 35.91it/s]\rBatches:  97%|█████████▋| 144/149 [00:06<00:00, 38.29it/s]\rBatches:  99%|█████████▉| 148/149 [00:07<00:00, 36.38it/s]\rBatches: 100%|██████████| 149/149 [00:07<00:00, 21.02it/s]"
   },
   "queue_health": {
     "schema": "techscope-queue-health-v1",
     "root": "<TECHSCOPE_ROOT>",
     "status": "pass",
     "stale_days_threshold": 7,
-    "created_at": "2026-06-21T16:57:53.756Z",
+    "created_at": "2026-06-21T22:10:24.760Z",
     "queues": [
       {
         "id": "telegram-intake",
@@ -139,7 +139,7 @@
         "path": ".queue/telegram-intake/awaiting_codex/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
         "updated_at": "2026-05-19T18:32:04.876Z",
         "created_at": "2026-05-19T18:31:50.241Z",
-        "age_days": 32.93
+        "age_days": 33.15
       },
       {
         "queue": "codex-media-review",
@@ -148,7 +148,7 @@
         "path": ".queue/codex-media-review/pending/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
         "updated_at": "2026-05-19T18:32:04.876Z",
         "created_at": "2026-05-19T18:32:04.876Z",
-        "age_days": 32.93
+        "age_days": 33.15
       }
     ],
     "failed": []
@@ -204,6 +204,409 @@
       }
     ],
     "stale_jobs": []
+  },
+  "control_center_health": {
+    "schema": "pritha-control-center-health-v1",
+    "baseUrl": "http://127.0.0.1:3420",
+    "created_at": "2026-06-21T22:10:25.801Z",
+    "strict": false,
+    "status": "pass",
+    "checks": [
+      {
+        "id": "control-center-reachable",
+        "status": "pass",
+        "message": "Control Center health endpoint is ready",
+        "url": "http://127.0.0.1:3420/api/health",
+        "httpStatus": 200
+      },
+      {
+        "id": "page:/voice",
+        "status": "pass",
+        "message": "Control Center page loaded and references JavaScript chunks",
+        "path": "/voice",
+        "url": "http://127.0.0.1:3420/voice",
+        "httpStatus": 200,
+        "contentType": "text/html; charset=utf-8",
+        "scripts": [
+          "/_next/static/chunks/07-hzktxqjvzd.js",
+          "/_next/static/chunks/11oof8oxnxiv9.js",
+          "/_next/static/chunks/3n7dm2ojtyzwn.js",
+          "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+          "/_next/static/chunks/0o31-p5o0k6u7.js",
+          "/_next/static/chunks/14mrh2-p_w84d.js",
+          "/_next/static/chunks/0fv7n0rg3_oyh.js",
+          "/_next/static/chunks/253pciu9fe727.js",
+          "/_next/static/chunks/0cz1d0mv5g_q7.js",
+          "/_next/static/chunks/10qk6v6416kh8.js"
+        ],
+        "detail": "",
+        "scriptCount": 10
+      },
+      {
+        "id": "page:/agents",
+        "status": "pass",
+        "message": "Control Center page loaded and references JavaScript chunks",
+        "path": "/agents",
+        "url": "http://127.0.0.1:3420/agents",
+        "httpStatus": 200,
+        "contentType": "text/html; charset=utf-8",
+        "scripts": [
+          "/_next/static/chunks/07-hzktxqjvzd.js",
+          "/_next/static/chunks/11oof8oxnxiv9.js",
+          "/_next/static/chunks/3n7dm2ojtyzwn.js",
+          "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+          "/_next/static/chunks/0o31-p5o0k6u7.js",
+          "/_next/static/chunks/14mrh2-p_w84d.js",
+          "/_next/static/chunks/0kpcyvqq7ark9.js",
+          "/_next/static/chunks/253pciu9fe727.js",
+          "/_next/static/chunks/3-byck4zm4nk2.js",
+          "/_next/static/chunks/0cz1d0mv5g_q7.js",
+          "/_next/static/chunks/10qk6v6416kh8.js"
+        ],
+        "detail": "",
+        "scriptCount": 11
+      },
+      {
+        "id": "page:/settings",
+        "status": "pass",
+        "message": "Control Center page loaded and references JavaScript chunks",
+        "path": "/settings",
+        "url": "http://127.0.0.1:3420/settings",
+        "httpStatus": 200,
+        "contentType": "text/html; charset=utf-8",
+        "scripts": [
+          "/_next/static/chunks/07-hzktxqjvzd.js",
+          "/_next/static/chunks/11oof8oxnxiv9.js",
+          "/_next/static/chunks/3n7dm2ojtyzwn.js",
+          "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+          "/_next/static/chunks/0o31-p5o0k6u7.js",
+          "/_next/static/chunks/14mrh2-p_w84d.js",
+          "/_next/static/chunks/3_ayhcn5b41g_.js",
+          "/_next/static/chunks/1s-dke3dusypc.js",
+          "/_next/static/chunks/0cz1d0mv5g_q7.js",
+          "/_next/static/chunks/10qk6v6416kh8.js"
+        ],
+        "detail": "",
+        "scriptCount": 10
+      },
+      {
+        "id": "chunk:/_next/static/chunks/07-hzktxqjvzd.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/07-hzktxqjvzd.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/07-hzktxqjvzd.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/11oof8oxnxiv9.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/11oof8oxnxiv9.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/11oof8oxnxiv9.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/3n7dm2ojtyzwn.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/3n7dm2ojtyzwn.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/3n7dm2ojtyzwn.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/0o31-p5o0k6u7.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/0o31-p5o0k6u7.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0o31-p5o0k6u7.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/14mrh2-p_w84d.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/14mrh2-p_w84d.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/14mrh2-p_w84d.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/253pciu9fe727.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/253pciu9fe727.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/253pciu9fe727.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/0cz1d0mv5g_q7.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/0cz1d0mv5g_q7.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0cz1d0mv5g_q7.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/10qk6v6416kh8.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/10qk6v6416kh8.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/10qk6v6416kh8.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/0kpcyvqq7ark9.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/0kpcyvqq7ark9.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0kpcyvqq7ark9.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/3-byck4zm4nk2.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/3-byck4zm4nk2.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/3-byck4zm4nk2.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/3_ayhcn5b41g_.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/3_ayhcn5b41g_.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/3_ayhcn5b41g_.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      },
+      {
+        "id": "chunk:/_next/static/chunks/1s-dke3dusypc.js",
+        "status": "pass",
+        "message": "Referenced JavaScript chunk loaded",
+        "path": "/_next/static/chunks/1s-dke3dusypc.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/1s-dke3dusypc.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "detail": ""
+      }
+    ],
+    "pages": [
+      {
+        "path": "/voice",
+        "url": "http://127.0.0.1:3420/voice",
+        "httpStatus": 200,
+        "contentType": "text/html; charset=utf-8",
+        "scripts": [
+          "/_next/static/chunks/07-hzktxqjvzd.js",
+          "/_next/static/chunks/11oof8oxnxiv9.js",
+          "/_next/static/chunks/3n7dm2ojtyzwn.js",
+          "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+          "/_next/static/chunks/0o31-p5o0k6u7.js",
+          "/_next/static/chunks/14mrh2-p_w84d.js",
+          "/_next/static/chunks/0fv7n0rg3_oyh.js",
+          "/_next/static/chunks/253pciu9fe727.js",
+          "/_next/static/chunks/0cz1d0mv5g_q7.js",
+          "/_next/static/chunks/10qk6v6416kh8.js"
+        ],
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/agents",
+        "url": "http://127.0.0.1:3420/agents",
+        "httpStatus": 200,
+        "contentType": "text/html; charset=utf-8",
+        "scripts": [
+          "/_next/static/chunks/07-hzktxqjvzd.js",
+          "/_next/static/chunks/11oof8oxnxiv9.js",
+          "/_next/static/chunks/3n7dm2ojtyzwn.js",
+          "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+          "/_next/static/chunks/0o31-p5o0k6u7.js",
+          "/_next/static/chunks/14mrh2-p_w84d.js",
+          "/_next/static/chunks/0kpcyvqq7ark9.js",
+          "/_next/static/chunks/253pciu9fe727.js",
+          "/_next/static/chunks/3-byck4zm4nk2.js",
+          "/_next/static/chunks/0cz1d0mv5g_q7.js",
+          "/_next/static/chunks/10qk6v6416kh8.js"
+        ],
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/settings",
+        "url": "http://127.0.0.1:3420/settings",
+        "httpStatus": 200,
+        "contentType": "text/html; charset=utf-8",
+        "scripts": [
+          "/_next/static/chunks/07-hzktxqjvzd.js",
+          "/_next/static/chunks/11oof8oxnxiv9.js",
+          "/_next/static/chunks/3n7dm2ojtyzwn.js",
+          "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+          "/_next/static/chunks/0o31-p5o0k6u7.js",
+          "/_next/static/chunks/14mrh2-p_w84d.js",
+          "/_next/static/chunks/3_ayhcn5b41g_.js",
+          "/_next/static/chunks/1s-dke3dusypc.js",
+          "/_next/static/chunks/0cz1d0mv5g_q7.js",
+          "/_next/static/chunks/10qk6v6416kh8.js"
+        ],
+        "status": "pass",
+        "detail": ""
+      }
+    ],
+    "chunks": [
+      {
+        "path": "/_next/static/chunks/07-hzktxqjvzd.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/07-hzktxqjvzd.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/11oof8oxnxiv9.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/11oof8oxnxiv9.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/3n7dm2ojtyzwn.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/3n7dm2ojtyzwn.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/turbopack-1a7w8x953fnac.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/0o31-p5o0k6u7.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0o31-p5o0k6u7.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/14mrh2-p_w84d.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/14mrh2-p_w84d.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/253pciu9fe727.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/253pciu9fe727.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/0cz1d0mv5g_q7.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0cz1d0mv5g_q7.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/10qk6v6416kh8.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/10qk6v6416kh8.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/0kpcyvqq7ark9.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0kpcyvqq7ark9.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/3-byck4zm4nk2.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/3-byck4zm4nk2.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/3_ayhcn5b41g_.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/3_ayhcn5b41g_.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      },
+      {
+        "path": "/_next/static/chunks/1s-dke3dusypc.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/1s-dke3dusypc.js",
+        "httpStatus": 200,
+        "contentType": "application/javascript; charset=UTF-8",
+        "status": "pass",
+        "detail": ""
+      }
+    ]
   },
   "warnings": [],
   "regressions": []

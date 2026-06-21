@@ -145,6 +145,9 @@ function CodexCommandFallback({ commands }: { commands?: LimitsState["codexSubsc
   if (!commands) return null;
   return (
     <div className="settings-limit-fallback">
+      <span className="settings-limit-fallback-note">
+        Usage Dashboard opens the external ChatGPT/Codex usage page. Slash commands are manual fallbacks when the Codex App Server probe cannot read limits.
+      </span>
       <a className="outline-button compact" href={commands.dashboardUrl} target="_blank" rel="noreferrer">
         <ExternalLink size={15} />
         Usage Dashboard
@@ -193,7 +196,15 @@ export function LimitsSettingsSection() {
   function renderCodexLimits() {
     if (!limits) return null;
     if (!primarySnapshot && extraSnapshots.length === 0) {
-      return <CodexCommandFallback commands={limits.codexSubscription.commands} />;
+      return (
+        <>
+          <div className="info-note settings-limit-hint">
+            <Gauge size={17} />
+            If this reports a protocol or app-server error, set PRITHA_REALTIME_CODEX_BIN to the Codex.app bundled binary rather than a Homebrew codex-cli shim.
+          </div>
+          <CodexCommandFallback commands={limits.codexSubscription.commands} />
+        </>
+      );
     }
     return (
       <div className="settings-limit-stack">

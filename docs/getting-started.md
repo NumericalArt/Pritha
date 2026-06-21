@@ -55,6 +55,18 @@ and all durable services require separate explicit operator approval.
 For private phone or laptop access through Tailscale, use the guided flow in
 [Tailscale Private Access](tailscale-private-access.md).
 
+`localhost` and `127.0.0.1` work only on the Mac that runs Control Center. A
+QR code with a localhost URL will not open Pritha from a phone, because on the
+phone it points back to the phone itself. Use Tailscale for the recommended
+private phone path, or start Control Center on `0.0.0.0` only on a trusted LAN.
+
+The Settings page can show Codex subscription limits through the Codex App
+Server. If the Limits panel reports a protocol or `app-server` error, check
+that `.env.local` points `PRITHA_REALTIME_CODEX_BIN` to the Codex.app bundled
+binary, not an older Homebrew `codex-cli` shim. The `Usage Dashboard` button
+opens the external ChatGPT/Codex usage page:
+<https://chatgpt.com/codex/settings/usage>.
+
 ## Create Your First Seed
 
 Start with the interview outline:
