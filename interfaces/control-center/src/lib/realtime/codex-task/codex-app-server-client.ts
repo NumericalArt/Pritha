@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
+import type { CodexReasoningEffort, CodexServiceTier } from "../pritha-runtime";
 import type { PrithaCodexTaskClient, PrithaCodexTaskPayload, PrithaCodexTaskRunOptions } from "./types";
 
 type RpcMessage = {
@@ -27,6 +28,11 @@ type CodexAppServerClientOptions = {
   registryPath?: string;
   clientName?: string;
   buildSandboxPolicy: (payload: PrithaCodexTaskPayload) => Record<string, unknown>;
+  getRuntimeSettings?: () => {
+    codexModel: string;
+    codexReasoningEffort: CodexReasoningEffort;
+    codexServiceTier: CodexServiceTier;
+  };
 };
 
 const RESULT_SCHEMA = {
@@ -60,6 +66,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
   private readonly registryPath?: string;
   private readonly clientName: string;
   private readonly buildSandboxPolicy: (payload: PrithaCodexTaskPayload) => Record<string, unknown>;
+  private readonly getRuntimeSettings?: CodexAppServerClientOptions["getRuntimeSettings"];
 
   constructor(options: CodexAppServerClientOptions) {
     this.codexBin = options.codexBin || process.env.CODEX_BIN?.trim() || "codex";
@@ -68,6 +75,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     this.registryPath = options.registryPath;
     this.clientName = options.clientName || "pritha-voice-control";
     this.buildSandboxPolicy = options.buildSandboxPolicy;
+    this.getRuntimeSettings = options.getRuntimeSettings;
   }
 
   async runTask(payload: PrithaCodexTaskPayload, options: PrithaCodexTaskRunOptions) {
@@ -119,6 +127,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         thread_name: target.threadName,
       });
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
+      const runtimeSettings = this.getRuntimeSettings?.();
 
       const turnResponse = (await connection.request(
         "turn/start",
@@ -126,10 +135,11 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
           threadId: target.threadId,
           input: [{ type: "text", text: buildPrompt(payload), text_elements: [] }],
           cwd: this.cwd,
+          model: runtimeSettings?.codexModel || undefined,
           approvalPolicy: "never",
           sandboxPolicy: this.buildSandboxPolicy(payload),
           outputSchema: RESULT_SCHEMA,
-          effort: effortForTask(payload.taskType),
+          effort: runtimeSettings?.codexReasoningEffort || effortForTask(payload.taskType),
           summary: "none",
           personality: "pragmatic",
         },

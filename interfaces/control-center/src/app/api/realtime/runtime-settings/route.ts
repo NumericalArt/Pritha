@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { getPrithaRealtimeStatus, getPrithaRuntimeSettings, updatePrithaRuntimeSettings } from "@/lib/realtime/pritha-runtime";
+import {
+  getPrithaRealtimeStatus,
+  getPrithaRuntimeSettings,
+  normalizeCodexReasoningEffort,
+  normalizeCodexServiceTier,
+  updatePrithaRuntimeSettings,
+} from "@/lib/realtime/pritha-runtime";
 import {
   isPrithaVoiceId,
   isVoiceBehaviorProfile,
@@ -13,6 +19,8 @@ export const dynamic = "force-dynamic";
 type RuntimeSettingsPayload = {
   deepTaskPrimaryTransport?: "codex-app" | "codex-cli";
   codexModel?: string;
+  codexReasoningEffort?: string;
+  codexServiceTier?: string;
   codexWorkdir?: string;
   codexSandbox?: "auto" | "read-only" | "workspace-write" | "danger-full-access";
   codexNetworkAccess?: boolean;
@@ -23,6 +31,10 @@ type RuntimeSettingsPayload = {
 
 function transportStatus() {
   return getPrithaRealtimeStatus().codex.transports;
+}
+
+function isCodexReasoningEffort(value: unknown) {
+  return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "very_high";
 }
 
 export async function GET() {
@@ -43,6 +55,18 @@ export async function POST(request: Request) {
     patch.deepTaskPrimaryTransport = payload.deepTaskPrimaryTransport;
   }
   if (typeof payload.codexModel === "string") patch.codexModel = payload.codexModel;
+  if ("codexReasoningEffort" in payload) {
+    if (!isCodexReasoningEffort(payload.codexReasoningEffort)) {
+      return NextResponse.json({ ok: false, error: "invalid_codex_reasoning_effort" }, { status: 400 });
+    }
+    patch.codexReasoningEffort = normalizeCodexReasoningEffort(payload.codexReasoningEffort);
+  }
+  if ("codexServiceTier" in payload) {
+    if (payload.codexServiceTier !== "standard" && payload.codexServiceTier !== "fast") {
+      return NextResponse.json({ ok: false, error: "invalid_codex_service_tier" }, { status: 400 });
+    }
+    patch.codexServiceTier = normalizeCodexServiceTier(payload.codexServiceTier);
+  }
   if (typeof payload.codexWorkdir === "string") patch.codexWorkdir = payload.codexWorkdir;
   if (["auto", "read-only", "workspace-write", "danger-full-access"].includes(String(payload.codexSandbox))) {
     patch.codexSandbox = payload.codexSandbox;

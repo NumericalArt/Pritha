@@ -20,8 +20,12 @@ import {
   X,
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { CodexAuthSection } from "@/components/settings/CodexAuthSection";
+import { CodexSettingsSection } from "@/components/settings/CodexSettingsSection";
+import { LimitsSettingsSection } from "@/components/settings/LimitsSettingsSection";
+import { OpenAIKeysSection } from "@/components/settings/OpenAIKeysSection";
 import { LanguageDropdown } from "@/components/primitives/LanguageDropdown";
 import { VoiceSettingsSection } from "@/components/settings/VoiceSettingsSection";
 import type { CapabilityStatus, ControlCenterStatus } from "@/lib/control-center/types";
@@ -107,15 +111,73 @@ function memoryIndexLabel(status?: ControlCenterStatus) {
   return `${stats.documents.toLocaleString("en-US")} docs / ${stats.chunks.toLocaleString("en-US")} chunks`;
 }
 
-function SettingsTabs() {
-  const tabs = ["General", "Access", "Codex", "Voice", "Limits", "Proactivity"];
+type SettingsSectionId = "general" | "access" | "codex" | "voice" | "limits" | "proactivity";
+
+const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
+  { id: "general", label: "General" },
+  { id: "access", label: "Access" },
+  { id: "codex", label: "Codex" },
+  { id: "voice", label: "Voice" },
+  { id: "limits", label: "Limits" },
+  { id: "proactivity", label: "Proactivity" },
+];
+
+function useSettingsAnchors(prefix: string) {
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>("general");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof IntersectionObserver === "undefined") return;
+    const elements = SETTINGS_SECTIONS.map((section) => document.getElementById(`${prefix}-${section.id}`)).filter((element): element is HTMLElement => Boolean(element));
+    if (!elements.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((first, second) => second.intersectionRatio - first.intersectionRatio)[0];
+        const section = visible?.target.getAttribute("data-settings-section") as SettingsSectionId | null;
+        if (section) setActiveSection(section);
+      },
+      { rootMargin: "-18% 0px -62% 0px", threshold: [0.1, 0.35, 0.6] },
+    );
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [prefix]);
+
+  const scrollToSection = useCallback(
+    (section: SettingsSectionId) => {
+      setActiveSection(section);
+      document.getElementById(`${prefix}-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [prefix],
+  );
+
+  return { activeSection, scrollToSection };
+}
+
+function SettingsTabs({ activeSection, onSelect, controlsPrefix }: { activeSection: SettingsSectionId; onSelect: (section: SettingsSectionId) => void; controlsPrefix: string }) {
   return (
     <div className="settings-tabs" role="tablist" aria-label="Settings sections">
-      {tabs.map((tab) => (
-        <button className={`settings-tab ${tab === "General" ? "active" : ""}`} type="button" role="tab" aria-selected={tab === "General"} key={tab}>
-          {tab}
+      {SETTINGS_SECTIONS.map((section) => (
+        <button
+          className={`settings-tab ${section.id === activeSection ? "active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={section.id === activeSection}
+          aria-controls={`${controlsPrefix}-${section.id}`}
+          onClick={() => onSelect(section.id)}
+          key={section.id}
+        >
+          {section.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function SettingsAnchorSection({ prefix, section, children }: { prefix: string; section: SettingsSectionId; children: React.ReactNode }) {
+  return (
+    <div id={`${prefix}-${section}`} className="settings-anchor-target settings-section-stack" data-settings-section={section}>
+      {children}
     </div>
   );
 }
@@ -469,6 +531,69 @@ function ProactivityCard({ status }: { status?: ControlCenterStatus }) {
   );
 }
 
+function ProactivitySettingsSection({ status }: { status?: ControlCenterStatus }) {
+  const proactivity = status?.proactivity;
+  const statusLabel = proactivity ? statusText(proactivity.status) : "unknown";
+  const cronLabel = proactivity?.cronAdapter === "not_installed" ? "Cron adapter not installed" : `Cron adapter ${proactivity ? statusText(proactivity.cronAdapter) : "unknown"}`;
+  const modeLabel = proactivity?.mode === "manual" ? "Manual-only" : proactivity?.mode === "planned" ? "Planned" : "Disabled";
+
+  return (
+    <section className="settings-section">
+      <div className="settings-section-row">
+        <SectionHeader icon={<Clock3 size={22} />} title="Proactivity" subtitle="Manual-first activity model" />
+        <span className="inline-status orange">{modeLabel}</span>
+      </div>
+      <div className="settings-rowline">
+        <div>
+          <strong>Mode</strong>
+          <span>Pritha remains manual-first until a separate operations decision enables scheduled work.</span>
+        </div>
+        <span className="settings-status-chip unknown">{modeLabel}</span>
+      </div>
+      <div className="settings-rowline">
+        <div>
+          <strong>Cron adapter</strong>
+          <span>{cronLabel}. Proactivity status: {statusLabel}.</span>
+        </div>
+        <button className="outline-button" type="button" aria-disabled="true" title="Proactivity configuration is planned">
+          Configure Draft
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function SettingsContent({ prefix, access, status }: AccessProps & { prefix: string }) {
+  const { activeSection, scrollToSection } = useSettingsAnchors(prefix);
+  return (
+    <>
+      <SettingsTabs activeSection={activeSection} onSelect={scrollToSection} controlsPrefix={prefix} />
+      <SettingsAnchorSection prefix={prefix} section="general">
+        <LanguageSection id={`${prefix}-language`} />
+        <OpenAIKeysSection />
+        <CodexAuthSection />
+        <AppearanceSection />
+        <DataStorageSection />
+      </SettingsAnchorSection>
+      <SettingsAnchorSection prefix={prefix} section="access">
+        <AccessSection access={access} />
+      </SettingsAnchorSection>
+      <SettingsAnchorSection prefix={prefix} section="codex">
+        <CodexSettingsSection />
+      </SettingsAnchorSection>
+      <SettingsAnchorSection prefix={prefix} section="voice">
+        <VoiceSettingsSection />
+      </SettingsAnchorSection>
+      <SettingsAnchorSection prefix={prefix} section="limits">
+        <LimitsSettingsSection />
+      </SettingsAnchorSection>
+      <SettingsAnchorSection prefix={prefix} section="proactivity">
+        <ProactivitySettingsSection status={status} />
+      </SettingsAnchorSection>
+    </>
+  );
+}
+
 export function SettingsControlPage({ access, status }: AccessProps) {
   return (
     <>
@@ -476,12 +601,7 @@ export function SettingsControlPage({ access, status }: AccessProps) {
         <PageHeader title="Settings" subtitle="Configure Pritha to work the way you want." variant="voice" showCodexButton status={status} />
         <div className="settings-layout">
           <main className="settings-main">
-            <SettingsTabs />
-            <LanguageSection id="settings-language" />
-            <AccessSection access={access} />
-            <AppearanceSection />
-            <VoiceSettingsSection />
-            <DataStorageSection />
+            <SettingsContent prefix="desktop-settings" access={access} status={status} />
           </main>
           <aside className="settings-rail">
             <SummaryCard status={status} />
@@ -492,15 +612,8 @@ export function SettingsControlPage({ access, status }: AccessProps) {
       </div>
       <div className="mobile-settings-screen">
         <h1 className="mobile-page-title">Settings</h1>
-        <SettingsTabs />
-        <LanguageSection id="mobile-settings-language" />
-        <AccessSection access={access} />
-        <AppearanceSection />
-        <VoiceSettingsSection />
-        <DataStorageSection />
+        <SettingsContent prefix="mobile-settings" access={access} status={status} />
         <SummaryCard status={status} />
-        <LimitsCard status={status} />
-        <ProactivityCard status={status} />
       </div>
     </>
   );
