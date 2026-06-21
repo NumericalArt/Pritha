@@ -38,6 +38,9 @@ jobs:
       - name: Install Node dependencies
         run: npm install --ignore-scripts
 
+      - name: Install Control Center dependencies
+        run: npm --prefix interfaces/control-center ci --ignore-scripts
+
       - name: Install portable Python dependencies
         run: |
           python -m pip install --upgrade pip
