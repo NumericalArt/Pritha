@@ -614,10 +614,10 @@ a {
 }
 
 .developer-brand {
-  justify-self: start;
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 12px;
+  justify-self: center;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 650;
   letter-spacing: 0;
 }
 
