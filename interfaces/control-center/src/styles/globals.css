@@ -4951,6 +4951,7 @@ button:active,
     gap: 14px;
   }
 
+  .mobile-voice-screen,
   .mobile-settings-screen {
     overflow-x: hidden;
   }
