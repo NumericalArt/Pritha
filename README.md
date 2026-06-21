@@ -56,7 +56,12 @@ node scripts/bootstrap.mjs plan --profile minimal
 node scripts/bootstrap.mjs install --profile local
 node scripts/bootstrap.mjs verify --profile control-center
 node scripts/bootstrap.mjs start --profile control-center
+npm run control-center:health
 ```
+
+`control-center:health` is read-only. When Control Center is running, it checks
+that the live `/voice`, `/agents` and `/settings` pages reference JavaScript
+chunks that are actually being served by the current Next.js process.
 
 ## Create Your First Child Agent
 

@@ -26,32 +26,42 @@ function runJson(command, commandArgs, options = {}) {
     maxBuffer: options.maxBuffer || 20 * 1024 * 1024,
     env: { ...process.env, TECHSCOPE_ROOT: ROOT },
   });
+  const stdout = String(result.stdout || "").trim();
+  const stderr = String(result.stderr || "").trim();
+  let parsed = null;
+  let parseError = "";
+  if (stdout) {
+    try {
+      parsed = JSON.parse(stdout);
+    } catch (error) {
+      parseError = error instanceof Error ? error.message : String(error);
+    }
+  }
   if (result.status !== 0) {
     return {
       ok: false,
       status: result.status || 1,
-      stdout: String(result.stdout || "").trim(),
-      stderr: String(result.stderr || "").trim(),
-      json: null,
+      stdout,
+      stderr: stderr || parseError,
+      json: parsed,
     };
   }
-  try {
-    return {
-      ok: true,
-      status: 0,
-      stdout: String(result.stdout || "").trim(),
-      stderr: String(result.stderr || "").trim(),
-      json: JSON.parse(result.stdout),
-    };
-  } catch (error) {
+  if (!parsed) {
     return {
       ok: false,
       status: 1,
-      stdout: String(result.stdout || "").trim(),
-      stderr: error instanceof Error ? error.message : String(error),
+      stdout,
+      stderr: parseError || "command returned no JSON output",
       json: null,
     };
   }
+  return {
+    ok: true,
+    status: 0,
+    stdout,
+    stderr,
+    json: parsed,
+  };
 }
 
 function runCommand(command, commandArgs, options = {}) {
@@ -128,6 +138,7 @@ function runSelfTest() {
     : { ok: true, status: 0, stdout: "", stderr: "", skipped: true };
   const queue = runJson("node", ["scripts/queue-health.mjs", "--json"]);
   const launchdRoot = runCommand("node", ["scripts/launchd-root-audit.mjs", "status", "--json"], { timeoutMs: 60000 });
+  const controlCenterHealth = runJson("node", ["scripts/control-center-health.mjs", "--json"], { timeoutMs: 60000 });
   const currentStats = stats();
   const previous = previousBaseline();
 
@@ -149,6 +160,28 @@ function runSelfTest() {
       severity: "warning",
       message: "launchd loaded state or plist root differs from the current Pritha root",
       detail: launchdRootAudit,
+    });
+  }
+  if (!controlCenterHealth.json) {
+    warnings.push({
+      id: "control-center-health-unavailable",
+      severity: "warning",
+      message: "Control Center live UI chunk health returned no machine-readable result",
+      detail: { stdout: controlCenterHealth.stdout, stderr: controlCenterHealth.stderr },
+    });
+  } else if (controlCenterHealth.json.status === "fail") {
+    regressions.push({
+      id: "control-center-live-ui",
+      severity: "critical",
+      message: "running Control Center failed live UI chunk health; restart the stale process before trusting the UI",
+      detail: controlCenterHealth.json,
+    });
+  } else if (controlCenterHealth.json.status === "pass-with-warnings") {
+    warnings.push({
+      id: "control-center-live-ui-warning",
+      severity: "warning",
+      message: "Control Center live UI chunk health passed with warnings",
+      detail: controlCenterHealth.json,
     });
   }
   const expectedQualityStatus = dryRun ? "planned" : "pass";
@@ -194,6 +227,7 @@ function runSelfTest() {
     embeddings_restore: embeddingsRestore,
     queue_health: queue.json || { status: "fail", stdout: queue.stdout, stderr: queue.stderr },
     launchd_root_audit: launchdRootAudit,
+    control_center_health: controlCenterHealth.json || { status: "unknown", stdout: controlCenterHealth.stdout, stderr: controlCenterHealth.stderr },
     warnings,
     regressions,
   });
@@ -216,6 +250,7 @@ if (jsonMode) {
   console.log(`Memory documents: ${payload.memory_stats.documents}`);
   console.log(`Queue failed jobs: ${(payload.queue_health.failed || []).length}`);
   console.log(`Queue stale items: ${(payload.queue_health.stale || []).length}`);
+  console.log(`Control Center live UI: ${payload.control_center_health.status}`);
   if (payload.previous_memory_stats) {
     console.log(`Previous documents: ${payload.previous_memory_stats.documents}`);
   } else {
