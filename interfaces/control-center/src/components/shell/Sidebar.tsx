@@ -159,10 +159,10 @@ export function Sidebar({ initialStatus }: { initialStatus: ControlCenterStatus 
         <div>
           {CONTROL_CENTER_PRODUCT} {appVersion}
         </div>
+        <div className="developer-brand">By NumericalArt</div>
         <div>
           Uptime {formatUptime(status?.app.uptimeSeconds)} <span className={`dot ${status ? "green" : "orange"}`} />
         </div>
-        <div className="developer-brand">NumericalArt</div>
       </div>
 
       {accessOpen ? (
