@@ -49,7 +49,7 @@ source_updated: 2026-06-12
 source_version: scaffold preparation blocked by current sandbox boundary
 retrieved: 2026-06-12
 verified: 2026-06-12
-valid_for: next writable session that can create /Users/jkl/StupidJoke
+valid_for: next writable session that can create <SIBLING_AGENT_ROOT>/StupidJoke
 temporal_status: current
 memory_domain: child-agents
 memory_domains:
@@ -72,23 +72,23 @@ Status: failed
 ## Summary
 
 - Agent name: StupidJoke
-- Target folder: `/Users/jkl/StupidJoke`
+- Target folder: `<SIBLING_AGENT_ROOT>/StupidJoke`
 - Contract: `11_agents/contracts/2026-06-12-stupidjoke-agent-contract.md`
 - Runtime family: codex-native with deterministic Node.js helpers.
 - Interfaces: Codex/CLI first, realtime voice event adapter placeholder.
 - Telegram mode: none.
-- Result: sibling scaffold was not created because the current sandbox can write inside `/Users/jkl/Techscope` but cannot write to the parent sibling location `/Users/jkl`.
+- Result: sibling scaffold was not created because the current sandbox can write inside `<LEGACY_TECHSCOPE_ROOT>` but cannot write to the parent sibling location `<USER_HOME>`.
 
 ## Write Checks
 
-Executed from `/Users/jkl/Techscope`:
+Executed from `<LEGACY_TECHSCOPE_ROOT>`:
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| `pwd` | pass | Current directory is `/Users/jkl/Techscope`. |
-| `git rev-parse --show-toplevel` | pass | Git root is `/Users/jkl/Techscope`. |
+| `pwd` | pass | Current directory is `<LEGACY_TECHSCOPE_ROOT>`. |
+| `git rev-parse --show-toplevel` | pass | Git root is `<LEGACY_TECHSCOPE_ROOT>`. |
 | `test -w .` | pass | Techscope itself is writable. |
-| `test -w ..` | fail | Parent `/Users/jkl` is not writable in the active sandbox. |
+| `test -w ..` | fail | Parent `<USER_HOME>` is not writable in the active sandbox. |
 | `test -e ../StupidJoke` | pass | Target sibling does not currently exist. |
 
 No `mkdir`, service install, deletion, publication, launchd, cron, queue, or broad deployment action was attempted outside the writable Techscope root.
@@ -98,7 +98,7 @@ No `mkdir`, service install, deletion, publication, launchd, cron, queue, or bro
 The next writable session should create this sibling folder:
 
 ```text
-/Users/jkl/StupidJoke/
+<SIBLING_AGENT_ROOT>/StupidJoke/
   AGENTS.md
   README.md
   .env.example
@@ -230,15 +230,15 @@ Safe fallback behavior: do not repeat rejected text; say a short neutral refusal
 Preferred Pritha path if the scaffold command is available:
 
 ```sh
-cd /Users/jkl/Techscope
+cd <LEGACY_TECHSCOPE_ROOT>
 node scripts/pritha.mjs validate 11_agents/contracts/2026-06-12-stupidjoke-agent-contract.md
 node scripts/pritha.mjs create 11_agents/contracts/2026-06-12-stupidjoke-agent-contract.md --output ../StupidJoke
 ```
 
-If the generator does not support this exact contract shape, manually create the tree above in `/Users/jkl/StupidJoke`, then run:
+If the generator does not support this exact contract shape, manually create the tree above in `<SIBLING_AGENT_ROOT>/StupidJoke`, then run:
 
 ```sh
-cd /Users/jkl/StupidJoke
+cd <SIBLING_AGENT_ROOT>/StupidJoke
 npm run health
 npm run smoke
 npm test
@@ -264,7 +264,7 @@ After a successful scaffold, create a new complete scaffold report or supersede 
 
 ## Next Steps
 
-- Re-run from a session that can write to `/Users/jkl`.
-- Create `/Users/jkl/StupidJoke` from the prepared package.
+- Re-run from a session that can write to `<USER_HOME>`.
+- Create `<SIBLING_AGENT_ROOT>/StupidJoke` from the prepared package.
 - Run `npm run health`, `npm run smoke`, and `npm test`.
 - Create a complete scaffold report and, after first real use, an agent post-creation review.

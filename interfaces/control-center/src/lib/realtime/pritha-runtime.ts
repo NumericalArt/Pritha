@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
 import { checkCodexAppServerAvailable, PrithaCodexAppServerClient } from "./codex-task/codex-app-server-client";
 import type { PrithaCodexTaskPayload, PrithaCodexTaskProgressEvent, PrithaCodexTaskResult, PrithaCodexTaskStatus, PrithaCodexTaskType } from "./codex-task/types";
 import {
@@ -503,7 +504,7 @@ function cappedLimit(value: unknown, fallback = 8, max = 30) {
 }
 
 function hasOperatorConfirmation(value: unknown) {
-  return /confirm|confirmed|approve|approved|yes|write|reindex|подтверж|разреш|да/i.test(String(value || ""));
+  return /confirm|confirmed|approve|approved|yes|write|reindex|\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436|\u0440\u0430\u0437\u0440\u0435\u0448|\u0434\u0430/i.test(String(value || ""));
 }
 
 function commandResult(command: string, args: string[]) {
@@ -1160,7 +1161,7 @@ const FILESYSTEM_TEXT_EXTENSIONS = new Set([
 function prithaFilesystemRoots(): FileSystemRoot[] {
   const root = resolveTechscopeRoot();
   return [
-    { id: "pritha", name: "Pritha", kind: "pritha", directory: root, aliases: ["pritha", "techscope", "прита"] },
+    { id: "pritha", name: "Pritha", kind: "pritha", directory: root, aliases: ["pritha", "techscope", "\u043f\u0440\u0438\u0442\u0430"] },
     ...knownSiblingChildAgentProjects(root).map((project) => ({
       id: project.name,
       name: project.name,
@@ -1935,7 +1936,7 @@ function classifyVoiceSessionMemory(events: ReturnType<typeof normalizeVoiceMemo
     "child agent",
     "child-agent",
     "agent",
-    "архитект",
+    "\u0430\u0440\u0445\u0438\u0442\u0435\u043a\u0442",
     "architecture",
     "ui",
     "ux",
@@ -1943,19 +1944,19 @@ function classifyVoiceSessionMemory(events: ReturnType<typeof normalizeVoiceMemo
     "realtime",
     "codex",
     "memory",
-    "памят",
+    "\u043f\u0430\u043c\u044f\u0442",
     "roadmap",
     "settings",
     "deployment",
     "operations",
     "telemetry",
     "handoff",
-    "контекст",
+    "\u043a\u043e\u043d\u0442\u0435\u043a\u0441\u0442",
   ];
-  const disposableTerms = ["bitcoin", "btc", "weather", "price", "курс", "погода"];
+  const disposableTerms = ["bitcoin", "btc", "weather", "price", "\u043a\u0443\u0440\u0441", "\u043f\u043e\u0433\u043e\u0434\u0430"];
   const score = durableTerms.reduce((count, term) => count + (text.includes(term) ? 1 : 0), 0);
   const disposableScore = disposableTerms.reduce((count, term) => count + (text.includes(term) ? 1 : 0), 0);
-  const userPreference = /\b(prefer|preference|i like|i want|my default)\b|предпоч|я хочу|мне нужно/i.test(text);
+  const userPreference = /\b(prefer|preference|i like|i want|my default)\b|\u043f\u0440\u0435\u0434\u043f\u043e\u0447|\u044f \u0445\u043e\u0447\u0443|\u043c\u043d\u0435 \u043d\u0443\u0436\u043d\u043e/i.test(text);
   if (score < 2 || (disposableScore > score && score < 4)) {
     return { decision: "skip", reason: "session_does_not_look_like_durable_pritha_or_agent_memory", score, disposableScore };
   }
@@ -2212,13 +2213,13 @@ function codexAppAvailable() {
 }
 
 function codexWorkspaceWriteAllowed() {
-  const value = env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", env("TECHSCOPE_VOICE_CODEX_WRITE_ENABLED", "explicit")).toLowerCase();
-  return value !== "0" && value !== "false" && value !== "disabled" && value !== "read-only";
+  const value = codexWriteFlagFromValues(env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""), env("TECHSCOPE_VOICE_CODEX_WRITE_ENABLED", ""));
+  return codexWorkspaceWriteAllowedFromFlag(value);
 }
 
 function codexLegacyWriteEnabled() {
-  const value = env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", env("TECHSCOPE_VOICE_CODEX_WRITE_ENABLED", "explicit")).toLowerCase();
-  return value === "1" || value === "true" || value === "workspace-write";
+  const value = codexWriteFlagFromValues(env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""), env("TECHSCOPE_VOICE_CODEX_WRITE_ENABLED", ""));
+  return codexLegacyWriteEnabledFromFlag(value);
 }
 
 function normalizeCodexWriteMode(value: unknown) {
@@ -2245,7 +2246,7 @@ function splitAgentName(value: string) {
 }
 
 function normalizeAgentAlias(value: string) {
-  return splitAgentName(value).toLowerCase().replace(/[^a-z0-9а-яё]+/gi, " ").replace(/\s+/g, " ").trim();
+  return splitAgentName(value).toLowerCase().replace(/[^\p{L}0-9]+/giu, " ").replace(/\s+/g, " ").trim();
 }
 
 function uniqueValues(values: string[]) {
@@ -2253,7 +2254,7 @@ function uniqueValues(values: string[]) {
 }
 
 function childAgentCompatibilityAliases(directoryName: string) {
-  if (directoryName === "StupidJoke") return ["Глупые шутки"];
+  if (directoryName === "StupidJoke") return ["Silly Jokes"];
   return [];
 }
 
@@ -2336,6 +2337,7 @@ function codexTaskApprovalReasons(task: Record<string, unknown>) {
   const reasons: string[] = [];
 
   if (sandbox === "danger-full-access") reasons.push("danger_full_access_sandbox");
+  if (sandbox === "workspace-write") reasons.push("workspace_write_requested");
   if (taskType === "system_change") reasons.push("system_change_task_type");
   if (/(deploy|deployment|publish|release|push\s+to\s+github|gh\s+pr|git\s+push)/.test(taskText)) reasons.push("external_publish_or_deployment");
   if (/(delete|remove|destroy|wipe|drop|rm\s+-rf|erase)\b/.test(taskText)) reasons.push("destructive_change");
@@ -2364,7 +2366,9 @@ function codexTaskApprovalFor(task: Record<string, unknown>, requestedAt = new D
           ? "destructive_change"
           : reasons.includes("danger_full_access_sandbox")
             ? "danger_full_access_sandbox"
-            : "system_change";
+            : reasons.includes("workspace_write_requested")
+              ? "workspace_write"
+              : "system_change";
   return {
     status: "pending",
     action_type: actionType,

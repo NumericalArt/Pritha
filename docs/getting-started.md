@@ -1,39 +1,69 @@
 # Getting Started
 
-## 10-Second Start
-
-Open the repository in Codex and say:
-
-```text
-запусти проект
-```
-
-Codex will follow `07_workflows/first-run-setup.md`. For a headless fallback:
-
-```sh
-node scripts/setup.mjs --non-interactive --config tests/fixtures/setup-minimal.json
-node scripts/setup-status.mjs --json
-```
-
 ## Fresh Clone
 
+Clone Pritha and run the bootstrap plan first:
+
 ```sh
-git clone <repo-url> pritha
+git clone https://github.com/NumericalArt/Pritha.git pritha
 cd pritha
-cp .env.example .env
-node scripts/setup.mjs --non-interactive --config tests/fixtures/setup-minimal.json
+node scripts/bootstrap.mjs plan --profile minimal
 ```
 
-The setup script writes local settings to `.env.local` and non-secret state to
-`.techscope-setup.json`. Both are gitignored.
+Then verify the minimal local environment:
+
+```sh
+node scripts/bootstrap.mjs verify --profile minimal
+```
+
+For the local Control Center:
+
+```sh
+node scripts/bootstrap.mjs --profile local --start control-center
+```
+
+Bootstrap writes local settings to `.env.local` and non-secret setup state to
+`.techscope-setup.json`. Both are gitignored. The start command runs the
+Control Center in the foreground and does not install a service.
+
+## Bootstrap Profiles
+
+- `minimal`: check Node.js, Git, Python, sqlite3 and authored memory.
+- `local`: install portable Python dependencies and local setup state.
+- `control-center`: install Control Center dependencies from lockfile, then
+  typecheck and build the UI.
+- `control-center-tailscale`: detect Tailscale readiness only. It does not
+  install Tailscale, authenticate the device or configure Serve.
+
+## Ready After Clone
+
+Without secrets, Pritha can plan and verify setup, validate memory, create and
+review agent contracts, inspect generated projects and run local tests. Control
+Center works locally after the Control Center profile installs dependencies.
+
+Optional credentials are still needed for hosted model calls, Realtime voice,
+Telegram, GitHub publishing and any external service. Tailscale private access
+and all durable services require separate explicit operator approval.
+
+For private phone or laptop access through Tailscale, use the guided flow in
+[Tailscale Private Access](tailscale-private-access.md).
 
 ## Create Your First Seed
+
+Start with the interview outline:
+
+```sh
+node scripts/pritha.mjs questions
+```
+
+Then create a draft Seed:
 
 ```sh
 node scripts/pritha.mjs create --name "research-agent" --mission "Track and review research links"
 ```
 
-Review the generated file in `11_agents/contracts/`.
+Review the generated file in `11_agents/contracts/`. Scaffold only from an
+accepted contract after Pritha memory research has been performed.
 
 ## Scaffold a Descendant
 
@@ -49,6 +79,7 @@ Place new material in `00_inbox/`, then create a brief, assessment, decision or 
 ## Verify
 
 ```sh
+node scripts/bootstrap.mjs verify --profile minimal
 node scripts/quality-gate.mjs
 node scripts/pritha.mjs lineage
 ```

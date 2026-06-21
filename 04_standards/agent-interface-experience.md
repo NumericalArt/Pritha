@@ -3,8 +3,8 @@ id: agent-interface-experience
 type: standard
 status: draft
 created: 2026-06-02
-updated: 2026-06-16
-last_reviewed: 2026-06-16
+updated: 2026-06-21
+last_reviewed: 2026-06-21
 owner: Pritha
 topics:
   - agentic-ui
@@ -17,6 +17,8 @@ topics:
   - 3d-interface
   - canvas-accessibility
   - model-loading
+  - raster-ui-assets
+  - image-generation
 tools:
   - Pritha
   - Codex
@@ -42,6 +44,8 @@ tools:
   - Threlte
   - PixiJS
   - Codex App Server
+  - imagegen
+  - OpenAI image_generation
 sources:
   - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
   - 03_reviews/2026-06-02-js-ts-agent-ui-framework-source-batch-review.md
@@ -51,6 +55,8 @@ sources:
   - 04_standards/agent-creation-harness.md
   - 04_standards/agent-mcp-connector-lifecycle.md
   - 04_standards/realtime-voice-control-ui.md
+  - 03_reviews/2026-06-21-raster-image-generation-ui-source-batch-review.md
+  - 04_standards/raster-ui-assets-for-child-agents.md
 related:
   reviews:
     - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
@@ -58,18 +64,20 @@ related:
     - 03_reviews/2026-06-02-threejs-3d-agent-interface-source-batch-review.md
     - 03_reviews/2026-06-16-webgl-3d-interface-resource-batch-review.md
     - 03_reviews/2026-06-02-codex-app-server-rate-limit-telemetry-review.md
+    - 03_reviews/2026-06-21-raster-image-generation-ui-source-batch-review.md
   standards:
     - 04_standards/agent-creation-harness.md
     - 04_standards/agent-mcp-connector-lifecycle.md
     - 04_standards/realtime-voice-control-ui.md
+    - 04_standards/raster-ui-assets-for-child-agents.md
 supersedes: []
 superseded_by: []
 freshness_status: current
-source_published: 2022-01-05..2026-06-16
-source_updated: 2026-06-16
-source_version: Pritha agent interface experience v5 + WebGL 3D interface resource batch
-retrieved: 2026-06-16
-verified: 2026-06-16
+source_published: 2021-12-09..2026-06-21
+source_updated: 2026-06-21
+source_version: Pritha agent interface experience v6 + WebGL 3D interface resource batch + raster UI asset protocol
+retrieved: 2026-06-21
+verified: 2026-06-21
 valid_for: Pritha-created child-agent interface selection and scaffolding
 temporal_status: current
 memory_domain: agent-building-knowledge
@@ -137,6 +145,9 @@ For any selected interface beyond `chat-or-codex-thread`, record:
 - UI framework or existing frontend stack;
 - AI UI layer, if any;
 - component/widget source and trust level;
+- raster visual asset layer, if any;
+- raster asset purpose, generation path, format/size policy, alt/fallback and
+  readiness check, if selected;
 - 3D visual layer, if any;
 - 3D renderer/framework choice, if any;
 - account/rate-limit telemetry source, if any;
@@ -264,6 +275,41 @@ For TypeScript/web UI, record:
 - approval control plan;
 - cancel/regenerate/resume plan;
 - mobile/accessibility verification.
+
+## Raster Visual Asset Layer Selection
+
+Raster image generation is an optional UI asset module, not a default child-agent
+interface layer. Apply `04_standards/raster-ui-assets-for-child-agents.md` when
+a web, workflow or operator UI might benefit from generated or edited bitmap
+assets.
+
+Select raster assets only when they support a concrete user workflow:
+
+- previewing or comparing generated visual artifacts;
+- showing media/product/lesson content;
+- explaining a workflow state or consequence;
+- supplying textures, sprites, thumbnails, illustrations or empty/error states
+  that carry useful meaning.
+
+Do not use raster generation for ordinary controls, app chrome, simple icons,
+logos, charts or text that should be DOM, SVG, canvas or design-system native.
+Meaningful text, warnings, status and controls must remain accessible outside
+the image.
+
+For any selected raster visual asset layer, record:
+
+- raster visual asset layer: none, generated, reference-based, existing-assets,
+  mixed or unknown;
+- asset purpose and target component;
+- generation path: Codex `imagegen`, OpenAI hosted `image_generation`,
+  existing design tool, manual or unknown;
+- prompt/spec, reference image roles and privacy boundary;
+- rendering boundary between real UI and bitmap content;
+- output format, sizes, responsive variants and compression target;
+- alt/fallback policy;
+- user review controls: accept, reject, regenerate, edit or none;
+- readiness check: mobile crop/readability, file size, responsive behavior,
+  accessibility, privacy and real-control coverage.
 
 ## 3D Visual Layer Selection
 
@@ -409,6 +455,10 @@ Block or downgrade rich UI when:
   single-context multi-view pattern.
 - meaningful UI text or controls exist only as canvas pixels without accessible
   DOM/fallback coverage.
+- a raster visual asset is selected without workflow purpose, target component,
+  format/size policy, alt/fallback, responsive check and privacy boundary.
+- generated bitmap text, warnings, status or controls are the only accessible
+  representation of important UI state.
 - a static scene renders continuously without a power/performance reason.
 - account/rate-limit telemetry is selected without an app-server-backed
   integration or with a plan to read undocumented local auth/workspace state.
@@ -424,6 +474,10 @@ Selected UI modules must have at least one readiness check:
 - MCP App/UI resource: widget/resource can render in sandbox or documented host;
 - declarative UI: component schema validates against the allowed catalog;
 - voice UI: apply `realtime-voice-control-ui` verification.
+- raster visual asset layer: asset communicates the intended workflow state,
+  final files live in the workspace, dimensions/variants are stable, alt or
+  fallback is correct, mobile crop/readability passes, file size is acceptable
+  and no real control/status exists only inside pixels.
 - 3D visual layer: scene renders nonblank, fits desktop/mobile viewports,
   expected objects/assets load, interactions work and canvas/pixel or
   screenshot checks confirm the visual state.

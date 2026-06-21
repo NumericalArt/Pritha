@@ -20,11 +20,11 @@ function makeProject() {
   write(project, "AGENTS.md", "# Sample Agent\n");
   write(project, "README.md", "# Sample Agent\n");
   write(project, ".env.example", "AGENT_NAME=sample-agent\n");
-  write(project, "interfaces/manifest.json", JSON.stringify({ generated_by: "TechScope Agents Mother", agent: "Sample Agent", adapters: [] }, null, 2));
-  write(project, "memory/manifest.json", JSON.stringify({ generated_by: "TechScope Agents Mother", agent: "Sample Agent", directories: ["memory/notes"] }, null, 2));
-  write(project, "tools/manifest.json", JSON.stringify({ generated_by: "TechScope Agents Mother", agent: "Sample Agent", profiles: [] }, null, 2));
+  write(project, "interfaces/manifest.json", JSON.stringify({ generated_by: "Pritha", agent: "Sample Agent", adapters: [] }, null, 2));
+  write(project, "memory/manifest.json", JSON.stringify({ generated_by: "Pritha", agent: "Sample Agent", directories: ["memory/notes"] }, null, 2));
+  write(project, "tools/manifest.json", JSON.stringify({ generated_by: "Pritha", agent: "Sample Agent", profiles: [] }, null, 2));
   write(project, "operations/manifest.json", JSON.stringify({
-    generated_by: "TechScope Agents Mother",
+    generated_by: "Pritha",
     agent: "Sample Agent",
     deployment_target: "local-test",
     deployment_profile: "test",

@@ -1,6 +1,15 @@
 # Architecture
 
-Pritha is a Codex-native agent factory inside Techscope.
+Pritha is a Codex-native universal trainable agent for creating and evolving
+AI agents.
+
+Its two primary functions are:
+
+1. Improve its own knowledge base, tools and agent-creation capabilities through
+   reviewed memory updates, standards, workflows, tests and harness changes.
+2. Create new child agents and improve existing child agents through contracts,
+   Pritha memory research, scaffold generation, git-based version control,
+   tests, reports and handoff.
 
 Another useful shorthand: Pritha is a harness for an agent that builds the
 harness of a new agent. The lineage language is deliberately genetic: a Seed

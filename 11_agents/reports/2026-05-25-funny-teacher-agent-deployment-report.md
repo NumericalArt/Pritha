@@ -57,7 +57,7 @@ Funny Teacher now follows the FESPA26 access pattern: local Next.js upstream plu
 ## Deployment Surface
 
 - Local upstream: `http://127.0.0.1:3033`
-- Tailscale HTTPS URL: `https://ivans-mac-mini.tail691439.ts.net:3034`
+- Tailscale HTTPS URL: `https://<TAILSCALE_HOST>:3034`
 - Proxy command: `tailscale serve --bg --https=3034 http://127.0.0.1:3033`
 - Service mode: manual
 - Autostart: disabled
@@ -79,8 +79,8 @@ Funny Teacher now follows the FESPA26 access pattern: local Next.js upstream plu
 | --- | --- |
 | `npm run smoke` | pass |
 | `npm run tailscale:serve` | pass |
-| `curl -I https://ivans-mac-mini.tail691439.ts.net:3034` | HTTP/2 200 |
-| `curl https://ivans-mac-mini.tail691439.ts.net:3034/api/health` | `voiceConfigured: true` |
+| `curl -I https://<TAILSCALE_HOST>:3034` | HTTP/2 200 |
+| `curl https://<TAILSCALE_HOST>:3034/api/health` | `voiceConfigured: true` |
 | `npm run operations` | shows local upstream and Tailscale proxy |
 
 ## Notes

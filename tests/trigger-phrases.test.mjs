@@ -6,7 +6,7 @@ test("setup trigger phrases route to the first-run workflow", () => {
   const routed = routeTriggerPhrase("запусти проект");
   assert.equal(routed.id, "first-run-setup");
   assert.equal(routed.workflow, "07_workflows/first-run-setup.md");
-  assert.equal(routed.command, "node scripts/setup.mjs");
+  assert.equal(routed.command, "node scripts/bootstrap.mjs plan --profile minimal");
 });
 
 test("operational trigger phrases route to health and Pritha commands", () => {

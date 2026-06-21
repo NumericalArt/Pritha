@@ -170,7 +170,7 @@ Only make the repository public after:
 - `v0.1.0` exists remotely;
 - CI is green;
 - GitHub Release exists;
-- a fresh clone passes the 10-minute start.
+- a fresh clone passes the bootstrap start.
 
 Fresh clone check:
 
@@ -178,8 +178,9 @@ Fresh clone check:
 tmp="$(mktemp -d)"
 git clone git@github.com:NumericalArt/Pritha.git "$tmp/pritha"
 cd "$tmp/pritha"
-node scripts/setup.mjs --non-interactive --config tests/fixtures/setup-minimal.json
-node scripts/quality-gate.mjs
+node scripts/bootstrap.mjs plan --profile minimal
+node scripts/bootstrap.mjs install --profile control-center
+node scripts/bootstrap.mjs verify --profile control-center
 ```
 
 Then GitHub Settings -> General -> Danger Zone -> Change repository visibility
@@ -225,7 +226,7 @@ baseline. Do not push raw JSON, transcripts, downloaded text/PDF/image source
 artifacts, original media, incoming-material source URLs, secrets,
 `.env.local`, `.queue/`, `.logs/`, `.tools/` or secure handoff folders. Any
 future need to retain raw material requires a separate secure storage decision
-outside the Git-tracked Techscope repository.
+outside the Git-tracked Pritha repository.
 
 ## Current GitHub CLI State
 

@@ -43,6 +43,21 @@
       },
       "additionalProperties": { "$ref": "#/$defs/moduleStatus" }
     },
+    "tailscale": {
+      "type": "object",
+      "properties": {
+        "app": { "type": "string" },
+        "port": { "type": "integer" },
+        "installed": { "type": "boolean" },
+        "authenticated": { "type": "boolean" },
+        "serve_configured": { "type": "boolean" },
+        "tailscale_url": { "type": "string" },
+        "local_upstream_health": { "type": "string" },
+        "peer_access_not_tested": { "type": "boolean" },
+        "updated": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "sections": {
       "type": "object",
       "additionalProperties": {

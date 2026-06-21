@@ -86,7 +86,7 @@ Status: accepted
   - package name: `stupidjoke`
   - environment prefix: `STUPIDJOKE_`
   - data namespace/table prefix: `stupidjoke_`
-- Target folder: `<parent-of-TECHSCOPE_ROOT>/StupidJoke`; in the current checkout this resolves to `/Users/jkl/StupidJoke`.
+- Target folder: `<parent-of-TECHSCOPE_ROOT>/StupidJoke`; in the current checkout this resolves to `<SIBLING_AGENT_ROOT>/StupidJoke`.
 - Primary mission: provide a small, safe, low-stakes joke agent that can ingest user-provided joke fixtures, reject unsafe material, and answer realtime voice requests with short silly jokes.
 - Target user: the local operator using Pritha Control Center voice/Codex sidecar.
 - Success criteria: the sibling scaffold runs a deterministic healthcheck, validates `user_import` fixtures, filters unsafe joke material, normalizes realtime events, and produces a safe short joke response without secrets or background services.
@@ -152,7 +152,7 @@ Status: accepted
 - Runtime isolation profile: project-folder.
 - Sandbox required: optional for local development; required before exposing to external users.
 - Host control plane: Pritha/Codex operator session.
-- Agent execution boundary: `/Users/jkl/StupidJoke` project folder when writable.
+- Agent execution boundary: `<SIBLING_AGENT_ROOT>/StupidJoke` project folder when writable.
 - Credential boundary: no credentials required for minimal v1; future Realtime credentials must remain server-side or in user-local env only.
 - Network policy: no-network for health/smoke; operator-approved for future hosted model or Realtime calls.
 - Filesystem policy: read/write only inside StupidJoke project; no access to Techscope private memory, `.env`, queues, logs, or credentials.
@@ -346,7 +346,7 @@ Allowed humor style for v1: short, silly, family-safe, non-targeted, and clearly
 
 ## Scaffold Requirements
 
-- Target folder: `/Users/jkl/StupidJoke` when parent directory is writable.
+- Target folder: `<SIBLING_AGENT_ROOT>/StupidJoke` when parent directory is writable.
 - Files to generate:
   - `AGENTS.md`
   - `README.md`

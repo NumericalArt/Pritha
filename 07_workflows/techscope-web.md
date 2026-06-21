@@ -44,7 +44,7 @@ Then open the Tailscale Serve URL from MacBook or phone connected to the same ta
 Current URL:
 
 ```text
-https://ivans-mac-mini.tail691439.ts.net/
+https://<TAILSCALE_HOST>/
 ```
 
 Stop serving:
@@ -75,7 +75,7 @@ Local API smoke tests passed for:
 Tailscale Serve is configured as:
 
 ```text
-https://ivans-mac-mini.tail691439.ts.net/
+https://<TAILSCALE_HOST>/
 |-- proxy http://127.0.0.1:3000
 ```
 

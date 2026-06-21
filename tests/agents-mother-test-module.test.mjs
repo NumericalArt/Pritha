@@ -6,7 +6,7 @@ import { detectProject, fileExists, readJsonIfExists } from "../scripts/agents-m
 
 const root = path.resolve(".");
 
-test("Agents Mother test module detects the TechScope harness", () => {
+test("Agents Mother test module detects the Pritha harness", () => {
   const detection = detectProject(root);
   assert.equal(detection.classification, "agent-project");
   assert.ok(detection.signals.some((signal) => signal.includes("AGENTS.md")));

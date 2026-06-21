@@ -13,7 +13,7 @@ type LanguageOption = {
 
 const LANGUAGE_OPTIONS: LanguageOption[] = [
   { value: "en", label: "English" },
-  { value: "ru", label: "Русский", disabled: true },
+  { value: "ru", label: "Russian", disabled: true },
 ];
 
 export function LanguageDropdown({

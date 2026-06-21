@@ -65,16 +65,16 @@ The recovery sequence deliberately restored the known-good FESPA26 voice service
 
 | Service | Tailscale URL | Tailscale upstream | Local upstream | Status |
 | --- | --- | --- | --- | --- |
-| FESPA26 voice | `https://ivans-mac-mini.tail691439.ts.net:3026/voice` | `3026` | `http://127.0.0.1:3027` | restored and user-verified |
-| Funny Teacher | `https://ivans-mac-mini.tail691439.ts.net:3034/` | `3034` | `http://127.0.0.1:3033` | restored and user-verified |
+| FESPA26 voice | `https://<TAILSCALE_HOST>:3026/voice` | `3026` | `http://127.0.0.1:3027` | restored and user-verified |
+| Funny Teacher | `https://<TAILSCALE_HOST>:3034/` | `3034` | `http://127.0.0.1:3033` | restored and user-verified |
 
 Current `tailscale serve status` shape:
 
 ```text
-https://ivans-mac-mini.tail691439.ts.net:3026 (tailnet only)
+https://<TAILSCALE_HOST>:3026 (tailnet only)
 |-- / proxy http://127.0.0.1:3027
 
-https://ivans-mac-mini.tail691439.ts.net:3034 (tailnet only)
+https://<TAILSCALE_HOST>:3034 (tailnet only)
 |-- / proxy http://127.0.0.1:3033
 ```
 
@@ -91,9 +91,9 @@ https://ivans-mac-mini.tail691439.ts.net:3034 (tailnet only)
 | Check | Result | Notes |
 | --- | --- | --- |
 | FESPA26 local health | pass | `http://127.0.0.1:3027/api/health` returned `ok: true` |
-| FESPA26 Tailscale health | pass | `https://ivans-mac-mini.tail691439.ts.net:3026/api/health` returned `ok: true` |
+| FESPA26 Tailscale health | pass | `https://<TAILSCALE_HOST>:3026/api/health` returned `ok: true` |
 | Funny Teacher local health | pass | `http://127.0.0.1:3033/api/health` returned `ok: true`, `voiceConfigured: true` |
-| Funny Teacher Tailscale health | pass | `https://ivans-mac-mini.tail691439.ts.net:3034/api/health` returned `ok: true`, `voiceConfigured: true` |
+| Funny Teacher Tailscale health | pass | `https://<TAILSCALE_HOST>:3034/api/health` returned `ok: true`, `voiceConfigured: true` |
 | MacBook access | pass | User confirmed after recovery |
 | iPhone access | pass | User confirmed after recovery |
 

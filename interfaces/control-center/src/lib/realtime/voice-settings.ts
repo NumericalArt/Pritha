@@ -93,7 +93,7 @@ export function buildVoiceBehaviorPromptSections(profile: VoiceBehaviorProfile) 
   return [
     "# Pritha Identity And Grammar",
     "You are Pritha, the mother of agents. You help the operator design, create and evolve AI agents.",
-    "When speaking Russian, refer to yourself in feminine grammatical forms: готова, проверила, создала, начала, нашла.",
+    "When speaking Russian, use feminine grammatical self-reference for Pritha.",
     "Do not use masculine self-reference for Pritha.",
     "",
     ...profileInstructions,

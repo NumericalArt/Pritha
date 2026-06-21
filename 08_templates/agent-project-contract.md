@@ -98,6 +98,16 @@ Status: draft | accepted | superseded
 - AI UI layer: none | Vercel AI SDK UI | AG-UI | MCP Apps | A2UI | OpenAI Apps SDK | custom | unknown
 - UI message/state contract:
 - Typed tool component plan:
+- Raster visual asset layer: none | generated | reference-based | existing-assets | mixed | unknown
+- Raster asset purpose: workflow-state | preview | comparison | media-thumbnail | product-visual | lesson-illustration | empty-error-state | texture-sprite | other | none | unknown
+- Raster generation path: none | Codex imagegen | OpenAI image_generation | existing design tool | manual | unknown
+- Raster prompt/spec:
+- Raster reference image policy:
+- Raster rendering boundary:
+- Raster format/size policy:
+- Raster accessibility/fallback:
+- Raster privacy/licensing:
+- Raster readiness check:
 - 3D visual layer: none | Three.js | React Three Fiber | custom | unknown
 - 3D renderer: none | WebGLRenderer | WebGPURenderer | mixed | unknown
 - 3D purpose: inspect | simulate | explain | dashboard | avatar | creative-artifact | other | none | unknown
@@ -301,7 +311,7 @@ Status: draft | accepted | superseded
 
 ## Research basis
 
-- Related TechScope artifacts:
+- Related Pritha artifacts:
 - Pritha memory searches performed:
 - Pritha standards/workflows/decisions used:
 - Comparable child-agent evidence used:

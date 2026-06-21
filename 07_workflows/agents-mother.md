@@ -114,6 +114,9 @@ experimental `--allow-draft-scaffold` override.
      realtime voice UI;
    - UI framework and AI UI layer only when a user-facing web/app interface is
      selected; do not infer them from backend agent frameworks;
+   - raster visual asset layer only when generated or edited bitmap assets help
+     a concrete workflow state, preview, comparison, consequence or operator
+     control;
    - 3D visual layer only when the user-facing workflow needs scene inspection,
      spatial simulation, 3D explanation, avatar/state visualization or 3D
      artifact creation;
@@ -150,6 +153,9 @@ experimental `--allow-draft-scaffold` override.
      boundary and fallback;
    - UI framework choice and message/state contract when a web/workflow UI is
      selected;
+   - raster asset purpose, generation path, prompt/spec, format/size policy,
+     alt/fallback, privacy boundary and readiness check when a raster visual
+     asset layer is selected;
    - 3D renderer/framework, scene state contract, asset policy, performance
      target and fallback when a 3D visual layer is selected;
    - Codex account/rate-limit telemetry mode, bucket/field display and privacy

@@ -81,9 +81,9 @@ Status: complete
 ## Summary
 
 - Agent name: StupidJoke
-- Target folder: `/Users/jkl/StupidJoke`
+- Target folder: `<SIBLING_AGENT_ROOT>/StupidJoke`
 - Contract: `11_agents/contracts/2026-06-12-stupidjoke-agent-contract.md`
-- Result: created the sibling child-agent scaffold at `/Users/jkl/StupidJoke`.
+- Result: created the sibling child-agent scaffold at `<SIBLING_AGENT_ROOT>/StupidJoke`.
 - Runtime family: codex-native with deterministic Node.js helpers.
 - Interface: CLI and realtime voice event fixtures; no long-running realtime service in v1.
 - Telegram mode: none.
@@ -134,7 +134,7 @@ No `.env`, tokens, credentials, private memory, runtime queues, logs, transcript
 
 ## Verification
 
-Executed from `/Users/jkl/StupidJoke`:
+Executed from `<SIBLING_AGENT_ROOT>/StupidJoke`:
 
 | Check | Result | Evidence |
 | --- | --- | --- |

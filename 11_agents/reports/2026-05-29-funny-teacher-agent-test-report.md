@@ -91,8 +91,8 @@ Status: complete
 | Interface status | pass | Agent: Funny Teacher Primary interface: web voice only - web: enabled=true; secrets=OPENAI_API_KEY for voice and embeddings - cli: enabled=true; secrets=none |
 | Memory status | pass | Agent: Funny Teacher Memory profile: sqlite-plus-semantic Database: data/funny-teacher.sqlite (exists) Semantic index: semantic_chunks table Fallback search: lexical scoring when embeddings or API key are unavailable |
 | Tools status | not-applicable | No tools-status command found. |
-| Operations status | pass | Agent: Funny Teacher Deployment target: local Mac or Mac mini via trusted local/Tailscale access Service mode: launchd Autostart: launchd-on-approval Start: npm run start Local upstream: http://127.0.0.1:3033 Tailscale URL: https://ivans-mac-mini.tail691439.ts |
-| Deployment plan | pass | Agent: Funny Teacher Service label: com.local.funny-teacher LaunchAgent: ~/Library/LaunchAgents/com.local.funny-teacher.plist Local upstream: http://127.0.0.1:3033 Tailscale URL: https://ivans-mac-mini.tail691439.ts.net:3034 Start command: npm run sta |
+| Operations status | pass | Agent: Funny Teacher Deployment target: local Mac or Mac mini via trusted local/Tailscale access Service mode: launchd Autostart: launchd-on-approval Start: npm run start Local upstream: http://127.0.0.1:3033 Tailscale URL: https://<TAILSCALE_HOST_TRUNCATED> |
+| Deployment plan | pass | Agent: Funny Teacher Service label: com.local.funny-teacher LaunchAgent: ~/Library/LaunchAgents/com.local.funny-teacher.plist Local upstream: http://127.0.0.1:3033 Tailscale URL: https://<TAILSCALE_HOST>:3034 Start command: npm run sta |
 | Telegram dry-run | not-applicable | Telegram adapter not detected. |
 
 ## Recommendations

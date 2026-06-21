@@ -17,9 +17,16 @@ Desktop `/` resolves to `/agents`; mobile `/` resolves to `/voice`.
 
 ## Run
 
-For local UI development:
+From a fresh Pritha clone, use bootstrap:
 
 ```sh
+node scripts/bootstrap.mjs --profile local --start control-center
+```
+
+For direct local UI development:
+
+```sh
+npm --prefix interfaces/control-center ci --ignore-scripts
 npm --prefix interfaces/control-center run dev
 ```
 
@@ -53,3 +60,15 @@ PRITHA_CONTROL_CENTER_PORT=3420
 
 Do not commit real Tailscale URLs, tailnet names, device names, API keys,
 private transcripts or Codex task outputs.
+
+Tailscale access is optional. Bootstrap may detect readiness, but it does not
+install Tailscale, authenticate the device or configure Tailscale Serve.
+
+Use the guided operator flow:
+
+```sh
+node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs status --json
+node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes
+node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes
+```

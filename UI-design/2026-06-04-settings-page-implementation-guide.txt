@@ -190,7 +190,7 @@ http://localhost:3000
 LAN
 192.168.1.50:3000
 Tailscale
-pritha.tail123.ts.net
+pritha.example.invalid
 QR Link
 Open /voice on phone
 

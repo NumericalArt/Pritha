@@ -42,7 +42,7 @@ node scripts/agents-mother.mjs <command>
 
 ## Contract-Selected Modules
 
-Pritha does not copy every useful Techscope pattern into every descendant. It
+Pritha does not copy every useful parent-agent pattern into every descendant. It
 builds each agent from the modules selected by the Seed/contract: harness,
 memory, data, skills, MCP, tools, evals, interfaces and operations. Optional
 modules remain absent unless the contract needs them.
@@ -56,7 +56,7 @@ meta-improvement material: extract lessons for its own harness, memory, tools,
 skills, MCP, evals, UX or operations, then save a brief/review/decision or send
 the distilled lesson back to Pritha.
 
-Setup and status commands must state module readiness. For Techscope itself:
+Setup and status commands must state module readiness. For Pritha itself:
 
 ```sh
 node scripts/setup-status.mjs --json

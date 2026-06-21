@@ -12,7 +12,21 @@ test("env-doctor exposes machine-readable dependency status", () => {
   assert.equal(payload.failed, 0);
   assert.ok(Array.isArray(payload.checks));
   assert.ok(payload.checks.some((check) => check.id === "node" && check.level === "critical"));
+  assert.ok(payload.checks.some((check) => check.id === "git" && check.level === "critical"));
   assert.ok(payload.checks.some((check) => check.id === "sentence-transformers" && check.level === "critical"));
+  assert.ok(payload.checks.some((check) => check.id === "control-center-pinned-deps" && check.level === "critical"));
+});
+
+test("env-doctor minimal profile skips install-heavy Python package checks", () => {
+  const result = spawnSync("node", ["scripts/env-doctor.mjs", "--profile", "minimal", "--json"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.profile, "minimal");
+  assert.ok(payload.checks.some((check) => check.id === "git"));
+  assert.equal(payload.checks.some((check) => check.id === "sentence-transformers"), false);
+  assert.equal(payload.checks.some((check) => check.id === "control-center-pinned-deps"), false);
 });
 
 test("env-doctor fails with an actionable message when a critical dependency is missing", () => {
