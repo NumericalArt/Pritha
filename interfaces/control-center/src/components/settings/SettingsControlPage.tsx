@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock3,
   Database,
+  ExternalLink,
   Globe2,
   Home,
   Info,
@@ -15,7 +16,9 @@ import {
   QrCode,
   ShieldCheck,
   SlidersHorizontal,
+  Smartphone,
   Sun,
+  Terminal,
   TimerReset,
   X,
 } from "lucide-react";
@@ -109,6 +112,10 @@ function memoryIndexLabel(status?: ControlCenterStatus) {
   const stats = status?.selfTest.memoryStats;
   if (!stats?.documents && !stats?.chunks) return "Unknown";
   return `${stats.documents.toLocaleString("en-US")} docs / ${stats.chunks.toLocaleString("en-US")} chunks`;
+}
+
+function metricLabel(value: number | undefined) {
+  return Number(value || 0).toLocaleString("en-US");
 }
 
 type SettingsSectionId = "general" | "access" | "codex" | "voice" | "limits" | "proactivity";
@@ -239,6 +246,11 @@ function VoiceLinkModal({ mode, url, onClose }: { mode: AccessMode; url?: string
   }, [url]);
 
   const localOnly = mode === "localhost";
+  const connectionNote = localOnly
+    ? "Localhost works only on this Mac. On a phone, 127.0.0.1 means the phone itself. Use LAN after binding to 0.0.0.0, or use Tailscale."
+    : mode === "lan"
+      ? "LAN works only when the Mac and phone are on the same trusted network and Control Center listens on 0.0.0.0."
+      : "Tailscale opens this only to trusted devices in the same tailnet. Peer access is accepted after opening this URL from the phone.";
   return (
     <div className="access-modal-overlay" role="presentation" onMouseDown={(event) => (event.target === event.currentTarget ? onClose() : undefined)}>
       <div className="access-modal voice-link-modal" role="dialog" aria-modal="true" aria-label="Voice link QR code">
@@ -253,8 +265,60 @@ function VoiceLinkModal({ mode, url, onClose }: { mode: AccessMode; url?: string
         </div>
         <p>{url || "Voice URL unavailable"}</p>
         <div className={`voice-link-note ${localOnly ? "warn" : ""}`}>
-          {localOnly ? "Localhost works only on this Mac. Select LAN or Tailscale for a phone." : "Scan this with iPhone, Android, or another smartphone."}
+          {connectionNote}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function accessStatusLabel(access: ControlCenterStatus["access"] | undefined, mode: AccessMode) {
+  if (!access) return "Loading";
+  if (mode === "localhost") return "Mac only";
+  if (mode === "lan") return access.lan === "ready" ? "Ready" : access.lanUrl ? "Detected, not listening" : "Unavailable";
+  if (access.tailscale === "ready") return "Serve ready";
+  if (access.tailscale === "pending_auth") return "Needs Serve";
+  return "Not configured";
+}
+
+function TailscaleSetupPanel({ access }: { access?: ControlCenterStatus["access"] }) {
+  const statusLabel = access?.tailscale === "ready" ? "Ready" : access?.tailscale === "pending_auth" ? "Needs Serve" : "Not configured";
+  return (
+    <div className="settings-setup-panel">
+      <div className="settings-setup-header">
+        <div>
+          <strong>Tailscale private access</strong>
+          <span>{statusLabel}. Localhost stays private; Tailscale Serve forwards trusted tailnet devices to this local Control Center.</span>
+        </div>
+        <span className={`settings-status-chip ${access?.tailscale === "ready" ? "alive" : "unknown"}`}>{statusLabel}</span>
+      </div>
+      <div className="settings-command-grid">
+        <div className="settings-command-row">
+          <Terminal size={16} />
+          <code>node scripts/tailscale-setup.mjs plan --app control-center --port 3420</code>
+        </div>
+        <div className="settings-command-row">
+          <Terminal size={16} />
+          <code>node scripts/tailscale-setup.mjs status --json</code>
+        </div>
+        <div className="settings-command-row">
+          <Terminal size={16} />
+          <code>node scripts/tailscale-setup.mjs auth-status</code>
+        </div>
+      </div>
+      <div className="info-note">
+        <Info size={17} />
+        Mutating actions require explicit operator approval: install --yes, serve --yes, off --yes, tailscale up, auth keys, Funnel and service changes.
+      </div>
+      <div className="settings-action-row">
+        <a className="outline-button compact" href="https://tailscale.com/docs/install/mac" target="_blank" rel="noreferrer">
+          <ExternalLink size={15} />
+          macOS install
+        </a>
+        <a className="outline-button compact" href="https://tailscale.com/docs/features/tailscale-serve" target="_blank" rel="noreferrer">
+          <ExternalLink size={15} />
+          Serve docs
+        </a>
       </div>
     </div>
   );
@@ -278,9 +342,27 @@ function AccessSection({ access }: AccessProps) {
   const voiceMode = access && accessModeReady(access, "tailscale") ? "tailscale" : selectedMode;
   const voiceUrl = access ? accessVoiceUrl(access, voiceMode) : undefined;
   const options = [
-    { id: "localhost" as const, label: "Localhost", value: access?.localhost || "http://127.0.0.1:3420", icon: Laptop },
-    { id: "lan" as const, label: "LAN", value: access?.lanUrl || "Unavailable", icon: Home },
-    { id: "tailscale" as const, label: "Tailscale", value: access?.tailscaleUrl || "Not configured", icon: ShieldCheck },
+    {
+      id: "localhost" as const,
+      label: "Localhost",
+      value: access?.localhost || "http://127.0.0.1:3420",
+      detail: "Works only on this Mac.",
+      icon: Laptop,
+    },
+    {
+      id: "lan" as const,
+      label: "LAN",
+      value: access?.lanUrl || "Unavailable",
+      detail: access?.lanReason || "Requires a trusted LAN and 0.0.0.0 host binding.",
+      icon: Home,
+    },
+    {
+      id: "tailscale" as const,
+      label: "Tailscale",
+      value: access?.tailscaleUrl || "Not configured",
+      detail: access?.tailscaleServeConfigured ? "Private Serve is configured." : "Install, authenticate, then approve Serve.",
+      icon: ShieldCheck,
+    },
   ].map((option) => ({ ...option, ready: access ? accessModeReady(access, option.id) : false }));
 
   return (
@@ -301,7 +383,9 @@ function AccessSection({ access }: AccessProps) {
             >
               <Icon size={25} />
               <strong>{option.label}</strong>
+              <small>{accessStatusLabel(access, option.id)}</small>
               <span>{option.value}</span>
+              <em>{option.detail}</em>
               {option.ready ? (
                 <span className="ready-check ready" aria-label={`${option.label} connection ready`}>
                   <CheckCircle2 size={18} />
@@ -311,15 +395,17 @@ function AccessSection({ access }: AccessProps) {
           );
         })}
         <button className={`access-option voice-link-action ${voiceUrl ? "ready" : "unavailable"}`} type="button" onClick={() => setVoiceLinkOpen(true)} disabled={!voiceUrl}>
-          <QrCode size={25} />
+          {voiceMode === "localhost" ? <Smartphone size={25} /> : <QrCode size={25} />}
           <strong>Voice Link</strong>
-          <span>{voiceUrl ? "Open /voice on phone" : "Select an available connection"}</span>
+          <small>{voiceMode === "localhost" ? "Mac only" : "Phone ready"}</small>
+          <span>{voiceUrl ? (voiceMode === "localhost" ? "Open /voice on this Mac" : "Open /voice on phone") : "Select an available connection"}</span>
         </button>
       </div>
       <div className="info-note">
         <Info size={17} />
-        The purple frame marks the default UI path. Green checks mark configured connection methods.
+        Localhost QR codes do not work from a phone. LAN requires Control Center to listen beyond 127.0.0.1; Tailscale is the recommended private phone path.
       </div>
+      <TailscaleSetupPanel access={access} />
       {voiceLinkOpen ? <VoiceLinkModal mode={voiceMode} url={voiceUrl} onClose={() => setVoiceLinkOpen(false)} /> : null}
     </section>
   );
@@ -395,10 +481,24 @@ function AppearanceSection() {
   );
 }
 
-function DataStorageSection() {
+function DataStorageSection({ status }: { status?: ControlCenterStatus }) {
+  const stats = status?.selfTest.memoryStats;
   return (
     <section className="settings-section">
       <SectionHeader icon={<Database size={23} />} title="Data & Storage" subtitle="Snapshots and local data" />
+      <div className="settings-rowline settings-memory-row">
+        <div>
+          <strong>Pritha memory snapshot</strong>
+          <span>Portable authored memory plus rebuildable SQLite/vector cache committed for fresh-clone usability.</span>
+        </div>
+        <div className="settings-mini-metrics" aria-label="Pritha memory snapshot">
+          <span>{metricLabel(stats?.documents)} docs</span>
+          <span>{metricLabel(stats?.chunks)} chunks</span>
+          <span>{metricLabel(stats?.entities)} entities</span>
+          <span>{metricLabel(stats?.relations)} relations</span>
+          <span>{metricLabel(stats?.embeddings)} embeddings</span>
+        </div>
+      </div>
       <div className="settings-rowline">
         <div>
           <strong>Snapshots retention per agent</strong>
@@ -573,7 +673,7 @@ function SettingsContent({ prefix, access, status }: AccessProps & { prefix: str
         <OpenAIKeysSection />
         <CodexAuthSection />
         <AppearanceSection />
-        <DataStorageSection />
+        <DataStorageSection status={status} />
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="access">
         <AccessSection access={access} />

@@ -185,6 +185,7 @@ type OperatorActionAuditEntry = {
 };
 
 const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
+const APP_HOST = process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1";
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
 
@@ -310,6 +311,7 @@ function canonicalTailscaleServeConfigured(dnsName: string, serveStatus: string)
 
 function accessLinks() {
   const lanIp = firstLanIPv4();
+  const lanReady = Boolean(lanIp) && !["127.0.0.1", "localhost", "::1"].includes(APP_HOST);
   const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || tailscaleSelfDnsName();
   const serveStatus = dnsName ? tailscaleServeStatusOutput() : "";
   const explicitTailscaleUrl = dnsName ? `https://${dnsName}:${APP_PORT}` : undefined;
@@ -321,6 +323,13 @@ function accessLinks() {
   return {
     localhost: `http://127.0.0.1:${APP_PORT}`,
     lanUrl: lanIp ? `http://${lanIp}:${APP_PORT}` : undefined,
+    lanReady,
+    lanBindHost: APP_HOST,
+    lanReason: lanReady
+      ? "Control Center is listening on a non-loopback host."
+      : lanIp
+        ? `Detected ${lanIp}, but Control Center is bound to ${APP_HOST}. Start with PRITHA_CONTROL_CENTER_HOST=0.0.0.0 for LAN access.`
+        : "No non-internal LAN IPv4 address was detected.",
     tailscaleUrl,
     tailscaleVoiceUrl: tailscaleUrl ? `${tailscaleUrl}/voice` : undefined,
     tailscaleServeConfigured: serveConfigured,
@@ -1831,8 +1840,10 @@ export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
     },
     access: {
       localhost: access.localhost,
-      lan: access.lanUrl ? "ready" : "unavailable",
+      lan: access.lanReady ? "ready" : "unavailable",
       lanUrl: access.lanUrl,
+      lanReason: access.lanReason,
+      lanBindHost: access.lanBindHost,
       tailscale: access.tailscaleServeConfigured ? "ready" : access.tailscaleUrl ? "pending_auth" : "unavailable",
       tailscaleUrl: access.tailscaleUrl,
       tailscaleVoiceUrl: access.tailscaleVoiceUrl,

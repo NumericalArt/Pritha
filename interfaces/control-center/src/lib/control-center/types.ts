@@ -717,6 +717,8 @@ export type ControlCenterStatus = {
     localhost: string;
     lan: CapabilityStatus;
     lanUrl?: string;
+    lanReason?: string;
+    lanBindHost?: string;
     tailscale: CapabilityStatus;
     tailscaleUrl?: string;
     tailscaleVoiceUrl?: string;

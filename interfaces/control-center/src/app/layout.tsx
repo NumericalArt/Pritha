@@ -32,6 +32,11 @@ const themeInitScript = `
 export const metadata: Metadata = {
   title: "Pritha Control Center",
   description: "Local control center for Pritha and child agents.",
+  icons: {
+    icon: "/pritha-logo.png",
+    shortcut: "/pritha-logo.png",
+    apple: "/pritha-logo.png",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
