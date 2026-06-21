@@ -25,13 +25,6 @@ tools:
   - mlx-whisper
 sources:
   - source-edee1fe0-1ed3-46f0-b75b-f9b417179f64
-  - https://www.youtube.com/watch?v=JoXbk2fm7jM
-  - https://www.lennysnewsletter.com/p/how-to-design-ai-agent-loops-schedules
-  - https://developers.openai.com/codex/codex-manual.md
-  - https://docs.anthropic.com/en/docs/claude-code/overview
-  - https://docs.anthropic.com/en/docs/claude-code/common-workflows
-  - https://docs.anthropic.com/en/docs/claude-code/hooks-guide
-  - https://docs.anthropic.com/en/docs/claude-code/skills
 related:
   intakes:
     - 00_inbox/links/2026-06-20-youtube-ai-agent-loops-claude-code-codex-intake.md

@@ -16,9 +16,7 @@ tools:
   - OpenAI Cookbook
   - Codex Manual
 sources:
-  - https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex
-  - https://developers.openai.com/codex/codex-manual.md
-  - https://github.com/openai/openai-cookbook/commit/9b4e6279edd4dceb6b4b7da582482a7c882f7544
+  - source-03e44633-53b6-4273-9e28-dbdf11d05b5e
 related:
   intakes:
     - 00_inbox/links/2026-05-21-openai-codex-goals-intake.md
@@ -35,6 +33,7 @@ processed_at: 2026-06-20T00:00:00-07:00
 retention_status: source-purged
 usefulness: high
 evidence_quality: high
+anonymous_source_id: source-03e44633-53b6-4273-9e28-dbdf11d05b5e
 agent_platforms:
   - Codex
 model_context:
