@@ -33,8 +33,8 @@ export const metadata: Metadata = {
   title: "Pritha Control Center",
   description: "Local control center for Pritha and child agents.",
   icons: {
-    icon: "/pritha-logo.png",
-    shortcut: "/pritha-logo.png",
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
     apple: "/pritha-logo.png",
   },
 };
