@@ -23,11 +23,6 @@ tools:
   - Git worktree
 sources:
   - source-8d01cbd3-72d9-4c00-bf48-9e0fcd86c840
-  - https://addyosmani.com/blog/loop-engineering/
-  - https://developers.openai.com/codex/codex-manual.md
-  - https://docs.anthropic.com/en/docs/claude-code/overview
-  - https://docs.anthropic.com/en/docs/claude-code/hooks-guide
-  - https://docs.anthropic.com/en/docs/claude-code/skills
 related:
   intakes:
     - 00_inbox/links/2026-06-20-addy-osmani-loop-engineering-intake.md
