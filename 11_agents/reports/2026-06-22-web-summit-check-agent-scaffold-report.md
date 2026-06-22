@@ -56,7 +56,7 @@ Status: complete
 ## Summary
 
 - Agent name: WebSummitCheckAgent
-- Target folder: /Users/ivanklushin/Documents/WebSummitCheckAgent
+- Target folder: <parent-of-TECHSCOPE_ROOT>/WebSummitCheckAgent
 - Contract: 11_agents/contracts/2026-06-22-web-summit-check-agent-agent-contract.md
 - Runtime family: codex-native
 - Interfaces: Codex project
