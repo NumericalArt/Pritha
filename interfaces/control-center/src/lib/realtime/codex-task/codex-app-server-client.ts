@@ -123,8 +123,8 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       );
       await emitProgress("codex_app_initialized", "Codex App sidecar initialized.");
 
-      target = await this.resolveControlThread(connection, remainingMs(startedAt, options.timeoutMs));
-      await emitProgress("thread_resolved", "Codex App control thread resolved.", {
+      target = await this.resolveTaskThread(connection, payload, remainingMs(startedAt, options.timeoutMs));
+      await emitProgress("thread_resolved", "Codex App task thread resolved.", {
         thread_id: target.threadId,
         thread_name: target.threadName,
       });
@@ -177,6 +177,16 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     }
   }
 
+  private async resolveTaskThread(connection: AppServerConnection, payload: PrithaCodexTaskPayload, timeoutMs: number) {
+    const overrideThreadId = process.env.PRITHA_CODEX_APP_THREAD_ID?.trim() || process.env.CODEX_APP_THREAD_ID?.trim();
+    const reuseControlThread = ["1", "true", "yes"].includes(String(process.env.PRITHA_CODEX_APP_REUSE_CONTROL_THREAD || "").toLowerCase());
+    if (overrideThreadId || reuseControlThread) return this.resolveControlThread(connection, timeoutMs);
+
+    const threadName = taskThreadName(this.cwd, this.branch, payload.requestId);
+    const thread = await this.startNamedThread(connection, threadName, timeoutMs);
+    return { threadId: String(thread.id), threadName };
+  }
+
   private async resolveControlThread(connection: AppServerConnection, timeoutMs: number) {
     const threadName = controlThreadName(this.cwd, this.branch);
     const overrideThreadId = process.env.PRITHA_CODEX_APP_THREAD_ID?.trim() || process.env.CODEX_APP_THREAD_ID?.trim();
@@ -208,6 +218,12 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       return { threadId: String(thread.id), threadName };
     }
 
+    const thread = await this.startNamedThread(connection, threadName, timeoutMs);
+    this.saveThread(threadName, thread);
+    return { threadId: String(thread.id), threadName };
+  }
+
+  private async startNamedThread(connection: AppServerConnection, threadName: string, timeoutMs: number) {
     const started = (await connection.request(
       "thread/start",
       {
@@ -222,8 +238,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     const thread = started.thread;
     if (!thread?.id) throw new Error("Codex app-server did not create a thread");
     await connection.request("thread/name/set", { threadId: thread.id, name: threadName }, timeoutMs);
-    this.saveThread(threadName, thread);
-    return { threadId: String(thread.id), threadName };
+    return thread;
   }
 
   private async resumeThread(connection: AppServerConnection, threadId: string, timeoutMs: number) {
@@ -631,6 +646,11 @@ function projectSlug(projectRoot: string) {
 
 function controlThreadName(projectRoot: string, branch: string) {
   return `VC · ${projectSlug(projectRoot)} · ${branch || "main"} · control`;
+}
+
+function taskThreadName(projectRoot: string, branch: string, requestId: string) {
+  const shortId = (requestId || randomUUID()).replace(/[^A-Za-z0-9_-]+/g, "-").slice(0, 32);
+  return `VC · ${projectSlug(projectRoot)} · ${branch || "main"} · task · ${shortId}`;
 }
 
 function registryKey(input: { projectRoot: string; branch: string; role: string }) {

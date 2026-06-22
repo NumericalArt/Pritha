@@ -154,6 +154,7 @@ export type PrithaRuntimeSettings = {
   codexNetworkAccess: boolean;
   codexApproval: "never";
   codexTimeoutMs: number;
+  codexPromptTokenBudget: number;
   codexPlanningMode: CodexPlanningMode;
   codexExecutionMode: CodexExecutionMode;
   codexMaxPlanSteps: number;
@@ -317,6 +318,31 @@ function compactText(value: unknown, maxChars = MAX_TOOL_TEXT) {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
   if (text.length <= maxChars) return text;
   return `${text.slice(0, maxChars - 1).trim()}...`;
+}
+
+function estimatePromptTokens(value: unknown) {
+  const text = String(value ?? "");
+  if (!text) return 0;
+  const pieces = text.match(/[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu)?.length || 0;
+  const punctuation = text.match(/[{}[\]":,./\\_-]/g)?.length || 0;
+  const charEstimate = Math.ceil(text.length / 3.2);
+  const pieceEstimate = Math.ceil(pieces * 1.18 + punctuation * 0.12);
+  return Math.max(charEstimate, pieceEstimate);
+}
+
+function codexOutboundPromptTokenBudget() {
+  return getPrithaRuntimeSettings().codexPromptTokenBudget || codexPromptTokenBudgetFromEnv();
+}
+
+function codexPromptTokenBudgetFromEnv() {
+  const raw = Number(env("PRITHA_CODEX_OUTBOUND_PROMPT_TOKEN_BUDGET", env("PRITHA_REALTIME_CODEX_PROMPT_TOKEN_BUDGET", "24000")));
+  return normalizeCodexPromptTokenBudget(raw);
+}
+
+export function normalizeCodexPromptTokenBudget(value: unknown) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return 24_000;
+  return Math.max(4_000, Math.min(Math.round(raw), 120_000));
 }
 
 function redactSensitiveText(value: unknown) {
@@ -1637,7 +1663,7 @@ export function buildRealtimeInstructions() {
     "Do not claim Codex work is complete after starting or queueing a task. Report the task id, status and next operator-visible path. If the task returns a plan or latest_voice_feedback, summarize that instead of saying only that the task is running.",
     "After run_codex_task returns a running or queued task, do not start another Codex task just to poll that task's status. Use inspect_codex_task for status, brief, timeline or diagnose requests. The Voice UI also monitors Codex task readiness and sends later completion/failure messages when a terminal result or operator brief is available.",
     "If the UI later adds a message that starts with 'Codex sidecar task' and includes 'Result:', treat it as the authoritative completion notification for that task. Summarize the result to the operator immediately instead of saying that you do not automatically know whether Codex finished.",
-    "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, mode_selected, step_started, step_completed or step_blocked. Never read heartbeat as the main progress update.",
+    "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed or step_blocked. Never read heartbeat as the main progress update.",
     "Do not ask for secrets or expose credentials. For credentials, route the operator to the child-agent credential UI. For publish, deletion, service install, launchd/cron or broad system changes, create a Codex task and let the UI decision gate collect approval.",
     "Realtime tools must not mutate curated Markdown directly except through confirmed deep_pritha_memory memory-write operations or through run_codex_task when its sandbox/write mode permits it. Keep edits narrowly scoped.",
     buildVoiceBehaviorPromptSections(settings.voiceBehaviorProfile),
@@ -1928,6 +1954,7 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
     codexNetworkAccess: true,
     codexApproval: "never",
     codexTimeoutMs: codexTimeoutMs(),
+    codexPromptTokenBudget: codexPromptTokenBudgetFromEnv(),
     codexPlanningMode: "planner",
     codexExecutionMode: "inline_only",
     codexMaxPlanSteps: 7,
@@ -1977,6 +2004,7 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     ? (value.codexSandbox as PrithaRuntimeSettings["codexSandbox"])
     : defaults.codexSandbox;
   const timeout = Number(value.codexTimeoutMs);
+  const promptTokenBudget = Number(value.codexPromptTokenBudget);
   const maxPlanSteps = Number(value.codexMaxPlanSteps);
   return {
     deepTaskPrimaryTransport: transport,
@@ -1988,6 +2016,7 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     codexNetworkAccess: typeof value.codexNetworkAccess === "boolean" ? value.codexNetworkAccess : defaults.codexNetworkAccess,
     codexApproval: "never",
     codexTimeoutMs: Number.isFinite(timeout) && timeout > 0 ? Math.max(10_000, Math.min(timeout, 3_600_000)) : defaults.codexTimeoutMs,
+    codexPromptTokenBudget: Number.isFinite(promptTokenBudget) ? normalizeCodexPromptTokenBudget(promptTokenBudget) : defaults.codexPromptTokenBudget,
     codexPlanningMode: normalizeCodexPlanningMode(value.codexPlanningMode, defaults.codexPlanningMode),
     codexExecutionMode: normalizeCodexExecutionMode(value.codexExecutionMode, defaults.codexExecutionMode),
     codexMaxPlanSteps: Number.isFinite(maxPlanSteps) ? Math.max(1, Math.min(Math.round(maxPlanSteps), 10)) : defaults.codexMaxPlanSteps,
@@ -2022,6 +2051,7 @@ export async function updatePrithaRuntimeSettings(patch: Partial<PrithaRuntimeSe
     codexSandbox: next.codexSandbox,
     codexNetworkAccess: next.codexNetworkAccess,
     codexTimeoutMs: next.codexTimeoutMs,
+    codexPromptTokenBudget: next.codexPromptTokenBudget,
     codexPlanningMode: next.codexPlanningMode,
     codexExecutionMode: next.codexExecutionMode,
     codexMaxPlanSteps: next.codexMaxPlanSteps,
@@ -2488,6 +2518,11 @@ function codexTaskApprovalReasons(task: Record<string, unknown>) {
   if (/(deploy|deployment|publish|release|push\s+to\s+github|gh\s+pr|git\s+push)/.test(taskText)) reasons.push("external_publish_or_deployment");
   if (/(delete|remove|destroy|wipe|drop|rm\s+-rf|erase)\b/.test(taskText)) reasons.push("destructive_change");
   if (/(secret|credential|token|api\s*key|password|\.env\.local|private\s+key)/.test(taskText)) reasons.push("credential_or_secret_change");
+  if (/(control\s*center|control-center|pritha\s+ui|\/voice|\/agents|127\.0\.0\.1:3420|:3420)/.test(taskText)) {
+    if (/(restart|rebuild|reload|stop|kill|terminate|npm\s+run\s+start|next\s+start|refresh\s+server|перезапуск|пересбор|перезапусти|останов)/.test(taskText)) {
+      reasons.push("control_center_runtime_change");
+    }
+  }
   if (/(launchctl|launchd|cron|crontab|daemon|service|autostart|startup|background\s+process|heartbeat|queue\s+watcher)/.test(taskText)) {
     if (/(add|create|install|enable|start|load|register|turn\s+on|configure|schedule|set\s+up|activate)/.test(taskText)) {
       reasons.push("scheduler_or_service_enablement");
@@ -2504,17 +2539,19 @@ function codexTaskApprovalFor(task: Record<string, unknown>, requestedAt = new D
   if (!reasons.length) return null;
   const actionType = reasons.includes("credential_or_secret_change")
     ? "credential_or_secret_change"
-    : reasons.includes("scheduler_or_service_enablement")
-      ? "scheduler_or_service_enablement"
-      : reasons.includes("external_publish_or_deployment")
-        ? "external_publish_or_deployment"
-        : reasons.includes("destructive_change")
-          ? "destructive_change"
-          : reasons.includes("danger_full_access_sandbox")
-            ? "danger_full_access_sandbox"
-            : reasons.includes("workspace_write_requested")
-              ? "workspace_write"
-              : "system_change";
+    : reasons.includes("control_center_runtime_change")
+      ? "control_center_runtime_change"
+      : reasons.includes("scheduler_or_service_enablement")
+        ? "scheduler_or_service_enablement"
+        : reasons.includes("external_publish_or_deployment")
+          ? "external_publish_or_deployment"
+          : reasons.includes("destructive_change")
+            ? "destructive_change"
+            : reasons.includes("danger_full_access_sandbox")
+              ? "danger_full_access_sandbox"
+              : reasons.includes("workspace_write_requested")
+                ? "workspace_write"
+                : "system_change";
   return {
     status: "pending",
     action_type: actionType,
@@ -2645,6 +2682,130 @@ function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodex
       schema: genericCodexTaskExpectedSchema(),
     },
   };
+}
+
+function codexOutboundTransports(...values: unknown[]) {
+  const transports = new Set<"codex-app" | "codex-cli">();
+  for (const value of values) {
+    if (value === "codex-app" || value === "codex-cli") transports.add(value);
+  }
+  if (!transports.size) {
+    transports.add("codex-app");
+    transports.add("codex-cli");
+  }
+  return [...transports];
+}
+
+function estimateCodexOutboundPromptTokens(task: Record<string, unknown>, transports: Array<"codex-app" | "codex-cli">) {
+  const estimates: Record<string, number> = {};
+  if (transports.includes("codex-cli")) estimates["codex-cli"] = estimatePromptTokens(buildCodexPrompt(task));
+  if (transports.includes("codex-app")) {
+    const payload = buildPrithaCodexTaskPayload(task);
+    estimates["codex-app"] = estimatePromptTokens(JSON.stringify(payload, null, 2)) + 1_200;
+  }
+  const max = Math.max(0, ...Object.values(estimates));
+  const transport = Object.entries(estimates).sort((a, b) => b[1] - a[1])[0]?.[0] || "unknown";
+  return { max, transport, estimates };
+}
+
+function stripLikelyOldPromptContext(text: string) {
+  const dropLine = [
+    /^Sticky Context Update:/i,
+    /^Sticky Voice Context/i,
+    /^Recent voice session events:/i,
+    /^Session journal events:/i,
+    /^Visible Codex tasks:/i,
+    /^Codex task state:/i,
+    /\bheartbeat\b/i,
+    /SkyComputerUseClient/i,
+    /"input-messages"\s*:/i,
+    /\bps aux\b/i,
+    /\b(stdout|stderr|progress|voice_feedback)_path\b/i,
+  ];
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !dropLine.some((pattern) => pattern.test(line)))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function compactTaskTextForOutboundBudget(value: unknown, maxChars: number) {
+  const original = String(value || "").trim();
+  if (original.length <= maxChars) return original;
+  const cleaned = stripLikelyOldPromptContext(original) || original;
+  if (cleaned.length <= maxChars) return cleaned;
+
+  const marker =
+    "[Pritha outbound prompt guard: context compacted. Kept the opening task statement and the newest tail context; omitted older middle/session/log material.]";
+  const budget = Math.max(800, maxChars - marker.length - 80);
+  const headChars = Math.max(280, Math.floor(budget * 0.34));
+  const tailChars = Math.max(420, budget - headChars);
+  const head = cleaned.slice(0, headChars).trim();
+  const tail = cleaned.slice(-tailChars).trim();
+  const omitted = Math.max(0, cleaned.length - head.length - tail.length);
+  const compacted = `${marker}\n\n${head}\n\n[older context omitted: ${omitted} chars]\n\n${tail}`;
+  if (compacted.length <= maxChars) return compacted;
+  return compacted.slice(0, Math.max(0, maxChars - 1)).trimEnd();
+}
+
+async function applyCodexOutboundPromptBudget(
+  task: Record<string, unknown>,
+  transports: Array<"codex-app" | "codex-cli">,
+  progress?: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
+) {
+  const budget = codexOutboundPromptTokenBudget();
+  const before = estimateCodexOutboundPromptTokens(task, transports);
+  if (before.max <= budget) return { applied: false, budget, before };
+
+  const originalTaskText = String(task.task || "");
+  let targetChars = Math.max(900, Math.min(originalTaskText.length, Math.floor(Math.max(900, budget - 2_000) * 2.8)));
+  let after = before;
+  let compactedTaskText = originalTaskText;
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    compactedTaskText = compactTaskTextForOutboundBudget(originalTaskText, targetChars);
+    task.task = compactedTaskText;
+    task.prompt_budget = {
+      applied: true,
+      strategy: "estimate_tokens_then_deterministic_compact_drop",
+      budget_tokens: budget,
+      estimated_tokens_before: before.max,
+      estimated_tokens_after: before.max,
+      limiting_transport_before: before.transport,
+      transports,
+      original_task_chars: originalTaskText.length,
+      compacted_task_chars: compactedTaskText.length,
+      dropped_task_chars: Math.max(0, originalTaskText.length - compactedTaskText.length),
+    };
+    after = estimateCodexOutboundPromptTokens(task, transports);
+    if (after.max <= budget || targetChars <= 900) break;
+    targetChars = Math.max(900, Math.floor(targetChars * 0.62));
+  }
+
+  task.prompt_budget = {
+    ...(typeof task.prompt_budget === "object" && task.prompt_budget !== null ? task.prompt_budget : {}),
+    estimated_tokens_after: after.max,
+    limiting_transport_after: after.transport,
+    estimate_by_transport_before: before.estimates,
+    estimate_by_transport_after: after.estimates,
+  };
+  await progress?.({
+    phase: "prompt_budget_compacted",
+    level: "warning",
+    status: String(task.status || "running"),
+    message: `Codex outbound prompt estimate exceeded budget; compacted task context before transport. ${before.max} -> ${after.max} estimated tokens.`,
+    prompt_budget: task.prompt_budget,
+  });
+  await logPrivateEvent("codex_task_prompt_budget_compacted", {
+    task_id: task.id,
+    budget_tokens: budget,
+    estimated_tokens_before: before.max,
+    estimated_tokens_after: after.max,
+    limiting_transport_before: before.transport,
+    limiting_transport_after: after.transport,
+  });
+  return { applied: true, budget, before, after };
 }
 
 function maybeParseJsonObject(value: unknown) {
@@ -2939,7 +3100,7 @@ async function planCodexAppTask(
       message: `Planning pass failed; using safe synthetic plan. ${compactText(error instanceof Error ? error.message : String(error), 400)}`,
     });
     await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
-      phase: "plan_created",
+      phase: "planning_fallback",
       speakable: true,
       priority: "normal",
       voice_text: `Не удалось получить отдельный Codex-план, поэтому я использую безопасный локальный план из ${plan.steps.length} шаг(а).`,
@@ -3273,6 +3434,12 @@ async function startCodexAppTask(
         message: `Codex App transport failed; starting Codex CLI fallback. ${compactText(message, 500)}`,
         elapsed_ms: elapsedMsSince(startedAt, Date.parse(finishedAt)),
       });
+      await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+        phase: "fallback_started",
+        speakable: true,
+        priority: "high",
+        voice_text: `Codex App остановился, поэтому я переключаю эту же задачу на Codex CLI и продолжаю работу. Причина: ${compactText(message, 360)}`,
+      });
       await appendFile(paths.stderrPath, `${finishedAt} Codex App transport failed: ${message}\n${finishedAt} Starting Codex CLI fallback for the same task.\n`, "utf8").catch(() => undefined);
       await startCodexExec(fallbackTask, paths);
       return;
@@ -3309,6 +3476,12 @@ async function startCodexAppTask(
       transport: "codex-app",
       message,
       elapsed_ms: elapsedMsSince(startedAt, Date.parse(finishedAt)),
+    });
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: status,
+      speakable: true,
+      priority: "high",
+      voice_text: `Codex App завершился с ошибкой и fallback недоступен. Подробности доступны в карточке задачи. Причина: ${compactText(message, 360)}`,
     });
   });
 
@@ -3590,6 +3763,7 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, progressPath, event);
 
+  await applyCodexOutboundPromptBudget(task, codexOutboundTransports(effectiveTransport, fallbackTransport), progress);
   await writeFile(requestPath, `${JSON.stringify(task, null, 2)}\n`, "utf8");
   await writeFile(promptPath, `${buildCodexPrompt(task)}\n`, "utf8");
   await writeFile(statusPath, `${JSON.stringify({ status: task.status, phase: task.status, created_at: task.created_at, approval: task.approval }, null, 2)}\n`, "utf8");
@@ -3791,7 +3965,7 @@ async function repairStaleCodexTaskStatus(
   id: string,
   request: Record<string, unknown> | null,
   status: Record<string, unknown> | null,
-  paths: { statusPath: string; resultPath: string; progressPath: string },
+  paths: { statusPath: string; resultPath: string; progressPath: string; voiceFeedbackPath?: string },
   resultText: string,
 ) {
   const statusValue = String(status?.status || request?.status || "unknown");
@@ -3848,6 +4022,16 @@ async function repairStaleCodexTaskStatus(
         : "Codex task did not produce a final result before the runner stopped or timed out.",
     reason: repaired.stale_reason,
   });
+  await appendCodexVoiceFeedback(id, paths.voiceFeedbackPath || "", {
+    phase: "stale_repaired",
+    priority: repairedStatus === "complete" ? "normal" : "high",
+    speakable: true,
+    voice_text:
+      repairedStatus === "complete"
+        ? "Codex-задача завершилась, но статус был stale; я починила карточку по найденному результату."
+        : `Codex-задача остановилась без финального результата; я пометила ее как timeout. Причина: ${compactText(repaired.stale_reason, 180)}`,
+    requires_response: false,
+  });
   await logPrivateEvent("codex_task_stale_status_repaired", { task_id: id, status: repairedStatus, reason: repaired.stale_reason });
   return { status: repaired, resultText: nextResultText, repaired: true };
 }
@@ -3864,7 +4048,7 @@ async function codexTaskSummary(id: string) {
   const request = await readJsonFile(requestPath);
   const initialStatus = await readJsonFile(statusPath);
   const initialResultText = await readFile(resultPath, "utf8").catch(() => "");
-  const repaired = await repairStaleCodexTaskStatus(id, request, initialStatus, { statusPath, resultPath, progressPath }, initialResultText);
+  const repaired = await repairStaleCodexTaskStatus(id, request, initialStatus, { statusPath, resultPath, progressPath, voiceFeedbackPath }, initialResultText);
   const status = repaired.status;
   const resultText = repaired.resultText;
   const statusValue = String(status?.status || request?.status || "unknown");
@@ -3999,7 +4183,7 @@ export async function getPrithaCodexTask(taskId: string) {
   const request = await readJsonFile(requestPath);
   const initialStatus = await readJsonFile(statusPath);
   const initialResultText = await readFile(resultPath, "utf8").catch(() => "");
-  const repaired = await repairStaleCodexTaskStatus(id, request, initialStatus, { statusPath, resultPath, progressPath }, initialResultText);
+  const repaired = await repairStaleCodexTaskStatus(id, request, initialStatus, { statusPath, resultPath, progressPath, voiceFeedbackPath }, initialResultText);
   const status = repaired.status;
   const resultText = repaired.resultText;
   const stdoutText = await readFile(stdoutPath, "utf8").catch(() => "");
@@ -4286,6 +4470,7 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
 
   const effectiveTransport = String(request.effective_transport || "queue");
   nextRequest.status = effectiveTransport === "queue" ? "queued" : "running";
+  await applyCodexOutboundPromptBudget(nextRequest, codexOutboundTransports(effectiveTransport), progress);
   await writeFile(requestPath, `${JSON.stringify(nextRequest, null, 2)}\n`, "utf8");
   await writeFile(promptPath, `${buildCodexPrompt(nextRequest)}\n`, "utf8");
 

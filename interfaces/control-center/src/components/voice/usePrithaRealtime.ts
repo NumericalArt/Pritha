@@ -31,6 +31,18 @@ export type CodexTaskApproval = {
   decided_by?: string;
 };
 
+export type CodexTaskVoiceFeedback = {
+  timestamp?: string;
+  task_id?: string;
+  phase?: string;
+  priority?: "low" | "normal" | "high" | string;
+  speakable?: boolean;
+  voice_text?: string;
+  requires_response?: boolean;
+  step_id?: string;
+  step_title?: string;
+};
+
 export type CodexTaskState = {
   id: string;
   title: string;
@@ -52,6 +64,7 @@ export type CodexTaskState = {
   handoffStatus?: "pending" | "sent" | "skipped";
   handoffReason?: string;
   approval?: CodexTaskApproval | null;
+  latestVoiceFeedback?: CodexTaskVoiceFeedback | null;
 };
 
 export type SessionMemoryPromotionState = {
@@ -143,6 +156,8 @@ type CodexTaskSnapshot = {
   stale?: boolean;
   operator_brief?: string;
   voice_handoff_required?: boolean;
+  latest_voice_feedback?: CodexTaskVoiceFeedback | null;
+  speakable_events?: CodexTaskVoiceFeedback[];
   result_available?: boolean;
   result_excerpt?: string;
   approval?: CodexTaskApproval | null;
@@ -191,10 +206,23 @@ type SessionMemoryPromotionPayload = {
 const SESSION_STORAGE_KEY = "pritha.voice.session.v1";
 const MAX_SESSION_EVENTS = 120;
 const MAX_VISIBLE_TASKS = 5;
-const MAX_STICKY_CONTEXT_EVENTS = 10;
-const MAX_STICKY_CONTEXT_TASKS = 5;
+const MAX_STICKY_CONTEXT_EVENTS = 6;
+const MAX_STICKY_CONTEXT_TASKS = 3;
+const MAX_STICKY_CONTEXT_CHARS = 3_500;
 const MIC_INPUT_LEVEL_STORAGE_KEY = "pritha.voice.inputLevel.v1";
 const LEGACY_MIC_GAIN_STORAGE_KEY = "pritha.voice.micGain.v1";
+
+function stickyText(value: unknown, maxChars: number) {
+  return String(value || "")
+    .replace(/(?:sk|pk|rk)-[A-Za-z0-9_-]{12,}/g, "[redacted-key]")
+    .replace(/([A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=)[^\s]+/gi, "$1[redacted]")
+    .replace(/SkyComputerUseClient[^\n]*/g, "[omitted computer-use process]")
+    .replace(/"input-messages"\s*:\s*\[[\s\S]{0,1600}/g, '"input-messages":[omitted]')
+    .replace(/\bps aux\b[^\n]*/g, "ps output omitted")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxChars);
+}
 
 function clampMicInputLevel(value: number) {
   return Math.max(0, Math.min(Number.isFinite(value) ? value : 100, 100));
@@ -417,6 +445,7 @@ function usePrithaRealtimeController() {
         handoffStatus: task.handoffStatus || existing?.handoffStatus,
         handoffReason: task.handoffReason || existing?.handoffReason,
         approval: task.approval === undefined ? existing?.approval : task.approval,
+        latestVoiceFeedback: task.latestVoiceFeedback === undefined ? existing?.latestVoiceFeedback : task.latestVoiceFeedback,
       };
       return [nextTask, ...tasks.filter((item) => item.id !== task.id)].slice(0, MAX_VISIBLE_TASKS);
     });
@@ -543,6 +572,8 @@ function usePrithaRealtimeController() {
       const failed = statusText.startsWith("failed");
       const resultText = snapshot.result_excerpt?.trim();
       const operatorBrief = snapshot.operator_brief?.trim();
+      const voiceFeedback = snapshot.latest_voice_feedback || null;
+      const voiceFeedbackText = voiceFeedback?.voice_text?.trim();
       const decisionRequired = statusText === "decision_required" || snapshot.approval?.status === "pending";
       const progress = terminal ? 100 : snapshot.result_available ? 75 : snapshot.stale ? 65 : statusText === "running" ? 45 : decisionRequired ? 5 : 15;
       const handoffSkipped = snapshot.telemetry?.find((event) => event.kind === "codex_task_result_handoff_skipped");
@@ -552,7 +583,9 @@ function usePrithaRealtimeController() {
       const summary = operatorBrief
         ? operatorBrief
         : terminal
-        ? resultText || (failed ? "Codex task failed. Open task logs for details." : "Codex task completed.")
+        ? resultText || voiceFeedbackText || (failed ? "Codex task failed. Open task logs for details." : "Codex task completed.")
+        : voiceFeedbackText
+          ? voiceFeedbackText
         : decisionRequired
           ? snapshot.approval?.summary || "Waiting for operator approval in Pritha UI."
         : snapshot.paths?.status
@@ -578,13 +611,14 @@ function usePrithaRealtimeController() {
         handoffStatus,
         handoffReason,
         approval: snapshot.approval || null,
+        latestVoiceFeedback: voiceFeedback,
         completedAt: terminal ? nowIso() : undefined,
       });
       setToolStatus(JSON.stringify(snapshot, null, 2));
 
       if (recordSessionEvent && terminal && snapshot.task_id && !sessionLoggedCodexTaskResultsRef.current.has(snapshot.task_id)) {
         sessionLoggedCodexTaskResultsRef.current.add(snapshot.task_id);
-        const eventText = operatorBrief || resultText || snapshot.task_id;
+        const eventText = operatorBrief || resultText || voiceFeedbackText || snapshot.task_id;
         addTranscript("tool", `Codex task ${statusText}: ${eventText.slice(0, 900)}`);
         appendSessionEvent("task", `Codex task ${snapshot.task_id} ${statusText}${eventText ? `: ${eventText.slice(0, 900)}` : ""}`, {
           taskId: snapshot.task_id,
@@ -624,8 +658,12 @@ function usePrithaRealtimeController() {
 
   const buildStickyContext = useCallback(
     (reason: string) => {
-      const recentEvents = sessionEvents.slice(-MAX_STICKY_CONTEXT_EVENTS);
-      const visibleTasks = codexTasks.slice(0, MAX_STICKY_CONTEXT_TASKS);
+      const recentEvents = sessionEvents
+        .filter((event) => event.kind !== "system" || /reset|sticky|codex|fallback|failed|complete/i.test(event.text))
+        .slice(-MAX_STICKY_CONTEXT_EVENTS);
+      const visibleTasks = codexTasks
+        .filter((task) => task.status !== "complete" || task.voiceHandoffRequired || task.handoffStatus === "pending")
+        .slice(0, MAX_STICKY_CONTEXT_TASKS);
       const activeTasks = visibleTasks.filter((task) => task.status !== "complete" && !task.status.startsWith("failed"));
       const lines = [
         "Sticky Voice Context is enabled for this Pritha Control Center session.",
@@ -639,9 +677,9 @@ function usePrithaRealtimeController() {
       if (visibleTasks.length) {
         lines.push("", "Codex task state:");
         for (const task of visibleTasks) {
-          const result = task.operatorBrief || task.resultExcerpt || task.summary;
+          const result = stickyText(task.latestVoiceFeedback?.voice_text || task.operatorBrief || task.summary || task.resultExcerpt, 260);
           lines.push(
-            `- ${task.id}: ${task.status}, phase ${task.phase || "unknown"}, progress ${task.progress}%, handoff ${task.handoffStatus || "pending"}${task.lastActivity ? `, last activity ${task.lastActivity.slice(0, 180)}` : ""}${result ? `, brief ${result.slice(0, 420)}` : ""}`,
+            `- ${task.id}: ${task.status}, phase ${task.phase || "unknown"}, progress ${task.progress}%, handoff ${task.handoffStatus || "pending"}${task.lastActivity ? `, last activity ${stickyText(task.lastActivity, 140)}` : ""}${result ? `, brief ${result}` : ""}`,
           );
         }
       }
@@ -649,11 +687,11 @@ function usePrithaRealtimeController() {
       if (recentEvents.length) {
         lines.push("", "Recent voice session events:");
         for (const event of recentEvents) {
-          lines.push(`- ${event.timestamp} ${event.kind}${event.taskId ? ` ${event.taskId}` : ""}: ${event.text.slice(0, 420)}`);
+          lines.push(`- ${event.timestamp} ${event.kind}${event.taskId ? ` ${event.taskId}` : ""}: ${stickyText(event.text, 220)}`);
         }
       }
 
-      return lines.join("\n").slice(0, 6_000);
+      return lines.join("\n").slice(0, MAX_STICKY_CONTEXT_CHARS);
     },
     [codexTasks, sessionEvents],
   );
@@ -734,9 +772,11 @@ function usePrithaRealtimeController() {
           const channel = eventsChannelRef.current;
           const resultText = snapshot.result_excerpt?.trim();
           const operatorBrief = snapshot.operator_brief?.trim();
+          const voiceFeedbackText = snapshot.latest_voice_feedback?.voice_text?.trim();
           const handoffText =
             resultText ||
             operatorBrief ||
+            voiceFeedbackText ||
             (snapshot.status?.startsWith("failed")
               ? `Codex sidecar task ${snapshot.task_id} finished with status ${snapshot.status}. Open the task card for details.`
               : "");
@@ -792,34 +832,39 @@ function usePrithaRealtimeController() {
               handoffReason: reason,
             });
           }
-        } else if (!terminal && snapshot.task_id && snapshot.operator_brief?.trim() && attempts >= 30) {
-          const channel = eventsChannelRef.current;
-          const now = Date.now();
-          const lastBriefAt = lastCodexTaskProgressBriefRef.current.get(snapshot.task_id) || 0;
-          const responseBusy = responseInProgressRef.current || processingToolBatchRef.current;
-          if (channel?.readyState === "open" && !responseBusy && now - lastBriefAt >= 180_000) {
-            lastCodexTaskProgressBriefRef.current.set(snapshot.task_id, now);
-            channel.send(
-              JSON.stringify({
-                type: "conversation.item.create",
-                item: {
-                  type: "message",
-                  role: "user",
-                  content: [
-                    {
-                      type: "input_text",
-                      text: `Codex sidecar task ${snapshot.task_id} progress update.\n\nStatus:\n${snapshot.operator_brief.trim()}`,
-                    },
-                  ],
-                },
-              }),
-            );
-            requestResponse("codex_task_progress");
-            logClientEvent("codex_task_progress_handoff_sent", {
-              task_id: snapshot.task_id,
-              status: snapshot.status || "unknown",
-              phase: snapshot.phase || "unknown",
-            });
+        } else if (!terminal && snapshot.task_id) {
+          const progressText = snapshot.latest_voice_feedback?.voice_text?.trim() || snapshot.operator_brief?.trim();
+          const urgentFeedback = snapshot.latest_voice_feedback?.priority === "high";
+          if (progressText && (urgentFeedback || attempts >= 30)) {
+            const channel = eventsChannelRef.current;
+            const now = Date.now();
+            const lastBriefAt = lastCodexTaskProgressBriefRef.current.get(snapshot.task_id) || 0;
+            const responseBusy = responseInProgressRef.current || processingToolBatchRef.current;
+            if (channel?.readyState === "open" && !responseBusy && now - lastBriefAt >= 180_000) {
+              lastCodexTaskProgressBriefRef.current.set(snapshot.task_id, now);
+              channel.send(
+                JSON.stringify({
+                  type: "conversation.item.create",
+                  item: {
+                    type: "message",
+                    role: "user",
+                    content: [
+                      {
+                        type: "input_text",
+                        text: `Codex sidecar task ${snapshot.task_id} progress update.\n\nStatus:\n${progressText}`,
+                      },
+                    ],
+                  },
+                }),
+              );
+              requestResponse("codex_task_progress");
+              logClientEvent("codex_task_progress_handoff_sent", {
+                task_id: snapshot.task_id,
+                status: snapshot.status || "unknown",
+                phase: snapshot.phase || "unknown",
+                voice_feedback_phase: snapshot.latest_voice_feedback?.phase || null,
+              });
+            }
           }
         }
         if (terminal || attempts >= 180) stopPolling();

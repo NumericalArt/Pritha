@@ -34,7 +34,7 @@ test("Codex App tasks write plan and voice feedback artifacts", () => {
 test("Realtime instructions prefer semantic voice feedback over heartbeat", () => {
   assert.match(runtimeSource, /Prefer latest_voice_feedback and speakable_events over heartbeat/);
   assert.match(runtimeSource, /Never read heartbeat as the main progress update/);
-  assert.match(runtimeSource, /plan_created, mode_selected, step_started, step_completed or step_blocked/);
+  assert.match(runtimeSource, /plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed or step_blocked/);
 });
 
 test("Step orchestrator remains policy gated", () => {

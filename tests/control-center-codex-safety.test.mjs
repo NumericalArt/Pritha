@@ -54,4 +54,6 @@ test("Control Center Realtime runtime gates every effective workspace-write task
   assert.doesNotMatch(runtimeSource, /CODEX_WRITE_ENABLED",\s*"explicit"/);
   assert.match(runtimeSource, /sandbox === "workspace-write"\) reasons\.push\("workspace_write_requested"\)/);
   assert.match(runtimeSource, /reasons\.includes\("workspace_write_requested"\)[\s\S]*\? "workspace_write"/);
+  assert.match(runtimeSource, /reasons\.push\("control_center_runtime_change"\)/);
+  assert.match(runtimeSource, /reasons\.includes\("control_center_runtime_change"\)[\s\S]*\? "control_center_runtime_change"/);
 });

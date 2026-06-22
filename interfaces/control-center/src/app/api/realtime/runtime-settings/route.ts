@@ -28,6 +28,7 @@ type RuntimeSettingsPayload = {
   codexSandbox?: "auto" | "read-only" | "workspace-write" | "danger-full-access";
   codexNetworkAccess?: boolean;
   codexTimeoutMs?: number;
+  codexPromptTokenBudget?: number;
   codexPlanningMode?: string;
   codexExecutionMode?: string;
   codexMaxPlanSteps?: number;
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
   }
   if (typeof payload.codexNetworkAccess === "boolean") patch.codexNetworkAccess = payload.codexNetworkAccess;
   if (Number.isFinite(Number(payload.codexTimeoutMs))) patch.codexTimeoutMs = Number(payload.codexTimeoutMs);
+  if (Number.isFinite(Number(payload.codexPromptTokenBudget))) patch.codexPromptTokenBudget = Number(payload.codexPromptTokenBudget);
   if ("codexPlanningMode" in payload) {
     if (!isCodexPlanningMode(payload.codexPlanningMode)) {
       return NextResponse.json({ ok: false, error: "invalid_codex_planning_mode" }, { status: 400 });

@@ -19,6 +19,7 @@ type RuntimeSettings = {
   codexNetworkAccess: boolean;
   codexApproval: "never";
   codexTimeoutMs: number;
+  codexPromptTokenBudget: number;
   codexPlanningMode: CodexPlanningMode;
   codexExecutionMode: CodexExecutionMode;
   codexMaxPlanSteps: number;
@@ -39,6 +40,7 @@ const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   codexNetworkAccess: true,
   codexApproval: "never",
   codexTimeoutMs: 300_000,
+  codexPromptTokenBudget: 24_000,
   codexPlanningMode: "planner",
   codexExecutionMode: "inline_only",
   codexMaxPlanSteps: 7,
@@ -113,6 +115,7 @@ export function CodexSettingsSection() {
         codexSandbox: runtimeSettings.codexSandbox,
         codexNetworkAccess: runtimeSettings.codexNetworkAccess,
         codexTimeoutMs: runtimeSettings.codexTimeoutMs,
+        codexPromptTokenBudget: runtimeSettings.codexPromptTokenBudget,
         codexPlanningMode: runtimeSettings.codexPlanningMode,
         codexExecutionMode: runtimeSettings.codexExecutionMode,
         codexMaxPlanSteps: runtimeSettings.codexMaxPlanSteps,
@@ -296,6 +299,22 @@ export function CodexSettingsSection() {
               value={Math.round(runtimeSettings.codexTimeoutMs / 1000)}
               aria-label="Codex task timeout seconds"
               onChange={(event) => updateRuntimeSetting("codexTimeoutMs", Math.max(10, Number(event.currentTarget.value) || 300) * 1000)}
+            />
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Prompt Budget</strong>
+              <span>Estimated outbound prompt tokens before compacting older context.</span>
+            </div>
+            <input
+              className="settings-number-input"
+              type="number"
+              min={4000}
+              max={120000}
+              step={1000}
+              value={runtimeSettings.codexPromptTokenBudget}
+              aria-label="Codex prompt token budget"
+              onChange={(event) => updateRuntimeSetting("codexPromptTokenBudget", Math.max(4000, Math.min(120000, Number(event.currentTarget.value) || 24000)))}
             />
           </div>
           <div className="settings-rowline">
