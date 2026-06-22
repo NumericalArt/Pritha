@@ -19,6 +19,7 @@ import { PrithaStarScene } from "./PrithaStarScene";
 import {
   usePrithaRealtime,
   type CodexTaskState,
+  type CodexTaskVoiceFeedback,
   type MicGainRuntimeState,
   type PrithaRealtimeStatus,
   type RealtimePhase,
@@ -38,6 +39,8 @@ type CodexTaskDetail = {
   stale?: boolean;
   operator_brief?: string;
   voice_handoff_required?: boolean;
+  latest_voice_feedback?: CodexTaskVoiceFeedback | null;
+  speakable_events?: CodexTaskVoiceFeedback[];
   request?: Record<string, unknown> | null;
   status_detail?: Record<string, unknown> | null;
   approval?: Record<string, unknown> | null;
@@ -276,6 +279,11 @@ function TaskListCard({
                 <span>{task.progress}%</span>
               </div>
               <p>{task.resultExcerpt || task.summary}</p>
+              {task.latestVoiceFeedback?.voice_text ? (
+                <div className={`task-row-note ${task.latestVoiceFeedback.priority === "high" ? "" : "neutral"}`}>
+                  Voice: {task.latestVoiceFeedback.voice_text}
+                </div>
+              ) : null}
               <div className="task-phase-row">
                 <span>{task.phase ? `phase: ${task.phase}` : "phase: unknown"}</span>
                 {task.stale ? <strong>possibly stale</strong> : null}
@@ -377,6 +385,10 @@ function TaskDetailDrawer({
             <section>
               <h3>Operator Brief</h3>
               <pre>{detail.operator_brief || detail.last_activity || "No brief available yet."}</pre>
+            </section>
+            <section>
+              <h3>Voice Feedback</h3>
+              <pre>{detail.latest_voice_feedback?.voice_text || formatJson(detail.latest_voice_feedback)}</pre>
             </section>
             <section>
               <h3>Request</h3>

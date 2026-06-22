@@ -12,9 +12,21 @@ type ControlCenterStatus = {
   counts: {
     childAgents: number;
   };
+  access: {
+    localhost: string;
+    tailscale: string;
+    tailscaleUrl?: string;
+  };
   childAgents: Array<{
     id: string;
     name: string;
+    url?: {
+      status: "available" | "unavailable";
+      local?: string;
+    };
+    ui?: {
+      state?: string;
+    };
     control?: {
       planAction?: "start" | "stop" | "check" | "restore";
     };
@@ -114,6 +126,66 @@ function writeFakeCodexTask(status: string) {
   return { taskId, taskDir };
 }
 
+function writeStaleCodexTask() {
+  const root = findRepoRoot();
+  const taskId = `test-stale-running-${Date.now()}`;
+  const taskDir = path.join(root, ".private", "interface-lab", "pritha-control-center", "realtime", "codex-tasks", taskId);
+  const startedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  mkdirSync(taskDir, { recursive: true });
+  writeFileSync(
+    path.join(taskDir, "request.json"),
+    `${JSON.stringify(
+      {
+        id: taskId,
+        created_at: startedAt,
+        status: "running",
+        task: "Synthetic stale Codex runner regression task",
+        task_type: "analysis",
+        effective_transport: "codex-cli",
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  writeFileSync(
+    path.join(taskDir, "status.json"),
+    `${JSON.stringify(
+      {
+        status: "running",
+        phase: "runner_started",
+        transport: "codex-cli",
+        pid: 999999,
+        started_at: startedAt,
+        timeout_ms: 1_000,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  writeFileSync(path.join(taskDir, "result.md"), "");
+  writeFileSync(
+    path.join(taskDir, "progress.jsonl"),
+    `${JSON.stringify({ timestamp: startedAt, phase: "runner_started", level: "info", status: "running", transport: "codex-cli", message: "Synthetic stale task started." })}\n`,
+  );
+  return { taskId, taskDir };
+}
+
+function expectedAgentUrl(rawUrl: string, baseUrl: string) {
+  const source = new URL(rawUrl);
+  const target = new URL(baseUrl);
+  source.protocol = target.protocol;
+  source.hostname = target.hostname;
+  source.port = source.port || target.port;
+  return source.toString().replace(/\/$/, "");
+}
+
+async function setAccessMode(page: Page, mode: "localhost" | "lan" | "tailscale") {
+  await page.addInitScript((value) => {
+    window.localStorage.setItem("pritha.defaultAccessMode", value);
+    document.cookie = `pritha.defaultAccessMode=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=31536000`;
+  }, mode);
+}
+
 function restoreFile(pathname: string, content: string | null) {
   if (content === null) {
     rmSync(pathname, { force: true });
@@ -168,6 +240,43 @@ test.describe("Control Center UI regression", () => {
     await page.locator(".access-card button").click();
     await expect(page.locator(".access-modal")).toBeVisible();
     await expect(page.locator(".access-modal")).toContainText("Voice Link");
+  });
+
+  test("keeps agent card URLs aligned with localhost access mode", async ({ page }) => {
+    const status = await getStatus(page);
+    const agent = status.childAgents.find((item) => item.url?.local && item.ui?.state === "alive");
+    if (!agent?.url?.local) {
+      test.skip(true, "No alive child agent with a local URL in current registry.");
+      return;
+    }
+
+    await setAccessMode(page, "localhost");
+    await page.goto("/agents");
+    const allButton = page.getByRole("button", { name: "All" });
+    if (await allButton.isEnabled().catch(() => false)) await allButton.click();
+    const localLink = page.locator(`[data-testid="agent-url-link"][data-agent-id="${agent.id}"]`).first();
+    await expect(localLink).toHaveAttribute("data-url", agent.url.local);
+  });
+
+  test("rewrites agent card URLs for Tailscale access mode when available", async ({ page }) => {
+    const status = await getStatus(page);
+    const agent = status.childAgents.find((item) => item.url?.local && item.ui?.state === "alive");
+    if (!agent?.url?.local) {
+      test.skip(true, "No alive child agent with a local URL in current registry.");
+      return;
+    }
+
+    if (status.access.tailscale !== "ready" || !status.access.tailscaleUrl) {
+      test.skip(true, "Tailscale access is not ready in current Control Center status.");
+      return;
+    }
+
+    await setAccessMode(page, "tailscale");
+    await page.goto("/agents");
+    const allButton = page.getByRole("button", { name: "All" });
+    if (await allButton.isEnabled().catch(() => false)) await allButton.click();
+    const localLink = page.locator(`[data-testid="agent-url-link"][data-agent-id="${agent.id}"]`).first();
+    await expect(localLink).toHaveAttribute("data-url", expectedAgentUrl(agent.url.local, status.access.tailscaleUrl));
   });
 
   test("guards start and stop actions behind blockers or exact confirmation", async ({ page }) => {
@@ -282,6 +391,24 @@ test.describe("Control Center UI regression", () => {
       await page.goto("/voice");
       await expect(page.getByText("failed_timeout").first()).toBeVisible();
       await expect(page.getByText(/timed out/i).first()).toBeVisible();
+    } finally {
+      rmSync(taskDir, { recursive: true, force: true });
+    }
+  });
+
+  test("adds voice-safe feedback when repairing a stale Codex runner", async ({ page }) => {
+    const { taskId, taskDir } = writeStaleCodexTask();
+    try {
+      const response = await page.request.get(`/api/realtime/codex-task/${encodeURIComponent(taskId)}`);
+      expect(response.ok()).toBeTruthy();
+      const detail = await response.json();
+      expect(detail.ok).toBe(true);
+      expect(detail.status).toBe("failed_timeout");
+      expect(detail.complete).toBe(true);
+      expect(detail.latest_voice_feedback?.phase).toBe("stale_repaired");
+      expect(detail.latest_voice_feedback?.speakable).toBe(true);
+      expect(detail.latest_voice_feedback?.voice_text).toContain("Codex");
+      expect(detail.voice_handoff_required).toBe(true);
     } finally {
       rmSync(taskDir, { recursive: true, force: true });
     }

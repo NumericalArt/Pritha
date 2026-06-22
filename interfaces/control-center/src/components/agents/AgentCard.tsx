@@ -192,7 +192,16 @@ export function AgentCard({
       {canShowUrl ? (
         <div className={`${mobile ? "mobile-agent-url-row" : "agent-url-row"}`}>
           <span>{displayUrl?.replace("http://", mobile ? "" : "http://")}</span>
-          <a className="icon-button" href={displayUrl} target="_blank" rel="noreferrer" aria-label={`Open URL for ${agent.name}`}>
+          <a
+            className="icon-button"
+            href={displayUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open URL for ${agent.name}`}
+            data-testid="agent-url-link"
+            data-agent-id={agent.id}
+            data-url={displayUrl}
+          >
             <ExternalLink size={17} />
           </a>
           <button className="icon-button" type="button" aria-label={`Copy URL for ${agent.name}`} title={copied ? "Copied" : "Copy URL"} onClick={() => void copyUrl()}>
