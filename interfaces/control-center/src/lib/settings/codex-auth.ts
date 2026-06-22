@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { checkCodexAppServerAvailable } from "@/lib/realtime/codex-task/codex-app-server-client";
+import { checkCodexAppServerAvailable, resolveCodexBinary } from "@/lib/realtime/codex-task/codex-app-server-client";
 import { resolveTechscopeRoot } from "@/lib/realtime/pritha-runtime";
 
 function codexBin() {
-  return process.env.PRITHA_REALTIME_CODEX_BIN?.trim() || process.env.TECHSCOPE_VOICE_CODEX_BIN?.trim() || process.env.CODEX_BIN?.trim() || "codex";
+  return resolveCodexBinary();
 }
 
 function runCodexVersion() {
