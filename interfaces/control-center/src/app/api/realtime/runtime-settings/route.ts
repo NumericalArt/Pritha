@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import {
   getPrithaRealtimeStatus,
   getPrithaRuntimeSettings,
+  normalizeCodexExecutionMode,
+  normalizeCodexPlanningMode,
   normalizeCodexReasoningEffort,
   normalizeCodexServiceTier,
+  normalizeCodexVoiceProgressVerbosity,
   updatePrithaRuntimeSettings,
 } from "@/lib/realtime/pritha-runtime";
 import {
@@ -25,6 +28,11 @@ type RuntimeSettingsPayload = {
   codexSandbox?: "auto" | "read-only" | "workspace-write" | "danger-full-access";
   codexNetworkAccess?: boolean;
   codexTimeoutMs?: number;
+  codexPlanningMode?: string;
+  codexExecutionMode?: string;
+  codexMaxPlanSteps?: number;
+  codexAskBeforeOrchestration?: boolean;
+  codexVoiceProgressVerbosity?: string;
   voiceBehaviorProfile?: string;
   prithaVoice?: string;
 };
@@ -35,6 +43,18 @@ function transportStatus() {
 
 function isCodexReasoningEffort(value: unknown) {
   return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "very_high";
+}
+
+function isCodexPlanningMode(value: unknown) {
+  return value === "off" || value === "inline_required" || value === "planner";
+}
+
+function isCodexExecutionMode(value: unknown) {
+  return value === "inline_only" || value === "orchestrator_enabled" || value === "orchestrator_preferred";
+}
+
+function isCodexVoiceProgressVerbosity(value: unknown) {
+  return value === "brief" || value === "normal" || value === "detailed";
 }
 
 export async function GET() {
@@ -73,6 +93,26 @@ export async function POST(request: Request) {
   }
   if (typeof payload.codexNetworkAccess === "boolean") patch.codexNetworkAccess = payload.codexNetworkAccess;
   if (Number.isFinite(Number(payload.codexTimeoutMs))) patch.codexTimeoutMs = Number(payload.codexTimeoutMs);
+  if ("codexPlanningMode" in payload) {
+    if (!isCodexPlanningMode(payload.codexPlanningMode)) {
+      return NextResponse.json({ ok: false, error: "invalid_codex_planning_mode" }, { status: 400 });
+    }
+    patch.codexPlanningMode = normalizeCodexPlanningMode(payload.codexPlanningMode);
+  }
+  if ("codexExecutionMode" in payload) {
+    if (!isCodexExecutionMode(payload.codexExecutionMode)) {
+      return NextResponse.json({ ok: false, error: "invalid_codex_execution_mode" }, { status: 400 });
+    }
+    patch.codexExecutionMode = normalizeCodexExecutionMode(payload.codexExecutionMode);
+  }
+  if (Number.isFinite(Number(payload.codexMaxPlanSteps))) patch.codexMaxPlanSteps = Number(payload.codexMaxPlanSteps);
+  if (typeof payload.codexAskBeforeOrchestration === "boolean") patch.codexAskBeforeOrchestration = payload.codexAskBeforeOrchestration;
+  if ("codexVoiceProgressVerbosity" in payload) {
+    if (!isCodexVoiceProgressVerbosity(payload.codexVoiceProgressVerbosity)) {
+      return NextResponse.json({ ok: false, error: "invalid_codex_voice_progress_verbosity" }, { status: 400 });
+    }
+    patch.codexVoiceProgressVerbosity = normalizeCodexVoiceProgressVerbosity(payload.codexVoiceProgressVerbosity);
+  }
   if ("voiceBehaviorProfile" in payload) {
     if (!isVoiceBehaviorProfile(payload.voiceBehaviorProfile)) {
       return NextResponse.json({ ok: false, error: "invalid_voice_behavior_profile" }, { status: 400 });

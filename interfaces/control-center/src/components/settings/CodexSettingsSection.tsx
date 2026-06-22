@@ -5,6 +5,9 @@ import { Bot, Code2, Save, Terminal, Zap } from "lucide-react";
 
 type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
 type CodexServiceTier = "standard" | "fast";
+type CodexPlanningMode = "off" | "inline_required" | "planner";
+type CodexExecutionMode = "inline_only" | "orchestrator_enabled" | "orchestrator_preferred";
+type CodexVoiceProgressVerbosity = "brief" | "normal" | "detailed";
 
 type RuntimeSettings = {
   deepTaskPrimaryTransport: "codex-app" | "codex-cli";
@@ -16,6 +19,11 @@ type RuntimeSettings = {
   codexNetworkAccess: boolean;
   codexApproval: "never";
   codexTimeoutMs: number;
+  codexPlanningMode: CodexPlanningMode;
+  codexExecutionMode: CodexExecutionMode;
+  codexMaxPlanSteps: number;
+  codexAskBeforeOrchestration: boolean;
+  codexVoiceProgressVerbosity: CodexVoiceProgressVerbosity;
   updatedAt: string;
 };
 
@@ -31,6 +39,11 @@ const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   codexNetworkAccess: true,
   codexApproval: "never",
   codexTimeoutMs: 300_000,
+  codexPlanningMode: "planner",
+  codexExecutionMode: "inline_only",
+  codexMaxPlanSteps: 7,
+  codexAskBeforeOrchestration: true,
+  codexVoiceProgressVerbosity: "normal",
   updatedAt: "",
 };
 
@@ -100,6 +113,11 @@ export function CodexSettingsSection() {
         codexSandbox: runtimeSettings.codexSandbox,
         codexNetworkAccess: runtimeSettings.codexNetworkAccess,
         codexTimeoutMs: runtimeSettings.codexTimeoutMs,
+        codexPlanningMode: runtimeSettings.codexPlanningMode,
+        codexExecutionMode: runtimeSettings.codexExecutionMode,
+        codexMaxPlanSteps: runtimeSettings.codexMaxPlanSteps,
+        codexAskBeforeOrchestration: runtimeSettings.codexAskBeforeOrchestration,
+        codexVoiceProgressVerbosity: runtimeSettings.codexVoiceProgressVerbosity,
       }),
     }).catch(() => null);
     setSaving(false);
@@ -279,6 +297,81 @@ export function CodexSettingsSection() {
               aria-label="Codex task timeout seconds"
               onChange={(event) => updateRuntimeSetting("codexTimeoutMs", Math.max(10, Number(event.currentTarget.value) || 300) * 1000)}
             />
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Planning Mode</strong>
+              <span>Controls whether new Codex App tasks create a plan before execution.</span>
+            </div>
+            <select
+              value={runtimeSettings.codexPlanningMode}
+              aria-label="Codex planning mode"
+              onChange={(event) => updateRuntimeSetting("codexPlanningMode", event.currentTarget.value as RuntimeSettings["codexPlanningMode"])}
+            >
+              <option value="planner">Planner pass</option>
+              <option value="inline_required">Inline required</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Execution Mode</strong>
+              <span>Inline keeps one Codex turn. Orchestrator can run the plan step by step for testing.</span>
+            </div>
+            <select
+              value={runtimeSettings.codexExecutionMode}
+              aria-label="Codex execution mode"
+              onChange={(event) => updateRuntimeSetting("codexExecutionMode", event.currentTarget.value as RuntimeSettings["codexExecutionMode"])}
+            >
+              <option value="inline_only">Inline only</option>
+              <option value="orchestrator_enabled">Orchestrator when recommended</option>
+              <option value="orchestrator_preferred">Orchestrator preferred</option>
+            </select>
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Plan Steps</strong>
+              <span>Maximum number of planner steps stored and executed.</span>
+            </div>
+            <input
+              className="settings-number-input"
+              type="number"
+              min={1}
+              max={10}
+              step={1}
+              value={runtimeSettings.codexMaxPlanSteps}
+              aria-label="Codex maximum plan steps"
+              onChange={(event) => updateRuntimeSetting("codexMaxPlanSteps", Math.max(1, Math.min(10, Number(event.currentTarget.value) || 7)))}
+            />
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Ask Before Orchestration</strong>
+              <span>Pause when the planner says operator input is required.</span>
+            </div>
+            <label className="settings-switch" aria-label="Codex ask before orchestration">
+              <input
+                type="checkbox"
+                checked={runtimeSettings.codexAskBeforeOrchestration}
+                onChange={(event) => updateRuntimeSetting("codexAskBeforeOrchestration", event.currentTarget.checked)}
+              />
+              <span />
+            </label>
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Voice Progress</strong>
+              <span>Controls how much semantic Codex progress Voice Control should prefer.</span>
+            </div>
+            <select
+              value={runtimeSettings.codexVoiceProgressVerbosity}
+              aria-label="Codex voice progress verbosity"
+              onChange={(event) => updateRuntimeSetting("codexVoiceProgressVerbosity", event.currentTarget.value as RuntimeSettings["codexVoiceProgressVerbosity"])}
+            >
+              <option value="brief">Brief</option>
+              <option value="normal">Normal</option>
+              <option value="detailed">Detailed</option>
+            </select>
           </div>
           <div className="settings-action-row">
             <button className="outline-button" type="button" onClick={saveRuntimeSettings} disabled={saving}>

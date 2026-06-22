@@ -3,7 +3,7 @@ id: agents-mother-registry
 type: agent-registry
 status: active
 created: 2026-05-18
-updated: 2026-06-12
+updated: 2026-06-22
 topics:
   - agent-engineering
   - agent-factory
@@ -11,7 +11,7 @@ topics:
 tools:
   - Codex
   - AGENTS.md
-  - Agents Mother
+  - Pritha
 agent_platforms:
   - Codex
 model_context:
@@ -43,38 +43,47 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: unknown
-source_updated: 2026-06-12
-source_version: generated registry 2026-06-12
-retrieved: 2026-06-12
-verified: 2026-06-12
-valid_for: current Pritha Agents Mother lifecycle
+source_updated: 2026-06-22
+source_version: generated registry 2026-06-22
+retrieved: 2026-06-22
+verified: 2026-06-22
+valid_for: current Pritha lifecycle
 temporal_status: current
 ---
 
-# Agents Mother Registry
+# Pritha Registry
 
-Date: 2026-06-12
+Date: 2026-06-22
 Status: active
 
 ## Summary
 
-- Agents tracked: 5
-- Contracts: 5
-- Reports: 59
-- Research reports: 1
+- Agents tracked: 6
+- Contracts: 6
+- Reports: 67
+- Research reports: 2
 
 ## Agents
 
 | Agent | Mission | Runtime | Interface | Deployment | Proactivity | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| FESPA26 | voice-first Codex-native workbench for processing FESPA 2026 booth media, notes, links and files into a bilingual mobile | hybrid, with Codex-native sidecar. | web. / Telegram none. | local Mac. | manual. | contracts:1 scaffold:0 test:4 handoff:1 ops:4 deploy:0 evolve:3 |
-| Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:1 handoff:0 ops:1 deploy:2 evolve:3 |
+| FESPA26 | voice-first Codex-native workbench for processing FESPA 2026 booth media, notes, links and files into a bilingual mobile | hybrid, with Codex-native sidecar. | web. / Telegram none. | local Mac. | manual. | contracts:1 scaffold:0 test:4 handoff:1 ops:3 deploy:0 evolve:2 |
+| Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:1 handoff:0 ops:0 deploy:0 evolve:2 |
 | Pritha Claude Code Adapter | define a future adapter that can translate selected Pritha/Codex-native descendant scaffolds into Claude Code-compatible | environment-specific | CLI / Telegram none | none | none | contracts:1 scaffold:0 test:0 handoff:0 ops:0 deploy:0 evolve:0 |
 | StupidJoke | provide a small, safe, low-stakes joke agent that can ingest user-provided joke fixtures, reject unsafe material, and an | codex-native | Codex project plus CLI healthcheck for v1. / Telegram none | local Mac. | manual | contracts:1 scaffold:2 test:1 handoff:0 ops:0 deploy:0 evolve:1 |
-| Pritha | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:24 deploy:0 evolve:1 |
+| Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:4 deploy:0 evolve:1 |
+| WebSummitCheckAgent | Analyze Web Summit-related correspondence from fixture data or explicitly gated local Apple Mail access, then produce a  | codex-native | Codex project / Telegram none | local Mac | none | contracts:1 scaffold:1 test:0 handoff:0 ops:0 deploy:0 evolve:0 |
 
 ## Recent Reports
 
+- 2026-06-22 scaffold-report/complete: 11_agents/reports/2026-06-22-web-summit-check-agent-scaffold-report.md
+- 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-5-report.md
+- 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-4-report.md
+- 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-3-report.md
+- 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-2-report.md
+- 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-1-report.md
+- 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-baseline-report.md
+- 2026-06-12 agent-operations-report/blocked: 11_agents/reports/2026-06-12-stupidjoke-scheduler-sidecar-result.md
 - 2026-06-12 agent-test-report/complete: 11_agents/reports/2026-06-12-stupidjoke-agent-test-report.md
 - 2026-06-12 scaffold-report/failed: 11_agents/reports/2026-06-12-stupidjoke-agent-scaffold-report.md
 - 2026-06-12 scaffold-report/complete: 11_agents/reports/2026-06-12-stupidjoke-agent-scaffold-completion-report.md
@@ -97,14 +106,6 @@ Status: active
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-4-dogfooding-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-3-shared-lib-report.md
 - 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-2-operations-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-13-github-ci-release-prep-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-12-first-run-setup-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-11-oss-doc-pack-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-10-pritha-rebrand-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-1-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-0-baseline-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-pre-phase-0-reconciliation-report.md
-- 2026-05-28 agent-operations-report/partial: 11_agents/reports/2026-05-28-techscope-github-release-status-gate-report.md
 
 ## Evolution Rules
 

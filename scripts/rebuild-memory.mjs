@@ -311,7 +311,11 @@ function main() {
   let chunksChanged = 0;
   let sql = "BEGIN;\n";
   sql += `
-DELETE FROM embeddings;
+CREATE TEMP TABLE IF NOT EXISTS preserved_embedding_chunk_hash AS
+SELECT e.id AS embedding_id, c.hash AS chunk_hash
+FROM embeddings e
+JOIN chunks c ON e.owner_type = 'chunk' AND c.id = e.owner_id;
+
 DELETE FROM relations;
 DELETE FROM entities;
 DELETE FROM chunks_fts;
@@ -330,6 +334,25 @@ VALUES (${sqlString(runId)}, ${sqlString(startedAt)}, 'running', ${files.length}
   }
 
   sql += `
+DELETE FROM embeddings
+WHERE owner_type = 'chunk'
+  AND (
+    NOT EXISTS (
+      SELECT 1
+      FROM chunks c
+      WHERE c.id = embeddings.owner_id
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM preserved_embedding_chunk_hash p
+      JOIN chunks c ON c.id = embeddings.owner_id
+      WHERE p.embedding_id = embeddings.id
+        AND p.chunk_hash != c.hash
+    )
+  );
+
+DROP TABLE IF EXISTS preserved_embedding_chunk_hash;
+
 UPDATE index_runs
 SET finished_at = ${sqlString(new Date().toISOString())},
     status = 'success',

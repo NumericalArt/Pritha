@@ -95,9 +95,54 @@ type CodexTaskApproval = {
   decided_by?: string;
 };
 
+type CodexTaskRuntimePaths = {
+  resultPath: string;
+  statusPath: string;
+  stdoutPath: string;
+  stderrPath: string;
+  progressPath: string;
+  planPath?: string;
+  voiceFeedbackPath?: string;
+};
+
 type DeepTaskPrimaryTransport = "codex-app" | "codex-cli" | "codex-session";
 export type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
 export type CodexServiceTier = "standard" | "fast";
+export type CodexPlanningMode = "off" | "inline_required" | "planner";
+export type CodexExecutionMode = "inline_only" | "orchestrator_enabled" | "orchestrator_preferred";
+export type CodexVoiceProgressVerbosity = "brief" | "normal" | "detailed";
+
+export type CodexTaskPlanStep = {
+  id: string;
+  title: string;
+  goal: string;
+  expectedOutput: string;
+  needsWrite: boolean;
+  needsNetwork: boolean;
+  operatorGate: boolean;
+};
+
+export type CodexTaskPlan = {
+  executionMode: "inline_progress" | "step_orchestrator";
+  reason: string;
+  riskLevel: "low" | "medium" | "high";
+  requiresOperatorInput: boolean;
+  operatorQuestions: string[];
+  steps: CodexTaskPlanStep[];
+  source: "planner" | "synthetic" | "fallback";
+};
+
+type CodexTaskVoiceFeedbackEvent = {
+  timestamp?: string;
+  task_id?: string;
+  phase: string;
+  priority?: "low" | "normal" | "high";
+  speakable: boolean;
+  voice_text: string;
+  requires_response?: boolean;
+  step_id?: string;
+  step_title?: string;
+};
 
 export type PrithaRuntimeSettings = {
   deepTaskPrimaryTransport: Extract<DeepTaskPrimaryTransport, "codex-app" | "codex-cli">;
@@ -109,6 +154,11 @@ export type PrithaRuntimeSettings = {
   codexNetworkAccess: boolean;
   codexApproval: "never";
   codexTimeoutMs: number;
+  codexPlanningMode: CodexPlanningMode;
+  codexExecutionMode: CodexExecutionMode;
+  codexMaxPlanSteps: number;
+  codexAskBeforeOrchestration: boolean;
+  codexVoiceProgressVerbosity: CodexVoiceProgressVerbosity;
   voiceBehaviorProfile: VoiceBehaviorProfile;
   prithaVoice: PrithaVoiceId;
   updatedAt: string;
@@ -1577,17 +1627,17 @@ export function buildRealtimeInstructions() {
     "Use inspect_pritha_files for fast read-only filesystem work: listing Pritha or child-agent projects, reading AGENTS.md/README/package files, checking folder structure, or searching filenames/text content. It cannot write files and intentionally excludes secrets, private runtime folders, logs, queues, node_modules, build outputs and credentials.",
     "Use inspect_pritha_files instead of run_codex_task when the operator only needs a quick filesystem view or a lightweight comment about how an agent is organized. Escalate to run_codex_task when the operator asks for edits, implementation, deep code reasoning, tests, or a durable review.",
     "Use inspect_codex_task for read-only status checks on Codex sidecar tasks. Use it when the operator asks what is happening with a task, whether it is stuck, whether it failed, what needs approval, or whether there is a recent progress timeline.",
-    "inspect_codex_task exposes only safe operational status, phase, last activity, bounded progress events and concise operator briefs. Do not ask for or expose chain-of-thought, raw reasoning deltas, secrets, private memory, or full logs.",
+    "inspect_codex_task exposes only safe operational status, phase, last activity, bounded progress events, speakable semantic progress and concise operator briefs. Prefer latest_voice_feedback and speakable_events over heartbeat when explaining task progress.",
     "Use run_codex_task for implementation, codebase changes, deep repo analysis, reviews, or internet/current-source research. If internet is needed, set requires_internet=true; Codex handles web access.",
-    "run_codex_task has one public tool surface but routes internally through the configured deep task transport. Codex App is the default primary transport; Codex CLI is the v1 fallback. A future session-contract transport is reserved but not active.",
+    "run_codex_task has one public tool surface but routes internally through the configured deep task transport. Codex App is the default primary transport; Codex CLI is the v1 fallback. New Codex App tasks first create or synthesize a plan, choose inline_progress or step_orchestrator by policy, and emit voice-safe semantic progress events.",
     "Voice Control and Codex thread have the same implementation path through run_codex_task. Risky actions are not hard-blocked by voice; the runtime will hold service install, scheduler enablement, deployment, deletion, credential writes or danger-full-access requests as decision_required until the operator approves them in the UI task card.",
     "For creating a new child agent or scaffold project, call run_codex_task with task_type=agent_creation and write_mode=workspace_write after the operator clearly requests that creation. Child-agent projects may be created as sibling folders next to Pritha according to AGENTS.md. Do not copy secrets, .env, private memory, runtime queues, logs or credentials.",
     "For ordinary implementation tasks, set task_type=implementation and write_mode=workspace_write only when the operator asked for code/file changes. Use read_only for analysis, review, research and status checks.",
     "When the operator asks to continue implementation work on an existing or newly created child-agent project, include the exact project/folder name in the task, call run_codex_task with task_type=implementation and write_mode=workspace_write; the runtime will add the matching sibling AGENTS.md project as a writable Codex root.",
-    "Do not claim Codex work is complete after starting or queueing a task. Report the task id, status and next operator-visible path.",
+    "Do not claim Codex work is complete after starting or queueing a task. Report the task id, status and next operator-visible path. If the task returns a plan or latest_voice_feedback, summarize that instead of saying only that the task is running.",
     "After run_codex_task returns a running or queued task, do not start another Codex task just to poll that task's status. Use inspect_codex_task for status, brief, timeline or diagnose requests. The Voice UI also monitors Codex task readiness and sends later completion/failure messages when a terminal result or operator brief is available.",
     "If the UI later adds a message that starts with 'Codex sidecar task' and includes 'Result:', treat it as the authoritative completion notification for that task. Summarize the result to the operator immediately instead of saying that you do not automatically know whether Codex finished.",
-    "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, appears stale, or has been running for a long time. Keep updates short and do not interrupt the operator with frequent progress chatter.",
+    "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, mode_selected, step_started, step_completed or step_blocked. Never read heartbeat as the main progress update.",
     "Do not ask for secrets or expose credentials. For credentials, route the operator to the child-agent credential UI. For publish, deletion, service install, launchd/cron or broad system changes, create a Codex task and let the UI decision gate collect approval.",
     "Realtime tools must not mutate curated Markdown directly except through confirmed deep_pritha_memory memory-write operations or through run_codex_task when its sandbox/write mode permits it. Keep edits narrowly scoped.",
     buildVoiceBehaviorPromptSections(settings.voiceBehaviorProfile),
@@ -1741,6 +1791,14 @@ function codexTaskProgressPath(taskDir: string) {
   return path.join(taskDir, "progress.jsonl");
 }
 
+function codexTaskPlanPath(taskDir: string) {
+  return path.join(taskDir, "plan.json");
+}
+
+function codexTaskVoiceFeedbackPath(taskDir: string) {
+  return path.join(taskDir, "voice-feedback.jsonl");
+}
+
 function sanitizeCodexTaskProgressEvent(event: PrithaCodexTaskProgressEvent): PrithaCodexTaskProgressEvent {
   const cleaned: Record<string, unknown> = {
     timestamp: event.timestamp || new Date().toISOString(),
@@ -1758,11 +1816,34 @@ function sanitizeCodexTaskProgressEvent(event: PrithaCodexTaskProgressEvent): Pr
   return cleaned as PrithaCodexTaskProgressEvent;
 }
 
+function sanitizeVoiceFeedbackEvent(event: CodexTaskVoiceFeedbackEvent): CodexTaskVoiceFeedbackEvent {
+  return {
+    timestamp: event.timestamp || new Date().toISOString(),
+    task_id: safeTaskId(String(event.task_id || "")) || undefined,
+    phase: compactText(event.phase || "progress", 80),
+    priority: event.priority === "low" || event.priority === "high" ? event.priority : "normal",
+    speakable: Boolean(event.speakable),
+    voice_text: redactSensitiveText(event.voice_text || "").slice(0, 700),
+    requires_response: Boolean(event.requires_response),
+    step_id: event.step_id ? compactText(event.step_id, 40) : undefined,
+    step_title: event.step_title ? compactText(event.step_title, 160) : undefined,
+  };
+}
+
 async function appendCodexTaskProgress(taskId: unknown, progressPath: string, event: PrithaCodexTaskProgressEvent) {
   const id = safeTaskId(String(taskId || ""));
   if (!id) return;
   const payload = sanitizeCodexTaskProgressEvent({ task_id: id, ...event });
   await appendFile(progressPath, `${JSON.stringify(payload)}\n`, "utf8").catch(() => undefined);
+}
+
+async function appendCodexVoiceFeedback(taskId: unknown, voiceFeedbackPath: string, event: CodexTaskVoiceFeedbackEvent) {
+  const id = safeTaskId(String(taskId || ""));
+  if (!id) return;
+  if (!voiceFeedbackPath) return;
+  const payload = sanitizeVoiceFeedbackEvent({ task_id: id, ...event });
+  if (!payload.voice_text.trim()) return;
+  await appendFile(voiceFeedbackPath, `${JSON.stringify(payload)}\n`, "utf8").catch(() => undefined);
 }
 
 function readCodexTaskProgress(progressPath: string, maxEvents = 20) {
@@ -1779,6 +1860,29 @@ function readCodexTaskProgress(progressPath: string, maxEvents = 20) {
     }
   }
   return events.slice(-max);
+}
+
+function readCodexVoiceFeedback(voiceFeedbackPath: string, maxEvents = 12) {
+  if (!existsSync(voiceFeedbackPath)) return [];
+  const max = Math.max(1, Math.min(Number(maxEvents) || 12, 40));
+  const lines = readFileSync(voiceFeedbackPath, "utf8").trim().split(/\r?\n/).filter(Boolean).slice(-120);
+  const events: CodexTaskVoiceFeedbackEvent[] = [];
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line) as CodexTaskVoiceFeedbackEvent;
+      if (parsed && typeof parsed === "object") events.push(sanitizeVoiceFeedbackEvent(parsed));
+    } catch {
+      continue;
+    }
+  }
+  return events.slice(-max);
+}
+
+function latestSpeakableFeedback(events: CodexTaskVoiceFeedbackEvent[]) {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    if (events[i]?.speakable && events[i]?.voice_text) return events[i];
+  }
+  return undefined;
 }
 
 function latestProgressEvent(events: PrithaCodexTaskProgressEvent[]) {
@@ -1806,7 +1910,7 @@ function secondsLabel(ms: number | undefined) {
 }
 
 function activeCodexStatus(status: string) {
-  return status === "running" || status === "queued" || status === "decision_required";
+  return status === "running" || status === "queued" || status === "decision_required" || status === "waiting_for_operator";
 }
 
 function runtimeSettingsPath() {
@@ -1824,6 +1928,11 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
     codexNetworkAccess: true,
     codexApproval: "never",
     codexTimeoutMs: codexTimeoutMs(),
+    codexPlanningMode: "planner",
+    codexExecutionMode: "inline_only",
+    codexMaxPlanSteps: 7,
+    codexAskBeforeOrchestration: true,
+    codexVoiceProgressVerbosity: "normal",
     voiceBehaviorProfile: normalizeVoiceBehaviorProfile(
       env("PRITHA_REALTIME_BEHAVIOR_PROFILE", env("TECHSCOPE_VOICE_BEHAVIOR_PROFILE", DEFAULT_VOICE_BEHAVIOR_PROFILE)),
     ),
@@ -1844,6 +1953,18 @@ export function normalizeCodexServiceTier(value: unknown, fallback: CodexService
   return value === "fast" ? "fast" : fallback;
 }
 
+export function normalizeCodexPlanningMode(value: unknown, fallback: CodexPlanningMode = "planner"): CodexPlanningMode {
+  return value === "off" || value === "inline_required" || value === "planner" ? value : fallback;
+}
+
+export function normalizeCodexExecutionMode(value: unknown, fallback: CodexExecutionMode = "inline_only"): CodexExecutionMode {
+  return value === "inline_only" || value === "orchestrator_enabled" || value === "orchestrator_preferred" ? value : fallback;
+}
+
+export function normalizeCodexVoiceProgressVerbosity(value: unknown, fallback: CodexVoiceProgressVerbosity = "normal"): CodexVoiceProgressVerbosity {
+  return value === "brief" || value === "normal" || value === "detailed" ? value : fallback;
+}
+
 export function codexModelSupportsFastMode(model: string) {
   return ["gpt-5.5", "gpt-5.4"].includes(model.trim());
 }
@@ -1856,6 +1977,7 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     ? (value.codexSandbox as PrithaRuntimeSettings["codexSandbox"])
     : defaults.codexSandbox;
   const timeout = Number(value.codexTimeoutMs);
+  const maxPlanSteps = Number(value.codexMaxPlanSteps);
   return {
     deepTaskPrimaryTransport: transport,
     codexModel: String(value.codexModel ?? defaults.codexModel ?? "").trim(),
@@ -1866,6 +1988,11 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     codexNetworkAccess: typeof value.codexNetworkAccess === "boolean" ? value.codexNetworkAccess : defaults.codexNetworkAccess,
     codexApproval: "never",
     codexTimeoutMs: Number.isFinite(timeout) && timeout > 0 ? Math.max(10_000, Math.min(timeout, 3_600_000)) : defaults.codexTimeoutMs,
+    codexPlanningMode: normalizeCodexPlanningMode(value.codexPlanningMode, defaults.codexPlanningMode),
+    codexExecutionMode: normalizeCodexExecutionMode(value.codexExecutionMode, defaults.codexExecutionMode),
+    codexMaxPlanSteps: Number.isFinite(maxPlanSteps) ? Math.max(1, Math.min(Math.round(maxPlanSteps), 10)) : defaults.codexMaxPlanSteps,
+    codexAskBeforeOrchestration: typeof value.codexAskBeforeOrchestration === "boolean" ? value.codexAskBeforeOrchestration : defaults.codexAskBeforeOrchestration,
+    codexVoiceProgressVerbosity: normalizeCodexVoiceProgressVerbosity(value.codexVoiceProgressVerbosity, defaults.codexVoiceProgressVerbosity),
     voiceBehaviorProfile: normalizeVoiceBehaviorProfile(value.voiceBehaviorProfile, defaults.voiceBehaviorProfile),
     prithaVoice: normalizePrithaVoice(value.prithaVoice, defaults.prithaVoice),
     updatedAt: String(value.updatedAt || defaults.updatedAt),
@@ -1895,6 +2022,11 @@ export async function updatePrithaRuntimeSettings(patch: Partial<PrithaRuntimeSe
     codexSandbox: next.codexSandbox,
     codexNetworkAccess: next.codexNetworkAccess,
     codexTimeoutMs: next.codexTimeoutMs,
+    codexPlanningMode: next.codexPlanningMode,
+    codexExecutionMode: next.codexExecutionMode,
+    codexMaxPlanSteps: next.codexMaxPlanSteps,
+    codexAskBeforeOrchestration: next.codexAskBeforeOrchestration,
+    codexVoiceProgressVerbosity: next.codexVoiceProgressVerbosity,
     voiceBehaviorProfile: next.voiceBehaviorProfile,
     prithaVoice: next.prithaVoice,
   });
@@ -2515,6 +2647,170 @@ function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodex
   };
 }
 
+function maybeParseJsonObject(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function boolValue(value: unknown) {
+  return value === true || String(value || "").toLowerCase() === "true";
+}
+
+function planStepFromUnknown(value: unknown, index: number): CodexTaskPlanStep {
+  const item = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const id = compactText(item.id || String(index + 1), 32) || String(index + 1);
+  const title = compactText(item.title || item.name || `Step ${index + 1}`, 120);
+  return {
+    id,
+    title,
+    goal: compactText(item.goal || item.description || title, 500),
+    expectedOutput: compactText(item.expectedOutput || item.expected_output || "Short operator-facing step result.", 300),
+    needsWrite: boolValue(item.needsWrite ?? item.needs_write),
+    needsNetwork: boolValue(item.needsNetwork ?? item.needs_network),
+    operatorGate: boolValue(item.operatorGate ?? item.operator_gate),
+  };
+}
+
+function syntheticCodexTaskPlan(task: Record<string, unknown>, source: CodexTaskPlan["source"] = "synthetic"): CodexTaskPlan {
+  const taskType = normalizeCodexTaskType(task.task_type);
+  const writeMode = normalizeCodexWriteMode(task.write_mode);
+  const complex = writeMode === "workspace_write" || ["implementation", "agent_creation", "system_change"].includes(taskType);
+  const steps: CodexTaskPlanStep[] = complex
+    ? [
+        {
+          id: "1",
+          title: "Inspect context",
+          goal: "Read the relevant files, task state, standards or logs before changing anything.",
+          expectedOutput: "A short context summary and selected files or evidence.",
+          needsWrite: false,
+          needsNetwork: Boolean(task.requires_internet),
+          operatorGate: false,
+        },
+        {
+          id: "2",
+          title: "Make the narrow change",
+          goal: "Apply the smallest implementation or scaffold change that satisfies the operator request.",
+          expectedOutput: "Changed files or a clear blocker.",
+          needsWrite: true,
+          needsNetwork: Boolean(task.requires_internet),
+          operatorGate: false,
+        },
+        {
+          id: "3",
+          title: "Verify",
+          goal: "Run focused checks and inspect the result.",
+          expectedOutput: "Verification result and any remaining risk.",
+          needsWrite: false,
+          needsNetwork: false,
+          operatorGate: false,
+        },
+        {
+          id: "4",
+          title: "Report",
+          goal: "Summarize outcome for Pritha Voice Control.",
+          expectedOutput: "Concise operator-facing completion summary.",
+          needsWrite: false,
+          needsNetwork: false,
+          operatorGate: false,
+        },
+      ]
+    : [
+        {
+          id: "1",
+          title: "Answer task",
+          goal: "Complete the requested analysis or status check in one bounded pass.",
+          expectedOutput: "Concise operator-facing result.",
+          needsWrite: false,
+          needsNetwork: Boolean(task.requires_internet),
+          operatorGate: false,
+        },
+      ];
+  return {
+    executionMode: complex ? "step_orchestrator" : "inline_progress",
+    reason: complex ? "Task appears multi-step or write-capable." : "Task appears bounded enough for one inline Codex turn.",
+    riskLevel: taskType === "system_change" || taskType === "agent_creation" ? "high" : complex ? "medium" : "low",
+    requiresOperatorInput: false,
+    operatorQuestions: [],
+    steps,
+    source,
+  };
+}
+
+function normalizeCodexTaskPlan(raw: unknown, task: Record<string, unknown>, settings = getPrithaRuntimeSettings(), source: CodexTaskPlan["source"] = "planner"): CodexTaskPlan {
+  const value = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
+  const fallback = syntheticCodexTaskPlan(task, source === "planner" ? "fallback" : source);
+  const maxSteps = Math.max(1, Math.min(settings.codexMaxPlanSteps || 7, 10));
+  const rawSteps = Array.isArray(value.steps) ? value.steps : [];
+  const steps = rawSteps.slice(0, maxSteps).map(planStepFromUnknown).filter((step) => step.title && step.goal);
+  const finalSteps = steps.length ? steps : fallback.steps.slice(0, maxSteps);
+  const risk = value.riskLevel === "high" || value.risk_level === "high"
+    ? "high"
+    : value.riskLevel === "medium" || value.risk_level === "medium"
+      ? "medium"
+      : value.riskLevel === "low" || value.risk_level === "low"
+        ? "low"
+        : fallback.riskLevel;
+  const requestedMode = value.executionMode || value.execution_mode;
+  const executionMode = requestedMode === "step_orchestrator" && finalSteps.length > 1 ? "step_orchestrator" : finalSteps.length > 1 && fallback.executionMode === "step_orchestrator" ? "step_orchestrator" : "inline_progress";
+  const questions = (Array.isArray(value.operatorQuestions) ? value.operatorQuestions : Array.isArray(value.operator_questions) ? value.operator_questions : [])
+    .map((item) => compactText(item, 240))
+    .filter(Boolean)
+    .slice(0, 3);
+  return {
+    executionMode,
+    reason: compactText(value.reason || fallback.reason, 700),
+    riskLevel: risk,
+    requiresOperatorInput: boolValue(value.requiresOperatorInput ?? value.requires_operator_input) || questions.length > 0,
+    operatorQuestions: questions,
+    steps: finalSteps,
+    source,
+  };
+}
+
+export function chooseCodexExecutionModeForPlan(plan: CodexTaskPlan, settings: Pick<PrithaRuntimeSettings, "codexExecutionMode">, task: Record<string, unknown> = {}) {
+  if (settings.codexExecutionMode === "inline_only") return "inline_progress" as const;
+  const multiStep = plan.steps.length > 1;
+  const writeMode = normalizeCodexWriteMode(task.write_mode);
+  const risky = plan.riskLevel !== "low" || writeMode === "workspace_write";
+  if (settings.codexExecutionMode === "orchestrator_preferred" && (plan.executionMode === "step_orchestrator" || multiStep || risky)) return "step_orchestrator" as const;
+  if (settings.codexExecutionMode === "orchestrator_enabled" && plan.executionMode === "step_orchestrator") return "step_orchestrator" as const;
+  return "inline_progress" as const;
+}
+
+function buildPlanningTask(task: Record<string, unknown>) {
+  return {
+    ...task,
+    task_type: "review",
+    write_mode: "read_only",
+    task: [
+      "Plan this Pritha Voice Control Codex task before execution.",
+      "Do not edit files, run deployment, publish, delete data, or perform the requested task.",
+      "Decide whether the task should run as inline_progress or step_orchestrator.",
+      "Return the plan in data.structuredJson as JSON with keys: executionMode, reason, riskLevel, requiresOperatorInput, operatorQuestions, steps.",
+      "Each step must include id, title, goal, expectedOutput, needsWrite, needsNetwork, operatorGate.",
+      "",
+      "Original task:",
+      compactText(task.task || "", 8_000),
+      "",
+      "Original task metadata:",
+      JSON.stringify({
+        task_type: task.task_type,
+        write_mode: task.write_mode,
+        requires_internet: task.requires_internet,
+        expected_result: task.expected_result,
+      }),
+    ].join("\n"),
+    expected_result: "Validated execution plan for Pritha Voice Control.",
+    operator_confirmation: "Planning pass only; no task execution.",
+  };
+}
+
 function statusForCodexAppError(error: unknown): "failed_timeout" | "failed" {
   return error instanceof Error && /timeout|timed out/i.test(error.message) ? "failed_timeout" : "failed";
 }
@@ -2543,9 +2839,236 @@ function codexAppSandboxPolicyForTask(task: Record<string, unknown>, sandbox: st
   return { type: "readOnly", networkAccess: getPrithaRuntimeSettings().codexNetworkAccess };
 }
 
+function codexAppClientForTask(task: Record<string, unknown>, sandbox: string, writableRoots: Array<{ absolute_path: string }>) {
+  const root = resolveTechscopeRoot();
+  return new PrithaCodexAppServerClient({
+    codexBin: codexBin(),
+    cwd: root,
+    clientName: "pritha-voice-control",
+    buildSandboxPolicy: () => codexAppSandboxPolicyForTask(task, sandbox, writableRoots),
+    getRuntimeSettings: () => getPrithaRuntimeSettings(),
+  });
+}
+
+async function writeCodexTaskPlan(taskId: string, planPath: string | undefined, plan: CodexTaskPlan) {
+  if (!planPath) return;
+  await writeFile(planPath, `${JSON.stringify({ ...plan, updated_at: new Date().toISOString() }, null, 2)}\n`, "utf8").catch(() => undefined);
+}
+
+async function emitCodexVoiceProgress(
+  taskId: string,
+  voiceFeedbackPath: string | undefined,
+  progressPath: string,
+  event: CodexTaskVoiceFeedbackEvent,
+) {
+  await appendCodexVoiceFeedback(taskId, voiceFeedbackPath || "", event);
+  await appendCodexTaskProgress(taskId, progressPath, {
+    phase: event.phase,
+    level: event.priority === "high" ? "warning" : "info",
+    status: event.requires_response ? "waiting_for_operator" : "running",
+    message: event.voice_text,
+    voice_text: event.voice_text,
+    speakable: event.speakable,
+    requires_response: event.requires_response,
+    step_id: event.step_id,
+    step_title: event.step_title,
+  });
+}
+
+async function planCodexAppTask(
+  task: Record<string, unknown>,
+  paths: CodexTaskRuntimePaths,
+  sandbox: string,
+  writableRoots: Array<{ absolute_path: string }>,
+  progress: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
+) {
+  const settings = getPrithaRuntimeSettings();
+  const taskId = String(task.id || "");
+  if (settings.codexPlanningMode === "off") {
+    const plan = normalizeCodexTaskPlan({ executionMode: "inline_progress", steps: [] }, task, settings, "synthetic");
+    await writeCodexTaskPlan(taskId, paths.planPath, plan);
+    return plan;
+  }
+  if (settings.codexPlanningMode === "inline_required") {
+    const plan = { ...syntheticCodexTaskPlan(task, "synthetic"), executionMode: "inline_progress" as const };
+    await writeCodexTaskPlan(taskId, paths.planPath, plan);
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: "plan_created",
+      speakable: true,
+      priority: "normal",
+      voice_text: `Я составила короткий план для Codex: ${plan.steps.length} шаг(а), выполнение в одном Codex turn.`,
+    });
+    return plan;
+  }
+
+  try {
+    const planningTask = buildPlanningTask(task);
+    const planningSandbox = "read-only";
+    const client = codexAppClientForTask(planningTask, planningSandbox, writableRoots);
+    const planningPayload = buildPrithaCodexTaskPayload(planningTask);
+    const planningTimeoutMs = Math.min(Math.max(60_000, Math.round(codexEffectiveTimeoutMs() / 4)), 180_000);
+    const raw = await client.runTask(planningPayload, {
+      timeoutMs: planningTimeoutMs,
+      userId: "pritha-voice-operator",
+      onProgress: (event) =>
+        progress({
+          ...event,
+          phase: `planning_${event.phase}`,
+          message: event.message ? `Planning pass: ${event.message}` : "Planning pass progress.",
+        }),
+    });
+    const result = normalizeCodexTaskResult(raw, planningPayload.requestId, new Date().toISOString(), "codex-app");
+    const structured = maybeParseJsonObject(result.data?.structuredJson) || maybeParseJsonObject(result.text) || result.data;
+    const plan = normalizeCodexTaskPlan(structured, task, settings, "planner");
+    await writeCodexTaskPlan(taskId, paths.planPath, plan);
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: "plan_created",
+      speakable: true,
+      priority: "normal",
+      voice_text: `Codex составил план: ${plan.steps.length} шаг(а). Режим: ${plan.executionMode === "step_orchestrator" ? "step orchestrator" : "inline progress"}.`,
+    });
+    return plan;
+  } catch (error) {
+    const plan = syntheticCodexTaskPlan(task, "fallback");
+    await writeCodexTaskPlan(taskId, paths.planPath, plan);
+    await progress({
+      phase: "planning_fallback",
+      level: "warning",
+      status: "running",
+      transport: "codex-app",
+      message: `Planning pass failed; using safe synthetic plan. ${compactText(error instanceof Error ? error.message : String(error), 400)}`,
+    });
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: "plan_created",
+      speakable: true,
+      priority: "normal",
+      voice_text: `Не удалось получить отдельный Codex-план, поэтому я использую безопасный локальный план из ${plan.steps.length} шаг(а).`,
+    });
+    return plan;
+  }
+}
+
+async function runCodexAppPayload(
+  task: Record<string, unknown>,
+  sandbox: string,
+  writableRoots: Array<{ absolute_path: string }>,
+  timeoutMs: number,
+  progress: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
+) {
+  const client = codexAppClientForTask(task, sandbox, writableRoots);
+  const payload = buildPrithaCodexTaskPayload(task);
+  const raw = await client.runTask(payload, { timeoutMs, userId: "pritha-voice-operator", onProgress: progress });
+  return normalizeCodexTaskResult(raw, payload.requestId, new Date().toISOString(), "codex-app");
+}
+
+async function runCodexStepOrchestrator(
+  task: Record<string, unknown>,
+  plan: CodexTaskPlan,
+  paths: CodexTaskRuntimePaths,
+  sandbox: string,
+  writableRoots: Array<{ absolute_path: string }>,
+  startedAt: string,
+  progress: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
+): Promise<PrithaCodexTaskResult> {
+  const taskId = String(task.id || "");
+  const stepResults: Array<{ step_id: string; title: string; status: string; text: string }> = [];
+  const timeoutMs = codexEffectiveTimeoutMs();
+  for (let index = 0; index < plan.steps.length; index += 1) {
+    const step = plan.steps[index];
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: "step_started",
+      speakable: true,
+      priority: "normal",
+      step_id: step.id,
+      step_title: step.title,
+      voice_text: `Codex начал шаг ${index + 1} из ${plan.steps.length}: ${step.title}.`,
+    });
+    const stepTask = {
+      ...task,
+      task: [
+        `Execute only step ${index + 1} of ${plan.steps.length} for the current Pritha Voice Control Codex task.`,
+        `Step title: ${step.title}`,
+        `Step goal: ${step.goal}`,
+        `Expected output: ${step.expectedOutput}`,
+        "",
+        "Full plan:",
+        JSON.stringify(plan.steps.map((item) => ({ id: item.id, title: item.title, goal: item.goal })), null, 2),
+        "",
+        "Previous step results:",
+        JSON.stringify(stepResults, null, 2),
+        "",
+        "Original operator task:",
+        compactText(task.task || "", 8_000),
+      ].join("\n"),
+      expected_result: step.expectedOutput,
+      requires_internet: Boolean(task.requires_internet) || step.needsNetwork,
+      write_mode: step.needsWrite ? normalizeCodexWriteMode(task.write_mode) : "read_only",
+      operator_confirmation: `${String(task.operator_confirmation || "")}\nStep orchestrator executing approved plan step ${step.id}.`.trim(),
+    };
+    const remaining = Math.max(60_000, Math.min(timeoutMs, timeoutMs - (elapsedMsSince(startedAt) || 0)));
+    const result = await runCodexAppPayload(stepTask, sandbox, writableRoots, remaining, (event) =>
+      progress({
+        ...event,
+        phase: `step_${step.id}_${event.phase}`,
+        step_id: step.id,
+        step_title: step.title,
+      }),
+    );
+    const stepText = result.text || String(result.data?.summary || "");
+    stepResults.push({ step_id: step.id, title: step.title, status: result.status, text: compactText(stepText, 1_000) });
+    if (result.status !== "ok") {
+      await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+        phase: "step_blocked",
+        speakable: true,
+        priority: "high",
+        step_id: step.id,
+        step_title: step.title,
+        voice_text: `Codex остановился на шаге ${index + 1}: ${step.title}. ${compactText(stepText || result.errors.join("; "), 360)}`,
+      });
+      return {
+        requestId: String(task.id || randomUUID()),
+        status: result.status,
+        text: `Step ${step.id} blocked: ${stepText || result.errors.join("; ")}`,
+        data: { summary: stepText, refs: [], changedFiles: [], nextActions: ["Review the blocked step in Pritha Control Center."], structuredJson: JSON.stringify({ plan, stepResults }) },
+        errors: result.errors,
+        warnings: result.warnings,
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        transport: "codex-app",
+      };
+    }
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: "step_completed",
+      speakable: true,
+      priority: "normal",
+      step_id: step.id,
+      step_title: step.title,
+      voice_text: `Codex завершил шаг ${index + 1} из ${plan.steps.length}: ${step.title}.`,
+    });
+  }
+
+  return {
+    requestId: String(task.id || randomUUID()),
+    status: "ok",
+    text: `Codex completed ${plan.steps.length} orchestrated step(s).`,
+    data: {
+      summary: `Completed ${plan.steps.length} orchestrated step(s).`,
+      refs: [],
+      changedFiles: [],
+      nextActions: [],
+      structuredJson: JSON.stringify({ plan, stepResults }),
+    },
+    errors: [],
+    warnings: [],
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    transport: "codex-app",
+  };
+}
+
 async function startCodexAppTask(
   task: Record<string, unknown>,
-  paths: { resultPath: string; statusPath: string; stdoutPath: string; stderrPath: string; progressPath: string },
+  paths: CodexTaskRuntimePaths,
 ) {
   const root = resolveTechscopeRoot();
   const taskType = String(task.task_type || "analysis");
@@ -2589,13 +3112,6 @@ async function startCodexAppTask(
     message: "Codex App sidecar started in the local Pritha environment.",
   });
 
-  const client = new PrithaCodexAppServerClient({
-    codexBin: codexBin(),
-    cwd: root,
-    clientName: "pritha-voice-control",
-    buildSandboxPolicy: () => codexAppSandboxPolicyForTask(task, sandbox, writableRoots),
-    getRuntimeSettings: () => getPrithaRuntimeSettings(),
-  });
   const heartbeat = setInterval(() => {
     void progress({
       phase: "heartbeat",
@@ -2608,10 +3124,90 @@ async function startCodexAppTask(
   }, 30_000);
   heartbeat.unref();
 
-  void client.runTask(payload, { timeoutMs, userId: "pritha-voice-operator", onProgress: progress }).then(async (raw) => {
+  void (async () => {
+    const settings = getPrithaRuntimeSettings();
+    const plan = await planCodexAppTask(task, paths, sandbox, writableRoots, progress);
+    const selectedMode = chooseCodexExecutionModeForPlan(plan, settings, task);
+    await progress({
+      phase: "mode_selected",
+      level: "info",
+      status: "running",
+      transport: "codex-app",
+      message: `Codex execution mode selected: ${selectedMode}. ${plan.reason}`,
+      execution_mode: selectedMode,
+      plan_source: plan.source,
+    });
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: "mode_selected",
+      speakable: true,
+      priority: "normal",
+      voice_text: selectedMode === "step_orchestrator" ? "Для этой задачи включен step orchestrator: Codex будет выполнять план по шагам." : "Для этой задачи Codex пойдет одним выполнением с сохраненным планом.",
+    });
+    if (plan.requiresOperatorInput && plan.operatorQuestions.length && settings.codexAskBeforeOrchestration) {
+      const question = plan.operatorQuestions[0];
+      const finishedAt = new Date().toISOString();
+      await writeFile(
+        paths.resultPath,
+        [
+          "Codex task needs operator input before execution.",
+          "",
+          question,
+          "",
+          "This question was returned as a completed result because the current task card cannot accept free-form operator answers.",
+          "Answer it by voice or start a follow-up task; do not provide secrets.",
+          "",
+        ].join("\n"),
+        "utf8",
+      ).catch(() => undefined);
+      await writeFile(
+        paths.statusPath,
+        `${JSON.stringify(
+          {
+            status: "complete",
+            phase: "operator_question",
+            transport: "codex-app",
+            question,
+            plan,
+            requires_operator_response: true,
+            operator_question_terminal: true,
+            sandbox,
+            writable_roots: writableRoots,
+            timeout_ms: timeoutMs,
+            started_at: startedAt,
+            completed_at: finishedAt,
+            result_path: rootRelative(root, paths.resultPath),
+            stdout_path: rootRelative(root, paths.stdoutPath),
+            stderr_path: rootRelative(root, paths.stderrPath),
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      ).catch(() => undefined);
+      await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+        phase: "operator_question",
+        speakable: true,
+        priority: "high",
+        requires_response: true,
+        voice_text: `Codex просит уточнение перед продолжением: ${question}`,
+      });
+      await progress({
+        phase: "operator_question_completed",
+        level: "complete",
+        status: "complete",
+        transport: "codex-app",
+        message: "Codex task completed with an operator question; no active wait card was left.",
+        elapsed_ms: elapsedMsSince(startedAt),
+      });
+      clearInterval(heartbeat);
+      return;
+    }
+
+    const result = selectedMode === "step_orchestrator"
+      ? await runCodexStepOrchestrator(task, plan, paths, sandbox, writableRoots, startedAt, progress)
+      : await runCodexAppPayload(task, sandbox, writableRoots, timeoutMs, progress);
     clearInterval(heartbeat);
     const finishedAt = new Date().toISOString();
-    const result = normalizeCodexTaskResult(raw, payload.requestId, startedAt, "codex-app");
     const status = result.status === "ok" || result.status === "decision_required" ? "complete" : "failed";
     await writeFile(paths.resultPath, codexAppResultText(result), "utf8").catch(() => undefined);
     await writeFile(
@@ -2622,6 +3218,8 @@ async function startCodexAppTask(
           phase: status === "complete" ? "completed" : "failed",
           transport: "codex-app",
           codex_app_status: result.status,
+          execution_mode: selectedMode,
+          plan,
           sandbox,
           writable_roots: writableRoots,
           timeout_ms: timeoutMs,
@@ -2630,6 +3228,8 @@ async function startCodexAppTask(
           result_path: rootRelative(root, paths.resultPath),
           stdout_path: rootRelative(root, paths.stdoutPath),
           stderr_path: rootRelative(root, paths.stderrPath),
+          plan_path: paths.planPath ? rootRelative(root, paths.planPath) : undefined,
+          voice_feedback_path: paths.voiceFeedbackPath ? rootRelative(root, paths.voiceFeedbackPath) : undefined,
           warnings: result.warnings,
           errors: result.errors,
         },
@@ -2646,7 +3246,13 @@ async function startCodexAppTask(
       message: status === "complete" ? "Codex App task completed." : "Codex App task failed.",
       elapsed_ms: elapsedMsSince(startedAt, Date.parse(finishedAt)),
     });
-  }).catch(async (error) => {
+    await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
+      phase: status === "complete" ? "completed" : "failed",
+      speakable: true,
+      priority: status === "complete" ? "normal" : "high",
+      voice_text: status === "complete" ? "Codex завершил задачу, результат готов." : "Codex завершил задачу с ошибкой. Подробности доступны в карточке задачи.",
+    });
+  })().catch(async (error) => {
     clearInterval(heartbeat);
     const finishedAt = new Date().toISOString();
     const status = statusForCodexAppError(error);
@@ -2980,6 +3586,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   const stdoutPath = path.join(taskDir, "stdout.log");
   const stderrPath = path.join(taskDir, "stderr.log");
   const progressPath = codexTaskProgressPath(taskDir);
+  const planPath = codexTaskPlanPath(taskDir);
+  const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, progressPath, event);
 
   await writeFile(requestPath, `${JSON.stringify(task, null, 2)}\n`, "utf8");
@@ -3002,7 +3610,7 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   if (task.status === "decision_required") {
     await logPrivateEvent("codex_task_decision_required", { task_id: taskId, approval });
   } else if (effectiveTransport === "codex-app") {
-    exec = await startCodexAppTask(task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
+    exec = await startCodexAppTask(task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
   } else if (effectiveTransport === "codex-cli") {
     exec = await startCodexExec(task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
   }
@@ -3029,6 +3637,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
     status_path: rootRelative(root, statusPath),
     result_path: rootRelative(root, resultPath),
     progress_path: rootRelative(root, progressPath),
+    plan_path: rootRelative(root, planPath),
+    voice_feedback_path: rootRelative(root, voiceFeedbackPath),
     approval,
     exec,
     operator_note:
@@ -3143,6 +3753,9 @@ function codexTaskOperatorBrief(params: {
       900,
     );
   }
+  if (params.statusValue === "waiting_for_operator") {
+    return compactText(result || `Codex task ${shortId} is waiting for operator input. Last activity: ${params.lastActivity || params.phase}.`, 900);
+  }
   if (params.statusValue === "failed_timeout") {
     return compactText(
       result ||
@@ -3246,6 +3859,8 @@ async function codexTaskSummary(id: string) {
   const statusPath = path.join(taskDir, "status.json");
   const resultPath = path.join(taskDir, "result.md");
   const progressPath = codexTaskProgressPath(taskDir);
+  const planPath = codexTaskPlanPath(taskDir);
+  const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
   const request = await readJsonFile(requestPath);
   const initialStatus = await readJsonFile(statusPath);
   const initialResultText = await readFile(resultPath, "utf8").catch(() => "");
@@ -3257,6 +3872,9 @@ async function codexTaskSummary(id: string) {
   const complete = TERMINAL_CODEX_TASK_STATUSES.has(statusValue);
   const telemetry = taskTelemetryFromEvents(id);
   const progress = readCodexTaskProgress(progressPath, 12);
+  const plan = await readJsonFile(planPath);
+  const voiceFeedback = readCodexVoiceFeedback(voiceFeedbackPath, 8);
+  const latestVoiceFeedback = latestSpeakableFeedback(voiceFeedback);
   const lastProgress = latestProgressEvent(progress);
   const handoffSent = lastPrivateEvent(telemetry, "codex_task_result_handoff_sent");
   const handoffSkipped = lastPrivateEvent(telemetry, "codex_task_result_handoff_skipped");
@@ -3295,7 +3913,7 @@ async function codexTaskSummary(id: string) {
     last_activity: activity.lastActivity,
     stale: activity.stale,
     operator_brief: operatorBrief,
-    voice_handoff_required: (complete || statusValue === "decision_required" || activity.stale) && handoffStatus === "pending",
+    voice_handoff_required: (complete || statusValue === "decision_required" || statusValue === "waiting_for_operator" || activity.stale || Boolean(latestVoiceFeedback)) && handoffStatus === "pending",
     created_at: String(request?.created_at || stat.birthtime.toISOString()),
     updated_at: String(status?.updated_at || stat.mtime.toISOString()),
     task: compactText(request?.task || id, 240),
@@ -3303,6 +3921,9 @@ async function codexTaskSummary(id: string) {
     result_available: Boolean(resultText.trim()),
     result_excerpt: compactText(resultText, 900),
     approval,
+    plan,
+    latest_voice_feedback: latestVoiceFeedback,
+    speakable_events: voiceFeedback,
     handoff_status: handoffStatus,
     handoff_reason: handoffReason,
     paths: {
@@ -3310,6 +3931,8 @@ async function codexTaskSummary(id: string) {
       status: rootRelative(root, statusPath),
       result: rootRelative(root, resultPath),
       progress: rootRelative(root, progressPath),
+      plan: rootRelative(root, planPath),
+      voice_feedback: rootRelative(root, voiceFeedbackPath),
     },
     progress_timeline: progress.map((event) => ({
       timestamp: event.timestamp,
@@ -3371,6 +3994,8 @@ export async function getPrithaCodexTask(taskId: string) {
   const stdoutPath = path.join(taskDir, "stdout.log");
   const stderrPath = path.join(taskDir, "stderr.log");
   const progressPath = codexTaskProgressPath(taskDir);
+  const planPath = codexTaskPlanPath(taskDir);
+  const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
   const request = await readJsonFile(requestPath);
   const initialStatus = await readJsonFile(statusPath);
   const initialResultText = await readFile(resultPath, "utf8").catch(() => "");
@@ -3384,6 +4009,9 @@ export async function getPrithaCodexTask(taskId: string) {
   const resultAvailable = Boolean(resultText.trim());
   const telemetry = taskTelemetryFromEvents(id);
   const progress = readCodexTaskProgress(progressPath, 30);
+  const plan = await readJsonFile(planPath);
+  const voiceFeedback = readCodexVoiceFeedback(voiceFeedbackPath, 20);
+  const latestVoiceFeedback = latestSpeakableFeedback(voiceFeedback);
   const approval = request?.approval || (status && "approval" in status ? status.approval : null);
   const stat = statSync(taskDir);
   const handoffSent = lastPrivateEvent(telemetry, "codex_task_result_handoff_sent");
@@ -3431,10 +4059,13 @@ export async function getPrithaCodexTask(taskId: string) {
     last_activity: activity.lastActivity,
     stale: activity.stale,
     operator_brief: operatorBrief,
-    voice_handoff_required: (complete || statusValue === "decision_required" || activity.stale) && handoffStatus === "pending",
+    voice_handoff_required: (complete || statusValue === "decision_required" || statusValue === "waiting_for_operator" || activity.stale || Boolean(latestVoiceFeedback)) && handoffStatus === "pending",
     request,
     status_detail: status,
     approval,
+    plan,
+    latest_voice_feedback: latestVoiceFeedback,
+    speakable_events: voiceFeedback,
     telemetry,
     result_available: resultAvailable,
     result_excerpt: compactText(resultText, 5_000),
@@ -3447,6 +4078,8 @@ export async function getPrithaCodexTask(taskId: string) {
       stdout: rootRelative(root, stdoutPath),
       stderr: rootRelative(root, stderrPath),
       progress: rootRelative(root, progressPath),
+      plan: rootRelative(root, planPath),
+      voice_feedback: rootRelative(root, voiceFeedbackPath),
     },
     progress_timeline: progress,
   };
@@ -3466,6 +4099,9 @@ function codexTaskToolView(task: Record<string, unknown>, maxEvents = 8) {
     task_type: task.task_type || (typeof task.request === "object" && task.request !== null ? (task.request as { task_type?: unknown }).task_type : undefined),
     result_available: task.result_available,
     result_excerpt: compactText(task.result_excerpt, 900),
+    plan: task.plan,
+    latest_voice_feedback: task.latest_voice_feedback,
+    speakable_events: Array.isArray(task.speakable_events) ? task.speakable_events.slice(-maxEvents) : [],
     approval: task.approval,
     operator_brief: task.operator_brief,
     voice_handoff_required: task.voice_handoff_required,
@@ -3535,6 +4171,7 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
       phase: view.phase,
       stale: view.stale,
       operator_brief: view.operator_brief,
+      latest_voice_feedback: view.latest_voice_feedback,
     };
   }
   if (operation === "timeline") {
@@ -3545,6 +4182,7 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
       status: view.status,
       phase: view.phase,
       progress_timeline: view.progress_timeline,
+      speakable_events: view.speakable_events,
       operator_brief: view.operator_brief,
     };
   }
@@ -3559,6 +4197,7 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
       stale: view.stale,
       voice_handoff_required: view.voice_handoff_required,
       operator_brief: view.operator_brief,
+      latest_voice_feedback: view.latest_voice_feedback,
       last_activity_at: view.last_activity_at,
       last_activity: view.last_activity,
     };
@@ -3587,6 +4226,8 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
   const stdoutPath = path.join(taskDir, "stdout.log");
   const stderrPath = path.join(taskDir, "stderr.log");
   const progressPath = codexTaskProgressPath(taskDir);
+  const planPath = codexTaskPlanPath(taskDir);
+  const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(id, progressPath, event);
   const request = await readJsonFile(requestPath);
   if (!request) {
@@ -3656,7 +4297,7 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
     message: "Operator approved the Codex task decision gate.",
   });
   if (effectiveTransport === "codex-app") {
-    exec = await startCodexAppTask(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
+    exec = await startCodexAppTask(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
   } else if (effectiveTransport === "codex-cli") {
     exec = await startCodexExec(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
   } else {

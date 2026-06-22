@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -77,4 +77,34 @@ test("remaining Agents Mother command modules run against an isolated root", () 
   assert.ok(reports.some((entry) => entry.includes("agent-operations-report")));
   assert.ok(reports.some((entry) => entry.includes("agent-deployment-report")));
   assert.ok(reports.some((entry) => entry.includes("agent-post-creation-review")));
+});
+
+test("registry does not promote roadmap phase reports to agents", () => {
+  const root = mkdtemp();
+  write(
+    root,
+    "11_agents/reports/2026-06-21-pritha-github-install-reproducibility-baseline-report.md",
+    `---
+id: 2026-06-21-pritha-github-install-reproducibility-baseline-report
+type: agent-operations-report
+status: complete
+created: 2026-06-21
+subject:
+  kind: roadmap-phase
+---
+
+# Agent Operations Report: Pritha GitHub Install Reproducibility Baseline
+
+Date: 2026-06-21
+Status: complete
+Phase: 0 - Baseline And Acceptance
+`,
+  );
+
+  const result = run(root, ["registry"]);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const registry = readFileSync(path.join(root, "11_agents", "registry.md"), "utf8");
+  assert.match(registry, /Agents tracked: 0/);
+  assert.match(registry, /Reports: 1/);
+  assert.doesNotMatch(registry, /Pritha GitHub Install Reproducibility Baseline \| unknown/);
 });
