@@ -13,7 +13,14 @@ type EnvEntry = {
 
 function controlCenterEnvFile() {
   const configured = process.env.PRITHA_CONTROL_CENTER_ENV_FILE?.trim();
-  return configured ? path.resolve(configured) : "";
+  if (configured) return path.resolve(configured);
+
+  const root = resolveTechscopeRoot();
+  for (const envPath of [path.join(root, ".env.local"), path.join(root, ".env")]) {
+    const value = readEnvFile(envPath).get("PRITHA_CONTROL_CENTER_ENV_FILE")?.trim();
+    if (value) return path.resolve(root, value);
+  }
+  return "";
 }
 
 export function envStoreTargetPath() {
