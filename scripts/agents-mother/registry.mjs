@@ -101,20 +101,28 @@ function reportSummaryFromFile(file) {
   const title = markdownTitle(text, path.basename(file, ".md"));
   const relPath = path.relative(ROOT, file);
   const projectPath = bodyValue(text, "Project path") || bodyValue(text, "Target folder") || "";
+  const agentName = bodyValue(text, "Agent name");
   const nameFromTitle = title.replace(/^Agent\s+(Scaffold|Test|Handoff|Operations|Deployment)\s+Report:\s*/i, "").trim();
-  const name = bodyValue(text, "Agent name") || nameFromTitle || path.basename(file, ".md");
+  const name = agentName || nameFromTitle || path.basename(file, ".md");
   return {
     kind: "report",
     path: relPath,
     id: fm.id || path.basename(file, ".md"),
     type: fm.type || "unknown",
     status: fm.status || "unknown",
+    subjectKind: typeof fm.subject === "object" && fm.subject ? fm.subject.kind || "" : "",
+    agentName,
     slug: slug(name || projectPath || relPath),
     name,
     projectPath,
     created: fm.created || "unknown",
     result: bodyValue(text, "Result") || fm.status || "unknown",
   };
+}
+
+function reportRepresentsChildAgent(report) {
+  if (report.subjectKind && !["agent", "child-agent"].includes(report.subjectKind)) return false;
+  return Boolean(report.agentName || report.projectPath);
 }
 
 function collectAgentLifecycle() {
@@ -150,6 +158,7 @@ function collectAgentLifecycle() {
     });
   }
   for (const report of reports) {
+    if (!reportRepresentsChildAgent(report)) continue;
     const key = [...bySlug.keys()].find((item) => report.path.includes(item) || report.slug.includes(item)) || report.slug;
     if (!bySlug.has(key)) {
       bySlug.set(key, {
@@ -197,7 +206,7 @@ topics:
 tools:
   - Codex
   - AGENTS.md
-    - Pritha
+  - Pritha
 agent_platforms:
   - Codex
 model_context:

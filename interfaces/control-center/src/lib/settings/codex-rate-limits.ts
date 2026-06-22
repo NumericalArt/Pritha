@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import readline from "node:readline";
 import { resolveTechscopeRoot } from "@/lib/realtime/pritha-runtime";
 
@@ -84,6 +85,7 @@ export type CodexRateLimitsProbe = {
 };
 
 let cachedProbe: { expiresAt: number; value: CodexRateLimitsProbe } | null = null;
+let cachedCodexAppServerBin: string | null | undefined;
 
 export async function readCodexRateLimits(options: { force?: boolean } = {}): Promise<CodexRateLimitsProbe> {
   if (!options.force && cachedProbe && cachedProbe.expiresAt > Date.now()) return cachedProbe.value;
@@ -94,7 +96,20 @@ export async function readCodexRateLimits(options: { force?: boolean } = {}): Pr
 }
 
 function codexBin() {
-  return process.env.PRITHA_REALTIME_CODEX_BIN?.trim() || process.env.TECHSCOPE_VOICE_CODEX_BIN?.trim() || process.env.CODEX_BIN?.trim() || "codex";
+  const configured =
+    process.env.PRITHA_REALTIME_CODEX_BIN?.trim() || process.env.TECHSCOPE_VOICE_CODEX_BIN?.trim() || process.env.CODEX_BIN?.trim();
+  if (configured) return configured;
+  if (cachedCodexAppServerBin !== undefined) return cachedCodexAppServerBin || "codex";
+
+  const candidates = [
+    "codex",
+    "/Applications/Codex.app/Contents/Resources/codex",
+    process.env.HOME ? `${process.env.HOME}/Applications/Codex.app/Contents/Resources/codex` : "",
+    process.env.HOME ? `${process.env.HOME}/.codex/plugins/.plugin-appserver/codex` : "",
+  ].filter(Boolean);
+
+  cachedCodexAppServerBin = candidates.find((candidate) => codexSupportsAppServer(candidate)) || null;
+  return cachedCodexAppServerBin || "codex";
 }
 
 async function runCodexRateLimitsProbe(): Promise<CodexRateLimitsProbe> {
@@ -102,7 +117,14 @@ async function runCodexRateLimitsProbe(): Promise<CodexRateLimitsProbe> {
     return unavailableProbe("Codex limits probe is disabled by PRITHA_CODEX_LIMITS_PROBE.");
   }
 
-  const connection = new RateLimitsAppServerConnection(codexBin(), resolveTechscopeRoot());
+  const selectedCodexBin = codexBin();
+  if (!codexSupportsAppServer(selectedCodexBin)) {
+    return unavailableProbe(
+      `Codex app-server unavailable: ${selectedCodexBin} does not support the app-server command. Set PRITHA_REALTIME_CODEX_BIN to the Codex.app bundled binary.`,
+    );
+  }
+
+  const connection = new RateLimitsAppServerConnection(selectedCodexBin, resolveTechscopeRoot());
   try {
     await connection.start(8_000);
     await connection.request(
@@ -166,6 +188,18 @@ function unavailableProbe(detail: string): CodexRateLimitsProbe {
     status: "unavailable",
     detail,
   };
+}
+
+function codexSupportsAppServer(bin: string) {
+  if (bin.includes("/") && !existsSync(bin)) return false;
+  const result = spawnSync(bin, ["app-server", "--help"], {
+    env: codexEnv(),
+    encoding: "utf8",
+    timeout: 3_000,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`;
+  return result.status === 0 && output.includes("Usage: codex app-server");
 }
 
 function normalizeRateLimitsResponse(value: unknown) {

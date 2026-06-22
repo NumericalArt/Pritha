@@ -5,6 +5,10 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
+from pritha_python_compat import apply_runtime_compat
+
+apply_runtime_compat()
+
 from sentence_transformers import SentenceTransformer
 
 
@@ -42,6 +46,7 @@ def main():
     model = SentenceTransformer(MODEL)
 
     texts = [row["text"] for row in chunks]
+    chunk_ids = [row["id"] for row in chunks]
     print(f"Embedding {len(texts)} chunks...")
     vectors = model.encode(
         texts,
@@ -52,10 +57,6 @@ def main():
 
     now = datetime.now(timezone.utc).isoformat()
     with conn:
-        conn.execute(
-            "DELETE FROM embeddings WHERE provider = ? AND model = ?",
-            (PROVIDER, MODEL),
-        )
         for row, vector in zip(chunks, vectors):
             owner_id = row["id"]
             conn.execute(
@@ -65,6 +66,12 @@ def main():
                   vector, vector_json, created_at
                 )
                 VALUES (?, 'chunk', ?, ?, ?, ?, NULL, ?, ?)
+                ON CONFLICT(owner_type, owner_id, provider, model) DO UPDATE SET
+                  id = excluded.id,
+                  dimensions = excluded.dimensions,
+                  vector = excluded.vector,
+                  vector_json = excluded.vector_json,
+                  created_at = excluded.created_at
                 """,
                 (
                     embedding_id("chunk", owner_id, PROVIDER, MODEL),
@@ -76,10 +83,20 @@ def main():
                     now,
                 ),
             )
+        placeholders = ",".join("?" for _ in chunk_ids)
+        conn.execute(
+            f"""
+            DELETE FROM embeddings
+            WHERE provider = ?
+              AND model = ?
+              AND owner_type = 'chunk'
+              AND owner_id NOT IN ({placeholders})
+            """,
+            (PROVIDER, MODEL, *chunk_ids),
+        )
 
     print(f"Stored {len(vectors)} embeddings in {DB_PATH}")
 
 
 if __name__ == "__main__":
     main()
-

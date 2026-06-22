@@ -2,6 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -222,7 +223,7 @@ function print(value) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   if (command === "status") {
     const result = auditLaunchdRoot();
     print(result);

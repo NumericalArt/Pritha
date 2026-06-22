@@ -5,6 +5,10 @@ import math
 import sqlite3
 import sys
 
+from pritha_python_compat import apply_runtime_compat
+
+apply_runtime_compat()
+
 from sentence_transformers import SentenceTransformer
 
 
@@ -100,4 +104,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
