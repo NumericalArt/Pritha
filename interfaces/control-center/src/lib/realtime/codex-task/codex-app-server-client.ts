@@ -35,6 +35,8 @@ type CodexAppServerClientOptions = {
   };
 };
 
+const BUNDLED_CODEX_APP_BIN = "/Applications/Codex.app/Contents/Resources/codex";
+
 const RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -69,7 +71,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
   private readonly getRuntimeSettings?: CodexAppServerClientOptions["getRuntimeSettings"];
 
   constructor(options: CodexAppServerClientOptions) {
-    this.codexBin = options.codexBin || process.env.CODEX_BIN?.trim() || "codex";
+    this.codexBin = resolveCodexBinary(options.codexBin);
     this.cwd = path.resolve(options.cwd);
     this.branch = options.branch || currentBranch(this.cwd);
     this.registryPath = options.registryPath;
@@ -420,10 +422,18 @@ export function checkCodexAppServerAvailable(codexBin: string, cwd: string) {
     timeout: 5_000,
   });
   const detail = `${result.stdout || ""}${result.stderr || ""}`.trim();
+  const hasAppServerHelp = /Usage:\s+codex app-server\b/.test(detail) && /--listen\s+<URL>/.test(detail);
   return {
-    available: result.status === 0 && !/unknown|unrecognized|invalid/i.test(detail),
+    available: result.status === 0 && hasAppServerHelp && !/unknown|unrecognized|invalid/i.test(detail),
     detail,
   };
+}
+
+export function resolveCodexBinary(explicit?: string) {
+  const configured = explicit?.trim() || process.env.PRITHA_REALTIME_CODEX_BIN?.trim() || process.env.TECHSCOPE_VOICE_CODEX_BIN?.trim() || process.env.CODEX_BIN?.trim();
+  if (configured) return configured;
+  if (fs.existsSync(BUNDLED_CODEX_APP_BIN)) return BUNDLED_CODEX_APP_BIN;
+  return "codex";
 }
 
 function buildPrompt(payload: PrithaCodexTaskPayload) {

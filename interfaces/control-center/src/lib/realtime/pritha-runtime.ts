@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSyn
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
-import { checkCodexAppServerAvailable, PrithaCodexAppServerClient } from "./codex-task/codex-app-server-client";
+import { checkCodexAppServerAvailable, PrithaCodexAppServerClient, resolveCodexBinary } from "./codex-task/codex-app-server-client";
 import type { PrithaCodexTaskPayload, PrithaCodexTaskProgressEvent, PrithaCodexTaskResult, PrithaCodexTaskStatus, PrithaCodexTaskType } from "./codex-task/types";
 import {
   buildVoiceBehaviorPromptSections,
@@ -2193,7 +2193,21 @@ function codexAvailable() {
 }
 
 function codexBin() {
-  return env("PRITHA_REALTIME_CODEX_BIN", env("TECHSCOPE_VOICE_CODEX_BIN", env("CODEX_BIN", "codex")));
+  return resolveCodexBinary();
+}
+
+function codexExecHelp() {
+  const result = spawnSync(codexBin(), ["exec", "--help"], {
+    cwd: resolveTechscopeRoot(),
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5_000,
+  });
+  return `${result.stdout || ""}${result.stderr || ""}`;
+}
+
+function codexExecSupportsEphemeral() {
+  return /\s--ephemeral\b/.test(codexExecHelp());
 }
 
 function codexAppAvailable() {
@@ -2746,7 +2760,6 @@ async function startCodexExec(
 
   const args = [
     "exec",
-    "--ephemeral",
     "--skip-git-repo-check",
     "--color",
     "never",
@@ -2760,6 +2773,7 @@ async function startCodexExec(
     paths.resultPath,
     "-",
   ];
+  if (codexExecSupportsEphemeral()) args.splice(1, 0, "--ephemeral");
   const model = settings.codexModel || env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", ""));
   if (model) args.splice(1, 0, "-m", model);
 
@@ -3176,7 +3190,15 @@ async function repairStaleCodexTaskStatus(
   const stale = Number.isFinite(startedMs) && Date.now() - startedMs > Math.max(1_000, timeoutMs) + 30_000;
   const pid = status?.pid;
   const livePid = pid ? processIsAlive(pid) : false;
-  if (!stale && (!pid || livePid)) return { status, resultText, repaired: false };
+  const progress = readCodexTaskProgress(paths.progressPath, 100);
+  const progressPhases = new Set(progress.map((event) => String(event.phase || "")));
+  const codexAppStartupStalled =
+    String(status?.transport || request?.effective_transport || "") === "codex-app" &&
+    (progressPhases.has("runner_started") || progressPhases.has("codex_app_started")) &&
+    !progressPhases.has("codex_app_initialized") &&
+    Number.isFinite(startedMs) &&
+    Date.now() - startedMs > 300_000;
+  if (!stale && !codexAppStartupStalled && (!pid || livePid)) return { status, resultText, repaired: false };
 
   const repairedStatus = resultText.trim() ? "complete" : "failed_timeout";
   const now = new Date().toISOString();
@@ -3200,7 +3222,7 @@ async function repairStaleCodexTaskStatus(
     previous_status: statusValue,
     completed_at: String(status?.completed_at || now),
     updated_at: now,
-    stale_reason: pid && !livePid ? "runner_pid_not_alive" : "timeout_elapsed_without_terminal_status",
+    stale_reason: codexAppStartupStalled ? "codex_app_initialize_missing" : pid && !livePid ? "runner_pid_not_alive" : "timeout_elapsed_without_terminal_status",
   };
   await writeFile(paths.statusPath, `${JSON.stringify(repaired, null, 2)}\n`, "utf8").catch(() => undefined);
   await appendCodexTaskProgress(id, paths.progressPath, {
