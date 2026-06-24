@@ -227,6 +227,18 @@ const ROLLING_SUMMARY_CLIENT_DEBOUNCE_MS = 12_000;
 const MIC_INPUT_LEVEL_STORAGE_KEY = "pritha.voice.inputLevel.v1";
 const LEGACY_MIC_GAIN_STORAGE_KEY = "pritha.voice.micGain.v1";
 
+function codexTaskCreatedMs(task: Pick<CodexTaskState, "createdAt" | "id">) {
+  const created = Date.parse(task.createdAt);
+  return Number.isFinite(created) ? created : 0;
+}
+
+function orderVisibleCodexTasks(tasks: CodexTaskState[]) {
+  return [...tasks]
+    .sort((a, b) => codexTaskCreatedMs(b) - codexTaskCreatedMs(a) || b.id.localeCompare(a.id))
+    .slice(0, MAX_VISIBLE_TASKS)
+    .sort((a, b) => codexTaskCreatedMs(a) - codexTaskCreatedMs(b) || a.id.localeCompare(b.id));
+}
+
 type RollingSummaryPayload = {
   topicKey: string;
   task: string;
@@ -597,7 +609,7 @@ function usePrithaRealtimeController() {
         threadScope: task.threadScope === undefined ? existing?.threadScope : task.threadScope,
         threadRoutingMode: task.threadRoutingMode || existing?.threadRoutingMode,
       };
-      const nextTasks = [nextTask, ...tasks.filter((item) => item.id !== task.id)].slice(0, MAX_VISIBLE_TASKS);
+      const nextTasks = orderVisibleCodexTasks([nextTask, ...tasks.filter((item) => item.id !== task.id)]);
       codexTasksRef.current = nextTasks;
       return nextTasks;
     });
@@ -1695,7 +1707,7 @@ function usePrithaRealtimeController() {
       channel.onopen = () => {
         rollingSummarySessionActiveRef.current = true;
         setPhase("listening");
-        setToolStatus("Realtime data channel connected. Tools: search_pritha_memory, deep_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task, run_codex_task.");
+        setToolStatus("Realtime data channel connected. Tools: full_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task, run_codex_task.");
         logClientEvent("realtime_data_channel_connected", {
           session_id: sessionIdRef.current,
           sticky_context_available: stickyContextEnabled,

@@ -239,7 +239,7 @@ type RollingSummaryArgs = RollingSummaryCheckpointInput & {
   force?: unknown;
 };
 
-type DeepMemoryArgs = {
+type FullMemoryArgs = {
   operation?: unknown;
   query?: unknown;
   id_or_path?: unknown;
@@ -863,27 +863,38 @@ function semanticMemorySearch(query: string, limit: number) {
   };
 }
 
-function hybridMemorySearch(args: DeepMemoryArgs) {
+function fullMemorySearch(args: FullMemoryArgs) {
   const query = String(args.query || "").trim();
   if (!query) return { ok: false, error: "missing_query" };
   const limit = cappedLimit(args.limit, 8, 20);
   const maxChars = Math.max(1_000, Math.min(Number(args.max_chars) || 8_000, 20_000));
-  const fts = existsSync(memoryDbPath()) && sqliteCliAvailable() ? ftsSearch(query, limit) : markdownFallbackSearch(query, limit);
+  const sqliteReady = existsSync(memoryDbPath()) && sqliteCliAvailable();
   const semantic = semanticMemorySearch(query, limit);
+  const entities = sqliteReady ? searchMemoryEntities({ ...args, limit }) : null;
   return {
     ok: true,
-    operation: "hybrid_search",
+    operation: "search",
+    search_strategy: "full",
     query,
-    fts,
+    fts: sqliteReady ? ftsSearch(query, limit) : markdownFallbackSearch(query, limit),
     semantic: {
       ...semantic,
       stdout: "stdout" in semantic ? compactText(semantic.stdout, maxChars) : undefined,
       stderr: "stderr" in semantic ? compactText(semantic.stderr, 2_000) : undefined,
     },
+    entities: entities?.ok
+      ? {
+          entities: entities.entities,
+          related_documents: entities.related_documents,
+        }
+      : entities,
+    sqlite: existsSync(memoryDbPath()),
+    sqlite_cli: sqliteCliAvailable(),
+    markdown_fallback: !sqliteReady,
   };
 }
 
-function searchMemoryEntities(args: DeepMemoryArgs) {
+function searchMemoryEntities(args: FullMemoryArgs) {
   const query = String(args.query || "").trim();
   if (!query) return { ok: false, error: "missing_query" };
   const limit = cappedLimit(args.limit, 10, 30);
@@ -942,7 +953,7 @@ LIMIT 1;
   return (rows[0] as Record<string, unknown> | undefined) || { id, node_type: type };
 }
 
-function resolveGraphStart(args: DeepMemoryArgs) {
+function resolveGraphStart(args: FullMemoryArgs) {
   const idOrPath = String(args.id_or_path || "").trim();
   if (!idOrPath) return null;
   const requestedType = String(args.node_type || "document").trim();
@@ -963,7 +974,7 @@ LIMIT 1;
   return null;
 }
 
-function traverseMemoryGraph(args: DeepMemoryArgs) {
+function traverseMemoryGraph(args: FullMemoryArgs) {
   const start = resolveGraphStart(args);
   if (!start) return { ok: false, error: "missing_or_unknown_start_node" };
   const depth = Math.max(1, Math.min(Number(args.depth) || 2, 4));
@@ -1039,7 +1050,7 @@ function listFilesRecursive(directory: string, maxFiles = 200) {
   return files;
 }
 
-function searchRuntimeMemory(args: DeepMemoryArgs) {
+function searchRuntimeMemory(args: FullMemoryArgs) {
   const root = resolveTechscopeRoot();
   const query = String(args.query || "").trim().toLowerCase();
   const limit = cappedLimit(args.limit, 12, 40);
@@ -1113,7 +1124,7 @@ async function validateAndRebuildMemory() {
   return { validation, rebuild, embeddings, ok };
 }
 
-async function writeDeepMemoryNote(args: DeepMemoryArgs) {
+async function writeFullMemoryNote(args: FullMemoryArgs) {
   if (!hasOperatorConfirmation(args.operator_confirmation)) {
     return { ok: false, error: "operator_confirmation_required", detail: "Ask the operator to confirm the memory write before calling this operation." };
   }
@@ -1138,7 +1149,7 @@ async function writeDeepMemoryNote(args: DeepMemoryArgs) {
     "  - pritha-control-center",
     "  - memory",
     "sources:",
-    "  - voice-control:deep_pritha_memory",
+    "  - voice-control:full_pritha_memory",
     "privacy: internal",
     "review_status: draft",
     "---",
@@ -1153,7 +1164,7 @@ async function writeDeepMemoryNote(args: DeepMemoryArgs) {
   return { ok: checks.ok, operation: "write_note", path: rootRelative(root, artifactPath), checks };
 }
 
-async function appendDeepMemoryArtifact(args: DeepMemoryArgs) {
+async function appendFullMemoryArtifact(args: FullMemoryArgs) {
   if (!hasOperatorConfirmation(args.operator_confirmation)) {
     return { ok: false, error: "operator_confirmation_required", detail: "Ask the operator to confirm the memory update before calling this operation." };
   }
@@ -1168,16 +1179,14 @@ async function appendDeepMemoryArtifact(args: DeepMemoryArgs) {
   const body = redactSensitiveText(args.body || "");
   if (!body) return { ok: false, error: "missing_body" };
   const stamp = new Date().toISOString();
-  await appendFile(fullPath, `\n\n## ${title}\n\n- Source: voice-control:deep_pritha_memory\n- Updated at: ${stamp}\n\n${body}\n`, "utf8");
+  await appendFile(fullPath, `\n\n## ${title}\n\n- Source: voice-control:full_pritha_memory\n- Updated at: ${stamp}\n\n${body}\n`, "utf8");
   const checks = await validateAndRebuildMemory();
   return { ok: checks.ok, operation: "append_artifact", path: rootRelative(root, fullPath), checks };
 }
 
-async function handleDeepPrithaMemory(args: DeepMemoryArgs = {}) {
-  const operation = String(args.operation || (args.query ? "hybrid_search" : "status")).trim();
-  if (!existsSync(memoryDbPath()) || !sqliteCliAvailable()) {
-    return { ok: false, operation, error: "memory_sqlite_unavailable", sqlite: existsSync(memoryDbPath()), sqlite_cli: sqliteCliAvailable() };
-  }
+async function handleFullPrithaMemory(args: FullMemoryArgs = {}) {
+  const operation = String(args.operation || (args.id_or_path ? "read" : args.query ? "search" : "status")).trim();
+  const sqliteReady = existsSync(memoryDbPath()) && sqliteCliAvailable();
 
   if (operation === "status") {
     const embeddings = embeddingCoverage();
@@ -1185,17 +1194,28 @@ async function handleDeepPrithaMemory(args: DeepMemoryArgs = {}) {
       ok: true,
       operation,
       memory: memoryStats(),
+      sqlite: existsSync(memoryDbPath()),
+      sqlite_cli: sqliteCliAvailable(),
       semantic_available: Boolean("semantic_available" in embeddings && embeddings.semantic_available),
       embeddings,
+      default_query_operation: "search",
+      search_strategy: "full",
       write_operations_require_confirmation: true,
     };
   }
-  if (operation === "semantic_search") {
-    const query = String(args.query || "").trim();
-    if (!query) return { ok: false, error: "missing_query" };
-    return { operation, ...semanticMemorySearch(query, cappedLimit(args.limit, 8, 20)) };
+  if (operation === "recent") {
+    if (!sqliteReady) return { ok: false, operation, error: "memory_sqlite_unavailable", sqlite: existsSync(memoryDbPath()), sqlite_cli: sqliteCliAvailable() };
+    return { ok: true, operation, recent: recentItems(cappedLimit(args.limit, 8, 30)) };
   }
-  if (operation === "hybrid_search") return hybridMemorySearch(args);
+  if (operation === "open") {
+    if (!sqliteReady) return { ok: false, operation, error: "memory_sqlite_unavailable", sqlite: existsSync(memoryDbPath()), sqlite_cli: sqliteCliAvailable() };
+    return { ok: true, operation, open: openItems(cappedLimit(args.limit, 8, 30)) };
+  }
+  if (operation === "read") return readArtifact(args.id_or_path, Number(args.max_chars) || 8_000);
+  if (operation === "search") return fullMemorySearch(args);
+  if (operation === "entity_search" || operation === "graph_traverse") {
+    if (!sqliteReady) return { ok: false, operation, error: "memory_sqlite_unavailable", sqlite: existsSync(memoryDbPath()), sqlite_cli: sqliteCliAvailable() };
+  }
   if (operation === "entity_search") return searchMemoryEntities(args);
   if (operation === "graph_traverse") return traverseMemoryGraph(args);
   if (operation === "runtime_search") return searchRuntimeMemory(args);
@@ -1217,9 +1237,9 @@ async function handleDeepPrithaMemory(args: DeepMemoryArgs = {}) {
     }
     return { ok: true, operation, rebuild: startEmbeddingRebuild("operator_confirmed_async"), embeddings: embeddingCoverage() };
   }
-  if (operation === "write_note") return writeDeepMemoryNote(args);
-  if (operation === "append_artifact") return appendDeepMemoryArtifact(args);
-  return { ok: false, error: "unknown_deep_memory_operation", operation };
+  if (operation === "write_note") return writeFullMemoryNote(args);
+  if (operation === "append_artifact") return appendFullMemoryArtifact(args);
+  return { ok: false, error: "unknown_full_memory_operation", operation };
 }
 
 type FileSystemRoot = {
@@ -1546,26 +1566,9 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
   return [
     {
       type: "function",
-      name: "search_pritha_memory",
+      name: "full_pritha_memory",
       description:
-        "Read-only access to Pritha memory. Use operation=status, search, recent, open, or read. Use this before answering questions about Pritha standards, decisions, workflows, child agents, prior experiments, or stored project knowledge.",
-      parameters: {
-        type: "object",
-        properties: {
-          operation: { type: "string", enum: ["status", "search", "recent", "open", "read"] },
-          query: { type: "string" },
-          id_or_path: { type: "string" },
-          search_mode: { type: "string", enum: ["fts", "markdown"] },
-          limit: { type: "number" },
-          max_chars: { type: "number" },
-        },
-      },
-    },
-    {
-      type: "function",
-      name: "deep_pritha_memory",
-      description:
-        "Deep Pritha memory operations. Use for semantic or hybrid retrieval, entity/graph traversal, runtime/task log lookup, confirmed reindexing, confirmed embedding rebuilds, and confirmed curated memory writes. Ask the operator how deep to search when uncertain.",
+        "Full Pritha memory access. Query-based search always runs the full retrieval path: indexed text or Markdown fallback, semantic retrieval when available, and entity matches when indexed memory is available. Use this before answering questions about Pritha standards, decisions, workflows, child agents, prior experiments, or stored project knowledge.",
       parameters: {
         type: "object",
         properties: {
@@ -1573,8 +1576,10 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
             type: "string",
             enum: [
               "status",
-              "semantic_search",
-              "hybrid_search",
+              "search",
+              "recent",
+              "open",
+              "read",
               "entity_search",
               "graph_traverse",
               "runtime_search",
@@ -1756,12 +1761,11 @@ export function buildRealtimeInstructions() {
     "You are Pritha, a Codex-native agent factory and knowledge assistant.",
     "Speak with the operator in Russian unless they switch language.",
     "This is an experimental realtime voice interface. Keep answers concise, calm and operational.",
-    "You have exactly seven tools: search_pritha_memory, deep_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task and run_codex_task.",
-    "Use search_pritha_memory for fast, shallow lookup before answering questions about curated Pritha memory: standards, decisions, workflows, child-agent lineage, previous UI/realtime experiments, or stored project knowledge.",
-    "For exact details after search, call search_pritha_memory with operation=read and id_or_path from a prior result.",
-    "Use deep_pritha_memory when the operator asks for deeper or more correct memory work: semantic or hybrid search, entity/graph relation traversal, runtime/task-log memory lookup, reindexing, embedding rebuilds, or curated memory writes/updates.",
-    "If you are unsure whether the operator needs quick memory lookup or deep memory investigation, ask how deeply to search before calling deep_pritha_memory.",
-    "For deep_pritha_memory write_note, append_artifact, reindex, rebuild_embeddings, or rebuild_embeddings_async, get explicit operator confirmation first and pass it in operator_confirmation. Semantic and hybrid searches may automatically start a background embedding rebuild when embeddings are missing or stale.",
+    "You have exactly six tools: full_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task and run_codex_task.",
+    "Use full_pritha_memory before answering questions about curated Pritha memory: standards, decisions, workflows, child-agent lineage, previous UI/realtime experiments, or stored project knowledge. Query-based search always runs the full retrieval path; do not ask whether the operator wants shallow or deep memory search.",
+    "For exact details after search, call full_pritha_memory with operation=read and id_or_path from a prior result.",
+    "Use full_pritha_memory for memory status, full search, recent/open document lookup, artifact reads, entity/graph traversal, runtime/task-log memory lookup, confirmed reindexing, confirmed embedding rebuilds, and confirmed curated memory writes/updates.",
+    "For full_pritha_memory write_note, append_artifact, reindex, rebuild_embeddings, or rebuild_embeddings_async, get explicit operator confirmation first and pass it in operator_confirmation. Full searches may automatically start a background embedding rebuild when embeddings are missing or stale.",
     "Use inspect_pritha_files for fast read-only filesystem and harness work in Pritha or child-agent projects: folder structure, manifests, scripts, config surfaces, safe text files, filename search and text search. Prefer it over memory tools whenever the operator asks what files exist, what a project contains, or how a local harness is organized. It cannot write files and intentionally excludes secrets, private runtime folders, logs, queues, node_modules, build outputs and credentials.",
     "Use inspect_pritha_files instead of run_codex_task when the operator only needs a quick filesystem view or a lightweight comment about how an agent is organized. Escalate to run_codex_task when the operator asks for edits, implementation, deep code reasoning, tests, or a durable review.",
     "Use inspect_codex_task for read-only status checks on Codex sidecar tasks. Use it when the operator asks what is happening with a task, whether it is stuck, whether it failed, what needs approval, or whether there is a recent progress timeline.",
@@ -1790,7 +1794,7 @@ export function buildRealtimeInstructions() {
     "If the UI later adds a message that starts with 'Codex sidecar task' and includes 'Result:', treat it as the authoritative completion notification for that task. Summarize the result to the operator immediately instead of saying that you do not automatically know whether Codex finished.",
     "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed, step_blocked or operator_question. Never read heartbeat as the main progress update.",
     "Do not ask for secrets or expose credentials. For credentials, route the operator to the child-agent credential UI. For publish, deletion, service install, launchd/cron or broad system changes, create a Codex task and let the UI decision gate collect approval.",
-    "Realtime tools must not mutate curated Markdown directly except through confirmed deep_pritha_memory memory-write operations or through run_codex_task when its sandbox/write mode permits it. Keep edits narrowly scoped.",
+    "Realtime tools must not mutate curated Markdown directly except through confirmed full_pritha_memory memory-write operations or through run_codex_task when its sandbox/write mode permits it. Keep edits narrowly scoped.",
     buildVoiceBehaviorPromptSections(settings.voiceBehaviorProfile),
   ].join("\n\n");
 }
@@ -4736,9 +4740,13 @@ export async function listPrithaCodexTasks(limit = 5) {
   const max = Math.max(1, Math.min(Number(limit) || 5, 20));
   const ids = readdirSync(tasksRoot)
     .filter((entry) => safeTaskId(entry) === entry)
-    .map((entry) => ({ id: entry, mtime: statSync(path.join(tasksRoot, entry)).mtimeMs }))
-    .sort((a, b) => b.mtime - a.mtime)
+    .map((entry) => {
+      const taskDir = path.join(tasksRoot, entry);
+      return { id: entry, createdMs: codexTaskCreatedMs(taskDir) };
+    })
+    .sort((a, b) => b.createdMs - a.createdMs || b.id.localeCompare(a.id))
     .slice(0, max)
+    .sort((a, b) => a.createdMs - b.createdMs || a.id.localeCompare(b.id))
     .map((entry) => entry.id);
 
   const tasks = [];
@@ -4747,6 +4755,19 @@ export async function listPrithaCodexTasks(limit = 5) {
   }
   await logPrivateEvent("codex_task_list_readback", { ok: true, count: tasks.length });
   return { ok: true, tasks };
+}
+
+function codexTaskCreatedMs(taskDir: string) {
+  const requestPath = path.join(taskDir, "request.json");
+  try {
+    const request = JSON.parse(readFileSync(requestPath, "utf8")) as { created_at?: unknown };
+    const requestCreated = Date.parse(String(request.created_at || ""));
+    if (Number.isFinite(requestCreated)) return requestCreated;
+  } catch {
+    // Fall back to filesystem metadata for legacy task directories.
+  }
+  const stat = statSync(taskDir);
+  return stat.birthtimeMs || stat.ctimeMs || stat.mtimeMs;
 }
 
 export async function getPrithaCodexTask(taskId: string) {
@@ -4909,10 +4930,19 @@ function codexTaskDiagnosis(task: Record<string, unknown>) {
   return "unknown";
 }
 
+function codexTaskSummaryCreatedMs(task: Record<string, unknown>) {
+  const created = Date.parse(String(task.created_at || ""));
+  return Number.isFinite(created) ? created : 0;
+}
+
+function newestCodexTaskFirst(a: Record<string, unknown>, b: Record<string, unknown>) {
+  return codexTaskSummaryCreatedMs(b) - codexTaskSummaryCreatedMs(a) || String(b.task_id || "").localeCompare(String(a.task_id || ""));
+}
+
 async function latestCodexTaskForInspection(limit: number) {
   const listed = await listPrithaCodexTasks(limit);
   if (!listed.ok) return null;
-  const tasks = Array.isArray(listed.tasks) ? listed.tasks : [];
+  const tasks = Array.isArray(listed.tasks) ? [...listed.tasks].sort(newestCodexTaskFirst) : [];
   return tasks.find((task) => activeCodexStatus(String(task.status || "")) || task.voice_handoff_required) || tasks[0] || null;
 }
 
@@ -4997,7 +5027,7 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
 async function latestWaitingCodexTaskId(limit = 10) {
   const listed = await listPrithaCodexTasks(limit);
   if (!listed.ok) return "";
-  const tasks = Array.isArray(listed.tasks) ? listed.tasks : [];
+  const tasks = Array.isArray(listed.tasks) ? [...listed.tasks].sort(newestCodexTaskFirst) : [];
   const waiting = tasks.find((task) => String(task.status || "") === "waiting_for_operator");
   return String(waiting?.task_id || "");
 }
@@ -5296,45 +5326,8 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
   await logPrivateEvent("tool_call_started", { name, args });
 
   let output: unknown;
-  if (name === "search_pritha_memory") {
-    const operation = String(args.operation || (args.id_or_path ? "read" : args.query ? "search" : "status"));
-    const limit = Math.max(1, Math.min(Number(args.limit) || 6, 12));
-
-    if (operation === "status") {
-      output = {
-        ok: true,
-        operation,
-        memory: memoryStats(),
-        sqlite: existsSync(memoryDbPath()),
-        sqlite_cli: sqliteCliAvailable(),
-      };
-    } else if (operation === "recent") {
-      output = { ok: true, operation, recent: recentItems(limit) };
-    } else if (operation === "open") {
-      output = { ok: true, operation, open: openItems(limit) };
-    } else if (operation === "read") {
-      output = await readArtifact(args.id_or_path, Number(args.max_chars) || 8_000);
-    } else if (operation === "search") {
-      const query = String(args.query || "").trim();
-      if (!query) {
-        output = { ok: false, error: "missing_query" };
-      } else {
-        const searchMode = String(args.search_mode || "fts");
-        const canUseFts = searchMode !== "markdown" && existsSync(memoryDbPath()) && sqliteCliAvailable();
-        const rows = canUseFts ? ftsSearch(query, limit) : markdownFallbackSearch(query, limit);
-        output = {
-          ok: true,
-          operation,
-          query,
-          search_mode: canUseFts ? "fts" : "markdown",
-          results: rows,
-        };
-      }
-    } else {
-      output = { ok: false, error: "unknown_memory_operation", operation };
-    }
-  } else if (name === "deep_pritha_memory") {
-    output = await handleDeepPrithaMemory(args);
+  if (name === "full_pritha_memory") {
+    output = await handleFullPrithaMemory(args);
   } else if (name === "inspect_pritha_files") {
     output = await handlePrithaFiles(args);
   } else if (name === "inspect_codex_task") {

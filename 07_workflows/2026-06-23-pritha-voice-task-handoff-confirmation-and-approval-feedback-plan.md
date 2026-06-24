@@ -151,7 +151,7 @@ This protocol applies to:
 It does not block:
 
 - quick spoken answers;
-- `search_pritha_memory`;
+- `full_pritha_memory`;
 - `inspect_pritha_files`;
 - `inspect_codex_task`;
 - read-only status checks and lightweight local inspection.

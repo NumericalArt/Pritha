@@ -1,31 +1,31 @@
 {
   "schema": "techscope-self-test-v1",
   "root": "<TECHSCOPE_ROOT>",
-  "status": "fail",
-  "created_at": "2026-06-24T10:20:30.901Z",
+  "status": "pass",
+  "created_at": "2026-06-24T22:43:21.612Z",
   "dry_run": false,
   "memory_stats": {
+    "documents": 601,
+    "chunks": 5626,
+    "entities": 1855,
+    "relations": 14085,
+    "embeddings": 5451
+  },
+  "previous_memory_stats": {
     "documents": 594,
     "chunks": 5555,
     "entities": 1836,
     "relations": 13944,
     "embeddings": 5380
   },
-  "previous_memory_stats": {
-    "documents": 579,
-    "chunks": 5244,
-    "entities": 1786,
-    "relations": 13597,
-    "embeddings": 5070
-  },
   "quality_gate": {
     "schema": "techscope-quality-gate-v1",
     "root": "<TECHSCOPE_ROOT>",
     "profile": "self-test",
-    "status": "fail",
-    "createdAt": "2026-06-24T10:20:15.291Z",
+    "status": "pass",
+    "createdAt": "2026-06-24T22:43:06.911Z",
     "dryRun": false,
-    "failed": 1,
+    "failed": 0,
     "checks": [
       {
         "id": "env-doctor",
@@ -33,7 +33,7 @@
         "command": "node scripts/env-doctor.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 256,
+        "durationMs": 308,
         "stdout": "Techscope env doctor: pass (1 warning)\n- PASS Node.js >= 20: current 24.15.0\n- PASS Git CLI: git version 2.50.1 (Apple Git-155)\n- PASS sqlite3 CLI: 3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)\n- PASS Python >= 3.9 compatibility floor: Python 3.9.6\n- WARN Python >= 3.10 recommended baseline: Python 3.9.6\n  hint: New Techscope setups should use Python 3.10+; current 3.9 support is transitional.\n- PASS Python package sentence-transformers: 5.1.2\n- PASS Python package imageio-ffmpeg: 0.6.0\n- PASS Python package mlx-whisper: 0.4.3\n- PASS mlx_whisper executable: <USER_HOME>/Library/Python/3.9/bin/mlx_whisper\n- PASS npm CLI: 11.12.1\n- PASS Control Center package-lock: interfaces/control-center/package-lock.json\n- PASS Control Center has no latest dependencies: no latest ranges found\n- PASS Codex CLI: <USER_HOME>/.local/bin/codex\n- PASS ripgrep: <USER_HOME>/.local/bin/rg\n- PASS system ffmpeg: <USER_HOME>/.local/bin/ffmpeg",
         "stderr": ""
       },
@@ -43,7 +43,7 @@
         "command": "node scripts/privacy-audit.mjs --strict",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 438,
+        "durationMs": 467,
         "stdout": "Pritha privacy audit: pass\nRoot: <TECHSCOPE_ROOT>\n- no raw/provenance retention findings",
         "stderr": ""
       },
@@ -53,8 +53,8 @@
         "command": "node scripts/validate-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 48,
-        "stdout": "Memory validation passed for 594 Markdown files.",
+        "durationMs": 50,
+        "stdout": "Memory validation passed for 601 Markdown files.",
         "stderr": ""
       },
       {
@@ -63,8 +63,8 @@
         "command": "node scripts/rebuild-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 1944,
-        "stdout": "Indexed 594 documents, 5555 chunks.\nDatabase: .memory/techscope.sqlite",
+        "durationMs": 2066,
+        "stdout": "Indexed 601 documents, 5626 chunks.\nDatabase: .memory/techscope.sqlite",
         "stderr": ""
       },
       {
@@ -74,17 +74,17 @@
         "status": "pass",
         "exitCode": 0,
         "durationMs": 73,
-        "stdout": "PASS AGENTS.md: required file\nPASS README.md: required file\nPASS .env.example: required file\nPASS interfaces/manifest.json: required file\nPASS memory/manifest.json: required file\nPASS tools/manifest.json: required file\nPASS operations/manifest.json: required file\nPASS scripts/golden-checks.mjs: required file\nPASS scripts/validate-memory.mjs: required file\nPASS scripts/rebuild-memory.mjs: required file\nPASS scripts/query-memory.mjs: required file\nPASS scripts/telegram-bot.mjs: required file\nPASS scripts/agents-mother.mjs: required file\nPASS scripts/smoke-test.mjs: status/smoke script\nPASS scripts/interface-status.mjs: status/smoke script\nPASS scripts/memory-status.mjs: status/smoke script\nPASS scripts/tools-status.mjs: status/smoke script\nPASS scripts/operations-status.mjs: status/smoke script\nPASS scripts/healthcheck.mjs: status/smoke script\nPASS scripts/smoke-test.mjs executable: executable bit\nPASS scripts/golden-checks.mjs executable: executable bit\nPASS scripts/healthcheck.mjs executable: executable bit\nPASS interfaces/manifest.json JSON\nPASS memory/manifest.json JSON\nPASS tools/manifest.json JSON\nPASS operations/manifest.json JSON\nPASS validate-memory: Memory validation passed for 594 Markdown files.\nSmoke test passed.",
+        "stdout": "PASS AGENTS.md: required file\nPASS README.md: required file\nPASS .env.example: required file\nPASS interfaces/manifest.json: required file\nPASS memory/manifest.json: required file\nPASS tools/manifest.json: required file\nPASS operations/manifest.json: required file\nPASS scripts/golden-checks.mjs: required file\nPASS scripts/validate-memory.mjs: required file\nPASS scripts/rebuild-memory.mjs: required file\nPASS scripts/query-memory.mjs: required file\nPASS scripts/telegram-bot.mjs: required file\nPASS scripts/agents-mother.mjs: required file\nPASS scripts/smoke-test.mjs: status/smoke script\nPASS scripts/interface-status.mjs: status/smoke script\nPASS scripts/memory-status.mjs: status/smoke script\nPASS scripts/tools-status.mjs: status/smoke script\nPASS scripts/operations-status.mjs: status/smoke script\nPASS scripts/healthcheck.mjs: status/smoke script\nPASS scripts/smoke-test.mjs executable: executable bit\nPASS scripts/golden-checks.mjs executable: executable bit\nPASS scripts/healthcheck.mjs executable: executable bit\nPASS interfaces/manifest.json JSON\nPASS memory/manifest.json JSON\nPASS tools/manifest.json JSON\nPASS operations/manifest.json JSON\nPASS validate-memory: Memory validation passed for 601 Markdown files.\nSmoke test passed.",
         "stderr": ""
       },
       {
         "id": "unit-tests",
         "name": "Unit tests",
         "command": "node --test tests/agents-mother-card-readiness.test.mjs tests/agents-mother-command-modules.test.mjs tests/agents-mother-contract.test.mjs tests/agents-mother-external-research.test.mjs tests/agents-mother-last30days-backend.test.mjs tests/agents-mother-pattern-research.test.mjs tests/agents-mother-research-gate.test.mjs tests/agents-mother-research-topics.test.mjs tests/agents-mother-skills.test.mjs tests/agents-mother-test-module.test.mjs tests/bootstrap.test.mjs tests/control-center-access-mode.test.mjs tests/control-center-codex-planning.test.mjs tests/control-center-codex-prompt-budget.test.mjs tests/control-center-codex-safety.test.mjs tests/control-center-codex-thread-routing.test.mjs tests/control-center-health.test.mjs tests/control-center-rolling-summary.test.mjs tests/control-center-voice-settings.test.mjs tests/env-doctor.test.mjs tests/external-research-tools.test.mjs tests/frontmatter.test.mjs tests/github-release-status.test.mjs tests/golden-checks.test.mjs tests/healthcheck.test.mjs tests/launchd-root-audit.test.mjs tests/media/transcribe-media-output.test.mjs tests/media/youtube-isolation.test.mjs tests/memory-embeddings-preservation.test.mjs tests/paths.test.mjs tests/pritha-alias.test.mjs tests/pritha-voice-control.test.mjs tests/privacy-audit.test.mjs tests/public-install-docs.test.mjs tests/quality-gate.test.mjs tests/queue-health.test.mjs tests/scaffold-snapshot.test.mjs tests/self-test.test.mjs tests/setup-cli.test.mjs tests/setup-state.test.mjs tests/slug.test.mjs tests/tailscale-setup.test.mjs tests/trigger-phrases.test.mjs tests/voice-control-kit.test.mjs",
-        "status": "fail",
-        "exitCode": 1,
-        "durationMs": 2670,
-        "stdout": "✔ card readiness reports missing when registry row is absent (1.593625ms)\n✔ card readiness reports ready for registered scaffold with card-ready manifest (1.294583ms)\n✔ card readiness reports blocked for registered scaffold missing operations manifest (0.551375ms)\n✔ remaining Agents Mother command modules run against an isolated root (407.087667ms)\n✔ registry does not promote roadmap phase reports to agents (47.656791ms)\n✔ valid fixture contract passes Agents Mother validation (52.618583ms)\n✔ invalid fixture contract fails with actionable messages (49.893542ms)\n✔ contract module validates fixture contracts directly (1.331917ms)\n✔ contract module extracts structured contract data (1.104875ms)\n✔ external research evidence normalization redacts secret-like values (2.149708ms)\n✔ external evidence coverage requires every required topic (0.987042ms)\n✔ applying complete external evidence updates frontmatter and sections (0.84225ms)\n✔ applying incomplete external evidence keeps gate pending (0.761708ms)\n✔ last30days JSON maps ranked candidates into Pritha evidence items (0.901ms)\n✔ last30days args use JSON, quick mode, lookback and keyless-first source set (0.339333ms)\n✔ last30days backend reports unavailable when pinned runtime is absent (3.865792ms)\n✔ pattern pack selects memory/domain/semantic matches and extracts external seeds (4.700958ms)\n✔ semantic search output parser reads ranked rows (0.217208ms)\n✔ semantic failure log is private jsonl and redacts secret-like values (0.7685ms)\n✔ keyword extraction keeps technology phrases for external enrichment (0.357ms)\n✔ research gate status requires explicit machine-readable fields (0.894458ms)\n✔ complete research gate passes for a matching contract (0.528209ms)\n✔ pending external research blocks scaffold readiness (0.535375ms)\n✔ not-applicable external research requires a contract reason (0.423334ms)\n✔ research gate rejects reports that do not reference the contract (0.125041ms)\n✔ research gate status values are strict (0.049667ms)\n✔ fixture-like deterministic contract does not require external research topics (1.474709ms)\n✔ realtime voice contract derives OpenAI Realtime research topic (0.122208ms)\n✔ Telegram contract derives Bot API and untrusted input topics (0.061084ms)\n✔ local inference contract derives runtime and memory topics (0.051792ms)\n✔ dependency and operations choices derive install and deployment topics (0.063291ms)\n✔ pattern pack seeds derive additional current-source research topics (0.528084ms)\n✔ Pritha local skill catalog is discoverable and valid (1.804667ms)\n✔ skill selector keeps default scaffold recommendation-only (2.569709ms)\n✔ skills CLI reports status (50.335625ms)\n✔ project skill audit catches missing installed skill files (1.062958ms)\n✔ Agents Mother test module detects the Pritha harness (0.773667ms)\n✔ test module reads optional JSON manifests safely (0.102125ms)\n✔ Agents Mother test command still supports no-report mode through wrapper and direct entrypoint (1705.720166ms)\n✔ bootstrap plan is machine-readable and non-mutating (41.545041ms)\n✔ bootstrap start target pulls in Control Center install and foreground start (41.279458ms)\n✔ bootstrap verify minimal performs read-only prerequisite checks (254.508375ms)\n✔ Agent cards render URLs through the selected Control Center access mode (0.438875ms)\n✔ Managed active web agents keep plan control as the primary action (0.084625ms)\n✔ Access mode URL rewrite keeps LAN ports but requires explicit child-agent Tailscale links (29.629083ms)\n✔ Control Center carries served agent Tailscale links into agent cards (0.256333ms)\n✔ Codex task planning settings are persisted and exposed through runtime settings (3.617875ms)\n✔ Codex App tasks write plan and voice feedback artifacts (0.204292ms)\n✔ Realtime instructions prefer semantic voice feedback over heartbeat (0.095083ms)\n✔ Agent creation Codex tasks carry mandatory research gate metadata (0.393917ms)\n✔ Step orchestrator remains policy gated (0.13275ms)\n✔ Planner operator questions leave actionable wait cards that can resume (0.357916ms)\n✔ Realtime Codex handoff waits for explicit full-brief confirmation (0.21975ms)\n✔ Voice UI keeps watching approval-gated tasks and handoffs approval decisions once (0.129042ms)\n✔ Codex outbound prompt guard estimates tokens before App or CLI transport (0.4585ms)\n✔ Codex prompt budget is configurable from Pritha settings (0.071083ms)\n✔ Codex outbound prompt guard compacts old session context only over budget (0.199708ms)\n✔ Codex task creation and approval both apply prompt budget guard before writing prompt files (0.339625ms)\n✔ Control Center Codex write flag is read-only unless explicitly enabled (25.048292ms)\n✔ Control Center Realtime runtime gates every effective workspace-write task (1.18425ms)\n✔ Control Center approval decisions create non-duplicating Realtime feedback (0.668208ms)\n✔ Codex task payloads carry a stable thread scope contract (0.40525ms)\n✔ Realtime task creation persists thread scope into request, status, progress and tool output (0.230541ms)\n✔ Codex App stale repair treats planner and step initialization phases as initialized (0.402458ms)\n✔ Codex App reconnect errors stay on App transport until final reconnect attempt (0.302541ms)\n✔ Codex App resolver reuses scoped threads before creating a new task thread (0.158791ms)\n✔ Subject scoped rotation enforces generation changes by turn count and age (0.159333ms)\n✔ Thread routing is configurable through the runtime settings API and UI (0.069417ms)\n✔ control-center health passes when rendered pages reference served JavaScript chunks (101.449583ms)\n✔ control-center health fails when rendered HTML points at a missing chunk (96.786083ms)\n✔ control-center health skips cleanly when the server is not running (59.122583ms)\n✔ rolling summary checkpoint has a fixed compact schema (82.685ms)\n✔ rolling summary derives latest sections from legacy handoff fields (17.165417ms)\n✔ rolling summary redacts secrets and rejects raw transcript-shaped input (35.304375ms)\n✔ rolling summary keeps a durable single-file handoff without expiry (11.639542ms)\n✔ rolling summary enforces the hard serialized size limit (15.151416ms)\n✔ rolling summary keeps one overwritable and recoverable current checkpoint (14.47425ms)\n✔ rolling summary relevance accepts related tasks and ignores unrelated ones (11.098708ms)\n✔ rolling summary recall context is empty for unrelated follow-up tasks (9.828125ms)\n✔ rolling summary realtime recall context is byte bounded (9.597ms)\n✔ rolling summary key event debounce rejects token-level noise (8.569667ms)\n✔ Control Center wires rolling summaries to private storage and debounced client updates (1.592834ms)\n✔ Control Center voice settings normalize behavior profile and Pritha voice (23.143625ms)\n✔ Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene (4.060208ms)\n✔ Control Center Realtime runtime uses behavior settings in instructions and selected Pritha voice in session config (6.598042ms)\n✔ env-doctor exposes machine-readable dependency status (424.473833ms)\n✔ env-doctor minimal profile skips install-heavy Python package checks (108.539209ms)\n✔ env-doctor fails with an actionable message when a critical dependency is missing (418.516084ms)\n✔ last30days lock resolves install and engine paths under root (1.376375ms)\n✔ last30days status is pending-install when runtime is present but checkout is absent (643.170917ms)\n✔ sanitized last30days env strips secrets and can disable host tool PATH (1.654334ms)\n✔ parseFrontmatter preserves body and parses nested lists (1.020042ms)\n✔ parseFrontmatterData returns null when frontmatter is absent (0.057959ms)\n✔ yamlList emits project-compatible block lists (0.074417ms)\n✔ github-release-status exposes a machine-readable external release contract (696.012083ms)\n✔ github-release-status strict mode fails while external release proof is incomplete (460.820291ms)\n✔ golden-checks exposes a machine-readable dry-run contract (39.728708ms)\n✔ healthcheck skips launchd plist lint on non-macOS runners (587.726791ms)\n✔ launchd root audit detects loaded stale state after disk plist is fixed (331.957125ms)\n✔ launchd root audit accepts fixed disk and loaded state (400.622709ms)\n✔ launchd reload retries bootstrap after bootout settles (781.575541ms)\n✔ transcribe-media purges temp artifacts and emits neutral status (59.317667ms)\n✖ platform-specific media strings stay inside the removable adapter (30.365625ms)\n✔ memory rebuild preserves usable embeddings instead of clearing the table (0.427167ms)\n✔ embedding generation is non-destructive and patches local Python import compatibility (0.079708ms)\n✔ resolveTechscopeRoot honors TECHSCOPE_ROOT (0.628041ms)\n✔ resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT (16.002708ms)\n✔ resolveSiblingAgentPath places agents beside root by default (0.147917ms)\n✔ resolveSiblingAgentPath supports explicit override (0.057541ms)\n✔ Pritha entrypoint preserves Agents Mother test behavior (882.099084ms)\n✔ legacy Agents Mother wrapper remains compatible and prints a deprecation note (707.905708ms)\n✔ Pritha aliases expose create, publish and lineage surfaces (671.119917ms)\n✔ Pritha voice realtime config exposes narrow tools (1.771ms)\n✔ Pritha voice memory search works through FTS (17.484166ms)\n✔ Pritha voice can read a curated artifact by id (25.993291ms)\n✔ Pritha voice Codex handoff writes only ignored private state by default (10.794917ms)\n✔ privacy helpers detect forbidden raw artifacts and incoming provenance (0.864584ms)\n✔ privacy helpers keep official reference URLs outside incoming artifacts (0.319916ms)\n✔ public install docs use bootstrap as the fresh-clone entrypoint (0.599792ms)\n✔ README defines Pritha as a universal trainable child-agent creator (0.141ms)\n✔ quality-gate exposes a serialized dry-run contract (33.603542ms)\n✔ quality-gate simulated failure returns a clear failing check (33.2145ms)\n✔ quality-gate emits GitHub annotations without breaking JSON output (39.008875ms)\n✔ quality-gate markdown output includes a summary table (34.933958ms)\n✔ quality-gate self-test profile omits heavier Agents Mother inspection (43.147792ms)\n✔ queue-health reports stale queue items without failing (33.419208ms)\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n✔ Agents Mother scaffold output matches the frozen file-list snapshot (154.375458ms)\n✔ scaffold module exposes generated agent files directly (4.865708ms)\n✔ scaffold command blocks draft contracts unless explicitly allowed (139.235458ms)\n✔ scaffold blocks legacy research reports without machine-readable gate fields (92.044958ms)\n✔ scaffold blocks pending external research unless explicitly overridden (129.525167ms)\n✔ scaffold adds realtime voice reference files when voice is selected (2.308167ms)\n✔ scaffold vendors reviewed local skills only when contract selects vendor mode (1.820625ms)\n✔ self-test exposes a dry-run JSON contract without writing baseline (1629.115709ms)\n✔ setup CLI writes private env and idempotent state (79.044875ms)\n✔ setup CLI configures default realtime tools when voice is selected (167.227291ms)\n✔ setup-status reports a missing setup state without failing (41.198ms)\n✔ setup manifest schema describes the v1 state contract (0.174958ms)\n✔ transliterate maps Cyrillic for ASCII ids (0.617833ms)\n✔ slug can preserve Cyrillic for legacy filenames (1.70875ms)\n✔ slug fallback is explicit (5.642541ms)\n✔ tailscale setup plan is safe when Tailscale is missing (52.702667ms)\n✔ tailscale setup status exposes readiness fields (633.092625ms)\n✔ tailscale setup serve requires explicit --yes (35.78975ms)\n✔ tailscale setup serve configures private Serve and writes setup state (312.373292ms)\n✔ Control Center Next config gets Tailscale dev origins from env (0.227ms)\n✔ Codex-facing Tailscale operator protocol is documented (34.686541ms)\n✔ setup trigger phrases route to the first-run workflow (0.745041ms)\n✔ operational trigger phrases route to health and Pritha commands (0.582208ms)\n✔ voice-control-kit exposes the FESPA26 reference plan (34.122042ms)\n✔ voice-control-kit copies the reference pack into a child interface folder (42.7295ms)\n✔ Pritha voice-kit alias delegates to the kit command (100.631041ms)\nℹ tests 152\nℹ suites 0\nℹ pass 151\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2642.805416\n\n✖ failing tests:\n\ntest at tests/media/youtube-isolation.test.mjs:51:1\n✖ platform-specific media strings stay inside the removable adapter (30.365625ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n  + [\n  +   '07_workflows/2026-06-22-pritha-child-agent-external-research-gate-implementation-plan.md'\n  + ]\n  - []\n  \n      at TestContext.<anonymous> (file://<TECHSCOPE_ROOT>/tests/media/youtube-isolation.test.mjs:59:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1201:25)\n      at Test.start (node:internal/test_runner/test:1096:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ '07_workflows/2026-06-22-pritha-child-agent-external-research-gate-implementation-plan.md' ],\n    expected: [],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }",
+        "status": "pass",
+        "exitCode": 0,
+        "durationMs": 2702,
+        "stdout": "✔ card readiness reports missing when registry row is absent (2.135875ms)\n✔ card readiness reports ready for registered scaffold with card-ready manifest (1.593833ms)\n✔ card readiness reports blocked for registered scaffold missing operations manifest (1.710792ms)\n✔ remaining Agents Mother command modules run against an isolated root (483.960708ms)\n✔ registry does not promote roadmap phase reports to agents (45.835792ms)\n✔ valid fixture contract passes Agents Mother validation (49.453083ms)\n✔ invalid fixture contract fails with actionable messages (54.876167ms)\n✔ contract module validates fixture contracts directly (1.550625ms)\n✔ contract module extracts structured contract data (0.832167ms)\n✔ external research evidence normalization redacts secret-like values (3.900333ms)\n✔ external evidence coverage requires every required topic (1.375875ms)\n✔ applying complete external evidence updates frontmatter and sections (0.837334ms)\n✔ applying incomplete external evidence keeps gate pending (0.713792ms)\n✔ last30days JSON maps ranked candidates into Pritha evidence items (0.815167ms)\n✔ last30days args use JSON, quick mode, lookback and keyless-first source set (0.31275ms)\n✔ last30days backend reports unavailable when pinned runtime is absent (3.778667ms)\n✔ pattern pack selects memory/domain/semantic matches and extracts external seeds (5.489833ms)\n✔ semantic search output parser reads ranked rows (0.222292ms)\n✔ semantic failure log is private jsonl and redacts secret-like values (0.745458ms)\n✔ keyword extraction keeps technology phrases for external enrichment (0.103083ms)\n✔ research gate status requires explicit machine-readable fields (0.608291ms)\n✔ complete research gate passes for a matching contract (0.486958ms)\n✔ pending external research blocks scaffold readiness (0.554958ms)\n✔ not-applicable external research requires a contract reason (0.425542ms)\n✔ research gate rejects reports that do not reference the contract (0.117667ms)\n✔ research gate status values are strict (0.047625ms)\n✔ fixture-like deterministic contract does not require external research topics (2.028334ms)\n✔ realtime voice contract derives OpenAI Realtime research topic (0.134958ms)\n✔ Telegram contract derives Bot API and untrusted input topics (0.065209ms)\n✔ local inference contract derives runtime and memory topics (0.053125ms)\n✔ dependency and operations choices derive install and deployment topics (0.063875ms)\n✔ pattern pack seeds derive additional current-source research topics (0.549333ms)\n✔ Pritha local skill catalog is discoverable and valid (3.736208ms)\n✔ skill selector keeps default scaffold recommendation-only (2.206ms)\n✔ skills CLI reports status (53.486833ms)\n✔ project skill audit catches missing installed skill files (0.843417ms)\n✔ Agents Mother test module detects the Pritha harness (0.7535ms)\n✔ test module reads optional JSON manifests safely (0.084541ms)\n✔ Agents Mother test command still supports no-report mode through wrapper and direct entrypoint (1813.791958ms)\n✔ bootstrap plan is machine-readable and non-mutating (40.906542ms)\n✔ bootstrap start target pulls in Control Center install and foreground start (43.329375ms)\n✔ bootstrap verify minimal performs read-only prerequisite checks (271.561875ms)\n✔ Agent cards render URLs through the selected Control Center access mode (0.456416ms)\n✔ Managed active web agents keep plan control as the primary action (0.092042ms)\n✔ Access mode URL rewrite keeps LAN ports but requires explicit child-agent Tailscale links (29.448542ms)\n✔ Control Center carries served agent Tailscale links into agent cards (0.2425ms)\n✔ Codex task planning settings are persisted and exposed through runtime settings (1.486167ms)\n✔ Codex App tasks write plan and voice feedback artifacts (0.174208ms)\n✔ Realtime instructions prefer semantic voice feedback over heartbeat (0.08125ms)\n✔ Agent creation Codex tasks carry mandatory research gate metadata (0.371ms)\n✔ Step orchestrator remains policy gated (0.130291ms)\n✔ Planner operator questions leave actionable wait cards that can resume (0.370875ms)\n✔ Realtime Codex handoff waits for explicit full-brief confirmation (0.220667ms)\n✔ Voice UI keeps watching approval-gated tasks and handoffs approval decisions once (0.132166ms)\n✔ Codex outbound prompt guard estimates tokens before App or CLI transport (0.454ms)\n✔ Codex prompt budget is configurable from Pritha settings (0.075125ms)\n✔ Codex outbound prompt guard compacts old session context only over budget (0.198666ms)\n✔ Codex task creation and approval both apply prompt budget guard before writing prompt files (0.3385ms)\n✔ Control Center Codex write flag is read-only unless explicitly enabled (19.250916ms)\n✔ Control Center Realtime runtime gates every effective workspace-write task (0.78975ms)\n✔ Control Center approval decisions create non-duplicating Realtime feedback (0.561792ms)\n✔ Codex task payloads carry a stable thread scope contract (0.41975ms)\n✔ Realtime task creation persists thread scope into request, status, progress and tool output (0.227833ms)\n✔ Codex App stale repair treats planner and step initialization phases as initialized (0.210792ms)\n✔ Codex App reconnect errors stay on App transport until final reconnect attempt (0.07625ms)\n✔ Codex App resolver reuses scoped threads before creating a new task thread (0.109625ms)\n✔ Subject scoped rotation enforces generation changes by turn count and age (0.11575ms)\n✔ Thread routing is configurable through the runtime settings API and UI (0.058917ms)\n✔ control-center health passes when rendered pages reference served JavaScript chunks (99.981042ms)\n✔ control-center health fails when rendered HTML points at a missing chunk (93.131584ms)\n✔ control-center health skips cleanly when the server is not running (61.057875ms)\n✔ rolling summary checkpoint has a fixed compact schema (62.598208ms)\n✔ rolling summary derives latest sections from legacy handoff fields (14.821583ms)\n✔ rolling summary redacts secrets and rejects raw transcript-shaped input (18.591292ms)\n✔ rolling summary keeps a durable single-file handoff without expiry (13.818625ms)\n✔ rolling summary enforces the hard serialized size limit (13.963875ms)\n✔ rolling summary keeps one overwritable and recoverable current checkpoint (11.600917ms)\n✔ rolling summary relevance accepts related tasks and ignores unrelated ones (9.904916ms)\n✔ rolling summary recall context is empty for unrelated follow-up tasks (12.216959ms)\n✔ rolling summary realtime recall context is byte bounded (9.18825ms)\n✔ rolling summary key event debounce rejects token-level noise (7.952833ms)\n✔ Control Center wires rolling summaries to private storage and debounced client updates (1.177833ms)\n✔ Control Center voice settings normalize behavior profile and Pritha voice (27.166583ms)\n✔ Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene (5.147083ms)\n✔ Control Center Realtime runtime uses behavior settings in instructions and selected Pritha voice in session config (0.463458ms)\n✔ env-doctor exposes machine-readable dependency status (487.830792ms)\n✔ env-doctor minimal profile skips install-heavy Python package checks (186.94575ms)\n✔ env-doctor fails with an actionable message when a critical dependency is missing (366.89075ms)\n✔ last30days lock resolves install and engine paths under root (0.867875ms)\n✔ last30days status is pending-install when runtime is present but checkout is absent (645.120625ms)\n✔ sanitized last30days env strips secrets and can disable host tool PATH (0.397459ms)\n✔ parseFrontmatter preserves body and parses nested lists (0.922041ms)\n✔ parseFrontmatterData returns null when frontmatter is absent (0.056625ms)\n✔ yamlList emits project-compatible block lists (0.068042ms)\n✔ github-release-status exposes a machine-readable external release contract (535.59825ms)\n✔ github-release-status strict mode fails while external release proof is incomplete (481.769542ms)\n✔ golden-checks exposes a machine-readable dry-run contract (43.5175ms)\n✔ healthcheck skips launchd plist lint on non-macOS runners (690.438083ms)\n✔ launchd root audit detects loaded stale state after disk plist is fixed (321.07025ms)\n✔ launchd root audit accepts fixed disk and loaded state (410.695458ms)\n✔ launchd reload retries bootstrap after bootout settles (641.16175ms)\n✔ transcribe-media purges temp artifacts and emits neutral status (62.879458ms)\n✔ platform-specific media strings stay inside the removable adapter (41.0675ms)\n✔ memory rebuild preserves usable embeddings instead of clearing the table (0.413042ms)\n✔ embedding generation is non-destructive and patches local Python import compatibility (0.083208ms)\n✔ resolveTechscopeRoot honors TECHSCOPE_ROOT (0.610875ms)\n✔ resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT (13.632792ms)\n✔ resolveSiblingAgentPath places agents beside root by default (0.100917ms)\n✔ resolveSiblingAgentPath supports explicit override (0.050584ms)\n✔ Pritha entrypoint preserves Agents Mother test behavior (921.006042ms)\n✔ legacy Agents Mother wrapper remains compatible and prints a deprecation note (686.272792ms)\n✔ Pritha aliases expose create, publish and lineage surfaces (675.557333ms)\n✔ Control Center realtime config exposes filesystem inspection for harness questions (0.788291ms)\n✔ Control Center /api/realtime/tool routes inspect_pritha_files to the filesystem handler (0.259667ms)\n✔ Voice UI fallback tool list includes filesystem inspection (0.072917ms)\n✔ Voice UI task cards stay stable and avoid duplicate approval placeholders (0.187166ms)\n✔ standalone port 3401 voice experiment is deprecated in favor of Control Center (0.078666ms)\n✔ privacy helpers detect forbidden raw artifacts and incoming provenance (0.878667ms)\n✔ privacy helpers keep official reference URLs outside incoming artifacts (0.322709ms)\n✔ public install docs use bootstrap as the fresh-clone entrypoint (0.629916ms)\n✔ README defines Pritha as a universal trainable child-agent creator (0.139416ms)\n✔ quality-gate exposes a serialized dry-run contract (59.4745ms)\n✔ quality-gate simulated failure returns a clear failing check (40.236041ms)\n✔ quality-gate emits GitHub annotations without breaking JSON output (42.018625ms)\n✔ quality-gate markdown output includes a summary table (34.084375ms)\n✔ quality-gate self-test profile omits heavier Agents Mother inspection (53.303917ms)\n✔ queue-health reports stale queue items without failing (61.1055ms)\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n✔ Agents Mother scaffold output matches the frozen file-list snapshot (149.373583ms)\n✔ scaffold module exposes generated agent files directly (4.474083ms)\n✔ scaffold command blocks draft contracts unless explicitly allowed (229.8315ms)\n✔ scaffold blocks legacy research reports without machine-readable gate fields (58.901709ms)\n✔ scaffold blocks pending external research unless explicitly overridden (149.145416ms)\n✔ scaffold adds realtime voice reference files when voice is selected (1.020083ms)\n✔ scaffold vendors reviewed local skills only when contract selects vendor mode (1.145208ms)\n✔ self-test exposes a dry-run JSON contract without writing baseline (1709.398625ms)\n✔ setup CLI writes private env and idempotent state (75.25875ms)\n✔ setup CLI configures default realtime tools when voice is selected (233.274708ms)\n✔ setup-status reports a missing setup state without failing (34.253958ms)\n✔ setup manifest schema describes the v1 state contract (0.177042ms)\n✔ transliterate maps Cyrillic for ASCII ids (0.612083ms)\n✔ slug can preserve Cyrillic for legacy filenames (0.131834ms)\n✔ slug fallback is explicit (0.048917ms)\n✔ tailscale setup plan is safe when Tailscale is missing (443.723625ms)\n✔ tailscale setup status exposes readiness fields (655.00175ms)\n✔ tailscale setup serve requires explicit --yes (36.259417ms)\n✔ tailscale setup serve configures private Serve and writes setup state (301.541334ms)\n✔ Control Center Next config gets Tailscale dev origins from env (0.19725ms)\n✔ Codex-facing Tailscale operator protocol is documented (32.736417ms)\n✔ setup trigger phrases route to the first-run workflow (0.556875ms)\n✔ operational trigger phrases route to health and Pritha commands (0.595708ms)\n✔ voice-control-kit exposes the FESPA26 reference plan (109.257083ms)\n✔ voice-control-kit copies the reference pack into a child interface folder (46.511125ms)\n✔ Pritha voice-kit alias delegates to the kit command (75.515292ms)\nℹ tests 153\nℹ suites 0\nℹ pass 153\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2679.558458",
         "stderr": ""
       },
       {
@@ -93,7 +93,7 @@
         "command": "node scripts/telegram-bot.mjs poll-once --dry-run",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 26,
+        "durationMs": 27,
         "stdout": "{\n  \"mode\": \"dry-run\",\n  \"root\": \"<TECHSCOPE_ROOT>\",\n  \"allowed_users\": [],\n  \"telegram_intake\": {\n    \"pending\": 0,\n    \"processing\": 0,\n    \"awaiting_codex\": 1,\n    \"complete\": 7,\n    \"done\": 12,\n    \"failed\": 0\n  },\n  \"codex_media_review\": {\n    \"pending\": 1,\n    \"done\": 5\n  }\n}",
         "stderr": ""
       }
@@ -102,15 +102,15 @@
   "embeddings_restore": {
     "ok": true,
     "status": 0,
-    "stdout": "Loading model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\nEmbedding 5380 chunks...\nStored 5380 embeddings in .memory/techscope.sqlite",
-    "stderr": "<USER_HOME>/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020\n  warnings.warn(\n\rBatches:   0%|          | 0/169 [00:00<?, ?it/s]\rBatches:   1%|          | 1/169 [00:00<00:26,  6.23it/s]\rBatches:   2%|▏         | 3/169 [00:00<00:14, 11.59it/s]\rBatches:   3%|▎         | 5/169 [00:00<00:11, 13.97it/s]\rBatches:   4%|▍         | 7/169 [00:00<00:10, 15.34it/s]\rBatches:   5%|▌         | 9/169 [00:00<00:09, 16.22it/s]\rBatches:   7%|▋         | 11/169 [00:00<00:09, 16.87it/s]\rBatches:   8%|▊         | 13/169 [00:00<00:09, 17.24it/s]\rBatches:   9%|▉         | 15/169 [00:00<00:08, 17.59it/s]\rBatches:  10%|█         | 17/169 [00:01<00:08, 17.84it/s]\rBatches:  11%|█         | 19/169 [00:01<00:08, 17.91it/s]\rBatches:  12%|█▏        | 21/169 [00:01<00:08, 18.02it/s]\rBatches:  14%|█▎        | 23/169 [00:01<00:08, 18.11it/s]\rBatches:  15%|█▍        | 25/169 [00:01<00:07, 18.22it/s]\rBatches:  16%|█▌        | 27/169 [00:01<00:07, 18.32it/s]\rBatches:  17%|█▋        | 29/169 [00:01<00:07, 18.38it/s]\rBatches:  18%|█▊        | 31/169 [00:01<00:07, 18.38it/s]\rBatches:  20%|█▉        | 33/169 [00:01<00:07, 18.39it/s]\rBatches:  21%|██        | 35/169 [00:02<00:07, 18.43it/s]\rBatches:  22%|██▏       | 37/169 [00:02<00:07, 18.44it/s]\rBatches:  23%|██▎       | 39/169 [00:02<00:07, 18.48it/s]\rBatches:  24%|██▍       | 41/169 [00:02<00:07, 18.17it/s]\rBatches:  25%|██▌       | 43/169 [00:02<00:06, 18.25it/s]\rBatches:  27%|██▋       | 45/169 [00:02<00:06, 18.36it/s]\rBatches:  28%|██▊       | 47/169 [00:02<00:06, 18.36it/s]\rBatches:  29%|██▉       | 49/169 [00:02<00:06, 18.38it/s]\rBatches:  30%|███       | 51/169 [00:02<00:06, 18.49it/s]\rBatches:  31%|███▏      | 53/169 [00:03<00:06, 18.47it/s]\rBatches:  33%|███▎      | 55/169 [00:03<00:06, 18.45it/s]\rBatches:  34%|███▎      | 57/169 [00:03<00:06, 18.47it/s]\rBatches:  35%|███▍      | 59/169 [00:03<00:06, 17.16it/s]\rBatches:  36%|███▌      | 61/169 [00:03<00:06, 17.51it/s]\rBatches:  37%|███▋      | 63/169 [00:03<00:05, 17.84it/s]\rBatches:  38%|███▊      | 65/169 [00:03<00:05, 18.04it/s]\rBatches:  40%|███▉      | 67/169 [00:03<00:05, 18.25it/s]\rBatches:  41%|████      | 69/169 [00:03<00:05, 18.36it/s]\rBatches:  42%|████▏     | 71/169 [00:04<00:05, 18.49it/s]\rBatches:  43%|████▎     | 73/169 [00:04<00:05, 18.02it/s]\rBatches:  44%|████▍     | 75/169 [00:04<00:05, 18.13it/s]\rBatches:  46%|████▌     | 77/169 [00:04<00:05, 16.04it/s]\rBatches:  47%|████▋     | 79/169 [00:04<00:05, 16.99it/s]\rBatches:  48%|████▊     | 81/169 [00:04<00:05, 16.74it/s]\rBatches:  49%|████▉     | 83/169 [00:04<00:05, 16.01it/s]\rBatches:  50%|█████     | 85/169 [00:04<00:05, 16.30it/s]\rBatches:  51%|█████▏    | 87/169 [00:05<00:05, 15.97it/s]\rBatches:  53%|█████▎    | 89/169 [00:05<00:04, 16.21it/s]\rBatches:  54%|█████▍    | 91/169 [00:05<00:04, 16.58it/s]\rBatches:  55%|█████▌    | 93/169 [00:05<00:04, 16.27it/s]\rBatches:  56%|█████▌    | 95/169 [00:05<00:04, 16.63it/s]\rBatches:  58%|█████▊    | 98/169 [00:05<00:03, 18.21it/s]\rBatches:  59%|█████▉    | 100/169 [00:05<00:03, 18.57it/s]\rBatches:  61%|██████    | 103/169 [00:05<00:03, 19.80it/s]\rBatches:  63%|██████▎   | 107/169 [00:05<00:02, 23.43it/s]\rBatches:  65%|██████▌   | 110/169 [00:06<00:02, 22.66it/s]\rBatches:  67%|██████▋   | 113/169 [00:06<00:02, 23.67it/s]\rBatches:  69%|██████▊   | 116/169 [00:06<00:02, 24.79it/s]\rBatches:  70%|███████   | 119/169 [00:06<00:02, 22.58it/s]\rBatches:  72%|███████▏  | 122/169 [00:06<00:01, 23.80it/s]\rBatches:  74%|███████▍  | 125/169 [00:06<00:01, 24.05it/s]\rBatches:  76%|███████▌  | 128/169 [00:06<00:01, 24.27it/s]\rBatches:  78%|███████▊  | 131/169 [00:06<00:01, 24.15it/s]\rBatches:  79%|███████▉  | 134/169 [00:07<00:01, 22.83it/s]\rBatches:  82%|████████▏ | 138/169 [00:07<00:01, 25.50it/s]\rBatches:  83%|████████▎ | 141/169 [00:07<00:01, 26.45it/s]\rBatches:  85%|████████▌ | 144/169 [00:07<00:00, 26.45it/s]\rBatches:  88%|████████▊ | 149/169 [00:07<00:00, 32.02it/s]\rBatches:  91%|█████████ | 154/169 [00:07<00:00, 34.08it/s]\rBatches:  94%|█████████▍| 159/169 [00:07<00:00, 37.15it/s]\rBatches:  96%|█████████▋| 163/169 [00:07<00:00, 36.88it/s]\rBatches:  99%|█████████▉| 168/169 [00:08<00:00, 37.68it/s]\rBatches: 100%|██████████| 169/169 [00:08<00:00, 20.85it/s]"
+    "stdout": "Loading model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\nEmbedding 5451 chunks...\nStored 5451 embeddings in .memory/techscope.sqlite",
+    "stderr": "<USER_HOME>/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020\n  warnings.warn(\n\rBatches:   0%|          | 0/171 [00:00<?, ?it/s]\rBatches:   1%|          | 1/171 [00:00<00:22,  7.56it/s]\rBatches:   2%|▏         | 3/171 [00:00<00:12, 13.12it/s]\rBatches:   3%|▎         | 5/171 [00:00<00:10, 15.33it/s]\rBatches:   4%|▍         | 7/171 [00:00<00:09, 16.52it/s]\rBatches:   5%|▌         | 9/171 [00:00<00:09, 17.26it/s]\rBatches:   6%|▋         | 11/171 [00:00<00:09, 17.76it/s]\rBatches:   8%|▊         | 13/171 [00:00<00:08, 18.16it/s]\rBatches:   9%|▉         | 15/171 [00:00<00:08, 18.45it/s]\rBatches:  10%|▉         | 17/171 [00:00<00:08, 18.64it/s]\rBatches:  11%|█         | 19/171 [00:01<00:08, 18.80it/s]\rBatches:  12%|█▏        | 21/171 [00:01<00:07, 18.96it/s]\rBatches:  13%|█▎        | 23/171 [00:01<00:07, 19.07it/s]\rBatches:  15%|█▍        | 25/171 [00:01<00:07, 19.08it/s]\rBatches:  16%|█▌        | 27/171 [00:01<00:07, 19.13it/s]\rBatches:  17%|█▋        | 29/171 [00:01<00:07, 19.18it/s]\rBatches:  18%|█▊        | 31/171 [00:01<00:07, 19.24it/s]\rBatches:  19%|█▉        | 33/171 [00:01<00:07, 19.25it/s]\rBatches:  20%|██        | 35/171 [00:01<00:07, 19.21it/s]\rBatches:  22%|██▏       | 37/171 [00:02<00:06, 19.25it/s]\rBatches:  23%|██▎       | 39/171 [00:02<00:06, 19.31it/s]\rBatches:  24%|██▍       | 41/171 [00:02<00:06, 19.30it/s]\rBatches:  25%|██▌       | 43/171 [00:02<00:06, 18.91it/s]\rBatches:  26%|██▋       | 45/171 [00:02<00:06, 18.98it/s]\rBatches:  27%|██▋       | 47/171 [00:02<00:06, 19.04it/s]\rBatches:  29%|██▊       | 49/171 [00:02<00:06, 19.06it/s]\rBatches:  30%|██▉       | 51/171 [00:02<00:06, 19.09it/s]\rBatches:  31%|███       | 53/171 [00:02<00:06, 19.11it/s]\rBatches:  32%|███▏      | 55/171 [00:02<00:06, 18.99it/s]\rBatches:  33%|███▎      | 57/171 [00:03<00:05, 19.02it/s]\rBatches:  35%|███▍      | 59/171 [00:03<00:06, 18.22it/s]\rBatches:  36%|███▌      | 61/171 [00:03<00:06, 17.80it/s]\rBatches:  37%|███▋      | 63/171 [00:03<00:05, 18.28it/s]\rBatches:  38%|███▊      | 65/171 [00:03<00:05, 18.61it/s]\rBatches:  39%|███▉      | 67/171 [00:03<00:05, 18.88it/s]\rBatches:  40%|████      | 69/171 [00:03<00:05, 19.08it/s]\rBatches:  42%|████▏     | 71/171 [00:03<00:05, 19.21it/s]\rBatches:  43%|████▎     | 73/171 [00:03<00:05, 19.38it/s]\rBatches:  44%|████▍     | 75/171 [00:04<00:05, 18.91it/s]\rBatches:  45%|████▌     | 77/171 [00:04<00:05, 18.51it/s]\rBatches:  46%|████▌     | 79/171 [00:04<00:04, 18.72it/s]\rBatches:  48%|████▊     | 82/171 [00:04<00:04, 19.82it/s]\rBatches:  49%|████▉     | 84/171 [00:04<00:04, 19.11it/s]\rBatches:  50%|█████     | 86/171 [00:04<00:04, 18.80it/s]\rBatches:  51%|█████▏    | 88/171 [00:04<00:04, 18.42it/s]\rBatches:  53%|█████▎    | 90/171 [00:04<00:04, 17.80it/s]\rBatches:  54%|█████▍    | 92/171 [00:04<00:04, 17.90it/s]\rBatches:  55%|█████▍    | 94/171 [00:05<00:04, 17.76it/s]\rBatches:  57%|█████▋    | 97/171 [00:05<00:03, 20.34it/s]\rBatches:  58%|█████▊    | 100/171 [00:05<00:03, 20.97it/s]\rBatches:  60%|██████    | 103/171 [00:05<00:03, 22.04it/s]\rBatches:  62%|██████▏   | 106/171 [00:05<00:02, 23.75it/s]\rBatches:  64%|██████▍   | 110/171 [00:05<00:02, 25.59it/s]\rBatches:  67%|██████▋   | 114/171 [00:05<00:02, 26.49it/s]\rBatches:  69%|██████▉   | 118/171 [00:05<00:01, 28.09it/s]\rBatches:  71%|███████   | 121/171 [00:06<00:01, 27.96it/s]\rBatches:  73%|███████▎  | 125/171 [00:06<00:01, 27.05it/s]\rBatches:  75%|███████▍  | 128/171 [00:06<00:01, 27.16it/s]\rBatches:  77%|███████▋  | 132/171 [00:06<00:01, 28.29it/s]\rBatches:  80%|███████▉  | 136/171 [00:06<00:01, 29.85it/s]\rBatches:  82%|████████▏ | 140/171 [00:06<00:01, 30.85it/s]\rBatches:  84%|████████▍ | 144/171 [00:06<00:00, 32.43it/s]\rBatches:  87%|████████▋ | 148/171 [00:06<00:00, 33.94it/s]\rBatches:  89%|████████▉ | 153/171 [00:07<00:00, 36.47it/s]\rBatches:  92%|█████████▏| 158/171 [00:07<00:00, 38.59it/s]\rBatches:  95%|█████████▌| 163/171 [00:07<00:00, 40.45it/s]\rBatches:  98%|█████████▊| 168/171 [00:07<00:00, 42.78it/s]\rBatches: 100%|██████████| 171/171 [00:07<00:00, 23.02it/s]"
   },
   "queue_health": {
     "schema": "techscope-queue-health-v1",
     "root": "<TECHSCOPE_ROOT>",
     "status": "pass",
     "stale_days_threshold": 7,
-    "created_at": "2026-06-24T10:20:29.634Z",
+    "created_at": "2026-06-24T22:43:20.371Z",
     "queues": [
       {
         "id": "telegram-intake",
@@ -139,7 +139,7 @@
         "path": ".queue/telegram-intake/awaiting_codex/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
         "updated_at": "2026-05-19T18:32:04.876Z",
         "created_at": "2026-05-19T18:31:50.241Z",
-        "age_days": 35.66
+        "age_days": 36.17
       },
       {
         "queue": "codex-media-review",
@@ -148,7 +148,7 @@
         "path": ".queue/codex-media-review/pending/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
         "updated_at": "2026-05-19T18:32:04.876Z",
         "created_at": "2026-05-19T18:32:04.876Z",
-        "age_days": 35.66
+        "age_days": 36.17
       }
     ],
     "failed": []
@@ -208,7 +208,7 @@
   "control_center_health": {
     "schema": "pritha-control-center-health-v1",
     "baseUrl": "http://127.0.0.1:3420",
-    "created_at": "2026-06-24T10:20:30.869Z",
+    "created_at": "2026-06-24T22:43:21.578Z",
     "strict": false,
     "status": "pass",
     "checks": [
@@ -232,9 +232,9 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3l5ywae2sz60u.js",
+          "/_next/static/chunks/0xqalapat-u66.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/1h7iyq044h5af.js",
+          "/_next/static/chunks/0n4v_od3sh10d.js",
           "/_next/static/chunks/253pciu9fe727.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
@@ -255,7 +255,7 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3l5ywae2sz60u.js",
+          "/_next/static/chunks/0xqalapat-u66.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
           "/_next/static/chunks/04ae1e1yva2ln.js",
           "/_next/static/chunks/253pciu9fe727.js",
@@ -279,7 +279,7 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3l5ywae2sz60u.js",
+          "/_next/static/chunks/0xqalapat-u66.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
           "/_next/static/chunks/13d8c7x4o0ecj.js",
           "/_next/static/chunks/1uberzkdsyejy.js",
@@ -330,11 +330,11 @@
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/3l5ywae2sz60u.js",
+        "id": "chunk:/_next/static/chunks/0xqalapat-u66.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/3l5ywae2sz60u.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3l5ywae2sz60u.js",
+        "path": "/_next/static/chunks/0xqalapat-u66.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0xqalapat-u66.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
@@ -350,11 +350,11 @@
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/1h7iyq044h5af.js",
+        "id": "chunk:/_next/static/chunks/0n4v_od3sh10d.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/1h7iyq044h5af.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/1h7iyq044h5af.js",
+        "path": "/_next/static/chunks/0n4v_od3sh10d.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0n4v_od3sh10d.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
@@ -441,9 +441,9 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3l5ywae2sz60u.js",
+          "/_next/static/chunks/0xqalapat-u66.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/1h7iyq044h5af.js",
+          "/_next/static/chunks/0n4v_od3sh10d.js",
           "/_next/static/chunks/253pciu9fe727.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
@@ -461,7 +461,7 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3l5ywae2sz60u.js",
+          "/_next/static/chunks/0xqalapat-u66.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
           "/_next/static/chunks/04ae1e1yva2ln.js",
           "/_next/static/chunks/253pciu9fe727.js",
@@ -482,7 +482,7 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3l5ywae2sz60u.js",
+          "/_next/static/chunks/0xqalapat-u66.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
           "/_next/static/chunks/13d8c7x4o0ecj.js",
           "/_next/static/chunks/1uberzkdsyejy.js",
@@ -527,8 +527,8 @@
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/3l5ywae2sz60u.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3l5ywae2sz60u.js",
+        "path": "/_next/static/chunks/0xqalapat-u66.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0xqalapat-u66.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
@@ -543,8 +543,8 @@
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/1h7iyq044h5af.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/1h7iyq044h5af.js",
+        "path": "/_next/static/chunks/0n4v_od3sh10d.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/0n4v_od3sh10d.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
@@ -609,11 +609,5 @@
     ]
   },
   "warnings": [],
-  "regressions": [
-    {
-      "id": "quality-gate",
-      "severity": "critical",
-      "message": "self-test quality-gate profile failed"
-    }
-  ]
+  "regressions": []
 }

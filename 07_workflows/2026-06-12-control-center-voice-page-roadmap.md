@@ -3,7 +3,7 @@ id: 2026-06-12-control-center-voice-page-roadmap
 type: workflow
 status: active
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-24
 topics:
   - pritha-control-center
   - realtime-voice
@@ -11,6 +11,8 @@ topics:
   - codex-sidecar
   - session-recall
   - curated-memory
+  - file-intake
+  - document-processing
 tools:
   - Next.js
   - React
@@ -19,8 +21,10 @@ tools:
   - WebRTC
   - Codex
   - SQLite
+  - Document Processor
 sources:
   - current-codex-thread:2026-06-12-voice-control-roadmap-review
+  - current-codex-thread:2026-06-24-voice-control-task-queue-and-file-intake
   - interfaces/control-center/src/components/voice/VoiceControlPage.tsx
   - interfaces/control-center/src/components/voice/usePrithaRealtime.ts
   - interfaces/control-center/src/components/voice/PrithaStarScene.tsx
@@ -128,15 +132,21 @@ UI behavior, safety and operations.
   retention exists, it does not need a prominent operator UI.
 - The main task list should show active and completed Codex tasks from the
   current session, capped at five visible tasks.
+- The Codex task list should stay in creation order, not last-activity order.
+  Progress polling, completion and refresh must update a task in place rather
+  than moving its card.
 - For each Codex task, the UI should show `task_id`, status, progress, result
   excerpt and elapsed time.
 - The voice interface should support up to five parallel Codex tasks before
   stronger queue controls are needed.
 - Context focus is needed, but sticky context must be explained and made
   inspectable. Reset action name: `Reset Voice Context`.
-- Keep the disabled `Decision Gate` as a visible future placeholder.
-- Real approval gates are required for deletion and service install. Voice
-  confirmation is enough for these gates.
+- Standalone disabled approval placeholders should not appear in the operator
+  UI. Codex task approval belongs directly on the relevant Codex task card.
+- Real approval gates are required for deletion, service install, deployment,
+  publication and credential writes. Voice confirmation alone is not enough for
+  these gates unless the approved action is represented by a concrete task card
+  or future backend decision object.
 - Keep one stop control: `Stop Listening`. Keep mute and add real microphone
   sensitivity/gain control.
 - Quick actions and visible transcript create noise on the main surface. Move
@@ -182,9 +192,12 @@ Desktop elements currently visible after the first V.12/V.13/V.14 slice:
   visualization, Three.js Pritha star scene with fallback drawing, timer,
   subtitle, mute, primary start/stop button and microphone sensitivity control.
 - Paste Command panel for links, file notes, long commands and external context
-  during an active realtime session.
+  during an active realtime session. It is text-only in the current
+  implementation.
 - Codex Tasks card: compact list of up to five current-session Codex sidecar
-  tasks with status, progress, elapsed time, result excerpt and handoff state.
+  tasks in creation order with status, progress, elapsed time, result excerpt,
+  handoff state and Details/Refresh actions. Approval actions appear on a task
+  row only when that task requires approval.
 - Current Session card: private browser session journal count, task event count,
   latest event and optional recap handoff to Pritha during an active session.
 - Connection card: realtime key/session readiness, Codex readiness, remote audio
@@ -192,8 +205,6 @@ Desktop elements currently visible after the first V.12/V.13/V.14 slice:
 - Voice Context card: Sticky Context is default-on, shows auto session context
   state, active tool chips are labelled by tooltip, and `Reset Voice Context`
   sends a reset message into the active realtime conversation.
-- Decision Gate card: disabled future placeholder for deletion/service-install
-  approvals.
 
 Mobile elements currently visible:
 
@@ -205,7 +216,6 @@ Mobile elements currently visible:
 - Codex Tasks card.
 - Current Session card.
 - Voice Context card.
-- Decision Gate card.
 
 The main transcript and quick actions are no longer visible in the operator
 surface. Realtime dialogue still feeds the bounded current-session journal and
@@ -231,9 +241,10 @@ state:
   user, assistant, tool, task and system events while the React session is
   alive.
 - `POST /api/realtime/tool` executes the narrow realtime tools:
-  `search_pritha_memory` and `run_codex_task`.
-- `search_pritha_memory` can read memory status, recent/open documents, search
-  via SQLite FTS or Markdown fallback, and read curated artifacts.
+  `full_pritha_memory` and `run_codex_task`.
+- `full_pritha_memory` can read memory status, recent/open documents, read
+  curated artifacts and run full memory search via indexed text or Markdown
+  fallback plus semantic/entity retrieval when available.
 - `run_codex_task` writes private task request/status/prompt/result files and
   starts Codex exec when available, with queue fallback.
 - `GET /api/realtime/codex-task/:id` reads task status and result excerpts.
@@ -254,11 +265,12 @@ binding:
 - There is no selectable memory/context focus yet.
 - Selectable context focus is still missing. Sticky Context currently sends a
   compact automatic session/task recap, not a user-selected artifact focus.
-- Decision Gate has no backend state for pending approvals.
 - Task recovery exists from recent private Codex task metadata, but filtering,
   search and archived/completed grouping are not implemented yet.
 - Mobile and desktop now have typed/paste command input, but only during an
   active realtime session.
+- Paste Command cannot yet accept clipboard screenshots, dropped files,
+  attached PDFs or other binary/document inputs.
 - There is a browser session id and `sessionStorage` journal, but no server-side
   `.private/.../sessions/` read model yet.
 - Current-session search/recap exists. Pinned details are still deferred.
@@ -282,8 +294,9 @@ Remove, merge or rename these until they are truthful:
 - `AppShell` now renders page children once. `/voice` also renders either the
   desktop or mobile branch by media query, so hidden duplicate voice controls no
   longer create extra WebGL contexts.
-- Decision Gate should be hidden or collapsed until backend approval state
-  exists, unless its visible placeholder continues to help roadmap orientation.
+- The standalone Decision Gate card has been removed. Future cross-task
+  approvals should return only with real backend state and clear routing to the
+  action being approved.
 - Static `Pritha Ready` mobile chip should become data-driven or disappear.
 - Tool chips have tooltips, but still need a details menu for debugging.
 - Header status strip and Connection card should have distinct jobs: header =
@@ -319,6 +332,10 @@ Remove, merge or rename these until they are truthful:
   Remaining hardening: selectable artifact/task focus, context inspection,
   per-agent defaults and a clearer reset/history model.
 - V.17 is not started: Decision Gate has no backend approval state.
+- 2026-06-24 UI cleanup: Codex task cards keep stable creation order across
+  polling/readback updates; the non-functional `Brief` action was removed; the
+  standalone `Decision Gate` placeholder was removed because approval is handled
+  on concrete Codex task cards.
 - V.18 is partially implemented: private telemetry routes, connection card
   signals, task handoff state and task detail drawer exist. Cross-page floating
   task dock was removed after mobile/Child Agents QA because it obscured the
@@ -422,7 +439,8 @@ Deliverables:
 - Keep a single end-session control: `Stop Listening`.
 - Keep mute and add microphone sensitivity/gain control.
 - Hide Current Context `Clear` while memory focus is fixed.
-- Keep Decision Gate disabled as a future placeholder.
+- Remove disabled approval placeholders from the main surface; show approval
+  only when attached to a concrete task/action.
 - Remove quick actions from the main voice UI.
 - Add labels/tooltips to active tool chips.
 - Do not add mobile transcript to the main screen yet.
@@ -443,6 +461,8 @@ Deliverables:
 - Change hook state from one `activeTask` to an `activeTasks` map/list.
 - Render active and recently completed task rows with title, status, progress,
   result availability and handoff state.
+- Keep task rows in stable creation order; polling and refresh update rows in
+  place rather than sorting by latest activity.
 - Add task detail drawer with request, status, result excerpt and safe relative
   paths.
 - Show telemetry-derived state: polling started, terminal snapshot, handoff
@@ -541,14 +561,15 @@ Acceptance criteria:
 
 ## V.17: Decision Gates
 
-Goal: connect approval UI to real pending decisions.
+Goal: connect approval UI to real pending decisions without bringing back a
+decorative standalone approval card.
 
 Deliverables:
 
 - Define decision types: memory write, file edit, Codex implementation,
   deployment/service change, publication, deletion and broad system change.
 - Add backend state for pending decision, evidence, proposed action, risk and
-  expiry.
+  expiry if a future action is not already represented by a Codex task card.
 - Require explicit approval for durable writes and system changes.
 - Log decisions to private telemetry and, when appropriate, curated reports.
 
@@ -556,6 +577,39 @@ Acceptance criteria:
 
 - Approve/Decline appears only when a concrete pending action exists.
 - The voice model cannot treat a decorative approval card as real permission.
+
+## V.20: Paste/File Intake And Document Processing Strategy
+
+Status: draft project, not implemented in the current UI cleanup.
+
+Goal: let the operator paste or drop screenshots, images, PDFs and other files
+into the Voice Control intake without confusing raw command text with files that
+require preprocessing.
+
+Draft direction:
+
+- Split typed text commands from binary/document attachments at intake time.
+- If the input contains files, create a Codex processing task with a compact
+  operator instruction and safe references to staged local files.
+- Let Codex run the document/file processing path and return a bounded summary
+  or extracted context to Pritha Voice Control, so the live session can continue
+  from processed content rather than raw file bytes.
+- Evaluate the GitHub Document Processor project as a candidate execution
+  dependency before implementing. Verify repository freshness, supported file
+  types, limits, installation shape, privacy posture and failure modes first.
+- Define limits before code: max file count, max bytes per file, supported MIME
+  types, image/PDF page limits, timeout, retry behavior, quarantine/staging
+  directory, cleanup policy and explicit approval gates for expensive or unsafe
+  processing.
+
+Open questions:
+
+- Whether Document Processor should be vendored, invoked as a sibling checkout,
+  installed as a package, or called through a small adapter script.
+- Whether processing results should be ephemeral Voice Context, private
+  session state, or curated memory candidates.
+- How to route screenshots from clipboard versus files from drag/drop or file
+  picker on mobile Safari and desktop browsers.
 
 ## V.18: Observability And Recovery
 

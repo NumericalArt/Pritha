@@ -173,7 +173,7 @@ function ToolIcon({ tool }: { tool: string }) {
 function activeToolNames(status: PrithaRealtimeStatus | null) {
   return status?.tools?.length
     ? status.tools
-    : ["search_pritha_memory", "deep_pritha_memory", "inspect_pritha_files", "inspect_codex_task", "recall_rolling_summary", "answer_codex_task", "run_codex_task"];
+    : ["full_pritha_memory", "inspect_pritha_files", "inspect_codex_task", "recall_rolling_summary", "answer_codex_task", "run_codex_task"];
 }
 
 function ContextCard({
@@ -255,7 +255,6 @@ function TaskListCard({
   toolStatus,
   onOpenTask,
   onRefreshTask,
-  onBriefTask,
   onApproveTask,
   onRejectTask,
 }: {
@@ -263,7 +262,6 @@ function TaskListCard({
   toolStatus: string;
   onOpenTask: (taskId: string) => void;
   onRefreshTask: (taskId: string) => void;
-  onBriefTask: (taskId: string) => void;
   onApproveTask: (taskId: string) => void;
   onRejectTask: (taskId: string) => void;
 }) {
@@ -319,9 +317,6 @@ function TaskListCard({
                 </button>
                 <button className="secondary-button compact" type="button" onClick={() => onRefreshTask(task.id)}>
                   Refresh
-                </button>
-                <button className="outline-button compact" type="button" onClick={() => onBriefTask(task.id)}>
-                  Brief
                 </button>
                 {taskNeedsApproval(task) ? (
                   <>
@@ -702,51 +697,6 @@ function MicInputLevelControl({
   );
 }
 
-function DecisionCard({
-  task,
-  onApproveTask,
-  onRejectTask,
-  onOpenTask,
-}: {
-  task?: CodexTaskState;
-  onApproveTask: (taskId: string) => void;
-  onRejectTask: (taskId: string) => void;
-  onOpenTask: (taskId: string) => void;
-}) {
-  const pending = task && taskNeedsApproval(task);
-  return (
-    <section className="side-card decision-card">
-      <div className="card-title-row">
-        <h2>Decision Gate</h2>
-        <span className={`inline-status ${pending ? "orange" : ""}`}>{pending ? "Waiting" : "Idle"}</span>
-      </div>
-      {pending ? (
-        <div className="decision-summary">
-          <strong>{task.approval?.action_type || "Codex approval required"}</strong>
-          <p>{task.approval?.summary || task.summary}</p>
-          {task.approval?.reasons?.length ? <small>{task.approval.reasons.join(", ")}</small> : null}
-        </div>
-      ) : (
-        <p>No pending decision.</p>
-      )}
-      <div className="decision-buttons">
-        <button className="decline-button" type="button" disabled={!pending} onClick={() => task ? onRejectTask(task.id) : undefined}>
-          <X size={18} />
-          Decline
-        </button>
-        <button className="approve-button" type="button" disabled={!pending} onClick={() => task ? onApproveTask(task.id) : undefined}>
-          <Check size={18} />
-          Approve
-        </button>
-      </div>
-      <button className="rail-link-button" type="button" disabled={!task} onClick={() => task ? onOpenTask(task.id) : undefined}>
-        View Details
-        <span>⌄</span>
-      </button>
-    </section>
-  );
-}
-
 function ConnectionCard({
   status,
   phase,
@@ -930,7 +880,6 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [sessionRecallOpen, setSessionRecallOpen] = useState(false);
   const isActive = phaseIsActive(realtime.phase);
-  const pendingDecisionTask = realtime.codexTasks.find((task) => taskNeedsApproval(task));
   const primaryAction = useMemo(
     () => () => {
       if (isActive) realtime.stop();
@@ -963,11 +912,6 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
   async function refreshVisibleTask(taskId: string) {
     const snapshot = await realtime.refreshCodexTask(taskId).catch(() => null);
     if (taskDetail?.task_id === taskId || snapshot?.task_id === taskDetail?.task_id) await openTaskDetails(taskId);
-  }
-
-  async function briefVisibleTask(taskId: string) {
-    await realtime.refreshCodexTask(taskId).catch(() => null);
-    realtime.sendStickyContext(`codex_task_brief:${taskId}`);
   }
 
   async function decideCodexTask(taskId: string, action: "approve" | "reject") {
@@ -1009,7 +953,6 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           toolStatus={realtime.toolStatus}
           onOpenTask={openTaskDetails}
           onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
-          onBriefTask={(taskId) => void briefVisibleTask(taskId)}
           onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
           onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
         />
@@ -1027,12 +970,6 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           sessionEventCount={realtime.sessionEvents.length}
           onResetVoiceContext={realtime.resetVoiceContext}
           mobile
-        />
-        <DecisionCard
-          task={pendingDecisionTask}
-          onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
-          onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
-          onOpenTask={openTaskDetails}
         />
       </div>
       <div className="voice-desktop-content">
@@ -1059,7 +996,6 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               toolStatus={realtime.toolStatus}
               onOpenTask={openTaskDetails}
               onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
-              onBriefTask={(taskId) => void briefVisibleTask(taskId)}
               onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
               onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
             />
@@ -1086,12 +1022,6 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               stickyContextEnabled={realtime.stickyContextEnabled}
               sessionEventCount={realtime.sessionEvents.length}
               onResetVoiceContext={realtime.resetVoiceContext}
-            />
-            <DecisionCard
-              task={pendingDecisionTask}
-              onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
-              onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
-              onOpenTask={openTaskDetails}
             />
           </aside>
         </div>
