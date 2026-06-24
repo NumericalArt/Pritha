@@ -1,6 +1,22 @@
 # Pritha Voice Control Experiment
 
-Status: experimental.
+Status: deprecated.
+
+The standalone browser voice interface on port `3401` is retired. Use the
+Pritha Control Center voice runtime instead:
+
+```sh
+npm run control-center
+```
+
+Open:
+
+```text
+http://127.0.0.1:3420/voice
+```
+
+This directory is retained only as historical implementation evidence until a
+separate archival cleanup removes it.
 
 This is a local browser voice interface for talking with Pritha. It uses the
 OpenAI Realtime API through WebRTC and exposes only narrow server tools:
@@ -15,11 +31,13 @@ Codex. It does not receive direct filesystem, shell, deployment or web browsing
 power. Internet research is routed through Codex task handoff with
 `requires_internet=true`.
 
-## Run
+## Legacy Run
 
 ```sh
 OPENAI_API_KEY=... node scripts/pritha-voice-control.mjs
 ```
+
+This command now exits with a deprecation notice.
 
 Open:
 

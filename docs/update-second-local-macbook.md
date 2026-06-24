@@ -11,8 +11,8 @@ state and private configuration.
   sibling child-agent folders between machines.
 - Keep sibling child agents next to Pritha, outside the Pritha checkout, unless
   a specific agent has its own explicit update procedure.
-- Use the same branch that was tested on the primary machine unless a release
-  merge has already moved the work to `main`.
+- Use `main` as the update target after the tested Pritha state has been
+  fast-forwarded and pushed there.
 
 ## Before Pulling
 
@@ -36,12 +36,20 @@ If Control Center is running locally, stop it before installing or rebuilding.
 
 ## Update
 
-Fetch the current GitHub state and switch to the tested branch:
+Fetch the current GitHub state and switch to `main`:
 
 ```sh
 git fetch origin
-git switch codex/voice-transport-context-hardening
-git pull --ff-only origin codex/voice-transport-context-hardening
+git switch main
+git pull --ff-only origin main
+```
+
+If `git pull --ff-only` refuses because the second MacBook has local commits,
+stop and inspect those commits before merging or rebasing:
+
+```sh
+git log --oneline --decorate --graph --max-count=20 --all
+git status --short --branch
 ```
 
 Install Control Center dependencies if `interfaces/control-center/package-lock.json`
@@ -80,7 +88,7 @@ Check the local server:
 
 ```sh
 curl -fsS http://127.0.0.1:3420/api/health
-curl -fsS http://127.0.0.1:3420/api/realtime/session
+curl -fsS -X POST http://127.0.0.1:3420/api/realtime/session
 ```
 
 If the second MacBook uses Tailscale, verify its own local Tailscale status.
@@ -90,3 +98,6 @@ machine into tracked files.
 Rolling summary handoff is local to each machine. The file
 `.private/interface-lab/pritha-control-center/realtime/rolling-summary/current.json`
 is intentionally private and should not be synced through Git.
+
+The old standalone voice experiment on port `3401` is deprecated. The supported
+voice entry point is Control Center `/voice` on port `3420`.

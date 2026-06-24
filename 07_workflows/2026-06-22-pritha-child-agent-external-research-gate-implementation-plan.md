@@ -146,7 +146,8 @@ Observed local runtime:
 - `node` exists and is current enough for Pritha local scripts.
 - `sqlite3` exists.
 - Host `python3` is 3.9.6.
-- `python3.12`, `python3.13`, `uv`, `go` and `yt-dlp` were not found.
+- `python3.12`, `python3.13`, `uv`, `go` and the optional
+  platform-specific media downloader binary were not found.
 - Therefore `last30days-skill` cannot run on this host until an optional Python
   3.12+ runtime is installed or configured.
 

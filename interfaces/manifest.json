@@ -23,10 +23,12 @@
     },
     {
       "name": "pritha-voice-control",
-      "mode": "experimental-realtime-voice-ui",
-      "status": "experimental",
+      "mode": "deprecated-standalone-realtime-voice-ui",
+      "status": "deprecated",
       "script": "scripts/pritha-voice-control.mjs",
-      "url": "http://127.0.0.1:3401"
+      "url": "http://127.0.0.1:3401",
+      "replaced_by": "pritha-control-center",
+      "replacement_url": "http://127.0.0.1:3420/voice"
     },
     {
       "name": "pritha-control-center",

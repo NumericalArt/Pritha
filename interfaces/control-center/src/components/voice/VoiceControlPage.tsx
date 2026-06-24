@@ -171,7 +171,9 @@ function ToolIcon({ tool }: { tool: string }) {
 }
 
 function activeToolNames(status: PrithaRealtimeStatus | null) {
-  return status?.tools?.length ? status.tools : ["search_pritha_memory", "deep_pritha_memory", "inspect_codex_task", "answer_codex_task", "run_codex_task"];
+  return status?.tools?.length
+    ? status.tools
+    : ["search_pritha_memory", "deep_pritha_memory", "inspect_pritha_files", "inspect_codex_task", "recall_rolling_summary", "answer_codex_task", "run_codex_task"];
 }
 
 function ContextCard({

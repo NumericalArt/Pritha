@@ -1,73 +1,41 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import {
-  buildRealtimeSessionConfig,
-  handleVoiceTool,
-  realtimeTools,
-} from "../interfaces/experiments/pritha-voice-control/server.mjs";
+const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
+const toolRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/tool/route.ts", "utf8");
+const voicePageSource = readFileSync("interfaces/control-center/src/components/voice/VoiceControlPage.tsx", "utf8");
+const legacyScriptSource = readFileSync("scripts/pritha-voice-control.mjs", "utf8");
+const interfacesManifest = JSON.parse(readFileSync("interfaces/manifest.json", "utf8"));
+const legacyExperimentManifest = JSON.parse(readFileSync("interfaces/experiments/pritha-voice-control/manifest.json", "utf8"));
 
-test("Pritha voice realtime config exposes narrow tools", () => {
-  const config = buildRealtimeSessionConfig();
-  assert.equal(config.type, "realtime");
-  assert.ok(config.model);
-  assert.equal(config.tool_choice, "auto");
-  const toolNames = config.tools.map((tool) => tool.name);
-  assert.deepEqual(toolNames, [
-    "get_pritha_status",
-    "search_pritha_memory",
-    "read_pritha_artifact",
-    "queue_codex_task",
-  ]);
-  assert.equal(realtimeTools().length, 4);
+test("Control Center realtime config exposes filesystem inspection for harness questions", () => {
+  assert.match(runtimeSource, /name:\s*"inspect_pritha_files"/);
+  assert.match(runtimeSource, /enum:\s*\["status", "list_projects", "tree", "file_info", "read_file", "search"\]/);
+  assert.match(runtimeSource, /Use inspect_pritha_files for fast read-only filesystem and harness work/);
+  assert.match(runtimeSource, /Prefer it over memory tools whenever the operator asks what files exist/);
+  assert.match(runtimeSource, /Use search_pritha_memory for fast, shallow lookup before answering questions about curated Pritha memory/);
 });
 
-test("Pritha voice memory search works through FTS", async () => {
-  const result = await handleVoiceTool("search_pritha_memory", {
-    query: "agent interface",
-    search_mode: "fts",
-    limit: 3,
-  });
-  assert.equal(result.ok, true);
-  assert.ok(Array.isArray(result.fts));
-  assert.ok(result.fts.length > 0);
-  assert.deepEqual(result.semantic, { ok: true, text: "" });
+test("Control Center /api/realtime/tool routes inspect_pritha_files to the filesystem handler", () => {
+  assert.match(toolRouteSource, /handlePrithaRealtimeTool\(name, payload\.arguments \|\| \{\}\)/);
+  assert.match(runtimeSource, /if \(name === "inspect_pritha_files"\) \{\s*output = await handlePrithaFiles\(args\);/s);
+  assert.match(runtimeSource, /async function handlePrithaFiles\(args: PrithaFilesArgs = \{\}\)/);
+  assert.match(runtimeSource, /if \(operation === "read_file"\) return readFilesystemFile\(args\);/);
+  assert.match(runtimeSource, /if \(operation === "search"\) return searchFilesystem\(args\);/);
 });
 
-test("Pritha voice can read a curated artifact by id", async () => {
-  const result = await handleVoiceTool("read_pritha_artifact", {
-    id_or_path: "agent-interface-experience",
-    max_chars: 4000,
-  });
-  assert.equal(result.ok, true);
-  assert.equal(result.document.id, "agent-interface-experience");
-  assert.match(result.markdown, /Agent Interface Experience/);
+test("Voice UI fallback tool list includes filesystem inspection", () => {
+  assert.match(voicePageSource, /"inspect_pritha_files"/);
+  assert.match(voicePageSource, /"recall_rolling_summary"/);
 });
 
-test("Pritha voice Codex handoff writes only ignored private state by default", async () => {
-  const tmp = mkdtempSync(path.join(os.tmpdir(), "pritha-voice-test-"));
-  const previousRoot = process.env.TECHSCOPE_VOICE_PRIVATE_ROOT;
-  const previousMode = process.env.TECHSCOPE_VOICE_CODEX_MODE;
-  process.env.TECHSCOPE_VOICE_PRIVATE_ROOT = tmp;
-  process.env.TECHSCOPE_VOICE_CODEX_MODE = "queue";
-  try {
-    const result = await handleVoiceTool("queue_codex_task", {
-      task: "Summarize the current Pritha voice experiment.",
-      task_type: "analysis",
-      requires_internet: false,
-    });
-    assert.equal(result.ok, true);
-    assert.equal(result.mode, "queue");
-    assert.ok(result.request_path.startsWith(tmp));
-    assert.match(result.operator_note, /private local queue/i);
-  } finally {
-    if (previousRoot === undefined) delete process.env.TECHSCOPE_VOICE_PRIVATE_ROOT;
-    else process.env.TECHSCOPE_VOICE_PRIVATE_ROOT = previousRoot;
-    if (previousMode === undefined) delete process.env.TECHSCOPE_VOICE_CODEX_MODE;
-    else process.env.TECHSCOPE_VOICE_CODEX_MODE = previousMode;
-    rmSync(tmp, { recursive: true, force: true });
-  }
+test("standalone port 3401 voice experiment is deprecated in favor of Control Center", () => {
+  const adapter = interfacesManifest.adapters.find((item) => item.name === "pritha-voice-control");
+  assert.equal(adapter.status, "deprecated");
+  assert.equal(adapter.replaced_by, "pritha-control-center");
+  assert.equal(adapter.replacement_url, "http://127.0.0.1:3420/voice");
+  assert.equal(legacyExperimentManifest.status, "deprecated");
+  assert.match(legacyScriptSource, /standalone Pritha Voice Control experiment on port 3401 has been retired/);
+  assert.match(legacyScriptSource, /http:\/\/127\.0\.0\.1:3420\/voice/);
 });

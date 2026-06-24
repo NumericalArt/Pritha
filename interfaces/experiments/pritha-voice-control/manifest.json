@@ -1,16 +1,17 @@
 {
   "id": "pritha-voice-control-experiment-v1",
   "type": "interface-experiment",
-  "status": "experimental",
+  "status": "deprecated",
   "created": "2026-06-02",
   "updated": "2026-06-02",
   "owner": "Pritha",
-  "purpose": "Browser voice interface for talking with Pritha through OpenAI Realtime while exposing narrow memory and Codex handoff tools.",
+  "purpose": "Deprecated standalone browser voice interface retained as historical implementation evidence. Use Pritha Control Center /voice for current Realtime voice control.",
   "runtime": {
     "server": "node",
     "entrypoint": "scripts/pritha-voice-control.mjs",
     "default_host": "127.0.0.1",
-    "default_port": 3401
+    "default_port": 3401,
+    "replacement": "interfaces/control-center / http://127.0.0.1:3420/voice"
   },
   "realtime": {
     "transport": "WebRTC",
