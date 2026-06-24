@@ -19,6 +19,7 @@ import { PrithaStarScene } from "./PrithaStarScene";
 import {
   usePrithaRealtime,
   type CodexTaskState,
+  type CodexTaskThreadScope,
   type CodexTaskVoiceFeedback,
   type MicGainRuntimeState,
   type PrithaRealtimeStatus,
@@ -50,6 +51,8 @@ type CodexTaskDetail = {
   stdout_excerpt?: string;
   stderr_excerpt?: string;
   progress_timeline?: Array<Record<string, unknown>>;
+  thread_scope?: CodexTaskThreadScope | null;
+  codex_app_thread_routing_mode?: string;
   paths?: Record<string, string>;
   error?: string;
 };
@@ -135,6 +138,12 @@ function taskIsTerminal(task: CodexTaskState) {
   return task.status === "complete" || task.status === "rejected" || task.status.startsWith("failed");
 }
 
+function formatThreadScope(scope?: CodexTaskThreadScope | null) {
+  if (!scope?.kind || !scope.id) return "thread: pending";
+  const generation = Number(scope.generation || 1);
+  return `thread: ${scope.kind}:${scope.id}${generation > 1 ? ` g${generation}` : ""}`;
+}
+
 function VoiceWave({ mobile = false }: { mobile?: boolean }) {
   return (
     <svg className={mobile ? "mobile-voice-wave" : "voice-wave"} viewBox="0 0 900 180" aria-hidden="true">
@@ -162,7 +171,7 @@ function ToolIcon({ tool }: { tool: string }) {
 }
 
 function activeToolNames(status: PrithaRealtimeStatus | null) {
-  return status?.tools?.length ? status.tools : ["search_pritha_memory", "deep_pritha_memory", "run_codex_task"];
+  return status?.tools?.length ? status.tools : ["search_pritha_memory", "deep_pritha_memory", "inspect_codex_task", "answer_codex_task", "run_codex_task"];
 }
 
 function ContextCard({
@@ -286,6 +295,8 @@ function TaskListCard({
               ) : null}
               <div className="task-phase-row">
                 <span>{task.phase ? `phase: ${task.phase}` : "phase: unknown"}</span>
+                <span>{formatThreadScope(task.threadScope)}</span>
+                {task.threadRoutingMode ? <span>{`routing: ${task.threadRoutingMode}`}</span> : null}
                 {task.stale ? <strong>possibly stale</strong> : null}
               </div>
               {task.lastActivity ? <div className="task-row-note neutral">Last activity: {task.lastActivity}</div> : null}
@@ -379,6 +390,10 @@ function TaskDetailDrawer({
               <strong>{detail.complete ? "yes" : "no"}</strong>
               <span>Result</span>
               <strong>{detail.result_available ? "available" : "not yet"}</strong>
+              <span>Thread</span>
+              <strong>{formatThreadScope(detail.thread_scope)}</strong>
+              <span>Routing</span>
+              <strong>{detail.codex_app_thread_routing_mode || "unknown"}</strong>
               <span>Last activity</span>
               <strong>{detail.last_activity_at || "unknown"}</strong>
             </div>
@@ -906,24 +921,9 @@ function MobileStatusChips({ status }: { status: PrithaRealtimeStatus | null }) 
   );
 }
 
-function useIsMobileViewport() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsMobile(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  return isMobile;
-}
-
 export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
   const realtime = usePrithaRealtime();
   const [elapsedSec, setElapsedSec] = useState(0);
-  const isMobile = useIsMobileViewport();
   const [taskDetail, setTaskDetail] = useState<CodexTaskDetail | null>(null);
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [sessionRecallOpen, setSessionRecallOpen] = useState(false);
@@ -986,117 +986,114 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
 
   return (
     <>
-      {isMobile ? (
-        <div className="mobile-voice-screen">
-          <MobileStatusChips status={realtime.status} />
-          <VoiceSessionPanel
-            phase={realtime.phase}
-            elapsedSec={elapsedSec}
-            status={realtime.status}
-            isMuted={realtime.isMuted}
-            micInputLevel={realtime.micInputLevel}
-            micGainRuntime={realtime.micGainRuntime}
-            error={realtime.error}
-            onPrimary={primaryAction}
-            onMute={realtime.toggleMute}
-            onMicInputLevelChange={realtime.setMicInputLevel}
-            mobile
-          />
-          <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
-          <TaskListCard
-            tasks={realtime.codexTasks}
-            toolStatus={realtime.toolStatus}
-            onOpenTask={openTaskDetails}
-            onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
-            onBriefTask={(taskId) => void briefVisibleTask(taskId)}
-            onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
-            onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
-          />
-          <SessionCard
-            events={realtime.sessionEvents}
-            phase={realtime.phase}
-            memoryPromotion={realtime.sessionMemoryPromotion}
-            onSendRecap={realtime.sendSessionRecap}
-            onOpenRecall={() => setSessionRecallOpen(true)}
-            onPromoteMemory={() => void realtime.promoteSessionMemory("manual")}
-          />
-          <ContextCard
-            status={realtime.status}
-            stickyContextEnabled={realtime.stickyContextEnabled}
-            sessionEventCount={realtime.sessionEvents.length}
-            onResetVoiceContext={realtime.resetVoiceContext}
-            mobile
-          />
-          <DecisionCard
-            task={pendingDecisionTask}
-            onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
-            onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
-            onOpenTask={openTaskDetails}
-          />
+      <div className="mobile-voice-screen">
+        <MobileStatusChips status={realtime.status} />
+        <VoiceSessionPanel
+          phase={realtime.phase}
+          elapsedSec={elapsedSec}
+          status={realtime.status}
+          isMuted={realtime.isMuted}
+          micInputLevel={realtime.micInputLevel}
+          micGainRuntime={realtime.micGainRuntime}
+          error={realtime.error}
+          onPrimary={primaryAction}
+          onMute={realtime.toggleMute}
+          onMicInputLevelChange={realtime.setMicInputLevel}
+          mobile
+        />
+        <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
+        <TaskListCard
+          tasks={realtime.codexTasks}
+          toolStatus={realtime.toolStatus}
+          onOpenTask={openTaskDetails}
+          onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
+          onBriefTask={(taskId) => void briefVisibleTask(taskId)}
+          onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+          onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+        />
+        <SessionCard
+          events={realtime.sessionEvents}
+          phase={realtime.phase}
+          memoryPromotion={realtime.sessionMemoryPromotion}
+          onSendRecap={realtime.sendSessionRecap}
+          onOpenRecall={() => setSessionRecallOpen(true)}
+          onPromoteMemory={() => void realtime.promoteSessionMemory("manual")}
+        />
+        <ContextCard
+          status={realtime.status}
+          stickyContextEnabled={realtime.stickyContextEnabled}
+          sessionEventCount={realtime.sessionEvents.length}
+          onResetVoiceContext={realtime.resetVoiceContext}
+          mobile
+        />
+        <DecisionCard
+          task={pendingDecisionTask}
+          onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+          onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+          onOpenTask={openTaskDetails}
+        />
+      </div>
+      <div className="voice-desktop-content">
+        <PageHeader title="Voice Control" subtitle="Talk to Pritha. Give commands. Get things done." variant="voice" status={status} />
+        <div className="voice-layout">
+          <main className="voice-main">
+            <VoiceSessionPanel
+              phase={realtime.phase}
+              elapsedSec={elapsedSec}
+              status={realtime.status}
+              isMuted={realtime.isMuted}
+              micInputLevel={realtime.micInputLevel}
+              micGainRuntime={realtime.micGainRuntime}
+              error={realtime.error}
+              onPrimary={primaryAction}
+              onMute={realtime.toggleMute}
+              onMicInputLevelChange={realtime.setMicInputLevel}
+            />
+            <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
+          </main>
+          <aside className="voice-rail">
+            <TaskListCard
+              tasks={realtime.codexTasks}
+              toolStatus={realtime.toolStatus}
+              onOpenTask={openTaskDetails}
+              onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
+              onBriefTask={(taskId) => void briefVisibleTask(taskId)}
+              onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+              onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+            />
+            <SessionCard
+              events={realtime.sessionEvents}
+              phase={realtime.phase}
+              memoryPromotion={realtime.sessionMemoryPromotion}
+              onSendRecap={realtime.sendSessionRecap}
+              onOpenRecall={() => setSessionRecallOpen(true)}
+              onPromoteMemory={() => void realtime.promoteSessionMemory("manual")}
+            />
+            <ConnectionCard
+              status={realtime.status}
+              phase={realtime.phase}
+              latencyMs={realtime.lastLatencyMs}
+              remoteAudioReady={realtime.remoteAudioReady}
+              onReconnect={() => {
+                realtime.stop();
+                void realtime.start();
+              }}
+            />
+            <ContextCard
+              status={realtime.status}
+              stickyContextEnabled={realtime.stickyContextEnabled}
+              sessionEventCount={realtime.sessionEvents.length}
+              onResetVoiceContext={realtime.resetVoiceContext}
+            />
+            <DecisionCard
+              task={pendingDecisionTask}
+              onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
+              onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
+              onOpenTask={openTaskDetails}
+            />
+          </aside>
         </div>
-      ) : (
-        <div className="voice-desktop-content">
-          <PageHeader title="Voice Control" subtitle="Talk to Pritha. Give commands. Get things done." variant="voice" status={status} />
-          <div className="voice-layout">
-            <main className="voice-main">
-              <VoiceSessionPanel
-                phase={realtime.phase}
-                elapsedSec={elapsedSec}
-                status={realtime.status}
-                isMuted={realtime.isMuted}
-                micInputLevel={realtime.micInputLevel}
-                micGainRuntime={realtime.micGainRuntime}
-                error={realtime.error}
-                onPrimary={primaryAction}
-                onMute={realtime.toggleMute}
-                onMicInputLevelChange={realtime.setMicInputLevel}
-              />
-              <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
-            </main>
-            <aside className="voice-rail">
-              <TaskListCard
-                tasks={realtime.codexTasks}
-                toolStatus={realtime.toolStatus}
-                onOpenTask={openTaskDetails}
-                onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
-                onBriefTask={(taskId) => void briefVisibleTask(taskId)}
-                onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
-                onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
-              />
-              <SessionCard
-                events={realtime.sessionEvents}
-                phase={realtime.phase}
-                memoryPromotion={realtime.sessionMemoryPromotion}
-                onSendRecap={realtime.sendSessionRecap}
-                onOpenRecall={() => setSessionRecallOpen(true)}
-                onPromoteMemory={() => void realtime.promoteSessionMemory("manual")}
-              />
-              <ConnectionCard
-                status={realtime.status}
-                phase={realtime.phase}
-                latencyMs={realtime.lastLatencyMs}
-                remoteAudioReady={realtime.remoteAudioReady}
-                onReconnect={() => {
-                  realtime.stop();
-                  void realtime.start();
-                }}
-              />
-              <ContextCard
-                status={realtime.status}
-                stickyContextEnabled={realtime.stickyContextEnabled}
-                sessionEventCount={realtime.sessionEvents.length}
-                onResetVoiceContext={realtime.resetVoiceContext}
-              />
-              <DecisionCard
-                task={pendingDecisionTask}
-                onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
-                onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
-                onOpenTask={openTaskDetails}
-              />
-            </aside>
-          </div>
-        </div>
-      )}
+      </div>
       <TaskDetailDrawer
         detail={taskDetail}
         loading={taskDetailLoading}

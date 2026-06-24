@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getPrithaRealtimeStatus,
   getPrithaRuntimeSettings,
+  normalizeCodexAppThreadRoutingMode,
   normalizeCodexExecutionMode,
   normalizeCodexPlanningMode,
   normalizeCodexReasoningEffort,
@@ -34,6 +35,9 @@ type RuntimeSettingsPayload = {
   codexMaxPlanSteps?: number;
   codexAskBeforeOrchestration?: boolean;
   codexVoiceProgressVerbosity?: string;
+  codexAppThreadRoutingMode?: string;
+  codexAppThreadMaxTurns?: number;
+  codexAppThreadMaxAgeHours?: number;
   voiceBehaviorProfile?: string;
   prithaVoice?: string;
 };
@@ -56,6 +60,10 @@ function isCodexExecutionMode(value: unknown) {
 
 function isCodexVoiceProgressVerbosity(value: unknown) {
   return value === "brief" || value === "normal" || value === "detailed";
+}
+
+function isCodexAppThreadRoutingMode(value: unknown) {
+  return value === "per_task" || value === "control" || value === "subject_scoped" || value === "subject_scoped_rotate";
 }
 
 export async function GET() {
@@ -115,6 +123,14 @@ export async function POST(request: Request) {
     }
     patch.codexVoiceProgressVerbosity = normalizeCodexVoiceProgressVerbosity(payload.codexVoiceProgressVerbosity);
   }
+  if ("codexAppThreadRoutingMode" in payload) {
+    if (!isCodexAppThreadRoutingMode(payload.codexAppThreadRoutingMode)) {
+      return NextResponse.json({ ok: false, error: "invalid_codex_app_thread_routing_mode" }, { status: 400 });
+    }
+    patch.codexAppThreadRoutingMode = normalizeCodexAppThreadRoutingMode(payload.codexAppThreadRoutingMode);
+  }
+  if (Number.isFinite(Number(payload.codexAppThreadMaxTurns))) patch.codexAppThreadMaxTurns = Number(payload.codexAppThreadMaxTurns);
+  if (Number.isFinite(Number(payload.codexAppThreadMaxAgeHours))) patch.codexAppThreadMaxAgeHours = Number(payload.codexAppThreadMaxAgeHours);
   if ("voiceBehaviorProfile" in payload) {
     if (!isVoiceBehaviorProfile(payload.voiceBehaviorProfile)) {
       return NextResponse.json({ ok: false, error: "invalid_voice_behavior_profile" }, { status: 400 });

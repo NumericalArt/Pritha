@@ -3,7 +3,7 @@ id: agents-mother-registry
 type: agent-registry
 status: active
 created: 2026-05-18
-updated: 2026-06-22
+updated: 2026-06-23
 topics:
   - agent-engineering
   - agent-factory
@@ -43,32 +43,34 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: unknown
-source_updated: 2026-06-22
-source_version: generated registry 2026-06-22
-retrieved: 2026-06-22
-verified: 2026-06-22
+source_updated: 2026-06-23
+source_version: generated registry 2026-06-23
+retrieved: 2026-06-23
+verified: 2026-06-23
 valid_for: current Pritha lifecycle
 temporal_status: current
 ---
 
 # Pritha Registry
 
-Date: 2026-06-22
+Date: 2026-06-23
 Status: active
 
 ## Summary
 
-- Agents tracked: 6
-- Contracts: 6
-- Reports: 67
-- Research reports: 2
+- Agents tracked: 8
+- Contracts: 8
+- Reports: 74
+- Research reports: 6
 
 ## Agents
 
 | Agent | Mission | Runtime | Interface | Deployment | Proactivity | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
+| FAS | provide a local one-page theater-scene demo agent where a | codex-native scaffold plus deterministic browser app. | local web. / Telegram none. | local Mac. | none. | contracts:1 scaffold:1 test:0 handoff:0 ops:1 deploy:1 evolve:0 |
 | FESPA26 | voice-first Codex-native workbench for processing FESPA 2026 booth media, notes, links and files into a bilingual mobile | hybrid, with Codex-native sidecar. | web. / Telegram none. | local Mac. | manual. | contracts:1 scaffold:0 test:4 handoff:1 ops:3 deploy:0 evolve:2 |
 | Funny Teacher | help one user quickly and enjoyably improve English, mainly speaking, by turning YouTube lessons into interactive voice  | hybrid. | web voice only. / Telegram none for v1 unless user later requests it. | local Mac or Mac mini, to be confirmed. | manual in v1. | contracts:1 scaffold:1 test:1 handoff:0 ops:0 deploy:0 evolve:2 |
+| PictureBoom | provide a local Pritha child agent that receives internally | codex-native | local web. / Telegram none | local Mac. | manual | contracts:1 scaffold:1 test:0 handoff:0 ops:0 deploy:0 evolve:0 |
 | Pritha Claude Code Adapter | define a future adapter that can translate selected Pritha/Codex-native descendant scaffolds into Claude Code-compatible | environment-specific | CLI / Telegram none | none | none | contracts:1 scaffold:0 test:0 handoff:0 ops:0 deploy:0 evolve:0 |
 | StupidJoke | provide a small, safe, low-stakes joke agent that can ingest user-provided joke fixtures, reject unsafe material, and an | codex-native | Codex project plus CLI healthcheck for v1. / Telegram none | local Mac. | manual | contracts:1 scaffold:2 test:1 handoff:0 ops:0 deploy:0 evolve:1 |
 | Techscope | unknown | unknown | unknown / Telegram unknown | unknown | unknown | contracts:0 scaffold:0 test:9 handoff:0 ops:4 deploy:0 evolve:1 |
@@ -76,7 +78,14 @@ Status: active
 
 ## Recent Reports
 
+- 2026-06-23 scaffold-report/complete: 11_agents/reports/2026-06-23-pictureboom-scaffold-report.md
+- 2026-06-23 agent-deployment-report/complete: 11_agents/reports/2026-06-23-fas-tailscale-serve-deployment-report.md
+- 2026-06-23 agent-operations-report/complete: 11_agents/reports/2026-06-23-fas-tailscale-control-center-routing-report.md
 - 2026-06-22 scaffold-report/complete: 11_agents/reports/2026-06-22-web-summit-check-agent-scaffold-report.md
+- 2026-06-22 scaffold-report/complete: 11_agents/reports/2026-06-22-fas-scaffold-report.md
+- 2026-06-22 agent-operations-report/complete: 11_agents/reports/2026-06-22-fas-local-runtime-integration-report.md
+- 2026-06-22 agent-operations-report/complete: 11_agents/reports/2026-06-22-fas-control-center-url-source-of-truth-report.md
+- 2026-06-22 agent-operations-report/complete: 11_agents/reports/2026-06-22-fas-control-center-integration-report.md
 - 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-5-report.md
 - 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-4-report.md
 - 2026-06-21 agent-operations-report/complete: 11_agents/reports/2026-06-21-pritha-github-install-reproducibility-phase-3-report.md
@@ -99,13 +108,6 @@ Status: active
 - 2026-05-28 agent-operations-report/partial: 11_agents/reports/2026-05-28-techscope-quality-phase-9c-agents-mother-scaffold-module-report.md
 - 2026-05-28 agent-operations-report/partial: 11_agents/reports/2026-05-28-techscope-quality-phase-9b-agents-mother-test-module-report.md
 - 2026-05-28 agent-operations-report/partial: 11_agents/reports/2026-05-28-techscope-quality-phase-9a-agents-mother-entry-contract-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-8-self-test-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-7-quality-gate-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-6-env-doctor-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-5-test-layer-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-4-dogfooding-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-3-shared-lib-report.md
-- 2026-05-28 agent-operations-report/complete: 11_agents/reports/2026-05-28-techscope-quality-phase-2-operations-report.md
 
 ## Evolution Rules
 

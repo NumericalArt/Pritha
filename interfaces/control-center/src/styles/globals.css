@@ -1093,6 +1093,7 @@ a {
   border: 1px solid var(--border-medium);
   cursor: pointer;
   font-weight: 650;
+  text-decoration: none;
 }
 
 .agent-action {
@@ -1146,6 +1147,10 @@ a {
   gap: 8px;
   margin-top: 18px;
   padding-left: 14px;
+}
+
+.agent-url-row.with-manage {
+  grid-template-columns: 1fr 36px 36px 36px;
 }
 
 .agent-url-row span,
@@ -3714,6 +3719,14 @@ button[aria-disabled="true"] {
   padding: 0 12px;
 }
 
+.settings-inline-fields {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .codex-transport-status,
 .settings-action-row {
   display: flex;
@@ -4879,6 +4892,10 @@ button:active,
     padding-left: 14px;
   }
 
+  .mobile-agent-url-row.with-manage {
+    grid-template-columns: 1fr 40px 40px 40px;
+  }
+
   .mobile-agent-url-row .icon-button {
     width: 40px;
     height: 40px;
@@ -5288,6 +5305,7 @@ button:active,
   .language-toggle-large,
   .theme-toggle,
   .settings-segmented-control,
+  .settings-inline-fields,
   .settings-rowline select,
   .settings-secret-form,
   .settings-number-input {

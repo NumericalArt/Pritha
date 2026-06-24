@@ -23,6 +23,7 @@ type ControlCenterStatus = {
     url?: {
       status: "available" | "unavailable";
       local?: string;
+      tailscale?: string;
     };
     ui?: {
       state?: string;
@@ -52,6 +53,8 @@ type OperatorActionResult = {
     status: string;
   };
 };
+
+type ChildAgent = ControlCenterStatus["childAgents"][number];
 
 async function getStatus(page: Page) {
   const response = await page.request.get("/api/status");
@@ -170,15 +173,6 @@ function writeStaleCodexTask() {
   return { taskId, taskDir };
 }
 
-function expectedAgentUrl(rawUrl: string, baseUrl: string) {
-  const source = new URL(rawUrl);
-  const target = new URL(baseUrl);
-  source.protocol = target.protocol;
-  source.hostname = target.hostname;
-  source.port = source.port || target.port;
-  return source.toString().replace(/\/$/, "");
-}
-
 async function setAccessMode(page: Page, mode: "localhost" | "lan" | "tailscale") {
   await page.addInitScript((value) => {
     window.localStorage.setItem("pritha.defaultAccessMode", value);
@@ -258,11 +252,11 @@ test.describe("Control Center UI regression", () => {
     await expect(localLink).toHaveAttribute("data-url", agent.url.local);
   });
 
-  test("rewrites agent card URLs for Tailscale access mode when available", async ({ page }) => {
+  test("uses served child-agent URLs for Tailscale access mode without inventing unserved links", async ({ page }) => {
     const status = await getStatus(page);
-    const agent = status.childAgents.find((item) => item.url?.local && item.ui?.state === "alive");
-    if (!agent?.url?.local) {
-      test.skip(true, "No alive child agent with a local URL in current registry.");
+    const agent = status.childAgents.find((item) => item.url?.local && item.url?.tailscale && item.ui?.state === "alive");
+    if (!agent?.url?.local || !agent.url.tailscale) {
+      test.skip(true, "No alive child agent with a served Tailscale URL in current registry.");
       return;
     }
 
@@ -276,7 +270,77 @@ test.describe("Control Center UI regression", () => {
     const allButton = page.getByRole("button", { name: "All" });
     if (await allButton.isEnabled().catch(() => false)) await allButton.click();
     const localLink = page.locator(`[data-testid="agent-url-link"][data-agent-id="${agent.id}"]`).first();
-    await expect(localLink).toHaveAttribute("data-url", expectedAgentUrl(agent.url.local, status.access.tailscaleUrl));
+    await expect(localLink).toHaveAttribute("data-url", agent.url.tailscale);
+
+    const unservedAgent = status.childAgents.find((item) => item.url?.local && !item.url?.tailscale && item.ui?.state === "alive");
+    if (unservedAgent) {
+      await expect(page.locator(`[data-testid="agent-url-link"][data-agent-id="${unservedAgent.id}"]`)).toHaveCount(0);
+    }
+  });
+
+  test("keeps active managed agents on Stop Plan while URL opening stays secondary", async ({ page }) => {
+    const status = await getStatus(page);
+    const agent = status.childAgents.find((item) => item.url?.local && item.ui?.state === "alive" && item.control?.planAction === "stop");
+    if (!agent?.url?.local) {
+      test.skip(true, "No active managed child agent with a local URL in current registry.");
+      return;
+    }
+
+    await setAccessMode(page, "localhost");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/agents");
+
+    const card = page.locator(".mobile-agent-card", { hasText: agent.name }).first();
+    await expect(card.locator("button.mobile-agent-action")).toContainText("Stop Plan");
+    await expect(card.locator('[data-testid="agent-primary-open-link"]')).toHaveCount(0);
+    await expect(card.locator(`[data-testid="agent-url-link"][data-agent-id="${agent.id}"]`)).toHaveAttribute("data-url", agent.url.local);
+  });
+
+  test("keeps manual confirmation phrase input editable even when start execution is blocked", async ({ page }) => {
+    const status = await getStatus(page);
+    const pictureBoom = status.childAgents.find((item) => item.id === "picture-boom");
+    const stupidJoke = status.childAgents.find((item) => item.id === "stupid-joke");
+    if (!pictureBoom || !stupidJoke) {
+      test.skip(true, "PictureBoom and StupidJoke must both be registered for this comparison.");
+      return;
+    }
+
+    async function openStartPlan(agent: ChildAgent) {
+      await page.goto("/agents");
+      await page.getByRole("button", { name: "All" }).click();
+      const card = page.locator(".agents-desktop-content .agent-card", { hasText: agent.name }).first();
+      await expect(card).toBeVisible();
+
+      const planResponse = page.waitForResponse((response) =>
+        response.url().includes(`/api/agents/${agent.id}/actions/start/plan`) && response.ok(),
+      );
+      await card.locator("button.agent-action").click();
+      const plan = (await (await planResponse).json()) as OperatorActionPlan;
+      const requiredPhrase = plan.confirmation?.requiredPhrase || "";
+      expect(requiredPhrase).toBeTruthy();
+
+      const panel = page.locator(".operator-action-panel", { hasText: agent.name });
+      await expect(panel).toBeVisible();
+      await expect(panel.locator(".operator-confirmation-copy strong")).toHaveText(requiredPhrase);
+
+      const input = panel.locator(".operator-confirmation-input input");
+      await expect(input).toBeEditable();
+      await input.fill(requiredPhrase);
+      await expect(input).toHaveValue(requiredPhrase);
+
+      return {
+        actionEnabled: plan.actionEnabled,
+        startButton: panel.getByRole("button", { name: "Start" }),
+      };
+    }
+
+    const blockedPlan = await openStartPlan(pictureBoom);
+    expect(blockedPlan.actionEnabled).toBe(false);
+    await expect(blockedPlan.startButton).toBeDisabled();
+
+    const executablePlan = await openStartPlan(stupidJoke);
+    expect(executablePlan.actionEnabled).toBe(true);
+    await expect(executablePlan.startButton).toBeEnabled();
   });
 
   test("guards start and stop actions behind blockers or exact confirmation", async ({ page }) => {

@@ -3,8 +3,8 @@ id: tailscale-private-device-access-for-local-agents
 type: standard
 status: active
 created: 2026-05-31
-updated: 2026-05-31
-last_reviewed: 2026-06-01
+updated: 2026-06-23
+last_reviewed: 2026-06-23
 owner: Techscope/user
 topics:
   - tailscale
@@ -40,6 +40,7 @@ sources:
   - 11_agents/reports/2026-05-26-funny-teacher-launchd-deployment-report.md
   - 11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.md
   - 11_agents/reports/2026-06-01-fespa26-funny-teacher-tailscale-serve-recovery-report.md
+  - 11_agents/reports/2026-06-23-fas-tailscale-control-center-routing-report.md
 related:
   decisions:
     - 05_decisions/2026-05-15-obsidian-web-access.md
@@ -52,10 +53,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-15
-source_updated: 2026-06-01
-source_version: FESPA26/Funny Teacher/Techscope Web Tailscale access pattern v1.1
+source_updated: 2026-06-23
+source_version: FESPA26/Funny Teacher/Techscope Web/FAS Tailscale access pattern v1.2
 retrieved: 2026-05-31
-verified: 2026-06-01
+verified: 2026-06-23
 valid_for: single-operator local agents exposed only to trusted devices in the same tailnet
 temporal_status: version-bound
 ---
@@ -64,7 +65,7 @@ temporal_status: version-bound
 
 Status: active
 Owner: Techscope/user
-Last reviewed: 2026-06-01
+Last reviewed: 2026-06-23
 
 ## Rule
 
@@ -94,7 +95,8 @@ The service stays local on `127.0.0.1:<local-port>`. Tailscale provides the priv
 - Keep the upstream app bound to `127.0.0.1` unless the contract explicitly requires LAN/public binding.
 - Use Tailscale Serve for the HTTPS device URL.
 - Treat Tailscale Funnel as a separate public-exposure decision; do not enable it as part of this pattern.
-- Record the local upstream URL, Tailscale URL and proxy command in `operations/manifest.json` or the agent operations guide.
+- Record the local upstream URL and intended proxy command in `operations/manifest.json` or the agent operations guide.
+- Treat a child-agent Tailscale URL as ready only when it is verified against actual `tailscale serve status` state or an equivalent peer-access check. Do not synthesize a child-agent Tailscale URL by replacing `127.0.0.1` with the Control Center Tailscale host.
 - Provide read-only status commands before any install/autostart action.
 - Verify both local health and Tailscale health after configuration.
 - Do not store Tailscale auth keys in `.env.local` for default v1 scaffolds.
@@ -139,7 +141,7 @@ An agent using this pattern should report:
 - `tailscale`: installed, authenticated, unauthenticated or missing.
 - `tailnet`: current node visible through `tailscale status` or pending-auth.
 - `localUpstream`: local URL and healthcheck result.
-- `tailscaleServe`: configured URL and HTTP status.
+- `tailscaleServe`: configured URL, actual local proxy target and HTTP status.
 - `secureContext`: pass when the phone can open the HTTPS URL.
 - `microphoneOnPhone`: pass, failed or not-tested for voice agents.
 - `serviceOwner`: manual dev server, launchd, external service or not configured.
@@ -185,10 +187,10 @@ For browser voice agents, Tailscale HTTPS is the preferred phone access path bec
 ## Temporal validity
 
 - Source published: 2026-05-15.
-- Source updated: 2026-06-01.
-- Source version: FESPA26/Funny Teacher/Techscope Web Tailscale access pattern v1.1.
+- Source updated: 2026-06-23.
+- Source version: FESPA26/Funny Teacher/Techscope Web/FAS Tailscale access pattern v1.2.
 - Retrieved: 2026-05-31.
-- Verified: 2026-06-01.
+- Verified: 2026-06-23.
 - Valid for: single-operator local agents exposed only to trusted devices in the same tailnet.
 - Freshness status: current.
 - Temporal status: version-bound.

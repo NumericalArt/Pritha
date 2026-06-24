@@ -90,7 +90,7 @@ export function AgentCard({
   const cardAction = getCardAction(agent);
   const actionTone = getCardActionTone(agent);
   const actionLabel = getCardActionLabel(agent);
-  const displayUrl = access && accessMode ? agentUrlForAccessMode(agent.url, access, accessMode) : agent.url;
+  const displayUrl = access && accessMode ? agentUrlForAccessMode(agent.url, access, accessMode, agent.tailscaleUrl) : agent.url;
   const canShowUrl = agent.state === "alive" && Boolean(displayUrl);
   const canOpenPlan = Boolean(onAction);
   const canOpenCredentials = Boolean(onCredentials && agent.credentials?.total);
@@ -190,7 +190,7 @@ export function AgentCard({
       </button>
 
       {canShowUrl ? (
-        <div className={`${mobile ? "mobile-agent-url-row" : "agent-url-row"}`}>
+        <div className={mobile ? "mobile-agent-url-row" : "agent-url-row"}>
           <span>{displayUrl?.replace("http://", mobile ? "" : "http://")}</span>
           <a
             className="icon-button"

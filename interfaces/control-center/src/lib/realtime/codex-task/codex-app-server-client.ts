@@ -4,8 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import type { CodexReasoningEffort, CodexServiceTier } from "../pritha-runtime";
-import type { PrithaCodexTaskClient, PrithaCodexTaskPayload, PrithaCodexTaskRunOptions } from "./types";
+import type { CodexAppThreadRoutingMode, CodexReasoningEffort, CodexServiceTier } from "../pritha-runtime";
+import type { PrithaCodexTaskClient, PrithaCodexTaskPayload, PrithaCodexTaskRunOptions, PrithaCodexThreadScope, PrithaCodexThreadScopeKind } from "./types";
 
 type RpcMessage = {
   id?: string | number;
@@ -32,10 +32,22 @@ type CodexAppServerClientOptions = {
     codexModel: string;
     codexReasoningEffort: CodexReasoningEffort;
     codexServiceTier: CodexServiceTier;
+    codexAppThreadRoutingMode?: CodexAppThreadRoutingMode;
+    codexAppThreadMaxTurns?: number;
+    codexAppThreadMaxAgeHours?: number;
   };
 };
 
+type CodexAppThreadTarget = {
+  threadId: string;
+  threadName: string;
+  role: VoiceCodexThreadRole;
+  scope: PrithaCodexThreadScope;
+  routingMode: CodexAppThreadRoutingMode;
+};
+
 const BUNDLED_CODEX_APP_BIN = "/Applications/Codex.app/Contents/Resources/codex";
+const CODEX_APP_RECONNECT_FINAL_ATTEMPT = 5;
 
 const RESULT_SCHEMA = {
   type: "object",
@@ -87,7 +99,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
 
     const connection = new AppServerConnection(this.codexBin, this.cwd);
     const startedAt = Date.now();
-    let target: { threadId: string; threadName: string } | null = null;
+    let target: CodexAppThreadTarget | null = null;
     let turnId = "";
     const emitProgress = async (phase: string, message: string, extra: Record<string, unknown> = {}) => {
       await options.onProgress?.({
@@ -127,6 +139,9 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       await emitProgress("thread_resolved", "Codex App task thread resolved.", {
         thread_id: target.threadId,
         thread_name: target.threadName,
+        thread_role: target.role,
+        thread_scope: target.scope,
+        routing_mode: target.routingMode,
       });
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
       const runtimeSettings = this.getRuntimeSettings?.();
@@ -177,32 +192,33 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     }
   }
 
-  private async resolveTaskThread(connection: AppServerConnection, payload: PrithaCodexTaskPayload, timeoutMs: number) {
+  private async resolveTaskThread(connection: AppServerConnection, payload: PrithaCodexTaskPayload, timeoutMs: number): Promise<CodexAppThreadTarget> {
     const overrideThreadId = process.env.PRITHA_CODEX_APP_THREAD_ID?.trim() || process.env.CODEX_APP_THREAD_ID?.trim();
     const reuseControlThread = ["1", "true", "yes"].includes(String(process.env.PRITHA_CODEX_APP_REUSE_CONTROL_THREAD || "").toLowerCase());
-    if (overrideThreadId || reuseControlThread) return this.resolveControlThread(connection, timeoutMs);
+    const routingMode = this.getRuntimeSettings?.().codexAppThreadRoutingMode || "subject_scoped";
+    if (overrideThreadId || reuseControlThread || routingMode === "control") return this.resolveControlThread(connection, timeoutMs, routingMode);
+    if (routingMode === "per_task") return this.resolveNamedTaskThread(connection, payload, timeoutMs, routingMode);
 
-    const threadName = taskThreadName(this.cwd, this.branch, payload.requestId);
-    const thread = await this.startNamedThread(connection, threadName, timeoutMs);
-    return { threadId: String(thread.id), threadName };
+    return this.resolveScopedThread(connection, payload, timeoutMs, routingMode);
   }
 
-  private async resolveControlThread(connection: AppServerConnection, timeoutMs: number) {
+  private async resolveControlThread(connection: AppServerConnection, timeoutMs: number, routingMode: CodexAppThreadRoutingMode = "control"): Promise<CodexAppThreadTarget> {
     const threadName = controlThreadName(this.cwd, this.branch);
     const overrideThreadId = process.env.PRITHA_CODEX_APP_THREAD_ID?.trim() || process.env.CODEX_APP_THREAD_ID?.trim();
+    const scope = { kind: "control", id: "control", label: "Control", source: overrideThreadId ? "override" : "fallback", generation: 1 } satisfies PrithaCodexThreadScope;
 
     if (overrideThreadId) {
       const thread = await this.resumeThread(connection, overrideThreadId, timeoutMs);
-      this.saveThread(threadName, thread);
-      return { threadId: String(thread.id), threadName };
+      this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+      return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
     }
 
     const registered = getVoiceCodexThread({ projectRoot: this.cwd, branch: this.branch, role: "control" }, this.registryPath);
     if (registered?.threadId) {
       try {
         const thread = await this.resumeThread(connection, registered.threadId, timeoutMs);
-        this.saveThread(threadName, thread);
-        return { threadId: String(thread.id), threadName };
+        this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+        return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
       } catch {
         // Stale registry entries are local hints only.
       }
@@ -214,13 +230,74 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
     if (exact?.id) {
       const thread = await this.resumeThread(connection, String(exact.id), timeoutMs);
-      this.saveThread(threadName, thread);
-      return { threadId: String(thread.id), threadName };
+      this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+      return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
     }
 
     const thread = await this.startNamedThread(connection, threadName, timeoutMs);
-    this.saveThread(threadName, thread);
-    return { threadId: String(thread.id), threadName };
+    this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+    return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
+  }
+
+  private async resolveNamedTaskThread(
+    connection: AppServerConnection,
+    payload: PrithaCodexTaskPayload,
+    timeoutMs: number,
+    routingMode: CodexAppThreadRoutingMode,
+  ): Promise<CodexAppThreadTarget> {
+    const scope = taskScope(payload.requestId);
+    const threadName = taskThreadName(this.cwd, this.branch, payload.requestId);
+    const thread = await this.resolveRegisteredOrNamedThread(connection, {
+      role: "task",
+      scope,
+      threadName,
+      timeoutMs,
+      routingMode,
+      forceNew: false,
+    });
+    return { threadId: String(thread.id), threadName, role: "task", scope, routingMode };
+  }
+
+  private async resolveScopedThread(
+    connection: AppServerConnection,
+    payload: PrithaCodexTaskPayload,
+    timeoutMs: number,
+    routingMode: CodexAppThreadRoutingMode,
+  ): Promise<CodexAppThreadTarget> {
+    const reset = asObject(payload.data)?.threadReset === true;
+    const baseScope = normalizedThreadScope(payload.threadScope, payload.requestId);
+    const runtimeSettings = this.getRuntimeSettings?.();
+    const maxTurns = Math.max(1, Number(runtimeSettings?.codexAppThreadMaxTurns || 24));
+    const maxAgeMs = Math.max(1, Number(runtimeSettings?.codexAppThreadMaxAgeHours || 168)) * 60 * 60 * 1000;
+    const registered = latestVoiceCodexThread(
+      {
+        projectRoot: this.cwd,
+        branch: this.branch,
+        role: "subject",
+        scopeKind: baseScope.kind,
+        scopeId: baseScope.id,
+      },
+      this.registryPath,
+    );
+    const registeredCreatedAt = Date.parse(String(registered?.createdAt || registered?.updatedAt || ""));
+    const rotateForTurns = routingMode === "subject_scoped_rotate" && Number(registered?.turnCount || 0) >= maxTurns;
+    const rotateForAge = routingMode === "subject_scoped_rotate" && Number.isFinite(registeredCreatedAt) && Date.now() - registeredCreatedAt > maxAgeMs;
+    const rotate = Boolean(registered) && (rotateForTurns || rotateForAge);
+    const generation =
+      reset || rotate
+        ? Math.max(Number(registered?.generation || 0) + 1, baseScope.generation || 1)
+        : Number(registered?.generation || baseScope.generation || 1);
+    const scope = { ...baseScope, generation };
+    const threadName = scopedThreadName(this.cwd, this.branch, scope);
+    const thread = await this.resolveRegisteredOrNamedThread(connection, {
+      role: "subject",
+      scope,
+      threadName,
+      timeoutMs,
+      routingMode,
+      forceNew: reset || rotate,
+    });
+    return { threadId: String(thread.id), threadName, role: "subject", scope, routingMode };
   }
 
   private async startNamedThread(connection: AppServerConnection, threadName: string, timeoutMs: number) {
@@ -257,16 +334,69 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     return resumed.thread;
   }
 
-  private saveThread(threadName: string, thread: Record<string, unknown>) {
+  private async resolveRegisteredOrNamedThread(
+    connection: AppServerConnection,
+    options: {
+      role: VoiceCodexThreadRole;
+      scope: PrithaCodexThreadScope;
+      threadName: string;
+      timeoutMs: number;
+      routingMode: CodexAppThreadRoutingMode;
+      forceNew: boolean;
+    },
+  ) {
+    if (!options.forceNew) {
+      const registered = latestVoiceCodexThread(
+        {
+          projectRoot: this.cwd,
+          branch: this.branch,
+          role: options.role,
+          scopeKind: options.scope.kind,
+          scopeId: options.scope.id,
+        },
+        this.registryPath,
+      );
+      if (registered?.threadId) {
+        try {
+          const thread = await this.resumeThread(connection, registered.threadId, options.timeoutMs);
+          this.saveThread({ threadName: registered.threadName || options.threadName, thread, role: options.role, scope: { ...options.scope, generation: Number(registered.generation || options.scope.generation || 1) }, routingMode: options.routingMode });
+          return thread;
+        } catch {
+          // Stale scoped registry entries are local hints only.
+        }
+      }
+
+      const listed = (await connection.request("thread/list", { limit: 20, cwd: this.cwd, archived: false, searchTerm: options.threadName }, options.timeoutMs)) as { data?: Array<Record<string, unknown>> };
+      const exact = (listed.data || [])
+        .filter((thread) => thread.name === options.threadName && thread.cwd === this.cwd)
+        .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
+      if (exact?.id) {
+        const thread = await this.resumeThread(connection, String(exact.id), options.timeoutMs);
+        this.saveThread({ threadName: options.threadName, thread, role: options.role, scope: options.scope, routingMode: options.routingMode });
+        return thread;
+      }
+    }
+
+    const thread = await this.startNamedThread(connection, options.threadName, options.timeoutMs);
+    this.saveThread({ threadName: options.threadName, thread, role: options.role, scope: options.scope, routingMode: options.routingMode });
+    return thread;
+  }
+
+  private saveThread(options: { threadName: string; thread: Record<string, unknown>; role: VoiceCodexThreadRole; scope: PrithaCodexThreadScope; routingMode: CodexAppThreadRoutingMode }) {
     saveVoiceCodexThread(
       {
         projectRoot: this.cwd,
         projectSlug: projectSlug(this.cwd),
         branch: this.branch,
-        role: "control",
-        threadName,
-        threadId: String(thread.id),
-        sessionId: stringOrNull(thread.sessionId),
+        role: options.role,
+        scopeKind: options.scope.kind,
+        scopeId: options.scope.id,
+        scopeLabel: options.scope.label,
+        generation: options.scope.generation,
+        routingMode: options.routingMode,
+        threadName: options.threadName,
+        threadId: String(options.thread.id),
+        sessionId: stringOrNull(options.thread.sessionId),
         updatedAt: new Date().toISOString(),
       },
       this.registryPath,
@@ -406,6 +536,8 @@ class AppServerConnection {
       const key = `${threadId}:${turnId}`;
       const waiter = this.turnWaiters.get(key);
       const messageText = String(error?.message || "Codex app-server turn failed");
+      const willRetry = message.params?.willRetry === true;
+      if (willRetry || isTransientCodexReconnectError(messageText)) return;
       if (waiter) {
         this.turnWaiters.delete(key);
         clearTimeout(waiter.timer);
@@ -427,6 +559,21 @@ class AppServerConnection {
       }
     }
   }
+}
+
+function isTransientCodexReconnectError(message: string) {
+  const progress = codexReconnectProgress(message);
+  if (!progress) return false;
+  return progress.current < CODEX_APP_RECONNECT_FINAL_ATTEMPT;
+}
+
+function codexReconnectProgress(message: string) {
+  const match = message.match(/\bReconnecting\.\.\.\s*(\d+)\s*\/\s*(\d+)\b/i);
+  if (!match) return null;
+  const current = Number(match[1]);
+  const total = Number(match[2]);
+  if (!Number.isFinite(current) || !Number.isFinite(total) || current < 1 || total < 1) return null;
+  return { current, total };
 }
 
 export function checkCodexAppServerAvailable(codexBin: string, cwd: string) {
@@ -483,6 +630,8 @@ function buildTaskReport(status: "started" | "completed" | "failed", payload: Pr
     user_id: payload.userId,
     task_type: payload.taskType,
     thread_name: threadName,
+    thread_scope: payload.threadScope || null,
+    routing_mode: stringOrNull(asObject(payload.data)?.routingMode),
     timestamp: new Date().toISOString(),
     duration_ms: durationMs ?? null,
     intent: truncate(payload.userIntent, 600),
@@ -625,14 +774,23 @@ function codexEnv() {
   return env;
 }
 
+type VoiceCodexThreadRole = "control" | "task" | "subject" | "worktree";
+
 type VoiceCodexThreadEntry = {
   projectRoot: string;
   projectSlug: string;
   branch: string;
-  role: "control" | "task" | "worktree";
+  role: VoiceCodexThreadRole;
+  scopeKind?: PrithaCodexThreadScopeKind;
+  scopeId?: string;
+  scopeLabel?: string;
+  generation?: number;
+  turnCount?: number;
+  routingMode?: CodexAppThreadRoutingMode;
   threadName: string;
   threadId: string;
   sessionId: string | null;
+  createdAt?: string;
   updatedAt: string;
 };
 
@@ -645,16 +803,22 @@ function projectSlug(projectRoot: string) {
 }
 
 function controlThreadName(projectRoot: string, branch: string) {
-  return `VC · ${projectSlug(projectRoot)} · ${branch || "main"} · control`;
+  return `VC · ${projectSlug(projectRoot)} · control · ${branch || "main"}`;
 }
 
 function taskThreadName(projectRoot: string, branch: string, requestId: string) {
   const shortId = (requestId || randomUUID()).replace(/[^A-Za-z0-9_-]+/g, "-").slice(0, 32);
-  return `VC · ${projectSlug(projectRoot)} · ${branch || "main"} · task · ${shortId}`;
+  return `VC · ${projectSlug(projectRoot)} · task · ${shortId} · ${branch || "main"}`;
 }
 
-function registryKey(input: { projectRoot: string; branch: string; role: string }) {
-  return `${path.resolve(input.projectRoot)}::${input.branch || "main"}::${input.role}`;
+function scopedThreadName(projectRoot: string, branch: string, scope: PrithaCodexThreadScope) {
+  return `VC · ${projectSlug(projectRoot)} · ${scope.kind}:${scope.id} · g${scope.generation || 1} · ${branch || "main"}`;
+}
+
+function registryKey(input: { projectRoot: string; branch: string; role: string; scopeKind?: string; scopeId?: string; generation?: number }) {
+  const base = `${path.resolve(input.projectRoot)}::${input.branch || "main"}::${input.role}`;
+  if (!input.scopeKind || !input.scopeId) return base;
+  return `${base}::${input.scopeKind}::${input.scopeId}::${input.generation || 1}`;
 }
 
 function readVoiceCodexRegistry(registryPath = defaultVoiceCodexRegistryPath()) {
@@ -667,16 +831,75 @@ function readVoiceCodexRegistry(registryPath = defaultVoiceCodexRegistryPath()) 
   }
 }
 
-function getVoiceCodexThread(input: { projectRoot: string; branch: string; role: "control" | "task" | "worktree" }, registryPath = defaultVoiceCodexRegistryPath()) {
+function getVoiceCodexThread(input: { projectRoot: string; branch: string; role: VoiceCodexThreadRole; scopeKind?: string; scopeId?: string; generation?: number }, registryPath = defaultVoiceCodexRegistryPath()) {
   return readVoiceCodexRegistry(registryPath).threads[registryKey(input)] || null;
+}
+
+function latestVoiceCodexThread(
+  input: { projectRoot: string; branch: string; role: VoiceCodexThreadRole; scopeKind?: string; scopeId?: string },
+  registryPath = defaultVoiceCodexRegistryPath(),
+) {
+  const registry = readVoiceCodexRegistry(registryPath);
+  const direct = getVoiceCodexThread(input, registryPath);
+  if (direct) return direct;
+  const root = path.resolve(input.projectRoot);
+  return Object.values(registry.threads)
+    .filter((entry) => path.resolve(entry.projectRoot) === root)
+    .filter((entry) => entry.branch === (input.branch || "main"))
+    .filter((entry) => entry.role === input.role)
+    .filter((entry) => !input.scopeKind || entry.scopeKind === input.scopeKind)
+    .filter((entry) => !input.scopeId || entry.scopeId === input.scopeId)
+    .sort((a, b) => Number(b.generation || 1) - Number(a.generation || 1) || Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || ""))[0] || null;
 }
 
 function saveVoiceCodexThread(entry: VoiceCodexThreadEntry, registryPath = defaultVoiceCodexRegistryPath()) {
   const registry = readVoiceCodexRegistry(registryPath);
-  registry.threads[registryKey({ projectRoot: entry.projectRoot, branch: entry.branch, role: entry.role })] = { ...entry, updatedAt: new Date().toISOString() };
+  const key = registryKey({
+    projectRoot: entry.projectRoot,
+    branch: entry.branch,
+    role: entry.role,
+    scopeKind: entry.scopeKind,
+    scopeId: entry.scopeId,
+    generation: entry.generation,
+  });
+  const previous = registry.threads[key];
+  registry.threads[key] = {
+    ...entry,
+    createdAt: entry.createdAt || previous?.createdAt || new Date().toISOString(),
+    turnCount: Number(previous?.turnCount || 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
   fs.mkdirSync(path.dirname(registryPath), { recursive: true });
   fs.writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
   return entry;
+}
+
+function safeScopeId(value: unknown, fallback: string) {
+  return String(value || fallback)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || fallback;
+}
+
+function normalizedThreadScope(value: unknown, requestId: string): PrithaCodexThreadScope {
+  const source = asObject(value);
+  const kind = source?.kind === "agent" || source?.kind === "pritha" || source?.kind === "control" || source?.kind === "task" ? source.kind : "task";
+  const id = safeScopeId(source?.id, kind === "task" ? requestId : "unknown");
+  const label = String(source?.label || id).replace(/\s+/g, " ").trim().slice(0, 80) || id;
+  const scopeSource = source?.source === "explicit" || source?.source === "derived" || source?.source === "override" || source?.source === "fallback" ? source.source : "fallback";
+  const generation = Math.max(1, Math.min(Number(source?.generation || 1) || 1, 999));
+  return { kind, id, label, source: scopeSource, generation };
+}
+
+function taskScope(requestId: string): PrithaCodexThreadScope {
+  return {
+    kind: "task",
+    id: safeScopeId(requestId, randomUUID()),
+    label: "One-off Codex task",
+    source: "fallback",
+    generation: 1,
+  };
 }
 
 function stringOrNull(value: unknown) {

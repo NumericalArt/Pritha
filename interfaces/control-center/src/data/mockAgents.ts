@@ -14,6 +14,7 @@ export type AgentCardModel = {
   state: AgentState;
   activity: AgentActivity;
   url?: string;
+  tailscaleUrl?: string;
   updateStatus?: "available" | "up-to-date" | "review-needed" | "none";
   issueText?: string;
   lifecycleNote?: string;

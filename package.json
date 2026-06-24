@@ -24,6 +24,7 @@
     "interfaces": "node scripts/interface-status.mjs --json",
     "memory": "node scripts/memory-status.mjs --json",
     "tools": "node scripts/tools-status.mjs --json",
+    "external-research-tools": "node scripts/external-research-tools.mjs",
     "tailscale": "node scripts/tailscale-setup.mjs",
     "operations": "node scripts/operations-status.mjs --json",
     "voice-kit": "node scripts/voice-control-kit.mjs",

@@ -12,7 +12,31 @@ Pritha can create descendants that use voice interfaces, but realtime voice is n
 - Codex sidecar handles project editing and deeper implementation work.
 - Risky Codex tasks can pause as `decision_required` and wait for operator
   approval in the Control Center task card.
-- Lesson/session memory is saved as curated artifacts.
+- Lesson/session memory is saved as curated artifacts when the domain contract
+  selects durable memory.
+
+## Pritha Voice Context
+
+Pritha Control Center has two separate voice-context mechanisms:
+
+- Rolling summary: a single private summary-only handoff file for the latest
+  Realtime/Codex work. It is stored outside the UI at
+  `.private/interface-lab/pritha-control-center/realtime/rolling-summary/current.json`.
+  It is overwritten in place, has a hard size limit and no TTL, and must not
+  contain raw transcripts, secrets or credentials.
+- Sticky context: a live, current-session prompt sent through the Realtime data
+  channel when selected Codex/task events need extra state in the active voice
+  call. It is not cross-session memory and does not read the rolling summary.
+
+The rolling summary is available to the Realtime model only through the
+`recall_rolling_summary` tool. Realtime instructions should call that tool when
+the operator asks about the previous session, asks what was discussed last time,
+or asks to continue from the prior handoff. Do not inject the rolling summary at
+session startup; an unrelated new conversation must start cleanly.
+
+Sticky context may include a bounded count of current-session events and recent
+Codex task state. It should be obvious in the UI, have an explicit reset control
+and prefer the operator's newest direct instruction over older pinned context.
 
 ## FESPA26 Reference Kit
 

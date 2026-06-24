@@ -2,11 +2,24 @@ export type PrithaCodexTaskStatus = "ok" | "error" | "timeout" | "unavailable" |
 
 export type PrithaCodexTaskType = "analysis" | "research" | "implementation" | "review" | "agent_creation" | "system_change";
 
+export type PrithaCodexThreadScopeKind = "agent" | "pritha" | "task" | "control";
+
+export type PrithaCodexThreadScopeSource = "explicit" | "derived" | "fallback" | "override";
+
+export type PrithaCodexThreadScope = {
+  kind: PrithaCodexThreadScopeKind;
+  id: string;
+  label: string;
+  source: PrithaCodexThreadScopeSource;
+  generation: number;
+};
+
 export type PrithaCodexTaskPayload = {
   requestId: string;
   userId: string;
   taskType: PrithaCodexTaskType;
   userIntent: string;
+  threadScope?: PrithaCodexThreadScope;
   projectContext: {
     project: "Pritha";
     cwd: string;

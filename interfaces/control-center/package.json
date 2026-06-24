@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --hostname ${PRITHA_CONTROL_CENTER_HOST:-127.0.0.1} --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
-    "build": "next build",
+    "build": "node scripts/build-preflight.mjs && next build",
     "serve": "npm run build && npm run start",
     "start": "next start --hostname ${PRITHA_CONTROL_CENTER_HOST:-127.0.0.1} --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
     "test:e2e": "playwright test",
+    "test:realtime-flow": "node --test tests/realtime-pictureboom-flow.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

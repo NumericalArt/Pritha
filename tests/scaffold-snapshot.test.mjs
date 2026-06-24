@@ -37,7 +37,15 @@ function writeFixtureResearch(root, contractPath, slug = "snapshot-agent") {
       "updated: 2026-06-15",
       "topics: [agent-engineering, tests]",
       "tools: [Pritha]",
-      "sources: [tests]",
+      "sources:",
+      `  - ${path.relative(root, contractPath).split(path.sep).join("/")}`,
+      "research_gate_status: complete",
+      "memory_research_status: complete",
+      "external_research_status: not-applicable",
+      "synthesis_status: complete",
+      "related:",
+      "  agent_contracts:",
+      `    - ${path.relative(root, contractPath).split(path.sep).join("/")}`,
       "---",
       "",
       "# Fixture Pritha Memory Research",
@@ -45,6 +53,69 @@ function writeFixtureResearch(root, contractPath, slug = "snapshot-agent") {
       `Contract: ${path.relative(root, contractPath).split(path.sep).join("/")}`,
       "",
       "Fixture result: local scaffold standards are sufficient; no external volatile choices.",
+      "",
+    ].join("\n"),
+  );
+}
+
+function writeLegacyResearch(root, contractPath, slug = "snapshot-agent") {
+  const researchDir = path.join(root, "11_agents", "research");
+  execFileSync("mkdir", ["-p", researchDir]);
+  writeFileSync(
+    path.join(researchDir, `2026-06-15-${slug}-legacy-research.md`),
+    [
+      "---",
+      `id: 2026-06-15-${slug}-legacy-research`,
+      "type: review",
+      "status: complete",
+      "created: 2026-06-15",
+      "updated: 2026-06-15",
+      "topics: [agent-engineering, tests]",
+      "tools: [Pritha]",
+      "sources: [tests]",
+      "---",
+      "",
+      "# Legacy Fixture Pritha Memory Research",
+      "",
+      `Contract: ${path.relative(root, contractPath).split(path.sep).join("/")}`,
+      "",
+      "Fixture result: local scaffold standards are sufficient; no external volatile choices.",
+      "",
+    ].join("\n"),
+  );
+}
+
+function writePendingResearch(root, contractPath, slug = "snapshot-agent") {
+  const researchDir = path.join(root, "11_agents", "research");
+  execFileSync("mkdir", ["-p", researchDir]);
+  const relContract = path.relative(root, contractPath).split(path.sep).join("/");
+  writeFileSync(
+    path.join(researchDir, `2026-06-15-${slug}-pending-research.md`),
+    [
+      "---",
+      `id: 2026-06-15-${slug}-pending-research`,
+      "type: review",
+      "status: draft",
+      "created: 2026-06-15",
+      "updated: 2026-06-15",
+      "topics: [agent-engineering, tests]",
+      "tools: [Pritha]",
+      "sources:",
+      `  - ${relContract}`,
+      "research_gate_status: pending",
+      "memory_research_status: complete",
+      "external_research_status: pending",
+      "synthesis_status: pending",
+      "related:",
+      "  agent_contracts:",
+      `    - ${relContract}`,
+      "---",
+      "",
+      "# Pending Pritha Memory Research",
+      "",
+      `Contract: ${relContract}`,
+      "",
+      "External evidence still needs to be gathered.",
       "",
     ].join("\n"),
   );
@@ -80,6 +151,14 @@ test("Agents Mother scaffold output matches the frozen file-list snapshot", () =
     encoding: "utf8",
   });
   assert.match(smoke, /Smoke test passed/);
+
+  const reportPath = path.join(root, "11_agents", "reports");
+  const reportFiles = listFiles(reportPath).filter((filePath) => filePath.endsWith("scaffold-report.md"));
+  assert.equal(reportFiles.length, 1);
+  const report = readFileSync(path.join(reportPath, reportFiles[0]), "utf8");
+  assert.match(report, /control_center_card_status: pending-registry/);
+  assert.match(report, /## Control Center Card Readiness/);
+  assert.match(report, /node scripts\/pritha\.mjs card-readiness snapshot-agent/);
 });
 
 test("scaffold module exposes generated agent files directly", () => {
@@ -140,6 +219,68 @@ test("scaffold command blocks draft contracts unless explicitly allowed", () => 
   });
   assert.match(allowed, /Smoke test: pass/);
   assert.match(allowed, /Warning: scaffold created from draft contract/);
+});
+
+test("scaffold blocks legacy research reports without machine-readable gate fields", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "techscope-legacy-research-gate-test-"));
+  const contractDir = path.join(root, "11_agents", "contracts");
+  execFileSync("mkdir", ["-p", contractDir]);
+  const contractPath = path.join(contractDir, "valid-agent-contract.md");
+  cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
+  writeLegacyResearch(root, contractPath);
+
+  const blocked = spawnSync("node", [
+    path.resolve("scripts/agents-mother.mjs"),
+    "scaffold",
+    contractPath,
+    "--output",
+    path.join(root, "blocked"),
+  ], {
+    encoding: "utf8",
+    env: { ...process.env, TECHSCOPE_ROOT: root },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  assert.notEqual(blocked.status, 0);
+  assert.match(`${blocked.stdout}\n${blocked.stderr}`, /External research gate is pending/);
+  assert.match(`${blocked.stdout}\n${blocked.stderr}`, /researchGate_missing/);
+});
+
+test("scaffold blocks pending external research unless explicitly overridden", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "techscope-pending-research-gate-test-"));
+  const contractDir = path.join(root, "11_agents", "contracts");
+  execFileSync("mkdir", ["-p", contractDir]);
+  const contractPath = path.join(contractDir, "valid-agent-contract.md");
+  cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
+  writePendingResearch(root, contractPath);
+
+  const blocked = spawnSync("node", [
+    path.resolve("scripts/agents-mother.mjs"),
+    "scaffold",
+    contractPath,
+    "--output",
+    path.join(root, "blocked"),
+  ], {
+    encoding: "utf8",
+    env: { ...process.env, TECHSCOPE_ROOT: root },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  assert.notEqual(blocked.status, 0);
+  assert.match(`${blocked.stdout}\n${blocked.stderr}`, /externalResearch_pending/);
+
+  const allowed = execFileSync("node", [
+    path.resolve("scripts/agents-mother.mjs"),
+    "scaffold",
+    contractPath,
+    "--output",
+    path.join(root, "allowed"),
+    "--allow-pending-external-verification",
+  ], {
+    encoding: "utf8",
+    env: { ...process.env, TECHSCOPE_ROOT: root },
+  });
+  assert.match(allowed, /Smoke test: pass/);
 });
 
 test("scaffold adds realtime voice reference files when voice is selected", () => {

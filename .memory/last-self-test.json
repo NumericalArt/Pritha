@@ -2,28 +2,28 @@
   "schema": "techscope-self-test-v1",
   "root": "<TECHSCOPE_ROOT>",
   "status": "pass",
-  "created_at": "2026-06-22T05:20:19.379Z",
+  "created_at": "2026-06-23T17:25:48.177Z",
   "dry_run": false,
   "memory_stats": {
-    "documents": 557,
-    "chunks": 5017,
-    "entities": 1692,
-    "relations": 13112,
-    "embeddings": 4843
+    "documents": 579,
+    "chunks": 5244,
+    "entities": 1786,
+    "relations": 13597,
+    "embeddings": 5070
   },
   "previous_memory_stats": {
-    "documents": 557,
-    "chunks": 5017,
-    "entities": 1692,
-    "relations": 13112,
-    "embeddings": 4843
+    "documents": 578,
+    "chunks": 5227,
+    "entities": 1780,
+    "relations": 13566,
+    "embeddings": 5053
   },
   "quality_gate": {
     "schema": "techscope-quality-gate-v1",
     "root": "<TECHSCOPE_ROOT>",
     "profile": "self-test",
     "status": "pass",
-    "createdAt": "2026-06-22T05:19:57.782Z",
+    "createdAt": "2026-06-23T17:25:33.922Z",
     "dryRun": false,
     "failed": 0,
     "checks": [
@@ -33,8 +33,8 @@
         "command": "node scripts/env-doctor.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 364,
-        "stdout": "Techscope env doctor: pass\n- PASS Node.js >= 20: current 22.15.1\n- PASS Git CLI: git version 2.39.5 (Apple Git-154)\n- PASS sqlite3 CLI: 3.43.2 2023-10-10 13:08:14 1b37c146ee9ebb7acd0160c0ab1fd11017a419fa8a3187386ed8cb32b709aapl (64-bit)\n- PASS Python >= 3.9 compatibility floor: Python 3.11.2\n- PASS Python >= 3.10 recommended baseline: Python 3.11.2\n- PASS Python package sentence-transformers: 5.1.2\n- PASS Python package imageio-ffmpeg: 0.6.0\n- PASS Python package mlx-whisper: 0.4.3\n- PASS mlx_whisper executable: <USER_HOME>/.local/bin/mlx_whisper\n- PASS npm CLI: 10.9.2\n- PASS Control Center package-lock: interfaces/control-center/package-lock.json\n- PASS Control Center has no latest dependencies: no latest ranges found\n- PASS Codex CLI: /opt/homebrew/bin/codex\n- PASS ripgrep: /opt/homebrew/bin/rg\n- PASS system ffmpeg: /opt/homebrew/bin/ffmpeg",
+        "durationMs": 241,
+        "stdout": "Techscope env doctor: pass (1 warning)\n- PASS Node.js >= 20: current 24.15.0\n- PASS Git CLI: git version 2.50.1 (Apple Git-155)\n- PASS sqlite3 CLI: 3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)\n- PASS Python >= 3.9 compatibility floor: Python 3.9.6\n- WARN Python >= 3.10 recommended baseline: Python 3.9.6\n  hint: New Techscope setups should use Python 3.10+; current 3.9 support is transitional.\n- PASS Python package sentence-transformers: 5.1.2\n- PASS Python package imageio-ffmpeg: 0.6.0\n- PASS Python package mlx-whisper: 0.4.3\n- PASS mlx_whisper executable: <USER_HOME>/Library/Python/3.9/bin/mlx_whisper\n- PASS npm CLI: 11.12.1\n- PASS Control Center package-lock: interfaces/control-center/package-lock.json\n- PASS Control Center has no latest dependencies: no latest ranges found\n- PASS Codex CLI: <USER_HOME>/.local/bin/codex\n- PASS ripgrep: <USER_HOME>/.local/bin/rg\n- PASS system ffmpeg: <USER_HOME>/.local/bin/ffmpeg",
         "stderr": ""
       },
       {
@@ -43,7 +43,7 @@
         "command": "node scripts/privacy-audit.mjs --strict",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 692,
+        "durationMs": 387,
         "stdout": "Pritha privacy audit: pass\nRoot: <TECHSCOPE_ROOT>\n- no raw/provenance retention findings",
         "stderr": ""
       },
@@ -53,8 +53,8 @@
         "command": "node scripts/validate-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 71,
-        "stdout": "Memory validation passed for 557 Markdown files.",
+        "durationMs": 44,
+        "stdout": "Memory validation passed for 579 Markdown files.",
         "stderr": ""
       },
       {
@@ -63,8 +63,8 @@
         "command": "node scripts/rebuild-memory.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 3395,
-        "stdout": "Indexed 557 documents, 5017 chunks.\nDatabase: .memory/techscope.sqlite",
+        "durationMs": 1662,
+        "stdout": "Indexed 579 documents, 5244 chunks.\nDatabase: .memory/techscope.sqlite",
         "stderr": ""
       },
       {
@@ -73,18 +73,18 @@
         "command": "node scripts/smoke-test.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 126,
-        "stdout": "PASS AGENTS.md: required file\nPASS README.md: required file\nPASS .env.example: required file\nPASS interfaces/manifest.json: required file\nPASS memory/manifest.json: required file\nPASS tools/manifest.json: required file\nPASS operations/manifest.json: required file\nPASS scripts/golden-checks.mjs: required file\nPASS scripts/validate-memory.mjs: required file\nPASS scripts/rebuild-memory.mjs: required file\nPASS scripts/query-memory.mjs: required file\nPASS scripts/telegram-bot.mjs: required file\nPASS scripts/agents-mother.mjs: required file\nPASS scripts/smoke-test.mjs: status/smoke script\nPASS scripts/interface-status.mjs: status/smoke script\nPASS scripts/memory-status.mjs: status/smoke script\nPASS scripts/tools-status.mjs: status/smoke script\nPASS scripts/operations-status.mjs: status/smoke script\nPASS scripts/healthcheck.mjs: status/smoke script\nPASS scripts/smoke-test.mjs executable: executable bit\nPASS scripts/golden-checks.mjs executable: executable bit\nPASS scripts/healthcheck.mjs executable: executable bit\nPASS interfaces/manifest.json JSON\nPASS memory/manifest.json JSON\nPASS tools/manifest.json JSON\nPASS operations/manifest.json JSON\nPASS validate-memory: Memory validation passed for 557 Markdown files.\nSmoke test passed.",
+        "durationMs": 67,
+        "stdout": "PASS AGENTS.md: required file\nPASS README.md: required file\nPASS .env.example: required file\nPASS interfaces/manifest.json: required file\nPASS memory/manifest.json: required file\nPASS tools/manifest.json: required file\nPASS operations/manifest.json: required file\nPASS scripts/golden-checks.mjs: required file\nPASS scripts/validate-memory.mjs: required file\nPASS scripts/rebuild-memory.mjs: required file\nPASS scripts/query-memory.mjs: required file\nPASS scripts/telegram-bot.mjs: required file\nPASS scripts/agents-mother.mjs: required file\nPASS scripts/smoke-test.mjs: status/smoke script\nPASS scripts/interface-status.mjs: status/smoke script\nPASS scripts/memory-status.mjs: status/smoke script\nPASS scripts/tools-status.mjs: status/smoke script\nPASS scripts/operations-status.mjs: status/smoke script\nPASS scripts/healthcheck.mjs: status/smoke script\nPASS scripts/smoke-test.mjs executable: executable bit\nPASS scripts/golden-checks.mjs executable: executable bit\nPASS scripts/healthcheck.mjs executable: executable bit\nPASS interfaces/manifest.json JSON\nPASS memory/manifest.json JSON\nPASS tools/manifest.json JSON\nPASS operations/manifest.json JSON\nPASS validate-memory: Memory validation passed for 579 Markdown files.\nSmoke test passed.",
         "stderr": ""
       },
       {
         "id": "unit-tests",
         "name": "Unit tests",
-        "command": "node --test tests/agents-mother-command-modules.test.mjs tests/agents-mother-contract.test.mjs tests/agents-mother-skills.test.mjs tests/agents-mother-test-module.test.mjs tests/bootstrap.test.mjs tests/control-center-codex-planning.test.mjs tests/control-center-codex-safety.test.mjs tests/control-center-health.test.mjs tests/control-center-voice-settings.test.mjs tests/env-doctor.test.mjs tests/frontmatter.test.mjs tests/github-release-status.test.mjs tests/golden-checks.test.mjs tests/healthcheck.test.mjs tests/launchd-root-audit.test.mjs tests/media/transcribe-media-output.test.mjs tests/media/youtube-isolation.test.mjs tests/memory-embeddings-preservation.test.mjs tests/paths.test.mjs tests/pritha-alias.test.mjs tests/pritha-voice-control.test.mjs tests/privacy-audit.test.mjs tests/public-install-docs.test.mjs tests/quality-gate.test.mjs tests/queue-health.test.mjs tests/scaffold-snapshot.test.mjs tests/self-test.test.mjs tests/setup-cli.test.mjs tests/setup-state.test.mjs tests/slug.test.mjs tests/tailscale-setup.test.mjs tests/trigger-phrases.test.mjs tests/voice-control-kit.test.mjs",
+        "command": "node --test tests/agents-mother-command-modules.test.mjs tests/agents-mother-contract.test.mjs tests/agents-mother-external-research.test.mjs tests/agents-mother-last30days-backend.test.mjs tests/agents-mother-pattern-research.test.mjs tests/agents-mother-research-gate.test.mjs tests/agents-mother-research-topics.test.mjs tests/agents-mother-skills.test.mjs tests/agents-mother-test-module.test.mjs tests/bootstrap.test.mjs tests/control-center-access-mode.test.mjs tests/control-center-codex-planning.test.mjs tests/control-center-codex-prompt-budget.test.mjs tests/control-center-codex-safety.test.mjs tests/control-center-codex-thread-routing.test.mjs tests/control-center-health.test.mjs tests/control-center-voice-settings.test.mjs tests/env-doctor.test.mjs tests/external-research-tools.test.mjs tests/frontmatter.test.mjs tests/github-release-status.test.mjs tests/golden-checks.test.mjs tests/healthcheck.test.mjs tests/launchd-root-audit.test.mjs tests/media/transcribe-media-output.test.mjs tests/media/youtube-isolation.test.mjs tests/memory-embeddings-preservation.test.mjs tests/paths.test.mjs tests/pritha-alias.test.mjs tests/pritha-voice-control.test.mjs tests/privacy-audit.test.mjs tests/public-install-docs.test.mjs tests/quality-gate.test.mjs tests/queue-health.test.mjs tests/scaffold-snapshot.test.mjs tests/self-test.test.mjs tests/setup-cli.test.mjs tests/setup-state.test.mjs tests/slug.test.mjs tests/tailscale-setup.test.mjs tests/trigger-phrases.test.mjs tests/voice-control-kit.test.mjs",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 4592,
-        "stdout": "TAP version 13\n# Subtest: remaining Agents Mother command modules run against an isolated root\nok 1 - remaining Agents Mother command modules run against an isolated root\n  ---\n  duration_ms: 686.068\n  type: 'test'\n  ...\n# Subtest: registry does not promote roadmap phase reports to agents\nok 2 - registry does not promote roadmap phase reports to agents\n  ---\n  duration_ms: 94.38175\n  type: 'test'\n  ...\n# Subtest: valid fixture contract passes Agents Mother validation\nok 3 - valid fixture contract passes Agents Mother validation\n  ---\n  duration_ms: 81.985375\n  type: 'test'\n  ...\n# Subtest: invalid fixture contract fails with actionable messages\nok 4 - invalid fixture contract fails with actionable messages\n  ---\n  duration_ms: 62.096166\n  type: 'test'\n  ...\n# Subtest: contract module validates fixture contracts directly\nok 5 - contract module validates fixture contracts directly\n  ---\n  duration_ms: 1.705417\n  type: 'test'\n  ...\n# Subtest: contract module extracts structured contract data\nok 6 - contract module extracts structured contract data\n  ---\n  duration_ms: 2.019625\n  type: 'test'\n  ...\n# Subtest: Pritha local skill catalog is discoverable and valid\nok 7 - Pritha local skill catalog is discoverable and valid\n  ---\n  duration_ms: 1.981208\n  type: 'test'\n  ...\n# Subtest: skill selector keeps default scaffold recommendation-only\nok 8 - skill selector keeps default scaffold recommendation-only\n  ---\n  duration_ms: 3.562333\n  type: 'test'\n  ...\n# Subtest: skills CLI reports status\nok 9 - skills CLI reports status\n  ---\n  duration_ms: 80.3765\n  type: 'test'\n  ...\n# Subtest: project skill audit catches missing installed skill files\nok 10 - project skill audit catches missing installed skill files\n  ---\n  duration_ms: 1.399334\n  type: 'test'\n  ...\n# Subtest: Agents Mother test module detects the Pritha harness\nok 11 - Agents Mother test module detects the Pritha harness\n  ---\n  duration_ms: 1.207125\n  type: 'test'\n  ...\n# Subtest: test module reads optional JSON manifests safely\nok 12 - test module reads optional JSON manifests safely\n  ---\n  duration_ms: 0.102083\n  type: 'test'\n  ...\n# Subtest: Agents Mother test command still supports no-report mode through wrapper and direct entrypoint\nok 13 - Agents Mother test command still supports no-report mode through wrapper and direct entrypoint\n  ---\n  duration_ms: 3011.51\n  type: 'test'\n  ...\n# Subtest: bootstrap plan is machine-readable and non-mutating\nok 14 - bootstrap plan is machine-readable and non-mutating\n  ---\n  duration_ms: 78.436125\n  type: 'test'\n  ...\n# Subtest: bootstrap start target pulls in Control Center install and foreground start\nok 15 - bootstrap start target pulls in Control Center install and foreground start\n  ---\n  duration_ms: 62.820667\n  type: 'test'\n  ...\n# Subtest: bootstrap verify minimal performs read-only prerequisite checks\nok 16 - bootstrap verify minimal performs read-only prerequisite checks\n  ---\n  duration_ms: 411.301417\n  type: 'test'\n  ...\n# Subtest: Codex task planning settings are persisted and exposed through runtime settings\nok 17 - Codex task planning settings are persisted and exposed through runtime settings\n  ---\n  duration_ms: 0.525416\n  type: 'test'\n  ...\n# Subtest: Codex App tasks write plan and voice feedback artifacts\nok 18 - Codex App tasks write plan and voice feedback artifacts\n  ---\n  duration_ms: 0.242667\n  type: 'test'\n  ...\n# Subtest: Realtime instructions prefer semantic voice feedback over heartbeat\nok 19 - Realtime instructions prefer semantic voice feedback over heartbeat\n  ---\n  duration_ms: 0.090958\n  type: 'test'\n  ...\n# Subtest: Step orchestrator remains policy gated\nok 20 - Step orchestrator remains policy gated\n  ---\n  duration_ms: 1.604125\n  type: 'test'\n  ...\n# Subtest: Planner operator questions do not leave non-actionable active task cards\nok 21 - Planner operator questions do not leave non-actionable active task cards\n  ---\n  duration_ms: 0.816541\n  type: 'test'\n  ...\n# Subtest: Control Center Codex write flag is read-only unless explicitly enabled\nok 22 - Control Center Codex write flag is read-only unless explicitly enabled\n  ---\n  duration_ms: 105.370416\n  type: 'test'\n  ...\n# Subtest: Control Center Realtime runtime gates every effective workspace-write task\nok 23 - Control Center Realtime runtime gates every effective workspace-write task\n  ---\n  duration_ms: 0.857167\n  type: 'test'\n  ...\n# Subtest: control-center health passes when rendered pages reference served JavaScript chunks\nok 24 - control-center health passes when rendered pages reference served JavaScript chunks\n  ---\n  duration_ms: 274.715458\n  type: 'test'\n  ...\n# Subtest: control-center health fails when rendered HTML points at a missing chunk\nok 25 - control-center health fails when rendered HTML points at a missing chunk\n  ---\n  duration_ms: 241.763583\n  type: 'test'\n  ...\n# Subtest: control-center health skips cleanly when the server is not running\nok 26 - control-center health skips cleanly when the server is not running\n  ---\n  duration_ms: 120.082167\n  type: 'test'\n  ...\n# Subtest: Control Center voice settings normalize behavior profile and Pritha voice\nok 27 - Control Center voice settings normalize behavior profile and Pritha voice\n  ---\n  duration_ms: 155.328167\n  type: 'test'\n  ...\n# Subtest: Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene\nok 28 - Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene\n  ---\n  duration_ms: 24.632209\n  type: 'test'\n  ...\n# Subtest: Control Center Realtime runtime uses behavior settings in instructions and selected Pritha voice in session config\nok 29 - Control Center Realtime runtime uses behavior settings in instructions and selected Pritha voice in session config\n  ---\n  duration_ms: 1.000583\n  type: 'test'\n  ...\n# Subtest: env-doctor exposes machine-readable dependency status\nok 30 - env-doctor exposes machine-readable dependency status\n  ---\n  duration_ms: 693.470333\n  type: 'test'\n  ...\n# Subtest: env-doctor minimal profile skips install-heavy Python package checks\nok 31 - env-doctor minimal profile skips install-heavy Python package checks\n  ---\n  duration_ms: 179.024125\n  type: 'test'\n  ...\n# Subtest: env-doctor fails with an actionable message when a critical dependency is missing\nok 32 - env-doctor fails with an actionable message when a critical dependency is missing\n  ---\n  duration_ms: 755.240875\n  type: 'test'\n  ...\n# Subtest: parseFrontmatter preserves body and parses nested lists\nok 33 - parseFrontmatter preserves body and parses nested lists\n  ---\n  duration_ms: 1.213834\n  type: 'test'\n  ...\n# Subtest: parseFrontmatterData returns null when frontmatter is absent\nok 34 - parseFrontmatterData returns null when frontmatter is absent\n  ---\n  duration_ms: 0.070208\n  type: 'test'\n  ...\n# Subtest: yamlList emits project-compatible block lists\nok 35 - yamlList emits project-compatible block lists\n  ---\n  duration_ms: 0.092333\n  type: 'test'\n  ...\n# Subtest: github-release-status exposes a machine-readable external release contract\nok 36 - github-release-status exposes a machine-readable external release contract\n  ---\n  duration_ms: 1032.517625\n  type: 'test'\n  ...\n# Subtest: github-release-status strict mode fails while external release proof is incomplete\nok 37 - github-release-status strict mode fails while external release proof is incomplete\n  ---\n  duration_ms: 966.38575\n  type: 'test'\n  ...\n# Subtest: golden-checks exposes a machine-readable dry-run contract\nok 38 - golden-checks exposes a machine-readable dry-run contract\n  ---\n  duration_ms: 63.669291\n  type: 'test'\n  ...\n# Subtest: healthcheck skips launchd plist lint on non-macOS runners\nok 39 - healthcheck skips launchd plist lint on non-macOS runners\n  ---\n  duration_ms: 913.155875\n  type: 'test'\n  ...\n# Subtest: launchd root audit detects loaded stale state after disk plist is fixed\nok 40 - launchd root audit detects loaded stale state after disk plist is fixed\n  ---\n  duration_ms: 350.837375\n  type: 'test'\n  ...\n# Subtest: launchd root audit accepts fixed disk and loaded state\nok 41 - launchd root audit accepts fixed disk and loaded state\n  ---\n  duration_ms: 260.829\n  type: 'test'\n  ...\n# Subtest: launchd reload retries bootstrap after bootout settles\nok 42 - launchd reload retries bootstrap after bootout settles\n  ---\n  duration_ms: 756.554041\n  type: 'test'\n  ...\n# Subtest: transcribe-media purges temp artifacts and emits neutral status\nok 43 - transcribe-media purges temp artifacts and emits neutral status\n  ---\n  duration_ms: 114.61575\n  type: 'test'\n  ...\n# Subtest: platform-specific media strings stay inside the removable adapter\nok 44 - platform-specific media strings stay inside the removable adapter\n  ---\n  duration_ms: 47.816708\n  type: 'test'\n  ...\n# Subtest: memory rebuild preserves usable embeddings instead of clearing the table\nok 45 - memory rebuild preserves usable embeddings instead of clearing the table\n  ---\n  duration_ms: 0.723125\n  type: 'test'\n  ...\n# Subtest: embedding generation is non-destructive and patches local Python import compatibility\nok 46 - embedding generation is non-destructive and patches local Python import compatibility\n  ---\n  duration_ms: 0.167958\n  type: 'test'\n  ...\n# Subtest: resolveTechscopeRoot honors TECHSCOPE_ROOT\nok 47 - resolveTechscopeRoot honors TECHSCOPE_ROOT\n  ---\n  duration_ms: 2.375833\n  type: 'test'\n  ...\n# Subtest: resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT\nok 48 - resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT\n  ---\n  duration_ms: 21.753833\n  type: 'test'\n  ...\n# Subtest: resolveSiblingAgentPath places agents beside root by default\nok 49 - resolveSiblingAgentPath places agents beside root by default\n  ---\n  duration_ms: 0.278875\n  type: 'test'\n  ...\n# Subtest: resolveSiblingAgentPath supports explicit override\nok 50 - resolveSiblingAgentPath supports explicit override\n  ---\n  duration_ms: 0.078208\n  type: 'test'\n  ...\n# Subtest: Pritha entrypoint preserves Agents Mother test behavior\nok 51 - Pritha entrypoint preserves Agents Mother test behavior\n  ---\n  duration_ms: 1628.1095\n  type: 'test'\n  ...\n# Subtest: legacy Agents Mother wrapper remains compatible and prints a deprecation note\nok 52 - legacy Agents Mother wrapper remains compatible and prints a deprecation note\n  ---\n  duration_ms: 925.698583\n  type: 'test'\n  ...\n# Subtest: Pritha aliases expose create, publish and lineage surfaces\nok 53 - Pritha aliases expose create, publish and lineage surfaces\n  ---\n  duration_ms: 926.968625\n  type: 'test'\n  ...\n# Subtest: Pritha voice realtime config exposes narrow tools\nok 54 - Pritha voice realtime config exposes narrow tools\n  ---\n  duration_ms: 1.122792\n  type: 'test'\n  ...\n# Subtest: Pritha voice memory search works through FTS\nok 55 - Pritha voice memory search works through FTS\n  ---\n  duration_ms: 38.044\n  type: 'test'\n  ...\n# Subtest: Pritha voice can read a curated artifact by id\nok 56 - Pritha voice can read a curated artifact by id\n  ---\n  duration_ms: 96.427958\n  type: 'test'\n  ...\n# Subtest: Pritha voice Codex handoff writes only ignored private state by default\nok 57 - Pritha voice Codex handoff writes only ignored private state by default\n  ---\n  duration_ms: 11.594042\n  type: 'test'\n  ...\n# Subtest: privacy helpers detect forbidden raw artifacts and incoming provenance\nok 58 - privacy helpers detect forbidden raw artifacts and incoming provenance\n  ---\n  duration_ms: 3.771\n  type: 'test'\n  ...\n# Subtest: privacy helpers keep official reference URLs outside incoming artifacts\nok 59 - privacy helpers keep official reference URLs outside incoming artifacts\n  ---\n  duration_ms: 0.453916\n  type: 'test'\n  ...\n# Subtest: public install docs use bootstrap as the fresh-clone entrypoint\nok 60 - public install docs use bootstrap as the fresh-clone entrypoint\n  ---\n  duration_ms: 0.896125\n  type: 'test'\n  ...\n# Subtest: README defines Pritha as a universal trainable child-agent creator\nok 61 - README defines Pritha as a universal trainable child-agent creator\n  ---\n  duration_ms: 0.19025\n  type: 'test'\n  ...\n# Subtest: quality-gate exposes a serialized dry-run contract\nok 62 - quality-gate exposes a serialized dry-run contract\n  ---\n  duration_ms: 50.373459\n  type: 'test'\n  ...\n# Subtest: quality-gate simulated failure returns a clear failing check\nok 63 - quality-gate simulated failure returns a clear failing check\n  ---\n  duration_ms: 95.795292\n  type: 'test'\n  ...\n# Subtest: quality-gate emits GitHub annotations without breaking JSON output\nok 64 - quality-gate emits GitHub annotations without breaking JSON output\n  ---\n  duration_ms: 104.011375\n  type: 'test'\n  ...\n# Subtest: quality-gate markdown output includes a summary table\nok 65 - quality-gate markdown output includes a summary table\n  ---\n  duration_ms: 75.39675\n  type: 'test'\n  ...\n# Subtest: quality-gate self-test profile omits heavier Agents Mother inspection\nok 66 - quality-gate self-test profile omits heavier Agents Mother inspection\n  ---\n  duration_ms: 65.808333\n  type: 'test'\n  ...\n# Subtest: queue-health reports stale queue items without failing\nok 67 - queue-health reports stale queue items without failing\n  ---\n  duration_ms: 97.71975\n  type: 'test'\n  ...\n# Deprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n# Deprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n# Subtest: Agents Mother scaffold output matches the frozen file-list snapshot\nok 68 - Agents Mother scaffold output matches the frozen file-list snapshot\n  ---\n  duration_ms: 337.825584\n  type: 'test'\n  ...\n# Subtest: scaffold module exposes generated agent files directly\nok 69 - scaffold module exposes generated agent files directly\n  ---\n  duration_ms: 9.634834\n  type: 'test'\n  ...\n# Subtest: scaffold command blocks draft contracts unless explicitly allowed\nok 70 - scaffold command blocks draft contracts unless explicitly allowed\n  ---\n  duration_ms: 366.636167\n  type: 'test'\n  ...\n# Subtest: scaffold adds realtime voice reference files when voice is selected\nok 71 - scaffold adds realtime voice reference files when voice is selected\n  ---\n  duration_ms: 1.570583\n  type: 'test'\n  ...\n# Subtest: scaffold vendors reviewed local skills only when contract selects vendor mode\nok 72 - scaffold vendors reviewed local skills only when contract selects vendor mode\n  ---\n  duration_ms: 1.073583\n  type: 'test'\n  ...\n# Subtest: self-test exposes a dry-run JSON contract without writing baseline\nok 73 - self-test exposes a dry-run JSON contract without writing baseline\n  ---\n  duration_ms: 1868.483042\n  type: 'test'\n  ...\n# Subtest: setup CLI writes private env and idempotent state\nok 74 - setup CLI writes private env and idempotent state\n  ---\n  duration_ms: 171.502875\n  type: 'test'\n  ...\n# Subtest: setup CLI configures default realtime tools when voice is selected\nok 75 - setup CLI configures default realtime tools when voice is selected\n  ---\n  duration_ms: 338.556958\n  type: 'test'\n  ...\n# Subtest: setup-status reports a missing setup state without failing\nok 76 - setup-status reports a missing setup state without failing\n  ---\n  duration_ms: 240.768334\n  type: 'test'\n  ...\n# Subtest: setup manifest schema describes the v1 state contract\nok 77 - setup manifest schema describes the v1 state contract\n  ---\n  duration_ms: 0.925334\n  type: 'test'\n  ...\n# Subtest: transliterate maps Cyrillic for ASCII ids\nok 78 - transliterate maps Cyrillic for ASCII ids\n  ---\n  duration_ms: 1.270042\n  type: 'test'\n  ...\n# Subtest: slug can preserve Cyrillic for legacy filenames\nok 79 - slug can preserve Cyrillic for legacy filenames\n  ---\n  duration_ms: 0.2565\n  type: 'test'\n  ...\n# Subtest: slug fallback is explicit\nok 80 - slug fallback is explicit\n  ---\n  duration_ms: 0.0735\n  type: 'test'\n  ...\n# Subtest: tailscale setup plan is safe when Tailscale is missing\nok 81 - tailscale setup plan is safe when Tailscale is missing\n  ---\n  duration_ms: 356.134209\n  type: 'test'\n  ...\n# Subtest: tailscale setup status exposes readiness fields\nok 82 - tailscale setup status exposes readiness fields\n  ---\n  duration_ms: 459.915208\n  type: 'test'\n  ...\n# Subtest: tailscale setup serve requires explicit --yes\nok 83 - tailscale setup serve requires explicit --yes\n  ---\n  duration_ms: 50.060625\n  type: 'test'\n  ...\n# Subtest: tailscale setup serve configures private Serve and writes setup state\nok 84 - tailscale setup serve configures private Serve and writes setup state\n  ---\n  duration_ms: 390.246166\n  type: 'test'\n  ...\n# Subtest: Control Center Next config gets Tailscale dev origins from env\nok 85 - Control Center Next config gets Tailscale dev origins from env\n  ---\n  duration_ms: 0.613334\n  type: 'test'\n  ...\n# Subtest: Codex-facing Tailscale operator protocol is documented\nok 86 - Codex-facing Tailscale operator protocol is documented\n  ---\n  duration_ms: 54.544709\n  type: 'test'\n  ...\n# Subtest: setup trigger phrases route to the first-run workflow\nok 87 - setup trigger phrases route to the first-run workflow\n  ---\n  duration_ms: 0.663833\n  type: 'test'\n  ...\n# Subtest: operational trigger phrases route to health and Pritha commands\nok 88 - operational trigger phrases route to health and Pritha commands\n  ---\n  duration_ms: 0.648375\n  type: 'test'\n  ...\n# Subtest: voice-control-kit exposes the FESPA26 reference plan\nok 89 - voice-control-kit exposes the FESPA26 reference plan\n  ---\n  duration_ms: 40.290333\n  type: 'test'\n  ...\n# Subtest: voice-control-kit copies the reference pack into a child interface folder\nok 90 - voice-control-kit copies the reference pack into a child interface folder\n  ---\n  duration_ms: 65.527583\n  type: 'test'\n  ...\n# Subtest: Pritha voice-kit alias delegates to the kit command\nok 91 - Pritha voice-kit alias delegates to the kit command\n  ---\n  duration_ms: 76.868125\n  type: 'test'\n  ...\n1..91\n# tests 91\n# suites 0\n# pass 91\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4550.465375",
+        "durationMs": 2292,
+        "stdout": "✔ remaining Agents Mother command modules run against an isolated root (333.405208ms)\n✔ registry does not promote roadmap phase reports to agents (46.482917ms)\n✔ valid fixture contract passes Agents Mother validation (48.681416ms)\n✔ invalid fixture contract fails with actionable messages (39.918625ms)\n✔ contract module validates fixture contracts directly (2.814292ms)\n✔ contract module extracts structured contract data (2.313791ms)\n✔ external research evidence normalization redacts secret-like values (3.950916ms)\n✔ external evidence coverage requires every required topic (0.999959ms)\n✔ applying complete external evidence updates frontmatter and sections (0.8725ms)\n✔ applying incomplete external evidence keeps gate pending (0.993166ms)\n✔ last30days JSON maps ranked candidates into Pritha evidence items (0.888792ms)\n✔ last30days args use JSON, quick mode, lookback and keyless-first source set (0.332083ms)\n✔ last30days backend reports unavailable when pinned runtime is absent (1.742792ms)\n✔ pattern pack selects memory/domain/semantic matches and extracts external seeds (3.605334ms)\n✔ semantic search output parser reads ranked rows (0.213583ms)\n✔ semantic failure log is private jsonl and redacts secret-like values (0.751083ms)\n✔ keyword extraction keeps technology phrases for external enrichment (0.099083ms)\n✔ research gate status requires explicit machine-readable fields (0.599667ms)\n✔ complete research gate passes for a matching contract (0.492084ms)\n✔ pending external research blocks scaffold readiness (0.484834ms)\n✔ not-applicable external research requires a contract reason (0.424375ms)\n✔ research gate rejects reports that do not reference the contract (0.1165ms)\n✔ research gate status values are strict (0.049584ms)\n✔ fixture-like deterministic contract does not require external research topics (1.361708ms)\n✔ realtime voice contract derives OpenAI Realtime research topic (0.115625ms)\n✔ Telegram contract derives Bot API and untrusted input topics (0.060708ms)\n✔ local inference contract derives runtime and memory topics (0.050209ms)\n✔ dependency and operations choices derive install and deployment topics (0.060125ms)\n✔ pattern pack seeds derive additional current-source research topics (0.513916ms)\n✔ Pritha local skill catalog is discoverable and valid (2.282708ms)\n✔ skill selector keeps default scaffold recommendation-only (2.205875ms)\n✔ skills CLI reports status (42.462958ms)\n✔ project skill audit catches missing installed skill files (1.313ms)\n✔ Agents Mother test module detects the Pritha harness (0.739667ms)\n✔ test module reads optional JSON manifests safely (0.086375ms)\n✔ Agents Mother test command still supports no-report mode through wrapper and direct entrypoint (1474.577708ms)\n✔ bootstrap plan is machine-readable and non-mutating (30.931459ms)\n✔ bootstrap start target pulls in Control Center install and foreground start (38.362458ms)\n✔ bootstrap verify minimal performs read-only prerequisite checks (201.08675ms)\n✔ Agent cards render URLs through the selected Control Center access mode (0.398375ms)\n✔ Managed active web agents keep plan control as the primary action (0.08ms)\n✔ Access mode URL rewrite keeps LAN ports but requires explicit child-agent Tailscale links (28.571042ms)\n✔ Control Center carries served agent Tailscale links into agent cards (0.241083ms)\n✔ Codex task planning settings are persisted and exposed through runtime settings (1.62575ms)\n✔ Codex App tasks write plan and voice feedback artifacts (0.178584ms)\n✔ Realtime instructions prefer semantic voice feedback over heartbeat (0.083542ms)\n✔ Agent creation Codex tasks carry mandatory research gate metadata (0.266667ms)\n✔ Step orchestrator remains policy gated (0.126167ms)\n✔ Planner operator questions leave actionable wait cards that can resume (0.346ms)\n✔ Realtime Codex handoff waits for explicit full-brief confirmation (0.218041ms)\n✔ Voice UI keeps watching approval-gated tasks and handoffs approval decisions once (0.111666ms)\n✔ Codex outbound prompt guard estimates tokens before App or CLI transport (0.411833ms)\n✔ Codex prompt budget is configurable from Pritha settings (0.072ms)\n✔ Codex outbound prompt guard compacts old session context only over budget (0.187958ms)\n✔ Codex task creation and approval both apply prompt budget guard before writing prompt files (0.342542ms)\n✔ Control Center Codex write flag is read-only unless explicitly enabled (18.539958ms)\n✔ Control Center Realtime runtime gates every effective workspace-write task (1.245333ms)\n✔ Control Center approval decisions create non-duplicating Realtime feedback (1.1235ms)\n✔ Codex task payloads carry a stable thread scope contract (0.417667ms)\n✔ Realtime task creation persists thread scope into request, status, progress and tool output (0.214541ms)\n✔ Codex App stale repair treats planner and step initialization phases as initialized (0.206875ms)\n✔ Codex App reconnect errors stay on App transport until final reconnect attempt (0.078333ms)\n✔ Codex App resolver reuses scoped threads before creating a new task thread (0.107625ms)\n✔ Subject scoped rotation enforces generation changes by turn count and age (0.11475ms)\n✔ Thread routing is configurable through the runtime settings API and UI (0.063291ms)\n✔ control-center health passes when rendered pages reference served JavaScript chunks (81.43775ms)\n✔ control-center health fails when rendered HTML points at a missing chunk (74.018916ms)\n✔ control-center health skips cleanly when the server is not running (42.637208ms)\n✔ Control Center voice settings normalize behavior profile and Pritha voice (21.65325ms)\n✔ Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene (3.865542ms)\n✔ Control Center Realtime runtime uses behavior settings in instructions and selected Pritha voice in session config (0.451166ms)\n✔ env-doctor exposes machine-readable dependency status (368.519458ms)\n✔ env-doctor minimal profile skips install-heavy Python package checks (104.575208ms)\n✔ env-doctor fails with an actionable message when a critical dependency is missing (293.079583ms)\n✔ last30days lock resolves install and engine paths under root (0.876041ms)\n✔ last30days status is pending-install when runtime is present but checkout is absent (624.51575ms)\n✔ sanitized last30days env strips secrets and can disable host tool PATH (0.388291ms)\n✔ parseFrontmatter preserves body and parses nested lists (0.981417ms)\n✔ parseFrontmatterData returns null when frontmatter is absent (0.061458ms)\n✔ yamlList emits project-compatible block lists (0.076791ms)\n✔ github-release-status exposes a machine-readable external release contract (544.192833ms)\n✔ github-release-status strict mode fails while external release proof is incomplete (383.101958ms)\n✔ golden-checks exposes a machine-readable dry-run contract (34.737417ms)\n✔ healthcheck skips launchd plist lint on non-macOS runners (457.055417ms)\n✔ launchd root audit detects loaded stale state after disk plist is fixed (355.280458ms)\n✔ launchd root audit accepts fixed disk and loaded state (396.013667ms)\n✔ launchd reload retries bootstrap after bootout settles (791.040875ms)\n✔ transcribe-media purges temp artifacts and emits neutral status (41.95275ms)\n✔ platform-specific media strings stay inside the removable adapter (19.893667ms)\n✔ memory rebuild preserves usable embeddings instead of clearing the table (0.447375ms)\n✔ embedding generation is non-destructive and patches local Python import compatibility (0.087042ms)\n✔ resolveTechscopeRoot honors TECHSCOPE_ROOT (0.844917ms)\n✔ resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT (12.905542ms)\n✔ resolveSiblingAgentPath places agents beside root by default (0.119708ms)\n✔ resolveSiblingAgentPath supports explicit override (0.063542ms)\n✔ Pritha entrypoint preserves Agents Mother test behavior (747.711083ms)\n✔ legacy Agents Mother wrapper remains compatible and prints a deprecation note (650.959875ms)\n✔ Pritha aliases expose create, publish and lineage surfaces (599.688167ms)\n✔ Pritha voice realtime config exposes narrow tools (0.673458ms)\n✔ Pritha voice memory search works through FTS (14.168125ms)\n✔ Pritha voice can read a curated artifact by id (15.236333ms)\n✔ Pritha voice Codex handoff writes only ignored private state by default (4.400083ms)\n✔ privacy helpers detect forbidden raw artifacts and incoming provenance (0.853208ms)\n✔ privacy helpers keep official reference URLs outside incoming artifacts (0.324916ms)\n✔ public install docs use bootstrap as the fresh-clone entrypoint (0.67075ms)\n✔ README defines Pritha as a universal trainable child-agent creator (0.161667ms)\n✔ quality-gate exposes a serialized dry-run contract (28.915625ms)\n✔ quality-gate simulated failure returns a clear failing check (29.961583ms)\n✔ quality-gate emits GitHub annotations without breaking JSON output (35.805833ms)\n✔ quality-gate markdown output includes a summary table (32.57525ms)\n✔ quality-gate self-test profile omits heavier Agents Mother inspection (36.382208ms)\n✔ queue-health reports stale queue items without failing (29.345416ms)\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\nDeprecation notice: Agents Mother is now Pritha. Use `node scripts/pritha.mjs <command>`; this alias remains for compatibility.\n✔ Agents Mother scaffold output matches the frozen file-list snapshot (110.572291ms)\n✔ scaffold module exposes generated agent files directly (4.534417ms)\n✔ scaffold command blocks draft contracts unless explicitly allowed (136.828167ms)\n✔ scaffold blocks legacy research reports without machine-readable gate fields (39.365333ms)\n✔ scaffold blocks pending external research unless explicitly overridden (108.388459ms)\n✔ scaffold adds realtime voice reference files when voice is selected (1.026666ms)\n✔ scaffold vendors reviewed local skills only when contract selects vendor mode (1.171916ms)\n✔ self-test exposes a dry-run JSON contract without writing baseline (1476.061375ms)\n✔ setup CLI writes private env and idempotent state (69.500583ms)\n✔ setup CLI configures default realtime tools when voice is selected (154.758375ms)\n✔ setup-status reports a missing setup state without failing (35.9935ms)\n✔ setup manifest schema describes the v1 state contract (0.180042ms)\n✔ transliterate maps Cyrillic for ASCII ids (0.605875ms)\n✔ slug can preserve Cyrillic for legacy filenames (0.124917ms)\n✔ slug fallback is explicit (0.046458ms)\n✔ tailscale setup plan is safe when Tailscale is missing (55.283041ms)\n✔ tailscale setup status exposes readiness fields (679.200459ms)\n✔ tailscale setup serve requires explicit --yes (33.6515ms)\n✔ tailscale setup serve configures private Serve and writes setup state (340.255541ms)\n✔ Control Center Next config gets Tailscale dev origins from env (0.1835ms)\n✔ Codex-facing Tailscale operator protocol is documented (32.455667ms)\n✔ setup trigger phrases route to the first-run workflow (0.492791ms)\n✔ operational trigger phrases route to health and Pritha commands (0.561625ms)\n✔ voice-control-kit exposes the FESPA26 reference plan (32.494875ms)\n✔ voice-control-kit copies the reference pack into a child interface folder (35.043416ms)\n✔ Pritha voice-kit alias delegates to the kit command (62.595166ms)\nℹ tests 138\nℹ suites 0\nℹ pass 138\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2271.336625",
         "stderr": ""
       },
       {
@@ -93,8 +93,8 @@
         "command": "node scripts/telegram-bot.mjs poll-once --dry-run",
         "status": "pass",
         "exitCode": 0,
-        "durationMs": 38,
-        "stdout": "{\n  \"mode\": \"dry-run\",\n  \"root\": \"<TECHSCOPE_ROOT>\",\n  \"allowed_users\": [],\n  \"telegram_intake\": {\n    \"pending\": 0,\n    \"processing\": 0,\n    \"awaiting_codex\": 0,\n    \"complete\": 0,\n    \"done\": 0,\n    \"failed\": 0\n  },\n  \"codex_media_review\": {\n    \"pending\": 0,\n    \"done\": 0\n  }\n}",
+        "durationMs": 24,
+        "stdout": "{\n  \"mode\": \"dry-run\",\n  \"root\": \"<TECHSCOPE_ROOT>\",\n  \"allowed_users\": [],\n  \"telegram_intake\": {\n    \"pending\": 0,\n    \"processing\": 0,\n    \"awaiting_codex\": 1,\n    \"complete\": 7,\n    \"done\": 12,\n    \"failed\": 0\n  },\n  \"codex_media_review\": {\n    \"pending\": 1,\n    \"done\": 5\n  }\n}",
         "stderr": ""
       }
     ]
@@ -102,86 +102,113 @@
   "embeddings_restore": {
     "ok": true,
     "status": 0,
-    "stdout": "Loading model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\nEmbedding 4843 chunks...\nStored 4843 embeddings in .memory/techscope.sqlite",
-    "stderr": "Batches:   0%|          | 0/152 [00:00<?, ?it/s]\rBatches:   1%|          | 1/152 [00:00<00:36,  4.08it/s]\rBatches:   2%|▏         | 3/152 [00:00<00:16,  8.91it/s]\rBatches:   3%|▎         | 5/152 [00:00<00:15,  9.59it/s]\rBatches:   5%|▍         | 7/152 [00:00<00:12, 11.74it/s]\rBatches:   6%|▌         | 9/152 [00:00<00:10, 13.02it/s]\rBatches:   7%|▋         | 11/152 [00:00<00:09, 14.29it/s]\rBatches:   9%|▊         | 13/152 [00:01<00:09, 15.04it/s]\rBatches:  10%|▉         | 15/152 [00:01<00:08, 15.71it/s]\rBatches:  11%|█         | 17/152 [00:01<00:08, 15.98it/s]\rBatches:  12%|█▎        | 19/152 [00:01<00:08, 16.07it/s]\rBatches:  14%|█▍        | 21/152 [00:01<00:07, 16.54it/s]\rBatches:  15%|█▌        | 23/152 [00:01<00:07, 16.61it/s]\rBatches:  16%|█▋        | 25/152 [00:01<00:07, 16.86it/s]\rBatches:  18%|█▊        | 27/152 [00:01<00:07, 17.05it/s]\rBatches:  19%|█▉        | 29/152 [00:01<00:07, 17.26it/s]\rBatches:  20%|██        | 31/152 [00:02<00:07, 17.01it/s]\rBatches:  22%|██▏       | 33/152 [00:02<00:07, 16.61it/s]\rBatches:  23%|██▎       | 35/152 [00:02<00:07, 15.99it/s]\rBatches:  24%|██▍       | 37/152 [00:02<00:07, 16.26it/s]\rBatches:  26%|██▌       | 39/152 [00:02<00:06, 16.39it/s]\rBatches:  27%|██▋       | 41/152 [00:02<00:06, 16.02it/s]\rBatches:  28%|██▊       | 43/152 [00:02<00:08, 12.29it/s]\rBatches:  30%|██▉       | 45/152 [00:03<00:10,  9.91it/s]\rBatches:  31%|███       | 47/152 [00:03<00:11,  9.21it/s]\rBatches:  32%|███▏      | 49/152 [00:03<00:10,  9.93it/s]\rBatches:  34%|███▎      | 51/152 [00:03<00:09, 10.60it/s]\rBatches:  35%|███▍      | 53/152 [00:04<00:08, 11.11it/s]\rBatches:  36%|███▌      | 55/152 [00:04<00:08, 11.62it/s]\rBatches:  38%|███▊      | 57/152 [00:04<00:08, 11.67it/s]\rBatches:  39%|███▉      | 59/152 [00:04<00:07, 11.84it/s]\rBatches:  40%|████      | 61/152 [00:04<00:08, 11.09it/s]\rBatches:  41%|████▏     | 63/152 [00:04<00:08, 10.47it/s]\rBatches:  43%|████▎     | 65/152 [00:05<00:08,  9.98it/s]\rBatches:  44%|████▍     | 67/152 [00:05<00:08,  9.74it/s]\rBatches:  45%|████▌     | 69/152 [00:05<00:08,  9.84it/s]\rBatches:  47%|████▋     | 71/152 [00:05<00:08,  9.87it/s]\rBatches:  47%|████▋     | 72/152 [00:05<00:08,  9.83it/s]\rBatches:  49%|████▊     | 74/152 [00:06<00:07, 10.19it/s]\rBatches:  50%|█████     | 76/152 [00:06<00:07, 10.78it/s]\rBatches:  51%|█████▏    | 78/152 [00:06<00:06, 10.77it/s]\rBatches:  53%|█████▎    | 80/152 [00:06<00:06, 10.83it/s]\rBatches:  54%|█████▍    | 82/152 [00:06<00:06, 11.44it/s]\rBatches:  55%|█████▌    | 84/152 [00:06<00:05, 12.20it/s]\rBatches:  57%|█████▋    | 86/152 [00:07<00:05, 12.84it/s]\rBatches:  58%|█████▊    | 88/152 [00:07<00:04, 13.95it/s]\rBatches:  59%|█████▉    | 90/152 [00:07<00:04, 13.56it/s]\rBatches:  61%|██████    | 92/152 [00:07<00:04, 14.51it/s]\rBatches:  62%|██████▎   | 95/152 [00:07<00:03, 17.06it/s]\rBatches:  64%|██████▍   | 97/152 [00:07<00:03, 17.05it/s]\rBatches:  65%|██████▌   | 99/152 [00:07<00:03, 16.73it/s]\rBatches:  67%|██████▋   | 102/152 [00:07<00:02, 18.68it/s]\rBatches:  68%|██████▊   | 104/152 [00:08<00:02, 18.24it/s]\rBatches:  70%|███████   | 107/152 [00:08<00:02, 19.36it/s]\rBatches:  72%|███████▏  | 110/152 [00:08<00:01, 21.43it/s]\rBatches:  74%|███████▍  | 113/152 [00:08<00:01, 20.93it/s]\rBatches:  76%|███████▋  | 116/152 [00:08<00:01, 21.02it/s]\rBatches:  78%|███████▊  | 119/152 [00:08<00:01, 22.36it/s]\rBatches:  80%|████████  | 122/152 [00:08<00:01, 23.42it/s]\rBatches:  82%|████████▏ | 125/152 [00:08<00:01, 23.99it/s]\rBatches:  84%|████████▍ | 128/152 [00:09<00:01, 18.51it/s]\rBatches:  86%|████████▌ | 131/152 [00:09<00:01, 19.20it/s]\rBatches:  89%|████████▉ | 135/152 [00:09<00:00, 23.55it/s]\rBatches:  91%|█████████ | 138/152 [00:09<00:00, 23.88it/s]\rBatches:  93%|█████████▎| 141/152 [00:09<00:00, 24.71it/s]\rBatches:  96%|█████████▌| 146/152 [00:09<00:00, 27.73it/s]\rBatches:  98%|█████████▊| 149/152 [00:09<00:00, 25.64it/s]\rBatches: 100%|██████████| 152/152 [00:10<00:00, 24.58it/s]\rBatches: 100%|██████████| 152/152 [00:10<00:00, 15.12it/s]"
+    "stdout": "Loading model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\nEmbedding 5070 chunks...\nStored 5070 embeddings in .memory/techscope.sqlite",
+    "stderr": "<USER_HOME>/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020\n  warnings.warn(\n\rBatches:   0%|          | 0/159 [00:00<?, ?it/s]\rBatches:   1%|          | 1/159 [00:00<00:24,  6.36it/s]\rBatches:   2%|▏         | 3/159 [00:00<00:12, 12.08it/s]\rBatches:   3%|▎         | 5/159 [00:00<00:10, 14.45it/s]\rBatches:   4%|▍         | 7/159 [00:00<00:09, 15.80it/s]\rBatches:   6%|▌         | 9/159 [00:00<00:08, 16.72it/s]\rBatches:   7%|▋         | 11/159 [00:00<00:08, 17.31it/s]\rBatches:   8%|▊         | 13/159 [00:00<00:08, 17.81it/s]\rBatches:   9%|▉         | 15/159 [00:00<00:07, 18.11it/s]\rBatches:  11%|█         | 17/159 [00:01<00:07, 18.41it/s]\rBatches:  12%|█▏        | 19/159 [00:01<00:07, 18.61it/s]\rBatches:  13%|█▎        | 21/159 [00:01<00:07, 18.72it/s]\rBatches:  14%|█▍        | 23/159 [00:01<00:07, 18.81it/s]\rBatches:  16%|█▌        | 25/159 [00:01<00:07, 18.94it/s]\rBatches:  17%|█▋        | 27/159 [00:01<00:06, 19.07it/s]\rBatches:  18%|█▊        | 29/159 [00:01<00:06, 19.12it/s]\rBatches:  19%|█▉        | 31/159 [00:01<00:06, 19.15it/s]\rBatches:  21%|██        | 33/159 [00:01<00:06, 19.21it/s]\rBatches:  22%|██▏       | 35/159 [00:01<00:06, 19.24it/s]\rBatches:  23%|██▎       | 37/159 [00:02<00:06, 19.02it/s]\rBatches:  25%|██▍       | 39/159 [00:02<00:06, 19.07it/s]\rBatches:  26%|██▌       | 41/159 [00:02<00:06, 19.16it/s]\rBatches:  27%|██▋       | 43/159 [00:02<00:06, 19.17it/s]\rBatches:  28%|██▊       | 45/159 [00:02<00:05, 19.18it/s]\rBatches:  30%|██▉       | 47/159 [00:02<00:05, 19.17it/s]\rBatches:  31%|███       | 49/159 [00:02<00:05, 19.26it/s]\rBatches:  32%|███▏      | 51/159 [00:02<00:05, 19.28it/s]\rBatches:  33%|███▎      | 53/159 [00:02<00:05, 18.34it/s]\rBatches:  35%|███▍      | 55/159 [00:03<00:05, 18.65it/s]\rBatches:  36%|███▌      | 57/159 [00:03<00:05, 18.86it/s]\rBatches:  37%|███▋      | 59/159 [00:03<00:05, 19.05it/s]\rBatches:  38%|███▊      | 61/159 [00:03<00:05, 19.13it/s]\rBatches:  40%|███▉      | 63/159 [00:03<00:05, 18.34it/s]\rBatches:  41%|████      | 65/159 [00:03<00:05, 18.23it/s]\rBatches:  42%|████▏     | 67/159 [00:03<00:04, 18.62it/s]\rBatches:  43%|████▎     | 69/159 [00:03<00:04, 18.85it/s]\rBatches:  45%|████▍     | 71/159 [00:03<00:04, 18.89it/s]\rBatches:  47%|████▋     | 74/159 [00:04<00:04, 19.36it/s]\rBatches:  48%|████▊     | 76/159 [00:04<00:04, 18.93it/s]\rBatches:  49%|████▉     | 78/159 [00:04<00:04, 18.90it/s]\rBatches:  50%|█████     | 80/159 [00:04<00:04, 18.80it/s]\rBatches:  52%|█████▏    | 83/159 [00:04<00:03, 19.34it/s]\rBatches:  53%|█████▎    | 85/159 [00:04<00:03, 18.88it/s]\rBatches:  55%|█████▌    | 88/159 [00:04<00:03, 19.53it/s]\rBatches:  57%|█████▋    | 91/159 [00:04<00:03, 21.19it/s]\rBatches:  59%|█████▉    | 94/159 [00:04<00:02, 22.77it/s]\rBatches:  61%|██████    | 97/159 [00:05<00:02, 23.68it/s]\rBatches:  63%|██████▎   | 100/159 [00:05<00:02, 24.39it/s]\rBatches:  65%|██████▍   | 103/159 [00:05<00:02, 25.17it/s]\rBatches:  67%|██████▋   | 106/159 [00:05<00:02, 25.49it/s]\rBatches:  69%|██████▉   | 110/159 [00:05<00:01, 27.61it/s]\rBatches:  72%|███████▏  | 114/159 [00:05<00:01, 29.00it/s]\rBatches:  74%|███████▍  | 118/159 [00:05<00:01, 29.58it/s]\rBatches:  77%|███████▋  | 122/159 [00:05<00:01, 30.58it/s]\rBatches:  80%|███████▉  | 127/159 [00:06<00:00, 34.54it/s]\rBatches:  82%|████████▏ | 131/159 [00:06<00:00, 35.83it/s]\rBatches:  85%|████████▍ | 135/159 [00:06<00:00, 34.52it/s]\rBatches:  88%|████████▊ | 140/159 [00:06<00:00, 38.58it/s]\rBatches:  91%|█████████ | 144/159 [00:06<00:00, 38.94it/s]\rBatches:  93%|█████████▎| 148/159 [00:06<00:00, 38.80it/s]\rBatches:  97%|█████████▋| 155/159 [00:06<00:00, 46.39it/s]\rBatches: 100%|██████████| 159/159 [00:06<00:00, 23.42it/s]"
   },
   "queue_health": {
     "schema": "techscope-queue-health-v1",
     "root": "<TECHSCOPE_ROOT>",
     "status": "pass",
     "stale_days_threshold": 7,
-    "created_at": "2026-06-22T05:20:17.946Z",
+    "created_at": "2026-06-23T17:25:46.956Z",
     "queues": [
       {
         "id": "telegram-intake",
         "counts": {
           "pending": 0,
           "processing": 0,
-          "awaiting_codex": 0,
-          "complete": 0,
-          "done": 0,
+          "awaiting_codex": 1,
+          "complete": 7,
+          "done": 12,
           "failed": 0
         }
       },
       {
         "id": "codex-media-review",
         "counts": {
-          "pending": 0,
-          "done": 0
+          "pending": 1,
+          "done": 5
         }
       }
     ],
-    "stale": [],
+    "stale": [
+      {
+        "queue": "telegram-intake",
+        "status": "awaiting_codex",
+        "id": "2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов",
+        "path": ".queue/telegram-intake/awaiting_codex/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
+        "updated_at": "2026-05-19T18:32:04.876Z",
+        "created_at": "2026-05-19T18:31:50.241Z",
+        "age_days": 34.95
+      },
+      {
+        "queue": "codex-media-review",
+        "status": "pending",
+        "id": "2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов",
+        "path": ".queue/codex-media-review/pending/2026-05-19-telegram-6208460904-64-как-дать-агенту-руки-4-типа-подключения-внешних-сервисов.json",
+        "updated_at": "2026-05-19T18:32:04.876Z",
+        "created_at": "2026-05-19T18:32:04.876Z",
+        "age_days": 34.95
+      }
+    ],
     "failed": []
   },
   "launchd_root_audit": {
-    "ok": false,
+    "ok": true,
     "root": "<TECHSCOPE_ROOT>",
     "domain": "gui/501",
     "agent_dir": "<USER_HOME>/Library/LaunchAgents",
     "jobs": [
       {
         "label": "com.techscope.web",
-        "status": "disk-missing",
+        "status": "ok",
         "disk": {
-          "status": "missing",
+          "status": "ok",
           "path": "<USER_HOME>/Library/LaunchAgents/com.techscope.web.plist",
-          "contains_expected_root": false,
+          "contains_expected_root": true,
           "contains_old_root": false
         },
         "loaded": {
-          "status": "not-loaded",
-          "contains_expected_root": false,
+          "status": "ok",
+          "contains_expected_root": true,
           "contains_old_root": false,
-          "detail": "Bad request.\nCould not find service \"com.techscope.web\" in domain for user gui: 501"
+          "excerpt": [
+            "\tpath = <USER_HOME>/Library/LaunchAgents/com.techscope.web.plist",
+            "\tworking directory = <TECHSCOPE_ROOT>",
+            "\tstdout path = <TECHSCOPE_ROOT>/.logs/techscope-web.out.log",
+            "\tstderr path = <TECHSCOPE_ROOT>/.logs/techscope-web.err.log"
+          ]
         }
       },
       {
         "label": "com.techscope.telegram-bot",
-        "status": "disk-missing",
+        "status": "ok",
         "disk": {
-          "status": "missing",
+          "status": "ok",
           "path": "<USER_HOME>/Library/LaunchAgents/com.techscope.telegram-bot.plist",
-          "contains_expected_root": false,
+          "contains_expected_root": true,
           "contains_old_root": false
         },
         "loaded": {
-          "status": "not-loaded",
-          "contains_expected_root": false,
+          "status": "ok",
+          "contains_expected_root": true,
           "contains_old_root": false,
-          "detail": "Bad request.\nCould not find service \"com.techscope.telegram-bot\" in domain for user gui: 501"
+          "excerpt": [
+            "\tpath = <USER_HOME>/Library/LaunchAgents/com.techscope.telegram-bot.plist",
+            "\t\t<TECHSCOPE_ROOT>/scripts/run-techscope-telegram-bot.sh",
+            "\tworking directory = <TECHSCOPE_ROOT>",
+            "\tstdout path = <TECHSCOPE_ROOT>/.logs/techscope-telegram-bot.out.log",
+            "\tstderr path = <TECHSCOPE_ROOT>/.logs/techscope-telegram-bot.err.log"
+          ]
         }
       }
     ],
-    "stale_jobs": [
-      "com.techscope.web",
-      "com.techscope.telegram-bot"
-    ]
+    "stale_jobs": []
   },
   "control_center_health": {
     "schema": "pritha-control-center-health-v1",
     "baseUrl": "http://127.0.0.1:3420",
-    "created_at": "2026-06-22T05:20:19.330Z",
+    "created_at": "2026-06-23T17:25:48.145Z",
     "strict": false,
     "status": "pass",
     "checks": [
@@ -205,9 +232,9 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3_ju5475y4b76.js",
+          "/_next/static/chunks/270ps3c90vpj0.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/0fv7n0rg3_oyh.js",
+          "/_next/static/chunks/1h7iyq044h5af.js",
           "/_next/static/chunks/253pciu9fe727.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
@@ -228,11 +255,11 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3_ju5475y4b76.js",
+          "/_next/static/chunks/270ps3c90vpj0.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/0kpcyvqq7ark9.js",
+          "/_next/static/chunks/04ae1e1yva2ln.js",
           "/_next/static/chunks/253pciu9fe727.js",
-          "/_next/static/chunks/3-byck4zm4nk2.js",
+          "/_next/static/chunks/37atpnmu8t1ec.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
         ],
@@ -252,10 +279,10 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3_ju5475y4b76.js",
+          "/_next/static/chunks/270ps3c90vpj0.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/3_ayhcn5b41g_.js",
-          "/_next/static/chunks/0dfnub3tvn52z.js",
+          "/_next/static/chunks/13d8c7x4o0ecj.js",
+          "/_next/static/chunks/1uberzkdsyejy.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
         ],
@@ -303,11 +330,11 @@
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/3_ju5475y4b76.js",
+        "id": "chunk:/_next/static/chunks/270ps3c90vpj0.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/3_ju5475y4b76.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3_ju5475y4b76.js",
+        "path": "/_next/static/chunks/270ps3c90vpj0.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/270ps3c90vpj0.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
@@ -323,11 +350,11 @@
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "id": "chunk:/_next/static/chunks/1h7iyq044h5af.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/0fv7n0rg3_oyh.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "path": "/_next/static/chunks/1h7iyq044h5af.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/1h7iyq044h5af.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
@@ -363,41 +390,41 @@
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/0kpcyvqq7ark9.js",
+        "id": "chunk:/_next/static/chunks/04ae1e1yva2ln.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/0kpcyvqq7ark9.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/0kpcyvqq7ark9.js",
+        "path": "/_next/static/chunks/04ae1e1yva2ln.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/04ae1e1yva2ln.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/3-byck4zm4nk2.js",
+        "id": "chunk:/_next/static/chunks/37atpnmu8t1ec.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/3-byck4zm4nk2.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3-byck4zm4nk2.js",
+        "path": "/_next/static/chunks/37atpnmu8t1ec.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/37atpnmu8t1ec.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/3_ayhcn5b41g_.js",
+        "id": "chunk:/_next/static/chunks/13d8c7x4o0ecj.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/3_ayhcn5b41g_.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3_ayhcn5b41g_.js",
+        "path": "/_next/static/chunks/13d8c7x4o0ecj.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/13d8c7x4o0ecj.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
       },
       {
-        "id": "chunk:/_next/static/chunks/0dfnub3tvn52z.js",
+        "id": "chunk:/_next/static/chunks/1uberzkdsyejy.js",
         "status": "pass",
         "message": "Referenced JavaScript chunk loaded",
-        "path": "/_next/static/chunks/0dfnub3tvn52z.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/0dfnub3tvn52z.js",
+        "path": "/_next/static/chunks/1uberzkdsyejy.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/1uberzkdsyejy.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "detail": ""
@@ -414,9 +441,9 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3_ju5475y4b76.js",
+          "/_next/static/chunks/270ps3c90vpj0.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/0fv7n0rg3_oyh.js",
+          "/_next/static/chunks/1h7iyq044h5af.js",
           "/_next/static/chunks/253pciu9fe727.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
@@ -434,11 +461,11 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3_ju5475y4b76.js",
+          "/_next/static/chunks/270ps3c90vpj0.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/0kpcyvqq7ark9.js",
+          "/_next/static/chunks/04ae1e1yva2ln.js",
           "/_next/static/chunks/253pciu9fe727.js",
-          "/_next/static/chunks/3-byck4zm4nk2.js",
+          "/_next/static/chunks/37atpnmu8t1ec.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
         ],
@@ -455,10 +482,10 @@
           "/_next/static/chunks/11oof8oxnxiv9.js",
           "/_next/static/chunks/3n7dm2ojtyzwn.js",
           "/_next/static/chunks/turbopack-1a7w8x953fnac.js",
-          "/_next/static/chunks/3_ju5475y4b76.js",
+          "/_next/static/chunks/270ps3c90vpj0.js",
           "/_next/static/chunks/14mrh2-p_w84d.js",
-          "/_next/static/chunks/3_ayhcn5b41g_.js",
-          "/_next/static/chunks/0dfnub3tvn52z.js",
+          "/_next/static/chunks/13d8c7x4o0ecj.js",
+          "/_next/static/chunks/1uberzkdsyejy.js",
           "/_next/static/chunks/0cz1d0mv5g_q7.js",
           "/_next/static/chunks/10qk6v6416kh8.js"
         ],
@@ -500,8 +527,8 @@
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/3_ju5475y4b76.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3_ju5475y4b76.js",
+        "path": "/_next/static/chunks/270ps3c90vpj0.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/270ps3c90vpj0.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
@@ -516,8 +543,8 @@
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/0fv7n0rg3_oyh.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/0fv7n0rg3_oyh.js",
+        "path": "/_next/static/chunks/1h7iyq044h5af.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/1h7iyq044h5af.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
@@ -548,32 +575,32 @@
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/0kpcyvqq7ark9.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/0kpcyvqq7ark9.js",
+        "path": "/_next/static/chunks/04ae1e1yva2ln.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/04ae1e1yva2ln.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/3-byck4zm4nk2.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3-byck4zm4nk2.js",
+        "path": "/_next/static/chunks/37atpnmu8t1ec.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/37atpnmu8t1ec.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/3_ayhcn5b41g_.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/3_ayhcn5b41g_.js",
+        "path": "/_next/static/chunks/13d8c7x4o0ecj.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/13d8c7x4o0ecj.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
         "detail": ""
       },
       {
-        "path": "/_next/static/chunks/0dfnub3tvn52z.js",
-        "url": "http://127.0.0.1:3420/_next/static/chunks/0dfnub3tvn52z.js",
+        "path": "/_next/static/chunks/1uberzkdsyejy.js",
+        "url": "http://127.0.0.1:3420/_next/static/chunks/1uberzkdsyejy.js",
         "httpStatus": 200,
         "contentType": "application/javascript; charset=UTF-8",
         "status": "pass",
@@ -581,56 +608,6 @@
       }
     ]
   },
-  "warnings": [
-    {
-      "id": "launchd-root-drift",
-      "severity": "warning",
-      "message": "launchd loaded state or plist root differs from the current Pritha root",
-      "detail": {
-        "ok": false,
-        "root": "<TECHSCOPE_ROOT>",
-        "domain": "gui/501",
-        "agent_dir": "<USER_HOME>/Library/LaunchAgents",
-        "jobs": [
-          {
-            "label": "com.techscope.web",
-            "status": "disk-missing",
-            "disk": {
-              "status": "missing",
-              "path": "<USER_HOME>/Library/LaunchAgents/com.techscope.web.plist",
-              "contains_expected_root": false,
-              "contains_old_root": false
-            },
-            "loaded": {
-              "status": "not-loaded",
-              "contains_expected_root": false,
-              "contains_old_root": false,
-              "detail": "Bad request.\nCould not find service \"com.techscope.web\" in domain for user gui: 501"
-            }
-          },
-          {
-            "label": "com.techscope.telegram-bot",
-            "status": "disk-missing",
-            "disk": {
-              "status": "missing",
-              "path": "<USER_HOME>/Library/LaunchAgents/com.techscope.telegram-bot.plist",
-              "contains_expected_root": false,
-              "contains_old_root": false
-            },
-            "loaded": {
-              "status": "not-loaded",
-              "contains_expected_root": false,
-              "contains_old_root": false,
-              "detail": "Bad request.\nCould not find service \"com.techscope.telegram-bot\" in domain for user gui: 501"
-            }
-          }
-        ],
-        "stale_jobs": [
-          "com.techscope.web",
-          "com.techscope.telegram-bot"
-        ]
-      }
-    }
-  ],
+  "warnings": [],
   "regressions": []
 }

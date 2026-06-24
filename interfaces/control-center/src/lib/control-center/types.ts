@@ -156,6 +156,7 @@ export type ControlCenterAgent = {
   url: {
     status: "available" | "unavailable";
     local?: string;
+    tailscale?: string;
     reason?: string;
   };
   ui: {
