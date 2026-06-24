@@ -57,3 +57,14 @@ test("Control Center Realtime runtime gates every effective workspace-write task
   assert.match(runtimeSource, /reasons\.push\("control_center_runtime_change"\)/);
   assert.match(runtimeSource, /reasons\.includes\("control_center_runtime_change"\)[\s\S]*\? "control_center_runtime_change"/);
 });
+
+test("Control Center approval decisions create non-duplicating Realtime feedback", () => {
+  const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
+
+  assert.match(runtimeSource, /phase: "approval_approved"/);
+  assert.match(runtimeSource, /phase: "approval_rejected"/);
+  assert.match(runtimeSource, /priority: "high"/);
+  assert.match(runtimeSource, /speakable: false/);
+  assert.match(runtimeSource, /Approve получен в UI/);
+  assert.match(runtimeSource, /Reject получен в UI/);
+});

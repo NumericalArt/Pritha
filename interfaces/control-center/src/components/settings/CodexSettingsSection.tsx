@@ -8,6 +8,7 @@ type CodexServiceTier = "standard" | "fast";
 type CodexPlanningMode = "off" | "inline_required" | "planner";
 type CodexExecutionMode = "inline_only" | "orchestrator_enabled" | "orchestrator_preferred";
 type CodexVoiceProgressVerbosity = "brief" | "normal" | "detailed";
+type CodexAppThreadRoutingMode = "per_task" | "control" | "subject_scoped" | "subject_scoped_rotate";
 
 type RuntimeSettings = {
   deepTaskPrimaryTransport: "codex-app" | "codex-cli";
@@ -25,6 +26,9 @@ type RuntimeSettings = {
   codexMaxPlanSteps: number;
   codexAskBeforeOrchestration: boolean;
   codexVoiceProgressVerbosity: CodexVoiceProgressVerbosity;
+  codexAppThreadRoutingMode: CodexAppThreadRoutingMode;
+  codexAppThreadMaxTurns: number;
+  codexAppThreadMaxAgeHours: number;
   updatedAt: string;
 };
 
@@ -46,6 +50,9 @@ const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   codexMaxPlanSteps: 7,
   codexAskBeforeOrchestration: true,
   codexVoiceProgressVerbosity: "normal",
+  codexAppThreadRoutingMode: "subject_scoped",
+  codexAppThreadMaxTurns: 24,
+  codexAppThreadMaxAgeHours: 168,
   updatedAt: "",
 };
 
@@ -121,6 +128,9 @@ export function CodexSettingsSection() {
         codexMaxPlanSteps: runtimeSettings.codexMaxPlanSteps,
         codexAskBeforeOrchestration: runtimeSettings.codexAskBeforeOrchestration,
         codexVoiceProgressVerbosity: runtimeSettings.codexVoiceProgressVerbosity,
+        codexAppThreadRoutingMode: runtimeSettings.codexAppThreadRoutingMode,
+        codexAppThreadMaxTurns: runtimeSettings.codexAppThreadMaxTurns,
+        codexAppThreadMaxAgeHours: runtimeSettings.codexAppThreadMaxAgeHours,
       }),
     }).catch(() => null);
     setSaving(false);
@@ -197,6 +207,50 @@ export function CodexSettingsSection() {
               Codex CLI {cliAvailable ? "ready" : "unavailable"}
             </span>
             <span>Session Contract reserved</span>
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Thread Routing</strong>
+              <span>Subject scoped keeps one Codex App thread per agent or Pritha subsystem. Per task is the isolation fallback.</span>
+            </div>
+            <select
+              value={runtimeSettings.codexAppThreadRoutingMode}
+              aria-label="Codex App thread routing mode"
+              onChange={(event) => updateRuntimeSetting("codexAppThreadRoutingMode", event.currentTarget.value as RuntimeSettings["codexAppThreadRoutingMode"])}
+            >
+              <option value="subject_scoped">Subject scoped</option>
+              <option value="per_task">Per task</option>
+              <option value="control">Control thread</option>
+              <option value="subject_scoped_rotate">Subject scoped + rotation</option>
+            </select>
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Thread Rotation</strong>
+              <span>Used by subject scoped + rotation to start a new generation before a thread gets too long.</span>
+            </div>
+            <div className="settings-inline-fields">
+              <input
+                className="settings-number-input"
+                type="number"
+                min={4}
+                max={100}
+                step={1}
+                value={runtimeSettings.codexAppThreadMaxTurns}
+                aria-label="Codex App thread max turns"
+                onChange={(event) => updateRuntimeSetting("codexAppThreadMaxTurns", Math.max(4, Math.min(100, Number(event.currentTarget.value) || 24)))}
+              />
+              <input
+                className="settings-number-input"
+                type="number"
+                min={1}
+                max={720}
+                step={1}
+                value={runtimeSettings.codexAppThreadMaxAgeHours}
+                aria-label="Codex App thread max age hours"
+                onChange={(event) => updateRuntimeSetting("codexAppThreadMaxAgeHours", Math.max(1, Math.min(720, Number(event.currentTarget.value) || 168)))}
+              />
+            </div>
           </div>
           <div className="settings-rowline">
             <div>

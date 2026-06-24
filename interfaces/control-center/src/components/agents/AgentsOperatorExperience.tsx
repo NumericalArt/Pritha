@@ -404,6 +404,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   const runtimeAction = selectedAction === "start" || selectedAction === "stop";
   const requiredPhrase = runtimeAction ? panel.plan?.confirmation?.requiredPhrase || "" : "";
   const confirmationMatches = Boolean(requiredPhrase && panel.confirmation.trim() === requiredPhrase);
+  const confirmationInputEditable = Boolean(requiredPhrase && !panel.running);
   const runtimeActionEnabled = Boolean(runtimeAction && panel.plan?.actionEnabled && confirmationMatches && !panel.running);
 
   return (
@@ -605,7 +606,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
                     placeholder={requiredPhrase || "Action unavailable"}
                     spellCheck={false}
                     autoComplete="off"
-                    disabled={!panel.plan?.actionEnabled || panel.running}
+                    disabled={!confirmationInputEditable}
                   />
                 </label>
                 {!panel.plan?.actionEnabled ? (

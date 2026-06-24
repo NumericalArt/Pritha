@@ -3,7 +3,7 @@ id: realtime-voice-control-ui
 type: standard
 status: active
 created: 2026-05-31
-updated: 2026-05-31
+updated: 2026-06-24
 last_reviewed: 2026-05-31
 owner: Techscope/user
 topics:
@@ -55,7 +55,7 @@ source_published: 2026-05-29
 source_updated: 2026-05-31
 source_version: initial reusable voice-control UI pattern v1
 retrieved: 2026-05-31
-verified: 2026-05-31
+verified: 2026-06-24
 valid_for: Pritha descendants with browser-based realtime voice control
 temporal_status: version-bound
 ---
@@ -100,6 +100,12 @@ This is the default initial UI for voice-enabled descendants until a contract se
 - Show recent transcript turns for both operator and assistant.
 - Show a compact tool/deep-task status area for queued, running, completed, failed and decision-required work.
 - Provide an explicit `reset` or `clear context` control when the UI allows selected memory focus, search result focus, feed-card focus, lesson focus or any other user-selected context.
+- If the UI has sticky context, label it as live current-session context rather
+  than durable memory. Sticky context may pin recent current-session events and
+  visible task state for the active Realtime call, but it must not imply that
+  cross-session rolling summary is automatically loaded.
+- Sticky context reset should be explicit enough to avoid accidental taps and
+  should only affect the active voice session's pinned context.
 - Keep publication, deletion, deployment, service install and broad system-change actions behind explicit confirmation controls.
 - Keep domain controls near the voice surface only when they affect the next voice turn, such as selected source, selected memory result or selected feed card.
 - Keep debug/event logs behind a secondary details panel or developer mode; do not make raw Realtime events the main operator UI.
@@ -139,7 +145,22 @@ These states should be visible enough for a phone user to know whether speaking 
 - Mobile layout is first-class: controls must remain reachable with one hand, and status text must not overflow small screens.
 - Controls should be icon-first where the icon is conventional, with accessible labels/tooltips.
 - The transcript is supporting context, not the whole product. Domain state and pending work must be visible separately.
-- The UI must make it obvious when context is "sticky" across turns.
+- The UI must make it obvious when context is "sticky" across turns within the
+  current Realtime session. Cross-session recall belongs to an explicit recall
+  tool, not automatic UI startup context.
+
+## Sticky Context UX
+
+Sticky context is a live pinned-context aid for the currently open Realtime
+session:
+
+- Show whether sticky context is enabled.
+- Show how many current-session events are available to pin.
+- Send sticky context only for explicit UI actions or key task events where the
+  active voice turn needs current task/session state.
+- Do not send rolling summary automatically when starting a new Realtime
+  session.
+- Provide a reset confirmation before clearing or resetting sticky context.
 
 ## Relationship to realtime architecture
 

@@ -5,6 +5,7 @@ import test from "node:test";
 const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
 const settingsRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/runtime-settings/route.ts", "utf8");
 const codexSettingsSource = readFileSync("interfaces/control-center/src/components/settings/CodexSettingsSection.tsx", "utf8");
+const realtimeHookSource = readFileSync("interfaces/control-center/src/components/voice/usePrithaRealtime.ts", "utf8");
 
 test("Codex task planning settings are persisted and exposed through runtime settings", () => {
   for (const key of [
@@ -34,7 +35,25 @@ test("Codex App tasks write plan and voice feedback artifacts", () => {
 test("Realtime instructions prefer semantic voice feedback over heartbeat", () => {
   assert.match(runtimeSource, /Prefer latest_voice_feedback and speakable_events over heartbeat/);
   assert.match(runtimeSource, /Never read heartbeat as the main progress update/);
-  assert.match(runtimeSource, /plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed or step_blocked/);
+  assert.match(runtimeSource, /plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed, step_blocked or operator_question/);
+});
+
+test("Agent creation Codex tasks carry mandatory research gate metadata", () => {
+  assert.match(runtimeSource, /agentCreationResearchGatePayload/);
+  assert.match(runtimeSource, /agentDevelopmentResearchGatePayload/);
+  assert.match(runtimeSource, /agent_creation_research_gate/);
+  assert.match(runtimeSource, /agent_development_research_gate/);
+  assert.match(runtimeSource, /node scripts\/pritha\.mjs research <contract>/);
+  assert.match(runtimeSource, /node scripts\/pritha\.mjs pattern-research <contract>/);
+  assert.match(runtimeSource, /node scripts\/pritha\.mjs improve <project-path> --task <text>/);
+  assert.match(runtimeSource, /node scripts\/pritha\.mjs external-research <contract> --input <evidence\.json>/);
+  assert.match(runtimeSource, /research_gate_status: complete/);
+  assert.match(runtimeSource, /separate pattern-pack artifact, external current-source evidence and memory-vs-external synthesis are mandatory before scaffold/);
+  assert.match(runtimeSource, /\.private\/agents-mother\/semantic-memory-failures\.jsonl/);
+  assert.match(runtimeSource, /card-first completion/);
+  assert.match(runtimeSource, /node scripts\/pritha\.mjs card-readiness <agent-slug>/);
+  assert.match(runtimeSource, /verify_control_center_card/);
+  assert.match(runtimeSource, /creation is not complete if card status is missing/);
 });
 
 test("Step orchestrator remains policy gated", () => {
@@ -44,13 +63,41 @@ test("Step orchestrator remains policy gated", () => {
   assert.match(runtimeSource, /settings\.codexExecutionMode === "orchestrator_preferred"/);
 });
 
-test("Planner operator questions do not leave non-actionable active task cards", () => {
-  assert.doesNotMatch(
-    runtimeSource,
-    /status: "waiting_for_operator",\s+phase: "operator_question"/,
-    "operator questions should complete with a question result instead of leaving an active wait card",
-  );
-  assert.match(runtimeSource, /status: "complete",\s+phase: "operator_question"/);
-  assert.match(runtimeSource, /operator_question_terminal: true/);
-  assert.match(runtimeSource, /Codex task needs operator input before execution/);
+test("Planner operator questions leave actionable wait cards that can resume", () => {
+  assert.match(runtimeSource, /status: "waiting_for_operator",\s+phase: "operator_question"/);
+  assert.match(runtimeSource, /operator_question_terminal: false/);
+  assert.match(runtimeSource, /export async function answerPrithaCodexTask/);
+  assert.match(runtimeSource, /operator_question_answered: true/);
+  assert.match(runtimeSource, /startCodexAppTask\(nextRequest/);
+  assert.match(runtimeSource, /name: "answer_codex_task"/);
+  assert.match(runtimeSource, /Do not start a new run_codex_task just to answer that clarification/);
+});
+
+test("Realtime Codex handoff waits for explicit full-brief confirmation", () => {
+  assert.match(runtimeSource, /function codexTaskNeedsHandoffConfirmation\(args: CodexTaskArgs, task: Record<string, unknown>\)/);
+  assert.match(runtimeSource, /function hasCodexHandoffConfirmation\(value: unknown\)/);
+  assert.match(runtimeSource, /handoff_confirmation_required/);
+  assert.match(runtimeSource, /ТЗ полностью проговорено\? Передавать это в Codex\?/);
+  assert.match(runtimeSource, /brief is complete and ready for Codex/);
+  assert.match(runtimeSource, /ask concise clarifying questions if required fields are missing/);
+  assert.match(runtimeSource, /Ask at most three questions at a time/);
+
+  const guardIndex = runtimeSource.indexOf("const handoffConfirmation = codexTaskHandoffConfirmationResult(args, task);");
+  const mkdirIndex = runtimeSource.indexOf("await mkdir(taskDir, { recursive: true });");
+  assert.ok(guardIndex > 0, "runCodexTask should check handoff confirmation");
+  assert.ok(mkdirIndex > guardIndex, "handoff confirmation guard should run before task files/directories are created");
+});
+
+test("Voice UI keeps watching approval-gated tasks and handoffs approval decisions once", () => {
+  assert.match(realtimeHookSource, /reportedCodexTaskApprovalDecisionsRef/);
+  assert.match(realtimeHookSource, /lastCodexTaskApprovalStatusRef/);
+  assert.match(realtimeHookSource, /UI approval received for Codex task/);
+  assert.match(realtimeHookSource, /UI rejection received for Codex task/);
+  assert.doesNotMatch(realtimeHookSource, /do not ask for this approval again/);
+  assert.match(realtimeHookSource, /codex_task_approval_handoff_sent/);
+  assert.match(realtimeHookSource, /requestResponse\("codex_task_approval_received"\)/);
+  assert.match(realtimeHookSource, /requestResponse\("codex_task_rejected"\)/);
+  assert.match(realtimeHookSource, /if \(taskId\) startCodexTaskPolling\(taskId\);/);
+  assert.match(realtimeHookSource, /item\.name === "run_codex_task" \|\| item\.name === "answer_codex_task"/);
+  assert.match(realtimeHookSource, /latestFeedback\?\.speakable === false/);
 });

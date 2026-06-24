@@ -43,6 +43,14 @@ export type CodexTaskVoiceFeedback = {
   step_title?: string;
 };
 
+export type CodexTaskThreadScope = {
+  kind?: string;
+  id?: string;
+  label?: string;
+  source?: string;
+  generation?: number;
+};
+
 export type CodexTaskState = {
   id: string;
   title: string;
@@ -65,6 +73,8 @@ export type CodexTaskState = {
   handoffReason?: string;
   approval?: CodexTaskApproval | null;
   latestVoiceFeedback?: CodexTaskVoiceFeedback | null;
+  threadScope?: CodexTaskThreadScope | null;
+  threadRoutingMode?: string;
 };
 
 export type SessionMemoryPromotionState = {
@@ -161,10 +171,14 @@ type CodexTaskSnapshot = {
   result_available?: boolean;
   result_excerpt?: string;
   approval?: CodexTaskApproval | null;
+  thread_scope?: CodexTaskThreadScope | null;
+  codex_app_thread_routing_mode?: string;
   request?: {
     created_at?: string;
     task?: string;
     task_type?: string;
+    thread_scope?: CodexTaskThreadScope | null;
+    codex_app_thread_routing_mode?: string;
   };
   handoff_status?: "pending" | "sent" | "skipped";
   handoff_reason?: string;
@@ -209,8 +223,40 @@ const MAX_VISIBLE_TASKS = 5;
 const MAX_STICKY_CONTEXT_EVENTS = 6;
 const MAX_STICKY_CONTEXT_TASKS = 3;
 const MAX_STICKY_CONTEXT_CHARS = 3_500;
+const ROLLING_SUMMARY_CLIENT_DEBOUNCE_MS = 12_000;
 const MIC_INPUT_LEVEL_STORAGE_KEY = "pritha.voice.inputLevel.v1";
 const LEGACY_MIC_GAIN_STORAGE_KEY = "pritha.voice.micGain.v1";
+
+type RollingSummaryPayload = {
+  topicKey: string;
+  task: string;
+  currentStatus: string;
+  keyRefs: string[];
+  keyResources: string[];
+  confirmedConstraints: string[];
+  confirmedAccesses: string[];
+  nextStep: string;
+  latestRealtimeSession: {
+    sessionId: string;
+    updatedAt: string;
+    summary: string;
+    keyPoints: string[];
+    userIntents: string[];
+    nextStep: string;
+  };
+  latestCodexTask: {
+    taskId: string;
+    title: string;
+    status: string;
+    phase: string;
+    subject: string;
+    result: string;
+    refs: string[];
+    nextStep: string;
+  };
+  sourceEvent: string;
+  force?: boolean;
+};
 
 function stickyText(value: unknown, maxChars: number) {
   return String(value || "")
@@ -272,6 +318,92 @@ function loadSessionEvents() {
   }
 }
 
+function uniqueLimited(values: Array<string | undefined>, limit: number) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = stickyText(value, 220);
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function extractRollingSummaryRefs(value: unknown) {
+  const text = String(value || "");
+  const matches = text.match(/https?:\/\/[^\s)"']+|(?:[A-Za-z0-9_.-]+\/){1,}[A-Za-z0-9_.-]+\.(?:md|ts|tsx|js|mjs|json|txt|sqlite)/g) || [];
+  return uniqueLimited(matches.map((item) => item.replace(/[),.;]+$/g, "")), 6);
+}
+
+function buildRealtimeSessionSection(sessionId: string, events: VoiceSessionEvent[], activeTask?: Partial<CodexTaskState> & { id?: string }) {
+  const recentEvents = events.slice(-20);
+  const userIntents = uniqueLimited(
+    recentEvents.filter((event) => event.kind === "user").map((event) => stickyText(event.text, 170)),
+    3,
+  );
+  const keyPoints = uniqueLimited(
+    recentEvents
+      .filter((event) => event.kind !== "user")
+      .map((event) => {
+        const label = event.kind === "assistant" ? "Pritha" : event.kind === "task" ? "Codex task" : event.kind;
+        return `${label}: ${stickyText(event.text, 170)}`;
+      }),
+    4,
+  );
+  const latestUserIntent = userIntents[userIntents.length - 1] || userIntents[0] || "";
+  const summary = stickyText(
+    [
+      userIntents.length ? `Operator asked/discussed: ${userIntents.join("; ")}` : "",
+      keyPoints.length ? `Session signals: ${keyPoints.slice(0, 2).join("; ")}` : "",
+      activeTask?.title ? `Recent Codex context: ${activeTask.title} (${activeTask.status || "unknown"}).` : "",
+    ].filter(Boolean).join(" "),
+    420,
+  ) || "No spoken Realtime session content captured yet.";
+
+  return {
+    sessionId,
+    updatedAt: nowIso(),
+    summary,
+    keyPoints,
+    userIntents,
+    nextStep: latestUserIntent
+      ? stickyText(`Continue from operator intent: ${latestUserIntent}`, 220)
+      : activeTask?.title
+        ? stickyText(`Continue around latest Codex task: ${activeTask.title}`, 220)
+        : "Ask the operator what to continue.",
+  };
+}
+
+function rollingSummaryEventFromSnapshot(snapshot: CodexTaskSnapshot) {
+  if (!snapshot.ok || !snapshot.task_id) return "";
+  const status = snapshot.status || "";
+  if (snapshot.complete) return status.startsWith("failed") ? "failed" : "completed";
+  if (status === "failed_timeout") return "failed_timeout";
+  if (status === "decision_required" || snapshot.approval?.status === "pending") return "decision_gate";
+  if (status === "waiting_for_operator") return "operator_question";
+  if (snapshot.stale) return "stale_repaired";
+  const phase = snapshot.latest_voice_feedback?.phase || snapshot.phase || "";
+  if (
+    [
+      "plan_created",
+      "mode_selected",
+      "step_started",
+      "step_completed",
+      "step_blocked",
+      "operator_question",
+      "fallback_started",
+      "stale_repaired",
+    ].includes(phase)
+  ) {
+    return phase;
+  }
+  return "";
+}
+
 function usePrithaRealtimeController() {
   const [phase, setPhase] = useState<RealtimePhase>("idle");
   const [isMuted, setIsMuted] = useState(false);
@@ -317,10 +449,24 @@ function usePrithaRealtimeController() {
   const handledToolCallsRef = useRef(new Set<string>());
   const codexTaskPollTimersRef = useRef(new Map<string, number>());
   const reportedCodexTaskResultsRef = useRef(new Set<string>());
+  const reportedCodexTaskApprovalDecisionsRef = useRef(new Set<string>());
+  const lastCodexTaskApprovalStatusRef = useRef(new Map<string, string>());
   const lastCodexTaskProgressBriefRef = useRef(new Map<string, number>());
   const sessionLoggedCodexTaskResultsRef = useRef(new Set<string>());
   const memoryPromotionAttemptCountRef = useRef(0);
+  const sessionEventsRef = useRef<VoiceSessionEvent[]>([]);
+  const codexTasksRef = useRef<CodexTaskState[]>([]);
   const lastStickyContextSentRef = useRef("");
+  const rollingSummaryTimerRef = useRef<number | null>(null);
+  const rollingSummaryPendingRef = useRef<RollingSummaryPayload | null>(null);
+  const lastRollingSummaryEventKeyRef = useRef("");
+  const rollingSummarySessionActiveRef = useRef(false);
+  const unmountCleanupRef = useRef<{
+    checkpointRollingSummaryNow?: (sourceEvent: string, options?: { keepalive?: boolean }) => unknown;
+    flushRollingSummaryCheckpoint?: (reason?: string) => unknown;
+    clearCodexTaskPolling?: () => void;
+    closeConnection?: () => void;
+  }>({});
 
   const logClientEvent = useCallback((kind: string, payload: Record<string, unknown> = {}) => {
     void fetch("/api/realtime/event", {
@@ -342,6 +488,7 @@ function usePrithaRealtimeController() {
     }
     const recoveredEvents = loadSessionEvents();
     if (recoveredEvents.length) {
+      sessionEventsRef.current = recoveredEvents;
       memoryPromotionAttemptCountRef.current = recoveredEvents.length;
       for (const event of recoveredEvents) {
         if (event.kind === "task" && event.taskId) sessionLoggedCodexTaskResultsRef.current.add(event.taskId);
@@ -379,6 +526,7 @@ function usePrithaRealtimeController() {
       };
       setSessionEvents((items) => {
         const next = [...items, event].slice(-MAX_SESSION_EVENTS);
+        sessionEventsRef.current = next;
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem(
             SESSION_STORAGE_KEY,
@@ -446,8 +594,12 @@ function usePrithaRealtimeController() {
         handoffReason: task.handoffReason || existing?.handoffReason,
         approval: task.approval === undefined ? existing?.approval : task.approval,
         latestVoiceFeedback: task.latestVoiceFeedback === undefined ? existing?.latestVoiceFeedback : task.latestVoiceFeedback,
+        threadScope: task.threadScope === undefined ? existing?.threadScope : task.threadScope,
+        threadRoutingMode: task.threadRoutingMode || existing?.threadRoutingMode,
       };
-      return [nextTask, ...tasks.filter((item) => item.id !== task.id)].slice(0, MAX_VISIBLE_TASKS);
+      const nextTasks = [nextTask, ...tasks.filter((item) => item.id !== task.id)].slice(0, MAX_VISIBLE_TASKS);
+      codexTasksRef.current = nextTasks;
+      return nextTasks;
     });
   }, []);
 
@@ -511,6 +663,8 @@ function usePrithaRealtimeController() {
     pendingToolCallsRef.current.clear();
     handledToolCallsRef.current.clear();
     reportedCodexTaskResultsRef.current.clear();
+    reportedCodexTaskApprovalDecisionsRef.current.clear();
+    lastCodexTaskApprovalStatusRef.current.clear();
     assistantDraftRef.current = "";
     setRemoteAudioReady(false);
     setIsMuted(false);
@@ -559,6 +713,295 @@ function usePrithaRealtimeController() {
     codexTaskPollTimersRef.current.clear();
   }, []);
 
+  const postRollingSummaryCheckpoint = useCallback(
+    async (payload: RollingSummaryPayload, options: { keepalive?: boolean } = {}) => {
+      const response = await fetch("/api/realtime/rolling-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: options.keepalive,
+      });
+      const result = (await response.json().catch(() => ({ ok: false, error: "rolling summary returned non-json" }))) as {
+        ok?: boolean;
+        saved?: boolean;
+        reason?: string;
+        topic_key?: string;
+        source_event?: string;
+        byte_length?: number;
+        path?: string;
+        error?: string;
+      };
+      logClientEvent("rolling_summary_checkpoint_result", {
+        ok: Boolean(result.ok),
+        saved: Boolean(result.saved),
+        reason: result.reason,
+        topic_key: result.topic_key || payload.topicKey,
+        source_event: result.source_event || payload.sourceEvent,
+        byte_length: result.byte_length,
+        path: result.path,
+      });
+      if (!response.ok || !result.ok) throw new Error(result.error || `Rolling summary failed with status ${response.status}`);
+      return result;
+    },
+    [logClientEvent],
+  );
+
+  const sendRollingSummaryCheckpointKeepalive = useCallback(
+    (payload: RollingSummaryPayload, reason = "keepalive") => {
+      const body = JSON.stringify({ ...payload, force: true });
+      let sentByBeacon = false;
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        sentByBeacon = navigator.sendBeacon(
+          "/api/realtime/rolling-summary",
+          new Blob([body], { type: "application/json" }),
+        );
+      }
+      if (!sentByBeacon) {
+        void fetch("/api/realtime/rolling-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          keepalive: true,
+        }).catch((err) => {
+          logClientEvent("rolling_summary_checkpoint_failed", {
+            topic_key: payload.topicKey,
+            source_event: payload.sourceEvent,
+            reason,
+            error: err instanceof Error ? err.message : "rolling summary keepalive checkpoint failed",
+          });
+        });
+      }
+      logClientEvent("rolling_summary_checkpoint_keepalive_sent", {
+        topic_key: payload.topicKey,
+        source_event: payload.sourceEvent,
+        reason,
+        sent_by_beacon: sentByBeacon,
+      });
+      return true;
+    },
+    [logClientEvent],
+  );
+
+  const flushRollingSummaryCheckpoint = useCallback(
+    (reason = "flush") => {
+      if (rollingSummaryTimerRef.current !== null) {
+        window.clearTimeout(rollingSummaryTimerRef.current);
+        rollingSummaryTimerRef.current = null;
+      }
+      const payload = rollingSummaryPendingRef.current;
+      rollingSummaryPendingRef.current = null;
+      if (!payload) return false;
+      void postRollingSummaryCheckpoint(payload).catch((err) => {
+        logClientEvent("rolling_summary_checkpoint_failed", {
+          topic_key: payload.topicKey,
+          source_event: payload.sourceEvent,
+          reason,
+          error: err instanceof Error ? err.message : "rolling summary checkpoint failed",
+        });
+      });
+      return true;
+    },
+    [logClientEvent, postRollingSummaryCheckpoint],
+  );
+
+  const buildRollingSummaryPayload = useCallback(
+    (
+      sourceEvent: string,
+      options: {
+        snapshot?: CodexTaskSnapshot;
+        task?: Partial<CodexTaskState> & { id?: string };
+        force?: boolean;
+      } = {},
+    ): RollingSummaryPayload => {
+      const taskSnapshot = codexTasksRef.current;
+      const activeTask =
+        options.task ||
+        taskSnapshot.find((task) => task.status !== "complete" && !task.status.startsWith("failed")) ||
+        taskSnapshot[0];
+      const snapshot = options.snapshot;
+      const scope = snapshot?.thread_scope || snapshot?.request?.thread_scope || activeTask?.threadScope || null;
+      const topicKey = scope?.kind && scope.id ? `${scope.kind}-${scope.id}` : "pritha-voice";
+      const taskLabel = stickyText(
+        scope?.label ||
+          snapshot?.request?.task ||
+          snapshot?.task ||
+          activeTask?.title ||
+          "Pritha voice session",
+        260,
+      );
+      const statusText = snapshot?.status || activeTask?.status || "active";
+      const phaseText = snapshot?.phase || activeTask?.phase || "voice-session";
+      const brief = stickyText(
+        snapshot?.latest_voice_feedback?.voice_text ||
+          snapshot?.operator_brief ||
+          snapshot?.result_excerpt ||
+          activeTask?.latestVoiceFeedback?.voice_text ||
+          activeTask?.operatorBrief ||
+          activeTask?.summary ||
+          "",
+        220,
+      );
+      const sessionSnapshot = sessionEventsRef.current;
+      const keyEventText = sessionSnapshot
+        .filter((event) => event.kind === "task" || event.kind === "system")
+        .slice(-8)
+        .map((event) => event.text)
+        .join(" ");
+      const keyRefs = uniqueLimited(
+        [
+          snapshot?.paths?.status,
+          snapshot?.paths?.result,
+          activeTask?.statusPath,
+          activeTask?.resultPath,
+          ...extractRollingSummaryRefs(keyEventText),
+          ...extractRollingSummaryRefs(brief),
+        ],
+        6,
+      );
+      const keyResources = uniqueLimited(
+        [
+          scope?.label,
+          scope?.kind && scope.id ? `${scope.kind}:${scope.id}` : undefined,
+          snapshot?.task_id ? `codex-task:${snapshot.task_id}` : activeTask?.id ? `codex-task:${activeTask.id}` : undefined,
+          snapshot?.codex_app_thread_routing_mode || activeTask?.threadRoutingMode,
+        ],
+        5,
+      );
+      const confirmedAccesses = uniqueLimited(
+        [
+          snapshot?.approval?.status === "approved" || activeTask?.approval?.status === "approved" ? "UI approval recorded for current Codex task" : undefined,
+          snapshot?.approval?.status === "rejected" || activeTask?.approval?.status === "rejected" ? "UI rejection recorded for current Codex task" : undefined,
+          snapshot?.codex_app_thread_routing_mode || activeTask?.threadRoutingMode ? `Codex App routing: ${snapshot?.codex_app_thread_routing_mode || activeTask?.threadRoutingMode}` : undefined,
+        ],
+        5,
+      );
+      const nextStep = snapshot?.complete || statusText === "complete"
+        ? "Review the completed Codex result and continue only if the operator asks."
+        : statusText === "waiting_for_operator"
+          ? "Ask the operator for the pending answer, then resume the same Codex task."
+          : statusText === "decision_required"
+            ? "Wait for the UI decision gate before continuing the Codex task."
+            : "Continue the current voice task from the latest saved step.";
+      const latestRealtimeSession = buildRealtimeSessionSection(sessionIdRef.current, sessionSnapshot, activeTask);
+      const latestCodexTask = {
+        taskId: stickyText(snapshot?.task_id || activeTask?.id || "none", 140),
+        title: taskLabel,
+        status: stickyText(statusText, 100),
+        phase: stickyText(phaseText, 100),
+        subject: stickyText(scope?.kind && scope.id ? `${scope.kind}:${scope.id}` : scope?.label || "pritha-voice", 120),
+        result: stickyText(
+          brief ||
+            snapshot?.last_activity ||
+            activeTask?.lastActivity ||
+            activeTask?.resultExcerpt ||
+            activeTask?.summary ||
+            "No Codex task result captured.",
+          320,
+        ),
+        refs: keyRefs.slice(0, 4),
+        nextStep: stickyText(nextStep, 220),
+      };
+
+      return {
+        topicKey,
+        task: taskLabel,
+        currentStatus: stickyText(`Status: ${statusText}; phase: ${phaseText}${brief ? `; brief: ${brief}` : ""}`, 300),
+        keyRefs,
+        keyResources,
+        confirmedConstraints: [
+          "Internal summary-only checkpoint",
+          "No raw transcript storage",
+          "No secrets or credentials",
+          "No user-visible UI change",
+        ],
+        confirmedAccesses,
+        nextStep,
+        latestRealtimeSession,
+        latestCodexTask,
+        sourceEvent,
+        force: options.force,
+      };
+    },
+    [],
+  );
+
+  const queueRollingSummaryCheckpoint = useCallback(
+    (
+      sourceEvent: string,
+      options: {
+        snapshot?: CodexTaskSnapshot;
+        task?: Partial<CodexTaskState> & { id?: string };
+        force?: boolean;
+      } = {},
+    ) => {
+      if (!sourceEvent) return false;
+      const payload = buildRollingSummaryPayload(sourceEvent, options);
+      const eventKey = [
+        payload.topicKey,
+        payload.sourceEvent,
+        payload.task,
+        payload.currentStatus,
+        payload.latestRealtimeSession.summary,
+        payload.latestCodexTask.result,
+        payload.nextStep,
+      ].join("|");
+      if (!options.force && eventKey === lastRollingSummaryEventKeyRef.current) return false;
+      lastRollingSummaryEventKeyRef.current = eventKey;
+      rollingSummaryPendingRef.current = payload;
+
+      if (options.force) return flushRollingSummaryCheckpoint(sourceEvent);
+      if (rollingSummaryTimerRef.current !== null) window.clearTimeout(rollingSummaryTimerRef.current);
+      rollingSummaryTimerRef.current = window.setTimeout(() => {
+        flushRollingSummaryCheckpoint("debounced");
+      }, ROLLING_SUMMARY_CLIENT_DEBOUNCE_MS);
+      logClientEvent("rolling_summary_checkpoint_queued", {
+        topic_key: payload.topicKey,
+        source_event: payload.sourceEvent,
+      });
+      return true;
+    },
+    [buildRollingSummaryPayload, flushRollingSummaryCheckpoint, logClientEvent],
+  );
+
+  const checkpointRollingSummaryNow = useCallback(
+    (
+      sourceEvent: string,
+      options: {
+        snapshot?: CodexTaskSnapshot;
+        task?: Partial<CodexTaskState> & { id?: string };
+        keepalive?: boolean;
+      } = {},
+    ) => {
+      if (!sourceEvent) return false;
+      if (rollingSummaryTimerRef.current !== null) {
+        window.clearTimeout(rollingSummaryTimerRef.current);
+        rollingSummaryTimerRef.current = null;
+      }
+      rollingSummaryPendingRef.current = null;
+      const payload = buildRollingSummaryPayload(sourceEvent, { ...options, force: true });
+      lastRollingSummaryEventKeyRef.current = [
+        payload.topicKey,
+        payload.sourceEvent,
+        payload.task,
+        payload.currentStatus,
+        payload.latestRealtimeSession.summary,
+        payload.latestCodexTask.result,
+        payload.nextStep,
+      ].join("|");
+      if (options.keepalive) return sendRollingSummaryCheckpointKeepalive(payload, sourceEvent);
+      void postRollingSummaryCheckpoint(payload, { keepalive: true }).catch((err) => {
+        logClientEvent("rolling_summary_checkpoint_failed", {
+          topic_key: payload.topicKey,
+          source_event: payload.sourceEvent,
+          reason: sourceEvent,
+          error: err instanceof Error ? err.message : "rolling summary checkpoint failed",
+        });
+      });
+      return true;
+    },
+    [buildRollingSummaryPayload, logClientEvent, postRollingSummaryCheckpoint, sendRollingSummaryCheckpointKeepalive],
+  );
+
   const applyCodexTaskSnapshot = useCallback(
     (snapshot: CodexTaskSnapshot, options: { recordSessionEvent?: boolean } = {}) => {
       const recordSessionEvent = options.recordSessionEvent !== false;
@@ -575,7 +1018,8 @@ function usePrithaRealtimeController() {
       const voiceFeedback = snapshot.latest_voice_feedback || null;
       const voiceFeedbackText = voiceFeedback?.voice_text?.trim();
       const decisionRequired = statusText === "decision_required" || snapshot.approval?.status === "pending";
-      const progress = terminal ? 100 : snapshot.result_available ? 75 : snapshot.stale ? 65 : statusText === "running" ? 45 : decisionRequired ? 5 : 15;
+      const waitingForOperator = statusText === "waiting_for_operator";
+      const progress = terminal ? 100 : waitingForOperator ? 80 : snapshot.result_available ? 75 : snapshot.stale ? 65 : statusText === "running" ? 45 : decisionRequired ? 5 : 15;
       const handoffSkipped = snapshot.telemetry?.find((event) => event.kind === "codex_task_result_handoff_skipped");
       const handoffSent = snapshot.telemetry?.find((event) => event.kind === "codex_task_result_handoff_sent");
       const handoffStatus = snapshot.handoff_status || (handoffSent ? "sent" : handoffSkipped ? "skipped" : undefined);
@@ -612,9 +1056,14 @@ function usePrithaRealtimeController() {
         handoffReason,
         approval: snapshot.approval || null,
         latestVoiceFeedback: voiceFeedback,
+        threadScope: snapshot.thread_scope || snapshot.request?.thread_scope || null,
+        threadRoutingMode: snapshot.codex_app_thread_routing_mode || snapshot.request?.codex_app_thread_routing_mode,
         completedAt: terminal ? nowIso() : undefined,
       });
       setToolStatus(JSON.stringify(snapshot, null, 2));
+
+      const rollingSummaryEvent = rollingSummaryEventFromSnapshot(snapshot);
+      if (rollingSummaryEvent) queueRollingSummaryCheckpoint(rollingSummaryEvent, { snapshot });
 
       if (recordSessionEvent && terminal && snapshot.task_id && !sessionLoggedCodexTaskResultsRef.current.has(snapshot.task_id)) {
         sessionLoggedCodexTaskResultsRef.current.add(snapshot.task_id);
@@ -627,7 +1076,7 @@ function usePrithaRealtimeController() {
       }
       return terminal;
     },
-    [addTranscript, appendSessionEvent, upsertCodexTask],
+    [addTranscript, appendSessionEvent, queueRollingSummaryCheckpoint, upsertCodexTask],
   );
 
   const refreshCodexTask = useCallback(
@@ -646,7 +1095,8 @@ function usePrithaRealtimeController() {
     const response = await fetch("/api/realtime/codex-task?limit=5", { cache: "no-store" });
     const payload = (await response.json().catch(() => ({ ok: false, error: "task list returned non-json" }))) as CodexTaskListPayload;
     if (!payload.ok) return payload;
-    for (const task of payload.tasks || []) {
+    const tasks = payload.tasks || [];
+    for (const task of tasks) {
       applyCodexTaskSnapshot({ ...task, ok: true }, { recordSessionEvent: false });
     }
     return payload;
@@ -731,6 +1181,7 @@ function usePrithaRealtimeController() {
     const text = "Reset Sticky Voice Context for this live voice session. Do not rely on earlier pinned context unless the operator restates it.";
     appendSessionEvent("system", "Sticky Voice Context reset requested.");
     logClientEvent("sticky_context_reset", { session_id: sessionIdRef.current, channel_state: channel?.readyState || "missing" });
+    queueRollingSummaryCheckpoint("sticky_context_reset", { force: true });
 
     if (!channel || channel.readyState !== "open") return false;
     channel.send(
@@ -745,7 +1196,64 @@ function usePrithaRealtimeController() {
     );
     requestResponse("sticky_context_reset");
     return true;
-  }, [appendSessionEvent, logClientEvent, requestResponse]);
+  }, [appendSessionEvent, logClientEvent, queueRollingSummaryCheckpoint, requestResponse]);
+
+  const sendCodexTaskApprovalHandoff = useCallback(
+    (snapshot: CodexTaskSnapshot) => {
+      if (!snapshot.ok || !snapshot.task_id) return false;
+      const approvalStatus = typeof snapshot.approval?.status === "string" ? snapshot.approval.status : "";
+      if (approvalStatus) lastCodexTaskApprovalStatusRef.current.set(snapshot.task_id, approvalStatus);
+      if (approvalStatus !== "approved" && approvalStatus !== "rejected") return false;
+
+      const decisionKey = `${snapshot.task_id}:${approvalStatus}:${snapshot.approval?.decided_at || ""}`;
+      if (reportedCodexTaskApprovalDecisionsRef.current.has(decisionKey)) return false;
+      reportedCodexTaskApprovalDecisionsRef.current.add(decisionKey);
+
+      const statusText = snapshot.status || (approvalStatus === "rejected" ? "rejected" : "running");
+      const message =
+        approvalStatus === "approved"
+          ? `UI approval received for Codex task ${snapshot.task_id}. Status is now ${statusText}. Briefly acknowledge only that approve was received and the Codex task started.`
+          : `UI rejection received for Codex task ${snapshot.task_id}. Status is now ${statusText}. Briefly acknowledge only that the Codex task was rejected.`;
+      appendSessionEvent("task", message, { taskId: snapshot.task_id, status: statusText });
+      queueRollingSummaryCheckpoint(approvalStatus === "approved" ? "codex_task_approval_received" : "codex_task_rejected", {
+        snapshot,
+        force: true,
+      });
+
+      const channel = eventsChannelRef.current;
+      const channelState = channel?.readyState || "missing";
+      if (channel?.readyState === "open") {
+        channel.send(
+          JSON.stringify({
+            type: "conversation.item.create",
+            item: {
+              type: "message",
+              role: "user",
+              content: [{ type: "input_text", text: message }],
+            },
+          }),
+        );
+        if (approvalStatus === "approved") requestResponse("codex_task_approval_received");
+        else requestResponse("codex_task_rejected");
+        logClientEvent("codex_task_approval_handoff_sent", {
+          task_id: snapshot.task_id,
+          approval_status: approvalStatus,
+          status: statusText,
+        });
+        sendStickyContext(approvalStatus === "approved" ? "codex_task_approval_received" : "codex_task_rejected");
+      } else {
+        logClientEvent("codex_task_approval_handoff_skipped", {
+          task_id: snapshot.task_id,
+          approval_status: approvalStatus,
+          status: statusText,
+          reason: `channel_${channelState}`,
+        });
+      }
+
+      return true;
+    },
+    [appendSessionEvent, logClientEvent, queueRollingSummaryCheckpoint, requestResponse, sendStickyContext],
+  );
 
   const startCodexTaskPolling = useCallback(
     (taskId: string) => {
@@ -767,7 +1275,9 @@ function usePrithaRealtimeController() {
         const snapshot = await refreshCodexTask(safeTaskId, false);
         if (!snapshot) return;
         const terminal = applyCodexTaskSnapshot(snapshot);
-        if (terminal && snapshot.task_id && !reportedCodexTaskResultsRef.current.has(snapshot.task_id)) {
+        const approvalHandoffSent = sendCodexTaskApprovalHandoff(snapshot);
+        const suppressTerminalHandoff = approvalHandoffSent && snapshot.approval?.status === "rejected";
+        if (terminal && !suppressTerminalHandoff && snapshot.task_id && !reportedCodexTaskResultsRef.current.has(snapshot.task_id)) {
           reportedCodexTaskResultsRef.current.add(snapshot.task_id);
           const channel = eventsChannelRef.current;
           const resultText = snapshot.result_excerpt?.trim();
@@ -832,9 +1342,10 @@ function usePrithaRealtimeController() {
               handoffReason: reason,
             });
           }
-        } else if (!terminal && snapshot.task_id) {
-          const progressText = snapshot.latest_voice_feedback?.voice_text?.trim() || snapshot.operator_brief?.trim();
-          const urgentFeedback = snapshot.latest_voice_feedback?.priority === "high";
+        } else if (!terminal && !approvalHandoffSent && snapshot.task_id) {
+          const latestFeedback = snapshot.latest_voice_feedback || null;
+          const progressText = latestFeedback?.speakable === false ? snapshot.operator_brief?.trim() : latestFeedback?.voice_text?.trim() || snapshot.operator_brief?.trim();
+          const urgentFeedback = latestFeedback?.speakable !== false && latestFeedback?.priority === "high";
           if (progressText && (urgentFeedback || attempts >= 30)) {
             const channel = eventsChannelRef.current;
             const now = Date.now();
@@ -880,7 +1391,7 @@ function usePrithaRealtimeController() {
         setToolStatus(err instanceof Error ? err.message : "Could not poll Codex task");
       });
     },
-    [applyCodexTaskSnapshot, clearCodexTaskPolling, logClientEvent, refreshCodexTask, requestResponse, sendStickyContext, upsertCodexTask],
+    [applyCodexTaskSnapshot, clearCodexTaskPolling, logClientEvent, refreshCodexTask, requestResponse, sendCodexTaskApprovalHandoff, sendStickyContext, upsertCodexTask],
   );
 
   const runToolCall = useCallback(
@@ -904,28 +1415,36 @@ function usePrithaRealtimeController() {
       const output = (await response.json().catch(() => ({ ok: false, error: "tool returned non-json" }))) as Record<string, unknown>;
       setToolStatus(JSON.stringify(output, null, 2));
 
-      if (item.name === "run_codex_task") {
+      if (item.name === "run_codex_task" || item.name === "answer_codex_task") {
         const taskId = typeof output.task_id === "string" ? output.task_id : "";
-        if (taskId) upsertCodexTask({
-          id: taskId,
-          title: taskId,
-          status: String(output.status || output.mode || "queued"),
-          summary: String(output.operator_note || "Codex handoff created."),
-          progress: output.status === "running" ? 35 : 10,
-          phase: String(output.status || output.mode || "queued"),
-          lastActivity: String(output.operator_note || "Codex handoff created."),
-          operatorBrief: String(output.operator_note || ""),
-          resultPath: typeof output.result_path === "string" ? output.result_path : undefined,
-          statusPath: typeof output.status_path === "string" ? output.status_path : undefined,
-          handoffStatus: "pending",
-          approval: typeof output.approval === "object" && output.approval !== null ? (output.approval as CodexTaskApproval) : null,
-        });
-        if (taskId && output.status !== "decision_required") startCodexTaskPolling(taskId);
+        if (taskId) {
+          const nextTask: Partial<CodexTaskState> & { id: string } = {
+            id: taskId,
+            title: taskId,
+            status: String(output.status || output.mode || "queued"),
+            summary: String(output.operator_note || "Codex handoff created."),
+            progress: output.status === "running" ? 35 : 10,
+            phase: String(output.status || output.mode || "queued"),
+            lastActivity: String(output.operator_note || "Codex handoff created."),
+            operatorBrief: String(output.operator_note || ""),
+            resultPath: typeof output.result_path === "string" ? output.result_path : undefined,
+            statusPath: typeof output.status_path === "string" ? output.status_path : undefined,
+            handoffStatus: "pending",
+            approval: typeof output.approval === "object" && output.approval !== null ? (output.approval as CodexTaskApproval) : null,
+            threadScope: typeof output.thread_scope === "object" && output.thread_scope !== null ? (output.thread_scope as CodexTaskThreadScope) : null,
+            threadRoutingMode: typeof output.codex_app_thread_routing_mode === "string" ? output.codex_app_thread_routing_mode : undefined,
+          };
+          upsertCodexTask(nextTask);
+          queueRollingSummaryCheckpoint(item.name === "answer_codex_task" ? "codex_task_progress" : "task_started", {
+            task: nextTask,
+          });
+        }
+        if (taskId) startCodexTaskPolling(taskId);
       }
 
       return output;
     },
-    [addTranscript, startCodexTaskPolling, upsertCodexTask],
+    [addTranscript, queueRollingSummaryCheckpoint, startCodexTaskPolling, upsertCodexTask],
   );
 
   const processPendingToolCalls = useCallback(async () => {
@@ -1003,7 +1522,10 @@ function usePrithaRealtimeController() {
       if (event.type === "response.audio_transcript.done") {
         const text = event.transcript || assistantDraftRef.current;
         assistantDraftRef.current = "";
-        if (text) addTranscript("assistant", text);
+        if (text) {
+          addTranscript("assistant", text);
+          queueRollingSummaryCheckpoint("session_turn");
+        }
       }
       if (event.type === "response.output_text.delta" && event.delta) {
         assistantDraftRef.current += event.delta;
@@ -1012,7 +1534,10 @@ function usePrithaRealtimeController() {
       if (event.type === "response.output_text.done") {
         const text = event.text || assistantDraftRef.current;
         assistantDraftRef.current = "";
-        if (text) addTranscript("assistant", text);
+        if (text) {
+          addTranscript("assistant", text);
+          queueRollingSummaryCheckpoint("session_turn");
+        }
       }
       if (event.type === "response.output_item.done" && event.item?.type === "function_call") {
         rememberToolCall(event.item);
@@ -1033,7 +1558,7 @@ function usePrithaRealtimeController() {
         addTranscript("tool", message);
       }
     },
-    [addTranscript, markResponseDone, rememberToolCall],
+    [addTranscript, markResponseDone, queueRollingSummaryCheckpoint, rememberToolCall],
   );
 
   const start = useCallback(async () => {
@@ -1058,6 +1583,23 @@ function usePrithaRealtimeController() {
         throw new Error(payload.error || `Realtime session failed with status ${sessionResponse.status}`);
       }
       const sessionData = (await sessionResponse.json()) as RealtimeSessionPayload;
+      const nextSessionId = `voice-${itemId()}`;
+      sessionIdRef.current = nextSessionId;
+      sessionEventsRef.current = [];
+      memoryPromotionAttemptCountRef.current = 0;
+      sessionLoggedCodexTaskResultsRef.current.clear();
+      setSessionEvents([]);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(`${SESSION_STORAGE_KEY}:id`, nextSessionId);
+        window.sessionStorage.setItem(
+          SESSION_STORAGE_KEY,
+          JSON.stringify({
+            session_id: nextSessionId,
+            updated_at: nowIso(),
+            events: [],
+          }),
+        );
+      }
       setStatus((current) =>
         current
           ? { ...current, model: sessionData.model, voice: sessionData.voice, tools: sessionData.tools }
@@ -1135,6 +1677,7 @@ function usePrithaRealtimeController() {
         if (peerConnection.connectionState === "failed" || peerConnection.connectionState === "disconnected") {
           setPhase("error");
           setError("Realtime connection lost. Reconnect to continue.");
+          queueRollingSummaryCheckpoint("connection_lost", { force: true });
         }
       };
       peerConnection.ontrack = (event) => {
@@ -1150,9 +1693,15 @@ function usePrithaRealtimeController() {
       const channel = peerConnection.createDataChannel("oai-events");
       eventsChannelRef.current = channel;
       channel.onopen = () => {
+        rollingSummarySessionActiveRef.current = true;
         setPhase("listening");
-        setToolStatus("Realtime data channel connected. Tools: search_pritha_memory, deep_pritha_memory, inspect_pritha_files, inspect_codex_task, run_codex_task.");
-        sendStickyContext("realtime_connected");
+        setToolStatus("Realtime data channel connected. Tools: search_pritha_memory, deep_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task, run_codex_task.");
+        logClientEvent("realtime_data_channel_connected", {
+          session_id: sessionIdRef.current,
+          sticky_context_available: stickyContextEnabled,
+          event_count: sessionEvents.length,
+          task_count: codexTasks.length,
+        });
       };
       channel.onmessage = (event) => handleRealtimeEvent(String(event.data));
       channel.onclose = () => {
@@ -1183,12 +1732,14 @@ function usePrithaRealtimeController() {
       setError(message);
       addTranscript("tool", message);
     }
-  }, [addTranscript, closeConnection, handleRealtimeEvent, loadStatus, phase, sendStickyContext]);
+  }, [addTranscript, checkpointRollingSummaryNow, closeConnection, codexTasks.length, handleRealtimeEvent, loadStatus, logClientEvent, phase, queueRollingSummaryCheckpoint, sessionEvents.length, stickyContextEnabled]);
 
   const stop = useCallback(() => {
+    checkpointRollingSummaryNow("session_stopping", { keepalive: true });
+    rollingSummarySessionActiveRef.current = false;
     closeConnection();
     setPhase("idle");
-  }, [closeConnection]);
+  }, [checkpointRollingSummaryNow, closeConnection]);
 
   const toggleMute = useCallback(() => {
     if (!localTrackRef.current) return;
@@ -1297,11 +1848,50 @@ function usePrithaRealtimeController() {
   }, [promoteSessionMemory, sessionEvents.length]);
 
   useEffect(() => {
-    return () => {
-      clearCodexTaskPolling();
-      closeConnection();
+    if (typeof window === "undefined") return;
+    const timer = window.setInterval(() => {
+      if (codexTasks.some((task) => task.status !== "complete" && !task.status.startsWith("failed"))) {
+        queueRollingSummaryCheckpoint("periodic_checkpoint");
+      }
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [codexTasks, queueRollingSummaryCheckpoint]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const checkpointUnload = () => {
+      if (!rollingSummarySessionActiveRef.current) return;
+      checkpointRollingSummaryNow("page_unload_checkpoint", { keepalive: true });
     };
-  }, [clearCodexTaskPolling, closeConnection]);
+    const checkpointHidden = () => {
+      if (document.visibilityState === "hidden") checkpointUnload();
+    };
+    window.addEventListener("pagehide", checkpointUnload);
+    document.addEventListener("visibilitychange", checkpointHidden);
+    return () => {
+      window.removeEventListener("pagehide", checkpointUnload);
+      document.removeEventListener("visibilitychange", checkpointHidden);
+    };
+  }, [checkpointRollingSummaryNow]);
+
+  useEffect(() => {
+    unmountCleanupRef.current = {
+      checkpointRollingSummaryNow,
+      flushRollingSummaryCheckpoint,
+      clearCodexTaskPolling,
+      closeConnection,
+    };
+  }, [checkpointRollingSummaryNow, clearCodexTaskPolling, closeConnection, flushRollingSummaryCheckpoint]);
+
+  useEffect(() => {
+    return () => {
+      const cleanup = unmountCleanupRef.current;
+      if (rollingSummarySessionActiveRef.current) cleanup.checkpointRollingSummaryNow?.("page_unload_checkpoint", { keepalive: true });
+      cleanup.flushRollingSummaryCheckpoint?.("unmount");
+      cleanup.clearCodexTaskPolling?.();
+      cleanup.closeConnection?.();
+    };
+  }, []);
 
   return {
     phase,

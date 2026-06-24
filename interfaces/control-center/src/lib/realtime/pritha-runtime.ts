@@ -1,11 +1,29 @@
 import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
 import { checkCodexAppServerAvailable, PrithaCodexAppServerClient, resolveCodexBinary } from "./codex-task/codex-app-server-client";
-import type { PrithaCodexTaskPayload, PrithaCodexTaskProgressEvent, PrithaCodexTaskResult, PrithaCodexTaskStatus, PrithaCodexTaskType } from "./codex-task/types";
+import {
+  buildRollingSummaryCheckpoint,
+  formatRollingSummaryForRealtime,
+  isRollingSummaryKeyEvent,
+  normalizeRollingSummaryTopicKey,
+  rollingSummaryDebounceDecision,
+  rollingSummaryRelevance,
+  type RollingSummaryCheckpoint,
+  type RollingSummaryCheckpointInput,
+} from "./rolling-summary";
+import type {
+  PrithaCodexTaskPayload,
+  PrithaCodexTaskProgressEvent,
+  PrithaCodexTaskResult,
+  PrithaCodexTaskStatus,
+  PrithaCodexTaskType,
+  PrithaCodexThreadScope,
+  PrithaCodexThreadScopeKind,
+} from "./codex-task/types";
 import {
   buildVoiceBehaviorPromptSections,
   DEFAULT_PRITHA_VOICE,
@@ -74,6 +92,10 @@ type CodexTaskArgs = {
   requires_internet?: unknown;
   expected_result?: unknown;
   operator_confirmation?: unknown;
+  subject_kind?: unknown;
+  subject_id?: unknown;
+  subject_label?: unknown;
+  thread_reset?: unknown;
 };
 
 type InspectCodexTaskArgs = {
@@ -81,6 +103,12 @@ type InspectCodexTaskArgs = {
   task_id?: unknown;
   limit?: unknown;
   max_events?: unknown;
+};
+
+type AnswerCodexTaskArgs = {
+  task_id?: unknown;
+  answer?: unknown;
+  operator_confirmation?: unknown;
 };
 
 type CodexTaskApprovalAction = "approve" | "reject";
@@ -111,6 +139,7 @@ export type CodexServiceTier = "standard" | "fast";
 export type CodexPlanningMode = "off" | "inline_required" | "planner";
 export type CodexExecutionMode = "inline_only" | "orchestrator_enabled" | "orchestrator_preferred";
 export type CodexVoiceProgressVerbosity = "brief" | "normal" | "detailed";
+export type CodexAppThreadRoutingMode = "per_task" | "control" | "subject_scoped" | "subject_scoped_rotate";
 
 export type CodexTaskPlanStep = {
   id: string;
@@ -160,6 +189,9 @@ export type PrithaRuntimeSettings = {
   codexMaxPlanSteps: number;
   codexAskBeforeOrchestration: boolean;
   codexVoiceProgressVerbosity: CodexVoiceProgressVerbosity;
+  codexAppThreadRoutingMode: CodexAppThreadRoutingMode;
+  codexAppThreadMaxTurns: number;
+  codexAppThreadMaxAgeHours: number;
   voiceBehaviorProfile: VoiceBehaviorProfile;
   prithaVoice: PrithaVoiceId;
   updatedAt: string;
@@ -190,6 +222,21 @@ type VoiceSessionMemoryArgs = {
   session_id?: unknown;
   reason?: unknown;
   events?: unknown;
+};
+
+type RollingSummaryArgs = RollingSummaryCheckpointInput & {
+  topic_key?: unknown;
+  current_status?: unknown;
+  key_refs?: unknown;
+  key_resources?: unknown;
+  confirmed_constraints?: unknown;
+  confirmed_accesses?: unknown;
+  next_step?: unknown;
+  latest_realtime_session?: unknown;
+  latest_codex_task?: unknown;
+  source_event?: unknown;
+  query?: unknown;
+  force?: unknown;
 };
 
 type DeepMemoryArgs = {
@@ -581,6 +628,11 @@ function cappedLimit(value: unknown, fallback = 8, max = 30) {
 
 function hasOperatorConfirmation(value: unknown) {
   return /confirm|confirmed|approve|approved|yes|write|reindex|\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436|\u0440\u0430\u0437\u0440\u0435\u0448|\u0434\u0430/i.test(String(value || ""));
+}
+
+function hasCodexHandoffConfirmation(value: unknown) {
+  const text = String(value || "").toLowerCase();
+  return /brief (?:is )?(?:complete|finished)|spec (?:is )?(?:complete|finished)|task (?:is )?ready|ready for codex|handoff confirmed|send (?:it )?to codex|передавай|передать в codex|передать в кодекс|тз (?:полностью )?(?:готово|проговорено|закончено)|можно (?:передавать|запускать)|да[,.\s]+(?:передавай|запускай)|готов[ао] к codex|готов[ао] к кодекс/i.test(text);
 }
 
 function commandResult(command: string, args: string[]) {
@@ -1610,6 +1662,45 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
     },
     {
       type: "function",
+      name: "recall_rolling_summary",
+      description:
+        "Read the current summary-only handoff from the previous/current Pritha Realtime voice session. Use when the operator asks what you discussed last time, what the previous conversation was about, where you left off, or asks to continue from the prior session. This is read-only and does not expose raw transcripts.",
+      parameters: {
+        type: "object",
+        properties: {
+          topic_key: {
+            type: "string",
+            description: "Optional stable topic key. Defaults to Pritha's general rolling handoff.",
+          },
+        },
+      },
+    },
+    {
+      type: "function",
+      name: "answer_codex_task",
+      description:
+        "Submit the operator's spoken answer to a Codex task that is waiting_for_operator, then resume that same task card in the same Codex thread. Use this when Codex asks a clarification question and the operator answers by voice.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: {
+            type: "string",
+            description: "Optional Codex task id. If omitted, the most recent waiting_for_operator task is used.",
+          },
+          answer: {
+            type: "string",
+            description: "The operator's direct answer to the Codex clarification question. Do not include secrets.",
+          },
+          operator_confirmation: {
+            type: "string",
+            description: "Brief note that the operator gave this answer by voice and wants Codex to continue the same task.",
+          },
+        },
+        required: ["answer"],
+      },
+    },
+    {
+      type: "function",
       name: "run_codex_task",
       description:
         "Start or queue a Codex sidecar task in the current Pritha environment. Use for implementation, repo inspection, deep analysis, review, or internet/current-source research. Do not claim the task is complete unless the returned status says complete.",
@@ -1630,7 +1721,28 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
           priority: { type: "string", enum: ["normal", "high"] },
           requires_internet: { type: "boolean" },
           expected_result: { type: "string" },
-          operator_confirmation: { type: "string" },
+          operator_confirmation: {
+            type: "string",
+            description:
+              "Required before agent creation, implementation, workspace-write, agent improvement/fix, or other large Codex handoff tasks. It must say the operator confirmed the spoken task brief is complete and ready for Codex.",
+          },
+          subject_kind: {
+            type: "string",
+            enum: ["agent", "pritha", "task", "control"],
+            description: "Stable Codex App thread subject kind. Use agent when the task is about a child agent, pritha for Pritha subsystem work, task for one-off work.",
+          },
+          subject_id: {
+            type: "string",
+            description: "Stable subject id such as fas, fespa26, control-center, memory, operations or agents-mother. Do not use raw transcript text.",
+          },
+          subject_label: {
+            type: "string",
+            description: "Short human-readable subject label for task cards and Codex thread names.",
+          },
+          thread_reset: {
+            type: "boolean",
+            description: "Only true when the operator explicitly asks to start a new Codex App thread for this subject.",
+          },
         },
         required: ["task"],
       },
@@ -1644,7 +1756,7 @@ export function buildRealtimeInstructions() {
     "You are Pritha, a Codex-native agent factory and knowledge assistant.",
     "Speak with the operator in Russian unless they switch language.",
     "This is an experimental realtime voice interface. Keep answers concise, calm and operational.",
-    "You have exactly five tools: search_pritha_memory, deep_pritha_memory, inspect_pritha_files, inspect_codex_task and run_codex_task.",
+    "You have exactly seven tools: search_pritha_memory, deep_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task and run_codex_task.",
     "Use search_pritha_memory for fast, shallow lookup before answering ordinary questions about Pritha memory, standards, decisions, workflows, child agents, previous UI/realtime experiments, or stored project knowledge.",
     "For exact details after search, call search_pritha_memory with operation=read and id_or_path from a prior result.",
     "Use deep_pritha_memory when the operator asks for deeper or more correct memory work: semantic or hybrid search, entity/graph relation traversal, runtime/task-log memory lookup, reindexing, embedding rebuilds, or curated memory writes/updates.",
@@ -1654,16 +1766,29 @@ export function buildRealtimeInstructions() {
     "Use inspect_pritha_files instead of run_codex_task when the operator only needs a quick filesystem view or a lightweight comment about how an agent is organized. Escalate to run_codex_task when the operator asks for edits, implementation, deep code reasoning, tests, or a durable review.",
     "Use inspect_codex_task for read-only status checks on Codex sidecar tasks. Use it when the operator asks what is happening with a task, whether it is stuck, whether it failed, what needs approval, or whether there is a recent progress timeline.",
     "inspect_codex_task exposes only safe operational status, phase, last activity, bounded progress events, speakable semantic progress and concise operator briefs. Prefer latest_voice_feedback and speakable_events over heartbeat when explaining task progress.",
+    "Use recall_rolling_summary when the operator asks what you discussed last time, what happened in the previous voice session, what the current handoff is, or asks to continue from where you left off. This tool reads the single summary-only rolling handoff file; it is not long-term curated memory and it does not contain raw transcript.",
+    "If recall_rolling_summary returns found=false, say that no rolling handoff is available yet and then offer to search curated Pritha memory if useful. Do not claim the previous conversation is unknown until you have tried recall_rolling_summary for such questions.",
+    "When a Codex task is waiting_for_operator or latest_voice_feedback.requires_response is true, ask the Codex question plainly and wait for the operator's direct answer. After the operator answers, call answer_codex_task for the same task_id. Do not start a new run_codex_task just to answer that clarification.",
     "Use run_codex_task for implementation, codebase changes, deep repo analysis, reviews, or internet/current-source research. If internet is needed, set requires_internet=true; Codex handles web access.",
     "run_codex_task has one public tool surface but routes internally through the configured deep task transport. Codex App is the default primary transport; Codex CLI is the v1 fallback. New Codex App tasks first create or synthesize a plan, choose inline_progress or step_orchestrator by policy, and emit voice-safe semantic progress events.",
+    "Before calling run_codex_task for agent creation, agent improvement, agent fixes, workspace-write implementation, Control Center/Voice Control/memory/operations changes, or another large multi-step task, first collect a usable brief. After the operator's first description, ask concise clarifying questions if required fields are missing: target/new agent, desired change, success criteria, constraints, interface/runtime/deployment, memory/tools/skills/MCP impact, secrets/approvals, and tests. Ask at most three questions at a time.",
+    "Only after the brief is usable, summarize the intended task in one to three short points and ask exactly: \"ТЗ полностью проговорено? Передавать это в Codex?\" Wait for a direct positive answer that the brief is complete and ready for Codex. A pause, semantic VAD turn end, acknowledgement, or partial yes is not enough.",
+    "If the operator says they are not finished, says to wait, changes the scope, or continues adding requirements, do not call run_codex_task yet. Continue listening and update the draft brief.",
+    "When you do call run_codex_task after that confirmation, pass operator_confirmation with the operator's explicit confirmation that the spoken task brief is complete and ready for Codex.",
     "Voice Control and Codex thread have the same implementation path through run_codex_task. Risky actions are not hard-blocked by voice; the runtime will hold service install, scheduler enablement, deployment, deletion, credential writes or danger-full-access requests as decision_required until the operator approves them in the UI task card.",
-    "For creating a new child agent or scaffold project, call run_codex_task with task_type=agent_creation and write_mode=workspace_write after the operator clearly requests that creation. Child-agent projects may be created as sibling folders next to Pritha according to AGENTS.md. Do not copy secrets, .env, private memory, runtime queues, logs or credentials.",
+    "For creating a new child agent or scaffold project, call run_codex_task with task_type=agent_creation and write_mode=workspace_write only after the operator clearly requests that creation and confirms the full spoken brief is complete. Child-agent projects may be created as sibling folders next to Pritha according to AGENTS.md. Do not copy secrets, .env, private memory, runtime queues, logs or credentials.",
+    "For improving or changing an existing child agent, treat it as an agent development task. Include the target project/folder, desired delta, success criteria, constraints, and tests. Codex must create or use an agent development task brief and pattern-pack before changing harness, memory, tools, skills, MCP, interfaces or operations.",
     "For ordinary implementation tasks, set task_type=implementation and write_mode=workspace_write only when the operator asked for code/file changes. Use read_only for analysis, review, research and status checks.",
+    "When a Codex task clearly concerns one child agent, pass subject_kind=agent and subject_id as a short stable slug such as fas, fespa26 or funny-teacher. When it concerns Control Center, memory, operations or Agents Mother, pass subject_kind=pritha and subject_id=control-center, memory, operations or agents-mother.",
+    "Do not pass raw voice transcript as a Codex thread subject. Use thread_reset=true only if the operator explicitly asks to start a new Codex App thread for that same subject.",
+    "When the operator asks to generate, create or publish an image for PictureBoom, treat it as a PictureBoom Codex image handoff. Do not call an image provider from Pritha or PictureBoom. Use run_codex_task with task_type=implementation, write_mode=workspace_write, requires_internet=false, subject_kind=agent, subject_id=pictureboom, subject_label=PictureBoom and thread_reset=false.",
+    "The PictureBoom image handoff task must instruct Codex to generate exactly one image using internal Codex image generation, keep the generated file only in Codex staging or PictureBoom-local staging, then run PictureBoom's project-local `node scripts/image-inbox.mjs ingest` command with a two or three word title, the Codex task request id, and a short prompt summary when available.",
+    "The PictureBoom image handoff must verify `node scripts/image-inbox.mjs list --json`, `node scripts/image-inbox.mjs assert-local` and PictureBoom feed/API visibility. It must keep generated image files out of Pritha memory, queues, logs and reports, and browser-facing API/UI evidence must not expose the prompt summary or request id.",
     "When the operator asks to continue implementation work on an existing or newly created child-agent project, include the exact project/folder name in the task, call run_codex_task with task_type=implementation and write_mode=workspace_write; the runtime will add the matching sibling AGENTS.md project as a writable Codex root.",
     "Do not claim Codex work is complete after starting or queueing a task. Report the task id, status and next operator-visible path. If the task returns a plan or latest_voice_feedback, summarize that instead of saying only that the task is running.",
     "After run_codex_task returns a running or queued task, do not start another Codex task just to poll that task's status. Use inspect_codex_task for status, brief, timeline or diagnose requests. The Voice UI also monitors Codex task readiness and sends later completion/failure messages when a terminal result or operator brief is available.",
     "If the UI later adds a message that starts with 'Codex sidecar task' and includes 'Result:', treat it as the authoritative completion notification for that task. Summarize the result to the operator immediately instead of saying that you do not automatically know whether Codex finished.",
-    "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed or step_blocked. Never read heartbeat as the main progress update.",
+    "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed, step_blocked or operator_question. Never read heartbeat as the main progress update.",
     "Do not ask for secrets or expose credentials. For credentials, route the operator to the child-agent credential UI. For publish, deletion, service install, launchd/cron or broad system changes, create a Codex task and let the UI decision gate collect approval.",
     "Realtime tools must not mutate curated Markdown directly except through confirmed deep_pritha_memory memory-write operations or through run_codex_task when its sandbox/write mode permits it. Keep edits narrowly scoped.",
     buildVoiceBehaviorPromptSections(settings.voiceBehaviorProfile),
@@ -1813,6 +1938,132 @@ function privateRoot() {
   return path.join(resolveTechscopeRoot(), ".private", "interface-lab", "pritha-control-center", "realtime");
 }
 
+const rollingSummaryLastWriteAt = new Map<string, number>();
+
+function rollingSummaryStorageDir() {
+  return path.join(privateRoot(), "rolling-summary");
+}
+
+function rollingSummaryCurrentPath() {
+  return path.join(rollingSummaryStorageDir(), "current.json");
+}
+
+function boolFromUnknown(value: unknown) {
+  return value === true || String(value || "").toLowerCase() === "true";
+}
+
+function rollingSummaryInputFromArgs(args: RollingSummaryArgs): RollingSummaryCheckpointInput {
+  return {
+    topicKey: args.topicKey ?? args.topic_key,
+    updatedAt: args.updatedAt,
+    task: args.task,
+    currentStatus: args.currentStatus ?? args.current_status,
+    keyRefs: args.keyRefs ?? args.key_refs,
+    keyResources: args.keyResources ?? args.key_resources,
+    confirmedConstraints: args.confirmedConstraints ?? args.confirmed_constraints,
+    confirmedAccesses: args.confirmedAccesses ?? args.confirmed_accesses,
+    nextStep: args.nextStep ?? args.next_step,
+    latestRealtimeSession: args.latestRealtimeSession ?? args.latest_realtime_session,
+    latestCodexTask: args.latestCodexTask ?? args.latest_codex_task,
+    sourceEvent: args.sourceEvent ?? args.source_event,
+    maxBytes: args.maxBytes,
+  };
+}
+
+async function writeRollingSummaryAtomic(checkpointPath: string, serialized: string) {
+  await mkdir(path.dirname(checkpointPath), { recursive: true });
+  const tmpPath = `${checkpointPath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmpPath, `${serialized}\n`, "utf8");
+  await rename(tmpPath, checkpointPath);
+}
+
+export async function upsertPrithaRollingSummary(args: RollingSummaryArgs = {}) {
+  const sourceEvent = compactText(args.sourceEvent ?? args.source_event ?? "manual_checkpoint", 80);
+  if (!isRollingSummaryKeyEvent(sourceEvent)) {
+    return { ok: true, saved: false, reason: "not_key_event", source_event: sourceEvent };
+  }
+
+  const input = rollingSummaryInputFromArgs({ ...args, sourceEvent });
+  const topicKey = normalizeRollingSummaryTopicKey(input.topicKey);
+  const checkpointPath = rollingSummaryCurrentPath();
+  const root = resolveTechscopeRoot();
+  const nowMs = Date.now();
+  const debounce = rollingSummaryDebounceDecision({
+    topicKey: "current",
+    sourceEvent,
+    nowMs,
+    lastWriteAtMs: rollingSummaryLastWriteAt.get("current") || 0,
+    force: boolFromUnknown(args.force),
+  });
+  if (!debounce.write) {
+    await logPrivateEvent("rolling_summary_checkpoint_skipped", {
+      topic_key: topicKey,
+      source_event: sourceEvent,
+      reason: debounce.reason,
+      wait_ms: debounce.waitMs,
+    });
+    return {
+      ok: true,
+      saved: false,
+      reason: debounce.reason,
+      topic_key: topicKey,
+      source_event: sourceEvent,
+      wait_ms: debounce.waitMs,
+    };
+  }
+
+  const result = buildRollingSummaryCheckpoint({
+    ...input,
+    topicKey,
+    sourceEvent,
+    updatedAt: new Date(nowMs).toISOString(),
+  });
+  await writeRollingSummaryAtomic(checkpointPath, result.serialized);
+  rollingSummaryLastWriteAt.set("current", nowMs);
+  await logPrivateEvent("rolling_summary_checkpoint_saved", {
+    topic_key: topicKey,
+    source_event: sourceEvent,
+    byte_length: result.byteLength,
+    raw_transcript_omitted: result.privacyFlags.rawTranscriptOmitted,
+    sensitive_redacted: result.privacyFlags.sensitiveRedacted,
+    truncated: result.privacyFlags.truncated,
+  });
+  return {
+    ok: true,
+    saved: true,
+    topic_key: topicKey,
+    source_event: sourceEvent,
+    path: rootRelative(root, checkpointPath),
+    updated_at: result.checkpoint.updatedAt,
+    byte_length: result.byteLength,
+    privacy_flags: result.privacyFlags,
+  };
+}
+
+export async function getPrithaRollingSummary(args: RollingSummaryArgs = {}) {
+  const requestedTopicKey = normalizeRollingSummaryTopicKey(args.topicKey ?? args.topic_key);
+  const checkpointPath = rollingSummaryCurrentPath();
+  const root = resolveTechscopeRoot();
+  if (!existsSync(checkpointPath)) {
+    return { ok: true, found: false, topic_key: requestedTopicKey, path: rootRelative(root, checkpointPath) };
+  }
+
+  const raw = await readFile(checkpointPath, "utf8");
+  const checkpoint = JSON.parse(raw) as RollingSummaryCheckpoint;
+  const relevance = args.query ? rollingSummaryRelevance(args.query, checkpoint) : undefined;
+  const contextText = !relevance || relevance.related ? formatRollingSummaryForRealtime(checkpoint) : "";
+  return {
+    ok: true,
+    found: true,
+    topic_key: checkpoint.topicKey || requestedTopicKey,
+    requested_topic_key: requestedTopicKey,
+    path: rootRelative(root, checkpointPath),
+    checkpoint,
+    relevance,
+    context_text: contextText,
+  };
+}
+
 function codexTaskProgressPath(taskDir: string) {
   return path.join(taskDir, "progress.jsonl");
 }
@@ -1960,6 +2211,9 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
     codexMaxPlanSteps: 7,
     codexAskBeforeOrchestration: true,
     codexVoiceProgressVerbosity: "normal",
+    codexAppThreadRoutingMode: "subject_scoped",
+    codexAppThreadMaxTurns: 24,
+    codexAppThreadMaxAgeHours: 168,
     voiceBehaviorProfile: normalizeVoiceBehaviorProfile(
       env("PRITHA_REALTIME_BEHAVIOR_PROFILE", env("TECHSCOPE_VOICE_BEHAVIOR_PROFILE", DEFAULT_VOICE_BEHAVIOR_PROFILE)),
     ),
@@ -1992,6 +2246,10 @@ export function normalizeCodexVoiceProgressVerbosity(value: unknown, fallback: C
   return value === "brief" || value === "normal" || value === "detailed" ? value : fallback;
 }
 
+export function normalizeCodexAppThreadRoutingMode(value: unknown, fallback: CodexAppThreadRoutingMode = "subject_scoped"): CodexAppThreadRoutingMode {
+  return value === "per_task" || value === "control" || value === "subject_scoped" || value === "subject_scoped_rotate" ? value : fallback;
+}
+
 export function codexModelSupportsFastMode(model: string) {
   return ["gpt-5.5", "gpt-5.4"].includes(model.trim());
 }
@@ -2006,6 +2264,8 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
   const timeout = Number(value.codexTimeoutMs);
   const promptTokenBudget = Number(value.codexPromptTokenBudget);
   const maxPlanSteps = Number(value.codexMaxPlanSteps);
+  const maxThreadTurns = Number(value.codexAppThreadMaxTurns);
+  const maxThreadAgeHours = Number(value.codexAppThreadMaxAgeHours);
   return {
     deepTaskPrimaryTransport: transport,
     codexModel: String(value.codexModel ?? defaults.codexModel ?? "").trim(),
@@ -2022,6 +2282,9 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     codexMaxPlanSteps: Number.isFinite(maxPlanSteps) ? Math.max(1, Math.min(Math.round(maxPlanSteps), 10)) : defaults.codexMaxPlanSteps,
     codexAskBeforeOrchestration: typeof value.codexAskBeforeOrchestration === "boolean" ? value.codexAskBeforeOrchestration : defaults.codexAskBeforeOrchestration,
     codexVoiceProgressVerbosity: normalizeCodexVoiceProgressVerbosity(value.codexVoiceProgressVerbosity, defaults.codexVoiceProgressVerbosity),
+    codexAppThreadRoutingMode: normalizeCodexAppThreadRoutingMode(value.codexAppThreadRoutingMode, defaults.codexAppThreadRoutingMode),
+    codexAppThreadMaxTurns: Number.isFinite(maxThreadTurns) ? Math.max(4, Math.min(Math.round(maxThreadTurns), 100)) : defaults.codexAppThreadMaxTurns,
+    codexAppThreadMaxAgeHours: Number.isFinite(maxThreadAgeHours) ? Math.max(1, Math.min(Math.round(maxThreadAgeHours), 720)) : defaults.codexAppThreadMaxAgeHours,
     voiceBehaviorProfile: normalizeVoiceBehaviorProfile(value.voiceBehaviorProfile, defaults.voiceBehaviorProfile),
     prithaVoice: normalizePrithaVoice(value.prithaVoice, defaults.prithaVoice),
     updatedAt: String(value.updatedAt || defaults.updatedAt),
@@ -2057,6 +2320,9 @@ export async function updatePrithaRuntimeSettings(patch: Partial<PrithaRuntimeSe
     codexMaxPlanSteps: next.codexMaxPlanSteps,
     codexAskBeforeOrchestration: next.codexAskBeforeOrchestration,
     codexVoiceProgressVerbosity: next.codexVoiceProgressVerbosity,
+    codexAppThreadRoutingMode: next.codexAppThreadRoutingMode,
+    codexAppThreadMaxTurns: next.codexAppThreadMaxTurns,
+    codexAppThreadMaxAgeHours: next.codexAppThreadMaxAgeHours,
     voiceBehaviorProfile: next.voiceBehaviorProfile,
     prithaVoice: next.prithaVoice,
   });
@@ -2466,8 +2732,112 @@ function taskSearchText(task: Record<string, unknown>) {
     task.task,
     task.expected_result,
     task.operator_confirmation,
+    task.subject_id,
+    task.subject_label,
   ].map((value) => compactText(value, 8_000)).join("\n");
   return normalizeAgentAlias(text);
+}
+
+function normalizeThreadScopeKind(value: unknown): PrithaCodexThreadScopeKind | null {
+  return value === "agent" || value === "pritha" || value === "task" || value === "control" ? value : null;
+}
+
+function normalizeThreadScopeId(value: unknown) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
+function normalizeThreadScopeLabel(value: unknown, fallback: string) {
+  const label = compactText(value || fallback, 80).replace(/\s+/g, " ").trim();
+  return label || fallback;
+}
+
+function threadScope(kind: PrithaCodexThreadScopeKind, id: string, label: string, source: PrithaCodexThreadScope["source"]): PrithaCodexThreadScope {
+  const normalizedId = normalizeThreadScopeId(id);
+  return {
+    kind,
+    id: normalizedId || "unknown",
+    label: normalizeThreadScopeLabel(label, normalizedId || "Unknown"),
+    source,
+    generation: 1,
+  };
+}
+
+function normalizedTextContainsAlias(normalizedText: string, alias: string) {
+  if (!normalizedText || !alias) return false;
+  const normalizedAlias = normalizeAgentAlias(alias);
+  if (!normalizedAlias) return false;
+  const spaced = ` ${normalizedText} `;
+  if (spaced.includes(` ${normalizedAlias} `)) return true;
+  const compactAlias = normalizedAlias.replace(/\s+/g, "");
+  if (compactAlias.length < 4) return false;
+  return normalizedText.replace(/\s+/g, "").includes(compactAlias);
+}
+
+function knownChildAgentScopeFromText(root: string, text: string): PrithaCodexThreadScope | null {
+  const normalizedText = normalizeAgentAlias(text);
+  if (!normalizedText) return null;
+  const match = knownSiblingChildAgentProjects(root).find((project) =>
+    project.aliases.some((alias) => normalizedTextContainsAlias(normalizedText, alias)),
+  );
+  return match ? threadScope("agent", match.name, match.name, "derived") : null;
+}
+
+function prithaSubsystemScopeFromText(text: string): PrithaCodexThreadScope | null {
+  const normalized = normalizeAgentAlias(text);
+  const raw = String(text || "").toLowerCase();
+  if (/(control\s*center|control-center|realtime|voice|\/voice|\/agents|ui|интерфейс|голос|войс)/i.test(raw)) {
+    return threadScope("pritha", "control-center", "Pritha Control Center", "derived");
+  }
+  if (/(memory|sqlite|embedding|embeddings|wiki|rebuild-memory|validate-memory|памят|индекс|эмбед)/i.test(raw)) {
+    return threadScope("pritha", "memory", "Pritha Memory", "derived");
+  }
+  if (/(tailscale|operations|launchd|service|serve|healthcheck|операци|сервис|хелс)/i.test(raw)) {
+    return threadScope("pritha", "operations", "Pritha Operations", "derived");
+  }
+  if (/(agents?\s*mother|scaffold|contract|child agent|child-agent|агент|скаффолд|контракт)/i.test(raw) || normalized.includes("agents mother")) {
+    return threadScope("pritha", "agents-mother", "Pritha Agents Mother", "derived");
+  }
+  return null;
+}
+
+function agentCreationScopeFromText(text: string): PrithaCodexThreadScope | null {
+  const raw = String(text || "");
+  const match = raw.match(/(?:agent|агент(?:а|ом)?|named|name)\s+["'`]?([A-Za-z][A-Za-z0-9_-]{1,48})["'`]?/i);
+  if (!match?.[1]) return null;
+  return threadScope("agent", match[1], match[1], "derived");
+}
+
+function fallbackTaskScope(taskId: unknown): PrithaCodexThreadScope {
+  return threadScope("task", String(taskId || randomUUID()), "One-off Codex task", "fallback");
+}
+
+function deriveCodexThreadScope(args: CodexTaskArgs, task: Record<string, unknown>): PrithaCodexThreadScope {
+  const explicitKind = normalizeThreadScopeKind(args.subject_kind);
+  const explicitId = normalizeThreadScopeId(args.subject_id);
+  if (explicitKind && explicitId) {
+    return threadScope(explicitKind, explicitId, String(args.subject_label || explicitId), "explicit");
+  }
+
+  const root = resolveTechscopeRoot();
+  const text = [
+    task.task,
+    task.expected_result,
+    task.operator_confirmation,
+  ].map((value) => compactText(value, 8_000)).join("\n");
+
+  const childAgentScope = knownChildAgentScopeFromText(root, text);
+  if (childAgentScope) return childAgentScope;
+
+  if (normalizeCodexTaskType(task.task_type) === "agent_creation") {
+    const creationScope = agentCreationScopeFromText(text);
+    if (creationScope) return creationScope;
+  }
+
+  return prithaSubsystemScopeFromText(text) || fallbackTaskScope(task.id);
 }
 
 function codexSandboxForTask(taskType: string, writeMode: string) {
@@ -2561,6 +2931,53 @@ function codexTaskApprovalFor(task: Record<string, unknown>, requestedAt = new D
   };
 }
 
+function codexTaskNeedsHandoffConfirmation(args: CodexTaskArgs, task: Record<string, unknown>) {
+  const taskType = String(task.task_type || args.task_type || "analysis").toLowerCase();
+  const writeMode = String(task.write_mode || args.write_mode || "read_only").toLowerCase();
+  const taskText = [
+    task.task,
+    task.expected_result,
+    task.subject_kind,
+    task.subject_id,
+    task.subject_label,
+  ].map((value) => compactText(value, 4_000).toLowerCase()).join("\n");
+
+  if (taskType === "agent_creation" || taskType === "system_change" || taskType === "implementation") return true;
+  if (writeMode === "workspace_write") return true;
+  if (/(созда[йт]|создание|нов(ый|ого) агент|агента|scaffold|child agent|agent creation|new agent)/i.test(taskText)) return true;
+  if (/(улучш|исправ|почин|доработ|перепиш|рефактор|implement|implementation|fix|improve|upgrade)/i.test(taskText)) {
+    return /(agent|агент|control\s*center|voice\s*control|realtime|pritha|прит|memory|harness|operations|интерфейс|код)/i.test(taskText);
+  }
+  return false;
+}
+
+function codexTaskLooksLikeAgentDevelopment(task: Record<string, unknown>) {
+  const taskType = String(task.task_type || "analysis").toLowerCase();
+  if (taskType === "agent_creation") return true;
+  const text = [
+    taskSearchText(task),
+    task.task_type,
+    task.write_mode,
+  ].map((value) => String(value || "").toLowerCase()).join("\n");
+  const agentSurface = /(agent|агент|child-agent|scaffold|harness|memory|tools|skills|mcp|interface|operations|pritha|прит)/i.test(text);
+  const developmentAction = /(созда|новый|creation|scaffold|улучш|исправ|почин|доработ|развив|improve|upgrade|fix|evolve|modify|implementation|implement)/i.test(text);
+  return agentSurface && developmentAction;
+}
+
+function codexTaskHandoffConfirmationResult(args: CodexTaskArgs, task: Record<string, unknown>) {
+  if (!codexTaskNeedsHandoffConfirmation(args, task)) return null;
+  if (hasCodexHandoffConfirmation(args.operator_confirmation)) return null;
+  return {
+    ok: false,
+    status: "handoff_confirmation_required",
+    error: "handoff_confirmation_required",
+    operator_note:
+      "Before creating a Codex task, summarize the task and ask whether the full brief has been spoken. Ask: \"ТЗ полностью проговорено? Передавать это в Codex?\"",
+    expected_next_step:
+      "Wait for explicit spoken confirmation that the brief is complete and ready for Codex, then call run_codex_task again with operator_confirmation.",
+  };
+}
+
 function codexAdditionalWritableDirs(root: string, task: Record<string, unknown>, sandbox: string) {
   if (sandbox !== "workspace-write") return [];
   const taskType = String(task.task_type || "").toLowerCase();
@@ -2609,6 +3026,10 @@ function buildCodexPrompt(task: Record<string, unknown>) {
     "If the task needs current internet facts, browse or use available network-capable tools through Codex.",
     "For write/system-change requests, make only narrowly scoped changes and report verification.",
     "If task_type is agent_creation, you may create a new sibling child-agent project folder next to Pritha when the task asks for it. Use the parent directory from the task payload as the sibling-agent parent. Follow AGENTS.md, create the required contract/scaffold/report artifacts, and do not copy secrets, .env, private memory, queues, logs or credentials.",
+    "For task_type=agent_creation, do not scaffold directly from the request. First create or validate the agent contract, run `node scripts/pritha.mjs research <contract>` which creates both the research report and a separate pattern-pack, complete current-source external research for volatile or pattern-derived choices with `node scripts/pritha.mjs external-research <contract> --input <evidence.json>` or an equivalent Codex-web/manual evidence update, and proceed to scaffold only when the research report has `research_gate_status: complete` or a justified `not-applicable` gate.",
+    "For task_type=agent_creation, use card-first completion: after scaffold, rebuild the registry with `node scripts/pritha.mjs registry`, run `node scripts/pritha.mjs card-readiness <agent-slug>`, and do not report the creation task complete if the agent card is missing from the Pritha Agents registry/Control Center surface.",
+    "A new child-agent card may show planned or blocked runtime controls; that is acceptable only when the card is visible and its blockers and next actions are explicit for the operator.",
+    "For existing child-agent improvement, use `node scripts/pritha.mjs improve <project-path> --task <task>` or create an equivalent agent development task brief before implementation. The brief/pattern-pack must query Pritha memory, attempt semantic/embedding search, log semantic failures, derive external research seeds from selected patterns, and guide the smallest verified change.",
     "Do not modify unrelated sibling projects in the sibling-agent parent. Use that parent only to create or update the child-agent project requested by the operator.",
     childAgentList
       ? `Existing sibling child-agent projects with AGENTS.md: ${childAgentList}. If the task explicitly asks to work on one of them, use that sibling project and keep edits inside it unless the operator separately asks for Pritha or Control Center changes.`
@@ -2637,6 +3058,9 @@ function genericCodexTaskExpectedSchema() {
       summary: "short technical summary",
       refs: ["file paths, commands, or source references"],
       changedFiles: ["changed file paths"],
+      patternsUsed: ["Pritha memory pattern-pack entries used for agent creation/improvement"],
+      externalEvidenceUsed: ["current-source evidence ids or URLs used to enrich memory patterns"],
+      memoryCoverage: "brief status of FTS/domain/semantic memory retrieval",
       nextActions: ["operator-visible next actions"],
       structuredJson: "optional JSON string for task-specific details",
     },
@@ -2645,13 +3069,48 @@ function genericCodexTaskExpectedSchema() {
   };
 }
 
+function agentDevelopmentResearchGatePayload() {
+  return {
+    required: true,
+    scope: "agent_creation_or_improvement",
+    memory_domains: ["agent-building-knowledge", "pritha-self", "child-agents"],
+    pattern_pack: {
+      required: true,
+      artifact: "11_agents/research/YYYY-MM-DD-<agent>-agent-pattern-pack.md",
+      semantic_embedding_search: "attempt-required; if unavailable, continue with warning and log to .private/agents-mother/semantic-memory-failures.jsonl",
+      external_seed_source: "selected memory patterns",
+    },
+    external_research: {
+      required: true,
+      topic_sources: ["contract_or_development_task", "pattern_pack_external_research_seeds"],
+      preferred_backends: ["codex-web", "last30days", "manual"],
+      free_keyless_only_by_default: true,
+      no_secret_backends_without_ui_approval: true,
+    },
+    required_commands: [
+      "node scripts/pritha.mjs research <contract>",
+      "node scripts/pritha.mjs pattern-research <contract>",
+      "node scripts/pritha.mjs improve <project-path> --task <text>",
+      "node scripts/pritha.mjs external-research <contract> --input <evidence.json>",
+    ],
+    scaffold_blocker: "research_gate_status must be complete or explicitly not-applicable before scaffold",
+    implementation_blocker: "agent improvement must have an agent development task brief or equivalent Codex-readable pattern-pack before harness/memory/tools/interfaces/operations changes",
+  };
+}
+
+function agentCreationResearchGatePayload() {
+  return agentDevelopmentResearchGatePayload();
+}
+
 function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodexTaskPayload {
   const root = resolveTechscopeRoot();
+  const threadScopeValue = typeof task.thread_scope === "object" && task.thread_scope !== null ? (task.thread_scope as PrithaCodexThreadScope) : undefined;
   return {
     requestId: String(task.id || randomUUID()),
     userId: "pritha-voice-operator",
     taskType: normalizeCodexTaskType(task.task_type),
     userIntent: compactText(task.task || "", 8_000),
+    threadScope: threadScopeValue,
     projectContext: {
       project: "Pritha",
       cwd: root,
@@ -2665,14 +3124,21 @@ function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodex
       requiresInternet: task.requires_internet,
       expectedResult: task.expected_result,
       operatorConfirmation: task.operator_confirmation,
+      threadScope: threadScopeValue,
+      threadReset: task.thread_reset,
+      routingMode: getPrithaRuntimeSettings().codexAppThreadRoutingMode,
       prompt: buildCodexPrompt(task),
       siblingAgentParent: task.sibling_agent_parent_absolute,
+      agentCreationResearchGate: task.agent_creation_research_gate,
+      agentDevelopmentResearchGate: task.agent_development_research_gate,
     },
     constraints: [
       "Do not expose secrets, .env values, credentials, private memory, runtime queues, or unnecessary raw logs.",
       "Use the existing Pritha and Control Center conventions.",
       "For write/system-change tasks, make narrowly scoped changes and report changed files plus verification.",
       "For agent_creation tasks, create or update sibling child-agent projects only when explicitly requested by the operator.",
+      "For agent_creation tasks, Pritha memory research, a separate pattern-pack artifact, external current-source evidence and memory-vs-external synthesis are mandatory before scaffold unless the research report explicitly marks the gate not-applicable with reason.",
+      "For existing agent improvement tasks, create or use an agent development task brief and pattern-pack before changing harness, memory, tools, skills, MCP, interfaces or operations.",
       String(task.requires_internet) === "true" || Boolean(task.requires_internet)
         ? "Current-source research and network access are allowed for this task."
         : "Do not browse unless needed to verify unstable or external facts.",
@@ -2841,6 +3307,72 @@ function planStepFromUnknown(value: unknown, index: number): CodexTaskPlanStep {
 function syntheticCodexTaskPlan(task: Record<string, unknown>, source: CodexTaskPlan["source"] = "synthetic"): CodexTaskPlan {
   const taskType = normalizeCodexTaskType(task.task_type);
   const writeMode = normalizeCodexWriteMode(task.write_mode);
+  if (taskType === "agent_creation") {
+    return {
+      executionMode: "step_orchestrator",
+      reason: "Agent creation requires research-gated scaffold plus card-first Control Center registration and verification.",
+      riskLevel: "high",
+      requiresOperatorInput: false,
+      operatorQuestions: [],
+      steps: [
+        {
+          id: "contract_research_gate",
+          title: "Contract And Research Gate",
+          goal: "Create or validate the accepted agent contract, run Pritha memory/pattern/current-source research, and confirm the scaffold gate is complete or explicitly not-applicable.",
+          expectedOutput: "Accepted contract plus research gate evidence or a clear blocker.",
+          needsWrite: true,
+          needsNetwork: Boolean(task.requires_internet),
+          operatorGate: false,
+        },
+        {
+          id: "scaffold_child_agent",
+          title: "Scaffold Child Agent",
+          goal: "Create or update the sibling child-agent project from the accepted contract without copying secrets or enabling services.",
+          expectedOutput: "Sibling project scaffold with AGENTS.md, README, scripts, manifests and scaffold report.",
+          needsWrite: true,
+          needsNetwork: false,
+          operatorGate: false,
+        },
+        {
+          id: "generate_card_ready_manifest",
+          title: "Generate Card-Ready Manifest",
+          goal: "Ensure operations/manifest.json has Control Center card metadata, structured planned start/stop commands, explicit blockers and no autostart/deployment side effects.",
+          expectedOutput: "Card-ready operations manifest that is safe even when runtime Start/Stop remains disabled.",
+          needsWrite: true,
+          needsNetwork: false,
+          operatorGate: false,
+        },
+        {
+          id: "rebuild_registry",
+          title: "Rebuild Registry",
+          goal: "Run the Pritha registry rebuild so the child-agent appears in 11_agents/registry.md with contract/report evidence.",
+          expectedOutput: "Registry contains the new child-agent row.",
+          needsWrite: true,
+          needsNetwork: false,
+          operatorGate: false,
+        },
+        {
+          id: "verify_control_center_card",
+          title: "Verify Control Center Card",
+          goal: "Run `node scripts/pritha.mjs card-readiness <agent-slug>` and verify the Agents surface sees a visible card or reports a precise blocker.",
+          expectedOutput: "Card readiness status with cardStatus, agentId, registryUpdated, controlCenterVisible, blockers and nextActions.",
+          needsWrite: false,
+          needsNetwork: false,
+          operatorGate: false,
+        },
+        {
+          id: "report_card_blockers",
+          title: "Report Card Status",
+          goal: "Summarize whether the card is ready, blocked or missing and list the next operator-visible tasks for Predictive Voice Control.",
+          expectedOutput: "Concise completion summary; creation is not complete if card status is missing.",
+          needsWrite: false,
+          needsNetwork: false,
+          operatorGate: false,
+        },
+      ],
+      source,
+    };
+  }
   const complex = writeMode === "workspace_write" || ["implementation", "agent_creation", "system_change"].includes(taskType);
   const steps: CodexTaskPlanStep[] = complex
     ? [
@@ -2895,7 +3427,7 @@ function syntheticCodexTaskPlan(task: Record<string, unknown>, source: CodexTask
   return {
     executionMode: complex ? "step_orchestrator" : "inline_progress",
     reason: complex ? "Task appears multi-step or write-capable." : "Task appears bounded enough for one inline Codex turn.",
-    riskLevel: taskType === "system_change" || taskType === "agent_creation" ? "high" : complex ? "medium" : "low",
+    riskLevel: taskType === "system_change" ? "high" : complex ? "medium" : "low",
     requiresOperatorInput: false,
     operatorQuestions: [],
     steps,
@@ -2955,6 +3487,7 @@ function buildPlanningTask(task: Record<string, unknown>) {
       "Decide whether the task should run as inline_progress or step_orchestrator.",
       "Return the plan in data.structuredJson as JSON with keys: executionMode, reason, riskLevel, requiresOperatorInput, operatorQuestions, steps.",
       "Each step must include id, title, goal, expectedOutput, needsWrite, needsNetwork, operatorGate.",
+      "For agent_creation, the plan must include a verify_control_center_card step and must not treat creation as complete while card readiness is missing.",
       "",
       "Original task:",
       compactText(task.task || "", 8_000),
@@ -3254,6 +3787,8 @@ async function startCodexAppTask(
         transport: "codex-app",
         sandbox,
         writable_roots: writableRoots,
+        thread_scope: task.thread_scope,
+        codex_app_thread_routing_mode: getPrithaRuntimeSettings().codexAppThreadRoutingMode,
         timeout_ms: timeoutMs,
         started_at: startedAt,
         result_path: rootRelative(root, paths.resultPath),
@@ -3271,6 +3806,8 @@ async function startCodexAppTask(
     status: "running",
     transport: "codex-app",
     message: "Codex App sidecar started in the local Pritha environment.",
+    thread_scope: task.thread_scope,
+    routing_mode: getPrithaRuntimeSettings().codexAppThreadRoutingMode,
   });
 
   const heartbeat = setInterval(() => {
@@ -3304,18 +3841,18 @@ async function startCodexAppTask(
       priority: "normal",
       voice_text: selectedMode === "step_orchestrator" ? "Для этой задачи включен step orchestrator: Codex будет выполнять план по шагам." : "Для этой задачи Codex пойдет одним выполнением с сохраненным планом.",
     });
-    if (plan.requiresOperatorInput && plan.operatorQuestions.length && settings.codexAskBeforeOrchestration) {
+    if (plan.requiresOperatorInput && plan.operatorQuestions.length && settings.codexAskBeforeOrchestration && !boolValue(task.operator_question_answered)) {
       const question = plan.operatorQuestions[0];
-      const finishedAt = new Date().toISOString();
+      const updatedAt = new Date().toISOString();
       await writeFile(
         paths.resultPath,
         [
-          "Codex task needs operator input before execution.",
+          "Codex task is waiting for operator input before continuing.",
           "",
+          "Question:",
           question,
           "",
-          "This question was returned as a completed result because the current task card cannot accept free-form operator answers.",
-          "Answer it by voice or start a follow-up task; do not provide secrets.",
+          "Answer this by voice in Pritha Voice Control; Pritha will resume this same Codex task.",
           "",
         ].join("\n"),
         "utf8",
@@ -3324,18 +3861,20 @@ async function startCodexAppTask(
         paths.statusPath,
         `${JSON.stringify(
           {
-            status: "complete",
+            status: "waiting_for_operator",
             phase: "operator_question",
             transport: "codex-app",
             question,
             plan,
             requires_operator_response: true,
-            operator_question_terminal: true,
+            operator_question_terminal: false,
             sandbox,
             writable_roots: writableRoots,
+            thread_scope: task.thread_scope,
+            codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
             timeout_ms: timeoutMs,
             started_at: startedAt,
-            completed_at: finishedAt,
+            updated_at: updatedAt,
             result_path: rootRelative(root, paths.resultPath),
             stdout_path: rootRelative(root, paths.stdoutPath),
             stderr_path: rootRelative(root, paths.stderrPath),
@@ -3353,11 +3892,11 @@ async function startCodexAppTask(
         voice_text: `Codex просит уточнение перед продолжением: ${question}`,
       });
       await progress({
-        phase: "operator_question_completed",
-        level: "complete",
-        status: "complete",
+        phase: "operator_question",
+        level: "warning",
+        status: "waiting_for_operator",
         transport: "codex-app",
-        message: "Codex task completed with an operator question; no active wait card was left.",
+        message: "Codex task is waiting for the operator answer before continuing.",
         elapsed_ms: elapsedMsSince(startedAt),
       });
       clearInterval(heartbeat);
@@ -3383,6 +3922,8 @@ async function startCodexAppTask(
           plan,
           sandbox,
           writable_roots: writableRoots,
+          thread_scope: task.thread_scope,
+          codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
           timeout_ms: timeoutMs,
           started_at: startedAt,
           completed_at: finishedAt,
@@ -3457,6 +3998,8 @@ async function startCodexAppTask(
           error: message,
           sandbox,
           writable_roots: writableRoots,
+          thread_scope: task.thread_scope,
+          codex_app_thread_routing_mode: getPrithaRuntimeSettings().codexAppThreadRoutingMode,
           timeout_ms: timeoutMs,
           started_at: startedAt,
           completed_at: finishedAt,
@@ -3706,7 +4249,6 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   const now = new Date();
   const taskId = `${now.toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
   const taskDir = path.join(privateRoot(), "codex-tasks", taskId);
-  await mkdir(taskDir, { recursive: true });
 
   const settings = getPrithaRuntimeSettings();
   const requestedMode = codexMode();
@@ -3727,25 +4269,48 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
               ? "codex-cli"
               : "queue";
   const effectiveMode = effectiveTransport === "queue" ? "queue" : "exec";
+  const taskType = normalizeCodexTaskType(args.task_type);
   const task: Record<string, unknown> = {
     id: taskId,
     created_at: now.toISOString(),
     source: "pritha-control-center-realtime",
     status: effectiveMode === "exec" ? "running" : "queued",
     task: taskText.slice(0, 8_000),
-    task_type: String(args.task_type || "analysis"),
+    task_type: taskType,
     write_mode: normalizeCodexWriteMode(args.write_mode),
     priority: String(args.priority || "normal"),
     requires_internet: Boolean(args.requires_internet),
     expected_result: String(args.expected_result || "concise operator-facing answer"),
     operator_confirmation: String(args.operator_confirmation || ""),
+    subject_kind: normalizeThreadScopeKind(args.subject_kind) || undefined,
+    subject_id: normalizeThreadScopeId(args.subject_id) || undefined,
+    subject_label: args.subject_label ? normalizeThreadScopeLabel(args.subject_label, String(args.subject_id || "subject")) : undefined,
+    thread_reset: boolValue(args.thread_reset),
     root: rootRelative(root, root),
     sibling_agent_parent: rootRelative(root, path.dirname(root)),
     sibling_agent_parent_absolute: path.dirname(root),
     requested_transport: requestedTransport,
     fallback_transport: fallbackTransport,
     effective_transport: effectiveTransport,
+    codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
+    ...(taskType === "agent_creation" ? { agent_creation_research_gate: agentCreationResearchGatePayload() } : {}),
   };
+  if (codexTaskLooksLikeAgentDevelopment(task)) {
+    task.agent_development_research_gate = agentDevelopmentResearchGatePayload();
+  }
+  task.thread_scope = deriveCodexThreadScope(args, task);
+  const handoffConfirmation = codexTaskHandoffConfirmationResult(args, task);
+  if (handoffConfirmation) {
+    await logPrivateEvent("codex_task_handoff_confirmation_required", {
+      task_type: task.task_type,
+      write_mode: task.write_mode,
+      subject_kind: task.subject_kind,
+      subject_id: task.subject_id,
+    });
+    return handoffConfirmation;
+  }
+
+  await mkdir(taskDir, { recursive: true });
   const approval = codexTaskApprovalFor(task, now.toISOString());
   if (approval?.status === "pending") {
     task.status = "decision_required";
@@ -3766,12 +4331,29 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   await applyCodexOutboundPromptBudget(task, codexOutboundTransports(effectiveTransport, fallbackTransport), progress);
   await writeFile(requestPath, `${JSON.stringify(task, null, 2)}\n`, "utf8");
   await writeFile(promptPath, `${buildCodexPrompt(task)}\n`, "utf8");
-  await writeFile(statusPath, `${JSON.stringify({ status: task.status, phase: task.status, created_at: task.created_at, approval: task.approval }, null, 2)}\n`, "utf8");
+  await writeFile(
+    statusPath,
+    `${JSON.stringify(
+      {
+        status: task.status,
+        phase: task.status,
+        created_at: task.created_at,
+        approval: task.approval,
+        thread_scope: task.thread_scope,
+        codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
   await progress({
     phase: String(task.status || "created"),
     level: task.status === "decision_required" ? "warning" : "info",
     status: String(task.status || "created"),
     transport: String(effectiveTransport),
+    thread_scope: task.thread_scope,
+    routing_mode: settings.codexAppThreadRoutingMode,
     message:
       task.status === "decision_required"
         ? "Codex task captured and waiting for explicit operator approval."
@@ -3798,6 +4380,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
     requested_transport: requestedTransport,
     effective_transport: effectiveTransport,
     fallback_transport: fallbackTransport,
+    thread_scope: task.thread_scope,
+    codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
     transport_availability: {
       codex_app: app,
       codex_cli: cli,
@@ -3978,11 +4562,13 @@ async function repairStaleCodexTaskStatus(
   const pid = status?.pid;
   const livePid = pid ? processIsAlive(pid) : false;
   const progress = readCodexTaskProgress(paths.progressPath, 100);
-  const progressPhases = new Set(progress.map((event) => String(event.phase || "")));
+  const progressPhases = progress.map((event) => String(event.phase || ""));
+  const hasCodexAppStarted = progressPhases.some((phase) => phase === "runner_started" || phase === "codex_app_started" || phase.endsWith("_codex_app_started"));
+  const hasCodexAppInitialized = progressPhases.some((phase) => phase === "codex_app_initialized" || phase.endsWith("_codex_app_initialized"));
   const codexAppStartupStalled =
     String(status?.transport || request?.effective_transport || "") === "codex-app" &&
-    (progressPhases.has("runner_started") || progressPhases.has("codex_app_started")) &&
-    !progressPhases.has("codex_app_initialized") &&
+    hasCodexAppStarted &&
+    !hasCodexAppInitialized &&
     Number.isFinite(startedMs) &&
     Date.now() - startedMs > 300_000;
   if (!stale && !codexAppStartupStalled && (!pid || livePid)) return { status, resultText, repaired: false };
@@ -4065,6 +4651,9 @@ async function codexTaskSummary(id: string) {
   const handoffStatus = handoffSent ? "sent" : handoffSkipped ? "skipped" : "pending";
   const handoffReason = handoffSkipped ? String(handoffSkipped.reason || "unknown") : undefined;
   const approval = request?.approval || (status && "approval" in status ? status.approval : null);
+  const statusRecord = status as Record<string, unknown> | null | undefined;
+  const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
+  const threadRoutingMode = String(statusRecord?.codex_app_thread_routing_mode || request?.codex_app_thread_routing_mode || "");
   const activity = codexTaskActivity({
     status,
     request,
@@ -4105,6 +4694,8 @@ async function codexTaskSummary(id: string) {
     result_available: Boolean(resultText.trim()),
     result_excerpt: compactText(resultText, 900),
     approval,
+    thread_scope: threadScope,
+    codex_app_thread_routing_mode: threadRoutingMode,
     plan,
     latest_voice_feedback: latestVoiceFeedback,
     speakable_events: voiceFeedback,
@@ -4197,6 +4788,9 @@ export async function getPrithaCodexTask(taskId: string) {
   const voiceFeedback = readCodexVoiceFeedback(voiceFeedbackPath, 20);
   const latestVoiceFeedback = latestSpeakableFeedback(voiceFeedback);
   const approval = request?.approval || (status && "approval" in status ? status.approval : null);
+  const statusRecord = status as Record<string, unknown> | null | undefined;
+  const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
+  const threadRoutingMode = String(statusRecord?.codex_app_thread_routing_mode || request?.codex_app_thread_routing_mode || "");
   const stat = statSync(taskDir);
   const handoffSent = lastPrivateEvent(telemetry, "codex_task_result_handoff_sent");
   const handoffSkipped = lastPrivateEvent(telemetry, "codex_task_result_handoff_skipped");
@@ -4247,6 +4841,8 @@ export async function getPrithaCodexTask(taskId: string) {
     request,
     status_detail: status,
     approval,
+    thread_scope: threadScope,
+    codex_app_thread_routing_mode: threadRoutingMode,
     plan,
     latest_voice_feedback: latestVoiceFeedback,
     speakable_events: voiceFeedback,
@@ -4283,6 +4879,8 @@ function codexTaskToolView(task: Record<string, unknown>, maxEvents = 8) {
     task_type: task.task_type || (typeof task.request === "object" && task.request !== null ? (task.request as { task_type?: unknown }).task_type : undefined),
     result_available: task.result_available,
     result_excerpt: compactText(task.result_excerpt, 900),
+    thread_scope: task.thread_scope || (typeof task.request === "object" && task.request !== null ? (task.request as { thread_scope?: unknown }).thread_scope : undefined),
+    codex_app_thread_routing_mode: task.codex_app_thread_routing_mode,
     plan: task.plan,
     latest_voice_feedback: task.latest_voice_feedback,
     speakable_events: Array.isArray(task.speakable_events) ? task.speakable_events.slice(-maxEvents) : [],
@@ -4299,6 +4897,7 @@ function codexTaskToolView(task: Record<string, unknown>, maxEvents = 8) {
 function codexTaskDiagnosis(task: Record<string, unknown>) {
   const status = String(task.status || "unknown");
   if (status === "decision_required") return "approval_required";
+  if (status === "waiting_for_operator") return "operator_input_required";
   if (status === "failed_timeout") return "timeout";
   if (status === "failed_empty_result") return "empty_result";
   if (status.startsWith("failed")) return "failed";
@@ -4354,6 +4953,8 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
       status: view.status,
       phase: view.phase,
       stale: view.stale,
+      thread_scope: view.thread_scope,
+      codex_app_thread_routing_mode: view.codex_app_thread_routing_mode,
       operator_brief: view.operator_brief,
       latest_voice_feedback: view.latest_voice_feedback,
     };
@@ -4365,6 +4966,8 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
       task_id: taskId,
       status: view.status,
       phase: view.phase,
+      thread_scope: view.thread_scope,
+      codex_app_thread_routing_mode: view.codex_app_thread_routing_mode,
       progress_timeline: view.progress_timeline,
       speakable_events: view.speakable_events,
       operator_brief: view.operator_brief,
@@ -4379,6 +4982,8 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
       status: view.status,
       phase: view.phase,
       stale: view.stale,
+      thread_scope: view.thread_scope,
+      codex_app_thread_routing_mode: view.codex_app_thread_routing_mode,
       voice_handoff_required: view.voice_handoff_required,
       operator_brief: view.operator_brief,
       latest_voice_feedback: view.latest_voice_feedback,
@@ -4387,6 +4992,156 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
     };
   }
   return { ok: true, operation, ...view };
+}
+
+async function latestWaitingCodexTaskId(limit = 10) {
+  const listed = await listPrithaCodexTasks(limit);
+  if (!listed.ok) return "";
+  const tasks = Array.isArray(listed.tasks) ? listed.tasks : [];
+  const waiting = tasks.find((task) => String(task.status || "") === "waiting_for_operator");
+  return String(waiting?.task_id || "");
+}
+
+export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
+  const answer = compactText(args.answer, 4_000);
+  if (!answer) {
+    await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "missing_answer" });
+    return { ok: false, error: "missing_answer" };
+  }
+
+  const root = resolveTechscopeRoot();
+  let id = safeTaskId(String(args.task_id || ""));
+  if (!id) id = await latestWaitingCodexTaskId();
+  if (!id) {
+    await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "no_waiting_codex_task" });
+    return { ok: false, error: "no_waiting_codex_task" };
+  }
+
+  const taskDir = path.join(privateRoot(), "codex-tasks", id);
+  if (!isPathInsideOrSame(privateRoot(), taskDir) || !existsSync(taskDir)) {
+    await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "task_not_found", task_id: id });
+    return { ok: false, error: "task_not_found", task_id: id };
+  }
+
+  const requestPath = path.join(taskDir, "request.json");
+  const promptPath = path.join(taskDir, "prompt.md");
+  const statusPath = path.join(taskDir, "status.json");
+  const resultPath = path.join(taskDir, "result.md");
+  const stdoutPath = path.join(taskDir, "stdout.log");
+  const stderrPath = path.join(taskDir, "stderr.log");
+  const progressPath = codexTaskProgressPath(taskDir);
+  const planPath = codexTaskPlanPath(taskDir);
+  const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
+  const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(id, progressPath, event);
+  const request = await readJsonFile(requestPath);
+  const status = await readJsonFile(statusPath);
+  const statusValue = String(status?.status || request?.status || "");
+  if (!request || statusValue !== "waiting_for_operator") {
+    await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "task_not_waiting_for_operator", task_id: id, status: statusValue });
+    return { ok: false, error: "task_not_waiting_for_operator", task_id: id, status: statusValue || "unknown" };
+  }
+
+  const now = new Date().toISOString();
+  const question = compactText(status?.question || request.operator_question || "", 1_000);
+  const operatorConfirmation = compactText(args.operator_confirmation, 700);
+  const operatorAnswer = {
+    question,
+    answer,
+    answered_at: now,
+    source: "pritha-voice-control",
+    operator_confirmation: operatorConfirmation || "Operator answered the Codex clarification by voice and asked Codex to continue the same task.",
+  };
+  const existingAnswers = Array.isArray(request.operator_answers) ? request.operator_answers : [];
+  const nextRequest: Record<string, unknown> = {
+    ...request,
+    status: "running",
+    operator_question_answered: true,
+    operator_question_answered_at: now,
+    operator_answers: [...existingAnswers, operatorAnswer],
+    operator_confirmation: [
+      String(request.operator_confirmation || "").trim(),
+      "",
+      `Operator answered Codex clarification at ${now}.`,
+      question ? `Question: ${question}` : "",
+      `Answer: ${answer}`,
+      operatorConfirmation,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
+
+  await applyCodexOutboundPromptBudget(nextRequest, codexOutboundTransports(nextRequest.effective_transport, nextRequest.fallback_transport), progress);
+  await writeFile(requestPath, `${JSON.stringify(nextRequest, null, 2)}\n`, "utf8");
+  await writeFile(promptPath, `${buildCodexPrompt(nextRequest)}\n`, "utf8");
+  await writeFile(resultPath, "", "utf8").catch(() => undefined);
+  await writeFile(
+    statusPath,
+    `${JSON.stringify(
+      {
+        ...(status || {}),
+        status: "running",
+        phase: "operator_answer_received",
+        transport: status?.transport || nextRequest.effective_transport || "codex-app",
+        question,
+        operator_answer: answer,
+        operator_answered_at: now,
+        requires_operator_response: false,
+        operator_question_terminal: false,
+        updated_at: now,
+        thread_scope: nextRequest.thread_scope,
+        codex_app_thread_routing_mode: nextRequest.codex_app_thread_routing_mode,
+        result_path: rootRelative(root, resultPath),
+        stdout_path: rootRelative(root, stdoutPath),
+        stderr_path: rootRelative(root, stderrPath),
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  await progress({
+    phase: "operator_answer_received",
+    level: "info",
+    status: "running",
+    transport: String(nextRequest.effective_transport || status?.transport || "codex-app"),
+    message: "Operator answered the Codex clarification; resuming the same task.",
+    question,
+    answer_excerpt: compactText(answer, 700),
+    thread_scope: nextRequest.thread_scope,
+    routing_mode: nextRequest.codex_app_thread_routing_mode,
+  });
+  await appendCodexVoiceFeedback(id, voiceFeedbackPath, {
+    phase: "operator_answer_received",
+    priority: "normal",
+    speakable: false,
+    voice_text: "Ответ получен, продолжаю ту же Codex-задачу.",
+    requires_response: false,
+  });
+
+  const effectiveTransport = String(nextRequest.effective_transport || status?.transport || "codex-app");
+  let exec: Awaited<ReturnType<typeof startCodexExec>> | Awaited<ReturnType<typeof startCodexAppTask>> | null = null;
+  if (effectiveTransport === "codex-app") {
+    exec = await startCodexAppTask(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
+  } else if (effectiveTransport === "codex-cli") {
+    exec = await startCodexExec(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
+  } else {
+    await progress({
+      phase: "queued",
+      level: "info",
+      status: "queued",
+      message: "Operator answer was recorded, but no execution transport is available.",
+      thread_scope: nextRequest.thread_scope,
+      routing_mode: nextRequest.codex_app_thread_routing_mode,
+    });
+  }
+
+  await logPrivateEvent("codex_task_operator_answer", { ok: true, task_id: id, status: "running", effective_transport: effectiveTransport });
+  return {
+    ...(await getPrithaCodexTask(id)),
+    answer_accepted: true,
+    exec,
+    operator_note: "Ответ принят. Та же Codex-задача продолжена.",
+  };
 }
 
 export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApprovalAction) {
@@ -4450,6 +5205,8 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
           status: "rejected",
           phase: "rejected",
           approval,
+          thread_scope: nextRequest.thread_scope,
+          codex_app_thread_routing_mode: nextRequest.codex_app_thread_routing_mode,
           completed_at: decidedAt,
           result_path: rootRelative(root, resultPath),
         },
@@ -4463,6 +5220,15 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
       level: "warning",
       status: "rejected",
       message: "Codex task rejected by the operator before execution.",
+      thread_scope: nextRequest.thread_scope,
+      routing_mode: nextRequest.codex_app_thread_routing_mode,
+    });
+    await appendCodexVoiceFeedback(id, voiceFeedbackPath, {
+      phase: "approval_rejected",
+      priority: "high",
+      speakable: false,
+      voice_text: "Reject получен в UI. Codex-задача отменена до запуска.",
+      requires_response: false,
     });
     await logPrivateEvent("codex_task_approval_decision", { ok: true, task_id: id, action, status: "rejected" });
     return getPrithaCodexTask(id);
@@ -4480,6 +5246,15 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
     level: "info",
     status: String(nextRequest.status || "running"),
     message: "Operator approved the Codex task decision gate.",
+    thread_scope: nextRequest.thread_scope,
+    routing_mode: nextRequest.codex_app_thread_routing_mode,
+  });
+  await appendCodexVoiceFeedback(id, voiceFeedbackPath, {
+    phase: "approval_approved",
+    priority: "high",
+    speakable: false,
+    voice_text: "Approve получен в UI. Codex-задача запущена или поставлена в очередь.",
+    requires_response: false,
   });
   if (effectiveTransport === "codex-app") {
     exec = await startCodexAppTask(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
@@ -4493,6 +5268,8 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
           status: "queued",
           phase: "queued",
           approval,
+          thread_scope: nextRequest.thread_scope,
+          codex_app_thread_routing_mode: nextRequest.codex_app_thread_routing_mode,
           updated_at: decidedAt,
           result_path: rootRelative(root, resultPath),
         },
@@ -4506,6 +5283,8 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
       level: "info",
       status: "queued",
       message: "Approved Codex task remains queued because no execution transport is available.",
+      thread_scope: nextRequest.thread_scope,
+      routing_mode: nextRequest.codex_app_thread_routing_mode,
     });
   }
 
@@ -4560,6 +5339,26 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
     output = await handlePrithaFiles(args);
   } else if (name === "inspect_codex_task") {
     output = await inspectCodexTask(args);
+  } else if (name === "recall_rolling_summary") {
+    const recall = (await getPrithaRollingSummary({
+      topicKey: args.topicKey ?? args.topic_key,
+    })) as Record<string, unknown>;
+    if (recall.ok && recall.found) {
+      const checkpoint = (typeof recall.checkpoint === "object" && recall.checkpoint !== null ? recall.checkpoint : {}) as Record<string, unknown>;
+      output = {
+        ok: true,
+        found: true,
+        topic_key: recall.topic_key,
+        updated_at: checkpoint.updatedAt,
+        context_text: recall.context_text,
+        source: "rolling-summary-current",
+        privacy: "summary-only",
+      };
+    } else {
+      output = recall;
+    }
+  } else if (name === "answer_codex_task") {
+    output = await answerPrithaCodexTask(args);
   } else if (name === "run_codex_task") {
     output = await runCodexTask(args);
   } else {

@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-06-07
+updated: 2026-06-24
 topics:
   - agent-engineering
   - agent-factory
@@ -101,6 +101,11 @@ sources, accept the contract, then generate a working scaffold with tests and a
 handoff guide. A draft contract may be scaffolded only with an explicit
 experimental `--allow-draft-scaffold` override.
 
+For Voice Control and Predictive Voice Control creation tasks, a visible Agents
+card is part of the minimum successful outcome. The card can show explicit
+runtime blockers, but creation is not complete while the agent is missing from
+`11_agents/registry.md` or the Control Center Agents model.
+
 ## Workflow
 
 1. Capture the request as an intake or direct thread brief.
@@ -134,8 +139,14 @@ experimental `--allow-draft-scaffold` override.
    - skill needs, allowed skill sources, install mode and mutation policy;
    - MCP needs, allowed connector sources, auth policy, toolset scope and side-effect policy;
    - acceptance tests and training expectations.
+   If the first user description is not enough to fill these fields, ask concise
+   clarifying questions before handing the task to Codex. Creation,
+   improvement, fixing and harness evolution are the same class of
+   agent-development task and need the same quality of brief.
 3. Create an `agent-contract` from `08_templates/agent-project-contract.md`.
-4. Search TechScope memory by domain:
+4. Create a reusable `agent-pattern-pack` artifact in `11_agents/research/`.
+   The pack must combine FTS search, domain-routed memory search and an
+   attempted semantic/embedding search:
    - first, `agent-building-knowledge` for standards, workflows and reusable
      architecture patterns;
    - second, `pritha-self` for current capabilities and limitations;
@@ -143,7 +154,12 @@ experimental `--allow-draft-scaffold` override.
      patterns, not templates to copy;
    - optionally, `user-model` local-private preferences only when available and
      permitted.
-5. Verify volatile architecture choices through current primary sources and trusted secondary sources.
+   If semantic/embedding search is unavailable, stale or fails, continue with a
+   warning, record the status in the pattern pack, and append the failure to
+   `.private/agents-mother/semantic-memory-failures.jsonl` for later repair.
+5. Derive external research topics from both the contract and the selected
+   pattern-pack seeds. Verify volatile architecture choices through current
+   primary sources and trusted secondary sources.
    If no volatile external choice is present, record why external verification
    is not needed.
 6. Record an architecture recommendation:
@@ -189,9 +205,11 @@ experimental `--allow-draft-scaffold` override.
    - token and user id only through environment variables.
 11. Run tests and healthchecks.
 12. Create a `scaffold-report` from `08_templates/agent-scaffold-report.md`.
-13. After the first meaningful working version, create an `agent-post-creation-review`.
-14. Record a user interaction review: initial prompt, clarifications, user feedback, failed assumptions and product decisions discovered during the build.
-15. Rebuild TechScope memory indexes so the new contract and reports become searchable.
+13. Rebuild the Pritha child-agent registry with `node scripts/pritha.mjs registry`.
+14. Run `node scripts/pritha.mjs card-readiness <agent-slug>`. If the status is `missing`, treat the creation task as blocked. If the status is `blocked`, report the card blockers and next operator tasks; do not hide the card behind unfinished runtime work.
+15. After the first meaningful working version, create an `agent-post-creation-review`.
+16. Record a user interaction review: initial prompt, clarifications, user feedback, failed assumptions and product decisions discovered during the build.
+17. Rebuild TechScope memory indexes so the new contract and reports become searchable.
 
 ## Current commands
 
@@ -206,6 +224,8 @@ node scripts/pritha.mjs skills audit ../existing-or-generated-agent
 node scripts/pritha.mjs test ../existing-or-generated-agent
 node scripts/pritha.mjs publish ../existing-or-generated-agent
 node scripts/pritha.mjs lineage
+node scripts/pritha.mjs registry
+node scripts/pritha.mjs card-readiness agent-name
 
 # Compatibility aliases retained for v0.1:
 node scripts/agents-mother.mjs questions
@@ -219,6 +239,7 @@ node scripts/agents-mother.mjs operations ../existing-or-generated-agent
 node scripts/agents-mother.mjs deploy ../existing-or-generated-agent plan
 node scripts/agents-mother.mjs evolve ../existing-or-generated-agent --notes "lessons"
 node scripts/agents-mother.mjs registry
+node scripts/agents-mother.mjs card-readiness agent-name
 node scripts/agents-mother.mjs validate 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/agents-mother.mjs list
 ```
@@ -510,6 +531,17 @@ node scripts/agents-mother.mjs evolve <agent-path> --notes "what changed after r
 node scripts/agents-mother.mjs registry
 ```
 
+For a concrete improvement request, create an agent-development task brief
+before implementation:
+
+```sh
+node scripts/pritha.mjs improve <agent-path> --task "describe the desired change"
+```
+
+This writes a development task and a pattern pack, then Codex App/CLI can use
+that brief to implement the smallest verified change after required
+current-source enrichment.
+
 The post-creation review must separate:
 
 - useful scaffold patterns;
@@ -542,7 +574,8 @@ sandbox behavior changes.
 An Agents Mother run is complete only when:
 
 - an `agent-contract` exists and validates;
-- the selected architecture is grounded in TechScope memory and current sources;
+- the selected architecture is grounded in TechScope memory, a pattern-pack
+  artifact and current sources;
 - a working scaffold exists in the chosen folder;
 - environment setup instructions are present;
 - smoke tests or healthchecks pass, or failures are documented;

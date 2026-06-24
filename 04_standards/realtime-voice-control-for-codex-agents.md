@@ -3,7 +3,7 @@ id: realtime-voice-control-for-codex-agents
 type: standard
 status: active
 created: 2026-05-25
-updated: 2026-05-31
+updated: 2026-06-24
 last_reviewed: 2026-05-31
 owner: Techscope/user
 topics:
@@ -87,7 +87,7 @@ source_published: unknown
 source_updated: 2026-05-31
 source_version: FESPA26 local implementation inspected 2026-05-30; Pritha reference pack v1; UI and Tailscale companion patterns v1
 retrieved: 2026-05-30
-verified: 2026-05-31
+verified: 2026-06-24
 valid_for: Codex-native agents with realtime voice UI, explicit server-side tools and deep-work transport
 temporal_status: version-bound
 ---
@@ -96,7 +96,7 @@ temporal_status: version-bound
 
 Status: active
 Owner: Techscope/user
-Last reviewed: 2026-05-31
+Last reviewed: 2026-06-24
 
 ## Rule
 
@@ -145,6 +145,12 @@ Pritha carries the source-level FESPA26 reference pack at `11_agents/reference-i
 - Validate Codex outputs before applying them. Accept only known statuses and expected JSON/data shapes.
 - Fail closed: if Codex App, Codex CLI or output validation fails, keep the voice session alive and record the failed/pending task.
 - Keep publication, deletion, deployment, service install and broad system changes behind explicit operator approval.
+- For cross-session continuity, use one bounded summary-only rolling handoff file
+  per voice/control subject or project. Overwrite it in place; do not append raw
+  transcript history.
+- Expose the rolling handoff to Realtime through an explicit recall tool, not as
+  automatic startup context. The model should call the recall tool only when the
+  operator asks about the prior session, prior discussion or previous handoff.
 - When constructing descendants, add a `realtime-voice` interface placeholder if the contract mentions voice/realtime. Copy the FESPA26 reference code only after adapting domain tools, env prefixes, repositories and confirmation gates.
 
 ## Universal Architecture
@@ -168,6 +174,28 @@ The important lanes:
 - `deep-task lane`: Codex App/thread or Codex CLI solves high-context tasks.
 - `queue lane`: background jobs, retries, stale-lock recovery and structured results.
 - `artifact lane`: reports, feed cards, memory entries, lessons or code changes.
+- `handoff lane`: bounded summary-only rolling checkpoint for the next session,
+  loaded only through explicit recall.
+
+## Rolling Handoff And Live Sticky Context
+
+Rolling handoff and sticky context solve different problems:
+
+- Rolling handoff is a private summary-only checkpoint between sessions. It
+  should include the latest task, status, key resources, confirmed constraints
+  and accesses without secrets, next step, latest Realtime session summary and
+  latest Codex task summary. It must have a hard byte limit and deterministic
+  redaction.
+- Rolling handoff is not curated long-term memory. It is a current handoff file,
+  overwritten in place.
+- Rolling handoff must not be injected automatically at Realtime session start.
+  The Realtime model may access it only through a named tool such as
+  `recall_rolling_summary` after the operator asks about the prior session or
+  asks to continue from the prior handoff.
+- Sticky context is live context inside the currently open Realtime session. It
+  may send bounded current-session events and recent task state through the data
+  channel after key Codex events. It is not cross-session storage and must not
+  read the rolling handoff file.
 
 ## FESPA26 Reference Flow
 
@@ -217,14 +245,14 @@ Funny Teacher confirms that the pattern is not limited to event/media work. It i
 ## Temporal Validity
 
 - Source published: unknown.
-- Source updated: 2026-05-29.
+- Source updated: 2026-06-24.
 - Source version: FESPA26 local implementation inspected 2026-05-29.
 - Retrieved: 2026-05-29.
-- Verified: 2026-05-29.
+- Verified: 2026-06-24.
 - Valid for: Codex-native agents with realtime voice UI, explicit server tools and deep-work transport.
 - Freshness status: current.
 - Temporal status: version-bound.
-- Recheck when: OpenAI Realtime session/call format changes, Codex App app-server transport changes, Codex CLI `exec --ephemeral` or sandbox behavior changes, or a third voice agent exposes a contradictory boundary.
+- Recheck when: OpenAI Realtime session/call format changes, Codex App app-server transport changes, Codex CLI `exec --ephemeral` or sandbox behavior changes, rolling handoff privacy rules change, or a third voice agent exposes a contradictory boundary.
 
 ## Examples
 

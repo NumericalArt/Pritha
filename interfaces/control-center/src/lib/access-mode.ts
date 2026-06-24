@@ -66,7 +66,8 @@ function isLocalHttpUrl(url: URL) {
   return url.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost");
 }
 
-export function agentUrlForAccessMode(rawUrl: string | undefined, access: ControlCenterStatus["access"], mode: AccessMode) {
+export function agentUrlForAccessMode(rawUrl: string | undefined, access: ControlCenterStatus["access"], mode: AccessMode, agentTailscaleUrl?: string) {
+  if (mode === "tailscale") return agentTailscaleUrl;
   if (!rawUrl) return undefined;
   let source: URL;
   try {

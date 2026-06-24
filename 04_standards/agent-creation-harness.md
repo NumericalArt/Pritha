@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-06-15
-last_reviewed: 2026-06-15
+updated: 2026-06-24
+last_reviewed: 2026-06-24
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -105,8 +105,8 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-06-11
-source_version: Techscope draft standard v13 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update
+source_updated: 2026-06-24
+source_version: Techscope draft standard v14 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update + card-first Control Center readiness
 retrieved: 2026-05-18
 verified: 2026-06-11
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
@@ -117,7 +117,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-07
+Last reviewed: 2026-06-24
 
 ## Rule
 
@@ -130,17 +130,44 @@ Pritha descendants are assembled from contract-selected modules, not from one un
 The initial scaffold is a starting point, not the final boundary of the agent. A descendant can always be evolved through its native interface, especially Codex App/Codex thread for Codex-native agents, plus any other interface selected in its contract. When a descendant receives an internet resource that is not directly relevant to its domain mission, it should treat the resource as meta-improvement input rather than domain memory: evaluate whether the material improves the agent's harness, memory, tools, skills, MCP, UX, evals, safety or operations, then record a brief/review/decision locally or send a distilled lesson back to Pritha/Techscope.
 
 Scaffold readiness is gated: the contract must be `accepted`, Pritha memory
-research must be checked for relevant standards/workflows/decisions/reports,
-and volatile external choices must be verified against current primary sources
-before production scaffold decisions. A draft scaffold is allowed only as an
-explicit experiment and must not be presented as a ready descendant.
+research must produce a dedicated pattern-pack, relevant
+standards/workflows/decisions/reports must be checked, and volatile or
+pattern-derived external choices must be verified against current primary
+sources before production scaffold decisions. Semantic/embedding memory search
+is attempted for every creation or major improvement task. If it is unavailable,
+stale or fails, Pritha may continue only with an explicit warning in the
+pattern-pack and a JSONL entry in
+`.private/agents-mother/semantic-memory-failures.jsonl`. A draft scaffold is
+allowed only as an explicit experiment and must not be presented as a ready
+descendant.
+
+For any child agent created through Pritha Voice Control or Predictive Voice
+Control, card-first readiness is part of the scaffold deliverable. The first
+successful creation pass must leave an Agents-tab card that is discoverable from
+Pritha's registry and Control Center model. A card may honestly show blocked or
+manual-only runtime state, but it must expose the child folder, manifest,
+contract/report lineage, planned start/check path, blockers and next actions. A
+missing card is a creation blocker, not a follow-up polish item.
+
+Card-first readiness does not authorize background runtime changes. Scaffold may
+generate planned structured `start_command`/`stop_command`, health URL and
+Control Center metadata, but `control_center_managed`, launchd, cron, service
+install, deployment, Tailscale Serve and autostart remain disabled unless the
+contract and a later explicit operator approval gate allow them.
 
 Every generated child harness must carry the same evolution rule. For any
 future change to instructions, memory, tools, skills, MCP, interfaces,
 operations, deployment, proactivity, security, model routing, evals, tests or
 recovery behavior, the child agent should first inspect its own project and
-contract, then consult Pritha memory, then verify current documentation where
-needed, then implement the narrowest change with verification.
+contract, then consult Pritha memory through a pattern-pack, then verify
+current documentation where needed, then implement the narrowest change with
+verification.
+
+Creation, improvement, fixing and harness evolution are one
+agent-development pipeline. For an existing child agent, Pritha should create
+an agent-development task brief, derive or reuse a pattern-pack, enrich selected
+patterns through current sources, and only then hand implementation to Codex App
+or Codex CLI.
 
 OpenAI's 2026-02-11 harness-engineering article strengthens the default Pritha rule: a created agent's repository is the agent-readable operating environment. `AGENTS.md` should be a concise map and contract entrypoint; deeper knowledge belongs in versioned docs, standards, workflows, plans, tests, scripts and reports that future Codex sessions can discover, validate and update.
 

@@ -99,6 +99,7 @@ type OperationsManifest = {
   worker_command?: OperationsCommand;
   schedule_command?: OperationsCommand;
   local_upstream_url?: string;
+  tailscale_public_url?: string;
   health_url?: string;
   healthcheck_command?: string;
   external_url?: string;
@@ -111,6 +112,33 @@ type OperationsManifest = {
     schedule?: string;
   };
   credentials?: OperationsCredentialDefinition[];
+};
+
+type TailscaleServeStatusJson = {
+  Web?: Record<
+    string,
+    {
+      Handlers?: Record<
+        string,
+        {
+          Proxy?: string;
+        }
+      >;
+    }
+  >;
+};
+
+type AccessLinkState = {
+  localhost: string;
+  lanUrl?: string;
+  lanReady: boolean;
+  lanBindHost: string;
+  lanReason: string;
+  tailscaleUrl?: string;
+  tailscaleVoiceUrl?: string;
+  tailscaleServeConfigured: boolean;
+  tailscaleDnsName?: string;
+  tailscaleServeStatusJson: TailscaleServeStatusJson | null;
 };
 
 type LifecycleMetadata = ControlCenterAgent["lifecycle"] & {
@@ -291,6 +319,20 @@ function tailscaleServeStatusOutput() {
   return result.stdout;
 }
 
+function tailscaleServeStatusJson() {
+  const result = spawnSync("tailscale", ["serve", "status", "--json"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5_000,
+  });
+  if (result.status !== 0 || !result.stdout.trim()) return null;
+  try {
+    return JSON.parse(result.stdout) as TailscaleServeStatusJson;
+  } catch {
+    return null;
+  }
+}
+
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -309,11 +351,12 @@ function canonicalTailscaleServeConfigured(dnsName: string, serveStatus: string)
   return tailscaleServeEndpointBlock(canonicalUrl, serveStatus).includes(`http://127.0.0.1:${APP_PORT}`);
 }
 
-function accessLinks() {
+function accessLinks(): AccessLinkState {
   const lanIp = firstLanIPv4();
   const lanReady = Boolean(lanIp) && !["127.0.0.1", "localhost", "::1"].includes(APP_HOST);
   const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || tailscaleSelfDnsName();
   const serveStatus = dnsName ? tailscaleServeStatusOutput() : "";
+  const serveStatusJson = dnsName ? tailscaleServeStatusJson() : null;
   const explicitTailscaleUrl = dnsName ? `https://${dnsName}:${APP_PORT}` : undefined;
   const canonicalTailscaleUrl = dnsName ? `https://${dnsName}` : undefined;
   const canonicalConfigured = dnsName ? canonicalTailscaleServeConfigured(dnsName, serveStatus) : false;
@@ -333,6 +376,8 @@ function accessLinks() {
     tailscaleUrl,
     tailscaleVoiceUrl: tailscaleUrl ? `${tailscaleUrl}/voice` : undefined,
     tailscaleServeConfigured: serveConfigured,
+    tailscaleDnsName: dnsName,
+    tailscaleServeStatusJson: serveStatusJson,
   };
 }
 
@@ -1529,6 +1574,79 @@ function isLocalUrl(url: string | undefined) {
   return !url || /^http:\/\/(127\.0\.0\.1|localhost):\d+/.test(url);
 }
 
+function validTailscalePublicUrl(value: string | undefined) {
+  const raw = String(value || "").trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (url.username || url.password) return undefined;
+    if (url.protocol !== "https:" || !url.hostname.endsWith(".ts.net")) return undefined;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return undefined;
+  }
+}
+
+function loopbackEquivalent(hostname: string) {
+  return hostname === "localhost" ? "127.0.0.1" : hostname;
+}
+
+function sameLocalProxyOrigin(proxy: string | undefined, localUrl: string | undefined) {
+  if (!proxy || !localUrl) return false;
+  try {
+    const proxyUrl = new URL(proxy);
+    const local = new URL(localUrl);
+    return (
+      proxyUrl.protocol === local.protocol &&
+      loopbackEquivalent(proxyUrl.hostname) === loopbackEquivalent(local.hostname) &&
+      (proxyUrl.port || defaultPort(proxyUrl.protocol)) === (local.port || defaultPort(local.protocol))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function defaultPort(protocol: string) {
+  if (protocol === "https:") return "443";
+  if (protocol === "http:") return "80";
+  return "";
+}
+
+function tailscaleWebUrl(webHost: string, handlerPath: string) {
+  try {
+    const rawHost = webHost.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const url = new URL(`https://${rawHost}`);
+    if (url.port === "443") url.port = "";
+    const pathPrefix = handlerPath === "/" ? "" : handlerPath.replace(/\/$/, "");
+    url.pathname = pathPrefix || "/";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return undefined;
+  }
+}
+
+function servedTailscaleUrlForLocalUrl(localUrl: string | undefined, access: AccessLinkState) {
+  if (!localUrl || !access.tailscaleDnsName || !access.tailscaleServeStatusJson?.Web) return undefined;
+
+  for (const [webHost, endpoint] of Object.entries(access.tailscaleServeStatusJson.Web)) {
+    const normalizedHost = webHost.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    if (!normalizedHost.startsWith(access.tailscaleDnsName)) continue;
+    for (const [handlerPath, handler] of Object.entries(endpoint.Handlers || {})) {
+      if (!sameLocalProxyOrigin(handler.Proxy, localUrl)) continue;
+      return tailscaleWebUrl(normalizedHost, handlerPath);
+    }
+  }
+
+  return undefined;
+}
+
+function agentTailscaleUrl(manifest: OperationsManifest | null, localUrl: string | undefined, access: AccessLinkState) {
+  const servedUrl = servedTailscaleUrlForLocalUrl(localUrl, access);
+  if (servedUrl) return servedUrl;
+  const declaredUrl = validTailscalePublicUrl(manifest?.tailscale_public_url);
+  return access.tailscaleServeStatusJson ? undefined : declaredUrl;
+}
+
 function isExternalDeployment(record: RegistryRecord, manifest: OperationsManifest | null) {
   const deployment = `${record.deployment} ${manifest?.external_url || ""}`.toLowerCase();
   return /\b(vps|cloud|external|remote|hosted)\b/.test(deployment) || !isLocalUrl(manifest?.health_url);
@@ -1675,13 +1793,14 @@ function issueText(folderPresent: boolean, manifest: OperationsManifest | null, 
   return undefined;
 }
 
-async function buildAgent(root: string, record: RegistryRecord): Promise<ControlCenterAgent> {
+async function buildAgent(root: string, record: RegistryRecord, access: AccessLinkState): Promise<ControlCenterAgent> {
   const folder = findSiblingFolder(root, record.name);
   const manifest = folder ? readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")) : null;
   const health = folder ? await probeHealth(manifest) : { status: "not_checked" as const, detail: "Missing folder" };
   const uiState = agentUiState(Boolean(folder), manifest, health.status);
   const operations = operationsStatus(manifest);
   const localUrl = manifest?.local_upstream_url;
+  const tailscaleUrl = agentTailscaleUrl(manifest, localUrl, access);
   const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
   const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity);
   const credentials = credentialsForAgent(root, folder, manifest);
@@ -1716,8 +1835,8 @@ async function buildAgent(root: string, record: RegistryRecord): Promise<Control
       issue: operations === "failed" ? "Manifest is missing required operation fields" : undefined,
     },
     health,
-    url: localUrl
-      ? { status: "available", local: localUrl }
+    url: localUrl || tailscaleUrl
+      ? { status: "available", local: localUrl, tailscale: tailscaleUrl }
       : { status: "unavailable", reason: folder ? "No local URL in operations manifest" : "Missing folder" },
     ui: {
       ...uiState,
@@ -1805,11 +1924,11 @@ function latestReports(root: string) {
 export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
   const root = resolveTechscopeRoot();
   const registry = parseRegistry(root);
-  const allAgents = await Promise.all(registry.records.map((record) => buildAgent(root, record)));
+  const access = accessLinks();
+  const allAgents = await Promise.all(registry.records.map((record) => buildAgent(root, record, access)));
   const childAgents = allAgents.filter((agent) => agent.name !== "Techscope" && agent.name !== "Pritha");
   const voiceRuntime = getPrithaRealtimeStatus();
   const caps = capabilities(root, registry.records.length > 0, childAgents, voiceRuntime);
-  const access = accessLinks();
   const selfTest = selfTestStatus(root);
   const launchdWarnings = launchdRootWarnings(root);
   const warnings = [

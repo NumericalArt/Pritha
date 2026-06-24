@@ -23,6 +23,16 @@ import { scaffoldContract } from "./scaffold/index.mjs";
 import { handoffProject } from "./handoff.mjs";
 import { deployProject, operationsProject } from "./operations.mjs";
 import { evolveProject, listContracts, rebuildRegistry } from "./registry.mjs";
+import { checkCardReadiness, printCardReadiness } from "./card-readiness.mjs";
+import { applyExternalResearchEvidence } from "./external-research.mjs";
+import { runLast30DaysBackend } from "./external-research-last30days.mjs";
+import { deriveExternalResearchTopics } from "./external-research-topics.mjs";
+import { contractAllowsExternalResearchNotApplicable, researchGateDecisionForReport } from "./research-gate.mjs";
+import {
+  buildAgentDevelopmentQuery,
+  patternPackMarkdown,
+  runSemanticPatternSearch,
+} from "./pattern-research.mjs";
 import { auditProjectSkills, printSkillSelection, printSkillsStatus, selectSkillsForContract, skillRowForManifest } from "./skills.mjs";
 
 const ROOT = resolveTechscopeRoot();
@@ -54,11 +64,15 @@ function usage() {
   ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} init --name <name> --mission <text> [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} research <contract-path> [--limit 12]
+  ${CLI_COMMAND} pattern-research <contract-path> [--limit 12] [--semantic-mode auto|skip]
+  ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days] [--input evidence.json]
   ${CLI_COMMAND} scaffold <contract-path> [--output <folder>] [--allow-draft-scaffold] [--allow-missing-research] [--allow-pending-external-verification]
   ${CLI_COMMAND} test <project-path>
   ${CLI_COMMAND} handoff <project-path>
   ${CLI_COMMAND} operations <project-path>
   ${CLI_COMMAND} deploy <project-path> [plan|status|install|uninstall] [--yes]
+  ${CLI_COMMAND} card-readiness <agent-slug> [--base-url <url>] [--no-control-center]
+  ${CLI_COMMAND} improve <project-path> --task <text>
   ${CLI_COMMAND} evolve <project-path> [--notes <text>]
   ${CLI_COMMAND} skills status|select|audit [target] [--json]
   ${CLI_COMMAND} voice-kit [plan|list|copy --target <child-agent>]
@@ -78,6 +92,8 @@ Layer 2 status:
 
 Layer 3 status:
   research creates a local memory research report in 11_agents/research/
+  pattern-research creates a reusable pattern-pack artifact from FTS/domain/semantic memory
+  external-research updates a research report with curated current-source evidence
 
 Layer 4 status:
   scaffold creates a Codex-native sibling project and scaffold report
@@ -589,8 +605,13 @@ ${bulletList(data.criticalWorkflows)}
 ## Research basis
 
 - Related Pritha artifacts: 07_workflows/agents-mother.md; 04_standards/agent-creation-harness.md; 04_standards/agent-runtime-placement.md; 04_standards/agent-environment-compatibility.md; 04_standards/agent-tool-integration-selection.md
+- Pritha memory searches performed: pending
+- Pattern pack: pending
+- Semantic/embedding memory status: pending
+- Semantic failure log: none
 - Current primary sources checked: pending
 - Trusted secondary sources checked: pending
+- Pattern-derived external research seeds: pending
 - Alternatives considered: ${scalar(data.alternativesConsidered, "pending research step")}
 - Decision rationale: ${scalar(data.decisionRationale, "pending research step")}
 
@@ -948,6 +969,41 @@ LIMIT ${Number(limit) || 8};
 `);
 }
 
+function collectAgentMemoryResearch(data, options = {}) {
+  const limit = Number(options.limit || 12);
+  const query = buildAgentDevelopmentQuery(data);
+  const memoryResults = searchMemory(query, limit);
+  const domainLimit = Math.max(4, Math.floor(limit / 2));
+  const domainResults = {
+    agentBuildingKnowledge: searchMemoryByDomain(query, "agent-building-knowledge", domainLimit),
+    prithaSelf: searchMemoryByDomain(query, "pritha-self", domainLimit),
+    childAgents: searchMemoryByDomain(query, "child-agents", domainLimit),
+  };
+  return {
+    query,
+    limit,
+    memoryResults,
+    domainResults,
+  };
+}
+
+function writePatternPack(data, researchContext, options = {}) {
+  ensureDirs();
+  const semantic = runSemanticPatternSearch(ROOT, researchContext.query, {
+    ...options,
+    contract: data.relPath,
+    project: data.projectPath,
+  });
+  const pack = patternPackMarkdown(data, { ...researchContext, semantic }, options);
+  const outPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-pattern-pack.md`));
+  writeFileSync(outPath, pack.text);
+  return {
+    ...pack,
+    fullPath: outPath,
+    relPath: path.relative(ROOT, outPath),
+  };
+}
+
 function readKnownDocs(paths) {
   return paths
     .filter((relPath) => existsSync(path.join(ROOT, relPath)))
@@ -1009,10 +1065,44 @@ function formatMemoryRows(rows) {
 `).join("\n");
 }
 
+function externalResearchGateState(data, topics) {
+  const notApplicable = topics.length === 0 && contractAllowsExternalResearchNotApplicable(data);
+  return {
+    researchGateStatus: notApplicable ? "complete" : "pending",
+    memoryResearchStatus: "complete",
+    externalResearchStatus: notApplicable ? "not-applicable" : "pending",
+    externalResearchBackend: notApplicable ? "none" : "pending",
+    externalResearchCompletedAt: notApplicable ? today() : "pending",
+    synthesisStatus: notApplicable ? "not-applicable" : "pending",
+    freshnessWindowDays: 30,
+  };
+}
+
+function externalResearchTopicList(topics) {
+  if (!topics.length) return "  - not-applicable";
+  return topics.map((topic) => `  - ${yamlScalar(topic.id)}`).join("\n");
+}
+
+function formatExternalResearchTopics(topics) {
+  if (!topics.length) return "- No volatile external research topics were derived from this contract.";
+  return topics.map((topic, index) => `### ${index + 1}. ${topic.topic}
+
+- ID: \`${topic.id}\`
+- Query: ${topic.query}
+- Reason: ${topic.reason}
+- Required: ${topic.required ? "yes" : "no"}
+- Preferred sources: ${topic.preferredSources.join(", ")}
+- Freshness window: ${topic.freshnessWindowDays} days
+`).join("\n");
+}
+
 function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSelection, options = {}) {
   const date = today();
   const agentSlug = slug(data.agentName);
   const title = `${data.agentName || agentSlug} agent architecture research`;
+  const externalResearchTopics = options.externalResearchTopics || deriveExternalResearchTopics(data);
+  const patternPack = options.patternPack || null;
+  const gate = externalResearchGateState(data, externalResearchTopics);
   const resultSources = [
     data.relPath,
     "07_workflows/agents-mother.md",
@@ -1027,7 +1117,8 @@ function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSe
     ...skillSelection.blocked,
   ].flatMap((row) => [row.skill.relPath, ...row.skill.sourcePaths]);
   const domainSources = Object.values(domainResults).flat().map((row) => row.path);
-  const allSources = [...new Set([...resultSources, ...memoryResults.map((row) => row.path), ...domainSources, ...skillSources])].slice(0, 50);
+  const patternSources = patternPack?.relPath ? [patternPack.relPath] : [];
+  const allSources = [...new Set([...resultSources, ...patternSources, ...memoryResults.map((row) => row.path), ...domainSources, ...skillSources])].slice(0, 50);
   const sourceYaml = allSources.map((source) => `  - ${source}`).join("\n");
   const relatedStandards = [
     "04_standards/agent-creation-harness.md",
@@ -1083,6 +1174,19 @@ retrieved: ${date}
 verified: pending
 valid_for: pre-scaffold architecture validation
 temporal_status: unknown
+research_gate_status: ${gate.researchGateStatus}
+memory_research_status: ${gate.memoryResearchStatus}
+external_research_status: ${gate.externalResearchStatus}
+external_research_backend: ${gate.externalResearchBackend}
+external_research_completed_at: ${gate.externalResearchCompletedAt}
+external_research_freshness_window_days: ${gate.freshnessWindowDays}
+external_research_topics:
+${externalResearchTopicList(externalResearchTopics)}
+synthesis_status: ${gate.synthesisStatus}
+pattern_pack: ${patternPack?.relPath || "pending"}
+pattern_research_status: ${patternPack?.status || "pending"}
+semantic_memory_status: ${patternPack?.semantic?.status || "pending"}
+semantic_failure_log: ${patternPack?.semantic?.failureLog || "none"}
 ---
 
 # Review: ${title}
@@ -1137,6 +1241,17 @@ past child agent by default.
 
 ${formatMemoryRows(domainResults.childAgents || [])}
 
+## Pattern Pack
+
+- Path: ${patternPack?.relPath || "pending"}
+- Status: ${patternPack?.status || "pending"}
+- Selected patterns: ${patternPack?.selectedPatterns?.length || 0}
+- Semantic/embedding search: ${patternPack?.semantic?.status || "pending"}
+- Semantic failure log: ${patternPack?.semantic?.failureLog || "none"}
+- External research seeds: ${patternPack?.externalResearchSeeds?.join(", ") || "none"}
+
+Codex must read this pattern pack before scaffold or agent improvement work. If semantic/embedding search failed, continue only with the warning recorded above and use external research to compensate for missing semantic retrieval.
+
 ## Standards and workflow basis
 
 ${knownDocs.map((doc) => `### ${doc.title}
@@ -1144,6 +1259,37 @@ ${knownDocs.map((doc) => `### ${doc.title}
 - Path: ${doc.path}
 - Basis: ${doc.summary.replace(/\s+/g, " ").slice(0, 500) || "See document for details."}
 `).join("\n")}
+
+## Research Gate Status
+
+| Gate | Status | Notes |
+| --- | --- | --- |
+| Research gate | ${gate.researchGateStatus} | Complete only after memory, external evidence and synthesis are complete or explicitly not applicable. |
+| Memory research | ${gate.memoryResearchStatus} | Local Pritha memory search completed for this report. |
+| External research | ${gate.externalResearchStatus} | ${gate.externalResearchStatus === "not-applicable" ? "Contract marks current external verification as not applicable." : "Fresh external evidence still needs to be gathered."} |
+| Synthesis | ${gate.synthesisStatus} | ${gate.synthesisStatus === "not-applicable" ? "No external synthesis required for this fixture-like contract." : "Memory vs external comparison is pending."} |
+
+## External Research Topics
+
+${formatExternalResearchTopics(externalResearchTopics)}
+
+## External Research Evidence
+
+${gate.externalResearchStatus === "not-applicable"
+  ? "- Not applicable for this contract. No volatile external choices were derived and the contract includes an explicit no-with-reason or fixture-style waiver."
+  : "- Pending. Run current-source verification for every required external research topic before production scaffold."}
+
+## Memory vs External Comparison
+
+${gate.synthesisStatus === "not-applicable"
+  ? "- Not applicable because no external research topics are required for this contract."
+  : "- Pending until external evidence is collected and compared with the local memory findings above."}
+
+## Scaffold Gate Decision
+
+- Status: ${gate.researchGateStatus}
+- Decision: ${gate.researchGateStatus === "complete" ? "scaffold may proceed if all other contract checks pass" : "do not scaffold without explicit experimental override"}
+- Required next action: ${gate.researchGateStatus === "complete" ? "none for research gate" : "complete external research evidence and synthesis"}
 
 ## External verification checklist
 
@@ -1196,20 +1342,8 @@ function researchContract(contractPath, options = {}) {
   ensureDirs();
   const data = contractData(contractPath);
   const validationIssues = validateContract(data.fullPath, { print: false });
-  const limit = Number(options.limit || 12);
-  const query = [
-    data.agentName,
-    data.primaryMission,
-    data.runtimeFamily,
-    data.primaryInterface,
-    data.telegramMode,
-    data.memoryModel,
-    data.inputDataTypes,
-    data.coreFunctions.join(" "),
-    data.criticalWorkflows.join(" "),
-    "agent harness scaffold tool memory security evaluation",
-  ].filter(Boolean).join(" ");
-  const memoryResults = searchMemory(query, limit);
+  const researchContext = collectAgentMemoryResearch(data, options);
+  const patternPack = writePatternPack(data, researchContext, options);
   const skillSelection = selectSkillsForContract(data);
   const knownDocs = readKnownDocs([
     "04_standards/agent-creation-harness.md",
@@ -1220,23 +1354,316 @@ function researchContract(contractPath, options = {}) {
     "07_workflows/agents-mother.md",
     "07_workflows/agents-mother-roadmap.md",
   ]);
-  const domainLimit = Math.max(4, Math.floor(limit / 2));
-  const domainResults = {
-    agentBuildingKnowledge: searchMemoryByDomain(query, "agent-building-knowledge", domainLimit),
-    prithaSelf: searchMemoryByDomain(query, "pritha-self", domainLimit),
-    childAgents: searchMemoryByDomain(query, "child-agents", domainLimit),
-  };
+  const externalResearchTopics = deriveExternalResearchTopics(data, { patternPack });
   const outPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-research.md`));
-  writeFileSync(outPath, researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSelection, { validationIssues }));
+  writeFileSync(outPath, researchMarkdown(data, researchContext.memoryResults, researchContext.domainResults, knownDocs, skillSelection, { validationIssues, externalResearchTopics, patternPack }));
   console.log(`Research report: ${path.relative(ROOT, outPath)}`);
-  console.log(`Local memory matches: ${memoryResults.length}`);
-  console.log(`Domain matches: agent-building=${domainResults.agentBuildingKnowledge.length}; pritha-self=${domainResults.prithaSelf.length}; child-agents=${domainResults.childAgents.length}`);
+  console.log(`Pattern pack: ${patternPack.relPath}`);
+  console.log(`Semantic/embedding search: ${patternPack.semantic.status}${patternPack.semantic.failureLog ? ` (logged: ${patternPack.semantic.failureLog})` : ""}`);
+  console.log(`Local memory matches: ${researchContext.memoryResults.length}`);
+  console.log(`Domain matches: agent-building=${researchContext.domainResults.agentBuildingKnowledge.length}; pritha-self=${researchContext.domainResults.prithaSelf.length}; child-agents=${researchContext.domainResults.childAgents.length}`);
+  console.log(`External research topics: ${externalResearchTopics.length}`);
   console.log(`Skill candidates: ${skillSelection.installed.length + skillSelection.candidates.length}; blocked: ${skillSelection.blocked.length}`);
   if (validationIssues.length > 0) {
     console.log("Contract still has validation issues:");
     for (const issue of validationIssues) console.log(`- ${issue}`);
   }
   console.log("Next: complete external verification checklist before scaffold.");
+}
+
+function patternResearchContract(contractPath, options = {}) {
+  ensureDirs();
+  const data = contractData(contractPath);
+  const researchContext = collectAgentMemoryResearch(data, options);
+  const patternPack = writePatternPack(data, researchContext, options);
+  const externalResearchTopics = deriveExternalResearchTopics(data, { patternPack });
+  console.log(`Pattern pack: ${patternPack.relPath}`);
+  console.log(`Status: ${patternPack.status}`);
+  console.log(`Selected patterns: ${patternPack.selectedPatterns.length}`);
+  console.log(`Semantic/embedding search: ${patternPack.semantic.status}${patternPack.semantic.failureLog ? ` (logged: ${patternPack.semantic.failureLog})` : ""}`);
+  console.log(`External research seeds: ${patternPack.externalResearchSeeds.length}`);
+  console.log(`External research topics from contract+patterns: ${externalResearchTopics.length}`);
+}
+
+function findResearchReportFor(data) {
+  const agentSlug = slug(data.agentName);
+  if (!existsSync(RESEARCH_DIR)) return null;
+  const files = readdirSync(RESEARCH_DIR)
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => path.join(RESEARCH_DIR, entry))
+    .sort((a, b) => path.basename(b).localeCompare(path.basename(a)));
+  for (const filePath of files) {
+    const text = readFileSync(filePath, "utf8");
+    if ((data.relPath && text.includes(data.relPath)) || path.basename(filePath).includes(agentSlug)) {
+      return {
+        fullPath: filePath,
+        relPath: path.relative(ROOT, filePath),
+        text,
+      };
+    }
+  }
+  return null;
+}
+
+function findPatternPackFor(data) {
+  const agentSlug = slug(data.agentName);
+  if (!existsSync(RESEARCH_DIR)) return null;
+  const files = readdirSync(RESEARCH_DIR)
+    .filter((entry) => entry.endsWith("-agent-pattern-pack.md") || entry.includes("pattern-pack"))
+    .map((entry) => path.join(RESEARCH_DIR, entry))
+    .sort((a, b) => path.basename(b).localeCompare(path.basename(a)));
+  for (const filePath of files) {
+    const text = readFileSync(filePath, "utf8");
+    if ((data.relPath && text.includes(data.relPath)) || path.basename(filePath).includes(agentSlug)) {
+      return {
+        fullPath: filePath,
+        relPath: path.relative(ROOT, filePath),
+        text,
+      };
+    }
+  }
+  return null;
+}
+
+function readEvidenceInput(inputPath) {
+  const fullPath = path.resolve(ROOT, inputPath);
+  if (!existsSync(fullPath)) throw new Error(`Evidence input not found: ${inputPath}`);
+  const stat = statSync(fullPath);
+  if (!stat.isFile()) throw new Error(`Evidence input is not a file: ${inputPath}`);
+  if (stat.size > 1_000_000) throw new Error(`Evidence input is too large: ${inputPath}`);
+  return JSON.parse(readFileSync(fullPath, "utf8"));
+}
+
+function externalResearchContract(contractPath, options = {}) {
+  ensureDirs();
+  const data = contractData(contractPath);
+  const patternPack = findPatternPackFor(data);
+  const topics = deriveExternalResearchTopics(data, { patternPack: patternPack?.text });
+  const report = findResearchReportFor(data);
+  const backend = String(options.backend || (options.input ? "manual" : "status")).trim() || "status";
+  const hasInput = Boolean(options.input);
+
+  if (backend === "status" || (!hasInput && backend !== "last30days")) {
+    console.log(`Contract: ${data.relPath}`);
+    console.log(`Research report: ${report ? report.relPath : "missing"}`);
+    console.log(`Pattern pack: ${patternPack ? patternPack.relPath : "missing"}`);
+    console.log(`External research topics: ${topics.length}`);
+    for (const topic of topics) {
+      console.log(`- ${topic.id}: ${topic.topic}`);
+    }
+    if (report) {
+      const gate = researchGateDecisionForReport(data, report.text);
+      console.log(`Research gate: ${gate.status}${gate.ok ? "" : ` (${gate.reasons.join(", ") || "pending"})`}`);
+    } else {
+      console.log("Research gate: missing");
+    }
+    return;
+  }
+
+  if (!report) {
+    throw new Error("No research report found for this contract. Run `node scripts/pritha.mjs research <contract>` first.");
+  }
+
+  if (backend === "last30days" && !hasInput) {
+    if (topics.length === 0) {
+      console.log(`Contract: ${data.relPath}`);
+      console.log(`Research report: ${report.relPath}`);
+      console.log("External research topics: 0");
+      console.log("last30days: skipped because this contract has no required external research topics.");
+      return;
+    }
+    const last30days = runLast30DaysBackend(data, topics, { root: ROOT });
+    if (!last30days.ok) {
+      const status = last30days.status || {};
+      const issues = Array.isArray(status.issues) && status.issues.length ? status.issues.join("; ") : last30days.error;
+      throw new Error([
+        `last30days backend unavailable: ${status.status || last30days.error}.`,
+        `Issues: ${issues}.`,
+        "Install Python 3.12+ and then run `node scripts/external-research-tools.mjs install last30days --yes`,",
+        "or provide curated evidence with `node scripts/pritha.mjs external-research <contract> --backend manual --input evidence.json`.",
+      ].join(" "));
+    }
+    const result = applyExternalResearchEvidence(report.text, data, last30days.evidence, { backend: "last30days", topics });
+    writeFileSync(report.fullPath, result.text);
+    console.log(`External research report updated: ${report.relPath}`);
+    console.log(`Backend: ${result.evidence.backend}`);
+    console.log(`Research gate: ${result.status}`);
+    console.log(`External evidence items: ${result.evidence.items.length}`);
+    if (result.coverage.missingTopicIds.length) {
+      console.log(`Missing required topics: ${result.coverage.missingTopicIds.join(", ")}`);
+    }
+    return;
+  }
+
+  const input = readEvidenceInput(options.input);
+  const result = applyExternalResearchEvidence(report.text, data, input, { backend, topics });
+  writeFileSync(report.fullPath, result.text);
+  console.log(`External research report updated: ${report.relPath}`);
+  console.log(`Backend: ${result.evidence.backend}`);
+  console.log(`Research gate: ${result.status}`);
+  console.log(`External evidence items: ${result.evidence.items.length}`);
+  if (result.coverage.missingTopicIds.length) {
+    console.log(`Missing required topics: ${result.coverage.missingTopicIds.join(", ")}`);
+  }
+}
+
+function readProjectText(projectRoot, relPath, maxChars = 1400) {
+  const fullPath = path.join(projectRoot, relPath);
+  if (!existsSync(fullPath) || !statSync(fullPath).isFile()) return "";
+  return readFileSync(fullPath, "utf8").replace(/\s+/g, " ").trim().slice(0, maxChars);
+}
+
+function projectAgentData(projectRoot, taskDescription) {
+  const projectName = path.basename(projectRoot);
+  const relPath = path.relative(ROOT, projectRoot);
+  const readme = readProjectText(projectRoot, "README.md");
+  const agents = readProjectText(projectRoot, "AGENTS.md");
+  const packageJson = readJsonIfExists(path.join(projectRoot, "package.json")) || {};
+  const interfaces = readJsonIfExists(path.join(projectRoot, "interfaces", "manifest.json")) || {};
+  const memory = readJsonIfExists(path.join(projectRoot, "memory", "manifest.json")) || {};
+  const tools = readJsonIfExists(path.join(projectRoot, "tools", "manifest.json")) || {};
+  const operations = readJsonIfExists(path.join(projectRoot, "operations", "manifest.json")) || {};
+  const adapters = Array.isArray(interfaces.adapters)
+    ? interfaces.adapters.map((item) => item?.name || item?.id || item).filter(Boolean).join(", ")
+    : "";
+  return {
+    agentName: projectName,
+    relPath,
+    projectPath: relPath,
+    text: `${readme}\n${agents}\n${taskDescription}`,
+    primaryMission: readme.match(/#\s+([^#]+)/)?.[1]?.trim() || taskDescription,
+    targetUser: "existing agent operator",
+    runtimeFamily: "codex-native",
+    runtimePlacementProfile: "hybrid",
+    primaryInterface: adapters || interfaces.primary || "Codex project",
+    secondaryInterfaces: adapters,
+    telegramMode: adapters.toLowerCase().includes("telegram") ? "operator-control" : "none",
+    expectedHosting: operations.deployment_target || "existing local project",
+    deploymentTarget: operations.deployment_target || "existing local project",
+    deploymentProfile: operations.deployment_profile || "existing",
+    serviceMode: operations.service_mode || "none",
+    autostart: operations.autostart || "disabled",
+    proactiveMode: operations.proactivity?.mode || operations.proactive_mode || "none",
+    memoryModel: memory.profile || memory.description || "existing project memory",
+    indexingSearchNeeds: memory.indexing || memory.search || "",
+    toolSystem: tools.description || "existing project tools",
+    inputDataTypes: "existing project inputs plus operator task",
+    dependencies: packageJson.dependencies ? Object.keys(packageJson.dependencies).slice(0, 12).join(", ") : "none",
+    coreFunctions: [taskDescription],
+    criticalWorkflows: [taskDescription],
+    taskDescription,
+    developmentTaskType: "improve",
+  };
+}
+
+function agentDevelopmentTaskMarkdown(projectRoot, data, detection, researchContext, patternPack, externalResearchTopics, options = {}) {
+  const date = today();
+  const agentSlug = slug(data.agentName);
+  const reportSources = [
+    data.relPath,
+    patternPack.relPath,
+    "07_workflows/agents-mother.md",
+    "04_standards/agent-creation-harness.md",
+    "04_standards/memory-domains.md",
+  ].filter(Boolean);
+  const externalStatus = externalResearchTopics.length ? "pending" : "not-applicable";
+  return `---
+id: ${date}-${agentSlug}-agent-development-task
+type: review
+status: draft
+created: ${date}
+updated: ${date}
+topics:
+  - agent-engineering
+  - agent-factory
+  - agent-improvement
+  - ${agentSlug}
+tools:
+  - Codex
+  - AGENTS.md
+sources:
+${reportSources.map((source) => `  - ${yamlScalar(source)}`).join("\n")}
+related:
+  agent_contracts: []
+  pattern_packs:
+    - ${patternPack.relPath}
+supersedes: []
+superseded_by: []
+development_task_type: improve
+target_project: ${yamlScalar(data.relPath)}
+pattern_pack: ${patternPack.relPath}
+pattern_research_status: ${patternPack.status}
+semantic_memory_status: ${patternPack.semantic.status}
+semantic_failure_log: ${patternPack.semantic.failureLog || "none"}
+memory_research_status: complete
+external_research_status: ${externalStatus}
+synthesis_status: ${externalStatus === "not-applicable" ? "not-applicable" : "pending"}
+verified: pending
+---
+
+# Agent Development Task: ${data.agentName}
+
+Date: ${date}
+Status: draft
+
+## Operator Task
+
+${scalar(options.task || options.notes, "No task text provided.")}
+
+## Current Project State
+
+- Project path: ${projectRoot}
+- Classification: ${detection.classification}
+- Pattern pack: ${patternPack.relPath}
+- Semantic/embedding search: ${patternPack.semantic.status}${patternPack.semantic.failureLog ? `; logged in ${patternPack.semantic.failureLog}` : ""}
+- FTS memory matches: ${researchContext.memoryResults.length}
+- Domain matches: agent-building=${researchContext.domainResults.agentBuildingKnowledge.length}; pritha-self=${researchContext.domainResults.prithaSelf.length}; child-agents=${researchContext.domainResults.childAgents.length}
+
+## Relevant Memory Patterns
+
+${patternPack.selectedPatterns.length ? patternPack.selectedPatterns.map((pattern) => `- ${pattern.id}: ${pattern.path} - ${pattern.applicability}`).join("\n") : "- No reusable local pattern found. Use external discovery before implementation."}
+
+## External Research Topics
+
+${formatExternalResearchTopics(externalResearchTopics)}
+
+## Required Codex Pipeline
+
+1. Inspect the target agent project, including \`AGENTS.md\`, \`README.md\`, manifests, scripts and current lifecycle reports.
+2. Read the pattern pack before editing.
+3. Run or collect current-source external research for the topics above when they are not marked not-applicable.
+4. Compare memory patterns with external evidence and record confirmed, updated, contradicted or newly discovered patterns.
+5. Implement the smallest change that satisfies the task.
+6. Run the relevant smoke tests or healthchecks and report changed files.
+
+## Next Step
+
+Hand this development task to Codex App/CLI as an implementation task only after the operator confirms the brief is complete.
+`;
+}
+
+function improveProjectTask(projectPath, options = {}) {
+  ensureDirs();
+  const projectRoot = path.resolve(ROOT, projectPath);
+  if (!existsSync(projectRoot) || !statSync(projectRoot).isDirectory()) {
+    throw new Error(`Project folder not found: ${projectPath}`);
+  }
+  const taskText = String(options.task || options.notes || options._?.slice(1).join(" ") || "").trim();
+  if (!taskText) {
+    throw new Error("Missing improvement task. Use: node scripts/pritha.mjs improve <project-path> --task <text>");
+  }
+  const detection = detectProject(projectRoot);
+  const data = projectAgentData(projectRoot, taskText);
+  const researchContext = collectAgentMemoryResearch(data, options);
+  const patternPack = writePatternPack(data, researchContext, options);
+  const externalResearchTopics = deriveExternalResearchTopics(data, { patternPack });
+  const reportPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-development-task.md`));
+  writeFileSync(reportPath, agentDevelopmentTaskMarkdown(projectRoot, data, detection, researchContext, patternPack, externalResearchTopics, options));
+  console.log(`Agent development task: ${path.relative(ROOT, reportPath)}`);
+  console.log(`Pattern pack: ${patternPack.relPath}`);
+  console.log(`Semantic/embedding search: ${patternPack.semantic.status}${patternPack.semantic.failureLog ? ` (logged: ${patternPack.semantic.failureLog})` : ""}`);
+  console.log(`External research topics: ${externalResearchTopics.length}`);
+  console.log("Next: hand this task to Codex for implementation after current-source enrichment when required.");
 }
 
 function questions() {
@@ -1318,6 +1745,18 @@ async function main() {
     researchContract(target, options);
     return;
   }
+  if (command === "pattern-research") {
+    const target = options._[0];
+    if (!target) throw new Error("Missing contract path.");
+    patternResearchContract(target, options);
+    return;
+  }
+  if (command === "external-research") {
+    const target = options._[0];
+    if (!target) throw new Error("Missing contract path.");
+    externalResearchContract(target, options);
+    return;
+  }
   if (command === "scaffold") {
     const target = options._[0];
     if (!target) throw new Error("Missing contract path.");
@@ -1348,10 +1787,26 @@ async function main() {
     deployProject(target, options);
     return;
   }
+  if (command === "card-readiness") {
+    const target = options._[0];
+    if (!target) throw new Error("Missing agent slug or name.");
+    const result = await checkCardReadiness(target, {
+      baseUrl: options["no-control-center"] ? false : options["base-url"],
+    });
+    printCardReadiness(result);
+    if (result.status === "missing") process.exitCode = 1;
+    return;
+  }
   if (command === "publish") {
     const target = options._[0];
     if (!target) throw new Error("Missing project path.");
     testProject(target, { ...options, "no-report": true });
+    return;
+  }
+  if (command === "improve") {
+    const target = options._[0];
+    if (!target) throw new Error("Missing project path.");
+    improveProjectTask(target, options);
     return;
   }
   if (command === "evolve") {

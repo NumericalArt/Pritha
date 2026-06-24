@@ -5,6 +5,7 @@ import { resolveTechscopeRoot } from "../../lib/paths.mjs";
 import { slug as makeSlug } from "../../lib/slug.mjs";
 import { today } from "../../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, RUNTIME_PLACEMENT_PROFILES, SERVICE_MODES, bodyValue, contractData, sectionItems, validateContract } from "../contract.mjs";
+import { researchGateDecisionForReport } from "../research-gate.mjs";
 import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "../skills.mjs";
 
 const ROOT = resolveTechscopeRoot();
@@ -579,7 +580,11 @@ function researchReportStatus(data) {
   for (const filePath of files) {
     const text = readFileSync(filePath, "utf8");
     if ((data.relPath && text.includes(data.relPath)) || path.basename(filePath).includes(agentSlug)) {
-      return { status: "found", path: path.relative(ROOT, filePath) };
+      return {
+        status: "found",
+        path: path.relative(ROOT, filePath),
+        gate: researchGateDecisionForReport(data, text),
+      };
     }
   }
   return { status: "missing", path: "" };
@@ -2030,22 +2035,33 @@ export function runSmoke(projectRoot) {
   }
 }
 
-function externalVerificationStatus(data) {
-  const value = [
-    data.text,
-    data.externalVerificationNeeds,
-    data.sourceFreshnessRequirements,
-  ].join("\n").toLowerCase();
-  return /(checked|verified|complete|done|not-applicable|tests only|none for fixture)/.test(value) ? "complete" : "pending";
+function externalVerificationStatus(research) {
+  return research?.gate?.fields?.externalResearch || "pending";
 }
 
-function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult) {
+function researchGateStatusLabel(research) {
+  return research?.gate?.status || "pending";
+}
+
+function researchGateResultLabel(research) {
+  if (research?.status !== "found") return "missing";
+  if (research.gate?.ok) return "pass";
+  return research.gate?.status || "pending";
+}
+
+function researchGateReasons(research) {
+  const reasons = research?.gate?.reasons || [];
+  return reasons.length ? reasons.join(", ") : "none";
+}
+
+function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, options = {}) {
   const date = today();
   const agentSlug = slug(data.agentName);
   const telegramApplicable = data.telegramMode && data.telegramMode !== "none";
   const operationProfile = operationProfileFor(data);
-  const research = researchReportStatus(data);
-  const externalVerification = externalVerificationStatus(data);
+  const research = options.research || researchReportStatus(data);
+  const externalVerification = externalVerificationStatus(research);
+  const gateFields = research.gate?.fields || {};
   return `---
 id: ${date}-${agentSlug}-scaffold-report
 type: scaffold-report
@@ -2093,6 +2109,16 @@ retrieved: ${date}
 verified: ${date}
 valid_for: initial scaffold
 temporal_status: current
+control_center_card_status: pending-registry
+card_refs:
+  - operations/manifest.json
+  - scripts/control-center-runtime.mjs
+card_blockers:
+  - Registry must be rebuilt after scaffold before the card appears in Agents.
+  - Runtime Start and Stop remain disabled until control_center_managed is explicitly approved.
+next_card_actions:
+  - node scripts/pritha.mjs registry
+  - node scripts/pritha.mjs card-readiness ${agentSlug}
 ---
 
 # Agent Scaffold Report: ${data.agentName || agentSlug}
@@ -2114,6 +2140,7 @@ Status: ${smokeResult.ok ? "complete" : "failed"}
 - Tool profiles: ${toolProfilesFor(data).join(", ")}
 - Skill policy: needs=${skillPolicyFor(data).skillNeeds}; sources=${skillPolicyFor(data).allowedSkillSources}; install=${skillPolicyFor(data).skillInstallMode}; mutation=${skillPolicyFor(data).skillMutationPolicy}
 - Research report: ${research.status}${research.path ? ` (${research.path})` : ""}
+- Research gate: ${researchGateStatusLabel(research)}
 - External verification: ${externalVerification}
 - Service mode: ${operationProfile.serviceMode}
 - Autostart: ${operationProfile.autostart}
@@ -2143,8 +2170,24 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 | Operations status | pending | \`node scripts/operations-status.mjs\` |
 | Skills status | pending | \`node scripts/skills-status.mjs\` |
 | Pritha memory research | ${research.status} | ${research.path || "Run `node scripts/pritha.mjs research <contract>` before production scaffold decisions"} |
-| External verification | ${externalVerification} | Verify current docs before adding volatile APIs, runtimes, models or deployment behavior |
+| Research gate | ${researchGateResultLabel(research)} | ${researchGateReasons(research)} |
+| Memory research gate | ${gateFields.memoryResearch || "pending"} | Machine-readable research report status |
+| External verification | ${externalVerification} | Machine-readable external research status |
+| Synthesis gate | ${gateFields.synthesis || "pending"} | Memory vs external comparison status |
+| Control Center card readiness | pending-registry | Run \`node scripts/pritha.mjs registry\`, then \`node scripts/pritha.mjs card-readiness ${agentSlug}\` |
 | Documentation review | pass | README and training guide generated |
+
+## Control Center Card Readiness
+
+- Status: pending-registry.
+- Card refs: \`operations/manifest.json\`, \`scripts/control-center-runtime.mjs\`.
+- Expected first card state: visible in Agents after registry rebuild; Start/Stop may remain blocked with explicit runtime blockers.
+- Card blockers:
+  - Registry must be rebuilt after scaffold.
+  - Runtime Start/Stop remain disabled until \`control_center_managed: true\` and managed structured runtime are explicitly approved.
+- Next card actions:
+  - From Pritha root, run \`node scripts/pritha.mjs registry\`.
+  - From Pritha root, run \`node scripts/pritha.mjs card-readiness ${agentSlug}\`.
 
 ## Handoff
 
@@ -2183,9 +2226,13 @@ export function scaffoldContract(contractPath, options = {}) {
   if (research.status !== "found" && !options["allow-missing-research"]) {
     throw new Error("Pritha memory research must be completed before scaffold. Run `node scripts/pritha.mjs research <contract>` or use --allow-missing-research only for an explicit experimental scaffold.");
   }
-  const externalVerification = externalVerificationStatus(data);
-  if (externalVerification !== "complete" && !options["allow-pending-external-verification"]) {
-    throw new Error("External verification is pending for volatile choices. Check current primary docs, update the contract, or use --allow-pending-external-verification only for an explicit experimental scaffold.");
+  const researchGate = research.gate || {
+    ok: false,
+    status: "pending",
+    reasons: ["research_report_missing"],
+  };
+  if (!researchGate.ok && !options["allow-pending-external-verification"]) {
+    throw new Error(`External research gate is ${researchGate.status}. Complete Pritha memory research, external evidence and synthesis before scaffold. Reasons: ${researchGate.reasons.join(", ") || "unknown"}. Use --allow-pending-external-verification only for an explicit experimental scaffold.`);
   }
   if (data.runtimeFamily !== "codex-native") {
     throw new Error(`Layer 4 scaffold currently supports codex-native only, got: ${data.runtimeFamily}`);
@@ -2201,7 +2248,7 @@ export function scaffoldContract(contractPath, options = {}) {
 
   const smokeResult = runSmoke(targetPath);
   const reportPath = uniquePath(path.join(REPORT_DIR, `${today()}-${slug(data.agentName)}-scaffold-report.md`));
-  writeFileSync(reportPath, scaffoldReportMarkdown(data, targetPath, createdFiles, smokeResult));
+  writeFileSync(reportPath, scaffoldReportMarkdown(data, targetPath, createdFiles, smokeResult, { research }));
 
   console.log(`Scaffold: ${targetPath}`);
   console.log(`Created files: ${createdFiles.length}`);

@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-06-15
+updated: 2026-06-24
 template_for: agent-contract
 topics: []
 tools: []
@@ -126,6 +126,23 @@ Status: draft | accepted | superseded
 - Interface fallback: text-summary | CLI-status | manual | none | unknown
 - Telegram mode: none | primary-chat | intake-channel | notifications-only | operator-control
 - Expected hosting: local Mac | Mac mini service | VPS | cloud | embedded | unknown
+
+## Control Center card contract
+
+- Agents tab card required: yes | no | later
+- Card id / slug:
+- Card display name:
+- Registry source: 11_agents/registry.md | custom | unknown
+- Required card lineage: contract | scaffold-report | operations-manifest | profile | other
+- Card first visible state: ready | blocked-with-next-actions | manual-only | unknown
+- Control Center manifest fields required: local_upstream_url | health_url | start_command | stop_command | control_center_contract | blockers | other
+- Start/Stop execution mode: disabled-plan-only | manual-local | control_center_managed | external | unknown
+- Structured start command approved: no | yes | later
+- Structured stop command approved: no | yes | later
+- Expected blockers before runtime is complete:
+- Operator-visible next actions:
+- Card readiness command: `node scripts/pritha.mjs card-readiness agent-slug`
+- Card completion rule: creation is not complete while card-readiness status is `missing`
 
 ## Runtime isolation and boundary
 
@@ -313,8 +330,12 @@ Status: draft | accepted | superseded
 
 - Related Pritha artifacts:
 - Pritha memory searches performed:
+- Pattern pack:
+- Semantic/embedding memory status:
+- Semantic failure log:
 - Pritha standards/workflows/decisions used:
 - Comparable child-agent evidence used:
+- Pattern-derived external research seeds:
 - Current primary sources checked:
 - Trusted secondary sources checked:
 - Alternatives considered:
