@@ -46,3 +46,12 @@ __pycache__/
 
 # Test artifacts
 interfaces/control-center/test-results/
+
+# Generated memory indexes; rebuild with `node scripts/bootstrap.mjs prepare --profile local`.
+.memory/techscope.sqlite
+.memory/techscope.sqlite-*
+.memory/*.sqlite
+.memory/*.sqlite3
+.memory/*.db
+.memory/last-rebuild.sql
+.memory/exports/

@@ -104,10 +104,10 @@ Retention: source-purged
 
 ## Trigger phrases и first-run setup
 
-Если пользователь открывает свежий checkout и пишет `запусти проект`, `setup`, `first run`, `bootstrap` или `start`, действовать по workflow `07_workflows/first-run-setup.md`. CLI fallback:
+Если пользователь открывает свежий checkout и пишет `запусти проект`, `стартуй проект`, `стартуй Pritha`, `начни Pritha`, `setup`, `first run`, `bootstrap` или `start`, действовать по workflow `07_workflows/first-run-setup.md`. Такая фраза считается явной командой на безопасный локальный bootstrap: создать локальный setup-state, установить выбранные локальные зависимости, пересобрать SQLite memory index, пересобрать embeddings и проверить semantic memory. CLI fallback:
 
 ```sh
-node scripts/bootstrap.mjs plan --profile minimal
+node scripts/bootstrap.mjs prepare --profile local
 ```
 
 Если пользователь пишет `проверь проект`, `self test` или `health`, запускать или предлагать:
@@ -196,7 +196,7 @@ node scripts/self-test.mjs
 - `subject`: объект с `kind` и `id`, если артефакт явно относится к Pritha, child agent, стандарту, workflow, marketing narrative или другому устойчивому субъекту.
 - `privacy`, `retention`, `review_status`, `confidence`: использовать для новых curated artifacts, когда важно зафиксировать границы доступа, долговечность и степень уверенности.
 
-Markdown-файлы являются canonical authored knowledge, но GitHub snapshot Pritha должен переносить всё рабочее состояние памяти: Markdown, `.memory/techscope.sqlite`, FTS, relations, embeddings, schema, rebuild SQL и baseline self-test. SQLite/vector/graph-like индексы должны оставаться пересоздаваемыми из Markdown, но не считаются локальным мусором и должны попадать в репозиторий как portability/cache layer.
+Markdown-файлы являются canonical authored knowledge и главным GitHub source of truth для памяти. SQLite/FTS/relations/embeddings являются локальными generated indexes: они должны полностью пересоздаваться из tracked Markdown, `.memory/schema.sql` и bootstrap/rebuild scripts, но не требуют длинной Git-истории бинарных snapshot-файлов. Fresh clone или обновлённый checkout должен запускать `node scripts/bootstrap.mjs prepare --profile local`, чтобы восстановить полноценную `.memory/techscope.sqlite` и embeddings локально.
 
 `privacy: local-private` и primary `memory_domain: user-model` не должны попадать в tracked Markdown или `.memory/techscope.sqlite`; для этого использовать `.private/user-memory/` и `.memory-private/`, которые не коммитятся.
 

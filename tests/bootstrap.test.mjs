@@ -16,8 +16,24 @@ test("bootstrap plan is machine-readable and non-mutating", () => {
   assert.equal(payload.status, "planned");
   assert.equal(payload.profile, "minimal");
   assert.ok(payload.steps.some((step) => step.id === "setup-state"));
+  assert.ok(payload.steps.some((step) => step.id === "memory-rebuild"));
+  assert.ok(payload.steps.some((step) => step.id === "memory-embeddings-deferred"));
   assert.ok(payload.steps.some((step) => step.id === "env-doctor"));
+  assert.ok(payload.steps.some((step) => step.id === "memory-stats"));
   assert.equal(payload.steps.some((step) => step.id === "control-center-npm-ci"), false);
+  assert.equal(payload.steps.some((step) => step.startsForegroundProcess), false);
+});
+
+test("bootstrap prepare builds local memory and semantic embeddings", () => {
+  const result = runBootstrap(["prepare", "--profile", "local", "--dry-run", "--json"]);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.status, "planned");
+  assert.deepEqual(payload.phases, ["install", "verify"]);
+  assert.ok(payload.steps.some((step) => step.id === "python-core"));
+  assert.ok(payload.steps.some((step) => step.id === "memory-rebuild" && step.writes));
+  assert.ok(payload.steps.some((step) => step.id === "memory-embeddings" && step.writes));
+  assert.ok(payload.steps.some((step) => step.id === "semantic-search-sanity" && !step.writes));
   assert.equal(payload.steps.some((step) => step.startsForegroundProcess), false);
 });
 

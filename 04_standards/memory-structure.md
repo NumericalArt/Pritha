@@ -29,7 +29,7 @@ Last reviewed: 2026-05-29
 
 ## Rule
 
-Каждый значимый authored-артефакт памяти должен быть Markdown-файлом с YAML frontmatter. Для Pritha GitHub snapshot переносит не только Markdown, но и очищенное рабочее состояние памяти: `.memory/techscope.sqlite`, FTS, relations, embeddings, schema, rebuild SQL and self-test baseline. SQLite, FTS, embeddings и graph-like relations должны оставаться пересоздаваемыми из Markdown, но они коммитятся как portability/cache layer. Raw JSON, transcripts, downloaded text/PDF/image source artifacts, original media and incoming-material provenance are not portable Git state.
+Каждый значимый authored-артефакт памяти должен быть Markdown-файлом с YAML frontmatter. Для Pritha GitHub snapshot переносит authored Markdown, schema, bootstrap/rebuild scripts and lightweight status baselines. SQLite, FTS, embeddings и graph-like relations являются локальными generated indexes: они должны оставаться полностью пересоздаваемыми из Markdown, но не должны накапливать длинную бинарную Git-историю. Raw JSON, transcripts, downloaded text/PDF/image source artifacts, original media and incoming-material provenance are not portable Git state.
 
 ## Use when
 

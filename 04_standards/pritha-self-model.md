@@ -102,7 +102,7 @@ operator-facing language should prefer Pritha.
 
 Current Pritha has three durable surfaces:
 
-- curated Markdown memory plus committed SQLite/FTS/relations/embeddings snapshot;
+- curated Markdown memory plus locally rebuildable SQLite/FTS/relations/embeddings indexes;
 - Pritha Control Center for child-agent status, credentials, voice and operator actions;
 - Codex task routing through Codex App primary transport with Codex CLI fallback.
 

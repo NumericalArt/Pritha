@@ -77,9 +77,11 @@ const maxRegularFileBytes = 95 * 1024 * 1024;
 const requiredMemorySnapshotFiles = [
   ".memory/README.md",
   ".memory/schema.sql",
+  ".memory/last-self-test.json",
+];
+const generatedMemoryIndexFiles = [
   ".memory/techscope.sqlite",
   ".memory/last-rebuild.sql",
-  ".memory/last-self-test.json",
 ];
 const secretHistory = git(["log", "--all", "--oneline", "--", ".env", ".env.local", "*.token", "secrets/*", "secure-handoffs/*"]);
 const forbiddenTracked = files.filter((file) =>
@@ -107,6 +109,7 @@ const ignoredMemorySnapshot = requiredMemorySnapshotFiles.filter((file) => {
   const result = git(["check-ignore", "-q", "--", file]);
   return result.status === 0;
 });
+const trackedGeneratedMemoryIndexes = generatedMemoryIndexFiles.filter((file) => files.includes(file));
 const localPathMatches = textFilesWithMatches(files, /\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+/g);
 const tailscaleHostnamePattern = new RegExp([
   String.raw`(?:https?:\/\/)?[a-z0-9-]+\.tail[0-9a-z-]+\.ts\.net`,
@@ -186,7 +189,14 @@ const checks = [
     status: untrackedMemorySnapshot.length ? "warn" : "pass",
     detail: untrackedMemorySnapshot.length
       ? `add before commit: ${untrackedMemorySnapshot.join(", ")}`
-      : "portable .memory snapshot files are tracked",
+      : "portable .memory source files are tracked",
+  },
+  {
+    id: "generated-memory-index-tracking",
+    status: trackedGeneratedMemoryIndexes.length ? "fail" : "pass",
+    detail: trackedGeneratedMemoryIndexes.length
+      ? `generated memory indexes must stay untracked: ${trackedGeneratedMemoryIndexes.join(", ")}`
+      : "generated SQLite and SQL dump memory indexes are untracked",
   },
   {
     id: "local-absolute-paths",

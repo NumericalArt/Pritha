@@ -30,8 +30,7 @@ future adapter; v0.1 remains Codex-native.
 ## Quick Start
 
 ```sh
-node scripts/bootstrap.mjs plan --profile minimal
-node scripts/bootstrap.mjs verify --profile minimal
+node scripts/bootstrap.mjs prepare --profile local
 node scripts/pritha.mjs questions
 node scripts/pritha.mjs test . --no-report
 ```
@@ -41,18 +40,21 @@ node scripts/pritha.mjs test . --no-report
 ```sh
 git clone https://github.com/NumericalArt/Pritha.git pritha
 cd pritha
+node scripts/bootstrap.mjs prepare --profile local
 node scripts/bootstrap.mjs --profile local --start control-center
 ```
 
-The bootstrap command installs deterministic local dependencies for the chosen
-profile, writes local non-secret setup state, verifies the portable memory
-snapshot and starts the Control Center in the foreground. It does not install
-launchd, cron, Tailscale, durable services or credentials.
+The prepare command installs deterministic local dependencies for the chosen
+profile, writes local non-secret setup state, rebuilds `.memory/techscope.sqlite`
+and semantic embeddings from tracked Markdown, and verifies semantic memory
+search. The optional Control Center start command runs in the foreground. It
+does not install launchd, cron, Tailscale, durable services or credentials.
 
 Useful profile-specific commands:
 
 ```sh
 node scripts/bootstrap.mjs plan --profile minimal
+node scripts/bootstrap.mjs prepare --profile local
 node scripts/bootstrap.mjs install --profile local
 node scripts/bootstrap.mjs verify --profile control-center
 node scripts/bootstrap.mjs start --profile control-center
@@ -147,6 +149,7 @@ node scripts/quality-gate.mjs
 Run the extended gate with embeddings:
 
 ```sh
+node scripts/bootstrap.mjs prepare --profile local
 node scripts/golden-checks.mjs --with-embeddings
 ```
 
@@ -178,10 +181,11 @@ Do not commit secrets or runtime state:
 - local machine paths
 - Telegram tokens or user identifiers
 
-Markdown artifacts are the source of truth. The portable `.memory/` snapshot,
-including `.memory/techscope.sqlite`, is intentionally tracked as a rebuildable
-cache layer for GitHub clone portability. Private user memory belongs outside
-the tracked snapshot.
+Markdown artifacts are the source of truth. Generated memory indexes such as
+`.memory/techscope.sqlite`, SQL rebuild dumps and embeddings are local artifacts
+rebuilt by `node scripts/bootstrap.mjs prepare --profile local`; they should not
+accumulate binary history in Git. Private user memory belongs outside the
+tracked snapshot.
 
 ## License
 

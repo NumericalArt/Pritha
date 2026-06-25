@@ -1,18 +1,23 @@
 # Techscope Memory
 
-This directory contains the portable working memory snapshot for Pritha.
+This directory contains local generated memory indexes for Pritha.
 
 The Markdown files in the repository are the canonical authored knowledge.
-Files in `.memory/` are generated and rebuildable, but they are also committed
-so another checkout can keep the same SQLite, FTS, relations, embeddings and
-baseline state without recomputing everything first.
+Files such as `techscope.sqlite`, SQL rebuild dumps and embeddings are generated
+from tracked Markdown, `.memory/schema.sql` and rebuild scripts. A fresh clone
+restores them with `node scripts/bootstrap.mjs prepare --profile local` instead
+of carrying long binary database history in Git.
 
 Tracked artifacts:
 
-- `techscope.sqlite`: SQLite sidecar index.
 - `schema.sql`: database schema.
+- `last-self-test.json`: latest lightweight operational self-test baseline.
+- `README.md`: local memory index contract.
+
+Ignored generated artifacts:
+
+- `techscope.sqlite`: SQLite sidecar index with FTS, relations and embeddings.
 - `last-rebuild.sql`: SQL snapshot used for debugging rebuild output.
-- `last-self-test.json`: latest operational self-test baseline.
 - `exports/`: optional generated exports for other projects or agents.
 
 ## Current commands
@@ -120,5 +125,5 @@ Notes:
 
 - Embeddings are generated artifacts stored in `.memory/techscope.sqlite`.
 - Run `node scripts/rebuild-memory.mjs` before `python3 scripts/embed-memory.py` after Markdown changes.
-- Before pushing, run `node scripts/golden-checks.mjs --with-embeddings` so the committed SQLite snapshot contains fresh embeddings.
+- Fresh clones and updated checkouts should run `node scripts/bootstrap.mjs prepare --profile local` to rebuild the local SQLite index and embeddings.
 - The current search computes cosine similarity locally over SQLite-stored vectors.

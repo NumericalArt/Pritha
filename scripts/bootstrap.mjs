@@ -8,7 +8,7 @@ import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = resolveTechscopeRoot({ cwd: path.resolve(SCRIPT_DIR, "..") });
-const PHASES = new Set(["plan", "install", "verify", "start"]);
+const PHASES = new Set(["plan", "prepare", "install", "verify", "start"]);
 const PROFILES = {
   minimal: {
     pythonCore: false,
@@ -126,6 +126,27 @@ function envProfile(profile, config) {
   return profile === "minimal" ? "minimal" : "local";
 }
 
+function memoryBuildSteps(config) {
+  const steps = [
+    step("memory-rebuild", "install", "Build local SQLite memory index", "node", [
+      "scripts/rebuild-memory.mjs",
+    ], { writes: true, timeoutMs: 300000 }),
+  ];
+  if (config.pythonCore) {
+    steps.push(step("memory-embeddings", "install", "Build local semantic embeddings", "python3", [
+      "scripts/embed-memory.py",
+    ], { writes: true, timeoutMs: 900000 }));
+  } else {
+    steps.push(note(
+      "memory-embeddings-deferred",
+      "install",
+      "Semantic embeddings need the local Python profile",
+      "Run node scripts/bootstrap.mjs prepare --profile local to install Python dependencies and build the full semantic memory index.",
+    ));
+  }
+  return steps;
+}
+
 function installSteps(profile, config, options) {
   const steps = [
     step("setup-state", "install", "Create local setup state", "node", setupArgs(options), {
@@ -153,6 +174,7 @@ function installSteps(profile, config, options) {
       "requirements-macos.txt",
     ], { writes: true, timeoutMs: 900000 }));
   }
+  steps.push(...memoryBuildSteps(config));
   if (config.controlCenter) {
     steps.push(step("control-center-npm-ci", "install", "Install Control Center dependencies from lockfile", "npm", [
       "--prefix",
@@ -183,7 +205,18 @@ function verifySteps(profile, config) {
     step("validate-memory", "verify", "Validate authored Markdown memory", "node", [
       "scripts/validate-memory.mjs",
     ], { timeoutMs: 240000 }),
+    step("memory-stats", "verify", "Check local memory index stats", "node", [
+      "scripts/query-memory.mjs",
+      "stats",
+    ], { timeoutMs: 120000 }),
   ];
+  if (config.pythonCore) {
+    steps.push(step("semantic-search-sanity", "verify", "Check semantic memory search", "node", [
+      "scripts/query-memory.mjs",
+      "semantic",
+      "agent factory",
+    ], { timeoutMs: 120000 }));
+  }
   if (config.controlCenter) {
     steps.push(step("control-center-typecheck", "verify", "Typecheck Control Center", "npm", [
       "--prefix",
@@ -300,6 +333,7 @@ async function main() {
   if (options.help) {
     console.log(`Usage:
   node scripts/bootstrap.mjs plan --profile minimal
+  node scripts/bootstrap.mjs prepare --profile local
   node scripts/bootstrap.mjs install --profile local
   node scripts/bootstrap.mjs verify --profile control-center
   node scripts/bootstrap.mjs start --profile control-center
@@ -319,7 +353,7 @@ credentials. The Control Center start command runs in the foreground.`);
   const profile = options.profile || (options.start ? "local" : "minimal");
   if (!PROFILES[profile]) throw new Error(`Unknown bootstrap profile: ${profile}`);
   const startTarget = phase === "start" && !options.start ? "control-center" : options.start;
-  const sequence = phase ? [phase] : startTarget ? ["install", "verify", "start"] : ["plan"];
+  const sequence = phase === "prepare" ? ["install", "verify"] : phase ? [phase] : startTarget ? ["install", "verify", "start"] : ["plan"];
   const config = effectiveConfig(profile, startTarget);
   const steps = plannedSteps(sequence, profile, config, { ...options, start: startTarget });
   const planOnly = sequence.length === 1 && sequence[0] === "plan";

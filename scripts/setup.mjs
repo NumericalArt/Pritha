@@ -27,11 +27,11 @@ const REALTIME_TOOL_ENV_NAMES = {
 export function routeTriggerPhrase(text) {
   const value = String(text || "").trim().toLowerCase();
   if (!value) return null;
-  if (/(^|\s)(запусти проект|setup|first run|bootstrap|start)(\s|$)/iu.test(value)) {
+  if (/(^|\s)(запусти проект|стартуй проект|начни проект|запусти прита|запусти притха|стартуй прита|стартуй притха|начни прита|начни притха|start pritha|start project|setup|first run|bootstrap|start)(\s|$)/iu.test(value)) {
     return {
       id: "first-run-setup",
       workflow: "07_workflows/first-run-setup.md",
-      command: "node scripts/bootstrap.mjs plan --profile minimal",
+      command: "node scripts/bootstrap.mjs prepare --profile local",
     };
   }
   if (/(^|\s)(проверь проект|self test|health)(\s|$)/iu.test(value)) {
@@ -389,7 +389,7 @@ async function main() {
   if (options.help) {
     console.log(`Usage:
   # Preferred fresh-clone entrypoint:
-  node scripts/bootstrap.mjs plan --profile minimal
+  node scripts/bootstrap.mjs prepare --profile local
   node scripts/bootstrap.mjs --profile local --start control-center
 
   # Lower-level setup-state wizard:

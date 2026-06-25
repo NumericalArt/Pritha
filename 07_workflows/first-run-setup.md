@@ -3,7 +3,7 @@ id: first-run-setup
 type: workflow
 status: active
 created: 2026-05-28
-updated: 2026-06-21
+updated: 2026-06-25
 topics:
   - pritha
   - setup
@@ -31,7 +31,7 @@ source_published: 2026-05-28
 source_updated: 2026-05-28
 source_version: phase-4-bootstrap-first-run-setup
 retrieved: 2026-05-28
-verified: 2026-06-21
+verified: 2026-06-25
 valid_for: Pritha v0.1 first-run bootstrap
 temporal_status: current
 ---
@@ -49,6 +49,9 @@ Bring the repository to a usable local state with minimal assumptions:
 - Optional connectors are explicit opt-in.
 - Deterministic dependencies can be installed only through the selected
   bootstrap profile.
+- The local SQLite memory index and semantic embeddings are generated from
+  tracked Markdown during bootstrap, so a fresh clone becomes a complete local
+  Pritha instance without committing generated database history.
 - Secrets stay in `.env.local`.
 - `.techscope-setup.json` stores only non-secret setup state.
 - Quality failures do not block the first run; they produce
@@ -65,21 +68,22 @@ Bring the repository to a usable local state with minimal assumptions:
    - Realtime voice connector;
    - Obsidian vault/sync notes;
    - first descendant agent now or later.
-4. Show a bootstrap plan before mutating local dependencies. Do not launch
-   services, enable launchd, start cron, run background queues, install
-   Tailscale, configure host networking, write credentials or publish anything
-   without a separate explicit user confirmation.
+4. For ambiguous setup requests, show a bootstrap plan before mutating local
+   dependencies. For explicit start phrases such as `стартуй Pritha`, `начни
+   Pritha` or `start Pritha`, Codex may run the safe local prepare command
+   directly. Do not launch services, enable launchd, start cron, run background
+   queues, install Tailscale, configure host networking, write credentials or
+   publish anything without a separate explicit user confirmation.
 5. If secrets are provided, write them only to `.env.local` using the setup
    script or equivalent atomic private write. Never put secrets in
    `.techscope-setup.json`, Markdown artifacts or Git.
 6. Run the preferred bootstrap CLI if useful:
 
 ```sh
-node scripts/bootstrap.mjs plan --profile minimal
-node scripts/bootstrap.mjs verify --profile minimal
+node scripts/bootstrap.mjs prepare --profile local
 ```
 
-For local Control Center setup:
+For local Control Center setup after memory is prepared:
 
 ```sh
 node scripts/bootstrap.mjs --profile local --start control-center
@@ -88,13 +92,21 @@ node scripts/bootstrap.mjs --profile local --start control-center
 Use `node scripts/setup.mjs` only as the lower-level setup-state wizard when
 debugging bootstrap or custom setup-state paths.
 
-7. Check status:
+7. The prepare command must leave `.memory/techscope.sqlite` populated with
+   documents, chunks, relations and embeddings. If `.memory/techscope.sqlite` is
+   absent or stale, rerun:
+
+```sh
+node scripts/bootstrap.mjs prepare --profile local
+```
+
+8. Check status:
 
 ```sh
 node scripts/setup-status.mjs --json
 ```
 
-8. If final status is `completed-with-warnings`, tell the user what to fix and
+9. If final status is `completed-with-warnings`, tell the user what to fix and
    suggest:
 
 ```sh
@@ -155,7 +167,7 @@ node scripts/tailscale-setup.mjs status --json
 - Setup status is `completed` or `completed-with-warnings`.
 - `.env.local` exists and is not committed.
 - `.techscope-setup.json` exists and contains no secrets.
-- `node scripts/bootstrap.mjs verify --profile minimal --json` prints
-  machine-readable verification state.
+- `node scripts/bootstrap.mjs prepare --profile local --json` prints
+  machine-readable setup and memory preparation state.
 - The user has the next concrete step: run self-test, create a first descendant
   via Pritha, or continue with manual connector setup.
