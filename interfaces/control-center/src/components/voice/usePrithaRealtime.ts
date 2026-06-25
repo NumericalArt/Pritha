@@ -57,6 +57,7 @@ export type CodexTaskState = {
   status: string;
   summary: string;
   progress: number;
+  progressDetail?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -170,6 +171,16 @@ type CodexTaskSnapshot = {
   speakable_events?: CodexTaskVoiceFeedback[];
   result_available?: boolean;
   result_excerpt?: string;
+  progress_percent?: number;
+  progress_detail?: {
+    source?: string;
+    total_steps?: number;
+    completed_steps?: number;
+    active_step_id?: string;
+    active_step_title?: string;
+    blocked_step_id?: string;
+    stale?: boolean;
+  };
   approval?: CodexTaskApproval | null;
   thread_scope?: CodexTaskThreadScope | null;
   codex_app_thread_routing_mode?: string;
@@ -186,6 +197,23 @@ type CodexTaskSnapshot = {
   updated_at?: string;
   task?: string;
   task_type?: string;
+  plan?: {
+    executionMode?: string;
+    steps?: Array<{
+      id?: string;
+      title?: string;
+    }>;
+  } | null;
+  progress_timeline?: Array<{
+    timestamp?: string;
+    phase?: string;
+    level?: string;
+    message?: string;
+    status?: string;
+    transport?: string;
+    step_id?: string;
+    step_title?: string;
+  }>;
   telemetry?: Array<{
     kind?: string;
     reason?: string;
@@ -235,8 +263,42 @@ function codexTaskCreatedMs(task: Pick<CodexTaskState, "createdAt" | "id">) {
 function orderVisibleCodexTasks(tasks: CodexTaskState[]) {
   return [...tasks]
     .sort((a, b) => codexTaskCreatedMs(b) - codexTaskCreatedMs(a) || b.id.localeCompare(a.id))
-    .slice(0, MAX_VISIBLE_TASKS)
-    .sort((a, b) => codexTaskCreatedMs(a) - codexTaskCreatedMs(b) || a.id.localeCompare(b.id));
+    .slice(0, MAX_VISIBLE_TASKS);
+}
+
+function clampTaskProgress(value: unknown, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(Math.round(numeric), 100));
+}
+
+function fallbackCodexTaskProgress(params: {
+  terminal: boolean;
+  waitingForOperator: boolean;
+  resultAvailable: boolean;
+  stale?: boolean;
+  statusText: string;
+  decisionRequired: boolean;
+}) {
+  if (params.terminal) return 100;
+  if (params.waitingForOperator) return 80;
+  if (params.resultAvailable) return 75;
+  if (params.stale) return 65;
+  if (params.statusText === "running") return 45;
+  if (params.decisionRequired) return 5;
+  return 15;
+}
+
+function formatCodexProgressDetail(detail?: CodexTaskSnapshot["progress_detail"]) {
+  if (!detail) return "";
+  const total = Number(detail.total_steps || 0);
+  const completed = Number(detail.completed_steps || 0);
+  if (!Number.isFinite(total) || total <= 1) return detail.source ? `progress: ${detail.source}` : "";
+  const parts = [`${Math.max(0, completed)} of ${total} steps complete`];
+  if (detail.active_step_title || detail.active_step_id) parts.push(`active: ${detail.active_step_title || detail.active_step_id}`);
+  if (detail.blocked_step_id) parts.push(`blocked: ${detail.blocked_step_id}`);
+  if (detail.stale) parts.push("possibly stale");
+  return parts.join("; ");
 }
 
 type RollingSummaryPayload = {
@@ -590,6 +652,7 @@ function usePrithaRealtimeController() {
         status: task.status || existing?.status || "queued",
         summary: task.summary || existing?.summary || "Codex task queued.",
         progress: typeof task.progress === "number" ? task.progress : existing?.progress || 0,
+        progressDetail: task.progressDetail || existing?.progressDetail,
         createdAt: task.createdAt || existing?.createdAt || timestamp,
         updatedAt: timestamp,
         completedAt: task.completedAt || existing?.completedAt,
@@ -1031,7 +1094,16 @@ function usePrithaRealtimeController() {
       const voiceFeedbackText = voiceFeedback?.voice_text?.trim();
       const decisionRequired = statusText === "decision_required" || snapshot.approval?.status === "pending";
       const waitingForOperator = statusText === "waiting_for_operator";
-      const progress = terminal ? 100 : waitingForOperator ? 80 : snapshot.result_available ? 75 : snapshot.stale ? 65 : statusText === "running" ? 45 : decisionRequired ? 5 : 15;
+      const fallbackProgress = fallbackCodexTaskProgress({
+        terminal,
+        waitingForOperator,
+        resultAvailable: Boolean(snapshot.result_available),
+        stale: snapshot.stale,
+        statusText,
+        decisionRequired,
+      });
+      const progress = snapshot.progress_percent === undefined ? fallbackProgress : clampTaskProgress(snapshot.progress_percent, fallbackProgress);
+      const progressDetail = formatCodexProgressDetail(snapshot.progress_detail);
       const handoffSkipped = snapshot.telemetry?.find((event) => event.kind === "codex_task_result_handoff_skipped");
       const handoffSent = snapshot.telemetry?.find((event) => event.kind === "codex_task_result_handoff_sent");
       const handoffStatus = snapshot.handoff_status || (handoffSent ? "sent" : handoffSkipped ? "skipped" : undefined);
@@ -1054,6 +1126,7 @@ function usePrithaRealtimeController() {
         status: statusText,
         summary,
         progress,
+        progressDetail,
         phase: snapshot.phase,
         lastActivityAt: snapshot.last_activity_at,
         lastActivity: snapshot.last_activity,

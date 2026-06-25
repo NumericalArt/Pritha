@@ -4,9 +4,12 @@ import test from "node:test";
 
 const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
 const toolRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/tool/route.ts", "utf8");
+const intakeRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/intake/route.ts", "utf8");
 const voicePageSource = readFileSync("interfaces/control-center/src/components/voice/VoiceControlPage.tsx", "utf8");
+const voiceStylesSource = readFileSync("interfaces/control-center/src/styles/globals.css", "utf8");
 const realtimeHookSource = readFileSync("interfaces/control-center/src/components/voice/usePrithaRealtime.ts", "utf8");
 const legacyScriptSource = readFileSync("scripts/pritha-voice-control.mjs", "utf8");
+const voiceRoadmapSource = readFileSync("07_workflows/2026-06-12-control-center-voice-page-roadmap.md", "utf8");
 const interfacesManifest = JSON.parse(readFileSync("interfaces/manifest.json", "utf8"));
 const legacyExperimentManifest = JSON.parse(readFileSync("interfaces/experiments/pritha-voice-control/manifest.json", "utf8"));
 const legacySearchToolName = ["search", "pritha", "memory"].join("_");
@@ -43,13 +46,82 @@ test("Voice UI fallback tool list includes filesystem inspection", () => {
 
 test("Voice UI task cards stay stable and avoid duplicate approval placeholders", () => {
   assert.match(runtimeSource, /function codexTaskCreatedMs\(taskDir: string\)/);
-  assert.match(runtimeSource, /\.sort\(\(a, b\) => a\.createdMs - b\.createdMs/);
+  assert.match(runtimeSource, /\.sort\(\(a, b\) => b\.createdMs - a\.createdMs/);
+  assert.doesNotMatch(runtimeSource, /\.sort\(\(a, b\) => a\.createdMs - b\.createdMs/);
   assert.match(realtimeHookSource, /function orderVisibleCodexTasks/);
-  assert.match(realtimeHookSource, /codexTaskCreatedMs\(a\) - codexTaskCreatedMs\(b\)/);
+  assert.match(realtimeHookSource, /codexTaskCreatedMs\(b\) - codexTaskCreatedMs\(a\)/);
+  assert.doesNotMatch(realtimeHookSource, /codexTaskCreatedMs\(a\) - codexTaskCreatedMs\(b\)/);
   assert.doesNotMatch(voicePageSource, /onBriefTask/);
   assert.doesNotMatch(voicePageSource, />\s*Brief\s*</);
   assert.doesNotMatch(voicePageSource, /function DecisionCard/);
   assert.doesNotMatch(voicePageSource, /Decision Gate/);
+});
+
+test("Voice UI task progress uses Codex plan step metrics when available", () => {
+  assert.match(runtimeSource, /function codexTaskProgressMetrics/);
+  assert.match(runtimeSource, /function codexTaskPlanSteps/);
+  assert.match(runtimeSource, /phase === "step_completed"/);
+  assert.match(runtimeSource, /progress_percent: progressMetrics\.percent/);
+  assert.match(runtimeSource, /progress_detail:/);
+  assert.match(realtimeHookSource, /progress_percent\?: number/);
+  assert.match(realtimeHookSource, /formatCodexProgressDetail/);
+  assert.match(realtimeHookSource, /snapshot\.progress_percent === undefined \? fallbackProgress : clampTaskProgress/);
+  assert.match(voicePageSource, /title=\{task\.progressDetail \|\| undefined\}/);
+});
+
+test("Voice intake sends files and links to bounded temporary Codex analysis", () => {
+  assert.match(intakeRouteSource, /multipart\/form-data/);
+  assert.match(intakeRouteSource, /createPrithaVoiceIntakeCodexTask/);
+  assert.match(intakeRouteSource, /form\.getAll\("files"\)/);
+  assert.match(intakeRouteSource, /new Uint8Array\(await entry\.arrayBuffer\(\)\)/);
+  assert.match(intakeRouteSource, /error\.includes\("large"\) \|\| error === "too_many_files"/);
+
+  assert.match(runtimeSource, /const VOICE_INTAKE_MAX_FILES = 8/);
+  assert.match(runtimeSource, /const VOICE_INTAKE_MAX_FILE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(runtimeSource, /const VOICE_INTAKE_MAX_TOTAL_BYTES = 25 \* 1024 \* 1024/);
+  assert.match(runtimeSource, /const VOICE_INTAKE_STAGING_TTL_MS = 2 \* 60 \* 60 \* 1000/);
+  assert.match(runtimeSource, /function voiceIntakeRoot\(\)/);
+  assert.match(runtimeSource, /"temporary-private-staging"/);
+  assert.match(runtimeSource, /mode: "ttl"/);
+  assert.match(runtimeSource, /terminal_task_readback: false/);
+  assert.match(runtimeSource, /ttl_ms: VOICE_INTAKE_STAGING_TTL_MS/);
+  assert.match(runtimeSource, /expires_at: expiresAtIso/);
+  assert.doesNotMatch(runtimeSource, new RegExp(["terminal", "summary", "readback"].join("_")));
+  assert.doesNotMatch(runtimeSource, new RegExp(["terminal", "detail", "readback"].join("_")));
+  assert.match(runtimeSource, /isPathInsideOrSame\(intakeRoot, directory\)/);
+  assert.match(runtimeSource, /await logPrivateEvent\("voice_intake_staging_purged"/);
+  assert.match(runtimeSource, /reason: "ttl_expired"/);
+  assert.match(runtimeSource, /task_type: "analysis"/);
+  assert.match(runtimeSource, /write_mode: "read_only"/);
+  assert.match(runtimeSource, /isVideoOrTranscriptUrl/);
+  assert.match(runtimeSource, /scripts\/transcribe-media\.mjs/);
+  assert.match(runtimeSource, /Do not store raw uploaded files or full transcripts in tracked memory/);
+
+  assert.match(voicePageSource, /const CLIENT_INTAKE_MAX_FILES = 8/);
+  assert.match(voicePageSource, /const CLIENT_INTAKE_MAX_FILE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(voicePageSource, /const CLIENT_INTAKE_MAX_TOTAL_BYTES = 25 \* 1024 \* 1024/);
+  assert.match(voicePageSource, /fetch\("\/api\/realtime\/intake"/);
+  assert.match(voicePageSource, /event\.clipboardData\.files/);
+  assert.match(voicePageSource, /event\.dataTransfer\.files/);
+  assert.match(voicePageSource, /onCodexTaskCreated\(payload\.task_id\)/);
+  assert.match(voicePageSource, /realtime\.watchCodexTask\(taskId\)/);
+
+  assert.match(voiceRoadmapSource, /Direct Codex Analysis/);
+  assert.match(voiceRoadmapSource, /Document Processor is intentionally not used/);
+  assert.doesNotMatch(voiceRoadmapSource, /Evaluate the GitHub Document Processor project/);
+});
+
+test("Voice task details drawer fits mobile viewport", () => {
+  assert.match(voiceStylesSource, /\.voice-drawer\s*\{[^}]*box-sizing:\s*border-box/s);
+  assert.match(voiceStylesSource, /\.voice-drawer\s*\{[^}]*max-width:\s*100vw/s);
+  assert.match(voiceStylesSource, /\.voice-drawer\s*\{[^}]*overflow-x:\s*hidden/s);
+  assert.match(voiceStylesSource, /\.drawer-stack pre\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+  assert.match(voiceStylesSource, /\.drawer-kv strong\s*\{[^}]*word-break:\s*break-word/s);
+  assert.match(voiceStylesSource, /\.drawer-event-list div,[\s\S]*\.drawer-session-list article\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(voiceStylesSource, /\.drawer-event-list strong\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+  assert.match(voiceStylesSource, /@media \(max-width: 767px\)[\s\S]*\.voice-drawer\s*\{[\s\S]*width:\s*100vw/);
+  assert.match(voiceStylesSource, /@media \(max-width: 767px\)[\s\S]*\.voice-drawer\s*\{[\s\S]*height:\s*100dvh/);
+  assert.match(voiceStylesSource, /@media \(max-width: 767px\)[\s\S]*\.drawer-actions\s*\{[\s\S]*position:\s*sticky/);
 });
 
 test("standalone port 3401 voice experiment is deprecated in favor of Control Center", () => {

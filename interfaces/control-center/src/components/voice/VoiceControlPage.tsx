@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   BookOpen,
   Check,
@@ -9,6 +9,7 @@ import {
   MemoryStick,
   Mic,
   MicOff,
+  Paperclip,
   SendHorizontal,
   Square,
   X,
@@ -176,6 +177,20 @@ function activeToolNames(status: PrithaRealtimeStatus | null) {
     : ["full_pritha_memory", "inspect_pritha_files", "inspect_codex_task", "recall_rolling_summary", "answer_codex_task", "run_codex_task"];
 }
 
+const CLIENT_INTAKE_MAX_FILES = 8;
+const CLIENT_INTAKE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const CLIENT_INTAKE_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+
+function fileSizeLabel(value: number) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
+function textHasUrl(value: string) {
+  return /https?:\/\/[^\s<>"')\]]+/i.test(value);
+}
+
 function ContextCard({
   status,
   stickyContextEnabled,
@@ -281,7 +296,7 @@ function TaskListCard({
                 <strong>{task.title}</strong>
                 <span className={`inline-status ${taskStatusTone(task)}`}>{task.status}</span>
               </div>
-              <div className="task-progress-row">
+              <div className="task-progress-row" title={task.progressDetail || undefined}>
                 <div className="task-progress-track">
                   <span className="task-progress-fill" style={{ width: `${task.progress}%` }} />
                 </div>
@@ -625,34 +640,158 @@ function SessionRecallDrawer({
   );
 }
 
-function PasteCommandPanel({ sendText, phase }: { sendText: (text: string) => boolean; phase: RealtimePhase }) {
+function PasteCommandPanel({
+  sendText,
+  phase,
+  sessionId,
+  onCodexTaskCreated,
+}: {
+  sendText: (text: string) => boolean;
+  phase: RealtimePhase;
+  sessionId: string;
+  onCodexTaskCreated: (taskId: string) => void;
+}) {
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canSend = phaseIsActive(phase);
+  const routesToCodex = files.length > 0 || textHasUrl(text);
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  const canSubmit = !busy && (routesToCodex ? Boolean(text.trim() || files.length) : canSend && Boolean(text.trim()));
+
+  function addFiles(nextFiles: Iterable<File>) {
+    setNote("");
+    setFiles((current) => {
+      const merged = [...current];
+      for (const file of nextFiles) {
+        if (merged.length >= CLIENT_INTAKE_MAX_FILES) {
+          setNote(`Too many files. Max ${CLIENT_INTAKE_MAX_FILES}.`);
+          break;
+        }
+        if (file.size > CLIENT_INTAKE_MAX_FILE_BYTES) {
+          setNote(`${file.name} is too large. Max ${fileSizeLabel(CLIENT_INTAKE_MAX_FILE_BYTES)}.`);
+          continue;
+        }
+        if (merged.reduce((sum, item) => sum + item.size, 0) + file.size > CLIENT_INTAKE_MAX_TOTAL_BYTES) {
+          setNote(`Files are too large. Max ${fileSizeLabel(CLIENT_INTAKE_MAX_TOTAL_BYTES)} total.`);
+          continue;
+        }
+        merged.push(file);
+      }
+      return merged;
+    });
+  }
+
+  function removeFile(index: number) {
+    setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  async function submitCodexIntake() {
+    const form = new FormData();
+    form.set("text", text.trim());
+    form.set("session_id", sessionId);
+    for (const file of files) form.append("files", file, file.name);
+    const response = await fetch("/api/realtime/intake", { method: "POST", body: form });
+    const payload = (await response.json().catch(() => ({ ok: false, error: "intake returned non-json" }))) as {
+      ok?: boolean;
+      task_id?: string;
+      error?: string;
+      operator_note?: string;
+      max_file_label?: string;
+      max_total_label?: string;
+    };
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || `Intake failed with status ${response.status}`);
+    }
+    if (payload.task_id) {
+      onCodexTaskCreated(payload.task_id);
+      if (canSend) sendText(`Codex intake task ${payload.task_id} created for the pasted files or links. Summarize its result when it completes.`);
+    }
+    setText("");
+    setFiles([]);
+    setNote(payload.operator_note || "Sent to Codex.");
+  }
 
   function submit() {
+    if (!canSubmit) return;
+    setNote("");
+    if (routesToCodex) {
+      setBusy(true);
+      void submitCodexIntake()
+        .catch((error) => setNote(error instanceof Error ? error.message : "Could not send intake to Codex."))
+        .finally(() => setBusy(false));
+      return;
+    }
     const sent = sendText(text);
     if (sent) setText("");
   }
 
   return (
-    <section className="command-panel">
+    <section
+      className={`command-panel ${routesToCodex ? "codex-intake" : ""}`}
+      onDragOver={(event) => {
+        event.preventDefault();
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        addFiles(event.dataTransfer.files);
+      }}
+    >
       <div className="card-title-row">
         <h2>Paste Command</h2>
-        <span className={`inline-status ${canSend ? "green" : ""}`}>{canSend ? "Live" : "Start voice"}</span>
+        <span className={`inline-status ${routesToCodex ? "blue" : canSend ? "green" : ""}`}>
+          {busy ? "Sending" : routesToCodex ? "Codex" : canSend ? "Live" : "Start voice"}
+        </span>
       </div>
       <div className="command-input-row large">
         <textarea
           value={text}
-          placeholder="Paste a link, file note, long command, or context for the live voice session."
+          placeholder="Paste a command, link, screenshot, file, or context."
           onChange={(event) => setText(event.target.value)}
+          onPaste={(event) => {
+            const pastedFiles = Array.from(event.clipboardData.files || []);
+            if (pastedFiles.length) addFiles(pastedFiles);
+          }}
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key === "Enter") submit();
           }}
         />
-        <button type="button" aria-label="Send command" onClick={submit} disabled={!canSend || !text.trim()}>
-          <SendHorizontal size={22} />
-        </button>
+        <div className="command-button-stack">
+          <button type="button" aria-label="Attach files" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+            <Paperclip size={20} />
+          </button>
+          <button type="button" aria-label="Send command" onClick={submit} disabled={!canSubmit}>
+            <SendHorizontal size={22} />
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          onChange={(event) => {
+            if (event.currentTarget.files) addFiles(event.currentTarget.files);
+            event.currentTarget.value = "";
+          }}
+        />
       </div>
+      {files.length ? (
+        <div className="command-file-list">
+          {files.map((file, index) => (
+            <div key={`${file.name}-${file.size}-${index}`} className="command-file-chip">
+              <span>{file.name}</span>
+              <small>{fileSizeLabel(file.size)}</small>
+              <button type="button" aria-label={`Remove ${file.name}`} onClick={() => removeFile(index)} disabled={busy}>
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          <span className="command-file-total">{fileSizeLabel(totalBytes)} total</span>
+        </div>
+      ) : null}
+      {note ? <p className="command-intake-note">{note}</p> : null}
     </section>
   );
 }
@@ -930,6 +1069,11 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
     }
   }
 
+  function handleCodexTaskCreated(taskId: string) {
+    realtime.watchCodexTask(taskId);
+    void realtime.refreshCodexTask(taskId).catch(() => undefined);
+  }
+
   return (
     <>
       <div className="mobile-voice-screen">
@@ -947,7 +1091,12 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           onMicInputLevelChange={realtime.setMicInputLevel}
           mobile
         />
-        <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
+        <PasteCommandPanel
+          sendText={realtime.sendTextMessage}
+          phase={realtime.phase}
+          sessionId={realtime.sessionId}
+          onCodexTaskCreated={handleCodexTaskCreated}
+        />
         <TaskListCard
           tasks={realtime.codexTasks}
           toolStatus={realtime.toolStatus}
@@ -988,7 +1137,12 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               onMute={realtime.toggleMute}
               onMicInputLevelChange={realtime.setMicInputLevel}
             />
-            <PasteCommandPanel sendText={realtime.sendTextMessage} phase={realtime.phase} />
+            <PasteCommandPanel
+              sendText={realtime.sendTextMessage}
+              phase={realtime.phase}
+              sessionId={realtime.sessionId}
+              onCodexTaskCreated={handleCodexTaskCreated}
+            />
           </main>
           <aside className="voice-rail">
             <TaskListCard

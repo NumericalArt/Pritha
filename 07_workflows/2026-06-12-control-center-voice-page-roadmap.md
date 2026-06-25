@@ -12,7 +12,7 @@ topics:
   - session-recall
   - curated-memory
   - file-intake
-  - document-processing
+  - direct-codex-intake
 tools:
   - Next.js
   - React
@@ -21,7 +21,6 @@ tools:
   - WebRTC
   - Codex
   - SQLite
-  - Document Processor
 sources:
   - current-codex-thread:2026-06-12-voice-control-roadmap-review
   - current-codex-thread:2026-06-24-voice-control-task-queue-and-file-intake
@@ -34,6 +33,7 @@ sources:
   - interfaces/control-center/src/app/api/realtime/tool/route.ts
   - interfaces/control-center/src/app/api/realtime/status/route.ts
   - interfaces/control-center/src/app/api/realtime/codex-task/[id]/route.ts
+  - interfaces/control-center/src/app/api/realtime/intake/route.ts
   - interfaces/control-center/src/app/api/realtime/event/route.ts
 related:
   workflows:
@@ -578,38 +578,40 @@ Acceptance criteria:
 - Approve/Decline appears only when a concrete pending action exists.
 - The voice model cannot treat a decorative approval card as real permission.
 
-## V.20: Paste/File Intake And Document Processing Strategy
+## V.20: Paste/File Intake And Direct Codex Analysis
 
-Status: draft project, not implemented in the current UI cleanup.
+Status: implemented first slice on 2026-06-24.
 
 Goal: let the operator paste or drop screenshots, images, PDFs and other files
-into the Voice Control intake without confusing raw command text with files that
-require preprocessing.
+into the Voice Control intake without confusing live command text with material
+that should become a Codex analysis task.
 
-Draft direction:
+Implemented direction:
 
-- Split typed text commands from binary/document attachments at intake time.
-- If the input contains files, create a Codex processing task with a compact
-  operator instruction and safe references to staged local files.
-- Let Codex run the document/file processing path and return a bounded summary
-  or extracted context to Pritha Voice Control, so the live session can continue
-  from processed content rather than raw file bytes.
-- Evaluate the GitHub Document Processor project as a candidate execution
-  dependency before implementing. Verify repository freshness, supported file
-  types, limits, installation shape, privacy posture and failure modes first.
-- Define limits before code: max file count, max bytes per file, supported MIME
-  types, image/PDF page limits, timeout, retry behavior, quarantine/staging
-  directory, cleanup policy and explicit approval gates for expensive or unsafe
-  processing.
+- Plain text without links still goes directly to the active realtime voice
+  session.
+- Files, screenshots pasted from the clipboard and text containing URLs create a
+  Codex sidecar analysis task through `/api/realtime/intake`.
+- Files are staged only under private temporary `voice-intake` storage, with
+  generated safe filenames and a manifest. They are not written to tracked
+  memory. Terminal task readback does not purge staging immediately; private
+  staging remains available to Codex for about two hours and is then removed by
+  TTL cleanup with a private audit event.
+- The current limits are 8 files, 10 MiB per file and 25 MiB total per intake.
+- URL intake is routed to Codex as well. Media-hosted URLs tell
+  Codex to use the existing transient media transcription workflow when useful
+  and to return a voice-ready summary instead of retaining a full transcript.
+- Document Processor is intentionally not used for this path. The chosen v1
+  behavior is direct Codex analysis with bounded private staging.
 
 Open questions:
 
-- Whether Document Processor should be vendored, invoked as a sibling checkout,
-  installed as a package, or called through a small adapter script.
-- Whether processing results should be ephemeral Voice Context, private
-  session state, or curated memory candidates.
-- How to route screenshots from clipboard versus files from drag/drop or file
-  picker on mobile Safari and desktop browsers.
+- Whether PDF/image/page-count limits need to be stricter than byte limits after
+  real usage data.
+- Whether successful intake summaries should be promoted only to ephemeral
+  Voice Context or optionally offered as curated memory candidates.
+- Whether mobile Safari clipboard behavior needs a separate capture affordance
+  beyond file picker and paste handling.
 
 ## V.18: Observability And Recovery
 
