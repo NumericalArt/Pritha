@@ -118,7 +118,66 @@ function metricLabel(value: number | undefined) {
   return Number(value || 0).toLocaleString("en-US");
 }
 
-type SettingsSectionId = "general" | "access" | "codex" | "voice" | "limits" | "proactivity";
+type MaintenanceGithubStatus = {
+  status: string;
+  updateNeeded: boolean;
+  safeToUpdate: boolean;
+  branch: string;
+  ahead: number;
+  behind: number;
+  checks?: MaintenanceCheck[];
+  curatedUntracked?: string[];
+};
+
+type MaintenanceRadarStatus = {
+  status: string;
+  candidates: number;
+  registryPath?: string;
+};
+
+type MaintenanceCheck = {
+  id: string;
+  status: string;
+  detail: string;
+  required?: boolean;
+};
+
+type MaintenanceStatus = {
+  schema: string;
+  status?: string;
+  ok?: boolean;
+  action?: string;
+  result?: string;
+  artifactPath?: string;
+  records?: number;
+  backupBranch?: string;
+  candidates?: unknown[] | number;
+  checks?: MaintenanceCheck[];
+  plannedQueries?: string[];
+  steps?: string[];
+  localStatus?: string;
+  blockedReason?: string;
+  error?: string;
+  updateNeeded?: boolean;
+  safeToUpdate?: boolean;
+  branch?: string;
+  ahead?: number;
+  behind?: number;
+  curatedUntracked?: string[];
+  github?: MaintenanceGithubStatus;
+  radar?: MaintenanceRadarStatus;
+  cronAdapter?: {
+    status: CapabilityStatus | string;
+    mode: string;
+  };
+  api?: {
+    ok: boolean;
+    exitCode: number;
+    stderr?: string;
+  };
+};
+
+type SettingsSectionId = "general" | "access" | "codex" | "voice" | "limits" | "maintenance" | "proactivity";
 
 const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -126,6 +185,7 @@ const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: "codex", label: "Codex" },
   { id: "voice", label: "Voice" },
   { id: "limits", label: "Limits" },
+  { id: "maintenance", label: "Maintenance" },
   { id: "proactivity", label: "Proactivity" },
 ];
 
@@ -598,6 +658,356 @@ function LimitsCard({ status }: { status?: ControlCenterStatus }) {
   );
 }
 
+function maintenanceStatusLabel(value?: MaintenanceStatus | null) {
+  if (!value) return "Loading";
+  const github = value.github;
+  if (!github) return value.status || "unknown";
+  if (github.safeToUpdate) return "Update ready";
+  if (github.status === "up_to_date") return "Up to date";
+  return github.status.replace(/_/g, " ");
+}
+
+function maintenanceResultText(value?: MaintenanceStatus | null) {
+  if (!value) return "";
+  if (value.artifactPath) return `Created ${value.artifactPath}`;
+  if (value.records != null) return `Registry refreshed: ${value.records} records`;
+  if (value.backupBranch) return `Updated with backup ${value.backupBranch}`;
+  if (value.result) return value.result;
+  if (Array.isArray(value.candidates)) return `Candidates found: ${value.candidates.length}`;
+  if (typeof value.candidates === "number") return `Candidates: ${value.candidates}`;
+  return `${value.action || value.schema}: ${value.status || (value.ok ? "ok" : "failed")}`;
+}
+
+const GITHUB_BLOCKING_LABELS: Record<string, string> = {
+  "main-branch": "current branch is not main",
+  "tracked-working-tree-clean": "working tree has local edits",
+  "origin-remote": "origin remote is unavailable",
+  "origin-fetch": "origin fetch failed",
+  "local-main": "local main is unavailable",
+  "origin-main": "origin/main is unavailable",
+  "ahead-behind": "ahead/behind check failed",
+  "local-commits-preserved": "local main has commits ahead of origin/main",
+  "fast-forward-only": "update is not fast-forward-only",
+};
+
+const MAINTENANCE_ACTION_LABELS: Record<string, string> = {
+  "github-check": "GitHub check",
+  "github-update": "GitHub update",
+  "rebuild-from-github": "Rebuild plan",
+  "refresh-agents": "Child agent refresh",
+  "refresh-self-knowledge": "Self knowledge refresh",
+  "github-knowledge-radar": "Knowledge Radar status",
+  "github-knowledge-radar-search": "Knowledge Radar search",
+};
+
+function maintenanceActionLabel(action?: string | null) {
+  if (!action) return "Maintenance action";
+  return MAINTENANCE_ACTION_LABELS[action] || action.replace(/-/g, " ");
+}
+
+function failedMaintenanceChecks(value?: MaintenanceStatus | null) {
+  if (value?.action === "rebuild-from-github") return [];
+  const checks = [...(value?.checks || []), ...(value?.github?.checks || [])];
+  return checks.filter((check) => check.status === "fail" || (check.required && check.status !== "pass"));
+}
+
+function githubBlockingSummary(github?: MaintenanceGithubStatus) {
+  if (!github || github.safeToUpdate) return "";
+  const failed = failedMaintenanceChecks({ schema: "github-check", github }).map((check) => GITHUB_BLOCKING_LABELS[check.id] || check.id.replace(/-/g, " "));
+  if (failed.length) return `Blocked: ${failed.slice(0, 3).join("; ")}.`;
+  if (!github.updateNeeded) return "No update is available.";
+  return "Update is not safe to apply yet.";
+}
+
+function githubFromMaintenanceResult(value?: MaintenanceStatus | null): MaintenanceGithubStatus | undefined {
+  if (!value) return undefined;
+  if (value.github) return value.github;
+  if (value.branch && typeof value.ahead === "number" && typeof value.behind === "number") {
+    return {
+      status: value.status || "unknown",
+      updateNeeded: Boolean(value.updateNeeded),
+      safeToUpdate: Boolean(value.safeToUpdate),
+      branch: value.branch,
+      ahead: value.ahead,
+      behind: value.behind,
+      checks: value.checks,
+      curatedUntracked: value.curatedUntracked,
+    };
+  }
+  return undefined;
+}
+
+function maintenanceResultTone(value?: MaintenanceStatus | null, busyAction?: string | null) {
+  if (busyAction) return "blue";
+  if (!value) return "";
+  if (value.api?.ok === false || value.ok === false || value.status === "failed") return "red";
+  if (value.status === "blocked" || value.status === "plan_only" || value.status === "planned") return "orange";
+  return "green";
+}
+
+function maintenanceResultTitle(value?: MaintenanceStatus | null, busyAction?: string | null) {
+  if (busyAction) return `${maintenanceActionLabel(busyAction)} is running`;
+  if (!value) return "No action result yet";
+  if (value.action === "github-check" && value.status === "blocked") return "GitHub update is blocked";
+  if (value.action === "refresh-agents" && value.status === "updated") return "Agent registry refreshed";
+  if (value.status === "blocked") return `${maintenanceActionLabel(value.action)} is blocked`;
+  if (value.status === "plan_only") return "Plan generated";
+  if (value.status === "planned") return "Search prepared";
+  if (value.status === "created") return "Draft created";
+  if (value.status === "updated") return "Update applied";
+  if (value.status === "up_to_date") return "Already up to date";
+  if (value.status === "failed") return "Action failed";
+  return maintenanceActionLabel(value.action);
+}
+
+function maintenanceResultDetail(value?: MaintenanceStatus | null) {
+  if (!value) return "";
+  if (value.action === "rebuild-from-github") return "Rebuild plan generated. No files were changed.";
+  if (value.action === "github-knowledge-radar") return value.radar ? `Registry status: ${value.radar.status}; ${value.radar.candidates} registered candidates.` : "Knowledge Radar status loaded.";
+  if (value.blockedReason) return value.blockedReason;
+  if (value.error) return value.error;
+  if (value.artifactPath) return `Draft artifact: ${value.artifactPath}`;
+  if (value.records != null) return `Agent registry rebuilt with ${value.records} records.`;
+  if (value.backupBranch) return `Backup branch: ${value.backupBranch}`;
+  if (value.schema === "pritha-github-update-check-v1" || value.github) {
+    const github = githubFromMaintenanceResult(value);
+    if (github) {
+      return `${github.status.replace(/_/g, " ")} on ${github.branch}; behind ${github.behind}, ahead ${github.ahead}. ${githubBlockingSummary(github)}`.trim();
+    }
+  }
+  if (value.plannedQueries?.length) return `Prepared ${value.plannedQueries.length} GitHub query candidates. Online search is disabled in the UI safety mode.`;
+  if (typeof value.candidates === "number") return `Registered candidates: ${value.candidates}.`;
+  if (Array.isArray(value.candidates)) return `Search candidates: ${value.candidates.length}.`;
+  return maintenanceResultText(value);
+}
+
+function compactMaintenanceCheckDetail(check: MaintenanceCheck) {
+  if (check.id === "tracked-working-tree-clean") {
+    const lines = check.detail.split(/\r?\n/).filter(Boolean);
+    if (lines.length > 1) return `${lines.length} tracked files have local edits.`;
+    if (check.detail.length > 90) return "Tracked working tree has local edits.";
+  }
+  if (check.detail.length > 180) return `${check.detail.slice(0, 177)}...`;
+  return check.detail;
+}
+
+function MaintenanceFeedbackPanel({ result, busyAction }: { result?: MaintenanceStatus | null; busyAction?: string | null }) {
+  if (!result && !busyAction) return null;
+  const tone = maintenanceResultTone(result, busyAction);
+  const checks = failedMaintenanceChecks(result);
+  return (
+    <div className={`maintenance-feedback ${tone}`} role="status" aria-live="polite">
+      <div>
+        <strong>{maintenanceResultTitle(result, busyAction)}</strong>
+        <span>{busyAction ? "Waiting for backend response..." : maintenanceResultDetail(result)}</span>
+      </div>
+      {!busyAction && (checks.length || result?.plannedQueries?.length || result?.steps?.length || result?.localStatus || result?.api?.stderr) ? (
+        <details>
+          <summary>Details</summary>
+          {checks.length ? (
+            <ul>
+              {checks.slice(0, 8).map((check) => (
+                <li key={`${check.id}-${check.detail}`}>
+                  <code>{GITHUB_BLOCKING_LABELS[check.id] || check.id}</code>: {compactMaintenanceCheckDetail(check)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {result?.plannedQueries?.length ? (
+            <ul>
+              {result.plannedQueries.map((query) => (
+                <li key={query}>{query}</li>
+              ))}
+            </ul>
+          ) : null}
+          {result?.steps?.length ? (
+            <ol>
+              {result.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          ) : null}
+          {result?.api?.stderr ? <code>{result.api.stderr}</code> : null}
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+type MaintenanceFeedbackGroup = "github" | "rebuild" | "agents" | "self" | "radar";
+
+function maintenanceFeedbackGroup(action?: string | null): MaintenanceFeedbackGroup | null {
+  if (!action) return null;
+  if (action === "github-check" || action === "github-update" || action === "github-update-plan") return "github";
+  if (action === "rebuild-from-github") return "rebuild";
+  if (action === "refresh-agents") return "agents";
+  if (action === "refresh-self-knowledge") return "self";
+  if (action === "github-knowledge-radar" || action === "github-knowledge-radar-search") return "radar";
+  return null;
+}
+
+function MaintenanceGroupFeedback({
+  group,
+  result,
+  busyAction,
+}: {
+  group: MaintenanceFeedbackGroup;
+  result?: MaintenanceStatus | null;
+  busyAction?: string | null;
+}) {
+  const busyMatches = maintenanceFeedbackGroup(busyAction) === group;
+  const resultMatches = !busyAction && maintenanceFeedbackGroup(result?.action) === group;
+  if (!busyMatches && !resultMatches) return null;
+  return <MaintenanceFeedbackPanel result={resultMatches ? result : null} busyAction={busyMatches ? busyAction : null} />;
+}
+
+function MaintenanceSettingsSection() {
+  const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
+  const [lastResult, setLastResult] = useState<MaintenanceStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  const loadMaintenance = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/maintenance", { cache: "no-store" });
+      const payload = (await response.json()) as MaintenanceStatus;
+      setMaintenance(payload);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMaintenance();
+  }, [loadMaintenance]);
+
+  const runAction = useCallback(
+    async (action: string) => {
+      if (action === "github-update") {
+        const accepted = window.confirm("Apply a fast-forward GitHub update to local Pritha now?");
+        if (!accepted) return;
+      }
+      setBusyAction(action);
+      try {
+        setLastResult(null);
+        const response = await fetch(`/api/maintenance/${action}`, { method: "POST" });
+        const payload = (await response.json()) as MaintenanceStatus;
+        if (!payload.action) payload.action = action;
+        setLastResult(payload);
+        await loadMaintenance();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [loadMaintenance],
+  );
+
+  const github = maintenance?.github;
+  const radar = maintenance?.radar;
+  const cronMode = maintenance?.cronAdapter?.mode || "manual_only";
+  const busy = Boolean(busyAction);
+  const canUpdate = Boolean(github?.safeToUpdate) && !busy;
+
+  return (
+    <section className="settings-section">
+      <div className="settings-section-row">
+        <SectionHeader icon={<TimerReset size={22} />} title="Maintenance" subtitle="Manual operations and cron placeholders" />
+        <span className="inline-status orange">{cronMode.replace(/_/g, " ")}</span>
+      </div>
+      <MaintenanceGroupFeedback group="github" result={lastResult} busyAction={busyAction} />
+      <div className="settings-rowline">
+        <div>
+          <strong>Local GitHub update</strong>
+          <span>
+            {maintenanceStatusLabel(maintenance)}
+            {github ? ` on ${github.branch}; behind ${github.behind}, ahead ${github.ahead}.` : "."}
+            {github ? ` ${githubBlockingSummary(github)}` : ""}
+          </span>
+        </div>
+        <div className="settings-inline-fields">
+          <button className="outline-button" type="button" onClick={() => void runAction("github-check")} disabled={busy}>
+            <Play size={16} />
+            {busyAction === "github-check" ? "Checking" : "Check"}
+          </button>
+          <button className="outline-button" type="button" onClick={() => void runAction("github-update")} disabled={!canUpdate} title={canUpdate ? "Fast-forward update is available" : "Update requires clean main with safe fast-forward"}>
+            <ExternalLink size={16} />
+            {busyAction === "github-update" ? "Updating" : "Update"}
+          </button>
+        </div>
+      </div>
+      <MaintenanceGroupFeedback group="rebuild" result={lastResult} busyAction={busyAction} />
+      <div className="settings-rowline">
+        <div>
+          <strong>Rebuild from GitHub</strong>
+          <span>Plan-only safety gate for a broken local checkout.</span>
+        </div>
+        <button className="outline-button" type="button" onClick={() => void runAction("rebuild-from-github")} disabled={busy}>
+          <ShieldCheck size={16} />
+          {busyAction === "rebuild-from-github" ? "Building" : "Build Plan"}
+        </button>
+      </div>
+      <MaintenanceGroupFeedback group="agents" result={lastResult} busyAction={busyAction} />
+      <div className="settings-rowline">
+        <div>
+          <strong>Child agents</strong>
+          <span>Refresh Pritha's registry from sibling agent folders.</span>
+        </div>
+        <button className="outline-button" type="button" onClick={() => void runAction("refresh-agents")} disabled={busy}>
+          <Database size={16} />
+          {busyAction === "refresh-agents" ? "Refreshing" : "Refresh"}
+        </button>
+      </div>
+      <MaintenanceGroupFeedback group="self" result={lastResult} busyAction={busyAction} />
+      <div className="settings-rowline">
+        <div>
+          <strong>Self knowledge</strong>
+          <span>Create a draft self-knowledge refresh artifact.</span>
+        </div>
+        <button className="outline-button" type="button" onClick={() => void runAction("refresh-self-knowledge")} disabled={busy}>
+          <CheckCircle2 size={16} />
+          {busyAction === "refresh-self-knowledge" ? "Refreshing" : "Refresh"}
+        </button>
+      </div>
+      <MaintenanceGroupFeedback group="radar" result={lastResult} busyAction={busyAction} />
+      <div className="settings-rowline">
+        <div>
+          <strong>GitHub Knowledge Radar</strong>
+          <span>
+            {radar?.status || "unknown"}
+            {radar ? `; ${radar.candidates} registered candidates.` : "."}
+          </span>
+        </div>
+        <div className="settings-inline-fields">
+          <button className="outline-button" type="button" onClick={() => void runAction("github-knowledge-radar")} disabled={busy}>
+            <Info size={16} />
+            {busyAction === "github-knowledge-radar" ? "Loading" : "Status"}
+          </button>
+          <button className="outline-button" type="button" onClick={() => void runAction("github-knowledge-radar-search")} disabled={busy}>
+            <Globe2 size={16} />
+            {busyAction === "github-knowledge-radar-search" ? "Searching" : "Search"}
+          </button>
+        </div>
+      </div>
+      <div className="settings-rowline">
+        <div>
+          <strong>Scheduled execution</strong>
+          <span>Cron adapter is disabled until a separate operations decision enables it.</span>
+        </div>
+        <div className="settings-inline-fields">
+          <label className="settings-status-chip unknown">
+            <input type="checkbox" disabled />
+            Cron off
+          </label>
+          <select disabled aria-label="Maintenance interval">
+            <option>Weekly</option>
+          </select>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ProactivityCard({ status }: { status?: ControlCenterStatus }) {
   const proactivity = status?.proactivity;
   const statusLabel = proactivity ? statusText(proactivity.status) : "unknown";
@@ -686,6 +1096,9 @@ function SettingsContent({ prefix, access, status }: AccessProps & { prefix: str
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="limits">
         <LimitsSettingsSection />
+      </SettingsAnchorSection>
+      <SettingsAnchorSection prefix={prefix} section="maintenance">
+        <MaintenanceSettingsSection />
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="proactivity">
         <ProactivitySettingsSection status={status} />
