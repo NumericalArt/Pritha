@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   BookOpen,
   Check,
@@ -10,6 +10,7 @@ import {
   Mic,
   MicOff,
   Paperclip,
+  Search,
   SendHorizontal,
   Square,
   X,
@@ -23,9 +24,13 @@ import {
   type CodexTaskThreadScope,
   type CodexTaskVoiceFeedback,
   type MicGainRuntimeState,
+  type PrithaRealtimeController,
   type PrithaRealtimeStatus,
   type RealtimePhase,
   type SessionMemoryPromotionState,
+  type VoiceIntakeClarificationMetadata,
+  type VoiceIntakeConfirmation,
+  type VoiceIntakeSubmitResult,
   type VoiceSessionEvent,
 } from "./usePrithaRealtime";
 
@@ -167,19 +172,82 @@ function VoiceVisualization({ phase, mobile = false }: { phase: RealtimePhase; m
 function ToolIcon({ tool }: { tool: string }) {
   const iconProps = { size: 20 };
   if (tool.includes("memory")) return <BookOpen {...iconProps} />;
+  if (tool.includes("intake")) return <Paperclip {...iconProps} />;
   if (tool.includes("codex")) return <Code2 {...iconProps} />;
+  if (tool.includes("search")) return <Search {...iconProps} />;
   return <Database {...iconProps} />;
 }
 
 function activeToolNames(status: PrithaRealtimeStatus | null) {
   return status?.tools?.length
     ? status.tools
-    : ["full_pritha_memory", "inspect_pritha_files", "inspect_codex_task", "recall_rolling_summary", "answer_codex_task", "run_codex_task"];
+    : ["full_pritha_memory", "inspect_pritha_files", "inspect_codex_task", "recall_rolling_summary", "answer_codex_task", "confirm_voice_intake", "web_search", "run_codex_task"];
+}
+
+type ActiveToolDetail = {
+  label: string;
+  summary: string;
+};
+
+const ACTIVE_TOOL_DETAILS: Record<string, ActiveToolDetail> = {
+  full_pritha_memory: {
+    label: "Full Pritha Memory",
+    summary: "Searches and reads curated Pritha knowledge: standards, decisions, workflows, child agents, and memory status.",
+  },
+  inspect_pritha_files: {
+    label: "Inspect Pritha Files",
+    summary: "Reads safe project files, folder trees, and text search results without changing the filesystem.",
+  },
+  inspect_codex_task: {
+    label: "Inspect Codex Task",
+    summary: "Checks Codex sidecar task status, progress, approvals, stale state, and failure details.",
+  },
+  recall_rolling_summary: {
+    label: "Rolling Summary",
+    summary: "Recalls the summary-only handoff from the current or previous voice session.",
+  },
+  answer_codex_task: {
+    label: "Answer Codex Task",
+    summary: "Sends your spoken answer back to a Codex task that is waiting for clarification.",
+  },
+  run_codex_task: {
+    label: "Run Codex Task",
+    summary: "Starts or queues deeper Codex work for implementation, research, review, or repo analysis.",
+  },
+  confirm_voice_intake: {
+    label: "Confirm Voice Intake",
+    summary: "Confirms, cancels, or clarifies pasted files and links before uploading them to Codex.",
+  },
+  web_search: {
+    label: "Web Search",
+    summary: "Searches the current public web through the local SearXNG backend and returns compact cited results.",
+  },
+};
+
+function activeToolDetail(tool: string): ActiveToolDetail {
+  return ACTIVE_TOOL_DETAILS[tool] ?? {
+    label: tool
+      .split("_")
+      .filter(Boolean)
+      .map((part) => `${part[0]?.toUpperCase() || ""}${part.slice(1)}`)
+      .join(" "),
+    summary: "Realtime tool exposed by the current Voice session.",
+  };
 }
 
 const CLIENT_INTAKE_MAX_FILES = 8;
 const CLIENT_INTAKE_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const CLIENT_INTAKE_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+
+type VoiceIntakeUiStatus =
+  | "idle"
+  | "starting_voice"
+  | "awaiting_instruction"
+  | "asking_more"
+  | "sending"
+  | "submitted"
+  | "cancelled"
+  | "failed";
 
 function fileSizeLabel(value: number) {
   if (value < 1024) return `${value} B`;
@@ -187,8 +255,25 @@ function fileSizeLabel(value: number) {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
+function intakeLinksFromText(value: string) {
+  return [...new Set(value.match(/https?:\/\/[^\s<>"')\]]+/g) || [])].slice(0, 20);
+}
+
 function textHasUrl(value: string) {
   return /https?:\/\/[^\s<>"')\]]+/i.test(value);
+}
+
+function voiceIntakeStatusLabel(status: VoiceIntakeUiStatus) {
+  return {
+    idle: "Ready",
+    starting_voice: "Starting voice...",
+    awaiting_instruction: "Waiting for instruction",
+    asking_more: "Clarifying",
+    sending: "Sending to Codex",
+    submitted: "Sent to Codex",
+    cancelled: "Cancelled",
+    failed: "Needs attention",
+  }[status];
 }
 
 function ContextCard({
@@ -207,6 +292,29 @@ function ContextCard({
   const tools = activeToolNames(status);
   const memoryReady = Boolean(status?.memory.sqlite && status.memory.sqlite_cli);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [openTool, setOpenTool] = useState<string | null>(null);
+  const toolPopoverId = useId();
+  const toolBlockRef = useRef<HTMLDivElement | null>(null);
+  const selectedTool = openTool ? activeToolDetail(openTool) : null;
+
+  useEffect(() => {
+    if (!openTool) return;
+
+    function onPointerDown(event: PointerEvent) {
+      if (!toolBlockRef.current?.contains(event.target as Node)) setOpenTool(null);
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpenTool(null);
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openTool]);
 
   return (
     <section className={mobile ? "mobile-info-card" : "side-card voice-context-card"}>
@@ -222,16 +330,37 @@ function ContextCard({
         </strong>
         <p>{memoryReady ? `${sessionEventCount} current-session events available to pin.` : "Pritha memory fallback is available."}</p>
       </div>
-      <div className="detail-block">
+      <div className="detail-block" ref={toolBlockRef}>
         <span className="muted-label">Active Tools</span>
         <div className={mobile ? "mobile-tool-row" : "tool-chip-row"}>
-          {tools.map((tool) => (
-            <span className={mobile ? "mobile-tool-chip" : "tool-chip"} key={tool} title={tool}>
-              <ToolIcon tool={tool} />
-            </span>
-          ))}
+          {tools.map((tool) => {
+            const detail = activeToolDetail(tool);
+            const open = openTool === tool;
+            return (
+              <button
+                className={`${mobile ? "mobile-tool-chip" : "tool-chip"} ${open ? "active" : ""}`}
+                type="button"
+                key={tool}
+                title={detail.label}
+                aria-label={`${detail.label}: ${detail.summary}`}
+                aria-expanded={open}
+                aria-controls={toolPopoverId}
+                aria-describedby={open ? toolPopoverId : undefined}
+                onClick={() => setOpenTool((current) => (current === tool ? null : tool))}
+              >
+                <ToolIcon tool={tool} />
+              </button>
+            );
+          })}
           <span className="tool-count">{tools.length} active</span>
         </div>
+        {selectedTool ? (
+          <div className="tool-summary-popover" id={toolPopoverId} role="tooltip">
+            <strong>{selectedTool.label}</strong>
+            <p>{selectedTool.summary}</p>
+            <code>{openTool}</code>
+          </div>
+        ) : null}
       </div>
       {confirmingReset ? (
         <div className="reset-confirmation">
@@ -644,22 +773,39 @@ function PasteCommandPanel({
   sendText,
   phase,
   sessionId,
+  voiceError,
+  beginVoiceIntakeClarification,
   onCodexTaskCreated,
 }: {
   sendText: (text: string) => boolean;
   phase: RealtimePhase;
   sessionId: string;
+  voiceError?: string | null;
+  beginVoiceIntakeClarification: PrithaRealtimeController["beginVoiceIntakeClarification"];
   onCodexTaskCreated: (taskId: string) => void;
 }) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [pendingIntake, setPendingIntake] = useState<{ id: string; status: VoiceIntakeUiStatus } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const sessionIdRef = useRef(sessionId);
   const canSend = phaseIsActive(phase);
   const routesToCodex = files.length > 0 || textHasUrl(text);
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-  const canSubmit = !busy && (routesToCodex ? Boolean(text.trim() || files.length) : canSend && Boolean(text.trim()));
+  const intakeLocked = Boolean(pendingIntake && !["cancelled", "failed"].includes(pendingIntake.status));
+  const canSubmit = !busy && !intakeLocked && (routesToCodex ? Boolean(text.trim() || files.length) : canSend && Boolean(text.trim()));
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!pendingIntake || pendingIntake.status === "failed" || phase !== "error") return;
+    setPendingIntake((current) => (current?.id === pendingIntake.id ? { ...current, status: "failed" } : current));
+    setNote(voiceError || "Voice Control could not start. The intake was not uploaded to Codex.");
+  }, [pendingIntake, pendingIntake?.id, pendingIntake?.status, phase, voiceError]);
 
   function addFiles(nextFiles: Iterable<File>) {
     setNote("");
@@ -688,40 +834,96 @@ function PasteCommandPanel({
     setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
-  async function submitCodexIntake() {
-    const form = new FormData();
-    form.set("text", text.trim());
-    form.set("session_id", sessionId);
-    for (const file of files) form.append("files", file, file.name);
-    const response = await fetch("/api/realtime/intake", { method: "POST", body: form });
-    const payload = (await response.json().catch(() => ({ ok: false, error: "intake returned non-json" }))) as {
-      ok?: boolean;
-      task_id?: string;
-      error?: string;
-      operator_note?: string;
-      max_file_label?: string;
-      max_total_label?: string;
+  async function submitConfirmedCodexIntake(params: {
+    intakeId: string;
+    intakeText: string;
+    intakeFiles: File[];
+    confirmation: VoiceIntakeConfirmation;
+  }): Promise<VoiceIntakeSubmitResult> {
+    setBusy(true);
+    try {
+      const form = new FormData();
+      const confirmedSessionId = sessionIdRef.current;
+      form.set("text", params.intakeText);
+      form.set("session_id", confirmedSessionId);
+      form.set("confirmation_intake_id", params.intakeId);
+      form.set("confirmation_session_id", confirmedSessionId);
+      form.set("confirmation_timestamp", new Date().toISOString());
+      form.set("confirmed_instruction", params.confirmation.operator_instruction || "");
+      form.set("confirmed_intent", params.confirmation.intent || "other");
+      form.set("original_text_role", params.confirmation.original_text_role || "unknown");
+      form.set("target_agent", params.confirmation.target_agent || "");
+      form.set("persistence", params.confirmation.persistence || "none");
+      form.set("confirmation_notes", params.confirmation.notes || "");
+      for (const file of params.intakeFiles) form.append("files", file, file.name);
+      const response = await fetch("/api/realtime/intake", { method: "POST", body: form });
+      const payload = (await response.json().catch(() => ({ ok: false, error: "intake returned non-json" }))) as VoiceIntakeSubmitResult & {
+        max_file_label?: string;
+        max_total_label?: string;
+      };
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Intake failed with status ${response.status}`);
+      }
+      if (payload.task_id) {
+        onCodexTaskCreated(payload.task_id);
+      }
+      setText("");
+      setFiles([]);
+      setNote(payload.operator_note || "Sent to Codex.");
+      setPendingIntake(null);
+      return payload;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startVoiceIntakeClarification() {
+    const intakeText = text.trim();
+    const intakeFiles = [...files];
+    const intakeId = `voice-intake-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
+    const links = intakeLinksFromText(intakeText);
+    const metadata: VoiceIntakeClarificationMetadata = {
+      intakeId,
+      textPreview: intakeText.replace(/\s+/g, " ").slice(0, 700),
+      textLength: intakeText.length,
+      links,
+      files: intakeFiles.map((file, index) => ({
+        id: `file-${index + 1}`,
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+      })),
+      totalBytes: intakeFiles.reduce((sum, file) => sum + file.size, 0),
     };
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || `Intake failed with status ${response.status}`);
-    }
-    if (payload.task_id) {
-      onCodexTaskCreated(payload.task_id);
-      if (canSend) sendText(`Codex intake task ${payload.task_id} created for the pasted files or links. Summarize its result when it completes.`);
-    }
-    setText("");
-    setFiles([]);
-    setNote(payload.operator_note || "Sent to Codex.");
+
+    setPendingIntake({ id: intakeId, status: "starting_voice" });
+    setNote("Starting Voice Control to clarify this intake before Codex.");
+    const started = beginVoiceIntakeClarification(metadata, {
+      status: (status) => {
+        setPendingIntake((current) => (current?.id === intakeId ? { ...current, status } : current));
+        if (status === "awaiting_instruction") setNote("Pritha is waiting for your voice instruction before uploading to Codex.");
+        if (status === "sending") setNote("Confirmed. Sending intake to Codex.");
+        if (status === "failed") setNote("Could not send intake to Codex.");
+      },
+      askMore: () => {
+        setPendingIntake((current) => (current?.id === intakeId ? { ...current, status: "asking_more" } : current));
+        setNote("Pritha is asking for one more clarification.");
+      },
+      cancel: () => {
+        setPendingIntake({ id: intakeId, status: "cancelled" });
+        setNote("Intake cancelled. Nothing was uploaded to Codex.");
+      },
+      submit: async (confirmation) => submitConfirmedCodexIntake({ intakeId, intakeText, intakeFiles, confirmation }),
+    });
+    if (started.status === "awaiting_instruction") setNote("Pritha is waiting for your voice instruction before uploading to Codex.");
+    if (started.status === "waiting_for_realtime_channel") setNote("Waiting for Voice Control data channel before asking for instructions.");
   }
 
   function submit() {
     if (!canSubmit) return;
     setNote("");
     if (routesToCodex) {
-      setBusy(true);
-      void submitCodexIntake()
-        .catch((error) => setNote(error instanceof Error ? error.message : "Could not send intake to Codex."))
-        .finally(() => setBusy(false));
+      startVoiceIntakeClarification();
       return;
     }
     const sent = sendText(text);
@@ -742,15 +944,17 @@ function PasteCommandPanel({
       <div className="card-title-row">
         <h2>Paste Command</h2>
         <span className={`inline-status ${routesToCodex ? "blue" : canSend ? "green" : ""}`}>
-          {busy ? "Sending" : routesToCodex ? "Codex" : canSend ? "Live" : "Start voice"}
+          {busy ? "Sending" : pendingIntake ? voiceIntakeStatusLabel(pendingIntake.status) : routesToCodex ? "Voice gate" : canSend ? "Live" : "Start voice"}
         </span>
       </div>
       <div className="command-input-row large">
         <textarea
           value={text}
           placeholder="Paste a command, link, screenshot, file, or context."
+          disabled={busy || intakeLocked}
           onChange={(event) => setText(event.target.value)}
           onPaste={(event) => {
+            if (busy || intakeLocked) return;
             const pastedFiles = Array.from(event.clipboardData.files || []);
             if (pastedFiles.length) addFiles(pastedFiles);
           }}
@@ -759,7 +963,7 @@ function PasteCommandPanel({
           }}
         />
         <div className="command-button-stack">
-          <button type="button" aria-label="Attach files" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+          <button type="button" aria-label="Attach files" onClick={() => fileInputRef.current?.click()} disabled={busy || intakeLocked}>
             <Paperclip size={20} />
           </button>
           <button type="button" aria-label="Send command" onClick={submit} disabled={!canSubmit}>
@@ -772,7 +976,7 @@ function PasteCommandPanel({
           multiple
           hidden
           onChange={(event) => {
-            if (event.currentTarget.files) addFiles(event.currentTarget.files);
+            if (!busy && !intakeLocked && event.currentTarget.files) addFiles(event.currentTarget.files);
             event.currentTarget.value = "";
           }}
         />
@@ -783,12 +987,22 @@ function PasteCommandPanel({
             <div key={`${file.name}-${file.size}-${index}`} className="command-file-chip">
               <span>{file.name}</span>
               <small>{fileSizeLabel(file.size)}</small>
-              <button type="button" aria-label={`Remove ${file.name}`} onClick={() => removeFile(index)} disabled={busy}>
+              <button type="button" aria-label={`Remove ${file.name}`} onClick={() => removeFile(index)} disabled={busy || intakeLocked}>
                 <X size={14} />
               </button>
             </div>
           ))}
           <span className="command-file-total">{fileSizeLabel(totalBytes)} total</span>
+        </div>
+      ) : null}
+      {pendingIntake ? (
+        <div className={`command-intake-status ${pendingIntake.status}`}>
+          <span>{voiceIntakeStatusLabel(pendingIntake.status)}</span>
+          {pendingIntake.status === "cancelled" || pendingIntake.status === "failed" ? (
+            <button type="button" onClick={() => setPendingIntake(null)}>
+              Clear
+            </button>
+          ) : null}
         </div>
       ) : null}
       {note ? <p className="command-intake-note">{note}</p> : null}
@@ -1095,6 +1309,8 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           sendText={realtime.sendTextMessage}
           phase={realtime.phase}
           sessionId={realtime.sessionId}
+          voiceError={realtime.error}
+          beginVoiceIntakeClarification={realtime.beginVoiceIntakeClarification}
           onCodexTaskCreated={handleCodexTaskCreated}
         />
         <TaskListCard
@@ -1141,6 +1357,8 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               sendText={realtime.sendTextMessage}
               phase={realtime.phase}
               sessionId={realtime.sessionId}
+              voiceError={realtime.error}
+              beginVoiceIntakeClarification={realtime.beginVoiceIntakeClarification}
               onCodexTaskCreated={handleCodexTaskCreated}
             />
           </main>

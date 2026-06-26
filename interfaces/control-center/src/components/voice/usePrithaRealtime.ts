@@ -235,6 +235,67 @@ type CodexTaskListPayload = {
   error?: string;
 };
 
+export type VoiceIntakeIntent =
+  | "summarize"
+  | "extract_facts"
+  | "memory_candidate"
+  | "agent_context"
+  | "transcribe"
+  | "research"
+  | "other";
+
+export type VoiceIntakeTextRole = "instruction" | "context" | "content_to_analyze" | "unknown";
+
+export type VoiceIntakePersistence = "none" | "candidate_only" | "write_if_relevant";
+
+export type VoiceIntakeFileMetadata = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+};
+
+export type VoiceIntakeClarificationMetadata = {
+  intakeId: string;
+  textPreview: string;
+  textLength: number;
+  links: string[];
+  files: VoiceIntakeFileMetadata[];
+  totalBytes: number;
+};
+
+export type VoiceIntakeConfirmation = {
+  intake_id?: string;
+  action: "submit" | "cancel" | "ask_more";
+  operator_instruction?: string;
+  intent?: VoiceIntakeIntent;
+  original_text_role?: VoiceIntakeTextRole;
+  target_agent?: string;
+  persistence?: VoiceIntakePersistence;
+  notes?: string;
+};
+
+export type VoiceIntakeSubmitResult = {
+  ok?: boolean;
+  task_id?: string;
+  status?: string;
+  mode?: string;
+  operator_note?: string;
+  result_path?: string;
+  status_path?: string;
+  approval?: CodexTaskApproval | null;
+  thread_scope?: CodexTaskThreadScope | null;
+  codex_app_thread_routing_mode?: string;
+  error?: string;
+};
+
+type VoiceIntakePendingHandlers = {
+  submit: (confirmation: VoiceIntakeConfirmation) => Promise<VoiceIntakeSubmitResult>;
+  cancel: (confirmation: VoiceIntakeConfirmation) => void;
+  askMore?: (confirmation: VoiceIntakeConfirmation) => void;
+  status?: (status: "starting_voice" | "awaiting_instruction" | "asking_more" | "sending" | "submitted" | "cancelled" | "failed") => void;
+};
+
 type SessionMemoryPromotionPayload = {
   ok: boolean;
   saved?: boolean;
@@ -254,6 +315,7 @@ const MAX_STICKY_CONTEXT_CHARS = 3_500;
 const ROLLING_SUMMARY_CLIENT_DEBOUNCE_MS = 12_000;
 const MIC_INPUT_LEVEL_STORAGE_KEY = "pritha.voice.inputLevel.v1";
 const LEGACY_MIC_GAIN_STORAGE_KEY = "pritha.voice.micGain.v1";
+const DEFAULT_MIC_INPUT_LEVEL = 100;
 
 function codexTaskCreatedMs(task: Pick<CodexTaskState, "createdAt" | "id">) {
   const created = Date.parse(task.createdAt);
@@ -301,6 +363,61 @@ function formatCodexProgressDetail(detail?: CodexTaskSnapshot["progress_detail"]
   return parts.join("; ");
 }
 
+function normalizeVoiceIntakeChoice<T extends string>(value: unknown, choices: readonly T[], fallback: T): T {
+  const text = String(value || "").trim();
+  return choices.includes(text as T) ? (text as T) : fallback;
+}
+
+function normalizeVoiceIntakeConfirmation(args: Record<string, unknown>): VoiceIntakeConfirmation {
+  return {
+    intake_id: stickyText(args.intake_id, 160),
+    action: normalizeVoiceIntakeChoice(args.action, ["submit", "cancel", "ask_more"] as const, "ask_more"),
+    operator_instruction: stickyText(args.operator_instruction, 3_000),
+    intent: normalizeVoiceIntakeChoice(
+      args.intent,
+      ["summarize", "extract_facts", "memory_candidate", "agent_context", "transcribe", "research", "other"] as const,
+      "other",
+    ),
+    original_text_role: normalizeVoiceIntakeChoice(
+      args.original_text_role,
+      ["instruction", "context", "content_to_analyze", "unknown"] as const,
+      "unknown",
+    ),
+    target_agent: stickyText(args.target_agent, 160),
+    persistence: normalizeVoiceIntakeChoice(args.persistence, ["none", "candidate_only", "write_if_relevant"] as const, "none"),
+    notes: stickyText(args.notes, 1_000),
+  };
+}
+
+function formatVoiceIntakeClarificationPrompt(metadata: VoiceIntakeClarificationMetadata) {
+  const files = metadata.files.length
+    ? metadata.files
+        .map((file) => `- ${file.id}: ${file.name} (${file.type || "unknown"}, ${Math.round(file.size / 1024)} KiB)`)
+        .join("\n")
+    : "- none";
+  const links = metadata.links.length ? metadata.links.map((url) => `- ${url}`).join("\n") : "- none";
+  const textPreview = metadata.textPreview || "(no pasted text)";
+  return [
+    "Voice Intake Clarification Pending",
+    "",
+    `intake_id: ${metadata.intakeId}`,
+    `pasted_text_chars: ${metadata.textLength}`,
+    `pasted_text_preview: ${textPreview}`,
+    "",
+    "Detected links:",
+    links,
+    "",
+    "Attached file metadata only; file bytes are still local in the browser and have not been uploaded to Codex:",
+    files,
+    "",
+    "Ask the operator in Russian what to do with this intake before Codex runs.",
+    "Offer concise options when useful: quick analysis for this conversation, extract important ideas as a Pritha memory candidate, prepare context for a specific child agent, transcribe/summarize video or audio, research/cite sources, or cancel.",
+    "Clarify whether pasted text is an instruction, context, or content to analyze when that is ambiguous.",
+    "Do not call run_codex_task for this intake. After the operator answers, call confirm_voice_intake with the same intake_id and action submit, cancel, or ask_more.",
+    "For submit, include operator_instruction, intent, original_text_role, target_agent when relevant, and persistence. Do not include secrets.",
+  ].join("\n");
+}
+
 type RollingSummaryPayload = {
   topicKey: string;
   task: string;
@@ -345,7 +462,7 @@ function stickyText(value: unknown, maxChars: number) {
 }
 
 function clampMicInputLevel(value: number) {
-  return Math.max(0, Math.min(Number.isFinite(value) ? value : 100, 100));
+  return Math.max(0, Math.min(Number.isFinite(value) ? value : DEFAULT_MIC_INPUT_LEVEL, 100));
 }
 
 function inputLevelToGain(inputLevel: number) {
@@ -355,12 +472,12 @@ function inputLevelToGain(inputLevel: number) {
 }
 
 function loadSavedMicInputLevel() {
-  if (typeof window === "undefined") return 100;
+  if (typeof window === "undefined") return DEFAULT_MIC_INPUT_LEVEL;
   const raw = window.localStorage.getItem(MIC_INPUT_LEVEL_STORAGE_KEY);
   if (raw !== null) return clampMicInputLevel(Number(raw));
   const legacyRaw = window.localStorage.getItem(LEGACY_MIC_GAIN_STORAGE_KEY);
   if (legacyRaw !== null) return clampMicInputLevel(Number(legacyRaw) * 100);
-  return 100;
+  return DEFAULT_MIC_INPUT_LEVEL;
 }
 
 function saveMicInputLevel(value: number) {
@@ -481,7 +598,7 @@ function rollingSummaryEventFromSnapshot(snapshot: CodexTaskSnapshot) {
 function usePrithaRealtimeController() {
   const [phase, setPhase] = useState<RealtimePhase>("idle");
   const [isMuted, setIsMuted] = useState(false);
-  const [micInputLevel, setMicInputLevelState] = useState(loadSavedMicInputLevel);
+  const [micInputLevel, setMicInputLevelState] = useState(DEFAULT_MIC_INPUT_LEVEL);
   const [micGainRuntime, setMicGainRuntime] = useState<MicGainRuntimeState>({
     available: true,
     active: false,
@@ -535,12 +652,23 @@ function usePrithaRealtimeController() {
   const rollingSummaryPendingRef = useRef<RollingSummaryPayload | null>(null);
   const lastRollingSummaryEventKeyRef = useRef("");
   const rollingSummarySessionActiveRef = useRef(false);
+  const pendingVoiceIntakeRef = useRef<{
+    metadata: VoiceIntakeClarificationMetadata;
+    handlers: VoiceIntakePendingHandlers;
+    promptSent: boolean;
+  } | null>(null);
   const unmountCleanupRef = useRef<{
     checkpointRollingSummaryNow?: (sourceEvent: string, options?: { keepalive?: boolean }) => unknown;
     flushRollingSummaryCheckpoint?: (reason?: string) => unknown;
     clearCodexTaskPolling?: () => void;
     closeConnection?: () => void;
   }>({});
+
+  useEffect(() => {
+    const savedLevel = loadSavedMicInputLevel();
+    micInputLevelRef.current = savedLevel;
+    setMicInputLevelState(savedLevel);
+  }, []);
 
   const logClientEvent = useCallback((kind: string, payload: Record<string, unknown> = {}) => {
     void fetch("/api/realtime/event", {
@@ -762,6 +890,41 @@ function usePrithaRealtimeController() {
     responseQueuedRef.current = false;
     requestResponse("queued");
   }, [requestResponse]);
+
+  const sendPendingVoiceIntakeClarification = useCallback(
+    (reason: string) => {
+      const pending = pendingVoiceIntakeRef.current;
+      const channel = eventsChannelRef.current;
+      if (!pending || pending.promptSent || !channel || channel.readyState !== "open") return false;
+
+      const prompt = formatVoiceIntakeClarificationPrompt(pending.metadata);
+      channel.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: prompt }],
+          },
+        }),
+      );
+      pending.promptSent = true;
+      pending.handlers.status?.("awaiting_instruction");
+      appendSessionEvent(
+        "system",
+        `Voice intake ${pending.metadata.intakeId} is waiting for spoken clarification before Codex upload.`,
+      );
+      logClientEvent("voice_intake_clarification_prompt_sent", {
+        intake_id: pending.metadata.intakeId,
+        file_count: pending.metadata.files.length,
+        link_count: pending.metadata.links.length,
+        reason,
+      });
+      requestResponse("voice_intake_clarification");
+      return true;
+    },
+    [appendSessionEvent, logClientEvent, requestResponse],
+  );
 
   const rememberToolCall = useCallback((item: RealtimeFunctionCallItem) => {
     if (!item.name || !item.call_id) return;
@@ -1479,6 +1642,93 @@ function usePrithaRealtimeController() {
     [applyCodexTaskSnapshot, clearCodexTaskPolling, logClientEvent, refreshCodexTask, requestResponse, sendCodexTaskApprovalHandoff, sendStickyContext, upsertCodexTask],
   );
 
+  const handleVoiceIntakeConfirmation = useCallback(
+    async (args: Record<string, unknown>) => {
+      const pending = pendingVoiceIntakeRef.current;
+      if (!pending) return { ok: false, error: "no_pending_voice_intake" };
+
+      const confirmation = normalizeVoiceIntakeConfirmation(args);
+      const confirmedIntakeId = confirmation.intake_id || pending.metadata.intakeId;
+      if (confirmedIntakeId !== pending.metadata.intakeId) {
+        return {
+          ok: false,
+          error: "voice_intake_id_mismatch",
+          expected_intake_id: pending.metadata.intakeId,
+          received_intake_id: confirmedIntakeId,
+        };
+      }
+      confirmation.intake_id = pending.metadata.intakeId;
+
+      if (confirmation.action === "cancel") {
+        pending.handlers.status?.("cancelled");
+        pending.handlers.cancel(confirmation);
+        pendingVoiceIntakeRef.current = null;
+        appendSessionEvent("system", `Voice intake ${confirmedIntakeId} cancelled before Codex upload.`);
+        logClientEvent("voice_intake_cancelled", { intake_id: confirmedIntakeId });
+        return { ok: true, intake_id: confirmedIntakeId, status: "cancelled" };
+      }
+
+      if (confirmation.action === "ask_more") {
+        pending.handlers.status?.("asking_more");
+        pending.handlers.askMore?.(confirmation);
+        logClientEvent("voice_intake_more_detail_requested", { intake_id: confirmedIntakeId });
+        return { ok: true, intake_id: confirmedIntakeId, status: "awaiting_more_instruction" };
+      }
+
+      if (!confirmation.operator_instruction?.trim()) {
+        return {
+          ok: false,
+          error: "operator_instruction_required",
+          intake_id: confirmedIntakeId,
+          message: "Ask the operator what Codex should do with the files or links, then call confirm_voice_intake again.",
+        };
+      }
+
+      pending.handlers.status?.("sending");
+      const output: VoiceIntakeSubmitResult = await pending.handlers.submit(confirmation).catch((error) => ({
+        ok: false,
+        error: error instanceof Error ? error.message : "voice_intake_submit_failed",
+      }));
+      if (!output.ok) {
+        pending.handlers.status?.("failed");
+        return output;
+      }
+
+      pending.handlers.status?.("submitted");
+      pendingVoiceIntakeRef.current = null;
+      const taskId = typeof output.task_id === "string" ? output.task_id : "";
+      if (taskId) {
+        const nextTask: Partial<CodexTaskState> & { id: string } = {
+          id: taskId,
+          title: `Voice intake ${confirmedIntakeId}`,
+          status: String(output.status || output.mode || "queued"),
+          summary: String(output.operator_note || "Voice intake sent to Codex after spoken clarification."),
+          progress: output.status === "running" ? 15 : 10,
+          phase: String(output.status || output.mode || "queued"),
+          lastActivity: "Voice intake sent to Codex after spoken clarification.",
+          operatorBrief: String(output.operator_note || ""),
+          resultPath: typeof output.result_path === "string" ? output.result_path : undefined,
+          statusPath: typeof output.status_path === "string" ? output.status_path : undefined,
+          handoffStatus: "pending",
+          approval: typeof output.approval === "object" && output.approval !== null ? output.approval : null,
+          threadScope: typeof output.thread_scope === "object" && output.thread_scope !== null ? output.thread_scope : null,
+          threadRoutingMode: typeof output.codex_app_thread_routing_mode === "string" ? output.codex_app_thread_routing_mode : undefined,
+        };
+        upsertCodexTask(nextTask);
+        startCodexTaskPolling(taskId);
+        queueRollingSummaryCheckpoint("voice_intake_submitted", { task: nextTask });
+      }
+
+      appendSessionEvent("task", `Voice intake ${confirmedIntakeId} submitted to Codex${taskId ? ` as ${taskId}` : ""}.`, {
+        taskId: taskId || undefined,
+        status: String(output.status || output.mode || "submitted"),
+      });
+      logClientEvent("voice_intake_confirmed_and_submitted", { intake_id: confirmedIntakeId, task_id: taskId });
+      return { ...output, intake_id: confirmedIntakeId };
+    },
+    [appendSessionEvent, logClientEvent, queueRollingSummaryCheckpoint, startCodexTaskPolling, upsertCodexTask],
+  );
+
   const runToolCall = useCallback(
     async (item: RealtimeFunctionCallItem) => {
       let args: Record<string, unknown> = {};
@@ -1491,6 +1741,12 @@ function usePrithaRealtimeController() {
       const label = `${item.name || "tool"}(${JSON.stringify(args).slice(0, 180)})`;
       addTranscript("tool", `Tool call: ${label}`);
       setToolStatus(`Running ${item.name || "tool"}...`);
+
+      if (item.name === "confirm_voice_intake") {
+        const output = await handleVoiceIntakeConfirmation(args);
+        setToolStatus(JSON.stringify(output, null, 2));
+        return output;
+      }
 
       const response = await fetch("/api/realtime/tool", {
         method: "POST",
@@ -1529,7 +1785,7 @@ function usePrithaRealtimeController() {
 
       return output;
     },
-    [addTranscript, queueRollingSummaryCheckpoint, startCodexTaskPolling, upsertCodexTask],
+    [addTranscript, handleVoiceIntakeConfirmation, queueRollingSummaryCheckpoint, startCodexTaskPolling, upsertCodexTask],
   );
 
   const processPendingToolCalls = useCallback(async () => {
@@ -1780,13 +2036,16 @@ function usePrithaRealtimeController() {
       channel.onopen = () => {
         rollingSummarySessionActiveRef.current = true;
         setPhase("listening");
-        setToolStatus("Realtime data channel connected. Tools: full_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task, run_codex_task.");
+        setToolStatus(
+          "Realtime data channel connected. Tools: full_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task, confirm_voice_intake, web_search, run_codex_task.",
+        );
         logClientEvent("realtime_data_channel_connected", {
           session_id: sessionIdRef.current,
           sticky_context_available: stickyContextEnabled,
           event_count: sessionEvents.length,
           task_count: codexTasks.length,
         });
+        sendPendingVoiceIntakeClarification("data_channel_open");
       };
       channel.onmessage = (event) => handleRealtimeEvent(String(event.data));
       channel.onclose = () => {
@@ -1817,7 +2076,39 @@ function usePrithaRealtimeController() {
       setError(message);
       addTranscript("tool", message);
     }
-  }, [addTranscript, checkpointRollingSummaryNow, closeConnection, codexTasks.length, handleRealtimeEvent, loadStatus, logClientEvent, phase, queueRollingSummaryCheckpoint, sessionEvents.length, stickyContextEnabled]);
+  }, [addTranscript, checkpointRollingSummaryNow, closeConnection, codexTasks.length, handleRealtimeEvent, loadStatus, logClientEvent, phase, queueRollingSummaryCheckpoint, sendPendingVoiceIntakeClarification, sessionEvents.length, stickyContextEnabled]);
+
+  const beginVoiceIntakeClarification = useCallback(
+    (metadata: VoiceIntakeClarificationMetadata, handlers: VoiceIntakePendingHandlers) => {
+      pendingVoiceIntakeRef.current = {
+        metadata,
+        handlers,
+        promptSent: false,
+      };
+      handlers.status?.(phase === "idle" || phase === "error" ? "starting_voice" : "awaiting_instruction");
+      appendSessionEvent(
+        "system",
+        `Voice intake ${metadata.intakeId} prepared for spoken clarification before Codex upload.`,
+      );
+      logClientEvent("voice_intake_clarification_started", {
+        intake_id: metadata.intakeId,
+        file_count: metadata.files.length,
+        link_count: metadata.links.length,
+        voice_phase: phase,
+      });
+
+      const sent = sendPendingVoiceIntakeClarification("begin_voice_intake");
+      if (!sent && (phase === "idle" || phase === "error")) {
+        void start();
+      }
+      return {
+        ok: true,
+        intake_id: metadata.intakeId,
+        status: sent ? "awaiting_instruction" : phase === "idle" || phase === "error" ? "starting_voice" : "waiting_for_realtime_channel",
+      };
+    },
+    [appendSessionEvent, logClientEvent, phase, sendPendingVoiceIntakeClarification, start],
+  );
 
   const stop = useCallback(() => {
     checkpointRollingSummaryNow("session_stopping", { keepalive: true });
@@ -2000,6 +2291,7 @@ function usePrithaRealtimeController() {
     refreshCodexTask,
     watchCodexTask: startCodexTaskPolling,
     start,
+    beginVoiceIntakeClarification,
     stop,
     toggleMute,
     setMicInputLevel,

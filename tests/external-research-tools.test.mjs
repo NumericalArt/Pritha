@@ -6,6 +6,8 @@ import path from "node:path";
 
 import {
   last30DaysConfig,
+  last30daysPayloadToVoiceBrief,
+  runRecentLast30DaysResearch,
   sanitizedLast30DaysEnv,
   statusForLast30Days,
 } from "../scripts/external-research-tools.mjs";
@@ -104,4 +106,56 @@ test("sanitized last30days env strips secrets and can disable host tool PATH", (
   assert.equal(env.LAST30DAYS_SKIP_PREFLIGHT, "1");
   assert.equal(env.FROM_BROWSER, "off");
   assert.equal(env.SETUP_COMPLETE, "true");
+});
+
+test("last30days payload becomes a bounded voice research brief", () => {
+  const brief = last30daysPayloadToVoiceBrief("Codex voice control", {
+    generated_at: "2026-06-25T12:00:00Z",
+    ranked_candidates: [
+      {
+        source: "hackernews",
+        title: "Codex voice control thread",
+        url: "https://news.ycombinator.com/item?id=1",
+        explanation: "Developers are discussing Codex voice task handoffs.",
+        final_score: 42,
+        source_items: [{ published_at: "2026-06-24" }],
+      },
+    ],
+    items_by_source: {
+      reddit: [
+        {
+          source: "reddit",
+          title: "Voice agents workflow",
+          url: "https://reddit.com/r/LocalLLaMA/example",
+          snippet: "A user describes using voice to route coding tasks.",
+          published_at: "2026-06-23",
+          relevance_hint: 0.7,
+        },
+      ],
+    },
+  }, {
+    searchSources: "reddit,hackernews,polymarket,grounding",
+    maxResults: 4,
+  });
+
+  assert.equal(brief.coverage.quality, "medium");
+  assert.deepEqual(brief.coverage.sources_used.sort(), ["hackernews", "reddit"]);
+  assert.ok(brief.coverage.missing_sources.includes("polymarket"));
+  assert.equal(brief.evidence_items.length, 2);
+  assert.match(brief.summary, /Найдено 2 релевантных сигналов/);
+  assert.ok(brief.key_findings.length >= 2);
+});
+
+test("recent last30days research rejects private or paid sources in default voice mode", () => {
+  const root = tempRoot();
+  writeLock(root);
+  const result = runRecentLast30DaysResearch({
+    root,
+    query: "Codex voice control",
+    searchSources: "reddit,youtube,x,perplexity",
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "unsupported_sources");
+  assert.deepEqual(result.rejected_sources, ["youtube", "x", "perplexity"]);
 });

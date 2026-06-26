@@ -20,6 +20,7 @@ test("bootstrap plan is machine-readable and non-mutating", () => {
   assert.ok(payload.steps.some((step) => step.id === "memory-embeddings-deferred"));
   assert.ok(payload.steps.some((step) => step.id === "env-doctor"));
   assert.ok(payload.steps.some((step) => step.id === "memory-stats"));
+  assert.equal(payload.steps.some((step) => step.id === "web-search-searxng-install"), false);
   assert.equal(payload.steps.some((step) => step.id === "control-center-npm-ci"), false);
   assert.equal(payload.steps.some((step) => step.startsForegroundProcess), false);
 });
@@ -33,6 +34,8 @@ test("bootstrap prepare builds local memory and semantic embeddings", () => {
   assert.ok(payload.steps.some((step) => step.id === "python-core"));
   assert.ok(payload.steps.some((step) => step.id === "memory-rebuild" && step.writes));
   assert.ok(payload.steps.some((step) => step.id === "memory-embeddings" && step.writes));
+  assert.ok(payload.steps.some((step) => step.id === "web-search-searxng-install" && step.writes));
+  assert.ok(payload.steps.some((step) => step.id === "web-search-searxng-status" && !step.writes));
   assert.ok(payload.steps.some((step) => step.id === "semantic-search-sanity" && !step.writes));
   assert.equal(payload.steps.some((step) => step.startsForegroundProcess), false);
 });
@@ -45,7 +48,10 @@ test("bootstrap start target pulls in Control Center install and foreground star
   assert.equal(payload.startTarget, "control-center");
   assert.ok(payload.steps.some((step) => step.id === "control-center-npm-ci"));
   assert.ok(payload.steps.some((step) => step.id === "control-center-typecheck"));
+  assert.ok(payload.steps.some((step) => step.id === "web-search-searxng-install"));
+  assert.ok(payload.steps.some((step) => step.id === "web-search-searxng-start" && step.writes));
   assert.ok(payload.steps.some((step) => step.id === "control-center-dev" && step.startsForegroundProcess));
+  assert.ok(payload.steps.some((step) => step.id === "control-center-dev" && step.timeoutMs === 0));
   assert.equal(payload.steps.some((step) => /launchd|cron/i.test(step.commandText || step.detail || "")), false);
 });
 
