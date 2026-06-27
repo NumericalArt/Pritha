@@ -1,31 +1,221 @@
 # Pritha
 
-**A universal, trainable agent for creating and evolving AI agents.**
+<p align="center">
+  <img src="docs/assets/pritha-logo.png" alt="Pritha logo" width="220">
+</p>
 
-Pritha is an open-source, Codex-native agent factory. It helps you turn a task
-description into a working child-agent project with instructions, memory
-boundaries, tool policy, tests, handoff notes and lifecycle reports.
+**A local-first, voice-first Control Center for creating, evolving, and operating AI child agents.**
 
-Pritha has two primary functions:
+Pritha is a Codex-native agent factory and operator console. It helps an
+operator turn a task, project, dataset, or workflow into a dedicated child-agent
+harness with clear instructions, memory boundaries, tool policies, tests,
+credentials, operations metadata, and lifecycle reports.
 
-1. Improve its own knowledge base, tools and agent-creation capabilities through
-   reviewed memory updates, standards, workflows, tests and harness changes.
-2. Create new child agents and improve existing child agents through contracts,
-   Pritha memory research, scaffold generation, git-based version control,
-   tests, reports and handoff.
+Pritha has two core jobs: create and improve child agents, and improve its own
+agent-building knowledge through reviewed memory updates, standards, workflows,
+tests, and harness changes.
 
-`Trainable` means curated, versioned, reviewable learning through Pritha memory
-and repository-local harness artifacts. It does not mean hidden autonomous
-self-modification, unreviewed skill installation, secret collection or
-background service activation.
+The goal is not to build one large general-purpose assistant that does
+everything. Pritha creates smaller, project-specific agents with their own
+harnesses, interfaces, memory rules, tools, safety gates, and operating
+procedures. This makes each agent easier to inspect, test, evolve, and trust.
 
-In other words: Pritha is a harness for an agent that builds the harness of a
-new agent. Its lineage model is intentionally genetic: Seeds become Descendants
-through inheritance, mutation and trial. A Claude Code version is coming as a
-future adapter; v0.1 remains Codex-native.
+## What Pritha Is
 
-> Existing `agents-mother` commands still work as compatibility aliases. New
-> public-facing commands should use `pritha`.
+Pritha is a local-first, Codex-native platform for building and operating AI
+child agents.
+
+It combines three layers:
+
+1. **Agent Factory** - a contract-driven workflow for designing, researching,
+   scaffolding, testing, handing off, and evolving child agents.
+2. **Control Center** - a local operator UI for monitoring agents, checking
+   readiness, managing credentials, reviewing lifecycle state, and preparing
+   operator-approved actions.
+3. **Voice Control** - a hands-free realtime interface that can search Pritha
+   memory, inspect project files, check Codex task status, process links and
+   files, and route deeper work to Codex App or Codex CLI.
+
+Pritha is designed for people who want more transparent and controllable agent
+systems than a single monolithic assistant can usually provide. Instead of
+giving one general agent unlimited context and broad tool access, Pritha helps
+create focused child agents with explicit contracts, minimal required modules,
+visible readiness checks, and narrow operational boundaries.
+
+Each child agent can be attached to a real project, data folder, workflow, or
+interface. Pritha tracks those agents through a registry and lifecycle reports,
+so the operator can understand what exists, what changed, what is ready, what
+is missing, and what requires approval.
+
+## Core Principles
+
+### 1. Child agents should be specific
+
+Pritha treats a child agent as a dedicated working system, not just a prompt. A
+child agent may include its own instructions, memory profile, interface
+adapters, tool manifests, skills policy, operations manifest, smoke tests, and
+handoff notes.
+
+Specialized agents are easier to evaluate because their mission, tools, inputs,
+outputs, and failure modes are narrower.
+
+### 2. Every serious agent starts with a contract
+
+Before a child agent is scaffolded, Pritha captures the mission, target user,
+core functions, runtime family, interface, deployment target, memory model, tool
+boundaries, secrets, readiness criteria, and operating rules in an
+`agent-contract`.
+
+The contract acts as a seed. The generated child agent becomes a descendant: it
+inherits base safety rules and harness patterns, then mutates only where the
+project needs it.
+
+### 3. Knowledge is curated, not dumped
+
+Pritha can accept links, text, files, transcripts, screenshots, and other input,
+but raw material should not directly become trusted memory.
+
+Useful material is reviewed, compared with existing knowledge, connected to
+standards or decisions, and promoted only when it improves future
+agent-building work. This keeps Pritha trainable without filling the memory
+base with duplicated or low-value information.
+
+### 4. Voice is an operator interface, not an unsafe shortcut
+
+Voice Control is designed for hands-free operation, but durable actions still
+pass through tool boundaries, task state, and approval gates.
+
+Voice can ask questions, search memory, inspect files, prepare Codex tasks,
+continue a task that is waiting for the operator, and send files or links into
+a gated intake flow. It should not silently install services, write secrets,
+deploy, delete, publish, or enable background processes.
+
+### 5. Local-first by default
+
+Pritha is designed to run locally. Long-running services, Tailscale access,
+launchd jobs, credentials, hosted model calls, and other external capabilities
+are optional and explicit.
+
+## Current Capabilities
+
+### Child-agent creation and evolution
+
+Pritha can create a child-agent contract, research relevant Pritha memory,
+scaffold a Git-ready project, run tests, generate lifecycle reports, and
+rebuild the lineage registry.
+
+Generated agents can include:
+
+- `AGENTS.md` or runtime-native instructions.
+- `README.md` and `.env.example`.
+- Interface, memory, tool, skills, and operations manifests.
+- Smoke and status scripts.
+- Optional adapter placeholders or generated adapters selected by the contract.
+- Handoff, operations, deployment, and post-creation reports.
+
+### Control Center
+
+Pritha Control Center is a local Next.js interface for operating Pritha and its
+child agents.
+
+It provides agent cards, version and lifecycle status, local or Tailscale URLs,
+credentials readiness, restore and rollback planning surfaces, runtime status,
+access settings, voice settings, music settings, maintenance actions, and
+capability diagnostics.
+
+### Voice Control
+
+The Voice Control surface uses a realtime model for low-latency conversation
+and a narrow set of server tools for real work.
+
+It can:
+
+- Search and read Pritha's curated memory.
+- Inspect safe project files.
+- Check Codex task status and progress.
+- Recall a summary-only rolling handoff from previous voice work.
+- Answer Codex clarification questions by voice.
+- Process pasted text, links, screenshots, PDFs, audio, and other files through
+  a confirmation gate.
+- Search the public web through a local SearXNG backend.
+- Route deeper research, review, implementation, and agent-creation work to
+  Codex.
+
+### Codex App and Codex CLI transport
+
+Pritha can route deeper tasks through Codex App or Codex CLI. The Control
+Center settings allow the operator to choose the primary transport, model,
+reasoning level, service tier, sandbox policy, network access, task timeout,
+prompt budget, planning mode, execution mode, and voice progress verbosity.
+
+### Private device access
+
+Pritha can expose the local Control Center to trusted devices through Tailscale
+Serve. The local app remains bound to localhost, while Tailscale provides a
+private HTTPS URL inside the tailnet. Public Funnel exposure is not enabled by
+default.
+
+### Visual and mobile-first interface work
+
+The Control Center includes a mobile-oriented Voice screen, 2D voice-wave UI,
+and a Three.js visual scene for realtime voice states. The interface is
+designed to pair well with Codex App while keeping the operator in control.
+
+## Knowledge and Self-Improvement
+
+Pritha maintains a local, reviewable knowledge base for agent-building work.
+
+Markdown artifacts are the source of truth. Rebuildable indexes provide search,
+relations, and semantic lookup. New information can enter Pritha through links,
+notes, files, voice intake, research reports, reviews, standards, decisions,
+and lifecycle evidence from child agents.
+
+The important rule is that Pritha improves through reviewable artifacts, not
+through hidden self-modification. It can learn from new agent-engineering
+patterns, open-source repositories, project reports, failed experiments, and
+successful child-agent implementations, but those lessons must be curated
+before they become reusable knowledge.
+
+## Example Use Cases
+
+- Build a project-specific research agent that watches a domain, reviews
+  sources, and reports only useful changes.
+- Attach a child agent to an existing codebase, dataset, or local workflow.
+- Create a voice-first workbench for media, links, screenshots, PDFs, notes,
+  and implementation tasks.
+- Give a team a shared agent architecture where each role or workflow has its
+  own constrained agent.
+- Create educational agents, such as an interactive homework agent that teaches
+  a student while testing understanding.
+- Use Pritha as an operator console for several local child agents, each with
+  its own readiness, credentials, memory, and lifecycle state.
+
+## Status
+
+Pritha is in active beta and user testing.
+
+The current implementation is local-first and Codex-native. It has been
+exercised on local Mac environments, with Tailscale-based access from trusted
+peer devices such as phones and laptops. Hosted model calls, Realtime voice,
+Tailscale Serve, Telegram adapters, GitHub publishing, launchd or service
+installation, and other mutating operations require credentials or explicit
+operator approval.
+
+The repository also includes several small generated child agents. They are
+useful as examples, test fixtures, and starting points for future development,
+but they should not be treated as polished production agents.
+
+## Roadmap
+
+Near-term development focuses on:
+
+- Simplifying the Pritha graphical UI.
+- Improving the knowledge base around 2D and 3D UI patterns for agent
+  interfaces.
+- Expanding the voice-first Control Center workflow.
+- Supporting additional coding-agent backends beyond Codex.
+- Exploring local-model and hybrid runtime placement for selected task classes.
+- Improving multi-user and team-oriented child-agent architectures.
 
 ## Quick Start
 
@@ -48,7 +238,7 @@ The prepare command installs deterministic local dependencies for the chosen
 profile, writes local non-secret setup state, rebuilds `.memory/techscope.sqlite`
 and semantic embeddings from tracked Markdown, and verifies semantic memory
 search. The optional Control Center start command runs in the foreground. It
-does not install launchd, cron, Tailscale, durable services or credentials.
+does not install launchd, cron, Tailscale, durable services, or credentials.
 
 Useful profile-specific commands:
 
@@ -62,7 +252,7 @@ npm run control-center:health
 ```
 
 `control-center:health` is read-only. When Control Center is running, it checks
-that the live `/voice`, `/agents` and `/settings` pages reference JavaScript
+that the live `/voice`, `/agents`, and `/settings` pages reference JavaScript
 chunks that are actually being served by the current Next.js process.
 
 ## Create Your First Child Agent
@@ -86,43 +276,6 @@ scaffold and test the descendant:
 node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md --output ../research-agent
 node scripts/pritha.mjs test ../research-agent
 ```
-
-## What Pritha Generates
-
-- `AGENTS.md` or runtime-native instructions.
-- `README.md` and `.env.example`.
-- Git-ready child-agent project structure.
-- Interface, memory, tools and operations manifests.
-- Smoke/status scripts.
-- Optional Telegram adapter when selected by the seed.
-- Handoff and lifecycle reports.
-
-## What Works After Clone
-
-Ready without secrets:
-
-- Bootstrap planning and minimal verification.
-- Markdown memory validation and portable memory snapshot checks.
-- Local contract creation, research, scaffold planning and project inspection.
-- Control Center local build/start after `npm ci` through bootstrap.
-
-Optional credentials or operator approval are still required for:
-
-- Hosted model API calls and Realtime voice.
-- Telegram or other messaging adapters.
-- GitHub publishing operations.
-- Tailscale private device access and Tailscale Serve.
-- Any launchd/service install or durable background process.
-
-## Core Concepts
-
-- **Seed**: the agent specification, technically an `agent-contract`.
-- **Descendant**: a generated child agent project.
-- **Lineage**: the lifecycle chain of contract, scaffold, tests, handoff, operations and reviews.
-- **Traits**: reusable capabilities and behavior patterns.
-- **Inheritance**: base safety, memory and tool policy.
-- **Mutation**: task-specific adaptation.
-- **Trial**: evaluation before handoff or release.
 
 ## Documentation
 
@@ -178,14 +331,14 @@ Do not commit secrets or runtime state:
 - `.logs/`
 - `.memory-private/`
 - `.private/`
-- local machine paths
-- Telegram tokens or user identifiers
+- Local machine paths.
+- Telegram tokens or user identifiers.
 
 Markdown artifacts are the source of truth. Generated memory indexes such as
-`.memory/techscope.sqlite`, SQL rebuild dumps and embeddings are local artifacts
-rebuilt by `node scripts/bootstrap.mjs prepare --profile local`; they should not
-accumulate binary history in Git. Private user memory belongs outside the
-tracked snapshot.
+`.memory/techscope.sqlite`, SQL rebuild dumps, and embeddings are local
+artifacts rebuilt by `node scripts/bootstrap.mjs prepare --profile local`; they
+should not accumulate binary history in Git. Private user memory belongs
+outside the tracked snapshot.
 
 ## License
 
