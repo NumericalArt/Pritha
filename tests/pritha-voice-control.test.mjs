@@ -42,6 +42,7 @@ test("Voice UI fallback tool list includes filesystem inspection", () => {
   assert.doesNotMatch(voicePageSource, new RegExp(`"${legacyDeepToolName}"`));
   assert.match(voicePageSource, /"inspect_pritha_files"/);
   assert.match(voicePageSource, /"recall_rolling_summary"/);
+  assert.match(voicePageSource, /"confirm_voice_intake"/);
 });
 
 test("Voice UI task cards stay stable and avoid duplicate approval placeholders", () => {
@@ -96,6 +97,7 @@ test("Voice intake sends files and links to bounded temporary Codex analysis", (
   assert.match(runtimeSource, /isVideoOrTranscriptUrl/);
   assert.match(runtimeSource, /scripts\/transcribe-media\.mjs/);
   assert.match(runtimeSource, /Do not store raw uploaded files or full transcripts in tracked memory/);
+  assert.match(runtimeSource, /confirmation,/);
 
   assert.match(voicePageSource, /const CLIENT_INTAKE_MAX_FILES = 8/);
   assert.match(voicePageSource, /const CLIENT_INTAKE_MAX_FILE_BYTES = 10 \* 1024 \* 1024/);
@@ -109,6 +111,35 @@ test("Voice intake sends files and links to bounded temporary Codex analysis", (
   assert.match(voiceRoadmapSource, /Direct Codex Analysis/);
   assert.match(voiceRoadmapSource, /Document Processor is intentionally not used/);
   assert.doesNotMatch(voiceRoadmapSource, /Evaluate the GitHub Document Processor project/);
+});
+
+test("Voice intake requires spoken clarification before Codex upload", () => {
+  assert.match(runtimeSource, /name:\s*"confirm_voice_intake"/);
+  assert.match(runtimeSource, /Voice Intake Clarification Pending/);
+  assert.match(runtimeSource, /do not call run_codex_task/i);
+  assert.match(runtimeSource, /voice_confirmation_required/);
+  assert.match(runtimeSource, /\(files\.length > 0 \|\| links\.length > 0\) && !confirmation\.instruction/);
+  assert.match(runtimeSource, /Confirmed voice instruction:/);
+  assert.match(runtimeSource, /Treat the confirmed voice instruction as the operator's trusted task intent/);
+  assert.match(runtimeSource, /write_if_relevant/);
+
+  assert.match(intakeRouteSource, /confirmed_instruction/);
+  assert.match(intakeRouteSource, /confirmation_intake_id/);
+  assert.match(intakeRouteSource, /voice_confirmation_required/);
+
+  assert.match(realtimeHookSource, /pendingVoiceIntakeRef/);
+  assert.match(realtimeHookSource, /formatVoiceIntakeClarificationPrompt/);
+  assert.match(realtimeHookSource, /item\.name === "confirm_voice_intake"/);
+  assert.match(realtimeHookSource, /beginVoiceIntakeClarification/);
+  assert.match(realtimeHookSource, /sendPendingVoiceIntakeClarification\("data_channel_open"\)/);
+  assert.match(realtimeHookSource, /Attached file metadata only; file bytes are still local in the browser/);
+
+  assert.match(voicePageSource, /startVoiceIntakeClarification/);
+  assert.match(voicePageSource, /beginVoiceIntakeClarification\(metadata/);
+  assert.match(voicePageSource, /if \(routesToCodex\) \{\s*startVoiceIntakeClarification\(\);\s*return;\s*\}/s);
+  assert.match(voicePageSource, /form\.set\("confirmed_instruction"/);
+  assert.match(voicePageSource, /disabled=\{busy \|\| intakeLocked\}/);
+  assert.match(voicePageSource, /Voice gate/);
 });
 
 test("Voice task details drawer fits mobile viewport", () => {

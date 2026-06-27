@@ -64,6 +64,33 @@ PRITHA_CONTROL_CENTER_HOST=127.0.0.1
 PRITHA_CONTROL_CENTER_PORT=3420
 ```
 
+## Optional Voice Music Control
+
+The `/voice` UI has one `Music` gate button. When it is off, the Realtime voice
+session uses the same tool surface and audio path as the normal Control Center.
+When it is on, the active or next Realtime session can use the `music_control`
+tool for generated background music commands.
+
+Music generation expects a separate local ACE-Step 1.5 API service:
+
+```sh
+git clone https://github.com/ACE-Step/ACE-Step-1.5.git
+cd ACE-Step-1.5
+uv sync
+uv run acestep-api
+```
+
+Default Control Center env:
+
+```sh
+ACE_STEP_BASE_URL=http://127.0.0.1:8001
+ACE_STEP_MODEL=acestep-v15-turbo
+ACE_STEP_AUDIO_FORMAT=mp3
+```
+
+Generated tracks are stored under Pritha's ignored private runtime directory,
+not in tracked Markdown memory.
+
 Do not commit real Tailscale URLs, tailnet names, device names, API keys,
 private transcripts or Codex task outputs.
 

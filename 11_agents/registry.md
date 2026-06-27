@@ -3,7 +3,7 @@ id: agents-mother-registry
 type: agent-registry
 status: active
 created: 2026-05-18
-updated: 2026-06-26
+updated: 2026-06-27
 topics:
   - agent-engineering
   - agent-factory
@@ -43,17 +43,17 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: unknown
-source_updated: 2026-06-26
-source_version: generated registry 2026-06-26
-retrieved: 2026-06-26
-verified: 2026-06-26
+source_updated: 2026-06-27
+source_version: generated registry 2026-06-27
+retrieved: 2026-06-27
+verified: 2026-06-27
 valid_for: current Pritha lifecycle
 temporal_status: current
 ---
 
 # Pritha Registry
 
-Date: 2026-06-26
+Date: 2026-06-27
 Status: active
 
 ## Summary
@@ -61,7 +61,7 @@ Status: active
 - Agents tracked: 8
 - Contracts: 8
 - Reports: 74
-- Research reports: 14
+- Research reports: 16
 
 ## Agents
 

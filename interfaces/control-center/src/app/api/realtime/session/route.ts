@@ -8,10 +8,16 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+type RealtimeSessionRequest = {
+  musicControlEnabled?: boolean;
+};
+
+export async function POST(request: Request) {
   try {
-    const session = await createEphemeralRealtimeSession();
-    const config = buildRealtimeSessionConfig();
+    const body = (await request.json().catch(() => ({}))) as RealtimeSessionRequest;
+    const options = { musicControlEnabled: body.musicControlEnabled === true };
+    const session = await createEphemeralRealtimeSession(options);
+    const config = buildRealtimeSessionConfig(options);
     return NextResponse.json({
       client_secret: session.client_secret,
       model: config.model,
