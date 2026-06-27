@@ -69,7 +69,30 @@ PRITHA_CONTROL_CENTER_PORT=3420
 The `/voice` UI has one `Music` gate button. When it is off, the Realtime voice
 session uses the same tool surface and audio path as the normal Control Center.
 When it is on, the active or next Realtime session can use the `music_control`
-tool for generated background music commands.
+tool for background music commands.
+
+The default source is selected in `/settings` -> `Music`:
+
+- `SomaFM` - default local/private radio provider. Control Center loads channel
+  metadata and playlist URLs only. It does not proxy, restream, record, cache or
+  retransmit audio.
+- `Local Folder` - saved audio files under Pritha's ignored private music
+  library folder. Supported files include mp3, m4a, aac, wav, flac, ogg and
+  opus, though iPhone playback is most reliable with mp3/m4a/aac.
+- `ACE-Step` - existing local generated-music provider.
+
+Default local env:
+
+```sh
+MUSIC_DEFAULT_SOURCE=somafm
+SOMAFM_ENABLED=true
+SOMAFM_DEFAULT_CHANNEL_ID=groovesalad
+MUSIC_LIBRARY_ROOT=
+```
+
+If this interface is turned into a public, commercial, game, streaming platform
+or embedded product, set `SOMAFM_ENABLED=false` until explicit SomaFM permission
+is obtained. Embedded/public use requires permission from SomaFM.
 
 Music generation expects a separate local ACE-Step 1.5 API service:
 

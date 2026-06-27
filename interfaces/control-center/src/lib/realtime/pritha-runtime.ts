@@ -2550,28 +2550,46 @@ function musicControlToolDefinition(): RealtimeToolDefinition {
     type: "function",
     name: "music_control",
     description:
-      "Control generated background music. Use only when the operator explicitly asks to play, stop, pause, resume, change style, change volume, or change music mode.",
+      "Control background music from the configured provider: SomaFM radio, local audio library, or ACE-Step generated music. Use only when the operator explicitly asks to play, stop, pause, resume, change source/station/style/track, change volume, or change music mode.",
     parameters: {
       type: "object",
       properties: {
         action: {
           type: "string",
-          enum: ["play", "stop", "pause", "resume", "set_style", "set_volume", "set_mode"],
+          enum: ["play", "start", "stop", "pause", "resume", "next", "previous", "set_source", "set_channel", "set_style", "set_volume", "set_mode", "repeat_all"],
+        },
+        source: {
+          type: "string",
+          enum: ["somafm", "library", "ace-step"],
+          description:
+            "Optional provider override. Omit to use the default source from Settings. somafm = SomaFM radio, library = local saved audio folder, ace-step = generated music.",
         },
         style: {
           type: "string",
-          description: "Concise requested music style, for example: organ ambient, calm piano, lofi, orchestral, dark ambient.",
+          description: "Concise requested ACE-Step music style, for example: organ ambient, calm piano, lofi, orchestral, dark ambient.",
+        },
+        channel_id: {
+          type: "string",
+          description: "Optional SomaFM channel id, for example groovesalad, dronezone, defcon, beatblender.",
+        },
+        query: {
+          type: "string",
+          description: "Optional natural-language search query for a SomaFM station or local library track.",
         },
         volume: {
           type: "number",
           minimum: 0,
-          maximum: 1,
-          description: "Normal music volume from 0 to 1. Automatic ducking still applies.",
+          maximum: 100,
+          description: "Music level percent from 0 to 100, where 100 is the maximum player level. Use 100 for maximum, 50 for half, and 0 for mute. Automatic ducking applies only to controllable local/generated music sources.",
         },
         mode: {
           type: "string",
           enum: ["off", "auto", "on"],
           description: "off = never play; auto = play during long Codex work only; on = keep playing until stopped.",
+        },
+        repeat: {
+          type: "boolean",
+          description: "For repeat_all. true enables local library repeat-all behavior, false disables it for this session.",
         },
       },
       required: ["action"],
@@ -2877,10 +2895,13 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
   const toolNames = buildPrithaRealtimeTools(options).map((tool) => tool.name);
   const musicInstructions = options.musicControlEnabled
     ? [
-        "Generated background music control is enabled for this session.",
-        "Use music_control only when the operator explicitly asks to start, stop, pause, resume, change style, change volume, or change music mode.",
+        "Background music control is enabled for this session. The default music source is configured in Settings and may be SomaFM radio, local library, or ACE-Step generation.",
+        "Use music_control only when the operator explicitly asks to start, stop, pause, resume, change source, station, local track, generated style, volume, repeat, or music mode.",
         "Do not call music_control for automatic ducking when you or the operator speak. The client app handles ducking locally.",
-        "For style requests, call music_control with action set_style and a concise style string. Examples: \"включи органную музыку\" -> {\"action\":\"set_style\",\"style\":\"organ ambient\"}; \"сделай музыку тише\" -> {\"action\":\"set_volume\",\"volume\":0.45}; \"играй музыку только когда работаешь\" -> {\"action\":\"set_mode\",\"mode\":\"auto\"}.",
+        "For SomaFM radio, use source somafm. Use set_channel with channel_id when the operator names a known SomaFM id, or query when they describe a station or genre.",
+        "For local saved audio files, use source library. Use next, previous, pause, resume, repeat_all, or query for a local track search.",
+        "For generated music, use source ace-step or action set_style with a concise style string. This may start ACE-Step generation and can take time.",
+        "Volume uses 0..100 percent: 0 is silent/minimum, 50 is medium, and 100 is the maximum player level. If the operator says minimum, minimal, zero, mute music, or 'на минимум', use volume 0, not 5. Examples: \"включи радио SomaFM Groove Salad\" -> {\"action\":\"set_channel\",\"source\":\"somafm\",\"channel_id\":\"groovesalad\"}; \"следующий трек\" -> {\"action\":\"next\",\"source\":\"library\"}; \"включи органную музыку\" -> {\"action\":\"set_style\",\"source\":\"ace-step\",\"style\":\"organ ambient\"}; \"сделай музыку тише\" -> {\"action\":\"set_volume\",\"volume\":35}; \"сделай музыку на минимум\" -> {\"action\":\"set_volume\",\"volume\":0}; \"сделай музыку громче\" -> {\"action\":\"set_volume\",\"volume\":80}; \"максимальная громкость музыки\" -> {\"action\":\"set_volume\",\"volume\":100}; \"играй музыку только когда работаешь\" -> {\"action\":\"set_mode\",\"mode\":\"auto\"}.",
       ]
     : [];
   return [

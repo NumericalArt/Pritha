@@ -28,6 +28,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { CodexAuthSection } from "@/components/settings/CodexAuthSection";
 import { CodexSettingsSection } from "@/components/settings/CodexSettingsSection";
 import { LimitsSettingsSection } from "@/components/settings/LimitsSettingsSection";
+import { MusicSettingsSection } from "@/components/settings/MusicSettingsSection";
 import { OpenAIKeysSection } from "@/components/settings/OpenAIKeysSection";
 import { LanguageDropdown } from "@/components/primitives/LanguageDropdown";
 import { VoiceSettingsSection } from "@/components/settings/VoiceSettingsSection";
@@ -177,13 +178,14 @@ type MaintenanceStatus = {
   };
 };
 
-type SettingsSectionId = "general" | "access" | "codex" | "voice" | "limits" | "maintenance" | "proactivity";
+type SettingsSectionId = "general" | "access" | "codex" | "voice" | "music" | "limits" | "maintenance" | "proactivity";
 
 const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: "general", label: "General" },
   { id: "access", label: "Access" },
   { id: "codex", label: "Codex" },
   { id: "voice", label: "Voice" },
+  { id: "music", label: "Music" },
   { id: "limits", label: "Limits" },
   { id: "maintenance", label: "Maintenance" },
   { id: "proactivity", label: "Proactivity" },
@@ -1093,6 +1095,9 @@ function SettingsContent({ prefix, access, status }: AccessProps & { prefix: str
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="voice">
         <VoiceSettingsSection />
+      </SettingsAnchorSection>
+      <SettingsAnchorSection prefix={prefix} section="music">
+        <MusicSettingsSection />
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="limits">
         <LimitsSettingsSection />

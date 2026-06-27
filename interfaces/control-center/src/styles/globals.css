@@ -2459,6 +2459,10 @@ button[aria-disabled="true"] {
   accent-color: var(--accent-purple-2);
 }
 
+.music-level-control input {
+  accent-color: var(--accent-green);
+}
+
 .mic-gain-control strong {
   color: var(--text-primary);
   text-align: right;
@@ -3683,6 +3687,13 @@ button[aria-disabled="true"] {
   margin-top: 16px;
 }
 
+.music-source-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
 .access-option {
   position: relative;
   min-height: 154px;
@@ -3698,6 +3709,58 @@ button[aria-disabled="true"] {
   cursor: pointer;
   text-decoration: none;
   font: inherit;
+}
+
+.music-source-option {
+  position: relative;
+  min-height: 146px;
+  border-radius: 10px;
+  padding: 18px 14px;
+  text-align: center;
+  background: var(--surface-control-soft);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 10px;
+  cursor: pointer;
+  text-decoration: none;
+  font: inherit;
+}
+
+.music-source-option:disabled {
+  cursor: default;
+  opacity: 0.68;
+}
+
+.music-source-option strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.music-source-option small {
+  min-height: 18px;
+  color: var(--accent-purple-2);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.music-source-option span:not(.ready-check) {
+  max-width: 100%;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.music-source-option svg {
+  color: var(--accent-purple-2);
+}
+
+.music-source-option.selected {
+  border-color: var(--purple-border);
+  background: var(--surface-selected);
 }
 
 .access-option:disabled {
@@ -5432,6 +5495,10 @@ button:active,
     overflow-x: hidden;
   }
 
+  .mobile-voice-screen {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  }
+
   .mobile-settings-screen {
     padding-bottom: calc(120px + env(safe-area-inset-bottom));
   }
@@ -5521,7 +5588,7 @@ button:active,
   }
 
   .mobile-voice-visual {
-    height: 236px;
+    height: 172px;
     display: grid;
     place-items: center;
     position: relative;
@@ -5534,10 +5601,10 @@ button:active,
   }
 
   .mobile-pritha-star-scene {
-    width: min(208px, 72vw);
-    height: min(208px, 72vw);
-    min-width: min(208px, 72vw);
-    min-height: min(208px, 72vw);
+    width: min(168px, 64vw);
+    height: min(168px, 64vw);
+    min-width: min(168px, 64vw);
+    min-height: min(168px, 64vw);
   }
 
   .mobile-voice-timer {
@@ -5557,22 +5624,22 @@ button:active,
 
   .mobile-voice-primary {
     width: 100%;
-    min-height: 58px;
-    margin-top: 22px;
+    min-height: 52px;
+    margin-top: 16px;
     border-radius: 8px;
     font-size: 17px;
     font-weight: 650;
   }
 
   .mobile-voice-secondary-row {
-    margin-top: 12px;
+    margin-top: 10px;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
   .mobile-voice-secondary {
-    min-height: 62px;
+    min-height: 56px;
     border-radius: 8px;
   }
 
@@ -5583,10 +5650,11 @@ button:active,
 
   .mobile-voice-card .mic-gain-control {
     width: 100%;
-    min-height: 76px;
+    min-height: 58px;
     grid-template-columns: minmax(0, 1fr) max-content;
     justify-items: stretch;
-    margin-top: 14px;
+    margin-top: 10px;
+    row-gap: 6px;
   }
 
   .mobile-voice-card .mic-gain-control > span {
@@ -5703,6 +5771,10 @@ button:active,
   .settings-number-input {
     width: 100%;
     min-width: 0;
+  }
+
+  .music-source-grid {
+    grid-template-columns: 1fr;
   }
 
   .settings-secret-form,

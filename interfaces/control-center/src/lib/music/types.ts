@@ -1,5 +1,22 @@
 export type MusicMode = "off" | "auto" | "on";
 
+export type MusicSource = "somafm" | "library" | "ace-step";
+
+export type MusicSourceSettings = {
+  schema: "pritha-music-settings-v1";
+  defaultSource: MusicSource;
+  somafm: {
+    defaultChannelId: string;
+  };
+  library: {
+    repeatMode: "off" | "all";
+  };
+  aceStep: {
+    defaultStyle: string;
+  };
+  updatedAt: string;
+};
+
 export type MusicGenerationStatus = "queued" | "generating" | "complete" | "failed";
 
 export type AceStepGenerateRequest = {
@@ -68,5 +85,75 @@ export type MusicStateResponse = {
   generation?: MusicGenerationJob | null;
   latestTrack?: PublicGeneratedTrack | null;
   activeJobs: MusicGenerationJob[];
+  error?: string;
+};
+
+export type SomaFmPlaylistFormat = "mp3" | "aac" | "aacp";
+export type SomaFmPlaylistQuality = "low" | "high" | "highest";
+
+export type PreferredPlaylistOptions = {
+  format?: SomaFmPlaylistFormat;
+  quality?: SomaFmPlaylistQuality;
+};
+
+export type SomaFmPlaylist = {
+  url: string;
+  format: SomaFmPlaylistFormat;
+  quality: SomaFmPlaylistQuality;
+};
+
+export type SomaFmChannel = {
+  id: string;
+  title: string;
+  description: string;
+  genre: string;
+  image: string;
+  largeimage: string;
+  xlimage: string;
+  playlists: SomaFmPlaylist[];
+  listeners: number | null;
+  lastPlaying: string;
+  lastPlayingImage: string;
+  lastPlayingArtist: string;
+  lastPlayingAlbum: string;
+  lastPlayingTrack: string;
+  lastPlayingLabel: string;
+  lastPlayingCountry: string;
+  lastPlayingYear: string;
+};
+
+export type SomaFmChannelsResponse = {
+  ok: boolean;
+  channels: SomaFmChannel[];
+  stale: boolean;
+  updatedAt?: string;
+  error?: string;
+};
+
+export type SomaFmPlaybackResponse = {
+  ok: boolean;
+  channel?: SomaFmChannel;
+  playlist?: SomaFmPlaylist;
+  playbackUrl?: string;
+  candidateUrls?: string[];
+  source: "playlist" | "resolved";
+  error?: string;
+};
+
+export type LocalMusicTrack = {
+  id: string;
+  title: string;
+  fileName: string;
+  relativePath: string;
+  url: string;
+  audioFormat: string;
+  sizeBytes: number;
+  updatedAt: string;
+};
+
+export type LocalMusicLibraryResponse = {
+  ok: boolean;
+  tracks: LocalMusicTrack[];
+  root: string;
   error?: string;
 };

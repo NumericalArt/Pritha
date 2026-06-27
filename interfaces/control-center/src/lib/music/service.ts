@@ -1,11 +1,16 @@
 import { AceStepClient } from "./ace-step-client";
 import { GeneratedMusicCache, publicGeneratedTrack } from "./cache";
 import { getMusicRuntimeConfig } from "./config";
+import { LocalMusicLibraryProvider } from "./library/provider";
 import { MusicGenerationQueue } from "./queue";
-import type { AceStepGenerateRequest, MusicGenerateResponse, MusicStateResponse } from "./types";
+import { getMusicSourceSettings, updateMusicSourceSettings } from "./settings";
+import { SomaFmProvider } from "./somafm/provider";
+import type { AceStepGenerateRequest, MusicGenerateResponse, MusicSourceSettings, MusicStateResponse, PreferredPlaylistOptions } from "./types";
 
 const cache = new GeneratedMusicCache();
 const client = new AceStepClient();
+const somaFmProvider = new SomaFmProvider();
+const libraryProvider = new LocalMusicLibraryProvider();
 const queue = new MusicGenerationQueue(async (request) => {
   const remote = await client.generateTrack(request);
   return await cache.saveTrack(request, remote);
@@ -65,9 +70,59 @@ export async function getMusicHealth() {
       maxTracks: config.cacheMaxTracks,
       maxBytes: config.cacheMaxBytes,
     },
+    sources: {
+      default: (await getMusicSourceSettings()).defaultSource,
+      somafm: {
+        enabled: config.somaFmEnabled,
+        metadataTtlMs: config.somaFmMetadataTtlMs,
+      },
+      library: {
+        root: ".private/interface-lab/pritha-control-center/music/library",
+      },
+    },
   };
 }
 
 export async function getCachedMusicTrack(id: string) {
   return await cache.resolveTrackFile(id);
+}
+
+export async function getMusicSettings() {
+  return await getMusicSourceSettings();
+}
+
+export async function saveMusicSettings(patch: Partial<MusicSourceSettings>) {
+  return await updateMusicSourceSettings(patch);
+}
+
+export async function getSomaFmChannels(forceRefresh = false) {
+  const result = await somaFmProvider.getChannelsResult(forceRefresh);
+  return {
+    ok: !result.error || result.channels.length > 0,
+    channels: result.channels,
+    stale: result.stale,
+    updatedAt: result.updatedAt,
+    error: result.error,
+  };
+}
+
+export async function getSomaFmPlaybackUrl(channelId: string, options: PreferredPlaylistOptions & { resolvePlaylist?: boolean } = {}) {
+  return await somaFmProvider.getPlayback(channelId, options);
+}
+
+export async function getLocalMusicLibrary() {
+  const config = getMusicRuntimeConfig();
+  return {
+    ok: true,
+    tracks: await libraryProvider.listTracks(),
+    root: config.libraryRoot,
+  };
+}
+
+export async function getLocalMusicTrack(id: string) {
+  return await libraryProvider.resolveTrackFile(id);
+}
+
+export function localMusicContentType(format: string) {
+  return libraryProvider.contentType(format);
 }

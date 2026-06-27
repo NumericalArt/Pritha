@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/shell/PageHeader";
 import type { ControlCenterStatus } from "@/lib/control-center/types";
+import { MAX_MUSIC_LEVEL_PERCENT, musicPercentToUserVolume, musicSourceCapabilities, musicUserVolumeToPercent } from "@/lib/music/volume";
 import { PrithaStarScene } from "./PrithaStarScene";
 import {
   usePrithaRealtime,
@@ -1051,6 +1052,51 @@ function MicInputLevelControl({
   );
 }
 
+function MusicLevelControl({
+  value,
+  enabled,
+  source,
+  streamKind,
+  onChange,
+}: {
+  value: number;
+  enabled: boolean;
+  source: string;
+  streamKind?: string;
+  onChange: (value: number) => void;
+}) {
+  function updateValue(event: ChangeEvent<HTMLInputElement> | FormEvent<HTMLInputElement>) {
+    onChange(musicPercentToUserVolume(Number(event.currentTarget.value)));
+  }
+
+  const percent = musicUserVolumeToPercent(value);
+  const capabilities = musicSourceCapabilities(source);
+  const statusText = !enabled
+    ? "Saved for music"
+    : streamKind === "decoded-radio"
+      ? "Live radio level"
+      : capabilities.programmaticVolume
+        ? "Live source level"
+        : "External stream";
+
+  return (
+    <label className="mic-gain-control music-level-control">
+      <span>Music level</span>
+      <input
+        aria-label="Music level"
+        type="range"
+        min="0"
+        max={MAX_MUSIC_LEVEL_PERCENT}
+        step="1"
+        value={percent}
+        onChange={updateValue}
+      />
+      <strong>{percent}%</strong>
+      <small>{statusText}</small>
+    </label>
+  );
+}
+
 function ConnectionCard({
   status,
   phase,
@@ -1111,10 +1157,14 @@ function VoiceSessionPanel({
   micInputLevel,
   micGainRuntime,
   musicControlEnabled,
+  musicVolume,
+  musicSource,
+  musicStreamKind,
   error,
   onPrimary,
   onMute,
   onMusicToggle,
+  onMusicVolumeChange,
   onMicInputLevelChange,
   mobile = false,
 }: {
@@ -1125,10 +1175,14 @@ function VoiceSessionPanel({
   micInputLevel: number;
   micGainRuntime: MicGainRuntimeState;
   musicControlEnabled: boolean;
+  musicVolume: number;
+  musicSource: string;
+  musicStreamKind?: string;
   error: string | null;
   onPrimary: () => void;
   onMute: () => void;
   onMusicToggle: () => void;
+  onMusicVolumeChange: (value: number) => void;
   onMicInputLevelChange: (value: number) => void;
   mobile?: boolean;
 }) {
@@ -1139,7 +1193,7 @@ function VoiceSessionPanel({
   const muteDisabled = !active || phase === "connecting";
   const muteTitle = muteDisabled ? "Mute becomes available after Start Listening connects the microphone." : "Toggle microphone mute.";
   const musicTitle = active
-    ? "Enable or disable generated music control for this voice session."
+    ? "Enable or disable background music control for this voice session."
     : "Music control can be enabled before starting the voice session.";
   const gainActive = phase === "listening" || phase === "speaking" || phase === "working";
 
@@ -1177,6 +1231,13 @@ function VoiceSessionPanel({
           </button>
         </div>
         <MicInputLevelControl value={micInputLevel} active={gainActive} runtime={micGainRuntime} onChange={onMicInputLevelChange} />
+        <MusicLevelControl
+          value={musicVolume}
+          enabled={musicControlEnabled}
+          source={musicSource}
+          streamKind={musicStreamKind}
+          onChange={onMusicVolumeChange}
+        />
       </section>
     );
   }
@@ -1220,6 +1281,13 @@ function VoiceSessionPanel({
         </button>
       </div>
       <MicInputLevelControl value={micInputLevel} active={gainActive} runtime={micGainRuntime} onChange={onMicInputLevelChange} />
+      <MusicLevelControl
+        value={musicVolume}
+        enabled={musicControlEnabled}
+        source={musicSource}
+        streamKind={musicStreamKind}
+        onChange={onMusicVolumeChange}
+      />
     </section>
   );
 }
@@ -1326,10 +1394,14 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           micInputLevel={realtime.micInputLevel}
           micGainRuntime={realtime.micGainRuntime}
           musicControlEnabled={realtime.music.controlEnabled}
+          musicVolume={realtime.music.userVolume}
+          musicSource={realtime.music.currentItem?.source || realtime.music.source}
+          musicStreamKind={realtime.music.currentItem?.streamKind}
           error={realtime.error}
           onPrimary={primaryAction}
           onMute={realtime.toggleMute}
           onMusicToggle={realtime.toggleMusicControl}
+          onMusicVolumeChange={(value) => void realtime.music.setMusicVolume(value, "ui")}
           onMicInputLevelChange={realtime.setMicInputLevel}
           mobile
         />
@@ -1377,10 +1449,14 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               micInputLevel={realtime.micInputLevel}
               micGainRuntime={realtime.micGainRuntime}
               musicControlEnabled={realtime.music.controlEnabled}
+              musicVolume={realtime.music.userVolume}
+              musicSource={realtime.music.currentItem?.source || realtime.music.source}
+              musicStreamKind={realtime.music.currentItem?.streamKind}
               error={realtime.error}
               onPrimary={primaryAction}
               onMute={realtime.toggleMute}
               onMusicToggle={realtime.toggleMusicControl}
+              onMusicVolumeChange={(value) => void realtime.music.setMusicVolume(value, "ui")}
               onMicInputLevelChange={realtime.setMicInputLevel}
             />
             <PasteCommandPanel

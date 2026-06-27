@@ -6,6 +6,8 @@ export type MusicRuntimeConfig = {
   storageRoot: string;
   tracksRoot: string;
   indexPath: string;
+  settingsPath: string;
+  libraryRoot: string;
   aceStepBaseUrl: string;
   aceStepApiKey: string;
   aceStepModel: string;
@@ -18,6 +20,13 @@ export type MusicRuntimeConfig = {
   cacheMaxBytes: number;
   cacheMaxTracks: number;
   defaultStyle: string;
+  somaFmEnabled: boolean;
+  somaFmChannelsUrl: string;
+  somaFmFallbackChannelsUrl: string;
+  somaFmCachePath: string;
+  somaFmMetadataTtlMs: number;
+  somaFmTimeoutMs: number;
+  somaFmUserAgent: string;
 };
 
 let envLoaded = false;
@@ -94,12 +103,15 @@ export function getMusicRuntimeConfig(): MusicRuntimeConfig {
   const root = resolvePrithaRoot();
   const storageRoot = path.join(root, ".private", "interface-lab", "pritha-control-center", "music");
   const maxDurationSec = numberEnv("ACE_STEP_MAX_DURATION_SEC", 120, 30, 120);
+  const defaultStyle = musicEnv("MUSIC_DEFAULT_STYLE", "calm organ ambient instrumental background music");
 
   return {
     root,
     storageRoot,
     tracksRoot: path.join(storageRoot, "tracks"),
     indexPath: path.join(storageRoot, "index.json"),
+    settingsPath: path.join(storageRoot, "settings.json"),
+    libraryRoot: path.resolve(musicEnv("MUSIC_LIBRARY_ROOT", path.join(storageRoot, "library"))),
     aceStepBaseUrl: musicEnv("ACE_STEP_BASE_URL", musicEnv("ACESTEP_BASE_URL", "http://127.0.0.1:8001")).replace(/\/$/, ""),
     aceStepApiKey: musicEnv("ACE_STEP_API_KEY", musicEnv("ACESTEP_API_KEY", "")),
     aceStepModel: musicEnv("ACE_STEP_MODEL", musicEnv("ACESTEP_MODEL", "acestep-v15-turbo")),
@@ -111,7 +123,14 @@ export function getMusicRuntimeConfig(): MusicRuntimeConfig {
     generationTimeoutMs: numberEnv("ACE_STEP_GENERATION_TIMEOUT_MS", 120_000, 10_000, 600_000),
     cacheMaxBytes: numberEnv("MUSIC_CACHE_MAX_BYTES", 500 * 1024 * 1024, 10 * 1024 * 1024, 5 * 1024 * 1024 * 1024),
     cacheMaxTracks: numberEnv("MUSIC_CACHE_MAX_TRACKS", 100, 1, 500),
-    defaultStyle: musicEnv("MUSIC_DEFAULT_STYLE", "calm organ ambient instrumental background music"),
+    defaultStyle,
+    somaFmEnabled: boolEnv("SOMAFM_ENABLED", true),
+    somaFmChannelsUrl: musicEnv("SOMAFM_CHANNELS_URL", "https://api.somafm.com/channels.json"),
+    somaFmFallbackChannelsUrl: musicEnv("SOMAFM_FALLBACK_CHANNELS_URL", "https://somafm.com/channels.json"),
+    somaFmCachePath: path.join(storageRoot, "somafm-channels-cache.json"),
+    somaFmMetadataTtlMs: numberEnv("SOMAFM_METADATA_TTL_MS", 20 * 60_000, 10 * 60_000, 30 * 60_000),
+    somaFmTimeoutMs: numberEnv("SOMAFM_TIMEOUT_MS", 9000, 1000, 15_000),
+    somaFmUserAgent: musicEnv("SOMAFM_USER_AGENT", "Pritha/1.0 (+local-control-center)"),
   };
 }
 
