@@ -75,12 +75,19 @@ function modelSupportsFastMode(model: string) {
   return model === "gpt-5.5" || model === "gpt-5.4";
 }
 
+function clampPlanSteps(value: unknown, fallback = DEFAULT_RUNTIME_SETTINGS.codexMaxPlanSteps) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(1, Math.min(10, Math.round(numeric)));
+}
+
 export function CodexSettingsSection() {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const [runtimeSettingsLoaded, setRuntimeSettingsLoaded] = useState(false);
   const [transportStatus, setTransportStatus] = useState<TransportStatus>({});
   const [runtimeStatus, setRuntimeStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [maxPlanStepsDraft, setMaxPlanStepsDraft] = useState(String(DEFAULT_RUNTIME_SETTINGS.codexMaxPlanSteps));
 
   useEffect(() => {
     void loadRuntimeSettings();
@@ -101,7 +108,9 @@ export function CodexSettingsSection() {
       setRuntimeStatus("Runtime settings unavailable");
       return;
     }
-    setRuntimeSettings({ ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings });
+    const nextSettings = { ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings };
+    setRuntimeSettings(nextSettings);
+    setMaxPlanStepsDraft(String(clampPlanSteps(nextSettings.codexMaxPlanSteps)));
     setTransportStatus(payload.transports || {});
     setRuntimeSettingsLoaded(true);
     setRuntimeStatus("");
@@ -110,27 +119,33 @@ export function CodexSettingsSection() {
   async function saveRuntimeSettings() {
     setSaving(true);
     setRuntimeStatus("");
+    const settingsToSave = {
+      ...runtimeSettings,
+      codexMaxPlanSteps: clampPlanSteps(runtimeSettings.codexMaxPlanSteps),
+    };
+    setRuntimeSettings(settingsToSave);
+    setMaxPlanStepsDraft(String(settingsToSave.codexMaxPlanSteps));
     const response = await fetch("/api/realtime/runtime-settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        deepTaskPrimaryTransport: runtimeSettings.deepTaskPrimaryTransport,
-        codexModel: runtimeSettings.codexModel,
-        codexReasoningEffort: runtimeSettings.codexReasoningEffort,
-        codexServiceTier: runtimeSettings.codexServiceTier,
-        codexWorkdir: runtimeSettings.codexWorkdir,
-        codexSandbox: runtimeSettings.codexSandbox,
-        codexNetworkAccess: runtimeSettings.codexNetworkAccess,
-        codexTimeoutMs: runtimeSettings.codexTimeoutMs,
-        codexPromptTokenBudget: runtimeSettings.codexPromptTokenBudget,
-        codexPlanningMode: runtimeSettings.codexPlanningMode,
-        codexExecutionMode: runtimeSettings.codexExecutionMode,
-        codexMaxPlanSteps: runtimeSettings.codexMaxPlanSteps,
-        codexAskBeforeOrchestration: runtimeSettings.codexAskBeforeOrchestration,
-        codexVoiceProgressVerbosity: runtimeSettings.codexVoiceProgressVerbosity,
-        codexAppThreadRoutingMode: runtimeSettings.codexAppThreadRoutingMode,
-        codexAppThreadMaxTurns: runtimeSettings.codexAppThreadMaxTurns,
-        codexAppThreadMaxAgeHours: runtimeSettings.codexAppThreadMaxAgeHours,
+        deepTaskPrimaryTransport: settingsToSave.deepTaskPrimaryTransport,
+        codexModel: settingsToSave.codexModel,
+        codexReasoningEffort: settingsToSave.codexReasoningEffort,
+        codexServiceTier: settingsToSave.codexServiceTier,
+        codexWorkdir: settingsToSave.codexWorkdir,
+        codexSandbox: settingsToSave.codexSandbox,
+        codexNetworkAccess: settingsToSave.codexNetworkAccess,
+        codexTimeoutMs: settingsToSave.codexTimeoutMs,
+        codexPromptTokenBudget: settingsToSave.codexPromptTokenBudget,
+        codexPlanningMode: settingsToSave.codexPlanningMode,
+        codexExecutionMode: settingsToSave.codexExecutionMode,
+        codexMaxPlanSteps: settingsToSave.codexMaxPlanSteps,
+        codexAskBeforeOrchestration: settingsToSave.codexAskBeforeOrchestration,
+        codexVoiceProgressVerbosity: settingsToSave.codexVoiceProgressVerbosity,
+        codexAppThreadRoutingMode: settingsToSave.codexAppThreadRoutingMode,
+        codexAppThreadMaxTurns: settingsToSave.codexAppThreadMaxTurns,
+        codexAppThreadMaxAgeHours: settingsToSave.codexAppThreadMaxAgeHours,
       }),
     }).catch(() => null);
     setSaving(false);
@@ -139,7 +154,9 @@ export function CodexSettingsSection() {
       return;
     }
     const payload = (await response.json()) as { settings?: RuntimeSettings; transports?: TransportStatus };
-    setRuntimeSettings({ ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings });
+    const nextSettings = { ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings };
+    setRuntimeSettings(nextSettings);
+    setMaxPlanStepsDraft(String(clampPlanSteps(nextSettings.codexMaxPlanSteps)));
     setTransportStatus(payload.transports || {});
     setRuntimeStatus("Codex runtime settings saved");
   }
@@ -154,6 +171,20 @@ export function CodexSettingsSection() {
       codexModel: model,
       codexServiceTier: modelSupportsFastMode(model) ? current.codexServiceTier : "standard",
     }));
+  }
+
+  function updateMaxPlanStepsDraft(value: string) {
+    setMaxPlanStepsDraft(value);
+    if (value.trim() === "") return;
+    const nextValue = clampPlanSteps(value, runtimeSettings.codexMaxPlanSteps);
+    setMaxPlanStepsDraft(String(nextValue));
+    updateRuntimeSetting("codexMaxPlanSteps", nextValue);
+  }
+
+  function commitMaxPlanStepsDraft() {
+    const nextValue = maxPlanStepsDraft.trim() === "" ? runtimeSettings.codexMaxPlanSteps : clampPlanSteps(maxPlanStepsDraft, runtimeSettings.codexMaxPlanSteps);
+    updateRuntimeSetting("codexMaxPlanSteps", nextValue);
+    setMaxPlanStepsDraft(String(nextValue));
   }
 
   const appAvailable = transportStatus.codex_app?.available;
@@ -409,12 +440,14 @@ export function CodexSettingsSection() {
             <input
               className="settings-number-input"
               type="number"
+              inputMode="numeric"
               min={1}
               max={10}
               step={1}
-              value={runtimeSettings.codexMaxPlanSteps}
+              value={maxPlanStepsDraft}
               aria-label="Codex maximum plan steps"
-              onChange={(event) => updateRuntimeSetting("codexMaxPlanSteps", Math.max(1, Math.min(10, Number(event.currentTarget.value) || 7)))}
+              onBlur={commitMaxPlanStepsDraft}
+              onChange={(event) => updateMaxPlanStepsDraft(event.currentTarget.value)}
             />
           </div>
           <div className="settings-rowline">

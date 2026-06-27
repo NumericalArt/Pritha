@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -7,6 +10,7 @@ import {
   normalizeMusicStyleKey,
 } from "../interfaces/control-center/src/lib/music/prompt-builder.ts";
 import { normalizeMusicSourceSettings } from "../interfaces/control-center/src/lib/music/settings.ts";
+import { LocalMusicLibraryProvider } from "../interfaces/control-center/src/lib/music/library/provider.ts";
 import {
   computeMusicDucking,
   computeMusicOutputGain,
@@ -30,6 +34,39 @@ const voiceMusicSource = readFileSync("interfaces/control-center/src/components/
 const realtimeHookSource = readFileSync("interfaces/control-center/src/components/voice/usePrithaRealtime.ts", "utf8");
 const sessionConfigRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/session-config/route.ts", "utf8");
 const voicePageSource = readFileSync("interfaces/control-center/src/components/voice/VoiceControlPage.tsx", "utf8");
+const libraryProviderSource = readFileSync("interfaces/control-center/src/lib/music/library/provider.ts", "utf8");
+const musicImportRouteSource = readFileSync("interfaces/control-center/src/app/api/music/library/import/route.ts", "utf8");
+const musicSettingsSource = readFileSync("interfaces/control-center/src/components/settings/MusicSettingsSection.tsx", "utf8");
+
+function musicTestConfig(root) {
+  return {
+    root,
+    storageRoot: root,
+    tracksRoot: path.join(root, "tracks"),
+    indexPath: path.join(root, "index.json"),
+    settingsPath: path.join(root, "settings.json"),
+    libraryRoot: path.join(root, "library"),
+    aceStepBaseUrl: "http://127.0.0.1:8001",
+    aceStepApiKey: "",
+    aceStepModel: "acestep-v15-turbo",
+    aceStepThinking: true,
+    audioFormat: "mp3",
+    defaultDurationSec: 60,
+    maxDurationSec: 120,
+    pollIntervalMs: 1000,
+    generationTimeoutMs: 120_000,
+    cacheMaxBytes: 500 * 1024 * 1024,
+    cacheMaxTracks: 100,
+    defaultStyle: "calm instrumental",
+    somaFmEnabled: true,
+    somaFmChannelsUrl: "https://api.somafm.com/channels.json",
+    somaFmFallbackChannelsUrl: "https://somafm.com/channels.json",
+    somaFmCachePath: path.join(root, "somafm.json"),
+    somaFmMetadataTtlMs: 20 * 60_000,
+    somaFmTimeoutMs: 9000,
+    somaFmUserAgent: "Pritha/test",
+  };
+}
 
 test("music prompt builder forces background instrumental intent", () => {
   const prompt = buildBackgroundMusicPrompt("organ");
@@ -123,6 +160,35 @@ test("music source capabilities mark SomaFM as external and local/generated as c
   assert.match(voiceMusicSource, /volume_saved_external_stream/);
   assert.match(voiceMusicSource, /programmatic_volume/);
   assert.match(voiceMusicSource, /external_stream/);
+});
+
+test("Local Folder library imports uploaded audio into private playback folder", async () => {
+  assert.match(libraryProviderSource, /LOCAL_MUSIC_IMPORT_MAX_FILE_BYTES = 50 \* 1024 \* 1024/);
+  assert.match(libraryProviderSource, /async importTrack\(input: LocalMusicImportInput\)/);
+  assert.match(musicImportRouteSource, /export async function POST/);
+  assert.match(musicImportRouteSource, /multipart\/form-data/);
+  assert.match(musicImportRouteSource, /importLocalMusicTrack/);
+
+  const root = await mkdtemp(path.join(os.tmpdir(), "pritha-music-library-"));
+  try {
+    const provider = new LocalMusicLibraryProvider(musicTestConfig(root));
+    const bytes = new Uint8Array([73, 68, 51, 1, 2, 3]);
+    const track = await provider.importTrack({
+      name: "../Voice Intake Demo.MP3",
+      type: "audio/mpeg",
+      size: bytes.byteLength,
+      bytes,
+      source: "voice-intake",
+    });
+    assert.equal(track.audioFormat, "mp3");
+    assert.match(track.relativePath, /^voice-intake\/Voice Intake Demo-[a-f0-9]{8}\.mp3$/);
+    assert.doesNotMatch(track.relativePath, /\.\./);
+    const resolved = await provider.resolveTrackFile(track.id);
+    assert.ok(resolved);
+    assert.deepEqual(Array.from(await readFile(resolved.path)), Array.from(bytes));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("music gain calculation keeps source volume separate from ducking", () => {
@@ -249,6 +315,13 @@ test("Voice UI exposes music source volume slider backed by the shared setter", 
   assert.match(voicePageSource, /musicStreamKind=\{realtime\.music\.currentItem\?\.streamKind\}/);
   assert.match(voicePageSource, /realtime\.music\.setMusicVolume\(value, "ui"\)/);
   assert.match(voicePageSource, /musicVolume=\{realtime\.music\.userVolume\}/);
+});
+
+test("Music settings keeps the ACE-Step status chip compact", () => {
+  assert.match(musicSettingsSource, /return "ACE-Step: ambient"/);
+  assert.match(musicSettingsSource, /settings-status-chip alive/);
+  assert.doesNotMatch(musicSettingsSource, /ACE-Step style: \$\{settings\.aceStep\.defaultStyle\}/);
+  assert.doesNotMatch(musicSettingsSource, /music-status-chip/);
 });
 
 test("music generation queue is single-worker and dedupes active style jobs", () => {

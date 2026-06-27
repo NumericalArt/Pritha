@@ -151,6 +151,24 @@ export type LocalMusicTrack = {
   updatedAt: string;
 };
 
+export type LocalMusicImportInput = {
+  name: string;
+  type?: string;
+  size: number;
+  bytes: Uint8Array;
+  source?: string;
+};
+
+export type LocalMusicImportResponse = {
+  ok: boolean;
+  tracks: LocalMusicTrack[];
+  root: string;
+  importedCount: number;
+  skippedCount?: number;
+  operator_note?: string;
+  error?: string;
+};
+
 export type LocalMusicLibraryResponse = {
   ok: boolean;
   tracks: LocalMusicTrack[];

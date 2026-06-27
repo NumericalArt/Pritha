@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getMusicRuntimeConfig, type MusicRuntimeConfig } from "../config.ts";
-import type { LocalMusicTrack } from "../types";
+import type { LocalMusicImportInput, LocalMusicTrack } from "../types";
 
 const AUDIO_FORMATS = new Map([
   [".mp3", "mp3"],
@@ -14,6 +14,8 @@ const AUDIO_FORMATS = new Map([
   [".ogg", "ogg"],
   [".opus", "opus"],
 ]);
+const IMPORT_FOLDER = "voice-intake";
+export const LOCAL_MUSIC_IMPORT_MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 function trackId(relativePath: string) {
   return `lib_${createHash("sha256").update(relativePath).digest("hex").slice(0, 24)}`;
@@ -23,11 +25,28 @@ function titleFromFileName(fileName: string) {
   return fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim() || fileName;
 }
 
+function safeImportFileName(value: string) {
+  const basename = path.basename(String(value || "audio").replace(/\\/g, "/"));
+  const cleaned = basename.replace(/[^\p{L}\p{N}._ -]+/gu, "_").replace(/\s+/g, " ").trim();
+  return cleaned.slice(0, 120) || "audio";
+}
+
+function importedFileName(originalName: string, format: string) {
+  const ext = `.${format === "m4a" ? "m4a" : format}`;
+  const base = safeImportFileName(originalName);
+  const stem = base.replace(/\.[^.]+$/, "").slice(0, 80).trim() || "audio";
+  return `${stem}-${randomUUID().replace(/-/g, "").slice(0, 8)}${ext}`;
+}
+
 function safeRelativePath(root: string, fullPath: string) {
   const resolvedRoot = path.resolve(root);
   const resolvedPath = path.resolve(fullPath);
   if (resolvedPath !== resolvedRoot && !resolvedPath.startsWith(`${resolvedRoot}${path.sep}`)) return null;
   return path.relative(resolvedRoot, resolvedPath);
+}
+
+function audioFormatForFileName(fileName: string) {
+  return AUDIO_FORMATS.get(path.extname(fileName).toLowerCase()) || "";
 }
 
 export class LocalMusicLibraryProvider {
@@ -39,6 +58,10 @@ export class LocalMusicLibraryProvider {
 
   async ensureRoot() {
     await mkdir(this.config.libraryRoot, { recursive: true });
+  }
+
+  isSupportedAudioFileName(fileName: string) {
+    return Boolean(audioFormatForFileName(fileName));
   }
 
   private async walk(dir: string, depth = 0): Promise<string[]> {
@@ -102,6 +125,37 @@ export class LocalMusicLibraryProvider {
     if (!relativePath || relativePath !== track.relativePath) return null;
     if (!existsSync(fullPath)) return null;
     return { track, path: fullPath };
+  }
+
+  async importTrack(input: LocalMusicImportInput): Promise<LocalMusicTrack> {
+    const originalName = safeImportFileName(input.name);
+    const audioFormat = audioFormatForFileName(originalName);
+    if (!audioFormat) throw new Error("unsupported_audio_format");
+    const size = Number(input.size || input.bytes?.byteLength || 0);
+    if (!Number.isFinite(size) || size <= 0) throw new Error("empty_audio_file");
+    if (size > LOCAL_MUSIC_IMPORT_MAX_FILE_BYTES) throw new Error("audio_file_too_large");
+
+    await this.ensureRoot();
+    const importDir = path.join(this.config.libraryRoot, IMPORT_FOLDER);
+    await mkdir(importDir, { recursive: true });
+    const targetName = importedFileName(originalName, audioFormat);
+    const targetPath = path.join(importDir, targetName);
+    const relativePath = safeRelativePath(this.config.libraryRoot, targetPath);
+    if (!relativePath) throw new Error("unsafe_audio_target_path");
+
+    await writeFile(targetPath, input.bytes);
+    const fileStat = await stat(targetPath);
+    const track: LocalMusicTrack = {
+      id: trackId(relativePath),
+      title: titleFromFileName(targetName),
+      fileName: targetName,
+      relativePath,
+      url: `/api/music/library/tracks/${encodeURIComponent(trackId(relativePath))}`,
+      audioFormat,
+      sizeBytes: fileStat.size,
+      updatedAt: fileStat.mtime.toISOString(),
+    };
+    return track;
   }
 
   contentType(format: string) {

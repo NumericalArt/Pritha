@@ -23,6 +23,19 @@ test("Codex task planning settings are persisted and exposed through runtime set
   assert.match(runtimeSource, /codexExecutionMode: "inline_only"/, "safe default should keep execution inline until the operator enables orchestration");
 });
 
+test("Codex plan steps setting is editable as a bounded maximum", () => {
+  assert.match(codexSettingsSource, /function clampPlanSteps/);
+  assert.match(codexSettingsSource, /Math\.max\(1, Math\.min\(10, Math\.round\(numeric\)\)\)/);
+  assert.match(codexSettingsSource, /maxPlanStepsDraft/);
+  assert.match(codexSettingsSource, /value=\{maxPlanStepsDraft\}/);
+  assert.match(codexSettingsSource, /onBlur=\{commitMaxPlanStepsDraft\}/);
+  assert.doesNotMatch(
+    codexSettingsSource,
+    /updateRuntimeSetting\("codexMaxPlanSteps", Math\.max\(1, Math\.min\(10, Number\(event\.currentTarget\.value\) \|\| 7\)\)\)/,
+    "the input must allow a temporary empty value while the operator edits it",
+  );
+});
+
 test("Codex App tasks write plan and voice feedback artifacts", () => {
   assert.match(runtimeSource, /function codexTaskPlanPath\(taskDir: string\)/);
   assert.match(runtimeSource, /function codexTaskVoiceFeedbackPath\(taskDir: string\)/);

@@ -60,6 +60,8 @@ type CodexTaskDetail = {
   stderr_excerpt?: string;
   progress_timeline?: Array<Record<string, unknown>>;
   thread_scope?: CodexTaskThreadScope | null;
+  parent_task_id?: string;
+  continuation?: Record<string, unknown> | null;
   codex_app_thread_routing_mode?: string;
   paths?: Record<string, string>;
   error?: string;
@@ -265,14 +267,19 @@ function textHasUrl(value: string) {
   return /https?:\/\/[^\s<>"')\]]+/i.test(value);
 }
 
+function isAudioIntakeFile(file: Pick<File, "name" | "type">) {
+  if (/^audio\//i.test(file.type || "")) return true;
+  return /\.(mp3|m4a|aac|wav|flac|ogg|opus)$/i.test(file.name || "");
+}
+
 function voiceIntakeStatusLabel(status: VoiceIntakeUiStatus) {
   return {
     idle: "Ready",
     starting_voice: "Starting voice...",
     awaiting_instruction: "Waiting for instruction",
     asking_more: "Clarifying",
-    sending: "Sending to Codex",
-    submitted: "Sent to Codex",
+    sending: "Processing intake",
+    submitted: "Intake handled",
     cancelled: "Cancelled",
     failed: "Needs attention",
   }[status];
@@ -439,6 +446,7 @@ function TaskListCard({
                   Voice: {task.latestVoiceFeedback.voice_text}
                 </div>
               ) : null}
+              {task.parentTaskId ? <div className="task-row-note neutral">Continues: {task.parentTaskId}</div> : null}
               <div className="task-phase-row">
                 <span>{task.phase ? `phase: ${task.phase}` : "phase: unknown"}</span>
                 <span>{formatThreadScope(task.threadScope)}</span>
@@ -535,6 +543,10 @@ function TaskDetailDrawer({
               <strong>{detail.result_available ? "available" : "not yet"}</strong>
               <span>Thread</span>
               <strong>{formatThreadScope(detail.thread_scope)}</strong>
+              <span>Parent task</span>
+              <strong>{detail.parent_task_id || "none"}</strong>
+              <span>Continuation</span>
+              <strong>{typeof detail.continuation?.mode === "string" ? detail.continuation.mode : detail.continuation ? "linked" : "none"}</strong>
               <span>Routing</span>
               <strong>{detail.codex_app_thread_routing_mode || "unknown"}</strong>
               <span>Last activity</span>
@@ -842,6 +854,9 @@ function PasteCommandPanel({
     intakeFiles: File[];
     confirmation: VoiceIntakeConfirmation;
   }): Promise<VoiceIntakeSubmitResult> {
+    if (params.confirmation.intent === "music_local_folder") {
+      return await submitConfirmedMusicImport(params);
+    }
     setBusy(true);
     try {
       const form = new FormData();
@@ -879,6 +894,53 @@ function PasteCommandPanel({
     }
   }
 
+  async function submitConfirmedMusicImport(params: {
+    intakeId: string;
+    intakeText: string;
+    intakeFiles: File[];
+    confirmation: VoiceIntakeConfirmation;
+  }): Promise<VoiceIntakeSubmitResult> {
+    setBusy(true);
+    try {
+      const audioFiles = params.intakeFiles.filter(isAudioIntakeFile);
+      if (!audioFiles.length) throw new Error("No supported audio files were attached for Local Folder import.");
+      const skippedCount = params.intakeFiles.length - audioFiles.length;
+      const form = new FormData();
+      form.set("source", "voice-intake");
+      form.set("source_intake_id", params.intakeId);
+      form.set("session_id", sessionIdRef.current);
+      form.set("operator_instruction", params.confirmation.operator_instruction || "");
+      form.set("note", params.intakeText);
+      for (const file of audioFiles) form.append("files", file, file.name);
+      const response = await fetch("/api/music/library/import", { method: "POST", body: form });
+      const payload = (await response.json().catch(() => ({ ok: false, error: "music import returned non-json" }))) as {
+        ok?: boolean;
+        importedCount?: number;
+        skippedCount?: number;
+        operator_note?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Music import failed with status ${response.status}`);
+      }
+      const importedCount = Number(payload.importedCount || audioFiles.length);
+      const baseNote = payload.operator_note || `Imported ${importedCount} audio file(s) to the Music Local Folder library.`;
+      const operatorNote = skippedCount ? `${baseNote} Skipped ${skippedCount} non-audio file(s).` : baseNote;
+      setText("");
+      setFiles([]);
+      setNote(operatorNote);
+      setPendingIntake(null);
+      return {
+        ok: true,
+        status: "music_library_imported",
+        mode: "music_local_folder",
+        operator_note: operatorNote,
+      };
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function startVoiceIntakeClarification() {
     const intakeText = text.trim();
     const intakeFiles = [...files];
@@ -899,13 +961,13 @@ function PasteCommandPanel({
     };
 
     setPendingIntake({ id: intakeId, status: "starting_voice" });
-    setNote("Starting Voice Control to clarify this intake before Codex.");
+    setNote("Starting Voice Control to clarify this intake before upload or import.");
     const started = beginVoiceIntakeClarification(metadata, {
       status: (status) => {
         setPendingIntake((current) => (current?.id === intakeId ? { ...current, status } : current));
-        if (status === "awaiting_instruction") setNote("Pritha is waiting for your voice instruction before uploading to Codex.");
-        if (status === "sending") setNote("Confirmed. Sending intake to Codex.");
-        if (status === "failed") setNote("Could not send intake to Codex.");
+        if (status === "awaiting_instruction") setNote("Pritha is waiting for your voice instruction before upload or import.");
+        if (status === "sending") setNote("Confirmed. Processing intake.");
+        if (status === "failed") setNote("Could not process intake.");
       },
       askMore: () => {
         setPendingIntake((current) => (current?.id === intakeId ? { ...current, status: "asking_more" } : current));
@@ -917,7 +979,7 @@ function PasteCommandPanel({
       },
       submit: async (confirmation) => submitConfirmedCodexIntake({ intakeId, intakeText, intakeFiles, confirmation }),
     });
-    if (started.status === "awaiting_instruction") setNote("Pritha is waiting for your voice instruction before uploading to Codex.");
+    if (started.status === "awaiting_instruction") setNote("Pritha is waiting for your voice instruction before upload or import.");
     if (started.status === "waiting_for_realtime_channel") setNote("Waiting for Voice Control data channel before asking for instructions.");
   }
 

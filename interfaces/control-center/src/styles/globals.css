@@ -5173,9 +5173,19 @@ button:active,
     gap: 7px;
   }
 
+  .mobile-agent-view-toggle {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 12px;
+  }
+
+  .mobile-agent-view-toggle button {
+    min-width: 0;
+  }
+
   .mobile-operator-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
     align-items: center;
     margin-top: 12px;
@@ -5194,7 +5204,7 @@ button:active,
     min-width: 0;
     color: var(--text-secondary);
     font-size: 12px;
-    white-space: nowrap;
+    line-height: 1.35;
   }
 
   .mobile-agent-list {
@@ -5213,15 +5223,6 @@ button:active,
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-
-  .agent-menu-button {
-    width: 36px;
-    height: 28px;
-    border: 0;
-    border-radius: 999px;
-    color: var(--text-secondary);
-    background: rgba(25, 36, 55, 0.6);
   }
 
   .mobile-agent-body {

@@ -66,7 +66,7 @@ const SOURCE_OPTIONS: Array<{
 function sourceStatus(settings: MusicSettings) {
   if (settings.defaultSource === "somafm") return `SomaFM channel: ${settings.somafm.defaultChannelId}`;
   if (settings.defaultSource === "library") return `Local folder repeat: ${settings.library.repeatMode}`;
-  return `ACE-Step style: ${settings.aceStep.defaultStyle}`;
+  return "ACE-Step: ambient";
 }
 
 export function MusicSettingsSection() {

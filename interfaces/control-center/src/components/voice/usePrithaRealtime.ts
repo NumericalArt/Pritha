@@ -77,6 +77,8 @@ export type CodexTaskState = {
   latestVoiceFeedback?: CodexTaskVoiceFeedback | null;
   threadScope?: CodexTaskThreadScope | null;
   threadRoutingMode?: string;
+  parentTaskId?: string;
+  continuation?: Record<string, unknown> | null;
 };
 
 export type SessionMemoryPromotionState = {
@@ -184,12 +186,16 @@ type CodexTaskSnapshot = {
   };
   approval?: CodexTaskApproval | null;
   thread_scope?: CodexTaskThreadScope | null;
+  parent_task_id?: string;
+  continuation?: Record<string, unknown> | null;
   codex_app_thread_routing_mode?: string;
   request?: {
     created_at?: string;
     task?: string;
     task_type?: string;
     thread_scope?: CodexTaskThreadScope | null;
+    parent_task_id?: string;
+    continuation?: Record<string, unknown> | null;
     codex_app_thread_routing_mode?: string;
   };
   handoff_status?: "pending" | "sent" | "skipped";
@@ -243,6 +249,7 @@ export type VoiceIntakeIntent =
   | "agent_context"
   | "transcribe"
   | "research"
+  | "music_local_folder"
   | "other";
 
 export type VoiceIntakeTextRole = "instruction" | "context" | "content_to_analyze" | "unknown";
@@ -286,6 +293,8 @@ export type VoiceIntakeSubmitResult = {
   status_path?: string;
   approval?: CodexTaskApproval | null;
   thread_scope?: CodexTaskThreadScope | null;
+  parent_task_id?: string;
+  continuation?: Record<string, unknown> | null;
   codex_app_thread_routing_mode?: string;
   error?: string;
 };
@@ -376,7 +385,7 @@ function normalizeVoiceIntakeConfirmation(args: Record<string, unknown>): VoiceI
     operator_instruction: stickyText(args.operator_instruction, 3_000),
     intent: normalizeVoiceIntakeChoice(
       args.intent,
-      ["summarize", "extract_facts", "memory_candidate", "agent_context", "transcribe", "research", "other"] as const,
+      ["summarize", "extract_facts", "memory_candidate", "agent_context", "transcribe", "research", "music_local_folder", "other"] as const,
       "other",
     ),
     original_text_role: normalizeVoiceIntakeChoice(
@@ -390,6 +399,11 @@ function normalizeVoiceIntakeConfirmation(args: Record<string, unknown>): VoiceI
   };
 }
 
+function voiceIntakeFileLooksAudio(file: VoiceIntakeFileMetadata) {
+  if (/^audio\//i.test(file.type || "")) return true;
+  return /\.(mp3|m4a|aac|wav|flac|ogg|opus)$/i.test(file.name || "");
+}
+
 function formatVoiceIntakeClarificationPrompt(metadata: VoiceIntakeClarificationMetadata) {
   const files = metadata.files.length
     ? metadata.files
@@ -398,6 +412,7 @@ function formatVoiceIntakeClarificationPrompt(metadata: VoiceIntakeClarification
     : "- none";
   const links = metadata.links.length ? metadata.links.map((url) => `- ${url}`).join("\n") : "- none";
   const textPreview = metadata.textPreview || "(no pasted text)";
+  const hasAudioFiles = metadata.files.some(voiceIntakeFileLooksAudio);
   return [
     "Voice Intake Clarification Pending",
     "",
@@ -412,7 +427,10 @@ function formatVoiceIntakeClarificationPrompt(metadata: VoiceIntakeClarification
     files,
     "",
     "Ask the operator in Russian what to do with this intake before Codex runs.",
-    "Offer concise options when useful: quick analysis for this conversation, extract important ideas as a Pritha memory candidate, prepare context for a specific child agent, transcribe/summarize video or audio, research/cite sources, or cancel.",
+    hasAudioFiles
+      ? "Audio files are present. Offer the Local Folder option: import supported audio files into the Music Local Folder library for playback in Music mode. If the operator chooses it, call confirm_voice_intake with intent=music_local_folder; do not upload those audio files to Codex."
+      : "",
+    "Offer concise options when useful: quick analysis for this conversation, extract important ideas as a Pritha memory candidate, prepare context for a specific child agent, transcribe/summarize video or audio, research/cite sources, import audio to Music Local Folder when audio is present, or cancel.",
     "Clarify whether pasted text is an instruction, context, or content to analyze when that is ambiguous.",
     "Do not call run_codex_task for this intake. After the operator answers, call confirm_voice_intake with the same intake_id and action submit, cancel, or ask_more.",
     "For submit, include operator_instruction, intent, original_text_role, target_agent when relevant, and persistence. Do not include secrets.",
@@ -808,6 +826,8 @@ function usePrithaRealtimeController() {
         latestVoiceFeedback: task.latestVoiceFeedback === undefined ? existing?.latestVoiceFeedback : task.latestVoiceFeedback,
         threadScope: task.threadScope === undefined ? existing?.threadScope : task.threadScope,
         threadRoutingMode: task.threadRoutingMode || existing?.threadRoutingMode,
+        parentTaskId: task.parentTaskId === undefined ? existing?.parentTaskId : task.parentTaskId,
+        continuation: task.continuation === undefined ? existing?.continuation || null : task.continuation,
       };
       const nextTasks = orderVisibleCodexTasks([nextTask, ...tasks.filter((item) => item.id !== task.id)]);
       codexTasksRef.current = nextTasks;
@@ -1381,6 +1401,13 @@ function usePrithaRealtimeController() {
         latestVoiceFeedback: voiceFeedback,
         threadScope: snapshot.thread_scope || snapshot.request?.thread_scope || null,
         threadRoutingMode: snapshot.codex_app_thread_routing_mode || snapshot.request?.codex_app_thread_routing_mode,
+        parentTaskId: snapshot.parent_task_id || snapshot.request?.parent_task_id,
+        continuation:
+          typeof snapshot.continuation === "object" && snapshot.continuation !== null
+            ? snapshot.continuation
+            : typeof snapshot.request?.continuation === "object" && snapshot.request.continuation !== null
+              ? snapshot.request.continuation
+              : null,
         completedAt: terminal ? nowIso() : undefined,
       });
       setToolStatus(JSON.stringify(snapshot, null, 2));
@@ -1738,7 +1765,7 @@ function usePrithaRealtimeController() {
         pending.handlers.status?.("cancelled");
         pending.handlers.cancel(confirmation);
         pendingVoiceIntakeRef.current = null;
-        appendSessionEvent("system", `Voice intake ${confirmedIntakeId} cancelled before Codex upload.`);
+        appendSessionEvent("system", `Voice intake ${confirmedIntakeId} cancelled before upload or import.`);
         logClientEvent("voice_intake_cancelled", { intake_id: confirmedIntakeId });
         return { ok: true, intake_id: confirmedIntakeId, status: "cancelled" };
       }
@@ -1755,7 +1782,7 @@ function usePrithaRealtimeController() {
           ok: false,
           error: "operator_instruction_required",
           intake_id: confirmedIntakeId,
-          message: "Ask the operator what Codex should do with the files or links, then call confirm_voice_intake again.",
+          message: "Ask the operator what should be done with the files or links, then call confirm_voice_intake again.",
         };
       }
 
@@ -1777,10 +1804,10 @@ function usePrithaRealtimeController() {
           id: taskId,
           title: `Voice intake ${confirmedIntakeId}`,
           status: String(output.status || output.mode || "queued"),
-          summary: String(output.operator_note || "Voice intake sent to Codex after spoken clarification."),
+          summary: String(output.operator_note || "Voice intake handled after spoken clarification."),
           progress: output.status === "running" ? 15 : 10,
           phase: String(output.status || output.mode || "queued"),
-          lastActivity: "Voice intake sent to Codex after spoken clarification.",
+          lastActivity: String(output.operator_note || "Voice intake handled after spoken clarification."),
           operatorBrief: String(output.operator_note || ""),
           resultPath: typeof output.result_path === "string" ? output.result_path : undefined,
           statusPath: typeof output.status_path === "string" ? output.status_path : undefined,
@@ -1788,13 +1815,15 @@ function usePrithaRealtimeController() {
           approval: typeof output.approval === "object" && output.approval !== null ? output.approval : null,
           threadScope: typeof output.thread_scope === "object" && output.thread_scope !== null ? output.thread_scope : null,
           threadRoutingMode: typeof output.codex_app_thread_routing_mode === "string" ? output.codex_app_thread_routing_mode : undefined,
+          parentTaskId: typeof output.parent_task_id === "string" ? output.parent_task_id : undefined,
+          continuation: typeof output.continuation === "object" && output.continuation !== null ? output.continuation : null,
         };
         upsertCodexTask(nextTask);
         startCodexTaskPolling(taskId);
         queueRollingSummaryCheckpoint("voice_intake_submitted", { task: nextTask });
       }
 
-      appendSessionEvent("task", `Voice intake ${confirmedIntakeId} submitted to Codex${taskId ? ` as ${taskId}` : ""}.`, {
+      appendSessionEvent("task", `Voice intake ${confirmedIntakeId} handled${taskId ? ` by Codex as ${taskId}` : ""}.`, {
         taskId: taskId || undefined,
         status: String(output.status || output.mode || "submitted"),
       });
@@ -1855,6 +1884,11 @@ function usePrithaRealtimeController() {
             approval: typeof output.approval === "object" && output.approval !== null ? (output.approval as CodexTaskApproval) : null,
             threadScope: typeof output.thread_scope === "object" && output.thread_scope !== null ? (output.thread_scope as CodexTaskThreadScope) : null,
             threadRoutingMode: typeof output.codex_app_thread_routing_mode === "string" ? output.codex_app_thread_routing_mode : undefined,
+            parentTaskId: typeof output.parent_task_id === "string" ? output.parent_task_id : undefined,
+            continuation:
+              typeof output.continuation === "object" && output.continuation !== null
+                ? (output.continuation as Record<string, unknown>)
+                : null,
           };
           upsertCodexTask(nextTask);
           queueRollingSummaryCheckpoint(item.name === "answer_codex_task" ? "codex_task_progress" : "task_started", {

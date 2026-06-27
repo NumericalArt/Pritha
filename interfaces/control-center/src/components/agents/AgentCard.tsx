@@ -110,9 +110,6 @@ export function AgentCard({
             <span className={`dot ${agent.state === "alive" ? "green" : agent.state === "missing" ? "red" : "orange"}`} />
             {stateLabel(agent)}
           </span>
-          <button className="agent-menu-button" type="button" aria-label={`Open menu for ${agent.name}`}>
-            ...
-          </button>
         </div>
       ) : (
         <span className={`agent-corner-dot ${agent.state}`} />

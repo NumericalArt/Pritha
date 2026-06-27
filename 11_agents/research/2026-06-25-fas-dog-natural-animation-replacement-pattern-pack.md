@@ -3,7 +3,7 @@ id: 2026-06-25-fas-dog-natural-animation-replacement-pattern-pack
 type: review
 status: draft
 created: 2026-06-25
-updated: 2026-06-25
+updated: 2026-06-27
 topics:
   - agent-engineering
   - agent-improvement
@@ -34,6 +34,9 @@ sources:
   - <FAS_ROOT>/src/main.js
   - <FAS_ROOT>/public/assets/README.md
   - <FAS_ROOT>/public/assets/models/third-party-assets.json
+  - https://sketchfab.com/3d-models/husky-animated-59858d6442e1482a8205e6b94704aeb0
+  - https://api.sketchfab.com/v3/models/59858d6442e1482a8205e6b94704aeb0
+  - https://creativecommons.org/licenses/by-nc-sa/4.0/
 related:
   agent_contracts:
     - 11_agents/contracts/2026-06-22-fas-agent-contract.md
@@ -60,7 +63,11 @@ semantic_memory_status: complete
 semantic_failure_log: none
 selected_pattern_count: 8
 external_research_seed_count: 6
-external_research_status: pending-required
+external_research_status: pending-required-for-alternative
+selected_asset: pending-alternative
+previous_selected_asset: Husky Animated
+previous_asset_status: blocked-missing-authorized-archive
+license_gate_status: pending-alternative-source
 verified: pending
 ---
 
@@ -113,6 +120,20 @@ Status: draft
   - Top hits: prior FAS third-dog pattern pack and development task, especially
     external research seeds, implementation guidance and acceptance criteria.
   - Failure log: none.
+- 2026-06-27 alternative search refresh:
+  - `node scripts/pritha.mjs improve /Users/jkl/FAS --task <alternative task>`
+    was attempted but still failed before writing artifacts with
+    `The "path" argument must be of type string. Received undefined`.
+  - FTS queries for `FAS accessible dog model archive noncommercial license
+    animation` and `Husky Animated archive authentication blocked FAS` returned
+    no rows.
+  - Subject query `agent fas` returned FAS lifecycle evidence, prior FAS dog
+    research, and background/visual verification pattern packs.
+  - Semantic query `FAS alternative dog model accessible archive noncommercial
+    license animations GLTF command fallbacks` completed with no failure log.
+    Top hits were the dog source-candidate record, the dog natural-animation
+    development task, the 2026-06-26 FAS model upgrade brief, and prior FAS dog
+    integration packs.
 
 ## Selected Patterns
 
@@ -230,9 +251,12 @@ Status: draft
 
 ## External Research Seeds
 
-Current-source external research is required before import because the task
+Current-source external research was required before import because the task
 selects a new third-party model/animation source and has a specific license
-constraint.
+constraint. The 2026-06-27 continuation resolves the source/license gate for
+`Husky Animated`, with one technical import caveat: the actual archive still
+must be obtained through the legitimate Sketchfab download flow or supplied by
+the operator.
 
 1. Candidate source page for a dog model/animation with clear author, format and
    current license text.
@@ -248,12 +272,62 @@ constraint.
    case the first source is too large, technically incompatible or legally
    unclear.
 
+## 2026-06-27 External Evidence Summary
+
+- Selected source: `Husky Animated` by Kastle on Sketchfab.
+- Source URL:
+  `https://sketchfab.com/3d-models/husky-animated-59858d6442e1482a8205e6b94704aeb0`.
+- API evidence:
+  `https://api.sketchfab.com/v3/models/59858d6442e1482a8205e6b94704aeb0`.
+- License: CC Attribution-NonCommercial-ShareAlike 4.0,
+  `https://creativecommons.org/licenses/by-nc-sa/4.0/`.
+- License fit: acceptable for noncommercial research/local demo use if FAS
+  keeps use noncommercial, credits Kastle, links the license, indicates changes
+  and preserves ShareAlike terms for modified versions.
+- Asset facts: Sketchfab metadata reports a downloadable free asset, glTF
+  extension, successful `source`, `gltf`, `usdz` and `glb` archives, 468 faces,
+  312 vertices, one texture and one animation.
+- Operator-accepted trade-off: one animation is enough only if FAS retains
+  explicit command fallbacks and procedural overlays for unsupported actions.
+- Import caveat: unauthenticated Sketchfab download API requires credentials;
+  implementation must not bypass access controls or store credentials.
+
+## 2026-06-27 Alternative Asset Direction
+
+`Husky Animated` is now historical evidence, not the active import target. The
+integration step failed because no authorized archive was available in workspace
+evidence and the public Sketchfab download API requires authentication. Its
+single-animation coverage also remains below the natural movement goal.
+
+The active implementation path is to find an alternative dog asset that meets
+all of these gates before import:
+
+1. Literal dog model unless the operator later approves a wolf/canine trade-off.
+2. Clear noncommercial research-suitable license with source URL and retrieval
+   date.
+3. Credible provenance from the author/source, not game-ripper/game-extracted
+   material without independent rights evidence.
+4. Verifiable archive access through a legitimate route: free/keyless official
+   download, public repository release, or operator-provided/approved archive.
+5. Local GLB/glTF preferred, with embedded or local textures and no hotlinks.
+6. At least idle plus walk/run animation preferred; jump, sit/crouch,
+   play/gesture or turn clips improve command mapping.
+7. Decoder additions are allowed only if the selected asset requires them and
+   the official Three.js loader path is verified.
+
+If no candidate satisfies license plus archive access plus animation coverage,
+the next gate should return `decision_required` rather than changing FAS runtime
+references.
+
 ## Implementation Guidance
 
 - Keep edits inside `<FAS_ROOT>` after this research brief lineage, unless a
   later operator task explicitly asks for Pritha/Control Center changes.
 - Do not import a candidate if the noncommercial restriction is absent, unclear
   or incompatible with local research/demo use.
+- Do not import a candidate if the archive cannot be obtained through a
+  legitimate accessible route. Do not scrape/reconstruct protected viewer
+  internals or bypass download controls.
 - Prefer one local GLB/GLTF asset with embedded or local textures and no hotlinks.
 - Update `<FAS_ROOT>/public/assets/models/third-party-assets.json` and
   `<FAS_ROOT>/public/assets/README.md` with source, author, URL, retrieval

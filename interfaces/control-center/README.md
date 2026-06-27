@@ -78,7 +78,9 @@ The default source is selected in `/settings` -> `Music`:
   retransmit audio.
 - `Local Folder` - saved audio files under Pritha's ignored private music
   library folder. Supported files include mp3, m4a, aac, wav, flac, ogg and
-  opus, though iPhone playback is most reliable with mp3/m4a/aac.
+  opus, though iPhone playback is most reliable with mp3/m4a/aac. Voice
+  intake can import attached audio files into this folder after spoken
+  clarification instead of sending them to Codex.
 - `ACE-Step` - existing local generated-music provider.
 
 Default local env:

@@ -5,7 +5,7 @@ import { LocalMusicLibraryProvider } from "./library/provider";
 import { MusicGenerationQueue } from "./queue";
 import { getMusicSourceSettings, updateMusicSourceSettings } from "./settings";
 import { SomaFmProvider } from "./somafm/provider";
-import type { AceStepGenerateRequest, MusicGenerateResponse, MusicSourceSettings, MusicStateResponse, PreferredPlaylistOptions } from "./types";
+import type { AceStepGenerateRequest, LocalMusicImportInput, MusicGenerateResponse, MusicSourceSettings, MusicStateResponse, PreferredPlaylistOptions } from "./types";
 
 const cache = new GeneratedMusicCache();
 const client = new AceStepClient();
@@ -117,6 +117,10 @@ export async function getLocalMusicLibrary() {
     tracks: await libraryProvider.listTracks(),
     root: config.libraryRoot,
   };
+}
+
+export async function importLocalMusicTrack(input: LocalMusicImportInput) {
+  return await libraryProvider.importTrack(input);
 }
 
 export async function getLocalMusicTrack(id: string) {

@@ -3,7 +3,7 @@ id: 2026-06-25-fas-dog-model-source-candidates
 type: review
 status: draft
 created: 2026-06-25
-updated: 2026-06-25
+updated: 2026-06-27
 topics:
   - agent-engineering
   - agent-improvement
@@ -49,8 +49,12 @@ privacy: internal
 retention: durable
 review_status: draft
 confidence: medium
-external_research_status: complete-for-step
-license_gate_status: pending
+external_research_status: pending-required-for-alternative
+license_gate_status: reopened-pending-alternative
+selected_candidate: pending-alternative
+previous_selected_candidate: Husky Animated
+previous_candidate_status: blocked-missing-authorized-archive
+selected_candidate_verified_at: pending
 verified: source-research-only
 ---
 
@@ -212,6 +216,58 @@ current-source evidence.
      a canine replacement for FAS.
 3. Do not use Game-animal-ripper candidates unless rights/provenance are
    independently verified.
+
+## 2026-06-27 Gate Resolution
+
+Operator decision: choose `Husky Animated` and accept the limited animation
+coverage trade-off.
+
+Validation result:
+
+- License/source gate: passed for the operator-approved compromise.
+- Exact asset: `Husky Animated`, Sketchfab uid
+  `59858d6442e1482a8205e6b94704aeb0`.
+- Author: Kastle (`https://sketchfab.com/kastle`).
+- Source URL:
+  `https://sketchfab.com/3d-models/husky-animated-59858d6442e1482a8205e6b94704aeb0`.
+- API URL:
+  `https://api.sketchfab.com/v3/models/59858d6442e1482a8205e6b94704aeb0`.
+- License: CC Attribution-NonCommercial-ShareAlike 4.0.
+- License URL: `https://creativecommons.org/licenses/by-nc-sa/4.0/`.
+- Required obligations: credit the author, link the license, indicate changes,
+  keep use noncommercial, and preserve ShareAlike terms for modified versions.
+- Current metadata: downloadable free Sketchfab asset, glTF extension, successful
+  `source`, `gltf`, `usdz` and `glb` archives in Sketchfab metadata, 468 faces,
+  312 vertices, one texture and one animation.
+- Accepted limitation: one animation only; FAS command mapping must use explicit
+  fallbacks and existing procedural overlays for unsupported actions.
+- Import caution: unauthenticated Sketchfab download API requires credentials.
+  Later implementation must use the legitimate Sketchfab download flow or an
+  operator-provided archive; do not bypass access controls.
+
+## 2026-06-27 Alternative Search Reopened
+
+The `Husky Animated` path is no longer the active import target. The
+integration step was blocked because the authorized archive was not present in
+workspace/task evidence and the unauthenticated Sketchfab download endpoint
+requires credentials. The one-animation limitation also remains weaker than the
+operator's natural command-movement requirement.
+
+The next research pass must find a replacement candidate that improves on the
+Husky blocker:
+
+- clear noncommercial research-suitable license;
+- credible author/source provenance;
+- verifiable archive available without bypassing controls, or an
+  operator-provided/approved archive;
+- practical GLB/glTF import path for FAS;
+- enough animation coverage to support at least idle and walk/run, with
+  additional command fallbacks documented;
+- no game-ripper/game-extracted candidates unless independent rights evidence
+  is available.
+
+Gate status: reopened. Do not import or update FAS loader references until a
+new source/license/archive candidate passes this gate.
 
 ## Integration Notes For Later Steps
 

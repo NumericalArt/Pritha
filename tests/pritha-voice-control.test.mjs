@@ -126,6 +126,8 @@ test("Voice intake requires spoken clarification before Codex upload", () => {
   assert.match(runtimeSource, /Confirmed voice instruction:/);
   assert.match(runtimeSource, /Treat the confirmed voice instruction as the operator's trusted task intent/);
   assert.match(runtimeSource, /write_if_relevant/);
+  assert.match(runtimeSource, /music_local_folder/);
+  assert.match(runtimeSource, /imports supported audio files into the Music Local Folder library instead of Codex/);
 
   assert.match(intakeRouteSource, /confirmed_instruction/);
   assert.match(intakeRouteSource, /confirmation_intake_id/);
@@ -137,11 +139,14 @@ test("Voice intake requires spoken clarification before Codex upload", () => {
   assert.match(realtimeHookSource, /beginVoiceIntakeClarification/);
   assert.match(realtimeHookSource, /sendPendingVoiceIntakeClarification\("data_channel_open"\)/);
   assert.match(realtimeHookSource, /Attached file metadata only; file bytes are still local in the browser/);
+  assert.match(realtimeHookSource, /intent=music_local_folder/);
 
   assert.match(voicePageSource, /startVoiceIntakeClarification/);
   assert.match(voicePageSource, /beginVoiceIntakeClarification\(metadata/);
   assert.match(voicePageSource, /if \(routesToCodex\) \{\s*startVoiceIntakeClarification\(\);\s*return;\s*\}/s);
   assert.match(voicePageSource, /form\.set\("confirmed_instruction"/);
+  assert.match(voicePageSource, /fetch\("\/api\/music\/library\/import"/);
+  assert.match(voicePageSource, /params\.confirmation\.intent === "music_local_folder"/);
   assert.match(voicePageSource, /disabled=\{busy \|\| intakeLocked\}/);
   assert.match(voicePageSource, /Voice gate/);
 });
@@ -185,6 +190,21 @@ test("Voice task details drawer fits mobile viewport", () => {
   assert.match(voiceStylesSource, /@media \(max-width: 767px\)[\s\S]*\.voice-drawer\s*\{[\s\S]*width:\s*100vw/);
   assert.match(voiceStylesSource, /@media \(max-width: 767px\)[\s\S]*\.voice-drawer\s*\{[\s\S]*height:\s*100dvh/);
   assert.match(voiceStylesSource, /@media \(max-width: 767px\)[\s\S]*\.drawer-actions\s*\{[\s\S]*position:\s*sticky/);
+});
+
+test("Voice Codex tasks support linked continuation cards", () => {
+  assert.match(runtimeSource, /continue_task_id/);
+  assert.match(runtimeSource, /continuation_mode/);
+  assert.match(runtimeSource, /continuation_choice_required/);
+  assert.match(runtimeSource, /history_context/);
+  assert.match(runtimeSource, /parent_task_id/);
+  assert.match(runtimeSource, /new_card_linked_to_parent_history/);
+  assert.match(runtimeSource, /answer_codex_task instead of creating a duplicate continuation card/);
+  assert.match(runtimeSource, /Use parent_result_excerpt, parent_plan and parent_progress_timeline/);
+  assert.match(realtimeHookSource, /parentTaskId/);
+  assert.match(realtimeHookSource, /continuation/);
+  assert.match(voicePageSource, /Continues:/);
+  assert.match(voicePageSource, /Parent task/);
 });
 
 test("standalone port 3401 voice experiment is deprecated in favor of Control Center", () => {
