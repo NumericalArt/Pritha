@@ -2,6 +2,7 @@
 
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { readStickyContextSetting, STICKY_CONTEXT_CHANGED_EVENT, STICKY_CONTEXT_STORAGE_KEY } from "./voicePreferences";
+import { useVoiceMusicController } from "./useVoiceMusic";
 
 export type RealtimePhase = "idle" | "connecting" | "listening" | "speaking" | "working" | "error";
 
@@ -631,6 +632,7 @@ function usePrithaRealtimeController() {
   const gainNodeRef = useRef<GainNode | null>(null);
   const micInputLevelRef = useRef(micInputLevel);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const eventsChannelRef = useRef<RTCDataChannel | null>(null);
   const assistantDraftRef = useRef("");
   const responseInProgressRef = useRef(false);
@@ -677,6 +679,13 @@ function usePrithaRealtimeController() {
       body: JSON.stringify({ kind, payload }),
     }).catch(() => undefined);
   }, []);
+
+  const music = useVoiceMusicController({ codexTasks, logClientEvent });
+  const musicControlEnabledRef = useRef(false);
+
+  useEffect(() => {
+    musicControlEnabledRef.current = music.controlEnabled;
+  }, [music.controlEnabled]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -860,6 +869,9 @@ function usePrithaRealtimeController() {
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
     }
+    remoteStreamRef.current = null;
+    musicControlEnabledRef.current = false;
+    music.setControlEnabled(false);
     responseInProgressRef.current = false;
     responseQueuedRef.current = false;
     processingToolBatchRef.current = false;
@@ -871,7 +883,7 @@ function usePrithaRealtimeController() {
     assistantDraftRef.current = "";
     setRemoteAudioReady(false);
     setIsMuted(false);
-  }, []);
+  }, [music]);
 
   const requestResponse = useCallback((reason = "") => {
     const channel = eventsChannelRef.current;
@@ -884,6 +896,69 @@ function usePrithaRealtimeController() {
     responseInProgressRef.current = true;
     channel.send(JSON.stringify({ type: "response.create" }));
   }, []);
+
+  const applyRealtimeMusicControlGate = useCallback(
+    async (enabled: boolean) => {
+      const channel = eventsChannelRef.current;
+      if (!channel || channel.readyState !== "open") return false;
+      const response = await fetch("/api/realtime/session-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ musicControlEnabled: enabled }),
+      });
+      const payload = (await response.json().catch(() => ({ ok: false, error: "session config returned non-json" }))) as {
+        ok?: boolean;
+        type?: string;
+        instructions?: string;
+        tools?: Array<{ name?: string }>;
+        tool_choice?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok || !payload.instructions || !Array.isArray(payload.tools)) {
+        throw new Error(payload.error || `Realtime session config failed with status ${response.status}`);
+      }
+      channel.send(
+        JSON.stringify({
+          type: "session.update",
+          session: {
+            type: payload.type || "realtime",
+            instructions: payload.instructions,
+            tools: payload.tools,
+            tool_choice: payload.tool_choice || "auto",
+          },
+        }),
+      );
+      setStatus((current) =>
+        current
+          ? {
+              ...current,
+              tools: payload.tools?.map((tool) => String(tool.name || "")).filter(Boolean) || current.tools,
+            }
+          : current,
+      );
+      setToolStatus(enabled ? "Music control enabled for Realtime voice." : "Music control disabled for Realtime voice.");
+      logClientEvent("realtime_music_control_session_update", {
+        enabled,
+        tool_count: payload.tools.length,
+      });
+      return true;
+    },
+    [logClientEvent],
+  );
+
+  const toggleMusicControl = useCallback(() => {
+    const previous = musicControlEnabledRef.current;
+    const enabled = !previous;
+    musicControlEnabledRef.current = enabled;
+    music.setControlEnabled(enabled);
+    if (enabled && remoteStreamRef.current) void music.attachAssistantStream(remoteStreamRef.current);
+    void applyRealtimeMusicControlGate(enabled).catch((error) => {
+      musicControlEnabledRef.current = previous;
+      music.setControlEnabled(previous);
+      if (previous && remoteStreamRef.current) void music.attachAssistantStream(remoteStreamRef.current);
+      setToolStatus(error instanceof Error ? error.message : "Could not update Realtime music control.");
+    });
+  }, [applyRealtimeMusicControlGate, music]);
 
   const flushQueuedResponse = useCallback(() => {
     if (!responseQueuedRef.current || responseInProgressRef.current || processingToolBatchRef.current) return;
@@ -1742,6 +1817,12 @@ function usePrithaRealtimeController() {
       addTranscript("tool", `Tool call: ${label}`);
       setToolStatus(`Running ${item.name || "tool"}...`);
 
+      if (item.name === "music_control") {
+        const output = (await music.handleMusicControl(args)) as Record<string, unknown>;
+        setToolStatus(JSON.stringify(output, null, 2));
+        return output;
+      }
+
       if (item.name === "confirm_voice_intake") {
         const output = await handleVoiceIntakeConfirmation(args);
         setToolStatus(JSON.stringify(output, null, 2));
@@ -1785,7 +1866,7 @@ function usePrithaRealtimeController() {
 
       return output;
     },
-    [addTranscript, handleVoiceIntakeConfirmation, queueRollingSummaryCheckpoint, startCodexTaskPolling, upsertCodexTask],
+    [addTranscript, handleVoiceIntakeConfirmation, music, queueRollingSummaryCheckpoint, startCodexTaskPolling, upsertCodexTask],
   );
 
   const processPendingToolCalls = useCallback(async () => {
@@ -1853,14 +1934,20 @@ function usePrithaRealtimeController() {
       }
 
       if (event.type === "response.created") responseInProgressRef.current = true;
+      if (event.type === "input_audio_buffer.speech_started") {
+        music.onUserSpeechStart();
+      }
+      if (event.type === "input_audio_buffer.speech_stopped") {
+        music.onUserSpeechStop();
+      }
       if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
         addTranscript("user", event.transcript);
       }
-      if (event.type === "response.audio_transcript.delta" && event.delta) {
+      if ((event.type === "response.audio_transcript.delta" || event.type === "response.output_audio_transcript.delta") && event.delta) {
         assistantDraftRef.current += event.delta;
         setPhase("speaking");
       }
-      if (event.type === "response.audio_transcript.done") {
+      if (event.type === "response.audio_transcript.done" || event.type === "response.output_audio_transcript.done") {
         const text = event.transcript || assistantDraftRef.current;
         assistantDraftRef.current = "";
         if (text) {
@@ -1899,7 +1986,7 @@ function usePrithaRealtimeController() {
         addTranscript("tool", message);
       }
     },
-    [addTranscript, markResponseDone, queueRollingSummaryCheckpoint, rememberToolCall],
+    [addTranscript, markResponseDone, music, queueRollingSummaryCheckpoint, rememberToolCall],
   );
 
   const start = useCallback(async () => {
@@ -1917,7 +2004,7 @@ function usePrithaRealtimeController() {
       const sessionResponse = await fetch("/api/realtime/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ musicControlEnabled: musicControlEnabledRef.current }),
       });
       if (!sessionResponse.ok) {
         const payload = (await sessionResponse.json().catch(() => ({}))) as SessionErrorPayload;
@@ -2023,6 +2110,8 @@ function usePrithaRealtimeController() {
       };
       peerConnection.ontrack = (event) => {
         const remoteStream = event.streams[0];
+        remoteStreamRef.current = remoteStream;
+        if (musicControlEnabledRef.current) void music.attachAssistantStream(remoteStream);
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = remoteStream;
           void remoteAudioRef.current.play();
@@ -2036,12 +2125,11 @@ function usePrithaRealtimeController() {
       channel.onopen = () => {
         rollingSummarySessionActiveRef.current = true;
         setPhase("listening");
-        setToolStatus(
-          "Realtime data channel connected. Tools: full_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task, confirm_voice_intake, web_search, run_codex_task.",
-        );
+        setToolStatus(`Realtime data channel connected. Tools: ${sessionData.tools.join(", ")}.`);
         logClientEvent("realtime_data_channel_connected", {
           session_id: sessionIdRef.current,
           sticky_context_available: stickyContextEnabled,
+          music_control_enabled: musicControlEnabledRef.current,
           event_count: sessionEvents.length,
           task_count: codexTasks.length,
         });
@@ -2076,7 +2164,7 @@ function usePrithaRealtimeController() {
       setError(message);
       addTranscript("tool", message);
     }
-  }, [addTranscript, checkpointRollingSummaryNow, closeConnection, codexTasks.length, handleRealtimeEvent, loadStatus, logClientEvent, phase, queueRollingSummaryCheckpoint, sendPendingVoiceIntakeClarification, sessionEvents.length, stickyContextEnabled]);
+  }, [addTranscript, checkpointRollingSummaryNow, closeConnection, codexTasks.length, handleRealtimeEvent, loadStatus, logClientEvent, music, phase, queueRollingSummaryCheckpoint, sendPendingVoiceIntakeClarification, sessionEvents.length, stickyContextEnabled]);
 
   const beginVoiceIntakeClarification = useCallback(
     (metadata: VoiceIntakeClarificationMetadata, handlers: VoiceIntakePendingHandlers) => {
@@ -2285,6 +2373,7 @@ function usePrithaRealtimeController() {
     remoteAudioReady,
     lastLatencyMs,
     codexTasks,
+    music,
     bindRemoteAudioElement,
     loadStatus,
     loadRecentCodexTasks,
@@ -2294,6 +2383,7 @@ function usePrithaRealtimeController() {
     beginVoiceIntakeClarification,
     stop,
     toggleMute,
+    toggleMusicControl,
     setMicInputLevel,
     sendTextMessage,
     sendSessionRecap,

@@ -9,6 +9,7 @@ import {
   MemoryStick,
   Mic,
   MicOff,
+  Music,
   Paperclip,
   Search,
   SendHorizontal,
@@ -1109,9 +1110,11 @@ function VoiceSessionPanel({
   isMuted,
   micInputLevel,
   micGainRuntime,
+  musicControlEnabled,
   error,
   onPrimary,
   onMute,
+  onMusicToggle,
   onMicInputLevelChange,
   mobile = false,
 }: {
@@ -1121,9 +1124,11 @@ function VoiceSessionPanel({
   isMuted: boolean;
   micInputLevel: number;
   micGainRuntime: MicGainRuntimeState;
+  musicControlEnabled: boolean;
   error: string | null;
   onPrimary: () => void;
   onMute: () => void;
+  onMusicToggle: () => void;
   onMicInputLevelChange: (value: number) => void;
   mobile?: boolean;
 }) {
@@ -1133,6 +1138,9 @@ function VoiceSessionPanel({
   const primaryDisabled = phase === "connecting" || (phase === "idle" && keyMissing);
   const muteDisabled = !active || phase === "connecting";
   const muteTitle = muteDisabled ? "Mute becomes available after Start Listening connects the microphone." : "Toggle microphone mute.";
+  const musicTitle = active
+    ? "Enable or disable generated music control for this voice session."
+    : "Music control can be enabled before starting the voice session.";
   const gainActive = phase === "listening" || phase === "speaking" || phase === "working";
 
   if (mobile) {
@@ -1157,6 +1165,15 @@ function VoiceSessionPanel({
           <button className="mobile-voice-secondary" type="button" onClick={onMute} disabled={muteDisabled} title={muteTitle}>
             {isMuted ? <Mic size={20} /> : <MicOff size={20} />}
             {isMuted ? "Unmute" : "Mute"}
+          </button>
+          <button
+            className={`mobile-voice-secondary ${musicControlEnabled ? "active" : ""}`}
+            type="button"
+            onClick={onMusicToggle}
+            title={musicTitle}
+          >
+            <Music size={20} />
+            Music
           </button>
         </div>
         <MicInputLevelControl value={micInputLevel} active={gainActive} runtime={micGainRuntime} onChange={onMicInputLevelChange} />
@@ -1191,6 +1208,15 @@ function VoiceSessionPanel({
         <button className="voice-primary-button" type="button" onClick={onPrimary} disabled={primaryDisabled}>
           <Square size={18} fill="currentColor" />
           {primaryButtonLabel(phase, status)}
+        </button>
+        <button
+          className={`voice-secondary-control ${musicControlEnabled ? "active" : ""}`}
+          type="button"
+          onClick={onMusicToggle}
+          title={musicTitle}
+        >
+          <Music size={22} />
+          Music
         </button>
       </div>
       <MicInputLevelControl value={micInputLevel} active={gainActive} runtime={micGainRuntime} onChange={onMicInputLevelChange} />
@@ -1299,9 +1325,11 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           isMuted={realtime.isMuted}
           micInputLevel={realtime.micInputLevel}
           micGainRuntime={realtime.micGainRuntime}
+          musicControlEnabled={realtime.music.controlEnabled}
           error={realtime.error}
           onPrimary={primaryAction}
           onMute={realtime.toggleMute}
+          onMusicToggle={realtime.toggleMusicControl}
           onMicInputLevelChange={realtime.setMicInputLevel}
           mobile
         />
@@ -1348,9 +1376,11 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               isMuted={realtime.isMuted}
               micInputLevel={realtime.micInputLevel}
               micGainRuntime={realtime.micGainRuntime}
+              musicControlEnabled={realtime.music.controlEnabled}
               error={realtime.error}
               onPrimary={primaryAction}
               onMute={realtime.toggleMute}
+              onMusicToggle={realtime.toggleMusicControl}
               onMicInputLevelChange={realtime.setMicInputLevel}
             />
             <PasteCommandPanel

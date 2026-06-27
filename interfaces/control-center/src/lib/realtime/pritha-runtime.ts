@@ -48,6 +48,10 @@ type RealtimeToolDefinition = {
   };
 };
 
+type RealtimeSessionBuildOptions = {
+  musicControlEnabled?: boolean;
+};
+
 type RealtimeSessionResponse = {
   client_secret: {
     value: string;
@@ -2541,8 +2545,42 @@ async function handleRecentExternalResearch(args: RecentExternalResearchArgs = {
   }
 }
 
-export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
-  return [
+function musicControlToolDefinition(): RealtimeToolDefinition {
+  return {
+    type: "function",
+    name: "music_control",
+    description:
+      "Control generated background music. Use only when the operator explicitly asks to play, stop, pause, resume, change style, change volume, or change music mode.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["play", "stop", "pause", "resume", "set_style", "set_volume", "set_mode"],
+        },
+        style: {
+          type: "string",
+          description: "Concise requested music style, for example: organ ambient, calm piano, lofi, orchestral, dark ambient.",
+        },
+        volume: {
+          type: "number",
+          minimum: 0,
+          maximum: 1,
+          description: "Normal music volume from 0 to 1. Automatic ducking still applies.",
+        },
+        mode: {
+          type: "string",
+          enum: ["off", "auto", "on"],
+          description: "off = never play; auto = play during long Codex work only; on = keep playing until stopped.",
+        },
+      },
+      required: ["action"],
+    },
+  };
+}
+
+export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = {}): RealtimeToolDefinition[] {
+  const tools: RealtimeToolDefinition[] = [
     {
       type: "function",
       name: "full_pritha_memory",
@@ -2825,15 +2863,31 @@ export function buildPrithaRealtimeTools(): RealtimeToolDefinition[] {
       },
     },
   ];
+  if (options.musicControlEnabled) tools.push(musicControlToolDefinition());
+  return tools;
 }
 
-export function buildRealtimeInstructions() {
+function formatToolNames(toolNames: string[]) {
+  if (toolNames.length <= 1) return toolNames.join("");
+  return `${toolNames.slice(0, -1).join(", ")} and ${toolNames[toolNames.length - 1]}`;
+}
+
+export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions = {}) {
   const settings = getPrithaRuntimeSettings();
+  const toolNames = buildPrithaRealtimeTools(options).map((tool) => tool.name);
+  const musicInstructions = options.musicControlEnabled
+    ? [
+        "Generated background music control is enabled for this session.",
+        "Use music_control only when the operator explicitly asks to start, stop, pause, resume, change style, change volume, or change music mode.",
+        "Do not call music_control for automatic ducking when you or the operator speak. The client app handles ducking locally.",
+        "For style requests, call music_control with action set_style and a concise style string. Examples: \"включи органную музыку\" -> {\"action\":\"set_style\",\"style\":\"organ ambient\"}; \"сделай музыку тише\" -> {\"action\":\"set_volume\",\"volume\":0.45}; \"играй музыку только когда работаешь\" -> {\"action\":\"set_mode\",\"mode\":\"auto\"}.",
+      ]
+    : [];
   return [
     "You are Pritha, a Codex-native agent factory and knowledge assistant.",
     "Speak with the operator in Russian unless they switch language.",
     "This is an experimental realtime voice interface. Keep answers concise, calm and operational.",
-    "You have exactly eight tools: full_pritha_memory, inspect_pritha_files, inspect_codex_task, recall_rolling_summary, answer_codex_task, confirm_voice_intake, web_search and run_codex_task.",
+    `You have exactly ${toolNames.length} tools: ${formatToolNames(toolNames)}.`,
     "Use full_pritha_memory before answering questions about curated Pritha memory: standards, decisions, workflows, child-agent lineage, previous UI/realtime experiments, or stored project knowledge. Query-based search always runs the full retrieval path; do not ask whether the operator wants shallow or deep memory search.",
     "For exact details after search, call full_pritha_memory with operation=read and id_or_path from a prior result.",
     "Use full_pritha_memory for memory status, full search, recent/open document lookup, artifact reads, entity/graph traversal, runtime/task-log memory lookup, confirmed reindexing, confirmed embedding rebuilds, and confirmed curated memory writes/updates.",
@@ -2872,18 +2926,19 @@ export function buildRealtimeInstructions() {
     "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed, step_blocked or operator_question. Never read heartbeat as the main progress update.",
     "Do not ask for secrets or expose credentials. For credentials, route the operator to the child-agent credential UI. For publish, deletion, service install, launchd/cron or broad system changes, create a Codex task and let the UI decision gate collect approval.",
     "Realtime tools must not mutate curated Markdown directly except through confirmed full_pritha_memory memory-write operations or through run_codex_task when its sandbox/write mode permits it. Keep edits narrowly scoped.",
+    ...musicInstructions,
     buildVoiceBehaviorPromptSections(settings.voiceBehaviorProfile),
   ].join("\n\n");
 }
 
-export function buildRealtimeSessionConfig() {
+export function buildRealtimeSessionConfig(options: RealtimeSessionBuildOptions = {}) {
   const runtimeSettings = getPrithaRuntimeSettings();
   return {
     type: "realtime",
     model: env("TECHSCOPE_VOICE_MODEL", env("OPENAI_REALTIME_MODEL", DEFAULT_MODEL)),
-    instructions: buildRealtimeInstructions(),
+    instructions: buildRealtimeInstructions(options),
     tool_choice: "auto",
-    tools: buildPrithaRealtimeTools(),
+    tools: buildPrithaRealtimeTools(options),
     audio: {
       input: {
         turn_detection: {
@@ -2925,7 +2980,7 @@ function normalizeClientSecret(result: RawSessionResponse) {
   return undefined;
 }
 
-export async function createEphemeralRealtimeSession() {
+export async function createEphemeralRealtimeSession(options: RealtimeSessionBuildOptions = {}) {
   const apiKey = env("OPENAI_API_KEY");
   if (!apiKey) {
     throw new RealtimeProviderError({
@@ -2946,7 +3001,7 @@ export async function createEphemeralRealtimeSession() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        session: buildRealtimeSessionConfig(),
+        session: buildRealtimeSessionConfig(options),
       }),
       signal: controller.signal,
     });

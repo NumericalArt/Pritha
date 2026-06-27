@@ -118,7 +118,7 @@ test("Voice intake sends files and links to bounded temporary Codex analysis", (
 
 test("Voice intake requires spoken clarification before Codex upload", () => {
   assert.match(runtimeSource, /name:\s*"confirm_voice_intake"/);
-  assert.match(runtimeSource, /exactly eight tools/);
+  assert.match(runtimeSource, /You have exactly \$\{toolNames\.length\} tools/);
   assert.match(runtimeSource, /Voice Intake Clarification Pending/);
   assert.match(runtimeSource, /do not call run_codex_task/i);
   assert.match(runtimeSource, /voice_confirmation_required/);
@@ -168,7 +168,7 @@ test("Voice Control exposes web search as the active eighth tool and keeps last3
   assert.match(runtimeSource, /external_research:/);
   assert.match(runtimeSource, /last30days_realtime_tool_surface: "disabled"/);
   assert.match(runtimeSource, /web_search: realtimeWebSearchStatus\(\)/);
-  assert.match(realtimeHookSource, /web_search/);
+  assert.match(realtimeHookSource, /sessionData\.tools\.join/);
   assert.doesNotMatch(realtimeHookSource, /recent_external_research/);
   assert.match(voicePageSource, /Web Search/);
   assert.doesNotMatch(voicePageSource, /Recent External Research/);
