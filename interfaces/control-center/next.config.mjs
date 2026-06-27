@@ -5,7 +5,8 @@ const configuredDevOrigins = (process.env.PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIG
   .filter(Boolean);
 
 const nextConfig = {
-  allowedDevOrigins: ["localhost", "127.0.0.1", ...configuredDevOrigins],
+  allowedDevOrigins: ["localhost", "127.0.0.1", "**.ts.net", ...configuredDevOrigins],
+  devIndicators: false,
   async headers() {
     return [
       {

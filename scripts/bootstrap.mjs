@@ -14,24 +14,28 @@ const PROFILES = {
     pythonCore: false,
     pythonMacos: false,
     controlCenter: false,
+    webSearch: false,
     tailscale: false,
   },
   local: {
     pythonCore: true,
     pythonMacos: true,
     controlCenter: false,
+    webSearch: true,
     tailscale: false,
   },
   "control-center": {
     pythonCore: true,
     pythonMacos: true,
     controlCenter: true,
+    webSearch: true,
     tailscale: false,
   },
   "control-center-tailscale": {
     pythonCore: true,
     pythonMacos: true,
     controlCenter: true,
+    webSearch: true,
     tailscale: true,
   },
 };
@@ -89,7 +93,7 @@ function step(id, phase, label, command, args, options = {}) {
     writes: Boolean(options.writes),
     startsForegroundProcess: Boolean(options.startsForegroundProcess),
     required: options.required !== false,
-    timeoutMs: options.timeoutMs || 180000,
+    timeoutMs: options.timeoutMs ?? 180000,
   };
 }
 
@@ -183,6 +187,15 @@ function installSteps(profile, config, options) {
       "--ignore-scripts",
     ], { writes: true, timeoutMs: 900000 }));
   }
+  if (config.webSearch) {
+    steps.push(step("web-search-searxng-install", "install", "Install local SearXNG web search backend", "node", [
+      "scripts/web-search-tools.mjs",
+      "install",
+      "searxng",
+      "--yes",
+      "--json",
+    ], { writes: true, timeoutMs: 1800000 }));
+  }
   if (config.tailscale) {
     steps.push(note(
       "tailscale-install-deferred",
@@ -231,6 +244,14 @@ function verifySteps(profile, config) {
       "build",
     ], { timeoutMs: 600000 }));
   }
+  if (config.webSearch) {
+    steps.push(step("web-search-searxng-status", "verify", "Check local SearXNG install status", "node", [
+      "scripts/web-search-tools.mjs",
+      "status",
+      "--require-installed",
+      "--json",
+    ], { timeoutMs: 60000 }));
+  }
   if (config.tailscale) {
     steps.push(step("tailscale-status", "verify", "Read Tailscale readiness", "node", [
       "scripts/tailscale-setup.mjs",
@@ -245,19 +266,30 @@ function verifySteps(profile, config) {
   return steps;
 }
 
-function startSteps(startTarget) {
+function startSteps(startTarget, config) {
   if (!startTarget || startTarget === true) startTarget = "control-center";
   if (startTarget !== "control-center") {
     throw new Error(`Unknown start target: ${startTarget}`);
   }
-  return [
+  const steps = [];
+  if (config.webSearch) {
+    steps.push(step("web-search-searxng-start", "start", "Start local SearXNG web search backend", "node", [
+      "scripts/web-search-tools.mjs",
+      "start",
+      "searxng",
+      "--yes",
+      "--json",
+    ], { writes: true, timeoutMs: 1800000 }));
+  }
+  steps.push(
     step("control-center-dev", "start", "Start Control Center in the foreground", "npm", [
       "--prefix",
       "interfaces/control-center",
       "run",
       "dev",
     ], { startsForegroundProcess: true, timeoutMs: 0 }),
-  ];
+  );
+  return steps;
 }
 
 function plannedSteps(sequence, profile, config, options) {
@@ -266,13 +298,13 @@ function plannedSteps(sequence, profile, config, options) {
     if (phase === "plan") {
       steps.push(...installSteps(profile, config, options));
       steps.push(...verifySteps(profile, config));
-      if (options.start) steps.push(...startSteps(options.start));
+      if (options.start) steps.push(...startSteps(options.start, config));
     } else if (phase === "install") {
       steps.push(...installSteps(profile, config, options));
     } else if (phase === "verify") {
       steps.push(...verifySteps(profile, config));
     } else if (phase === "start") {
-      steps.push(...startSteps(options.start));
+      steps.push(...startSteps(options.start, config));
     }
   }
   return steps;
@@ -342,7 +374,8 @@ async function main() {
 Profiles: minimal, local, control-center, control-center-tailscale
 
 Safety: bootstrap never installs launchd, cron, durable services, Tailscale, or
-credentials. The Control Center start command runs in the foreground.`);
+credentials. The local web search backend is installed under ignored .tools and
+.private paths. The Control Center start command runs in the foreground.`);
     return;
   }
 

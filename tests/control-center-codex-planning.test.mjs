@@ -79,13 +79,28 @@ test("Realtime Codex handoff waits for explicit full-brief confirmation", () => 
   assert.match(runtimeSource, /handoff_confirmation_required/);
   assert.match(runtimeSource, /ТЗ полностью проговорено\? Передавать это в Codex\?/);
   assert.match(runtimeSource, /brief is complete and ready for Codex/);
-  assert.match(runtimeSource, /ask concise clarifying questions if required fields are missing/);
-  assert.match(runtimeSource, /Ask at most three questions at a time/);
+  assert.match(runtimeSource, /ask only for missing information that blocks a useful Codex handoff/);
+  assert.match(runtimeSource, /Do not announce a fixed number of questions/);
+  assert.match(runtimeSource, /Ask one concise question per turn/);
+  assert.match(runtimeSource, /use up to five total only for genuinely complex or risky tasks/i);
+  assert.match(runtimeSource, /short confirmations like да, ок, подтверждаю, передавай, запускай/);
+  assert.match(runtimeSource, /concise synthesized note that the operator confirmed by voice/);
 
   const guardIndex = runtimeSource.indexOf("const handoffConfirmation = codexTaskHandoffConfirmationResult(args, task);");
   const mkdirIndex = runtimeSource.indexOf("await mkdir(taskDir, { recursive: true });");
   assert.ok(guardIndex > 0, "runCodexTask should check handoff confirmation");
   assert.ok(mkdirIndex > guardIndex, "handoff confirmation guard should run before task files/directories are created");
+});
+
+test("Voice Codex confirmations can be synthesized from short spoken approval", () => {
+  assert.match(runtimeSource, /function isShortPositiveConfirmation\(value: unknown\)/);
+  assert.match(runtimeSource, /function extractRequestedConfirmationPhrase\(question: unknown\)/);
+  assert.match(runtimeSource, /function synthesizeCodexOperatorAnswer\(question: unknown, spokenAnswer: string\)/);
+  assert.match(runtimeSource, /synthesized_from_voice_confirmation/);
+  assert.match(runtimeSource, /spoken_answer/);
+  assert.match(runtimeSource, /requested_confirmation_phrase/);
+  assert.match(runtimeSource, /operatorQuestions must contain at most one next blocking question/);
+  assert.match(runtimeSource, /\.slice\(0, 1\)/);
 });
 
 test("Voice UI keeps watching approval-gated tasks and handoffs approval decisions once", () => {

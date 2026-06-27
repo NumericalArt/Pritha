@@ -3,7 +3,7 @@ id: 2026-06-23-last30days-external-research-backend-runbook
 type: workflow
 status: active
 created: 2026-06-23
-updated: 2026-06-23
+updated: 2026-06-25
 topics:
   - pritha
   - external-research
@@ -22,9 +22,11 @@ sources:
   - scripts/agents-mother/index.mjs
   - 07_workflows/2026-06-22-pritha-child-agent-external-research-gate-implementation-plan.md
   - https://github.com/mvanhorn/last30days-skill
+  - 07_workflows/2026-06-25-pritha-last30days-voice-tool-plan.md
 related:
   workflows:
     - 07_workflows/2026-06-22-pritha-child-agent-external-research-gate-implementation-plan.md
+    - 07_workflows/2026-06-25-pritha-last30days-voice-tool-plan.md
     - 07_workflows/agents-mother.md
   reviews:
     - 03_reviews/2026-06-22-last30days-skill-pritha-harness-assessment.md
@@ -69,9 +71,18 @@ APIs, runtime models, Realtime/voice behavior, Telegram, MCP, deployment,
 security constraints, dependency versions, local inference, RAG/storage or other
 internet-sensitive topics.
 
-Voice Control must not call `last30days` directly. Voice Control creates a
-Codex `agent_creation` task; that Codex task runs `research`, then
-`external-research`, then scaffold only after the research gate is complete.
+For child-agent creation and scaffold gates, Voice Control must not call raw
+`last30days` directly. Voice Control creates a Codex `agent_creation` task; that
+Codex task runs `research`, then `external-research`, then scaffold only after
+the research gate is complete.
+
+For quick spoken freshness checks, Pritha Voice Control may call the narrow
+`recent_external_research` Realtime tool. That tool is a Pritha-owned
+no-secret wrapper around `scripts/external-research-tools.mjs recent
+last30days`; it returns a bounded voice-ready research brief and stores raw
+output only in private runtime artifacts. It does not replace this child-agent
+research gate and must not be treated as enough evidence to scaffold, publish or
+change standards without Codex/primary-source follow-up.
 
 ## Preconditions
 
@@ -111,6 +122,21 @@ run sets:
 Scaffold is allowed only after the research report references the contract and
 the research gate is complete, unless the user explicitly chooses an
 experimental override.
+
+## Voice quick research command
+
+Use this only through the `recent_external_research` Voice Control tool or for a
+local smoke test of that tool surface:
+
+```sh
+node scripts/external-research-tools.mjs recent last30days --query "<topic>" --days 30 --mode quick
+```
+
+Default sources are `reddit,hackernews,polymarket,grounding`; `github` and
+`jobs` are also allowed as public no-secret sources. X/Twitter, YouTube,
+browser cookies, ScrapeCreators, Perplexity, paid APIs, private auth,
+`--store`, watchlists, publish/setup and scheduler behavior remain out of scope
+for default voice runs.
 
 ## Safety Notes
 

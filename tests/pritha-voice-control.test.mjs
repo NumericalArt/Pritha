@@ -9,6 +9,7 @@ const voicePageSource = readFileSync("interfaces/control-center/src/components/v
 const voiceStylesSource = readFileSync("interfaces/control-center/src/styles/globals.css", "utf8");
 const realtimeHookSource = readFileSync("interfaces/control-center/src/components/voice/usePrithaRealtime.ts", "utf8");
 const legacyScriptSource = readFileSync("scripts/pritha-voice-control.mjs", "utf8");
+const webSearchToolsSource = readFileSync("scripts/web-search-tools.mjs", "utf8");
 const voiceRoadmapSource = readFileSync("07_workflows/2026-06-12-control-center-voice-page-roadmap.md", "utf8");
 const interfacesManifest = JSON.parse(readFileSync("interfaces/manifest.json", "utf8"));
 const legacyExperimentManifest = JSON.parse(readFileSync("interfaces/experiments/pritha-voice-control/manifest.json", "utf8"));
@@ -42,6 +43,9 @@ test("Voice UI fallback tool list includes filesystem inspection", () => {
   assert.doesNotMatch(voicePageSource, new RegExp(`"${legacyDeepToolName}"`));
   assert.match(voicePageSource, /"inspect_pritha_files"/);
   assert.match(voicePageSource, /"recall_rolling_summary"/);
+  assert.match(voicePageSource, /"confirm_voice_intake"/);
+  assert.match(voicePageSource, /"web_search"/);
+  assert.doesNotMatch(voicePageSource, /"recent_external_research"/);
 });
 
 test("Voice UI task cards stay stable and avoid duplicate approval placeholders", () => {
@@ -96,6 +100,7 @@ test("Voice intake sends files and links to bounded temporary Codex analysis", (
   assert.match(runtimeSource, /isVideoOrTranscriptUrl/);
   assert.match(runtimeSource, /scripts\/transcribe-media\.mjs/);
   assert.match(runtimeSource, /Do not store raw uploaded files or full transcripts in tracked memory/);
+  assert.match(runtimeSource, /confirmation,/);
 
   assert.match(voicePageSource, /const CLIENT_INTAKE_MAX_FILES = 8/);
   assert.match(voicePageSource, /const CLIENT_INTAKE_MAX_FILE_BYTES = 10 \* 1024 \* 1024/);
@@ -109,6 +114,64 @@ test("Voice intake sends files and links to bounded temporary Codex analysis", (
   assert.match(voiceRoadmapSource, /Direct Codex Analysis/);
   assert.match(voiceRoadmapSource, /Document Processor is intentionally not used/);
   assert.doesNotMatch(voiceRoadmapSource, /Evaluate the GitHub Document Processor project/);
+});
+
+test("Voice intake requires spoken clarification before Codex upload", () => {
+  assert.match(runtimeSource, /name:\s*"confirm_voice_intake"/);
+  assert.match(runtimeSource, /exactly eight tools/);
+  assert.match(runtimeSource, /Voice Intake Clarification Pending/);
+  assert.match(runtimeSource, /do not call run_codex_task/i);
+  assert.match(runtimeSource, /voice_confirmation_required/);
+  assert.match(runtimeSource, /\(files\.length > 0 \|\| links\.length > 0\) && !confirmation\.instruction/);
+  assert.match(runtimeSource, /Confirmed voice instruction:/);
+  assert.match(runtimeSource, /Treat the confirmed voice instruction as the operator's trusted task intent/);
+  assert.match(runtimeSource, /write_if_relevant/);
+
+  assert.match(intakeRouteSource, /confirmed_instruction/);
+  assert.match(intakeRouteSource, /confirmation_intake_id/);
+  assert.match(intakeRouteSource, /voice_confirmation_required/);
+
+  assert.match(realtimeHookSource, /pendingVoiceIntakeRef/);
+  assert.match(realtimeHookSource, /formatVoiceIntakeClarificationPrompt/);
+  assert.match(realtimeHookSource, /item\.name === "confirm_voice_intake"/);
+  assert.match(realtimeHookSource, /beginVoiceIntakeClarification/);
+  assert.match(realtimeHookSource, /sendPendingVoiceIntakeClarification\("data_channel_open"\)/);
+  assert.match(realtimeHookSource, /Attached file metadata only; file bytes are still local in the browser/);
+
+  assert.match(voicePageSource, /startVoiceIntakeClarification/);
+  assert.match(voicePageSource, /beginVoiceIntakeClarification\(metadata/);
+  assert.match(voicePageSource, /if \(routesToCodex\) \{\s*startVoiceIntakeClarification\(\);\s*return;\s*\}/s);
+  assert.match(voicePageSource, /form\.set\("confirmed_instruction"/);
+  assert.match(voicePageSource, /disabled=\{busy \|\| intakeLocked\}/);
+  assert.match(voicePageSource, /Voice gate/);
+});
+
+test("Voice Control exposes web search as the active eighth tool and keeps last30days disabled from Realtime", () => {
+  assert.match(runtimeSource, /name:\s*"web_search"/);
+  assert.doesNotMatch(runtimeSource, /name:\s*"recent_external_research"/);
+  assert.match(runtimeSource, /name === "recent_external_research"/);
+  assert.match(runtimeSource, /Search the current public web through Pritha's local SearXNG backend/);
+  assert.match(runtimeSource, /PRITHA_SEARXNG_URL/);
+  assert.match(runtimeSource, /PRITHA_WEB_SEARCH_AUTO_ENSURE/);
+  assert.match(runtimeSource, /ensureLocalSearxngSearchBackend/);
+  assert.match(runtimeSource, /local_searxng_auto_ensure_ran/);
+  assert.match(runtimeSource, /operation=diagnose/);
+  assert.match(runtimeSource, /output = await handleWebSearch\(args\);/);
+  assert.match(webSearchToolsSource, /searxng-lock\.json/);
+  assert.match(webSearchToolsSource, /install searxng --yes/);
+  assert.match(webSearchToolsSource, /start searxng --yes/);
+  assert.match(webSearchToolsSource, /binds to 127\.0\.0\.1/);
+  assert.match(runtimeSource, /recent_external_research\/last30days remains available in the backend but is intentionally not exposed as an active Realtime tool/);
+  assert.match(runtimeSource, /RECENT_RESEARCH_DEFAULT_SOURCES = "reddit,hackernews,polymarket,grounding"/);
+  assert.match(runtimeSource, /RECENT_RESEARCH_ALLOWED_SOURCES = new Set\(\["reddit", "hackernews", "polymarket", "grounding", "github", "jobs"\]\)/);
+  assert.match(runtimeSource, /output = await handleRecentExternalResearch\(args\);/);
+  assert.match(runtimeSource, /external_research:/);
+  assert.match(runtimeSource, /last30days_realtime_tool_surface: "disabled"/);
+  assert.match(runtimeSource, /web_search: realtimeWebSearchStatus\(\)/);
+  assert.match(realtimeHookSource, /web_search/);
+  assert.doesNotMatch(realtimeHookSource, /recent_external_research/);
+  assert.match(voicePageSource, /Web Search/);
+  assert.doesNotMatch(voicePageSource, /Recent External Research/);
 });
 
 test("Voice task details drawer fits mobile viewport", () => {
