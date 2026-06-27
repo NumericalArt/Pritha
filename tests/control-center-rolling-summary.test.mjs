@@ -445,7 +445,7 @@ test("Control Center wires rolling summaries to private storage and debounced cl
   assert.match(hookSource, /unmountCleanupRef/);
   assert.match(hookSource, /cleanup\.closeConnection\?\.\(\)/);
   assert.match(hookSource, /cleanup\.closeConnection\?\.\(\);\n\s+\};\n\s+\}, \[\]\);/);
-  assert.match(hookSource, /recall_rolling_summary/);
+  assert.match(hookSource, /sessionData\.tools\.join/);
   assert.doesNotMatch(hookSource, /sendRollingSummaryRecall/);
   assert.doesNotMatch(hookSource, /Internal Rolling Summary Recall/);
   assert.doesNotMatch(hookSource, /rolling_summary_recall_used/);
