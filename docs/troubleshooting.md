@@ -50,17 +50,13 @@ http://127.0.0.1:3420/agents
 running Control Center. A phone that scans a localhost QR code will try to open
 the phone's own localhost, not the Mac.
 
-For temporary trusted-LAN testing, Control Center must listen on a non-loopback
-host:
+LAN binding is disabled by policy in this build. Keep Control Center on
+`127.0.0.1` and use Tailscale Serve for phone or trusted peer-device access.
 
 ```sh
-PRITHA_CONTROL_CENTER_HOST=0.0.0.0 \
-PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIGINS=<mac-lan-ip> \
-npm --prefix interfaces/control-center run dev
+node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs status --json
 ```
-
-This exposes the UI to the local network. Prefer Tailscale for normal private
-phone access.
 
 Check a running Control Center without mutating local runtime state:
 

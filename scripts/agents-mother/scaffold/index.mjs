@@ -37,6 +37,14 @@ function scalar(value, fallback = "TBD") {
   return text || fallback;
 }
 
+const SHELL_COMMAND_META_PATTERN = /[;&|<>`$\\'"()\n\r]/;
+
+function commandArgvFromText(value) {
+  const text = scalar(value, "");
+  if (!text || SHELL_COMMAND_META_PATTERN.test(text)) return [];
+  return text.split(/\s+/).filter(Boolean);
+}
+
 function yamlScalar(value) {
   return String(value || "")
     .replaceAll("\n", " ")
@@ -231,6 +239,7 @@ function operationProfileFor(data) {
   const serviceMode = normalizeServiceMode(data.serviceMode || data.expectedHosting || "none");
   const autostart = normalizeAutostartMode(data.autostart || "disabled", serviceMode);
   const proactiveMode = normalizeProactiveMode(data.proactiveMode || "none");
+  const healthcheckCommand = scalar(data.healthcheckCommand, "node scripts/smoke-test.mjs");
   return {
     serviceMode,
     autostart,
@@ -238,7 +247,8 @@ function operationProfileFor(data) {
     deploymentProfile: scalar(data.deploymentProfile, "local-development"),
     startCommand: scalar(data.startCommand, "node scripts/agent-cli.mjs status"),
     stopCommand: scalar(data.stopCommand, serviceMode === "none" ? "not-applicable" : "manual stop; define before production"),
-    healthcheckCommand: scalar(data.healthcheckCommand, "node scripts/smoke-test.mjs"),
+    healthcheckCommand,
+    healthcheckArgv: commandArgvFromText(healthcheckCommand),
     logPath: scalar(data.logPath, "logs/"),
     restartPolicy: serviceMode === "launchd" ? "launchd template only; install after explicit user approval" : "manual unless contract is updated",
     serviceLabel: `com.local.${slug(data.agentName, "agent")}`,
@@ -720,6 +730,8 @@ export function generatedAgentFiles(data) {
       description: "Structured Control Center entrypoint. Disabled until control_center_managed is explicitly approved.",
     },
     healthcheck_command: operationProfile.healthcheckCommand,
+    healthcheck_argv: operationProfile.healthcheckArgv,
+    healthcheck_command_executable: false,
     log_path: operationProfile.logPath,
     restart_policy: operationProfile.restartPolicy,
     service_label: operationProfile.serviceLabel,
@@ -1235,7 +1247,7 @@ Proactive mode: \`${operationProfile.proactiveMode}\`
 
 \`\`\`sh
 node scripts/operations-status.mjs
-${operationProfile.healthcheckCommand}
+${operationProfile.healthcheckArgv.length > 0 ? operationProfile.healthcheckArgv.join(" ") : "# Define operations/manifest.json healthcheck_argv before deployment install"}
 \`\`\`
 
 ## Policy
@@ -1244,7 +1256,8 @@ ${operationProfile.healthcheckCommand}
 - Scaffold never installs autostart.
 - Autostart is configurable through the contract, but enabling it requires an explicit user-approved deployment step.
 - Control Center start/stop use structured argv only. Legacy command strings are planning evidence, not executable input.
-- Keep healthcheck, runtime manager, start argv, stop behavior and log paths documented before treating this as a service.
+- Healthcheck execution uses \`healthcheck_argv\` only. Legacy \`healthcheck_command\` is planning/display metadata.
+- Keep healthcheck argv, runtime manager, start argv, stop behavior and log paths documented before treating this as a service.
 - Deployment automation is available through \`node scripts/deploy-service.mjs plan|status|install|uninstall\`.
 - \`install\` and \`uninstall\` require \`--yes\` and refuse incompatible service/autostart modes.
 
@@ -1254,7 +1267,8 @@ ${operationProfile.healthcheckCommand}
 - Runtime manager: \`none\`
 - Planned start command: \`${operationProfile.startCommand}\`
 - Planned stop command: \`${operationProfile.stopCommand}\`
-- Healthcheck command: \`${operationProfile.healthcheckCommand}\`
+- Healthcheck argv: \`${operationProfile.healthcheckArgv.length > 0 ? operationProfile.healthcheckArgv.join(" ") : "not configured"}\`
+- Legacy healthcheck command: \`${operationProfile.healthcheckCommand}\`
 - Log path: \`${operationProfile.logPath}\`
 - Restart policy: ${operationProfile.restartPolicy}
 - Service label: \`${operationProfile.serviceLabel}\`
@@ -1564,7 +1578,8 @@ console.log(\`Control Center managed: \${manifest.control_center_managed === tru
 console.log(\`Control Center runtime: \${manifest.control_center_runtime?.manager || "none"}\`);
 console.log(\`Start: \${commandSummary(manifest.start_command)}\`);
 console.log(\`Stop: \${commandSummary(manifest.stop_command)}\`);
-console.log(\`Healthcheck: \${manifest.healthcheck_command}\`);
+console.log(\`Healthcheck argv: \${Array.isArray(manifest.healthcheck_argv) ? manifest.healthcheck_argv.join(" ") : "not configured"}\`);
+console.log(\`Legacy healthcheck command: \${manifest.healthcheck_command || "not documented"}\`);
 console.log(\`Logs: \${manifest.log_path}\`);
 if (manifest.proactivity) {
   console.log(\`Proactive mode: \${manifest.proactivity.mode}\`);
@@ -1639,6 +1654,17 @@ function commandSummary(command) {
   return JSON.stringify(command);
 }
 
+function healthcheckArgv() {
+  if (!Array.isArray(manifest.healthcheck_argv)) return [];
+  return manifest.healthcheck_argv.map((part) => String(part || "")).filter(Boolean);
+}
+
+function healthcheckSummary() {
+  const argv = healthcheckArgv();
+  if (argv.length > 0) return argv.join(" ");
+  return \`\${manifest.healthcheck_command || "not configured"} (legacy/planning only)\`;
+}
+
 function renderTemplate() {
   if (!manifest.launchd_template) {
     console.error("No launchd template selected in operations/manifest.json");
@@ -1676,7 +1702,7 @@ function printPlan() {
   console.log(\`Proactive mode: \${manifest.proactivity?.mode || "unknown"}\`);
   console.log(\`Service label: \${serviceLabel}\`);
   console.log(\`LaunchAgent path: \${launchAgentPath}\`);
-  console.log(\`Healthcheck: \${manifest.healthcheck_command}\`);
+  console.log(\`Healthcheck: \${healthcheckSummary()}\`);
   console.log(\`Start: \${commandSummary(manifest.start_command)}\`);
   console.log(\`Stop: \${commandSummary(manifest.stop_command)}\`);
   if (manifest.service_mode !== "launchd") {
@@ -1705,12 +1731,13 @@ function printStatus() {
 }
 
 function runHealthcheck() {
-  if (!manifest.healthcheck_command) {
-    console.error("No healthcheck_command in operations/manifest.json");
+  const argv = healthcheckArgv();
+  if (argv.length === 0) {
+    console.error("No healthcheck_argv (array) in operations/manifest.json. Legacy healthcheck_command is display-only.");
     process.exit(1);
   }
-  console.log(\`Running healthcheck: \${manifest.healthcheck_command}\`);
-  const result = run("/bin/sh", ["-lc", manifest.healthcheck_command], { timeout: 60000 });
+  console.log(\`Running healthcheck: \${argv.join(" ")}\`);
+  const result = run(argv[0], argv.slice(1), { timeout: 60000 });
   if (result.output) console.log(result.output);
 }
 

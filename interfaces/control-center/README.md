@@ -48,9 +48,7 @@ on `3000`.
 
 Localhost URLs and localhost QR codes work only on the Mac that runs Control
 Center. A phone sees `127.0.0.1` as the phone itself. For phone access, prefer
-Tailscale Serve; for temporary trusted-LAN testing start with
-`PRITHA_CONTROL_CENTER_HOST=0.0.0.0` and set
-`PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIGINS` to the Mac LAN IP.
+Tailscale Serve. LAN binding is disabled by policy in this build.
 
 Do not expose `next dev` through Tailscale. The dev client can render the page
 while failing to hydrate React event handlers behind HTTPS proxying; production
@@ -62,6 +60,8 @@ Optional local env:
 ```sh
 PRITHA_CONTROL_CENTER_HOST=127.0.0.1
 PRITHA_CONTROL_CENTER_PORT=3420
+PRITHA_TAILNET_HOSTNAME=
+PRITHA_TAILSCALE_ALLOWED_LOGINS=
 ```
 
 ## Optional Voice Music Control

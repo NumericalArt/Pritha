@@ -790,6 +790,9 @@ async function readArtifact(identifier: unknown, maxChars = 8_000) {
   if (!relative || !isPathInsideOrSame(root, fullPath)) {
     return { ok: false, error: "path_outside_root", path: relative };
   }
+  if (isExcludedSecretPath(fullPath)) {
+    return { ok: false, error: "path_excluded", path: rootRelative(root, fullPath) };
+  }
   if (!existsSync(fullPath)) {
     return { ok: false, error: "artifact_not_found", identifier: requestedPath };
   }
@@ -1621,6 +1624,16 @@ function isExcludedFilesystemEntry(name: string, fullPath: string) {
   if (FILESYSTEM_EXCLUDED_NAMES.has(name)) return true;
   if (name.startsWith(".") && [".env", ".DS_Store"].includes(name)) return true;
   const relative = rootRelative(resolveTechscopeRoot(), fullPath);
+  return FILESYSTEM_EXCLUDED_FILE_PATTERNS.some((pattern) => pattern.test(name) || pattern.test(relative));
+}
+
+function isExcludedSecretPath(fullPath: string) {
+  const root = resolveTechscopeRoot();
+  const name = path.basename(fullPath);
+  if (FILESYSTEM_EXCLUDED_NAMES.has(name)) return true;
+  const relative = rootRelative(root, fullPath);
+  const segments = relative.split(path.sep).filter(Boolean);
+  if (segments.some((segment) => FILESYSTEM_EXCLUDED_NAMES.has(segment))) return true;
   return FILESYSTEM_EXCLUDED_FILE_PATTERNS.some((pattern) => pattern.test(name) || pattern.test(relative));
 }
 

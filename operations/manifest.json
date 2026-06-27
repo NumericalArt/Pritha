@@ -11,6 +11,11 @@
   "stop_command": "launchctl bootout gui/$(id -u)/com.techscope.web; launchctl bootout gui/$(id -u)/com.techscope.telegram-bot",
   "smoke_test_command": "node scripts/smoke-test.mjs",
   "healthcheck_command": "node scripts/healthcheck.mjs",
+  "healthcheck_argv": [
+    "node",
+    "scripts/healthcheck.mjs"
+  ],
+  "healthcheck_command_executable": false,
   "log_path": ".logs/",
   "launchd_template": "launchd/com.techscope.web.plist",
   "proactivity": {

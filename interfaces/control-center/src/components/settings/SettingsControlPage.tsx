@@ -309,9 +309,9 @@ function VoiceLinkModal({ mode, url, onClose }: { mode: AccessMode; url?: string
 
   const localOnly = mode === "localhost";
   const connectionNote = localOnly
-    ? "Localhost works only on this Mac. On a phone, 127.0.0.1 means the phone itself. Use LAN after binding to 0.0.0.0, or use Tailscale."
+    ? "Localhost works only on this Mac. On a phone, 127.0.0.1 means the phone itself. Use Tailscale Serve for phone access."
     : mode === "lan"
-      ? "LAN works only when the Mac and phone are on the same trusted network and Control Center listens on 0.0.0.0."
+      ? "LAN access is disabled by policy. Control Center stays on 127.0.0.1; use Tailscale Serve for trusted devices."
       : "Tailscale opens this only to trusted devices in the same tailnet. Peer access is accepted after opening this URL from the phone.";
   return (
     <div className="access-modal-overlay" role="presentation" onMouseDown={(event) => (event.target === event.currentTarget ? onClose() : undefined)}>
@@ -337,7 +337,7 @@ function VoiceLinkModal({ mode, url, onClose }: { mode: AccessMode; url?: string
 function accessStatusLabel(access: ControlCenterStatus["access"] | undefined, mode: AccessMode) {
   if (!access) return "Loading";
   if (mode === "localhost") return "Mac only";
-  if (mode === "lan") return access.lan === "ready" ? "Ready" : access.lanUrl ? "Detected, not listening" : "Unavailable";
+  if (mode === "lan") return access.lan === "ready" ? "Ready" : "Disabled";
   if (access.tailscale === "ready") return "Serve ready";
   if (access.tailscale === "pending_auth") return "Needs Serve";
   return "Not configured";
@@ -414,8 +414,8 @@ function AccessSection({ access }: AccessProps) {
     {
       id: "lan" as const,
       label: "LAN",
-      value: access?.lanUrl || "Unavailable",
-      detail: access?.lanReason || "Requires a trusted LAN and 0.0.0.0 host binding.",
+      value: "Disabled by policy",
+      detail: access?.lanReason || "LAN binding is disabled by policy. Use Tailscale Serve.",
       icon: Home,
     },
     {
@@ -465,7 +465,7 @@ function AccessSection({ access }: AccessProps) {
       </div>
       <div className="info-note">
         <Info size={17} />
-        Localhost QR codes do not work from a phone. LAN requires Control Center to listen beyond 127.0.0.1; Tailscale is the recommended private phone path.
+        Localhost QR codes do not work from a phone. LAN binding is disabled by policy; Tailscale is the private phone path.
       </div>
       <TailscaleSetupPanel access={access} />
       {voiceLinkOpen ? <VoiceLinkModal mode={voiceMode} url={voiceUrl} onClose={() => setVoiceLinkOpen(false)} /> : null}

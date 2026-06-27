@@ -353,7 +353,7 @@ function canonicalTailscaleServeConfigured(dnsName: string, serveStatus: string)
 
 function accessLinks(): AccessLinkState {
   const lanIp = firstLanIPv4();
-  const lanReady = Boolean(lanIp) && !["127.0.0.1", "localhost", "::1"].includes(APP_HOST);
+  const lanReady = false;
   const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || tailscaleSelfDnsName();
   const serveStatus = dnsName ? tailscaleServeStatusOutput() : "";
   const serveStatusJson = dnsName ? tailscaleServeStatusJson() : null;
@@ -368,11 +368,7 @@ function accessLinks(): AccessLinkState {
     lanUrl: lanIp ? `http://${lanIp}:${APP_PORT}` : undefined,
     lanReady,
     lanBindHost: APP_HOST,
-    lanReason: lanReady
-      ? "Control Center is listening on a non-loopback host."
-      : lanIp
-        ? `Detected ${lanIp}, but Control Center is bound to ${APP_HOST}. Start with PRITHA_CONTROL_CENTER_HOST=0.0.0.0 for LAN access.`
-        : "No non-internal LAN IPv4 address was detected.",
+    lanReason: "LAN access is disabled by policy. Use Tailscale Serve for phone or trusted peer access.",
     tailscaleUrl,
     tailscaleVoiceUrl: tailscaleUrl ? `${tailscaleUrl}/voice` : undefined,
     tailscaleServeConfigured: serveConfigured,
