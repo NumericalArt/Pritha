@@ -4,12 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { SomaFmApiClient } from "../interfaces/control-center/src/lib/music/somafm/api-client.ts";
-import { parseM3u, parsePls } from "../interfaces/control-center/src/lib/music/somafm/playlists.ts";
-import {
-  normalizeSomaFmChannel,
-  preferredSomaFmPlaylist,
-} from "../interfaces/control-center/src/lib/music/somafm/types.ts";
+import { importControlCenterMusicModule } from "./helpers/control-center-ts.mjs";
+
+const { SomaFmApiClient } = await importControlCenterMusicModule("somafm/api-client.ts");
+const { parseM3u, parsePls } = await importControlCenterMusicModule("somafm/playlists.ts");
+const { normalizeSomaFmChannel, preferredSomaFmPlaylist } = await importControlCenterMusicModule("somafm/types.ts");
 
 function testConfig(cachePath) {
   return {
