@@ -133,8 +133,8 @@ node scripts/external-research-tools.mjs recent last30days --query "<topic>" --d
 ```
 
 Default sources are `reddit,hackernews,polymarket,grounding`; `github` and
-`jobs` are also allowed as public no-secret sources. X/Twitter, YouTube,
-browser cookies, ScrapeCreators, Perplexity, paid APIs, private auth,
+`jobs` are also allowed as public no-secret sources. Private social/video
+platform sources, browser cookies, ScrapeCreators, Perplexity, paid APIs, private auth,
 `--store`, watchlists, publish/setup and scheduler behavior remain out of scope
 for default voice runs.
 

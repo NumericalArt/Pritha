@@ -26,6 +26,29 @@ function runSql(sql) {
   });
 }
 
+function runScalarSql(sql) {
+  return execFileSync("sqlite3", ["-noheader", DB_PATH, sql], {
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+}
+
+function tableExists(tableName) {
+  return runScalarSql(`
+SELECT COUNT(*)
+FROM sqlite_master
+WHERE type = 'table'
+  AND name = ${sqlString(tableName)};
+`) === "1";
+}
+
+function countTableQuery(tableName) {
+  if (!tableExists(tableName)) {
+    return `SELECT ${sqlString(tableName)} AS table_name, 0 AS count`;
+  }
+  return `SELECT ${sqlString(tableName)} AS table_name, COUNT(*) AS count FROM ${tableName}`;
+}
+
 const command = process.argv[2] || "help";
 const arg = process.argv.slice(3).join(" ");
 
@@ -51,13 +74,8 @@ Filters:
 }
 
 if (command === "stats") {
-  console.log(runSql(`
-SELECT 'documents' AS table_name, COUNT(*) AS count FROM documents
-UNION ALL SELECT 'chunks', COUNT(*) FROM chunks
-UNION ALL SELECT 'entities', COUNT(*) FROM entities
-UNION ALL SELECT 'relations', COUNT(*) FROM relations
-UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
-`));
+  const tables = ["documents", "chunks", "entities", "relations", "embeddings"];
+  console.log(runSql(`${tables.map(countTableQuery).join("\nUNION ALL\n")};`));
   process.exit(0);
 }
 

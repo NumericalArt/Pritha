@@ -31,10 +31,11 @@ test("public install docs use bootstrap as the fresh-clone entrypoint", () => {
   }
 });
 
-test("README defines Pritha as a universal trainable child-agent creator", () => {
+test("README defines Pritha as a local-first child-agent factory", () => {
   const body = text("README.md");
-  assert.match(body, /universal, trainable agent/i);
-  assert.match(body, /Improve its own knowledge base, tools and agent-creation capabilities/);
-  assert.match(body, /Create new child agents and improve existing child agents/);
-  assert.match(body, /does not install\s+launchd, cron, Tailscale, durable services or credentials/);
+  assert.match(body, /local-first, voice-first Control Center/i);
+  assert.match(body, /Codex-native agent factory and operator console/i);
+  assert.match(body, /improve its own\s+agent-building knowledge/i);
+  assert.match(body, /create focused child agents with explicit contracts/i);
+  assert.match(body, /does not install\s+launchd, cron, Tailscale, durable services,? or credentials/);
 });

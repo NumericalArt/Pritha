@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 function runBootstrap(args) {
   return spawnSync("node", ["scripts/bootstrap.mjs", ...args], {
@@ -63,4 +66,35 @@ test("bootstrap verify minimal performs read-only prerequisite checks", () => {
   assert.deepEqual(payload.phases, ["verify"]);
   assert.ok(payload.steps.every((step) => step.writes === false));
   assert.ok(payload.steps.some((step) => step.id === "validate-memory" && step.status === "pass"));
+});
+
+test("query-memory stats tolerates minimal memory index without embeddings", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "pritha-minimal-memory-"));
+  try {
+    mkdirSync(path.join(root, ".memory"), { recursive: true });
+    const dbPath = path.join(root, ".memory", "techscope.sqlite");
+    const setup = spawnSync(
+      "sqlite3",
+      [
+        dbPath,
+        [
+          "CREATE TABLE documents (id TEXT);",
+          "CREATE TABLE chunks (id TEXT);",
+          "CREATE TABLE entities (id TEXT);",
+          "CREATE TABLE relations (id TEXT);",
+        ].join(" "),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(setup.status, 0, setup.stderr || setup.stdout);
+
+    const result = spawnSync("node", ["scripts/query-memory.mjs", "stats"], {
+      encoding: "utf8",
+      env: { ...process.env, TECHSCOPE_ROOT: root },
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /embeddings\s+0/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
