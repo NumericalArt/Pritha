@@ -123,6 +123,15 @@ the exact action:
 node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes
 ```
 
+Control Center API access through the tailnet fails closed unless the Tailscale
+identity header is present and trusted. Configure accepted identities in an
+ignored local env file:
+
+```sh
+PRITHA_TAILNET_HOSTNAME=<your-control-center-tailnet-host>
+PRITHA_TAILSCALE_ALLOWED_LOGINS=<trusted-login@example.com>
+```
+
 Stop serving after the user approves the exact action:
 
 ```sh
@@ -139,6 +148,8 @@ node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes
   run the action automatically.
 - `serve --yes` checks that Tailscale is installed, authenticated and that the
   local upstream health endpoint is ready.
+- Tailscale identity headers are required for Control Center API access through
+  the tailnet; missing or untrusted identity returns `403`.
 - Peer access is not considered fully tested until the Tailscale URL is opened
   from the phone or trusted peer device.
 - Tailscale is a private network boundary, not application authentication.

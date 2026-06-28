@@ -122,6 +122,10 @@ tailscale status
 tailscale serve --bg --https=<tailscale-port> http://127.0.0.1:<local-port>
 ```
 
+For Pritha Control Center, API access through the tailnet also requires trusted
+Tailscale identity headers. Missing or untrusted identity must fail closed
+rather than falling back to unauthenticated access.
+
 For a default HTTPS route without a custom port, existing Techscope Web notes also use:
 
 ```sh

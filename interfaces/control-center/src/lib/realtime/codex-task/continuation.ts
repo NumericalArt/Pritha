@@ -12,6 +12,7 @@ export type CodexContinuationThreadScope = {
 
 export type CodexContinuationCandidate = {
   taskId: string;
+  shortId?: string;
   status: string;
   taskType?: string;
   taskText?: string;
@@ -57,7 +58,7 @@ export type CodexContinuationResolution =
       candidates: ScoredCodexContinuationCandidate[];
     };
 
-const STOPPED_STATUSES = new Set(["complete", "failed", "failed_timeout", "failed_empty_result", "rejected"]);
+const STOPPED_STATUSES = new Set(["complete", "failed", "failed_timeout", "failed_empty_result", "rejected", "aborted"]);
 const BLOCKED_STATUSES = new Set(["decision_required", "waiting_for_operator"]);
 const ACTIVE_STATUSES = new Set(["running", "queued"]);
 
@@ -100,8 +101,8 @@ export function scoreCodexTaskContinuation(
     reasons.push("task_id_mentioned");
   }
 
-  const shortTaskId = candidate.taskId.split("-").at(-1);
-  if (shortTaskId && shortTaskId.length >= 6 && taskTextLower.includes(shortTaskId.toLowerCase())) {
+  const shortTaskId = normalizeTaskRef(candidate.shortId);
+  if (shortTaskId && textMentionsToken(taskTextLower, shortTaskId)) {
     score += 80;
     reasons.push("short_task_id_mentioned");
   }
@@ -161,20 +162,25 @@ export function resolveCodexTaskContinuation(
   }
 
   const safeCandidates = candidates.filter((candidate) => candidate.taskId);
-  const explicitTaskId = String(request.explicitTaskId || "").trim();
+  const explicitTaskId = normalizeTaskRef(request.explicitTaskId);
   if (explicitTaskId) {
-    const explicit = safeCandidates.find((candidate) => candidate.taskId === explicitTaskId);
+    const explicit = safeCandidates.find((candidate) => {
+      const taskId = normalizeTaskRef(candidate.taskId);
+      const shortId = normalizeTaskRef(candidate.shortId);
+      return taskId === explicitTaskId || shortId === explicitTaskId;
+    });
     if (!explicit) return { action: "ask", confidence: "medium", reason: "explicit_task_not_found", candidates: [] };
+    const explicitReason = normalizeTaskRef(explicit.shortId) === explicitTaskId ? "explicit_short_task_id" : "explicit_task_id";
     const selected = {
       ...scoreCodexTaskContinuation(request, explicit, 0),
       score: 100,
       confidence: "high" as const,
-      reasons: ["explicit_task_id"],
+      reasons: [explicitReason],
     };
     return {
       action: "continue",
       confidence: "high",
-      reason: "explicit_task_id",
+      reason: explicitReason,
       selected,
       candidates: [selected],
     };
@@ -224,6 +230,22 @@ export function resolveCodexTaskContinuation(
 function compactText(value: unknown, maxChars: number) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   return text.length <= maxChars ? text : text.slice(0, maxChars).trim();
+}
+
+function normalizeTaskRef(value: unknown) {
+  return String(value || "")
+    .trim()
+    .replace(/^#/, "")
+    .toLowerCase();
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textMentionsToken(textLower: string, tokenLower: string) {
+  if (!tokenLower) return false;
+  return new RegExp(`(^|[^a-z0-9])${escapeRegex(tokenLower)}(?=$|[^a-z0-9])`, "i").test(textLower);
 }
 
 function sameThreadScope(left?: CodexContinuationThreadScope | null, right?: CodexContinuationThreadScope | null) {

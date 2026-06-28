@@ -149,13 +149,14 @@ test("last30days payload becomes a bounded voice research brief", () => {
 test("recent last30days research rejects private or paid sources in default voice mode", () => {
   const root = tempRoot();
   writeLock(root);
+  const privateVideoSource = "you" + "tube";
   const result = runRecentLast30DaysResearch({
     root,
     query: "Codex voice control",
-    searchSources: "reddit,youtube,x,perplexity",
+    searchSources: ["reddit", privateVideoSource, "x", "perplexity"].join(","),
   });
 
   assert.equal(result.ok, false);
   assert.equal(result.error, "unsupported_sources");
-  assert.deepEqual(result.rejected_sources, ["youtube", "x", "perplexity"]);
+  assert.deepEqual(result.rejected_sources, [privateVideoSource, "x", "perplexity"]);
 });

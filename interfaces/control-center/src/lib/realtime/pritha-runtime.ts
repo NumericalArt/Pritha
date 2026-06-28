@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -191,6 +191,14 @@ type CodexTaskRuntimePaths = {
   progressPath: string;
   planPath?: string;
   voiceFeedbackPath?: string;
+};
+
+type CodexAppAbortHandle = {
+  controller: AbortController;
+  statusPath: string;
+  progressPath: string;
+  voiceFeedbackPath?: string;
+  startedAt: string;
 };
 
 type DeepTaskPrimaryTransport = "codex-app" | "codex-cli" | "codex-session";
@@ -790,6 +798,9 @@ async function readArtifact(identifier: unknown, maxChars = 8_000) {
   if (!relative || !isPathInsideOrSame(root, fullPath)) {
     return { ok: false, error: "path_outside_root", path: relative };
   }
+  if (isExcludedSecretPath(fullPath)) {
+    return { ok: false, error: "path_excluded", path: rootRelative(root, fullPath) };
+  }
   if (!existsSync(fullPath)) {
     return { ok: false, error: "artifact_not_found", identifier: requestedPath };
   }
@@ -843,7 +854,11 @@ function isShortPositiveConfirmation(value: unknown) {
 function hasCodexHandoffConfirmation(value: unknown) {
   const text = String(value || "").toLowerCase();
   if (isShortPositiveConfirmation(text)) return true;
-  return /brief (?:is )?(?:complete|finished)|spec (?:is )?(?:complete|finished)|task (?:is )?ready|ready for codex|handoff confirmed|send (?:it )?to codex|передавай|передать в codex|передать в кодекс|тз (?:полностью )?(?:готово|проговорено|закончено)|можно (?:передавать|запускать)|да[,.\s]+(?:передавай|запускай)|готов[ао] к codex|готов[ао] к кодекс/i.test(text);
+  return (
+    /brief (?:is )?(?:complete|finished)|spec (?:is )?(?:complete|finished)|task (?:is )?ready|ready for codex|handoff confirmed|send (?:it )?to codex|передавай|передать в codex|передать в кодекс|тз (?:полностью )?(?:готово|проговорено|закончено)|можно (?:передавать|запускать)|да[,.\s]+(?:передавай|запускай)|готов[ао] к codex|готов[ао] к кодекс/i.test(text) ||
+    /(?:brief|бриф|тз|task|задани[ея])[\s\S]{0,140}(?:complete|finished|ready|готов|готово|проговорен|проговорено|закончено)[\s\S]{0,140}(?:codex|кодекс|передач)/i.test(text) ||
+    /(?:оператор|operator)[\s\S]{0,120}(?:подтвердил|подтвердила|confirmed)[\s\S]{0,120}(?:codex|кодекс|передач|продолжен|запуск)/i.test(text)
+  );
 }
 
 function quotedSegments(value: string) {
@@ -1621,6 +1636,16 @@ function isExcludedFilesystemEntry(name: string, fullPath: string) {
   if (FILESYSTEM_EXCLUDED_NAMES.has(name)) return true;
   if (name.startsWith(".") && [".env", ".DS_Store"].includes(name)) return true;
   const relative = rootRelative(resolveTechscopeRoot(), fullPath);
+  return FILESYSTEM_EXCLUDED_FILE_PATTERNS.some((pattern) => pattern.test(name) || pattern.test(relative));
+}
+
+function isExcludedSecretPath(fullPath: string) {
+  const root = resolveTechscopeRoot();
+  const name = path.basename(fullPath);
+  if (FILESYSTEM_EXCLUDED_NAMES.has(name)) return true;
+  const relative = rootRelative(root, fullPath);
+  const segments = relative.split(path.sep).filter(Boolean);
+  if (segments.some((segment) => FILESYSTEM_EXCLUDED_NAMES.has(segment))) return true;
   return FILESYSTEM_EXCLUDED_FILE_PATTERNS.some((pattern) => pattern.test(name) || pattern.test(relative));
 }
 
@@ -2700,10 +2725,10 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
             enum: ["list_active", "status", "brief", "timeline", "diagnose"],
             description: "Use brief for a short voice-safe answer; diagnose for stuck/error questions; timeline for recent safe operational events.",
           },
-          task_id: {
-            type: "string",
-            description: "Optional Codex task id. If omitted, the most recent active or voice-handoff-required task is used for status/brief/timeline/diagnose.",
-          },
+	          task_id: {
+	            type: "string",
+	            description: "Optional Codex task id or the 3-character short id shown on the task card. If omitted, the most recent active or voice-handoff-required task is used.",
+	          },
           limit: { type: "number" },
           max_events: { type: "number" },
         },
@@ -2732,10 +2757,10 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
       parameters: {
         type: "object",
         properties: {
-          task_id: {
-            type: "string",
-            description: "Optional Codex task id. If omitted, the most recent waiting_for_operator task is used.",
-          },
+	          task_id: {
+	            type: "string",
+	            description: "Optional Codex task id or the 3-character short id shown on the task card. If omitted, the most recent waiting_for_operator task is used.",
+	          },
           answer: {
             type: "string",
             description:
@@ -2886,11 +2911,11 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
             type: "boolean",
             description: "Only true when the operator explicitly asks to start a new Codex App thread for this subject.",
           },
-          continue_task_id: {
-            type: "string",
-            description:
-              "Optional exact previous Codex task id to continue. Use after the operator chooses from continuation candidates or when they explicitly name a task id.",
-          },
+	          continue_task_id: {
+	            type: "string",
+	            description:
+	              "Optional previous Codex task id or 3-character short card id to continue. Use after the operator names a card id.",
+	          },
           continuation_mode: {
             type: "string",
             enum: ["auto", "force_new"],
@@ -2948,7 +2973,7 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     "recent_external_research/last30days remains available in the backend but is intentionally not exposed as an active Realtime tool. Do not call it directly. For last-7/30-days community pulse checks, use run_codex_task or ask the operator to re-enable that tool.",
     "Use run_codex_task for implementation, codebase changes, deep repo analysis, reviews, or internet/current-source research. If internet is needed, set requires_internet=true; Codex handles web access.",
     "run_codex_task has one public tool surface but routes internally through the configured deep task transport. Codex App is the default primary transport; Codex CLI is the v1 fallback. New Codex App tasks first create or synthesize a plan, choose inline_progress or step_orchestrator by policy, and emit voice-safe semantic progress events.",
-    "When the operator asks to continue, resume, retry, fix, finish, or do the next step of prior Codex work, call run_codex_task normally and let the runtime resolve whether it continues a previous stopped task. If run_codex_task returns continuation_choice_required, ask the operator by voice which candidate to continue or whether to start a new task. After the operator answers, call run_codex_task again with continue_task_id for the chosen candidate or continuation_mode=force_new for a separate task.",
+    "When the operator asks to continue, resume, retry, fix, finish, or do the next step of prior Codex work, call run_codex_task normally and let the runtime resolve whether it continues a previous stopped task. If run_codex_task returns continuation_choice_required, ask only: \"Запускаем новую задачу или скажи короткий ID карточки.\" Do not list candidate tasks unless the operator asks. After the operator answers, call run_codex_task once with continue_task_id set to the chosen short card id or continuation_mode=force_new for a separate task, include an operator_confirmation note that the full brief was already confirmed, and do not repeat the task brief or ask for launch permission again.",
     "Do not silently bypass an existing waiting_for_operator, running, queued, or decision_required task. If run_codex_task says the matching task is waiting, active, or approval-gated, explain that status and use answer_codex_task, inspect_codex_task, or UI approval instead of creating a duplicate.",
     "Before calling run_codex_task for agent creation, agent improvement, agent fixes, workspace-write implementation, Control Center/Voice Control/memory/operations changes, or another large multi-step task, first collect a usable brief. After the operator's first description, ask only for missing information that blocks a useful Codex handoff: target/new agent, desired change, success criteria, constraints, interface/runtime/deployment, memory/tools/skills/MCP impact, secrets/approvals, and tests. Do not announce a fixed number of questions. Ask one concise question per turn, wait for the answer, then decide whether another question is necessary. Use zero or one question for simple tasks; use up to five total only for genuinely complex or risky tasks. Do not invent optional questions just to fill a quota.",
     "Only after the brief is usable, summarize the intended task in one to three short points and ask a short direct confirmation question such as: \"ТЗ полностью проговорено? Передавать это в Codex?\" Wait for a direct positive answer that the brief is complete and ready for Codex. After this confirmation question, short confirmations like да, ок, подтверждаю, передавай, запускай, yes, ok or go ahead are enough.",
@@ -2964,7 +2989,7 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     "The PictureBoom image handoff task must instruct Codex to generate exactly one image using internal Codex image generation, keep the generated file only in Codex staging or PictureBoom-local staging, then run PictureBoom's project-local `node scripts/image-inbox.mjs ingest` command with a two or three word title, the Codex task request id, and a short prompt summary when available.",
     "The PictureBoom image handoff must verify `node scripts/image-inbox.mjs list --json`, `node scripts/image-inbox.mjs assert-local` and PictureBoom feed/API visibility. It must keep generated image files out of Pritha memory, queues, logs and reports, and browser-facing API/UI evidence must not expose the prompt summary or request id.",
     "When the operator asks to continue implementation work on an existing or newly created child-agent project, include the exact project/folder name in the task, call run_codex_task with task_type=implementation and write_mode=workspace_write; the runtime will add the matching sibling AGENTS.md project as a writable Codex root.",
-    "Do not claim Codex work is complete after starting or queueing a task. Report the task id, status and next operator-visible path. If the task returns a plan or latest_voice_feedback, summarize that instead of saying only that the task is running.",
+    "Do not claim Codex work is complete after starting or queueing a task. Report the 3-character short card id, status and next operator-visible path. If the task returns a plan or latest_voice_feedback, summarize that instead of saying only that the task is running.",
     "After run_codex_task returns a running or queued task, do not start another Codex task just to poll that task's status. Use inspect_codex_task for status, brief, timeline or diagnose requests. The Voice UI also monitors Codex task readiness and sends later completion/failure messages when a terminal result or operator brief is available.",
     "If the UI later adds a message that starts with 'Codex sidecar task' and includes 'Result:', treat it as the authoritative completion notification for that task. Summarize the result to the operator immediately instead of saying that you do not automatically know whether Codex finished.",
     "For proactive task updates, stay quiet unless a task finishes, fails, times out, needs approval, asks an operator question, appears stale, or emits a speakable semantic progress event such as plan_created, planning_fallback, fallback_started, stale_repaired, mode_selected, step_started, step_completed, step_blocked or operator_question. Never read heartbeat as the main progress update.",
@@ -4324,6 +4349,7 @@ function continuationThreadScopeFromUnknown(value: unknown): PrithaCodexThreadSc
 function codexContinuationCandidateFromSummary(task: Record<string, unknown>): CodexContinuationCandidate {
   return {
     taskId: String(task.task_id || ""),
+    shortId: String(task.short_id || ""),
     status: String(task.status || "unknown"),
     taskType: String(task.task_type || ""),
     taskText: compactText(task.task, 900),
@@ -4344,13 +4370,15 @@ async function recentCodexContinuationCandidates(limit = 12) {
 function continuationCandidateVoiceLabel(candidate: ScoredCodexContinuationCandidate, index: number) {
   const title = compactText(candidate.taskText || candidate.operatorBrief || candidate.resultExcerpt || candidate.taskId, 140);
   const scope = candidate.threadScope?.kind && candidate.threadScope.id ? `${candidate.threadScope.kind}:${candidate.threadScope.id}` : "unknown subject";
-  return `${index + 1}. ${candidate.status} ${scope}: ${title}`;
+  const shortId = normalizeCodexShortId(candidate.shortId) || "???";
+  return `#${shortId}: ${candidate.status} ${scope}: ${title}`;
 }
 
 function continuationCandidateOutput(candidate: ScoredCodexContinuationCandidate, index: number) {
   return {
     index: index + 1,
     task_id: candidate.taskId,
+    short_id: normalizeCodexShortId(candidate.shortId) || undefined,
     status: candidate.status,
     task_type: candidate.taskType,
     thread_scope: candidate.threadScope || null,
@@ -4374,11 +4402,12 @@ function continuationChoiceResponse(resolution: CodexContinuationResolution, tas
     reason: resolution.reason,
     task_preview: compactText(task.task, 500),
     candidates,
+    candidate_short_ids: candidates.map((candidate) => candidate.short_id).filter(Boolean),
     operator_note: candidates.length
-      ? "I found more than one plausible previous Codex task. Ask the operator which one to continue, or whether to start a separate new task."
-      : "The requested previous Codex task was not found. Ask the operator whether to start a new task.",
+      ? "Ask one short question: \"Запускаем новую задачу или скажи короткий ID карточки.\" Do not list the candidate tasks unless the operator asks."
+      : "The requested previous Codex task was not found. Ask one short question: \"Запускаем новую задачу?\"",
     expected_next_step:
-      "Ask by voice. Then call run_codex_task again with continue_task_id set to the chosen task id, or continuation_mode=force_new if the operator wants a separate new task.",
+      "After the operator answers, call run_codex_task once with continue_task_id set to the chosen 3-character short_id or continuation_mode=force_new. Include operator_confirmation that the full brief was already confirmed; do not repeat the brief or ask launch permission again.",
   };
 }
 
@@ -4504,7 +4533,7 @@ async function resolveContinuationForTask(args: CodexTaskArgs, task: Record<stri
       taskText: String(task.task || ""),
       taskType: String(task.task_type || ""),
       threadScope: continuationThreadScopeFromUnknown(task.thread_scope),
-      explicitTaskId: safeTaskId(String(args.continue_task_id || "")),
+      explicitTaskId: normalizeCodexTaskRef(args.continue_task_id),
       mode: continuationMode,
     },
     candidates,
@@ -4660,7 +4689,12 @@ function codexTaskApprovalFor(task: Record<string, unknown>, requestedAt = new D
   };
 }
 
+function codexTaskContinuationChoiceProvided(args: CodexTaskArgs) {
+  return Boolean(normalizeCodexTaskRef(args.continue_task_id)) || normalizeCodexContinuationMode(args.continuation_mode) === "force_new";
+}
+
 function codexTaskNeedsHandoffConfirmation(args: CodexTaskArgs, task: Record<string, unknown>) {
+  if (codexTaskContinuationChoiceProvided(args)) return false;
   const taskType = String(task.task_type || args.task_type || "analysis").toLowerCase();
   const writeMode = String(task.write_mode || args.write_mode || "read_only").toLowerCase();
   const taskText = [
@@ -5309,6 +5343,14 @@ function statusForCodexAppError(error: unknown): "failed_timeout" | "failed" {
   return error instanceof Error && /timeout|timed out/i.test(error.message) ? "failed_timeout" : "failed";
 }
 
+function isCodexAbortError(error: unknown) {
+  return error instanceof Error && /aborted by operator|task aborted|codex_task_aborted/i.test(error.message);
+}
+
+function throwIfCodexTaskAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error("Codex task aborted by operator");
+}
+
 function codexAppResultText(result: PrithaCodexTaskResult) {
   const lines = [
     result.text || result.data?.summary || "",
@@ -5375,9 +5417,11 @@ async function planCodexAppTask(
   sandbox: string,
   writableRoots: Array<{ absolute_path: string }>,
   progress: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
+  signal?: AbortSignal,
 ) {
   const settings = getPrithaRuntimeSettings();
   const taskId = String(task.id || "");
+  throwIfCodexTaskAborted(signal);
   if (settings.codexPlanningMode === "off") {
     const plan = normalizeCodexTaskPlan({ executionMode: "inline_progress", steps: [] }, task, settings, "synthetic");
     await writeCodexTaskPlan(taskId, paths.planPath, plan);
@@ -5404,6 +5448,7 @@ async function planCodexAppTask(
     const raw = await client.runTask(planningPayload, {
       timeoutMs: planningTimeoutMs,
       userId: "pritha-voice-operator",
+      signal,
       onProgress: (event) =>
         progress({
           ...event,
@@ -5411,6 +5456,7 @@ async function planCodexAppTask(
           message: event.message ? `Planning pass: ${event.message}` : "Planning pass progress.",
         }),
     });
+    throwIfCodexTaskAborted(signal);
     const result = normalizeCodexTaskResult(raw, planningPayload.requestId, new Date().toISOString(), "codex-app");
     const structured = maybeParseJsonObject(result.data?.structuredJson) || maybeParseJsonObject(result.text) || result.data;
     const plan = normalizeCodexTaskPlan(structured, task, settings, "planner");
@@ -5423,6 +5469,7 @@ async function planCodexAppTask(
     });
     return plan;
   } catch (error) {
+    if (isCodexAbortError(error) || signal?.aborted) throw error;
     const plan = syntheticCodexTaskPlan(task, "fallback");
     await writeCodexTaskPlan(taskId, paths.planPath, plan);
     await progress({
@@ -5448,10 +5495,13 @@ async function runCodexAppPayload(
   writableRoots: Array<{ absolute_path: string }>,
   timeoutMs: number,
   progress: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
+  signal?: AbortSignal,
 ) {
+  throwIfCodexTaskAborted(signal);
   const client = codexAppClientForTask(task, sandbox, writableRoots);
   const payload = buildPrithaCodexTaskPayload(task);
-  const raw = await client.runTask(payload, { timeoutMs, userId: "pritha-voice-operator", onProgress: progress });
+  const raw = await client.runTask(payload, { timeoutMs, userId: "pritha-voice-operator", signal, onProgress: progress });
+  throwIfCodexTaskAborted(signal);
   return normalizeCodexTaskResult(raw, payload.requestId, new Date().toISOString(), "codex-app");
 }
 
@@ -5463,11 +5513,13 @@ async function runCodexStepOrchestrator(
   writableRoots: Array<{ absolute_path: string }>,
   startedAt: string,
   progress: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
+  signal?: AbortSignal,
 ): Promise<PrithaCodexTaskResult> {
   const taskId = String(task.id || "");
   const stepResults: Array<{ step_id: string; title: string; status: string; text: string }> = [];
   const timeoutMs = codexEffectiveTimeoutMs();
   for (let index = 0; index < plan.steps.length; index += 1) {
+    throwIfCodexTaskAborted(signal);
     const step = plan.steps[index];
     await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
       phase: "step_started",
@@ -5500,13 +5552,19 @@ async function runCodexStepOrchestrator(
       operator_confirmation: `${String(task.operator_confirmation || "")}\nStep orchestrator executing approved plan step ${step.id}.`.trim(),
     };
     const remaining = Math.max(60_000, Math.min(timeoutMs, timeoutMs - (elapsedMsSince(startedAt) || 0)));
-    const result = await runCodexAppPayload(stepTask, sandbox, writableRoots, remaining, (event) =>
-      progress({
-        ...event,
-        phase: `step_${step.id}_${event.phase}`,
-        step_id: step.id,
-        step_title: step.title,
-      }),
+    const result = await runCodexAppPayload(
+      stepTask,
+      sandbox,
+      writableRoots,
+      remaining,
+      (event) =>
+        progress({
+          ...event,
+          phase: `step_${step.id}_${event.phase}`,
+          step_id: step.id,
+          step_title: step.title,
+        }),
+      signal,
     );
     const stepText = result.text || String(result.data?.summary || "");
     stepResults.push({ step_id: step.id, title: step.title, status: result.status, text: compactText(stepText, 1_000) });
@@ -5577,13 +5635,23 @@ async function startCodexAppTask(
   const payload = buildPrithaCodexTaskPayload(task);
   const taskId = String(task.id || payload.requestId);
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, paths.progressPath, event);
+  const abortController = new AbortController();
+  activeCodexAppAbortHandles.set(taskId, {
+    controller: abortController,
+    statusPath: paths.statusPath,
+    progressPath: paths.progressPath,
+    voiceFeedbackPath: paths.voiceFeedbackPath,
+    startedAt,
+  });
+  const taskWasAborted = async () => abortController.signal.aborted || (await codexTaskIsAborted(paths.statusPath));
 
   await writeFile(
     paths.statusPath,
     `${JSON.stringify(
       {
-        status: "running",
-        phase: "runner_started",
+	        status: "running",
+	        short_id: task.short_id,
+	        phase: "runner_started",
         transport: "codex-app",
         sandbox,
         writable_roots: writableRoots,
@@ -5626,7 +5694,15 @@ async function startCodexAppTask(
 
   void (async () => {
     const settings = getPrithaRuntimeSettings();
-    const plan = await planCodexAppTask(task, paths, sandbox, writableRoots, progress);
+    if (await taskWasAborted()) {
+      clearInterval(heartbeat);
+      return;
+    }
+    const plan = await planCodexAppTask(task, paths, sandbox, writableRoots, progress, abortController.signal);
+    if (await taskWasAborted()) {
+      clearInterval(heartbeat);
+      return;
+    }
     const selectedMode = chooseCodexExecutionModeForPlan(plan, settings, task);
     await progress({
       phase: "mode_selected",
@@ -5663,8 +5739,9 @@ async function startCodexAppTask(
         paths.statusPath,
         `${JSON.stringify(
           {
-            status: "waiting_for_operator",
-            phase: "operator_question",
+	            status: "waiting_for_operator",
+	            short_id: task.short_id,
+	            phase: "operator_question",
             transport: "codex-app",
             question,
             plan,
@@ -5708,9 +5785,10 @@ async function startCodexAppTask(
     }
 
     const result = selectedMode === "step_orchestrator"
-      ? await runCodexStepOrchestrator(task, plan, paths, sandbox, writableRoots, startedAt, progress)
-      : await runCodexAppPayload(task, sandbox, writableRoots, timeoutMs, progress);
+      ? await runCodexStepOrchestrator(task, plan, paths, sandbox, writableRoots, startedAt, progress, abortController.signal)
+      : await runCodexAppPayload(task, sandbox, writableRoots, timeoutMs, progress, abortController.signal);
     clearInterval(heartbeat);
+    if (await taskWasAborted()) return;
     const finishedAt = new Date().toISOString();
     const status = result.status === "ok" || result.status === "decision_required" ? "complete" : "failed";
     await writeFile(paths.resultPath, codexAppResultText(result), "utf8").catch(() => undefined);
@@ -5718,8 +5796,9 @@ async function startCodexAppTask(
       paths.statusPath,
       `${JSON.stringify(
         {
-          status,
-          phase: status === "complete" ? "completed" : "failed",
+	          status,
+	          short_id: task.short_id,
+	          phase: status === "complete" ? "completed" : "failed",
           transport: "codex-app",
           codex_app_status: result.status,
           execution_mode: selectedMode,
@@ -5762,6 +5841,7 @@ async function startCodexAppTask(
     });
   })().catch(async (error) => {
     clearInterval(heartbeat);
+    if (abortController.signal.aborted || isCodexAbortError(error) || (await codexTaskIsAborted(paths.statusPath))) return;
     const finishedAt = new Date().toISOString();
     const status = statusForCodexAppError(error);
     const message = error instanceof Error ? error.message : "Codex App task failed";
@@ -5798,8 +5878,9 @@ async function startCodexAppTask(
       paths.statusPath,
       `${JSON.stringify(
         {
-          status,
-          phase: status,
+	          status,
+	          short_id: task.short_id,
+	          phase: status,
           transport: "codex-app",
           error: message,
           sandbox,
@@ -5834,6 +5915,8 @@ async function startCodexAppTask(
       priority: "high",
       voice_text: `Codex App завершился с ошибкой и fallback недоступен. Подробности доступны в карточке задачи. Причина: ${compactText(message, 360)}`,
     });
+  }).finally(() => {
+    activeCodexAppAbortHandles.delete(taskId);
   });
 
   return {
@@ -5928,8 +6011,9 @@ async function startCodexExec(
     paths.statusPath,
     `${JSON.stringify(
         {
-          status: "running",
-          phase: "runner_started",
+	          status: "running",
+	          short_id: task.short_id,
+	          phase: "runner_started",
           transport: "codex-cli",
           pid: child.pid,
         sandbox,
@@ -5987,6 +6071,7 @@ async function startCodexExec(
   child.on("close", async (code, signal) => {
     clearTimeout(timer);
     clearInterval(heartbeat);
+    if (await codexTaskIsAborted(paths.statusPath)) return;
     const resultText = await readFile(paths.resultPath, "utf8").catch(() => "");
     const hasResult = Boolean(resultText.trim());
     const status = killedByTimeout ? "failed_timeout" : code === 0 && hasResult ? "complete" : code === 0 ? "failed_empty_result" : "failed";
@@ -6002,8 +6087,9 @@ async function startCodexExec(
       paths.statusPath,
       `${JSON.stringify(
         {
-          status,
-          phase: status === "complete" ? "completed" : status,
+	          status,
+	          short_id: task.short_id,
+	          phase: status === "complete" ? "completed" : status,
           transport: "codex-cli",
           fallback_from: typeof task.fallback_from === "string" ? task.fallback_from : undefined,
           code,
@@ -6132,7 +6218,7 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
       task_type: task.task_type,
       subject_kind: task.subject_kind,
       subject_id: task.subject_id,
-      continue_task_id: safeTaskId(String(args.continue_task_id || "")) || undefined,
+      continue_task_id: normalizeCodexTaskRef(args.continue_task_id) || undefined,
     });
     return continuation.response;
   }
@@ -6149,6 +6235,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   }
 
   await mkdir(taskDir, { recursive: true });
+  const shortId = await ensureCodexTaskShortId(taskId);
+  task.short_id = shortId;
   const approval = codexTaskApprovalFor(task, now.toISOString());
   if (approval?.status === "pending") {
     task.status = "decision_required";
@@ -6174,6 +6262,7 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
     `${JSON.stringify(
       {
         status: task.status,
+        short_id: shortId,
         phase: task.status,
         created_at: task.created_at,
         approval: task.approval,
@@ -6216,6 +6305,7 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   return {
     ok: true,
     task_id: taskId,
+    short_id: shortId,
     status: task.status,
     mode: task.status === "decision_required" ? "approval" : effectiveMode,
     requested_mode: requestedMode,
@@ -6259,6 +6349,109 @@ function safeTaskId(taskId: string) {
   return /^[0-9A-Za-z._:-]+$/.test(id) && !id.includes("/") && !id.includes("\\") && id.length <= 120 ? id : "";
 }
 
+const CODEX_SHORT_ID_LENGTH = 3;
+const CODEX_SHORT_ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const CODEX_SHORT_ID_RE = /^[0-9A-Z]{3}$/;
+
+function normalizeCodexTaskRef(value: unknown) {
+  return String(value || "").trim().replace(/^#/, "");
+}
+
+function normalizeCodexShortId(value: unknown) {
+  const id = normalizeCodexTaskRef(value).toUpperCase();
+  return CODEX_SHORT_ID_RE.test(id) ? id : "";
+}
+
+function codexTaskShortIdRegistryPath() {
+  return path.join(privateRoot(), "codex-task-short-ids.json");
+}
+
+function codexTaskIds() {
+  const tasksRoot = path.join(privateRoot(), "codex-tasks");
+  if (!existsSync(tasksRoot)) return [];
+  return readdirSync(tasksRoot).filter((entry) => safeTaskId(entry) === entry);
+}
+
+function codexTaskIdExists(id: string) {
+  if (!safeTaskId(id)) return false;
+  const taskDir = path.join(privateRoot(), "codex-tasks", id);
+  return isPathInsideOrSame(privateRoot(), taskDir) && existsSync(taskDir);
+}
+
+function codexShortIdCandidate(taskId: string, attempt: number) {
+  const digest = createHash("sha256").update(`${taskId}:${attempt}`).digest();
+  let value = digest.readUInt32BE(0);
+  let id = "";
+  for (let index = 0; index < CODEX_SHORT_ID_LENGTH; index += 1) {
+    id += CODEX_SHORT_ID_ALPHABET[value % CODEX_SHORT_ID_ALPHABET.length];
+    value = Math.floor(value / CODEX_SHORT_ID_ALPHABET.length);
+  }
+  return id;
+}
+
+async function readCodexTaskShortIdRegistry() {
+  const registry = await readJsonFile(codexTaskShortIdRegistryPath());
+  const aliases = typeof registry?.aliases === "object" && registry.aliases !== null ? (registry.aliases as Record<string, unknown>) : {};
+  const normalized: Record<string, string> = {};
+  for (const [taskId, shortId] of Object.entries(aliases)) {
+    const safeId = safeTaskId(taskId);
+    const safeShortId = normalizeCodexShortId(shortId);
+    if (safeId && safeShortId && codexTaskIdExists(safeId)) normalized[safeId] = safeShortId;
+  }
+  return normalized;
+}
+
+async function writeCodexTaskShortIdRegistry(aliases: Record<string, string>) {
+  await mkdir(privateRoot(), { recursive: true }).catch(() => undefined);
+  await writeFile(
+    codexTaskShortIdRegistryPath(),
+    `${JSON.stringify({ version: 1, updated_at: new Date().toISOString(), aliases }, null, 2)}\n`,
+    "utf8",
+  ).catch(() => undefined);
+}
+
+async function ensureCodexTaskShortId(taskId: string) {
+  const id = safeTaskId(taskId);
+  if (!id || !codexTaskIdExists(id)) return "";
+  const aliases = await readCodexTaskShortIdRegistry();
+  const existing = normalizeCodexShortId(aliases[id]);
+  if (existing) return existing;
+
+  const used = new Set(Object.entries(aliases).filter(([otherId]) => otherId !== id).map(([, shortId]) => shortId));
+  let shortId = "";
+  for (let attempt = 0; attempt < 512; attempt += 1) {
+    const candidate = codexShortIdCandidate(id, attempt);
+    if (used.has(candidate)) continue;
+    shortId = candidate;
+    break;
+  }
+  if (!shortId) shortId = codexShortIdCandidate(`${id}:${Date.now()}`, 0);
+  aliases[id] = shortId;
+  await writeCodexTaskShortIdRegistry(aliases);
+  return shortId;
+}
+
+async function resolveCodexTaskIdRef(taskRef: unknown) {
+  const normalized = normalizeCodexTaskRef(taskRef);
+  const direct = safeTaskId(normalized);
+  if (direct && codexTaskIdExists(direct)) return direct;
+
+  const shortId = normalizeCodexShortId(normalized);
+  if (!shortId) return direct;
+
+  const aliases = await readCodexTaskShortIdRegistry();
+  for (const [taskId, alias] of Object.entries(aliases)) {
+    if (alias === shortId && codexTaskIdExists(taskId)) return taskId;
+  }
+
+  for (const taskId of codexTaskIds()) {
+    if ((await ensureCodexTaskShortId(taskId)) === shortId) return taskId;
+  }
+  return direct;
+}
+
+const activeCodexAppAbortHandles = new Map<string, CodexAppAbortHandle>();
+
 function taskTelemetryFromEvents(taskId?: string) {
   const eventsPath = path.join(privateRoot(), "events.jsonl");
   if (!existsSync(eventsPath)) return [];
@@ -6297,7 +6490,7 @@ async function readJsonFile(filePath: string) {
   }
 }
 
-const TERMINAL_CODEX_TASK_STATUSES = new Set(["complete", "failed", "failed_timeout", "failed_empty_result", "rejected"]);
+const TERMINAL_CODEX_TASK_STATUSES = new Set(["complete", "failed", "failed_timeout", "failed_empty_result", "rejected", "aborted"]);
 
 function codexTaskActivity(params: {
   status: Record<string, unknown> | null;
@@ -6333,6 +6526,7 @@ function codexTaskActivity(params: {
 
 function codexTaskOperatorBrief(params: {
   id: string;
+  shortId?: string;
   statusValue: string;
   task: unknown;
   resultText: string;
@@ -6344,7 +6538,7 @@ function codexTaskOperatorBrief(params: {
   lastActivity: string;
   lastActivityAt: string;
 }) {
-  const shortId = params.id.slice(0, 28);
+  const shortId = normalizeCodexShortId(params.shortId) ? `#${normalizeCodexShortId(params.shortId)}` : params.id.slice(0, 28);
   const elapsed = secondsLabel(params.elapsedMs);
   const task = compactText(params.task || params.id, 120);
   const result = compactText(params.resultText, 700);
@@ -6373,6 +6567,9 @@ function codexTaskOperatorBrief(params: {
   }
   if (params.statusValue === "rejected") {
     return compactText(result || `Codex task ${shortId} was rejected before execution.`, 900);
+  }
+  if (params.statusValue === "aborted") {
+    return compactText(result || `Codex task ${shortId} was aborted by the operator.`, 900);
   }
   if (params.statusValue === "complete") {
     return compactText(result || `Codex task ${shortId} completed after ${elapsed}.`, 900);
@@ -6469,6 +6666,7 @@ async function repairStaleCodexTaskStatus(
 async function codexTaskSummary(id: string) {
   const root = resolveTechscopeRoot();
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
+  const shortId = await ensureCodexTaskShortId(id);
   const requestPath = path.join(taskDir, "request.json");
   const statusPath = path.join(taskDir, "status.json");
   const resultPath = path.join(taskDir, "result.md");
@@ -6510,6 +6708,7 @@ async function codexTaskSummary(id: string) {
   const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
   const threadRoutingMode = String(statusRecord?.codex_app_thread_routing_mode || request?.codex_app_thread_routing_mode || "");
   const parentTaskId = String(request?.parent_task_id || statusRecord?.parent_task_id || "");
+  const parentShortId = parentTaskId ? await ensureCodexTaskShortId(parentTaskId) : "";
   const continuation = request?.continuation || statusRecord?.continuation || null;
   const activity = codexTaskActivity({
     status,
@@ -6521,6 +6720,7 @@ async function codexTaskSummary(id: string) {
   });
   const operatorBrief = codexTaskOperatorBrief({
     id,
+    shortId,
     statusValue,
     task: request?.task || id,
     resultText,
@@ -6536,6 +6736,7 @@ async function codexTaskSummary(id: string) {
 
   return {
     task_id: id,
+    short_id: shortId,
     status: statusValue,
     complete,
     phase: activity.phase,
@@ -6559,6 +6760,7 @@ async function codexTaskSummary(id: string) {
     approval,
     thread_scope: threadScope,
     parent_task_id: parentTaskId || undefined,
+    parent_short_id: parentShortId || undefined,
     continuation,
     codex_app_thread_routing_mode: threadRoutingMode,
     plan,
@@ -6631,7 +6833,7 @@ function codexTaskCreatedMs(taskDir: string) {
 }
 
 export async function getPrithaCodexTask(taskId: string) {
-  const id = safeTaskId(taskId);
+  const id = await resolveCodexTaskIdRef(taskId);
   if (!id) {
     await logPrivateEvent("codex_task_readback", { ok: false, error: "invalid_task_id" });
     return { ok: false, error: "invalid_task_id" };
@@ -6643,6 +6845,7 @@ export async function getPrithaCodexTask(taskId: string) {
     await logPrivateEvent("codex_task_readback", { ok: false, error: "task_not_found", task_id: id });
     return { ok: false, error: "task_not_found", task_id: id };
   }
+  const shortId = await ensureCodexTaskShortId(id);
 
   const requestPath = path.join(taskDir, "request.json");
   const statusPath = path.join(taskDir, "status.json");
@@ -6684,6 +6887,7 @@ export async function getPrithaCodexTask(taskId: string) {
   const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
   const threadRoutingMode = String(statusRecord?.codex_app_thread_routing_mode || request?.codex_app_thread_routing_mode || "");
   const parentTaskId = String(request?.parent_task_id || statusRecord?.parent_task_id || "");
+  const parentShortId = parentTaskId ? await ensureCodexTaskShortId(parentTaskId) : "";
   const continuation = request?.continuation || statusRecord?.continuation || null;
   const stat = statSync(taskDir);
   const handoffSent = lastPrivateEvent(telemetry, "codex_task_result_handoff_sent");
@@ -6699,6 +6903,7 @@ export async function getPrithaCodexTask(taskId: string) {
   });
   const operatorBrief = codexTaskOperatorBrief({
     id,
+    shortId,
     statusValue,
     task: request?.task || id,
     resultText,
@@ -6715,16 +6920,18 @@ export async function getPrithaCodexTask(taskId: string) {
   await logPrivateEvent("codex_task_readback", {
     ok: true,
     task_id: id,
+    short_id: shortId,
     status: statusValue,
     phase: activity.phase,
     complete,
     result_available: resultAvailable,
   });
 
-  return {
-    ok: true,
-    task_id: id,
-    status: statusValue,
+	  return {
+	    ok: true,
+	    task_id: id,
+	    short_id: shortId,
+	    status: statusValue,
     complete,
     phase: activity.phase,
     elapsed_ms: activity.elapsedMs,
@@ -6738,6 +6945,7 @@ export async function getPrithaCodexTask(taskId: string) {
     approval,
     thread_scope: threadScope,
     parent_task_id: parentTaskId || undefined,
+    parent_short_id: parentShortId || undefined,
     continuation,
     codex_app_thread_routing_mode: threadRoutingMode,
     plan,
@@ -6770,6 +6978,7 @@ export async function getPrithaCodexTask(taskId: string) {
 function codexTaskToolView(task: Record<string, unknown>, maxEvents = 8) {
   return {
     task_id: task.task_id,
+    short_id: task.short_id,
     status: task.status,
     complete: task.complete,
     phase: task.phase,
@@ -6783,6 +6992,7 @@ function codexTaskToolView(task: Record<string, unknown>, maxEvents = 8) {
     result_excerpt: compactText(task.result_excerpt, 900),
     thread_scope: task.thread_scope || (typeof task.request === "object" && task.request !== null ? (task.request as { thread_scope?: unknown }).thread_scope : undefined),
     parent_task_id: task.parent_task_id || (typeof task.request === "object" && task.request !== null ? (task.request as { parent_task_id?: unknown }).parent_task_id : undefined),
+    parent_short_id: task.parent_short_id,
     continuation: task.continuation || (typeof task.request === "object" && task.request !== null ? (task.request as { continuation?: unknown }).continuation : undefined),
     codex_app_thread_routing_mode: task.codex_app_thread_routing_mode,
     plan: task.plan,
@@ -6806,6 +7016,7 @@ function codexTaskDiagnosis(task: Record<string, unknown>) {
   if (status === "failed_empty_result") return "empty_result";
   if (status.startsWith("failed")) return "failed";
   if (status === "complete") return "complete";
+  if (status === "aborted") return "aborted";
   if (task.stale) return "possibly_stale";
   if (status === "running") return "running";
   if (status === "queued") return "queued";
@@ -6850,7 +7061,7 @@ async function inspectCodexTask(args: InspectCodexTaskArgs = {}) {
     return { ok: false, operation, error: "unknown_codex_task_operation" };
   }
 
-  const requestedId = safeTaskId(String(args.task_id || ""));
+  const requestedId = normalizeCodexTaskRef(args.task_id) ? await resolveCodexTaskIdRef(args.task_id) : "";
   const selected = requestedId ? null : await latestCodexTaskForInspection(limit);
   const taskId = requestedId || String(selected?.task_id || "");
   if (!taskId) return { ok: false, operation, error: "no_codex_tasks" };
@@ -6915,6 +7126,201 @@ async function latestWaitingCodexTaskId(limit = 10) {
   return String(waiting?.task_id || "");
 }
 
+function codexTaskPidCommand(pid: unknown) {
+  const numericPid = Number(pid);
+  if (!Number.isFinite(numericPid) || numericPid <= 0) return "";
+  const result = spawnSync("ps", ["-p", String(Math.trunc(numericPid)), "-o", "command="], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return String(result.stdout || "").trim();
+}
+
+function codexTaskPidLooksAbortable(pid: unknown) {
+  const command = codexTaskPidCommand(pid);
+  if (!command) return { ok: false, command, reason: "process_command_unavailable" };
+  if (/(^|[/\s])codex(\s|$)|Codex\.app|app-server/i.test(command)) return { ok: true, command, reason: "codex_process_match" };
+  return { ok: false, command, reason: "process_not_codex" };
+}
+
+function signalCodexTaskPid(pid: unknown) {
+  const numericPid = Number(pid);
+  if (!Number.isFinite(numericPid) || numericPid <= 0) return { attempted: false, signaled: false, reason: "invalid_pid" };
+  if (!processIsAlive(numericPid)) return { attempted: false, signaled: false, reason: "pid_not_alive", pid: numericPid };
+  const check = codexTaskPidLooksAbortable(numericPid);
+  if (!check.ok) return { attempted: false, signaled: false, pid: numericPid, command: check.command, reason: check.reason };
+  try {
+    process.kill(numericPid, "SIGTERM");
+    setTimeout(() => {
+      if (processIsAlive(numericPid)) {
+        try {
+          process.kill(numericPid, "SIGKILL");
+        } catch {
+          // The process may have already exited after SIGTERM.
+        }
+      }
+    }, 5_000).unref();
+    return { attempted: true, signaled: true, pid: numericPid, command: check.command, reason: "sigterm_sent" };
+  } catch (error) {
+    return {
+      attempted: true,
+      signaled: false,
+      pid: numericPid,
+      command: check.command,
+      reason: error instanceof Error ? error.message : "signal_failed",
+    };
+  }
+}
+
+async function codexTaskStatusValue(statusPath: string) {
+  const status = await readJsonFile(statusPath);
+  return String(status?.status || "");
+}
+
+async function codexTaskIsAborted(statusPath: string) {
+  return (await codexTaskStatusValue(statusPath)) === "aborted";
+}
+
+export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
+  const id = await resolveCodexTaskIdRef(taskRef);
+  if (!id) {
+    await logPrivateEvent("codex_task_abort", { ok: false, error: "invalid_task_id" });
+    return { ok: false, error: "invalid_task_id" };
+  }
+
+  const root = resolveTechscopeRoot();
+  const taskDir = path.join(privateRoot(), "codex-tasks", id);
+  if (!isPathInsideOrSame(privateRoot(), taskDir) || !existsSync(taskDir)) {
+    await logPrivateEvent("codex_task_abort", { ok: false, error: "task_not_found", task_id: id });
+    return { ok: false, error: "task_not_found", task_id: id };
+  }
+
+  const requestPath = path.join(taskDir, "request.json");
+  const statusPath = path.join(taskDir, "status.json");
+  const resultPath = path.join(taskDir, "result.md");
+  const stdoutPath = path.join(taskDir, "stdout.log");
+  const stderrPath = path.join(taskDir, "stderr.log");
+  const progressPath = codexTaskProgressPath(taskDir);
+  const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
+  const request = await readJsonFile(requestPath);
+  const status = await readJsonFile(statusPath);
+  const statusValue = String(status?.status || request?.status || "unknown");
+  const shortId = await ensureCodexTaskShortId(id);
+  const abortReason = compactText(reason || "operator_requested", 300) || "operator_requested";
+
+  if (TERMINAL_CODEX_TASK_STATUSES.has(statusValue)) {
+    await logPrivateEvent("codex_task_abort", { ok: true, task_id: id, short_id: shortId, status: statusValue, already_terminal: true });
+    return {
+      ...(await getPrithaCodexTask(id)),
+      abort_applied: false,
+      operator_note: statusValue === "aborted" ? "Codex task was already aborted." : "Codex task is already terminal; no abort signal was sent.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const handle = activeCodexAppAbortHandles.get(id);
+  if (handle) handle.controller.abort();
+  const pidSignal = signalCodexTaskPid(status?.pid);
+  const resultText = await readFile(resultPath, "utf8").catch(() => "");
+  const abortNote = [
+    "Codex task aborted by the operator.",
+    "",
+    `Task id: ${id}`,
+    shortId ? `Short id: ${shortId}` : "",
+    `Previous status: ${statusValue}`,
+    `Reason: ${abortReason}`,
+    `Aborted at: ${now}`,
+  ].filter(Boolean).join("\n");
+
+  if (resultText.trim()) await appendFile(resultPath, `\n\n${abortNote}\n`, "utf8").catch(() => undefined);
+  else await writeFile(resultPath, `${abortNote}\n`, "utf8").catch(() => undefined);
+
+  if (request) {
+    await writeFile(
+      requestPath,
+      `${JSON.stringify(
+        {
+          ...request,
+          status: "aborted",
+          short_id: shortId,
+          previous_status: statusValue,
+          abort_reason: abortReason,
+          aborted_at: now,
+          aborted_by: "pritha-control-center-ui",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    ).catch(() => undefined);
+  }
+
+  await writeFile(
+    statusPath,
+    `${JSON.stringify(
+      {
+        ...(status || {}),
+        status: "aborted",
+        short_id: shortId,
+        phase: "aborted",
+        previous_status: statusValue,
+        abort_reason: abortReason,
+        aborted_at: now,
+        aborted_by: "pritha-control-center-ui",
+        completed_at: now,
+        updated_at: now,
+        transport: status?.transport || request?.effective_transport || request?.requested_transport || "unknown",
+        pid: status?.pid,
+        app_abort_signal_sent: Boolean(handle),
+        pid_signal: pidSignal,
+        thread_scope: status?.thread_scope || request?.thread_scope,
+        parent_task_id: status?.parent_task_id || request?.parent_task_id,
+        continuation: status?.continuation || request?.continuation,
+        codex_app_thread_routing_mode: status?.codex_app_thread_routing_mode || request?.codex_app_thread_routing_mode,
+        result_path: rootRelative(root, resultPath),
+        stdout_path: rootRelative(root, stdoutPath),
+        stderr_path: rootRelative(root, stderrPath),
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  ).catch(() => undefined);
+
+  await appendCodexTaskProgress(id, progressPath, {
+    phase: "aborted",
+    level: "warning",
+    status: "aborted",
+    transport: String(status?.transport || request?.effective_transport || "unknown"),
+    message: "Codex task aborted by the operator from the task card.",
+    reason: abortReason,
+    pid_signal_reason: String(pidSignal.reason || ""),
+  });
+  await appendCodexVoiceFeedback(id, voiceFeedbackPath, {
+    phase: "aborted",
+    priority: "high",
+    speakable: true,
+    voice_text: `Codex-задача #${shortId || id.slice(0, 8)} остановлена оператором.`,
+    requires_response: false,
+  });
+  await logPrivateEvent("codex_task_abort", {
+    ok: true,
+    task_id: id,
+    short_id: shortId,
+    previous_status: statusValue,
+    reason: abortReason,
+    app_abort_signal_sent: Boolean(handle),
+    pid_signal: pidSignal,
+  });
+  return {
+    ...(await getPrithaCodexTask(id)),
+    abort_applied: true,
+    pid_signal: pidSignal,
+    app_abort_signal_sent: Boolean(handle),
+    operator_note: "Codex task aborted from the task card.",
+  };
+}
+
 export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
   const spokenAnswer = compactText(args.answer, 4_000);
   if (!spokenAnswer) {
@@ -6923,7 +7329,7 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
   }
 
   const root = resolveTechscopeRoot();
-  let id = safeTaskId(String(args.task_id || ""));
+  let id = await resolveCodexTaskIdRef(args.task_id);
   if (!id) id = await latestWaitingCodexTaskId();
   if (!id) {
     await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "no_waiting_codex_task" });
@@ -6948,6 +7354,7 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(id, progressPath, event);
   const request = await readJsonFile(requestPath);
   const status = await readJsonFile(statusPath);
+  const shortId = await ensureCodexTaskShortId(id);
   const statusValue = String(status?.status || request?.status || "");
   if (!request || statusValue !== "waiting_for_operator") {
     await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "task_not_waiting_for_operator", task_id: id, status: statusValue });
@@ -6975,6 +7382,7 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
   const existingAnswers = Array.isArray(request.operator_answers) ? request.operator_answers : [];
   const nextRequest: Record<string, unknown> = {
     ...request,
+    short_id: shortId,
     status: "running",
     operator_question_answered: true,
     operator_question_answered_at: now,
@@ -7001,9 +7409,10 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
     statusPath,
     `${JSON.stringify(
       {
-        ...(status || {}),
-        status: "running",
-        phase: "operator_answer_received",
+	        ...(status || {}),
+	        status: "running",
+	        short_id: shortId,
+	        phase: "operator_answer_received",
         transport: status?.transport || nextRequest.effective_transport || "codex-app",
         question,
         operator_answer: answer,
@@ -7068,7 +7477,7 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
 }
 
 export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApprovalAction) {
-  const id = safeTaskId(taskId);
+  const id = await resolveCodexTaskIdRef(taskId);
   if (!id) {
     await logPrivateEvent("codex_task_approval_decision", { ok: false, error: "invalid_task_id" });
     return { ok: false, error: "invalid_task_id" };
@@ -7096,6 +7505,7 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
     await logPrivateEvent("codex_task_approval_decision", { ok: false, error: "request_missing", task_id: id });
     return { ok: false, error: "request_missing", task_id: id };
   }
+  const shortId = await ensureCodexTaskShortId(id);
 
   const currentApproval = normalizeCodexTaskApproval(existingCodexTaskApproval(request), request) || codexTaskApprovalFor(request, String(request.created_at || new Date().toISOString()));
   if (!currentApproval || currentApproval.status !== "pending") {
@@ -7112,6 +7522,7 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
   };
   const nextRequest: Record<string, unknown> = {
     ...request,
+    short_id: shortId,
     approval,
     operator_confirmation: action === "approve" ? "Approved through Pritha Control Center UI decision gate." : String(request.operator_confirmation || ""),
     status: action === "approve" ? request.status : "rejected",
@@ -7125,8 +7536,9 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
       statusPath,
       `${JSON.stringify(
         {
-          status: "rejected",
-          phase: "rejected",
+	          status: "rejected",
+	          short_id: shortId,
+	          phase: "rejected",
           approval,
           thread_scope: nextRequest.thread_scope,
           codex_app_thread_routing_mode: nextRequest.codex_app_thread_routing_mode,
@@ -7187,9 +7599,10 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
     await writeFile(
       statusPath,
       `${JSON.stringify(
-        {
-          status: "queued",
-          phase: "queued",
+	        {
+	          status: "queued",
+	          short_id: shortId,
+	          phase: "queued",
           approval,
           thread_scope: nextRequest.thread_scope,
           codex_app_thread_routing_mode: nextRequest.codex_app_thread_routing_mode,

@@ -57,8 +57,8 @@ For private phone or laptop access through Tailscale, use the guided flow in
 
 `localhost` and `127.0.0.1` work only on the Mac that runs Control Center. A
 QR code with a localhost URL will not open Pritha from a phone, because on the
-phone it points back to the phone itself. Use Tailscale for the recommended
-private phone path, or start Control Center on `0.0.0.0` only on a trusted LAN.
+phone it points back to the phone itself. Use Tailscale for the private phone
+path. LAN binding is disabled by policy in this build.
 
 The Settings page can show Codex subscription limits through the Codex App
 Server. If the Limits panel reports a protocol or `app-server` error, check

@@ -104,9 +104,10 @@ test("Codex task continuation resolver respects explicit and force-new choices",
   try {
     const { resolveCodexTaskContinuation } = loaded.module;
     const candidates = [
-      {
-        taskId: "rejected-parent",
-        status: "rejected",
+        {
+          taskId: "rejected-parent",
+          shortId: "A7K",
+          status: "rejected",
         taskType: "review",
         taskText: "Review Pritha voice safety.",
         resultExcerpt: "Rejected before execution.",
@@ -125,6 +126,18 @@ test("Codex task continuation resolver respects explicit and force-new choices",
     assert.equal(explicit.action, "continue");
     assert.equal(explicit.selected.status, "rejected");
     assert.deepEqual(explicit.selected.reasons, ["explicit_task_id"]);
+
+    const explicitShort = resolveCodexTaskContinuation(
+      {
+        taskText: "Продолжи A7K.",
+        taskType: "review",
+        explicitTaskId: "A7K",
+      },
+      candidates,
+    );
+    assert.equal(explicitShort.action, "continue");
+    assert.equal(explicitShort.selected.taskId, "rejected-parent");
+    assert.deepEqual(explicitShort.selected.reasons, ["explicit_short_task_id"]);
 
     const forced = resolveCodexTaskContinuation(
       {
@@ -166,6 +179,7 @@ test("Codex task continuation resolver creates a new task for unrelated requests
     assert.equal(result.reason, "no_suitable_continuation_candidate");
     assert.equal(isStoppedCodexTaskStatus("failed_timeout"), true);
     assert.equal(isStoppedCodexTaskStatus("rejected"), true);
+    assert.equal(isStoppedCodexTaskStatus("aborted"), true);
     assert.equal(isActiveCodexTaskStatus("running"), true);
     assert.equal(isBlockedCodexTaskStatus("waiting_for_operator"), true);
   } finally {

@@ -292,6 +292,16 @@ function startSteps(startTarget, config) {
   return steps;
 }
 
+function assertControlCenterHostPolicy(sequence) {
+  if (!sequence.includes("start")) return;
+  const host = String(process.env.PRITHA_CONTROL_CENTER_HOST || "").trim();
+  if (!host) return;
+  const allowed = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+  if (!allowed.has(host.toLowerCase())) {
+    throw new Error(`PRITHA_CONTROL_CENTER_HOST=${host} is disabled in this build (localhost + Tailscale only).`);
+  }
+}
+
 function plannedSteps(sequence, profile, config, options) {
   const steps = [];
   for (const phase of sequence) {
@@ -387,6 +397,7 @@ credentials. The local web search backend is installed under ignored .tools and
   if (!PROFILES[profile]) throw new Error(`Unknown bootstrap profile: ${profile}`);
   const startTarget = phase === "start" && !options.start ? "control-center" : options.start;
   const sequence = phase === "prepare" ? ["install", "verify"] : phase ? [phase] : startTarget ? ["install", "verify", "start"] : ["plan"];
+  assertControlCenterHostPolicy(sequence);
   const config = effectiveConfig(profile, startTarget);
   const steps = plannedSteps(sequence, profile, config, { ...options, start: startTarget });
   const planOnly = sequence.length === 1 && sequence[0] === "plan";

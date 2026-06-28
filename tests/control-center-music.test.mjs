@@ -5,13 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import {
-  buildBackgroundMusicPrompt,
-  normalizeMusicStyleKey,
-} from "../interfaces/control-center/src/lib/music/prompt-builder.ts";
-import { normalizeMusicSourceSettings } from "../interfaces/control-center/src/lib/music/settings.ts";
-import { LocalMusicLibraryProvider } from "../interfaces/control-center/src/lib/music/library/provider.ts";
-import {
+import { importControlCenterMusicModule } from "./helpers/control-center-ts.mjs";
+
+const { buildBackgroundMusicPrompt, normalizeMusicStyleKey } = await importControlCenterMusicModule("prompt-builder.ts");
+const { normalizeMusicSourceSettings } = await importControlCenterMusicModule("settings.ts");
+const { LocalMusicLibraryProvider } = await importControlCenterMusicModule("library/provider.ts");
+const {
   computeMusicDucking,
   computeMusicOutputGain,
   dbToGain,
@@ -25,7 +24,7 @@ import {
   MUSIC_DUCK_DB,
   MUSIC_NORMAL_DB,
   normalizeMusicUserVolume,
-} from "../interfaces/control-center/src/lib/music/volume.ts";
+} = await importControlCenterMusicModule("volume.ts");
 
 const aceStepClientSource = readFileSync("interfaces/control-center/src/lib/music/ace-step-client.ts", "utf8");
 const queueSource = readFileSync("interfaces/control-center/src/lib/music/queue.ts", "utf8");

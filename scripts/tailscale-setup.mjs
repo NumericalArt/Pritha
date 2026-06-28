@@ -190,6 +190,9 @@ async function readiness(options = {}) {
     serve_configured: false,
     tailscale_url: authenticated ? urlFromStatus(statusProbe.json, app.port) : "",
     local_upstream_health: await checkLocalHealth(app),
+    identity_headers_required: true,
+    tailnet_hostname_configured: Boolean(process.env.PRITHA_TAILNET_HOSTNAME || process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST),
+    allowed_logins_configured: Boolean(process.env.PRITHA_TAILSCALE_ALLOWED_LOGINS),
     peer_access_not_tested: true,
   };
   const serveProbe = authenticated ? serveStatusJson() : { result: { ok: false }, json: null };
@@ -254,6 +257,12 @@ function planSteps(payload) {
       status: payload.status.serve_configured ? "complete" : "pending-operator-approval",
       command: `node scripts/tailscale-setup.mjs serve --app ${payload.app} --port ${payload.port} --yes`,
       detail: `Will run: tailscale serve --yes --bg --https=${payload.port} ${app.localUrl}`,
+    },
+    {
+      id: "identity-headers",
+      status: payload.status.allowed_logins_configured ? "configured" : "pending-operator-config",
+      command: "set PRITHA_TAILNET_HOSTNAME and PRITHA_TAILSCALE_ALLOWED_LOGINS in an ignored local env file",
+      detail: "Control Center API access through Tailscale fails closed without a Tailscale-User-Login identity that matches the allowed login list.",
     },
     {
       id: "peer-access",
@@ -326,6 +335,8 @@ function printHuman(payload, options = {}) {
   console.log(`Installed: ${payload.status.installed ? "yes" : "no"}`);
   console.log(`Authenticated: ${payload.status.authenticated ? "yes" : "no"}`);
   console.log(`Serve configured: ${payload.status.serve_configured ? "yes" : "no"}`);
+  console.log(`Identity headers required: ${payload.status.identity_headers_required ? "yes" : "no"}`);
+  console.log(`Allowed logins configured: ${payload.status.allowed_logins_configured ? "yes" : "no"}`);
   if (payload.status.tailscale_url) console.log(`Tailscale URL: ${payload.status.tailscale_url}`);
   if (options.plan) {
     for (const item of planSteps(payload)) {

@@ -33,6 +33,8 @@ function makeProject() {
     start_command: "node scripts/agent-cli.mjs status",
     stop_command: "not-applicable",
     healthcheck_command: "node scripts/smoke-test.mjs",
+    healthcheck_argv: ["node", "scripts/smoke-test.mjs"],
+    healthcheck_command_executable: false,
     log_path: "logs/",
     proactivity: { mode: "none" },
   }, null, 2));

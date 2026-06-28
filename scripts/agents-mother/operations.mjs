@@ -11,6 +11,10 @@ const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 
+function argvSummary(value) {
+  return Array.isArray(value) ? value.map((part) => String(part || "")).filter(Boolean).join(" ") : "";
+}
+
 function ensureDirs() {
   mkdirSync(REPORT_DIR, { recursive: true });
 }
@@ -74,9 +78,14 @@ export function operationsProject(projectPath, options = {}) {
       manifest.stop_command || "No stop command documented.",
     ));
     checks.push(checkResult(
-      "Healthcheck command",
-      manifest.healthcheck_command ? "pass" : "missing",
-      manifest.healthcheck_command || "No healthcheck command documented.",
+      "Healthcheck argv",
+      argvSummary(manifest.healthcheck_argv) ? "pass" : "missing",
+      argvSummary(manifest.healthcheck_argv) || "No healthcheck_argv documented.",
+    ));
+    checks.push(checkResult(
+      "Legacy healthcheck command",
+      manifest.healthcheck_command ? "pass" : "warning",
+      manifest.healthcheck_command ? `${manifest.healthcheck_command}; display/planning only.` : "No legacy healthcheck command documented.",
     ));
     checks.push(checkResult(
       "Log path",
@@ -215,7 +224,8 @@ ${checks.map((item) => `| ${item.name} | ${item.result} | ${item.notes.replace(/
 
 - Start: \`${manifest?.start_command || "not documented"}\`
 - Stop: \`${manifest?.stop_command || "not documented"}\`
-- Healthcheck: \`${manifest?.healthcheck_command || "not documented"}\`
+- Healthcheck argv: \`${argvSummary(manifest?.healthcheck_argv) || "not documented"}\`
+- Legacy healthcheck command: \`${manifest?.healthcheck_command || "not documented"}\`
 - Logs: \`${manifest?.log_path || "not documented"}\`
 
 ## Proactivity
@@ -358,4 +368,3 @@ ${result.output || "no output"}
 - \`install\` is allowed only when the agent manifest explicitly selects \`service_mode: launchd\` and \`autostart: launchd-on-approval\`.
 `;
 }
-

@@ -4,7 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { LocalMusicLibraryProvider } from "../interfaces/control-center/src/lib/music/library/provider.ts";
+import { importControlCenterMusicModule } from "./helpers/control-center-ts.mjs";
+
+const { LocalMusicLibraryProvider } = await importControlCenterMusicModule("library/provider.ts");
 
 function testConfig(libraryRoot) {
   return { libraryRoot };

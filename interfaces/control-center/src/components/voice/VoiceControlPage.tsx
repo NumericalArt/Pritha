@@ -39,6 +39,7 @@ import {
 type CodexTaskDetail = {
   ok: boolean;
   task_id?: string;
+  short_id?: string;
   status?: string;
   complete?: boolean;
   phase?: string;
@@ -61,6 +62,7 @@ type CodexTaskDetail = {
   progress_timeline?: Array<Record<string, unknown>>;
   thread_scope?: CodexTaskThreadScope | null;
   parent_task_id?: string;
+  parent_short_id?: string;
   continuation?: Record<string, unknown> | null;
   codex_app_thread_routing_mode?: string;
   paths?: Record<string, string>;
@@ -134,7 +136,7 @@ function taskStatusTone(task: CodexTaskState) {
   if (task.stale) return "orange";
   if (task.status.startsWith("failed")) return "orange";
   if (task.status === "decision_required" || task.approval?.status === "pending") return "orange";
-  if (task.status === "rejected" || task.approval?.status === "rejected") return "orange";
+  if (task.status === "rejected" || task.status === "aborted" || task.approval?.status === "rejected") return "orange";
   if (task.status === "complete") return "green";
   if (task.status === "running") return "blue";
   return "";
@@ -145,7 +147,16 @@ function taskNeedsApproval(task: CodexTaskState) {
 }
 
 function taskIsTerminal(task: CodexTaskState) {
-  return task.status === "complete" || task.status === "rejected" || task.status.startsWith("failed");
+  return task.status === "complete" || task.status === "rejected" || task.status === "aborted" || task.status.startsWith("failed");
+}
+
+function taskShortLabel(task: Pick<CodexTaskState, "shortId" | "id">) {
+  return task.shortId ? `#${task.shortId}` : `#${task.id.slice(-3).toUpperCase()}`;
+}
+
+function parentTaskLabel(task: Pick<CodexTaskState, "parentShortId" | "parentTaskId">) {
+  if (task.parentShortId) return `#${task.parentShortId}`;
+  return task.parentTaskId || "";
 }
 
 function formatThreadScope(scope?: CodexTaskThreadScope | null) {
@@ -407,14 +418,14 @@ function TaskListCard({
   tasks,
   toolStatus,
   onOpenTask,
-  onRefreshTask,
+  onAbortTask,
   onApproveTask,
   onRejectTask,
 }: {
   tasks: CodexTaskState[];
   toolStatus: string;
   onOpenTask: (taskId: string) => void;
-  onRefreshTask: (taskId: string) => void;
+  onAbortTask: (taskId: string) => void;
   onApproveTask: (taskId: string) => void;
   onRejectTask: (taskId: string) => void;
 }) {
@@ -431,7 +442,10 @@ function TaskListCard({
           {tasks.map((task) => (
             <article className="task-list-row" key={task.id}>
               <div className="task-row-top">
-                <strong>{task.title}</strong>
+                <div className="task-title-cell">
+                  <span className="task-short-id">{taskShortLabel(task)}</span>
+                  <strong>{task.title}</strong>
+                </div>
                 <span className={`inline-status ${taskStatusTone(task)}`}>{task.status}</span>
               </div>
               <div className="task-progress-row" title={task.progressDetail || undefined}>
@@ -446,7 +460,7 @@ function TaskListCard({
                   Voice: {task.latestVoiceFeedback.voice_text}
                 </div>
               ) : null}
-              {task.parentTaskId ? <div className="task-row-note neutral">Continues: {task.parentTaskId}</div> : null}
+              {task.parentTaskId ? <div className="task-row-note neutral">Continues: {parentTaskLabel(task)}</div> : null}
               <div className="task-phase-row">
                 <span>{task.phase ? `phase: ${task.phase}` : "phase: unknown"}</span>
                 <span>{formatThreadScope(task.threadScope)}</span>
@@ -469,8 +483,15 @@ function TaskListCard({
                 <button className="outline-button compact" type="button" onClick={() => onOpenTask(task.id)}>
                   Details
                 </button>
-                <button className="secondary-button compact" type="button" onClick={() => onRefreshTask(task.id)}>
-                  Refresh
+                <button
+                  className="decline-button compact"
+                  type="button"
+                  onClick={() => onAbortTask(task.id)}
+                  disabled={taskIsTerminal(task)}
+                  title={taskIsTerminal(task) ? "Task is already terminal" : "Abort this Codex task"}
+                >
+                  <Square size={15} />
+                  Abort
                 </button>
                 {taskNeedsApproval(task) ? (
                   <>
@@ -522,7 +543,8 @@ function TaskDetailDrawer({
         <div className="voice-drawer-header">
           <div>
             <span className="muted-label">Codex Task</span>
-            <h2>{detail?.task_id || "Loading..."}</h2>
+            <h2>{detail?.short_id ? `#${detail.short_id}` : detail?.task_id || "Loading..."}</h2>
+            {detail?.task_id ? <code className="drawer-subtitle">{detail.task_id}</code> : null}
           </div>
           <button className="icon-button" type="button" aria-label="Close task details" onClick={onClose}>
             <X size={18} />
@@ -535,6 +557,8 @@ function TaskDetailDrawer({
             <div className="drawer-kv">
               <span>Status</span>
               <strong>{detail.status || "unknown"}</strong>
+              <span>Short ID</span>
+              <strong>{detail.short_id ? `#${detail.short_id}` : "unknown"}</strong>
               <span>Phase</span>
               <strong>{detail.phase || "unknown"}</strong>
               <span>Complete</span>
@@ -544,7 +568,7 @@ function TaskDetailDrawer({
               <span>Thread</span>
               <strong>{formatThreadScope(detail.thread_scope)}</strong>
               <span>Parent task</span>
-              <strong>{detail.parent_task_id || "none"}</strong>
+              <strong>{detail.parent_short_id ? `#${detail.parent_short_id}` : detail.parent_task_id || "none"}</strong>
               <span>Continuation</span>
               <strong>{typeof detail.continuation?.mode === "string" ? detail.continuation.mode : detail.continuation ? "linked" : "none"}</strong>
               <span>Routing</span>
@@ -1439,6 +1463,22 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
     }
   }
 
+  async function abortCodexTask(taskId: string) {
+    const response = await fetch(`/api/realtime/codex-task/${encodeURIComponent(taskId)}/abort`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "operator_requested_from_task_card" }),
+    });
+    const result = (await response.json().catch(() => ({ ok: false, error: "abort returned non-json" }))) as CodexTaskDetail;
+    if (response.ok) {
+      const nextTaskId = result.task_id || taskId;
+      await realtime.refreshCodexTask(nextTaskId);
+      if (taskDetail?.task_id === taskId || result.task_id === taskDetail?.task_id) setTaskDetail(result);
+    } else {
+      setTaskDetail(result);
+    }
+  }
+
   function handleCodexTaskCreated(taskId: string) {
     realtime.watchCodexTask(taskId);
     void realtime.refreshCodexTask(taskId).catch(() => undefined);
@@ -1479,7 +1519,7 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           tasks={realtime.codexTasks}
           toolStatus={realtime.toolStatus}
           onOpenTask={openTaskDetails}
-          onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
+          onAbortTask={(taskId) => void abortCodexTask(taskId)}
           onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
           onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
         />
@@ -1535,7 +1575,7 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               tasks={realtime.codexTasks}
               toolStatus={realtime.toolStatus}
               onOpenTask={openTaskDetails}
-              onRefreshTask={(taskId) => void refreshVisibleTask(taskId)}
+              onAbortTask={(taskId) => void abortCodexTask(taskId)}
               onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
               onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
             />

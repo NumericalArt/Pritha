@@ -196,12 +196,16 @@ test("Voice Codex tasks support linked continuation cards", () => {
   assert.match(runtimeSource, /continue_task_id/);
   assert.match(runtimeSource, /continuation_mode/);
   assert.match(runtimeSource, /continuation_choice_required/);
+  assert.match(runtimeSource, /Запускаем новую задачу или скажи короткий ID карточки/);
+  assert.match(runtimeSource, /3-character short_id/);
   assert.match(runtimeSource, /history_context/);
   assert.match(runtimeSource, /parent_task_id/);
+  assert.match(runtimeSource, /parent_short_id/);
   assert.match(runtimeSource, /new_card_linked_to_parent_history/);
   assert.match(runtimeSource, /answer_codex_task instead of creating a duplicate continuation card/);
   assert.match(runtimeSource, /Use parent_result_excerpt, parent_plan and parent_progress_timeline/);
   assert.match(realtimeHookSource, /parentTaskId/);
+  assert.match(realtimeHookSource, /parentShortId/);
   assert.match(realtimeHookSource, /continuation/);
   assert.match(voicePageSource, /Continues:/);
   assert.match(voicePageSource, /Parent task/);

@@ -21,7 +21,8 @@ test("Codex prompt budget is configurable from Pritha settings", () => {
   assert.match(settingsRouteSource, /patch\.codexPromptTokenBudget = Number\(payload\.codexPromptTokenBudget\)/);
   assert.match(codexSettingsSource, /codexPromptTokenBudget: 24_000/);
   assert.match(codexSettingsSource, /aria-label="Codex prompt token budget"/);
-  assert.match(codexSettingsSource, /codexPromptTokenBudget: runtimeSettings\.codexPromptTokenBudget/);
+  assert.match(codexSettingsSource, /value=\{runtimeSettings\.codexPromptTokenBudget\}/);
+  assert.match(codexSettingsSource, /codexPromptTokenBudget: settingsToSave\.codexPromptTokenBudget/);
 });
 
 test("Codex outbound prompt guard compacts old session context only over budget", () => {

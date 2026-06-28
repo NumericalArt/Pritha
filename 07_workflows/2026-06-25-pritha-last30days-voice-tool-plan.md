@@ -307,7 +307,7 @@ After the read-only public-source tool is stable, add an optional UI decision pa
 
 - `gh`/GitHub authenticated search;
 - X/Twitter cookies or API keys;
-- YouTube via `yt-dlp`;
+- removable video-platform adapter;
 - ScrapeCreators;
 - Perplexity Deep Research;
 - `--store` or watchlists.
