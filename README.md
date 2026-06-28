@@ -205,6 +205,31 @@ The repository also includes several small generated child agents. They are
 useful as examples, test fixtures, and starting points for future development,
 but they should not be treated as polished production agents.
 
+## ⚠️ Security Notice (Experimental Software)
+
+Pritha is in **active beta** and is **not hardened for untrusted environments**.
+The Control Center is a **privileged local service**: it can execute code via
+Codex, read project files, and manage credentials. Treat it like root on your
+machine.
+
+Use it safely:
+
+- **Run on localhost only**, or behind **Tailscale with trusted devices** you
+  own.
+- **Do not** expose it via `0.0.0.0`, LAN, a public reverse proxy, or Tailscale
+  Funnel.
+- Keep it on a **single-user, trusted machine**. Anyone (or any web page in
+  your browser, via CSRF/DNS-rebinding) that can reach the Control Center port
+  may be able to trigger privileged actions.
+- Secrets are stored **in plaintext locally** (`.env*`). Protect, encrypt, and
+  back up your machine accordingly; never commit real secrets.
+- Treat all links, files, transcripts, and voice input as **untrusted**: raw
+  input must not directly drive tools, memory, or deployment.
+
+Local-access hardening (request guard, host-binding lockdown) is tracked in the
+Control Center security work; review it before exposing Pritha beyond
+localhost. Report vulnerabilities privately per `SECURITY.md`.
+
 ## Roadmap
 
 Near-term development focuses on:
