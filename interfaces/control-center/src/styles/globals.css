@@ -2982,6 +2982,31 @@ button[aria-disabled="true"] {
   gap: 10px;
 }
 
+.task-title-cell {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.task-short-id {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid rgba(53, 170, 255, 0.32);
+  border-radius: 6px;
+  background: rgba(53, 170, 255, 0.1);
+  color: #a7dcff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .task-row-top strong {
   min-width: 0;
   color: #35aaff;
@@ -3071,6 +3096,15 @@ button[aria-disabled="true"] {
 .task-row-actions .decline-button {
   width: auto;
   min-width: 80px;
+}
+
+.drawer-subtitle {
+  display: block;
+  max-width: min(100%, 560px);
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .task-limit-note {

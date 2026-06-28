@@ -73,6 +73,14 @@ const RESULT_SCHEMA = {
   },
 } as const;
 
+function codexAppAbortError() {
+  return new Error("Codex App task aborted by operator");
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw codexAppAbortError();
+}
+
 export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
   private readonly codexBin: string;
   private readonly cwd: string;
@@ -114,8 +122,15 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       });
     };
 
+    const abortHandler = () => connection.close(codexAppAbortError());
+    if (options.signal) {
+      throwIfAborted(options.signal);
+      options.signal.addEventListener("abort", abortHandler, { once: true });
+    }
+
     try {
       await connection.start(options.timeoutMs);
+      throwIfAborted(options.signal);
       await emitProgress("codex_app_started", "Codex App sidecar process started.");
       await connection.request(
         "initialize",
@@ -133,9 +148,11 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         },
         remainingMs(startedAt, options.timeoutMs),
       );
+      throwIfAborted(options.signal);
       await emitProgress("codex_app_initialized", "Codex App sidecar initialized.");
 
       target = await this.resolveTaskThread(connection, payload, remainingMs(startedAt, options.timeoutMs));
+      throwIfAborted(options.signal);
       await emitProgress("thread_resolved", "Codex App task thread resolved.", {
         thread_id: target.threadId,
         thread_name: target.threadName,
@@ -144,6 +161,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         routing_mode: target.routingMode,
       });
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
+      throwIfAborted(options.signal);
       const runtimeSettings = this.getRuntimeSettings?.();
 
       const turnResponse = (await connection.request(
@@ -162,12 +180,14 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         },
         remainingMs(startedAt, options.timeoutMs),
       )) as { turn?: { id?: string; items?: unknown[] } };
+      throwIfAborted(options.signal);
 
       turnId = String(turnResponse.turn?.id || "");
       if (!turnId) throw new Error("Codex app-server did not return a turn id");
       await emitProgress("turn_started", "Codex App turn started; waiting for completion.", { turn_id: turnId });
 
       const completed = await connection.waitForTurnCompleted(target.threadId, turnId, remainingMs(startedAt, options.timeoutMs));
+      throwIfAborted(options.signal);
       await emitProgress("turn_completed", "Codex App turn completed.", { turn_id: turnId, level: "complete", status: "complete" });
       const text = extractAssistantText(completed) || connection.agentTextForTurn(turnId);
       const result = parseCodexJson(text);
@@ -188,6 +208,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       }
       throw error;
     } finally {
+      options.signal?.removeEventListener("abort", abortHandler);
       connection.close();
     }
   }
@@ -495,9 +516,16 @@ class AppServerConnection {
     return this.agentText.get(turnId) || "";
   }
 
-  close() {
-    for (const pending of this.pending.values()) clearTimeout(pending.timer);
-    for (const waiter of this.turnWaiters.values()) clearTimeout(waiter.timer);
+  close(reason?: Error) {
+    const closeError = reason || new Error("Codex app-server connection closed");
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(closeError);
+    }
+    for (const waiter of this.turnWaiters.values()) {
+      clearTimeout(waiter.timer);
+      waiter.reject(closeError);
+    }
     this.pending.clear();
     this.turnWaiters.clear();
     this.turnErrors.clear();

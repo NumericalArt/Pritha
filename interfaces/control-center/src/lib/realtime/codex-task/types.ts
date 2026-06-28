@@ -50,6 +50,7 @@ export type PrithaCodexTaskResult = {
 export type PrithaCodexTaskRunOptions = {
   timeoutMs: number;
   userId: string;
+  signal?: AbortSignal;
   onProgress?: (event: PrithaCodexTaskProgressEvent) => void | Promise<void>;
 };
 

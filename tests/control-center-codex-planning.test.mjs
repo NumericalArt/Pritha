@@ -77,7 +77,7 @@ test("Step orchestrator remains policy gated", () => {
 });
 
 test("Planner operator questions leave actionable wait cards that can resume", () => {
-  assert.match(runtimeSource, /status: "waiting_for_operator",\s+phase: "operator_question"/);
+  assert.match(runtimeSource, /status: "waiting_for_operator",[\s\S]{0,80}phase: "operator_question"/);
   assert.match(runtimeSource, /operator_question_terminal: false/);
   assert.match(runtimeSource, /export async function answerPrithaCodexTask/);
   assert.match(runtimeSource, /operator_question_answered: true/);
@@ -98,11 +98,33 @@ test("Realtime Codex handoff waits for explicit full-brief confirmation", () => 
   assert.match(runtimeSource, /use up to five total only for genuinely complex or risky tasks/i);
   assert.match(runtimeSource, /short confirmations like да, ок, подтверждаю, передавай, запускай/);
   assert.match(runtimeSource, /concise synthesized note that the operator confirmed by voice/);
+  assert.match(runtimeSource, /codexTaskContinuationChoiceProvided/);
+  assert.match(runtimeSource, /do not repeat the task brief or ask for launch permission again/);
+  assert.match(runtimeSource, /бриф\|тз\|task\|задани/);
+  assert.match(runtimeSource, /подтвердил\|подтвердила\|confirmed/);
 
   const guardIndex = runtimeSource.indexOf("const handoffConfirmation = codexTaskHandoffConfirmationResult(args, task);");
   const mkdirIndex = runtimeSource.indexOf("await mkdir(taskDir, { recursive: true });");
   assert.ok(guardIndex > 0, "runCodexTask should check handoff confirmation");
   assert.ok(mkdirIndex > guardIndex, "handoff confirmation guard should run before task files/directories are created");
+});
+
+test("Codex task cards expose short ids and abort instead of card refresh", () => {
+  const voicePageSource = readFileSync("interfaces/control-center/src/components/voice/VoiceControlPage.tsx", "utf8");
+  const voiceStylesSource = readFileSync("interfaces/control-center/src/styles/globals.css", "utf8");
+
+  assert.match(runtimeSource, /const CODEX_SHORT_ID_LENGTH = 3/);
+  assert.match(runtimeSource, /short_id/);
+  assert.match(runtimeSource, /export async function abortPrithaCodexTask/);
+  assert.match(runtimeSource, /TERMINAL_CODEX_TASK_STATUSES = new Set\(\["complete", "failed", "failed_timeout", "failed_empty_result", "rejected", "aborted"\]\)/);
+  assert.match(voicePageSource, /function taskShortLabel/);
+  assert.match(voicePageSource, /className="task-short-id"/);
+  assert.match(voicePageSource, /onAbortTask/);
+  assert.match(voicePageSource, /\/api\/realtime\/codex-task\/\$\{encodeURIComponent\(taskId\)\}\/abort/);
+  assert.match(voicePageSource, /disabled=\{taskIsTerminal\(task\)\}/);
+  assert.match(voicePageSource, /<Square size=\{15\} \/>[\s\S]*Abort/);
+  assert.doesNotMatch(voicePageSource, /onRefreshTask/);
+  assert.match(voiceStylesSource, /\.task-short-id/);
 });
 
 test("Voice Codex confirmations can be synthesized from short spoken approval", () => {

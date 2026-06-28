@@ -54,6 +54,7 @@ export type CodexTaskThreadScope = {
 
 export type CodexTaskState = {
   id: string;
+  shortId?: string;
   title: string;
   status: string;
   summary: string;
@@ -78,6 +79,7 @@ export type CodexTaskState = {
   threadScope?: CodexTaskThreadScope | null;
   threadRoutingMode?: string;
   parentTaskId?: string;
+  parentShortId?: string;
   continuation?: Record<string, unknown> | null;
 };
 
@@ -161,6 +163,7 @@ type RealtimeEvent = {
 type CodexTaskSnapshot = {
   ok: boolean;
   task_id?: string;
+  short_id?: string;
   status?: string;
   complete?: boolean;
   phase?: string;
@@ -187,6 +190,7 @@ type CodexTaskSnapshot = {
   approval?: CodexTaskApproval | null;
   thread_scope?: CodexTaskThreadScope | null;
   parent_task_id?: string;
+  parent_short_id?: string;
   continuation?: Record<string, unknown> | null;
   codex_app_thread_routing_mode?: string;
   request?: {
@@ -286,6 +290,7 @@ export type VoiceIntakeConfirmation = {
 export type VoiceIntakeSubmitResult = {
   ok?: boolean;
   task_id?: string;
+  short_id?: string;
   status?: string;
   mode?: string;
   operator_note?: string;
@@ -294,6 +299,7 @@ export type VoiceIntakeSubmitResult = {
   approval?: CodexTaskApproval | null;
   thread_scope?: CodexTaskThreadScope | null;
   parent_task_id?: string;
+  parent_short_id?: string;
   continuation?: Record<string, unknown> | null;
   codex_app_thread_routing_mode?: string;
   error?: string;
@@ -588,10 +594,20 @@ function buildRealtimeSessionSection(sessionId: string, events: VoiceSessionEven
   };
 }
 
+function isTerminalCodexTaskStatus(status: unknown) {
+  const value = String(status || "");
+  return value === "complete" || value === "rejected" || value === "aborted" || value.startsWith("failed");
+}
+
 function rollingSummaryEventFromSnapshot(snapshot: CodexTaskSnapshot) {
   if (!snapshot.ok || !snapshot.task_id) return "";
   const status = snapshot.status || "";
-  if (snapshot.complete) return status.startsWith("failed") ? "failed" : "completed";
+  if (snapshot.complete) {
+    if (status.startsWith("failed")) return "failed";
+    if (status === "aborted") return "aborted";
+    if (status === "rejected") return "rejected";
+    return "completed";
+  }
   if (status === "failed_timeout") return "failed_timeout";
   if (status === "decision_required" || snapshot.approval?.status === "pending") return "decision_gate";
   if (status === "waiting_for_operator") return "operator_question";
@@ -803,6 +819,7 @@ function usePrithaRealtimeController() {
       const existing = tasks.find((item) => item.id === task.id);
       const nextTask: CodexTaskState = {
         id: task.id,
+        shortId: task.shortId || existing?.shortId,
         title: task.title || task.id,
         status: task.status || existing?.status || "queued",
         summary: task.summary || existing?.summary || "Codex task queued.",
@@ -827,7 +844,8 @@ function usePrithaRealtimeController() {
         threadScope: task.threadScope === undefined ? existing?.threadScope : task.threadScope,
         threadRoutingMode: task.threadRoutingMode || existing?.threadRoutingMode,
         parentTaskId: task.parentTaskId === undefined ? existing?.parentTaskId : task.parentTaskId,
-        continuation: task.continuation === undefined ? existing?.continuation || null : task.continuation,
+        parentShortId: task.parentShortId === undefined ? existing?.parentShortId : task.parentShortId,
+	        continuation: task.continuation === undefined ? existing?.continuation || null : task.continuation,
       };
       const nextTasks = orderVisibleCodexTasks([nextTask, ...tasks.filter((item) => item.id !== task.id)]);
       codexTasksRef.current = nextTasks;
@@ -1149,7 +1167,7 @@ function usePrithaRealtimeController() {
       const taskSnapshot = codexTasksRef.current;
       const activeTask =
         options.task ||
-        taskSnapshot.find((task) => task.status !== "complete" && !task.status.startsWith("failed")) ||
+	        taskSnapshot.find((task) => !isTerminalCodexTaskStatus(task.status)) ||
         taskSnapshot[0];
       const snapshot = options.snapshot;
       const scope = snapshot?.thread_scope || snapshot?.request?.thread_scope || activeTask?.threadScope || null;
@@ -1208,8 +1226,10 @@ function usePrithaRealtimeController() {
         ],
         5,
       );
-      const nextStep = snapshot?.complete || statusText === "complete"
-        ? "Review the completed Codex result and continue only if the operator asks."
+	      const nextStep = statusText === "aborted"
+	        ? "The Codex task was aborted by the operator; ask what to do next only if needed."
+	        : snapshot?.complete || isTerminalCodexTaskStatus(statusText)
+	        ? "Review the terminal Codex result and continue only if the operator asks."
         : statusText === "waiting_for_operator"
           ? "Ask the operator for the pending answer, then resume the same Codex task."
           : statusText === "decision_required"
@@ -1344,6 +1364,7 @@ function usePrithaRealtimeController() {
       }
 
       const statusText = snapshot.status || "unknown";
+      const displayTaskId = snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id;
       const terminal = Boolean(snapshot.complete);
       const failed = statusText.startsWith("failed");
       const resultText = snapshot.result_excerpt?.trim();
@@ -1380,6 +1401,7 @@ function usePrithaRealtimeController() {
 
       upsertCodexTask({
         id: snapshot.task_id,
+        shortId: snapshot.short_id,
         title: snapshot.task ? snapshot.task.slice(0, 80) : snapshot.request?.task ? snapshot.request.task.slice(0, 80) : snapshot.task_id,
         status: statusText,
         summary,
@@ -1402,6 +1424,7 @@ function usePrithaRealtimeController() {
         threadScope: snapshot.thread_scope || snapshot.request?.thread_scope || null,
         threadRoutingMode: snapshot.codex_app_thread_routing_mode || snapshot.request?.codex_app_thread_routing_mode,
         parentTaskId: snapshot.parent_task_id || snapshot.request?.parent_task_id,
+        parentShortId: snapshot.parent_short_id,
         continuation:
           typeof snapshot.continuation === "object" && snapshot.continuation !== null
             ? snapshot.continuation
@@ -1417,9 +1440,9 @@ function usePrithaRealtimeController() {
 
       if (recordSessionEvent && terminal && snapshot.task_id && !sessionLoggedCodexTaskResultsRef.current.has(snapshot.task_id)) {
         sessionLoggedCodexTaskResultsRef.current.add(snapshot.task_id);
-        const eventText = operatorBrief || resultText || voiceFeedbackText || snapshot.task_id;
+        const eventText = operatorBrief || resultText || voiceFeedbackText || displayTaskId;
         addTranscript("tool", `Codex task ${statusText}: ${eventText.slice(0, 900)}`);
-        appendSessionEvent("task", `Codex task ${snapshot.task_id} ${statusText}${eventText ? `: ${eventText.slice(0, 900)}` : ""}`, {
+        appendSessionEvent("task", `Codex task ${displayTaskId} ${statusText}${eventText ? `: ${eventText.slice(0, 900)}` : ""}`, {
           taskId: snapshot.task_id,
           status: statusText,
         });
@@ -1459,12 +1482,12 @@ function usePrithaRealtimeController() {
   const buildStickyContext = useCallback(
     (reason: string) => {
       const recentEvents = sessionEvents
-        .filter((event) => event.kind !== "system" || /reset|sticky|codex|fallback|failed|complete/i.test(event.text))
+	        .filter((event) => event.kind !== "system" || /reset|sticky|codex|fallback|failed|complete|aborted/i.test(event.text))
         .slice(-MAX_STICKY_CONTEXT_EVENTS);
       const visibleTasks = codexTasks
-        .filter((task) => task.status !== "complete" || task.voiceHandoffRequired || task.handoffStatus === "pending")
-        .slice(0, MAX_STICKY_CONTEXT_TASKS);
-      const activeTasks = visibleTasks.filter((task) => task.status !== "complete" && !task.status.startsWith("failed"));
+	        .filter((task) => !isTerminalCodexTaskStatus(task.status) || task.voiceHandoffRequired || task.handoffStatus === "pending")
+	        .slice(0, MAX_STICKY_CONTEXT_TASKS);
+	      const activeTasks = visibleTasks.filter((task) => !isTerminalCodexTaskStatus(task.status));
       const lines = [
         "Sticky Voice Context is enabled for this Pritha Control Center session.",
         `Session id: ${sessionIdRef.current}`,
@@ -1560,10 +1583,11 @@ function usePrithaRealtimeController() {
       reportedCodexTaskApprovalDecisionsRef.current.add(decisionKey);
 
       const statusText = snapshot.status || (approvalStatus === "rejected" ? "rejected" : "running");
+      const displayTaskId = snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id;
       const message =
         approvalStatus === "approved"
-          ? `UI approval received for Codex task ${snapshot.task_id}. Status is now ${statusText}. Briefly acknowledge only that approve was received and the Codex task started.`
-          : `UI rejection received for Codex task ${snapshot.task_id}. Status is now ${statusText}. Briefly acknowledge only that the Codex task was rejected.`;
+          ? `UI approval received for Codex task ${displayTaskId}. Status is now ${statusText}. Briefly acknowledge only that approve was received and the Codex task started.`
+          : `UI rejection received for Codex task ${displayTaskId}. Status is now ${statusText}. Briefly acknowledge only that the Codex task was rejected.`;
       appendSessionEvent("task", message, { taskId: snapshot.task_id, status: statusText });
       queueRollingSummaryCheckpoint(approvalStatus === "approved" ? "codex_task_approval_received" : "codex_task_rejected", {
         snapshot,
@@ -1633,12 +1657,13 @@ function usePrithaRealtimeController() {
           const resultText = snapshot.result_excerpt?.trim();
           const operatorBrief = snapshot.operator_brief?.trim();
           const voiceFeedbackText = snapshot.latest_voice_feedback?.voice_text?.trim();
+          const displayTaskId = snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id;
           const handoffText =
             resultText ||
             operatorBrief ||
             voiceFeedbackText ||
             (snapshot.status?.startsWith("failed")
-              ? `Codex sidecar task ${snapshot.task_id} finished with status ${snapshot.status}. Open the task card for details.`
+              ? `Codex sidecar task ${displayTaskId} finished with status ${snapshot.status}. Open the task card for details.`
               : "");
           const channelState = channel?.readyState || "missing";
           const responseBusy = responseInProgressRef.current || processingToolBatchRef.current;
@@ -1660,7 +1685,7 @@ function usePrithaRealtimeController() {
                   content: [
                     {
                       type: "input_text",
-                      text: `Codex sidecar task ${snapshot.task_id} finished with status ${snapshot.status || "complete"}.\n\nResult:\n${handoffText}`,
+                      text: `Codex sidecar task ${displayTaskId} finished with status ${snapshot.status || "complete"}.\n\nResult:\n${handoffText}`,
                     },
                   ],
                 },
@@ -1712,7 +1737,7 @@ function usePrithaRealtimeController() {
                     content: [
                       {
                         type: "input_text",
-                        text: `Codex sidecar task ${snapshot.task_id} progress update.\n\nStatus:\n${progressText}`,
+                        text: `Codex sidecar task ${snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id} progress update.\n\nStatus:\n${progressText}`,
                       },
                     ],
                   },
@@ -1802,6 +1827,7 @@ function usePrithaRealtimeController() {
       if (taskId) {
         const nextTask: Partial<CodexTaskState> & { id: string } = {
           id: taskId,
+          shortId: typeof output.short_id === "string" ? output.short_id : undefined,
           title: `Voice intake ${confirmedIntakeId}`,
           status: String(output.status || output.mode || "queued"),
           summary: String(output.operator_note || "Voice intake handled after spoken clarification."),
@@ -1816,6 +1842,7 @@ function usePrithaRealtimeController() {
           threadScope: typeof output.thread_scope === "object" && output.thread_scope !== null ? output.thread_scope : null,
           threadRoutingMode: typeof output.codex_app_thread_routing_mode === "string" ? output.codex_app_thread_routing_mode : undefined,
           parentTaskId: typeof output.parent_task_id === "string" ? output.parent_task_id : undefined,
+          parentShortId: typeof output.parent_short_id === "string" ? output.parent_short_id : undefined,
           continuation: typeof output.continuation === "object" && output.continuation !== null ? output.continuation : null,
         };
         upsertCodexTask(nextTask);
@@ -1871,6 +1898,7 @@ function usePrithaRealtimeController() {
         if (taskId) {
           const nextTask: Partial<CodexTaskState> & { id: string } = {
             id: taskId,
+            shortId: typeof output.short_id === "string" ? output.short_id : undefined,
             title: taskId,
             status: String(output.status || output.mode || "queued"),
             summary: String(output.operator_note || "Codex handoff created."),
@@ -1885,6 +1913,7 @@ function usePrithaRealtimeController() {
             threadScope: typeof output.thread_scope === "object" && output.thread_scope !== null ? (output.thread_scope as CodexTaskThreadScope) : null,
             threadRoutingMode: typeof output.codex_app_thread_routing_mode === "string" ? output.codex_app_thread_routing_mode : undefined,
             parentTaskId: typeof output.parent_task_id === "string" ? output.parent_task_id : undefined,
+            parentShortId: typeof output.parent_short_id === "string" ? output.parent_short_id : undefined,
             continuation:
               typeof output.continuation === "object" && output.continuation !== null
                 ? (output.continuation as Record<string, unknown>)
@@ -2348,7 +2377,7 @@ function usePrithaRealtimeController() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const timer = window.setInterval(() => {
-      if (codexTasks.some((task) => task.status !== "complete" && !task.status.startsWith("failed"))) {
+	      if (codexTasks.some((task) => !isTerminalCodexTaskStatus(task.status))) {
         queueRollingSummaryCheckpoint("periodic_checkpoint");
       }
     }, 60_000);
