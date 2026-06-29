@@ -2,6 +2,23 @@
 
 ## Fresh Clone
 
+The simplest path is to use Codex as the installer. Download or clone the
+repository, open the project folder in Codex, and say something like:
+
+```text
+Install this project.
+```
+
+or:
+
+```text
+Set up and run Pritha locally.
+```
+
+Codex should inspect the repo instructions and run the required bootstrap
+commands for you. The commands below are the manual equivalent and are useful
+when you want to see or run each step yourself.
+
 Clone Pritha and run the bootstrap plan first:
 
 ```sh

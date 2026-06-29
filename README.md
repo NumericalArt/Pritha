@@ -252,6 +252,12 @@ node scripts/pritha.mjs test . --no-report
 
 ## Fresh Clone Bootstrap
 
+Codex can run the setup for you. Download or clone this repository, open the
+folder in Codex, and ask: `install this project`, `set up Pritha`, or
+`deploy/run this project locally`. Codex should read the repository
+instructions and run the needed bootstrap commands itself. The shell commands
+below are the manual equivalent if you want to run setup directly.
+
 ```sh
 git clone https://github.com/NumericalArt/Pritha.git pritha
 cd pritha
