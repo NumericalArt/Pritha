@@ -12,7 +12,7 @@
       "settings_path": ".private/services/searxng/settings.yml",
       "pid_path": ".private/services/searxng/searxng.pid",
       "log_path": ".private/services/searxng/logs/searxng.log",
-      "url": "http://127.0.0.1:8888/search"
+      "url": "http://127.0.0.1:4888/search"
     }
   }
 }

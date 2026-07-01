@@ -17,7 +17,7 @@ loadEnv({ root: ROOT });
 const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
 const DEFAULT_MODEL = "gpt-realtime";
 const DEFAULT_VOICE = "marin";
-const DEFAULT_PORT = 3401;
+const DEFAULT_PORT = 4401;
 const DEFAULT_CODEX_TIMEOUT_MS = 300_000;
 const MAX_BODY_BYTES = 1_000_000;
 const MAX_TOOL_TEXT = 8_000;

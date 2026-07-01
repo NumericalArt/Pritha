@@ -10,6 +10,7 @@ import ts from "../interfaces/control-center/node_modules/typescript/lib/typescr
 const accessModeSource = readFileSync("interfaces/control-center/src/lib/access-mode.ts", "utf8");
 const agentCardSource = readFileSync("interfaces/control-center/src/components/agents/AgentCard.tsx", "utf8");
 const agentsPageSource = readFileSync("interfaces/control-center/src/app/agents/page.tsx", "utf8");
+const agentStatusPageSource = readFileSync("interfaces/control-center/src/app/agents/[id]/page.tsx", "utf8");
 const controlCenterServerSource = readFileSync("interfaces/control-center/src/lib/control-center/server.ts", "utf8");
 
 async function loadAccessModeModule() {
@@ -31,8 +32,12 @@ async function loadAccessModeModule() {
 
 test("Agent cards render URLs through the selected Control Center access mode", () => {
   assert.match(agentCardSource, /agentUrlForAccessMode\(agent\.url,\s*access,\s*accessMode,\s*agent\.tailscaleUrl\)/);
+  assert.match(agentCardSource, /statusUrlForAccessMode\(agent\.statusUrl,\s*access,\s*accessMode\)/);
+  assert.match(agentCardSource, /agent\.activity === "active"/);
+  assert.match(agentCardSource, /Status page/);
   assert.match(agentCardSource, /data-testid="agent-url-link"/);
   assert.match(agentCardSource, /data-url=\{displayUrl\}/);
+  assert.match(agentsPageSource, /statusUrl: `\/agents\/\$\{agent\.id\}`/);
 });
 
 test("Managed active web agents keep plan control as the primary action", () => {
@@ -48,20 +53,20 @@ test("Access mode URL rewrite keeps LAN ports but requires explicit child-agent 
   const loaded = await loadAccessModeModule();
   try {
     const access = {
-      localhost: "http://127.0.0.1:3420",
+      localhost: "http://127.0.0.1:4420",
       lan: "ready",
-      lanUrl: "http://192.0.2.10:3420",
+      lanUrl: "http://192.0.2.10:4420",
       tailscale: "ready",
       tailscaleUrl: "https://example.tail000000.ts.net",
       qr: "ready",
     };
 
-    assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:8787", access, "localhost"), "http://127.0.0.1:8787");
-    assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:8787", access, "lan"), "http://192.0.2.10:8787");
-    assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:8787", access, "tailscale"), undefined);
+    assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "localhost"), "http://127.0.0.1:4877");
+    assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "lan"), "http://192.0.2.10:4877");
+    assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "tailscale"), undefined);
     assert.equal(
-      loaded.module.agentUrlForAccessMode("http://127.0.0.1:8787", access, "tailscale", "https://agent.tail000000.ts.net:8787"),
-      "https://agent.tail000000.ts.net:8787",
+      loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "tailscale", "https://agent.tail000000.ts.net:4877"),
+      "https://agent.tail000000.ts.net:4877",
     );
   } finally {
     loaded.cleanup();
@@ -87,4 +92,11 @@ test("Control Center carries served agent Tailscale links into agent cards", () 
   assert.match(controlCenterServerSource, /const tailscaleUrl = agentTailscaleUrl\(manifest,\s*localUrl,\s*access\)/);
   assert.match(controlCenterServerSource, /tailscale: tailscaleUrl/);
   assert.match(agentsPageSource, /tailscaleUrl: agent\.url\.tailscale/);
+});
+
+test("Agent status page gives inactive runtimes a human-readable fallback", () => {
+  assert.match(agentStatusPageSource, /getControlCenterStatus/);
+  assert.match(agentStatusPageSource, /Child agent status/);
+  assert.match(agentStatusPageSource, /Runtime not open/);
+  assert.match(agentStatusPageSource, /Open Runtime/);
 });

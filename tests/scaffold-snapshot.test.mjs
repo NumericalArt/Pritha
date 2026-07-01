@@ -167,20 +167,33 @@ test("scaffold module exposes generated agent files directly", () => {
   const paths = files.map((file) => file.path).sort();
   assert.ok(paths.includes("AGENTS.md"));
   assert.ok(paths.includes("scripts/smoke-test.mjs"));
+  assert.ok(paths.includes("scripts/healthcheck.mjs"));
+  assert.ok(paths.includes("scripts/control-center-agent-service.mjs"));
   assert.ok(paths.includes("operations/manifest.json"));
   assert.ok(paths.includes("skills/manifest.json"));
   assert.ok(paths.includes("scripts/skills-status.mjs"));
   assert.ok(paths.includes("scripts/control-center-runtime.mjs"));
+  const service = files.find((file) => file.path === "scripts/control-center-agent-service.mjs")?.content || "";
+  assert.match(service, /url\.pathname === "\/" \|\| url\.pathname === "\/index\.html"/);
+  assert.match(service, /Control Center managed local runtime is running/);
+  assert.match(service, /function escapeHtml/);
+  assert.match(service, /status_endpoint: "\/api\/status"/);
   const agents = files.find((file) => file.path === "AGENTS.md")?.content || "";
   assert.match(agents, /Harness Evolution Protocol/);
   assert.match(agents, /Consult Pritha memory/);
   const manifest = JSON.parse(files.find((file) => file.path === "operations/manifest.json")?.content || "{}");
-  assert.equal(manifest.control_center_managed, false);
+  assert.equal(manifest.control_center_managed, true);
   assert.equal(manifest.control_center_contract.legacy_strings_executable, false);
+  assert.equal(manifest.control_center_contract.confirmation_required, false);
+  assert.equal(manifest.control_center_runtime.manager, "detached-node-process");
+  assert.match(manifest.local_upstream_url, /^http:\/\/127\.0\.0\.1:\d+$/);
+  assert.match(manifest.health_url, /^http:\/\/127\.0\.0\.1:\d+\/api\/health$/);
   assert.deepEqual(manifest.start_command.argv, ["node", "scripts/control-center-runtime.mjs", "start"]);
-  assert.equal(manifest.start_command.control_center_managed, false);
+  assert.equal(manifest.start_command.control_center_managed, true);
   assert.deepEqual(manifest.stop_command.argv, ["node", "scripts/control-center-runtime.mjs", "stop"]);
-  assert.equal(manifest.stop_command.control_center_managed, false);
+  assert.equal(manifest.stop_command.control_center_managed, true);
+  assert.deepEqual(manifest.healthcheck_argv, ["node", "scripts/healthcheck.mjs"]);
+  assert.equal(manifest.healthcheck_command_executable, true);
 });
 
 test("scaffold command blocks draft contracts unless explicitly allowed", () => {

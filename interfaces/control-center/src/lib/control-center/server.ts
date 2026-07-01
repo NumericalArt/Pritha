@@ -17,6 +17,7 @@ import type {
   ControlCenterOperatorActivityEntry,
   ControlCenterOperatorActivityResponse,
   ControlCenterOperatorActionPlan,
+  ControlCenterOperatorActionPlanStatus,
   ControlCenterOperatorActionResult,
   ControlCenterPreRestoreContract,
   ControlCenterRestorePlan,
@@ -93,6 +94,9 @@ type OperationsManifest = {
   service_mode?: string;
   autostart?: string;
   control_center_managed?: boolean;
+  control_center_contract?: {
+    confirmation_required?: boolean;
+  };
   start_command?: OperationsCommand;
   stop_command?: OperationsCommand;
   run_command?: OperationsCommand;
@@ -212,7 +216,7 @@ type OperatorActionAuditEntry = {
   };
 };
 
-const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
+const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 4420);
 const APP_HOST = process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1";
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
@@ -1706,8 +1710,11 @@ function buildAgentControl(
     runtimeKind,
     ownership,
     executionMode: "plan_only" as const,
+    confirmationRequired: manifest?.control_center_contract?.confirmation_required !== false,
     commandReadiness,
   };
+  const canExecuteStart = ownership === "managed" && commandReadiness.start === "structured_executable";
+  const canExecuteStop = ownership === "managed" && commandReadiness.stop === "structured_executable";
 
   if (state === "missing" || runtimeKind === "scaffold") {
     return {
@@ -1723,7 +1730,7 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "run_check",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Check",
       reason: "Operations metadata needs review before runtime controls can be planned.",
     };
@@ -1733,7 +1740,7 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "run_check",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Check",
       reason: "Codex-native project agents use diagnostics or Codex tasks, not generic Start/Stop.",
     };
@@ -1743,7 +1750,7 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "run_now",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Now",
       reason: "Scheduled agents should expose run/pause/resume controls instead of generic Start/Stop.",
     };
@@ -1753,8 +1760,11 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "stop_plan",
       planAction: "stop",
-      label: "Stop Plan",
-      reason: "A local service is active; stop requires a managed structured command and explicit confirmation.",
+      executionMode: canExecuteStop ? "executable" : "plan_only",
+      label: canExecuteStop ? "Stop" : "Stop Plan",
+      reason: canExecuteStop
+        ? "A managed structured stop command is available for Control Center execution."
+        : "A local service is active; stop requires a managed structured command.",
     };
   }
   if (runtimeKind === "web_service") {
@@ -1762,15 +1772,18 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "start_plan",
       planAction: "start",
-      label: "Start Plan",
-      reason: "A local service manifest exists; start requires a managed structured command and explicit confirmation.",
+      executionMode: canExecuteStart ? "executable" : "plan_only",
+      label: canExecuteStart ? "Start" : "Start Plan",
+      reason: canExecuteStart
+        ? "A managed structured start command is available for Control Center execution."
+        : "A local service manifest exists; start requires a managed structured command.",
     };
   }
   return {
     ...base,
     primaryCardAction: "run_check",
     planAction: "check",
-    executionMode: "manual_only",
+    executionMode: "executable",
     label: "Run Check",
     reason: "Runtime class is unknown or unmanaged; only diagnostics are enabled.",
   };
@@ -1837,7 +1850,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
     ui: {
       ...uiState,
       primaryAction: legacyPlanAction(control),
-      actionEnabled: false,
+      actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
       issueText: issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
@@ -1872,7 +1885,7 @@ function capabilities(root: string, registryReady: boolean, agents: ControlCente
     agents_registry: registryReady ? "ready" : "not_installed",
     sibling_scan: "ready",
     operations_manifest: anyOperationsReady ? "ready" : "not_installed",
-    start_stop: anyStartStopExecutable ? "manual_only" : "planned",
+    start_stop: anyStartStopExecutable ? "ready" : "planned",
     restore: anyRestorePlan ? "manual_only" : "planned",
     snapshots: snapshotsStatus(root),
     rollback: anyRollbackPlan ? "manual_only" : "unavailable",
@@ -2270,9 +2283,9 @@ function controlForAction(agent: ControlCenterAgent, action: ControlCenterOperat
       ...agent.control,
       primaryCardAction: "run_check",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Check",
-      reason: "Manual check reads metadata and probes health without mutating runtime state.",
+      reason: "Run Check reads metadata and probes health without mutating runtime state.",
     };
   }
   if (action === "start") {
@@ -2355,35 +2368,52 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
     return true;
   });
   const startStopAction = action === "start" || action === "stop";
+  const unavailableBlockers =
+    startStopAction
+      ? [
+          agent.control.runtimeKind === "external_service" ? "External services cannot be started or stopped by Control Center." : "",
+          agent.control.runtimeKind === "scaffold" || agent.folder.status !== "present" ? "Agent folder is missing or scaffold-only." : "",
+        ].filter(Boolean)
+      : [];
   const runtimeBlockers =
     startStopAction
       ? [
           agent.control.ownership !== "managed" ? "Agent is not control_center_managed; start/stop execution is disabled." : "",
           actionCommandReadiness !== "structured_executable" ? `${action.toUpperCase()} requires a structured executable argv command in operations/manifest.json.` : "",
-          agent.control.runtimeKind === "external_service" ? "External services cannot be started or stopped by Control Center." : "",
-          agent.control.runtimeKind === "scaffold" || agent.folder.status !== "present" ? "Agent folder is missing or scaffold-only." : "",
         ].filter(Boolean)
       : [];
   const actionBackendMissing =
     action === "restore" ? "Restore backend is planned-only; Control Center will not create folders yet" : "";
   const plannedOnlyBlockers = actionBackendMissing ? [actionBackendMissing] : [];
-  const blockers = action === "check" ? [] : [...runtimeBlockers, ...plannedOnlyBlockers, ...failedChecks.map((check) => `${check.label}: ${check.detail}`)];
+  const blockers =
+    action === "check"
+      ? []
+      : [...unavailableBlockers, ...runtimeBlockers, ...plannedOnlyBlockers, ...failedChecks.map((check) => `${check.label}: ${check.detail}`)];
   const startStopEnabled = startStopAction && blockers.length === 0;
-  const planStatus: CapabilityStatus =
+  const requiresConfirmation =
+    action !== "check" &&
+    !(startStopEnabled && startStopAction && planControl.confirmationRequired === false);
+  const planStatus: ControlCenterOperatorActionPlanStatus =
     action === "check"
       ? "manual_only"
       : startStopEnabled
-        ? "manual_only"
-        : blockers.length > plannedOnlyBlockers.length
-        ? "unavailable"
-        : "planned";
+        ? requiresConfirmation
+          ? "needs_confirmation"
+          : "ready"
+        : unavailableBlockers.length > 0
+          ? "unavailable"
+          : plannedOnlyBlockers.length > 0 && blockers.length === plannedOnlyBlockers.length
+            ? "plan_only"
+            : "blocked";
   const effectiveControl: ControlCenterAgentControl =
     startStopEnabled
       ? {
           ...planControl,
           executionMode: "executable",
           label: action === "start" ? "Start" : "Stop",
-          reason: "Structured managed command is available behind manual confirmation.",
+          reason: planControl.confirmationRequired === false
+            ? "Structured managed command is available for Control Center execution."
+            : "Structured managed command is available behind confirmation.",
         }
       : planControl;
 
@@ -2398,9 +2428,9 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
     action,
     status: planStatus,
     actionEnabled: action === "check" || startStopEnabled,
-    requiresConfirmation: action !== "check",
+    requiresConfirmation,
     confirmation:
-      action === "check"
+      !requiresConfirmation
         ? undefined
         : {
             requiredPhrase: operatorActionPhrase(agent, action),
@@ -2427,7 +2457,11 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
           ]
         : [
             "Review plan, preflight checks and blockers",
-            startStopEnabled ? `Enter the required confirmation phrase to ${action} the managed agent runtime` : "Resolve blockers before execution is enabled",
+            startStopEnabled && requiresConfirmation
+              ? `Enter the required confirmation phrase to ${action} the managed agent runtime`
+              : startStopEnabled
+                ? `Run the ${action} action for the managed agent runtime`
+                : "Resolve blockers before execution is enabled",
             startStopEnabled ? "Control Center executes only the structured argv command without a shell" : "Use Dev diagnostics or Codex for remediation or manifest upgrade planning",
           ],
     blockers,
@@ -2435,13 +2469,17 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
       action === "check"
         ? ["Health probes can report stale local state if the child-agent server is changing while the check runs"]
         : startStopEnabled
-          ? ["This action mutates local runtime state and is gated by explicit operator confirmation."]
+          ? requiresConfirmation
+            ? ["This action mutates local runtime state and is gated by explicit operator confirmation."]
+            : ["This action mutates only this child agent's local runtime state using the structured argv contract."]
           : ["This action would mutate runtime state and remains disabled until the managed structured contract is complete."],
     warnings: [
       action === "check"
         ? "Manual check does not start, stop, restore, install, remove or schedule anything."
         : startStopEnabled
-          ? "Confirmation-gated action. No shell strings, secrets, launchd install, cron enablement or external service mutation is allowed."
+          ? requiresConfirmation
+            ? "Confirmation-gated action. No shell strings, secrets, launchd install, cron enablement or external service mutation is allowed."
+            : "Executable managed action. No shell strings, secrets, launchd install, cron enablement or external service mutation is allowed."
           : "Plan-only action. No process, folder, service, snapshot or memory mutation is available from this endpoint.",
     ],
   };
@@ -2715,7 +2753,7 @@ export async function runAgentRuntimeAction(
     return result;
   }
 
-  if (confirmation.trim() !== requiredPhrase) {
+  if (plan.confirmation && confirmation.trim() !== requiredPhrase) {
     const result = blockedOperatorActionResult({
       status,
       agent,

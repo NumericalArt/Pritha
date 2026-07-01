@@ -201,7 +201,7 @@ function installSteps(profile, config, options) {
       "tailscale-install-deferred",
       "install",
       "Tailscale install is operator-approved only",
-      "Bootstrap detects Tailscale readiness but does not install or configure host networking. Use scripts/tailscale-setup.mjs plan/status/install for the approved flow.",
+      "Bootstrap detects Tailscale readiness but does not install or configure host networking. Use scripts/tailscale-setup.mjs plan/status/plan-agents/install for the approved flow.",
     ));
   }
   return steps;
@@ -259,7 +259,7 @@ function verifySteps(profile, config) {
       "--app",
       "control-center",
       "--port",
-      String(config.controlCenter ? 3420 : 3000),
+      String(config.controlCenter ? 4420 : 4000),
       "--json",
     ], { required: false, timeoutMs: 30000 }));
   }

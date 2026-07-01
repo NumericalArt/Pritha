@@ -46,5 +46,5 @@ confidence: high
 - Secrets: `OPENAI_API_KEY` only through local environment or credential UI.
 - Current readiness: scaffold and Control Center registration complete;
   Realtime pending operator credentials.
-- Control Center URL: `http://127.0.0.1:8787`.
+- Control Center URL: `http://127.0.0.1:4877`.
 - Control mode: managed manual local web service; no autostart.

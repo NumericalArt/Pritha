@@ -16,8 +16,10 @@ operations/README.md
 operations/manifest.json
 package.json
 scripts/agent-cli.mjs
+scripts/control-center-agent-service.mjs
 scripts/control-center-runtime.mjs
 scripts/deploy-service.mjs
+scripts/healthcheck.mjs
 scripts/interface-status.mjs
 scripts/memory-status.mjs
 scripts/operations-status.mjs

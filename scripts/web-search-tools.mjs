@@ -219,7 +219,7 @@ search:
     - html
     - json
 server:
-  port: 8888
+  port: 4888
   bind_address: "127.0.0.1"
   base_url: false
   limiter: false

@@ -357,7 +357,7 @@ function TailscaleSetupPanel({ access }: { access?: ControlCenterStatus["access"
       <div className="settings-command-grid">
         <div className="settings-command-row">
           <Terminal size={16} />
-          <code>node scripts/tailscale-setup.mjs plan --app control-center --port 3420</code>
+          <code>node scripts/tailscale-setup.mjs plan --app control-center --port 4420</code>
         </div>
         <div className="settings-command-row">
           <Terminal size={16} />
@@ -407,7 +407,7 @@ function AccessSection({ access }: AccessProps) {
     {
       id: "localhost" as const,
       label: "Localhost",
-      value: access?.localhost || "http://127.0.0.1:3420",
+      value: access?.localhost || "http://127.0.0.1:4420",
       detail: "Works only on this Mac.",
       icon: Laptop,
     },

@@ -234,15 +234,20 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
 
   async function runRuntimeAction() {
     if (!selectedAgent || (selectedAction !== "start" && selectedAction !== "stop")) return;
+    const plan = panel.plan;
+    if (!plan?.actionEnabled) return;
+    const needsConfirmation = plan.requiresConfirmation === true;
     const requiredPhrase = panel.plan?.confirmation?.requiredPhrase || "";
-    if (!panel.plan?.actionEnabled || !requiredPhrase) return;
-    const confirmed = window.confirm(`${actionLabel(selectedAction)} ${selectedAgent.name}? This will execute the managed runtime command.`);
-    if (!confirmed) return;
+    if (needsConfirmation && !requiredPhrase) return;
+    if (needsConfirmation) {
+      const confirmed = window.confirm(`${actionLabel(selectedAction)} ${selectedAgent.name}? This will execute the managed runtime command.`);
+      if (!confirmed) return;
+    }
     setPanel((current) => ({ ...current, running: true, error: undefined }));
     try {
       const result = await fetchJson<ControlCenterOperatorActionResult>(`/api/agents/${selectedAgent.id}/actions/${selectedAction}`, {
         method: "POST",
-        body: JSON.stringify({ confirmation: requiredPhrase }),
+        body: JSON.stringify({ confirmation: needsConfirmation ? requiredPhrase : "" }),
       });
       setPanel((current) => ({ ...current, result, running: false }));
       router.refresh();
@@ -406,7 +411,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   const selectedActionLabel = panel.plan?.control.label || (selectedAgent ? getCardActionLabel(selectedAgent) : actionLabel(selectedAction));
   const runtimeAction = selectedAction === "start" || selectedAction === "stop";
   const requiredPhrase = runtimeAction ? panel.plan?.confirmation?.requiredPhrase || "" : "";
-  const runtimeActionEnabled = Boolean(runtimeAction && panel.plan?.actionEnabled && requiredPhrase && !panel.running);
+  const runtimeActionEnabled = Boolean(runtimeAction && panel.plan?.actionEnabled && !panel.running && (!panel.plan.requiresConfirmation || requiredPhrase));
 
   return (
     <>

@@ -228,7 +228,7 @@ export const devMock: DevPageState = {
   environment: {
     platform: "macOS 14.4 (arm64)",
     node: "v20.11.1",
-    appPort: 3420,
+    appPort: 4420,
     dataPath: ".pritha/data",
     timezone: "Europe/Moscow",
     git: "main (a1b2c3d)",

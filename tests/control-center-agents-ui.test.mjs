@@ -8,10 +8,11 @@ const agentCardSource = readFileSync("interfaces/control-center/src/components/a
 const globalCssSource = readFileSync("interfaces/control-center/src/styles/globals.css", "utf8");
 const serverSource = readFileSync("interfaces/control-center/src/lib/control-center/server.ts", "utf8");
 
-test("Agents runtime actions use a confirm dialog instead of exact phrase input", () => {
+test("Agents runtime actions support automatic execution and confirmation-gated execution", () => {
   assert.match(agentsOperatorSource, /window\.confirm/);
-  assert.match(agentsOperatorSource, /body: JSON\.stringify\(\{ confirmation: requiredPhrase \}\)/);
-  assert.match(agentsOperatorSource, /runtimeActionEnabled = Boolean\(runtimeAction && panel\.plan\?\.actionEnabled && requiredPhrase && !panel\.running\)/);
+  assert.match(agentsOperatorSource, /const needsConfirmation = plan\.requiresConfirmation === true/);
+  assert.match(agentsOperatorSource, /body: JSON\.stringify\(\{ confirmation: needsConfirmation \? requiredPhrase : "" \}\)/);
+  assert.match(agentsOperatorSource, /runtimeActionEnabled = Boolean\(runtimeAction && panel\.plan\?\.actionEnabled && !panel\.running && \(!panel\.plan\.requiresConfirmation \|\| requiredPhrase\)\)/);
   assert.doesNotMatch(agentsOperatorSource, /Manual Confirmation/);
   assert.doesNotMatch(agentsOperatorSource, /Type exact phrase/);
   assert.doesNotMatch(agentsOperatorSource, /panel\.confirmation/);
@@ -20,6 +21,21 @@ test("Agents runtime actions use a confirm dialog instead of exact phrase input"
 test("Agents runtime backend still requires the exact confirmation phrase", () => {
   assert.match(serverSource, /confirmation\.trim\(\) !== requiredPhrase/);
   assert.match(serverSource, /Confirmation phrase mismatch/);
+});
+
+test("Agents runtime backend uses explicit Start/Stop plan statuses", () => {
+  const start = serverSource.indexOf("function buildOperatorActionPlan");
+  const end = serverSource.indexOf("export async function getAgentOperatorActionPlan", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const planBuilder = serverSource.slice(start, end);
+
+  assert.match(planBuilder, /\? "needs_confirmation"\s*:\s*"ready"/);
+  assert.match(planBuilder, /unavailableBlockers\.length > 0\s*\?\s*"unavailable"/);
+  assert.match(planBuilder, /\?\s*"plan_only"\s*:\s*"blocked"/);
+  assert.match(planBuilder, /action === "check"\s*\?\s*"manual_only"/);
+  assert.doesNotMatch(planBuilder, /startStopEnabled[\s\S]{0,140}\?\s*"manual_only"/);
+  assert.doesNotMatch(planBuilder, /startStopEnabled[\s\S]{0,140}\?\s*"planned"/);
 });
 
 test("Mobile Agents mirrors desktop filtering and uses readable fleet audit summary", () => {

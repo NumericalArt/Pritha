@@ -19,23 +19,23 @@
       "name": "web",
       "mode": "read/search-ui",
       "status": "active",
-      "url": "http://127.0.0.1:3000"
+      "url": "http://127.0.0.1:4000"
     },
     {
       "name": "pritha-voice-control",
       "mode": "deprecated-standalone-realtime-voice-ui",
       "status": "deprecated",
       "script": "scripts/pritha-voice-control.mjs",
-      "url": "http://127.0.0.1:3401",
+      "url": "http://127.0.0.1:4401",
       "replaced_by": "pritha-control-center",
-      "replacement_url": "http://127.0.0.1:3420/voice"
+      "replacement_url": "http://127.0.0.1:4420/voice"
     },
     {
       "name": "pritha-control-center",
       "mode": "local-control-center",
       "status": "experimental",
       "script": "npm --prefix interfaces/control-center run dev",
-      "url": "http://127.0.0.1:3420"
+      "url": "http://127.0.0.1:4420"
     },
     {
       "name": "obsidian",

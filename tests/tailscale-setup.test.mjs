@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import http from "node:http";
@@ -54,13 +54,13 @@ if (args[0] === "status" && args[1] === "--json") {
   process.exit(0);
 }
 if (args[0] === "serve" && args[1] === "status" && args[2] === "--json") {
-  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:3420";
-  console.log(JSON.stringify({ Web: { "test-host.example.invalid:3420": { Handlers: { "/": { Proxy: upstream } } } } }));
+  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:4420";
+  console.log(JSON.stringify({ Web: { "test-host.example.invalid:4420": { Handlers: { "/": { Proxy: upstream } } } } }));
   process.exit(0);
 }
 if (args[0] === "serve" && args[1] === "status") {
-  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:3420";
-  console.log("https://test-host.example.invalid:3420 (tailnet only)\\n|-- " + upstream);
+  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:4420";
+  console.log("https://test-host.example.invalid:4420 (tailnet only)\\n|-- " + upstream);
   process.exit(0);
 }
 if (args[0] === "serve") {
@@ -102,7 +102,7 @@ test("tailscale setup plan is safe when Tailscale is missing", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-missing-"));
   try {
     const missingBin = path.join(dir, "missing-tailscale");
-    const result = runTailscaleSetup(["plan", "--app", "control-center", "--port", "3420", "--json"], {
+    const result = runTailscaleSetup(["plan", "--app", "control-center", "--port", "4420", "--json"], {
       PRITHA_TAILSCALE_BIN: missingBin,
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -120,7 +120,7 @@ test("tailscale setup status exposes readiness fields", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-status-"));
   try {
     const fakeBin = writeFakeTailscale(dir);
-    const result = runTailscaleSetup(["status", "--app", "control-center", "--port", "3420", "--json"], {
+    const result = runTailscaleSetup(["status", "--app", "control-center", "--port", "4420", "--json"], {
       PRITHA_TAILSCALE_BIN: fakeBin,
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -128,7 +128,7 @@ test("tailscale setup status exposes readiness fields", () => {
     assert.equal(payload.status.installed, true);
     assert.equal(payload.status.authenticated, true);
     assert.equal(payload.status.serve_configured, true);
-    assert.equal(payload.status.tailscale_url, "https://test-host.example.invalid:3420");
+    assert.equal(payload.status.tailscale_url, "https://test-host.example.invalid:4420");
     assert.equal(payload.status.peer_access_not_tested, true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -136,7 +136,7 @@ test("tailscale setup status exposes readiness fields", () => {
 });
 
 test("tailscale setup serve requires explicit --yes", () => {
-  const result = runTailscaleSetup(["serve", "--app", "control-center", "--port", "3420", "--json"]);
+  const result = runTailscaleSetup(["serve", "--app", "control-center", "--port", "4420", "--json"]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /requires --yes/);
 });
@@ -181,6 +181,54 @@ test("tailscale setup serve configures private Serve and writes setup state", as
   }
 });
 
+test("tailscale setup plans sibling child-agent Serve mappings without mutation", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-agents-"));
+  try {
+    const fakeBin = writeFakeTailscale(dir);
+    const root = path.join(dir, "Pritha");
+    const agent = path.join(dir, "DesignAgent");
+    await withServer(async (port) => {
+      mkdirSync(root, { recursive: true });
+      mkdirSync(path.join(agent, "operations"), { recursive: true });
+      writeFileSync(path.join(root, ".keep"), "", "utf8");
+      writeFileSync(
+        path.join(agent, "operations", "manifest.json"),
+        JSON.stringify(
+          {
+            local_upstream_url: `http://127.0.0.1:${port}`,
+            health_url: `http://127.0.0.1:${port}/api/health`,
+          },
+          null,
+          2,
+        ),
+      );
+      const result = await runTailscaleSetupAsync(["plan-agents", "--json"], {
+        TECHSCOPE_ROOT: root,
+        PRITHA_TAILSCALE_BIN: fakeBin,
+        FAKE_TAILSCALE_UPSTREAM: "http://127.0.0.1:9",
+      });
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.schema, "pritha-tailscale-agent-fleet-v1");
+      assert.equal(payload.summary.total, 1);
+      assert.equal(payload.summary.readyToServe, 1);
+      assert.equal(payload.agents[0].app, "DesignAgent");
+      assert.equal(payload.agents[0].local_upstream_health.status, "ready");
+      assert.equal(payload.agents[0].serve_configured, false);
+      assert.match(payload.agents[0].serve_command, new RegExp(`--port ${port} --health-path /api/health --yes`));
+      assert.doesNotMatch(result.stdout, /test-host\.example\.invalid/);
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("tailscale setup serve-agents requires explicit --yes", () => {
+  const result = runTailscaleSetup(["serve-agents", "--json"]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /requires --yes/);
+});
+
 test("Control Center Next config gets Tailscale dev origins from env", () => {
   const config = readFileSync("interfaces/control-center/next.config.mjs", "utf8");
   assert.match(config, /PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIGINS/);
@@ -196,8 +244,10 @@ test("Codex-facing Tailscale operator protocol is documented", () => {
 
   for (const body of [agents, workflow, guide, cli.stdout]) {
     assert.match(body, /plan .*status|plan`, `status`|plan\/status|plan --app control-center/s);
+    assert.match(body, /plan-agents|agent/i);
     assert.match(body, /install --yes/);
     assert.match(body, /serve --yes/);
+    assert.match(body, /serve-agents --yes|agent/i);
     assert.match(body, /off(?: .*?)? --yes|off --yes/);
     assert.match(body, /explicit\s+user approval|explicit\s+user confirmation|separate explicit\s+user approval/);
     assert.match(body, /Peer access|peer access|trusted peer device|phone/);

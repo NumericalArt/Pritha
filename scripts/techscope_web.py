@@ -30,7 +30,7 @@ def resolve_root():
 ROOT = resolve_root()
 DB_PATH = ROOT / ".memory" / "techscope.sqlite"
 HOST = os.environ.get("HOST", "127.0.0.1")
-PORT = int(os.environ.get("PORT", "3000"))
+PORT = int(os.environ.get("PORT", "4000"))
 
 
 PAGE = """<!doctype html>

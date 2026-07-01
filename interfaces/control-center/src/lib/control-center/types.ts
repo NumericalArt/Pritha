@@ -31,6 +31,14 @@ export type ControlCenterCapabilities = {
 
 export type ControlCenterOperatorAction = "start" | "stop" | "check" | "restore";
 
+export type ControlCenterOperatorActionPlanStatus =
+  | "ready"
+  | "needs_confirmation"
+  | "plan_only"
+  | "blocked"
+  | "unavailable"
+  | "manual_only";
+
 export type ControlCenterAgentRuntimeKind =
   | "web_service"
   | "scheduled_job"
@@ -108,6 +116,7 @@ export type ControlCenterAgentControl = {
   executionMode: ControlCenterActionExecutionMode;
   label: string;
   reason: string;
+  confirmationRequired?: boolean;
   commandReadiness: {
     start: ControlCenterCommandReadiness;
     stop: ControlCenterCommandReadiness;
@@ -238,7 +247,7 @@ export type ControlCenterOperatorActionPlan = {
     folderStatus: "present" | "missing";
   };
   action: ControlCenterOperatorAction;
-  status: CapabilityStatus;
+  status: ControlCenterOperatorActionPlanStatus;
   actionEnabled: boolean;
   requiresConfirmation: boolean;
   confirmation?: {

@@ -14,7 +14,7 @@ node scripts/self-test.mjs
 ## Web
 
 ```sh
-HOST=127.0.0.1 PORT=3000 node scripts/techscope-web.mjs
+HOST=127.0.0.1 PORT=4000 node scripts/techscope-web.mjs
 ```
 
 ## Services

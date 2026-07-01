@@ -2,7 +2,7 @@
 
 Status: deprecated.
 
-The standalone browser voice interface on port `3401` is retired. Use the
+The standalone browser voice interface on port `4401` is retired. Use the
 Pritha Control Center voice runtime instead:
 
 ```sh
@@ -12,7 +12,7 @@ npm run control-center
 Open:
 
 ```text
-http://127.0.0.1:3420/voice
+http://127.0.0.1:4420/voice
 ```
 
 This directory is retained only as historical implementation evidence until a
@@ -42,14 +42,14 @@ This command now exits with a deprecation notice.
 Open:
 
 ```text
-http://127.0.0.1:3401
+http://127.0.0.1:4401
 ```
 
 Optional env:
 
 ```sh
 TECHSCOPE_VOICE_HOST=127.0.0.1
-TECHSCOPE_VOICE_PORT=3401
+TECHSCOPE_VOICE_PORT=4401
 TECHSCOPE_VOICE_MODEL=gpt-realtime
 TECHSCOPE_VOICE_REALTIME_VOICE=marin
 TECHSCOPE_VOICE_CODEX_MODE=queue

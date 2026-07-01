@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.techscope.telegram-bot</string>
+  <string>com.techscope.telegram-bot-dasha</string>
 
   <key>ProgramArguments</key>
   <array>

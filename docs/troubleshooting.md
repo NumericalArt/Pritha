@@ -43,7 +43,7 @@ node scripts/bootstrap.mjs --profile local --start control-center
 The default local URL is:
 
 ```text
-http://127.0.0.1:3420/agents
+http://127.0.0.1:4420/agents
 ```
 
 `localhost` and `127.0.0.1` are loopback addresses. They work only on the Mac
@@ -54,7 +54,7 @@ LAN binding is disabled by policy in this build. Keep Control Center on
 `127.0.0.1` and use Tailscale Serve for phone or trusted peer-device access.
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan --app control-center --port 4420
 node scripts/tailscale-setup.mjs status --json
 ```
 
@@ -85,12 +85,12 @@ Use read-only diagnosis first:
 
 ```sh
 node scripts/control-center-health.mjs --json
-lsof -nP -iTCP:3420 -sTCP:LISTEN
+lsof -nP -iTCP:4420 -sTCP:LISTEN
 ```
 
 If Codex is operating the project, killing or replacing the local Control
 Center process requires explicit user approval immediately before the action.
-After approval, stop only the PID that is listening on `127.0.0.1:3420`, then
+After approval, stop only the PID that is listening on `127.0.0.1:4420`, then
 start a fresh foreground server:
 
 ```sh
@@ -216,7 +216,7 @@ used by the read-only limits probe.
 Read the current plan/status first:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan --app control-center --port 4420
 node scripts/tailscale-setup.mjs status --json
 node scripts/tailscale-setup.mjs auth-status
 ```
@@ -224,8 +224,8 @@ node scripts/tailscale-setup.mjs auth-status
 Serve and stop commands require explicit approval:
 
 ```sh
-node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes
-node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes
+node scripts/tailscale-setup.mjs serve --app control-center --port 4420 --yes
+node scripts/tailscale-setup.mjs off --app control-center --port 4420 --yes
 ```
 
 Pritha setup never enables Tailscale Funnel. Funnel is public exposure and must

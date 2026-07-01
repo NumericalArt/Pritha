@@ -78,7 +78,7 @@ Start Control Center on the expected local port:
 
 ```sh
 PRITHA_CONTROL_CENTER_HOST=127.0.0.1 \
-PRITHA_CONTROL_CENTER_PORT=3420 \
+PRITHA_CONTROL_CENTER_PORT=4420 \
 npm --prefix interfaces/control-center run start
 ```
 
@@ -87,8 +87,8 @@ npm --prefix interfaces/control-center run start
 Check the local server:
 
 ```sh
-curl -fsS http://127.0.0.1:3420/api/health
-curl -fsS -X POST http://127.0.0.1:3420/api/realtime/session
+curl -fsS http://127.0.0.1:4420/api/health
+curl -fsS -X POST http://127.0.0.1:4420/api/realtime/session
 ```
 
 If the second MacBook uses Tailscale, verify its own local Tailscale status.
@@ -99,5 +99,5 @@ Rolling summary handoff is local to each machine. The file
 `.private/interface-lab/pritha-control-center/realtime/rolling-summary/current.json`
 is intentionally private and should not be synced through Git.
 
-The old standalone voice experiment on port `3401` is deprecated. The supported
-voice entry point is Control Center `/voice` on port `3420`.
+The old standalone voice experiment on port `4401` is deprecated. The supported
+voice entry point is Control Center `/voice` on port `4420`.

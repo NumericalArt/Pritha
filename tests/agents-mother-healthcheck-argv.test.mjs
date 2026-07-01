@@ -37,17 +37,18 @@ function runHealthcheckSource(deployService) {
 }
 
 test("generated operations manifest stores executable healthcheck as argv", () => {
-  const { manifest } = generatedManifest({ healthcheckCommand: "node scripts/smoke-test.mjs" });
-  assert.equal(manifest.healthcheck_command, "node scripts/smoke-test.mjs");
-  assert.deepEqual(manifest.healthcheck_argv, ["node", "scripts/smoke-test.mjs"]);
-  assert.equal(manifest.healthcheck_command_executable, false);
+  const { manifest } = generatedManifest({ healthcheckCommand: "node scripts/healthcheck.mjs" });
+  assert.equal(manifest.healthcheck_command, "node scripts/healthcheck.mjs");
+  assert.deepEqual(manifest.healthcheck_argv, ["node", "scripts/healthcheck.mjs"]);
+  assert.equal(manifest.healthcheck_command_executable, true);
 });
 
-test("generated healthcheck argv refuses shell-shaped command strings", () => {
+test("generated healthcheck argv canonicalizes shell-shaped contract strings", () => {
   const { manifest } = generatedManifest({ healthcheckCommand: "node scripts/smoke-test.mjs; rm -rf /" });
-  assert.equal(manifest.healthcheck_command, "node scripts/smoke-test.mjs; rm -rf /");
-  assert.deepEqual(manifest.healthcheck_argv, []);
-  assert.equal(manifest.healthcheck_command_executable, false);
+  assert.equal(manifest.healthcheck_command, "node scripts/healthcheck.mjs");
+  assert.equal(manifest.requested_healthcheck_command, "node scripts/smoke-test.mjs; rm -rf /");
+  assert.deepEqual(manifest.healthcheck_argv, ["node", "scripts/healthcheck.mjs"]);
+  assert.equal(manifest.healthcheck_command_executable, true);
 });
 
 test("generated deploy-service healthcheck does not invoke a shell", () => {
@@ -65,6 +66,6 @@ test("scaffold source marks legacy healthcheck_command as non-executable", () =>
   const source = readFileSync("scripts/agents-mother/scaffold/index.mjs", "utf8");
   assert.match(source, /SHELL_COMMAND_META_PATTERN/);
   assert.match(source, /healthcheck_argv: operationProfile\.healthcheckArgv/);
-  assert.match(source, /healthcheck_command_executable: false/);
+  assert.match(source, /healthcheck_command_executable: operationProfile\.healthcheckArgv\.length > 0/);
   assert.doesNotMatch(source, /run\("\/bin\/sh", \["-lc", manifest\.healthcheck_command\]/);
 });

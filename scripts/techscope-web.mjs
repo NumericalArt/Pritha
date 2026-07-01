@@ -9,7 +9,7 @@ import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || "127.0.0.1";
 
 function sqlString(value) {

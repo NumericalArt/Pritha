@@ -55,7 +55,8 @@ enabled by Pritha setup.
 Codex must start with read-only commands and use them for instruction:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan --app control-center --port 4420
+node scripts/tailscale-setup.mjs plan-agents
 node scripts/tailscale-setup.mjs status --json
 node scripts/tailscale-setup.mjs auth-status
 ```
@@ -64,8 +65,9 @@ Codex must not run real mutating Tailscale actions without separate explicit
 user approval immediately before the action:
 
 - `node scripts/tailscale-setup.mjs install --yes`
-- `node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes`
-- `node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes`
+- `node scripts/tailscale-setup.mjs serve --app control-center --port 4420 --yes`
+- `node scripts/tailscale-setup.mjs serve-agents --yes`
+- `node scripts/tailscale-setup.mjs off --app control-center --port 4420 --yes`
 - `tailscale up`
 - auth-key commands
 - Funnel/public exposure
@@ -84,7 +86,8 @@ tracked Markdown, reports, Git-ready setup state or memory snapshots.
 Read-only plan:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan --app control-center --port 4420
+node scripts/tailscale-setup.mjs plan-agents
 ```
 
 Read-only status:
@@ -120,8 +123,22 @@ Configure private Serve after the local app is healthy and the user approves
 the exact action:
 
 ```sh
-node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes
+node scripts/tailscale-setup.mjs serve --app control-center --port 4420 --yes
 ```
+
+Configure private Serve for child-agent local upstreams after the agents are
+healthy and the user approves the fleet action:
+
+```sh
+node scripts/tailscale-setup.mjs plan-agents
+node scripts/tailscale-setup.mjs serve-agents --yes
+```
+
+`plan-agents` scans sibling child-agent `operations/manifest.json` files for
+local `127.0.0.1` upstreams and compares them with real `tailscale serve
+status`. It does not invent agent URLs and does not mutate host networking.
+`serve-agents --yes` only configures agents whose local health endpoint is
+ready and whose Serve mapping is missing.
 
 Control Center API access through the tailnet fails closed unless the Tailscale
 identity header is present and trusted. Configure accepted identities in an
@@ -135,14 +152,14 @@ PRITHA_TAILSCALE_ALLOWED_LOGINS=<trusted-login@example.com>
 Stop serving after the user approves the exact action:
 
 ```sh
-node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes
+node scripts/tailscale-setup.mjs off --app control-center --port 4420 --yes
 ```
 
 ## Safety Boundary
 
-- `plan`, `status` and `auth-status` are read-only.
-- `install`, `serve` and `off` require `--yes`.
-- `install --yes`, `serve --yes` and `off --yes` are operator-approved
+- `plan`, `plan-agents`, `status` and `auth-status` are read-only.
+- `install`, `serve`, `serve-agents` and `off` require `--yes`.
+- `install --yes`, `serve --yes`, `serve-agents --yes` and `off --yes` are operator-approved
   actions, even when shown as guided commands.
 - Codex must treat `--yes` as an operator approval gate, not as permission to
   run the action automatically.

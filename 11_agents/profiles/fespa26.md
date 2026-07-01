@@ -111,7 +111,7 @@ Status: active
 - Deployment target: local Mac.
 - Service mode: manual.
 - Autostart: disabled.
-- Local upstream observed by operations manifest: `http://127.0.0.1:3027`.
+- Local upstream observed by operations manifest: `http://127.0.0.1:4027`.
 - Healthcheck command is defined in the child operations manifest.
 
 ## Known Issues

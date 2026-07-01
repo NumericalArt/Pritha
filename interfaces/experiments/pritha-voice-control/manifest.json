@@ -10,8 +10,8 @@
     "server": "node",
     "entrypoint": "scripts/pritha-voice-control.mjs",
     "default_host": "127.0.0.1",
-    "default_port": 3401,
-    "replacement": "interfaces/control-center / http://127.0.0.1:3420/voice"
+    "default_port": 4401,
+    "replacement": "interfaces/control-center / http://127.0.0.1:4420/voice"
   },
   "realtime": {
     "transport": "WebRTC",

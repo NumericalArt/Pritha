@@ -378,7 +378,7 @@ const VOICE_INTAKE_STAGING_TTL_MS = 2 * 60 * 60 * 1000;
 const RECENT_RESEARCH_DEFAULT_SOURCES = "reddit,hackernews,polymarket,grounding";
 const RECENT_RESEARCH_ALLOWED_SOURCES = new Set(["reddit", "hackernews", "polymarket", "grounding", "github", "jobs"]);
 const WEB_SEARCH_DEFAULT_BACKEND = "searxng";
-const WEB_SEARCH_DEFAULT_SEARXNG_URL = "http://127.0.0.1:8888/search";
+const WEB_SEARCH_DEFAULT_SEARXNG_URL = "http://127.0.0.1:4888/search";
 const WEB_SEARCH_DEFAULT_TIMEOUT_MS = 6_000;
 const WEB_SEARCH_AUTO_ENSURE_DEFAULT_TIMEOUT_MS = 240_000;
 const LAST30DAYS_LOCK_PATH = path.join("tools", "external-research", "last30days-lock.json");
@@ -4646,7 +4646,7 @@ function codexTaskApprovalReasons(task: Record<string, unknown>) {
   if (/(deploy|deployment|publish|release|push\s+to\s+github|gh\s+pr|git\s+push)/.test(taskText)) reasons.push("external_publish_or_deployment");
   if (/(delete|remove|destroy|wipe|drop|rm\s+-rf|erase)\b/.test(taskText)) reasons.push("destructive_change");
   if (/(secret|credential|token|api\s*key|password|\.env\.local|private\s+key)/.test(taskText)) reasons.push("credential_or_secret_change");
-  if (/(control\s*center|control-center|pritha\s+ui|\/voice|\/agents|127\.0\.0\.1:3420|:3420)/.test(taskText)) {
+  if (/(control\s*center|control-center|pritha\s+ui|\/voice|\/agents|127\.0\.0\.1:4420|:4420)/.test(taskText)) {
     if (/(restart|rebuild|reload|stop|kill|terminate|npm\s+run\s+start|next\s+start|refresh\s+server|перезапуск|пересбор|перезапусти|останов)/.test(taskText)) {
       reasons.push("control_center_runtime_change");
     }
