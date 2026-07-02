@@ -293,6 +293,11 @@ credential UI or placeholder docs.
   child agent. MCP is an optional contract-selected connector layer; selected
   connectors need source review, scoped toolsets, auth policy, approval gates,
   readiness status and fallback.
+- Apply `agent-a2a-interoperability` before enabling child-agent peer
+  communication, delegation or cross-agent task execution. A2A is an optional
+  contract-selected peer-agent layer; selected A2A surfaces need Agent Card
+  policy, discovery mode, trust registry, auth, per-skill authorization,
+  untrusted-input handling, task policy, observability and readiness checks.
 - Apply `agent-skill-pack-lifecycle` before adding reusable skills to a child
   agent. Skills are optional contract-selected modules; external skills require
   provenance review, source pinning, script/resource inspection, approval,
@@ -330,7 +335,7 @@ credential UI or placeholder docs.
 - Treat model swaps as harness changes, not only provider changes. A different
   model may need different prompt shape, tool schemas, context ordering, eval
   baselines, retry policy or verification surfaces.
-- At the end of setup/init, verify and state module readiness for the selected agent: harness, memory, data layer, skills, MCP, tools, interfaces, operations and any selected external connectors. Missing optional modules are reported as skipped; missing selected modules are reported as failed or pending-auth.
+- At the end of setup/init, verify and state module readiness for the selected agent: harness, memory, data layer, skills, MCP, A2A, tools, interfaces, operations and any selected external connectors. Missing optional modules are reported as skipped; missing selected modules are reported as failed or pending-auth.
 - If realtime voice control is selected, initialize the default realtime tool surface unless the contract explicitly opts out: internet access, agent memory access and Codex CLI sidecar access. Treat these as selected realtime-interface modules; setup must report their readiness and must not silently mark the voice interface as ready when memory or Codex CLI access is missing.
 - Preserve an evolution path through the agent's native interface. For Codex-native descendants, document how to continue development in Codex App and how to route non-domain learning materials into agent self-improvement review rather than task memory.
 
@@ -338,7 +343,7 @@ credential UI or placeholder docs.
 
 Each created agent must document:
 
-- selected modules: which parts of harness, memory, data, skills, MCP, tools, evals, interfaces and operations are included and why;
+- selected modules: which parts of harness, memory, data, skills, MCP, A2A, tools, evals, interfaces and operations are included and why;
 - information boundaries: what the model sees, what remains hidden, how context is compressed;
 - runtime boundary: where the agent runs, what the host controls, where secrets
   live, and what network/filesystem policy applies;

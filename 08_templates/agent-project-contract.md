@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-06-24
+updated: 2026-07-02
 template_for: agent-contract
 topics: []
 tools: []
@@ -20,6 +20,7 @@ related:
   decisions: []
   standards:
     - 04_standards/agent-ai-safe-security-checklist.md
+    - 04_standards/agent-a2a-interoperability.md
   workflows:
     - 07_workflows/agents-mother.md
 supersedes: []
@@ -250,6 +251,26 @@ Status: draft | accepted | superseded
 - Pending MCP auth:
 - MCP readiness command:
 - MCP audit/update policy:
+
+## A2A inter-agent communication
+
+- A2A enabled: false | true | later
+- A2A role: none | provider | client | both
+- A2A discovery: none | private-direct | local-registry | well-known | external-registry
+- A2A Agent Card visibility: none | private | authenticated | public
+- A2A Agent Card path:
+- A2A selected skills:
+- A2A consumed peer agents:
+- A2A provided peer agents:
+- A2A auth: none-local-only | api-key | bearer | oauth2 | oidc | mtls | unknown
+- A2A per-skill authorization:
+- A2A trust registry:
+- A2A task policy:
+- A2A memory policy:
+- A2A untrusted-input policy:
+- A2A observability:
+- A2A readiness: skipped | pending-auth | pending-network | ready | failed
+- A2A recheck before scaffold: yes | no
 
 ## Harness inventory
 
