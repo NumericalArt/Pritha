@@ -7,6 +7,7 @@ export const MAX_MUSIC_LEVEL_PERCENT = 100;
 export const MUSIC_NORMAL_DB = -18;
 export const MUSIC_DUCK_DB = -42;
 export const MUSIC_OFF_DB = -80;
+export const MUSIC_NORMAL_GAIN = dbToGain(MUSIC_NORMAL_DB);
 
 export type MusicSourceCapabilities = {
   source: MusicSource | "somafm-decoded" | "unknown";
@@ -48,9 +49,15 @@ export function musicSourceCapabilities(source: unknown): MusicSourceCapabilitie
   return {
     source: normalized,
     programmaticVolume: !externalStream,
-    ducking: !externalStream,
+    ducking: true,
     externalStream,
   };
+}
+
+export function musicDuckingGainToElementVolumeRatio(gain: unknown) {
+  const numeric = Number(gain);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return Math.max(0, Math.min(numeric / MUSIC_NORMAL_GAIN, 1));
 }
 
 export function normalizeMusicUserVolume(value: unknown, fallback = 0.8) {

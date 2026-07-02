@@ -80,9 +80,72 @@ function parseJson(text) {
   }
 }
 
-function appConfig(options = {}) {
+function candidateControlCenterPorts() {
+  const seen = new Set();
+  const ports = [];
+  const add = (value) => {
+    const port = Number(value);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535 || seen.has(port)) return;
+    seen.add(port);
+    ports.push(port);
+  };
+
+  add(process.env.PRITHA_CONTROL_CENTER_PORT);
+  const state = readJsonIfExists(DEFAULT_STATE_PATH);
+  if (state?.tailscale?.app === "control-center") add(state.tailscale.port);
+  const interfacesManifest = readJsonIfExists(path.join(ROOT, "interfaces", "manifest.json"));
+  for (const item of interfacesManifest?.interfaces || []) {
+    if (item?.name !== "pritha-control-center" || !item?.url) continue;
+    const url = localHttpUrl(item.url);
+    if (url) add(url.port);
+  }
+  add(3420);
+  add(4420);
+  add(5420);
+  return ports;
+}
+
+function localControlCenterStatus(port) {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${port}/api/status`, { timeout: 900 }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 256 * 1024) req.destroy(new Error("response_too_large"));
+      });
+      res.on("end", () => {
+        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 400) {
+          resolve(null);
+          return;
+        }
+        resolve(parseJson(body));
+      });
+    });
+    req.on("timeout", () => {
+      req.destroy(new Error("timeout"));
+    });
+    req.on("error", () => {
+      resolve(null);
+    });
+  });
+}
+
+async function detectedControlCenterPortForRoot() {
+  for (const port of candidateControlCenterPorts()) {
+    const status = await localControlCenterStatus(port);
+    if (path.resolve(String(status?.root || "")) === path.resolve(ROOT)) return port;
+  }
+  return 0;
+}
+
+async function appConfig(options = {}) {
   const app = String(options.app || "control-center").trim() || "control-center";
-  const port = Number(options.port || (app === "control-center" ? process.env.PRITHA_CONTROL_CENTER_PORT || 4420 : 4000));
+  const explicitPort = options.port !== undefined && options.port !== true && String(options.port).trim() !== "";
+  let port = Number(options.port || (app === "control-center" ? process.env.PRITHA_CONTROL_CENTER_PORT || 4420 : 4000));
+  if (!explicitPort && app === "control-center" && !process.env.PRITHA_CONTROL_CENTER_PORT) {
+    port = (await detectedControlCenterPortForRoot()) || port;
+  }
   if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new Error(`Invalid port: ${options.port}`);
   const healthPath = String(options["health-path"] || (app === "control-center" ? "/api/health" : "/")).trim() || "/";
   return {
@@ -236,7 +299,7 @@ function checkLocalHealth(app) {
 }
 
 async function readiness(options = {}) {
-  const app = appConfig(options);
+  const app = await appConfig(options);
   const installed = installedStatus();
   const statusProbe = installed.installed ? statusJson() : { result: { ok: false, stderr: "tailscale not installed" }, json: null };
   const authenticated = installed.installed && authenticatedFromStatus(statusProbe.json);
@@ -582,14 +645,14 @@ async function main() {
   const command = options._[0] || "plan";
   if (options.help) {
     console.log(`Usage:
-  node scripts/tailscale-setup.mjs plan --app control-center --port 4420
+  node scripts/tailscale-setup.mjs plan --app control-center
   node scripts/tailscale-setup.mjs plan-agents
   node scripts/tailscale-setup.mjs status --json
   node scripts/tailscale-setup.mjs auth-status
   node scripts/tailscale-setup.mjs install --yes
-  node scripts/tailscale-setup.mjs serve --app control-center --port 4420 --yes
+  node scripts/tailscale-setup.mjs serve --app control-center --port <control-center-port> --yes
   node scripts/tailscale-setup.mjs serve-agents --yes
-  node scripts/tailscale-setup.mjs off --app control-center --port 4420 --yes
+  node scripts/tailscale-setup.mjs off --app control-center --port <control-center-port> --yes
 
 Safety: plan/plan-agents/status/auth-status are read-only. install/serve/serve-agents/off require --yes.
 Codex/operator protocol: do not run install --yes, serve --yes, serve-agents --yes, off --yes,

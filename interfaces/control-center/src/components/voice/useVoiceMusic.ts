@@ -6,6 +6,7 @@ import {
   computeMusicOutputGain,
   MAX_MUSIC_USER_VOLUME,
   musicControlVolumeArgToUserVolume,
+  musicDuckingGainToElementVolumeRatio,
   musicSourceCapabilities,
   musicUserVolumeToElementVolume,
   musicUserVolumeToPercent,
@@ -536,7 +537,7 @@ export function useVoiceMusicController({
     const source = slot.item?.source || activeMusicSource(stateRef.current);
     const capabilities = musicSourceCapabilities(source);
     if (capabilities.externalStream) {
-      const elementVolume = slot.duckingGainValue > 0 ? musicUserVolumeToElementVolume(slot.sourceVolumeValue) : 0;
+      const elementVolume = musicUserVolumeToElementVolume(slot.sourceVolumeValue) * musicDuckingGainToElementVolumeRatio(slot.duckingGainValue);
       slot.audio.volume = elementVolume;
       slot.audio.muted = elementVolume <= 0;
       return;

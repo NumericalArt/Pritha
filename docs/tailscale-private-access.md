@@ -55,7 +55,7 @@ enabled by Pritha setup.
 Codex must start with read-only commands and use them for instruction:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 4420
+node scripts/tailscale-setup.mjs plan --app control-center
 node scripts/tailscale-setup.mjs plan-agents
 node scripts/tailscale-setup.mjs status --json
 node scripts/tailscale-setup.mjs auth-status
@@ -65,9 +65,9 @@ Codex must not run real mutating Tailscale actions without separate explicit
 user approval immediately before the action:
 
 - `node scripts/tailscale-setup.mjs install --yes`
-- `node scripts/tailscale-setup.mjs serve --app control-center --port 4420 --yes`
+- `node scripts/tailscale-setup.mjs serve --app control-center --port <control-center-port> --yes`
 - `node scripts/tailscale-setup.mjs serve-agents --yes`
-- `node scripts/tailscale-setup.mjs off --app control-center --port 4420 --yes`
+- `node scripts/tailscale-setup.mjs off --app control-center --port <control-center-port> --yes`
 - `tailscale up`
 - auth-key commands
 - Funnel/public exposure
@@ -86,7 +86,7 @@ tracked Markdown, reports, Git-ready setup state or memory snapshots.
 Read-only plan:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 4420
+node scripts/tailscale-setup.mjs plan --app control-center
 node scripts/tailscale-setup.mjs plan-agents
 ```
 
@@ -123,7 +123,7 @@ Configure private Serve after the local app is healthy and the user approves
 the exact action:
 
 ```sh
-node scripts/tailscale-setup.mjs serve --app control-center --port 4420 --yes
+node scripts/tailscale-setup.mjs serve --app control-center --port <control-center-port> --yes
 ```
 
 Configure private Serve for child-agent local upstreams after the agents are
@@ -152,7 +152,7 @@ PRITHA_TAILSCALE_ALLOWED_LOGINS=<trusted-login@example.com>
 Stop serving after the user approves the exact action:
 
 ```sh
-node scripts/tailscale-setup.mjs off --app control-center --port 4420 --yes
+node scripts/tailscale-setup.mjs off --app control-center --port <control-center-port> --yes
 ```
 
 ## Safety Boundary

@@ -17,6 +17,7 @@ const {
   MAX_MUSIC_LEVEL_PERCENT,
   MAX_MUSIC_USER_VOLUME,
   musicControlVolumeArgToUserVolume,
+  musicDuckingGainToElementVolumeRatio,
   musicSourceCapabilities,
   musicPercentToUserVolume,
   musicUserVolumeToElementVolume,
@@ -141,11 +142,11 @@ test("music volume supports boosted voice control above standard level", () => {
   assert.doesNotMatch(voiceMusicSource, /function clamp01/);
 });
 
-test("music source capabilities mark SomaFM as external and local/generated as controllable", () => {
+test("music source capabilities mark SomaFM as external but duckable", () => {
   assert.deepEqual(musicSourceCapabilities("somafm"), {
     source: "somafm",
     programmaticVolume: false,
-    ducking: false,
+    ducking: true,
     externalStream: true,
   });
   assert.deepEqual(musicSourceCapabilities("somafm-decoded"), {
@@ -156,9 +157,13 @@ test("music source capabilities mark SomaFM as external and local/generated as c
   });
   assert.equal(musicSourceCapabilities("library").programmaticVolume, true);
   assert.equal(musicSourceCapabilities("ace-step").ducking, true);
+  assert.equal(musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_NORMAL_DB)), 1);
+  assert.ok(musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_DUCK_DB)) > 0);
+  assert.ok(musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_DUCK_DB)) < 0.1);
   assert.match(voiceMusicSource, /volume_saved_external_stream/);
   assert.match(voiceMusicSource, /programmatic_volume/);
   assert.match(voiceMusicSource, /external_stream/);
+  assert.match(voiceMusicSource, /musicDuckingGainToElementVolumeRatio\(slot\.duckingGainValue\)/);
 });
 
 test("Local Folder library imports uploaded audio into private playback folder", async () => {
@@ -231,9 +236,9 @@ test("music gain calculation keeps source volume separate from ducking", () => {
   });
   assert.equal(externalRadio.programmaticVolume, false);
   assert.equal(externalRadio.externalStream, true);
-  assert.equal(externalRadio.duckingSupported, false);
-  assert.equal(externalRadio.ducking, false);
-  assert.equal(externalRadio.duckingGain, dbToGain(MUSIC_NORMAL_DB));
+  assert.equal(externalRadio.duckingSupported, true);
+  assert.equal(externalRadio.ducking, true);
+  assert.equal(externalRadio.duckingGain, dbToGain(MUSIC_DUCK_DB));
 
   const decodedRadio = computeMusicOutputGain({
     controlEnabled: true,
@@ -298,7 +303,7 @@ test("music volume control protects against stuck speech and stale slots", () =>
   assert.match(voiceMusicSource, /gain_source/);
   assert.match(voiceMusicSource, /decoded_graph_rms/);
   assert.match(voiceMusicSource, /if \(gainParam\) slot\.audio\.volume = 1/);
-  assert.match(voiceMusicSource, /musicUserVolumeToElementVolume\(slot\.sourceVolumeValue\)/);
+  assert.match(voiceMusicSource, /musicDuckingGainToElementVolumeRatio\(slot\.duckingGainValue\)/);
   assert.match(voiceMusicSource, /slot\.audio\.muted = elementVolume <= 0/);
   assert.match(voiceMusicSource, /return await setMusicVolume\(musicControlVolumeArgToUserVolume\(args\.volume\), "voice_control"\)/);
 });

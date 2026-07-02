@@ -258,8 +258,6 @@ function verifySteps(profile, config) {
       "status",
       "--app",
       "control-center",
-      "--port",
-      String(config.controlCenter ? 4420 : 4000),
       "--json",
     ], { required: false, timeoutMs: 30000 }));
   }

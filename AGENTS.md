@@ -125,7 +125,7 @@ node scripts/pritha.mjs interview
 Если пользователь просит `tailscale`, `private access`, `phone access` или доступ к локальному Control Center с другого доверенного устройства, использовать `docs/tailscale-private-access.md` и `scripts/tailscale-setup.mjs`. По умолчанию Codex может выполнять только read-only команды:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 4420
+node scripts/tailscale-setup.mjs plan --app control-center
 node scripts/tailscale-setup.mjs status --json
 node scripts/tailscale-setup.mjs auth-status
 ```

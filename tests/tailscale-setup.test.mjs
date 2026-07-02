@@ -73,11 +73,14 @@ process.exit(1);
   return fakePath;
 }
 
-function withServer(handler) {
+function withServer(handler, options = {}) {
   const server = http.createServer((req, res) => {
     if (req.url === "/api/health") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
+    } else if (req.url === "/api/status") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, root: options.root || process.cwd() }));
     } else {
       res.writeHead(404);
       res.end("not found");
@@ -130,6 +133,42 @@ test("tailscale setup status exposes readiness fields", () => {
     assert.equal(payload.status.serve_configured, true);
     assert.equal(payload.status.tailscale_url, "https://test-host.example.invalid:4420");
     assert.equal(payload.status.peer_access_not_tested, true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("tailscale setup detects the live Control Center port for the current root", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-live-port-"));
+  try {
+    const fakeBin = writeFakeTailscale(dir);
+    const root = path.join(dir, "Pritha");
+    mkdirSync(root, { recursive: true });
+    await withServer(async (port) => {
+      const upstream = `http://127.0.0.1:${port}`;
+      writeFileSync(
+        path.join(root, ".techscope-setup.json"),
+        JSON.stringify({
+          schema: "techscope-setup-state-v1",
+          tailscale: {
+            app: "control-center",
+            port,
+          },
+        }),
+      );
+      const result = await runTailscaleSetupAsync(["status", "--app", "control-center", "--json"], {
+        TECHSCOPE_ROOT: root,
+        PRITHA_CONTROL_CENTER_PORT: "",
+        PRITHA_TAILSCALE_BIN: fakeBin,
+        FAKE_TAILSCALE_UPSTREAM: upstream,
+      });
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.port, port);
+      assert.equal(payload.local_url, upstream);
+      assert.equal(payload.status.local_upstream_health.status, "ready");
+      assert.equal(payload.status.serve_configured, true);
+    }, { root });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
