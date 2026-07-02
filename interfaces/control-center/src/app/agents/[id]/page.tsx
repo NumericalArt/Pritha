@@ -21,6 +21,9 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
   const readinessRows = [
     ["Folder", agent.folder.status, agent.folder.relativePath || agent.folder.name || "not available"],
     ["Health", agent.health.status, agent.health.checkedUrl || agent.health.detail || "not checked"],
+    ["Readiness", agent.readiness.status, agent.readiness.summary],
+    ["Runtime service", agent.readiness.runtime.status, agent.readiness.runtime.detail],
+    ["Access", agent.readiness.access.tailscale, agent.readiness.access.detail],
     ["Runtime", agent.control.executionMode, agent.control.reason],
     ["Operations", agent.operations.status, agent.operations.localUrl || agent.operations.issue || "manifest not available"],
   ];

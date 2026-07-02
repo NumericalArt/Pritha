@@ -38,6 +38,25 @@ test("Agents runtime backend uses explicit Start/Stop plan statuses", () => {
   assert.doesNotMatch(planBuilder, /startStopEnabled[\s\S]{0,140}\?\s*"planned"/);
 });
 
+test("Agents runtime backend exposes mandatory lifecycle readiness checks", () => {
+  assert.match(serverSource, /function operationalReadiness/);
+  assert.match(serverSource, /service_install_required/);
+  assert.match(serverSource, /LaunchAgent plist is missing/);
+  assert.match(serverSource, /Tailscale route pending/);
+  assert.match(serverSource, /Local runtime is ready; Tailscale route is pending/);
+  assert.match(serverSource, /\.\.\.agent\.readiness\.checks/);
+  assert.match(serverSource, /readiness\.status === "service_install_required"/);
+  assert.match(serverSource, /label: "Service Required"/);
+  assert.match(serverSource, /readinessIssueText\(readiness\) \|\| issueText/);
+});
+
+test("Agent status page renders operational readiness rows", () => {
+  const statusPageSource = readFileSync("interfaces/control-center/src/app/agents/[id]/page.tsx", "utf8");
+  assert.match(statusPageSource, /\["Readiness", agent\.readiness\.status, agent\.readiness\.summary\]/);
+  assert.match(statusPageSource, /\["Runtime service", agent\.readiness\.runtime\.status, agent\.readiness\.runtime\.detail\]/);
+  assert.match(statusPageSource, /\["Access", agent\.readiness\.access\.tailscale, agent\.readiness\.access\.detail\]/);
+});
+
 test("Mobile Agents mirrors desktop filtering and uses readable fleet audit summary", () => {
   assert.match(agentsOperatorSource, /agents=\{visibleAgents\}/);
   assert.match(agentsOperatorSource, /agentView=\{agentView\}/);

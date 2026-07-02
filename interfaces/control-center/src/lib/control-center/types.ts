@@ -130,6 +130,42 @@ export type ControlCenterOperatorActionCheck = {
   detail: string;
 };
 
+export type ControlCenterAgentOperationalReadinessStatus =
+  | "ready"
+  | "local_ready"
+  | "tailscale_pending"
+  | "service_install_required"
+  | "blocked"
+  | "missing";
+
+export type ControlCenterAgentRuntimeReadiness = {
+  manager?: string;
+  status: "ready" | "installable" | "service_install_required" | "not_applicable" | "unknown";
+  serviceLabel?: string;
+  launchAgentPath?: string;
+  loaded?: boolean;
+  installed?: boolean;
+  detail: string;
+};
+
+export type ControlCenterAgentAccessReadiness = {
+  localhost: "ready" | "pending" | "unavailable";
+  tailscale: "ready" | "pending_serve" | "waiting_for_local" | "not_configured" | "unavailable";
+  tailscaleUrl?: string;
+  localUrl?: string;
+  detail: string;
+};
+
+export type ControlCenterAgentOperationalReadiness = {
+  status: ControlCenterAgentOperationalReadinessStatus;
+  summary: string;
+  runtime: ControlCenterAgentRuntimeReadiness;
+  access: ControlCenterAgentAccessReadiness;
+  checks: ControlCenterOperatorActionCheck[];
+  blockers: string[];
+  nextActions: string[];
+};
+
 export type ControlCenterAgent = {
   id: string;
   name: string;
@@ -157,6 +193,7 @@ export type ControlCenterAgent = {
     healthcheckCommand?: string;
     issue?: string;
   };
+  readiness: ControlCenterAgentOperationalReadiness;
   health: {
     status: "ok" | "failed" | "unknown" | "not_checked";
     checkedUrl?: string;

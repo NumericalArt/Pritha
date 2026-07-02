@@ -97,6 +97,16 @@ type OperationsManifest = {
   control_center_contract?: {
     confirmation_required?: boolean;
   };
+  service_label?: string;
+  launch_agent_path?: string;
+  control_center_runtime?: {
+    manager?: string;
+    launchd_label?: string;
+    launch_agent_path?: string;
+    screen_session?: string;
+    pid_file?: string;
+    health_url?: string;
+  };
   start_command?: OperationsCommand;
   stop_command?: OperationsCommand;
   run_command?: OperationsCommand;
@@ -143,6 +153,12 @@ type AccessLinkState = {
   tailscaleServeConfigured: boolean;
   tailscaleDnsName?: string;
   tailscaleServeStatusJson: TailscaleServeStatusJson | null;
+};
+
+type AgentHealthProbe = {
+  status: "ok" | "failed" | "unknown" | "not_checked";
+  checkedUrl?: string;
+  detail?: string;
 };
 
 type LifecycleMetadata = ControlCenterAgent["lifecycle"] & {
@@ -1647,6 +1663,250 @@ function agentTailscaleUrl(manifest: OperationsManifest | null, localUrl: string
   return access.tailscaleServeStatusJson ? undefined : declaredUrl;
 }
 
+function expandUserPath(value: string | undefined) {
+  const raw = String(value || "").trim();
+  if (!raw) return undefined;
+  return raw.replace(/^~(?=\/|$)/, os.homedir());
+}
+
+function operationalRuntimeManager(manifest: OperationsManifest | null) {
+  return String(manifest?.control_center_runtime?.manager || manifest?.service_mode || "").trim();
+}
+
+function launchdRuntimeState(manifest: OperationsManifest | null) {
+  const manager = operationalRuntimeManager(manifest);
+  if (manager !== "launchd") return null;
+  const label = String(manifest?.control_center_runtime?.launchd_label || manifest?.service_label || "").trim();
+  const launchAgentPath = expandUserPath(manifest?.control_center_runtime?.launch_agent_path || manifest?.launch_agent_path);
+  const installed = Boolean(launchAgentPath && existsSync(launchAgentPath));
+  const uid = process.getuid ? process.getuid() : undefined;
+  const target = label && uid !== undefined ? `gui/${uid}/${label}` : label;
+  const loaded =
+    Boolean(target) &&
+    spawnSync("launchctl", ["print", target], {
+      encoding: "utf8",
+      timeout: 2500,
+      stdio: ["ignore", "pipe", "pipe"],
+    }).status === 0;
+
+  return {
+    label,
+    launchAgentPath,
+    installed,
+    loaded,
+  };
+}
+
+function screenSessionRunning(session: string | undefined) {
+  if (!session) return false;
+  const result = spawnSync("screen", ["-ls"], {
+    encoding: "utf8",
+    timeout: 2500,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`;
+  return output.split(/\r?\n/).some((line) => line.includes(`.${session}`) || line.trim() === session);
+}
+
+function operationalReadiness(params: {
+  folderPresent: boolean;
+  manifest: OperationsManifest | null;
+  operations: CapabilityStatus;
+  health: AgentHealthProbe;
+  localUrl?: string;
+  tailscaleUrl?: string;
+  access: AccessLinkState;
+}): ControlCenterAgent["readiness"] {
+  const { folderPresent, manifest, operations, health, localUrl, tailscaleUrl, access } = params;
+  const checks: ControlCenterOperatorActionCheck[] = [];
+  const blockers: string[] = [];
+  const nextActions: string[] = [];
+  const manager = operationalRuntimeManager(manifest);
+  let runtime: ControlCenterAgent["readiness"]["runtime"] = {
+    manager: manager || undefined,
+    status: "not_applicable",
+    detail: manager ? `Runtime manager: ${manager}` : "No runtime manager declared",
+  };
+
+  if (!folderPresent) {
+    return {
+      status: "missing",
+      summary: "Child-agent folder is missing.",
+      runtime,
+      access: {
+        localhost: "unavailable",
+        tailscale: "unavailable",
+        detail: "No local runtime can be checked while the folder is missing.",
+      },
+      checks,
+      blockers: ["Child-agent folder is missing."],
+      nextActions: ["Use Restore Plan or recreate the agent folder from its contract."],
+    };
+  }
+
+  if (!manifest) {
+    return {
+      status: "blocked",
+      summary: "operations/manifest.json is missing.",
+      runtime,
+      access: {
+        localhost: "unavailable",
+        tailscale: "unavailable",
+        detail: "No local runtime can be checked without operations metadata.",
+      },
+      checks,
+      blockers: ["operations/manifest.json is missing."],
+      nextActions: ["Add an operations manifest with structured start, stop, health and access settings."],
+    };
+  }
+
+  if (operations === "failed") {
+    blockers.push("Operations manifest is present but does not declare a usable runtime, command or local URL.");
+  }
+
+  const launchd = launchdRuntimeState(manifest);
+  if (launchd) {
+    runtime = {
+      manager: "launchd",
+      status: launchd.installed ? (launchd.loaded || health.status === "ok" ? "ready" : "installable") : "service_install_required",
+      serviceLabel: launchd.label || undefined,
+      launchAgentPath: launchd.launchAgentPath,
+      loaded: launchd.loaded,
+      installed: launchd.installed,
+      detail: launchd.installed
+        ? launchd.loaded
+          ? `Launchd service is loaded: ${launchd.label || "unknown label"}`
+          : `LaunchAgent plist exists but service is not loaded: ${launchd.launchAgentPath || "unknown path"}`
+        : `LaunchAgent plist is missing: ${launchd.launchAgentPath || "unknown path"}`,
+    };
+    checks.push({
+      id: "runtime-service",
+      label: "Runtime service",
+      status: launchd.installed ? (launchd.loaded || health.status === "ok" ? "pass" : "warn") : "fail",
+      detail: runtime.detail,
+    });
+    if (!launchd.installed && health.status !== "ok") {
+      blockers.push("LaunchAgent plist is missing; install the service with explicit operator approval before Start.");
+      nextActions.push("Run the agent deploy/install service action after reviewing its plan and confirmation gate.");
+    }
+  } else if (manager === "screen") {
+    const session = manifest.control_center_runtime?.screen_session;
+    const running = screenSessionRunning(session);
+    runtime = {
+      manager: "screen",
+      status: running || health.status === "ok" ? "ready" : "installable",
+      detail: session ? `Screen session ${session} ${running ? "is running" : "is not running"}` : "Screen manager has no session name",
+    };
+    checks.push({
+      id: "runtime-service",
+      label: "Runtime service",
+      status: session ? (running || health.status === "ok" ? "pass" : "warn") : "warn",
+      detail: runtime.detail,
+    });
+  } else if (manager) {
+    runtime = {
+      manager,
+      status: health.status === "ok" ? "ready" : "unknown",
+      detail: `Runtime manager ${manager} is declared; readiness depends on the health probe.`,
+    };
+    checks.push({
+      id: "runtime-service",
+      label: "Runtime service",
+      status: health.status === "ok" ? "pass" : "warn",
+      detail: runtime.detail,
+    });
+  }
+
+  const accessReady: ControlCenterAgent["readiness"]["access"] = {
+    localhost: health.status === "ok" && localUrl ? "ready" : localUrl ? "pending" : "unavailable",
+    tailscale: "unavailable",
+    tailscaleUrl,
+    localUrl,
+    detail: localUrl ? `Local upstream: ${localUrl}` : "No local upstream URL declared.",
+  };
+
+  if (!localUrl) {
+    accessReady.tailscale = "not_configured";
+  } else if (tailscaleUrl) {
+    accessReady.tailscale = "ready";
+    accessReady.detail = `Tailscale route is served: ${tailscaleUrl}`;
+    checks.push({
+      id: "tailscale-route",
+      label: "Tailscale route",
+      status: "pass",
+      detail: accessReady.detail,
+    });
+  } else if (access.tailscaleDnsName && access.tailscaleServeStatusJson && health.status === "ok") {
+    accessReady.tailscale = "pending_serve";
+    accessReady.detail = `Local runtime is ready, but no Tailscale Serve route points to ${localUrl}.`;
+    checks.push({
+      id: "tailscale-route",
+      label: "Tailscale route",
+      status: "warn",
+      detail: accessReady.detail,
+    });
+    nextActions.push("Approve a Tailscale Serve action for this local upstream if trusted-device access is required.");
+  } else if (access.tailscaleDnsName && access.tailscaleServeStatusJson) {
+    accessReady.tailscale = "waiting_for_local";
+    accessReady.detail = "Tailscale can be checked after the local runtime becomes healthy.";
+    checks.push({
+      id: "tailscale-route",
+      label: "Tailscale route",
+      status: "warn",
+      detail: accessReady.detail,
+    });
+  } else {
+    accessReady.tailscale = "not_configured";
+    accessReady.detail = "Tailscale status is unavailable or not authenticated for route verification.";
+  }
+
+  if (blockers.length > 0) {
+    return {
+      status: blockers.some((item) => item.includes("LaunchAgent plist")) ? "service_install_required" : "blocked",
+      summary: blockers[0],
+      runtime,
+      access: accessReady,
+      checks,
+      blockers,
+      nextActions,
+    };
+  }
+
+  if (health.status === "ok" && accessReady.tailscale === "pending_serve") {
+    return {
+      status: "tailscale_pending",
+      summary: "Local runtime is ready; Tailscale route is pending.",
+      runtime,
+      access: accessReady,
+      checks,
+      blockers,
+      nextActions,
+    };
+  }
+
+  if (health.status === "ok") {
+    return {
+      status: accessReady.tailscale === "ready" ? "ready" : "local_ready",
+      summary: accessReady.tailscale === "ready" ? "Local and Tailscale access are ready." : "Local runtime is ready.",
+      runtime,
+      access: accessReady,
+      checks,
+      blockers,
+      nextActions,
+    };
+  }
+
+  return {
+    status: "blocked",
+    summary: health.checkedUrl || health.detail || "Local runtime is not ready.",
+    runtime,
+    access: accessReady,
+    checks,
+    blockers,
+    nextActions,
+  };
+}
+
 function isExternalDeployment(record: RegistryRecord, manifest: OperationsManifest | null) {
   const deployment = `${record.deployment} ${manifest?.external_url || ""}`.toLowerCase();
   return /\b(vps|cloud|external|remote|hosted)\b/.test(deployment) || !isLocalUrl(manifest?.health_url);
@@ -1699,6 +1959,7 @@ function buildAgentControl(
   lifecycle: LifecycleMetadata,
   state: ControlCenterAgent["ui"]["state"],
   activity: ControlCenterAgent["ui"]["activity"],
+  readiness: ControlCenterAgent["readiness"],
 ): ControlCenterAgentControl {
   const runtimeKind = classifyRuntime(record, folder, manifest, lifecycle);
   const commandReadiness = {
@@ -1767,6 +2028,16 @@ function buildAgentControl(
         : "A local service is active; stop requires a managed structured command.",
     };
   }
+  if (runtimeKind === "web_service" && readiness.status === "service_install_required") {
+    return {
+      ...base,
+      primaryCardAction: "start_plan",
+      planAction: "start",
+      executionMode: "plan_only",
+      label: "Service Required",
+      reason: readiness.summary,
+    };
+  }
   if (runtimeKind === "web_service") {
     return {
       ...base,
@@ -1802,6 +2073,13 @@ function issueText(folderPresent: boolean, manifest: OperationsManifest | null, 
   return undefined;
 }
 
+function readinessIssueText(readiness: ControlCenterAgent["readiness"]) {
+  if (readiness.status === "service_install_required") return "Service install required";
+  if (readiness.status === "tailscale_pending") return "Tailscale route pending";
+  if (readiness.status === "local_ready") return "Local only";
+  return undefined;
+}
+
 async function buildAgent(root: string, record: RegistryRecord, access: AccessLinkState): Promise<ControlCenterAgent> {
   const folder = findSiblingFolder(root, record.name);
   const manifest = folder ? readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")) : null;
@@ -1811,7 +2089,16 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const localUrl = manifest?.local_upstream_url;
   const tailscaleUrl = agentTailscaleUrl(manifest, localUrl, access);
   const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
-  const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity);
+  const readiness = operationalReadiness({
+    folderPresent: Boolean(folder),
+    manifest,
+    operations,
+    health,
+    localUrl,
+    tailscaleUrl,
+    access,
+  });
+  const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity, readiness);
   const credentials = credentialsForAgent(root, folder, manifest);
 
   return {
@@ -1843,6 +2130,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       healthcheckCommand: manifest?.healthcheck_command,
       issue: operations === "failed" ? "Manifest is missing required operation fields" : undefined,
     },
+    readiness,
     health,
     url: localUrl || tailscaleUrl
       ? { status: "available", local: localUrl, tailscale: tailscaleUrl }
@@ -1852,7 +2140,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       primaryAction: legacyPlanAction(control),
       actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
-      issueText: issueText(Boolean(folder), manifest, health.status),
+      issueText: readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
     },
     control,
@@ -2269,6 +2557,7 @@ function baseOperatorChecks(agent: ControlCenterAgent): ControlCenterOperatorAct
       status: agent.lifecycle.contract.status === "ready" ? "pass" : "warn",
       detail: agent.lifecycle.contract.path || agent.lifecycle.contract.reason || "Contract unavailable",
     },
+    ...agent.readiness.checks,
   ];
 }
 
