@@ -17,23 +17,7 @@ tools:
   - MCP
   - Pritha
 sources:
-  - https://a2a-protocol.org/latest/
-  - https://a2a-protocol.org/latest/specification/
-  - https://github.com/a2aproject/A2A
-  - https://github.com/a2aproject/A2A/releases/tag/v1.0.1
-  - https://github.com/a2aproject/a2a-python
-  - https://github.com/a2aproject/a2a-samples
-  - https://a2a-protocol.org/latest/tutorials/python/2-setup/
-  - https://a2a-protocol.org/latest/tutorials/python/3-agent-skills-and-card/
-  - https://a2a-protocol.org/latest/tutorials/python/6-interact-with-server/
-  - https://a2a-protocol.org/latest/topics/a2a-and-mcp/
-  - https://a2a-protocol.org/latest/topics/agent-discovery/
-  - https://a2a-protocol.org/latest/topics/enterprise-ready/
-  - https://a2a-protocol.org/latest/topics/streaming-and-async/
-  - https://github.com/a2aproject/A2A/discussions/69
-  - https://github.com/a2aproject/A2A/discussions/97
-  - https://news.ycombinator.com/item?id=48582679
-  - https://blogs.cisco.com/ai/mcp-and-a2a-a-network-engineers-mental-model-for-agentic-ai
+  - source-a2a-protocol-batch-2026-07-02
 related:
   reviews:
     - 03_reviews/2026-07-02-a2a-protocol-child-agent-communication-review.md
@@ -48,6 +32,7 @@ related:
     - 07_workflows/agent-a2a-communication-selection.md
 source_type: document-batch
 source_class: official-docs-with-community-signal
+anonymous_source_id: source-a2a-protocol-batch-2026-07-02
 ingested_at: 2026-07-02T00:00:00-07:00
 processed_at: 2026-07-02T00:00:00-07:00
 retention_status: source-purged
@@ -80,7 +65,7 @@ Status: processed
 
 ## Public references checked
 
-- Official overview and specification at `a2a-protocol.org/latest/`.
+- Official overview and specification pages for the A2A Protocol.
 - A2A main GitHub repository and release list.
 - A2A release `v1.0.1`, dated 2026-05-26 and released on GitHub on 2026-05-28.
 - Official Python SDK repository `a2aproject/a2a-python`.

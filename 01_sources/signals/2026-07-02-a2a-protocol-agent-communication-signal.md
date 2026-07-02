@@ -24,8 +24,7 @@ related:
   standards:
     - 04_standards/agent-a2a-interoperability.md
 generated_from:
-  - https://a2a-protocol.org/latest/
-  - https://a2a-protocol.org/latest/specification/
+  - source-a2a-protocol-batch-2026-07-02
 signal_quality: high
 extraction_mode: codex-assisted
 refinement_status: codex-refined
