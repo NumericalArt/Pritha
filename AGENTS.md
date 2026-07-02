@@ -3,7 +3,7 @@ id: AGENTS
 type: artifact
 status: processed
 created: 2026-06-01
-updated: 2026-06-21
+updated: 2026-07-02
 topics:
   - privacy-preserving-intake
 tools:[]
@@ -13,6 +13,8 @@ related:
   workflows:
     - 07_workflows/privacy-preserving-intake.md
     - 07_workflows/pritha-good-state-baseline.md
+  standards:
+    - 04_standards/pritha-good-state-alignment.md
 source_type: telegram
 source_class: telegram
 ingested_at: 2026-06-01
@@ -150,6 +152,14 @@ node scripts/self-test.mjs
 Если после внесенных изменений пользователь явно говорит, что текущее состояние Pritha или выбранного child agent является желаемым, хорошо настроенным, "тем самым", "как надо", "класс, это то, что нужно" или эквивалентно подтверждает принятие результата, нужно предложить или выполнить workflow `07_workflows/pritha-good-state-baseline.md`.
 
 Good State Baseline фиксирует не только git-точку, но и смысловую память о том, что именно понравилось: над чем работали в последнем цикле, какая конфигурация принята, какие проверки прошли, какие предупреждения допустимы, какие runtime/private файлы не входят в baseline и по каким признакам будущие изменения считаются регрессией.
+
+Перед любым изменением Pritha, ее runtime, интерфейсов, памяти, agent harness или child-agent шаблонов нужно выполнить пропорциональную сверку с Good State Baseline по стандарту `04_standards/pritha-good-state-alignment.md`. По умолчанию достаточно смотреть последние 3 релевантных accepted baseline для затронутого scope через:
+
+```sh
+node scripts/good-state-alignment.mjs --scope "<affected surface>" --limit 3
+```
+
+Эта сверка не должна превращаться в постоянные запросы подтверждения. Если изменение сохраняет accepted behavior, является добавлением, тестом, документацией или внутренним refactor без изменения пользовательского поведения, продолжать работу без прерывания пользователя. Явное подтверждение нужно только если планируемое изменение materially conflicts с недавним baseline: ломает зафиксированное поведение, удаляет принятую возможность, ослабляет privacy/security/runtime guardrail, обходит recovery anchor или делает невозможными проверки, которые baseline считал обязательными.
 
 Канонический результат:
 

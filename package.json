@@ -23,6 +23,7 @@
     "health": "node scripts/healthcheck.mjs",
     "interfaces": "node scripts/interface-status.mjs --json",
     "memory": "node scripts/memory-status.mjs --json",
+    "good-state:align": "node scripts/good-state-alignment.mjs",
     "tools": "node scripts/tools-status.mjs --json",
     "external-research-tools": "node scripts/external-research-tools.mjs",
     "tailscale": "node scripts/tailscale-setup.mjs",

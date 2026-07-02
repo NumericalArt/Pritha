@@ -7,6 +7,7 @@ updated: 2026-07-02
 topics:
   - pritha
   - good-state-baseline
+  - baseline-alignment
   - git
   - memory
   - regression-recovery
@@ -24,13 +25,14 @@ related:
   reports:
     - 11_agents/reports/2026-07-02-pritha-good-state-baseline-voice-ducking-control-centers.md
   standards:
+    - 04_standards/pritha-good-state-alignment.md
     - 04_standards/pritha-self-model.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-07-02
 source_updated: 2026-07-02
-source_version: pritha-good-state-baseline-v1
+source_version: pritha-good-state-baseline-v2
 retrieved: 2026-07-02
 verified: 2026-07-02
 valid_for: Pritha accepted-state capture and future regression recovery
@@ -59,7 +61,8 @@ Status: active
 Capture moments when the operator accepts the current Pritha or child-agent
 state as especially good, correct or desirable. The baseline should make that
 state searchable in memory and recoverable through Git without storing private
-runtime state.
+runtime state. Accepted baselines also become near-term alignment guardrails
+for future changes.
 
 ## Trigger
 
@@ -77,7 +80,7 @@ Use this workflow when the operator says a variant of:
 The trigger can apply to all of Pritha, one clone, one child agent, one UI
 surface or a focused feature.
 
-## Procedure
+## Capture Procedure
 
 1. Identify the accepted scope:
    - Pritha overall;
@@ -110,6 +113,31 @@ surface or a focused feature.
 9. Rebuild local memory indexes so keyword and semantic search can find the
    baseline.
 
+## Alignment Use Before Future Changes
+
+Before future Pritha development, use recent accepted baselines as guardrails
+according to `04_standards/pritha-good-state-alignment.md`.
+
+Default lookup depth is the latest 3 relevant accepted baseline reports for the
+affected scope:
+
+```sh
+node scripts/good-state-alignment.mjs --scope "<affected surface>" --limit 3
+```
+
+Classify the planned change:
+
+- `aligned`: the change preserves or extends accepted behavior;
+- `no-relevant-baseline`: no recent accepted baseline covers the scope;
+- `needs-user-confirmation`: the change materially conflicts with accepted
+  behavior, protected invariants, privacy/runtime guardrails, recovery notes or
+  regression signals from a relevant baseline.
+
+Proceed without operator interruption for `aligned` and `no-relevant-baseline`.
+Ask for explicit confirmation only for `needs-user-confirmation`, and include
+the baseline report, tag, conflicting invariant, reason, fallback plan and
+verification checks.
+
 ## Report Contents
 
 Each baseline report must include:
@@ -119,6 +147,7 @@ Each baseline report must include:
 - Git branch, tag and relevant commits;
 - recent work summary;
 - accepted behavior;
+- protected baseline invariants or future alignment notes, when useful;
 - checks and results;
 - known acceptable warnings;
 - private/runtime exclusions;

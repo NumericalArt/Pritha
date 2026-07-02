@@ -8,6 +8,7 @@ template_for: agent-operations-report
 topics:
   - pritha
   - good-state-baseline
+  - baseline-alignment
   - regression-recovery
 tools:
   - Pritha
@@ -17,6 +18,8 @@ sources: []
 related:
   workflows:
     - 07_workflows/pritha-good-state-baseline.md
+  standards:
+    - 04_standards/pritha-good-state-alignment.md
 supersedes: []
 superseded_by: []
 freshness_status: current | changed | outdated | uncertain
@@ -68,6 +71,10 @@ Status: draft | accepted
 
 -
 
+## Protected Baseline Invariants
+
+-
+
 ## Checks
 
 | Check | Result | Notes |
@@ -83,6 +90,10 @@ Status: draft | accepted
 -
 
 ## Regression Signals
+
+-
+
+## Future Alignment Notes
 
 -
 
