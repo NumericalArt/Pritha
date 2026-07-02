@@ -149,9 +149,11 @@ node scripts/self-test.mjs
 
 ## Good State Baseline
 
-Если после внесенных изменений пользователь явно говорит, что текущее состояние Pritha или выбранного child agent является желаемым, хорошо настроенным, "тем самым", "как надо", "класс, это то, что нужно" или эквивалентно подтверждает принятие результата, нужно предложить или выполнить workflow `07_workflows/pritha-good-state-baseline.md`.
+Если после внесенных изменений пользователь явно или неформально дает понятный позитивный acceptance-сигнал о текущем состоянии Pritha, выбранного clone, feature surface или child agent, нужно предложить или выполнить workflow `07_workflows/pritha-good-state-baseline.md`. Не привязываться к фиксированным фразам: сигнал может быть техническим, бытовым, эмоциональным или ласковым, если смысл ясен - это состояние нравится и его стоит сохранить.
 
 Good State Baseline фиксирует не только git-точку, но и смысловую память о том, что именно понравилось: над чем работали в последнем цикле, какая конфигурация принята, какие проверки прошли, какие предупреждения допустимы, какие runtime/private файлы не входят в baseline и по каким признакам будущие изменения считаются регрессией.
+
+Если такой позитивный сигнал приходит через browser Realtime Voice Control, Pritha должна использовать узкий tool `record_good_state_signal`, а не запускать Codex-задачу только ради фиксации сигнала. Этот tool создает private pending Good State candidate в Control Center и связывает его с Good State Alignment. Финальная tracked baseline фиксация - Markdown report, git commit, annotated tag, push and memory rebuild - остается отдельным шагом с явным approval/checks.
 
 Перед любым изменением Pritha, ее runtime, интерфейсов, памяти, agent harness или child-agent шаблонов нужно выполнить пропорциональную сверку с Good State Baseline по стандарту `04_standards/pritha-good-state-alignment.md`. По умолчанию достаточно смотреть последние 3 релевантных accepted baseline для затронутого scope через:
 

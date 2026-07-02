@@ -18,6 +18,7 @@ tools:
   - Git
   - SQLite
   - Node.js
+  - Realtime Voice Control
 sources:
   - source-pritha-good-state-alignment-2026-07-02
 related:
@@ -72,6 +73,14 @@ reports for the affected scope.
 Default depth is the latest 3 relevant accepted baselines. Expand beyond that
 only when the change is unusually broad, the operator asks for deeper history,
 or a regression symptom clearly points to an older accepted state.
+
+Good State acceptance signals can arrive through a Codex thread or through
+browser Realtime Voice Control. Voice signals do not need fixed trigger
+phrases. If the operator clearly praises, accepts, loves, approves or wants to
+preserve the current state, the voice runtime should call the narrow
+`record_good_state_signal` tool and create a private pending candidate. That
+capture is part of Good State Alignment, but it is not yet a tracked Git
+baseline.
 
 ## Alignment Procedure
 
@@ -162,6 +171,24 @@ accepted, create a new Good State Baseline tag/report.
 Do not silently treat an old baseline as obsolete because a newer change was
 implemented. A baseline becomes obsolete only through an explicit decision,
 superseding artifact or a newer accepted baseline for the same scope.
+
+## Voice Capture
+
+Realtime Voice Control may directly record a Good State signal through
+`record_good_state_signal`.
+
+The tool is intentionally narrow:
+
+- it writes a private pending candidate under the Control Center runtime state;
+- it captures scope, sanitized operator signal, current Git anchor and recent
+  alignment snapshot;
+- it does not write tracked Markdown;
+- it does not create a commit, tag or GitHub push;
+- it does not start a Codex task by itself.
+
+Finalization remains a separate approval-gated workflow: review the pending
+candidate, run proportionate checks, create the tracked baseline report, commit,
+tag, push and rebuild memory.
 
 ## Privacy
 

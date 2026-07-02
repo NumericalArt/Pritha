@@ -292,6 +292,50 @@ type VoiceSessionMemoryArgs = {
   events?: unknown;
 };
 
+type GoodStateSignalArgs = {
+  operator_signal?: unknown;
+  operator_message?: unknown;
+  scope?: unknown;
+  surface?: unknown;
+  reason?: unknown;
+  reasons?: unknown;
+  session_id?: unknown;
+  confidence?: unknown;
+};
+
+export type GoodStateSignalRecord = {
+  id: string;
+  status: "pending_baseline_review";
+  source: "voice-control-realtime";
+  created_at: string;
+  scope: string;
+  operator_signal_preview: string;
+  reasons: string[];
+  session_id?: string;
+  confidence: string;
+  git: {
+    branch: string;
+    head: string;
+    recent_commits: string[];
+    dirty_tracked_count: number;
+    untracked_count: number;
+  };
+  alignment: Record<string, unknown>;
+  paths: {
+    record: string;
+  };
+  finalization: {
+    codex_task_required: boolean;
+    ui_approval_required: boolean;
+    next_action: string;
+  };
+  privacy: {
+    tracked_git_artifact: boolean;
+    raw_transcript_stored: boolean;
+    secrets_redacted: boolean;
+  };
+};
+
 type RollingSummaryArgs = RollingSummaryCheckpointInput & {
   topic_key?: unknown;
   current_status?: unknown;
@@ -2751,6 +2795,45 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
     },
     {
       type: "function",
+      name: "record_good_state_signal",
+      description:
+        "Record a positive operator acceptance signal from the current voice conversation as a pending Good State Baseline candidate. Use this whenever the operator clearly says the current Pritha state, recent change, behavior, configuration, or experience is good, beloved, exactly right, working well, or should be preserved, regardless of exact wording. This writes only a private pending signal; it does not edit tracked Markdown, create Git commits, create tags, push to GitHub, or start Codex.",
+      parameters: {
+        type: "object",
+        properties: {
+          operator_signal: {
+            type: "string",
+            description:
+              "Short sanitized summary or direct positive phrase from the operator. Do not include secrets, private URLs, raw logs, credentials, or long transcript.",
+          },
+          scope: {
+            type: "string",
+            description:
+              "Affected scope if clear: pritha, voice-control, control-center, agents, tailscale, memory-good-state, a clone name, child agent name, or feature surface. Infer a compact scope when possible.",
+          },
+          reason: {
+            type: "string",
+            description: "Why this moment seems worth preserving as a Good State candidate.",
+          },
+          reasons: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional short reasons, accepted behaviors, or clues the operator liked.",
+          },
+          session_id: {
+            type: "string",
+            description: "Optional current voice session id when available.",
+          },
+          confidence: {
+            type: "string",
+            enum: ["operator-positive-signal", "explicit-save-request", "strong-acceptance", "uncertain-positive"],
+          },
+        },
+        required: ["operator_signal"],
+      },
+    },
+    {
+      type: "function",
       name: "answer_codex_task",
       description:
         "Submit the operator's spoken answer to a Codex task that is waiting_for_operator, then resume that same task card in the same Codex thread. Use this when Codex asks a clarification question and the operator answers by voice.",
@@ -2965,6 +3048,9 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     "inspect_codex_task exposes only safe operational status, phase, last activity, bounded progress events, speakable semantic progress and concise operator briefs. Prefer latest_voice_feedback and speakable_events over heartbeat when explaining task progress.",
     "Use recall_rolling_summary when the operator asks what you discussed last time, what happened in the previous voice session, what the current handoff is, or asks to continue from where you left off. This tool reads the single summary-only rolling handoff file; it is not long-term curated memory and it does not contain raw transcript.",
     "If recall_rolling_summary returns found=false, say that no rolling handoff is available yet and then offer to search curated Pritha memory if useful. Do not claim the previous conversation is unknown until you have tried recall_rolling_summary for such questions.",
+    "Use record_good_state_signal whenever the operator gives a clear positive acceptance signal about the current Pritha state, a recent fix, a clone, a feature surface, voice behavior, Agents behavior, Control Center behavior, memory/alignment, or a child agent. Do not rely on fixed phrases. Signals may be formal, casual or affectionate, for example: this works well, this is exactly right, Pritha is wonderful, I love this Pritha, you did great, keep this state, or equivalent Russian wording.",
+    "record_good_state_signal is a narrow private capture tool. It creates a pending Good State candidate for later review and Good State Baseline finalization. It must not create tracked Markdown, commit, tag, push, install services, write secrets, or start Codex. Do not call run_codex_task just to record the positive signal.",
+    "After record_good_state_signal succeeds, briefly say that the moment was captured as a pending Good State signal and that final Git/tag baseline still requires separate confirmation/checks.",
     "When a Codex task is waiting_for_operator or latest_voice_feedback.requires_response is true, ask the Codex question plainly and wait for the operator's direct answer. If Codex asks for an exact confirmation phrase and the operator gives a clear short confirmation such as да, ок, подтверждаю, передавай, запускай, yes, ok or go ahead, do not force the operator to repeat the phrase word for word; call answer_codex_task and let the runtime synthesize the exact Codex answer when possible. Do not start a new run_codex_task just to answer that clarification.",
     "When the UI sends a 'Voice Intake Clarification Pending' message, do not call run_codex_task. First ask the operator what they want done with the files, screenshots, PDFs, pasted links, YouTube/video links, audio files, or nearby pasted text. Offer concise options when useful: quick analysis, extract facts, memory candidate, context for a specific child agent, transcription/summarization, research/citation, import supported audio into Music Local Folder for Music mode playback, or cancel. After the operator gives a clear intent, call confirm_voice_intake with the same intake_id. Use action=ask_more if the instruction is still ambiguous, action=cancel if the operator cancels, and action=submit only when operator_instruction is clear. If the operator chooses Music Local Folder, set intent=music_local_folder; the UI imports audio locally and does not upload it to Codex.",
     "Use web_search for ordinary current web lookup: official pages, docs, release pages, current facts, source discovery, news lookup or a quick cited search before answering by voice. Prefer source_policy=official_first and domains when the operator asks for a reliable or official answer. Use operation=diagnose if the operator asks whether search is working.",
@@ -3141,6 +3227,204 @@ export async function createRealtimeCall(offerSdp: string, ephemeralKey: string)
 
 function privateRoot() {
   return path.join(resolveTechscopeRoot(), ".private", "interface-lab", "pritha-control-center", "realtime");
+}
+
+function goodStateRoot() {
+  return path.join(privateRoot(), "good-state");
+}
+
+function goodStatePendingDir() {
+  return path.join(goodStateRoot(), "pending");
+}
+
+function redactGoodStateText(value: unknown, maxChars = 1_000) {
+  return redactSensitiveText(value, maxChars)
+    .replace(/https?:\/\/[^\s<>"')\]]+/g, "[redacted-url]")
+    .replace(/\b[A-Za-z0-9-]+\.ts\.net\b/gi, "[redacted-tailscale-host]");
+}
+
+function normalizeGoodStateScope(args: GoodStateSignalArgs) {
+  const explicit = compactText(args.scope || args.surface, 140).toLowerCase();
+  if (explicit) return explicit.replace(/[^a-z0-9а-яё _.-]+/gi, " ").replace(/\s+/g, "-").replace(/^-+|-+$/g, "") || "pritha";
+
+  const signal = compactText(args.operator_signal || args.operator_message || "", 800).toLowerCase();
+  if (/voice|realtime|голос|войс|music|duck|музык|звук|громк/.test(signal)) return "voice-control";
+  if (/agent|агент|tailscale|tailnet|start|stop|запуск|останов/.test(signal)) return "agents";
+  if (/memory|памят|baseline|alignment|good state/.test(signal)) return "memory-good-state";
+  if (/control center|центр|интерфейс|ui|страниц/.test(signal)) return "control-center";
+  return "pritha";
+}
+
+function normalizeGoodStateReasons(value: unknown, fallback: string) {
+  const raw = Array.isArray(value) ? value : String(value || "").split(/[;\n]+/);
+  const reasons = raw.map((item) => redactGoodStateText(item, 240)).filter(Boolean).slice(0, 6);
+  if (reasons.length) return reasons;
+  return fallback ? [fallback] : ["operator gave a clear positive acceptance signal"];
+}
+
+function countGitStatusLines(status: string, prefixPattern: RegExp) {
+  return status.split(/\r?\n/).filter((line) => prefixPattern.test(line)).length;
+}
+
+function currentGoodStateGitAnchor() {
+  const branch = commandResult("git", ["rev-parse", "--abbrev-ref", "HEAD"], { raw: true });
+  const head = commandResult("git", ["rev-parse", "--short", "HEAD"], { raw: true });
+  const log = commandResult("git", ["log", "-5", "--oneline", "--decorate"], { raw: true, maxBuffer: 2 * 1024 * 1024 });
+  const status = commandResult("git", ["status", "--short"], { raw: true, maxBuffer: 2 * 1024 * 1024 });
+  const statusText = status.ok ? status.stdout : "";
+  return {
+    branch: branch.ok ? compactText(branch.stdout, 120) : "unknown",
+    head: head.ok ? compactText(head.stdout, 40) : "unknown",
+    recent_commits: log.ok ? log.stdout.split(/\r?\n/).map((line) => compactText(line, 220)).filter(Boolean).slice(0, 5) : [],
+    dirty_tracked_count: countGitStatusLines(statusText, /^(?:\s?M|\s?A|\s?D|\s?R|\s?C|UU|AA|DD)/),
+    untracked_count: countGitStatusLines(statusText, /^\?\?/),
+  };
+}
+
+function goodStateAlignmentSnapshot(scope: string, change: string) {
+  const result = commandResult(
+    "node",
+    ["scripts/good-state-alignment.mjs", "--scope", scope, "--change", change, "--limit", "3", "--json"],
+    { raw: true, timeoutMs: 30_000, maxBuffer: 4 * 1024 * 1024 },
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: "alignment-helper-failed",
+      error: compactText(result.stderr || result.stdout || result.error, 1_200),
+    };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout || "{}") as Record<string, unknown>;
+    const baselines = Array.isArray(parsed.baselines)
+      ? parsed.baselines.slice(0, 3).map((baseline) => {
+          const item = (typeof baseline === "object" && baseline !== null ? baseline : {}) as Record<string, unknown>;
+          return {
+            path: compactText(item.path, 240),
+            title: compactText(item.title, 180),
+            tag: compactText(item.tag, 180),
+            relevance: compactText(item.relevance, 80),
+            match_score: item.match_score,
+          };
+        })
+      : [];
+    return {
+      ok: true,
+      status: compactText(parsed.status, 120),
+      scope: compactText(parsed.scope, 180),
+      baselines,
+      classification_hint: baselines.length ? "review-relevant-baselines" : "no-relevant-baseline",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: "alignment-json-parse-failed",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function writeGoodStateRecord(record: GoodStateSignalRecord) {
+  const dir = goodStatePendingDir();
+  await mkdir(dir, { recursive: true });
+  const recordPath = path.join(dir, `${record.id}.json`);
+  const tmpPath = `${recordPath}.${process.pid}.${Date.now()}.tmp`;
+  const root = resolveTechscopeRoot();
+  const withPath = {
+    ...record,
+    paths: {
+      record: rootRelative(root, recordPath),
+    },
+  };
+  await writeFile(tmpPath, `${JSON.stringify(withPath, null, 2)}\n`, "utf8");
+  await rename(tmpPath, recordPath);
+  await appendFile(path.join(goodStateRoot(), "signals.jsonl"), `${JSON.stringify(withPath)}\n`, "utf8");
+  return withPath;
+}
+
+export async function recordPrithaGoodStateSignal(args: GoodStateSignalArgs = {}) {
+  const operatorSignal = redactGoodStateText(args.operator_signal || args.operator_message || args.reason || "positive operator signal", 1_000);
+  const scope = normalizeGoodStateScope(args);
+  const reasonText = redactGoodStateText(args.reason, 240);
+  const reasons = normalizeGoodStateReasons(args.reasons, reasonText);
+  const now = new Date().toISOString();
+  const id = `good-state-${now.slice(0, 10)}-${randomUUID().slice(0, 8)}`;
+  const git = currentGoodStateGitAnchor();
+  const alignment = goodStateAlignmentSnapshot(scope, `Voice Control recorded positive operator acceptance: ${operatorSignal}`);
+  const record: GoodStateSignalRecord = {
+    id,
+    status: "pending_baseline_review",
+    source: "voice-control-realtime",
+    created_at: now,
+    scope,
+    operator_signal_preview: operatorSignal,
+    reasons,
+    session_id: compactText(args.session_id, 180) || undefined,
+    confidence: compactText(args.confidence, 80) || "operator-positive-signal",
+    git,
+    alignment,
+    paths: {
+      record: "",
+    },
+    finalization: {
+      codex_task_required: false,
+      ui_approval_required: true,
+      next_action:
+        "Review this pending Good State signal, run proportionate checks, then finalize through the Good State Baseline workflow if the operator confirms the Git/tag baseline.",
+    },
+    privacy: {
+      tracked_git_artifact: false,
+      raw_transcript_stored: false,
+      secrets_redacted: true,
+    },
+  };
+  const saved = await writeGoodStateRecord(record);
+  await logPrivateEvent("good_state_signal_recorded", {
+    id: saved.id,
+    scope: saved.scope,
+    status: saved.status,
+    record_path: saved.paths.record,
+    alignment_status: compactText(saved.alignment.status, 120),
+  });
+  return {
+    ok: true,
+    status: saved.status,
+    signal: saved,
+    speakable_summary:
+      "Зафиксировала это как pending Good State signal. Это еще не Git baseline: финальная фиксация потребует отдельного подтверждения и проверок.",
+  };
+}
+
+function listPrithaGoodStateSignalsSync(limit = 5) {
+  const dir = goodStatePendingDir();
+  const root = resolveTechscopeRoot();
+  if (!existsSync(dir)) return [];
+  const files = readdirSync(dir)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => path.join(dir, entry))
+    .filter((filePath) => isPathInsideOrSame(dir, filePath))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    .slice(0, Math.max(1, Math.min(Number(limit) || 5, 20)));
+  const records: GoodStateSignalRecord[] = [];
+  for (const filePath of files) {
+    try {
+      const parsed = JSON.parse(readFileSync(filePath, "utf8")) as GoodStateSignalRecord;
+      records.push({
+        ...parsed,
+        paths: {
+          ...parsed.paths,
+          record: parsed.paths?.record || rootRelative(root, filePath),
+        },
+      });
+    } catch {
+      continue;
+    }
+  }
+  return records;
+}
+
+export async function listPrithaGoodStateSignals(limit = 5) {
+  return listPrithaGoodStateSignalsSync(limit);
 }
 
 const rollingSummaryLastWriteAt = new Map<string, number>();
@@ -7658,6 +7942,8 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
     }
   } else if (name === "answer_codex_task") {
     output = await answerPrithaCodexTask(args);
+  } else if (name === "record_good_state_signal") {
+    output = await recordPrithaGoodStateSignal(args);
   } else if (name === "web_search") {
     output = await handleWebSearch(args);
   } else if (name === "recent_external_research") {
@@ -7723,6 +8009,12 @@ export function getPrithaRealtimeStatus() {
       private_or_paid_sources: "disabled-by-default",
     },
     web_search: realtimeWebSearchStatus(),
+    good_state: {
+      pending_count: listPrithaGoodStateSignalsSync(20).length,
+      latest: listPrithaGoodStateSignalsSync(1)[0] || null,
+      tool: "record_good_state_signal",
+      finalize_requires: "separate-ui-approval-and-good-state-baseline-workflow",
+    },
     private_root: rootRelative(root, privateRoot()),
   };
 }

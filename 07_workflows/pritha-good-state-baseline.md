@@ -77,8 +77,17 @@ Use this workflow when the operator says a variant of:
 - "зафиксируем это состояние";
 - "это то, что нам нужно".
 
+These examples are not a fixed phrase list. Any clear positive acceptance
+signal counts, including informal praise or affectionate wording, when the
+meaning is that the current state is good and worth preserving.
+
 The trigger can apply to all of Pritha, one clone, one child agent, one UI
 surface or a focused feature.
+
+When the trigger arrives through browser Realtime Voice Control, first use
+`record_good_state_signal`. That creates a private pending candidate and runs a
+bounded alignment lookup without starting Codex. Continue to the full baseline
+capture procedure only after explicit finalization approval/checks.
 
 ## Capture Procedure
 

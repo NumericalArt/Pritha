@@ -92,6 +92,41 @@ export type SessionMemoryPromotionState = {
   error?: string;
 };
 
+export type GoodStateSignalState = {
+  id: string;
+  status: "pending_baseline_review" | string;
+  source?: string;
+  created_at: string;
+  scope: string;
+  operator_signal_preview: string;
+  reasons?: string[];
+  confidence?: string;
+  git?: {
+    branch?: string;
+    head?: string;
+    dirty_tracked_count?: number;
+    untracked_count?: number;
+  };
+  alignment?: {
+    status?: string;
+    baselines?: Array<{
+      path?: string;
+      title?: string;
+      tag?: string;
+      relevance?: string;
+      match_score?: number;
+    }>;
+  };
+  paths?: {
+    record?: string;
+  };
+  finalization?: {
+    codex_task_required?: boolean;
+    ui_approval_required?: boolean;
+    next_action?: string;
+  };
+};
+
 export type MicGainRuntimeState = {
   available: boolean;
   active: boolean;
@@ -319,6 +354,12 @@ type SessionMemoryPromotionPayload = {
   reason?: string;
   path?: string;
   event_count?: number;
+  error?: string;
+};
+
+type GoodStateSignalsPayload = {
+  ok: boolean;
+  signals?: GoodStateSignalState[];
   error?: string;
 };
 
@@ -653,6 +694,7 @@ function usePrithaRealtimeController() {
   const [remoteAudioReady, setRemoteAudioReady] = useState(false);
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
   const [codexTasks, setCodexTasks] = useState<CodexTaskState[]>([]);
+  const [goodStateSignals, setGoodStateSignals] = useState<GoodStateSignalState[]>([]);
   const [sessionEvents, setSessionEvents] = useState<VoiceSessionEvent[]>([]);
   const [stickyContextEnabled, setStickyContextEnabled] = useState(true);
   const [sessionMemoryPromotion, setSessionMemoryPromotion] = useState<SessionMemoryPromotionState>({ status: "idle" });
@@ -850,6 +892,16 @@ function usePrithaRealtimeController() {
       const nextTasks = orderVisibleCodexTasks([nextTask, ...tasks.filter((item) => item.id !== task.id)]);
       codexTasksRef.current = nextTasks;
       return nextTasks;
+    });
+  }, []);
+
+  const upsertGoodStateSignal = useCallback((signal: GoodStateSignalState) => {
+    if (!signal?.id) return;
+    setGoodStateSignals((items) => {
+      const next = [signal, ...items.filter((item) => item.id !== signal.id)]
+        .sort((a, b) => Date.parse(b.created_at || "") - Date.parse(a.created_at || "") || b.id.localeCompare(a.id))
+        .slice(0, 5);
+      return next;
     });
   }, []);
 
@@ -1475,9 +1527,18 @@ function usePrithaRealtimeController() {
     return payload;
   }, [applyCodexTaskSnapshot]);
 
+  const refreshGoodStateSignals = useCallback(async () => {
+    const response = await fetch("/api/realtime/good-state?limit=5", { cache: "no-store" });
+    const payload = (await response.json().catch(() => ({ ok: false, error: "good state returned non-json" }))) as GoodStateSignalsPayload;
+    if (!response.ok || !payload.ok) throw new Error(payload.error || `Good State signals failed with status ${response.status}`);
+    setGoodStateSignals(payload.signals || []);
+    return payload;
+  }, []);
+
   useEffect(() => {
     void loadRecentCodexTasks().catch(() => undefined);
-  }, [loadRecentCodexTasks]);
+    void refreshGoodStateSignals().catch(() => undefined);
+  }, [loadRecentCodexTasks, refreshGoodStateSignals]);
 
   const buildStickyContext = useCallback(
     (reason: string) => {
@@ -1927,9 +1988,31 @@ function usePrithaRealtimeController() {
         if (taskId) startCodexTaskPolling(taskId);
       }
 
+      if (item.name === "record_good_state_signal") {
+        const signal = typeof output.signal === "object" && output.signal !== null ? (output.signal as GoodStateSignalState) : null;
+        if (signal?.id) {
+          upsertGoodStateSignal(signal);
+          appendSessionEvent("system", `Good State signal ${signal.id} captured for ${signal.scope}.`, {
+            status: signal.status,
+          });
+          queueRollingSummaryCheckpoint("good_state_signal_recorded", { force: true });
+        }
+        void refreshGoodStateSignals().catch(() => undefined);
+      }
+
       return output;
     },
-    [addTranscript, handleVoiceIntakeConfirmation, music, queueRollingSummaryCheckpoint, startCodexTaskPolling, upsertCodexTask],
+    [
+      addTranscript,
+      appendSessionEvent,
+      handleVoiceIntakeConfirmation,
+      music,
+      queueRollingSummaryCheckpoint,
+      refreshGoodStateSignals,
+      startCodexTaskPolling,
+      upsertCodexTask,
+      upsertGoodStateSignal,
+    ],
   );
 
   const processPendingToolCalls = useCallback(async () => {
@@ -2436,10 +2519,12 @@ function usePrithaRealtimeController() {
     remoteAudioReady,
     lastLatencyMs,
     codexTasks,
+    goodStateSignals,
     music,
     bindRemoteAudioElement,
     loadStatus,
     loadRecentCodexTasks,
+    refreshGoodStateSignals,
     refreshCodexTask,
     watchCodexTask: startCodexTaskPolling,
     start,
