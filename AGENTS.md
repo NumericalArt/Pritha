@@ -12,6 +12,7 @@ sources:
 related:
   workflows:
     - 07_workflows/privacy-preserving-intake.md
+    - 07_workflows/pritha-good-state-baseline.md
 source_type: telegram
 source_class: telegram
 ingested_at: 2026-06-01
@@ -144,6 +145,22 @@ node scripts/self-test.mjs
 
 `self-test` и `queue-health` являются ручными проверками по умолчанию. Не включать cron, heartbeat, launchd, background service или scheduled pulse без явного подтверждения пользователя и отдельного deployment/operations report. `queue-health` только сообщает stale/failed jobs и не меняет очередь автоматически.
 
+## Good State Baseline
+
+Если после внесенных изменений пользователь явно говорит, что текущее состояние Pritha или выбранного child agent является желаемым, хорошо настроенным, "тем самым", "как надо", "класс, это то, что нужно" или эквивалентно подтверждает принятие результата, нужно предложить или выполнить workflow `07_workflows/pritha-good-state-baseline.md`.
+
+Good State Baseline фиксирует не только git-точку, но и смысловую память о том, что именно понравилось: над чем работали в последнем цикле, какая конфигурация принята, какие проверки прошли, какие предупреждения допустимы, какие runtime/private файлы не входят в baseline и по каким признакам будущие изменения считаются регрессией.
+
+Канонический результат:
+
+- tracked baseline report в `11_agents/reports/YYYY-MM-DD-pritha-good-state-baseline-short-title.md`;
+- git commit с baseline report и связанными workflow/template изменениями;
+- git tag вида `pritha-good-state-YYYY-MM-DD-short-title`;
+- push commit and tag на GitHub, если пользователь не запретил публикацию;
+- пересборка локальной памяти после записи Markdown.
+
+Не записывать в tracked baseline report реальные секреты, auth keys, private credentials, raw Tailscale URLs, tailnet names, device-specific identifiers, `.env`, `.private`, `.memory-private`, `.queue`, `.logs`, `.snapshots` или пользовательские private memory values. Для приватных endpoints использовать placeholders и ссылаться на локальные setup state как на непубликуемый источник.
+
 ## GitHub publication and push
 
 ## Экспертные роли
@@ -175,6 +192,7 @@ node scripts/self-test.mjs
 - Операционные отчеты агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-operations-report.md`.
 - Отчеты о deployment-действиях агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-deployment-report.md`.
 - Post-creation reviews агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-post-creation-review.md`.
+- Good State Baseline для принятых пользователем состояний Pritha или child agents: `11_agents/reports/YYYY-MM-DD-pritha-good-state-baseline-short-title.md`.
 - Профили child agents: `11_agents/profiles/agent-id.md`.
 - Реестр созданных агентов: `11_agents/registry.md`.
 - Маркетинговые тексты Pritha: `12_marketing/pritha/*.md`.
