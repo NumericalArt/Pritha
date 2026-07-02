@@ -158,8 +158,9 @@ test("music source capabilities mark SomaFM as external but duckable", () => {
   assert.equal(musicSourceCapabilities("library").programmaticVolume, true);
   assert.equal(musicSourceCapabilities("ace-step").ducking, true);
   assert.equal(musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_NORMAL_DB)), 1);
-  assert.ok(musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_DUCK_DB)) > 0);
-  assert.ok(musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_DUCK_DB)) < 0.1);
+  const duckedElementRatio = musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_DUCK_DB));
+  assert.ok(duckedElementRatio > 0.15);
+  assert.ok(duckedElementRatio < 0.25);
   assert.match(voiceMusicSource, /volume_saved_external_stream/);
   assert.match(voiceMusicSource, /programmatic_volume/);
   assert.match(voiceMusicSource, /external_stream/);
@@ -289,6 +290,10 @@ test("music volume control protects against stuck speech and stale slots", () =>
   assert.match(voiceMusicSource, /USER_SPEECH_FALLBACK_STOP_MS/);
   assert.match(voiceMusicSource, /voice_music_user_speech_fallback_stop/);
   assert.match(voiceMusicSource, /voice_music_volume_settle/);
+  assert.match(voiceMusicSource, /const DUCK_ATTACK_SEC = 0\.35/);
+  assert.match(voiceMusicSource, /const RELEASE_DELAY_MS = 650/);
+  assert.match(voiceMusicSource, /const RELEASE_TIME_SEC = 1\.8/);
+  assert.doesNotMatch(voiceMusicSource, /const DUCK_ATTACK_SEC = 0\.04/);
   assert.match(voiceMusicSource, /rampSlotSourceVolume/);
   assert.match(voiceMusicSource, /rampSlotDuckingGain/);
   assert.match(voiceMusicSource, /mediaSource\.connect\(sourceGain\)/);

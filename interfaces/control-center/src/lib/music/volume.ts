@@ -5,7 +5,7 @@ export type MusicMode = "off" | "auto" | "on";
 export const MAX_MUSIC_USER_VOLUME = 3;
 export const MAX_MUSIC_LEVEL_PERCENT = 100;
 export const MUSIC_NORMAL_DB = -18;
-export const MUSIC_DUCK_DB = -42;
+export const MUSIC_DUCK_DB = -32;
 export const MUSIC_OFF_DB = -80;
 export const MUSIC_NORMAL_GAIN = dbToGain(MUSIC_NORMAL_DB);
 
