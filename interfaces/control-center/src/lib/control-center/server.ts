@@ -1722,6 +1722,7 @@ function operationalReadiness(params: {
   const blockers: string[] = [];
   const nextActions: string[] = [];
   const manager = operationalRuntimeManager(manifest);
+  let unmanagedLocalRuntime = false;
   let runtime: ControlCenterAgent["readiness"]["runtime"] = {
     manager: manager || undefined,
     status: "not_applicable",
@@ -1792,17 +1793,26 @@ function operationalReadiness(params: {
   } else if (manager === "screen") {
     const session = manifest.control_center_runtime?.screen_session;
     const running = screenSessionRunning(session);
+    unmanagedLocalRuntime = Boolean(session && !running && health.status === "ok");
+    const detail = session
+      ? unmanagedLocalRuntime
+        ? `Local health is ok, but screen session ${session} is not running.`
+        : `Screen session ${session} ${running ? "is running" : "is not running"}`
+      : "Screen manager has no session name";
     runtime = {
       manager: "screen",
-      status: running || health.status === "ok" ? "ready" : "installable",
-      detail: session ? `Screen session ${session} ${running ? "is running" : "is not running"}` : "Screen manager has no session name",
+      status: running ? "ready" : unmanagedLocalRuntime ? "unmanaged" : "installable",
+      detail,
     };
     checks.push({
       id: "runtime-service",
       label: "Runtime service",
-      status: session ? (running || health.status === "ok" ? "pass" : "warn") : "warn",
+      status: session ? (running ? "pass" : "warn") : "warn",
       detail: runtime.detail,
     });
+    if (unmanagedLocalRuntime) {
+      nextActions.push("Restart this agent through the managed runtime or add a narrow fallback_stop_process rule for orphaned local processes.");
+    }
   } else if (manager) {
     runtime = {
       manager,
@@ -1874,8 +1884,10 @@ function operationalReadiness(params: {
 
   if (health.status === "ok" && accessReady.tailscale === "pending_serve") {
     return {
-      status: "tailscale_pending",
-      summary: "Local runtime is ready; Tailscale route is pending.",
+      status: unmanagedLocalRuntime ? "unmanaged_local" : "tailscale_pending",
+      summary: unmanagedLocalRuntime
+        ? "Local runtime is healthy, but the declared runtime does not own it; Tailscale route is pending."
+        : "Local runtime is ready; Tailscale route is pending.",
       runtime,
       access: accessReady,
       checks,
@@ -1886,8 +1898,12 @@ function operationalReadiness(params: {
 
   if (health.status === "ok") {
     return {
-      status: accessReady.tailscale === "ready" ? "ready" : "local_ready",
-      summary: accessReady.tailscale === "ready" ? "Local and Tailscale access are ready." : "Local runtime is ready.",
+      status: unmanagedLocalRuntime ? "unmanaged_local" : accessReady.tailscale === "ready" ? "ready" : "local_ready",
+      summary: unmanagedLocalRuntime
+        ? "Local runtime is healthy, but the declared runtime does not own it."
+        : accessReady.tailscale === "ready"
+          ? "Local and Tailscale access are ready."
+          : "Local runtime is ready.",
       runtime,
       access: accessReady,
       checks,
@@ -2075,6 +2091,7 @@ function issueText(folderPresent: boolean, manifest: OperationsManifest | null, 
 
 function readinessIssueText(readiness: ControlCenterAgent["readiness"]) {
   if (readiness.status === "service_install_required") return "Service install required";
+  if (readiness.status === "unmanaged_local") return "Unmanaged local process";
   if (readiness.status === "tailscale_pending") return "Tailscale route pending";
   if (readiness.status === "local_ready") return "Local only";
   return undefined;

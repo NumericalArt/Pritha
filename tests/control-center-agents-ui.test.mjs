@@ -42,6 +42,9 @@ test("Agents runtime backend exposes mandatory lifecycle readiness checks", () =
   assert.match(serverSource, /function operationalReadiness/);
   assert.match(serverSource, /service_install_required/);
   assert.match(serverSource, /LaunchAgent plist is missing/);
+  assert.match(serverSource, /unmanaged_local/);
+  assert.match(serverSource, /Unmanaged local process/);
+  assert.match(serverSource, /fallback_stop_process/);
   assert.match(serverSource, /Tailscale route pending/);
   assert.match(serverSource, /Local runtime is ready; Tailscale route is pending/);
   assert.match(serverSource, /\.\.\.agent\.readiness\.checks/);

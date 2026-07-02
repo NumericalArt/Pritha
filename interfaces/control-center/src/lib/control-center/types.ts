@@ -134,13 +134,14 @@ export type ControlCenterAgentOperationalReadinessStatus =
   | "ready"
   | "local_ready"
   | "tailscale_pending"
+  | "unmanaged_local"
   | "service_install_required"
   | "blocked"
   | "missing";
 
 export type ControlCenterAgentRuntimeReadiness = {
   manager?: string;
-  status: "ready" | "installable" | "service_install_required" | "not_applicable" | "unknown";
+  status: "ready" | "installable" | "service_install_required" | "unmanaged" | "not_applicable" | "unknown";
   serviceLabel?: string;
   launchAgentPath?: string;
   loaded?: boolean;
