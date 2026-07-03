@@ -6,6 +6,16 @@ import { publicGeneratedTrack } from "./cache";
 
 type MusicGenerationRunner = (request: MusicGenerationJob["request"]) => Promise<CachedGeneratedTrack>;
 
+function hasPromptSpecifics(request: AceStepGenerateRequest) {
+  return Boolean(
+    request.prompt?.trim() ||
+      request.operatorRequest?.trim() ||
+      request.referenceStyle?.trim() ||
+      request.referencePrompt?.trim() ||
+      request.preserveCurrent,
+  );
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -32,7 +42,7 @@ export class MusicGenerationQueue {
     const config = getMusicRuntimeConfig();
     const normalizedStyle = normalizeMusicStyleKey(request.style || config.defaultStyle);
     const existing = this.findActiveByStyle(normalizedStyle);
-    if (existing && !request.forceFresh) return cloneJob(existing);
+    if (existing && !request.forceFresh && !hasPromptSpecifics(request)) return cloneJob(existing);
 
     const now = nowIso();
     const job: MusicGenerationJob = {

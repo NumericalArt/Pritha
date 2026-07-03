@@ -22,6 +22,11 @@ type PublicGeneratedTrack = {
   style: string;
   normalizedStyle: string;
   prompt: string;
+  operatorRequest?: string;
+  sentPrompt?: string;
+  providerPrompt?: string;
+  promptWarnings?: string[];
+  promptMismatch?: boolean;
   localUrl: string;
   durationSec: number;
   createdAt: string;
@@ -94,6 +99,8 @@ type MusicControlArgs = {
   action?: unknown;
   source?: unknown;
   style?: unknown;
+  operator_request?: unknown;
+  preserve_current?: unknown;
   volume?: unknown;
   mode?: unknown;
   channel_id?: unknown;
@@ -187,6 +194,24 @@ async function resumeAudioContextIfNeeded(context: AudioContext | null) {
 
 function normalizeStyle(value: unknown) {
   return String(value || DEFAULT_STYLE).replace(/\s+/g, " ").trim().slice(0, 180) || DEFAULT_STYLE;
+}
+
+function normalizeOperatorRequest(value: unknown) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 900);
+}
+
+function wantsPreserveCurrent(value: unknown) {
+  return /\b(keep|preserve|same|as\s+is|only\s+change|leave)\b|(?:оставь|сохрани|как есть|только\s+убрать|только\s+изменить)/iu.test(
+    String(value || ""),
+  );
+}
+
+function generatedReferenceFromItem(item?: PlayableMusicItem | null) {
+  if (!item || item.source !== "ace-step") return {};
+  return {
+    referenceStyle: item.title,
+    referencePrompt: typeof item.metadata?.prompt === "string" ? item.metadata.prompt : "",
+  };
 }
 
 function normalizeMusicSource(value: unknown, fallback: MusicSource = "somafm"): MusicSource {
@@ -1204,14 +1229,25 @@ export function useVoiceMusicController({
   );
 
   const ensureGeneratedTrack = useCallback(
-    async (style: string, forceFresh = false) => {
+    async (
+      style: string,
+      forceFresh = false,
+      options: { operatorRequest?: string; preserveCurrent?: boolean; referenceStyle?: string; referencePrompt?: string } = {},
+    ) => {
       if (!stateRef.current.controlEnabled) return { ok: false, error: "music_control_disabled" };
       const desiredStyle = normalizeStyle(style);
       patchState({ source: "ace-step", desiredStyle, generationStatus: "queued", error: undefined });
       const response = await fetch("/api/music/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ style: desiredStyle, forceFresh }),
+        body: JSON.stringify({
+          style: desiredStyle,
+          operatorRequest: options.operatorRequest || "",
+          preserveCurrent: options.preserveCurrent === true,
+          referenceStyle: options.referenceStyle || "",
+          referencePrompt: options.referencePrompt || "",
+          forceFresh,
+        }),
       });
       const payload = (await response.json().catch(() => ({ ok: false, error: "music_generate_non_json" }))) as {
         ok?: boolean;
@@ -1632,8 +1668,15 @@ export function useVoiceMusicController({
       if (action === "set_style") {
         if (!args.style) return { ok: false, error: "style_required" };
         const style = normalizeStyle(args.style);
+        const operatorRequest = normalizeOperatorRequest(args.operator_request || args.query || args.style);
+        const reference = generatedReferenceFromItem(stateRef.current.currentItem);
+        const preserveCurrent = args.preserve_current === true || wantsPreserveCurrent(operatorRequest);
         patchState({ mode: "on", source: "ace-step", desiredStyle: style });
-        const result = (await ensureGeneratedTrack(style, true)) as Record<string, unknown>;
+        const result = (await ensureGeneratedTrack(style, true, {
+          operatorRequest,
+          preserveCurrent,
+          ...reference,
+        })) as Record<string, unknown>;
         return { ...result, status: result.ok === false ? result.status || "style_generation_failed" : "style_set_generation_started", state: stateRef.current };
       }
       if (action === "set_volume") {

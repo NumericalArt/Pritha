@@ -2646,7 +2646,18 @@ function musicControlToolDefinition(): RealtimeToolDefinition {
         },
         style: {
           type: "string",
-          description: "Concise requested ACE-Step music style, for example: organ ambient, calm piano, lofi, orchestral, dark ambient.",
+          description:
+            "Concise requested ACE-Step music style, for example: organ ambient, calm piano, lofi, orchestral, dark ambient. Keep this short, but preserve the operator's exact detailed request in operator_request.",
+        },
+        operator_request: {
+          type: "string",
+          description:
+            "For ACE-Step generated music, include the operator's exact natural-language music request and constraints. This is the primary generation intent and should preserve details like 'leave the current track as-is, only remove drums'.",
+        },
+        preserve_current: {
+          type: "boolean",
+          description:
+            "For ACE-Step generated music. Set true when the operator asks to keep the current track/style/mood as-is and change only one attribute.",
         },
         channel_id: {
           type: "string",
@@ -3031,7 +3042,8 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
         "Do not call music_control for automatic ducking when you or the operator speak. The client app handles ducking locally.",
         "For SomaFM radio, use source somafm. Use set_channel with channel_id when the operator names a known SomaFM id, or query when they describe a station or genre.",
         "For local saved audio files, use source library. Use next, previous, pause, resume, repeat_all, or query for a local track search.",
-        "For generated music, use source ace-step or action set_style with a concise style string. This may start ACE-Step generation and can take time.",
+        "For generated music, use source ace-step or action set_style. Put a short genre/mood label in style, and put the operator's full request in operator_request. Do not compress away constraints. If the operator says 'leave it as-is, only remove drums' or similar, set preserve_current=true and include that exact instruction in operator_request.",
+        "For generated music negative constraints, be literal. If the operator says no drums, no percussion, no rhythm, no piano, no strings, no vocals, or asks to remove something, include those words in operator_request rather than replacing them with a generic style.",
         "Volume uses 0..100 percent: 0 is silent/minimum, 50 is medium, and 100 is the maximum player level. If the operator says minimum, minimal, zero, mute music, or 'на минимум', use volume 0, not 5. Examples: \"включи радио SomaFM Groove Salad\" -> {\"action\":\"set_channel\",\"source\":\"somafm\",\"channel_id\":\"groovesalad\"}; \"следующий трек\" -> {\"action\":\"next\",\"source\":\"library\"}; \"включи органную музыку\" -> {\"action\":\"set_style\",\"source\":\"ace-step\",\"style\":\"organ ambient\"}; \"сделай музыку тише\" -> {\"action\":\"set_volume\",\"volume\":35}; \"сделай музыку на минимум\" -> {\"action\":\"set_volume\",\"volume\":0}; \"сделай музыку громче\" -> {\"action\":\"set_volume\",\"volume\":80}; \"максимальная громкость музыки\" -> {\"action\":\"set_volume\",\"volume\":100}; \"играй музыку только когда работаешь\" -> {\"action\":\"set_mode\",\"mode\":\"auto\"}.",
       ]
     : [];
