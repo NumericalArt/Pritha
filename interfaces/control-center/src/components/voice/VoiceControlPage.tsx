@@ -235,7 +235,7 @@ const ACTIVE_TOOL_DETAILS: Record<string, ActiveToolDetail> = {
   },
   record_good_state_signal: {
     label: "Good State Signal",
-    summary: "Captures positive operator acceptance as a private pending Good State Baseline candidate.",
+    summary: "Captures positive operator acceptance as a private Good State Alignment signal.",
   },
   answer_codex_task: {
     label: "Answer Codex Task",
@@ -551,13 +551,13 @@ function GoodStateCard({
   signals: GoodStateSignalState[];
   onRefresh: () => void;
 }) {
-  const pendingCount = signals.filter((signal) => signal.status === "pending_baseline_review").length;
+  const capturedCount = signals.length;
 
   return (
     <section className="side-card task-list-card">
       <div className="card-title-row">
         <h2>Good State</h2>
-        <span className={`inline-status ${pendingCount ? "green" : ""}`}>{pendingCount ? `${pendingCount} pending` : "Ready"}</span>
+        <span className={`inline-status ${capturedCount ? "green" : ""}`}>{capturedCount ? `${capturedCount} captured` : "Ready"}</span>
       </div>
       {signals.length ? (
         <div className="task-list">

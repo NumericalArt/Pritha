@@ -11,6 +11,6 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     signals,
-    finalize_requires: "separate-ui-approval-and-good-state-baseline-workflow",
+    finalize_requires: "voice-capture-complete-git-baseline-optional",
   });
 }

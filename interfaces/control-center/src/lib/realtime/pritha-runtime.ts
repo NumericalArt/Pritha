@@ -305,7 +305,7 @@ type GoodStateSignalArgs = {
 
 export type GoodStateSignalRecord = {
   id: string;
-  status: "pending_baseline_review";
+  status: "voice_confirmed_alignment_signal" | "pending_baseline_review";
   source: "voice-control-realtime";
   created_at: string;
   scope: string;
@@ -327,6 +327,8 @@ export type GoodStateSignalRecord = {
   finalization: {
     codex_task_required: boolean;
     ui_approval_required: boolean;
+    voice_confirmation_sufficient?: boolean;
+    tracked_git_baseline?: string;
     next_action: string;
   };
   privacy: {
@@ -2797,7 +2799,7 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
       type: "function",
       name: "record_good_state_signal",
       description:
-        "Record a positive operator acceptance signal from the current voice conversation as a pending Good State Baseline candidate. Use this whenever the operator clearly says the current Pritha state, recent change, behavior, configuration, or experience is good, beloved, exactly right, working well, or should be preserved, regardless of exact wording. This writes only a private pending signal; it does not edit tracked Markdown, create Git commits, create tags, push to GitHub, or start Codex.",
+        "Record a positive operator acceptance signal from the current voice conversation as a private Good State Alignment signal. Use this whenever the operator clearly says the current Pritha state, recent change, behavior, configuration, or experience is good, beloved, exactly right, working well, or should be preserved, regardless of exact wording. This writes only a private alignment signal; it does not edit tracked Markdown, create Git commits, create tags, push to GitHub, or start Codex.",
       parameters: {
         type: "object",
         properties: {
@@ -2813,7 +2815,7 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
           },
           reason: {
             type: "string",
-            description: "Why this moment seems worth preserving as a Good State candidate.",
+            description: "Why this moment seems worth preserving as a Good State alignment signal.",
           },
           reasons: {
             type: "array",
@@ -3049,8 +3051,9 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     "Use recall_rolling_summary when the operator asks what you discussed last time, what happened in the previous voice session, what the current handoff is, or asks to continue from where you left off. This tool reads the single summary-only rolling handoff file; it is not long-term curated memory and it does not contain raw transcript.",
     "If recall_rolling_summary returns found=false, say that no rolling handoff is available yet and then offer to search curated Pritha memory if useful. Do not claim the previous conversation is unknown until you have tried recall_rolling_summary for such questions.",
     "Use record_good_state_signal whenever the operator gives a clear positive acceptance signal about the current Pritha state, a recent fix, a clone, a feature surface, voice behavior, Agents behavior, Control Center behavior, memory/alignment, or a child agent. Do not rely on fixed phrases. Signals may be formal, casual or affectionate, for example: this works well, this is exactly right, Pritha is wonderful, I love this Pritha, you did great, keep this state, or equivalent Russian wording.",
-    "record_good_state_signal is a narrow private capture tool. It creates a pending Good State candidate for later review and Good State Baseline finalization. It must not create tracked Markdown, commit, tag, push, install services, write secrets, or start Codex. Do not call run_codex_task just to record the positive signal.",
-    "After record_good_state_signal succeeds, briefly say that the moment was captured as a pending Good State signal and that final Git/tag baseline still requires separate confirmation/checks.",
+    "record_good_state_signal is a narrow private capture tool. It creates a voice-confirmed Good State Alignment signal. The operator's clear voice confirmation is sufficient for this private alignment signal; do not require a separate UI confirmation and do not claim that a nonexistent UI step is required.",
+    "record_good_state_signal must not create tracked Markdown, commit, tag, push, install services, write secrets, or start Codex. Do not call run_codex_task just to record the positive signal. A tracked Git/tag Good State Baseline is optional and should be discussed only if the operator explicitly asks to create a durable Git recovery point.",
+    "After record_good_state_signal succeeds, briefly say that the moment was captured as a Good State alignment signal. Do not say it is blocked on UI approval.",
     "When a Codex task is waiting_for_operator or latest_voice_feedback.requires_response is true, ask the Codex question plainly and wait for the operator's direct answer. If Codex asks for an exact confirmation phrase and the operator gives a clear short confirmation such as да, ок, подтверждаю, передавай, запускай, yes, ok or go ahead, do not force the operator to repeat the phrase word for word; call answer_codex_task and let the runtime synthesize the exact Codex answer when possible. Do not start a new run_codex_task just to answer that clarification.",
     "When the UI sends a 'Voice Intake Clarification Pending' message, do not call run_codex_task. First ask the operator what they want done with the files, screenshots, PDFs, pasted links, YouTube/video links, audio files, or nearby pasted text. Offer concise options when useful: quick analysis, extract facts, memory candidate, context for a specific child agent, transcription/summarization, research/citation, import supported audio into Music Local Folder for Music mode playback, or cancel. After the operator gives a clear intent, call confirm_voice_intake with the same intake_id. Use action=ask_more if the instruction is still ambiguous, action=cancel if the operator cancels, and action=submit only when operator_instruction is clear. If the operator chooses Music Local Folder, set intent=music_local_folder; the UI imports audio locally and does not upload it to Codex.",
     "Use web_search for ordinary current web lookup: official pages, docs, release pages, current facts, source discovery, news lookup or a quick cited search before answering by voice. Prefer source_policy=official_first and domains when the operator asks for a reliable or official answer. Use operation=diagnose if the operator asks whether search is working.",
@@ -3233,7 +3236,11 @@ function goodStateRoot() {
   return path.join(privateRoot(), "good-state");
 }
 
-function goodStatePendingDir() {
+function goodStateSignalsDir() {
+  return path.join(goodStateRoot(), "signals");
+}
+
+function goodStateLegacyPendingDir() {
   return path.join(goodStateRoot(), "pending");
 }
 
@@ -3308,12 +3315,31 @@ function goodStateAlignmentSnapshot(scope: string, change: string) {
           };
         })
       : [];
+    const voiceSignals = Array.isArray(parsed.voice_signals)
+      ? parsed.voice_signals.slice(0, 3).map((signal) => {
+          const item = (typeof signal === "object" && signal !== null ? signal : {}) as Record<string, unknown>;
+          return {
+            id: compactText(item.id, 120),
+            status: compactText(item.status, 120),
+            scope: compactText(item.scope, 120),
+            created_at: compactText(item.created_at, 80),
+            operator_signal_preview: compactText(item.operator_signal_preview, 240),
+            relevance: compactText(item.relevance, 80),
+            match_score: item.match_score,
+          };
+        })
+      : [];
     return {
       ok: true,
       status: compactText(parsed.status, 120),
       scope: compactText(parsed.scope, 180),
       baselines,
-      classification_hint: baselines.length ? "review-relevant-baselines" : "no-relevant-baseline",
+      voice_signals: voiceSignals,
+      classification_hint: baselines.length
+        ? "review-relevant-baselines"
+        : voiceSignals.length
+          ? "review-relevant-voice-signals"
+          : "no-relevant-baseline",
     };
   } catch (error) {
     return {
@@ -3325,7 +3351,7 @@ function goodStateAlignmentSnapshot(scope: string, change: string) {
 }
 
 async function writeGoodStateRecord(record: GoodStateSignalRecord) {
-  const dir = goodStatePendingDir();
+  const dir = goodStateSignalsDir();
   await mkdir(dir, { recursive: true });
   const recordPath = path.join(dir, `${record.id}.json`);
   const tmpPath = `${recordPath}.${process.pid}.${Date.now()}.tmp`;
@@ -3353,7 +3379,7 @@ export async function recordPrithaGoodStateSignal(args: GoodStateSignalArgs = {}
   const alignment = goodStateAlignmentSnapshot(scope, `Voice Control recorded positive operator acceptance: ${operatorSignal}`);
   const record: GoodStateSignalRecord = {
     id,
-    status: "pending_baseline_review",
+    status: "voice_confirmed_alignment_signal",
     source: "voice-control-realtime",
     created_at: now,
     scope,
@@ -3368,9 +3394,11 @@ export async function recordPrithaGoodStateSignal(args: GoodStateSignalArgs = {}
     },
     finalization: {
       codex_task_required: false,
-      ui_approval_required: true,
+      ui_approval_required: false,
+      voice_confirmation_sufficient: true,
+      tracked_git_baseline: "optional-separate-workflow-only-if-operator-asks-for-git-recovery-point",
       next_action:
-        "Review this pending Good State signal, run proportionate checks, then finalize through the Good State Baseline workflow if the operator confirms the Git/tag baseline.",
+        "No UI action is required for the private voice signal. Use it as a Good State Alignment anchor; create a tracked Git/tag baseline later only if the operator explicitly asks for a durable recovery point.",
     },
     privacy: {
       tracked_git_artifact: false,
@@ -3391,24 +3419,30 @@ export async function recordPrithaGoodStateSignal(args: GoodStateSignalArgs = {}
     status: saved.status,
     signal: saved,
     speakable_summary:
-      "Зафиксировала это как pending Good State signal. Это еще не Git baseline: финальная фиксация потребует отдельного подтверждения и проверок.",
+      "Зафиксировала это как Good State alignment signal. Отдельное UI-подтверждение не нужно.",
   };
 }
 
 function listPrithaGoodStateSignalsSync(limit = 5) {
-  const dir = goodStatePendingDir();
   const root = resolveTechscopeRoot();
-  if (!existsSync(dir)) return [];
-  const files = readdirSync(dir)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => path.join(dir, entry))
-    .filter((filePath) => isPathInsideOrSame(dir, filePath))
+  const dirs = [goodStateSignalsDir(), goodStateLegacyPendingDir()];
+  const files = dirs
+    .filter((dir) => existsSync(dir))
+    .flatMap((dir) =>
+      readdirSync(dir)
+        .filter((entry) => entry.endsWith(".json"))
+        .map((entry) => path.join(dir, entry))
+        .filter((filePath) => isPathInsideOrSame(dir, filePath)),
+    )
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
     .slice(0, Math.max(1, Math.min(Number(limit) || 5, 20)));
   const records: GoodStateSignalRecord[] = [];
+  const seen = new Set<string>();
   for (const filePath of files) {
     try {
       const parsed = JSON.parse(readFileSync(filePath, "utf8")) as GoodStateSignalRecord;
+      if (parsed.id && seen.has(parsed.id)) continue;
+      if (parsed.id) seen.add(parsed.id);
       records.push({
         ...parsed,
         paths: {
@@ -8010,10 +8044,11 @@ export function getPrithaRealtimeStatus() {
     },
     web_search: realtimeWebSearchStatus(),
     good_state: {
-      pending_count: listPrithaGoodStateSignalsSync(20).length,
+      signal_count: listPrithaGoodStateSignalsSync(20).length,
+      pending_count: listPrithaGoodStateSignalsSync(20).filter((signal) => signal.status === "pending_baseline_review").length,
       latest: listPrithaGoodStateSignalsSync(1)[0] || null,
       tool: "record_good_state_signal",
-      finalize_requires: "separate-ui-approval-and-good-state-baseline-workflow",
+      finalize_requires: "voice-capture-complete-git-baseline-optional",
     },
     private_root: rootRelative(root, privateRoot()),
   };

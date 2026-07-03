@@ -85,9 +85,11 @@ The trigger can apply to all of Pritha, one clone, one child agent, one UI
 surface or a focused feature.
 
 When the trigger arrives through browser Realtime Voice Control, first use
-`record_good_state_signal`. That creates a private pending candidate and runs a
-bounded alignment lookup without starting Codex. Continue to the full baseline
-capture procedure only after explicit finalization approval/checks.
+`record_good_state_signal`. That creates a private voice-confirmed Good State
+Alignment signal and runs a bounded alignment lookup without starting Codex. Do
+not tell the operator that a separate UI approval is required for this private
+signal. Continue to the full tracked Git/tag baseline capture procedure only
+when the operator explicitly asks for a durable recovery point.
 
 ## Capture Procedure
 

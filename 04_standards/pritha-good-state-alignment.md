@@ -78,9 +78,10 @@ Good State acceptance signals can arrive through a Codex thread or through
 browser Realtime Voice Control. Voice signals do not need fixed trigger
 phrases. If the operator clearly praises, accepts, loves, approves or wants to
 preserve the current state, the voice runtime should call the narrow
-`record_good_state_signal` tool and create a private pending candidate. That
-capture is part of Good State Alignment, but it is not yet a tracked Git
-baseline.
+`record_good_state_signal` tool and create a private voice-confirmed alignment
+signal. That capture is part of Good State Alignment. It is intentionally not a
+tracked Git baseline unless the operator separately asks for a durable Git/tag
+recovery point.
 
 ## Alignment Procedure
 
@@ -179,16 +180,18 @@ Realtime Voice Control may directly record a Good State signal through
 
 The tool is intentionally narrow:
 
-- it writes a private pending candidate under the Control Center runtime state;
+- it writes a private voice-confirmed signal under the Control Center runtime
+  state;
 - it captures scope, sanitized operator signal, current Git anchor and recent
   alignment snapshot;
 - it does not write tracked Markdown;
 - it does not create a commit, tag or GitHub push;
 - it does not start a Codex task by itself.
 
-Finalization remains a separate approval-gated workflow: review the pending
-candidate, run proportionate checks, create the tracked baseline report, commit,
-tag, push and rebuild memory.
+No separate UI approval is required for the private voice signal. If the
+operator later asks for a durable Git recovery point, use the full Good State
+Baseline workflow: review the signal, run proportionate checks, create the
+tracked baseline report, commit, tag, push and rebuild memory.
 
 ## Privacy
 

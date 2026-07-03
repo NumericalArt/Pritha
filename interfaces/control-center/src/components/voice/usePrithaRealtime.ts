@@ -94,7 +94,7 @@ export type SessionMemoryPromotionState = {
 
 export type GoodStateSignalState = {
   id: string;
-  status: "pending_baseline_review" | string;
+  status: "voice_confirmed_alignment_signal" | "pending_baseline_review" | string;
   source?: string;
   created_at: string;
   scope: string;
@@ -123,6 +123,8 @@ export type GoodStateSignalState = {
   finalization?: {
     codex_task_required?: boolean;
     ui_approval_required?: boolean;
+    voice_confirmation_sufficient?: boolean;
+    tracked_git_baseline?: string;
     next_action?: string;
   };
 };
