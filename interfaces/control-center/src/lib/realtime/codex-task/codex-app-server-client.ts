@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import type { CodexAppThreadRoutingMode, CodexReasoningEffort, CodexServiceTier } from "../pritha-runtime";
+import { codexAppTurnSettings } from "../../settings/codex-model-catalog";
 import type { PrithaCodexTaskClient, PrithaCodexTaskPayload, PrithaCodexTaskRunOptions, PrithaCodexThreadScope, PrithaCodexThreadScopeKind } from "./types";
 
 type RpcMessage = {
@@ -163,6 +164,11 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
       throwIfAborted(options.signal);
       const runtimeSettings = this.getRuntimeSettings?.();
+      const turnSettings = codexAppTurnSettings({
+        model: runtimeSettings?.codexModel || "",
+        effort: runtimeSettings?.codexReasoningEffort || effortForTask(payload.taskType),
+        serviceTier: runtimeSettings?.codexServiceTier || "standard",
+      });
 
       const turnResponse = (await connection.request(
         "turn/start",
@@ -170,11 +176,12 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
           threadId: target.threadId,
           input: [{ type: "text", text: buildPrompt(payload), text_elements: [] }],
           cwd: this.cwd,
-          model: runtimeSettings?.codexModel || undefined,
+          model: turnSettings.model || undefined,
           approvalPolicy: "never",
           sandboxPolicy: this.buildSandboxPolicy(payload),
           outputSchema: RESULT_SCHEMA,
-          effort: runtimeSettings?.codexReasoningEffort || effortForTask(payload.taskType),
+          effort: turnSettings.effort,
+          serviceTier: turnSettings.serviceTier,
           summary: "none",
           personality: "pragmatic",
         },

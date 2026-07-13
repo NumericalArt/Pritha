@@ -188,6 +188,12 @@ function restoreFile(pathname: string, content: string | null) {
   writeFileSync(pathname, content);
 }
 
+function realtimePrivateRoot() {
+  const stateRoot = process.env.PRITHA_STATE_ROOT?.trim();
+  if (stateRoot) return path.join(stateRoot, "private", "interface-lab", "pritha-control-center", "realtime");
+  return path.join(findRepoRoot(), ".private", "interface-lab", "pritha-control-center", "realtime");
+}
+
 test.describe("Control Center UI regression", () => {
   test("renders all primary tabs without console errors, page overflow, or raw secrets", async ({ page }) => {
     const consoleErrors: string[] = [];
@@ -395,6 +401,130 @@ test.describe("Control Center UI regression", () => {
     await page.goto("/dev");
     await expect(page.locator(".readiness-panel").first()).toContainText(`Last self-test: ${status.selfTest.ageLabel}`);
     await expect(page.locator(".readiness-panel").first()).not.toContainText("Last self-test: 2h ago");
+  });
+
+  test("selects, saves, and reloads catalog-backed Codex model capabilities without overflow", async ({ page }) => {
+    const isolatedStateRoot = process.env.PRITHA_STATE_ROOT?.trim();
+    const isolatedPort = process.env.PRITHA_CONTROL_CENTER_PORT?.trim();
+    test.skip(
+      process.env.PRITHA_E2E_ISOLATED_STATE !== "1" || !isolatedStateRoot || !isolatedPort || isolatedPort === "3420",
+      "Codex settings persistence test requires an explicit isolated state root and a non-live port.",
+    );
+    const privateRoot = realtimePrivateRoot();
+    const runtimePath = path.join(privateRoot, "runtime-settings.json");
+    const eventsPath = path.join(privateRoot, "events.jsonl");
+    const originalRuntime = existsSync(runtimePath) ? readFileSync(runtimePath, "utf8") : null;
+    const originalEvents = existsSync(eventsPath) ? readFileSync(eventsPath, "utf8") : null;
+
+    try {
+      const beforeResponse = await page.request.get("/api/realtime/runtime-settings");
+      expect(beforeResponse.ok()).toBeTruthy();
+      const before = await beforeResponse.json();
+      const legacyUltraSettings = {
+        ...before.settings,
+        codexModel: "gpt-5.6-sol",
+        codexReasoningEffort: "ultra",
+        codexServiceTier: "fast",
+        codexExecutionMode: "orchestrator_preferred",
+        updatedAt: new Date().toISOString(),
+      };
+      mkdirSync(privateRoot, { recursive: true });
+      writeFileSync(runtimePath, `${JSON.stringify(legacyUltraSettings, null, 2)}\n`);
+      const normalizedLegacy = await (await page.request.get("/api/realtime/runtime-settings")).json();
+      expect(normalizedLegacy.settings.codexReasoningEffort).toBe("ultra");
+      expect(normalizedLegacy.settings.codexExecutionMode).toBe("inline_only");
+
+      const customSettings = {
+        ...before.settings,
+        codexModel: "private-custom-model",
+        codexReasoningEffort: "custom_effort",
+        codexServiceTier: "fast",
+        updatedAt: new Date().toISOString(),
+      };
+      writeFileSync(runtimePath, `${JSON.stringify(customSettings, null, 2)}\n`);
+
+      await page.goto("/settings");
+      const customModel = page.locator('select[aria-label="Codex model"]:visible');
+      const customEffort = page.locator('select[aria-label="Codex reasoning level"]:visible');
+      await expect(customModel).toHaveValue("private-custom-model");
+      await expect(customModel.locator('option[value="private-custom-model"]')).toContainText("Unavailable/custom");
+      await expect(customEffort).toHaveValue("custom_effort");
+      await expect(customEffort.locator('option[value="custom_effort"]')).toContainText("Unavailable/custom");
+      await expect(page.locator('.settings-segmented-control:visible button', { hasText: "Fast" })).toHaveCount(0);
+      await page.locator('button:visible', { hasText: "Save Codex Runtime" }).click();
+      await expect(page.getByText("Codex runtime settings saved").filter({ visible: true }).first()).toBeVisible();
+      await page.reload();
+      await expect(page.locator('select[aria-label="Codex model"]:visible')).toHaveValue("private-custom-model");
+
+      const rejected = await page.request.post("/api/realtime/runtime-settings", {
+        data: { codexModel: "gpt-5.6-luna", codexReasoningEffort: "ultra", codexServiceTier: "fast" },
+      });
+      expect(rejected.status()).toBe(400);
+      expect((await rejected.json()).error).toBe("unsupported_codex_reasoning_effort");
+      const afterRejected = await (await page.request.get("/api/realtime/runtime-settings")).json();
+      expect(afterRejected.settings.codexModel).toBe(customSettings.codexModel);
+      expect(afterRejected.settings.codexReasoningEffort).toBe(customSettings.codexReasoningEffort);
+
+      const legacy = await page.request.post("/api/realtime/runtime-settings", {
+        data: { codexModel: "gpt-5.5", codexReasoningEffort: "very_high", codexServiceTier: "standard" },
+      });
+      expect(legacy.ok()).toBeTruthy();
+      expect((await legacy.json()).settings.codexReasoningEffort).toBe("xhigh");
+
+      const nestedOrchestration = await page.request.post("/api/realtime/runtime-settings", {
+        data: {
+          codexModel: "gpt-5.6-sol",
+          codexReasoningEffort: "ultra",
+          codexServiceTier: "fast",
+          codexExecutionMode: "orchestrator_preferred",
+        },
+      });
+      expect(nestedOrchestration.status()).toBe(400);
+      expect((await nestedOrchestration.json()).error).toBe("ultra_requires_inline_execution");
+
+      await page.goto("/settings");
+      const model = page.locator('select[aria-label="Codex model"]:visible');
+      const effort = page.locator('select[aria-label="Codex reasoning level"]:visible');
+      const executionMode = page.locator('select[aria-label="Codex execution mode"]:visible');
+      await expect(model).toBeVisible();
+      await expect(model.locator('option[value="gpt-5.6-sol"]')).toHaveCount(1);
+
+      await model.selectOption("gpt-5.6-sol");
+      await expect(effort.locator('option[value="low"]')).toHaveCount(1);
+      await expect(effort.locator('option[value="medium"]')).toHaveCount(1);
+      await expect(effort.locator('option[value="high"]')).toHaveCount(1);
+      await expect(effort.locator('option[value="xhigh"]')).toHaveCount(1);
+      await expect(effort.locator('option[value="max"]')).toHaveCount(1);
+      await expect(effort.locator('option[value="ultra"]')).toHaveCount(1);
+
+      await executionMode.selectOption("orchestrator_preferred");
+      await effort.selectOption("ultra");
+      await expect(executionMode).toHaveValue("inline_only");
+      await expect(executionMode).toBeDisabled();
+      await expect(page.getByText(/Ultra includes automatic task delegation/i).first()).toBeVisible();
+
+      const fast = page.locator('.settings-segmented-control:visible button', { hasText: "Fast" });
+      await expect(fast).toBeVisible();
+      await fast.click();
+      await page.locator('button:visible', { hasText: "Save Codex Runtime" }).click();
+      await expect(page.getByText("Codex runtime settings saved").filter({ visible: true }).first()).toBeVisible();
+
+      await page.reload();
+      await expect(page.locator('select[aria-label="Codex model"]:visible')).toHaveValue("gpt-5.6-sol");
+      await expect(page.locator('select[aria-label="Codex reasoning level"]:visible')).toHaveValue("ultra");
+      await expect(page.locator('select[aria-label="Codex execution mode"]:visible')).toHaveValue("inline_only");
+      await expect(page.locator('.settings-segmented-control:visible button.active', { hasText: "Fast" })).toBeVisible();
+      await expectNoPageOverflow(page);
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.reload();
+      await expect(page.locator('select[aria-label="Codex model"]:visible')).toHaveValue("gpt-5.6-sol");
+      await expect(page.locator('select[aria-label="Codex reasoning level"]:visible')).toHaveValue("ultra");
+      await expectNoPageOverflow(page);
+    } finally {
+      restoreFile(runtimePath, originalRuntime);
+      restoreFile(eventsPath, originalEvents);
+    }
   });
 
   test("guards voice context reset behind an explicit confirmation", async ({ page }) => {
