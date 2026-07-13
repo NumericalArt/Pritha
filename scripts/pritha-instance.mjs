@@ -21,6 +21,7 @@ import path from "node:path";
 import process from "node:process";
 import {
   PRITHA_STATE_LAYOUT,
+  isPrithaCodeCheckout,
   prithaInstanceConfig,
   resolvePrithaStatePath,
 } from "./lib/paths.mjs";
@@ -114,7 +115,9 @@ function childAgentFolders() {
     .filter((entry) => path.resolve(entry.directory) !== path.resolve(config.codeRoot))
     .filter((entry) => {
       try {
-        return statSync(entry.directory).isDirectory() && existsSync(path.join(entry.directory, "AGENTS.md"));
+        return statSync(entry.directory).isDirectory()
+          && existsSync(path.join(entry.directory, "AGENTS.md"))
+          && !isPrithaCodeCheckout(entry.directory);
       } catch {
         return false;
       }

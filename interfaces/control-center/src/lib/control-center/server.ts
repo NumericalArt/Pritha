@@ -3,6 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import {
+  isPrithaCodeCheckout,
   resolvePrithaAgentMemoryRoot,
   resolvePrithaAgentParent,
   resolvePrithaStatePath,
@@ -1423,6 +1424,7 @@ function siblingFolders(root: string) {
         try {
           if (!statSync(entry.absolutePath).isDirectory() || entry.name.startsWith(".")) return false;
           if (path.resolve(entry.absolutePath) === codeRoot) return false;
+          if (isPrithaCodeCheckout(entry.absolutePath)) return false;
           return existsSync(path.join(entry.absolutePath, "AGENTS.md"));
         } catch {
           return false;

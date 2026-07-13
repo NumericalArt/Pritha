@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { isPrithaCodeCheckout, resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../lib/paths.mjs";
 
 function controlCenterSlug(value) {
   return String(value || "")
@@ -86,7 +86,7 @@ function evidencePaths(root, target, record) {
 }
 
 function findSiblingFolder(root, target, record) {
-  const parent = path.dirname(root);
+  const parent = resolvePrithaAgentParent({ root });
   const keys = [...new Set([target, record?.name].filter(Boolean).map(comparableKey))];
   try {
     return readdirSync(parent)
@@ -96,7 +96,9 @@ function findSiblingFolder(root, target, record) {
       })
       .filter((entry) => {
         try {
-          return statSync(entry.absolutePath).isDirectory();
+          return statSync(entry.absolutePath).isDirectory()
+            && path.resolve(entry.absolutePath) !== path.resolve(root)
+            && !isPrithaCodeCheckout(entry.absolutePath);
         } catch {
           return false;
         }

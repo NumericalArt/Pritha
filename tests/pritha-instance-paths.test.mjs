@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
+  isPrithaCodeCheckout,
   prithaInstanceConfig,
   resolvePrithaAgentMemoryRoot,
   resolvePrithaAgentParent,
@@ -12,6 +13,24 @@ import {
   resolvePrithaStatePath,
   resolveSiblingAgentPath,
 } from "../scripts/lib/paths.mjs";
+
+test("Pritha sibling checkouts are distinguishable from child-agent projects", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "pritha-checkout-kind-"));
+  const pritha = path.join(base, "Pritha Local");
+  const agent = path.join(base, "FunnyTeacher");
+  try {
+    mkdirSync(path.join(pritha, "11_agents"), { recursive: true });
+    mkdirSync(path.join(pritha, "scripts"), { recursive: true });
+    mkdirSync(path.join(pritha, "interfaces", "control-center"), { recursive: true });
+    writeFileSync(path.join(pritha, "scripts", "pritha.mjs"), "// fixture\n");
+    mkdirSync(agent, { recursive: true });
+    writeFileSync(path.join(agent, "AGENTS.md"), "# Agent\n");
+    assert.equal(isPrithaCodeCheckout(pritha), true);
+    assert.equal(isPrithaCodeCheckout(agent), false);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
 
 function withEnv(values, callback) {
   const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
