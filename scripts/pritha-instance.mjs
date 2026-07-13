@@ -12,6 +12,7 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -411,7 +412,7 @@ async function updateInstance() {
     target: remoteCommit,
     branch: status.git.branch,
     clean: status.git.clean,
-    steps: ["fetch origin main", "fast-forward only", "save previous .next", "build", "stop only configured port", "start", "healthcheck", "rollback .next on failure"],
+    steps: ["fetch origin main", "fast-forward only", "save previous .next", "build staged .next", "stop only configured port", "atomic build swap", "start", "healthcheck", "rollback .next on failure"],
   };
   if (!options.apply) return plan;
   if (!options.yes) throw new Error("update --apply requires --yes");
@@ -430,8 +431,27 @@ async function updateInstance() {
   mkdirSync(releaseDir, { recursive: true });
   const liveNext = path.join(config.codeRoot, "interfaces", "control-center", ".next");
   const previousNext = path.join(releaseDir, "previous.next");
+  const stagedName = ".next-pritha-staging";
+  const stagedNext = path.join(config.codeRoot, "interfaces", "control-center", stagedName);
+  const buildMetadataPaths = [
+    path.join(config.codeRoot, "interfaces", "control-center", "next-env.d.ts"),
+    path.join(config.codeRoot, "interfaces", "control-center", "tsconfig.json"),
+  ];
+  const buildMetadata = buildMetadataPaths.map((file) => ({
+    file,
+    existed: existsSync(file),
+    content: existsSync(file) ? readFileSync(file) : null,
+  }));
   const hadPreviousBuild = copyNext(liveNext, previousNext);
-  const build = run("npm", ["--prefix", "interfaces/control-center", "run", "build"], { timeoutMs: 900_000 });
+  rmSync(stagedNext, { recursive: true, force: true });
+  const build = run("npm", ["--prefix", "interfaces/control-center", "run", "build"], {
+    timeoutMs: 900_000,
+    env: { PRITHA_CONTROL_CENTER_DIST_DIR: stagedName },
+  });
+  for (const item of buildMetadata) {
+    if (item.existed && item.content) writeFileSync(item.file, item.content);
+    else if (!item.existed) rmSync(item.file, { force: true });
+  }
   const release = {
     schema: "pritha-instance-release-v1",
     created_at: new Date().toISOString(),
@@ -439,16 +459,34 @@ async function updateInstance() {
     previous_commit: status.git.head,
     target_commit: target,
     had_previous_build: hadPreviousBuild,
+    staged_build: stagedName,
     build: { ok: build.ok, status: build.status, stderr: build.stderr.slice(-4_000) },
   };
   const manifest = path.join(releaseDir, "release.json");
   if (!build.ok) {
-    if (hadPreviousBuild) copyNext(previousNext, liveNext);
+    rmSync(stagedNext, { recursive: true, force: true });
     writeFileSync(manifest, `${JSON.stringify({ ...release, status: "build-failed-running-previous-release" }, null, 2)}\n`);
     return { ...plan, ok: false, applied: true, status: "build-failed", manifest };
   }
 
   const stopped = await stopPort(config.controlCenterPort);
+  try {
+    rmSync(liveNext, { recursive: true, force: true });
+    renameSync(stagedNext, liveNext);
+  } catch (error) {
+    if (hadPreviousBuild) copyNext(previousNext, liveNext);
+    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild ? await waitForHealth(30_000) : { ok: false, status: 0 };
+    writeFileSync(manifest, `${JSON.stringify({
+      ...release,
+      status: "swap-failed-rolled-back",
+      stopped,
+      error: error instanceof Error ? error.message : String(error),
+      rollback_pid: rollbackPid,
+      rollback_health: rollbackHealth,
+    }, null, 2)}\n`);
+    return { ...plan, ok: false, applied: true, status: "swap-failed-rolled-back", rollbackPid, rollbackHealth, manifest };
+  }
   const pid = startControlCenter();
   const healthTimeout = Number(process.env.PRITHA_UPDATE_HEALTH_TIMEOUT_MS || 45_000);
   const rollbackHealthTimeout = Number(process.env.PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS || 30_000);
