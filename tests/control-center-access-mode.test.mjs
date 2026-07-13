@@ -12,6 +12,7 @@ const agentCardSource = readFileSync("interfaces/control-center/src/components/a
 const agentsPageSource = readFileSync("interfaces/control-center/src/app/agents/page.tsx", "utf8");
 const agentStatusPageSource = readFileSync("interfaces/control-center/src/app/agents/[id]/page.tsx", "utf8");
 const controlCenterServerSource = readFileSync("interfaces/control-center/src/lib/control-center/server.ts", "utf8");
+const settingsSource = readFileSync("interfaces/control-center/src/components/settings/SettingsControlPage.tsx", "utf8");
 
 async function loadAccessModeModule() {
   const output = ts.transpileModule(accessModeSource, {
@@ -92,6 +93,12 @@ test("Control Center carries served agent Tailscale links into agent cards", () 
   assert.match(controlCenterServerSource, /const tailscaleUrl = agentTailscaleUrl\(manifest,\s*localUrl,\s*access\)/);
   assert.match(controlCenterServerSource, /tailscale: tailscaleUrl/);
   assert.match(agentsPageSource, /tailscaleUrl: agent\.url\.tailscale/);
+});
+
+test("Settings Tailscale guidance uses the current instance port", () => {
+  assert.match(settingsSource, /new URL\(access\?\.localhost/);
+  assert.match(settingsSource, /--port \$\{controlCenterPort\}/);
+  assert.doesNotMatch(settingsSource, /<code>node scripts\/tailscale-setup\.mjs plan --app control-center --port 3420<\/code>/);
 });
 
 test("Agent status page gives inactive runtimes a human-readable fallback", () => {

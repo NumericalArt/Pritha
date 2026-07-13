@@ -345,6 +345,12 @@ function accessStatusLabel(access: ControlCenterStatus["access"] | undefined, mo
 
 function TailscaleSetupPanel({ access }: { access?: ControlCenterStatus["access"] }) {
   const statusLabel = access?.tailscale === "ready" ? "Ready" : access?.tailscale === "pending_auth" ? "Needs Serve" : "Not configured";
+  let controlCenterPort = "3420";
+  try {
+    controlCenterPort = new URL(access?.localhost || "http://127.0.0.1:3420").port || "3420";
+  } catch {
+    // Keep the neutral default in setup guidance until status has loaded.
+  }
   return (
     <div className="settings-setup-panel">
       <div className="settings-setup-header">
@@ -357,7 +363,7 @@ function TailscaleSetupPanel({ access }: { access?: ControlCenterStatus["access"
       <div className="settings-command-grid">
         <div className="settings-command-row">
           <Terminal size={16} />
-          <code>node scripts/tailscale-setup.mjs plan --app control-center --port 3420</code>
+          <code>{`node scripts/tailscale-setup.mjs plan --app control-center --port ${controlCenterPort}`}</code>
         </div>
         <div className="settings-command-row">
           <Terminal size={16} />
