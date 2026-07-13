@@ -5,6 +5,13 @@ import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/prom
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
+import {
+  codexCliConfigEntries,
+  codexModelSupportsFast,
+  FALLBACK_CODEX_MODELS,
+  normalizeCodexReasoningEffortToken,
+  type CodexReasoningEffort as CatalogCodexReasoningEffort,
+} from "../settings/codex-model-catalog";
 import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
 import { checkCodexAppServerAvailable, PrithaCodexAppServerClient, resolveCodexBinary } from "./codex-task/codex-app-server-client";
 import {
@@ -205,7 +212,7 @@ type CodexAppAbortHandle = {
 };
 
 type DeepTaskPrimaryTransport = "codex-app" | "codex-cli" | "codex-session";
-export type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
+export type CodexReasoningEffort = CatalogCodexReasoningEffort;
 export type CodexServiceTier = "standard" | "fast";
 export type CodexPlanningMode = "off" | "inline_required" | "planner";
 export type CodexExecutionMode = "inline_only" | "orchestrator_enabled" | "orchestrator_preferred";
@@ -3852,7 +3859,7 @@ function runtimeSettingsPath() {
 function defaultRuntimeSettings(): PrithaRuntimeSettings {
   return {
     deepTaskPrimaryTransport: "codex-app",
-    codexModel: env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", "gpt-5.5")),
+    codexModel: env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", "gpt-5.6-sol")),
     codexReasoningEffort: normalizeCodexReasoningEffort(env("PRITHA_REALTIME_CODEX_REASONING_EFFORT", "medium")),
     codexServiceTier: normalizeCodexServiceTier(env("PRITHA_REALTIME_CODEX_SERVICE_TIER", "standard")),
     codexWorkdir: resolveTechscopeRoot(),
@@ -3880,9 +3887,7 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
 }
 
 export function normalizeCodexReasoningEffort(value: unknown, fallback: CodexReasoningEffort = "medium"): CodexReasoningEffort {
-  if (value === "low" || value === "medium" || value === "high" || value === "xhigh") return value;
-  if (value === "very_high") return "xhigh";
-  return fallback;
+  return normalizeCodexReasoningEffortToken(value, fallback);
 }
 
 export function normalizeCodexServiceTier(value: unknown, fallback: CodexServiceTier = "standard"): CodexServiceTier {
@@ -3906,7 +3911,8 @@ export function normalizeCodexAppThreadRoutingMode(value: unknown, fallback: Cod
 }
 
 export function codexModelSupportsFastMode(model: string) {
-  return ["gpt-5.5", "gpt-5.4"].includes(model.trim());
+  const catalogModel = FALLBACK_CODEX_MODELS.find((item) => item.id === model.trim());
+  return catalogModel ? codexModelSupportsFast(catalogModel) : false;
 }
 
 function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
@@ -3921,10 +3927,13 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
   const maxPlanSteps = Number(value.codexMaxPlanSteps);
   const maxThreadTurns = Number(value.codexAppThreadMaxTurns);
   const maxThreadAgeHours = Number(value.codexAppThreadMaxAgeHours);
+  const codexReasoningEffort = normalizeCodexReasoningEffort(value.codexReasoningEffort, defaults.codexReasoningEffort);
+  const requestedExecutionMode = normalizeCodexExecutionMode(value.codexExecutionMode, defaults.codexExecutionMode);
+  const codexExecutionMode = codexReasoningEffort === "ultra" ? "inline_only" : requestedExecutionMode;
   return {
     deepTaskPrimaryTransport: transport,
     codexModel: String(value.codexModel ?? defaults.codexModel ?? "").trim(),
-    codexReasoningEffort: normalizeCodexReasoningEffort(value.codexReasoningEffort, defaults.codexReasoningEffort),
+    codexReasoningEffort,
     codexServiceTier: normalizeCodexServiceTier(value.codexServiceTier, defaults.codexServiceTier),
     codexWorkdir: String(value.codexWorkdir || defaults.codexWorkdir),
     codexSandbox: sandbox,
@@ -3933,7 +3942,7 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     codexTimeoutMs: Number.isFinite(timeout) && timeout > 0 ? Math.max(10_000, Math.min(timeout, 3_600_000)) : defaults.codexTimeoutMs,
     codexPromptTokenBudget: Number.isFinite(promptTokenBudget) ? normalizeCodexPromptTokenBudget(promptTokenBudget) : defaults.codexPromptTokenBudget,
     codexPlanningMode: normalizeCodexPlanningMode(value.codexPlanningMode, defaults.codexPlanningMode),
-    codexExecutionMode: normalizeCodexExecutionMode(value.codexExecutionMode, defaults.codexExecutionMode),
+    codexExecutionMode,
     codexMaxPlanSteps: Number.isFinite(maxPlanSteps) ? Math.max(1, Math.min(Math.round(maxPlanSteps), 10)) : defaults.codexMaxPlanSteps,
     codexAskBeforeOrchestration: typeof value.codexAskBeforeOrchestration === "boolean" ? value.codexAskBeforeOrchestration : defaults.codexAskBeforeOrchestration,
     codexVoiceProgressVerbosity: normalizeCodexVoiceProgressVerbosity(value.codexVoiceProgressVerbosity, defaults.codexVoiceProgressVerbosity),
@@ -6285,11 +6294,11 @@ async function startCodexExec(
   ];
   const writableRoots = codexWritableRootEntries(root, additionalWritableDirs);
   const config = ['approval_policy="never"'];
-  if (settings.codexReasoningEffort) config.push(`model_reasoning_effort="${settings.codexReasoningEffort}"`);
-  if (settings.codexServiceTier === "fast" && codexModelSupportsFastMode(settings.codexModel)) {
-    config.push('service_tier="fast"');
-    config.push("features.fast_mode=true");
-  }
+  config.push(...codexCliConfigEntries({
+    model: settings.codexModel,
+    effort: settings.codexReasoningEffort,
+    serviceTier: settings.codexServiceTier,
+  }));
   if (sandbox === "workspace-write") config.push(`sandbox_workspace_write.network_access=${settings.codexNetworkAccess ? "true" : "false"}`);
   if (sandbox === "read-only") config.push(`sandbox_read_only.network_access=${settings.codexNetworkAccess ? "true" : "false"}`);
 

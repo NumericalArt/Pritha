@@ -16,6 +16,13 @@ import {
   PRITHA_FEMININE_VOICE_OPTIONS,
   VOICE_BEHAVIOR_PROFILE_OPTIONS,
 } from "@/lib/realtime/voice-settings";
+import { getCodexModelCatalog } from "@/lib/settings/codex-model-catalog-server";
+import {
+  isSafeCodexReasoningEffort,
+  normalizeCodexReasoningEffortToken,
+  validateCodexSelection,
+  type CodexServiceTier,
+} from "@/lib/settings/codex-model-catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,10 +51,6 @@ type RuntimeSettingsPayload = {
 
 function transportStatus() {
   return getPrithaRealtimeStatus().codex.transports;
-}
-
-function isCodexReasoningEffort(value: unknown) {
-  return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "very_high";
 }
 
 function isCodexPlanningMode(value: unknown) {
@@ -79,22 +82,58 @@ export async function GET() {
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => ({}))) as RuntimeSettingsPayload;
   const patch: Parameters<typeof updatePrithaRuntimeSettings>[0] = {};
+  const currentSettings = getPrithaRuntimeSettings();
 
   if (payload.deepTaskPrimaryTransport === "codex-app" || payload.deepTaskPrimaryTransport === "codex-cli") {
     patch.deepTaskPrimaryTransport = payload.deepTaskPrimaryTransport;
   }
-  if (typeof payload.codexModel === "string") patch.codexModel = payload.codexModel;
-  if ("codexReasoningEffort" in payload) {
-    if (!isCodexReasoningEffort(payload.codexReasoningEffort)) {
+  const updatesExecutionMode = "codexExecutionMode" in payload;
+  let requestedExecutionMode = currentSettings.codexExecutionMode;
+  if (updatesExecutionMode) {
+    if (!isCodexExecutionMode(payload.codexExecutionMode)) {
+      return NextResponse.json({ ok: false, error: "invalid_codex_execution_mode" }, { status: 400 });
+    }
+    requestedExecutionMode = normalizeCodexExecutionMode(payload.codexExecutionMode);
+    patch.codexExecutionMode = requestedExecutionMode;
+  }
+  const updatesCodexSelection = "codexModel" in payload || "codexReasoningEffort" in payload || "codexServiceTier" in payload;
+  if (updatesCodexSelection) {
+    if ("codexModel" in payload && typeof payload.codexModel !== "string") {
+      return NextResponse.json({ ok: false, error: "invalid_codex_model" }, { status: 400 });
+    }
+    const model = typeof payload.codexModel === "string" ? payload.codexModel.trim() : currentSettings.codexModel;
+    const rawEffort = "codexReasoningEffort" in payload ? payload.codexReasoningEffort : currentSettings.codexReasoningEffort;
+    const effort = normalizeCodexReasoningEffortToken(rawEffort, "");
+    if (!isSafeCodexReasoningEffort(effort)) {
       return NextResponse.json({ ok: false, error: "invalid_codex_reasoning_effort" }, { status: 400 });
     }
-    patch.codexReasoningEffort = normalizeCodexReasoningEffort(payload.codexReasoningEffort);
-  }
-  if ("codexServiceTier" in payload) {
-    if (payload.codexServiceTier !== "standard" && payload.codexServiceTier !== "fast") {
+    const rawServiceTier = "codexServiceTier" in payload ? payload.codexServiceTier : currentSettings.codexServiceTier;
+    if (rawServiceTier !== "standard" && rawServiceTier !== "fast") {
       return NextResponse.json({ ok: false, error: "invalid_codex_service_tier" }, { status: 400 });
     }
-    patch.codexServiceTier = normalizeCodexServiceTier(payload.codexServiceTier);
+    const serviceTier = normalizeCodexServiceTier(rawServiceTier) as CodexServiceTier;
+    const catalog = await getCodexModelCatalog();
+    const validation = validateCodexSelection(
+      { model, effort, serviceTier },
+      catalog.models,
+      {
+        model: currentSettings.codexModel,
+        effort: currentSettings.codexReasoningEffort,
+        serviceTier: currentSettings.codexServiceTier,
+      },
+    );
+    if (!validation.ok) {
+      return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
+    }
+    if (effort === "ultra" && requestedExecutionMode !== "inline_only") {
+      return NextResponse.json({ ok: false, error: "ultra_requires_inline_execution" }, { status: 400 });
+    }
+    patch.codexModel = model;
+    patch.codexReasoningEffort = normalizeCodexReasoningEffort(rawEffort);
+    patch.codexServiceTier = serviceTier;
+    if (effort === "ultra") patch.codexExecutionMode = "inline_only";
+  } else if (updatesExecutionMode && currentSettings.codexReasoningEffort === "ultra" && requestedExecutionMode !== "inline_only") {
+    return NextResponse.json({ ok: false, error: "ultra_requires_inline_execution" }, { status: 400 });
   }
   if (typeof payload.codexWorkdir === "string") patch.codexWorkdir = payload.codexWorkdir;
   if (["auto", "read-only", "workspace-write", "danger-full-access"].includes(String(payload.codexSandbox))) {
@@ -108,12 +147,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "invalid_codex_planning_mode" }, { status: 400 });
     }
     patch.codexPlanningMode = normalizeCodexPlanningMode(payload.codexPlanningMode);
-  }
-  if ("codexExecutionMode" in payload) {
-    if (!isCodexExecutionMode(payload.codexExecutionMode)) {
-      return NextResponse.json({ ok: false, error: "invalid_codex_execution_mode" }, { status: 400 });
-    }
-    patch.codexExecutionMode = normalizeCodexExecutionMode(payload.codexExecutionMode);
   }
   if (Number.isFinite(Number(payload.codexMaxPlanSteps))) patch.codexMaxPlanSteps = Number(payload.codexMaxPlanSteps);
   if (typeof payload.codexAskBeforeOrchestration === "boolean") patch.codexAskBeforeOrchestration = payload.codexAskBeforeOrchestration;

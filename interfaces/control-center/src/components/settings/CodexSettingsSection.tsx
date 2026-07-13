@@ -2,9 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { Bot, Code2, Save, Terminal, Zap } from "lucide-react";
+import {
+  FALLBACK_CODEX_MODELS,
+  codexModelSupportsFast,
+  codexReasoningEffortLabel,
+  fallbackCodexModelCatalog,
+  reconcileCodexSelectionForModel,
+  type CodexModelCatalog,
+  type CodexReasoningEffort,
+  type CodexServiceTier,
+} from "@/lib/settings/codex-model-catalog";
 
-type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
-type CodexServiceTier = "standard" | "fast";
 type CodexPlanningMode = "off" | "inline_required" | "planner";
 type CodexExecutionMode = "inline_only" | "orchestrator_enabled" | "orchestrator_preferred";
 type CodexVoiceProgressVerbosity = "brief" | "normal" | "detailed";
@@ -36,7 +44,7 @@ type TransportStatus = Record<string, { available?: boolean; detail?: string }>;
 
 const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   deepTaskPrimaryTransport: "codex-app",
-  codexModel: "gpt-5.5",
+  codexModel: "gpt-5.6-sol",
   codexReasoningEffort: "medium",
   codexServiceTier: "standard",
   codexWorkdir: "",
@@ -56,25 +64,6 @@ const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   updatedAt: "",
 };
 
-const MODEL_OPTIONS = [
-  { id: "gpt-5.5", label: "GPT-5.5", fast: true },
-  { id: "gpt-5.4", label: "GPT-5.4", fast: true },
-  { id: "gpt-5.4-mini", label: "GPT-5.4 mini", fast: false },
-  { id: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark", fast: false },
-  { id: "", label: "Codex default", fast: false },
-] as const;
-
-const REASONING_OPTIONS: Array<{ id: CodexReasoningEffort; label: string }> = [
-  { id: "low", label: "Low" },
-  { id: "medium", label: "Medium" },
-  { id: "high", label: "High" },
-  { id: "xhigh", label: "Very High" },
-];
-
-function modelSupportsFastMode(model: string) {
-  return model === "gpt-5.5" || model === "gpt-5.4";
-}
-
 function clampPlanSteps(value: unknown, fallback = DEFAULT_RUNTIME_SETTINGS.codexMaxPlanSteps) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -83,11 +72,13 @@ function clampPlanSteps(value: unknown, fallback = DEFAULT_RUNTIME_SETTINGS.code
 
 export function CodexSettingsSection() {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
+  const [modelCatalog, setModelCatalog] = useState<CodexModelCatalog>(() => fallbackCodexModelCatalog(new Date(0)));
   const [runtimeSettingsLoaded, setRuntimeSettingsLoaded] = useState(false);
   const [transportStatus, setTransportStatus] = useState<TransportStatus>({});
   const [runtimeStatus, setRuntimeStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [maxPlanStepsDraft, setMaxPlanStepsDraft] = useState(String(DEFAULT_RUNTIME_SETTINGS.codexMaxPlanSteps));
+  const [selectionNotice, setSelectionNotice] = useState("");
 
   useEffect(() => {
     void loadRuntimeSettings();
@@ -95,12 +86,24 @@ export function CodexSettingsSection() {
 
   async function loadRuntimeSettings() {
     setRuntimeSettingsLoaded(false);
-    const response = await fetch("/api/realtime/runtime-settings", { cache: "no-store" }).catch(() => null);
-    if (!response?.ok) {
+    const [runtimeResponse, catalogResponse] = await Promise.all([
+      fetch("/api/realtime/runtime-settings", { cache: "no-store" }).catch(() => null),
+      fetch("/api/settings/codex-models", { cache: "no-store" }).catch(() => null),
+    ]);
+    const catalogPayload = catalogResponse?.ok ? ((await catalogResponse.json().catch(() => null)) as CodexModelCatalog | null) : null;
+    if (catalogPayload && Array.isArray(catalogPayload.models) && catalogPayload.models.length) {
+      setModelCatalog(catalogPayload);
+    } else {
+      setModelCatalog({
+        ...fallbackCodexModelCatalog(),
+        warning: "Catalog endpoint unavailable; built-in fallback is active.",
+      });
+    }
+    if (!runtimeResponse?.ok) {
       setRuntimeStatus("Runtime settings unavailable");
       return;
     }
-    const payload = (await response.json().catch(() => null)) as {
+    const payload = (await runtimeResponse.json().catch(() => null)) as {
       settings?: RuntimeSettings;
       transports?: TransportStatus;
     } | null;
@@ -108,12 +111,15 @@ export function CodexSettingsSection() {
       setRuntimeStatus("Runtime settings unavailable");
       return;
     }
-    const nextSettings = { ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings };
+    const loadedSettings = { ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings };
+    const forcedInline = loadedSettings.codexReasoningEffort === "ultra" && loadedSettings.codexExecutionMode !== "inline_only";
+    const nextSettings = forcedInline ? { ...loadedSettings, codexExecutionMode: "inline_only" as const } : loadedSettings;
     setRuntimeSettings(nextSettings);
     setMaxPlanStepsDraft(String(clampPlanSteps(nextSettings.codexMaxPlanSteps)));
     setTransportStatus(payload.transports || {});
     setRuntimeSettingsLoaded(true);
     setRuntimeStatus("");
+    setSelectionNotice(forcedInline ? "Ultra includes automatic task delegation; Execution Mode was set to Inline only to avoid nested orchestration." : "");
   }
 
   async function saveRuntimeSettings() {
@@ -149,16 +155,17 @@ export function CodexSettingsSection() {
       }),
     }).catch(() => null);
     setSaving(false);
-    if (!response?.ok) {
-      setRuntimeStatus("Failed to save Codex runtime settings");
+    const payload = (await response?.json().catch(() => null)) as { settings?: RuntimeSettings; transports?: TransportStatus; error?: string } | null;
+    if (!response?.ok || !payload) {
+      setRuntimeStatus(payload?.error ? `Failed to save: ${payload.error}` : "Failed to save Codex runtime settings");
       return;
     }
-    const payload = (await response.json()) as { settings?: RuntimeSettings; transports?: TransportStatus };
     const nextSettings = { ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings };
     setRuntimeSettings(nextSettings);
     setMaxPlanStepsDraft(String(clampPlanSteps(nextSettings.codexMaxPlanSteps)));
     setTransportStatus(payload.transports || {});
     setRuntimeStatus("Codex runtime settings saved");
+    setSelectionNotice("");
   }
 
   function updateRuntimeSetting<K extends keyof RuntimeSettings>(key: K, value: RuntimeSettings[K]) {
@@ -166,11 +173,38 @@ export function CodexSettingsSection() {
   }
 
   function selectModel(model: string) {
-    setRuntimeSettings((current) => ({
-      ...current,
-      codexModel: model,
-      codexServiceTier: modelSupportsFastMode(model) ? current.codexServiceTier : "standard",
-    }));
+    const catalogModel = modelCatalog.models.find((item) => item.id === model);
+    if (!catalogModel) {
+      setRuntimeSettings((current) => ({ ...current, codexModel: model }));
+      return;
+    }
+    const next = reconcileCodexSelectionForModel(catalogModel, {
+      model: runtimeSettings.codexModel,
+      effort: runtimeSettings.codexReasoningEffort,
+      serviceTier: runtimeSettings.codexServiceTier,
+    });
+    const notices: string[] = [];
+    if (next.effortChanged) {
+      notices.push(`${codexReasoningEffortLabel(runtimeSettings.codexReasoningEffort)} is unavailable for ${catalogModel.label}; using ${codexReasoningEffortLabel(next.effort)}.`);
+    }
+    if (next.serviceTierChanged) notices.push(`Fast is unavailable for ${catalogModel.label}; using Standard.`);
+    setSelectionNotice(notices.join(" "));
+    setRuntimeSettings({
+      ...runtimeSettings,
+      codexModel: next.model,
+      codexReasoningEffort: next.effort,
+      codexServiceTier: next.serviceTier,
+    });
+  }
+
+  function selectReasoningEffort(effort: CodexReasoningEffort) {
+    const forceInline = effort === "ultra" && runtimeSettings.codexExecutionMode !== "inline_only";
+    setSelectionNotice(forceInline ? "Ultra includes automatic task delegation; Execution Mode was set to Inline only to avoid nested orchestration." : "");
+    setRuntimeSettings({
+      ...runtimeSettings,
+      codexReasoningEffort: effort,
+      codexExecutionMode: forceInline ? "inline_only" : runtimeSettings.codexExecutionMode,
+    });
   }
 
   function updateMaxPlanStepsDraft(value: string) {
@@ -189,8 +223,45 @@ export function CodexSettingsSection() {
 
   const appAvailable = transportStatus.codex_app?.available;
   const cliAvailable = transportStatus.codex_cli?.available;
-  const fastSupported = modelSupportsFastMode(runtimeSettings.codexModel);
-  const fastStatus = fastSupported ? "Fast mode uses included Codex limits faster when ChatGPT auth supports it." : "Fast mode is unavailable for this model.";
+  const selectedModel = modelCatalog.models.find((model) => model.id === runtimeSettings.codexModel);
+  const modelOptions = selectedModel
+    ? modelCatalog.models
+    : [
+        {
+          ...FALLBACK_CODEX_MODELS[0],
+          id: runtimeSettings.codexModel,
+          label: `${runtimeSettings.codexModel || "Codex default"} — Unavailable/custom`,
+          isDefault: false,
+          defaultReasoningEffort: runtimeSettings.codexReasoningEffort,
+          supportedReasoningEfforts: [],
+          serviceTiers: [],
+        },
+        ...modelCatalog.models,
+      ];
+  const advertisedEfforts = selectedModel?.supportedReasoningEfforts || [];
+  const selectedEffort = advertisedEfforts.find((effort) => effort.id === runtimeSettings.codexReasoningEffort);
+  const reasoningOptions = selectedEffort
+    ? advertisedEfforts
+    : [
+        {
+          id: runtimeSettings.codexReasoningEffort,
+          label: `${codexReasoningEffortLabel(runtimeSettings.codexReasoningEffort)} — Unavailable/custom`,
+          description: "This saved effort is not advertised by the current local Codex catalog.",
+        },
+        ...advertisedEfforts,
+      ];
+  const fastSupported = Boolean(selectedModel && codexModelSupportsFast(selectedModel));
+  const fastStatus = fastSupported
+    ? "Fast is about 1.5x quicker and increases Codex usage."
+    : !selectedModel && runtimeSettings.codexServiceTier === "fast"
+      ? "The saved Fast setting is preserved, but this custom model is unavailable in the current catalog."
+      : "Fast is unavailable for this model.";
+  const effortStatus = runtimeSettings.codexReasoningEffort === "ultra"
+    ? "Ultra includes automatic task delegation; keep Execution Mode inline to avoid nested orchestration."
+    : selectedEffort?.description || "This saved effort is unavailable in the current local catalog.";
+  const catalogTime = modelCatalog.refreshedAt && modelCatalog.refreshedAt !== new Date(0).toISOString()
+    ? new Date(modelCatalog.refreshedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "pending";
 
   return (
     <section className="settings-section">
@@ -239,6 +310,13 @@ export function CodexSettingsSection() {
             </span>
             <span>Session Contract reserved</span>
           </div>
+          <div className="codex-catalog-meta" aria-label="Codex model catalog status">
+            <span className={modelCatalog.source === "app-server" ? "good" : "warn"}>
+              Model catalog: {modelCatalog.source === "app-server" ? "local Codex App" : "built-in fallback"}
+            </span>
+            <span>Refreshed {catalogTime}</span>
+            {modelCatalog.warning ? <span className="warn">{modelCatalog.warning}</span> : null}
+          </div>
           <div className="settings-rowline">
             <div>
               <strong>Thread Routing</strong>
@@ -286,10 +364,27 @@ export function CodexSettingsSection() {
           <div className="settings-rowline">
             <div>
               <strong>Model</strong>
-              <span>Default model for new Codex deep tasks.</span>
+              <span>Available models come from the installed local Codex App.</span>
             </div>
             <select value={runtimeSettings.codexModel} aria-label="Codex model" onChange={(event) => selectModel(event.currentTarget.value)}>
-              {MODEL_OPTIONS.map((option) => (
+              {modelOptions.map((option) => (
+                <option value={option.id} key={option.id}>
+                  {option.label}{option.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="settings-rowline">
+            <div>
+              <strong>Reasoning Level</strong>
+              <span>{effortStatus}</span>
+            </div>
+            <select
+              value={runtimeSettings.codexReasoningEffort}
+              aria-label="Codex reasoning level"
+              onChange={(event) => selectReasoningEffort(event.currentTarget.value)}
+            >
+              {reasoningOptions.map((option) => (
                 <option value={option.id} key={option.id}>
                   {option.label}
                 </option>
@@ -298,52 +393,35 @@ export function CodexSettingsSection() {
           </div>
           <div className="settings-rowline">
             <div>
-              <strong>Reasoning Level</strong>
-              <span>Higher levels can improve complex work but use more time and quota.</span>
-            </div>
-            <div className="settings-segmented-control" role="radiogroup" aria-label="Codex reasoning level">
-              {REASONING_OPTIONS.map((option) => (
-                <button
-                  className={runtimeSettings.codexReasoningEffort === option.id ? "active" : ""}
-                  type="button"
-                  role="radio"
-                  aria-checked={runtimeSettings.codexReasoningEffort === option.id}
-                  onClick={() => updateRuntimeSetting("codexReasoningEffort", option.id)}
-                  key={option.id}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="settings-rowline">
-            <div>
               <strong>Speed</strong>
               <span>{fastStatus}</span>
             </div>
-            <div className="settings-segmented-control compact" role="radiogroup" aria-label="Codex speed">
+            <div className={`settings-segmented-control compact${fastSupported ? "" : " single"}`} role="radiogroup" aria-label="Codex speed">
               <button
                 className={runtimeSettings.codexServiceTier === "standard" ? "active" : ""}
                 type="button"
                 role="radio"
                 aria-checked={runtimeSettings.codexServiceTier === "standard"}
+                disabled={!selectedModel}
                 onClick={() => updateRuntimeSetting("codexServiceTier", "standard")}
               >
                 Standard
               </button>
-              <button
-                className={runtimeSettings.codexServiceTier === "fast" ? "active" : ""}
-                type="button"
-                role="radio"
-                aria-checked={runtimeSettings.codexServiceTier === "fast"}
-                disabled={!fastSupported}
-                onClick={() => fastSupported && updateRuntimeSetting("codexServiceTier", "fast")}
-              >
-                <Zap size={14} />
-                Fast
-              </button>
+              {fastSupported ? (
+                <button
+                  className={runtimeSettings.codexServiceTier === "fast" ? "active" : ""}
+                  type="button"
+                  role="radio"
+                  aria-checked={runtimeSettings.codexServiceTier === "fast"}
+                  onClick={() => updateRuntimeSetting("codexServiceTier", "fast")}
+                >
+                  <Zap size={14} />
+                  Fast
+                </button>
+              ) : null}
             </div>
           </div>
+          {selectionNotice ? <div className="codex-selection-notice" role="status">{selectionNotice}</div> : null}
           <div className="settings-rowline">
             <div>
               <strong>Codex Sandbox</strong>
@@ -420,11 +498,16 @@ export function CodexSettingsSection() {
           <div className="settings-rowline">
             <div>
               <strong>Execution Mode</strong>
-              <span>Inline keeps one Codex turn. Orchestrator can run the plan step by step for testing.</span>
+              <span>
+                {runtimeSettings.codexReasoningEffort === "ultra"
+                  ? "Ultra delegates automatically, so outer orchestration stays Inline only."
+                  : "Inline keeps one Codex turn. Orchestrator can run the plan step by step for testing."}
+              </span>
             </div>
             <select
               value={runtimeSettings.codexExecutionMode}
               aria-label="Codex execution mode"
+              disabled={runtimeSettings.codexReasoningEffort === "ultra"}
               onChange={(event) => updateRuntimeSetting("codexExecutionMode", event.currentTarget.value as RuntimeSettings["codexExecutionMode"])}
             >
               <option value="inline_only">Inline only</option>
