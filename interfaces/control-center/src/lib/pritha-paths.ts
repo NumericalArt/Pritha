@@ -31,6 +31,13 @@ export function resolvePrithaAgentMemoryRoot(root = resolveTechscopeRoot()) {
   return stateRoot === root ? path.join(root, "11_agents") : path.join(stateRoot, "agents");
 }
 
+export function isPrithaCodeCheckout(candidate: string) {
+  const directory = path.resolve(candidate);
+  return existsSync(path.join(directory, "11_agents"))
+    && existsSync(path.join(directory, "scripts", "pritha.mjs"))
+    && existsSync(path.join(directory, "interfaces", "control-center"));
+}
+
 const stateLayout = {
   config: "config",
   setup: "setup",

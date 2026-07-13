@@ -6,7 +6,7 @@ import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { isPrithaCodeCheckout, resolvePrithaAgentParent, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot({ cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
@@ -179,7 +179,7 @@ function healthPathForLocalUrl(localUrl, healthUrl) {
 }
 
 function siblingAgentApps() {
-  const parent = path.dirname(ROOT);
+  const parent = resolvePrithaAgentParent({ root: ROOT });
   const items = [];
   let folders = [];
   try {
@@ -187,7 +187,9 @@ function siblingAgentApps() {
       .map((name) => ({ name, absolutePath: path.join(parent, name) }))
       .filter((entry) => {
         try {
-          return statSync(entry.absolutePath).isDirectory() && !entry.name.startsWith(".");
+          return statSync(entry.absolutePath).isDirectory()
+            && !entry.name.startsWith(".")
+            && !isPrithaCodeCheckout(entry.absolutePath);
         } catch {
           return false;
         }

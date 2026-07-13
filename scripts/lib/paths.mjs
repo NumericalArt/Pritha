@@ -70,6 +70,13 @@ export function resolvePrithaAgentMemoryRoot(options = {}) {
   return stateRoot === root ? path.join(root, "11_agents") : path.join(stateRoot, PRITHA_STATE_LAYOUT.agents);
 }
 
+export function isPrithaCodeCheckout(candidate) {
+  const directory = path.resolve(candidate);
+  return existsSync(path.join(directory, "11_agents"))
+    && existsSync(path.join(directory, "scripts", "pritha.mjs"))
+    && existsSync(path.join(directory, "interfaces", "control-center"));
+}
+
 export function resolvePrithaStatePath(kind, ...segments) {
   if (!Object.hasOwn(PRITHA_STATE_LAYOUT, kind)) {
     throw new Error(`Unknown Pritha state path kind: ${kind}`);
