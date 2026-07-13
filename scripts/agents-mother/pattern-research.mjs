@@ -3,8 +3,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { today } from "../lib/date.mjs";
+import { resolvePrithaStateRoot } from "../lib/paths.mjs";
 
 export const SEMANTIC_FAILURE_LOG_REL = ".private/agents-mother/semantic-memory-failures.jsonl";
+const ISOLATED_SEMANTIC_FAILURE_LOG_REL = "private/agents-mother/semantic-memory-failures.jsonl";
 
 const STOP_WORDS = new Set([
   "about",
@@ -118,7 +120,9 @@ export function buildAgentDevelopmentQuery(data = {}) {
 }
 
 export function logSemanticFailure(root, failure = {}) {
-  const logPath = path.join(root, SEMANTIC_FAILURE_LOG_REL);
+  const stateRoot = resolvePrithaStateRoot({ root });
+  const relativePath = stateRoot === path.resolve(root) ? SEMANTIC_FAILURE_LOG_REL : ISOLATED_SEMANTIC_FAILURE_LOG_REL;
+  const logPath = path.join(stateRoot, relativePath);
   mkdirSync(path.dirname(logPath), { recursive: true });
   const entry = {
     timestamp: new Date().toISOString(),
@@ -131,7 +135,7 @@ export function logSemanticFailure(root, failure = {}) {
     stderr: compact(failure.stderr || "", 1200),
   };
   appendFileSync(logPath, `${JSON.stringify(entry)}\n`);
-  return path.relative(root, logPath);
+  return stateRoot === path.resolve(root) ? relativePath : path.relative(root, logPath);
 }
 
 function semanticFailureStatus(result) {

@@ -4,10 +4,11 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ENV_ROOT = process.env.TECHSCOPE_ROOT ? path.resolve(process.env.TECHSCOPE_ROOT) : "";
-const ROOT = ENV_ROOT && existsSync(ENV_ROOT) ? ENV_ROOT : DEFAULT_ROOT;
+const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);
@@ -20,13 +21,13 @@ const staleMs = staleDays * 24 * 60 * 60 * 1000;
 const queues = [
   {
     id: "telegram-intake",
-    root: path.join(ROOT, ".queue", "telegram-intake"),
+    root: resolvePrithaStatePath("queue", "telegram-intake"),
     statuses: ["pending", "processing", "awaiting_codex", "complete", "done", "failed"],
     staleStatuses: ["pending", "awaiting_codex"],
   },
   {
     id: "codex-media-review",
-    root: path.join(ROOT, ".queue", "codex-media-review"),
+    root: resolvePrithaStatePath("queue", "codex-media-review"),
     statuses: ["pending", "done"],
     staleStatuses: ["pending"],
   },
@@ -61,7 +62,7 @@ function listStatus(queue, status) {
         queue: queue.id,
         status,
         id: job.id || path.basename(name, ".json"),
-        path: path.relative(ROOT, filePath).split(path.sep).join("/"),
+        path: path.relative(STATE_ROOT, filePath).split(path.sep).join("/"),
         updated_at: job.updated_at || "",
         created_at: job.created_at || "",
         age_days: Number((ageMs / (24 * 60 * 60 * 1000)).toFixed(2)),
@@ -89,6 +90,7 @@ for (const queue of queues) {
 const payload = {
   schema: "techscope-queue-health-v1",
   root: ROOT,
+  state_root: STATE_ROOT,
   status: "pass",
   stale_days_threshold: staleDays,
   created_at: new Date().toISOString(),

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "../../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../../lib/paths.mjs";
 import { slug as makeSlug } from "../../lib/slug.mjs";
 import { today } from "../../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, RUNTIME_PLACEMENT_PROFILES, SERVICE_MODES, bodyValue, contractData, sectionItems, validateContract } from "../contract.mjs";
@@ -9,8 +9,9 @@ import { researchGateDecisionForReport } from "../research-gate.mjs";
 import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "../skills.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
-const RESEARCH_DIR = path.join(ROOT, "11_agents", "research");
+const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
+const REPORT_DIR = path.join(AGENT_MEMORY_ROOT, "reports");
+const RESEARCH_DIR = path.join(AGENT_MEMORY_ROOT, "research");
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 
 function ensureDirs() {
@@ -665,8 +666,10 @@ if (action === "status") {
 */});
 
 function resolveTargetPath(data, options = {}) {
-  const requested = scalar(options.output || data.targetFolder || `../${slug(data.agentName)}`);
-  return path.resolve(ROOT, requested);
+  const requested = scalar(options.output || data.targetFolder || "", "");
+  return requested
+    ? path.resolve(ROOT, requested)
+    : path.join(resolvePrithaAgentParent({ root: ROOT }), slug(data.agentName));
 }
 
 function ensureWritableTarget(targetPath) {

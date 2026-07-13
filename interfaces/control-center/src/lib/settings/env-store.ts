@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "@/lib/realtime/pritha-runtime";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
 
 export type EnvSecretSource = "process_env" | "control_center_env_file" | "root_env_local" | "root_env" | "unknown";
 
@@ -20,6 +20,8 @@ function controlCenterEnvFile() {
     const value = readEnvFile(envPath).get("PRITHA_CONTROL_CENTER_ENV_FILE")?.trim();
     if (value) return path.resolve(root, value);
   }
+  const stateRoot = resolvePrithaStateRoot(root);
+  if (stateRoot !== root) return path.join(stateRoot, "config", "runtime.env");
   return "";
 }
 
@@ -128,7 +130,7 @@ export function writeEnvSecret(name: string, value: string) {
 function appendSettingsEvent(kind: string, payload: Record<string, unknown>) {
   try {
     const root = resolveTechscopeRoot();
-    const eventDir = path.join(root, ".private", "interface-lab", "pritha-control-center", "settings");
+    const eventDir = resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "settings");
     mkdirSync(eventDir, { recursive: true });
     writeFileSync(
       path.join(eventDir, "events.jsonl"),

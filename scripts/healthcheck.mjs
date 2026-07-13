@@ -4,9 +4,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const root = resolveTechscopeRoot();
+const stateRoot = resolvePrithaStateRoot({ root });
 const platform = process.env.TECHSCOPE_HEALTHCHECK_PLATFORM || process.platform;
 const isDarwin = platform === "darwin";
 const checks = [];
@@ -51,7 +52,7 @@ function run(name, command, args, options = {}) {
 
 add("TECHSCOPE_ROOT", existsSync(root), root);
 add("git root", existsSync(path.join(root, ".git")), path.join(root, ".git"));
-add("memory sqlite", existsSync(path.join(root, ".memory", "techscope.sqlite")), ".memory/techscope.sqlite");
+add("memory sqlite", existsSync(resolvePrithaStatePath("memory", "techscope.sqlite")), "state-root/memory/techscope.sqlite");
 
 for (const relPath of [
   "interfaces/manifest.json",

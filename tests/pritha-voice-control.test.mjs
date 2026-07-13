@@ -211,12 +211,12 @@ test("Voice Codex tasks support linked continuation cards", () => {
   assert.match(voicePageSource, /Parent task/);
 });
 
-test("standalone port 4401 voice experiment is deprecated in favor of Control Center", () => {
+test("standalone port 3401 voice experiment is deprecated in favor of Control Center", () => {
   const adapter = interfacesManifest.adapters.find((item) => item.name === "pritha-voice-control");
   assert.equal(adapter.status, "deprecated");
   assert.equal(adapter.replaced_by, "pritha-control-center");
-  assert.equal(adapter.replacement_url, "http://127.0.0.1:4420/voice");
+  assert.equal(adapter.replacement_url, "http://127.0.0.1:3420/voice");
   assert.equal(legacyExperimentManifest.status, "deprecated");
-  assert.match(legacyScriptSource, /standalone Pritha Voice Control experiment on port 4401 has been retired/);
-  assert.match(legacyScriptSource, /http:\/\/127\.0\.0\.1:4420\/voice/);
+  assert.match(legacyScriptSource, /standalone Pritha Voice Control experiment on port 3401 has been retired/);
+  assert.match(legacyScriptSource, /http:\/\/127\.0\.0\.1:3420\/voice/);
 });

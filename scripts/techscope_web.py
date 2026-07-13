@@ -28,9 +28,10 @@ def resolve_root():
 
 
 ROOT = resolve_root()
-DB_PATH = ROOT / ".memory" / "techscope.sqlite"
+STATE_ROOT = Path(os.environ["PRITHA_STATE_ROOT"]).expanduser().resolve() if os.environ.get("PRITHA_STATE_ROOT") else ROOT
+DB_PATH = STATE_ROOT / "memory" / "techscope.sqlite" if STATE_ROOT != ROOT else ROOT / ".memory" / "techscope.sqlite"
 HOST = os.environ.get("HOST", "127.0.0.1")
-PORT = int(os.environ.get("PORT", "4000"))
+PORT = int(os.environ.get("PORT", "3000"))
 
 
 PAGE = """<!doctype html>

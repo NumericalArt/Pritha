@@ -3,8 +3,8 @@ id: memory-domains
 type: standard
 status: draft
 created: 2026-06-02
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-07-13
+last_reviewed: 2026-07-13
 owner: Techscope/user
 topics:
   - memory-domains
@@ -118,6 +118,12 @@ domains. `subject.kind` and `subject.id` identify what the artifact is about.
   contracts, reports or tests.
 - Successful child-agent patterns are used as evidence and reusable pattern
   candidates, not copied blindly into new descendants.
+- Tracked Markdown is shared authored knowledge. Generated SQLite, embeddings,
+  setup state, audit, queues, voice drafts and live child-agent registry belong
+  to the external `PRITHA_STATE_ROOT` of one instance.
+- `11_agents/` is historical shared evidence. Live contracts, reports,
+  research and registry use `<state-root>/agents/` and require explicit review
+  before promotion to shared knowledge.
 
 ## Child-Agent Research Order
 

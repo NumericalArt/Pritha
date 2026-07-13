@@ -85,9 +85,10 @@ test("last30days status is pending-install when runtime is present but checkout 
 });
 
 test("sanitized last30days env strips secrets and can disable host tool PATH", () => {
+  const fixtureHome = path.join(path.sep, "fixture-home");
   const env = sanitizedLast30DaysEnv({
     PATH: "/usr/bin:/bin",
-    HOME: "/Users/example",
+    HOME: fixtureHome,
     OPENAI_API_KEY: "sk-secret",
     AUTH_TOKEN: "secret",
     PASSWORD_STORE_DIR: "/private/pass",
@@ -96,7 +97,7 @@ test("sanitized last30days env strips secrets and can disable host tool PATH", (
     extra: { LAST30DAYS_SKIP_PREFLIGHT: "1" },
   });
 
-  assert.equal(env.HOME, "/Users/example");
+  assert.equal(env.HOME, fixtureHome);
   assert.equal(env.PATH, "");
   assert.equal(env.OPENAI_API_KEY, undefined);
   assert.equal(env.AUTH_TOKEN, undefined);

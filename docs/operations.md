@@ -14,7 +14,7 @@ node scripts/self-test.mjs
 ## Web
 
 ```sh
-HOST=127.0.0.1 PORT=4000 node scripts/techscope-web.mjs
+HOST=127.0.0.1 PORT=3000 node scripts/techscope-web.mjs
 ```
 
 ## Services
@@ -28,3 +28,17 @@ node scripts/operations-status.mjs
 node scripts/deploy-service.mjs plan
 node scripts/deploy-service.mjs status
 ```
+
+## Instance and fleet updates
+
+```sh
+node scripts/pritha-instance.mjs status --json
+node scripts/pritha-instance.mjs migrate --plan --json
+node scripts/pritha-instance.mjs update --plan --json
+node scripts/pritha-fleet.mjs status --manifest "$PRITHA_FLEET_CONFIG"
+node scripts/pritha-fleet.mjs rollout --manifest "$PRITHA_FLEET_CONFIG"
+```
+
+Apply commands require `--apply --yes`. Fleet rollout is ordered by the local
+manifest and stops at the first failed instance. No scheduler, cron or launchd
+job is installed by these commands.

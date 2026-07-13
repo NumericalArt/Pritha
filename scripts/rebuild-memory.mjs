@@ -5,13 +5,13 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatter } from "./lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug } from "./lib/slug.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const MEMORY_DIR = path.join(ROOT, ".memory");
+const MEMORY_DIR = resolvePrithaStatePath("memory");
 const DB_PATH = path.join(MEMORY_DIR, "techscope.sqlite");
-const SCHEMA_PATH = path.join(MEMORY_DIR, "schema.sql");
+const SCHEMA_PATH = path.join(ROOT, ".memory", "schema.sql");
 
 const INCLUDE_DIRS = [
   "00_inbox",

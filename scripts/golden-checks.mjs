@@ -4,10 +4,11 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ENV_ROOT = process.env.TECHSCOPE_ROOT ? path.resolve(process.env.TECHSCOPE_ROOT) : "";
-const ROOT = ENV_ROOT && existsSync(ENV_ROOT) ? ENV_ROOT : DEFAULT_ROOT;
+const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
@@ -77,7 +78,7 @@ checks.push(run(
   "node",
   ["scripts/query-memory.mjs", "semantic", "agent factory"],
   {
-    skip: !withEmbeddings || !existsSync(path.join(ROOT, ".memory/techscope.sqlite")),
+    skip: !withEmbeddings || !existsSync(resolvePrithaStatePath("memory", "techscope.sqlite")),
     reason: "optional; requires embeddings rebuild",
     timeoutMs: 120000,
   },

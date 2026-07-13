@@ -17,15 +17,16 @@ import {
 import path from "node:path";
 import { loadEnv } from "./lib/env.mjs";
 import { yamlList, yamlString } from "./lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { now, today } from "./lib/date.mjs";
 import { createAnonymousSourceId, inferSourceClass } from "./lib/privacy.mjs";
 
 const ROOT = resolveTechscopeRoot();
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 const INBOX_DIR = path.join(ROOT, "00_inbox", "telegram");
-const QUEUE_DIR = path.join(ROOT, ".queue", "telegram-intake");
-const CODEX_REVIEW_DIR = path.join(ROOT, ".queue", "codex-media-review");
+const QUEUE_DIR = resolvePrithaStatePath("queue", "telegram-intake");
+const CODEX_REVIEW_DIR = resolvePrithaStatePath("queue", "codex-media-review");
 const DEFAULT_ALLOWED_USER_IDS = [];
 const POLL_TIMEOUT_SECONDS = 30;
 const RETRY_DELAY_MS = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_INITIAL_MS || 3000);

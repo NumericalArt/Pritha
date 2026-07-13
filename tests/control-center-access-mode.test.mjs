@@ -53,11 +53,11 @@ test("Access mode URL rewrite keeps LAN ports but requires explicit child-agent 
   const loaded = await loadAccessModeModule();
   try {
     const access = {
-      localhost: "http://127.0.0.1:4420",
+      localhost: "http://127.0.0.1:3420",
       lan: "ready",
-      lanUrl: "http://192.0.2.10:4420",
+      lanUrl: "http://192.0.2.10:3420",
       tailscale: "ready",
-      tailscaleUrl: "https://example.tail000000.ts.net",
+      tailscaleUrl: "https://control-center.example.invalid",
       qr: "ready",
     };
 
@@ -65,8 +65,8 @@ test("Access mode URL rewrite keeps LAN ports but requires explicit child-agent 
     assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "lan"), "http://192.0.2.10:4877");
     assert.equal(loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "tailscale"), undefined);
     assert.equal(
-      loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "tailscale", "https://agent.tail000000.ts.net:4877"),
-      "https://agent.tail000000.ts.net:4877",
+      loaded.module.agentUrlForAccessMode("http://127.0.0.1:4877", access, "tailscale", "https://agent.example.invalid:4877"),
+      "https://agent.example.invalid:4877",
     );
   } finally {
     loaded.cleanup();

@@ -23,7 +23,7 @@ function run(command, args, options = {}) {
 function runJson(args, root, options = {}) {
   const result = run("node", ["scripts/pritha-maintenance.mjs", ...args, "--json"], {
     check: options.check,
-    env: { TECHSCOPE_ROOT: root },
+    env: { TECHSCOPE_ROOT: root, ...(options.env || {}) },
   });
   return {
     status: result.status,
@@ -138,6 +138,22 @@ test("refresh self knowledge creates a draft artifact without editing standards"
     assert.equal(result.payload.status, "created");
     assert.match(result.payload.artifactPath, /^03_reviews\/\d{4}-\d{2}-\d{2}-pritha-self-knowledge-refresh/);
     assert.equal(existsSync(path.join(fixture.workUpdate, result.payload.artifactPath)), true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("refresh self knowledge writes to external instance state when isolation is configured", () => {
+  const fixture = setupGitFixture();
+  const stateRoot = path.join(fixture.base, "state");
+  try {
+    const result = runJson(["refresh-self-knowledge"], fixture.workUpdate, {
+      env: { PRITHA_STATE_ROOT: stateRoot },
+    });
+    assert.equal(result.payload.status, "created");
+    assert.match(result.payload.artifactPath, /^agents\/reports\/\d{4}-\d{2}-\d{2}-pritha-self-knowledge-refresh/);
+    assert.equal(existsSync(path.join(stateRoot, result.payload.artifactPath)), true);
+    assert.equal(existsSync(path.join(fixture.workUpdate, "03_reviews")), false);
   } finally {
     fixture.cleanup();
   }

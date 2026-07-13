@@ -8,16 +8,16 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "../../../scripts/lib/env.mjs";
-import { resolveTechscopeRoot } from "../../../scripts/lib/paths.mjs";
+import { resolvePrithaStatePath, resolveTechscopeRoot } from "../../../scripts/lib/paths.mjs";
 
 const MODULE_PATH = fileURLToPath(import.meta.url);
 const ROOT = resolveTechscopeRoot();
 loadEnv({ root: ROOT });
 
-const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
+const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
 const DEFAULT_MODEL = "gpt-realtime";
 const DEFAULT_VOICE = "marin";
-const DEFAULT_PORT = 4401;
+const DEFAULT_PORT = 3401;
 const DEFAULT_CODEX_TIMEOUT_MS = 300_000;
 const MAX_BODY_BYTES = 1_000_000;
 const MAX_TOOL_TEXT = 8_000;

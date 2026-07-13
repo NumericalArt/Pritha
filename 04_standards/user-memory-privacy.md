@@ -3,8 +3,8 @@ id: user-memory-privacy
 type: standard
 status: draft
 created: 2026-06-02
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-07-13
+last_reviewed: 2026-07-13
 owner: Techscope/user
 topics:
   - user-memory
@@ -76,9 +76,10 @@ unless the user explicitly asks for a specific export.
 
 ## Required Practices
 
-- Store local user-model files under `.private/user-memory/`.
-- Store private indexes under `.memory-private/`.
+- Store local user-model files under `<state-root>/private/user-memory/`.
+- Store private indexes under `<state-root>/private/memory-private/`.
 - Keep both locations ignored by Git.
+- Never share these locations between Pritha instance IDs.
 - Record confidence and confirmation state.
 - Separate confirmed preferences from inferred preferences.
 - Provide a future review/edit/delete workflow before expanding this layer.

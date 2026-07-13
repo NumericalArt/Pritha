@@ -1,14 +1,14 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { yamlList } from "../lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, SERVICE_MODES } from "./contract.mjs";
 import { checkResult, detectProject, fileExists, readJsonIfExists, runProjectCommand } from "./test.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
+const REPORT_DIR = path.join(resolvePrithaAgentMemoryRoot({ root: ROOT }), "reports");
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 
 function argvSummary(value) {

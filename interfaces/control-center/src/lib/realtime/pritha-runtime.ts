@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSyn
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
 import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
 import { checkCodexAppServerAvailable, PrithaCodexAppServerClient, resolveCodexBinary } from "./codex-task/codex-app-server-client";
 import {
@@ -43,6 +44,8 @@ import {
   type PrithaVoiceId,
   type VoiceBehaviorProfile,
 } from "./voice-settings";
+
+export { resolveTechscopeRoot } from "../pritha-paths";
 
 type RealtimeToolDefinition = {
   type: "function";
@@ -424,7 +427,7 @@ const VOICE_INTAKE_STAGING_TTL_MS = 2 * 60 * 60 * 1000;
 const RECENT_RESEARCH_DEFAULT_SOURCES = "reddit,hackernews,polymarket,grounding";
 const RECENT_RESEARCH_ALLOWED_SOURCES = new Set(["reddit", "hackernews", "polymarket", "grounding", "github", "jobs"]);
 const WEB_SEARCH_DEFAULT_BACKEND = "searxng";
-const WEB_SEARCH_DEFAULT_SEARXNG_URL = "http://127.0.0.1:4888/search";
+const WEB_SEARCH_DEFAULT_SEARXNG_URL = "http://127.0.0.1:8080/search";
 const WEB_SEARCH_DEFAULT_TIMEOUT_MS = 6_000;
 const WEB_SEARCH_AUTO_ENSURE_DEFAULT_TIMEOUT_MS = 240_000;
 const LAST30DAYS_LOCK_PATH = path.join("tools", "external-research", "last30days-lock.json");
@@ -445,23 +448,6 @@ export class RealtimeProviderError extends Error {
     this.status = params.status;
     this.providerCode = params.providerCode;
   }
-}
-
-export function resolveTechscopeRoot() {
-  if (process.env.TECHSCOPE_ROOT) {
-    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
-    if (existsSync(envRoot)) return envRoot;
-  }
-
-  let cursor = process.cwd();
-  for (let i = 0; i < 8; i += 1) {
-    if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "11_agents"))) return cursor;
-    const next = path.dirname(cursor);
-    if (next === cursor) break;
-    cursor = next;
-  }
-
-  return process.cwd();
 }
 
 function loadEnvFile(filePath: string) {
@@ -487,6 +473,9 @@ function loadRuntimeEnv() {
   loadEnvFile(path.join(root, ".env.local"));
   loadEnvFile(path.join(process.cwd(), ".env"));
   loadEnvFile(path.join(process.cwd(), ".env.local"));
+  if (process.env.PRITHA_STATE_ROOT) {
+    loadEnvFile(path.join(resolvePrithaStateRoot(root), "config", "runtime.env"));
+  }
   const extraEnvFile = process.env.PRITHA_CONTROL_CENTER_ENV_FILE;
   if (extraEnvFile) loadEnvFile(path.resolve(extraEnvFile));
 }
@@ -669,7 +658,7 @@ async function cleanupVoiceIntakeStaging(intake: unknown, reason: string) {
 }
 
 function memoryDbPath(root = resolveTechscopeRoot()) {
-  return path.join(root, ".memory", "techscope.sqlite");
+  return resolvePrithaStatePath("memory", "techscope.sqlite");
 }
 
 function memoryStatsMap() {
@@ -1397,7 +1386,7 @@ function searchRuntimeMemory(args: FullMemoryArgs) {
     }
   }
 
-  const runtimeDirs = [path.join(privateRoot(), "codex-tasks"), path.join(root, ".queue")];
+  const runtimeDirs = [path.join(privateRoot(), "codex-tasks"), resolvePrithaStatePath("queue")];
   for (const directory of runtimeDirs) {
     const files = listFilesRecursive(directory, 300)
       .filter((filePath) => /\.(json|jsonl|md|log|txt)$/.test(filePath))
@@ -3241,7 +3230,7 @@ export async function createRealtimeCall(offerSdp: string, ephemeralKey: string)
 }
 
 function privateRoot() {
-  return path.join(resolveTechscopeRoot(), ".private", "interface-lab", "pritha-control-center", "realtime");
+  return resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "realtime");
 }
 
 function goodStateRoot() {
@@ -4107,7 +4096,7 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
   const summaryLines = bulletLines(events);
 
   if (classified.decision === "private-user-memory") {
-    const privateDir = path.join(root, ".private", "user-memory");
+    const privateDir = resolvePrithaStatePath("private", "user-memory");
     await mkdir(privateDir, { recursive: true });
     const privatePath = path.join(privateDir, `${date}-${sessionId}.md`);
     const body = [
@@ -4132,7 +4121,7 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
       "## Suggested Target",
       "",
       "- Target: local-private user memory note.",
-      `- Path: ${rootRelative(root, privatePath)}`,
+      `- Path: ${rootRelative(resolvePrithaStateRoot(root), privatePath)}`,
       "",
       "## Risks And Open Questions",
       "",
@@ -4143,13 +4132,13 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
       "",
     ].join("\n");
     await writeFile(privatePath, body, "utf8");
-    const result = { ok: true, saved: true, decision: classified.decision, path: rootRelative(root, privatePath), event_count: events.length };
+    const result = { ok: true, saved: true, decision: classified.decision, path: rootRelative(resolvePrithaStateRoot(root), privatePath), event_count: events.length };
     await writeFile(indexPath, `${JSON.stringify({ ...result, updated_at: now.toISOString() }, null, 2)}\n`, "utf8");
     await logPrivateEvent("voice_session_memory_saved", { session_id: sessionId, path: result.path, decision: classified.decision });
     return result;
   }
 
-  const artifactDir = path.join(root, "03_reviews");
+  const artifactDir = resolvePrithaStatePath("voiceDrafts");
   await mkdir(artifactDir, { recursive: true });
   const artifactPath = path.join(artifactDir, `${date}-${sessionId}-voice-session-memory.md`);
   const artifactId = `${date}-${sessionId}-voice-session-memory`;
@@ -4217,7 +4206,7 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
     "## Suggested Target Artifact",
     "",
     "- Suggested type: review.",
-    `- Suggested path: ${rootRelative(root, artifactPath)}`,
+    `- Suggested path: ${rootRelative(resolvePrithaStateRoot(root), artifactPath)}`,
     "- Promotion path: review evidence first; only later convert stable patterns into decisions, workflows or standards.",
     "",
     "## Routing Decision",
@@ -4235,16 +4224,18 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
     "",
   ].join("\n");
   await writeFile(artifactPath, body, "utf8");
-  const checks = await validateAndRebuildMemory();
+  const isolatedState = resolvePrithaStateRoot(root) !== root;
+  const rebuilt = isolatedState ? null : await validateAndRebuildMemory();
+  const checks = rebuilt || { ok: true, skipped: true, reason: "local_voice_draft_not_promoted_to_shared_memory" };
   const result = {
     ok: checks.ok,
     saved: true,
     decision: classified.decision,
-    path: rootRelative(root, artifactPath),
+    path: rootRelative(resolvePrithaStateRoot(root), artifactPath),
     event_count: events.length,
-    validation: checks.validation,
-    rebuild: checks.rebuild,
-    embeddings: checks.embeddings,
+    validation: rebuilt?.validation || null,
+    rebuild: rebuilt?.rebuild || null,
+    embeddings: rebuilt?.embeddings || null,
   };
   await writeFile(indexPath, `${JSON.stringify({ ...result, updated_at: now.toISOString() }, null, 2)}\n`, "utf8");
   await logPrivateEvent("voice_session_memory_saved", { session_id: sessionId, path: result.path, decision: classified.decision, ok: result.ok });
@@ -4376,8 +4367,8 @@ function childAgentAliases(directoryName: string) {
 }
 
 function knownSiblingChildAgentProjects(root: string) {
-  const parent = path.dirname(root);
-  const rootName = path.basename(root);
+  const parent = resolvePrithaAgentParent(root);
+  const codeRoot = path.resolve(root);
   let entries: string[] = [];
   try {
     entries = readdirSync(parent);
@@ -4386,8 +4377,9 @@ function knownSiblingChildAgentProjects(root: string) {
   }
 
   return entries.flatMap((entry): ChildAgentProject[] => {
-    if (!entry || entry.startsWith(".") || entry === rootName) return [];
+    if (!entry || entry.startsWith(".")) return [];
     const directory = path.join(parent, entry);
+    if (path.resolve(directory) === codeRoot) return [];
     if (!isDirectory(directory) || !existsSync(path.join(directory, "AGENTS.md"))) return [];
     return [{ name: entry, directory, aliases: childAgentAliases(entry) }];
   });
@@ -4976,7 +4968,7 @@ function codexTaskApprovalReasons(task: Record<string, unknown>) {
   if (/(deploy|deployment|publish|release|push\s+to\s+github|gh\s+pr|git\s+push)/.test(taskText)) reasons.push("external_publish_or_deployment");
   if (/(delete|remove|destroy|wipe|drop|rm\s+-rf|erase)\b/.test(taskText)) reasons.push("destructive_change");
   if (/(secret|credential|token|api\s*key|password|\.env\.local|private\s+key)/.test(taskText)) reasons.push("credential_or_secret_change");
-  if (/(control\s*center|control-center|pritha\s+ui|\/voice|\/agents|127\.0\.0\.1:4420|:4420)/.test(taskText)) {
+  if (/(control\s*center|control-center|pritha\s+ui|\/voice|\/agents|127\.0\.0\.1:\d+|localhost:\d+)/.test(taskText)) {
     if (/(restart|rebuild|reload|stop|kill|terminate|npm\s+run\s+start|next\s+start|refresh\s+server|перезапуск|пересбор|перезапусти|останов)/.test(taskText)) {
       reasons.push("control_center_runtime_change");
     }
@@ -5075,7 +5067,7 @@ function codexAdditionalWritableDirs(root: string, task: Record<string, unknown>
   if (sandbox !== "workspace-write") return [];
   const taskType = String(task.task_type || "").toLowerCase();
   if (taskType.toLowerCase() !== "agent_creation") return [];
-  return [path.dirname(root)];
+  return [resolvePrithaAgentParent(root)];
 }
 
 function codexExistingChildAgentWritableDirs(root: string, task: Record<string, unknown>) {
@@ -5238,7 +5230,7 @@ function agentDevelopmentResearchGatePayload() {
     pattern_pack: {
       required: true,
       artifact: "11_agents/research/YYYY-MM-DD-<agent>-agent-pattern-pack.md",
-      semantic_embedding_search: "attempt-required; if unavailable, continue with warning and log to .private/agents-mother/semantic-memory-failures.jsonl",
+      semantic_embedding_search: "attempt-required; if unavailable, continue with warning and log to the current instance private state",
       external_seed_source: "selected memory patterns",
     },
     external_research: {
@@ -5508,7 +5500,7 @@ function syntheticCodexTaskPlan(task: Record<string, unknown>, source: CodexTask
         {
           id: "rebuild_registry",
           title: "Rebuild Registry",
-          goal: "Run the Pritha registry rebuild so the child-agent appears in 11_agents/registry.md with contract/report evidence.",
+          goal: "Run the Pritha registry rebuild so the child-agent appears in the current instance registry with contract/report evidence.",
           expectedOutput: "Registry contains the new child-agent row.",
           needsWrite: true,
           needsNetwork: false,
@@ -6517,8 +6509,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
     subject_label: args.subject_label ? normalizeThreadScopeLabel(args.subject_label, String(args.subject_id || "subject")) : undefined,
     thread_reset: boolValue(args.thread_reset),
     root: rootRelative(root, root),
-    sibling_agent_parent: rootRelative(root, path.dirname(root)),
-    sibling_agent_parent_absolute: path.dirname(root),
+    sibling_agent_parent: rootRelative(root, resolvePrithaAgentParent(root)),
+    sibling_agent_parent_absolute: resolvePrithaAgentParent(root),
     requested_transport: requestedTransport,
     fallback_transport: fallbackTransport,
     effective_transport: effectiveTransport,

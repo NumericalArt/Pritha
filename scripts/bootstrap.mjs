@@ -383,7 +383,8 @@ Profiles: minimal, local, control-center, control-center-tailscale
 
 Safety: bootstrap never installs launchd, cron, durable services, Tailscale, or
 credentials. The local web search backend is installed under ignored .tools and
-.private paths. The Control Center start command runs in the foreground.`);
+the configured PRITHA_STATE_ROOT private directory. The Control Center start
+command runs in the foreground.`);
     return;
   }
 

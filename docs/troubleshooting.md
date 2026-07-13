@@ -43,7 +43,7 @@ node scripts/bootstrap.mjs --profile local --start control-center
 The default local URL is:
 
 ```text
-http://127.0.0.1:4420/agents
+http://127.0.0.1:3420/agents
 ```
 
 `localhost` and `127.0.0.1` are loopback addresses. They work only on the Mac
@@ -85,12 +85,12 @@ Use read-only diagnosis first:
 
 ```sh
 node scripts/control-center-health.mjs --json
-lsof -nP -iTCP:4420 -sTCP:LISTEN
+lsof -nP -iTCP:3420 -sTCP:LISTEN
 ```
 
 If Codex is operating the project, killing or replacing the local Control
 Center process requires explicit user approval immediately before the action.
-After approval, stop only the PID that is listening on `127.0.0.1:4420`, then
+After approval, stop only the PID that is listening on the configured Control Center port, then
 start a fresh foreground server:
 
 ```sh

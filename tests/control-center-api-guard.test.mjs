@@ -33,11 +33,11 @@ function headers(values = {}) {
 function request(overrides = {}) {
   const { headers: headerOverrides, ...rest } = overrides;
   return {
-    url: "http://127.0.0.1:4420/api/realtime/tool",
+    url: "http://127.0.0.1:3420/api/realtime/tool",
     method: "POST",
     headers: headers({
-      host: "127.0.0.1:4420",
-      origin: "http://127.0.0.1:4420",
+      host: "127.0.0.1:3420",
+      origin: "http://127.0.0.1:3420",
       "sec-fetch-site": "same-origin",
       ...(headerOverrides || {}),
     }),
@@ -123,8 +123,8 @@ test("Control Center API guard accepts loopback and strips spoofed Tailscale ide
     const ipv6 = loaded.module.evaluateApiRequestGuard(
       request({
         headers: {
-          host: "[::1]:4420",
-          origin: "http://[::1]:4420",
+          host: "[::1]:3420",
+          origin: "http://[::1]:3420",
           "sec-fetch-site": "same-origin",
         },
       }),

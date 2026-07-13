@@ -11,7 +11,7 @@
     "entrypoint": "npm --prefix interfaces/control-center run serve",
     "development_entrypoint": "npm --prefix interfaces/control-center run dev",
     "default_host": "127.0.0.1",
-    "default_port": 4420,
+    "default_port": 3420,
     "external_mode": "Use production build/start for Tailscale or other non-local browser access. Next dev is local-only because the dev client can fail to hydrate behind HTTPS proxying."
   },
   "routes": ["/agents", "/voice", "/settings", "/dev"],

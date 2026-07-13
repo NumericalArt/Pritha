@@ -4,10 +4,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
+const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
 
 function usage() {
   return `Usage:
@@ -177,7 +178,7 @@ function isPathInsideOrSame(parent, child) {
 }
 
 function privateGoodStateSignalDirs() {
-  const root = path.join(ROOT, ".private", "interface-lab", "pritha-control-center", "realtime", "good-state");
+  const root = resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "realtime", "good-state");
   return [path.join(root, "signals"), path.join(root, "pending")];
 }
 
@@ -258,7 +259,7 @@ function buildPayload(options) {
       limit: options.limit,
       status: "memory-index-missing",
       baselines: [],
-      message: "Missing .memory/techscope.sqlite. Run node scripts/rebuild-memory.mjs before Good State Alignment.",
+      message: "Missing state-root/memory/techscope.sqlite. Run node scripts/rebuild-memory.mjs before Good State Alignment.",
     };
   }
 

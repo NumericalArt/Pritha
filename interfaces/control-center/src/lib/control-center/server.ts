@@ -2,6 +2,13 @@ import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFile
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import {
+  resolvePrithaAgentMemoryRoot,
+  resolvePrithaAgentParent,
+  resolvePrithaStatePath,
+  resolvePrithaStateRoot,
+  resolveTechscopeRoot,
+} from "../pritha-paths";
 import type {
   CapabilityStatus,
   ControlCenterAgentCredentials,
@@ -232,27 +239,10 @@ type OperatorActionAuditEntry = {
   };
 };
 
-const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 4420);
+const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
 const APP_HOST = process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1";
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
-
-function resolveTechscopeRoot() {
-  if (process.env.TECHSCOPE_ROOT) {
-    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
-    if (existsSync(envRoot)) return envRoot;
-  }
-
-  let cursor = process.cwd();
-  for (let i = 0; i < 8; i += 1) {
-    if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "11_agents"))) return cursor;
-    const next = path.dirname(cursor);
-    if (next === cursor) break;
-    cursor = next;
-  }
-
-  return process.cwd();
-}
 
 function slug(value: string) {
   return value
@@ -289,19 +279,19 @@ function isPathInside(parent: string, child: string) {
 }
 
 function snapshotAuditLogPath(root: string) {
-  return path.join(root, ".snapshots", "audit", "child-agent-snapshot-actions.jsonl");
+  return resolvePrithaStatePath("audit", "child-agent-snapshot-actions.jsonl");
 }
 
 function snapshotAuditLogRelativePath(root: string) {
-  return relativePath(root, snapshotAuditLogPath(root));
+  return relativePath(resolvePrithaStateRoot(root), snapshotAuditLogPath(root));
 }
 
 function operatorActionAuditLogPath(root: string) {
-  return path.join(root, ".snapshots", "audit", "child-agent-operator-actions.jsonl");
+  return resolvePrithaStatePath("audit", "child-agent-operator-actions.jsonl");
 }
 
 function operatorActionAuditLogRelativePath(root: string) {
-  return relativePath(root, operatorActionAuditLogPath(root));
+  return relativePath(resolvePrithaStateRoot(root), operatorActionAuditLogPath(root));
 }
 
 function firstLanIPv4() {
@@ -451,7 +441,7 @@ function emptyMemoryStats(): MemoryStats {
 }
 
 function sqliteMemoryStats(root: string): MemoryStats | null {
-  const databasePath = path.join(root, ".memory", "techscope.sqlite");
+  const databasePath = resolvePrithaStatePath("memory", "techscope.sqlite");
   if (!existsSync(databasePath)) return null;
   const result = spawnSync(
     "sqlite3",
@@ -488,7 +478,7 @@ UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
 }
 
 function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
-  const baseline = readJson<SelfTestBaseline>(path.join(root, ".memory", "last-self-test.json"));
+  const baseline = readJson<SelfTestBaseline>(resolvePrithaStatePath("memory", "last-self-test.json"));
   const sqliteStats = sqliteMemoryStats(root);
   const baselineStats = baseline?.memory_stats;
   const memoryStats = sqliteStats || {
@@ -631,17 +621,29 @@ function explicitVersionFromText(text: string, agentName: string) {
 }
 
 function findProfile(root: string, agent: RegistryRecord) {
-  const profiles = markdownFiles(root, ["11_agents", "profiles"]);
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  const profiles = [
+    ...markdownFiles(liveRoot, ["profiles"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "profiles"])),
+  ];
   return profiles.find((file) => fileMatchesAgent(file, agent.name)) || null;
 }
 
 function findContract(root: string, agent: RegistryRecord) {
-  const contracts = markdownFiles(root, ["11_agents", "contracts"]).filter((file) => fileMatchesAgent(file, agent.name));
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  const contracts = [
+    ...markdownFiles(liveRoot, ["contracts"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "contracts"])),
+  ].filter((file) => fileMatchesAgent(file, agent.name));
   return contracts[0] || null;
 }
 
 function findReports(root: string, agent: RegistryRecord) {
-  return markdownFiles(root, ["11_agents", "reports"])
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  return [
+    ...markdownFiles(liveRoot, ["reports"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "reports"])),
+  ]
     .filter((file) => fileMatchesAgent(file, agent.name))
     .slice(0, 8);
 }
@@ -657,7 +659,11 @@ function resolveRelativePath(root: string, value: string | undefined) {
 }
 
 function metadataPathForSnapshot(root: string, storePath: string, snapshotId: string) {
-  return path.join(resolveRelativePath(root, storePath) || path.join(root, ".snapshots", "child-agents"), snapshotId, "snapshot.json");
+  const stateRoot = resolvePrithaStateRoot(root);
+  const configuredStore = stateRoot === root
+    ? String(storePath || "")
+    : String(storePath || "").replace(/^\.snapshots(?:\/|$)/, "snapshots/");
+  return path.join(resolveRelativePath(stateRoot, configuredStore) || resolvePrithaStatePath("snapshots", "child-agents"), snapshotId, "snapshot.json");
 }
 
 function profileSnapshotStore(agent: ControlCenterAgent) {
@@ -683,7 +689,7 @@ function projectRelativeAgentFolder(agent: ControlCenterAgent) {
 
 function snapshotIncludeCandidates(root: string, agent: ControlCenterAgent) {
   if (!agent.folder.name) return [];
-  const folderPath = path.join(root, "..", agent.folder.name);
+  const folderPath = path.join(resolvePrithaAgentParent(root), agent.folder.name);
   const candidates = [
     "AGENTS.md",
     "README.md",
@@ -746,12 +752,17 @@ function snapshotValidationStatus(agent: ControlCenterAgent): ControlCenterAgent
 }
 
 function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = ""): ControlCenterAgent["lifecycle"]["snapshots"] {
-  const profileStore = resolveProfilePath(root, scalarValue(profileFrontmatter, "snapshot_store") || undefined);
+  const stateRoot = resolvePrithaStateRoot(root);
+  const configuredStoreRaw = scalarValue(profileFrontmatter, "snapshot_store");
+  const configuredStore = stateRoot === root
+    ? configuredStoreRaw
+    : configuredStoreRaw?.replace(/^\.snapshots(?:\/|$)/, "snapshots/");
+  const profileStore = resolveProfilePath(stateRoot, configuredStore || undefined);
   const retention = numberValue(profileFrontmatter, "snapshot_retention");
   const candidates = [
     ...(profileStore ? [profileStore] : []),
-    path.join(root, ".snapshots", "child-agents", agentId),
-    path.join(root, ".snapshots", "child-agents", compactKey(agentId)),
+    resolvePrithaStatePath("snapshots", "child-agents", agentId),
+    resolvePrithaStatePath("snapshots", "child-agents", compactKey(agentId)),
   ];
   const store = candidates.find((candidate) => existsSync(candidate));
   if (!store) {
@@ -759,7 +770,7 @@ function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = "
       status: "unavailable",
       count: 0,
       retention,
-      storePath: profileStore ? relativePath(root, profileStore) : undefined,
+      storePath: profileStore ? relativePath(stateRoot, profileStore) : undefined,
       reason: "Snapshot metadata store is not present",
     };
   }
@@ -1373,7 +1384,7 @@ function parseTableLine(line: string) {
 }
 
 function parseRegistry(root: string) {
-  const registryPath = path.join(root, "11_agents", "registry.md");
+  const registryPath = path.join(resolvePrithaAgentMemoryRoot(root), "registry.md");
   if (!existsSync(registryPath)) return { registryPath, records: [] as RegistryRecord[] };
 
   const text = readFileSync(registryPath, "utf8");
@@ -1400,7 +1411,8 @@ function parseRegistry(root: string) {
 }
 
 function siblingFolders(root: string) {
-  const parent = path.dirname(root);
+  const parent = resolvePrithaAgentParent(root);
+  const codeRoot = path.resolve(root);
   try {
     return readdirSync(parent)
       .map((entry) => {
@@ -1409,7 +1421,9 @@ function siblingFolders(root: string) {
       })
       .filter((entry) => {
         try {
-          return statSync(entry.absolutePath).isDirectory() && !entry.name.startsWith(".");
+          if (!statSync(entry.absolutePath).isDirectory() || entry.name.startsWith(".")) return false;
+          if (path.resolve(entry.absolutePath) === codeRoot) return false;
+          return existsSync(path.join(entry.absolutePath, "AGENTS.md"));
         } catch {
           return false;
         }
@@ -1417,6 +1431,25 @@ function siblingFolders(root: string) {
   } catch {
     return [];
   }
+}
+
+function liveRegistryRecords(root: string, records: RegistryRecord[]) {
+  const folders = siblingFolders(root);
+  const folderKeys = new Set(folders.map((folder) => compactKey(folder.name)));
+  const localRecords = records.filter((record) => folderKeys.has(compactKey(record.name)));
+  const recordKeys = new Set(localRecords.map((record) => compactKey(record.name)));
+  const scannedRecords = folders
+    .filter((folder) => !recordKeys.has(compactKey(folder.name)))
+    .map<RegistryRecord>((folder) => ({
+      name: folder.name,
+      mission: "Local sibling child agent",
+      runtime: "local project",
+      interface: "project-defined",
+      deployment: "local",
+      proactivity: "manual",
+      evidence: "local sibling scan",
+    }));
+  return [...localRecords, ...scannedRecords].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function findSiblingFolder(root: string, agentName: string) {
@@ -2167,7 +2200,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
 }
 
 function snapshotsStatus(root: string): CapabilityStatus {
-  return existsSync(path.join(root, ".snapshots", "child-agents")) ? "ready" : "unavailable";
+  return existsSync(resolvePrithaStatePath("snapshots", "child-agents")) ? "ready" : "unavailable";
 }
 
 type VoiceRuntimeStatus = ReturnType<typeof getPrithaRealtimeStatus>;
@@ -2209,7 +2242,7 @@ function capabilities(root: string, registryReady: boolean, agents: ControlCente
 }
 
 function latestReports(root: string) {
-  const reportsDir = path.join(root, "11_agents", "reports");
+  const reportsDir = path.join(resolvePrithaAgentMemoryRoot(root), "reports");
   if (!existsSync(reportsDir)) return [];
   return readdirSync(reportsDir)
     .filter((entry) => entry.endsWith(".md"))
@@ -2218,7 +2251,7 @@ function latestReports(root: string) {
       const stat = statSync(absolutePath);
       return {
         title: entry,
-        path: path.relative(root, absolutePath),
+        path: path.relative(resolvePrithaStateRoot(root), absolutePath),
         updated: stat.mtime.toISOString(),
         type: entry.includes("self-test")
           ? "self_test"
@@ -2238,11 +2271,12 @@ function latestReports(root: string) {
 export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
   const root = resolveTechscopeRoot();
   const registry = parseRegistry(root);
+  const records = liveRegistryRecords(root, registry.records);
   const access = accessLinks();
-  const allAgents = await Promise.all(registry.records.map((record) => buildAgent(root, record, access)));
+  const allAgents = await Promise.all(records.map((record) => buildAgent(root, record, access)));
   const childAgents = allAgents.filter((agent) => agent.name !== "Techscope" && agent.name !== "Pritha");
   const voiceRuntime = getPrithaRealtimeStatus();
-  const caps = capabilities(root, registry.records.length > 0, childAgents, voiceRuntime);
+  const caps = capabilities(root, records.length > 0, childAgents, voiceRuntime);
   const selfTest = selfTestStatus(root);
   const launchdWarnings = launchdRootWarnings(root);
   const warnings = [
@@ -3622,7 +3656,11 @@ function snapshotRemovalPath(metadataPath: string) {
 
 function retentionCandidates(status: ControlCenterStatus, agent: ControlCenterAgent) {
   const snapshots = snapshotItems(agent);
-  const storeAbsolutePath = agent.lifecycle.snapshots.storePath ? resolveRelativePath(status.root, agent.lifecycle.snapshots.storePath) : null;
+  const snapshotStateRoot = resolvePrithaStateRoot(status.root);
+  const snapshotStorePath = snapshotStateRoot === status.root
+    ? agent.lifecycle.snapshots.storePath
+    : agent.lifecycle.snapshots.storePath?.replace(/^\.snapshots(?:\/|$)/, "snapshots/");
+  const storeAbsolutePath = snapshotStorePath ? resolveRelativePath(snapshotStateRoot, snapshotStorePath) : null;
   const retention = agent.lifecycle.snapshots.retention;
   const configured = typeof retention === "number" && retention >= 0;
   const overflow = configured ? Math.max(0, snapshots.length - retention) : 0;
@@ -4059,9 +4097,10 @@ export async function getAgentPreRestoreContract(agentId: string, snapshotId?: s
 }
 
 function moduleList(status: ControlCenterStatus): ControlCenterDiagnostics["modules"] {
+  const stateRoot = resolvePrithaStateRoot(status.root);
   return [
     { id: "harness", label: "Harness", status: "ready" },
-    { id: "memory", label: "Memory", status: existsSync(path.join(status.root, ".memory")) ? "ready" : "unavailable" },
+    { id: "memory", label: "Memory", status: existsSync(resolvePrithaStatePath("memory")) ? "ready" : "unavailable" },
     { id: "tools", label: "Tools", status: existsSync(path.join(status.root, "tools", "manifest.json")) ? "ready" : "unavailable" },
     { id: "interfaces", label: "Interfaces", status: "ready" },
     { id: "operations", label: "Operations", status: existsSync(path.join(status.root, "operations", "manifest.json")) ? "ready" : "unavailable" },
@@ -4095,6 +4134,7 @@ function agentToFolderRow(agent: ControlCenterAgent): ControlCenterDiagnostics["
 
 export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagnostics> {
   const status = await getControlCenterStatus();
+  const stateRoot = resolvePrithaStateRoot(status.root);
   const voiceRuntime = getPrithaRealtimeStatus();
   const reports = status.latestReports.map((report) => ({
     path: report.path,
@@ -4118,7 +4158,7 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
       platform: `${os.type()} ${os.release()} (${os.arch()})`,
       node: process.version,
       appPort: APP_PORT,
-      dataPath: ".pritha/data",
+      dataPath: stateRoot,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       git: "unavailable",
     },
@@ -4129,7 +4169,7 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
       lastSession: "unknown",
     },
     memoryIndex: {
-      status: existsSync(path.join(status.root, ".memory", "techscope.sqlite")) ? "up_to_date" : "unknown",
+      status: existsSync(resolvePrithaStatePath("memory", "techscope.sqlite")) ? "up_to_date" : "unknown",
       documents: status.selfTest.memoryStats.documents,
       chunks: status.selfTest.memoryStats.chunks,
       lastUpdated: status.selfTest.createdAt ? status.selfTest.ageLabel : "unknown",

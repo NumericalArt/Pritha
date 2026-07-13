@@ -1,9 +1,10 @@
 import { mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
+import { resolvePrithaStatePath } from "../../lib/paths.mjs";
 
 export function createArtifactPaths(root, id, originalExtension = ".bin") {
   const safeExt = originalExtension && originalExtension.startsWith(".") ? originalExtension : `.${originalExtension || "bin"}`;
-  const dir = path.join(root, ".queue", "media-processing", id);
+  const dir = resolvePrithaStatePath("queue", "media-processing", id);
   mkdirSync(dir, { recursive: true });
   return {
     dir,

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
 
 export type MusicRuntimeConfig = {
   root: string;
@@ -32,20 +33,7 @@ export type MusicRuntimeConfig = {
 let envLoaded = false;
 
 export function resolvePrithaRoot() {
-  if (process.env.TECHSCOPE_ROOT) {
-    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
-    if (existsSync(envRoot)) return envRoot;
-  }
-
-  let cursor = process.cwd();
-  for (let i = 0; i < 8; i += 1) {
-    if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "11_agents"))) return cursor;
-    const next = path.dirname(cursor);
-    if (next === cursor) break;
-    cursor = next;
-  }
-
-  return process.cwd();
+  return resolveTechscopeRoot();
 }
 
 function loadEnvFile(filePath: string) {
@@ -70,6 +58,9 @@ export function loadMusicRuntimeEnv() {
   loadEnvFile(path.join(root, ".env.local"));
   loadEnvFile(path.join(process.cwd(), ".env"));
   loadEnvFile(path.join(process.cwd(), ".env.local"));
+  if (process.env.PRITHA_STATE_ROOT) {
+    loadEnvFile(path.join(resolvePrithaStateRoot(root), "config", "runtime.env"));
+  }
   const extraEnvFile = process.env.PRITHA_CONTROL_CENTER_ENV_FILE;
   if (extraEnvFile) loadEnvFile(path.resolve(extraEnvFile));
 }
@@ -101,7 +92,7 @@ function audioFormat(value: string): MusicRuntimeConfig["audioFormat"] {
 
 export function getMusicRuntimeConfig(): MusicRuntimeConfig {
   const root = resolvePrithaRoot();
-  const storageRoot = path.join(root, ".private", "interface-lab", "pritha-control-center", "music");
+  const storageRoot = resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "music");
   const maxDurationSec = numberEnv("ACE_STEP_MAX_DURATION_SEC", 120, 30, 120);
   const defaultStyle = musicEnv("MUSIC_DEFAULT_STYLE", "calm organ ambient instrumental background music");
 

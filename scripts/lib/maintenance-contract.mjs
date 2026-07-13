@@ -44,8 +44,8 @@ export const MAINTENANCE_ACTIONS = [
     mutates: true,
     status: "manual_only",
     summary: "Rescans sibling child-agent folders and rebuilds Pritha's agent registry.",
-    safety: "Writes only the tracked registry artifact produced by the existing agents-mother registry builder.",
-    writes: ["11_agents/registry.md"],
+    safety: "Writes only the current instance's local registry under PRITHA_STATE_ROOT.",
+    writes: ["agents/registry.md"],
   },
   {
     id: "refresh-self-knowledge",
@@ -56,8 +56,8 @@ export const MAINTENANCE_ACTIONS = [
     mutates: true,
     status: "manual_only",
     summary: "Writes a draft review describing Pritha's current local maintenance surface and cron placeholders.",
-    safety: "Creates a new draft artifact only; it does not edit standards or decisions automatically.",
-    writes: ["03_reviews/YYYY-MM-DD-pritha-self-knowledge-refresh*.md"],
+    safety: "Creates a local draft report only; it does not edit shared standards or decisions automatically.",
+    writes: ["agents/reports/YYYY-MM-DD-pritha-self-knowledge-refresh*.md"],
   },
   {
     id: "github-knowledge-radar",

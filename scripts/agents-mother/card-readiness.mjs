@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
 
 function controlCenterSlug(value) {
   return String(value || "")
@@ -25,7 +25,7 @@ function parseTableLine(line) {
 }
 
 function parseRegistry(root) {
-  const registryPath = path.join(root, "11_agents", "registry.md");
+  const registryPath = path.join(resolvePrithaAgentMemoryRoot({ root }), "registry.md");
   if (!existsSync(registryPath)) return { registryPath, records: [] };
 
   const lines = readFileSync(registryPath, "utf8").split(/\r?\n/);
@@ -76,10 +76,10 @@ function evidenceMatches(filePath, keys) {
 function evidencePaths(root, target, record) {
   const keys = [...new Set([target, record?.name].filter(Boolean).map(comparableKey))];
   return {
-    contracts: listMarkdownFiles(path.join(root, "11_agents", "contracts"))
+    contracts: listMarkdownFiles(path.join(resolvePrithaAgentMemoryRoot({ root }), "contracts"))
       .filter((filePath) => evidenceMatches(filePath, keys))
       .map((filePath) => path.relative(root, filePath)),
-    reports: listMarkdownFiles(path.join(root, "11_agents", "reports"))
+    reports: listMarkdownFiles(path.join(resolvePrithaAgentMemoryRoot({ root }), "reports"))
       .filter((filePath) => evidenceMatches(filePath, keys))
       .map((filePath) => path.relative(root, filePath)),
   };
@@ -182,7 +182,7 @@ function normalizedActionPlanStatus(plan) {
 
 async function liveControlCenterCard(params) {
   if (params.baseUrl === false) return { visible: "unknown", reason: "live Control Center check disabled" };
-  const baseUrl = String(params.baseUrl || `http://127.0.0.1:${process.env.PRITHA_CONTROL_CENTER_PORT || 4420}`).replace(/\/$/, "");
+  const baseUrl = String(params.baseUrl || `http://127.0.0.1:${process.env.PRITHA_CONTROL_CENTER_PORT || 3420}`).replace(/\/$/, "");
   const agentsResponse = await fetchJson(`${baseUrl}/api/agents`, params.timeoutMs);
   if (!agentsResponse.ok) {
     return { visible: "unknown", reason: `Control Center unavailable at ${baseUrl}`, baseUrl };
@@ -229,7 +229,7 @@ export async function checkCardReadiness(target, options = {}) {
   const nextActions = [];
 
   if (!record) {
-    blockers.push("Agent is missing from 11_agents/registry.md; rebuild the registry after scaffold.");
+    blockers.push("Agent is missing from the current instance registry; rebuild the registry after scaffold.");
     nextActions.push("Run `node scripts/pritha.mjs registry` after contract/scaffold artifacts exist.");
   }
   if (!folder) {

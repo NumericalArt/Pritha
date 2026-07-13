@@ -1,0 +1,519 @@
+#!/usr/bin/env node
+
+import { createHash } from "node:crypto";
+import { spawn, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  closeSync,
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
+import process from "node:process";
+import {
+  PRITHA_STATE_LAYOUT,
+  prithaInstanceConfig,
+  resolvePrithaStatePath,
+} from "./lib/paths.mjs";
+
+function parseArgs(argv) {
+  const options = { _: [] };
+  for (let index = 0; index < argv.length; index += 1) {
+    const value = argv[index];
+    if (!value.startsWith("--")) {
+      options._.push(value);
+      continue;
+    }
+    const [rawKey, inline] = value.slice(2).split("=", 2);
+    if (inline !== undefined) options[rawKey] = inline;
+    else if (argv[index + 1] && !argv[index + 1].startsWith("--")) options[rawKey] = argv[++index];
+    else options[rawKey] = true;
+  }
+  return options;
+}
+
+const options = parseArgs(process.argv.slice(2));
+if (options.root) process.env.TECHSCOPE_ROOT = path.resolve(String(options.root));
+
+function loadEnvFile(filePath) {
+  if (!filePath || !existsSync(filePath)) return false;
+  for (const line of readFileSync(filePath, "utf8").split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!match) continue;
+    const value = match[2].trim().replace(/^["']|["']$/g, "");
+    if (process.env[match[1]] === undefined) process.env[match[1]] = value;
+  }
+  return true;
+}
+
+loadEnvFile(String(options.env || process.env.PRITHA_CONTROL_CENTER_ENV_FILE || ""));
+if (process.env.PRITHA_STATE_ROOT) {
+  loadEnvFile(path.join(path.resolve(process.env.PRITHA_STATE_ROOT), "config", "runtime.env"));
+}
+
+const config = prithaInstanceConfig({
+  root: process.env.TECHSCOPE_ROOT,
+  stateRoot: options["state-root"],
+  agentParent: options["agent-parent"],
+  instanceId: options["instance-id"],
+  instanceRole: options.role,
+  controlCenterPort: options.port,
+});
+process.env.TECHSCOPE_ROOT = config.codeRoot;
+process.env.PRITHA_STATE_ROOT = config.stateRoot;
+process.env.PRITHA_AGENT_PARENT = config.agentParent;
+process.env.PRITHA_INSTANCE_ID = config.instanceId;
+process.env.PRITHA_INSTANCE_ROLE = config.instanceRole;
+process.env.PRITHA_CONTROL_CENTER_PORT = String(config.controlCenterPort);
+
+function run(command, args, runOptions = {}) {
+  const result = spawnSync(command, args, {
+    cwd: runOptions.cwd || config.codeRoot,
+    env: { ...process.env, ...(runOptions.env || {}) },
+    encoding: "utf8",
+    stdio: runOptions.stdio || ["ignore", "pipe", "pipe"],
+    timeout: runOptions.timeoutMs || 120_000,
+    maxBuffer: 50 * 1024 * 1024,
+  });
+  return {
+    ok: result.status === 0,
+    status: result.status ?? 1,
+    stdout: String(result.stdout || "").trim(),
+    stderr: String(result.stderr || "").trim(),
+  };
+}
+
+function git(args, runOptions = {}) {
+  return run("git", args, runOptions);
+}
+
+function sha256(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function walkFiles(directory) {
+  if (!existsSync(directory)) return [];
+  const stat = statSync(directory);
+  if (stat.isFile()) return [directory];
+  return readdirSync(directory).flatMap((entry) => walkFiles(path.join(directory, entry)));
+}
+
+function childAgentFolders() {
+  if (!existsSync(config.agentParent)) return [];
+  return readdirSync(config.agentParent)
+    .map((name) => ({ name, directory: path.join(config.agentParent, name) }))
+    .filter((entry) => path.resolve(entry.directory) !== path.resolve(config.codeRoot))
+    .filter((entry) => {
+      try {
+        return statSync(entry.directory).isDirectory() && existsSync(path.join(entry.directory, "AGENTS.md"));
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function memoryDocuments() {
+  const database = resolvePrithaStatePath("memory", "techscope.sqlite");
+  if (!existsSync(database)) return null;
+  const result = run("sqlite3", [database, "SELECT COUNT(*) FROM documents;"], { timeoutMs: 10_000 });
+  return result.ok ? Number(result.stdout || 0) : null;
+}
+
+async function httpStatus() {
+  try {
+    const response = await fetch(`http://127.0.0.1:${config.controlCenterPort}/api/health`, {
+      signal: AbortSignal.timeout(2_000),
+      cache: "no-store",
+    });
+    return { ok: response.ok, status: response.status };
+  } catch (error) {
+    return { ok: false, status: 0, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function instanceStatus() {
+  const head = git(["rev-parse", "HEAD"]);
+  const branch = git(["branch", "--show-current"]);
+  const dirty = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+  const origin = git(["rev-parse", "origin/main"]);
+  return {
+    schema: "pritha-instance-status-v1",
+    ok: head.ok,
+    instance: {
+      id: config.instanceId,
+      role: config.instanceRole,
+      code_root: config.codeRoot,
+      state_root: config.stateRoot,
+      agent_parent: config.agentParent,
+      control_center_port: config.controlCenterPort,
+    },
+    git: {
+      branch: branch.stdout,
+      head: head.stdout,
+      origin_main: origin.stdout || null,
+      clean: !dirty.stdout,
+      dirty: dirty.stdout ? dirty.stdout.split(/\r?\n/).filter(Boolean) : [],
+      matches_origin_main: Boolean(head.stdout && origin.stdout && head.stdout === origin.stdout),
+    },
+    runtime: {
+      health: await httpStatus(),
+      memory_documents: memoryDocuments(),
+      state_exists: existsSync(config.stateRoot),
+    },
+    child_agents: childAgentFolders().map((entry) => ({ name: entry.name, directory: entry.directory })),
+  };
+}
+
+function migrationOperations() {
+  const operations = [];
+  const add = (source, destination, kind = "state") => {
+    if (existsSync(source)) operations.push({ source, destination, kind });
+  };
+  add(path.join(config.codeRoot, ".private"), path.join(config.stateRoot, "private"));
+  add(path.join(config.codeRoot, ".queue"), path.join(config.stateRoot, "queue"));
+  add(path.join(config.codeRoot, ".logs"), path.join(config.stateRoot, "logs"));
+  add(path.join(config.codeRoot, ".memory-private"), path.join(config.stateRoot, "private", "memory-private"));
+  add(path.join(config.codeRoot, ".memory", "techscope.sqlite"), path.join(config.stateRoot, "memory", "techscope.sqlite"));
+  add(path.join(config.codeRoot, ".memory", "last-self-test.json"), path.join(config.stateRoot, "memory", "last-self-test.json"));
+  add(path.join(config.codeRoot, ".techscope-setup.json"), path.join(config.stateRoot, "setup", "setup.json"));
+  add(path.join(config.codeRoot, ".snapshots", "audit"), path.join(config.stateRoot, "audit"));
+  add(path.join(config.codeRoot, ".snapshots", "child-agents"), path.join(config.stateRoot, "snapshots", "child-agents"));
+
+  const reviewDir = path.join(config.codeRoot, "03_reviews");
+  if (existsSync(reviewDir)) {
+    for (const file of readdirSync(reviewDir).filter((name) => name.endsWith("-voice-session-memory.md"))) {
+      add(path.join(reviewDir, file), path.join(config.stateRoot, "voice-drafts", file), "voice-draft");
+    }
+  }
+
+  const names = childAgentFolders().map((entry) => entry.name.toLowerCase().replace(/[^a-z0-9]+/g, ""));
+  for (const section of ["contracts", "profiles", "reports", "research"]) {
+    const sourceDir = path.join(config.codeRoot, "11_agents", section);
+    if (!existsSync(sourceDir)) continue;
+    for (const file of readdirSync(sourceDir)) {
+      const compact = file.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      if (names.some((name) => name && compact.includes(name))) {
+        add(path.join(sourceDir, file), path.join(config.stateRoot, "agents", section, file), "agent-artifact");
+      }
+    }
+  }
+  return operations;
+}
+
+function copyOperation(operation) {
+  mkdirSync(path.dirname(operation.destination), { recursive: true });
+  if (statSync(operation.source).isDirectory()) {
+    cpSync(operation.source, operation.destination, { recursive: true, force: true, preserveTimestamps: true });
+  } else {
+    copyFileSync(operation.source, operation.destination);
+  }
+}
+
+function envAssignments(text) {
+  const entries = new Map();
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (match) entries.set(match[1], match[2]);
+  }
+  return entries;
+}
+
+function writeRuntimeEnv() {
+  const sourceEnv = path.join(config.codeRoot, ".env.local");
+  const target = path.join(config.stateRoot, "config", "runtime.env");
+  const sourceText = existsSync(sourceEnv) ? readFileSync(sourceEnv, "utf8") : existsSync(target) ? readFileSync(target, "utf8") : "";
+  const entries = envAssignments(sourceText);
+  entries.set("TECHSCOPE_ROOT", JSON.stringify(config.codeRoot));
+  entries.set("PRITHA_INSTANCE_ID", JSON.stringify(config.instanceId));
+  entries.set("PRITHA_INSTANCE_ROLE", JSON.stringify(config.instanceRole));
+  entries.set("PRITHA_STATE_ROOT", JSON.stringify(config.stateRoot));
+  entries.set("PRITHA_AGENT_PARENT", JSON.stringify(config.agentParent));
+  entries.set("PRITHA_CONTROL_CENTER_PORT", String(config.controlCenterPort));
+  const searchUrl = process.env.PRITHA_SEARXNG_URL || entries.get("PRITHA_SEARXNG_URL");
+  if (searchUrl) entries.set("PRITHA_SEARXNG_URL", searchUrl);
+  entries.set("PRITHA_CONTROL_CENTER_ENV_FILE", JSON.stringify(target));
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, `${[...entries].map(([key, value]) => `${key}=${value}`).join("\n")}\n`, { encoding: "utf8", mode: 0o600 });
+  chmodSync(target, 0o600);
+  return target;
+}
+
+function parseSharedRegistry() {
+  const registry = path.join(config.codeRoot, "11_agents", "registry.md");
+  if (!existsSync(registry)) return [];
+  const lines = readFileSync(registry, "utf8").split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === "## Agents");
+  if (start < 0) return [];
+  return lines.slice(start + 1)
+    .filter((line) => line.trim().startsWith("|"))
+    .slice(2)
+    .map((line) => line.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()))
+    .filter((cells) => cells.length >= 7);
+}
+
+function writeLocalRegistry() {
+  const folders = childAgentFolders();
+  const shared = parseSharedRegistry();
+  const rows = folders.map((folder) => {
+    const key = folder.name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const row = shared.find((cells) => cells[0].toLowerCase().replace(/[^a-z0-9]+/g, "") === key);
+    return row || [folder.name, "Local sibling child agent", "local project", "project-defined", "local", "manual", "local sibling scan"];
+  });
+  const registryPath = path.join(config.stateRoot, "agents", "registry.md");
+  mkdirSync(path.dirname(registryPath), { recursive: true });
+  const date = new Date().toISOString().slice(0, 10);
+  const markdown = [
+    "---",
+    `id: ${config.instanceId}-local-agent-registry`,
+    "type: agent-registry",
+    "status: local",
+    `created: ${date}`,
+    `updated: ${date}`,
+    "topics:",
+    "  - child-agents",
+    "  - instance-isolation",
+    "tools: []",
+    "sources: []",
+    "related: {}",
+    "privacy: local-private",
+    "retention: indefinite",
+    "review_status: local",
+    "confidence: high",
+    "---",
+    "",
+    `# Local Agent Registry: ${config.instanceId}`,
+    "",
+    "## Agents",
+    "",
+    "| Agent | Mission | Runtime | Interface | Deployment | Proactivity | Evidence |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${row.slice(0, 7).join(" | ")} |`),
+    "",
+  ].join("\n");
+  writeFileSync(registryPath, markdown, "utf8");
+  return registryPath;
+}
+
+function migrationPlan() {
+  const operations = migrationOperations();
+  return {
+    schema: "pritha-instance-migration-plan-v1",
+    ok: true,
+    mode: options.apply ? "apply" : "plan",
+    instance: config,
+    writes: options.apply ? operations.length + 3 : 0,
+    operations,
+    retains_sources: true,
+  };
+}
+
+async function migrate() {
+  const plan = migrationPlan();
+  if (!options.apply) return plan;
+  if (!options.yes) throw new Error("migrate --apply requires --yes");
+  if (config.stateRoot === config.codeRoot) throw new Error("PRITHA_STATE_ROOT must be outside the checkout for migration");
+  for (const directory of Object.values(PRITHA_STATE_LAYOUT)) mkdirSync(path.join(config.stateRoot, directory), { recursive: true });
+  for (const operation of plan.operations) copyOperation(operation);
+  const runtimeEnv = writeRuntimeEnv();
+  const registry = writeLocalRegistry();
+  const checksums = plan.operations.flatMap((operation) => walkFiles(operation.destination))
+    .filter((file) => path.resolve(file) !== path.resolve(runtimeEnv))
+    .map((file) => ({ path: path.relative(config.stateRoot, file), sha256: sha256(file), bytes: statSync(file).size }));
+  const inventory = await instanceStatus();
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const manifestPath = path.join(config.stateRoot, "releases", `migration-${stamp}.json`);
+  writeFileSync(manifestPath, `${JSON.stringify({
+    schema: "pritha-instance-migration-result-v1",
+    created_at: new Date().toISOString(),
+    instance: config,
+    runtime_env: path.relative(config.stateRoot, runtimeEnv),
+    registry: path.relative(config.stateRoot, registry),
+    checksums,
+    inventory,
+    sources_retained: true,
+  }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  return { ...plan, applied: true, runtime_env: runtimeEnv, registry, manifest: manifestPath, checksums: checksums.length };
+}
+
+function portPids(port) {
+  const result = run("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], { timeoutMs: 10_000 });
+  return result.stdout.split(/\s+/).map(Number).filter((pid) => Number.isFinite(pid) && pid > 1);
+}
+
+async function stopPort(port) {
+  const pids = portPids(port);
+  for (const pid of pids) {
+    try { process.kill(pid, "SIGTERM"); } catch { /* already stopped */ }
+  }
+  for (let attempt = 0; attempt < 20 && portPids(port).length; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  for (const pid of portPids(port)) {
+    try { process.kill(pid, "SIGKILL"); } catch { /* already stopped */ }
+  }
+  return pids;
+}
+
+function startControlCenter() {
+  const logDir = resolvePrithaStatePath("logs");
+  mkdirSync(logDir, { recursive: true });
+  const stdout = openSync(path.join(logDir, "control-center.stdout.log"), "a");
+  const stderr = openSync(path.join(logDir, "control-center.stderr.log"), "a");
+  const child = spawn("npm", ["--prefix", "interfaces/control-center", "run", "start"], {
+    cwd: config.codeRoot,
+    env: { ...process.env },
+    detached: true,
+    stdio: ["ignore", stdout, stderr],
+  });
+  child.unref();
+  closeSync(stdout);
+  closeSync(stderr);
+  return child.pid;
+}
+
+async function waitForHealth(timeoutMs = 45_000) {
+  const started = Date.now();
+  let last = null;
+  while (Date.now() - started < timeoutMs) {
+    last = await httpStatus();
+    if (last.ok) return last;
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+  return last || { ok: false, status: 0, error: "health_timeout" };
+}
+
+function copyNext(source, destination) {
+  if (!existsSync(source)) return false;
+  rmSync(destination, { recursive: true, force: true });
+  cpSync(source, destination, { recursive: true, force: true, preserveTimestamps: true });
+  return true;
+}
+
+async function updateInstance() {
+  const status = await instanceStatus();
+  const remote = git(["ls-remote", "origin", "refs/heads/main"], { timeoutMs: 30_000 });
+  const remoteCommit = remote.stdout.split(/\s+/)[0] || null;
+  const plan = {
+    schema: "pritha-instance-update-plan-v1",
+    ok: status.git.clean && status.git.branch === "main" && Boolean(remoteCommit),
+    mode: options.apply ? "apply" : "plan",
+    instance: config,
+    current: status.git.head,
+    target: remoteCommit,
+    branch: status.git.branch,
+    clean: status.git.clean,
+    steps: ["fetch origin main", "fast-forward only", "save previous .next", "build", "stop only configured port", "start", "healthcheck", "rollback .next on failure"],
+  };
+  if (!options.apply) return plan;
+  if (!options.yes) throw new Error("update --apply requires --yes");
+  if (!status.git.clean) throw new Error("Refusing update: checkout has uncommitted or untracked changes");
+  if (status.git.branch !== "main") throw new Error(`Refusing update: expected branch main, got ${status.git.branch || "detached"}`);
+  const fetch = git(["fetch", "origin", "main"], { timeoutMs: 120_000 });
+  if (!fetch.ok) throw new Error(fetch.stderr || "git fetch failed");
+  const target = git(["rev-parse", "origin/main"]).stdout;
+  const ancestor = git(["merge-base", "--is-ancestor", status.git.head, target]);
+  if (!ancestor.ok) throw new Error("Refusing update: local main diverged or cannot fast-forward to origin/main");
+  const ff = git(["merge", "--ff-only", "origin/main"], { timeoutMs: 120_000 });
+  if (!ff.ok) throw new Error(ff.stderr || "fast-forward failed");
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const releaseDir = resolvePrithaStatePath("releases", stamp);
+  mkdirSync(releaseDir, { recursive: true });
+  const liveNext = path.join(config.codeRoot, "interfaces", "control-center", ".next");
+  const previousNext = path.join(releaseDir, "previous.next");
+  const hadPreviousBuild = copyNext(liveNext, previousNext);
+  const build = run("npm", ["--prefix", "interfaces/control-center", "run", "build"], { timeoutMs: 900_000 });
+  const release = {
+    schema: "pritha-instance-release-v1",
+    created_at: new Date().toISOString(),
+    instance: config.instanceId,
+    previous_commit: status.git.head,
+    target_commit: target,
+    had_previous_build: hadPreviousBuild,
+    build: { ok: build.ok, status: build.status, stderr: build.stderr.slice(-4_000) },
+  };
+  const manifest = path.join(releaseDir, "release.json");
+  if (!build.ok) {
+    if (hadPreviousBuild) copyNext(previousNext, liveNext);
+    writeFileSync(manifest, `${JSON.stringify({ ...release, status: "build-failed-running-previous-release" }, null, 2)}\n`);
+    return { ...plan, ok: false, applied: true, status: "build-failed", manifest };
+  }
+
+  const stopped = await stopPort(config.controlCenterPort);
+  const pid = startControlCenter();
+  const healthTimeout = Number(process.env.PRITHA_UPDATE_HEALTH_TIMEOUT_MS || 45_000);
+  const rollbackHealthTimeout = Number(process.env.PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS || 30_000);
+  const health = await waitForHealth(healthTimeout);
+  if (!health.ok) {
+    await stopPort(config.controlCenterPort);
+    if (hadPreviousBuild) copyNext(previousNext, liveNext);
+    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
+    writeFileSync(manifest, `${JSON.stringify({ ...release, status: "health-failed-rolled-back", stopped, failed_pid: pid, health, rollback_pid: rollbackPid, rollback_health: rollbackHealth }, null, 2)}\n`);
+    return {
+      ...plan,
+      ok: false,
+      applied: true,
+      status: "health-failed-rolled-back",
+      health,
+      rollbackPid,
+      rollbackHealth,
+      manifest,
+    };
+  }
+  writeFileSync(manifest, `${JSON.stringify({ ...release, status: "deployed", stopped, pid, health }, null, 2)}\n`);
+  return { ...plan, ok: true, applied: true, status: "deployed", stopped, pid, health, manifest };
+}
+
+function print(payload) {
+  if (options.json) console.log(JSON.stringify(payload, null, 2));
+  else {
+    console.log(`Pritha instance ${config.instanceId}: ${payload.status || payload.mode || (payload.ok ? "ok" : "attention")}`);
+    console.log(`Code: ${config.codeRoot}`);
+    console.log(`State: ${config.stateRoot}`);
+    if (payload.manifest) console.log(`Manifest: ${payload.manifest}`);
+    if (payload.operations) console.log(`Planned copies: ${payload.operations.length}`);
+  }
+}
+
+function usage() {
+  console.log(`Usage:
+  node scripts/pritha-instance.mjs status [--json]
+  node scripts/pritha-instance.mjs migrate --plan [--json]
+  node scripts/pritha-instance.mjs migrate --apply --yes [--json]
+  node scripts/pritha-instance.mjs update --plan [--json]
+  node scripts/pritha-instance.mjs update --apply --yes [--json]
+
+Environment: TECHSCOPE_ROOT, PRITHA_INSTANCE_ID, PRITHA_INSTANCE_ROLE,
+PRITHA_STATE_ROOT, PRITHA_AGENT_PARENT, PRITHA_CONTROL_CENTER_PORT,
+PRITHA_CONTROL_CENTER_ENV_FILE and PRITHA_SEARXNG_URL.`);
+}
+
+try {
+  const command = options._[0] || "status";
+  let result;
+  if (command === "status") result = await instanceStatus();
+  else if (command === "migrate") result = await migrate();
+  else if (command === "update") result = await updateInstance();
+  else {
+    usage();
+    process.exitCode = command === "help" ? 0 : 1;
+    process.exit();
+  }
+  print(result);
+  if (result.ok === false) process.exitCode = 1;
+} catch (error) {
+  const payload = { schema: "pritha-instance-error-v1", ok: false, error: error instanceof Error ? error.message : String(error) };
+  if (options.json) console.log(JSON.stringify(payload, null, 2));
+  else console.error(`Pritha instance error: ${payload.error}`);
+  process.exitCode = 1;
+}

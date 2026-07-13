@@ -76,7 +76,7 @@ export async function getMusicHealth() {
       apiKeyConfigured: Boolean(config.aceStepApiKey),
     },
     cache: {
-      storageRoot: ".private/interface-lab/pritha-control-center/music",
+      storageRoot: "private/interface-lab/pritha-control-center/music",
       maxTracks: config.cacheMaxTracks,
       maxBytes: config.cacheMaxBytes,
     },
@@ -87,7 +87,7 @@ export async function getMusicHealth() {
         metadataTtlMs: config.somaFmMetadataTtlMs,
       },
       library: {
-        root: ".private/interface-lab/pritha-control-center/music/library",
+        root: "private/interface-lab/pritha-control-center/music/library",
       },
     },
   };

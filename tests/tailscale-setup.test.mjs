@@ -54,13 +54,13 @@ if (args[0] === "status" && args[1] === "--json") {
   process.exit(0);
 }
 if (args[0] === "serve" && args[1] === "status" && args[2] === "--json") {
-  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:4420";
-  console.log(JSON.stringify({ Web: { "test-host.example.invalid:4420": { Handlers: { "/": { Proxy: upstream } } } } }));
+  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:3420";
+  console.log(JSON.stringify({ Web: { "test-host.example.invalid:3420": { Handlers: { "/": { Proxy: upstream } } } } }));
   process.exit(0);
 }
 if (args[0] === "serve" && args[1] === "status") {
-  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:4420";
-  console.log("https://test-host.example.invalid:4420 (tailnet only)\\n|-- " + upstream);
+  const upstream = process.env.FAKE_TAILSCALE_UPSTREAM || "http://127.0.0.1:3420";
+  console.log("https://test-host.example.invalid:3420 (tailnet only)\\n|-- " + upstream);
   process.exit(0);
 }
 if (args[0] === "serve") {
@@ -105,7 +105,7 @@ test("tailscale setup plan is safe when Tailscale is missing", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-missing-"));
   try {
     const missingBin = path.join(dir, "missing-tailscale");
-    const result = runTailscaleSetup(["plan", "--app", "control-center", "--port", "4420", "--json"], {
+    const result = runTailscaleSetup(["plan", "--app", "control-center", "--port", "3420", "--json"], {
       PRITHA_TAILSCALE_BIN: missingBin,
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -123,7 +123,7 @@ test("tailscale setup status exposes readiness fields", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-status-"));
   try {
     const fakeBin = writeFakeTailscale(dir);
-    const result = runTailscaleSetup(["status", "--app", "control-center", "--port", "4420", "--json"], {
+    const result = runTailscaleSetup(["status", "--app", "control-center", "--port", "3420", "--json"], {
       PRITHA_TAILSCALE_BIN: fakeBin,
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -131,7 +131,7 @@ test("tailscale setup status exposes readiness fields", () => {
     assert.equal(payload.status.installed, true);
     assert.equal(payload.status.authenticated, true);
     assert.equal(payload.status.serve_configured, true);
-    assert.equal(payload.status.tailscale_url, "https://test-host.example.invalid:4420");
+    assert.equal(payload.status.tailscale_url, "https://test-host.example.invalid:3420");
     assert.equal(payload.status.peer_access_not_tested, true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -175,7 +175,7 @@ test("tailscale setup detects the live Control Center port for the current root"
 });
 
 test("tailscale setup serve requires explicit --yes", () => {
-  const result = runTailscaleSetup(["serve", "--app", "control-center", "--port", "4420", "--json"]);
+  const result = runTailscaleSetup(["serve", "--app", "control-center", "--port", "3420", "--json"]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /requires --yes/);
 });

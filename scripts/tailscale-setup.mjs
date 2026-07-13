@@ -6,10 +6,11 @@ import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot({ cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") });
-const DEFAULT_STATE_PATH = path.join(ROOT, ".techscope-setup.json");
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
+const DEFAULT_STATE_PATH = STATE_ROOT === ROOT ? path.join(ROOT, ".techscope-setup.json") : path.join(STATE_ROOT, "setup", "setup.json");
 const INSTALL_URL = "https://tailscale.com/download/mac";
 const DOCS = {
   macInstall: "https://tailscale.com/docs/install/mac",
@@ -100,7 +101,7 @@ function candidateControlCenterPorts() {
     if (url) add(url.port);
   }
   add(3420);
-  add(4420);
+  add(3420);
   add(5420);
   return ports;
 }
@@ -142,7 +143,7 @@ async function detectedControlCenterPortForRoot() {
 async function appConfig(options = {}) {
   const app = String(options.app || "control-center").trim() || "control-center";
   const explicitPort = options.port !== undefined && options.port !== true && String(options.port).trim() !== "";
-  let port = Number(options.port || (app === "control-center" ? process.env.PRITHA_CONTROL_CENTER_PORT || 4420 : 4000));
+  let port = Number(options.port || (app === "control-center" ? process.env.PRITHA_CONTROL_CENTER_PORT || 3420 : 3000));
   if (!explicitPort && app === "control-center" && !process.env.PRITHA_CONTROL_CENTER_PORT) {
     port = (await detectedControlCenterPortForRoot()) || port;
   }

@@ -6,7 +6,7 @@ import { stdin as input, stdout as output } from "node:process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData, yamlList } from "../lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { printIssues } from "./contract.mjs";
@@ -36,11 +36,12 @@ import {
 import { auditProjectSkills, printSkillSelection, printSkillsStatus, selectSkillsForContract, skillRowForManifest } from "./skills.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const CONTRACT_DIR = path.join(ROOT, "11_agents", "contracts");
-const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
-const RESEARCH_DIR = path.join(ROOT, "11_agents", "research");
-const REGISTRY_PATH = path.join(ROOT, "11_agents", "registry.md");
-const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
+const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
+const CONTRACT_DIR = path.join(AGENT_MEMORY_ROOT, "contracts");
+const REPORT_DIR = path.join(AGENT_MEMORY_ROOT, "reports");
+const RESEARCH_DIR = path.join(AGENT_MEMORY_ROOT, "research");
+const REGISTRY_PATH = path.join(AGENT_MEMORY_ROOT, "registry.md");
+const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
 
 const RUNTIME_FAMILIES = new Set(["codex-native", "cli", "api", "local-model", "hybrid", "environment-specific"]);
 const TELEGRAM_MODES = new Set(["none", "primary-chat", "intake-channel", "notifications-only", "operator-control"]);

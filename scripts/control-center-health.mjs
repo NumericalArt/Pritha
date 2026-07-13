@@ -37,7 +37,7 @@ function asArray(value) {
 function normalizeBaseUrl(options) {
   if (options["base-url"]) return String(options["base-url"]).replace(/\/+$/, "");
   const host = String(options.host || process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1");
-  const port = Number(options.port || process.env.PRITHA_CONTROL_CENTER_PORT || 4420);
+  const port = Number(options.port || process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
   return `http://${host}:${port}`;
 }
 
@@ -254,8 +254,8 @@ if (options.help) {
   console.log(`Usage:
   node scripts/control-center-health.mjs
   node scripts/control-center-health.mjs --json
-  node scripts/control-center-health.mjs --strict --port 4420
-  node scripts/control-center-health.mjs --base-url http://127.0.0.1:4420
+  node scripts/control-center-health.mjs --strict --port 3420
+  node scripts/control-center-health.mjs --base-url http://127.0.0.1:3420
 
 Read-only check. If Control Center is running, verifies that key UI pages and
 their referenced Next.js JavaScript chunks load from the same live build. If the

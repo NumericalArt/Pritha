@@ -77,7 +77,7 @@ test("card readiness reports missing when registry row is absent", async () => {
 
   assert.equal(result.status, "missing");
   assert.equal(result.registryPresent, false);
-  assert.match(result.blockers.join("\n"), /missing from 11_agents\/registry\.md/);
+  assert.match(result.blockers.join("\n"), /missing from the current instance registry/);
 });
 
 test("card readiness reports ready for registered scaffold with card-ready manifest", async () => {

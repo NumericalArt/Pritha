@@ -53,15 +53,25 @@ Retention: source-purged
 линейки должен называться `NumericalArt/Pritha`, если нет отдельного
 миграционного blocker.
 
-Канонический runtime-корень определяется env-first:
+Канонический корень кода определяется env-first:
 
 1. `TECHSCOPE_ROOT`, если переменная окружения задана.
 2. Git root текущего checkout.
 3. Текущий рабочий каталог как fallback.
 
+Локальное runtime-состояние отдельного экземпляра определяется
+`PRITHA_STATE_ROOT`. При заданной переменной все generated memory, setup,
+private data, queues, logs, audit, snapshots, voice drafts и live agent
+registry пишутся только во внешний state-root. Отсутствие переменной сохраняет
+legacy layout внутри checkout исключительно для обратной совместимости.
+`PRITHA_AGENT_PARENT` задаёт единственный каталог sibling agents, доступный
+этому экземпляру; Control Center не должен показывать агентов других Pritha.
+
 Не зашивать абсолютные user-specific пути в исполняемые скрипты, launchd-шаблоны, manifest-файлы и generated scaffold. Исторические Markdown-артефакты могут содержать старые пути как контекст миграций, но не должны быть источником runtime-конфигурации.
 
-Все новые агенты, создаваемые Pritha, должны размещаться соседними папками рядом с корнем Pritha, если пользователь явно не указал другой путь. Legacy `TECHSCOPE_ROOT` остается совместимым способом найти этот корень. Это позволяет держать Pritha и созданных агентов на одном уровне:
+Все новые агенты, создаваемые Pritha, должны размещаться в
+`PRITHA_AGENT_PARENT`, если пользователь явно не указал другой путь. При
+отсутствии переменной используется родитель `TECHSCOPE_ROOT`.
 
 - `<parent-of-TECHSCOPE_ROOT>/Pritha` — агент-копилка и фабрика агентов;
 - `<parent-of-TECHSCOPE_ROOT>/<agent-name>` — отдельный создаваемый или анализируемый агент;

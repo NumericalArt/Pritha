@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/host-policy.mjs && next dev --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-4420}",
+    "dev": "node scripts/host-policy.mjs && next dev --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
     "build": "node scripts/build-preflight.mjs && next build",
     "serve": "npm run build && npm run start",
-    "start": "node scripts/host-policy.mjs && next start --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-4420}",
+    "start": "node scripts/host-policy.mjs && next start --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
     "test:e2e": "playwright test",
     "test:realtime-flow": "node --test tests/realtime-pictureboom-flow.test.mjs",
     "typecheck": "tsc --noEmit"

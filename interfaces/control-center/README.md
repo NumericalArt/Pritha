@@ -40,11 +40,11 @@ npm --prefix interfaces/control-center run serve
 Default local URL:
 
 ```text
-http://127.0.0.1:4420/agents
+http://127.0.0.1:3420/agents
 ```
 
-The app defaults to `4420` to avoid colliding with the existing legacy web UI
-on `4000`.
+The shared app default is `3420`; each instance overrides it in its external
+`runtime.env`. The deprecated legacy web UI defaults to `3000`.
 
 Localhost URLs and localhost QR codes work only on the Mac that runs Control
 Center. A phone sees `127.0.0.1` as the phone itself. For phone access, prefer
@@ -59,7 +59,7 @@ Optional local env:
 
 ```sh
 PRITHA_CONTROL_CENTER_HOST=127.0.0.1
-PRITHA_CONTROL_CENTER_PORT=4420
+PRITHA_CONTROL_CENTER_PORT=3420
 PRITHA_TAILNET_HOSTNAME=
 PRITHA_TAILSCALE_ALLOWED_LOGINS=
 ```
@@ -125,10 +125,10 @@ install Tailscale, authenticate the device or configure Tailscale Serve.
 Use the guided operator flow:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 4420
+node scripts/tailscale-setup.mjs plan --app control-center --port 3420
 node scripts/tailscale-setup.mjs plan-agents
 node scripts/tailscale-setup.mjs status --json
-node scripts/tailscale-setup.mjs serve --app control-center --port 4420 --yes
+node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes
 node scripts/tailscale-setup.mjs serve-agents --yes
-node scripts/tailscale-setup.mjs off --app control-center --port 4420 --yes
+node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes
 ```

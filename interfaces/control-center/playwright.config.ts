@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = process.env.PRITHA_CONTROL_CENTER_PORT || "4420";
+const port = process.env.PRITHA_CONTROL_CENTER_PORT || "3420";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${port}`;
 
 export default defineConfig({
