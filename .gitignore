@@ -37,6 +37,7 @@ data/logs/
 # Dependencies / caches
 node_modules/
 .next/
+.next-pritha-staging/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]

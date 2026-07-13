@@ -45,6 +45,8 @@ function makeFixture() {
   copyFileSync(path.join(sourceRoot, "scripts", "pritha-instance.mjs"), path.join(scripts, "pritha-instance.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
   writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "version"), "good\n");
+  writeFileSync(path.join(checkout, "interfaces", "control-center", "next-env.d.ts"), "stable next env\n");
+  writeFileSync(path.join(checkout, "interfaces", "control-center", "tsconfig.json"), "{}\n");
   writeFileSync(path.join(checkout, "README.md"), "base\n");
 
   git(checkout, "init", "-b", "main");
@@ -75,8 +77,11 @@ const path = require("node:path");
 const live = path.join(process.cwd(), "interfaces", "control-center", ".next");
 const command = process.argv.slice(2).join(" ");
 if (command.includes("run build")) {
-  fs.mkdirSync(live, { recursive: true });
-  fs.writeFileSync(path.join(live, "version"), "bad\\n");
+  const target = path.join(process.cwd(), "interfaces", "control-center", process.env.PRITHA_CONTROL_CENTER_DIST_DIR || ".next");
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(path.join(target, "version"), "bad\\n");
+  fs.writeFileSync(path.join(process.cwd(), "interfaces", "control-center", "next-env.d.ts"), "generated next env\\n");
+  fs.writeFileSync(path.join(process.cwd(), "interfaces", "control-center", "tsconfig.json"), "generated tsconfig\\n");
   process.exit(0);
 }
 if (command.includes("run start")) {
@@ -135,6 +140,8 @@ test("instance update blocks dirty/diverged trees and restores the previous buil
     assert.equal(payload.status, "health-failed-rolled-back");
     assert.equal(payload.rollbackHealth.ok, true);
     assert.equal(readFileSync(path.join(fixture.checkout, "interfaces", "control-center", ".next", "version"), "utf8"), "good\n");
+    assert.equal(readFileSync(path.join(fixture.checkout, "interfaces", "control-center", "next-env.d.ts"), "utf8"), "stable next env\n");
+    assert.equal(readFileSync(path.join(fixture.checkout, "interfaces", "control-center", "tsconfig.json"), "utf8"), "{}\n");
     rollbackPid = payload.rollbackPid;
     assert.ok(Number.isInteger(rollbackPid));
     process.kill(rollbackPid, "SIGTERM");

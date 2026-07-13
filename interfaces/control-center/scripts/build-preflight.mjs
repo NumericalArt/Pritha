@@ -1,9 +1,10 @@
 const host = process.env.PRITHA_CONTROL_CENTER_HOST && process.env.PRITHA_CONTROL_CENTER_HOST !== "0.0.0.0" ? process.env.PRITHA_CONTROL_CENTER_HOST : "127.0.0.1";
 const allowLiveBuild = process.env.PRITHA_CONTROL_CENTER_ALLOW_LIVE_BUILD === "1";
+const distDir = String(process.env.PRITHA_CONTROL_CENTER_DIST_DIR || ".next").trim();
 const configuredPort = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
-const ports = [...new Set([3420, configuredPort].filter(Number.isFinite))];
+const ports = [configuredPort].filter(Number.isFinite);
 
-if (allowLiveBuild) process.exit(0);
+if (allowLiveBuild || distDir !== ".next") process.exit(0);
 
 async function runningControlCenterUrl(port) {
   const controller = new AbortController();

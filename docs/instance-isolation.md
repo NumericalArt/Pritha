@@ -96,9 +96,11 @@ Keep the protected migration backup for at least 30 days.
 ## Update and rollback
 
 An instance update requires a clean `main`, fetches `origin/main`, allows only
-fast-forward, saves the previous `.next`, builds before stopping the configured
-port, and verifies health after restart. A failed build leaves the old process
-running. A failed healthcheck restores the previous `.next` and restarts it.
+fast-forward, saves the previous `.next`, builds into an isolated staging
+directory while the old process keeps its unchanged `.next`, stops only the
+configured port, atomically swaps the completed build, and verifies health after
+restart. A failed build leaves the old process running. A failed swap or
+healthcheck restores the previous `.next` and restarts it.
 
 ```sh
 node scripts/pritha-instance.mjs update --plan --json
