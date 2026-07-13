@@ -100,4 +100,4 @@ Rolling summary handoff is local to each machine. The file
 is intentionally private and should not be synced through Git.
 
 The old standalone voice experiment on port `3401` is deprecated. The supported
-voice entry point is Control Center `/voice` on port `3420`.
+voice entry point is Control Center `/voice` on the instance-configured port.

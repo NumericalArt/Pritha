@@ -16,10 +16,20 @@ const queue = new MusicGenerationQueue(async (request) => {
   return await cache.saveTrack(request, remote);
 });
 
+function hasPromptSpecifics(request: AceStepGenerateRequest) {
+  return Boolean(
+    request.prompt?.trim() ||
+      request.operatorRequest?.trim() ||
+      request.referenceStyle?.trim() ||
+      request.referencePrompt?.trim() ||
+      request.preserveCurrent,
+  );
+}
+
 export async function requestGeneratedMusic(request: AceStepGenerateRequest): Promise<MusicGenerateResponse> {
   const config = getMusicRuntimeConfig();
   const style = String(request.style || config.defaultStyle).trim() || config.defaultStyle;
-  const latest = request.forceFresh ? null : await cache.findLatestByStyle(style);
+  const latest = request.forceFresh || hasPromptSpecifics(request) ? null : await cache.findLatestByStyle(style);
   const job = queue.enqueue({ ...request, style });
 
   if (latest) {
@@ -66,7 +76,7 @@ export async function getMusicHealth() {
       apiKeyConfigured: Boolean(config.aceStepApiKey),
     },
     cache: {
-      storageRoot: ".private/interface-lab/pritha-control-center/music",
+      storageRoot: "private/interface-lab/pritha-control-center/music",
       maxTracks: config.cacheMaxTracks,
       maxBytes: config.cacheMaxBytes,
     },
@@ -77,7 +87,7 @@ export async function getMusicHealth() {
         metadataTtlMs: config.somaFmMetadataTtlMs,
       },
       library: {
-        root: ".private/interface-lab/pritha-control-center/music/library",
+        root: "private/interface-lab/pritha-control-center/music/library",
       },
     },
   };

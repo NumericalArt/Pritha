@@ -8,7 +8,7 @@ import path from "node:path";
 import process from "node:process";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
-const DEFAULT_LABELS = ["com.techscope.web", "com.techscope.telegram-bot"];
+const DEFAULT_LABELS = ["com.techscope.web-dasha", "com.techscope.telegram-bot-dasha"];
 const args = process.argv.slice(2);
 const command = args[0] || "status";
 const jsonMode = args.includes("--json");

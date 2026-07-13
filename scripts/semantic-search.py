@@ -2,6 +2,7 @@
 
 import json
 import math
+import os
 import sqlite3
 import sys
 
@@ -12,7 +13,8 @@ apply_runtime_compat()
 from sentence_transformers import SentenceTransformer
 
 
-DB_PATH = ".memory/techscope.sqlite"
+STATE_ROOT = os.environ.get("PRITHA_STATE_ROOT", "").strip()
+DB_PATH = os.path.join(STATE_ROOT, "memory", "techscope.sqlite") if STATE_ROOT else ".memory/techscope.sqlite"
 PROVIDER = "sentence-transformers"
 MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 DEFAULT_LIMIT = 8

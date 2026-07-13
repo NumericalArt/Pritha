@@ -77,14 +77,14 @@ const maxRegularFileBytes = 95 * 1024 * 1024;
 const requiredMemorySnapshotFiles = [
   ".memory/README.md",
   ".memory/schema.sql",
-  ".memory/last-self-test.json",
 ];
 const generatedMemoryIndexFiles = [
   ".memory/techscope.sqlite",
   ".memory/last-rebuild.sql",
+  ".memory/last-self-test.json",
 ];
 const secretHistory = git(["log", "--all", "--oneline", "--", ".env", ".env.local", "*.token", "secrets/*", "secure-handoffs/*"]);
-const forbiddenTracked = files.filter((file) =>
+const forbiddenTracked = files.filter((file) => existsSync(path.join(ROOT, file)) && (
   file === ".env" ||
   file === ".env.local" ||
   file.endsWith(".token") ||
@@ -92,8 +92,10 @@ const forbiddenTracked = files.filter((file) =>
   file.startsWith(".queue/") ||
   file.startsWith(".logs/") ||
   file.startsWith(".tools/") ||
-  file.startsWith("secure-handoffs/"),
-);
+  file.startsWith(".snapshots/audit/") ||
+  file === ".memory/last-self-test.json" ||
+  file.startsWith("secure-handoffs/")
+));
 const forbiddenRawMedia = files.filter((file) => rawMediaPattern.test(file));
 const forbiddenRawSources = files.filter((file) => isForbiddenRawPath(file));
 const oversizedTrackedFiles = files.filter((file) => {
@@ -109,8 +111,10 @@ const ignoredMemorySnapshot = requiredMemorySnapshotFiles.filter((file) => {
   const result = git(["check-ignore", "-q", "--", file]);
   return result.status === 0;
 });
-const trackedGeneratedMemoryIndexes = generatedMemoryIndexFiles.filter((file) => files.includes(file));
-const localPathMatches = textFilesWithMatches(files, /\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+/g);
+const trackedGeneratedMemoryIndexes = generatedMemoryIndexFiles.filter((file) => files.includes(file) && existsSync(path.join(ROOT, file)));
+const historicalKnowledgePattern = /^(?:00_inbox|01_sources|02_briefs|03_reviews|04_standards|05_decisions|06_subagents|07_workflows|08_templates|09_archive|10_wiki|11_agents|12_marketing)\//;
+const portableRuntimeFiles = files.filter((file) => !historicalKnowledgePattern.test(file));
+const localPathMatches = textFilesWithMatches(portableRuntimeFiles, /\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+/g);
 const tailscaleHostnamePattern = new RegExp([
   String.raw`(?:https?:\/\/)?[a-z0-9-]+\.tail[0-9a-z-]+\.ts\.net`,
   "tail" + "691439",

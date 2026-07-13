@@ -6,6 +6,7 @@ import {
   Check,
   Code2,
   Database,
+  Heart,
   MemoryStick,
   Mic,
   MicOff,
@@ -25,6 +26,7 @@ import {
   type CodexTaskState,
   type CodexTaskThreadScope,
   type CodexTaskVoiceFeedback,
+  type GoodStateSignalState,
   type MicGainRuntimeState,
   type PrithaRealtimeController,
   type PrithaRealtimeStatus,
@@ -196,7 +198,17 @@ function ToolIcon({ tool }: { tool: string }) {
 function activeToolNames(status: PrithaRealtimeStatus | null) {
   return status?.tools?.length
     ? status.tools
-    : ["full_pritha_memory", "inspect_pritha_files", "inspect_codex_task", "recall_rolling_summary", "answer_codex_task", "confirm_voice_intake", "web_search", "run_codex_task"];
+    : [
+        "full_pritha_memory",
+        "inspect_pritha_files",
+        "inspect_codex_task",
+        "recall_rolling_summary",
+        "record_good_state_signal",
+        "answer_codex_task",
+        "confirm_voice_intake",
+        "web_search",
+        "run_codex_task",
+      ];
 }
 
 type ActiveToolDetail = {
@@ -220,6 +232,10 @@ const ACTIVE_TOOL_DETAILS: Record<string, ActiveToolDetail> = {
   recall_rolling_summary: {
     label: "Rolling Summary",
     summary: "Recalls the summary-only handoff from the current or previous voice session.",
+  },
+  record_good_state_signal: {
+    label: "Good State Signal",
+    summary: "Captures positive operator acceptance as a private Good State Alignment signal.",
   },
   answer_codex_task: {
     label: "Answer Codex Task",
@@ -513,6 +529,76 @@ function TaskListCard({
         <p>{toolStatus}</p>
       )}
       <p className="task-limit-note">Voice queue target: up to 5 parallel Codex tasks.</p>
+    </section>
+  );
+}
+
+function formatGoodStateTime(value: string) {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return "pending";
+  return new Date(parsed).toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function GoodStateCard({
+  signals,
+  onRefresh,
+}: {
+  signals: GoodStateSignalState[];
+  onRefresh: () => void;
+}) {
+  const capturedCount = signals.length;
+
+  return (
+    <section className="side-card task-list-card">
+      <div className="card-title-row">
+        <h2>Good State</h2>
+        <span className={`inline-status ${capturedCount ? "green" : ""}`}>{capturedCount ? `${capturedCount} captured` : "Ready"}</span>
+      </div>
+      {signals.length ? (
+        <div className="task-list">
+          {signals.slice(0, 3).map((signal) => {
+            const baseline = signal.alignment?.baselines?.[0];
+            return (
+              <article className="task-list-row" key={signal.id}>
+                <div className="task-row-top">
+                  <div className="task-title-cell">
+                    <span className="task-short-id">
+                      <Heart size={14} />
+                    </span>
+                    <strong>{signal.scope || "pritha"}</strong>
+                  </div>
+                  <span className="inline-status green">{signal.status.replace(/_/g, " ")}</span>
+                </div>
+                <p>{signal.operator_signal_preview || "Positive operator signal captured."}</p>
+                <div className="task-phase-row">
+                  <span>{formatGoodStateTime(signal.created_at)}</span>
+                  <span>{signal.git?.head ? `HEAD ${signal.git.head}` : "HEAD pending"}</span>
+                  <span>{signal.alignment?.status || "alignment pending"}</span>
+                </div>
+                {baseline?.tag || baseline?.title ? (
+                  <div className="task-row-note neutral">
+                    Baseline: {baseline.tag || baseline.title}
+                  </div>
+                ) : null}
+                {signal.paths?.record ? <div className="task-row-note neutral">Record: {signal.paths.record}</div> : null}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p>Positive voice signals will appear here before Git baseline finalization.</p>
+      )}
+      <div className="task-row-actions">
+        <button className="outline-button compact" type="button" onClick={onRefresh}>
+          Refresh
+        </button>
+      </div>
+      <p className="task-limit-note">Final Git/tag baseline still needs separate approval and checks.</p>
     </section>
   );
 }
@@ -1523,6 +1609,7 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
           onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
           onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
         />
+        <GoodStateCard signals={realtime.goodStateSignals} onRefresh={() => void realtime.refreshGoodStateSignals()} />
         <SessionCard
           events={realtime.sessionEvents}
           phase={realtime.phase}
@@ -1579,6 +1666,7 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
               onApproveTask={(taskId) => void decideCodexTask(taskId, "approve")}
               onRejectTask={(taskId) => void decideCodexTask(taskId, "reject")}
             />
+            <GoodStateCard signals={realtime.goodStateSignals} onRefresh={() => void realtime.refreshGoodStateSignals()} />
             <SessionCard
               events={realtime.sessionEvents}
               phase={realtime.phase}

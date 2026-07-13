@@ -5,17 +5,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ENV_ROOT = process.env.TECHSCOPE_ROOT ? path.resolve(process.env.TECHSCOPE_ROOT) : "";
-const ROOT = ENV_ROOT && existsSync(ENV_ROOT) ? ENV_ROOT : DEFAULT_ROOT;
+const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);
 const jsonMode = args.has("--json");
 const dryRun = args.has("--dry-run");
 const noWrite = args.has("--no-write") || dryRun;
-const baselinePath = path.join(ROOT, ".memory", "last-self-test.json");
+const baselinePath = resolvePrithaStatePath("memory", "last-self-test.json");
 
 function runJson(command, commandArgs, options = {}) {
   const result = spawnSync(command, commandArgs, {

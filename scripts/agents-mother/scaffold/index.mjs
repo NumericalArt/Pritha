@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "../../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../../lib/paths.mjs";
 import { slug as makeSlug } from "../../lib/slug.mjs";
 import { today } from "../../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, RUNTIME_PLACEMENT_PROFILES, SERVICE_MODES, bodyValue, contractData, sectionItems, validateContract } from "../contract.mjs";
@@ -9,8 +9,9 @@ import { researchGateDecisionForReport } from "../research-gate.mjs";
 import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "../skills.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
-const RESEARCH_DIR = path.join(ROOT, "11_agents", "research");
+const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
+const REPORT_DIR = path.join(AGENT_MEMORY_ROOT, "reports");
+const RESEARCH_DIR = path.join(AGENT_MEMORY_ROOT, "research");
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 
 function ensureDirs() {
@@ -239,7 +240,8 @@ function operationProfileFor(data) {
   const serviceMode = normalizeServiceMode(data.serviceMode || data.expectedHosting || "none");
   const autostart = normalizeAutostartMode(data.autostart || "disabled", serviceMode);
   const proactiveMode = normalizeProactiveMode(data.proactiveMode || "none");
-  const healthcheckCommand = scalar(data.healthcheckCommand, "node scripts/smoke-test.mjs");
+  const requestedHealthcheckCommand = scalar(data.healthcheckCommand, "node scripts/healthcheck.mjs");
+  const healthcheckCommand = "node scripts/healthcheck.mjs";
   return {
     serviceMode,
     autostart,
@@ -248,6 +250,7 @@ function operationProfileFor(data) {
     startCommand: scalar(data.startCommand, "node scripts/agent-cli.mjs status"),
     stopCommand: scalar(data.stopCommand, serviceMode === "none" ? "not-applicable" : "manual stop; define before production"),
     healthcheckCommand,
+    requestedHealthcheckCommand,
     healthcheckArgv: commandArgvFromText(healthcheckCommand),
     logPath: scalar(data.logPath, "logs/"),
     restartPolicy: serviceMode === "launchd" ? "launchd template only; install after explicit user approval" : "manual unless contract is updated",
@@ -258,6 +261,14 @@ function operationProfileFor(data) {
     heartbeatInterval: scalar(data.heartbeatInterval, proactiveMode === "heartbeat" ? "TBD" : "not-applicable"),
     idleBehavior: scalar(data.idleBehavior, "sleep until trigger"),
   };
+}
+
+function stableLocalPort(agentSlug) {
+  let hash = 0;
+  for (const char of String(agentSlug || "agent")) {
+    hash = (hash * 31 + char.charCodeAt(0)) % 1000;
+  }
+  return 4800 + hash;
 }
 
 function extractBodyComment(fn) {
@@ -273,8 +284,8 @@ function extractBodyComment(fn) {
 const CONTROL_CENTER_RUNTIME_SCRIPT = extractBodyComment(function controlCenterRuntimeScriptSource() {/*
 #!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
@@ -311,6 +322,41 @@ function run(bin, args, options = {}) {
     console.error(output || error.message);
     process.exit(1);
   }
+}
+
+function pidFilePath() {
+  const pidFile = runtime.pid_file;
+  if (!pidFile) return "";
+  return path.resolve(ROOT, String(pidFile));
+}
+
+function processAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readPidFile() {
+  const filePath = pidFilePath();
+  if (!filePath || !existsSync(filePath)) return 0;
+  const pid = Number(readFileSync(filePath, "utf8").trim());
+  return Number.isInteger(pid) ? pid : 0;
+}
+
+function writePidFile(pid) {
+  const filePath = pidFilePath();
+  if (!filePath) return;
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, `${pid}\n`);
+}
+
+function removePidFile() {
+  const filePath = pidFilePath();
+  if (filePath && existsSync(filePath)) rmSync(filePath);
 }
 
 function screenSessionExists(session) {
@@ -434,6 +480,10 @@ async function waitForHealth(expected, timeoutMs = 10000) {
 async function printStatus() {
   console.log(`Agent: ${manifest.agent || manifest.id || "unknown"}`);
   console.log(`Manager: ${manager}`);
+  if (manager === "detached-node-process") {
+    const pid = readPidFile();
+    console.log(`Pid file: ${runtime.pid_file || "missing"}; pid=${pid || "none"}; alive=${processAlive(pid)}`);
+  }
   if (manager === "screen") console.log(`Screen session: ${runtime.screen_session || "missing"}; exists=${screenSessionExists(runtime.screen_session)}`);
   if (manager === "launchd") {
     const target = launchdTarget();
@@ -442,6 +492,64 @@ async function printStatus() {
   }
   const health = await probeHealth();
   console.log(`Health: ${health.status}; ${health.detail}`);
+}
+
+async function startDetachedNodeProcess() {
+  const argv = runtime.start_argv;
+  if (!Array.isArray(argv) || argv.length === 0) {
+    console.error("detached-node-process manager requires control_center_runtime.start_argv.");
+    process.exit(1);
+  }
+  const existingPid = readPidFile();
+  if (processAlive(existingPid)) {
+    const health = await waitForHealth("up", Number(runtime.readiness_timeout_ms || 10000));
+    if (health.status === "ok") {
+      console.log(`Detached process already running: ${existingPid}`);
+      return;
+    }
+    console.error(`Pid file process is alive but health did not pass: ${health.detail}`);
+    process.exit(1);
+  }
+  const currentHealth = await probeHealth();
+  if (currentHealth.status === "ok") {
+    console.log(`Health already ok without pid file: ${currentHealth.url || "unknown url"}`);
+    return;
+  }
+  runPrestart();
+  const child = spawn(argv[0], argv.slice(1), {
+    cwd: ROOT,
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, ...(runtime.env || {}) },
+  });
+  child.unref();
+  writePidFile(child.pid);
+  const health = await waitForHealth("up", Number(runtime.readiness_timeout_ms || 10000));
+  if (health.status !== "ok") {
+    if (processAlive(child.pid)) process.kill(child.pid, "SIGTERM");
+    removePidFile();
+    console.error(`Started detached process but health did not pass: ${health.detail}`);
+    process.exit(1);
+  }
+  console.log(`Started detached process: ${child.pid}`);
+}
+
+async function stopDetachedNodeProcess() {
+  const pid = readPidFile();
+  if (processAlive(pid)) {
+    process.kill(pid, runtime.stop_signal || "SIGTERM");
+    const health = await waitForHealth("down", Number(runtime.stop_timeout_ms || 10000));
+    if (health.status === "ok") {
+      console.error(`Stopped pid ${pid} but health is still ok: ${health.url || "unknown url"}`);
+      process.exit(1);
+    }
+    removePidFile();
+    console.log(`Stopped detached process: ${pid}`);
+    return;
+  }
+  removePidFile();
+  if (await stopFallbackProcesses("Pid file is missing while fallback process is listening")) return;
+  console.log("Detached process is not running.");
 }
 
 async function startScreen() {
@@ -539,6 +647,10 @@ async function stopLaunchd() {
 
 if (action === "status") {
   await printStatus();
+} else if (manager === "detached-node-process" && action === "start") {
+  await startDetachedNodeProcess();
+} else if (manager === "detached-node-process" && action === "stop") {
+  await stopDetachedNodeProcess();
 } else if (manager === "screen" && action === "start") {
   await startScreen();
 } else if (manager === "screen" && action === "stop") {
@@ -554,8 +666,10 @@ if (action === "status") {
 */});
 
 function resolveTargetPath(data, options = {}) {
-  const requested = scalar(options.output || data.targetFolder || `../${slug(data.agentName)}`);
-  return path.resolve(ROOT, requested);
+  const requested = scalar(options.output || data.targetFolder || "", "");
+  return requested
+    ? path.resolve(ROOT, requested)
+    : path.join(resolvePrithaAgentParent({ root: ROOT }), slug(data.agentName));
 }
 
 function ensureWritableTarget(targetPath) {
@@ -609,6 +723,10 @@ export function generatedAgentFiles(data) {
   const memoryDetails = memoryProfileDetails(memoryProfile);
   const toolProfiles = toolProfilesFor(data);
   const operationProfile = operationProfileFor(data);
+  const controlCenterPort = stableLocalPort(agentSlug);
+  const controlCenterLocalUrl = `http://127.0.0.1:${controlCenterPort}`;
+  const controlCenterHealthUrl = `${controlCenterLocalUrl}/api/health`;
+  const controlCenterServiceMode = operationProfile.serviceMode === "none" ? "manual" : operationProfile.serviceMode;
   const skillSelection = selectSkillsForContract(data);
   const skillPolicy = skillSelection.policy;
   const installedSkillRows = skillSelection.installed.map((row) => skillRowForManifest(row, "installed"));
@@ -691,47 +809,70 @@ export function generatedAgentFiles(data) {
     agent: agentName,
     deployment_target: operationProfile.deploymentTarget,
     deployment_profile: operationProfile.deploymentProfile,
-    service_mode: operationProfile.serviceMode,
+    service_mode: controlCenterServiceMode,
     autostart: operationProfile.autostart,
-    control_center_managed: false,
+    control_center_managed: true,
     autostart_policy: "configurable; never install or enable autostart from scaffold without explicit user approval",
     control_center_contract: {
       version: 1,
       command_shape: "structured-argv",
       executor: "scripts/control-center-runtime.mjs",
-      default_execution: "disabled-until-managed-runtime-is-explicitly-approved",
+      default_execution: "control-center-managed-local-runtime",
       legacy_strings_executable: false,
-      planned_start_command: operationProfile.startCommand,
-      planned_stop_command: operationProfile.stopCommand,
+      confirmation_required: false,
+      managed_runtime: "detached-node-process",
+      planned_start_command: "node scripts/control-center-agent-service.mjs",
+      planned_stop_command: "node scripts/control-center-runtime.mjs stop",
     },
     control_center_runtime: {
-      manager: "none",
-      service_boundary: "not-managed-by-control-center",
+      manager: "detached-node-process",
+      service_boundary: "project-local-control-center-runtime",
+      pid_file: ".state/control-center-runtime.pid",
       prestart_argv: [],
-      start_argv: [],
-      health_url: null,
+      start_argv: ["node", "scripts/control-center-agent-service.mjs"],
+      env: {
+        CONTROL_CENTER_AGENT_PORT: String(controlCenterPort),
+      },
+      fallback_stop_process: {
+        port: controlCenterPort,
+        cwd: ".",
+        command_contains: ["node", "scripts/control-center-agent-service.mjs"],
+        signal: "SIGTERM",
+        timeout_ms: 10000,
+        reason: "Stops an orphaned project-local Control Center runtime only when it is listening on this agent's managed port from this project folder.",
+      },
+      health_url: controlCenterHealthUrl,
       readiness_timeout_ms: 10000,
       stop_timeout_ms: 10000,
     },
     start_command: {
       argv: ["node", "scripts/control-center-runtime.mjs", "start"],
       cwd: ".",
-      control_center_managed: false,
+      control_center_managed: true,
+      background: true,
       timeout_ms: 30000,
       success_exit_codes: [0],
-      description: "Structured Control Center entrypoint. Disabled until control_center_managed is explicitly approved.",
+      readiness: {
+        kind: "health_url",
+        url: controlCenterHealthUrl,
+        timeout_ms: 10000,
+      },
+      description: "Control Center start for the project-local child-agent runtime.",
     },
     stop_command: {
       argv: ["node", "scripts/control-center-runtime.mjs", "stop"],
       cwd: ".",
-      control_center_managed: false,
+      control_center_managed: true,
       timeout_ms: 30000,
       success_exit_codes: [0],
-      description: "Structured Control Center entrypoint. Disabled until control_center_managed is explicitly approved.",
+      description: "Control Center stop for the project-local child-agent runtime.",
     },
     healthcheck_command: operationProfile.healthcheckCommand,
+    requested_healthcheck_command: operationProfile.requestedHealthcheckCommand,
     healthcheck_argv: operationProfile.healthcheckArgv,
-    healthcheck_command_executable: false,
+    healthcheck_command_executable: operationProfile.healthcheckArgv.length > 0,
+    local_upstream_url: controlCenterLocalUrl,
+    health_url: controlCenterHealthUrl,
     log_path: operationProfile.logPath,
     restart_policy: operationProfile.restartPolicy,
     service_label: operationProfile.serviceLabel,
@@ -783,7 +924,7 @@ ${scalar(data.primaryMission)}
 - Expected hosting: ${scalar(data.expectedHosting, "local Mac")}
 - Deployment target: ${operationProfile.deploymentTarget}
 - Deployment profile: ${operationProfile.deploymentProfile}
-- Service mode: ${operationProfile.serviceMode}
+- Service mode: ${controlCenterServiceMode}
 - Autostart: ${operationProfile.autostart}
 - Proactive mode: ${operationProfile.proactiveMode}
 
@@ -906,7 +1047,7 @@ node scripts/telegram-bot.mjs healthcheck
 - Skill policy: needs=${skillPolicy.skillNeeds}; sources=${skillPolicy.allowedSkillSources}; install=${skillPolicy.skillInstallMode}; mutation=${skillPolicy.skillMutationPolicy}
 - Deployment target: ${operationProfile.deploymentTarget}
 - Deployment profile: ${operationProfile.deploymentProfile}
-- Service mode: ${operationProfile.serviceMode}
+- Service mode: ${controlCenterServiceMode}
 - Autostart: ${operationProfile.autostart}
 - Proactive mode: ${operationProfile.proactiveMode}
 `,
@@ -928,6 +1069,7 @@ LOG_LEVEL=info
   "type": "module",
   "scripts": {
     "smoke": "node scripts/smoke-test.mjs",
+    "health": "node scripts/healthcheck.mjs",
     "help": "node scripts/agent-cli.mjs help",
     "status": "node scripts/agent-cli.mjs status",
     "interfaces": "node scripts/interface-status.mjs",
@@ -1380,6 +1522,121 @@ ${bulletList(sectionItems(data.text, "Deferred functions"))}
   });
 
   files.push({
+    path: "scripts/control-center-agent-service.mjs",
+    content: `#!/usr/bin/env node
+
+import { createServer } from "node:http";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+const ROOT = process.cwd();
+const manifestPath = path.join(ROOT, "operations", "manifest.json");
+const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : {};
+const runtime = manifest.control_center_runtime || {};
+const port = Number(process.env.CONTROL_CENTER_AGENT_PORT || runtime.port || new URL(manifest.local_upstream_url || "${controlCenterLocalUrl}").port || ${controlCenterPort});
+const host = process.env.CONTROL_CENTER_AGENT_HOST || "127.0.0.1";
+
+function json(res, status, payload) {
+  const body = JSON.stringify(payload);
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "content-length": Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
+function html(res, status, body) {
+  res.writeHead(status, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+    "content-length": Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const startedAt = new Date().toISOString();
+const server = createServer((req, res) => {
+  const url = new URL(req.url || "/", \`http://\${req.headers.host || \`\${host}:\${port}\`}\`);
+  if (url.pathname === "/" || url.pathname === "/index.html") {
+    const agent = escapeHtml(manifest.agent || "${agentName}");
+    const serviceMode = escapeHtml(manifest.service_mode || "manual");
+    const started = escapeHtml(startedAt);
+    html(res, 200, \`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>\${agent}</title>
+  <style>
+    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: Canvas; color: CanvasText; }
+    main { width: min(720px, calc(100vw - 32px)); }
+    h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.1; letter-spacing: 0; }
+    p { margin: 0 0 20px; color: color-mix(in srgb, CanvasText 72%, transparent); line-height: 1.55; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; margin: 0 0 24px; }
+    dt { color: color-mix(in srgb, CanvasText 60%, transparent); }
+    dd { margin: 0; font-weight: 600; }
+    nav { display: flex; gap: 10px; flex-wrap: wrap; }
+    a { color: CanvasText; border: 1px solid color-mix(in srgb, CanvasText 28%, transparent); border-radius: 8px; padding: 9px 12px; text-decoration: none; }
+    a:hover { border-color: CanvasText; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>\${agent}</h1>
+    <p>Control Center managed local runtime is running.</p>
+    <dl>
+      <dt>Status</dt><dd>running</dd>
+      <dt>Service mode</dt><dd>\${serviceMode}</dd>
+      <dt>Started</dt><dd>\${started}</dd>
+    </dl>
+    <nav>
+      <a href="/api/health">Health</a>
+      <a href="/api/status">Status</a>
+    </nav>
+  </main>
+</body>
+</html>\`);
+    return;
+  }
+  if (url.pathname === "/api/health" || url.pathname === "/api/status") {
+    json(res, 200, {
+      ok: true,
+      status: "ok",
+      agent: manifest.agent || "${agentName}",
+      service: "control-center-agent-service",
+      startedAt,
+    });
+    return;
+  }
+  json(res, 404, { ok: false, error: "not_found", status_endpoint: "/api/status" });
+});
+
+server.listen(port, host, () => {
+  console.log(\`Control Center agent service listening on http://\${host}:\${port}\`);
+});
+
+function shutdown() {
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 3000).unref();
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+`,
+  });
+
+  files.push({
     path: "scripts/agent-cli.mjs",
     content: `#!/usr/bin/env node
 
@@ -1781,6 +2038,78 @@ if (command === "uninstall") {
   });
 
   files.push({
+    path: "scripts/healthcheck.mjs",
+    content: `#!/usr/bin/env node
+
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+const ROOT = process.cwd();
+const requiredPaths = [
+  "AGENTS.md",
+  "README.md",
+  ".env.example",
+  "package.json",
+  "operations/manifest.json",
+  "interfaces/manifest.json",
+  "memory/manifest.json",
+  "tools/manifest.json",
+  "skills/manifest.json",
+  "scripts/control-center-agent-service.mjs",
+  "scripts/control-center-runtime.mjs",
+  "scripts/smoke-test.mjs"
+];
+
+const forbiddenPaths = [
+  ".env",
+  ".memory",
+  ".memory-private",
+  ".private",
+  ".queue",
+  ".logs"
+];
+
+const issues = [];
+for (const relPath of requiredPaths) {
+  if (!existsSync(path.join(ROOT, relPath))) issues.push(\`missing \${relPath}\`);
+}
+for (const relPath of forbiddenPaths) {
+  if (existsSync(path.join(ROOT, relPath))) issues.push(\`forbidden path present: \${relPath}\`);
+}
+
+const manifestPath = path.join(ROOT, "operations", "manifest.json");
+if (existsSync(manifestPath)) {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const runtime = manifest.control_center_runtime || {};
+  const healthcheckArgv = Array.isArray(manifest.healthcheck_argv) ? manifest.healthcheck_argv : [];
+  if (manifest.control_center_managed !== true) issues.push("operations manifest must be control_center_managed");
+  if (!manifest.control_center_contract) issues.push("operations manifest missing control_center_contract");
+  if (!Array.isArray(manifest.start_command?.argv) || !manifest.start_command.argv.length) issues.push("start_command argv missing");
+  if (!Array.isArray(manifest.stop_command?.argv) || !manifest.stop_command.argv.length) issues.push("stop_command argv missing");
+  if (manifest.start_command?.control_center_managed !== true) issues.push("start_command must be control_center_managed");
+  if (manifest.stop_command?.control_center_managed !== true) issues.push("stop_command must be control_center_managed");
+  if (!runtime.manager || runtime.manager === "none") issues.push("control_center_runtime manager missing");
+  if (!Array.isArray(runtime.start_argv) || !runtime.start_argv.length) issues.push("control_center_runtime start_argv missing");
+  if (!manifest.local_upstream_url) issues.push("local_upstream_url missing");
+  if (!manifest.health_url && !runtime.health_url) issues.push("health_url missing");
+  if (healthcheckArgv.join(" ") !== "node scripts/healthcheck.mjs") issues.push("healthcheck_argv must point to scripts/healthcheck.mjs");
+  if (manifest.healthcheck_command_executable !== true) issues.push("healthcheck_command_executable must be true");
+  if (!["disabled", "optional", "external", "launchd-on-approval"].includes(manifest.autostart)) {
+    issues.push("autostart mode is invalid");
+  }
+}
+
+if (issues.length > 0) {
+  console.error("Healthcheck failed:");
+  for (const issue of issues) console.error(\`- \${issue}\`);
+  process.exit(1);
+}
+
+console.log("Healthcheck passed.");
+`,
+  });
+
+  files.push({
     path: "scripts/smoke-test.mjs",
     content: `#!/usr/bin/env node
 
@@ -1809,6 +2138,8 @@ const required = [
   "docs/user-training-guide.md",
   "scripts/agent-cli.mjs",
   "scripts/interface-status.mjs",
+  "scripts/healthcheck.mjs",
+  "scripts/control-center-agent-service.mjs",
   "scripts/memory-status.mjs",
   "scripts/tools-status.mjs",
   "scripts/skills-status.mjs",
@@ -2062,6 +2393,22 @@ export function runSmoke(projectRoot) {
   }
 }
 
+export function runHealthcheck(projectRoot) {
+  try {
+    const outputText = execFileSync("node", ["scripts/healthcheck.mjs"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    return { ok: true, output: outputText };
+  } catch (error) {
+    return {
+      ok: false,
+      output: [error.stdout, error.stderr, error.message].filter(Boolean).join("\n").trim(),
+    };
+  }
+}
+
 function externalVerificationStatus(research) {
   return research?.gate?.fields?.externalResearch || "pending";
 }
@@ -2086,13 +2433,19 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   const agentSlug = slug(data.agentName);
   const telegramApplicable = data.telegramMode && data.telegramMode !== "none";
   const operationProfile = operationProfileFor(data);
+  const controlCenterServiceMode = operationProfile.serviceMode === "none" ? "manual" : operationProfile.serviceMode;
+  const controlCenterPort = stableLocalPort(agentSlug);
+  const controlCenterLocalUrl = `http://127.0.0.1:${controlCenterPort}`;
+  const controlCenterHealthUrl = `${controlCenterLocalUrl}/api/health`;
   const research = options.research || researchReportStatus(data);
+  const healthResult = options.healthResult || smokeResult;
+  const scaffoldOk = smokeResult.ok && healthResult.ok;
   const externalVerification = externalVerificationStatus(research);
   const gateFields = research.gate?.fields || {};
   return `---
 id: ${date}-${agentSlug}-scaffold-report
 type: scaffold-report
-status: ${smokeResult.ok ? "complete" : "failed"}
+status: ${scaffoldOk ? "complete" : "failed"}
 created: ${date}
 updated: ${date}
 topics:
@@ -2103,7 +2456,7 @@ tools:
   - Codex
   - AGENTS.md
   - ${telegramApplicable ? "Telegram" : "CLI"}
-  - ${operationProfile.serviceMode === "launchd" ? "launchd" : "operations"}
+  - ${controlCenterServiceMode === "launchd" ? "launchd" : "operations"}
 agent_platforms:
   - Codex
 model_context:
@@ -2140,9 +2493,10 @@ control_center_card_status: pending-registry
 card_refs:
   - operations/manifest.json
   - scripts/control-center-runtime.mjs
+  - scripts/control-center-agent-service.mjs
+  - scripts/healthcheck.mjs
 card_blockers:
   - Registry must be rebuilt after scaffold before the card appears in Agents.
-  - Runtime Start and Stop remain disabled until control_center_managed is explicitly approved.
 next_card_actions:
   - node scripts/pritha.mjs registry
   - node scripts/pritha.mjs card-readiness ${agentSlug}
@@ -2151,7 +2505,7 @@ next_card_actions:
 # Agent Scaffold Report: ${data.agentName || agentSlug}
 
 Date: ${date}
-Status: ${smokeResult.ok ? "complete" : "failed"}
+Status: ${scaffoldOk ? "complete" : "failed"}
 
 ## Summary
 
@@ -2169,10 +2523,12 @@ Status: ${smokeResult.ok ? "complete" : "failed"}
 - Research report: ${research.status}${research.path ? ` (${research.path})` : ""}
 - Research gate: ${researchGateStatusLabel(research)}
 - External verification: ${externalVerification}
-- Service mode: ${operationProfile.serviceMode}
+- Service mode: ${controlCenterServiceMode}
 - Autostart: ${operationProfile.autostart}
+- Local upstream URL: ${controlCenterLocalUrl}
+- Health URL: ${controlCenterHealthUrl}
 - Proactive mode: ${operationProfile.proactiveMode}
-- Result: ${smokeResult.ok ? "scaffold created and smoke test passed" : "scaffold created but smoke test failed"}
+- Result: ${scaffoldOk ? "scaffold created and required readiness checks passed" : "scaffold created but required readiness checks failed"}
 
 ## Generated structure
 
@@ -2183,7 +2539,7 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 - Required secrets: ${data.secretsRequired || (telegramApplicable ? "Telegram bot token and allowed user ids" : "none known yet")}
 - \`.env.example\` created: yes
 - Dependencies installed: no external dependencies installed
-- Services configured: ${operationProfile.serviceMode}; no service was started or installed
+- Services configured: ${controlCenterServiceMode}; project-local runtime contract generated, but no service was started or installed
 - Autostart configured: ${operationProfile.autostart}; installation requires explicit approval
 
 ## Verification
@@ -2192,7 +2548,7 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 | --- | --- | --- |
 | Structure validation | ${smokeResult.ok ? "pass" : "fail"} | \`node scripts/smoke-test.mjs\` |
 | Smoke test | ${smokeResult.ok ? "pass" : "fail"} | ${smokeResult.output.replaceAll("\n", " ")} |
-| Healthcheck | pending | Run command from README after configuration |
+| Healthcheck | ${healthResult.ok ? "pass" : "fail"} | ${healthResult.output.replaceAll("\n", " ")} |
 | Telegram adapter test | ${telegramApplicable ? "pending" : "not-applicable"} | ${telegramApplicable ? "Fill .env and run npm run telegram:healthcheck" : "Telegram not selected"} |
 | Operations status | pending | \`node scripts/operations-status.mjs\` |
 | Skills status | pending | \`node scripts/skills-status.mjs\` |
@@ -2201,17 +2557,17 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 | Memory research gate | ${gateFields.memoryResearch || "pending"} | Machine-readable research report status |
 | External verification | ${externalVerification} | Machine-readable external research status |
 | Synthesis gate | ${gateFields.synthesis || "pending"} | Memory vs external comparison status |
+| Control Center runtime contract | ${healthResult.ok ? "pass" : "fail"} | Managed structured start/stop plus ${controlCenterHealthUrl} |
 | Control Center card readiness | pending-registry | Run \`node scripts/pritha.mjs registry\`, then \`node scripts/pritha.mjs card-readiness ${agentSlug}\` |
 | Documentation review | pass | README and training guide generated |
 
 ## Control Center Card Readiness
 
 - Status: pending-registry.
-- Card refs: \`operations/manifest.json\`, \`scripts/control-center-runtime.mjs\`.
-- Expected first card state: visible in Agents after registry rebuild; Start/Stop may remain blocked with explicit runtime blockers.
+- Card refs: \`operations/manifest.json\`, \`scripts/control-center-runtime.mjs\`, \`scripts/control-center-agent-service.mjs\`, \`scripts/healthcheck.mjs\`.
+- Expected first card state: visible in Agents after registry rebuild; Start Plan should be available for the generated project-local runtime.
 - Card blockers:
   - Registry must be rebuilt after scaffold.
-  - Runtime Start/Stop remain disabled until \`control_center_managed: true\` and managed structured runtime are explicitly approved.
 - Next card actions:
   - From Pritha root, run \`node scripts/pritha.mjs registry\`.
   - From Pritha root, run \`node scripts/pritha.mjs card-readiness ${agentSlug}\`.
@@ -2220,9 +2576,12 @@ ${createdFiles.map((file) => `- ${file}`).join("\n")}
 
 - How to run: \`node scripts/agent-cli.mjs status\`
 - How to test: \`node scripts/smoke-test.mjs\`
+- How to healthcheck: \`node scripts/healthcheck.mjs\`
+- How to start local runtime: \`node scripts/control-center-runtime.mjs start\`
+- How to stop local runtime: \`node scripts/control-center-runtime.mjs stop\`
 - How to inspect operations: \`node scripts/operations-status.mjs\`
 - How to inspect skills: \`node scripts/skills-status.mjs\`
-- How to stop: no long-running process is started by scaffold
+- How to stop: no long-running process is started during scaffold; use the Control Center stop action or \`node scripts/control-center-runtime.mjs stop\` after starting it
 - How to inspect logs: see \`logs/\`
 - First user exercise: follow \`docs/user-training-guide.md\`
 
@@ -2274,18 +2633,20 @@ export function scaffoldContract(contractPath, options = {}) {
   }
 
   const smokeResult = runSmoke(targetPath);
+  const healthResult = runHealthcheck(targetPath);
   const reportPath = uniquePath(path.join(REPORT_DIR, `${today()}-${slug(data.agentName)}-scaffold-report.md`));
-  writeFileSync(reportPath, scaffoldReportMarkdown(data, targetPath, createdFiles, smokeResult, { research }));
+  writeFileSync(reportPath, scaffoldReportMarkdown(data, targetPath, createdFiles, smokeResult, { research, healthResult }));
 
   console.log(`Scaffold: ${targetPath}`);
   console.log(`Created files: ${createdFiles.length}`);
   console.log(`Smoke test: ${smokeResult.ok ? "pass" : "fail"}`);
+  console.log(`Healthcheck: ${healthResult.ok ? "pass" : "fail"}`);
   console.log(`Scaffold report: ${path.relative(ROOT, reportPath)}`);
   if (contractStatus(data) !== "accepted") {
     console.log(`Warning: scaffold created from ${contractStatus(data) || "unknown"} contract because --allow-draft-scaffold was set.`);
   }
-  if (!smokeResult.ok) {
-    console.log(smokeResult.output);
+  if (!smokeResult.ok || !healthResult.ok) {
+    console.log([smokeResult.ok ? "" : smokeResult.output, healthResult.ok ? "" : healthResult.output].filter(Boolean).join("\n"));
     process.exitCode = 1;
   }
 }

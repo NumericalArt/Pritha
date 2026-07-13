@@ -201,7 +201,7 @@ function installSteps(profile, config, options) {
       "tailscale-install-deferred",
       "install",
       "Tailscale install is operator-approved only",
-      "Bootstrap detects Tailscale readiness but does not install or configure host networking. Use scripts/tailscale-setup.mjs plan/status/install for the approved flow.",
+      "Bootstrap detects Tailscale readiness but does not install or configure host networking. Use scripts/tailscale-setup.mjs plan/status/plan-agents/install for the approved flow.",
     ));
   }
   return steps;
@@ -258,8 +258,6 @@ function verifySteps(profile, config) {
       "status",
       "--app",
       "control-center",
-      "--port",
-      String(config.controlCenter ? 3420 : 3000),
       "--json",
     ], { required: false, timeoutMs: 30000 }));
   }
@@ -385,7 +383,8 @@ Profiles: minimal, local, control-center, control-center-tailscale
 
 Safety: bootstrap never installs launchd, cron, durable services, Tailscale, or
 credentials. The local web search backend is installed under ignored .tools and
-.private paths. The Control Center start command runs in the foreground.`);
+the configured PRITHA_STATE_ROOT private directory. The Control Center start
+command runs in the foreground.`);
     return;
   }
 

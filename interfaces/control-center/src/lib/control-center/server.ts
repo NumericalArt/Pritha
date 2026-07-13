@@ -2,6 +2,13 @@ import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFile
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import {
+  resolvePrithaAgentMemoryRoot,
+  resolvePrithaAgentParent,
+  resolvePrithaStatePath,
+  resolvePrithaStateRoot,
+  resolveTechscopeRoot,
+} from "../pritha-paths";
 import type {
   CapabilityStatus,
   ControlCenterAgentCredentials,
@@ -17,6 +24,7 @@ import type {
   ControlCenterOperatorActivityEntry,
   ControlCenterOperatorActivityResponse,
   ControlCenterOperatorActionPlan,
+  ControlCenterOperatorActionPlanStatus,
   ControlCenterOperatorActionResult,
   ControlCenterPreRestoreContract,
   ControlCenterRestorePlan,
@@ -93,6 +101,19 @@ type OperationsManifest = {
   service_mode?: string;
   autostart?: string;
   control_center_managed?: boolean;
+  control_center_contract?: {
+    confirmation_required?: boolean;
+  };
+  service_label?: string;
+  launch_agent_path?: string;
+  control_center_runtime?: {
+    manager?: string;
+    launchd_label?: string;
+    launch_agent_path?: string;
+    screen_session?: string;
+    pid_file?: string;
+    health_url?: string;
+  };
   start_command?: OperationsCommand;
   stop_command?: OperationsCommand;
   run_command?: OperationsCommand;
@@ -139,6 +160,12 @@ type AccessLinkState = {
   tailscaleServeConfigured: boolean;
   tailscaleDnsName?: string;
   tailscaleServeStatusJson: TailscaleServeStatusJson | null;
+};
+
+type AgentHealthProbe = {
+  status: "ok" | "failed" | "unknown" | "not_checked";
+  checkedUrl?: string;
+  detail?: string;
 };
 
 type LifecycleMetadata = ControlCenterAgent["lifecycle"] & {
@@ -217,23 +244,6 @@ const APP_HOST = process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1";
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
 
-function resolveTechscopeRoot() {
-  if (process.env.TECHSCOPE_ROOT) {
-    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
-    if (existsSync(envRoot)) return envRoot;
-  }
-
-  let cursor = process.cwd();
-  for (let i = 0; i < 8; i += 1) {
-    if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "11_agents"))) return cursor;
-    const next = path.dirname(cursor);
-    if (next === cursor) break;
-    cursor = next;
-  }
-
-  return process.cwd();
-}
-
 function slug(value: string) {
   return value
     .trim()
@@ -269,19 +279,19 @@ function isPathInside(parent: string, child: string) {
 }
 
 function snapshotAuditLogPath(root: string) {
-  return path.join(root, ".snapshots", "audit", "child-agent-snapshot-actions.jsonl");
+  return resolvePrithaStatePath("audit", "child-agent-snapshot-actions.jsonl");
 }
 
 function snapshotAuditLogRelativePath(root: string) {
-  return relativePath(root, snapshotAuditLogPath(root));
+  return relativePath(resolvePrithaStateRoot(root), snapshotAuditLogPath(root));
 }
 
 function operatorActionAuditLogPath(root: string) {
-  return path.join(root, ".snapshots", "audit", "child-agent-operator-actions.jsonl");
+  return resolvePrithaStatePath("audit", "child-agent-operator-actions.jsonl");
 }
 
 function operatorActionAuditLogRelativePath(root: string) {
-  return relativePath(root, operatorActionAuditLogPath(root));
+  return relativePath(resolvePrithaStateRoot(root), operatorActionAuditLogPath(root));
 }
 
 function firstLanIPv4() {
@@ -431,7 +441,7 @@ function emptyMemoryStats(): MemoryStats {
 }
 
 function sqliteMemoryStats(root: string): MemoryStats | null {
-  const databasePath = path.join(root, ".memory", "techscope.sqlite");
+  const databasePath = resolvePrithaStatePath("memory", "techscope.sqlite");
   if (!existsSync(databasePath)) return null;
   const result = spawnSync(
     "sqlite3",
@@ -468,7 +478,7 @@ UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
 }
 
 function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
-  const baseline = readJson<SelfTestBaseline>(path.join(root, ".memory", "last-self-test.json"));
+  const baseline = readJson<SelfTestBaseline>(resolvePrithaStatePath("memory", "last-self-test.json"));
   const sqliteStats = sqliteMemoryStats(root);
   const baselineStats = baseline?.memory_stats;
   const memoryStats = sqliteStats || {
@@ -611,17 +621,29 @@ function explicitVersionFromText(text: string, agentName: string) {
 }
 
 function findProfile(root: string, agent: RegistryRecord) {
-  const profiles = markdownFiles(root, ["11_agents", "profiles"]);
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  const profiles = [
+    ...markdownFiles(liveRoot, ["profiles"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "profiles"])),
+  ];
   return profiles.find((file) => fileMatchesAgent(file, agent.name)) || null;
 }
 
 function findContract(root: string, agent: RegistryRecord) {
-  const contracts = markdownFiles(root, ["11_agents", "contracts"]).filter((file) => fileMatchesAgent(file, agent.name));
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  const contracts = [
+    ...markdownFiles(liveRoot, ["contracts"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "contracts"])),
+  ].filter((file) => fileMatchesAgent(file, agent.name));
   return contracts[0] || null;
 }
 
 function findReports(root: string, agent: RegistryRecord) {
-  return markdownFiles(root, ["11_agents", "reports"])
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  return [
+    ...markdownFiles(liveRoot, ["reports"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "reports"])),
+  ]
     .filter((file) => fileMatchesAgent(file, agent.name))
     .slice(0, 8);
 }
@@ -637,7 +659,11 @@ function resolveRelativePath(root: string, value: string | undefined) {
 }
 
 function metadataPathForSnapshot(root: string, storePath: string, snapshotId: string) {
-  return path.join(resolveRelativePath(root, storePath) || path.join(root, ".snapshots", "child-agents"), snapshotId, "snapshot.json");
+  const stateRoot = resolvePrithaStateRoot(root);
+  const configuredStore = stateRoot === root
+    ? String(storePath || "")
+    : String(storePath || "").replace(/^\.snapshots(?:\/|$)/, "snapshots/");
+  return path.join(resolveRelativePath(stateRoot, configuredStore) || resolvePrithaStatePath("snapshots", "child-agents"), snapshotId, "snapshot.json");
 }
 
 function profileSnapshotStore(agent: ControlCenterAgent) {
@@ -663,7 +689,7 @@ function projectRelativeAgentFolder(agent: ControlCenterAgent) {
 
 function snapshotIncludeCandidates(root: string, agent: ControlCenterAgent) {
   if (!agent.folder.name) return [];
-  const folderPath = path.join(root, "..", agent.folder.name);
+  const folderPath = path.join(resolvePrithaAgentParent(root), agent.folder.name);
   const candidates = [
     "AGENTS.md",
     "README.md",
@@ -726,12 +752,17 @@ function snapshotValidationStatus(agent: ControlCenterAgent): ControlCenterAgent
 }
 
 function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = ""): ControlCenterAgent["lifecycle"]["snapshots"] {
-  const profileStore = resolveProfilePath(root, scalarValue(profileFrontmatter, "snapshot_store") || undefined);
+  const stateRoot = resolvePrithaStateRoot(root);
+  const configuredStoreRaw = scalarValue(profileFrontmatter, "snapshot_store");
+  const configuredStore = stateRoot === root
+    ? configuredStoreRaw
+    : configuredStoreRaw?.replace(/^\.snapshots(?:\/|$)/, "snapshots/");
+  const profileStore = resolveProfilePath(stateRoot, configuredStore || undefined);
   const retention = numberValue(profileFrontmatter, "snapshot_retention");
   const candidates = [
     ...(profileStore ? [profileStore] : []),
-    path.join(root, ".snapshots", "child-agents", agentId),
-    path.join(root, ".snapshots", "child-agents", compactKey(agentId)),
+    resolvePrithaStatePath("snapshots", "child-agents", agentId),
+    resolvePrithaStatePath("snapshots", "child-agents", compactKey(agentId)),
   ];
   const store = candidates.find((candidate) => existsSync(candidate));
   if (!store) {
@@ -739,7 +770,7 @@ function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = "
       status: "unavailable",
       count: 0,
       retention,
-      storePath: profileStore ? relativePath(root, profileStore) : undefined,
+      storePath: profileStore ? relativePath(stateRoot, profileStore) : undefined,
       reason: "Snapshot metadata store is not present",
     };
   }
@@ -1353,7 +1384,7 @@ function parseTableLine(line: string) {
 }
 
 function parseRegistry(root: string) {
-  const registryPath = path.join(root, "11_agents", "registry.md");
+  const registryPath = path.join(resolvePrithaAgentMemoryRoot(root), "registry.md");
   if (!existsSync(registryPath)) return { registryPath, records: [] as RegistryRecord[] };
 
   const text = readFileSync(registryPath, "utf8");
@@ -1380,7 +1411,8 @@ function parseRegistry(root: string) {
 }
 
 function siblingFolders(root: string) {
-  const parent = path.dirname(root);
+  const parent = resolvePrithaAgentParent(root);
+  const codeRoot = path.resolve(root);
   try {
     return readdirSync(parent)
       .map((entry) => {
@@ -1389,7 +1421,9 @@ function siblingFolders(root: string) {
       })
       .filter((entry) => {
         try {
-          return statSync(entry.absolutePath).isDirectory() && !entry.name.startsWith(".");
+          if (!statSync(entry.absolutePath).isDirectory() || entry.name.startsWith(".")) return false;
+          if (path.resolve(entry.absolutePath) === codeRoot) return false;
+          return existsSync(path.join(entry.absolutePath, "AGENTS.md"));
         } catch {
           return false;
         }
@@ -1397,6 +1431,25 @@ function siblingFolders(root: string) {
   } catch {
     return [];
   }
+}
+
+function liveRegistryRecords(root: string, records: RegistryRecord[]) {
+  const folders = siblingFolders(root);
+  const folderKeys = new Set(folders.map((folder) => compactKey(folder.name)));
+  const localRecords = records.filter((record) => folderKeys.has(compactKey(record.name)));
+  const recordKeys = new Set(localRecords.map((record) => compactKey(record.name)));
+  const scannedRecords = folders
+    .filter((folder) => !recordKeys.has(compactKey(folder.name)))
+    .map<RegistryRecord>((folder) => ({
+      name: folder.name,
+      mission: "Local sibling child agent",
+      runtime: "local project",
+      interface: "project-defined",
+      deployment: "local",
+      proactivity: "manual",
+      evidence: "local sibling scan",
+    }));
+  return [...localRecords, ...scannedRecords].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function findSiblingFolder(root: string, agentName: string) {
@@ -1643,6 +1696,266 @@ function agentTailscaleUrl(manifest: OperationsManifest | null, localUrl: string
   return access.tailscaleServeStatusJson ? undefined : declaredUrl;
 }
 
+function expandUserPath(value: string | undefined) {
+  const raw = String(value || "").trim();
+  if (!raw) return undefined;
+  return raw.replace(/^~(?=\/|$)/, os.homedir());
+}
+
+function operationalRuntimeManager(manifest: OperationsManifest | null) {
+  return String(manifest?.control_center_runtime?.manager || manifest?.service_mode || "").trim();
+}
+
+function launchdRuntimeState(manifest: OperationsManifest | null) {
+  const manager = operationalRuntimeManager(manifest);
+  if (manager !== "launchd") return null;
+  const label = String(manifest?.control_center_runtime?.launchd_label || manifest?.service_label || "").trim();
+  const launchAgentPath = expandUserPath(manifest?.control_center_runtime?.launch_agent_path || manifest?.launch_agent_path);
+  const installed = Boolean(launchAgentPath && existsSync(launchAgentPath));
+  const uid = process.getuid ? process.getuid() : undefined;
+  const target = label && uid !== undefined ? `gui/${uid}/${label}` : label;
+  const loaded =
+    Boolean(target) &&
+    spawnSync("launchctl", ["print", target], {
+      encoding: "utf8",
+      timeout: 2500,
+      stdio: ["ignore", "pipe", "pipe"],
+    }).status === 0;
+
+  return {
+    label,
+    launchAgentPath,
+    installed,
+    loaded,
+  };
+}
+
+function screenSessionRunning(session: string | undefined) {
+  if (!session) return false;
+  const result = spawnSync("screen", ["-ls"], {
+    encoding: "utf8",
+    timeout: 2500,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`;
+  return output.split(/\r?\n/).some((line) => line.includes(`.${session}`) || line.trim() === session);
+}
+
+function operationalReadiness(params: {
+  folderPresent: boolean;
+  manifest: OperationsManifest | null;
+  operations: CapabilityStatus;
+  health: AgentHealthProbe;
+  localUrl?: string;
+  tailscaleUrl?: string;
+  access: AccessLinkState;
+}): ControlCenterAgent["readiness"] {
+  const { folderPresent, manifest, operations, health, localUrl, tailscaleUrl, access } = params;
+  const checks: ControlCenterOperatorActionCheck[] = [];
+  const blockers: string[] = [];
+  const nextActions: string[] = [];
+  const manager = operationalRuntimeManager(manifest);
+  let unmanagedLocalRuntime = false;
+  let runtime: ControlCenterAgent["readiness"]["runtime"] = {
+    manager: manager || undefined,
+    status: "not_applicable",
+    detail: manager ? `Runtime manager: ${manager}` : "No runtime manager declared",
+  };
+
+  if (!folderPresent) {
+    return {
+      status: "missing",
+      summary: "Child-agent folder is missing.",
+      runtime,
+      access: {
+        localhost: "unavailable",
+        tailscale: "unavailable",
+        detail: "No local runtime can be checked while the folder is missing.",
+      },
+      checks,
+      blockers: ["Child-agent folder is missing."],
+      nextActions: ["Use Restore Plan or recreate the agent folder from its contract."],
+    };
+  }
+
+  if (!manifest) {
+    return {
+      status: "blocked",
+      summary: "operations/manifest.json is missing.",
+      runtime,
+      access: {
+        localhost: "unavailable",
+        tailscale: "unavailable",
+        detail: "No local runtime can be checked without operations metadata.",
+      },
+      checks,
+      blockers: ["operations/manifest.json is missing."],
+      nextActions: ["Add an operations manifest with structured start, stop, health and access settings."],
+    };
+  }
+
+  if (operations === "failed") {
+    blockers.push("Operations manifest is present but does not declare a usable runtime, command or local URL.");
+  }
+
+  const launchd = launchdRuntimeState(manifest);
+  if (launchd) {
+    runtime = {
+      manager: "launchd",
+      status: launchd.installed ? (launchd.loaded || health.status === "ok" ? "ready" : "installable") : "service_install_required",
+      serviceLabel: launchd.label || undefined,
+      launchAgentPath: launchd.launchAgentPath,
+      loaded: launchd.loaded,
+      installed: launchd.installed,
+      detail: launchd.installed
+        ? launchd.loaded
+          ? `Launchd service is loaded: ${launchd.label || "unknown label"}`
+          : `LaunchAgent plist exists but service is not loaded: ${launchd.launchAgentPath || "unknown path"}`
+        : `LaunchAgent plist is missing: ${launchd.launchAgentPath || "unknown path"}`,
+    };
+    checks.push({
+      id: "runtime-service",
+      label: "Runtime service",
+      status: launchd.installed ? (launchd.loaded || health.status === "ok" ? "pass" : "warn") : "fail",
+      detail: runtime.detail,
+    });
+    if (!launchd.installed && health.status !== "ok") {
+      blockers.push("LaunchAgent plist is missing; install the service with explicit operator approval before Start.");
+      nextActions.push("Run the agent deploy/install service action after reviewing its plan and confirmation gate.");
+    }
+  } else if (manager === "screen") {
+    const session = manifest.control_center_runtime?.screen_session;
+    const running = screenSessionRunning(session);
+    unmanagedLocalRuntime = Boolean(session && !running && health.status === "ok");
+    const detail = session
+      ? unmanagedLocalRuntime
+        ? `Local health is ok, but screen session ${session} is not running.`
+        : `Screen session ${session} ${running ? "is running" : "is not running"}`
+      : "Screen manager has no session name";
+    runtime = {
+      manager: "screen",
+      status: running ? "ready" : unmanagedLocalRuntime ? "unmanaged" : "installable",
+      detail,
+    };
+    checks.push({
+      id: "runtime-service",
+      label: "Runtime service",
+      status: session ? (running ? "pass" : "warn") : "warn",
+      detail: runtime.detail,
+    });
+    if (unmanagedLocalRuntime) {
+      nextActions.push("Restart this agent through the managed runtime or add a narrow fallback_stop_process rule for orphaned local processes.");
+    }
+  } else if (manager) {
+    runtime = {
+      manager,
+      status: health.status === "ok" ? "ready" : "unknown",
+      detail: `Runtime manager ${manager} is declared; readiness depends on the health probe.`,
+    };
+    checks.push({
+      id: "runtime-service",
+      label: "Runtime service",
+      status: health.status === "ok" ? "pass" : "warn",
+      detail: runtime.detail,
+    });
+  }
+
+  const accessReady: ControlCenterAgent["readiness"]["access"] = {
+    localhost: health.status === "ok" && localUrl ? "ready" : localUrl ? "pending" : "unavailable",
+    tailscale: "unavailable",
+    tailscaleUrl,
+    localUrl,
+    detail: localUrl ? `Local upstream: ${localUrl}` : "No local upstream URL declared.",
+  };
+
+  if (!localUrl) {
+    accessReady.tailscale = "not_configured";
+  } else if (tailscaleUrl) {
+    accessReady.tailscale = "ready";
+    accessReady.detail = `Tailscale route is served: ${tailscaleUrl}`;
+    checks.push({
+      id: "tailscale-route",
+      label: "Tailscale route",
+      status: "pass",
+      detail: accessReady.detail,
+    });
+  } else if (access.tailscaleDnsName && access.tailscaleServeStatusJson && health.status === "ok") {
+    accessReady.tailscale = "pending_serve";
+    accessReady.detail = `Local runtime is ready, but no Tailscale Serve route points to ${localUrl}.`;
+    checks.push({
+      id: "tailscale-route",
+      label: "Tailscale route",
+      status: "warn",
+      detail: accessReady.detail,
+    });
+    nextActions.push("Approve a Tailscale Serve action for this local upstream if trusted-device access is required.");
+  } else if (access.tailscaleDnsName && access.tailscaleServeStatusJson) {
+    accessReady.tailscale = "waiting_for_local";
+    accessReady.detail = "Tailscale can be checked after the local runtime becomes healthy.";
+    checks.push({
+      id: "tailscale-route",
+      label: "Tailscale route",
+      status: "warn",
+      detail: accessReady.detail,
+    });
+  } else {
+    accessReady.tailscale = "not_configured";
+    accessReady.detail = "Tailscale status is unavailable or not authenticated for route verification.";
+  }
+
+  if (blockers.length > 0) {
+    return {
+      status: blockers.some((item) => item.includes("LaunchAgent plist")) ? "service_install_required" : "blocked",
+      summary: blockers[0],
+      runtime,
+      access: accessReady,
+      checks,
+      blockers,
+      nextActions,
+    };
+  }
+
+  if (health.status === "ok" && accessReady.tailscale === "pending_serve") {
+    return {
+      status: unmanagedLocalRuntime ? "unmanaged_local" : "tailscale_pending",
+      summary: unmanagedLocalRuntime
+        ? "Local runtime is healthy, but the declared runtime does not own it; Tailscale route is pending."
+        : "Local runtime is ready; Tailscale route is pending.",
+      runtime,
+      access: accessReady,
+      checks,
+      blockers,
+      nextActions,
+    };
+  }
+
+  if (health.status === "ok") {
+    return {
+      status: unmanagedLocalRuntime ? "unmanaged_local" : accessReady.tailscale === "ready" ? "ready" : "local_ready",
+      summary: unmanagedLocalRuntime
+        ? "Local runtime is healthy, but the declared runtime does not own it."
+        : accessReady.tailscale === "ready"
+          ? "Local and Tailscale access are ready."
+          : "Local runtime is ready.",
+      runtime,
+      access: accessReady,
+      checks,
+      blockers,
+      nextActions,
+    };
+  }
+
+  return {
+    status: "blocked",
+    summary: health.checkedUrl || health.detail || "Local runtime is not ready.",
+    runtime,
+    access: accessReady,
+    checks,
+    blockers,
+    nextActions,
+  };
+}
+
 function isExternalDeployment(record: RegistryRecord, manifest: OperationsManifest | null) {
   const deployment = `${record.deployment} ${manifest?.external_url || ""}`.toLowerCase();
   return /\b(vps|cloud|external|remote|hosted)\b/.test(deployment) || !isLocalUrl(manifest?.health_url);
@@ -1695,6 +2008,7 @@ function buildAgentControl(
   lifecycle: LifecycleMetadata,
   state: ControlCenterAgent["ui"]["state"],
   activity: ControlCenterAgent["ui"]["activity"],
+  readiness: ControlCenterAgent["readiness"],
 ): ControlCenterAgentControl {
   const runtimeKind = classifyRuntime(record, folder, manifest, lifecycle);
   const commandReadiness = {
@@ -1706,8 +2020,11 @@ function buildAgentControl(
     runtimeKind,
     ownership,
     executionMode: "plan_only" as const,
+    confirmationRequired: manifest?.control_center_contract?.confirmation_required !== false,
     commandReadiness,
   };
+  const canExecuteStart = ownership === "managed" && commandReadiness.start === "structured_executable";
+  const canExecuteStop = ownership === "managed" && commandReadiness.stop === "structured_executable";
 
   if (state === "missing" || runtimeKind === "scaffold") {
     return {
@@ -1723,7 +2040,7 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "run_check",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Check",
       reason: "Operations metadata needs review before runtime controls can be planned.",
     };
@@ -1733,7 +2050,7 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "run_check",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Check",
       reason: "Codex-native project agents use diagnostics or Codex tasks, not generic Start/Stop.",
     };
@@ -1743,7 +2060,7 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "run_now",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Now",
       reason: "Scheduled agents should expose run/pause/resume controls instead of generic Start/Stop.",
     };
@@ -1753,8 +2070,21 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "stop_plan",
       planAction: "stop",
-      label: "Stop Plan",
-      reason: "A local service is active; stop requires a managed structured command and explicit confirmation.",
+      executionMode: canExecuteStop ? "executable" : "plan_only",
+      label: canExecuteStop ? "Stop" : "Stop Plan",
+      reason: canExecuteStop
+        ? "A managed structured stop command is available for Control Center execution."
+        : "A local service is active; stop requires a managed structured command.",
+    };
+  }
+  if (runtimeKind === "web_service" && readiness.status === "service_install_required") {
+    return {
+      ...base,
+      primaryCardAction: "start_plan",
+      planAction: "start",
+      executionMode: "plan_only",
+      label: "Service Required",
+      reason: readiness.summary,
     };
   }
   if (runtimeKind === "web_service") {
@@ -1762,15 +2092,18 @@ function buildAgentControl(
       ...base,
       primaryCardAction: "start_plan",
       planAction: "start",
-      label: "Start Plan",
-      reason: "A local service manifest exists; start requires a managed structured command and explicit confirmation.",
+      executionMode: canExecuteStart ? "executable" : "plan_only",
+      label: canExecuteStart ? "Start" : "Start Plan",
+      reason: canExecuteStart
+        ? "A managed structured start command is available for Control Center execution."
+        : "A local service manifest exists; start requires a managed structured command.",
     };
   }
   return {
     ...base,
     primaryCardAction: "run_check",
     planAction: "check",
-    executionMode: "manual_only",
+    executionMode: "executable",
     label: "Run Check",
     reason: "Runtime class is unknown or unmanaged; only diagnostics are enabled.",
   };
@@ -1789,6 +2122,14 @@ function issueText(folderPresent: boolean, manifest: OperationsManifest | null, 
   return undefined;
 }
 
+function readinessIssueText(readiness: ControlCenterAgent["readiness"]) {
+  if (readiness.status === "service_install_required") return "Service install required";
+  if (readiness.status === "unmanaged_local") return "Unmanaged local process";
+  if (readiness.status === "tailscale_pending") return "Tailscale route pending";
+  if (readiness.status === "local_ready") return "Local only";
+  return undefined;
+}
+
 async function buildAgent(root: string, record: RegistryRecord, access: AccessLinkState): Promise<ControlCenterAgent> {
   const folder = findSiblingFolder(root, record.name);
   const manifest = folder ? readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")) : null;
@@ -1798,7 +2139,16 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const localUrl = manifest?.local_upstream_url;
   const tailscaleUrl = agentTailscaleUrl(manifest, localUrl, access);
   const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
-  const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity);
+  const readiness = operationalReadiness({
+    folderPresent: Boolean(folder),
+    manifest,
+    operations,
+    health,
+    localUrl,
+    tailscaleUrl,
+    access,
+  });
+  const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity, readiness);
   const credentials = credentialsForAgent(root, folder, manifest);
 
   return {
@@ -1830,6 +2180,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       healthcheckCommand: manifest?.healthcheck_command,
       issue: operations === "failed" ? "Manifest is missing required operation fields" : undefined,
     },
+    readiness,
     health,
     url: localUrl || tailscaleUrl
       ? { status: "available", local: localUrl, tailscale: tailscaleUrl }
@@ -1837,9 +2188,9 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
     ui: {
       ...uiState,
       primaryAction: legacyPlanAction(control),
-      actionEnabled: false,
+      actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
-      issueText: issueText(Boolean(folder), manifest, health.status),
+      issueText: readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
     },
     control,
@@ -1849,7 +2200,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
 }
 
 function snapshotsStatus(root: string): CapabilityStatus {
-  return existsSync(path.join(root, ".snapshots", "child-agents")) ? "ready" : "unavailable";
+  return existsSync(resolvePrithaStatePath("snapshots", "child-agents")) ? "ready" : "unavailable";
 }
 
 type VoiceRuntimeStatus = ReturnType<typeof getPrithaRealtimeStatus>;
@@ -1872,7 +2223,7 @@ function capabilities(root: string, registryReady: boolean, agents: ControlCente
     agents_registry: registryReady ? "ready" : "not_installed",
     sibling_scan: "ready",
     operations_manifest: anyOperationsReady ? "ready" : "not_installed",
-    start_stop: anyStartStopExecutable ? "manual_only" : "planned",
+    start_stop: anyStartStopExecutable ? "ready" : "planned",
     restore: anyRestorePlan ? "manual_only" : "planned",
     snapshots: snapshotsStatus(root),
     rollback: anyRollbackPlan ? "manual_only" : "unavailable",
@@ -1891,7 +2242,7 @@ function capabilities(root: string, registryReady: boolean, agents: ControlCente
 }
 
 function latestReports(root: string) {
-  const reportsDir = path.join(root, "11_agents", "reports");
+  const reportsDir = path.join(resolvePrithaAgentMemoryRoot(root), "reports");
   if (!existsSync(reportsDir)) return [];
   return readdirSync(reportsDir)
     .filter((entry) => entry.endsWith(".md"))
@@ -1900,7 +2251,7 @@ function latestReports(root: string) {
       const stat = statSync(absolutePath);
       return {
         title: entry,
-        path: path.relative(root, absolutePath),
+        path: path.relative(resolvePrithaStateRoot(root), absolutePath),
         updated: stat.mtime.toISOString(),
         type: entry.includes("self-test")
           ? "self_test"
@@ -1920,11 +2271,12 @@ function latestReports(root: string) {
 export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
   const root = resolveTechscopeRoot();
   const registry = parseRegistry(root);
+  const records = liveRegistryRecords(root, registry.records);
   const access = accessLinks();
-  const allAgents = await Promise.all(registry.records.map((record) => buildAgent(root, record, access)));
+  const allAgents = await Promise.all(records.map((record) => buildAgent(root, record, access)));
   const childAgents = allAgents.filter((agent) => agent.name !== "Techscope" && agent.name !== "Pritha");
   const voiceRuntime = getPrithaRealtimeStatus();
-  const caps = capabilities(root, registry.records.length > 0, childAgents, voiceRuntime);
+  const caps = capabilities(root, records.length > 0, childAgents, voiceRuntime);
   const selfTest = selfTestStatus(root);
   const launchdWarnings = launchdRootWarnings(root);
   const warnings = [
@@ -2256,6 +2608,7 @@ function baseOperatorChecks(agent: ControlCenterAgent): ControlCenterOperatorAct
       status: agent.lifecycle.contract.status === "ready" ? "pass" : "warn",
       detail: agent.lifecycle.contract.path || agent.lifecycle.contract.reason || "Contract unavailable",
     },
+    ...agent.readiness.checks,
   ];
 }
 
@@ -2270,9 +2623,9 @@ function controlForAction(agent: ControlCenterAgent, action: ControlCenterOperat
       ...agent.control,
       primaryCardAction: "run_check",
       planAction: "check",
-      executionMode: "manual_only",
+      executionMode: "executable",
       label: "Run Check",
-      reason: "Manual check reads metadata and probes health without mutating runtime state.",
+      reason: "Run Check reads metadata and probes health without mutating runtime state.",
     };
   }
   if (action === "start") {
@@ -2355,35 +2708,52 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
     return true;
   });
   const startStopAction = action === "start" || action === "stop";
+  const unavailableBlockers =
+    startStopAction
+      ? [
+          agent.control.runtimeKind === "external_service" ? "External services cannot be started or stopped by Control Center." : "",
+          agent.control.runtimeKind === "scaffold" || agent.folder.status !== "present" ? "Agent folder is missing or scaffold-only." : "",
+        ].filter(Boolean)
+      : [];
   const runtimeBlockers =
     startStopAction
       ? [
           agent.control.ownership !== "managed" ? "Agent is not control_center_managed; start/stop execution is disabled." : "",
           actionCommandReadiness !== "structured_executable" ? `${action.toUpperCase()} requires a structured executable argv command in operations/manifest.json.` : "",
-          agent.control.runtimeKind === "external_service" ? "External services cannot be started or stopped by Control Center." : "",
-          agent.control.runtimeKind === "scaffold" || agent.folder.status !== "present" ? "Agent folder is missing or scaffold-only." : "",
         ].filter(Boolean)
       : [];
   const actionBackendMissing =
     action === "restore" ? "Restore backend is planned-only; Control Center will not create folders yet" : "";
   const plannedOnlyBlockers = actionBackendMissing ? [actionBackendMissing] : [];
-  const blockers = action === "check" ? [] : [...runtimeBlockers, ...plannedOnlyBlockers, ...failedChecks.map((check) => `${check.label}: ${check.detail}`)];
+  const blockers =
+    action === "check"
+      ? []
+      : [...unavailableBlockers, ...runtimeBlockers, ...plannedOnlyBlockers, ...failedChecks.map((check) => `${check.label}: ${check.detail}`)];
   const startStopEnabled = startStopAction && blockers.length === 0;
-  const planStatus: CapabilityStatus =
+  const requiresConfirmation =
+    action !== "check" &&
+    !(startStopEnabled && startStopAction && planControl.confirmationRequired === false);
+  const planStatus: ControlCenterOperatorActionPlanStatus =
     action === "check"
       ? "manual_only"
       : startStopEnabled
-        ? "manual_only"
-        : blockers.length > plannedOnlyBlockers.length
-        ? "unavailable"
-        : "planned";
+        ? requiresConfirmation
+          ? "needs_confirmation"
+          : "ready"
+        : unavailableBlockers.length > 0
+          ? "unavailable"
+          : plannedOnlyBlockers.length > 0 && blockers.length === plannedOnlyBlockers.length
+            ? "plan_only"
+            : "blocked";
   const effectiveControl: ControlCenterAgentControl =
     startStopEnabled
       ? {
           ...planControl,
           executionMode: "executable",
           label: action === "start" ? "Start" : "Stop",
-          reason: "Structured managed command is available behind manual confirmation.",
+          reason: planControl.confirmationRequired === false
+            ? "Structured managed command is available for Control Center execution."
+            : "Structured managed command is available behind confirmation.",
         }
       : planControl;
 
@@ -2398,9 +2768,9 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
     action,
     status: planStatus,
     actionEnabled: action === "check" || startStopEnabled,
-    requiresConfirmation: action !== "check",
+    requiresConfirmation,
     confirmation:
-      action === "check"
+      !requiresConfirmation
         ? undefined
         : {
             requiredPhrase: operatorActionPhrase(agent, action),
@@ -2427,7 +2797,11 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
           ]
         : [
             "Review plan, preflight checks and blockers",
-            startStopEnabled ? `Enter the required confirmation phrase to ${action} the managed agent runtime` : "Resolve blockers before execution is enabled",
+            startStopEnabled && requiresConfirmation
+              ? `Enter the required confirmation phrase to ${action} the managed agent runtime`
+              : startStopEnabled
+                ? `Run the ${action} action for the managed agent runtime`
+                : "Resolve blockers before execution is enabled",
             startStopEnabled ? "Control Center executes only the structured argv command without a shell" : "Use Dev diagnostics or Codex for remediation or manifest upgrade planning",
           ],
     blockers,
@@ -2435,13 +2809,17 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
       action === "check"
         ? ["Health probes can report stale local state if the child-agent server is changing while the check runs"]
         : startStopEnabled
-          ? ["This action mutates local runtime state and is gated by explicit operator confirmation."]
+          ? requiresConfirmation
+            ? ["This action mutates local runtime state and is gated by explicit operator confirmation."]
+            : ["This action mutates only this child agent's local runtime state using the structured argv contract."]
           : ["This action would mutate runtime state and remains disabled until the managed structured contract is complete."],
     warnings: [
       action === "check"
         ? "Manual check does not start, stop, restore, install, remove or schedule anything."
         : startStopEnabled
-          ? "Confirmation-gated action. No shell strings, secrets, launchd install, cron enablement or external service mutation is allowed."
+          ? requiresConfirmation
+            ? "Confirmation-gated action. No shell strings, secrets, launchd install, cron enablement or external service mutation is allowed."
+            : "Executable managed action. No shell strings, secrets, launchd install, cron enablement or external service mutation is allowed."
           : "Plan-only action. No process, folder, service, snapshot or memory mutation is available from this endpoint.",
     ],
   };
@@ -2715,7 +3093,7 @@ export async function runAgentRuntimeAction(
     return result;
   }
 
-  if (confirmation.trim() !== requiredPhrase) {
+  if (plan.confirmation && confirmation.trim() !== requiredPhrase) {
     const result = blockedOperatorActionResult({
       status,
       agent,
@@ -3278,7 +3656,11 @@ function snapshotRemovalPath(metadataPath: string) {
 
 function retentionCandidates(status: ControlCenterStatus, agent: ControlCenterAgent) {
   const snapshots = snapshotItems(agent);
-  const storeAbsolutePath = agent.lifecycle.snapshots.storePath ? resolveRelativePath(status.root, agent.lifecycle.snapshots.storePath) : null;
+  const snapshotStateRoot = resolvePrithaStateRoot(status.root);
+  const snapshotStorePath = snapshotStateRoot === status.root
+    ? agent.lifecycle.snapshots.storePath
+    : agent.lifecycle.snapshots.storePath?.replace(/^\.snapshots(?:\/|$)/, "snapshots/");
+  const storeAbsolutePath = snapshotStorePath ? resolveRelativePath(snapshotStateRoot, snapshotStorePath) : null;
   const retention = agent.lifecycle.snapshots.retention;
   const configured = typeof retention === "number" && retention >= 0;
   const overflow = configured ? Math.max(0, snapshots.length - retention) : 0;
@@ -3715,9 +4097,10 @@ export async function getAgentPreRestoreContract(agentId: string, snapshotId?: s
 }
 
 function moduleList(status: ControlCenterStatus): ControlCenterDiagnostics["modules"] {
+  const stateRoot = resolvePrithaStateRoot(status.root);
   return [
     { id: "harness", label: "Harness", status: "ready" },
-    { id: "memory", label: "Memory", status: existsSync(path.join(status.root, ".memory")) ? "ready" : "unavailable" },
+    { id: "memory", label: "Memory", status: existsSync(resolvePrithaStatePath("memory")) ? "ready" : "unavailable" },
     { id: "tools", label: "Tools", status: existsSync(path.join(status.root, "tools", "manifest.json")) ? "ready" : "unavailable" },
     { id: "interfaces", label: "Interfaces", status: "ready" },
     { id: "operations", label: "Operations", status: existsSync(path.join(status.root, "operations", "manifest.json")) ? "ready" : "unavailable" },
@@ -3751,6 +4134,7 @@ function agentToFolderRow(agent: ControlCenterAgent): ControlCenterDiagnostics["
 
 export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagnostics> {
   const status = await getControlCenterStatus();
+  const stateRoot = resolvePrithaStateRoot(status.root);
   const voiceRuntime = getPrithaRealtimeStatus();
   const reports = status.latestReports.map((report) => ({
     path: report.path,
@@ -3774,7 +4158,7 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
       platform: `${os.type()} ${os.release()} (${os.arch()})`,
       node: process.version,
       appPort: APP_PORT,
-      dataPath: ".pritha/data",
+      dataPath: stateRoot,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       git: "unavailable",
     },
@@ -3785,7 +4169,7 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
       lastSession: "unknown",
     },
     memoryIndex: {
-      status: existsSync(path.join(status.root, ".memory", "techscope.sqlite")) ? "up_to_date" : "unknown",
+      status: existsSync(resolvePrithaStatePath("memory", "techscope.sqlite")) ? "up_to_date" : "unknown",
       documents: status.selfTest.memoryStats.documents,
       chunks: status.selfTest.memoryStats.chunks,
       lastUpdated: status.selfTest.createdAt ? status.selfTest.ageLabel : "unknown",

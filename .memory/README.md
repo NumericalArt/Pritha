@@ -1,6 +1,8 @@
 # Techscope Memory
 
-This directory contains local generated memory indexes for Pritha.
+This tracked directory contains the portable schema and memory contract. With
+`PRITHA_STATE_ROOT` configured, generated indexes live under
+`<state-root>/memory/`.
 
 The Markdown files in the repository are the canonical authored knowledge.
 Files such as `techscope.sqlite`, SQL rebuild dumps and embeddings are generated
@@ -11,14 +13,14 @@ of carrying long binary database history in Git.
 Tracked artifacts:
 
 - `schema.sql`: database schema.
-- `last-self-test.json`: latest lightweight operational self-test baseline.
 - `README.md`: local memory index contract.
 
 Ignored generated artifacts:
 
-- `techscope.sqlite`: SQLite sidecar index with FTS, relations and embeddings.
-- `last-rebuild.sql`: SQL snapshot used for debugging rebuild output.
-- `exports/`: optional generated exports for other projects or agents.
+- `<state-root>/memory/techscope.sqlite`: SQLite sidecar index with FTS,
+  relations and embeddings.
+- `<state-root>/memory/last-self-test.json`: instance self-test baseline.
+- `<state-root>/memory/last-rebuild.sql`: generated rebuild diagnostics.
 
 ## Current commands
 

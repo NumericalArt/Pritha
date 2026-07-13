@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import http from "node:http";
@@ -73,11 +73,14 @@ process.exit(1);
   return fakePath;
 }
 
-function withServer(handler) {
+function withServer(handler, options = {}) {
   const server = http.createServer((req, res) => {
     if (req.url === "/api/health") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
+    } else if (req.url === "/api/status") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, root: options.root || process.cwd() }));
     } else {
       res.writeHead(404);
       res.end("not found");
@@ -135,6 +138,42 @@ test("tailscale setup status exposes readiness fields", () => {
   }
 });
 
+test("tailscale setup detects the live Control Center port for the current root", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-live-port-"));
+  try {
+    const fakeBin = writeFakeTailscale(dir);
+    const root = path.join(dir, "Pritha");
+    mkdirSync(root, { recursive: true });
+    await withServer(async (port) => {
+      const upstream = `http://127.0.0.1:${port}`;
+      writeFileSync(
+        path.join(root, ".techscope-setup.json"),
+        JSON.stringify({
+          schema: "techscope-setup-state-v1",
+          tailscale: {
+            app: "control-center",
+            port,
+          },
+        }),
+      );
+      const result = await runTailscaleSetupAsync(["status", "--app", "control-center", "--json"], {
+        TECHSCOPE_ROOT: root,
+        PRITHA_CONTROL_CENTER_PORT: "",
+        PRITHA_TAILSCALE_BIN: fakeBin,
+        FAKE_TAILSCALE_UPSTREAM: upstream,
+      });
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.port, port);
+      assert.equal(payload.local_url, upstream);
+      assert.equal(payload.status.local_upstream_health.status, "ready");
+      assert.equal(payload.status.serve_configured, true);
+    }, { root });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("tailscale setup serve requires explicit --yes", () => {
   const result = runTailscaleSetup(["serve", "--app", "control-center", "--port", "3420", "--json"]);
   assert.notEqual(result.status, 0);
@@ -181,6 +220,54 @@ test("tailscale setup serve configures private Serve and writes setup state", as
   }
 });
 
+test("tailscale setup plans sibling child-agent Serve mappings without mutation", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "pritha-tailscale-agents-"));
+  try {
+    const fakeBin = writeFakeTailscale(dir);
+    const root = path.join(dir, "Pritha");
+    const agent = path.join(dir, "DesignAgent");
+    await withServer(async (port) => {
+      mkdirSync(root, { recursive: true });
+      mkdirSync(path.join(agent, "operations"), { recursive: true });
+      writeFileSync(path.join(root, ".keep"), "", "utf8");
+      writeFileSync(
+        path.join(agent, "operations", "manifest.json"),
+        JSON.stringify(
+          {
+            local_upstream_url: `http://127.0.0.1:${port}`,
+            health_url: `http://127.0.0.1:${port}/api/health`,
+          },
+          null,
+          2,
+        ),
+      );
+      const result = await runTailscaleSetupAsync(["plan-agents", "--json"], {
+        TECHSCOPE_ROOT: root,
+        PRITHA_TAILSCALE_BIN: fakeBin,
+        FAKE_TAILSCALE_UPSTREAM: "http://127.0.0.1:9",
+      });
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.schema, "pritha-tailscale-agent-fleet-v1");
+      assert.equal(payload.summary.total, 1);
+      assert.equal(payload.summary.readyToServe, 1);
+      assert.equal(payload.agents[0].app, "DesignAgent");
+      assert.equal(payload.agents[0].local_upstream_health.status, "ready");
+      assert.equal(payload.agents[0].serve_configured, false);
+      assert.match(payload.agents[0].serve_command, new RegExp(`--port ${port} --health-path /api/health --yes`));
+      assert.doesNotMatch(result.stdout, /test-host\.example\.invalid/);
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("tailscale setup serve-agents requires explicit --yes", () => {
+  const result = runTailscaleSetup(["serve-agents", "--json"]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /requires --yes/);
+});
+
 test("Control Center Next config gets Tailscale dev origins from env", () => {
   const config = readFileSync("interfaces/control-center/next.config.mjs", "utf8");
   assert.match(config, /PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIGINS/);
@@ -196,8 +283,10 @@ test("Codex-facing Tailscale operator protocol is documented", () => {
 
   for (const body of [agents, workflow, guide, cli.stdout]) {
     assert.match(body, /plan .*status|plan`, `status`|plan\/status|plan --app control-center/s);
+    assert.match(body, /plan-agents|agent/i);
     assert.match(body, /install --yes/);
     assert.match(body, /serve --yes/);
+    assert.match(body, /serve-agents --yes|agent/i);
     assert.match(body, /off(?: .*?)? --yes|off --yes/);
     assert.match(body, /explicit\s+user approval|explicit\s+user confirmation|separate explicit\s+user approval/);
     assert.match(body, /Peer access|peer access|trusted peer device|phone/);

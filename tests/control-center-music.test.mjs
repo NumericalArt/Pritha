@@ -7,7 +7,7 @@ import test from "node:test";
 
 import { importControlCenterMusicModule } from "./helpers/control-center-ts.mjs";
 
-const { buildBackgroundMusicPrompt, normalizeMusicStyleKey } = await importControlCenterMusicModule("prompt-builder.ts");
+const { buildBackgroundMusicPrompt, findMusicPromptMismatches, normalizeMusicStyleKey } = await importControlCenterMusicModule("prompt-builder.ts");
 const { normalizeMusicSourceSettings } = await importControlCenterMusicModule("settings.ts");
 const { LocalMusicLibraryProvider } = await importControlCenterMusicModule("library/provider.ts");
 const {
@@ -17,6 +17,7 @@ const {
   MAX_MUSIC_LEVEL_PERCENT,
   MAX_MUSIC_USER_VOLUME,
   musicControlVolumeArgToUserVolume,
+  musicDuckingGainToElementVolumeRatio,
   musicSourceCapabilities,
   musicPercentToUserVolume,
   musicUserVolumeToElementVolume,
@@ -75,6 +76,46 @@ test("music prompt builder forces background instrumental intent", () => {
   assert.equal(normalizeMusicStyleKey("  Organ!!! Ambient  "), "organ ambient");
 });
 
+test("music prompt builder preserves operator request and flags provider contradictions", () => {
+  const prompt = buildBackgroundMusicPrompt("melodic ambient without drums", {
+    operatorRequest: "Оставь весь музыкальный трек как есть, только убери ударные.",
+    preserveCurrent: true,
+    referenceStyle: "calm ambient",
+    referencePrompt: "slow warm ambient pads with no lead melody",
+  });
+  assert.match(prompt, /Operator request, highest priority musical intent/);
+  assert.match(prompt, /только убери ударные/);
+  assert.match(prompt, /preserves the current track/);
+  assert.match(prompt, /Strict exclusion: no drums, no percussion, no drum machine/);
+  assert.match(prompt, /Do not replace the operator request with a generic upbeat/);
+
+  assert.deepEqual(
+    findMusicPromptMismatches({
+      style: "melodic ambient without drums",
+      operatorRequest: "remove drums",
+      providerPrompt: "A bright track driven by a tight drum machine and crisp percussion.",
+    }),
+    ["provider_prompt_conflicts_with_no_drums"],
+  );
+  assert.deepEqual(
+    findMusicPromptMismatches({
+      style: "melodic ambient without drums",
+      operatorRequest: "remove drums",
+      providerPrompt: "A spacious, non-percussive ambient drone with no drums.",
+    }),
+    [],
+  );
+  assert.deepEqual(
+    findMusicPromptMismatches({
+      style: "melodic ambient without drums",
+      operatorRequest: "remove drums",
+      sentPrompt: prompt,
+      providerPrompt: prompt,
+    }),
+    [],
+  );
+});
+
 test("music source settings default to SomaFM", () => {
   const settings = normalizeMusicSourceSettings({});
   assert.equal(settings.defaultSource, "somafm");
@@ -102,6 +143,8 @@ test("Realtime music_control tool is gated by session config", () => {
   assert.match(runtimeSource, /enum: \["somafm", "library", "ace-step"\]/);
   assert.match(runtimeSource, /set_channel/);
   assert.match(runtimeSource, /repeat_all/);
+  assert.match(runtimeSource, /operator_request/);
+  assert.match(runtimeSource, /preserve_current/);
   assert.match(runtimeSource, /buildRealtimeSessionConfig\(options: RealtimeSessionBuildOptions = \{\}\)/);
 });
 
@@ -141,11 +184,11 @@ test("music volume supports boosted voice control above standard level", () => {
   assert.doesNotMatch(voiceMusicSource, /function clamp01/);
 });
 
-test("music source capabilities mark SomaFM as external and local/generated as controllable", () => {
+test("music source capabilities mark SomaFM as external but duckable", () => {
   assert.deepEqual(musicSourceCapabilities("somafm"), {
     source: "somafm",
     programmaticVolume: false,
-    ducking: false,
+    ducking: true,
     externalStream: true,
   });
   assert.deepEqual(musicSourceCapabilities("somafm-decoded"), {
@@ -156,9 +199,14 @@ test("music source capabilities mark SomaFM as external and local/generated as c
   });
   assert.equal(musicSourceCapabilities("library").programmaticVolume, true);
   assert.equal(musicSourceCapabilities("ace-step").ducking, true);
+  assert.equal(musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_NORMAL_DB)), 1);
+  const duckedElementRatio = musicDuckingGainToElementVolumeRatio(dbToGain(MUSIC_DUCK_DB));
+  assert.ok(duckedElementRatio > 0.15);
+  assert.ok(duckedElementRatio < 0.25);
   assert.match(voiceMusicSource, /volume_saved_external_stream/);
   assert.match(voiceMusicSource, /programmatic_volume/);
   assert.match(voiceMusicSource, /external_stream/);
+  assert.match(voiceMusicSource, /musicDuckingGainToElementVolumeRatio\(slot\.duckingGainValue\)/);
 });
 
 test("Local Folder library imports uploaded audio into private playback folder", async () => {
@@ -231,9 +279,9 @@ test("music gain calculation keeps source volume separate from ducking", () => {
   });
   assert.equal(externalRadio.programmaticVolume, false);
   assert.equal(externalRadio.externalStream, true);
-  assert.equal(externalRadio.duckingSupported, false);
-  assert.equal(externalRadio.ducking, false);
-  assert.equal(externalRadio.duckingGain, dbToGain(MUSIC_NORMAL_DB));
+  assert.equal(externalRadio.duckingSupported, true);
+  assert.equal(externalRadio.ducking, true);
+  assert.equal(externalRadio.duckingGain, dbToGain(MUSIC_DUCK_DB));
 
   const decodedRadio = computeMusicOutputGain({
     controlEnabled: true,
@@ -284,6 +332,10 @@ test("music volume control protects against stuck speech and stale slots", () =>
   assert.match(voiceMusicSource, /USER_SPEECH_FALLBACK_STOP_MS/);
   assert.match(voiceMusicSource, /voice_music_user_speech_fallback_stop/);
   assert.match(voiceMusicSource, /voice_music_volume_settle/);
+  assert.match(voiceMusicSource, /const DUCK_ATTACK_SEC = 0\.35/);
+  assert.match(voiceMusicSource, /const RELEASE_DELAY_MS = 650/);
+  assert.match(voiceMusicSource, /const RELEASE_TIME_SEC = 1\.8/);
+  assert.doesNotMatch(voiceMusicSource, /const DUCK_ATTACK_SEC = 0\.04/);
   assert.match(voiceMusicSource, /rampSlotSourceVolume/);
   assert.match(voiceMusicSource, /rampSlotDuckingGain/);
   assert.match(voiceMusicSource, /mediaSource\.connect\(sourceGain\)/);
@@ -298,7 +350,7 @@ test("music volume control protects against stuck speech and stale slots", () =>
   assert.match(voiceMusicSource, /gain_source/);
   assert.match(voiceMusicSource, /decoded_graph_rms/);
   assert.match(voiceMusicSource, /if \(gainParam\) slot\.audio\.volume = 1/);
-  assert.match(voiceMusicSource, /musicUserVolumeToElementVolume\(slot\.sourceVolumeValue\)/);
+  assert.match(voiceMusicSource, /musicDuckingGainToElementVolumeRatio\(slot\.duckingGainValue\)/);
   assert.match(voiceMusicSource, /slot\.audio\.muted = elementVolume <= 0/);
   assert.match(voiceMusicSource, /return await setMusicVolume\(musicControlVolumeArgToUserVolume\(args\.volume\), "voice_control"\)/);
 });
@@ -329,7 +381,8 @@ test("music generation queue is single-worker and dedupes active style jobs", ()
   assert.match(queueSource, /while \(this\.pending\.length\)/);
   assert.match(queueSource, /await this\.runner\(job\.request\)/);
   assert.match(queueSource, /findActiveByStyle/);
-  assert.match(queueSource, /if \(existing && !request\.forceFresh\) return cloneJob\(existing\)/);
+  assert.match(queueSource, /hasPromptSpecifics/);
+  assert.match(queueSource, /if \(existing && !request\.forceFresh && !hasPromptSpecifics\(request\)\) return cloneJob\(existing\)/);
 });
 
 test("Voice client handles music_control locally and exposes one compact toggle pattern", () => {

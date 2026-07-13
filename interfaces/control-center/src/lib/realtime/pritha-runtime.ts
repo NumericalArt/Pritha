@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSyn
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
 import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
 import { checkCodexAppServerAvailable, PrithaCodexAppServerClient, resolveCodexBinary } from "./codex-task/codex-app-server-client";
 import {
@@ -43,6 +44,8 @@ import {
   type PrithaVoiceId,
   type VoiceBehaviorProfile,
 } from "./voice-settings";
+
+export { resolveTechscopeRoot } from "../pritha-paths";
 
 type RealtimeToolDefinition = {
   type: "function";
@@ -292,6 +295,52 @@ type VoiceSessionMemoryArgs = {
   events?: unknown;
 };
 
+type GoodStateSignalArgs = {
+  operator_signal?: unknown;
+  operator_message?: unknown;
+  scope?: unknown;
+  surface?: unknown;
+  reason?: unknown;
+  reasons?: unknown;
+  session_id?: unknown;
+  confidence?: unknown;
+};
+
+export type GoodStateSignalRecord = {
+  id: string;
+  status: "voice_confirmed_alignment_signal" | "pending_baseline_review";
+  source: "voice-control-realtime";
+  created_at: string;
+  scope: string;
+  operator_signal_preview: string;
+  reasons: string[];
+  session_id?: string;
+  confidence: string;
+  git: {
+    branch: string;
+    head: string;
+    recent_commits: string[];
+    dirty_tracked_count: number;
+    untracked_count: number;
+  };
+  alignment: Record<string, unknown>;
+  paths: {
+    record: string;
+  };
+  finalization: {
+    codex_task_required: boolean;
+    ui_approval_required: boolean;
+    voice_confirmation_sufficient?: boolean;
+    tracked_git_baseline?: string;
+    next_action: string;
+  };
+  privacy: {
+    tracked_git_artifact: boolean;
+    raw_transcript_stored: boolean;
+    secrets_redacted: boolean;
+  };
+};
+
 type RollingSummaryArgs = RollingSummaryCheckpointInput & {
   topic_key?: unknown;
   current_status?: unknown;
@@ -378,7 +427,7 @@ const VOICE_INTAKE_STAGING_TTL_MS = 2 * 60 * 60 * 1000;
 const RECENT_RESEARCH_DEFAULT_SOURCES = "reddit,hackernews,polymarket,grounding";
 const RECENT_RESEARCH_ALLOWED_SOURCES = new Set(["reddit", "hackernews", "polymarket", "grounding", "github", "jobs"]);
 const WEB_SEARCH_DEFAULT_BACKEND = "searxng";
-const WEB_SEARCH_DEFAULT_SEARXNG_URL = "http://127.0.0.1:8888/search";
+const WEB_SEARCH_DEFAULT_SEARXNG_URL = "http://127.0.0.1:8080/search";
 const WEB_SEARCH_DEFAULT_TIMEOUT_MS = 6_000;
 const WEB_SEARCH_AUTO_ENSURE_DEFAULT_TIMEOUT_MS = 240_000;
 const LAST30DAYS_LOCK_PATH = path.join("tools", "external-research", "last30days-lock.json");
@@ -399,23 +448,6 @@ export class RealtimeProviderError extends Error {
     this.status = params.status;
     this.providerCode = params.providerCode;
   }
-}
-
-export function resolveTechscopeRoot() {
-  if (process.env.TECHSCOPE_ROOT) {
-    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
-    if (existsSync(envRoot)) return envRoot;
-  }
-
-  let cursor = process.cwd();
-  for (let i = 0; i < 8; i += 1) {
-    if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "11_agents"))) return cursor;
-    const next = path.dirname(cursor);
-    if (next === cursor) break;
-    cursor = next;
-  }
-
-  return process.cwd();
 }
 
 function loadEnvFile(filePath: string) {
@@ -441,6 +473,9 @@ function loadRuntimeEnv() {
   loadEnvFile(path.join(root, ".env.local"));
   loadEnvFile(path.join(process.cwd(), ".env"));
   loadEnvFile(path.join(process.cwd(), ".env.local"));
+  if (process.env.PRITHA_STATE_ROOT) {
+    loadEnvFile(path.join(resolvePrithaStateRoot(root), "config", "runtime.env"));
+  }
   const extraEnvFile = process.env.PRITHA_CONTROL_CENTER_ENV_FILE;
   if (extraEnvFile) loadEnvFile(path.resolve(extraEnvFile));
 }
@@ -623,7 +658,7 @@ async function cleanupVoiceIntakeStaging(intake: unknown, reason: string) {
 }
 
 function memoryDbPath(root = resolveTechscopeRoot()) {
-  return path.join(root, ".memory", "techscope.sqlite");
+  return resolvePrithaStatePath("memory", "techscope.sqlite");
 }
 
 function memoryStatsMap() {
@@ -1351,7 +1386,7 @@ function searchRuntimeMemory(args: FullMemoryArgs) {
     }
   }
 
-  const runtimeDirs = [path.join(privateRoot(), "codex-tasks"), path.join(root, ".queue")];
+  const runtimeDirs = [path.join(privateRoot(), "codex-tasks"), resolvePrithaStatePath("queue")];
   for (const directory of runtimeDirs) {
     const files = listFilesRecursive(directory, 300)
       .filter((filePath) => /\.(json|jsonl|md|log|txt)$/.test(filePath))
@@ -2600,7 +2635,18 @@ function musicControlToolDefinition(): RealtimeToolDefinition {
         },
         style: {
           type: "string",
-          description: "Concise requested ACE-Step music style, for example: organ ambient, calm piano, lofi, orchestral, dark ambient.",
+          description:
+            "Concise requested ACE-Step music style, for example: organ ambient, calm piano, lofi, orchestral, dark ambient. Keep this short, but preserve the operator's exact detailed request in operator_request.",
+        },
+        operator_request: {
+          type: "string",
+          description:
+            "For ACE-Step generated music, include the operator's exact natural-language music request and constraints. This is the primary generation intent and should preserve details like 'leave the current track as-is, only remove drums'.",
+        },
+        preserve_current: {
+          type: "boolean",
+          description:
+            "For ACE-Step generated music. Set true when the operator asks to keep the current track/style/mood as-is and change only one attribute.",
         },
         channel_id: {
           type: "string",
@@ -2747,6 +2793,45 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
             description: "Optional stable topic key. Defaults to Pritha's general rolling handoff.",
           },
         },
+      },
+    },
+    {
+      type: "function",
+      name: "record_good_state_signal",
+      description:
+        "Record a positive operator acceptance signal from the current voice conversation as a private Good State Alignment signal. Use this whenever the operator clearly says the current Pritha state, recent change, behavior, configuration, or experience is good, beloved, exactly right, working well, or should be preserved, regardless of exact wording. This writes only a private alignment signal; it does not edit tracked Markdown, create Git commits, create tags, push to GitHub, or start Codex.",
+      parameters: {
+        type: "object",
+        properties: {
+          operator_signal: {
+            type: "string",
+            description:
+              "Short sanitized summary or direct positive phrase from the operator. Do not include secrets, private URLs, raw logs, credentials, or long transcript.",
+          },
+          scope: {
+            type: "string",
+            description:
+              "Affected scope if clear: pritha, voice-control, control-center, agents, tailscale, memory-good-state, a clone name, child agent name, or feature surface. Infer a compact scope when possible.",
+          },
+          reason: {
+            type: "string",
+            description: "Why this moment seems worth preserving as a Good State alignment signal.",
+          },
+          reasons: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional short reasons, accepted behaviors, or clues the operator liked.",
+          },
+          session_id: {
+            type: "string",
+            description: "Optional current voice session id when available.",
+          },
+          confidence: {
+            type: "string",
+            enum: ["operator-positive-signal", "explicit-save-request", "strong-acceptance", "uncertain-positive"],
+          },
+        },
+        required: ["operator_signal"],
       },
     },
     {
@@ -2946,7 +3031,8 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
         "Do not call music_control for automatic ducking when you or the operator speak. The client app handles ducking locally.",
         "For SomaFM radio, use source somafm. Use set_channel with channel_id when the operator names a known SomaFM id, or query when they describe a station or genre.",
         "For local saved audio files, use source library. Use next, previous, pause, resume, repeat_all, or query for a local track search.",
-        "For generated music, use source ace-step or action set_style with a concise style string. This may start ACE-Step generation and can take time.",
+        "For generated music, use source ace-step or action set_style. Put a short genre/mood label in style, and put the operator's full request in operator_request. Do not compress away constraints. If the operator says 'leave it as-is, only remove drums' or similar, set preserve_current=true and include that exact instruction in operator_request.",
+        "For generated music negative constraints, be literal. If the operator says no drums, no percussion, no rhythm, no piano, no strings, no vocals, or asks to remove something, include those words in operator_request rather than replacing them with a generic style.",
         "Volume uses 0..100 percent: 0 is silent/minimum, 50 is medium, and 100 is the maximum player level. If the operator says minimum, minimal, zero, mute music, or 'на минимум', use volume 0, not 5. Examples: \"включи радио SomaFM Groove Salad\" -> {\"action\":\"set_channel\",\"source\":\"somafm\",\"channel_id\":\"groovesalad\"}; \"следующий трек\" -> {\"action\":\"next\",\"source\":\"library\"}; \"включи органную музыку\" -> {\"action\":\"set_style\",\"source\":\"ace-step\",\"style\":\"organ ambient\"}; \"сделай музыку тише\" -> {\"action\":\"set_volume\",\"volume\":35}; \"сделай музыку на минимум\" -> {\"action\":\"set_volume\",\"volume\":0}; \"сделай музыку громче\" -> {\"action\":\"set_volume\",\"volume\":80}; \"максимальная громкость музыки\" -> {\"action\":\"set_volume\",\"volume\":100}; \"играй музыку только когда работаешь\" -> {\"action\":\"set_mode\",\"mode\":\"auto\"}.",
       ]
     : [];
@@ -2965,6 +3051,10 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     "inspect_codex_task exposes only safe operational status, phase, last activity, bounded progress events, speakable semantic progress and concise operator briefs. Prefer latest_voice_feedback and speakable_events over heartbeat when explaining task progress.",
     "Use recall_rolling_summary when the operator asks what you discussed last time, what happened in the previous voice session, what the current handoff is, or asks to continue from where you left off. This tool reads the single summary-only rolling handoff file; it is not long-term curated memory and it does not contain raw transcript.",
     "If recall_rolling_summary returns found=false, say that no rolling handoff is available yet and then offer to search curated Pritha memory if useful. Do not claim the previous conversation is unknown until you have tried recall_rolling_summary for such questions.",
+    "Use record_good_state_signal whenever the operator gives a clear positive acceptance signal about the current Pritha state, a recent fix, a clone, a feature surface, voice behavior, Agents behavior, Control Center behavior, memory/alignment, or a child agent. Do not rely on fixed phrases. Signals may be formal, casual or affectionate, for example: this works well, this is exactly right, Pritha is wonderful, I love this Pritha, you did great, keep this state, or equivalent Russian wording.",
+    "record_good_state_signal is a narrow private capture tool. It creates a voice-confirmed Good State Alignment signal. The operator's clear voice confirmation is sufficient for this private alignment signal; do not require a separate UI confirmation and do not claim that a nonexistent UI step is required.",
+    "record_good_state_signal must not create tracked Markdown, commit, tag, push, install services, write secrets, or start Codex. Do not call run_codex_task just to record the positive signal. A tracked Git/tag Good State Baseline is optional and should be discussed only if the operator explicitly asks to create a durable Git recovery point.",
+    "After record_good_state_signal succeeds, briefly say that the moment was captured as a Good State alignment signal. Do not say it is blocked on UI approval.",
     "When a Codex task is waiting_for_operator or latest_voice_feedback.requires_response is true, ask the Codex question plainly and wait for the operator's direct answer. If Codex asks for an exact confirmation phrase and the operator gives a clear short confirmation such as да, ок, подтверждаю, передавай, запускай, yes, ok or go ahead, do not force the operator to repeat the phrase word for word; call answer_codex_task and let the runtime synthesize the exact Codex answer when possible. Do not start a new run_codex_task just to answer that clarification.",
     "When the UI sends a 'Voice Intake Clarification Pending' message, do not call run_codex_task. First ask the operator what they want done with the files, screenshots, PDFs, pasted links, YouTube/video links, audio files, or nearby pasted text. Offer concise options when useful: quick analysis, extract facts, memory candidate, context for a specific child agent, transcription/summarization, research/citation, import supported audio into Music Local Folder for Music mode playback, or cancel. After the operator gives a clear intent, call confirm_voice_intake with the same intake_id. Use action=ask_more if the instruction is still ambiguous, action=cancel if the operator cancels, and action=submit only when operator_instruction is clear. If the operator chooses Music Local Folder, set intent=music_local_folder; the UI imports audio locally and does not upload it to Codex.",
     "Use web_search for ordinary current web lookup: official pages, docs, release pages, current facts, source discovery, news lookup or a quick cited search before answering by voice. Prefer source_policy=official_first and domains when the operator asks for a reliable or official answer. Use operation=diagnose if the operator asks whether search is working.",
@@ -3140,7 +3230,236 @@ export async function createRealtimeCall(offerSdp: string, ephemeralKey: string)
 }
 
 function privateRoot() {
-  return path.join(resolveTechscopeRoot(), ".private", "interface-lab", "pritha-control-center", "realtime");
+  return resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "realtime");
+}
+
+function goodStateRoot() {
+  return path.join(privateRoot(), "good-state");
+}
+
+function goodStateSignalsDir() {
+  return path.join(goodStateRoot(), "signals");
+}
+
+function goodStateLegacyPendingDir() {
+  return path.join(goodStateRoot(), "pending");
+}
+
+function redactGoodStateText(value: unknown, maxChars = 1_000) {
+  return redactSensitiveText(value, maxChars)
+    .replace(/https?:\/\/[^\s<>"')\]]+/g, "[redacted-url]")
+    .replace(/\b[A-Za-z0-9-]+\.ts\.net\b/gi, "[redacted-tailscale-host]");
+}
+
+function normalizeGoodStateScope(args: GoodStateSignalArgs) {
+  const explicit = compactText(args.scope || args.surface, 140).toLowerCase();
+  if (explicit) return explicit.replace(/[^a-z0-9а-яё _.-]+/gi, " ").replace(/\s+/g, "-").replace(/^-+|-+$/g, "") || "pritha";
+
+  const signal = compactText(args.operator_signal || args.operator_message || "", 800).toLowerCase();
+  if (/voice|realtime|голос|войс|music|duck|музык|звук|громк/.test(signal)) return "voice-control";
+  if (/agent|агент|tailscale|tailnet|start|stop|запуск|останов/.test(signal)) return "agents";
+  if (/memory|памят|baseline|alignment|good state/.test(signal)) return "memory-good-state";
+  if (/control center|центр|интерфейс|ui|страниц/.test(signal)) return "control-center";
+  return "pritha";
+}
+
+function normalizeGoodStateReasons(value: unknown, fallback: string) {
+  const raw = Array.isArray(value) ? value : String(value || "").split(/[;\n]+/);
+  const reasons = raw.map((item) => redactGoodStateText(item, 240)).filter(Boolean).slice(0, 6);
+  if (reasons.length) return reasons;
+  return fallback ? [fallback] : ["operator gave a clear positive acceptance signal"];
+}
+
+function countGitStatusLines(status: string, prefixPattern: RegExp) {
+  return status.split(/\r?\n/).filter((line) => prefixPattern.test(line)).length;
+}
+
+function currentGoodStateGitAnchor() {
+  const branch = commandResult("git", ["rev-parse", "--abbrev-ref", "HEAD"], { raw: true });
+  const head = commandResult("git", ["rev-parse", "--short", "HEAD"], { raw: true });
+  const log = commandResult("git", ["log", "-5", "--oneline", "--decorate"], { raw: true, maxBuffer: 2 * 1024 * 1024 });
+  const status = commandResult("git", ["status", "--short"], { raw: true, maxBuffer: 2 * 1024 * 1024 });
+  const statusText = status.ok ? status.stdout : "";
+  return {
+    branch: branch.ok ? compactText(branch.stdout, 120) : "unknown",
+    head: head.ok ? compactText(head.stdout, 40) : "unknown",
+    recent_commits: log.ok ? log.stdout.split(/\r?\n/).map((line) => compactText(line, 220)).filter(Boolean).slice(0, 5) : [],
+    dirty_tracked_count: countGitStatusLines(statusText, /^(?:\s?M|\s?A|\s?D|\s?R|\s?C|UU|AA|DD)/),
+    untracked_count: countGitStatusLines(statusText, /^\?\?/),
+  };
+}
+
+function goodStateAlignmentSnapshot(scope: string, change: string) {
+  const result = commandResult(
+    "node",
+    ["scripts/good-state-alignment.mjs", "--scope", scope, "--change", change, "--limit", "3", "--json"],
+    { raw: true, timeoutMs: 30_000, maxBuffer: 4 * 1024 * 1024 },
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: "alignment-helper-failed",
+      error: compactText(result.stderr || result.stdout || result.error, 1_200),
+    };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout || "{}") as Record<string, unknown>;
+    const baselines = Array.isArray(parsed.baselines)
+      ? parsed.baselines.slice(0, 3).map((baseline) => {
+          const item = (typeof baseline === "object" && baseline !== null ? baseline : {}) as Record<string, unknown>;
+          return {
+            path: compactText(item.path, 240),
+            title: compactText(item.title, 180),
+            tag: compactText(item.tag, 180),
+            relevance: compactText(item.relevance, 80),
+            match_score: item.match_score,
+          };
+        })
+      : [];
+    const voiceSignals = Array.isArray(parsed.voice_signals)
+      ? parsed.voice_signals.slice(0, 3).map((signal) => {
+          const item = (typeof signal === "object" && signal !== null ? signal : {}) as Record<string, unknown>;
+          return {
+            id: compactText(item.id, 120),
+            status: compactText(item.status, 120),
+            scope: compactText(item.scope, 120),
+            created_at: compactText(item.created_at, 80),
+            operator_signal_preview: compactText(item.operator_signal_preview, 240),
+            relevance: compactText(item.relevance, 80),
+            match_score: item.match_score,
+          };
+        })
+      : [];
+    return {
+      ok: true,
+      status: compactText(parsed.status, 120),
+      scope: compactText(parsed.scope, 180),
+      baselines,
+      voice_signals: voiceSignals,
+      classification_hint: baselines.length
+        ? "review-relevant-baselines"
+        : voiceSignals.length
+          ? "review-relevant-voice-signals"
+          : "no-relevant-baseline",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: "alignment-json-parse-failed",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function writeGoodStateRecord(record: GoodStateSignalRecord) {
+  const dir = goodStateSignalsDir();
+  await mkdir(dir, { recursive: true });
+  const recordPath = path.join(dir, `${record.id}.json`);
+  const tmpPath = `${recordPath}.${process.pid}.${Date.now()}.tmp`;
+  const root = resolveTechscopeRoot();
+  const withPath = {
+    ...record,
+    paths: {
+      record: rootRelative(root, recordPath),
+    },
+  };
+  await writeFile(tmpPath, `${JSON.stringify(withPath, null, 2)}\n`, "utf8");
+  await rename(tmpPath, recordPath);
+  await appendFile(path.join(goodStateRoot(), "signals.jsonl"), `${JSON.stringify(withPath)}\n`, "utf8");
+  return withPath;
+}
+
+export async function recordPrithaGoodStateSignal(args: GoodStateSignalArgs = {}) {
+  const operatorSignal = redactGoodStateText(args.operator_signal || args.operator_message || args.reason || "positive operator signal", 1_000);
+  const scope = normalizeGoodStateScope(args);
+  const reasonText = redactGoodStateText(args.reason, 240);
+  const reasons = normalizeGoodStateReasons(args.reasons, reasonText);
+  const now = new Date().toISOString();
+  const id = `good-state-${now.slice(0, 10)}-${randomUUID().slice(0, 8)}`;
+  const git = currentGoodStateGitAnchor();
+  const alignment = goodStateAlignmentSnapshot(scope, `Voice Control recorded positive operator acceptance: ${operatorSignal}`);
+  const record: GoodStateSignalRecord = {
+    id,
+    status: "voice_confirmed_alignment_signal",
+    source: "voice-control-realtime",
+    created_at: now,
+    scope,
+    operator_signal_preview: operatorSignal,
+    reasons,
+    session_id: compactText(args.session_id, 180) || undefined,
+    confidence: compactText(args.confidence, 80) || "operator-positive-signal",
+    git,
+    alignment,
+    paths: {
+      record: "",
+    },
+    finalization: {
+      codex_task_required: false,
+      ui_approval_required: false,
+      voice_confirmation_sufficient: true,
+      tracked_git_baseline: "optional-separate-workflow-only-if-operator-asks-for-git-recovery-point",
+      next_action:
+        "No UI action is required for the private voice signal. Use it as a Good State Alignment anchor; create a tracked Git/tag baseline later only if the operator explicitly asks for a durable recovery point.",
+    },
+    privacy: {
+      tracked_git_artifact: false,
+      raw_transcript_stored: false,
+      secrets_redacted: true,
+    },
+  };
+  const saved = await writeGoodStateRecord(record);
+  await logPrivateEvent("good_state_signal_recorded", {
+    id: saved.id,
+    scope: saved.scope,
+    status: saved.status,
+    record_path: saved.paths.record,
+    alignment_status: compactText(saved.alignment.status, 120),
+  });
+  return {
+    ok: true,
+    status: saved.status,
+    signal: saved,
+    speakable_summary:
+      "Зафиксировала это как Good State alignment signal. Отдельное UI-подтверждение не нужно.",
+  };
+}
+
+function listPrithaGoodStateSignalsSync(limit = 5) {
+  const root = resolveTechscopeRoot();
+  const dirs = [goodStateSignalsDir(), goodStateLegacyPendingDir()];
+  const files = dirs
+    .filter((dir) => existsSync(dir))
+    .flatMap((dir) =>
+      readdirSync(dir)
+        .filter((entry) => entry.endsWith(".json"))
+        .map((entry) => path.join(dir, entry))
+        .filter((filePath) => isPathInsideOrSame(dir, filePath)),
+    )
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    .slice(0, Math.max(1, Math.min(Number(limit) || 5, 20)));
+  const records: GoodStateSignalRecord[] = [];
+  const seen = new Set<string>();
+  for (const filePath of files) {
+    try {
+      const parsed = JSON.parse(readFileSync(filePath, "utf8")) as GoodStateSignalRecord;
+      if (parsed.id && seen.has(parsed.id)) continue;
+      if (parsed.id) seen.add(parsed.id);
+      records.push({
+        ...parsed,
+        paths: {
+          ...parsed.paths,
+          record: parsed.paths?.record || rootRelative(root, filePath),
+        },
+      });
+    } catch {
+      continue;
+    }
+  }
+  return records;
+}
+
+export async function listPrithaGoodStateSignals(limit = 5) {
+  return listPrithaGoodStateSignalsSync(limit);
 }
 
 const rollingSummaryLastWriteAt = new Map<string, number>();
@@ -3777,7 +4096,7 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
   const summaryLines = bulletLines(events);
 
   if (classified.decision === "private-user-memory") {
-    const privateDir = path.join(root, ".private", "user-memory");
+    const privateDir = resolvePrithaStatePath("private", "user-memory");
     await mkdir(privateDir, { recursive: true });
     const privatePath = path.join(privateDir, `${date}-${sessionId}.md`);
     const body = [
@@ -3802,7 +4121,7 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
       "## Suggested Target",
       "",
       "- Target: local-private user memory note.",
-      `- Path: ${rootRelative(root, privatePath)}`,
+      `- Path: ${rootRelative(resolvePrithaStateRoot(root), privatePath)}`,
       "",
       "## Risks And Open Questions",
       "",
@@ -3813,13 +4132,13 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
       "",
     ].join("\n");
     await writeFile(privatePath, body, "utf8");
-    const result = { ok: true, saved: true, decision: classified.decision, path: rootRelative(root, privatePath), event_count: events.length };
+    const result = { ok: true, saved: true, decision: classified.decision, path: rootRelative(resolvePrithaStateRoot(root), privatePath), event_count: events.length };
     await writeFile(indexPath, `${JSON.stringify({ ...result, updated_at: now.toISOString() }, null, 2)}\n`, "utf8");
     await logPrivateEvent("voice_session_memory_saved", { session_id: sessionId, path: result.path, decision: classified.decision });
     return result;
   }
 
-  const artifactDir = path.join(root, "03_reviews");
+  const artifactDir = resolvePrithaStatePath("voiceDrafts");
   await mkdir(artifactDir, { recursive: true });
   const artifactPath = path.join(artifactDir, `${date}-${sessionId}-voice-session-memory.md`);
   const artifactId = `${date}-${sessionId}-voice-session-memory`;
@@ -3887,7 +4206,7 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
     "## Suggested Target Artifact",
     "",
     "- Suggested type: review.",
-    `- Suggested path: ${rootRelative(root, artifactPath)}`,
+    `- Suggested path: ${rootRelative(resolvePrithaStateRoot(root), artifactPath)}`,
     "- Promotion path: review evidence first; only later convert stable patterns into decisions, workflows or standards.",
     "",
     "## Routing Decision",
@@ -3905,16 +4224,18 @@ export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {
     "",
   ].join("\n");
   await writeFile(artifactPath, body, "utf8");
-  const checks = await validateAndRebuildMemory();
+  const isolatedState = resolvePrithaStateRoot(root) !== root;
+  const rebuilt = isolatedState ? null : await validateAndRebuildMemory();
+  const checks = rebuilt || { ok: true, skipped: true, reason: "local_voice_draft_not_promoted_to_shared_memory" };
   const result = {
     ok: checks.ok,
     saved: true,
     decision: classified.decision,
-    path: rootRelative(root, artifactPath),
+    path: rootRelative(resolvePrithaStateRoot(root), artifactPath),
     event_count: events.length,
-    validation: checks.validation,
-    rebuild: checks.rebuild,
-    embeddings: checks.embeddings,
+    validation: rebuilt?.validation || null,
+    rebuild: rebuilt?.rebuild || null,
+    embeddings: rebuilt?.embeddings || null,
   };
   await writeFile(indexPath, `${JSON.stringify({ ...result, updated_at: now.toISOString() }, null, 2)}\n`, "utf8");
   await logPrivateEvent("voice_session_memory_saved", { session_id: sessionId, path: result.path, decision: classified.decision, ok: result.ok });
@@ -4046,8 +4367,8 @@ function childAgentAliases(directoryName: string) {
 }
 
 function knownSiblingChildAgentProjects(root: string) {
-  const parent = path.dirname(root);
-  const rootName = path.basename(root);
+  const parent = resolvePrithaAgentParent(root);
+  const codeRoot = path.resolve(root);
   let entries: string[] = [];
   try {
     entries = readdirSync(parent);
@@ -4056,8 +4377,9 @@ function knownSiblingChildAgentProjects(root: string) {
   }
 
   return entries.flatMap((entry): ChildAgentProject[] => {
-    if (!entry || entry.startsWith(".") || entry === rootName) return [];
+    if (!entry || entry.startsWith(".")) return [];
     const directory = path.join(parent, entry);
+    if (path.resolve(directory) === codeRoot) return [];
     if (!isDirectory(directory) || !existsSync(path.join(directory, "AGENTS.md"))) return [];
     return [{ name: entry, directory, aliases: childAgentAliases(entry) }];
   });
@@ -4646,7 +4968,7 @@ function codexTaskApprovalReasons(task: Record<string, unknown>) {
   if (/(deploy|deployment|publish|release|push\s+to\s+github|gh\s+pr|git\s+push)/.test(taskText)) reasons.push("external_publish_or_deployment");
   if (/(delete|remove|destroy|wipe|drop|rm\s+-rf|erase)\b/.test(taskText)) reasons.push("destructive_change");
   if (/(secret|credential|token|api\s*key|password|\.env\.local|private\s+key)/.test(taskText)) reasons.push("credential_or_secret_change");
-  if (/(control\s*center|control-center|pritha\s+ui|\/voice|\/agents|127\.0\.0\.1:3420|:3420)/.test(taskText)) {
+  if (/(control\s*center|control-center|pritha\s+ui|\/voice|\/agents|127\.0\.0\.1:\d+|localhost:\d+)/.test(taskText)) {
     if (/(restart|rebuild|reload|stop|kill|terminate|npm\s+run\s+start|next\s+start|refresh\s+server|перезапуск|пересбор|перезапусти|останов)/.test(taskText)) {
       reasons.push("control_center_runtime_change");
     }
@@ -4745,7 +5067,7 @@ function codexAdditionalWritableDirs(root: string, task: Record<string, unknown>
   if (sandbox !== "workspace-write") return [];
   const taskType = String(task.task_type || "").toLowerCase();
   if (taskType.toLowerCase() !== "agent_creation") return [];
-  return [path.dirname(root)];
+  return [resolvePrithaAgentParent(root)];
 }
 
 function codexExistingChildAgentWritableDirs(root: string, task: Record<string, unknown>) {
@@ -4908,7 +5230,7 @@ function agentDevelopmentResearchGatePayload() {
     pattern_pack: {
       required: true,
       artifact: "11_agents/research/YYYY-MM-DD-<agent>-agent-pattern-pack.md",
-      semantic_embedding_search: "attempt-required; if unavailable, continue with warning and log to .private/agents-mother/semantic-memory-failures.jsonl",
+      semantic_embedding_search: "attempt-required; if unavailable, continue with warning and log to the current instance private state",
       external_seed_source: "selected memory patterns",
     },
     external_research: {
@@ -5178,7 +5500,7 @@ function syntheticCodexTaskPlan(task: Record<string, unknown>, source: CodexTask
         {
           id: "rebuild_registry",
           title: "Rebuild Registry",
-          goal: "Run the Pritha registry rebuild so the child-agent appears in 11_agents/registry.md with contract/report evidence.",
+          goal: "Run the Pritha registry rebuild so the child-agent appears in the current instance registry with contract/report evidence.",
           expectedOutput: "Registry contains the new child-agent row.",
           needsWrite: true,
           needsNetwork: false,
@@ -6187,8 +6509,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
     subject_label: args.subject_label ? normalizeThreadScopeLabel(args.subject_label, String(args.subject_id || "subject")) : undefined,
     thread_reset: boolValue(args.thread_reset),
     root: rootRelative(root, root),
-    sibling_agent_parent: rootRelative(root, path.dirname(root)),
-    sibling_agent_parent_absolute: path.dirname(root),
+    sibling_agent_parent: rootRelative(root, resolvePrithaAgentParent(root)),
+    sibling_agent_parent_absolute: resolvePrithaAgentParent(root),
     requested_transport: requestedTransport,
     fallback_transport: fallbackTransport,
     effective_transport: effectiveTransport,
@@ -7658,6 +7980,8 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
     }
   } else if (name === "answer_codex_task") {
     output = await answerPrithaCodexTask(args);
+  } else if (name === "record_good_state_signal") {
+    output = await recordPrithaGoodStateSignal(args);
   } else if (name === "web_search") {
     output = await handleWebSearch(args);
   } else if (name === "recent_external_research") {
@@ -7723,6 +8047,13 @@ export function getPrithaRealtimeStatus() {
       private_or_paid_sources: "disabled-by-default",
     },
     web_search: realtimeWebSearchStatus(),
+    good_state: {
+      signal_count: listPrithaGoodStateSignalsSync(20).length,
+      pending_count: listPrithaGoodStateSignalsSync(20).filter((signal) => signal.status === "pending_baseline_review").length,
+      latest: listPrithaGoodStateSignalsSync(1)[0] || null,
+      tool: "record_good_state_signal",
+      finalize_requires: "voice-capture-complete-git-baseline-optional",
+    },
     private_root: rootRelative(root, privateRoot()),
   };
 }

@@ -54,7 +54,7 @@ LAN binding is disabled by policy in this build. Keep Control Center on
 `127.0.0.1` and use Tailscale Serve for phone or trusted peer-device access.
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan --app control-center
 node scripts/tailscale-setup.mjs status --json
 ```
 
@@ -90,7 +90,7 @@ lsof -nP -iTCP:3420 -sTCP:LISTEN
 
 If Codex is operating the project, killing or replacing the local Control
 Center process requires explicit user approval immediately before the action.
-After approval, stop only the PID that is listening on `127.0.0.1:3420`, then
+After approval, stop only the PID that is listening on the configured Control Center port, then
 start a fresh foreground server:
 
 ```sh
@@ -216,7 +216,7 @@ used by the read-only limits probe.
 Read the current plan/status first:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan --app control-center
 node scripts/tailscale-setup.mjs status --json
 node scripts/tailscale-setup.mjs auth-status
 ```
@@ -224,8 +224,8 @@ node scripts/tailscale-setup.mjs auth-status
 Serve and stop commands require explicit approval:
 
 ```sh
-node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes
-node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes
+node scripts/tailscale-setup.mjs serve --app control-center --port <control-center-port> --yes
+node scripts/tailscale-setup.mjs off --app control-center --port <control-center-port> --yes
 ```
 
 Pritha setup never enables Tailscale Funnel. Funnel is public exposure and must

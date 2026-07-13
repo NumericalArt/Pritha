@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-06-24
+updated: 2026-07-02
 topics:
   - agent-engineering
   - agent-factory
@@ -18,6 +18,7 @@ tools:
   - OpenAI Realtime API
   - gpt-realtime-2
   - Pritha
+  - A2A Protocol
 sources:
   - 03_reviews/2026-05-18-techscope-agents-mother-scenario-review.md
   - 04_standards/agent-creation-harness.md
@@ -37,6 +38,7 @@ sources:
   - 04_standards/agent-team-operating-model.md
   - 04_standards/agent-skill-pack-lifecycle.md
   - 04_standards/agent-mcp-connector-lifecycle.md
+  - 04_standards/agent-a2a-interoperability.md
   - 04_standards/agent-ai-safe-security-checklist.md
 related:
   standards:
@@ -50,6 +52,7 @@ related:
     - 04_standards/agent-team-operating-model.md
     - 04_standards/agent-skill-pack-lifecycle.md
     - 04_standards/agent-mcp-connector-lifecycle.md
+    - 04_standards/agent-a2a-interoperability.md
     - 04_standards/agent-ai-safe-security-checklist.md
   templates:
     - 08_templates/agent-project-contract.md
@@ -58,6 +61,7 @@ related:
     - 07_workflows/agents-mother-roadmap.md
     - 07_workflows/agent-skill-pack-selection.md
     - 07_workflows/agent-mcp-connector-selection.md
+    - 07_workflows/agent-a2a-communication-selection.md
 supersedes: []
 superseded_by: []
 ---
@@ -138,6 +142,7 @@ runtime blockers, but creation is not complete while the agent is missing from
      execution/tools and infrastructure/orchestration controls;
    - skill needs, allowed skill sources, install mode and mutation policy;
    - MCP needs, allowed connector sources, auth policy, toolset scope and side-effect policy;
+   - A2A needs, peer-agent role, discovery mode, Agent Card visibility, trust registry and task policy;
    - acceptance tests and training expectations.
    If the first user description is not enough to fill these fields, ask concise
    clarifying questions before handing the task to Codex. Creation,
@@ -336,6 +341,14 @@ When selected, use `04_standards/agent-mcp-connector-lifecycle.md` and
 `07_workflows/agent-mcp-connector-selection.md`. External MCP servers should be
 recommended, reviewed, scoped and marked for readiness; they should not be
 installed silently or exposed with broad toolsets.
+
+A2A is an optional peer-agent communication module, not a default property of
+every descendant. When selected, use
+`04_standards/agent-a2a-interoperability.md` and
+`07_workflows/agent-a2a-communication-selection.md`. A2A should expose only
+selected Agent Skills through an adapter layer, with private/direct discovery by
+default for sibling agents, explicit trust registry, untrusted-input handling,
+auth policy and readiness checks.
 
 ## Runtime Placement Decision Point
 

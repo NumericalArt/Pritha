@@ -17,11 +17,11 @@ replace:
 Do not commit a filled plist back to the repository or to a fork. Filled plist
 files contain local paths and may reveal machine-specific configuration.
 
-Validate a rendered plist before loading it:
+Copy rendered plists with Dasha-specific filenames, then validate them before loading:
 
 ```sh
-plutil -lint ~/Library/LaunchAgents/com.techscope.web.plist
-plutil -lint ~/Library/LaunchAgents/com.techscope.telegram-bot.plist
+plutil -lint ~/Library/LaunchAgents/com.techscope.web-dasha.plist
+plutil -lint ~/Library/LaunchAgents/com.techscope.telegram-bot-dasha.plist
 ```
 
 Installing or enabling launchd services is always an explicit user action.

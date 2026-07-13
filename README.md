@@ -266,7 +266,7 @@ node scripts/bootstrap.mjs --profile local --start control-center
 ```
 
 The prepare command installs deterministic local dependencies for the chosen
-profile, writes local non-secret setup state, rebuilds `.memory/techscope.sqlite`
+profile, writes local non-secret setup state, rebuilds the generated SQLite index
 and semantic embeddings from tracked Markdown, and verifies semantic memory
 search. The optional Control Center start command runs in the foreground. It
 does not install launchd, cron, Tailscale, durable services, or credentials.
@@ -315,6 +315,7 @@ node scripts/pritha.mjs test ../research-agent
 - [Using Pritha](docs/pritha.md)
 - [Memory](docs/memory.md)
 - [Operations](docs/operations.md)
+- [Instance Isolation And Fleet Rollout](docs/instance-isolation.md)
 - [GitHub Publish And Push](docs/github-publish-and-push.md)
 - [Contributing Workflow](docs/contributing-workflow.md)
 - [Realtime](docs/realtime.md)
@@ -365,8 +366,13 @@ Do not commit secrets or runtime state:
 - Local machine paths.
 - Telegram tokens or user identifiers.
 
+For normal multi-instance operation, set an external `PRITHA_STATE_ROOT` and
+keep instance paths, ports and secrets in `<state-root>/config/runtime.env`.
+Use `node scripts/pritha-instance.mjs status --json` for one instance and
+`node scripts/pritha-fleet.mjs status` for a local fleet.
+
 Markdown artifacts are the source of truth. Generated memory indexes such as
-`.memory/techscope.sqlite`, SQL rebuild dumps, and embeddings are local
+`<state-root>/memory/techscope.sqlite`, SQL rebuild dumps, and embeddings are local
 artifacts rebuilt by `node scripts/bootstrap.mjs prepare --profile local`; they
 should not accumulate binary history in Git. Private user memory belongs
 outside the tracked snapshot.

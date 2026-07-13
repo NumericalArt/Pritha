@@ -1,7 +1,7 @@
 import { CheckCircle2, ClipboardCheck, Copy, ExternalLink, HelpCircle, KeyRound, Play, RefreshCcw, RotateCcw, Square } from "lucide-react";
 import { useState } from "react";
 import type { AgentCardModel } from "@/data/mockAgents";
-import { type AccessMode, agentUrlForAccessMode } from "@/lib/access-mode";
+import { type AccessMode, accessBaseUrl, agentUrlForAccessMode } from "@/lib/access-mode";
 import { getCardAction, getCardActionLabel, getCardActionTone } from "@/data/mockAgents";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type { ControlCenterStatus } from "@/lib/control-center/types";
@@ -71,6 +71,18 @@ function credentialLabel(agent: AgentCardModel) {
   return "Unavailable";
 }
 
+function statusUrlForAccessMode(path: string | undefined, access: ControlCenterStatus["access"] | undefined, mode: AccessMode | undefined) {
+  if (!path) return undefined;
+  if (!access || !mode) return path;
+  const baseUrl = accessBaseUrl(access, mode);
+  if (!baseUrl) return path;
+  try {
+    return new URL(path, `${baseUrl.replace(/\/$/, "")}/`).toString().replace(/\/$/, "");
+  } catch {
+    return path;
+  }
+}
+
 export function AgentCard({
   agent,
   access,
@@ -90,7 +102,11 @@ export function AgentCard({
   const cardAction = getCardAction(agent);
   const actionTone = getCardActionTone(agent);
   const actionLabel = getCardActionLabel(agent);
-  const displayUrl = access && accessMode ? agentUrlForAccessMode(agent.url, access, accessMode, agent.tailscaleUrl) : agent.url;
+  const directUrl = access && accessMode ? agentUrlForAccessMode(agent.url, access, accessMode, agent.tailscaleUrl) : agent.url;
+  const fallbackStatusUrl = statusUrlForAccessMode(agent.statusUrl, access, accessMode);
+  const useDirectUrl = agent.activity === "active" && Boolean(directUrl);
+  const displayUrl = useDirectUrl ? directUrl : fallbackStatusUrl || directUrl;
+  const displayUrlLabel = useDirectUrl ? displayUrl?.replace("http://", mobile ? "" : "http://") : "Status page";
   const canShowUrl = agent.state === "alive" && Boolean(displayUrl);
   const canOpenPlan = Boolean(onAction);
   const canOpenCredentials = Boolean(onCredentials && agent.credentials?.total);
@@ -188,7 +204,7 @@ export function AgentCard({
 
       {canShowUrl ? (
         <div className={mobile ? "mobile-agent-url-row" : "agent-url-row"}>
-          <span>{displayUrl?.replace("http://", mobile ? "" : "http://")}</span>
+          <span>{displayUrlLabel}</span>
           <a
             className="icon-button"
             href={displayUrl}

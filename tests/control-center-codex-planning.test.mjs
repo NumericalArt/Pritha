@@ -62,7 +62,7 @@ test("Agent creation Codex tasks carry mandatory research gate metadata", () => 
   assert.match(runtimeSource, /node scripts\/pritha\.mjs external-research <contract> --input <evidence\.json>/);
   assert.match(runtimeSource, /research_gate_status: complete/);
   assert.match(runtimeSource, /separate pattern-pack artifact, external current-source evidence and memory-vs-external synthesis are mandatory before scaffold/);
-  assert.match(runtimeSource, /\.private\/agents-mother\/semantic-memory-failures\.jsonl/);
+  assert.match(runtimeSource, /current instance private state/);
   assert.match(runtimeSource, /card-first completion/);
   assert.match(runtimeSource, /node scripts\/pritha\.mjs card-readiness <agent-slug>/);
   assert.match(runtimeSource, /verify_control_center_card/);

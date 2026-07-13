@@ -96,6 +96,21 @@ test("semantic failure log is private jsonl and redacts secret-like values", () 
   assert.match(line, /query_hash/);
 });
 
+test("semantic failure log uses external private state when instance isolation is configured", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-semantic-root-"));
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-semantic-state-"));
+  const previous = process.env.PRITHA_STATE_ROOT;
+  try {
+    process.env.PRITHA_STATE_ROOT = stateRoot;
+    logSemanticFailure(root, { status: "unavailable", reason: "fixture" });
+    assert.equal(existsSync(path.join(stateRoot, "private", "agents-mother", "semantic-memory-failures.jsonl")), true);
+    assert.equal(existsSync(path.join(root, ".private", "agents-mother", "semantic-memory-failures.jsonl")), false);
+  } finally {
+    if (previous === undefined) delete process.env.PRITHA_STATE_ROOT;
+    else process.env.PRITHA_STATE_ROOT = previous;
+  }
+});
+
 test("keyword extraction keeps technology phrases for external enrichment", () => {
   const keywords = extractKeywords("OpenAI Realtime WebRTC voice plus MCP connector and semantic embeddings", 8);
   assert.ok(keywords.some((keyword) => /openai realtime/i.test(keyword) || keyword === "openai"));

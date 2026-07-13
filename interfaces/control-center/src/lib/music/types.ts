@@ -22,6 +22,10 @@ export type MusicGenerationStatus = "queued" | "generating" | "complete" | "fail
 export type AceStepGenerateRequest = {
   style: string;
   prompt?: string;
+  operatorRequest?: string;
+  preserveCurrent?: boolean;
+  referenceStyle?: string;
+  referencePrompt?: string;
   durationSec?: number;
   bpm?: number;
   keyScale?: string;
@@ -33,6 +37,9 @@ export type AceStepRemoteTrack = {
   taskId: string;
   fileUrl: string;
   prompt: string;
+  sentPrompt: string;
+  providerPrompt: string;
+  promptWarnings: string[];
   durationSec: number;
   audioBytes: Uint8Array;
   contentType: string;
@@ -44,6 +51,11 @@ export type CachedGeneratedTrack = {
   style: string;
   normalizedStyle: string;
   prompt: string;
+  operatorRequest?: string;
+  sentPrompt?: string;
+  providerPrompt?: string;
+  promptWarnings?: string[];
+  promptMismatch?: boolean;
   localPath: string;
   localUrl: string;
   durationSec: number;

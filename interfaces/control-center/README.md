@@ -43,8 +43,8 @@ Default local URL:
 http://127.0.0.1:3420/agents
 ```
 
-The app defaults to `3420` to avoid colliding with the existing legacy web UI
-on `3000`.
+The shared app default is `3420`; each instance overrides it in its external
+`runtime.env`. The deprecated legacy web UI defaults to `3000`.
 
 Localhost URLs and localhost QR codes work only on the Mac that runs Control
 Center. A phone sees `127.0.0.1` as the phone itself. For phone access, prefer
@@ -126,7 +126,9 @@ Use the guided operator flow:
 
 ```sh
 node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan-agents
 node scripts/tailscale-setup.mjs status --json
 node scripts/tailscale-setup.mjs serve --app control-center --port 3420 --yes
+node scripts/tailscale-setup.mjs serve-agents --yes
 node scripts/tailscale-setup.mjs off --app control-center --port 3420 --yes
 ```

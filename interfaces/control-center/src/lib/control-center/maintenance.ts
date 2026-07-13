@@ -1,22 +1,5 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { spawnSync } from "node:child_process";
-
-function resolvePrithaRoot() {
-  if (process.env.TECHSCOPE_ROOT && existsSync(process.env.TECHSCOPE_ROOT)) {
-    return path.resolve(process.env.TECHSCOPE_ROOT);
-  }
-
-  let cursor = process.cwd();
-  for (let index = 0; index < 8; index += 1) {
-    if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "11_agents"))) return cursor;
-    const next = path.dirname(cursor);
-    if (next === cursor) break;
-    cursor = next;
-  }
-
-  return path.resolve(process.cwd(), "..", "..");
-}
+import { resolveTechscopeRoot } from "../pritha-paths";
 
 function parseJson(stdout: string) {
   try {
@@ -33,7 +16,7 @@ function parseJson(stdout: string) {
 }
 
 export function runPrithaMaintenance(args: string[], options: { timeoutMs?: number } = {}) {
-  const root = resolvePrithaRoot();
+  const root = resolveTechscopeRoot();
   const result = spawnSync("node", args, {
     cwd: root,
     encoding: "utf8",

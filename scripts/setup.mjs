@@ -6,12 +6,13 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 import { moduleReadiness } from "./lib/module-readiness.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const DEFAULT_STATE_PATH = path.join(ROOT, ".techscope-setup.json");
-const DEFAULT_ENV_PATH = path.join(ROOT, ".env.local");
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
+const DEFAULT_STATE_PATH = STATE_ROOT === ROOT ? path.join(ROOT, ".techscope-setup.json") : path.join(STATE_ROOT, "setup", "setup.json");
+const DEFAULT_ENV_PATH = STATE_ROOT === ROOT ? path.join(ROOT, ".env.local") : path.join(STATE_ROOT, "config", "runtime.env");
 const SETUP_VERSION = 1;
 const REALTIME_DEFAULT_TOOLS = {
   internet: true,

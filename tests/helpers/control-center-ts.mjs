@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 
 const repoRoot = process.cwd();
 const musicSourceRoot = path.join(repoRoot, "interfaces", "control-center", "src", "lib", "music");
+const prithaPathsSource = path.join(repoRoot, "interfaces", "control-center", "src", "lib", "pritha-paths.ts");
 let transpilePromise;
 
 function loadTypeScript() {
@@ -29,7 +30,9 @@ async function collectTsFiles(dir) {
 }
 
 function rewriteTsImports(source) {
-  return source.replace(/(from\s+["']\.[^"']*)\.ts(["'])/g, "$1.mjs$2");
+  return source
+    .replace(/(from\s+["']\.[^"']*)\.ts(["'])/g, "$1.mjs$2")
+    .replace(/(from\s+["']\.\.\/pritha-paths)(["'])/g, "$1.mjs$2");
 }
 
 async function transpileMusicModules() {
@@ -52,6 +55,17 @@ async function transpileMusicModules() {
     });
     await writeFile(outPath, rewriteTsImports(compiled.outputText), "utf8");
   }
+  const pathSource = await readFile(prithaPathsSource, "utf8");
+  const pathCompiled = ts.transpileModule(pathSource, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ES2022,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      verbatimModuleSyntax: false,
+    },
+    fileName: prithaPathsSource,
+  });
+  await writeFile(path.join(path.dirname(outRoot), "pritha-paths.mjs"), pathCompiled.outputText, "utf8");
   return outRoot;
 }
 

@@ -3,7 +3,7 @@ id: AGENTS
 type: artifact
 status: processed
 created: 2026-06-01
-updated: 2026-06-21
+updated: 2026-07-02
 topics:
   - privacy-preserving-intake
 tools:[]
@@ -12,6 +12,9 @@ sources:
 related:
   workflows:
     - 07_workflows/privacy-preserving-intake.md
+    - 07_workflows/pritha-good-state-baseline.md
+  standards:
+    - 04_standards/pritha-good-state-alignment.md
 source_type: telegram
 source_class: telegram
 ingested_at: 2026-06-01
@@ -50,15 +53,25 @@ Retention: source-purged
 линейки должен называться `NumericalArt/Pritha`, если нет отдельного
 миграционного blocker.
 
-Канонический runtime-корень определяется env-first:
+Канонический корень кода определяется env-first:
 
 1. `TECHSCOPE_ROOT`, если переменная окружения задана.
 2. Git root текущего checkout.
 3. Текущий рабочий каталог как fallback.
 
+Локальное runtime-состояние отдельного экземпляра определяется
+`PRITHA_STATE_ROOT`. При заданной переменной все generated memory, setup,
+private data, queues, logs, audit, snapshots, voice drafts и live agent
+registry пишутся только во внешний state-root. Отсутствие переменной сохраняет
+legacy layout внутри checkout исключительно для обратной совместимости.
+`PRITHA_AGENT_PARENT` задаёт единственный каталог sibling agents, доступный
+этому экземпляру; Control Center не должен показывать агентов других Pritha.
+
 Не зашивать абсолютные user-specific пути в исполняемые скрипты, launchd-шаблоны, manifest-файлы и generated scaffold. Исторические Markdown-артефакты могут содержать старые пути как контекст миграций, но не должны быть источником runtime-конфигурации.
 
-Все новые агенты, создаваемые Pritha, должны размещаться соседними папками рядом с корнем Pritha, если пользователь явно не указал другой путь. Legacy `TECHSCOPE_ROOT` остается совместимым способом найти этот корень. Это позволяет держать Pritha и созданных агентов на одном уровне:
+Все новые агенты, создаваемые Pritha, должны размещаться в
+`PRITHA_AGENT_PARENT`, если пользователь явно не указал другой путь. При
+отсутствии переменной используется родитель `TECHSCOPE_ROOT`.
 
 - `<parent-of-TECHSCOPE_ROOT>/Pritha` — агент-копилка и фабрика агентов;
 - `<parent-of-TECHSCOPE_ROOT>/<agent-name>` — отдельный создаваемый или анализируемый агент;
@@ -125,7 +138,7 @@ node scripts/pritha.mjs interview
 Если пользователь просит `tailscale`, `private access`, `phone access` или доступ к локальному Control Center с другого доверенного устройства, использовать `docs/tailscale-private-access.md` и `scripts/tailscale-setup.mjs`. По умолчанию Codex может выполнять только read-only команды:
 
 ```sh
-node scripts/tailscale-setup.mjs plan --app control-center --port 3420
+node scripts/tailscale-setup.mjs plan --app control-center
 node scripts/tailscale-setup.mjs status --json
 node scripts/tailscale-setup.mjs auth-status
 ```
@@ -143,6 +156,32 @@ node scripts/self-test.mjs
 ```
 
 `self-test` и `queue-health` являются ручными проверками по умолчанию. Не включать cron, heartbeat, launchd, background service или scheduled pulse без явного подтверждения пользователя и отдельного deployment/operations report. `queue-health` только сообщает stale/failed jobs и не меняет очередь автоматически.
+
+## Good State Baseline
+
+Если после внесенных изменений пользователь явно или неформально дает понятный позитивный acceptance-сигнал о текущем состоянии Pritha, выбранного clone, feature surface или child agent, нужно предложить или выполнить workflow `07_workflows/pritha-good-state-baseline.md`. Не привязываться к фиксированным фразам: сигнал может быть техническим, бытовым, эмоциональным или ласковым, если смысл ясен - это состояние нравится и его стоит сохранить.
+
+Good State Baseline фиксирует не только git-точку, но и смысловую память о том, что именно понравилось: над чем работали в последнем цикле, какая конфигурация принята, какие проверки прошли, какие предупреждения допустимы, какие runtime/private файлы не входят в baseline и по каким признакам будущие изменения считаются регрессией.
+
+Если такой позитивный сигнал приходит через browser Realtime Voice Control, Pritha должна использовать узкий tool `record_good_state_signal`, а не запускать Codex-задачу только ради фиксации сигнала. Этот tool создает private voice-confirmed Good State Alignment signal в Control Center. Голосовое подтверждение пользователя достаточно для такой private фиксации; Pritha не должна ссылаться на несуществующее UI-одобрение или говорить, что сигнал "не завершен". Полная tracked baseline фиксация - Markdown report, git commit, annotated tag, push and memory rebuild - является отдельным recovery-point workflow только если пользователь явно просит именно Git/tag baseline.
+
+Перед любым изменением Pritha, ее runtime, интерфейсов, памяти, agent harness или child-agent шаблонов нужно выполнить пропорциональную сверку с Good State Baseline по стандарту `04_standards/pritha-good-state-alignment.md`. По умолчанию достаточно смотреть последние 3 релевантных accepted baseline для затронутого scope через:
+
+```sh
+node scripts/good-state-alignment.mjs --scope "<affected surface>" --limit 3
+```
+
+Эта сверка не должна превращаться в постоянные запросы подтверждения. Если изменение сохраняет accepted behavior, является добавлением, тестом, документацией или внутренним refactor без изменения пользовательского поведения, продолжать работу без прерывания пользователя. Явное подтверждение нужно только если планируемое изменение materially conflicts с недавним baseline: ломает зафиксированное поведение, удаляет принятую возможность, ослабляет privacy/security/runtime guardrail, обходит recovery anchor или делает невозможными проверки, которые baseline считал обязательными.
+
+Канонический результат:
+
+- tracked baseline report в `11_agents/reports/YYYY-MM-DD-pritha-good-state-baseline-short-title.md`;
+- git commit с baseline report и связанными workflow/template изменениями;
+- git tag вида `pritha-good-state-YYYY-MM-DD-short-title`;
+- push commit and tag на GitHub, если пользователь не запретил публикацию;
+- пересборка локальной памяти после записи Markdown.
+
+Не записывать в tracked baseline report реальные секреты, auth keys, private credentials, raw Tailscale URLs, tailnet names, device-specific identifiers, `.env`, `.private`, `.memory-private`, `.queue`, `.logs`, `.snapshots` или пользовательские private memory values. Для приватных endpoints использовать placeholders и ссылаться на локальные setup state как на непубликуемый источник.
 
 ## GitHub publication and push
 
@@ -175,6 +214,7 @@ node scripts/self-test.mjs
 - Операционные отчеты агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-operations-report.md`.
 - Отчеты о deployment-действиях агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-deployment-report.md`.
 - Post-creation reviews агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-post-creation-review.md`.
+- Good State Baseline для принятых пользователем состояний Pritha или child agents: `11_agents/reports/YYYY-MM-DD-pritha-good-state-baseline-short-title.md`.
 - Профили child agents: `11_agents/profiles/agent-id.md`.
 - Реестр созданных агентов: `11_agents/registry.md`.
 - Маркетинговые тексты Pritha: `12_marketing/pritha/*.md`.

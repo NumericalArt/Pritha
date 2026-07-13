@@ -113,7 +113,7 @@ Status: active
 - Deployment target: local Mac or Mac mini.
 - Service mode: launchd, enabled only after explicit user approval.
 - Autostart policy: `launchd-on-approval`.
-- Local upstream observed by operations manifest: `http://127.0.0.1:3033`.
+- Local upstream observed by operations manifest: `http://127.0.0.1:4033`.
 - Tailscale URL recorded in reports and operations manifest.
 
 ## Known Issues

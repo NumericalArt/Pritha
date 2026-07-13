@@ -1,4 +1,4 @@
-import { buildBackgroundMusicPrompt } from "./prompt-builder";
+import { buildBackgroundMusicPrompt, findMusicPromptMismatches } from "./prompt-builder";
 import { clampMusicDuration, getMusicRuntimeConfig, type MusicRuntimeConfig } from "./config";
 import type { AceStepGenerateRequest, AceStepRemoteTrack } from "./types";
 
@@ -128,7 +128,14 @@ export class AceStepClient {
 
   async generateTrack(request: AceStepGenerateRequest): Promise<AceStepRemoteTrack> {
     const durationSec = clampMusicDuration(request.durationSec, this.config);
-    const prompt = request.prompt?.trim() || buildBackgroundMusicPrompt(request.style);
+    const prompt =
+      request.prompt?.trim() ||
+      buildBackgroundMusicPrompt(request.style, {
+        operatorRequest: request.operatorRequest,
+        preserveCurrent: request.preserveCurrent,
+        referenceStyle: request.referenceStyle,
+        referencePrompt: request.referencePrompt,
+      });
     const releasePayload = {
       prompt,
       lyrics: "",
@@ -173,6 +180,16 @@ export class AceStepClient {
       const item = selectAceAudioItem(row.result);
       if (!item?.file) throw new Error("ace_step_missing_audio_file");
       const fileUrl = item.file;
+      const providerPrompt = firstString(item.prompt, "");
+      const promptWarnings = findMusicPromptMismatches({
+        style: request.style,
+        operatorRequest: request.operatorRequest,
+        sentPrompt: prompt,
+        providerPrompt,
+      });
+      if (promptWarnings.length) {
+        throw new Error(`ace_step_prompt_mismatch:${promptWarnings.join(",")}`);
+      }
       const audioResponse = await fetch(this.url(fileUrl), {
         headers: this.config.aceStepApiKey ? { Authorization: `Bearer ${this.config.aceStepApiKey}` } : undefined,
       });
@@ -181,7 +198,10 @@ export class AceStepClient {
       return {
         taskId,
         fileUrl,
-        prompt: firstString(item.prompt, prompt),
+        prompt,
+        sentPrompt: prompt,
+        providerPrompt,
+        promptWarnings,
         durationSec,
         audioBytes,
         contentType: audioResponse.headers.get("content-type") || `audio/${this.config.audioFormat === "wav32" ? "wav" : this.config.audioFormat}`,

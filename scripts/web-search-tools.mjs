@@ -15,7 +15,7 @@ import {
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = resolveTechscopeRoot({ cwd: path.resolve(SCRIPT_DIR, "..") });
@@ -95,15 +95,22 @@ export function searxngConfig(options = {}) {
   const { root, lockPath, lock } = loadWebSearchToolLock(options);
   const cfg = lock?.tools?.searxng;
   if (!cfg) throw new Error(`Missing searxng lock entry in ${rel(root, lockPath)}`);
+  const stateRoot = resolvePrithaStateRoot({ root });
+  const runtimePath = (value) => {
+    if (stateRoot !== root && String(value).startsWith(".private/")) {
+      return path.join(stateRoot, "private", String(value).slice(".private/".length));
+    }
+    return path.resolve(root, value);
+  };
   return {
     ...cfg,
     root,
     lockPath,
     installPath: path.resolve(root, cfg.install_path),
     venvPath: path.resolve(root, cfg.venv_path),
-    settingsPath: path.resolve(root, cfg.settings_path),
-    pidPath: path.resolve(root, cfg.pid_path),
-    logPath: path.resolve(root, cfg.log_path),
+    settingsPath: runtimePath(cfg.settings_path),
+    pidPath: runtimePath(cfg.pid_path),
+    logPath: runtimePath(cfg.log_path),
     url: process.env.PRITHA_SEARXNG_URL || process.env.SEARXNG_URL || cfg.url,
   };
 }
@@ -207,7 +214,13 @@ function ensureParent(filePath) {
   mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
-function defaultSettingsYaml() {
+function defaultSettingsYaml(cfg) {
+  let port = 8080;
+  try {
+    port = Number(new URL(cfg.url).port || 8080);
+  } catch {
+    // Keep the neutral local SearXNG default.
+  }
   return `use_default_settings: true
 general:
   debug: false
@@ -219,7 +232,7 @@ search:
     - html
     - json
 server:
-  port: 8888
+  port: ${port}
   bind_address: "127.0.0.1"
   base_url: false
   limiter: false
@@ -235,7 +248,7 @@ valkey:
 function ensureSettings(cfg) {
   if (existsSync(cfg.settingsPath)) return { created: false, path: cfg.settingsPath };
   ensureParent(cfg.settingsPath);
-  writeFileSync(cfg.settingsPath, defaultSettingsYaml(), { encoding: "utf8", mode: 0o600 });
+  writeFileSync(cfg.settingsPath, defaultSettingsYaml(cfg), { encoding: "utf8", mode: 0o600 });
   return { created: true, path: cfg.settingsPath };
 }
 

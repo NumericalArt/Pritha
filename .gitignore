@@ -19,6 +19,8 @@ Untitled*.canvas
 data/logs/
 .techscope-setup.json
 .obsidian/
+.snapshots/audit/
+03_reviews/*-voice-session-memory.md
 
 # Raw source artifacts, transcripts and media stay out of the portable snapshot.
 # Keep only processed knowledge and neutral metadata in tracked memory.
@@ -54,4 +56,5 @@ interfaces/control-center/test-results/
 .memory/*.sqlite3
 .memory/*.db
 .memory/last-rebuild.sql
+.memory/last-self-test.json
 .memory/exports/

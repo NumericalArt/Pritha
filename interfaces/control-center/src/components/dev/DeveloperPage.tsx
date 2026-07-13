@@ -96,7 +96,7 @@ function RegistrySummaryPanel({ data }: DeveloperPageProps) {
       <div className="panel-heading-row">
         <div>
           <h2>Registry Summary</h2>
-          <p>Parsed from 11_agents/registry.md</p>
+          <p>Parsed from the current instance registry</p>
         </div>
         <button className="outline-button small" type="button">
           View Raw

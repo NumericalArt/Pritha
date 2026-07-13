@@ -1,17 +1,18 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData, yamlList } from "../lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { bodyValue } from "./contract.mjs";
 import { detectProject, fileExists } from "./test.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const CONTRACT_DIR = path.join(ROOT, "11_agents", "contracts");
-const REPORT_DIR = path.join(ROOT, "11_agents", "reports");
-const RESEARCH_DIR = path.join(ROOT, "11_agents", "research");
-const REGISTRY_PATH = path.join(ROOT, "11_agents", "registry.md");
+const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
+const CONTRACT_DIR = path.join(AGENT_MEMORY_ROOT, "contracts");
+const REPORT_DIR = path.join(AGENT_MEMORY_ROOT, "reports");
+const RESEARCH_DIR = path.join(AGENT_MEMORY_ROOT, "research");
+const REGISTRY_PATH = path.join(AGENT_MEMORY_ROOT, "registry.md");
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 const readFrontmatter = (text) => parseFrontmatterData(text) || {};
 

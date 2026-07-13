@@ -74,7 +74,7 @@ Status: active
 
 - Validates manually curated user-import fixtures.
 - Filters every candidate joke through the mandatory deterministic safety scanner.
-- Runs a manual local HTTP server at `http://127.0.0.1:3039`.
+- Runs a manual local HTTP server at `http://127.0.0.1:4039`.
 - Runs an in-process 10 minute scheduler while the manual server is active.
 - Supports a one-shot collection command through `npm run collect:once`.
 - Stores runtime candidate, run, and announcement state under ignored `.state/stupidjoke`.
@@ -107,8 +107,8 @@ Status: active
 - Deployment target: local Mac.
 - Service mode: none.
 - Autostart: disabled.
-- Local upstream: `http://127.0.0.1:3039`.
-- Health URL: `http://127.0.0.1:3039/api/status`.
+- Local upstream: `http://127.0.0.1:4039`.
+- Health URL: `http://127.0.0.1:4039/api/status`.
 - Start command: `npm run server`.
 - Stop behavior: operator stops the manual server process.
 - Cron, launchd, heartbeat, queue watcher, and service install remain disabled.

@@ -31,6 +31,14 @@ export type ControlCenterCapabilities = {
 
 export type ControlCenterOperatorAction = "start" | "stop" | "check" | "restore";
 
+export type ControlCenterOperatorActionPlanStatus =
+  | "ready"
+  | "needs_confirmation"
+  | "plan_only"
+  | "blocked"
+  | "unavailable"
+  | "manual_only";
+
 export type ControlCenterAgentRuntimeKind =
   | "web_service"
   | "scheduled_job"
@@ -108,6 +116,7 @@ export type ControlCenterAgentControl = {
   executionMode: ControlCenterActionExecutionMode;
   label: string;
   reason: string;
+  confirmationRequired?: boolean;
   commandReadiness: {
     start: ControlCenterCommandReadiness;
     stop: ControlCenterCommandReadiness;
@@ -119,6 +128,43 @@ export type ControlCenterOperatorActionCheck = {
   label: string;
   status: "pass" | "warn" | "fail";
   detail: string;
+};
+
+export type ControlCenterAgentOperationalReadinessStatus =
+  | "ready"
+  | "local_ready"
+  | "tailscale_pending"
+  | "unmanaged_local"
+  | "service_install_required"
+  | "blocked"
+  | "missing";
+
+export type ControlCenterAgentRuntimeReadiness = {
+  manager?: string;
+  status: "ready" | "installable" | "service_install_required" | "unmanaged" | "not_applicable" | "unknown";
+  serviceLabel?: string;
+  launchAgentPath?: string;
+  loaded?: boolean;
+  installed?: boolean;
+  detail: string;
+};
+
+export type ControlCenterAgentAccessReadiness = {
+  localhost: "ready" | "pending" | "unavailable";
+  tailscale: "ready" | "pending_serve" | "waiting_for_local" | "not_configured" | "unavailable";
+  tailscaleUrl?: string;
+  localUrl?: string;
+  detail: string;
+};
+
+export type ControlCenterAgentOperationalReadiness = {
+  status: ControlCenterAgentOperationalReadinessStatus;
+  summary: string;
+  runtime: ControlCenterAgentRuntimeReadiness;
+  access: ControlCenterAgentAccessReadiness;
+  checks: ControlCenterOperatorActionCheck[];
+  blockers: string[];
+  nextActions: string[];
 };
 
 export type ControlCenterAgent = {
@@ -148,6 +194,7 @@ export type ControlCenterAgent = {
     healthcheckCommand?: string;
     issue?: string;
   };
+  readiness: ControlCenterAgentOperationalReadiness;
   health: {
     status: "ok" | "failed" | "unknown" | "not_checked";
     checkedUrl?: string;
@@ -238,7 +285,7 @@ export type ControlCenterOperatorActionPlan = {
     folderStatus: "present" | "missing";
   };
   action: ControlCenterOperatorAction;
-  status: CapabilityStatus;
+  status: ControlCenterOperatorActionPlanStatus;
   actionEnabled: boolean;
   requiresConfirmation: boolean;
   confirmation?: {

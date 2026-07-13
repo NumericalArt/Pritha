@@ -24,6 +24,7 @@ function toCardAgent(agent: ControlCenterAgent): AgentCardModel {
     activity: agent.ui.activity,
     url: agent.url.local,
     tailscaleUrl: agent.url.tailscale,
+    statusUrl: `/agents/${agent.id}`,
     updateStatus: agent.ui.updateStatus,
     issueText: agent.ui.issueText || (agent.versionStatus === "unavailable" ? "Assigned version unavailable" : undefined),
     lifecycleNote:

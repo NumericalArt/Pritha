@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const LOCK_PATH = path.join("tools", "external-research", "last30days-lock.json");
 const PYTHON_VERSION_PROBE = "import json,sys; print(json.dumps({'executable': sys.executable, 'version': '.'.join(map(str, sys.version_info[:3])), 'major': sys.version_info[0], 'minor': sys.version_info[1], 'micro': sys.version_info[2]}))";
@@ -470,7 +470,7 @@ export function runRecentLast30DaysResearch(options = {}) {
   const mode = options.mode === "deep" ? "deep" : "quick";
   const searchSources = sanitizeRecentSearchSources(options.searchSources);
   const runId = `l30-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-  const artifactRoot = path.join(root, ".private", "voice-research", runId);
+  const artifactRoot = resolvePrithaStatePath("private", "voice-research", runId);
   mkdirSync(artifactRoot, { recursive: true });
   const planPath = path.join(artifactRoot, "plan.json");
   const stdoutPath = path.join(artifactRoot, "stdout.json");

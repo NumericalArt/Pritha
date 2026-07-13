@@ -2,10 +2,10 @@
 
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const DB_PATH = path.join(ROOT, ".memory", "techscope.sqlite");
+const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
 
 function sqlString(value) {
   return `'${String(value).replaceAll("'", "''")}'`;

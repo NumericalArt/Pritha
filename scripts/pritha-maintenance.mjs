@@ -7,9 +7,11 @@ import process from "node:process";
 import { rebuildRegistry } from "./agents-mother/registry.mjs";
 import { maintenanceContracts } from "./lib/maintenance-contract.mjs";
 import { now, today } from "./lib/date.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
+const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
+const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const argv = process.argv.slice(2);
 const command = argv.find((arg) => !arg.startsWith("-")) || "status";
 const jsonMode = argv.includes("--json");
@@ -327,7 +329,7 @@ function refreshAgents() {
   try {
     console.log = (...parts) => captured.push(parts.join(" "));
     rebuildRegistry();
-    const registryPath = path.join(ROOT, "11_agents", "registry.md");
+    const registryPath = path.join(AGENT_MEMORY_ROOT, "registry.md");
     return {
       schema: "pritha-refresh-agents-result-v1",
       generatedAt: now(),
@@ -344,7 +346,7 @@ function refreshAgents() {
 }
 
 function readRegistryCount() {
-  const registryPath = path.join(ROOT, "11_agents", "registry.md");
+  const registryPath = path.join(AGENT_MEMORY_ROOT, "registry.md");
   if (!existsSync(registryPath)) return 0;
   const text = readFileSync(registryPath, "utf8");
   return text
@@ -366,15 +368,16 @@ function uniqueArtifactPath(relativePath) {
 
 function uniqueSelfKnowledgeTarget(date) {
   const baseId = `${date}-pritha-self-knowledge-refresh`;
-  let relativePath = path.join("03_reviews", `${baseId}.md`);
+  const targetRoot = STATE_ROOT === ROOT ? path.join(ROOT, "03_reviews") : path.join(AGENT_MEMORY_ROOT, "reports");
+  let absolutePath = path.join(targetRoot, `${baseId}.md`);
   let artifactId = baseId;
   let index = 2;
-  while (existsSync(path.join(ROOT, relativePath))) {
+  while (existsSync(absolutePath)) {
     artifactId = `${baseId}-${index}`;
-    relativePath = path.join("03_reviews", `${artifactId}.md`);
+    absolutePath = path.join(targetRoot, `${artifactId}.md`);
     index += 1;
   }
-  return { relativePath, artifactId };
+  return { absolutePath, artifactId };
 }
 
 function refreshSelfKnowledge() {
@@ -383,8 +386,7 @@ function refreshSelfKnowledge() {
   const gitCommit = git(["rev-parse", "--short", "HEAD"]);
   const gitStatus = git(["status", "--short"]);
   const contracts = maintenanceContracts();
-  const { relativePath, artifactId } = uniqueSelfKnowledgeTarget(date);
-  const absolutePath = path.join(ROOT, relativePath);
+  const { absolutePath, artifactId } = uniqueSelfKnowledgeTarget(date);
   mkdirSync(path.dirname(absolutePath), { recursive: true });
   const body = `---
 id: ${artifactId}
@@ -452,7 +454,7 @@ ${contracts.actions.map((action) => `- \`${action.id}\`: ${action.summary} Statu
     action: "refresh-self-knowledge",
     ok: true,
     status: "created",
-    artifactPath: relativePath,
+    artifactPath: path.relative(STATE_ROOT, absolutePath),
   };
 }
 
