@@ -76,13 +76,15 @@ function run(id, name, command, commandArgs, options = {}) {
     };
   }
 
+  const childEnv = { ...process.env, TECHSCOPE_ROOT: ROOT, ...(options.env || {}) };
+  for (const key of options.unsetEnv || []) delete childEnv[key];
   const result = spawnSync(command, commandArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs || 120000,
     maxBuffer: options.maxBuffer || 20 * 1024 * 1024,
-    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+    env: childEnv,
   });
 
   return {
@@ -105,7 +107,19 @@ const allCheckSpecs = [
   ["validate-memory", "Markdown memory validation", "node", ["scripts/validate-memory.mjs"]],
   ["rebuild-memory", "Memory rebuild", "node", ["scripts/rebuild-memory.mjs"], { timeoutMs: 180000 }],
   ["smoke-test", "Smoke test", "node", ["scripts/smoke-test.mjs"]],
-  ["unit-tests", "Unit tests", "node", ["--test", ...unitTestFiles], { timeoutMs: 180000 }],
+  ["unit-tests", "Unit tests", "node", ["--test", ...unitTestFiles], {
+    timeoutMs: 180000,
+    env: { PRITHA_QUALITY_GATE_CHILD: "1" },
+    unsetEnv: [
+      "PRITHA_STATE_ROOT",
+      "PRITHA_AGENT_PARENT",
+      "PRITHA_INSTANCE_ID",
+      "PRITHA_INSTANCE_ROLE",
+      "PRITHA_CONTROL_CENTER_PORT",
+      "PRITHA_CONTROL_CENTER_ENV_FILE",
+      "PRITHA_SEARXNG_URL",
+    ],
+  }],
   ["agents-mother-test", "Agents Mother self-inspection", "node", ["scripts/agents-mother.mjs", "test", ".", "--no-report"]],
   ["telegram-dry-run", "Telegram dry-run", "node", ["scripts/telegram-bot.mjs", "poll-once", "--dry-run"]],
 ];
