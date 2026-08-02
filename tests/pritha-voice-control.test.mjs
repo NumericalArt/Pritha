@@ -48,6 +48,13 @@ test("Voice UI fallback tool list includes filesystem inspection", () => {
   assert.doesNotMatch(voicePageSource, /"recent_external_research"/);
 });
 
+test("Voice session start controls use a play icon while stop controls keep the square icon", () => {
+  assert.match(voicePageSource, /primaryButtonLabel\(phase, status\) === "Start Listening"/);
+  assert.match(voicePageSource, /return <Play size=\{size\} fill="currentColor" \/>/);
+  assert.match(voicePageSource, /return <Square size=\{size\} fill="currentColor" \/>/);
+  assert.equal(voicePageSource.match(/<PrimaryButtonIcon phase=\{phase\} status=\{status\} size=\{1[78]\} \/>/g)?.length, 2);
+});
+
 test("Voice UI task cards stay stable and avoid duplicate approval placeholders", () => {
   assert.match(runtimeSource, /function codexTaskCreatedMs\(taskDir: string\)/);
   assert.match(runtimeSource, /\.sort\(\(a, b\) => b\.createdMs - a\.createdMs/);

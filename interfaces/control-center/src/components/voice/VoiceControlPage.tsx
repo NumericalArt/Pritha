@@ -12,6 +12,7 @@ import {
   MicOff,
   Music,
   Paperclip,
+  Play,
   Search,
   SendHorizontal,
   Square,
@@ -121,6 +122,13 @@ function primaryButtonLabel(phase: RealtimePhase, status: PrithaRealtimeStatus |
   if (phase === "connecting") return "Connecting...";
   if (phase === "error") return "Reconnect";
   return "Stop Listening";
+}
+
+function PrimaryButtonIcon({ phase, status, size }: { phase: RealtimePhase; status: PrithaRealtimeStatus | null; size: number }) {
+  if (primaryButtonLabel(phase, status) === "Start Listening") {
+    return <Play size={size} fill="currentColor" />;
+  }
+  return <Square size={size} fill="currentColor" />;
 }
 
 function formatTaskElapsed(createdAt: string, completedAt?: string) {
@@ -1384,7 +1392,7 @@ function VoiceSessionPanel({
         <div className="mobile-voice-timer">{formatElapsed(elapsedSec)}</div>
         <div className="mobile-voice-subtitle">{subtitleForState(phase)}</div>
         <button className="mobile-voice-primary" type="button" onClick={onPrimary} disabled={primaryDisabled}>
-          <Square size={17} fill="currentColor" />
+          <PrimaryButtonIcon phase={phase} status={status} size={17} />
           {primaryButtonLabel(phase, status)}
         </button>
         <div className="mobile-voice-secondary-row">
@@ -1439,7 +1447,7 @@ function VoiceSessionPanel({
           {isMuted ? "Unmute" : "Mute"}
         </button>
         <button className="voice-primary-button" type="button" onClick={onPrimary} disabled={primaryDisabled}>
-          <Square size={18} fill="currentColor" />
+          <PrimaryButtonIcon phase={phase} status={status} size={18} />
           {primaryButtonLabel(phase, status)}
         </button>
         <button

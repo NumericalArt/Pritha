@@ -3,7 +3,7 @@ id: realtime-voice-control-for-codex-agents
 type: standard
 status: active
 created: 2026-05-25
-updated: 2026-06-24
+updated: 2026-07-13
 last_reviewed: 2026-05-31
 owner: Techscope/user
 topics:
@@ -111,7 +111,7 @@ Companion patterns are intentionally separate:
 - `04_standards/realtime-voice-control-ui.md` defines the first reusable voice UI control surface.
 - `04_standards/tailscale-private-device-access-for-local-agents.md` defines private phone/device access for local agents.
 
-Pritha carries the source-level FESPA26 reference pack at `11_agents/reference-implementations/fespa26-voice-control/`. Use `node scripts/voice-control-kit.mjs plan` for discovery and `node scripts/voice-control-kit.mjs copy --target ../child-agent` only when the descendant contract explicitly selects browser Realtime voice plus Codex deep-task transport.
+Pritha carries the source-level FESPA26 reference pack at `11_agents/reference-implementations/fespa26-voice-control/`. Use `node scripts/voice-control-kit.mjs plan` for discovery and `node scripts/voice-control-kit.mjs copy --target sibling:child-agent` only when the descendant contract explicitly selects browser Realtime voice plus Codex deep-task transport. The logical `sibling:` target resolves through `PRITHA_AGENT_PARENT`.
 
 ## Use When
 

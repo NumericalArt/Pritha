@@ -1,8 +1,19 @@
 #!/usr/bin/env node
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentParent, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const KIT_REL = "11_agents/reference-implementations/fespa26-voice-control";
@@ -53,10 +64,11 @@ function usage() {
   node scripts/voice-control-kit.mjs plan
   node scripts/voice-control-kit.mjs list
   node scripts/voice-control-kit.mjs copy --target <child-agent> [--force]
+  node scripts/voice-control-kit.mjs copy --target sibling:<agent-slug> [--force]
 
 Pritha alias:
   node scripts/pritha.mjs voice-kit plan
-  node scripts/pritha.mjs voice-kit copy --target ../child-agent`);
+  node scripts/pritha.mjs voice-kit copy --target sibling:child-agent`);
 }
 
 function plan() {
@@ -88,20 +100,113 @@ function list() {
   }
 }
 
+function isWithin(root, candidate) {
+  return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+}
+
+function prepareTargetRoot(requestedPath) {
+  const requested = path.resolve(requestedPath);
+  if (existsSync(requested)) {
+    const targetStat = lstatSync(requested);
+    if (!targetStat.isDirectory() || targetStat.isSymbolicLink()) {
+      throw new Error(`Target must be a regular directory and not a symlink: ${requestedPath}`);
+    }
+    return realpathSync(requested);
+  }
+
+  let ancestor = path.dirname(requested);
+  while (!existsSync(ancestor)) {
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) break;
+    ancestor = parent;
+  }
+  const ancestorStat = lstatSync(ancestor);
+  if (!ancestorStat.isDirectory() || ancestorStat.isSymbolicLink()) {
+    throw new Error(`Target has an unsafe nearest existing ancestor: ${ancestor}`);
+  }
+  const canonicalAncestor = realpathSync(ancestor);
+  const tail = path.relative(ancestor, requested).split(path.sep).filter(Boolean);
+  if (tail.some((segment) => segment === "." || segment === "..")) {
+    throw new Error(`Target path is unsafe: ${requestedPath}`);
+  }
+
+  let current = canonicalAncestor;
+  for (const segment of tail) {
+    const next = path.join(current, segment);
+    if (!existsSync(next)) mkdirSync(next);
+    const nextStat = lstatSync(next);
+    if (!nextStat.isDirectory() || nextStat.isSymbolicLink()) {
+      throw new Error(`Target path contains an unsafe component: ${requestedPath}`);
+    }
+    const canonicalNext = realpathSync(next);
+    if (!isWithin(canonicalAncestor, canonicalNext)) {
+      throw new Error(`Target path escapes its canonical ancestor: ${requestedPath}`);
+    }
+    current = canonicalNext;
+  }
+  return current;
+}
+
+function ensureSafeDirectory(root, segments) {
+  const canonicalRoot = realpathSync(root);
+  let current = canonicalRoot;
+  for (const segment of segments) {
+    const next = path.join(current, segment);
+    if (!existsSync(next)) mkdirSync(next);
+    const nextStat = lstatSync(next);
+    if (!nextStat.isDirectory() || nextStat.isSymbolicLink()) {
+      throw new Error(`Destination path contains an unsafe component: ${next}`);
+    }
+    const canonicalNext = realpathSync(next);
+    if (!isWithin(canonicalRoot, canonicalNext)) {
+      throw new Error(`Destination path escapes target root: ${next}`);
+    }
+    current = canonicalNext;
+  }
+  return current;
+}
+
 function copyToTarget(options) {
   const target = String(options.target || "").trim();
   if (!target) {
     throw new Error("Missing --target <child-agent>");
   }
-  const targetRoot = path.resolve(ROOT, target);
-  const destination = path.join(targetRoot, "interfaces", "realtime-voice", "fespa26-reference");
-  if (existsSync(destination) && !options.force) {
-    throw new Error(`Destination already exists: ${destination}. Pass --force to replace it.`);
+  let targetRoot;
+  if (target.startsWith("sibling:")) {
+    const agentSlug = target.slice("sibling:".length);
+    if (!/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/.test(agentSlug) || agentSlug === "." || agentSlug === "..") {
+      throw new Error("Invalid sibling agent slug");
+    }
+    const agentParent = prepareTargetRoot(resolvePrithaAgentParent({ root: ROOT }));
+    targetRoot = prepareTargetRoot(path.join(agentParent, agentSlug));
+  } else {
+    targetRoot = prepareTargetRoot(path.resolve(ROOT, target));
   }
-  mkdirSync(path.dirname(destination), { recursive: true });
-  cpSync(KIT_DIR, destination, { recursive: true, force: Boolean(options.force) });
+  const voiceRoot = ensureSafeDirectory(targetRoot, ["interfaces", "realtime-voice"]);
+  const destination = path.join(voiceRoot, "fespa26-reference");
+  const readmePath = path.join(voiceRoot, "README.md");
+  if (existsSync(destination)) {
+    const destinationStat = lstatSync(destination);
+    if (!destinationStat.isDirectory() || destinationStat.isSymbolicLink()) {
+      throw new Error(`Destination must be a regular directory and not a symlink: ${destination}`);
+    }
+    if (!options.force) {
+      throw new Error(`Destination already exists: ${destination}. Pass --force to replace it.`);
+    }
+  }
+  if (existsSync(readmePath)) {
+    const readmeStat = lstatSync(readmePath);
+    if (!readmeStat.isFile() || readmeStat.isSymbolicLink()) {
+      throw new Error(`Interface README must be a regular file and not a symlink: ${readmePath}`);
+    }
+    if (!options.force) {
+      throw new Error(`Interface README already exists: ${readmePath}. Pass --force to replace it.`);
+    }
+  }
+  if (existsSync(destination)) rmSync(destination, { recursive: true, force: false });
+  cpSync(KIT_DIR, destination, { recursive: true, force: false, errorOnExist: true });
   writeFileSync(
-    path.join(path.dirname(destination), "README.md"),
+    readmePath,
     `# Realtime Voice Interface
 
 This interface was initialized from Pritha's FESPA26 voice-control reference pack.

@@ -1,12 +1,66 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { quarantineUntrustedInstructionText, redactSensitiveText } from "../lib/redaction.mjs";
 import { today } from "../lib/date.mjs";
 import { resolvePrithaStateRoot } from "../lib/paths.mjs";
+import { parseFrontmatterData } from "../lib/frontmatter.mjs";
+import { parseBoundedJson } from "../lib/bounded-json.mjs";
+import { markdownBodyText, markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
 
 export const SEMANTIC_FAILURE_LOG_REL = ".private/agents-mother/semantic-memory-failures.jsonl";
 const ISOLATED_SEMANTIC_FAILURE_LOG_REL = "private/agents-mother/semantic-memory-failures.jsonl";
+const PATTERN_PACK_PAYLOAD_MARKER = "pritha-agent-pattern-pack-v1";
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+  }
+  return value;
+}
+
+function patternPackLock(payload) {
+  return `sha256:${createHash("sha256").update(JSON.stringify(canonicalize(payload))).digest("hex")}`;
+}
+
+export function verifyPatternPackIntegrity(text, expectedContractFingerprint = "") {
+  const normalizedText = String(text || "").replace(/\r\n?/g, "\n");
+  const frontmatter = parseFrontmatterData(normalizedText) || {};
+  const reasons = [];
+  const documentBody = markdownBodyText(normalizedText);
+  const match = documentBody.match(new RegExp(`<!--\\s*${PATTERN_PACK_PAYLOAD_MARKER}\\s+([A-Za-z0-9_-]+)\\s*-->`));
+  let payload = null;
+  try {
+    if (match) {
+      const decoded = Buffer.from(match[1], "base64url").toString("utf8");
+      if (decoded.length <= 1_000_000) payload = parseBoundedJson(decoded, { maxBytes: 1_000_000, maxDepth: 20, maxNodes: 10_000 });
+    }
+  } catch {
+    payload = null;
+  }
+  if (!payload || payload.schema !== PATTERN_PACK_PAYLOAD_MARKER) {
+    return { ok: false, reasons: ["pattern_pack_payload_missing_or_malformed"], payload: null };
+  }
+  const lock = patternPackLock(payload);
+  if (frontmatter.pattern_pack_lock !== lock) reasons.push("pattern_pack_lock_mismatch");
+  const documentLockOccurrences = (normalizedText.match(/^pattern_pack_document_lock:/gm) || []).length;
+  if (documentLockOccurrences !== 1 || !/^sha256:[a-f0-9]{64}$/i.test(String(frontmatter.pattern_pack_document_lock || ""))) {
+    reasons.push("pattern_pack_document_lock_invalid");
+  } else if (frontmatter.pattern_pack_document_lock !== markdownDocumentLock(normalizedText, "pattern_pack_document_lock")) {
+    reasons.push("pattern_pack_document_mismatch");
+  }
+  if (frontmatter.contract_fingerprint !== payload.contract_fingerprint) reasons.push("pattern_pack_contract_fingerprint_mismatch");
+  if (expectedContractFingerprint && payload.contract_fingerprint !== expectedContractFingerprint) reasons.push("pattern_pack_contract_stale");
+  if (frontmatter.pattern_pack_status !== payload.status) reasons.push("pattern_pack_status_mismatch");
+  if (Number(frontmatter.selected_pattern_count) !== payload.patterns?.length) reasons.push("pattern_pack_count_mismatch");
+  if (Number(frontmatter.external_research_seed_count) !== payload.external_research_seeds?.length) reasons.push("pattern_pack_seed_count_mismatch");
+  const renderedBody = documentBody.replace(match[0], "").replace(/^\s+/, "");
+  const renderedBodyHash = `sha256:${createHash("sha256").update(renderedBody).digest("hex")}`;
+  if (payload.body_sha256 !== renderedBodyHash) reasons.push("pattern_pack_body_mismatch");
+  return { ok: reasons.length === 0, reasons: [...new Set(reasons)], payload, lock };
+}
 
 const STOP_WORDS = new Set([
   "about",
@@ -55,26 +109,53 @@ const STOP_WORDS = new Set([
   "это",
 ]);
 
-const TECH_SEED_PATTERN = /\b(openai|realtime|webrtc|voice|speech|telegram|bot api|mcp|connector|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron|tailscale|oauth|webhook|browser|sandbox|codex app|codex cli|agents sdk|api)\b/i;
+const TECH_SEED_PATTERN = /\b(openai|realtime|webrtc|voice|speech|telegram|bot api|mcp|connector|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron|tailscale|oauth|webhook|browser|sandbox|codex app|codex cli|agents sdk|github|repository|skill|eval|evaluation|open-source|api)\b/i;
+const CANONICAL_EXTERNAL_SEEDS = Object.freeze([
+  [/\bopenai\b.*\b(?:realtime|webrtc)\b|\b(?:realtime|webrtc)\b.*\bopenai\b/i, "openai realtime webrtc"],
+  [/\bmcp\b.*\bconnector\b|\bconnector\b.*\bmcp\b/i, "mcp connector permissions"],
+  [/\bopenai\b/i, "openai"],
+  [/\b(?:realtime|webrtc)\b/i, "realtime webrtc"],
+  [/\b(?:voice|speech)\b/i, "voice speech"],
+  [/\b(?:telegram|bot api)\b/i, "telegram bot api"],
+  [/\b(?:mcp|model context protocol|connector)\b/i, "mcp connector"],
+  [/\b(?:embedding|embeddings|semantic|vector|rag)\b/i, "semantic embeddings rag"],
+  [/\bsqlite\b/i, "sqlite"],
+  [/\b(?:next\.?js|react)\b/i, "nextjs react"],
+  [/\b(?:launchd|cron)\b/i, "launchd cron"],
+  [/\btailscale\b/i, "tailscale"],
+  [/\b(?:oauth|webhook)\b/i, "oauth webhook"],
+  [/\b(?:browser|sandbox)\b/i, "browser sandbox"],
+  [/\b(?:codex app|codex cli)\b/i, "codex"],
+  [/\bagents sdk\b/i, "agents sdk"],
+  [/\b(?:github|repository|open-source)\b/i, "github repository"],
+  [/\b(?:skill|eval|evaluation)\b/i, "agent skills evals"],
+  [/\bapi\b/i, "api"],
+]);
+
+export function canonicalPatternResearchSeed(value) {
+  const text = redactSensitiveText(String(value || "")).replace(/\s+/g, " ").trim();
+  return CANONICAL_EXTERNAL_SEEDS.find(([pattern]) => pattern.test(text))?.[1] || "";
+}
 
 function compact(value, maxChars = 2000) {
-  const text = redactSensitiveText(String(value || "").replace(/\s+/g, " ").trim());
+  const text = quarantineUntrustedInstructionText(String(value || "").replace(/\s+/g, " ").trim());
   if (text.length <= maxChars) return text;
   return `${text.slice(0, maxChars - 1).trim()}...`;
 }
 
-function redactSensitiveText(value) {
-  return String(value || "")
-    .replace(/\b(sk|pk|rk|ak|sess|ghp|github_pat)_[A-Za-z0-9_-]{12,}\b/g, "[REDACTED_TOKEN]")
-    .replace(/\b[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/g, "[REDACTED_JWT]")
-    .replace(/\b(AUTH_TOKEN|CT0|API_KEY|SECRET|TOKEN|PASSWORD)\s*[:=]\s*[^,\s)]+/gi, "$1=[REDACTED]")
-    .replace(/\b(api[_-]?key|access[_-]?token|auth[_-]?token|password|secret)\b\s*[:=]\s*[^,\s)]+/gi, "$1=[REDACTED]");
+function markdownText(value, maxChars = 2000) {
+  return compact(value, maxChars)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("`", "&#96;")
+    .replaceAll("!", "&#33;")
+    .replaceAll("[", "&#91;")
+    .replaceAll("]", "&#93;");
 }
 
 function yamlScalar(value) {
-  return String(value || "")
-    .replaceAll("\n", " ")
-    .replaceAll(":", " -");
+  return JSON.stringify(markdownText(value, 1000) || "none");
 }
 
 function slug(value, fallback = "pattern") {
@@ -123,7 +204,8 @@ export function logSemanticFailure(root, failure = {}) {
   const stateRoot = resolvePrithaStateRoot({ root });
   const relativePath = stateRoot === path.resolve(root) ? SEMANTIC_FAILURE_LOG_REL : ISOLATED_SEMANTIC_FAILURE_LOG_REL;
   const logPath = path.join(stateRoot, relativePath);
-  mkdirSync(path.dirname(logPath), { recursive: true });
+  mkdirSync(path.dirname(logPath), { recursive: true, mode: 0o700 });
+  chmodSync(path.dirname(logPath), 0o700);
   const entry = {
     timestamp: new Date().toISOString(),
     status: compact(failure.status || "failed", 80),
@@ -131,10 +213,10 @@ export function logSemanticFailure(root, failure = {}) {
     contract: compact(failure.contract || "", 240),
     project: compact(failure.project || "", 240),
     query_hash: queryHash(failure.query || ""),
-    query: compact(failure.query || "", 600),
     stderr: compact(failure.stderr || "", 1200),
   };
-  appendFileSync(logPath, `${JSON.stringify(entry)}\n`);
+  appendFileSync(logPath, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
+  chmodSync(logPath, 0o600);
   return stateRoot === path.resolve(root) ? relativePath : path.relative(root, logPath);
 }
 
@@ -290,7 +372,11 @@ export function extractPatternCandidates(inputs = {}, options = {}) {
     if (seen.has(key)) continue;
     seen.add(key);
     const kind = rowPatternKind(row, row.sourceKind);
-    const text = [row.path, row.title, row.heading, row.snippet].filter(Boolean).join(" ");
+    const safePath = compact(row.path || "unknown", 500);
+    const safeTitle = compact(row.title || row.path || "Memory pattern", 240);
+    const safeHeading = compact(row.heading || "n/a", 240);
+    const safeSnippet = compact(row.snippet || "", 500);
+    const text = [safePath, safeTitle, safeHeading, safeSnippet].filter(Boolean).join(" ");
     const keywords = extractKeywords(text, 10);
     candidates.push({
       id: `pattern-${String(candidates.length + 1).padStart(2, "0")}`,
@@ -299,10 +385,10 @@ export function extractPatternCandidates(inputs = {}, options = {}) {
       memoryDomain: row.domain || "general",
       kind,
       confidence: confidenceFor(row, kind, row.sourceKind),
-      path: row.path || "unknown",
-      title: row.title || row.path || "Memory pattern",
-      heading: row.heading || "n/a",
-      snippet: compact(row.snippet || "", 500),
+      path: safePath,
+      title: safeTitle,
+      heading: safeHeading,
+      snippet: safeSnippet,
       score: row.score,
       applicability: applicabilityFor(kind, row.sourceKind),
       keywords,
@@ -319,7 +405,8 @@ export function externalResearchSeedsForPatterns(patterns, max = 16) {
   for (const pattern of patterns || []) {
     for (const keyword of pattern.keywords || []) {
       if (!TECH_SEED_PATTERN.test(keyword)) continue;
-      seeds.push(keyword);
+      const seed = canonicalPatternResearchSeed(keyword);
+      if (seed) seeds.push(seed);
     }
   }
   return [...new Set(seeds.map((seed) => seed.trim()).filter(Boolean))].slice(0, max);
@@ -327,20 +414,20 @@ export function externalResearchSeedsForPatterns(patterns, max = 16) {
 
 function formatPattern(pattern) {
   return [
-    `### ${pattern.id}: ${pattern.title}`,
+    `### ${markdownText(pattern.id, 80)}: ${markdownText(pattern.title, 240)}`,
     "",
     `- Status: ${pattern.status}`,
-    `- Source kind: ${pattern.sourceKind}`,
-    `- Memory domain: ${pattern.memoryDomain}`,
-    `- Pattern kind: ${pattern.kind}`,
-    `- Confidence: ${pattern.confidence}`,
-    `- Path: ${pattern.path}`,
-    `- Heading: ${pattern.heading || "n/a"}`,
-    `- Applicability: ${pattern.applicability}`,
-    `- Rationale: ${pattern.rationale}`,
-    `- Keywords: ${(pattern.keywords || []).join(", ") || "none"}`,
+    `- Source kind: ${markdownText(pattern.sourceKind, 80)}`,
+    `- Memory domain: ${markdownText(pattern.memoryDomain, 120)}`,
+    `- Pattern kind: ${markdownText(pattern.kind, 80)}`,
+    `- Confidence: ${markdownText(pattern.confidence, 40)}`,
+    `- Path: ${markdownText(pattern.path, 500)}`,
+    `- Heading: ${markdownText(pattern.heading || "n/a", 240)}`,
+    `- Applicability: ${markdownText(pattern.applicability, 500)}`,
+    `- Rationale: ${markdownText(pattern.rationale, 500)}`,
+    `- Keywords: ${markdownText((pattern.keywords || []).join(", ") || "none", 500)}`,
     pattern.score === undefined ? "" : `- Semantic score: ${pattern.score}`,
-    `- Evidence snippet: ${pattern.snippet || "n/a"}`,
+    `- Evidence snippet: ${markdownText(pattern.snippet || "n/a", 500)}`,
   ].filter(Boolean).join("\n");
 }
 
@@ -357,9 +444,63 @@ export function patternPackMarkdown(data = {}, inputs = {}, options = {}) {
     ...patterns.map((pattern) => pattern.path),
   ].filter(Boolean);
   const uniqueSources = [...new Set(sources)].slice(0, 60);
+  const body = `# Agent Pattern Pack: ${markdownText(data.agentName || agentSlug, 240)}
 
-  const text = `---
-id: ${date}-${agentSlug}-agent-pattern-pack
+Date: ${date}
+Status: draft
+
+## Task Basis
+
+- Contract/project: ${markdownText(data.relPath || data.projectPath || "unknown", 500)}
+- Agent/task: ${markdownText(data.agentName || "unknown", 240)}
+- Query: ${markdownText(query, 1200)}
+- Development task type: ${markdownText(data.developmentTaskType || "creation-or-improvement", 120)}
+
+## Semantic/Embedding Search Status
+
+- Status: ${markdownText(semantic.status || "skipped", 80)}
+- Rows: ${semantic.rows?.length || 0}
+- Failure log: ${markdownText(semantic.failureLog || "none", 500)}
+- Behavior on failure: continue with warning, FTS/domain memory and external discovery; review the failure log later.
+
+## Selected Patterns
+
+${patterns.length ? patterns.map(formatPattern).join("\n\n") : "- No reusable local patterns were found. Broaden memory queries and use external discovery before implementation."}
+
+## External Research Seeds
+
+${seeds.length ? seeds.map((seed) => `- ${seed}`).join("\n") : "- No technology-specific seeds were extracted from local patterns. Use the contract/task text for external discovery."}
+
+## Implementation Guidance
+
+- Codex must read this pattern pack before scaffold or agent improvement implementation.
+- Apply selected standards/workflows directly when they fit the task.
+- Treat child-agent reports as evidence, not as templates to clone.
+- Use external research to confirm, update or reject these patterns before changing harness, memory, tools, skills, MCP, interfaces or operations.
+`;
+  const payload = {
+    schema: PATTERN_PACK_PAYLOAD_MARKER,
+    contract_fingerprint: data.fingerprint || "pending",
+    status,
+    query: compact(query, 1200),
+    semantic_status: semantic.status || "skipped",
+    body_sha256: `sha256:${createHash("sha256").update(body).digest("hex")}`,
+    patterns: patterns.map((pattern) => ({
+      id: pattern.id,
+      path: pattern.path,
+      heading: pattern.heading || "",
+      kind: pattern.kind,
+      status: pattern.status,
+      confidence: pattern.confidence,
+      score: pattern.score ?? null,
+    })),
+    external_research_seeds: seeds,
+  };
+  const lock = patternPackLock(payload);
+  const machineComment = `<!-- ${PATTERN_PACK_PAYLOAD_MARKER} ${Buffer.from(JSON.stringify(canonicalize(payload)), "utf8").toString("base64url")} -->`;
+
+  let text = `---
+id: ${yamlScalar(options.artifactId || `${date}-${agentSlug}-agent-pattern-pack`)}
 type: review
 status: draft
 created: ${date}
@@ -381,6 +522,9 @@ supersedes: []
 superseded_by: []
 memory_domain: agent-building-knowledge
 pattern_pack_status: ${status}
+contract_fingerprint: ${data.fingerprint || "pending"}
+pattern_pack_lock: ${lock}
+pattern_pack_document_lock: pending
 semantic_memory_status: ${semantic.status || "skipped"}
 semantic_failure_log: ${semantic.failureLog || "none"}
 selected_pattern_count: ${patterns.length}
@@ -388,40 +532,13 @@ external_research_seed_count: ${seeds.length}
 verified: pending
 ---
 
-# Agent Pattern Pack: ${data.agentName || agentSlug}
+${machineComment}
 
-Date: ${date}
-Status: draft
-
-## Task Basis
-
-- Contract/project: ${data.relPath || data.projectPath || "unknown"}
-- Agent/task: ${data.agentName || "unknown"}
-- Query: ${compact(query, 1200)}
-- Development task type: ${data.developmentTaskType || "creation-or-improvement"}
-
-## Semantic/Embedding Search Status
-
-- Status: ${semantic.status || "skipped"}
-- Rows: ${semantic.rows?.length || 0}
-- Failure log: ${semantic.failureLog || "none"}
-- Behavior on failure: continue with warning, FTS/domain memory and external discovery; review the failure log later.
-
-## Selected Patterns
-
-${patterns.length ? patterns.map(formatPattern).join("\n\n") : "- No reusable local patterns were found. Broaden memory queries and use external discovery before implementation."}
-
-## External Research Seeds
-
-${seeds.length ? seeds.map((seed) => `- ${seed}`).join("\n") : "- No technology-specific seeds were extracted from local patterns. Use the contract/task text for external discovery."}
-
-## Implementation Guidance
-
-- Codex must read this pattern pack before scaffold or agent improvement implementation.
-- Apply selected standards/workflows directly when they fit the task.
-- Treat child-agent reports as evidence, not as templates to clone.
-- Use external research to confirm, update or reject these patterns before changing harness, memory, tools, skills, MCP, interfaces or operations.
-`;
+${body}`;
+  text = text.replace(
+    /^pattern_pack_document_lock:.*$/m,
+    `pattern_pack_document_lock: ${markdownDocumentLock(text, "pattern_pack_document_lock")}`,
+  );
 
   return {
     text,
@@ -430,6 +547,8 @@ ${seeds.length ? seeds.map((seed) => `- ${seed}`).join("\n") : "- No technology-
     patterns,
     selectedPatterns: patterns,
     externalResearchSeeds: seeds,
+    lock,
+    contractFingerprint: data.fingerprint || "pending",
   };
 }
 

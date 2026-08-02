@@ -90,6 +90,21 @@ Status: accepted
 - Human approval gates: required before any deployment.
 - Completion criteria: smoke test passes.
 
+## Repository research and adoption
+
+- Repository research policy: not-applicable
+- Repository research topics: none
+- Repository research waiver reason: deterministic local fixture has no external repository dependency.
+- Selected GitHub repositories: none
+- Repository adoption mode: none
+- Selected repository module: not-applicable
+- Repository pin: not-applicable
+- Repository license decision: not-applicable
+- Repository security review: not-applicable
+- Repository permissions: not-applicable
+- Repository eval status: not-applicable
+- Repository user approval: not-applicable
+
 ## Data, memory and sources
 
 - Input data types: Markdown notes.

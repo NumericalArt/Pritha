@@ -45,7 +45,7 @@ Pritha carries a source-level reference implementation extracted from FESPA26:
 ```sh
 node scripts/voice-control-kit.mjs plan
 node scripts/voice-control-kit.mjs list
-node scripts/voice-control-kit.mjs copy --target ../child-agent
+node scripts/voice-control-kit.mjs copy --target sibling:child-agent
 ```
 
 The same command is available through Pritha:

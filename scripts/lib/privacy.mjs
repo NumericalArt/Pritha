@@ -51,6 +51,11 @@ export const FORBIDDEN_TEXT_PATTERNS = [
     pattern: /\b(user_id|chat_id|message_id|file_id|file_unique_id|forwarded_from)\s*:/i,
     description: "Telegram/user/file identifiers must not be retained in tracked knowledge",
   },
+  {
+    id: "live-telegram-token",
+    pattern: /\b\d{6,12}:[A-Za-z0-9_-]{30,}\b/,
+    description: "live Telegram bot tokens must not be retained in tracked knowledge",
+  },
 ];
 
 export const INCOMING_URL_PATTERN = /https?:\/\/[^\s<>)\]]+/i;
@@ -144,7 +149,7 @@ export function containsForbiddenText(relPath, text) {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const patterns = scanRawPathOnly
-      ? FORBIDDEN_TEXT_PATTERNS.filter((item) => item.id === "raw-source-path")
+      ? FORBIDDEN_TEXT_PATTERNS.filter((item) => ["raw-source-path", "live-telegram-token"].includes(item.id))
       : FORBIDDEN_TEXT_PATTERNS;
     for (const item of patterns) {
       item.pattern.lastIndex = 0;

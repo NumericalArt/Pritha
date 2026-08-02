@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-07-02
+updated: 2026-07-13
 topics:
   - agent-engineering
   - agent-factory
@@ -40,6 +40,9 @@ sources:
   - 04_standards/agent-mcp-connector-lifecycle.md
   - 04_standards/agent-a2a-interoperability.md
   - 04_standards/agent-ai-safe-security-checklist.md
+  - 01_sources/registries/github-agent-building-repos.md
+  - 01_sources/signals/2026-06-28-open-source-agent-building-repos-signal.md
+  - 03_reviews/2026-06-28-open-source-agent-building-repos-review.md
 related:
   standards:
     - 04_standards/agent-creation-harness.md
@@ -57,6 +60,7 @@ related:
   templates:
     - 08_templates/agent-project-contract.md
     - 08_templates/agent-scaffold-report.md
+    - 08_templates/github-source-registry-entry.md
   workflows:
     - 07_workflows/agents-mother-roadmap.md
     - 07_workflows/agent-skill-pack-selection.md
@@ -142,6 +146,8 @@ runtime blockers, but creation is not complete while the agent is missing from
      execution/tools and infrastructure/orchestration controls;
    - skill needs, allowed skill sources, install mode and mutation policy;
    - MCP needs, allowed connector sources, auth policy, toolset scope and side-effect policy;
+   - GitHub repository research policy, capability scopes and whether any
+     repository is only a reference or supplies a selected scaffold module;
    - A2A needs, peer-agent role, discovery mode, Agent Card visibility, trust registry and task policy;
    - acceptance tests and training expectations.
    If the first user description is not enough to fill these fields, ask concise
@@ -165,8 +171,31 @@ runtime blockers, but creation is not complete while the agent is missing from
 5. Derive external research topics from both the contract and the selected
    pattern-pack seeds. Verify volatile architecture choices through current
    primary sources and trusted secondary sources.
-   If no volatile external choice is present, record why external verification
-   is not needed.
+   When the contract or pattern pack implies an external harness, memory/RAG
+   layer, eval/security component, MCP/tool server, external skill source or
+   declared dependency, run contract-aware GitHub repository research:
+   - apply `Repository research policy`: `auto`, `required`, `registry-only` or
+     `not-applicable`; `not-applicable` requires a recorded waiver reason;
+   - derive only the relevant scopes: `agent-harness`, `agent-memory`,
+     `agent-evals`, `mcp-tools`, `agent-skills`, `agent-interface`,
+     `agent-voice` and/or `agent-operations`;
+   - search the curated
+     `01_sources/registries/github-agent-building-repos.md` first;
+   - in `auto` or `online` mode, augment registry matches with bounded GitHub API
+     discovery; default to five candidates and never exceed ten per research run;
+   - merge and deduplicate candidates into the research report without mutating
+     the registry;
+   - preserve all explicitly selected repositories within a hard maximum of ten,
+     even when the requested shortlist limit is lower;
+   - treat the shortlist as advisory-only. Discovery must not clone, install,
+     execute, vendor, link, activate or trust repository code.
+   For `reference-only`, require current `github-repository-review` evidence for
+   every exact canonical repository. For `selected-module` v1, require exactly
+   one directory module verified as a tree at the immutable pin plus module-local
+   license evidence bound to that pin. Treat GitHub HEAD license metadata as
+   advisory only.
+   If no volatile external choice or repository-relevant scope is present,
+   record why that verification is not needed.
 6. Record an architecture recommendation:
    - selected runtime family;
    - selected interface adapters;
@@ -188,8 +217,20 @@ runtime blockers, but creation is not complete while the agent is missing from
    - untrusted-input risk tier and scanner/quarantine path;
    - skill candidates, trust/risk score and activation decision;
    - MCP connector candidates, auth/readiness state, toolset scope and activation decision;
+   - GitHub repository shortlist, research status and adoption mode;
+   - for every selected repository module: canonical repository, exact
+     verified commit/tree SHA, safe repository-relative directory path and
+     module tree SHA; module-local LICENSE/manifest source URL, Git blob SHA,
+     content SHA-256, detected SPDX and `license_scope: module-local`; compatible
+     license decision; security and permission review,
+     contract-specific eval result, current `github-repository-review` evidence,
+     completed synthesis and explicit user approval;
    - testing and observability model.
 7. Mark the contract `accepted` before production scaffold.
+   If `Repository adoption mode` is `selected-module`, keep scaffold blocked until
+   the repository research is current and the selected-module gates above are
+   complete. `candidate`, `accepted-for-review` and `reference-only` never grant
+   runtime or vendoring permission.
 8. Scaffold the new agent in a sibling folder unless the contract explicitly chooses another location.
 9. Generate minimum project files:
    - `AGENTS.md` or runtime-native equivalent;
@@ -222,7 +263,8 @@ runtime blockers, but creation is not complete while the agent is missing from
 node scripts/pritha.mjs questions
 node scripts/pritha.mjs init --name "agent-name" --mission "mission"
 node scripts/pritha.mjs create --name "agent-name" --mission "mission"
-node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name
+node scripts/pritha.mjs research 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --github-mode auto --github-limit 5
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/pritha.mjs skills status
 node scripts/pritha.mjs skills select 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/pritha.mjs skills audit ../existing-or-generated-agent
@@ -249,12 +291,43 @@ node scripts/agents-mother.mjs validate 11_agents/contracts/YYYY-MM-DD-agent-nam
 node scripts/agents-mother.mjs list
 ```
 
+Fresh generated contracts use `Target folder: sibling of Pritha`; scaffold
+resolves that logical default through `PRITHA_AGENT_PARENT`. An explicit
+contract path or `--output` remains an intentional override. Subsequent lifecycle
+commands should use the actual scaffold path printed by Pritha rather than assume
+the legacy `../agent-name` layout in an isolated instance.
+
+Repository-research flags for `research`:
+
+- `--github-mode auto|online|registry-only|skip`: `auto` is the normal
+  registry-first path and performs bounded online discovery only for derived
+  repository scopes; `online` requests online augmentation when contract policy
+  permits it;
+  `registry-only` disables network discovery; `skip` records a failed/pending
+  result when repository research is required.
+- `--github-limit <1..10>`: requested merged shortlist size; default `5`.
+  Explicit contract selections raise the effective limit so none is silently
+  dropped, while the hard maximum remains ten.
+- `--github-timeout-ms <1000..60000>`: per GitHub request timeout; default
+  `15000`. The full online discovery pass also has a 45-second fail-closed
+  deadline so several unavailable scopes cannot block the workflow indefinitely.
+- `--github-fixture <json>`: deterministic test/development input only. Fixture
+  metadata remains untrusted and never counts as approval to adopt a module.
+
+Invalid policy or mode values must fail before network access. Do not silently
+fall back to `auto`. Policy `not-applicable` is invalid with every adoption mode
+except `none`, including `reference-only`.
+
+These flags control discovery, not adoption. The command only writes the
+contract-specific research and pattern-pack artifacts; it does not alter the
+curated GitHub registry.
+
 Experimental scaffold overrides:
 
 ```sh
-node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name --allow-draft-scaffold
-node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name --allow-missing-research
-node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --output ../agent-name --allow-pending-external-verification
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --allow-draft-scaffold
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --allow-missing-research
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --allow-pending-external-verification
 ```
 
 Use these only for explicit experiments, not production descendant readiness.
@@ -380,6 +453,98 @@ use different models for different tasks, or when cost, privacy, latency, risk o
 quality requirements make it necessary. Concrete model names, prices and quotas
 are only date-stamped candidates; the reusable rule is the placement principle,
 and current official docs must be rechecked before scaffold or deployment.
+
+## GitHub Repository Research Decision Point
+
+Repository research is a scoped part of the existing child-agent research gate,
+not a package installer. Use it when a contract or pattern-pack seed creates a
+real choice among external harness, memory, eval/security or MCP/tool modules.
+
+The contract records:
+
+- `Repository research policy`: `auto`, `required`, `registry-only` or
+  `not-applicable`;
+- `Repository research topics`: any of `agent-harness`, `agent-memory`,
+  `agent-evals`, `mcp-tools`, `agent-skills`, `agent-interface`, `agent-voice`
+  and `agent-operations`;
+- `Repository research waiver reason` when policy is `not-applicable`;
+- `Repository adoption mode`: `none`, `reference-only` or `selected-module`;
+- selected repository/module and, for `selected-module`, the exact pin, license
+  decision, security review, permission boundary, eval status and user approval.
+
+Unknown scopes and a sentinel mixed with explicit scopes are contract errors and
+must fail before any GitHub request without reflecting the raw rejected value.
+
+The generated research review records these machine-readable fields:
+
+```yaml
+repository_research_required: true | false
+repository_research_policy: auto | required | registry-only | not-applicable
+repository_research_mode: auto | online | registry-only | skip
+repository_research_status: complete | pending | not-applicable | failed
+repository_research_completed_at: ISO-8601 | pending
+repository_research_online_status: complete | fixture | failed | registry-only | skipped | not-applicable
+repository_research_lock: sha256:... | pending | not-applicable
+repository_candidate_count: 0
+repository_adoption_status: none | reference-only | pending-review
+repository_research_scopes:
+  - agent-harness | agent-memory | agent-evals | mcp-tools | agent-skills | agent-interface | agent-voice | agent-operations | not-applicable
+external_evidence_count: 0
+external_evidence_topics: []
+external_research_lock: sha256:... | pending
+synthesis_lock: sha256:... | pending
+research_content_lock: sha256:... | pending
+```
+
+The final synthesis must classify each relationship to current Pritha memory as
+`confirms`, `refines`, `contradicts` or `makes-outdated`. Candidate discovery
+may complete while adoption remains blocked: a shortlist proves only that
+research ran. It does not prove license compatibility, code safety, permissions,
+runtime fit or quality.
+
+When repository adoption mode is `reference-only` or `selected-module`, the
+locked synthesis payload must also contain
+`repository_adoption_recommendation: proceed | hold | reject`. This enum, not
+free-form architecture prose, controls scaffold authorization: `proceed` makes
+an otherwise complete gate eligible, `hold` keeps it pending, and `reject`
+makes the overall gate failed while preserving the completed research record.
+
+For `reference-only`, current external evidence must use adoption decision
+`reference-only` and bind to every exact selected canonical repository. Each
+authorizing review must pass freshness independently; topic-level coverage from
+another review cannot make a stale repository review current.
+
+For a selected module, recheck current repository metadata and primary files,
+then select exactly one public repository in the v1 contract. The module must be
+a safe repository-relative directory verified as a Git tree at the immutable
+commit/tree pin; a file/blob module is not accepted. Verify a module-local
+LICENSE or supported manifest under that directory at the same pin and record
+its exact GitHub blob URL, Git blob SHA, SHA-256 content identity, safely detected
+SPDX and `license_scope: module-local`. A root-only license and GitHub current-HEAD
+license metadata are advisory and cannot close this gate. Also record scripts
+and dependency-manifest inspection, network/filesystem/secrets permissions,
+prompt-injection/supply-chain review, contract-specific evals and explicit user
+approval. The external evidence must include a valid
+`github-repository-review` topic, and the evidence-to-memory synthesis must be
+complete. Until every selected-module field is complete, keep the module
+candidate-only and the production scaffold gate pending.
+The evidence item must match the contract's canonical repository, module,
+immutable pin, license decision, exact permission set, passing eval and explicit
+approval; evidence for a different repository cannot close the gate.
+
+Retrieval time alone does not establish freshness. Current evidence must provide
+source publication/update dates, or substantive `version_context` and
+`temporal_compatibility` plus locked
+`temporal_compatibility_status: compatible | incompatible | unknown` when those
+dates are unavailable. Only `compatible` may satisfy the version-based freshness
+fallback. External narrative is
+untrusted: redact sensitive values and quarantine instruction-like content before
+coverage or synthesis. `repository_research_lock`, `external_research_lock`,
+`synthesis_lock` and the full-document `research_content_lock` must all verify;
+the repository payload additionally binds the visible rendered GitHub section.
+The generated selected-module manifest must additionally remain a bounded
+non-symlink regular file and match its generated SHA-256 plus the verified
+`repository_research_lock` during child smoke/health checks.
 
 ## Harness Evaluation Decision Point
 
@@ -589,6 +754,10 @@ An Agents Mother run is complete only when:
 - an `agent-contract` exists and validates;
 - the selected architecture is grounded in TechScope memory, a pattern-pack
   artifact and current sources;
+- any contract-relevant GitHub shortlist is recorded as advisory evidence, and
+  every selected repository module has passed exact-pin, license, security,
+  permission, eval, `github-repository-review`, synthesis and
+  explicit-user-approval gates;
 - a working scaffold exists in the chosen folder;
 - environment setup instructions are present;
 - smoke tests or healthchecks pass, or failures are documented;
