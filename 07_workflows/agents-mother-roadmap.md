@@ -3,7 +3,7 @@ id: agents-mother-roadmap
 type: workflow
 status: active
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-07-13
 topics:
   - agent-engineering
   - agent-factory
@@ -21,6 +21,9 @@ sources:
   - 07_workflows/agents-mother.md
   - 04_standards/agent-creation-harness.md
   - 03_reviews/2026-05-18-techscope-agents-mother-scenario-review.md
+  - 01_sources/registries/github-agent-building-repos.md
+  - 01_sources/signals/2026-06-28-open-source-agent-building-repos-signal.md
+  - 03_reviews/2026-06-28-open-source-agent-building-repos-review.md
 related:
   standards:
     - 04_standards/agent-creation-harness.md
@@ -33,6 +36,7 @@ related:
     - 08_templates/agent-project-contract.md
     - 08_templates/agent-scaffold-report.md
     - 08_templates/agent-operations-report.md
+    - 08_templates/github-source-registry-entry.md
 supersedes: []
 superseded_by: []
 ---
@@ -116,6 +120,20 @@ Deliverables:
   - changelogs/releases when tool behavior matters;
   - trusted secondary sources only as support;
   - publication/update dates recorded.
+- Contract-aware GitHub repository research:
+  - contract policy: `auto`, `required`, `registry-only` or `not-applicable`;
+  - capability scopes: `agent-harness`, `agent-memory`, `agent-evals`,
+    `mcp-tools`, `agent-skills`, `agent-interface`, `agent-voice` and
+    `agent-operations`;
+  - curated registry searched before bounded online discovery;
+  - online shortlist limited to 5 candidates by default and 10 at most;
+  - explicitly selected repositories preserved within the hard maximum of 10;
+  - duplicate repository URLs merged into one advisory candidate;
+  - online results never mutate the curated registry automatically.
+- Research-only trust boundary: discovery may read bounded repository metadata but
+  never clones, installs, executes, vendors, links, activates or registers code.
+- Separate repository adoption decision: `none`, `reference-only` or
+  `selected-module`.
 - Architecture recommendation section added to the contract or a linked review.
 - Research reports saved in `11_agents/research/`.
 
@@ -124,6 +142,22 @@ Acceptance criteria:
 - Before scaffold, TechScope can show which sources and internal artifacts justify the architecture.
 - Platform-specific ideas are classified as `codex-native`, `portable`, `adapter-needed` or `environment-specific`.
 - Stale or unverified claims cannot silently become scaffold defaults.
+- Repository research records its policy, mode, status, online status, scopes,
+  candidate count, adoption status, completion time and evidence locks.
+- `candidate` and `accepted-for-review` repositories remain advisory and cannot
+  silently become dependencies or scaffold defaults.
+- A `selected-module` cannot pass the scaffold gate until the contract records
+  the exact repository and directory module, immutable pin and module tree SHA,
+  pin-bound module-local license URL/blob SHA/content SHA-256/detected SPDX,
+  compatible license decision, security review, required permissions, eval
+  result, current exact `github-repository-review` evidence, completed synthesis
+  and explicit user approval.
+- `reference-only` requires current evidence for every exact canonical selected
+  repository and never authorizes code use.
+- Retrieval time alone cannot prove source freshness, and quarantined external
+  instructions cannot satisfy evidence or synthesis.
+- Repository payload, visible rendered section, external evidence, synthesis and
+  the full research document are integrity locked.
 
 ## Layer 4: Scaffold Generation Layer
 
@@ -330,7 +364,8 @@ Acceptance criteria:
 
 1. Done: create governance layer, standard, workflow and templates.
 2. Done: implement `agents-mother.mjs interview` and contract validation.
-3. Done: implement `agents-mother.mjs research` using local memory search plus web verification notes.
+3. Done: implement `agents-mother.mjs research` using local memory, current-source
+   verification and contract-aware, registry-first GitHub repository discovery.
 4. Done: implement `agents-mother.mjs scaffold` for `codex-native`.
 5. Done: add modular interface adapter layer with optional Telegram scaffold profile.
 6. Done: implement memory and tool profiles in generated scaffolds.
@@ -348,6 +383,8 @@ Acceptance criteria:
 - TechScope Markdown remains the source of truth.
 - Generated project files must not include TechScope secrets.
 - Autostart defaults to `disabled`, but can be explicitly configured per agent contract.
+- Repository discovery defaults to contract policy `auto`; its shortlist is
+  advisory and does not authorize code adoption.
 
 ## Open questions
 

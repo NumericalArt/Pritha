@@ -1,7 +1,13 @@
-import { parsePatternPackSeeds } from "./pattern-research.mjs";
+import { canonicalPatternResearchSeed, parsePatternPackSeeds } from "./pattern-research.mjs";
+import { normalizeGitHubRepositoryUrl } from "../lib/github-repository-radar.mjs";
 
 function compact(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function hasSelectedGitHubRepository(value) {
+  const matches = String(value || "").match(/https:\/\/github\.com\/[^\s,;`]+/gi) || [];
+  return matches.some((candidate) => normalizeGitHubRepositoryUrl(candidate));
 }
 
 function slug(value, fallback = "pattern") {
@@ -37,6 +43,10 @@ function combinedContractText(data = {}) {
     data.dependencies,
     data.allowedNetworkAccess,
     data.secretsRequired,
+    data.repositoryResearchPolicy,
+    data.repositoryResearchTopics,
+    data.repositoryAdoptionMode,
+    data.selectedGitHubRepositories,
     data.coreFunctions?.join(" "),
     data.criticalWorkflows?.join(" "),
   ].filter(Boolean).join("\n").toLowerCase();
@@ -57,9 +67,9 @@ function pushTopic(topics, id, topic, query, reason, extra = {}) {
 
 function addPatternDerivedTopics(topics, patternPack) {
   const seeds = parsePatternPackSeeds(patternPack)
-    .map((seed) => compact(seed))
+    .map((seed) => canonicalPatternResearchSeed(compact(seed)))
     .filter(Boolean)
-    .filter((seed) => /\b(openai|realtime|webrtc|voice|speech|telegram|bot api|mcp|connector|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron|tailscale|oauth|webhook|browser|sandbox|codex app|codex cli|agents sdk|api)\b/i.test(seed))
+    .filter((seed) => /\b(openai|realtime|webrtc|voice|speech|telegram|bot api|mcp|connector|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron|tailscale|oauth|webhook|browser|sandbox|codex app|codex cli|agents sdk|github|repository|skill|eval|evaluation|open-source|api)\b/i.test(seed))
     .slice(0, 5);
 
   for (const seed of seeds) {
@@ -82,6 +92,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
   const serviceMode = String(data.serviceMode || "none").trim();
   const autostart = String(data.autostart || "disabled").trim();
   const proactiveMode = String(data.proactiveMode || "none").trim();
+  const repositoryAdoptionMode = String(data.repositoryAdoptionMode || "none").trim();
 
   if (runtime === "api" || /\bopenai agents sdk\b|\bagents sdk\b/.test(text)) {
     pushTopic(
@@ -195,6 +206,17 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
+  if (repositoryAdoptionMode !== "none" || hasSelectedGitHubRepository(data.selectedGitHubRepositories)) {
+    pushTopic(
+      topics,
+      "github-repository-review",
+      "Selected GitHub repository provenance and adoption review",
+      "selected GitHub repository current HEAD release license maintainer security permissions supply chain evaluation",
+      "The contract explicitly references a GitHub repository or repository adoption mode.",
+      { preferredSources: ["github", "official-docs", "security-docs"] },
+    );
+  }
+
   const dependencies = compact(data.dependencies);
   const normalizedDependencies = dependencies.replace(/[.\s]+$/g, "");
   if (dependencies && !/^(none|minimal|tbd|unknown|not-applicable)$/i.test(normalizedDependencies)) {
@@ -202,7 +224,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
       topics,
       "declared-dependencies",
       "Declared dependency versions and install safety",
-      `current versions changelog security install documentation ${dependencies}`,
+      "current dependency versions changelog security install documentation agent runtime",
       "Contract declares dependencies that should be checked before scaffold.",
       { preferredSources: ["official-docs", "github", "changelog"] },
     );

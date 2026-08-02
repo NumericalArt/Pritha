@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-07-02
+updated: 2026-07-13
 template_for: agent-contract
 topics: []
 tools: []
@@ -21,6 +21,8 @@ related:
   standards:
     - 04_standards/agent-ai-safe-security-checklist.md
     - 04_standards/agent-a2a-interoperability.md
+    - 04_standards/agent-creation-harness.md
+    - 04_standards/agent-untrusted-input-security.md
   workflows:
     - 07_workflows/agents-mother.md
 supersedes: []
@@ -231,12 +233,18 @@ Status: draft | accepted | superseded
 - Skill network policy: no-network | approval-required | allowed-by-contract
 - Skill source pinning: none | tag | commit | tree-sha | lockfile
 - Skill eval policy: smoke-only | trigger-evals | full-behavior-evals | none-with-justification
-- Installed skills:
+- Installed skills: exact local catalog names when `Skill needs: selected` | none
 - Candidate skills:
 - External skill approval:
 - Skill trusted catalogs:
 - Skill update policy:
 - Skill audit command:
+
+Current scaffold activation is deliberately narrower than the policy vocabulary:
+only reviewed local catalog skills may be vendored. `Skill needs: selected`
+requires unique exact known names in `Installed skills`. External/self-asserted
+skills, `link` and `runtime-install` remain candidate-only until a dedicated
+pinned-bundle workflow exists; approval text alone is insufficient.
 
 ## MCP connectors
 
@@ -251,6 +259,46 @@ Status: draft | accepted | superseded
 - Pending MCP auth:
 - MCP readiness command:
 - MCP audit/update policy:
+
+## GitHub repository research and adoption
+
+- Repository research policy: auto | required | registry-only | not-applicable
+- Repository research topics: auto from contract and pattern pack | agent-harness | agent-memory | agent-evals | mcp-tools | agent-skills | agent-interface | agent-voice | agent-operations | comma-separated selection | none
+- Repository research waiver reason: required when policy is not-applicable
+- Selected GitHub repositories: one canonical `https://github.com/OWNER/REPO` URL for selected-module v1 | reference-only URLs | none
+- Repository adoption mode: none | reference-only | selected-module
+- Selected repository module: safe repository-relative directory path (selected-module v1; files/blobs are unsupported) | none
+- Repository pin: commit:<40-hex-SHA> | tree-sha:<40-hex-SHA> | none; release tags are descriptive metadata only, not adoption pins
+- Repository license decision: <SPDX/license> compatible and approved | reference-only | blocked | pending
+- Repository security review: passed | blocked | failed | pending | not-applicable
+- Repository permissions: explicit bounded filesystem, shell, network, secrets, messaging, deployment and spend boundary | no permissions required
+- Repository eval status: passed | failed | pending | not-applicable
+- Repository user approval: explicitly approved by user | rejected | pending | not-required-reference-only
+
+`auto` searches the curated Pritha GitHub registry first and performs bounded
+online discovery only for repository-relevant capability scopes. Discovery is
+advisory-only: it must not clone, install, execute, vendor, link, activate or
+register a repository. `selected-module` requires the exact pin, license,
+security, permission, eval and user-approval fields above before production
+scaffold, plus valid `github-repository-review` evidence and completed synthesis;
+a candidate or `accepted-for-review` label is not approval.
+The v1 selected-module schema supports exactly one selected repository because
+module/pin/license/security/eval/approval fields are singular.
+Policy `not-applicable` is valid only with adoption mode `none`.
+`reference-only` requires current `github-repository-review` evidence for every
+exact selected canonical repository. Selected-module research must verify the
+directory tree and a module-local LICENSE/supported manifest at the same pin,
+including source URL, Git blob SHA, content SHA-256, detected SPDX and
+`license_scope: module-local`; current HEAD license metadata and root-only license
+metadata are advisory only.
+For both repository adoption modes, the evidence-to-memory synthesis must lock
+`repository_adoption_recommendation: proceed | hold | reject`; only `proceed`
+can make the scaffold gate eligible.
+Retrieval time alone does not establish freshness. When recent source
+publication/update dates are unavailable, version-based fallback requires
+substantive version/temporal context and a lock-bound
+`temporal_compatibility_status: compatible`; `incompatible`, `unknown` and invalid
+values remain non-authorizing.
 
 ## A2A inter-agent communication
 
@@ -357,6 +405,9 @@ Status: draft | accepted | superseded
 - Pritha standards/workflows/decisions used:
 - Comparable child-agent evidence used:
 - Pattern-derived external research seeds:
+- GitHub repository research report:
+- Repository shortlist and reference-only decisions:
+- Selected repository module review artifact:
 - Current primary sources checked:
 - Trusted secondary sources checked:
 - Alternatives considered:
@@ -368,6 +419,9 @@ Status: draft | accepted | superseded
 - [ ] Contract status is `accepted` before production scaffold.
 - [ ] Pritha memory research completed or explicitly waived with reason.
 - [ ] Current primary sources checked for volatile choices or marked not-applicable.
+- [ ] Repository research policy, scopes and adoption mode recorded.
+- [ ] GitHub shortlist remains advisory-only and did not trigger clone/install/execute/vendor/link/activation or registry mutation.
+- [ ] Every selected repository module has a canonical URL, exact immutable pin, compatible license decision, security/permission review, passed contract-specific eval, valid `github-repository-review` evidence, completed synthesis and explicit user approval.
 - [ ] Runtime family selected.
 - [ ] Runtime isolation profile selected or explicitly marked unnecessary.
 - [ ] Runtime placement selected per task class.

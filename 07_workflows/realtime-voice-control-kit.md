@@ -3,7 +3,7 @@ id: realtime-voice-control-kit
 type: workflow
 status: active
 created: 2026-05-30
-updated: 2026-05-31
+updated: 2026-07-13
 topics: [voice-control, realtime, agent-scaffold, pritha, codex-sidecar]
 tools: [OpenAI Realtime API, Codex App, Codex CLI, Next.js, WebRTC]
 sources:
@@ -51,14 +51,14 @@ node scripts/voice-control-kit.mjs list
 Copy the pack into a child agent for adaptation:
 
 ```sh
-node scripts/voice-control-kit.mjs copy --target ../child-agent
+node scripts/voice-control-kit.mjs copy --target sibling:child-agent
 ```
 
 Equivalent Pritha entrypoint:
 
 ```sh
 node scripts/pritha.mjs voice-kit plan
-node scripts/pritha.mjs voice-kit copy --target ../child-agent
+node scripts/pritha.mjs voice-kit copy --target sibling:child-agent
 ```
 
 ## Intake Rules

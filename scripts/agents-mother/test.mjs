@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { yamlList } from "../lib/frontmatter.mjs";
 import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 
@@ -27,13 +28,74 @@ export function fileExists(projectRoot, relPath) {
 }
 
 export function readJsonIfExists(projectRoot, relPath) {
-  const fullPath = path.join(projectRoot, relPath);
-  if (!existsSync(fullPath)) return null;
+  const canonicalRoot = path.resolve(projectRoot);
+  const fullPath = path.resolve(canonicalRoot, String(relPath || ""));
+  if (fullPath !== canonicalRoot && !fullPath.startsWith(`${canonicalRoot}${path.sep}`)) return null;
   try {
-    return JSON.parse(readFileSync(fullPath, "utf8"));
+    return JSON.parse(readBoundedRegularFile(fullPath, {
+      maxBytes: 1_000_000,
+      allowedRoots: [canonicalRoot],
+    }).text);
   } catch {
     return null;
   }
+}
+
+export function readProjectText(projectRoot, relPath, maxChars = 1400) {
+  const canonicalRoot = path.resolve(projectRoot);
+  const fullPath = path.resolve(canonicalRoot, String(relPath || ""));
+  if (fullPath !== canonicalRoot && !fullPath.startsWith(`${canonicalRoot}${path.sep}`)) return "";
+  try {
+    return readBoundedRegularFile(fullPath, {
+      maxBytes: 256_000,
+      allowedRoots: [canonicalRoot],
+    }).text.replace(/\s+/g, " ").trim().slice(0, maxChars);
+  } catch {
+    return "";
+  }
+}
+
+export function projectAgentData(projectRoot, taskDescription) {
+  const projectName = path.basename(projectRoot);
+  const relPath = path.relative(ROOT, projectRoot);
+  const readme = readProjectText(projectRoot, "README.md");
+  const agents = readProjectText(projectRoot, "AGENTS.md");
+  const packageJson = readJsonIfExists(projectRoot, "package.json") || {};
+  const interfaces = readJsonIfExists(projectRoot, "interfaces/manifest.json") || {};
+  const memory = readJsonIfExists(projectRoot, "memory/manifest.json") || {};
+  const tools = readJsonIfExists(projectRoot, "tools/manifest.json") || {};
+  const operations = readJsonIfExists(projectRoot, "operations/manifest.json") || {};
+  const adapters = Array.isArray(interfaces.adapters)
+    ? interfaces.adapters.map((item) => item?.name || item?.id || item).filter(Boolean).join(", ")
+    : "";
+  return {
+    agentName: projectName,
+    relPath,
+    projectPath: relPath,
+    text: `${readme}\n${agents}\n${taskDescription}`,
+    primaryMission: readme.match(/#\s+([^#]+)/)?.[1]?.trim() || taskDescription,
+    targetUser: "existing agent operator",
+    runtimeFamily: "codex-native",
+    runtimePlacementProfile: "hybrid",
+    primaryInterface: adapters || interfaces.primary || "Codex project",
+    secondaryInterfaces: adapters,
+    telegramMode: adapters.toLowerCase().includes("telegram") ? "operator-control" : "none",
+    expectedHosting: operations.deployment_target || "existing local project",
+    deploymentTarget: operations.deployment_target || "existing local project",
+    deploymentProfile: operations.deployment_profile || "existing",
+    serviceMode: operations.service_mode || "none",
+    autostart: operations.autostart || "disabled",
+    proactiveMode: operations.proactivity?.mode || operations.proactive_mode || "none",
+    memoryModel: memory.profile || memory.description || "existing project memory",
+    indexingSearchNeeds: memory.indexing || memory.search || "",
+    toolSystem: tools.description || "existing project tools",
+    inputDataTypes: "existing project inputs plus operator task",
+    dependencies: packageJson.dependencies ? Object.keys(packageJson.dependencies).slice(0, 12).join(", ") : "none",
+    coreFunctions: [taskDescription],
+    criticalWorkflows: [taskDescription],
+    taskDescription,
+    developmentTaskType: "improve",
+  };
 }
 
 export function runProjectCommand(projectRoot, command, args) {

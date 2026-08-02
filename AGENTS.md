@@ -3,7 +3,7 @@ id: AGENTS
 type: artifact
 status: processed
 created: 2026-06-01
-updated: 2026-07-02
+updated: 2026-07-13
 topics:
   - privacy-preserving-intake
 tools:[]
@@ -262,6 +262,57 @@ Scaffold допускается только из `agent-contract` со стат
 runtime, модели, deployment или внешние интеграции могли измениться, нужно
 проверить первичную документацию и отразить это в scaffold report.
 
+GitHub repository research для нового агента управляется контрактом. Контракт
+должен выбрать policy `auto`, `required`, `registry-only` или `not-applicable`,
+релевантные scopes `agent-harness`, `agent-memory`, `agent-evals`, `mcp-tools`,
+`agent-skills`, `agent-interface`, `agent-voice`, `agent-operations` и adoption
+mode `none`, `reference-only` или `selected-module`. Research сначала
+ищет в curated registry, затем при разрешенной policy выполняет bounded online
+discovery; полученный shortlist является только advisory evidence. На research
+этапе нельзя clone, install, execute, vendor, link, activate найденный код или
+автоматически менять registry. Shortlist ограничен десятью уникальными
+репозиториями; все явно выбранные reference-only репозитории сохраняются в
+пределах этого hard limit.
+
+Для `reference-only` current evidence topic `github-repository-review` должен
+точно соответствовать каждому canonical repository из контракта. Для
+`selected-module` v1 разрешена ровно одна публичная repository и только
+directory module: GitHub должен подтвердить exact pin, tree SHA и module path,
+а внутри этой directory на том же pin должна быть module-local LICENSE или
+поддерживаемый manifest. Evidence фиксирует license source URL, Git blob SHA,
+SHA-256 содержимого, safely detected SPDX и `license_scope: module-local`.
+License metadata текущего HEAD является только advisory и не заменяет эту
+проверку. Security review, exact permissions, contract-specific eval, явное
+user approval, current external evidence и synthesis с памятью Pritha также
+обязательны.
+
+Для `reference-only` и `selected-module` locked synthesis обязан содержать
+`repository_adoption_recommendation: proceed | hold | reject`. Только `proceed`
+делает полный research gate пригодным для scaffold; `hold` оставляет его
+`pending`, а `reject` переводит overall gate в `failed`. Свободный текст
+architecture decision не заменяет этот machine-readable выбор.
+
+Invalid policy/mode и неизвестный или смешанный repository scope должны
+завершаться до network request без эха входного значения; policy
+`not-applicable` несовместима с любым adoption mode кроме `none`. Retrieval date
+сама по себе не доказывает свежесть источника: нужны source published/updated
+dates либо содержательный version context и temporal compatibility для каждого
+авторизующего repository evidence item, а не только для topic в целом. Внешний
+version-based fallback дополнительно требует locked
+`temporal_compatibility_status: compatible`; значения `incompatible` и `unknown`
+не авторизуют scaffold. Внешний
+текст проходит redaction и prompt-injection quarantine; repository payload,
+external evidence, synthesis и полный rendered research document защищаются
+content locks. Evidence обязано совпадать с exact contract binding, а не только
+иметь тот же topic id.
+
+Vendored child skills должны проходить deterministic `skills-status` до чтения
+`SKILL.md`. Manifest, lock и frontmatter связываются по hash, source paths,
+version, source, trust/review/risk levels и required toolsets; shared redaction и
+prompt-injection scanner применяется также к candidate metadata. Для выбранного
+repository module child smoke/healthcheck читает только bounded regular manifest
+и сверяет его с generated content hash и `repository_research_lock`.
+
 Для такого сценария использовать:
 
 - workflow `07_workflows/agents-mother.md`;
@@ -340,7 +391,7 @@ CLI:
 - `node scripts/agents-mother.mjs questions`
 - `node scripts/agents-mother.mjs interview`
 - `node scripts/agents-mother.mjs init --name ... --mission ...`
-- `node scripts/agents-mother.mjs research <contract-path>`
+- `node scripts/agents-mother.mjs research <contract-path> [--github-mode auto|online|registry-only|skip] [--github-limit 5] [--github-timeout-ms 15000] [--github-fixture <json>]`
 - `node scripts/agents-mother.mjs scaffold <contract-path>`
 - `node scripts/agents-mother.mjs test <project-path>`
 - `node scripts/agents-mother.mjs handoff <project-path>`

@@ -104,9 +104,13 @@ accepted contract after Pritha memory research has been performed.
 ## Scaffold a Descendant
 
 ```sh
-node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md --output ../research-agent
-node scripts/pritha.mjs test ../research-agent
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md
 ```
+
+The default `sibling of Pritha` target resolves through `PRITHA_AGENT_PARENT`
+(or the checkout parent in the legacy layout). Use the absolute project path
+printed by `create` for the subsequent `test`, `publish` and operations
+commands. Reserve `--output` for an intentional override.
 
 ## Add Knowledge
 

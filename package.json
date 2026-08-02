@@ -11,7 +11,7 @@
   "scripts": {
     "smoke": "node scripts/smoke-test.mjs",
     "test": "npm run check && npm run test:unit",
-    "test:unit": "node --test --test-concurrency=1 tests/**/*.test.mjs",
+    "test:unit": "node --test --test-concurrency=1 tests/*.test.mjs tests/**/*.test.mjs",
     "check": "node scripts/golden-checks.mjs",
     "check:embeddings": "node scripts/golden-checks.mjs --with-embeddings",
     "env": "node scripts/env-doctor.mjs",

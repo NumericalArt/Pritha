@@ -3,18 +3,30 @@
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData, yamlList } from "../lib/frontmatter.mjs";
+import { atomicCompareAndSwapFile } from "../lib/atomic-file.mjs";
+import { parseBoundedJson } from "../lib/bounded-json.mjs";
+import { markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
+import { redactSensitiveText } from "../lib/redaction.mjs";
+import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
-import { printIssues } from "./contract.mjs";
+import {
+  AUTOSTART_MODES,
+  PROACTIVE_MODES,
+  RUNTIME_PLACEMENT_PROFILES,
+  SERVICE_MODES,
+  contractData,
+  validateContract,
+} from "./contract.mjs";
 import {
   checkResult,
   detectProject,
   fileExists,
-  readJsonIfExists,
+  projectAgentData,
   recommendationForProject,
   runProjectCommand,
   testProject,
@@ -25,6 +37,7 @@ import { deployProject, operationsProject } from "./operations.mjs";
 import { evolveProject, listContracts, rebuildRegistry } from "./registry.mjs";
 import { checkCardReadiness, printCardReadiness } from "./card-readiness.mjs";
 import { applyExternalResearchEvidence } from "./external-research.mjs";
+import { newestArtifactPathsFirst, writeUniqueArtifact } from "./artifact-selection.mjs";
 import { runLast30DaysBackend } from "./external-research-last30days.mjs";
 import { deriveExternalResearchTopics } from "./external-research-topics.mjs";
 import { contractAllowsExternalResearchNotApplicable, researchGateDecisionForReport } from "./research-gate.mjs";
@@ -32,8 +45,14 @@ import {
   buildAgentDevelopmentQuery,
   patternPackMarkdown,
   runSemanticPatternSearch,
+  verifyPatternPackIntegrity,
 } from "./pattern-research.mjs";
 import { auditProjectSkills, printSkillSelection, printSkillsStatus, selectSkillsForContract, skillRowForManifest } from "./skills.mjs";
+import {
+  repositoryResearchFrontmatter,
+  repositoryResearchMarkdown,
+  runRepositoryResearch,
+} from "./github-research.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -43,17 +62,6 @@ const RESEARCH_DIR = path.join(AGENT_MEMORY_ROOT, "research");
 const REGISTRY_PATH = path.join(AGENT_MEMORY_ROOT, "registry.md");
 const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
 
-const RUNTIME_FAMILIES = new Set(["codex-native", "cli", "api", "local-model", "hybrid", "environment-specific"]);
-const TELEGRAM_MODES = new Set(["none", "primary-chat", "intake-channel", "notifications-only", "operator-control"]);
-const SERVICE_MODES = new Set(["none", "manual", "launchd", "external"]);
-const AUTOSTART_MODES = new Set(["disabled", "optional", "launchd-on-approval", "external"]);
-const PROACTIVE_MODES = new Set(["none", "manual", "scheduled", "heartbeat", "event-driven", "queue-watcher", "hybrid"]);
-const RUNTIME_PLACEMENT_PROFILES = new Set(["deterministic-first", "frontier-first", "local-first", "hybrid", "unknown"]);
-const SKILL_NEEDS = new Set(["auto", "none", "selected"]);
-const SKILL_SOURCES = new Set(["local-only", "trusted-only", "external-with-approval"]);
-const SKILL_INSTALL_MODES = new Set(["recommend", "vendor", "link", "runtime-install"]);
-const SKILL_MUTATION_POLICIES = new Set(["read-only", "patch-with-approval", "agent-managed"]);
-const STATUS_VALUES = new Set(["draft", "accepted", "superseded"]);
 const INVOKED_SCRIPT = path.basename(process.argv[1] || "pritha.mjs");
 const CLI_COMMAND = INVOKED_SCRIPT.includes("pritha") ? "node scripts/pritha.mjs" : "node scripts/agents-mother.mjs";
 const CLI_PRODUCT = INVOKED_SCRIPT.includes("pritha") ? "Pritha" : "Pritha (Agents Mother compatibility alias)";
@@ -64,7 +72,7 @@ function usage() {
   ${CLI_COMMAND} questions
   ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} init --name <name> --mission <text> [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
-  ${CLI_COMMAND} research <contract-path> [--limit 12]
+  ${CLI_COMMAND} research <contract-path> [--limit 12] [--github-mode auto|online|registry-only|skip] [--github-limit 5] [--github-timeout-ms 15000] [--github-fixture <json>]
   ${CLI_COMMAND} pattern-research <contract-path> [--limit 12] [--semantic-mode auto|skip]
   ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days] [--input evidence.json]
   ${CLI_COMMAND} scaffold <contract-path> [--output <folder>] [--allow-draft-scaffold] [--allow-missing-research] [--allow-pending-external-verification]
@@ -83,7 +91,7 @@ function usage() {
 
 Pritha aliases:
   ${CLI_COMMAND} create --name <name> --mission <text>       # alias for init
-  ${CLI_COMMAND} create <contract-path> --output <folder>    # alias for scaffold
+  ${CLI_COMMAND} create <contract-path> [--output <folder>]  # alias for scaffold; default resolves PRITHA_AGENT_PARENT
   ${CLI_COMMAND} publish <project-path>                      # trial: test --no-report
   ${CLI_COMMAND} lineage                                     # alias for registry
 
@@ -134,23 +142,11 @@ function parseArgs(argv) {
 }
 
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
-const readFrontmatter = (text) => parseFrontmatterData(text) || {};
 
 function ensureDirs() {
   mkdirSync(CONTRACT_DIR, { recursive: true });
   mkdirSync(REPORT_DIR, { recursive: true });
   mkdirSync(RESEARCH_DIR, { recursive: true });
-}
-
-function uniquePath(filePath) {
-  if (!existsSync(filePath)) return filePath;
-  const ext = path.extname(filePath);
-  const base = filePath.slice(0, -ext.length);
-  for (let i = 2; i < 100; i += 1) {
-    const candidate = `${base}-${i}${ext}`;
-    if (!existsSync(candidate)) return candidate;
-  }
-  throw new Error(`Could not create unique path for ${filePath}`);
 }
 
 function listFromText(value, fallback = []) {
@@ -164,18 +160,30 @@ function listFromText(value, fallback = []) {
 
 function bulletList(items) {
   const list = Array.isArray(items) && items.length > 0 ? items : ["TBD"];
-  return list.map((item) => `- ${item}`).join("\n");
+  return list.map((item) => `- ${markdownText(item)}`).join("\n");
 }
 
 function scalar(value, fallback = "TBD") {
-  const text = String(value || "").trim();
-  return text || fallback;
+  const text = redactSensitiveText(String(value || "")).replace(/\s+/g, " ").trim();
+  return text || redactSensitiveText(String(fallback || "")).replace(/\s+/g, " ").trim();
 }
 
 function yamlScalar(value) {
-  return String(value || "")
-    .replaceAll("\n", " ")
-    .replaceAll(":", " -");
+  return JSON.stringify(redactSensitiveText(String(value || "")).replace(/\s+/g, " ").trim() || "none");
+}
+
+function markdownText(value, max = 2000) {
+  const text = redactSensitiveText(String(value || "")).replace(/\s+/g, " ").trim();
+  const bounded = text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3)).trim()}...`;
+  return bounded
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("`", "&#96;")
+    .replaceAll("!", "&#33;")
+    .replaceAll("[", "&#91;")
+    .replaceAll("]", "&#93;")
+    .replaceAll("|", "&#124;");
 }
 
 function normalizeInterfaceName(value) {
@@ -392,7 +400,7 @@ function contractMarkdown(data) {
   const runtimeFamily = scalar(data.runtimeFamily, "codex-native");
   const telegramMode = scalar(data.telegramMode, "none");
   const primaryInterface = scalar(data.primaryInterface, "Codex project");
-  const targetFolder = scalar(data.targetFolder, `../${agentSlug}`);
+  const targetFolder = scalar(data.targetFolder, "sibling of Pritha");
   const serviceMode = normalizeServiceMode(data.serviceMode || data.service || "none");
   const autostart = normalizeAutostartMode(data.autostart || "disabled", serviceMode);
   const proactiveMode = normalizeProactiveMode(data.proactiveMode || "none");
@@ -400,6 +408,9 @@ function contractMarkdown(data) {
   const allowedSkillSources = scalar(data.allowedSkillSources, "local-only");
   const skillInstallMode = scalar(data.skillInstallMode, "recommend");
   const skillMutationPolicy = scalar(data.skillMutationPolicy, "read-only");
+  const repositoryResearchPolicy = scalar(data.repositoryResearchPolicy, "auto");
+  const repositoryResearchTopics = scalar(data.repositoryResearchTopics, "auto from contract and pattern pack");
+  const repositoryAdoptionMode = scalar(data.repositoryAdoptionMode, "none");
   const runtimePlacementProfile = normalizeRuntimePlacementProfile(data.runtimePlacementProfile, runtimeFamily);
   const multiModelRoutingRequested = scalar(data.multiModelRoutingRequested, "only-if-needed");
   const localInferenceRequired = scalar(data.localInferenceRequired, runtimeFamily === "local-model" ? "required" : runtimeFamily === "hybrid" ? "optional" : "later");
@@ -409,8 +420,8 @@ function contractMarkdown(data) {
   if (runtimeFamily === "api") tools.push("OpenAI Agents SDK");
   if (serviceMode === "launchd") tools.push("launchd");
 
-  return `---
-id: ${date}-${agentSlug}-agent-contract
+  const report = `---
+id: ${data.artifactId || `${date}-${agentSlug}-agent-contract`}
 type: agent-contract
 status: draft
 created: ${date}
@@ -426,7 +437,7 @@ agent_platforms:
 model_context:
   - unknown
 runtime_environment:
-  - ${runtimeFamily}
+  - ${yamlScalar(runtimeFamily)}
 config_surfaces:
   - AGENTS.md
   - workflows
@@ -549,9 +560,26 @@ ${bulletList(data.criticalWorkflows)}
 - Skill mutation policy: ${skillMutationPolicy}
 - Installed skills: ${scalar(data.installedSkills, "none yet; research step may recommend local reviewed skills")}
 - Candidate skills: ${scalar(data.candidateSkills, "to be filled by research")}
-- External skill approval: ${scalar(data.externalSkillApproval, "explicit approval required before any external skill is vendored, linked or runtime-installed")}
+- External skill approval: ${scalar(data.externalSkillApproval, "external skills remain candidate-only until a dedicated pinned-bundle verification and approval workflow exists; approval text alone is insufficient")}
 - Skill update policy: ${scalar(data.skillUpdatePolicy, "read-only for scaffold v1; update through Pritha audit")}
 - Skill audit command: ${scalar(data.skillAuditCommand, "node scripts/skills-status.mjs")}
+
+## Repository research and adoption
+
+- Repository research policy: ${repositoryResearchPolicy}
+- Repository research topics: ${repositoryResearchTopics}
+- Repository research waiver reason: ${scalar(data.repositoryResearchWaiverReason, repositoryResearchPolicy === "not-applicable" ? "TBD: explain why repository discovery cannot affect this contract" : "not-applicable")}
+- Selected GitHub repositories: ${scalar(data.selectedGitHubRepositories, "none")}
+- Repository adoption mode: ${repositoryAdoptionMode}
+- Selected repository module: ${scalar(data.selectedRepositoryModule, "not-applicable")}
+- Repository pin: ${scalar(data.repositoryPin, "pending")}
+- Repository license decision: ${scalar(data.repositoryLicenseDecision, "pending")}
+- Repository security review: ${scalar(data.repositorySecurityReview, "pending")}
+- Repository permissions: ${scalar(data.repositoryPermissions, "pending")}
+- Repository eval status: ${scalar(data.repositoryEvalStatus, "pending")}
+- Repository user approval: ${scalar(data.repositoryUserApproval, "pending")}
+
+Discovery produces advisory candidates only. It never authorizes cloning, installation, execution, vendoring or registry mutation. Reference-only use requires current evidence bound to every exact selected repository. In selected-module v1, the module must be a verified directory tree at the immutable pin and carry module-local LICENSE/manifest evidence whose Git blob SHA, SHA-256 content identity and detected SPDX identifier are bound to that pin. GitHub HEAD license metadata is advisory only. Every adoption field, current evidence item and memory synthesis must pass before scaffold.
 
 ## Harness inventory
 
@@ -628,6 +656,7 @@ ${bulletList(data.criticalWorkflows)}
 - [ ] Tests/healthchecks defined.
 - [ ] Handoff/training plan defined.
 `;
+  return report;
 }
 
 async function ask(rl, question, defaultValue = "") {
@@ -681,6 +710,25 @@ async function interview(options) {
       data.allowedSkillSources = await ask(rl, "Allowed skill sources (local-only|trusted-only|external-with-approval)", options["skill-sources"] || "local-only");
       data.skillInstallMode = await ask(rl, "Skill install mode (recommend|vendor|link|runtime-install)", options["skill-install"] || "recommend");
       data.skillMutationPolicy = await ask(rl, "Skill mutation policy (read-only|patch-with-approval|agent-managed)", options["skill-mutation"] || "read-only");
+      data.installedSkills = data.skillNeeds === "selected"
+        ? await ask(rl, "Installed skills (comma-separated canonical local catalog names)", options["installed-skills"] || "")
+        : options["installed-skills"] || "none";
+      data.repositoryResearchPolicy = await ask(rl, "Repository research policy (auto|required|registry-only|not-applicable)", options["repository-policy"] || "auto");
+      data.repositoryResearchTopics = await ask(rl, "Repository research topics (allowlisted scopes or auto)", options["repository-topics"] || "auto from contract and pattern pack");
+      data.repositoryResearchWaiverReason = data.repositoryResearchPolicy === "not-applicable"
+        ? await ask(rl, "Repository research waiver reason", options["repository-waiver"] || "")
+        : "not-applicable";
+      data.selectedGitHubRepositories = await ask(rl, "Selected GitHub repositories (canonical URLs or none)", options["github-repositories"] || "none");
+      data.repositoryAdoptionMode = await ask(rl, "Repository adoption mode (none|reference-only|selected-module)", options["repository-adoption"] || "none");
+      if (data.repositoryAdoptionMode === "selected-module") {
+        data.selectedRepositoryModule = await ask(rl, "Selected repository module", options["repository-module"] || "pending");
+        data.repositoryPin = await ask(rl, "Exact repository pin (40-hex commit SHA or tree-sha:<40-hex>)", options["repository-pin"] || "pending");
+        data.repositoryLicenseDecision = await ask(rl, "Repository license decision", options["repository-license"] || "pending");
+        data.repositorySecurityReview = await ask(rl, "Repository security review", options["repository-security"] || "pending");
+        data.repositoryPermissions = await ask(rl, "Repository permissions", options["repository-permissions"] || "pending");
+        data.repositoryEvalStatus = await ask(rl, "Repository eval status", options["repository-eval"] || "pending");
+        data.repositoryUserApproval = await ask(rl, "Repository user approval", options["repository-approval"] || "pending");
+      }
       data.inputDataTypes = await ask(rl, "Input data types", options.inputs || "text");
       data.storedData = await ask(rl, "Stored data", options.stored || "Markdown artifacts");
       data.sensitiveData = await ask(rl, "Sensitive data", options.sensitive || "unknown");
@@ -729,6 +777,19 @@ async function interview(options) {
     data.allowedSkillSources = options["skill-sources"] || "local-only";
     data.skillInstallMode = options["skill-install"] || "recommend";
     data.skillMutationPolicy = options["skill-mutation"] || "read-only";
+    data.installedSkills = options["installed-skills"] || "none";
+    data.repositoryResearchPolicy = options["repository-policy"] || "auto";
+    data.repositoryResearchTopics = options["repository-topics"] || "auto from contract and pattern pack";
+    data.repositoryResearchWaiverReason = options["repository-waiver"] || (data.repositoryResearchPolicy === "not-applicable" ? "TBD" : "not-applicable");
+    data.selectedGitHubRepositories = options["github-repositories"] || "none";
+    data.repositoryAdoptionMode = options["repository-adoption"] || "none";
+    data.selectedRepositoryModule = options["repository-module"] || "not-applicable";
+    data.repositoryPin = options["repository-pin"] || "pending";
+    data.repositoryLicenseDecision = options["repository-license"] || "pending";
+    data.repositorySecurityReview = options["repository-security"] || "pending";
+    data.repositoryPermissions = options["repository-permissions"] || "pending";
+    data.repositoryEvalStatus = options["repository-eval"] || "pending";
+    data.repositoryUserApproval = options["repository-approval"] || "pending";
     data.inputDataTypes = options.inputs || "text";
     data.storedData = options.stored || "Markdown artifacts";
     data.sensitiveData = options.sensitive || "unknown";
@@ -740,8 +801,11 @@ async function interview(options) {
   }
 
   const date = today();
-  const outPath = uniquePath(path.join(CONTRACT_DIR, `${date}-${slug(data.agentName)}-agent-contract.md`));
-  writeFileSync(outPath, contractMarkdown({ ...data, date }));
+  const writtenContract = writeUniqueArtifact(
+    path.join(CONTRACT_DIR, `${date}-${slug(data.agentName)}-agent-contract.md`),
+    ({ artifactId }) => contractMarkdown({ ...data, date, artifactId }),
+  );
+  const outPath = writtenContract.path;
   console.log(`Created: ${path.relative(ROOT, outPath)}`);
 
   const issues = validateContract(outPath, { print: false });
@@ -751,187 +815,6 @@ async function interview(options) {
   } else {
     console.log("Contract validation passed.");
   }
-}
-
-function bodyValue(text, label) {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = text.match(new RegExp(`^- ${escaped}:\\s*(.*)$`, "mi"));
-  return match ? match[1].trim() : "";
-}
-
-function sectionItems(text, heading) {
-  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = text.match(new RegExp(`^### ${escaped}\\s+([\\s\\S]*?)(?:\\n### |\\n## |$)`, "mi"));
-  if (!match) return [];
-  return match[1]
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("- "))
-    .map((line) => line.replace(/^- /, "").trim())
-    .filter(Boolean);
-}
-
-function isMissing(value) {
-  return !value || value === "TBD" || value === "unknown" || value === "pending";
-}
-
-function validateContract(contractPath, options = { print: true }) {
-  const fullPath = path.resolve(ROOT, contractPath);
-  const issues = [];
-  if (!existsSync(fullPath)) {
-    issues.push(`file not found: ${contractPath}`);
-    if (options.print) printIssues(issues);
-    return issues;
-  }
-
-  const text = readFileSync(fullPath, "utf8");
-  const fm = readFrontmatter(text);
-  if (fm.type !== "agent-contract") issues.push('frontmatter "type" must be agent-contract');
-  if (!STATUS_VALUES.has(fm.status)) issues.push(`status must be one of: ${Array.from(STATUS_VALUES).join(", ")}`);
-
-  const runtime = bodyValue(text, "Runtime family");
-  const runtimePlacement = bodyValue(text, "Runtime placement profile");
-  const multiModelRouting = bodyValue(text, "Multi-model routing requested");
-  const telegram = bodyValue(text, "Telegram mode");
-  const serviceMode = bodyValue(text, "Service mode");
-  const autostart = bodyValue(text, "Autostart");
-  const proactiveMode = bodyValue(text, "Proactive mode");
-  const skillNeeds = bodyValue(text, "Skill needs");
-  const allowedSkillSources = bodyValue(text, "Allowed skill sources");
-  const skillInstallMode = bodyValue(text, "Skill install mode");
-  const skillMutationPolicy = bodyValue(text, "Skill mutation policy");
-  const requiredLabels = [
-    "Agent name",
-    "Primary mission",
-    "Target user",
-    "Success criteria",
-    "Runtime family",
-    "Runtime placement profile",
-    "Multi-model routing requested",
-    "Local inference required",
-    "Primary interface",
-    "Telegram mode",
-    "Target folder",
-    "Tests/healthchecks",
-    "User training guide",
-  ];
-
-  for (const label of requiredLabels) {
-    if (isMissing(bodyValue(text, label))) issues.push(`missing or placeholder value: ${label}`);
-  }
-
-  if (runtime && !RUNTIME_FAMILIES.has(runtime)) {
-    issues.push(`invalid Runtime family "${runtime}". Expected: ${Array.from(RUNTIME_FAMILIES).join(", ")}`);
-  }
-  if (runtimePlacement && !RUNTIME_PLACEMENT_PROFILES.has(runtimePlacement)) {
-    issues.push(`invalid Runtime placement profile "${runtimePlacement}". Expected: ${Array.from(RUNTIME_PLACEMENT_PROFILES).join(", ")}`);
-  }
-  if (multiModelRouting && !["no", "yes", "only-if-needed"].includes(multiModelRouting)) {
-    issues.push('invalid Multi-model routing requested. Expected: no, yes or only-if-needed');
-  }
-  if (telegram && !TELEGRAM_MODES.has(telegram)) {
-    issues.push(`invalid Telegram mode "${telegram}". Expected: ${Array.from(TELEGRAM_MODES).join(", ")}`);
-  }
-  if (serviceMode && !SERVICE_MODES.has(serviceMode)) {
-    issues.push(`invalid Service mode "${serviceMode}". Expected: ${Array.from(SERVICE_MODES).join(", ")}`);
-  }
-  if (autostart && !AUTOSTART_MODES.has(autostart)) {
-    issues.push(`invalid Autostart "${autostart}". Expected: ${Array.from(AUTOSTART_MODES).join(", ")}`);
-  }
-  if (proactiveMode && !PROACTIVE_MODES.has(proactiveMode)) {
-    issues.push(`invalid Proactive mode "${proactiveMode}". Expected: ${Array.from(PROACTIVE_MODES).join(", ")}`);
-  }
-  if (skillNeeds && !SKILL_NEEDS.has(skillNeeds)) {
-    issues.push(`invalid Skill needs "${skillNeeds}". Expected: ${Array.from(SKILL_NEEDS).join(", ")}`);
-  }
-  if (allowedSkillSources && !SKILL_SOURCES.has(allowedSkillSources)) {
-    issues.push(`invalid Allowed skill sources "${allowedSkillSources}". Expected: ${Array.from(SKILL_SOURCES).join(", ")}`);
-  }
-  if (skillInstallMode && !SKILL_INSTALL_MODES.has(skillInstallMode)) {
-    issues.push(`invalid Skill install mode "${skillInstallMode}". Expected: ${Array.from(SKILL_INSTALL_MODES).join(", ")}`);
-  }
-  if (skillMutationPolicy && !SKILL_MUTATION_POLICIES.has(skillMutationPolicy)) {
-    issues.push(`invalid Skill mutation policy "${skillMutationPolicy}". Expected: ${Array.from(SKILL_MUTATION_POLICIES).join(", ")}`);
-  }
-  if (telegram && telegram !== "none") {
-    const secrets = bodyValue(text, "Secrets required");
-    const auth = bodyValue(text, "User authorization model");
-    if (!/telegram/i.test(secrets)) issues.push("Telegram mode selected but Secrets required does not mention Telegram token");
-    if (!/(allowlist|user id|allowed user|telegram)/i.test(auth)) issues.push("Telegram mode selected but User authorization model does not define Telegram allowlist/user id");
-  }
-
-  if (!text.includes("## Harness inventory")) issues.push("missing Harness inventory section");
-  if (!text.includes("## Security and permissions")) issues.push("missing Security and permissions section");
-  if (!text.includes("## Acceptance checklist")) issues.push("missing Acceptance checklist section");
-
-  if (options.print) {
-    if (issues.length === 0) {
-      console.log(`Contract validation passed: ${path.relative(ROOT, fullPath)}`);
-    } else {
-      console.error(`Contract validation failed: ${path.relative(ROOT, fullPath)}`);
-      printIssues(issues);
-    }
-  }
-  return issues;
-}
-
-function contractData(contractPath) {
-  const fullPath = path.resolve(ROOT, contractPath);
-  if (!existsSync(fullPath)) throw new Error(`Contract not found: ${contractPath}`);
-  const text = readFileSync(fullPath, "utf8");
-  const fm = readFrontmatter(text);
-  return {
-    fullPath,
-    relPath: path.relative(ROOT, fullPath),
-    text,
-    fm,
-    agentName: bodyValue(text, "Agent name"),
-    primaryMission: bodyValue(text, "Primary mission"),
-    targetUser: bodyValue(text, "Target user"),
-    successCriteria: bodyValue(text, "Success criteria"),
-    runtimeFamily: bodyValue(text, "Runtime family"),
-    primaryInterface: bodyValue(text, "Primary interface"),
-    secondaryInterfaces: bodyValue(text, "Secondary interfaces"),
-    telegramMode: bodyValue(text, "Telegram mode"),
-    expectedHosting: bodyValue(text, "Expected hosting"),
-    deploymentTarget: bodyValue(text, "Deployment target"),
-    deploymentProfile: bodyValue(text, "Deployment profile"),
-    serviceMode: bodyValue(text, "Service mode") || "none",
-    autostart: bodyValue(text, "Autostart") || "disabled",
-    startCommand: bodyValue(text, "Start command"),
-    stopCommand: bodyValue(text, "Stop command"),
-    healthcheckCommand: bodyValue(text, "Healthcheck command"),
-    logPath: bodyValue(text, "Log path"),
-    restartPolicy: bodyValue(text, "Restart policy"),
-    proactiveMode: bodyValue(text, "Proactive mode") || "none",
-    skillNeeds: bodyValue(text, "Skill needs") || "auto",
-    allowedSkillSources: bodyValue(text, "Allowed skill sources") || "local-only",
-    skillInstallMode: bodyValue(text, "Skill install mode") || "recommend",
-    skillMutationPolicy: bodyValue(text, "Skill mutation policy") || "read-only",
-    triggerSources: bodyValue(text, "Trigger sources"),
-    schedule: bodyValue(text, "Schedule"),
-    heartbeatInterval: bodyValue(text, "Heartbeat interval"),
-    idleBehavior: bodyValue(text, "Idle behavior"),
-    userInterruptionPolicy: bodyValue(text, "User interruption policy"),
-    memoryModel: bodyValue(text, "Memory model"),
-    indexingSearchNeeds: bodyValue(text, "Indexing/search needs"),
-    toolSystem: bodyValue(text, "Tool system"),
-    inputDataTypes: bodyValue(text, "Input data types"),
-    sensitiveData: bodyValue(text, "Sensitive data"),
-    targetFolder: bodyValue(text, "Target folder"),
-    filesToGenerate: bodyValue(text, "Files to generate"),
-    dependencies: bodyValue(text, "Dependencies"),
-    setupCommands: bodyValue(text, "Setup commands"),
-    runCommands: bodyValue(text, "Run commands"),
-    testsHealthchecks: bodyValue(text, "Tests/healthchecks"),
-    userTrainingGuide: bodyValue(text, "User training guide"),
-    envExampleVariables: bodyValue(text, "`.env.example` variables"),
-    secretsRequired: bodyValue(text, "Secrets required"),
-    allowedNetworkAccess: bodyValue(text, "Allowed network access"),
-    userAuthorizationModel: bodyValue(text, "User authorization model"),
-    coreFunctions: sectionItems(text, "V1 core functions"),
-    criticalWorkflows: sectionItems(text, "Critical user workflows"),
-  };
 }
 
 function searchMemory(query, limit) {
@@ -995,9 +878,15 @@ function writePatternPack(data, researchContext, options = {}) {
     contract: data.relPath,
     project: data.projectPath,
   });
-  const pack = patternPackMarkdown(data, { ...researchContext, semantic }, options);
-  const outPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-pattern-pack.md`));
-  writeFileSync(outPath, pack.text);
+  let pack;
+  const written = writeUniqueArtifact(
+    path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-pattern-pack.md`),
+    ({ artifactId }) => {
+      pack = patternPackMarkdown(data, { ...researchContext, semantic }, { ...options, artifactId });
+      return pack.text;
+    },
+  );
+  const outPath = written.path;
   return {
     ...pack,
     fullPath: outPath,
@@ -1008,15 +897,23 @@ function writePatternPack(data, researchContext, options = {}) {
 function readKnownDocs(paths) {
   return paths
     .filter((relPath) => existsSync(path.join(ROOT, relPath)))
-    .map((relPath) => {
-      const text = readFileSync(path.join(ROOT, relPath), "utf8");
-      return {
+    .flatMap((relPath) => {
+      let text;
+      try {
+        text = readBoundedRegularFile(path.join(ROOT, relPath), {
+          maxBytes: 1_000_000,
+          allowedRoots: [ROOT],
+        }).text;
+      } catch {
+        return [];
+      }
+      return [{
         path: relPath,
         title: text.match(/^#\s+(.+)$/m)?.[1] || path.basename(relPath, ".md"),
         summary: text.match(/## Rule\s+([\s\S]*?)(?:\n## |$)/)?.[1]?.trim()
           || text.match(/## Goal\s+([\s\S]*?)(?:\n## |$)/)?.[1]?.trim()
           || "",
-      };
+      }];
     });
 }
 
@@ -1055,26 +952,29 @@ function recommendationFor(data) {
   return notes;
 }
 
-function formatMemoryRows(rows) {
+export function formatMemoryRows(rows) {
   if (rows.length === 0) return "- No domain-specific matches found.";
-  return rows.map((row, index) => `### ${index + 1}. ${row.title || row.path}
+  return rows.map((row, index) => `### ${index + 1}. ${markdownText(row.title || row.path, 300)}
 
-- Path: ${row.path}
-- Type/status: ${row.type}/${row.status}
-- Heading: ${row.heading || "n/a"}
-- Relevance note: ${row.snippet || ""}
+- Path: ${markdownText(row.path, 500)}
+- Type/status: ${markdownText(`${row.type}/${row.status}`, 120)}
+- Heading: ${markdownText(row.heading || "n/a", 300)}
+- Relevance note: ${markdownText(row.snippet || "", 500)}
 `).join("\n");
 }
 
-function externalResearchGateState(data, topics) {
+function externalResearchGateState(data, topics, repositoryResearch = null) {
   const notApplicable = topics.length === 0 && contractAllowsExternalResearchNotApplicable(data);
+  const repositoryStatus = repositoryResearch?.status || "not-applicable";
+  const repositoryPassing = ["complete", "not-applicable"].includes(repositoryStatus);
   return {
-    researchGateStatus: notApplicable ? "complete" : "pending",
+    researchGateStatus: notApplicable && repositoryPassing ? "complete" : "pending",
     memoryResearchStatus: "complete",
     externalResearchStatus: notApplicable ? "not-applicable" : "pending",
     externalResearchBackend: notApplicable ? "none" : "pending",
     externalResearchCompletedAt: notApplicable ? today() : "pending",
     synthesisStatus: notApplicable ? "not-applicable" : "pending",
+    repositoryResearchStatus: repositoryStatus,
     freshnessWindowDays: 30,
   };
 }
@@ -1086,24 +986,25 @@ function externalResearchTopicList(topics) {
 
 function formatExternalResearchTopics(topics) {
   if (!topics.length) return "- No volatile external research topics were derived from this contract.";
-  return topics.map((topic, index) => `### ${index + 1}. ${topic.topic}
+  return topics.map((topic, index) => `### ${index + 1}. ${markdownText(topic.topic, 300)}
 
-- ID: \`${topic.id}\`
-- Query: ${topic.query}
-- Reason: ${topic.reason}
+- ID: ${markdownText(topic.id, 120)}
+- Query: ${markdownText(topic.query, 600)}
+- Reason: ${markdownText(topic.reason, 600)}
 - Required: ${topic.required ? "yes" : "no"}
-- Preferred sources: ${topic.preferredSources.join(", ")}
+- Preferred sources: ${markdownText(topic.preferredSources.join(", "), 400)}
 - Freshness window: ${topic.freshnessWindowDays} days
 `).join("\n");
 }
 
-function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSelection, options = {}) {
+export function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSelection, options = {}) {
   const date = today();
   const agentSlug = slug(data.agentName);
   const title = `${data.agentName || agentSlug} agent architecture research`;
   const externalResearchTopics = options.externalResearchTopics || deriveExternalResearchTopics(data);
   const patternPack = options.patternPack || null;
-  const gate = externalResearchGateState(data, externalResearchTopics);
+  const repositoryResearch = options.repositoryResearch || null;
+  const gate = externalResearchGateState(data, externalResearchTopics, repositoryResearch);
   const resultSources = [
     data.relPath,
     "07_workflows/agents-mother.md",
@@ -1119,8 +1020,9 @@ function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSe
   ].flatMap((row) => [row.skill.relPath, ...row.skill.sourcePaths]);
   const domainSources = Object.values(domainResults).flat().map((row) => row.path);
   const patternSources = patternPack?.relPath ? [patternPack.relPath] : [];
-  const allSources = [...new Set([...resultSources, ...patternSources, ...memoryResults.map((row) => row.path), ...domainSources, ...skillSources])].slice(0, 50);
-  const sourceYaml = allSources.map((source) => `  - ${source}`).join("\n");
+  const repositorySources = repositoryResearch?.registry?.ok ? [repositoryResearch.registry.relativePath] : [];
+  const allSources = [...new Set([...resultSources, ...patternSources, ...repositorySources, ...memoryResults.map((row) => row.path), ...domainSources, ...skillSources])].slice(0, 50);
+  const sourceYaml = allSources.map((source) => `  - ${yamlScalar(source)}`).join("\n");
   const relatedStandards = [
     "04_standards/agent-creation-harness.md",
     "04_standards/agent-environment-compatibility.md",
@@ -1129,8 +1031,8 @@ function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSe
     "04_standards/pritha-self-model.md",
   ];
 
-  return `---
-id: ${date}-${agentSlug}-agent-research
+  const report = `---
+id: ${yamlScalar(options.artifactId || `${date}-${agentSlug}-agent-research`)}
 type: review
 status: draft
 created: ${date}
@@ -1149,7 +1051,7 @@ agent_platforms:
 model_context:
   - unknown
 runtime_environment:
-  - ${data.runtimeFamily || "codex-native"}
+  - ${yamlScalar(data.runtimeFamily || "codex-native")}
 config_surfaces:
   - AGENTS.md
   - workflows
@@ -1159,7 +1061,7 @@ sources:
 ${sourceYaml}
 related:
   agent_contracts:
-    - ${data.relPath}
+    - ${yamlScalar(data.relPath)}
   standards:
 ${relatedStandards.map((item) => `    - ${item}`).join("\n")}
   workflows:
@@ -1175,22 +1077,32 @@ retrieved: ${date}
 verified: pending
 valid_for: pre-scaffold architecture validation
 temporal_status: unknown
+research_report_version: 2
+contract_fingerprint: ${data.fingerprint}
 research_gate_status: ${gate.researchGateStatus}
 memory_research_status: ${gate.memoryResearchStatus}
 external_research_status: ${gate.externalResearchStatus}
 external_research_backend: ${gate.externalResearchBackend}
 external_research_completed_at: ${gate.externalResearchCompletedAt}
 external_research_freshness_window_days: ${gate.freshnessWindowDays}
+external_evidence_count: 0
+external_evidence_topics: []
+external_research_lock: pending
+synthesis_lock: pending
+research_content_lock: pending
 external_research_topics:
 ${externalResearchTopicList(externalResearchTopics)}
 synthesis_status: ${gate.synthesisStatus}
-pattern_pack: ${patternPack?.relPath || "pending"}
-pattern_research_status: ${patternPack?.status || "pending"}
-semantic_memory_status: ${patternPack?.semantic?.status || "pending"}
-semantic_failure_log: ${patternPack?.semantic?.failureLog || "none"}
+${repositoryResearch ? repositoryResearchFrontmatter(repositoryResearch) : "repository_research_required: false\nrepository_research_policy: not-applicable\nrepository_research_mode: skip\nrepository_research_status: not-applicable\nrepository_research_completed_at: " + date + "\nrepository_research_online_status: not-applicable\nrepository_candidate_count: 0\nrepository_adoption_status: none\nrepository_research_scopes:\n  - not-applicable"}
+pattern_pack: ${yamlScalar(patternPack?.relPath || "pending")}
+pattern_pack_lock: ${yamlScalar(patternPack?.lock || "pending")}
+pattern_pack_contract_fingerprint: ${yamlScalar(patternPack?.contractFingerprint || "pending")}
+pattern_research_status: ${yamlScalar(patternPack?.status || "pending")}
+semantic_memory_status: ${yamlScalar(patternPack?.semantic?.status || "pending")}
+semantic_failure_log: ${yamlScalar(patternPack?.semantic?.failureLog || "none")}
 ---
 
-# Review: ${title}
+# Review: ${markdownText(title, 300)}
 
 Date: ${date}
 Status: draft
@@ -1201,25 +1113,19 @@ Is the current agent contract ready to move toward scaffold, and what architectu
 
 ## Contract summary
 
-- Contract: ${data.relPath}
-- Agent name: ${data.agentName || "unknown"}
-- Mission: ${data.primaryMission || "unknown"}
-- Target user: ${data.targetUser || "unknown"}
-- Runtime family: ${data.runtimeFamily || "unknown"}
-- Primary interface: ${data.primaryInterface || "unknown"}
-- Telegram mode: ${data.telegramMode || "unknown"}
-- Expected hosting: ${data.expectedHosting || "unknown"}
-- Memory model: ${data.memoryModel || "unknown"}
+- Contract: ${markdownText(data.relPath, 500)}
+- Agent name: ${markdownText(data.agentName || "unknown", 240)}
+- Mission: ${markdownText(data.primaryMission || "unknown", 1000)}
+- Target user: ${markdownText(data.targetUser || "unknown", 500)}
+- Runtime family: ${markdownText(data.runtimeFamily || "unknown", 120)}
+- Primary interface: ${markdownText(data.primaryInterface || "unknown", 240)}
+- Telegram mode: ${markdownText(data.telegramMode || "unknown", 120)}
+- Expected hosting: ${markdownText(data.expectedHosting || "unknown", 300)}
+- Memory model: ${markdownText(data.memoryModel || "unknown", 500)}
 
 ## Local memory findings
 
-${memoryResults.length === 0 ? "- No local memory matches found. Rebuild memory and broaden query before scaffold." : memoryResults.map((row, index) => `### ${index + 1}. ${row.title || row.path}
-
-- Path: ${row.path}
-- Type/status: ${row.type}/${row.status}
-- Heading: ${row.heading || "n/a"}
-- Relevance note: ${row.snippet || ""}
-`).join("\n")}
+${memoryResults.length === 0 ? "- No local memory matches found. Rebuild memory and broaden query before scaffold." : formatMemoryRows(memoryResults)}
 
 ## Domain-aware memory findings
 
@@ -1244,21 +1150,21 @@ ${formatMemoryRows(domainResults.childAgents || [])}
 
 ## Pattern Pack
 
-- Path: ${patternPack?.relPath || "pending"}
-- Status: ${patternPack?.status || "pending"}
+- Path: ${markdownText(patternPack?.relPath || "pending", 500)}
+- Status: ${markdownText(patternPack?.status || "pending", 80)}
 - Selected patterns: ${patternPack?.selectedPatterns?.length || 0}
-- Semantic/embedding search: ${patternPack?.semantic?.status || "pending"}
-- Semantic failure log: ${patternPack?.semantic?.failureLog || "none"}
-- External research seeds: ${patternPack?.externalResearchSeeds?.join(", ") || "none"}
+- Semantic/embedding search: ${markdownText(patternPack?.semantic?.status || "pending", 80)}
+- Semantic failure log: ${markdownText(patternPack?.semantic?.failureLog || "none", 500)}
+- External research seeds: ${markdownText(patternPack?.externalResearchSeeds?.join(", ") || "none", 500)}
 
 Codex must read this pattern pack before scaffold or agent improvement work. If semantic/embedding search failed, continue only with the warning recorded above and use external research to compensate for missing semantic retrieval.
 
 ## Standards and workflow basis
 
-${knownDocs.map((doc) => `### ${doc.title}
+${knownDocs.map((doc) => `### ${markdownText(doc.title, 300)}
 
-- Path: ${doc.path}
-- Basis: ${doc.summary.replace(/\s+/g, " ").slice(0, 500) || "See document for details."}
+- Path: ${markdownText(doc.path, 500)}
+- Basis: ${markdownText(doc.summary || "See document for details.", 500)}
 `).join("\n")}
 
 ## Research Gate Status
@@ -1268,11 +1174,14 @@ ${knownDocs.map((doc) => `### ${doc.title}
 | Research gate | ${gate.researchGateStatus} | Complete only after memory, external evidence and synthesis are complete or explicitly not applicable. |
 | Memory research | ${gate.memoryResearchStatus} | Local Pritha memory search completed for this report. |
 | External research | ${gate.externalResearchStatus} | ${gate.externalResearchStatus === "not-applicable" ? "Contract marks current external verification as not applicable." : "Fresh external evidence still needs to be gathered."} |
+| GitHub repository discovery | ${gate.repositoryResearchStatus} | Candidate discovery is advisory; it never authorizes adoption. |
 | Synthesis | ${gate.synthesisStatus} | ${gate.synthesisStatus === "not-applicable" ? "No external synthesis required for this fixture-like contract." : "Memory vs external comparison is pending."} |
 
 ## External Research Topics
 
 ${formatExternalResearchTopics(externalResearchTopics)}
+
+${repositoryResearch ? repositoryResearchMarkdown(repositoryResearch) : "## GitHub Repository Research\n\n- Status: not-applicable\n- No repository research plan was produced."}
 
 ## External Research Evidence
 
@@ -1294,11 +1203,11 @@ ${gate.synthesisStatus === "not-applicable"
 
 ## External verification checklist
 
-${externalChecksFor(data).map((item) => `- [ ] ${item}`).join("\n")}
+${externalChecksFor(data).map((item) => `- [ ] ${markdownText(item, 800)}`).join("\n")}
 
 ## Skill candidates
 
-Policy: needs=\`${skillSelection.policy.skillNeeds}\`; sources=\`${skillSelection.policy.allowedSkillSources}\`; install=\`${skillSelection.policy.skillInstallMode}\`; mutation=\`${skillSelection.policy.skillMutationPolicy}\`.
+Policy: needs=${markdownText(skillSelection.policy.skillNeeds, 80)}; sources=${markdownText(skillSelection.policy.allowedSkillSources, 120)}; install=${markdownText(skillSelection.policy.skillInstallMode, 80)}; mutation=${markdownText(skillSelection.policy.skillMutationPolicy, 80)}.
 
 | Skill | Source | Fit | Trust | Risk | Recommendation |
 | --- | --- | ---: | --- | --- | --- |
@@ -1312,7 +1221,7 @@ ${[
   ...skillSelection.blocked,
 ].map((row) => {
   const item = skillRowForManifest(row, row.recommendation === "blocked" ? "blocked" : "not-installed");
-  return `| ${item.name} | ${item.source} | ${item.fit_score} | ${item.trust_level} | ${item.risk_level} | ${item.recommendation} |`;
+  return `| ${markdownText(item.name, 120)} | ${markdownText(item.source, 300)} | ${item.fit_score} | ${markdownText(item.trust_level, 80)} | ${markdownText(item.risk_level, 80)} | ${markdownText(item.recommendation, 120)} |`;
 }).join("\n")}
 
 ## Skill decisions required
@@ -1320,16 +1229,16 @@ ${[
 ${skillSelection.policy.skillInstallMode === "vendor"
   ? "- [ ] Review recommended local skills before scaffold vendors them."
   : "- [ ] Keep recommended skills candidate-only unless the contract selects `Skill install mode: vendor`."}
-- [ ] Do not install external skills until explicit approval and audit workflow exists.
+- [ ] Keep external skills candidate-only until a dedicated pinned-bundle verification and approval workflow exists; approval text alone is insufficient.
 - [ ] Keep generated wiki pages as references only, never as direct skill provenance.
 
-## Architecture recommendation
+## Architecture Recommendation
 
-${recommendationFor(data).map((item) => `- ${item}`).join("\n")}
+${recommendationFor(data).map((item) => `- ${markdownText(item, 800)}`).join("\n")}
 
 ## Risks and open questions
 
-- Contract validation issues: ${options.validationIssues?.length ? options.validationIssues.join("; ") : "none blocking from structural validator"}
+- Contract validation issues: ${markdownText(options.validationIssues?.length ? options.validationIssues.join("; ") : "none blocking from structural validator", 1200)}
 - Source freshness is pending until external verification is completed.
 - Scaffold should not start if runtime docs, Telegram behavior or dependency versions are uncertain.
 
@@ -1337,9 +1246,13 @@ ${recommendationFor(data).map((item) => `- ${item}`).join("\n")}
 
 Run external verification for the checklist above, update this review or the contract, then proceed to scaffold planning.
 `;
+  return report.replace(
+    /^research_content_lock:.*$/m,
+    `research_content_lock: ${markdownDocumentLock(report)}`,
+  );
 }
 
-function researchContract(contractPath, options = {}) {
+async function researchContract(contractPath, options = {}) {
   ensureDirs();
   const data = contractData(contractPath);
   const validationIssues = validateContract(data.fullPath, { print: false });
@@ -1356,14 +1269,25 @@ function researchContract(contractPath, options = {}) {
     "07_workflows/agents-mother-roadmap.md",
   ]);
   const externalResearchTopics = deriveExternalResearchTopics(data, { patternPack });
-  const outPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-research.md`));
-  writeFileSync(outPath, researchMarkdown(data, researchContext.memoryResults, researchContext.domainResults, knownDocs, skillSelection, { validationIssues, externalResearchTopics, patternPack }));
+  const repositoryResearch = await runRepositoryResearch(ROOT, data, externalResearchTopics, options);
+  const written = writeUniqueArtifact(
+    path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-research.md`),
+    ({ artifactId }) => researchMarkdown(data, researchContext.memoryResults, researchContext.domainResults, knownDocs, skillSelection, {
+      validationIssues,
+      externalResearchTopics,
+      patternPack,
+      repositoryResearch,
+      artifactId,
+    }),
+  );
+  const outPath = written.path;
   console.log(`Research report: ${path.relative(ROOT, outPath)}`);
   console.log(`Pattern pack: ${patternPack.relPath}`);
   console.log(`Semantic/embedding search: ${patternPack.semantic.status}${patternPack.semantic.failureLog ? ` (logged: ${patternPack.semantic.failureLog})` : ""}`);
   console.log(`Local memory matches: ${researchContext.memoryResults.length}`);
   console.log(`Domain matches: agent-building=${researchContext.domainResults.agentBuildingKnowledge.length}; pritha-self=${researchContext.domainResults.prithaSelf.length}; child-agents=${researchContext.domainResults.childAgents.length}`);
   console.log(`External research topics: ${externalResearchTopics.length}`);
+  console.log(`GitHub repository research: ${repositoryResearch.status} (${repositoryResearch.candidates.length} curated candidates; online=${repositoryResearch.onlineStatus})`);
   console.log(`Skill candidates: ${skillSelection.installed.length + skillSelection.candidates.length}; blocked: ${skillSelection.blocked.length}`);
   if (validationIssues.length > 0) {
     console.log("Contract still has validation issues:");
@@ -1386,16 +1310,50 @@ function patternResearchContract(contractPath, options = {}) {
   console.log(`External research topics from contract+patterns: ${externalResearchTopics.length}`);
 }
 
+function frontmatterList(value) {
+  if (Array.isArray(value)) return value.map(String);
+  if (value === undefined || value === null || value === "") return [];
+  return [String(value)];
+}
+
+function artifactReferencesContract(frontmatter, relPath) {
+  if (!relPath || !frontmatter) return false;
+  const related = frontmatter.related && typeof frontmatter.related === "object" ? frontmatter.related : {};
+  return [...frontmatterList(frontmatter.sources), ...frontmatterList(related.agent_contracts)].includes(relPath);
+}
+
+function safeResearchArtifactPaths(predicate) {
+  if (!existsSync(RESEARCH_DIR)) return [];
+  try {
+    const directoryStat = lstatSync(RESEARCH_DIR);
+    if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) return [];
+    const memoryRoot = realpathSync(AGENT_MEMORY_ROOT);
+    const researchRoot = realpathSync(RESEARCH_DIR);
+    if (researchRoot !== memoryRoot && !researchRoot.startsWith(`${memoryRoot}${path.sep}`)) return [];
+    return newestArtifactPathsFirst(readdirSync(researchRoot, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && !entry.isSymbolicLink() && predicate(entry.name))
+      .map((entry) => path.join(researchRoot, entry.name)));
+  } catch {
+    return [];
+  }
+}
+
 function findResearchReportFor(data) {
-  const agentSlug = slug(data.agentName);
-  if (!existsSync(RESEARCH_DIR)) return null;
-  const files = readdirSync(RESEARCH_DIR)
-    .filter((entry) => entry.endsWith(".md"))
-    .map((entry) => path.join(RESEARCH_DIR, entry))
-    .sort((a, b) => path.basename(b).localeCompare(path.basename(a)));
+  const files = safeResearchArtifactPaths((entry) => entry.endsWith(".md"));
   for (const filePath of files) {
-    const text = readFileSync(filePath, "utf8");
-    if ((data.relPath && text.includes(data.relPath)) || path.basename(filePath).includes(agentSlug)) {
+    let text;
+    try {
+      text = readBoundedRegularFile(filePath, { maxBytes: 1_000_000, allowedRoots: [AGENT_MEMORY_ROOT] }).text;
+    } catch {
+      continue;
+    }
+    const frontmatter = parseFrontmatterData(text);
+    if (
+      frontmatter?.type === "review"
+      && frontmatter.research_gate_status !== undefined
+      && frontmatter.contract_fingerprint === data.fingerprint
+      && artifactReferencesContract(frontmatter, data.relPath)
+    ) {
       return {
         fullPath: filePath,
         relPath: path.relative(ROOT, filePath),
@@ -1407,40 +1365,83 @@ function findResearchReportFor(data) {
 }
 
 function findPatternPackFor(data) {
-  const agentSlug = slug(data.agentName);
-  if (!existsSync(RESEARCH_DIR)) return null;
-  const files = readdirSync(RESEARCH_DIR)
-    .filter((entry) => entry.endsWith("-agent-pattern-pack.md") || entry.includes("pattern-pack"))
-    .map((entry) => path.join(RESEARCH_DIR, entry))
-    .sort((a, b) => path.basename(b).localeCompare(path.basename(a)));
+  const files = safeResearchArtifactPaths(
+    (entry) => entry.endsWith("-agent-pattern-pack.md") || entry.includes("pattern-pack"),
+  );
   for (const filePath of files) {
-    const text = readFileSync(filePath, "utf8");
-    if ((data.relPath && text.includes(data.relPath)) || path.basename(filePath).includes(agentSlug)) {
+    let text;
+    try {
+      text = readBoundedRegularFile(filePath, { maxBytes: 1_000_000, allowedRoots: [AGENT_MEMORY_ROOT] }).text;
+    } catch {
+      continue;
+    }
+    const frontmatter = parseFrontmatterData(text);
+    const integrity = verifyPatternPackIntegrity(text, data.fingerprint);
+    if (
+      frontmatter?.pattern_pack_status !== undefined
+      && frontmatter.contract_fingerprint === data.fingerprint
+      && artifactReferencesContract(frontmatter, data.relPath)
+      && integrity.ok
+    ) {
       return {
         fullPath: filePath,
         relPath: path.relative(ROOT, filePath),
         text,
+        externalResearchSeeds: integrity.payload.external_research_seeds || [],
+        lock: integrity.lock,
       };
     }
   }
   return null;
 }
 
+function findPatternPackReferencedByReport(data, report) {
+  if (!report) return null;
+  const reportFrontmatter = parseFrontmatterData(report.text) || {};
+  const reference = String(reportFrontmatter.pattern_pack || "").trim();
+  if (!reference || reference === "pending") return null;
+  const fullPath = path.resolve(ROOT, reference);
+  const allowedRoot = path.resolve(AGENT_MEMORY_ROOT);
+  if (fullPath !== allowedRoot && !fullPath.startsWith(`${allowedRoot}${path.sep}`)) return null;
+  let text;
+  try {
+    text = readBoundedRegularFile(fullPath, { maxBytes: 1_000_000, allowedRoots: [allowedRoot] }).text;
+  } catch {
+    return null;
+  }
+  const integrity = verifyPatternPackIntegrity(text, data.fingerprint);
+  if (!integrity.ok || integrity.lock !== reportFrontmatter.pattern_pack_lock) return null;
+  return {
+    fullPath,
+    relPath: path.relative(ROOT, fullPath),
+    text,
+    externalResearchSeeds: integrity.payload.external_research_seeds || [],
+    lock: integrity.lock,
+  };
+}
+
 function readEvidenceInput(inputPath) {
   const fullPath = path.resolve(ROOT, inputPath);
-  if (!existsSync(fullPath)) throw new Error(`Evidence input not found: ${inputPath}`);
-  const stat = statSync(fullPath);
-  if (!stat.isFile()) throw new Error(`Evidence input is not a file: ${inputPath}`);
-  if (stat.size > 1_000_000) throw new Error(`Evidence input is too large: ${inputPath}`);
-  return JSON.parse(readFileSync(fullPath, "utf8"));
+  try {
+    return parseBoundedJson(readBoundedRegularFile(fullPath, { maxBytes: 1_000_000, allowedRoots: [ROOT] }).text, {
+      maxBytes: 1_000_000,
+      maxDepth: 20,
+      maxNodes: 20_000,
+    });
+  } catch {
+    throw new Error("Evidence input is missing, unsafe, too large or invalid JSON");
+  }
 }
 
 function externalResearchContract(contractPath, options = {}) {
   ensureDirs();
   const data = contractData(contractPath);
-  const patternPack = findPatternPackFor(data);
-  const topics = deriveExternalResearchTopics(data, { patternPack: patternPack?.text });
   const report = findResearchReportFor(data);
+  const patternPack = report ? findPatternPackReferencedByReport(data, report) : findPatternPackFor(data);
+  if (report && !patternPack) {
+    throw new Error("The research report's exact pattern pack is missing, stale or tampered. Run `node scripts/pritha.mjs research <contract>` again.");
+  }
+  const topics = deriveExternalResearchTopics(data, { patternPack });
   const backend = String(options.backend || (options.input ? "manual" : "status")).trim() || "status";
   const hasInput = Boolean(options.input);
 
@@ -1484,11 +1485,16 @@ function externalResearchContract(contractPath, options = {}) {
         "or provide curated evidence with `node scripts/pritha.mjs external-research <contract> --backend manual --input evidence.json`.",
       ].join(" "));
     }
-    const result = applyExternalResearchEvidence(report.text, data, last30days.evidence, { backend: "last30days", topics });
-    writeFileSync(report.fullPath, result.text);
+    const result = applyExternalResearchEvidence(report.text, data, last30days.evidence, {
+      backend: "last30days",
+      topics,
+      evaluateOverallGate: (text) => researchGateDecisionForReport(data, text),
+    });
+    atomicCompareAndSwapFile(report.fullPath, report.text, result.text);
+    const gate = researchGateDecisionForReport(data, result.text);
     console.log(`External research report updated: ${report.relPath}`);
     console.log(`Backend: ${result.evidence.backend}`);
-    console.log(`Research gate: ${result.status}`);
+    console.log(`Research gate: ${gate.status}${gate.ok ? "" : ` (${gate.reasons.join(", ") || "pending"})`}`);
     console.log(`External evidence items: ${result.evidence.items.length}`);
     if (result.coverage.missingTopicIds.length) {
       console.log(`Missing required topics: ${result.coverage.missingTopicIds.join(", ")}`);
@@ -1497,67 +1503,23 @@ function externalResearchContract(contractPath, options = {}) {
   }
 
   const input = readEvidenceInput(options.input);
-  const result = applyExternalResearchEvidence(report.text, data, input, { backend, topics });
-  writeFileSync(report.fullPath, result.text);
+  const result = applyExternalResearchEvidence(report.text, data, input, {
+    backend,
+    topics,
+    evaluateOverallGate: (text) => researchGateDecisionForReport(data, text),
+  });
+  atomicCompareAndSwapFile(report.fullPath, report.text, result.text);
+  const gate = researchGateDecisionForReport(data, result.text);
   console.log(`External research report updated: ${report.relPath}`);
   console.log(`Backend: ${result.evidence.backend}`);
-  console.log(`Research gate: ${result.status}`);
+  console.log(`Research gate: ${gate.status}${gate.ok ? "" : ` (${gate.reasons.join(", ") || "pending"})`}`);
   console.log(`External evidence items: ${result.evidence.items.length}`);
   if (result.coverage.missingTopicIds.length) {
     console.log(`Missing required topics: ${result.coverage.missingTopicIds.join(", ")}`);
   }
 }
 
-function readProjectText(projectRoot, relPath, maxChars = 1400) {
-  const fullPath = path.join(projectRoot, relPath);
-  if (!existsSync(fullPath) || !statSync(fullPath).isFile()) return "";
-  return readFileSync(fullPath, "utf8").replace(/\s+/g, " ").trim().slice(0, maxChars);
-}
-
-function projectAgentData(projectRoot, taskDescription) {
-  const projectName = path.basename(projectRoot);
-  const relPath = path.relative(ROOT, projectRoot);
-  const readme = readProjectText(projectRoot, "README.md");
-  const agents = readProjectText(projectRoot, "AGENTS.md");
-  const packageJson = readJsonIfExists(path.join(projectRoot, "package.json")) || {};
-  const interfaces = readJsonIfExists(path.join(projectRoot, "interfaces", "manifest.json")) || {};
-  const memory = readJsonIfExists(path.join(projectRoot, "memory", "manifest.json")) || {};
-  const tools = readJsonIfExists(path.join(projectRoot, "tools", "manifest.json")) || {};
-  const operations = readJsonIfExists(path.join(projectRoot, "operations", "manifest.json")) || {};
-  const adapters = Array.isArray(interfaces.adapters)
-    ? interfaces.adapters.map((item) => item?.name || item?.id || item).filter(Boolean).join(", ")
-    : "";
-  return {
-    agentName: projectName,
-    relPath,
-    projectPath: relPath,
-    text: `${readme}\n${agents}\n${taskDescription}`,
-    primaryMission: readme.match(/#\s+([^#]+)/)?.[1]?.trim() || taskDescription,
-    targetUser: "existing agent operator",
-    runtimeFamily: "codex-native",
-    runtimePlacementProfile: "hybrid",
-    primaryInterface: adapters || interfaces.primary || "Codex project",
-    secondaryInterfaces: adapters,
-    telegramMode: adapters.toLowerCase().includes("telegram") ? "operator-control" : "none",
-    expectedHosting: operations.deployment_target || "existing local project",
-    deploymentTarget: operations.deployment_target || "existing local project",
-    deploymentProfile: operations.deployment_profile || "existing",
-    serviceMode: operations.service_mode || "none",
-    autostart: operations.autostart || "disabled",
-    proactiveMode: operations.proactivity?.mode || operations.proactive_mode || "none",
-    memoryModel: memory.profile || memory.description || "existing project memory",
-    indexingSearchNeeds: memory.indexing || memory.search || "",
-    toolSystem: tools.description || "existing project tools",
-    inputDataTypes: "existing project inputs plus operator task",
-    dependencies: packageJson.dependencies ? Object.keys(packageJson.dependencies).slice(0, 12).join(", ") : "none",
-    coreFunctions: [taskDescription],
-    criticalWorkflows: [taskDescription],
-    taskDescription,
-    developmentTaskType: "improve",
-  };
-}
-
-function agentDevelopmentTaskMarkdown(projectRoot, data, detection, researchContext, patternPack, externalResearchTopics, options = {}) {
+export function agentDevelopmentTaskMarkdown(projectRoot, data, detection, researchContext, patternPack, externalResearchTopics, repositoryResearch, options = {}) {
   const date = today();
   const agentSlug = slug(data.agentName);
   const reportSources = [
@@ -1569,7 +1531,7 @@ function agentDevelopmentTaskMarkdown(projectRoot, data, detection, researchCont
   ].filter(Boolean);
   const externalStatus = externalResearchTopics.length ? "pending" : "not-applicable";
   return `---
-id: ${date}-${agentSlug}-agent-development-task
+id: ${options.artifactId || `${date}-${agentSlug}-agent-development-task`}
 type: review
 status: draft
 created: ${date}
@@ -1587,46 +1549,49 @@ ${reportSources.map((source) => `  - ${yamlScalar(source)}`).join("\n")}
 related:
   agent_contracts: []
   pattern_packs:
-    - ${patternPack.relPath}
+    - ${yamlScalar(patternPack.relPath)}
 supersedes: []
 superseded_by: []
 development_task_type: improve
 target_project: ${yamlScalar(data.relPath)}
-pattern_pack: ${patternPack.relPath}
-pattern_research_status: ${patternPack.status}
-semantic_memory_status: ${patternPack.semantic.status}
-semantic_failure_log: ${patternPack.semantic.failureLog || "none"}
+pattern_pack: ${yamlScalar(patternPack.relPath)}
+pattern_research_status: ${yamlScalar(patternPack.status)}
+semantic_memory_status: ${yamlScalar(patternPack.semantic.status)}
+semantic_failure_log: ${yamlScalar(patternPack.semantic.failureLog || "none")}
 memory_research_status: complete
 external_research_status: ${externalStatus}
 synthesis_status: ${externalStatus === "not-applicable" ? "not-applicable" : "pending"}
+${repositoryResearchFrontmatter(repositoryResearch)}
 verified: pending
 ---
 
-# Agent Development Task: ${data.agentName}
+# Agent Development Task: ${markdownText(data.agentName, 300)}
 
 Date: ${date}
 Status: draft
 
 ## Operator Task
 
-${scalar(options.task || options.notes, "No task text provided.")}
+${markdownText(scalar(options.task || options.notes, "No task text provided."), 2000)}
 
 ## Current Project State
 
-- Project path: ${projectRoot}
-- Classification: ${detection.classification}
-- Pattern pack: ${patternPack.relPath}
-- Semantic/embedding search: ${patternPack.semantic.status}${patternPack.semantic.failureLog ? `; logged in ${patternPack.semantic.failureLog}` : ""}
+- Project path: ${markdownText(path.relative(ROOT, projectRoot) || ".", 500)}
+- Classification: ${markdownText(detection.classification, 120)}
+- Pattern pack: ${markdownText(patternPack.relPath, 500)}
+- Semantic/embedding search: ${markdownText(`${patternPack.semantic.status}${patternPack.semantic.failureLog ? `; logged in ${patternPack.semantic.failureLog}` : ""}`, 600)}
 - FTS memory matches: ${researchContext.memoryResults.length}
 - Domain matches: agent-building=${researchContext.domainResults.agentBuildingKnowledge.length}; pritha-self=${researchContext.domainResults.prithaSelf.length}; child-agents=${researchContext.domainResults.childAgents.length}
 
 ## Relevant Memory Patterns
 
-${patternPack.selectedPatterns.length ? patternPack.selectedPatterns.map((pattern) => `- ${pattern.id}: ${pattern.path} - ${pattern.applicability}`).join("\n") : "- No reusable local pattern found. Use external discovery before implementation."}
+${patternPack.selectedPatterns.length ? patternPack.selectedPatterns.map((pattern) => `- ${markdownText(`${pattern.id}: ${pattern.path} - ${pattern.applicability}`, 900)}`).join("\n") : "- No reusable local pattern found. Use external discovery before implementation."}
 
 ## External Research Topics
 
 ${formatExternalResearchTopics(externalResearchTopics)}
+
+${repositoryResearchMarkdown(repositoryResearch)}
 
 ## Required Codex Pipeline
 
@@ -1643,7 +1608,7 @@ Hand this development task to Codex App/CLI as an implementation task only after
 `;
 }
 
-function improveProjectTask(projectPath, options = {}) {
+async function improveProjectTask(projectPath, options = {}) {
   ensureDirs();
   const projectRoot = path.resolve(ROOT, projectPath);
   if (!existsSync(projectRoot) || !statSync(projectRoot).isDirectory()) {
@@ -1658,12 +1623,26 @@ function improveProjectTask(projectPath, options = {}) {
   const researchContext = collectAgentMemoryResearch(data, options);
   const patternPack = writePatternPack(data, researchContext, options);
   const externalResearchTopics = deriveExternalResearchTopics(data, { patternPack });
-  const reportPath = uniquePath(path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-development-task.md`));
-  writeFileSync(reportPath, agentDevelopmentTaskMarkdown(projectRoot, data, detection, researchContext, patternPack, externalResearchTopics, options));
+  const repositoryResearch = await runRepositoryResearch(ROOT, data, externalResearchTopics, options);
+  const writtenReport = writeUniqueArtifact(
+    path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-development-task.md`),
+    ({ artifactId }) => agentDevelopmentTaskMarkdown(
+      projectRoot,
+      data,
+      detection,
+      researchContext,
+      patternPack,
+      externalResearchTopics,
+      repositoryResearch,
+      { ...options, artifactId },
+    ),
+  );
+  const reportPath = writtenReport.path;
   console.log(`Agent development task: ${path.relative(ROOT, reportPath)}`);
   console.log(`Pattern pack: ${patternPack.relPath}`);
   console.log(`Semantic/embedding search: ${patternPack.semantic.status}${patternPack.semantic.failureLog ? ` (logged: ${patternPack.semantic.failureLog})` : ""}`);
   console.log(`External research topics: ${externalResearchTopics.length}`);
+  console.log(`GitHub repository research: ${repositoryResearch.status} (${repositoryResearch.candidates.length} curated candidates)`);
   console.log("Next: hand this task to Codex for implementation after current-source enrichment when required.");
 }
 
@@ -1680,7 +1659,8 @@ function questions() {
 8. Deployment: target environment, deployment profile, service mode and autostart policy.
 9. Proactivity: manual, scheduled, heartbeat, event-driven, queue-watcher or hybrid; triggers and interruption policy.
 10. Skills: needs, allowed sources, install mode and mutation policy.
-11. Scaffold: target folder, generated files, dependencies, setup/run commands, tests and training guide.`);
+11. Repository research: policy, allowlisted capability scopes, explicit repository candidates and adoption mode.
+12. Scaffold: target folder, generated files, dependencies, setup/run commands, tests and training guide.`);
 }
 
 async function main() {
@@ -1743,7 +1723,7 @@ async function main() {
   if (command === "research") {
     const target = options._[0];
     if (!target) throw new Error("Missing contract path.");
-    researchContract(target, options);
+    await researchContract(target, options);
     return;
   }
   if (command === "pattern-research") {
@@ -1807,7 +1787,7 @@ async function main() {
   if (command === "improve") {
     const target = options._[0];
     if (!target) throw new Error("Missing project path.");
-    improveProjectTask(target, options);
+    await improveProjectTask(target, options);
     return;
   }
   if (command === "evolve") {

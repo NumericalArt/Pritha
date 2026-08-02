@@ -2,7 +2,7 @@ export function parseScalar(value) {
   const trimmed = String(value ?? "").trim();
   if (trimmed === "") return "";
   if (trimmed === "[]") return [];
-  if (trimmed === "{}") return {};
+  if (trimmed === "{}") return Object.create(null);
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
     const inner = trimmed.slice(1, -1).trim();
     if (!inner) return [];
@@ -32,15 +32,21 @@ export function parseFrontmatterData(text) {
 
 function parseFrontmatterBlock(raw) {
   const lines = raw.split(/\r?\n/);
-  const data = {};
+  const data = Object.create(null);
   let currentKey = null;
   let currentNestedKey = null;
+  const forbiddenKeys = new Set(["__proto__", "constructor", "prototype"]);
 
   for (const line of lines) {
     if (!line.trim()) continue;
 
     const topMatch = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
     if (topMatch) {
+      if (forbiddenKeys.has(topMatch[1].toLowerCase())) {
+        currentKey = null;
+        currentNestedKey = null;
+        continue;
+      }
       currentKey = topMatch[1];
       currentNestedKey = null;
       data[currentKey] = parseScalar(topMatch[2] ?? "");
@@ -49,8 +55,12 @@ function parseFrontmatterBlock(raw) {
 
     const nestedMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
     if (nestedMatch && currentKey) {
+      if (forbiddenKeys.has(nestedMatch[1].toLowerCase())) {
+        currentNestedKey = null;
+        continue;
+      }
       if (!data[currentKey] || Array.isArray(data[currentKey]) || typeof data[currentKey] !== "object") {
-        data[currentKey] = {};
+        data[currentKey] = Object.create(null);
       }
       currentNestedKey = nestedMatch[1];
       data[currentKey][currentNestedKey] = parseScalar(nestedMatch[2] ?? "");

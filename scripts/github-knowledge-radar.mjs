@@ -1,10 +1,22 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { now, today } from "./lib/date.mjs";
+import {
+  normalizeGitHubApiRepository,
+  normalizeGitHubRepositoryUrl,
+  isAllowedGitHubRepositoryTopic,
+  plannedGitHubRepositoryQueries,
+  readGitHubRepositoryRegistry,
+  searchGitHubRepositoryCandidates,
+} from "./lib/github-repository-radar.mjs";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { atomicWriteFile, withFileLock } from "./lib/atomic-file.mjs";
+import { parseBoundedJson } from "./lib/bounded-json.mjs";
+import { redactSensitiveText } from "./lib/redaction.mjs";
+import { readBoundedRegularFile } from "./lib/safe-file-read.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REGISTRY_PATH = path.join(ROOT, "01_sources", "registries", "github-agent-building-repos.md");
@@ -12,26 +24,6 @@ const argv = process.argv.slice(2);
 const command = argv.find((arg) => !arg.startsWith("-")) || "status";
 const jsonMode = argv.includes("--json");
 const onlineMode = argv.includes("--online");
-
-const TOPIC_QUERIES = {
-  "agent-harness": [
-    "agent framework harness tool calling stars:>25",
-    "AI agent framework TypeScript MCP stars:>25",
-    "LLM agent memory tools workflow stars:>25",
-  ],
-  "agent-memory": [
-    "AI agent memory vector database workflow stars:>25",
-    "LLM memory retrieval agent stars:>25",
-  ],
-  "agent-evals": [
-    "LLM agent evals benchmark harness stars:>25",
-    "AI agent evaluation framework tool use stars:>25",
-  ],
-  "mcp-tools": [
-    "MCP server tools agent framework stars:>25",
-    "model context protocol agent tools stars:>25",
-  ],
-};
 
 function argValue(name, fallback = "") {
   const index = argv.indexOf(name);
@@ -81,69 +73,127 @@ This registry stores candidate open-source repositories that may improve Pritha'
 
 Safety rule: entries are candidates for review only. Do not clone, install, execute, or trust repository code until a separate review artifact accepts that action.
 
-| Repo | Topics | Status | Added | Last checked | Stars | Why | Notes |
-| --- | --- | --- | --- | --- | ---: | --- | --- |
+| Repo | Topics | Status | Added | Last checked | Stars | License | Why | Notes |
+| --- | --- | --- | --- | --- | ---: | --- | --- | --- |
 `;
 }
 
+function pathInside(candidate, root) {
+  return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+}
+
+function assertSafeRegistryAncestors() {
+  const rootRealPath = realpathSync(ROOT);
+  let current = ROOT;
+  for (const segment of path.relative(ROOT, path.dirname(REGISTRY_PATH)).split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    try {
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error("unsafe_registry_boundary");
+      if (!pathInside(realpathSync(current), rootRealPath)) throw new Error("unsafe_registry_boundary");
+    } catch (error) {
+      if (error?.code === "ENOENT") break;
+      throw error;
+    }
+  }
+}
+
+function registrySnapshot(options = {}) {
+  try {
+    assertSafeRegistryAncestors();
+  } catch {
+    return { exists: true, ok: false, rows: [], text: "" };
+  }
+  let exists = true;
+  try {
+    lstatSync(REGISTRY_PATH);
+  } catch (error) {
+    if (error?.code === "ENOENT") exists = false;
+    else return { exists: true, ok: false, rows: [], text: "" };
+  }
+  if (!exists) return { exists: false, ok: true, rows: [], text: "" };
+  const registry = readGitHubRepositoryRegistry(ROOT);
+  if (!registry.ok) return { exists: true, ok: false, rows: [], text: "" };
+  try {
+    const text = options.includeText
+      ? readBoundedRegularFile(REGISTRY_PATH, { maxBytes: 1_000_000, allowedRoots: [ROOT] }).text
+      : "";
+    return { exists: true, ok: true, rows: registry.rows, text };
+  } catch {
+    return { exists: true, ok: false, rows: [], text: "" };
+  }
+}
+
 function ensureRegistry(write = false) {
-  if (existsSync(REGISTRY_PATH)) return true;
-  if (!write) return false;
-  mkdirSync(path.dirname(REGISTRY_PATH), { recursive: true });
-  writeFileSync(REGISTRY_PATH, registryTemplate());
-  return true;
+  const existing = registrySnapshot();
+  if (existing.exists) {
+    if (!existing.ok) throw new Error("unsafe_registry_boundary");
+    return existing;
+  }
+  if (!write) return existing;
+  assertSafeRegistryAncestors();
+  return withFileLock(REGISTRY_PATH, () => {
+    const current = registrySnapshot();
+    if (current.exists && !current.ok) throw new Error("unsafe_registry_boundary");
+    if (!current.exists) atomicWriteFile(REGISTRY_PATH, registryTemplate());
+    const created = registrySnapshot();
+    if (!created.ok || !created.exists) throw new Error("unsafe_registry_boundary");
+    return created;
+  });
+}
+
+function compactText(value, max = 800) {
+  return redactSensitiveText(String(value ?? ""))
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
 }
 
 function escapeCell(value) {
-  return String(value ?? "")
-    .replace(/\r?\n/g, " ")
-    .replace(/\|/g, "\\|")
-    .trim();
+  return compactText(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("`", "&#96;")
+    .replaceAll("!", "&#33;")
+    .replaceAll("[", "&#91;")
+    .replaceAll("]", "&#93;")
+    .replace(/\|/g, "\\|");
 }
 
-function normalizeRepoUrl(value) {
-  const source = String(value || "").trim();
-  const match = source.match(/github\.com[:/]([^/\s]+)\/([^/\s#?]+?)(?:\.git)?(?:[/?#].*)?$/i);
-  if (!match) return null;
-  return {
-    owner: match[1],
-    repo: match[2],
-    fullName: `${match[1]}/${match[2]}`,
-    url: `https://github.com/${match[1]}/${match[2]}`,
-  };
-}
+const normalizeRepoUrl = normalizeGitHubRepositoryUrl;
 
 function parseTopics(value) {
   return String(value || "")
     .split(/[,\s]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => /^[a-z0-9][a-z0-9._-]{0,63}$/.test(item))
+    .slice(0, 12);
 }
 
-function registryRows() {
-  if (!existsSync(REGISTRY_PATH)) return [];
-  const text = readFileSync(REGISTRY_PATH, "utf8");
-  return text
-    .split(/\r?\n/)
-    .filter((line) => /^\|\s*https:\/\/github\.com\//i.test(line))
-    .map((line) => {
-      const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
-      return {
-        repo: cells[0] || "",
-        topics: cells[1] || "",
-        status: cells[2] || "",
-        added: cells[3] || "",
-        lastChecked: cells[4] || "",
-        stars: Number.parseInt(cells[5] || "0", 10) || 0,
-        why: cells[6] || "",
-        notes: cells[7] || "",
-      };
-    });
+const REGISTRY_STATUSES = new Set(["candidate", "accepted-for-review", "rejected", "archived"]);
+
+function normalizedLicense(value) {
+  const license = redactSensitiveText(String(value || "unknown")).trim().slice(0, 120);
+  if (/^(?:unknown|unlicensed)$/i.test(license)) return license.toLowerCase();
+  return /^[A-Za-z0-9][A-Za-z0-9.+() -]{1,119}$/.test(license) ? license : "";
+}
+
+function sanitizeRadarCandidate(candidate) {
+  if (!candidate?.repo?.url) return null;
+  return {
+    ...candidate,
+    description: compactText(candidate.description, 400),
+    language: compactText(candidate.language, 80),
+    license: normalizedLicense(candidate.license) || "unknown",
+    topics: parseTopics((candidate.topics || []).join(",")),
+    latestReleaseTag: compactText(candidate.latestReleaseTag, 120),
+  };
 }
 
 function statusPayload() {
-  const exists = ensureRegistry(false);
-  const rows = registryRows();
+  const registry = registrySnapshot();
+  const rows = registry.ok ? registry.rows : [];
   const byStatus = rows.reduce((acc, row) => {
     acc[row.status || "unknown"] = (acc[row.status || "unknown"] || 0) + 1;
     return acc;
@@ -153,8 +203,9 @@ function statusPayload() {
     generatedAt: now(),
     root: ROOT,
     registryPath: registryRelativePath(),
-    exists,
-    status: exists ? "ready" : "not_initialized",
+    ok: registry.ok,
+    exists: registry.exists,
+    status: !registry.exists ? "not_initialized" : registry.ok ? "ready" : "unsafe_registry",
     candidates: rows.length,
     byStatus,
     safety: "Registry stores candidate links only; no clone/install/run is performed.",
@@ -162,12 +213,23 @@ function statusPayload() {
 }
 
 function initRegistry() {
-  ensureRegistry(true);
-  return {
-    ...statusPayload(),
-    status: "ready",
-    initialized: true,
-  };
+  try {
+    ensureRegistry(true);
+    const status = statusPayload();
+    return {
+      ...status,
+      status: status.ok ? "ready" : "unsafe_registry",
+      initialized: status.ok,
+    };
+  } catch {
+    return {
+      ...statusPayload(),
+      ok: false,
+      status: "unsafe_registry",
+      initialized: false,
+      detail: "Registry must be a bounded regular file inside TECHSCOPE_ROOT.",
+    };
+  }
 }
 
 function registerRepo() {
@@ -183,79 +245,87 @@ function registerRepo() {
     };
   }
 
-  ensureRegistry(true);
-  const existing = registryRows().find((row) => normalizeRepoUrl(row.repo)?.url.toLowerCase() === repo.url.toLowerCase());
-  if (existing) {
+  const topics = parseTopics(argValue("--topics") || argValue("--topic") || "agent-building-knowledge");
+  const why = compactText(argValue("--why", "Candidate for agent-building knowledge review."), 400);
+  const notes = compactText(argValue("--notes", "Needs source review before adoption."), 600);
+  const status = String(argValue("--status", "candidate")).trim().toLowerCase();
+  const starsInput = Number.parseInt(argValue("--stars", "0"), 10);
+  const stars = Number.isSafeInteger(starsInput) ? Math.max(0, Math.min(starsInput, 1_000_000_000)) : 0;
+  const license = normalizedLicense(argValue("--license", "unknown"));
+  if (!topics.length || !REGISTRY_STATUSES.has(status) || !license) {
     return {
       schema: "pritha-github-knowledge-radar-register-v1",
       generatedAt: now(),
-      ok: true,
-      status: "already_registered",
-      repo,
-      registryPath: registryRelativePath(),
-      existing,
+      ok: false,
+      status: "invalid_registry_metadata",
+      detail: "Topics, status or license are invalid. Use safe topic slugs, an allowed review status and a simple SPDX/license label.",
     };
   }
-
-  const topics = parseTopics(argValue("--topics") || argValue("--topic") || "agent-building-knowledge");
-  const why = argValue("--why", "Candidate for agent-building knowledge review.");
-  const notes = argValue("--notes", "Needs source review before adoption.");
-  const status = argValue("--status", "candidate");
-  const stars = Number.parseInt(argValue("--stars", "0"), 10) || 0;
-  const row = `| ${repo.url} | ${escapeCell(topics.join(", "))} | ${escapeCell(status)} | ${today()} | ${today()} | ${stars} | ${escapeCell(why)} | ${escapeCell(notes)} |\n`;
-  const previous = readFileSync(REGISTRY_PATH, "utf8");
-  writeFileSync(REGISTRY_PATH, previous.endsWith("\n") ? `${previous}${row}` : `${previous}\n${row}`);
-  return {
-    schema: "pritha-github-knowledge-radar-register-v1",
-    generatedAt: now(),
-    ok: true,
-    status: "registered",
-    repo,
-    registryPath: registryRelativePath(),
-  };
+  const row = `| ${repo.url} | ${escapeCell(topics.join(", "))} | ${escapeCell(status)} | ${today()} | ${today()} | ${stars} | ${escapeCell(license)} | ${escapeCell(why)} | ${escapeCell(notes)} |\n`;
+  try {
+    ensureRegistry(true);
+    return withFileLock(REGISTRY_PATH, () => {
+      const registry = registrySnapshot({ includeText: true });
+      if (!registry.exists || !registry.ok) throw new Error("unsafe_registry_boundary");
+      const existing = registry.rows
+        .find((entry) => normalizeRepoUrl(entry.repo)?.url.toLowerCase() === repo.url.toLowerCase());
+      if (existing) {
+        return {
+          schema: "pritha-github-knowledge-radar-register-v1",
+          generatedAt: now(),
+          ok: true,
+          status: "already_registered",
+          repo,
+          registryPath: registryRelativePath(),
+          existing,
+        };
+      }
+      const previous = registry.text;
+      atomicWriteFile(REGISTRY_PATH, previous.endsWith("\n") ? `${previous}${row}` : `${previous}\n${row}`);
+      return {
+        schema: "pritha-github-knowledge-radar-register-v1",
+        generatedAt: now(),
+        ok: true,
+        status: "registered",
+        repo,
+        registryPath: registryRelativePath(),
+      };
+    });
+  } catch {
+    return {
+      schema: "pritha-github-knowledge-radar-register-v1",
+      generatedAt: now(),
+      ok: false,
+      status: "unsafe_registry",
+      registryPath: registryRelativePath(),
+      detail: "Registry must be a bounded regular file inside TECHSCOPE_ROOT.",
+    };
+  }
 }
 
 function plannedQueries(topic) {
-  return TOPIC_QUERIES[topic] || [
-    `${topic} AI agent framework stars:>25`,
-    `${topic} LLM agent tools memory stars:>25`,
-  ];
-}
-
-function normalizeGitHubApiItem(item) {
-  const repo = normalizeRepoUrl(item.html_url || item.url || "");
-  if (!repo) return null;
-  return {
-    repo,
-    description: item.description || "",
-    stars: Number(item.stargazers_count || item.stars || 0),
-    language: item.language || "",
-    updatedAt: item.updated_at || item.updatedAt || "",
-    topics: Array.isArray(item.topics) ? item.topics : [],
-  };
-}
-
-async function fetchGitHubSearch(query, limit) {
-  const url = new URL("https://api.github.com/search/repositories");
-  url.searchParams.set("q", query);
-  url.searchParams.set("sort", "stars");
-  url.searchParams.set("order", "desc");
-  url.searchParams.set("per_page", String(Math.min(Math.max(limit, 1), 25)));
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": "pritha-github-knowledge-radar",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`GitHub search failed: ${response.status} ${response.statusText}`);
-  }
-  return response.json();
+  return plannedGitHubRepositoryQueries(topic);
 }
 
 async function searchCandidates() {
   const topic = argValue("--topic") || argValue("--topics") || "agent-harness";
-  const limit = Number.parseInt(argValue("--limit", "5"), 10) || 5;
+  const parsedLimit = Number.parseInt(argValue("--limit", "5"), 10);
+  const limit = Math.max(1, Math.min(Number.isFinite(parsedLimit) ? parsedLimit : 5, 25));
+  if (!isAllowedGitHubRepositoryTopic(topic)) {
+    return {
+      schema: "pritha-github-knowledge-radar-search-v1",
+      generatedAt: now(),
+      ok: false,
+      status: "invalid_topic",
+      topic: "rejected",
+      source: "planned",
+      online: false,
+      plannedQueries: [],
+      candidates: [],
+      error: "Topic is not in the public GitHub research allowlist.",
+      safety: "Arbitrary contract or user text is never sent to GitHub Search.",
+    };
+  }
   const queries = plannedQueries(topic);
   const fixturePath = process.env.PRITHA_GITHUB_RADAR_FIXTURE;
   let source = "planned";
@@ -265,27 +335,29 @@ async function searchCandidates() {
   try {
     if (fixturePath) {
       source = "fixture";
-      const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
+      const fixtureText = readBoundedRegularFile(fixturePath, { maxBytes: 2_000_000 }).text;
+      const fixture = parseBoundedJson(fixtureText, {
+        maxBytes: 2_000_000,
+        maxDepth: 16,
+        maxNodes: 30_000,
+        maxArrayLength: 5_000,
+      });
       const items = Array.isArray(fixture) ? fixture : fixture.items || [];
-      candidates = items.map(normalizeGitHubApiItem).filter(Boolean).slice(0, limit);
+      candidates = items.map(normalizeGitHubApiRepository).filter(Boolean).map(sanitizeRadarCandidate).filter(Boolean).slice(0, limit);
     } else if (onlineMode) {
       source = "github-api";
-      const seen = new Set();
-      for (const query of queries) {
-        const result = await fetchGitHubSearch(query, limit);
-        const items = (result.items || []).map(normalizeGitHubApiItem).filter(Boolean);
-        for (const item of items) {
-          const key = item.repo.url.toLowerCase();
-          if (seen.has(key)) continue;
-          seen.add(key);
-          candidates.push(item);
-          if (candidates.length >= limit) break;
-        }
-        if (candidates.length >= limit) break;
-      }
+      const result = await searchGitHubRepositoryCandidates({ topic, queries, limit });
+      candidates = result.candidates.map(sanitizeRadarCandidate).filter(Boolean);
     }
   } catch (caught) {
-    error = caught instanceof Error ? caught.message : String(caught);
+    const rawError = caught instanceof Error ? caught.message : String(caught);
+    if (source === "fixture" && rawError === "file_size_limit_exceeded") {
+      error = "GitHub fixture must be a file no larger than 2 MB";
+    } else if (source === "fixture" && /file_must_be_regular|file_outside_allowed_roots/.test(rawError)) {
+      error = "GitHub fixture must be a bounded regular file and not a symlink";
+    } else {
+      error = compactText(rawError, 400);
+    }
   }
 
   return {
@@ -321,9 +393,11 @@ let exitCode = 0;
 switch (command) {
   case "status":
     payload = statusPayload();
+    exitCode = payload.ok === false ? 1 : 0;
     break;
   case "init":
     payload = initRegistry();
+    exitCode = payload.ok === false ? 1 : 0;
     break;
   case "register":
     payload = registerRepo();

@@ -26,3 +26,11 @@ test("privacy helpers keep official reference URLs outside incoming artifacts", 
   const findings = containsForbiddenText("04_standards/example.md", "See https://docs.example.invalid/reference for stable docs.");
   assert.deepEqual(findings, []);
 });
+
+test("privacy helpers detect live Telegram tokens in any tracked Markdown", () => {
+  const findings = containsForbiddenText(
+    "11_agents/reports/example.md",
+    "TELEGRAM_BOT_TOKEN=123456789:AAEabcdefghijklmnopqrstuvwxyz123456",
+  );
+  assert.ok(findings.some((finding) => finding.id === "live-telegram-token"));
+});

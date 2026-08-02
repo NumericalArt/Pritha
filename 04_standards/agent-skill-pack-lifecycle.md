@@ -3,8 +3,8 @@ id: agent-skill-pack-lifecycle
 type: standard
 status: draft
 created: 2026-05-30
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-07-13
+last_reviewed: 2026-07-13
 owner: Pritha
 topics: [agent-skills, pritha, agent-factory, procedural-memory, supply-chain-security]
 tools: [Pritha, Codex, Agent Skills, Hermes Agent]
@@ -26,10 +26,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-30
-source_updated: 2026-06-02
-source_version: Pritha skill pack lifecycle v2 + Agent Skills source batch
+source_updated: 2026-07-13
+source_version: Pritha skill pack lifecycle v3 + fail-closed local catalog implementation
 retrieved: 2026-05-30
-verified: 2026-06-02
+verified: 2026-07-13
 valid_for: Pritha-created Codex-native agent scaffolds
 temporal_status: current
 memory_domain: agent-building-knowledge
@@ -64,14 +64,28 @@ minimum scope needed for that agent's mission.
 - External skills: candidate-only until a dedicated approval workflow exists
 - Generated wiki pages: discovery context only, never direct provenance
 
+Current scaffold implementation is intentionally narrower than the future bundle
+model below. It accepts exactly one regular, non-symlink `SKILL.md` per local
+catalog directory; extra references, scripts, assets, nested files or symlinks
+fail closed. Only audited local catalog skills can be installed, and only by
+`vendor`. `link`, `runtime-install` and every external/self-asserted source remain
+candidate-only until a dedicated pinned-bundle workflow is implemented.
+
 ## Requirements
 
 - Every active skill must have `SKILL.md` frontmatter with name, description, version, source, review status, trust level, required toolsets and risk level.
 - A skill may include references, scripts, templates/assets and platform metadata. All bundled files are part of the review surface, not just `SKILL.md`.
 - Skill descriptions are routing metadata. They must state the positive trigger and the boundary where the skill should not be used.
-- Every vendored skill must be recorded in `skills/manifest.json` and `skills/lock.json` with source paths and SHA-256 hash.
+- Every vendored skill must be recorded in `skills/manifest.json` and
+  `skills/lock.json`. Manifest, lock and `SKILL.md` frontmatter must agree on
+  SHA-256 hash, source paths, version, source, trust level, review status, risk
+  level and required toolsets.
 - `skills/candidates.json` is advisory and must not be used as active instructions.
-- External skills are supply-chain input. They require provenance, license, hash, trust review, prompt-injection review and explicit user approval before activation.
+- Run the deterministic child `scripts/skills-status.mjs` successfully before
+  reading any installed `SKILL.md`; fail closed on drift. The child uses the same
+  secret/private-endpoint and prompt-injection scanner as Pritha for installed
+  files and all skill metadata, including blocked candidates.
+- External skills are supply-chain input. The future activation workflow requires provenance, license, complete bundle identity, hash, trust review, prompt-injection review, evals and explicit user approval; approval text alone does not activate them today.
 - Official catalogs, official organization repositories and CLI installers are discovery sources, not trust decisions. A skill found through them still requires inspection, pinning and approval before Pritha activates it in a child scaffold.
 - External skills must be pinned to a tag, commit or tree SHA when vendored or linked. Runtime floating installs are not allowed by default.
 - If a skill depends on MCP, network access, filesystem writes or secrets, those dependencies must be present in the child-agent contract and readiness report.
@@ -115,6 +129,9 @@ frontier hosted model will be selected correctly by a small model.
 A skill can move from candidate to installed only when it is reviewed,
 contract-compatible, low or accepted medium risk, provenance-backed, pinned,
 eval-covered for its trigger behavior and covered by a status/audit command.
+In the current implementation this promotion is limited to local catalog skills;
+`Skill needs: selected` additionally requires unique exact names in the
+contract's `Installed skills` field.
 
 ## Failure Rules
 

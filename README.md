@@ -100,9 +100,12 @@ are optional and explicit.
 
 ### Child-agent creation and evolution
 
-Pritha can create a child-agent contract, research relevant Pritha memory,
-scaffold a Git-ready project, run tests, generate lifecycle reports, and
-rebuild the lineage registry.
+Pritha can create a child-agent contract, research relevant Pritha memory and
+contract-relevant GitHub repositories, scaffold a Git-ready project, run tests,
+generate lifecycle reports, and rebuild the lineage registry. Repository
+research searches Pritha's curated registry first and can add a bounded online
+shortlist; candidates remain advisory and are never cloned, installed or
+executed by discovery.
 
 Generated agents can include:
 
@@ -300,13 +303,53 @@ Create a draft Seed:
 node scripts/pritha.mjs create --name "research-agent" --mission "Track and review research links"
 ```
 
-Review the generated contract in `11_agents/contracts/`. After it is accepted,
+Review the generated contract in `11_agents/contracts/`. Before production
+scaffold, run the contract-aware memory, external-source and repository research
+pass:
+
+```sh
+node scripts/pritha.mjs research \
+  11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md \
+  --github-mode auto \
+  --github-limit 5
+```
+
+`auto` searches `01_sources/registries/github-agent-building-repos.md` first and
+uses bounded online GitHub discovery only when the contract derives a relevant
+`agent-harness`, `agent-memory`, `agent-evals`, `mcp-tools`, `agent-skills`,
+`agent-interface`, `agent-voice` or `agent-operations` scope. Use
+`--github-mode registry-only` for a no-network pass. `--github-mode skip` does
+not waive a required repository gate. A run never returns more than ten unique
+repositories; explicitly selected reference repositories are preserved within
+that hard limit even when `--github-limit` is lower.
+
+The generated shortlist is evidence, not an install plan. Pritha does not clone,
+install, execute, vendor, activate or register candidates during research.
+Reference-only use requires current evidence bound to every exact selected
+repository. Selected-module v1 accepts exactly one verified directory module:
+record its immutable pin and tree SHA plus module-local LICENSE/manifest source
+URL, Git blob SHA, content SHA-256, detected SPDX, security/permissions review,
+contract-specific eval and explicit user approval. Current HEAD license metadata
+is advisory only. The complete report, evidence and synthesis are integrity
+locked before scaffold. For `reference-only` and `selected-module`, synthesis
+must include a locked `repository_adoption_recommendation`; only `proceed`
+authorizes scaffold, while `hold` stays pending and `reject` fails the gate.
+Retrieval time alone does not make evidence current. Version-based freshness is
+allowed only with substantive version/temporal context and the lock-bound
+`temporal_compatibility_status: compatible`; `incompatible`, `unknown` and invalid
+values remain non-authorizing.
+
+After the contract is accepted and all required research gates are complete,
 scaffold and test the descendant:
 
 ```sh
-node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md --output ../research-agent
-node scripts/pritha.mjs test ../research-agent
+node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md
 ```
+
+The contract's logical `sibling of Pritha` target resolves through
+`PRITHA_AGENT_PARENT` (or the checkout parent in the legacy layout). Pass the
+absolute project path printed by `create` to the later `test`, `publish` and
+operations commands; use `--output` only for an intentional path override.
 
 ## Documentation
 

@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-06-24
-last_reviewed: 2026-06-24
+updated: 2026-07-13
+last_reviewed: 2026-07-13
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -79,6 +79,9 @@ sources:
   - 04_standards/agent-ai-safe-security-checklist.md
   - 03_reviews/2026-06-11-pi-agent-architecture-assessment.md
   - 04_standards/agent-minimal-core-extension-surface.md
+  - 01_sources/registries/github-agent-building-repos.md
+  - 01_sources/signals/2026-06-28-open-source-agent-building-repos-signal.md
+  - 03_reviews/2026-06-28-open-source-agent-building-repos-review.md
 related:
   decisions: []
   reviews:
@@ -105,10 +108,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-06-24
-source_version: Techscope draft standard v14 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update + card-first Control Center readiness
+source_updated: 2026-07-13
+source_version: Techscope draft standard v15 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update + card-first Control Center readiness + contract-aware GitHub repository research and selected-module adoption gates
 retrieved: 2026-05-18
-verified: 2026-06-11
+verified: 2026-07-13
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -117,7 +120,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-24
+Last reviewed: 2026-07-13
 
 ## Rule
 
@@ -140,6 +143,33 @@ pattern-pack and a JSONL entry in
 `.private/agents-mother/semantic-memory-failures.jsonl`. A draft scaffold is
 allowed only as an explicit experiment and must not be presented as a ready
 descendant.
+
+When those choices may be supplied by a GitHub repository, Pritha performs
+contract-aware repository research inside the same pre-scaffold research pass.
+The contract chooses `auto`, `required`, `registry-only` or `not-applicable`;
+the latter requires a waiver reason. Research derives only the relevant
+`agent-harness`, `agent-memory`, `agent-evals`, `mcp-tools`, `agent-skills`,
+`agent-interface`, `agent-voice` and `agent-operations` scopes, searches the
+curated repository registry first, and may augment it with a bounded online
+GitHub search. The merged shortlist is advisory evidence only. Discovery never
+clones, installs, executes, vendors, links, activates, trusts or automatically
+registers third-party code.
+
+Repository discovery and repository adoption are separate gates. A registry
+status such as `candidate` or `accepted-for-review`, an online search result,
+stars, recent activity or an apparently compatible license does not authorize
+use. `not-applicable` repository policy is valid only with adoption mode `none`.
+Reference-only use requires current `github-repository-review` evidence bound to
+every exact selected canonical repository.
+
+If the contract selects a repository module, production scaffold remains
+blocked until it records exactly one canonical public repository, a safe
+repository-relative directory module, an exact immutable pin and verified tree
+SHA. The same pin must expose module-local LICENSE or supported-manifest evidence
+with exact GitHub blob URL, Git blob SHA, content SHA-256, safely detected SPDX
+and `license_scope: module-local`; current HEAD license metadata is advisory
+only. Security and exact permission review, contract-specific eval, current
+evidence, completed synthesis and explicit user approval remain mandatory.
 
 For any child agent created through Pritha Voice Control or Predictive Voice
 Control, card-first readiness is part of the scaffold deliverable. The first
@@ -260,6 +290,42 @@ credential UI or placeholder docs.
   `--allow-draft-scaffold` only for an explicit experimental scaffold.
 - Run Pritha memory research before scaffold and record whether current
   external documentation verification is complete or pending.
+- Record `Repository research policy` and `Repository adoption mode` in every
+  new contract. Use `auto`/`none` when no explicit repository decision has been
+  made; use `not-applicable` only with a concrete reason.
+- For repository-relevant choices, search the curated GitHub registry before
+  bounded online discovery, deduplicate the shortlist and keep discovery
+  read-only. Do not mutate the registry from child-agent research.
+- Invalid repository policy/mode values fail before network access, and
+  `not-applicable` cannot be combined with any adoption mode except `none`.
+- Record repository research status and scope in the research frontmatter. A
+  completed shortlist does not complete selected-module adoption.
+- Before selecting code or configuration from a repository, require an exact
+  immutable pin, verified directory tree, module-local pin-bound license source
+  URL/blob SHA/content SHA-256/detected SPDX, license decision,
+  source/script/dependency inspection,
+  security and permission review, contract-specific eval evidence and explicit
+  user approval. The evidence set must include a valid
+  `github-repository-review` topic and completed synthesis. Missing evidence
+  keeps the module candidate-only.
+- Reference-only evidence must bind to every exact selected canonical repository.
+- Repository-mode synthesis must lock a structured
+  `repository_adoption_recommendation` enum. Only `proceed` can authorize
+  scaffold; `hold` remains pending and `reject` fails the overall gate.
+- Selected-module evidence must bind to the same canonical repository, module,
+  immutable pin, license, permission boundary, eval and explicit approval
+  recorded in the contract.
+- Retrieval time alone does not establish source freshness. Require recent
+  source publication/update dates, or substantive version context and temporal
+  compatibility plus a locked `temporal_compatibility_status` enum when those
+  dates are unavailable. Only `compatible` can authorize the version fallback;
+  `incompatible` and `unknown` remain non-authorizing.
+- Treat repository metadata and every external narrative field as untrusted
+  input. Redact sensitive values and quarantine prompt-injection-like text; a
+  quarantined item cannot satisfy evidence coverage or synthesis.
+- Verify the canonical repository payload and its rendered-section hash,
+  external evidence lock, synthesis lock and full-document
+  `research_content_lock` before a production scaffold.
 - Prefer `codex-native + optional Telegram` as the first scaffold path unless the contract chooses another runtime.
 - Record runtime family, interface mode, target folder, hosting expectation, memory model, tool boundaries and tests.
 - Record Codex surface profile when Codex is involved: CLI, app, IDE, cloud,
@@ -299,9 +365,10 @@ credential UI or placeholder docs.
   policy, discovery mode, trust registry, auth, per-skill authorization,
   untrusted-input handling, task policy, observability and readiness checks.
 - Apply `agent-skill-pack-lifecycle` before adding reusable skills to a child
-  agent. Skills are optional contract-selected modules; external skills require
-  provenance review, source pinning, script/resource inspection, approval,
-  trigger/side-effect evals, readiness status and update/audit policy.
+  agent. Skills are optional contract-selected modules. The current scaffold may
+  vendor only reviewed local catalog skills; every external or self-asserted
+  trusted skill remains candidate-only until a dedicated pinned-bundle workflow
+  verifies provenance, contents, approval, evals and lock identity.
 - Apply `agent-untrusted-input-security` before allowing external content to drive model context, tools, memory or spend.
 - Apply `agent-runtime-placement` before assuming one global model or before
   adding local inference as a cost/privacy optimization.
@@ -344,6 +411,9 @@ credential UI or placeholder docs.
 Each created agent must document:
 
 - selected modules: which parts of harness, memory, data, skills, MCP, A2A, tools, evals, interfaces and operations are included and why;
+- external repository basis: research policy/scopes, advisory shortlist,
+  reference-only sources and every selected module's canonical repo, immutable
+  pin, license, trust, permissions, activation, readiness, evals and approval;
 - information boundaries: what the model sees, what remains hidden, how context is compressed;
 - runtime boundary: where the agent runs, what the host controls, where secrets
   live, and what network/filesystem policy applies;
@@ -375,13 +445,14 @@ Each created agent must document:
 ## Temporal validity
 
 - Source published: 2026-05-18 user scenario and current external docs.
-- Source updated: 2026-06-07.
-- Source version: Techscope draft standard v11 plus Funny Teacher reference
+- Source updated: 2026-07-13.
+- Source version: Techscope draft standard v15 plus Funny Teacher reference
   evidence, OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv
   harness source batch, Codex surfaces/AWS batch, scheduling/heartbeat batch and
-  Agent Skills, agentic UI and AI-SAFE child-agent checklist source batches.
+  Agent Skills, agentic UI and AI-SAFE child-agent checklist source batches,
+  Pi minimal-core evidence and contract-aware GitHub repository research.
 - Retrieved: 2026-05-18.
-- Verified: 2026-06-07.
+- Verified: 2026-07-13.
 - Valid for: TechScope agent creation workflow from 2026-05-18 onward.
 - Freshness status: current.
 - Temporal status: current.

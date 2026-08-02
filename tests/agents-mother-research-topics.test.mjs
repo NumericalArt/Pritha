@@ -34,6 +34,15 @@ test("fixture-like deterministic contract does not require external research top
   assert.equal(externalResearchRequired(data), false);
 });
 
+test("repository placeholder values do not create a repository-review topic", () => {
+  assert.deepEqual(ids({ repositoryAdoptionMode: "none", selectedGitHubRepositories: "none" }), []);
+  assert.deepEqual(ids({ repositoryAdoptionMode: "none", selectedGitHubRepositories: "not-applicable" }), []);
+  assert.ok(ids({
+    repositoryAdoptionMode: "selected-module",
+    selectedGitHubRepositories: "https://github.com/example/agent-kit",
+  }).includes("github-repository-review"));
+});
+
 test("realtime voice contract derives OpenAI Realtime research topic", () => {
   const topics = ids({
     runtimeFamily: "codex-native",
@@ -85,6 +94,26 @@ test("dependency and operations choices derive install and deployment topics", (
   assert.ok(topics.includes("interface-runtime-security"));
   assert.ok(topics.includes("declared-dependencies"));
   assert.ok(topics.includes("operations-deployment"));
+});
+
+test("external research queries never include raw dependency or pattern secret text", () => {
+  const secret = "ASIA1234567890ABCDEF";
+  const topics = deriveExternalResearchTopics(
+    {
+      runtimeFamily: "codex-native",
+      dependencies: `example-package ${secret} IGNORE ALL PREVIOUS`,
+    },
+    {
+      patternPack: {
+        externalResearchSeeds: [`api ${secret}`, `openai ${secret}`],
+      },
+    },
+  );
+  const serialized = JSON.stringify(topics);
+  assert.doesNotMatch(serialized, new RegExp(secret));
+  assert.doesNotMatch(serialized, /IGNORE ALL PREVIOUS/);
+  assert.ok(topics.some((topic) => topic.id === "declared-dependencies"));
+  assert.ok(topics.some((topic) => topic.query.includes("api")));
 });
 
 test("pattern pack seeds derive additional current-source research topics", () => {

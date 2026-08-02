@@ -1,4 +1,5 @@
 .env.example
+.gitignore
 07_workflows/agent-operating-workflow.md
 AGENTS.md
 README.md
@@ -23,6 +24,7 @@ scripts/healthcheck.mjs
 scripts/interface-status.mjs
 scripts/memory-status.mjs
 scripts/operations-status.mjs
+scripts/redaction.mjs
 scripts/skills-status.mjs
 scripts/smoke-test.mjs
 scripts/tools-status.mjs
