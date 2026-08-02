@@ -20,7 +20,6 @@ tools:
   - GitHub CLI
 sources:
   - source-158d0f80-16d8-4c74-8682-a23238004060
-  - https://github.com/Panniantong/Agent-Reach
 related:
   intakes:
     - 00_inbox/links/2026-07-20-cross-platform-agent-web-access-intake.md
