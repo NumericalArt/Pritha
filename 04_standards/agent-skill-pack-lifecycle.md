@@ -3,8 +3,8 @@ id: agent-skill-pack-lifecycle
 type: standard
 status: draft
 created: 2026-05-30
-updated: 2026-07-13
-last_reviewed: 2026-07-13
+updated: 2026-08-09
+last_reviewed: 2026-08-09
 owner: Pritha
 topics: [agent-skills, pritha, agent-factory, procedural-memory, supply-chain-security]
 tools: [Pritha, Codex, Agent Skills, Hermes Agent]
@@ -14,6 +14,9 @@ sources:
   - 02_briefs/2026-05-17-hermes-agent-architecture-brief.md
   - 04_standards/agent-tool-integration-selection.md
   - 03_reviews/2026-06-02-agent-skills-source-batch-review.md
+  - 03_reviews/2026-08-09-agent-runtime-control-plane-research-assessment.md
+  - https://arxiv.org/abs/2608.05223
+  - https://arxiv.org/abs/2607.25619
 related:
   workflows:
     - 07_workflows/agent-skill-pack-selection.md
@@ -26,10 +29,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-30
-source_updated: 2026-07-13
-source_version: Pritha skill pack lifecycle v3 + fail-closed local catalog implementation
+source_updated: 2026-08-05
+source_version: Pritha skill pack lifecycle v4 + fail-closed catalog, quarantine and empirical malicious-skill evidence
 retrieved: 2026-05-30
-verified: 2026-07-13
+verified: 2026-08-09
 valid_for: Pritha-created Codex-native agent scaffolds
 temporal_status: current
 memory_domain: agent-building-knowledge
@@ -85,6 +88,12 @@ candidate-only until a dedicated pinned-bundle workflow is implemented.
   reading any installed `SKILL.md`; fail closed on drift. The child uses the same
   secret/private-endpoint and prompt-injection scanner as Pritha for installed
   files and all skill metadata, including blocked candidates.
+- Keep external candidate bundles in a non-active quarantine location. Scanning,
+  rendering or describing a candidate must not make it discoverable as an
+  installed skill.
+- Pre-install scanning is one signal, not authorization. A clean scan does not
+  replace provenance, license, complete-bundle review, content locking,
+  contract permissions, isolated smoke evaluation and explicit activation.
 - External skills are supply-chain input. The future activation workflow requires provenance, license, complete bundle identity, hash, trust review, prompt-injection review, evals and explicit user approval; approval text alone does not activate them today.
 - Official catalogs, official organization repositories and CLI installers are discovery sources, not trust decisions. A skill found through them still requires inspection, pinning and approval before Pritha activates it in a child scaffold.
 - External skills must be pinned to a tag, commit or tree SHA when vendored or linked. Runtime floating installs are not allowed by default.
@@ -107,6 +116,11 @@ Before a candidate skill can become installed, review:
 - compatibility with the selected runtime host;
 - expected install/update mechanism.
 
+Do not execute a candidate's setup, tests, hook scripts or examples merely to
+inspect it. If dynamic evaluation is justified, use an isolated disposable
+environment with no production credentials, no private workspace mounts,
+deny-by-default egress and bounded side effects.
+
 ## Evaluation
 
 A skill is not promoted only because it reads well. For recommended or installed
@@ -119,6 +133,10 @@ skills, Pritha should define lightweight eval cases that check:
 - output artifact format and quality;
 - cleanup and side effects;
 - regression score after skill updates or model/runtime changes.
+- refusal or quarantine behavior for adversarial instructions disguised as
+  mandatory setup, preflight, validation or environment checks;
+- activation behavior when scanner, manifest, lock, license or content hash is
+  missing, ambiguous or inconsistent.
 
 If a child agent uses a local or small language model path, skill selection must
 be evaluated for that model family. Do not assume that a skill helpful to a
@@ -140,3 +158,15 @@ policy, includes dangerous command patterns, has unknown provenance, depends
 directly on generated wiki pages, hides instructions in references/assets, uses
 unreviewed network calls, cannot be pinned, fails trigger/side-effect evals, or
 asks for broad runtime mutation without contract approval.
+
+## Evidence Boundary
+
+2026 malicious-skill research reports high execution rates when harmful commands
+are disguised as benign skill procedures. Treat the reported numbers as
+preprint, setup-specific evidence, not universal exploit probabilities.
+
+The associated AgentJailbreak repository contains live adversarial commands and
+has no detected repository license as of 2026-08-09. It is evidence for threat
+modeling only and is not an approved dependency, skill source or vendorable
+module. Likewise, the SkillGate paper supports layered pre-install analysis but
+does not make any similarly named package or service an approved Pritha tool.

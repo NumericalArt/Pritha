@@ -3,8 +3,8 @@ id: agent-trajectory-control-and-evidence
 type: standard
 status: draft
 created: 2026-07-24
-updated: 2026-07-24
-last_reviewed: 2026-07-24
+updated: 2026-08-09
+last_reviewed: 2026-08-09
 owner: Pritha/user
 topics:
   - agent-engineering
@@ -52,6 +52,13 @@ sources:
   - https://developers.googleblog.com/evolving-spec-driven-development-conductor-now-supports-antigravity/
   - https://developers.googleblog.com/en/building-scalable-ai-agents-with-modular-prompt-transpilation/
   - https://developer.nvidia.com/blog/mastering-agentic-techniques-ai-agent-reinforcement-learning/
+  - 03_reviews/2026-08-09-agent-runtime-control-plane-research-assessment.md
+  - https://arxiv.org/abs/2608.00808
+  - https://arxiv.org/abs/2608.01964
+  - https://github.com/AMAP-ML/LongHorizon-Harness
+  - https://arxiv.org/abs/2607.26637
+  - https://arxiv.org/abs/2608.02499
+  - https://github.com/Trae1ounG/SWE-Touch
 related:
   assessments:
     - 03_reviews/2026-07-24-production-agent-operating-layer-assessment.md
@@ -70,10 +77,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-07-13
-source_updated: 2026-07-20
-source_version: Pritha trajectory control standard v1; primary sources verified 2026-07-24
+source_updated: 2026-08-05
+source_version: Pritha trajectory control standard v2; execution-ledger, workspace-freshness and typed-lifecycle evidence verified 2026-08-09
 retrieved: 2026-07-24
-verified: 2026-07-24
+verified: 2026-08-09
 valid_for: Pritha and child-agent runs that are long-running, proactive, parallel, permission-bearing or capable of external side effects
 temporal_status: current
 memory_domain: agent-building-knowledge
@@ -93,7 +100,7 @@ confidence: high
 
 Status: draft
 Owner: Pritha/user
-Last reviewed: 2026-07-24
+Last reviewed: 2026-08-09
 
 ## Rule
 
@@ -186,6 +193,67 @@ without storing private chain-of-thought:
 Prefer append-only structured events. Summarize tool inputs and outputs when raw
 payloads contain secrets, personal data, copyrighted material or untrusted
 content.
+
+## Execution Ledger
+
+Every resumable or multi-round run must maintain a compact machine-readable
+ledger separate from conversational memory. At minimum record:
+
+- objective/specification version;
+- current lifecycle state and reason code;
+- workspace or external-state revision;
+- verified facts and their evidence references;
+- unverified executor claims;
+- created or changed artifacts;
+- next action, blocker and owner;
+- budget and policy state;
+- last successful independent verification.
+
+Do not promote an executor claim to a verified fact because it was summarized,
+repeated, compacted or written to memory. Promotion requires deterministic or
+independent evidence.
+
+The ledger is an execution primitive, not authored long-term knowledge. Store it
+in runtime state with the privacy and retention policy of the run. Promote only
+curated, non-sensitive lessons to tracked Markdown.
+
+## Workspace and External-State Freshness
+
+Evidence is valid only for the state it observed. Bind checks and completion
+claims to a `workspace_revision` or equivalent state token such as Git SHA,
+database version, object ETag, API revision or normalized snapshot hash.
+
+Before a write, resume or completion decision:
+
+1. compare the current state token with the token used by the plan and evidence;
+2. classify any change as expected, authoritative user/external change, worker
+   output or unexplained drift;
+3. preserve authoritative changes;
+4. invalidate or selectively rerun stale checks;
+5. record the new state token and reconciliation decision.
+
+For coding agents, eval at least one case where a user edits a critical file
+after the agent has read it. The agent must detect the stale workspace and must
+not overwrite the user's newer intent from cached context.
+
+## Typed Pause and Resume
+
+Use structured states and reason codes rather than free-text status alone.
+Recommended lifecycle states are `running`, `input_required`, `paused`,
+`budget_exhausted`, `blocked`, `verifying`, `complete`, `cancelled` and
+`failed`.
+
+Resume must revalidate:
+
+- run-contract and instruction version;
+- workspace/external-state revision;
+- credential lease and permission scope;
+- remaining budgets;
+- pending external effects and approval gates;
+- monitor and verifier availability.
+
+Protocol- or vendor-specific statuses should map into this internal lifecycle;
+they must not become the only source of truth.
 
 ## Monitor Independence
 
@@ -354,10 +422,11 @@ Before this standard becomes active:
 
 ## Temporal Validity
 
-- Primary evidence window: 2026-07-13 through 2026-07-20.
-- Retrieved and verified: 2026-07-24.
+- Primary evidence window: 2026-07-13 through 2026-08-05.
+- Retrieved and verified: 2026-08-09.
 - Valid for: Pritha and child-agent production architecture from 2026-07-24
-  until a material change in runtime, monitoring or incident evidence.
+  until a material change in runtime, monitoring, workspace-concurrency or
+  incident evidence.
 - Recheck when: Pritha adds a durable worker runtime, autonomous credential
   management, production deployment permissions, a fleet control plane or a
   local forensic route.

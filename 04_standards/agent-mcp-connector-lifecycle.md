@@ -3,8 +3,8 @@ id: agent-mcp-connector-lifecycle
 type: standard
 status: draft
 created: 2026-06-01
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-08-09
+last_reviewed: 2026-08-09
 owner: Pritha
 topics: [mcp, agent-connectors, agent-factory, harness-engineering, tool-use, security]
 tools: [Pritha, MCP, Codex, Agent Skills]
@@ -19,6 +19,8 @@ sources:
   - https://modelcontextprotocol.io/development/roadmap
   - https://modelcontextprotocol.io/community/skills-over-mcp/charter
   - https://modelcontextprotocol.io/seps/2575-stateless-mcp
+  - https://blog.modelcontextprotocol.io/posts/2026-07-28/
+  - https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/
   - https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1649
   - https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
   - https://github.com/github/github-mcp-server
@@ -27,6 +29,7 @@ sources:
   - https://www.docker.com/blog/connect-codex-to-mcp-servers-mcp-toolkit/
   - 03_reviews/2026-06-02-remote-mcp-source-batch-review.md
   - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
+  - 03_reviews/2026-08-09-agent-runtime-control-plane-research-assessment.md
 related:
   workflows:
     - 07_workflows/agent-mcp-connector-selection.md
@@ -41,10 +44,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-17
-source_updated: 2026-06-02
-source_version: Pritha MCP connector lifecycle v4; MCP/GitHub MCP references plus Codex/Docker/remote MCP and agentic UI source batches
+source_updated: 2026-07-28
+source_version: Pritha MCP connector lifecycle v5; MCP 2026-07-28 stateless core, discovery, MRTR and extension migration
 retrieved: 2026-06-01
-verified: 2026-06-02
+verified: 2026-08-09
 valid_for: Pritha-created agents that may use external MCP servers or MCP-style connectors
 temporal_status: current
 memory_domain: agent-building-knowledge
@@ -230,18 +233,48 @@ Before enabling an external MCP server:
 Tool poisoning and rug-pull drift are blocking risks for untrusted or broad MCP
 servers.
 
+## MCP 2026-07-28 Compatibility Boundary
+
+The 2026-07-28 protocol release makes the core request model stateless. Do not
+assume that a server receives a mandatory initialization handshake, durable
+session identifier or prior-request capabilities. Identity, protocol version
+and capabilities required for one request must be available on that request or
+through an explicitly selected extension.
+
+For every connector, record:
+
+- negotiated protocol version;
+- legacy initialization/session dependence;
+- discovery method and fallback;
+- whether list responses support safe caching and invalidation;
+- whether elicitation uses multi-round tool requests (MRTR);
+- selected extensions such as Tasks;
+- client/server compatibility test evidence.
+
+During migration, use a version-aware adapter. It may support both legacy and
+2026-07-28 behavior, but it must not silently emulate session state in a way that
+changes authorization, tenant identity or replay semantics.
+
+MRTR `input_required` is a protocol interaction state, not blanket permission to
+ask for secrets or approve side effects. Map it into the agent's typed lifecycle,
+apply privacy rules to requested input and preserve human approval gates.
+
+MCP request headers and cacheable catalogs improve routing and efficiency but
+also create trust boundaries. Gateways must validate header-derived identity,
+vary caches by the relevant authorization/capability scope and avoid leaking
+one tenant's tools or metadata to another.
+
 ## Emerging MCP Directions
 
 Track these as `watch` or `experiment` unless a child-agent contract explicitly
 requires them and current client/server support is verified:
 
-- stateless or sessionless MCP transport patterns for horizontally scaled
-  services;
 - MCP Server Cards and `.well-known` discovery metadata;
 - Skills Over MCP for distributing procedural knowledge through MCP resources or
   extensions;
 - MCP Apps / UI resources for interactive widgets;
-- MCP Tasks for long-running or human-in-the-loop tool work.
+- MCP Tasks for long-running or human-in-the-loop tool work where current
+  client/server extension support is verified.
 
 These directions can improve enterprise operation, but they are version-bound.
 Recheck official MCP Roadmap, SEPs, extension docs and client support before
@@ -379,11 +412,11 @@ only when the child agent contract requires it.
 ## Temporal Validity
 
 - Source published: 2026-05-17.
-- Source updated: 2026-06-02.
-- Source version: Pritha MCP connector lifecycle v3; prior Techscope memory,
-  MCP/GitHub MCP references and Codex/Docker/remote MCP source batches reviewed.
+- Source updated: 2026-07-28.
+- Source version: Pritha MCP connector lifecycle v5; MCP 2026-07-28 stateless
+  core, discovery, MRTR and extensions plus prior connector source batches.
 - Retrieved: 2026-06-01.
-- Verified: 2026-06-02.
+- Verified: 2026-08-09.
 - Valid for: Pritha-created agents that may use external MCP servers or
   MCP-style connectors.
 - Freshness status: current.
