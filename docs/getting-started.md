@@ -1,126 +1,149 @@
 # Getting Started
 
-## Fresh Clone
+## Core: Start In Codex
 
-The simplest path is to use Codex as the installer. Download or clone the
-repository, open the project folder in Codex, and say something like:
+The simplest path is to use Codex as the Pritha workbench and installer:
 
-```text
-Install this project.
-```
-
-or:
+1. Download or clone the repository.
+2. Open the project folder in Codex.
+3. Say:
 
 ```text
-Set up and run Pritha locally.
+Set up and start Pritha.
 ```
 
-Codex should inspect the repo instructions and run the required bootstrap
-commands for you. The commands below are the manual equivalent and are useful
-when you want to see or run each step yourself.
+Codex reads `AGENTS.md` and the setup workflow, checks the environment, installs
+the selected local dependencies, rebuilds local memory, and verifies that
+Pritha is ready. You can then continue working with Pritha in the same Codex
+task.
 
-Clone Pritha and run the bootstrap plan first:
+This core path does not require Control Center, Voice, Tailscale, Telegram, or
+hosted-model credentials. It does not silently start a server or install a
+background service.
+
+Core is ready when bootstrap completes and local memory validation and semantic
+search pass. Ask Codex to resolve any reported prerequisite rather than running
+unrelated setup commands manually.
+
+## Manual Core Setup
+
+If you prefer the shell, clone Pritha and run the canonical bootstrap command:
 
 ```sh
 git clone https://github.com/NumericalArt/Pritha.git pritha
 cd pritha
-node scripts/bootstrap.mjs plan --profile minimal
+node scripts/bootstrap.mjs prepare --profile local
 ```
 
-Then verify the minimal local environment:
+The command installs the local profile dependencies, writes non-secret setup
+state, rebuilds SQLite and embeddings from tracked Markdown, and verifies the
+result. See [Prerequisites](prerequisites.md) for the supported Node.js, Python,
+Git, and SQLite versions.
+
+By default, local configuration is written to `.env.local` and non-secret setup
+state to `.techscope-setup.json`; both are ignored by Git. When
+`PRITHA_STATE_ROOT` is configured, generated and private runtime state belongs
+under that external state root instead of the checkout.
+
+Do not copy `.env.example` as a mandatory fresh-clone step. Real credentials are
+optional and must remain local and untracked.
+
+## Use Pritha
+
+You can now work in natural language. For example:
+
+```text
+Create an agent that reviews research links and reports meaningful changes.
+```
+
+This starts the agent-contract interview. The CLI fallback is:
 
 ```sh
-node scripts/bootstrap.mjs verify --profile minimal
+node scripts/pritha.mjs interview
 ```
 
-For the local Control Center:
+Pritha records the mission, runtime, interfaces, memory, tools, permissions,
+research requirements, tests, and operating boundaries before scaffolding a
+production agent. Generated descendants are sibling projects resolved through
+`PRITHA_AGENT_PARENT` or, for legacy compatibility, the checkout parent.
+
+To add knowledge, put new material in `00_inbox/` or give it to Codex directly,
+then ask Pritha to verify and turn it into a brief, assessment, review, decision,
+or standard. Markdown remains the authored source of truth.
+
+## Optional Functional UI And Voice
+
+Control Center and its integrated Voice interface are active, functional
+operator surfaces. They are optional because the full core workflow works in
+Codex without them.
+
+Prepare and start Control Center with:
 
 ```sh
 node scripts/bootstrap.mjs --profile local --start control-center
 ```
 
-Bootstrap writes local settings to `.env.local` and non-secret setup state to
-`.techscope-setup.json`. Both are gitignored. The start command runs the
-Control Center in the foreground and does not install a service.
+This installs the locked UI dependencies when needed, verifies the selected
+profile, and runs Control Center in the foreground on localhost. It does not
+install launchd, cron, Tailscale, credentials, or another durable service.
 
-In another terminal, you can verify the running UI without changing runtime
-state:
+The active routes include:
+
+- `/agents` for child-agent state and actions;
+- `/voice` for realtime Voice operation;
+- `/settings` for local operator configuration;
+- `/dev` for read-only diagnostics.
+
+Some Voice capabilities use hosted realtime models and therefore require
+explicit credentials and may incur provider costs. See [Realtime and
+Voice](realtime.md) for readiness and privacy boundaries.
+
+Verify a running UI from another terminal:
 
 ```sh
 npm run control-center:health
 ```
+
+## Optional Private-Device And External Access
+
+`localhost` and `127.0.0.1` work only on the machine running Pritha. A localhost
+URL or QR code will not open the service from a phone.
+
+Use the separate [Tailscale Private Access](tailscale-private-access.md) workflow
+for a trusted phone or laptop. Tailscale installation, authentication, Serve,
+and every other mutating network action require explicit operator approval.
+Public Funnel exposure and LAN binding are not supported defaults.
+
+Telegram, hosted model calls, web integrations, deployment, and long-running
+services are also opt-in surfaces. They are not part of core onboarding and
+must follow their own credential, privacy, and approval policies.
 
 ## Bootstrap Profiles
 
-- `minimal`: check Node.js, Git, Python, sqlite3 and authored memory.
-- `local`: install portable Python dependencies and local setup state.
-- `control-center`: install Control Center dependencies from lockfile, then
-  typecheck and build the UI.
-- `control-center-tailscale`: detect Tailscale readiness only. It does not
-  install Tailscale, authenticate the device or configure Serve.
+- `minimal`: check prerequisites and authored/local memory without installing
+  the full semantic profile.
+- `local`: install portable local dependencies, rebuild SQLite and embeddings,
+  and verify semantic memory and configured local tools.
+- `control-center`: add locked Control Center dependencies, typecheck, and build.
+- `control-center-tailscale`: detect Tailscale readiness only; it does not
+  install Tailscale, authenticate, or configure Serve.
 
-## Ready After Clone
-
-Without secrets, Pritha can plan and verify setup, validate memory, create and
-review agent contracts, inspect generated projects and run local tests. Control
-Center works locally after the Control Center profile installs dependencies.
-
-Optional credentials are still needed for hosted model calls, Realtime voice,
-Telegram, GitHub publishing and any external service. Tailscale private access
-and all durable services require separate explicit operator approval.
-
-For private phone or laptop access through Tailscale, use the guided flow in
-[Tailscale Private Access](tailscale-private-access.md).
-
-`localhost` and `127.0.0.1` work only on the Mac that runs Control Center. A
-QR code with a localhost URL will not open Pritha from a phone, because on the
-phone it points back to the phone itself. Use Tailscale for the private phone
-path. LAN binding is disabled by policy in this build.
-
-The Settings page can show Codex subscription limits through the Codex App
-Server. If the Limits panel reports a protocol or `app-server` error, check
-that `.env.local` points `PRITHA_REALTIME_CODEX_BIN` to the Codex.app bundled
-binary, not an older Homebrew `codex-cli` shim. The `Usage Dashboard` button
-opens the external ChatGPT/Codex usage page:
-<https://chatgpt.com/codex/settings/usage>.
-
-## Create Your First Seed
-
-Start with the interview outline:
+Useful read-only plans:
 
 ```sh
-node scripts/pritha.mjs questions
+node scripts/bootstrap.mjs plan --profile minimal
+node scripts/bootstrap.mjs plan --profile local
+node scripts/bootstrap.mjs plan --profile control-center
 ```
 
-Then create a draft Seed:
-
-```sh
-node scripts/pritha.mjs create --name "research-agent" --mission "Track and review research links"
-```
-
-Review the generated file in `11_agents/contracts/`. Scaffold only from an
-accepted contract after Pritha memory research has been performed.
-
-## Scaffold a Descendant
-
-```sh
-node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-research-agent-agent-contract.md
-```
-
-The default `sibling of Pritha` target resolves through `PRITHA_AGENT_PARENT`
-(or the checkout parent in the legacy layout). Use the absolute project path
-printed by `create` for the subsequent `test`, `publish` and operations
-commands. Reserve `--output` for an intentional override.
-
-## Add Knowledge
-
-Place new material in `00_inbox/`, then create a brief, assessment, decision or standard. Markdown carries the authored knowledge; `.memory/` carries the portable SQLite/embeddings snapshot.
-
-## Verify
+## Verification And Help
 
 ```sh
 node scripts/bootstrap.mjs verify --profile minimal
+node scripts/pritha.mjs registry
 node scripts/quality-gate.mjs
-npm run control-center:health
-node scripts/pritha.mjs lineage
 ```
+
+For setup failures, see [Troubleshooting](troubleshooting.md). For operational
+status, private access, or service installation, follow [Operations](operations.md)
+instead of enabling background processes ad hoc.

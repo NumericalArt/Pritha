@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 
-function text(path) {
-  return readFileSync(path, "utf8");
+function text(filePath) {
+  return readFileSync(filePath, "utf8");
 }
 
 test("public install docs use bootstrap as the fresh-clone entrypoint", () => {
@@ -31,11 +32,65 @@ test("public install docs use bootstrap as the fresh-clone entrypoint", () => {
   }
 });
 
-test("README defines Pritha as a local-first child-agent factory", () => {
+test("README presents the Codex-first core before optional operator surfaces", () => {
   const body = text("README.md");
-  assert.match(body, /local-first, voice-first Control Center/i);
-  assert.match(body, /Codex-native agent factory and operator console/i);
-  assert.match(body, /improve its own\s+agent-building knowledge/i);
-  assert.match(body, /create focused child agents with explicit contracts/i);
-  assert.match(body, /does not install\s+launchd, cron, Tailscale, durable services,? or credentials/);
+  const startPosition = body.indexOf("## Start In Codex");
+  const optionalPosition = body.indexOf("## Optional Control Center And Voice");
+
+  assert.match(body, /local-first, Codex-native agent foundry and knowledge OS/i);
+  assert.match(body, /primary workbench is a Codex task/i);
+  assert.match(body, /Set up and start Pritha\./);
+  assert.match(body, /bootstrap\.mjs prepare --profile local/);
+  assert.ok(startPosition >= 0 && optionalPosition > startPosition, "Codex start should precede the optional UI section");
+  assert.doesNotMatch(body, /local-first, voice-first Control Center/i);
+});
+
+test("public docs describe Control Center and integrated Voice as active, functional, and optional", () => {
+  const readme = text("README.md");
+  const gettingStarted = text("docs/getting-started.md");
+  const architecture = text("docs/architecture.md");
+
+  assert.match(readme, /active, functional operator surfaces/i);
+  assert.match(readme, /they are optional/i);
+  assert.match(gettingStarted, /active, functional\s+operator surfaces/i);
+  assert.match(architecture, /active,\s+functional operator layer/i);
+  assert.match(readme, /does not\s+install launchd, cron, Tailscale, credentials, or a durable service/i);
+});
+
+test("interface manifests distinguish current Control Center and integrated Voice from legacy Voice", () => {
+  const interfaces = JSON.parse(text("interfaces/manifest.json"));
+  const controlCenterManifest = JSON.parse(text("interfaces/control-center/manifest.json"));
+  const controlCenter = interfaces.adapters.find((adapter) => adapter.name === "pritha-control-center");
+  const legacyVoice = interfaces.adapters.find((adapter) => adapter.name === "pritha-voice-control");
+
+  assert.equal(interfaces.primary_interface, "Codex project");
+  assert.equal(controlCenter?.status, "active");
+  assert.equal(controlCenterManifest.status, "active");
+  assert.equal(legacyVoice?.status, "deprecated");
+  assert.equal(legacyVoice?.replaced_by, "pritha-control-center");
+  assert.equal(legacyVoice?.replacement_url, "http://127.0.0.1:3420/voice");
+});
+
+test("README.ru points to the canonical public README instead of duplicating stale claims", () => {
+  const body = text("README.ru.md");
+  assert.match(body, /\[канонический README\]\(README\.md\)/);
+  assert.doesNotMatch(body, /^---$/m);
+  assert.doesNotMatch(body, /# Artifact:/);
+  assert.doesNotMatch(body, /agents-mother\.mjs/);
+});
+
+test("local Markdown links in the public packaging files resolve", () => {
+  const files = ["README.md", "README.ru.md", "docs/getting-started.md", "docs/architecture.md"];
+  const markdownLink = /(?<!!)\[[^\]]+\]\(([^)]+)\)/g;
+
+  for (const file of files) {
+    const body = text(file);
+    for (const match of body.matchAll(markdownLink)) {
+      const target = match[1].trim();
+      if (/^(?:https?:|mailto:|#)/i.test(target)) continue;
+      const pathOnly = target.split("#", 1)[0].split("?", 1)[0];
+      const resolved = path.resolve(path.dirname(file), decodeURIComponent(pathOnly));
+      assert.ok(existsSync(resolved), `${file} links to missing local target ${target}`);
+    }
+  }
 });
