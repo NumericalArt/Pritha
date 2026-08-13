@@ -2,7 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import http from "node:http";
+
+const healthRouteSource = readFileSync("interfaces/control-center/src/app/api/health/route.ts", "utf8");
+
+test("Control Center health contract reports the maintained interface as active", () => {
+  assert.match(healthRouteSource, /status:\s*"active"/);
+  assert.doesNotMatch(healthRouteSource, /status:\s*"experimental"/);
+});
 
 async function withServer(handler, fn) {
   const server = http.createServer(handler);

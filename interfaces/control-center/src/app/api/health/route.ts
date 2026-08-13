@@ -4,7 +4,7 @@ export function GET() {
   return Response.json({
     ok: true,
     service: "pritha-control-center",
-    status: "experimental",
+    status: "active",
     timestamp: new Date().toISOString(),
   });
 }
