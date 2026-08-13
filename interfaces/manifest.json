@@ -33,7 +33,7 @@
     {
       "name": "pritha-control-center",
       "mode": "local-control-center",
-      "status": "experimental",
+      "status": "active",
       "script": "npm --prefix interfaces/control-center run dev",
       "url": "http://127.0.0.1:3420"
     },

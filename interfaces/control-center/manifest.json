@@ -1,9 +1,9 @@
 {
   "id": "pritha-control-center",
   "type": "interface",
-  "status": "experimental",
+  "status": "active",
   "created": "2026-06-04",
-  "updated": "2026-06-12",
+  "updated": "2026-08-13",
   "owner": "Pritha",
   "purpose": "Local web control center for Pritha and child agents: agents overview, voice control surface, settings-lite and read-only developer diagnostics.",
   "runtime": {

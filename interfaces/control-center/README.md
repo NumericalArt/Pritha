@@ -1,10 +1,11 @@
 # Pritha Control Center
 
-Status: experimental.
+Status: active.
 
-This is the new local web UI for Pritha. It is intentionally isolated from the
-legacy web UI and from the current voice experiment while the control
-center design is being rebuilt.
+This is Pritha's functional local operator UI. It combines agent operations,
+the maintained Voice interface, settings and diagnostics in one Control Center.
+It is an optional layer: Pritha's core workflow remains available directly in
+Codex without running a web server.
 
 ## Routes
 

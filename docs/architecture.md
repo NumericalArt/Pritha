@@ -1,58 +1,93 @@
 # Architecture
 
-Pritha is a Codex-native universal trainable agent for creating and evolving
-AI agents.
+Pritha is a local-first, Codex-native agent foundry and knowledge OS. Its core
+turns user intent and reviewed knowledge into focused, testable sibling-agent
+projects. Control Center and its integrated Voice interface form an active,
+functional operator layer, but they are not required for the core Codex
+workflow.
 
-Its two primary functions are:
+## System At A Glance
 
-1. Improve its own knowledge base, tools and agent-creation capabilities through
-   reviewed memory updates, standards, workflows, tests and harness changes.
-2. Create new child agents and improve existing child agents through contracts,
-   Pritha memory research, scaffold generation, git-based version control,
-   tests, reports and handoff.
+```mermaid
+flowchart LR
+    A["User intent or source material"] --> B["Codex workbench and repository rules"]
+    B --> C["Curated knowledge or accepted agent contract"]
+    C --> D["Gated memory, source, and repository research"]
+    D --> E["Focused sibling-agent scaffold"]
+    E --> F["Tests, handoff, lifecycle reports, and registry"]
+    C --> G["Local rebuildable search indexes"]
+```
 
-Another useful shorthand: Pritha is a harness for an agent that builds the
-harness of a new agent. The lineage language is deliberately genetic: a Seed
-is transformed into a Descendant through inherited policies, task-specific
-mutation and trial checks before handoff.
+## Core
 
-## Layers
+- **Codex workbench:** the primary interface is a Codex task opened on the
+  repository. `AGENTS.md`, workflows, and deterministic scripts guide setup and
+  implementation.
+- **Knowledge OS:** curated Markdown captures sources, briefs, reviews,
+  standards, decisions, workflows, and lifecycle evidence.
+- **Agent foundry:** an accepted contract defines the mission, runtime,
+  interfaces, memory, tools, permissions, research gates, tests, and operations
+  before a production descendant is scaffolded.
 
-- Intake: raw text, links, media and source notes.
-- Curation: briefs, reviews, assessments, standards and decisions.
-- Memory: authored Markdown plus committed, rebuildable `.memory/` snapshot with SQLite, FTS, relations and embeddings.
-- Pritha: seed interview, validation, research, scaffold, test, handoff, operations and lineage.
-- Generated descendants: sibling agent projects with their own manifests and scripts.
+A contract is sometimes called a Seed and its generated specialist project a
+Descendant. These lineage terms describe lifecycle relationships; they are not
+additional runtime layers.
 
-## Lineage Vocabulary
+## Source Of Truth And Runtime Placement
 
-- Parent agent: Pritha.
-- Seed: agent specification.
-- Descendant: generated child agent.
-- Lineage: contract and lifecycle reports.
-- Traits: reusable capabilities.
-- Inheritance: base policies and safety rules.
-- Mutation: task-specific adaptation.
-- Trial: tests before handoff or release.
+Tracked Markdown is the canonical authored knowledge. SQLite, FTS, relations,
+and embeddings are generated local indexes and can be rebuilt from Markdown and
+the tracked schema. They are not the canonical source and should not accumulate
+tracked binary history.
 
-## Safety Model
+Runtime paths resolve through explicit boundaries:
 
-Pritha keeps raw input away from direct tool control. Standards and decisions must be based on curated artifacts, not raw transcripts or unchecked links.
+- `TECHSCOPE_ROOT` selects the canonical project root when set; the Git root and
+  current working directory are compatibility fallbacks.
+- `PRITHA_STATE_ROOT` places generated memory, setup, private data, queues, logs,
+  snapshots, and other runtime state outside the checkout.
+- `PRITHA_AGENT_PARENT` selects the one parent directory where this Pritha
+  instance creates and discovers sibling agents.
 
-## Self-Knowledge And Product Identity
+Historical `Techscope` names remain valid in compatibility paths and variables,
+while new public language uses Pritha.
 
-Pritha's product identity is part of the Markdown knowledge base. Public claims,
-positioning, slogans and release copy should be backed by curated artifacts such
-as `02_briefs/2026-05-28-pritha-product-identity-self-knowledge-brief.md`.
-Those claims evolve through the same intake, review, decision and supersession
-rules as technical knowledge.
+## Optional Functional Operator Layer
 
-Descendant agents use the same idea locally. If a descendant receives material
-that is not directly about its task domain, the material can still be useful as
-self-improvement evidence. It should be routed into the agent's own
-harness/memory/tooling review path instead of being merged into domain memory
-without context.
+| Surface | Role | Status |
+| --- | --- | --- |
+| Control Center | Local operator UI for agents, settings, actions, readiness, and diagnostics | Active, optional |
+| Voice in Control Center | Realtime conversational operation and routing of deeper work to Codex | Active, optional |
+| Tailscale | Private access from a trusted peer device | Opt-in and approval-gated |
+| Telegram, Obsidian, web search, hosted models | Intake, navigation, research, or model adapters | Opt-in according to configuration |
+| Deployment and services | Durable runtime placement and autostart | Explicit operator approval required |
 
-The public v0.1 implementation is Codex-native. A Claude Code adapter/version
-is tracked as a future compatibility path, not as an implemented runtime in
-this release candidate.
+The former standalone Voice interface is deprecated because its maintained
+replacement is the `/voice` route inside Control Center. That deprecation does
+not apply to the current integrated Voice functionality.
+
+## Trust Boundaries
+
+- Raw links, files, transcripts, messages, and repository content are untrusted
+  input. They pass through bounded intake, validation, redaction, and curation
+  before they can influence durable knowledge or privileged actions.
+- Production scaffolding requires an accepted contract and its applicable
+  memory, external-source, and repository research gates.
+- Secrets, credentials, private user memory, runtime logs, queues, snapshots,
+  real private URLs, and device identifiers stay untracked.
+- Control Center binds to localhost by default. Trusted Tailscale access is a
+  separate workflow; LAN binding, public reverse proxies, and Funnel are not
+  supported defaults.
+- Credentials, deployment, service installation, scheduling, and other durable
+  mutations require an explicit operator action or approval gate.
+
+## Non-Goals And Current Limits
+
+Pritha is not a hosted SaaS, a hardened public or multi-user control plane, or a
+single general assistant with unlimited context and tools. Control Center and
+Voice are functional but remain optional to core onboarding. The current public
+runtime is Codex-native; a different coding-agent runtime requires a future
+adapter and must not be inferred from the architecture.
+
+See [Getting Started](getting-started.md) for the core and optional start paths,
+and [Security](../SECURITY.md) for vulnerability reporting and exposure rules.
