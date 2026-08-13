@@ -3,8 +3,8 @@ id: agent-team-operating-model
 type: standard
 status: draft
 created: 2026-05-27
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-08-13
+last_reviewed: 2026-08-13
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -27,6 +27,8 @@ sources:
   - https://hermes-agent.nousresearch.com/docs/user-guide/features/delegation/
   - 04_standards/agent-proactivity-scheduling.md
   - 03_reviews/2026-06-02-agent-scheduling-heartbeat-source-batch-review.md
+  - 03_reviews/2026-08-13-swarm-forge-repository-assessment.md
+  - https://github.com/unclebob/swarm-forge/tree/9acd54d2239fef7e41ddacd8fd30dfb0e69672fe
 related:
   decisions: []
   reviews:
@@ -36,23 +38,36 @@ related:
     - 02_briefs/2026-05-27-hermes-agent-team-operating-model-brief.md
   workflows:
     - 07_workflows/agents-mother.md
+  assessments:
+    - 03_reviews/2026-08-13-swarm-forge-repository-assessment.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-04
-source_updated: 2026-06-02
-source_version: Techscope draft standard v2; Hermes docs plus proactivity scheduling source batch
+source_updated: 2026-08-12
+source_version: Pritha draft standard v3; durable handoff, queue liveness and role-topology evidence
 retrieved: 2026-05-27
-verified: 2026-06-02
+verified: 2026-08-13
 valid_for: Agents Mother role/team design from 2026-05-27 onward
 temporal_status: current
+memory_domain: agent-building-knowledge
+memory_domains:
+  - agent-building-knowledge
+  - governance
+subject:
+  kind: standard
+  id: agent-team-operating-model
+privacy: public
+retention: durable
+review_status: draft
+confidence: high
 ---
 
 # Standard: agent-team-operating-model
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-02
+Last reviewed: 2026-08-13
 
 ## Rule
 
@@ -108,6 +123,67 @@ context/tool sprawl.
 - Route long-running coding, media or verification work to a worker runtime with
   logs and completion criteria.
 
+## Durable Handoff Contract
+
+When roles exchange work asynchronously, the handoff must be durable and typed.
+A chat message, terminal keystroke or model-visible notification is not an
+authoritative task record.
+
+Record at minimum:
+
+- stable handoff and task identifiers;
+- sender and recipient roles;
+- task-contract/instruction revision;
+- immutable artifact or workspace revision;
+- priority and lifecycle state;
+- created, claimed, completed or failed timestamps;
+- current owner or lease;
+- required verifier and acceptance condition.
+
+Use atomic publish and claim operations. One worker should have at most one
+current task unless its contract explicitly selects batch mode. Batch membership
+and ordering must be deterministic.
+
+Keep transport and notification separate:
+
+- the durable inbox/queue is the source of truth;
+- a wake-up is an idempotent hint;
+- the runtime must reconcile queued-but-unclaimed and stale claimed work;
+- missed notifications must trigger bounded re-notification or operator alert;
+- restart must recover current and queued work without relying on transcript
+  memory;
+- health status must expose queue age, owner, attempt count and failure class.
+
+Validate recipients and artifact revisions before delivery. Use a deterministic
+merge/apply tool with typed output, or unambiguous natural-language instructions;
+do not generate prose that resembles a nonexistent shell command.
+
+Runtime queue state, raw handoff payloads and worker traces belong in the
+instance state root. Promote only curated, non-sensitive lessons into tracked
+Markdown.
+
+## Worktree Boundary
+
+A worktree can reduce branch collisions and clarify ownership, but it is not a
+sandbox. A team contract must separately decide process, filesystem, network,
+credential, port, service, cache and database isolation. Avoid assigning an
+autonomous writing role directly to the operator's main checkout when a
+dedicated worktree is practical.
+
+## Topology Escalation
+
+Start with the smallest topology that can provide the required evidence:
+
+1. one executor for simple, reversible, locally verified work;
+2. executor plus fresh verifier for meaningful correctness risk;
+3. coordinator plus narrow workers when parallel ownership or distinct tools
+   materially help;
+4. specialist pipeline only when separate specification, implementation,
+   architecture, hardening or QA gates improve measured accepted-result quality.
+
+Do not add roles only to imitate a software organization. Every additional role
+must justify its context, latency, cost, merge traffic and failure surface.
+
 ## Role patterns
 
 | Role | Purpose | Watch for |
@@ -141,11 +217,11 @@ Future `agent-contract` files should answer:
 ## Temporal validity
 
 - Source published: 2026-05-04.
-- Source updated: 2026-06-02.
-- Source version: Techscope draft standard v2; Hermes docs plus proactivity
-  scheduling source batch.
+- Source updated: 2026-08-12.
+- Source version: Pritha draft standard v3; Hermes sources plus durable
+  handoff, queue-liveness and role-topology evidence.
 - Retrieved: 2026-05-27.
-- Verified: 2026-06-02.
+- Verified: 2026-08-13.
 - Valid for: Agents Mother role/team design from 2026-05-27 onward.
 - Freshness status: current.
 - Temporal status: current.
