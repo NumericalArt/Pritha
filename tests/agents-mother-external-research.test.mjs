@@ -665,7 +665,7 @@ test("GitHub repository review requires provenance and selected-module readiness
     source_url: "https://github.com/example/agent-kit",
     source_type: "official-repository",
     source_updated: TEST_NOW,
-    retrieved_at: "2026-07-13T18:00:00Z",
+    retrieved_at: TEST_NOW,
     evidence_summary: "Repository metadata, LICENSE and pinned source tree were reviewed.",
     confidence: "high",
     risk_note: "Install scripts and network permissions require bounded review.",
