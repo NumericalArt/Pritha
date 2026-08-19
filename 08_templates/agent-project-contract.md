@@ -56,6 +56,7 @@ Status: draft | accepted | superseded
 ## Purpose
 
 - Agent name:
+- Technical slug:
 - Primary mission:
 - Target user:
 - Success criteria:
@@ -86,6 +87,22 @@ Status: draft | accepted | superseded
 ### Critical user workflows
 
 -
+
+## Outcome delivery
+
+- Outcome Spec required: yes | no-with-reason
+- Outcome Spec path: proposed after contract | explicit relative path
+- Outcome approval policy: separate-explicit-user
+- Build Git mode: disposable-worktree | no-git-in-place
+- Build executor: codex-app-server | manual
+- Trial backend policy: local-or-app-server | app-server-required | local-trusted-only
+- Build iteration budget: 6
+- Build elapsed budget ms: 5400000
+- Repeated failure threshold: 3
+- Automated Trial waiver: none | concrete reason requiring user acceptance
+- Autonomous effects denied: push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation
+- Acceptance policy: verified is distinct from accepted; operator-judged Trials require explicit user acceptance
+- Correction policy: revise Outcome Spec, preserve lineage and require fresh approval
 
 ## Runtime and interface
 
@@ -417,6 +434,8 @@ values remain non-authorizing.
 
 - [ ] Contract reviewed with user.
 - [ ] Contract status is `accepted` before production scaffold.
+- [ ] Separate Outcome Spec reviewed and explicitly approved before autonomous delivery.
+- [ ] V1 functions, deliverables, safety boundaries and critical recovery paths have Trial coverage.
 - [ ] Pritha memory research completed or explicitly waived with reason.
 - [ ] Current primary sources checked for volatile choices or marked not-applicable.
 - [ ] Repository research policy, scopes and adoption mode recorded.

@@ -63,9 +63,17 @@ Retention: source-purged
 `PRITHA_STATE_ROOT`. При заданной переменной все generated memory, setup,
 private data, queues, logs, audit, snapshots, voice drafts и live agent
 registry пишутся только во внешний state-root. Отсутствие переменной сохраняет
-legacy layout внутри checkout исключительно для обратной совместимости.
+legacy layout внутри checkout исключительно для обратной совместимости, кроме
+live agent memory: она всегда остаётся вне tracked `11_agents/`.
 `PRITHA_AGENT_PARENT` задаёт единственный каталог sibling agents, доступный
 этому экземпляру; Control Center не должен показывать агентов других Pritha.
+
+Live contracts, outcome specs, research, reports, profiles и registry новых
+child agents являются instance-local данными: они пишутся в
+`<PRITHA_STATE_ROOT>/agents/`, а при отсутствии внешнего state-root — только в
+gitignored `.private/agents/`. Tracked `11_agents/` содержит общую платформенную
+историю и reference-материалы; новые child-agent артефакты не добавляются туда
+без отдельного явного promotion/review решения.
 
 Не зашивать абсолютные user-specific пути в исполняемые скрипты, launchd-шаблоны, manifest-файлы и generated scaffold. Исторические Markdown-артефакты могут содержать старые пути как контекст миграций, но не должны быть источником runtime-конфигурации.
 
@@ -134,6 +142,15 @@ node scripts/self-test.mjs
 ```sh
 node scripts/pritha.mjs interview
 ```
+
+Interview должен быть proposal-first: сначала выяснить наблюдаемый конечный
+результат, пользователя, интерфейс или headless input/output, границы v1 и
+существенные риски. Runtime, memory, tools, research, Git-режим, бюджеты и
+coverage Pritha предлагает сама из стандартов и задаёт дополнительный вопрос
+только когда ответ materially меняет результат или необратимое действие.
+Interview создаёт два разных authored artifacts: архитектурный
+`agent-contract` и пользовательский `agent-outcome-spec`; их approval нельзя
+смешивать.
 
 Если пользователь просит `tailscale`, `private access`, `phone access` или доступ к локальному Control Center с другого доверенного устройства, использовать `docs/tailscale-private-access.md` и `scripts/tailscale-setup.mjs`. По умолчанию Codex может выполнять только read-only команды:
 
@@ -208,7 +225,9 @@ node scripts/good-state-alignment.mjs --scope "<affected surface>" --limit 3
 - Технологические стандарты: `04_standards/topic.md`.
 - Решения: `05_decisions/YYYY-MM-DD-topic.md`.
 - Контракты новых агентов: `11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md`.
+- Спецификации конечного результата: `11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md`.
 - Отчеты о создании агентов: `11_agents/reports/YYYY-MM-DD-agent-name-scaffold-report.md`.
+- Отчеты outcome-driven delivery: `11_agents/reports/YYYY-MM-DD-agent-name-agent-delivery-report.md`.
 - Отчеты о тестировании агентов и существующих проектов: `11_agents/reports/YYYY-MM-DD-project-name-agent-test-report.md`.
 - Отчеты о передаче агента пользователю: `11_agents/reports/YYYY-MM-DD-project-name-agent-handoff-report.md`.
 - Операционные отчеты агентов: `11_agents/reports/YYYY-MM-DD-project-name-agent-operations-report.md`.
@@ -222,7 +241,7 @@ node scripts/good-state-alignment.mjs --scope "<affected surface>" --limit 3
 Каждый новый Markdown-артефакт должен начинаться с YAML frontmatter по шаблонам из `08_templates/`. Минимальные поля:
 
 - `id`: стабильный идентификатор.
-- `type`: `intake`, `brief`, `assessment`, `review`, `decision`, `standard`, `workflow`, `agent-contract`, `scaffold-report`, `agent-test-report`, `agent-handoff-report`, `agent-operations-report`, `agent-deployment-report`, `agent-post-creation-review`, `agent-registry`, `child-agent-profile`, `signal`, `wiki-page`, `marketing-section`, `marketing-copy` или `template`.
+- `type`: `intake`, `brief`, `assessment`, `review`, `decision`, `standard`, `workflow`, `agent-contract`, `agent-outcome-spec`, `scaffold-report`, `agent-delivery-report`, `agent-test-report`, `agent-handoff-report`, `agent-operations-report`, `agent-deployment-report`, `agent-post-creation-review`, `agent-registry`, `child-agent-profile`, `signal`, `wiki-page`, `marketing-section`, `marketing-copy` или `template`.
 - `status`: текущее состояние.
 - `created`: дата создания.
 - `updated`: дата последнего изменения.
@@ -253,7 +272,15 @@ Markdown-файлы являются canonical authored knowledge и главн�
 
 ## Agents Mother
 
-Pritha может создавать и развивать новых агентов по техническому заданию пользователя. Перед созданием нового агента обязательно оформить `agent-contract`: назначение, пользователь, функции v1, отложенные функции, runtime family, интерфейс, deployment target, модель проактивности, память, инструменты, права доступа, секреты, тесты, критерии готовности и план обучения пользователя.
+Pritha может создавать и развивать новых агентов по техническому заданию
+пользователя. Перед созданием нового агента обязательно оформить
+`agent-contract`: назначение, пользователь, функции v1, отложенные функции,
+runtime family, интерфейс, deployment target, модель проактивности, память,
+инструменты, права доступа, секреты, тесты, критерии готовности и план обучения
+пользователя. Отдельно оформить `agent-outcome-spec`: видимый конечный результат,
+journey или headless contract, deliverables, non-goals, примеры, demo и Trials.
+Contract описывает устройство и границы; Outcome Spec — то, что пользователь
+должен получить. Оба документа имеют отдельный review/approval.
 
 Scaffold допускается только из `agent-contract` со статусом `accepted`.
 Экспериментальный scaffold из `draft` возможен только с явным
@@ -327,7 +354,9 @@ repository module child smoke/healthcheck читает только bounded regu
 - стандарт `04_standards/agent-interface-experience.md`;
 - workflow `07_workflows/agent-skill-pack-selection.md`;
 - шаблон `08_templates/agent-project-contract.md`;
+- шаблон `08_templates/agent-outcome-spec.md`;
 - шаблон `08_templates/agent-scaffold-report.md`;
+- шаблон `08_templates/agent-delivery-report.md`;
 - шаблон `08_templates/agent-operations-report.md`;
 - шаблон `08_templates/agent-deployment-report.md`;
 - шаблон `08_templates/agent-post-creation-review.md`.
@@ -341,6 +370,26 @@ repository module child smoke/healthcheck читает только bounded regu
 Предпочтительный путь реализации для v1: `codex-native` агент в соседней папке `<parent-of-TECHSCOPE_ROOT>/<agent-name>` с опциональным Telegram-интерфейсом. Telegram считается interface adapter, а не обязательной частью каждого агента.
 
 Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Pritha.
+
+Scaffold readiness не является готовым агентом. Для outcome-driven delivery
+нужны approved Outcome Spec и host-owned approval evidence. Markdown Trials
+компилируются в deterministic `trial-plan.json` внутри private state-root; JSON
+не редактируется руками. Build/fix loop идёт до `verified`,
+`awaiting_acceptance` или typed blocker. Любое активное состояние ledger обязано
+иметь ровно одно: `next_action` либо непустой список blockers. Каждый blocker
+обязан содержать один вопрос и 2–5 вариантов ответа.
+
+Автономная реализация работает только в отдельной ветке `pritha/build-*` и
+disposable Git worktree. Нельзя stash/reset/overwrite активный пользовательский
+worktree. Новый scaffold с `Build Git mode: disposable-worktree` получает
+чистый локальный baseline commit без remote/push, чтобы delivery могла сразу
+создать отдельный worktree. Executor не может менять approved Outcome Spec, approval store,
+budgets, ledger, verifier или protected Trial inputs. Он не делает push, merge,
+deployment, service/scheduler enablement и secret provisioning. Локальный Trial
+backend честно имеет `isolation: none`; если Trial требует sandbox, использовать
+подтверждённый App Server `command/exec` backend или остановиться fail-closed.
+`verified`, `awaiting_acceptance`, `accepted`, merge-ready и deployment-ready —
+разные состояния.
 
 Каждый generated child `AGENTS.md` должен содержать harness evolution protocol:
 при любой доработке harness сначала проверять локальный проект и контракт,
@@ -391,8 +440,16 @@ CLI:
 - `node scripts/agents-mother.mjs questions`
 - `node scripts/agents-mother.mjs interview`
 - `node scripts/agents-mother.mjs init --name ... --mission ...`
+- `node scripts/agents-mother.mjs outcome init <contract-path>`
+- `node scripts/agents-mother.mjs outcome validate <outcome-spec-path>`
+- `node scripts/agents-mother.mjs outcome revise <approved-outcome-spec-path>`
+- `node scripts/agents-mother.mjs outcome approve <outcome-spec-path> --approved-by user`
+- `node scripts/agents-mother.mjs outcome compile <outcome-spec-path>`
 - `node scripts/agents-mother.mjs research <contract-path> [--github-mode auto|online|registry-only|skip] [--github-limit 5] [--github-timeout-ms 15000] [--github-fixture <json>]`
 - `node scripts/agents-mother.mjs scaffold <contract-path>`
+- `node scripts/agents-mother.mjs trial run <outcome-spec-path> --project <project-path>`
+- `node scripts/agents-mother.mjs deliver <outcome-spec-path> --project <project-path>`
+- `node scripts/agents-mother.mjs delivery status|resume|accept <run-id>`
 - `node scripts/agents-mother.mjs test <project-path>`
 - `node scripts/agents-mother.mjs handoff <project-path>`
 - `node scripts/agents-mother.mjs operations <project-path>`

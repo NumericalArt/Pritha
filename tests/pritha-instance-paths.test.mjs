@@ -48,13 +48,14 @@ function withEnv(values, callback) {
   }
 }
 
-test("state and agent roots fall back to the legacy checkout layout", () => {
+test("state falls back locally while live agent memory stays outside tracked 11_agents", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-code-"));
   try {
+    mkdirSync(path.join(root, ".git"));
     withEnv({ TECHSCOPE_ROOT: root, PRITHA_STATE_ROOT: undefined, PRITHA_AGENT_PARENT: undefined }, () => {
       assert.equal(resolvePrithaStateRoot({ root }), root);
       assert.equal(resolvePrithaAgentParent({ root }), path.dirname(root));
-      assert.equal(resolvePrithaAgentMemoryRoot({ root }), path.join(root, "11_agents"));
+      assert.equal(resolvePrithaAgentMemoryRoot({ root }), path.join(root, ".private", "agents"));
       assert.equal(resolvePrithaStatePath("memory", "techscope.sqlite"), path.join(root, ".memory", "techscope.sqlite"));
     });
   } finally {

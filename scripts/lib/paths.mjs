@@ -14,6 +14,7 @@ export const PRITHA_STATE_LAYOUT = Object.freeze({
   snapshots: "snapshots",
   voiceDrafts: "voice-drafts",
   agents: "agents",
+  builds: "builds",
   releases: "releases",
 });
 
@@ -27,7 +28,8 @@ const LEGACY_STATE_LAYOUT = Object.freeze({
   audit: path.join(".snapshots", "audit"),
   snapshots: ".snapshots",
   voiceDrafts: "03_reviews",
-  agents: "11_agents",
+  agents: path.join(".private", "agents"),
+  builds: path.join(".private", "builds"),
   releases: path.join(".snapshots", "releases"),
 });
 
@@ -67,7 +69,10 @@ export function resolvePrithaAgentParent(options = {}) {
 export function resolvePrithaAgentMemoryRoot(options = {}) {
   const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
   const stateRoot = resolvePrithaStateRoot({ ...options, root });
-  return stateRoot === root ? path.join(root, "11_agents") : path.join(stateRoot, PRITHA_STATE_LAYOUT.agents);
+  if (stateRoot !== root) return path.join(stateRoot, PRITHA_STATE_LAYOUT.agents);
+  return existsSync(path.join(root, ".git"))
+    ? path.join(root, LEGACY_STATE_LAYOUT.agents)
+    : path.join(root, "11_agents");
 }
 
 export function isPrithaCodeCheckout(candidate) {
@@ -77,14 +82,18 @@ export function isPrithaCodeCheckout(candidate) {
     && existsSync(path.join(directory, "interfaces", "control-center"));
 }
 
-export function resolvePrithaStatePath(kind, ...segments) {
+export function resolvePrithaStatePathFrom(options, kind, ...segments) {
   if (!Object.hasOwn(PRITHA_STATE_LAYOUT, kind)) {
     throw new Error(`Unknown Pritha state path kind: ${kind}`);
   }
-  const root = resolveTechscopeRoot();
-  const stateRoot = resolvePrithaStateRoot({ root });
+  const root = options?.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
+  const stateRoot = resolvePrithaStateRoot({ ...options, root });
   const directory = stateRoot === root ? LEGACY_STATE_LAYOUT[kind] : PRITHA_STATE_LAYOUT[kind];
   return path.join(stateRoot, directory, ...segments);
+}
+
+export function resolvePrithaStatePath(kind, ...segments) {
+  return resolvePrithaStatePathFrom({}, kind, ...segments);
 }
 
 export function prithaStatePath(kind, ...segments) {

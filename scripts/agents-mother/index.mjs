@@ -53,6 +53,22 @@ import {
   repositoryResearchMarkdown,
   runRepositoryResearch,
 } from "./github-research.mjs";
+import {
+  approveOutcomeSpec,
+  compileOutcomeSpec,
+  createOutcomeSpec,
+  formatOutcomeIssues,
+  outcomeSpecFile,
+  reviseOutcomeSpec,
+  verifyOutcomeApproval,
+} from "./outcome-spec.mjs";
+import {
+  acceptDelivery,
+  deliverOutcome,
+  deliveryStatus,
+  resumeDelivery,
+} from "./delivery-loop.mjs";
+import { runTrialPlan } from "./trial-runner.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -72,6 +88,17 @@ function usage() {
   ${CLI_COMMAND} questions
   ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} init --name <name> --mission <text> [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
+  ${CLI_COMMAND} outcome init <contract-path> [--interaction-mode interface|headless|hybrid]
+  ${CLI_COMMAND} outcome validate <outcome-spec-path>
+  ${CLI_COMMAND} outcome status <outcome-spec-path>
+  ${CLI_COMMAND} outcome revise <approved-outcome-spec-path>
+  ${CLI_COMMAND} outcome approve <outcome-spec-path> --approved-by user
+  ${CLI_COMMAND} outcome compile <outcome-spec-path> [--run-id <id>] [--allow-draft]
+  ${CLI_COMMAND} trial run <outcome-spec-path> --project <path> [--backend local|app-server] [--run-id <id>]
+  ${CLI_COMMAND} deliver <outcome-spec-path> --project <path> [--executor codex-app-server] [--trial-backend local|app-server] [--run-id <id>]
+  ${CLI_COMMAND} delivery status <run-id>
+  ${CLI_COMMAND} delivery resume <run-id> [--answer <option-id>] [--guidance <text>] [--project <path>]
+  ${CLI_COMMAND} delivery accept <run-id> --accepted-by user
   ${CLI_COMMAND} research <contract-path> [--limit 12] [--github-mode auto|online|registry-only|skip] [--github-limit 5] [--github-timeout-ms 15000] [--github-fixture <json>]
   ${CLI_COMMAND} pattern-research <contract-path> [--limit 12] [--semantic-mode auto|skip]
   ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days] [--input evidence.json]
@@ -96,11 +123,15 @@ Pritha aliases:
   ${CLI_COMMAND} lineage                                     # alias for registry
 
 Layer 2 status:
-  interview asks questions; init creates a non-interactive draft agent-contract in 11_agents/contracts/
+  interview proposes a draft agent-contract and a separate user-visible Outcome Spec
   validate checks whether the contract is ready for research/scaffold planning
 
+Outcome delivery status:
+  outcome validates, locks, approves and deterministically compiles user-visible Trials
+  deliver builds in a disposable branch/worktree until verified or a typed blocker
+
 Layer 3 status:
-  research creates a local memory research report in 11_agents/research/
+  research creates a local memory research report under the current instance agent state.
   pattern-research creates a reusable pattern-pack artifact from FTS/domain/semantic memory
   external-research updates a research report with curated current-source evidence
 
@@ -480,6 +511,7 @@ Status: draft
 ## Purpose
 
 - Agent name: ${scalar(data.agentName)}
+- Technical slug: ${slug(data.agentName)}
 - Primary mission: ${scalar(data.primaryMission)}
 - Target user: ${scalar(data.targetUser)}
 - Success criteria: ${scalar(data.successCriteria)}
@@ -498,6 +530,19 @@ ${bulletList(data.deferredFunctions)}
 ### Critical user workflows
 
 ${bulletList(data.criticalWorkflows)}
+
+## Outcome delivery
+
+- Outcome Spec required: yes
+- Outcome approval policy: separate-explicit-user
+- Build Git mode: ${scalar(data.buildGitMode, "disposable-worktree")}
+- Build executor: ${scalar(data.buildExecutor, "codex-app-server")}
+- Trial backend policy: ${scalar(data.trialBackendPolicy, "local-or-app-server")}
+- Build iteration budget: ${scalar(data.buildIterationBudget, "6")}
+- Build elapsed budget ms: ${scalar(data.buildElapsedBudgetMs, "5400000")}
+- Repeated failure threshold: ${scalar(data.repeatedFailureThreshold, "3")}
+- Autonomous effects denied: push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation
+- Acceptance policy: verified is distinct from accepted; operator-judged Trials require explicit user acceptance
 
 ## Runtime and interface
 
@@ -647,6 +692,8 @@ Discovery produces advisory candidates only. It never authorizes cloning, instal
 ## Acceptance checklist
 
 - [ ] Contract reviewed with user.
+- [ ] Separate Outcome Spec reviewed and explicitly approved by user.
+- [ ] Every V1 core function and required deliverable is covered by a Trial.
 - [x] Runtime family selected.
 - [x] Runtime placement selected.
 - [x] Interface mode selected.
@@ -665,6 +712,75 @@ async function ask(rl, question, defaultValue = "") {
   return answer || defaultValue;
 }
 
+function applyInterviewTechnicalProposal(data, options = {}) {
+  data.coreFunctions = Array.isArray(data.coreFunctions) && data.coreFunctions.length
+    ? data.coreFunctions
+    : listFromText(options.core, [data.primaryMission || "TBD"]);
+  data.deferredFunctions = Array.isArray(data.deferredFunctions) && data.deferredFunctions.length
+    ? data.deferredFunctions
+    : listFromText(options.deferred, [data.outOfScope || "TBD"]);
+  data.criticalWorkflows = Array.isArray(data.criticalWorkflows) && data.criticalWorkflows.length
+    ? data.criticalWorkflows
+    : listFromText(options.workflows, ["Request the outcome, review evidence, then correct or accept the result"]);
+  data.runtimeFamily = options.runtime || "codex-native";
+  data.primaryInterface = data.primaryInterface || options.interface || "Codex project";
+  data.secondaryInterfaces = options.secondary || "none";
+  data.telegramMode = options.telegram || (String(data.primaryInterface).toLowerCase().includes("telegram") ? "primary-chat" : "none");
+  data.expectedHosting = options.hosting || "local Mac";
+  data.runtimePlacementProfile = options["runtime-placement"] || options.placement || "frontier-first";
+  data.multiModelRoutingRequested = options["multi-model"] || "only-if-needed";
+  data.localInferenceRequired = options["local-inference"] || "later";
+  data.localInferenceAdapter = options["local-adapter"] || "none";
+  data.providerFallbacks = options.fallbacks || "frontier hosted model or manual review";
+  data.privacyRoutingRules = options.privacy || "do not send sensitive data to external providers unless explicitly allowed";
+  data.modelBudgetPolicy = options.budget || "bounded per delivery run; measure before changing defaults";
+  data.deploymentTarget = options.deployTarget || options["deployment-target"] || data.expectedHosting;
+  data.deploymentProfile = options.deployProfile || options["deployment-profile"] || "local-development";
+  data.serviceMode = options.service || "none";
+  data.autostart = options.autostart || "disabled";
+  data.healthcheckCommand = options.healthcheck || "node scripts/smoke-test.mjs";
+  data.startCommand = options.start || "node scripts/agent-cli.mjs status";
+  data.stopCommand = options.stop || "not-applicable";
+  data.proactiveMode = options.proactive || "none";
+  data.triggerSources = options.triggers || "manual user request";
+  data.schedule = options.schedule || "not-applicable";
+  data.heartbeatInterval = options.heartbeat || "not-applicable";
+  data.idleBehavior = options.idle || "sleep until trigger";
+  data.skillNeeds = options["skill-needs"] || "auto";
+  data.allowedSkillSources = options["skill-sources"] || "local-only";
+  data.skillInstallMode = options["skill-install"] || "recommend";
+  data.skillMutationPolicy = options["skill-mutation"] || "read-only";
+  data.installedSkills = options["installed-skills"] || "none";
+  data.repositoryResearchPolicy = options["repository-policy"] || "auto";
+  data.repositoryResearchTopics = options["repository-topics"] || "auto from contract and pattern pack";
+  data.repositoryResearchWaiverReason = options["repository-waiver"] || (data.repositoryResearchPolicy === "not-applicable" ? "TBD" : "not-applicable");
+  data.selectedGitHubRepositories = options["github-repositories"] || "none";
+  data.repositoryAdoptionMode = options["repository-adoption"] || "none";
+  data.selectedRepositoryModule = options["repository-module"] || "not-applicable";
+  data.repositoryPin = options["repository-pin"] || "pending";
+  data.repositoryLicenseDecision = options["repository-license"] || "pending";
+  data.repositorySecurityReview = options["repository-security"] || "pending";
+  data.repositoryPermissions = options["repository-permissions"] || "pending";
+  data.repositoryEvalStatus = options["repository-eval"] || "pending";
+  data.repositoryUserApproval = options["repository-approval"] || "pending";
+  data.inputDataTypes = options.inputs || "text and contract-selected files";
+  data.storedData = options.stored || "Markdown artifacts and private run state";
+  data.sensitiveData = data.sensitiveData || options.sensitive || "unknown; resolve before production use";
+  data.memoryModel = options.memory || "Markdown-first";
+  data.toolSystem = options.tools || "minimal structured CLI/script tools";
+  data.executionOrchestration = options.orchestration || "outcome-driven build, independent Trials and typed blockers";
+  data.testsHealthchecks = options.tests || "Outcome Trials plus structure validation and smoke test";
+  data.userTrainingGuide = options.training || "first exercise demonstrating and accepting the main V1 outcome";
+  data.targetFolder = options["target-folder"] || "sibling of Pritha";
+  data.buildGitMode = options["build-git-mode"] || "disposable-worktree";
+  data.buildExecutor = options["build-executor"] || "codex-app-server";
+  data.trialBackendPolicy = options["trial-backend-policy"] || "local-or-app-server";
+  data.buildIterationBudget = options["build-iterations"] || "6";
+  data.buildElapsedBudgetMs = options["build-elapsed-ms"] || "5400000";
+  data.repeatedFailureThreshold = options["repeated-failure-threshold"] || "3";
+  return data;
+}
+
 async function interview(options) {
   ensureDirs();
   const interactive = Boolean(process.stdin.isTTY && !options["no-input"]);
@@ -674,69 +790,15 @@ async function interview(options) {
     const rl = createInterface({ input, output });
     try {
       data.agentName = await ask(rl, "Agent name", options.name || "new-agent");
-      data.primaryMission = await ask(rl, "Primary mission", options.mission || "");
-      data.targetUser = await ask(rl, "Target user", options.user || "single operator");
-      data.successCriteria = await ask(rl, "Success criteria", options.success || "");
-      data.outOfScope = await ask(rl, "Out of scope", options["out-of-scope"] || "");
-      data.coreFunctions = listFromText(await ask(rl, "V1 core functions (; separated)", options.core || ""));
-      data.deferredFunctions = listFromText(await ask(rl, "Deferred functions (; separated)", options.deferred || ""));
-      data.criticalWorkflows = listFromText(await ask(rl, "Critical workflows (; separated)", options.workflows || ""));
-      data.runtimeFamily = await ask(rl, "Runtime family (codex-native|cli|api|local-model|hybrid|environment-specific)", options.runtime || "codex-native");
-      data.primaryInterface = await ask(rl, "Primary interface (Codex project|Telegram|CLI|web|API|mixed)", options.interface || "Codex project");
-      data.secondaryInterfaces = await ask(rl, "Secondary interfaces", options.secondary || "none");
-      const telegramDefault = String(data.primaryInterface).toLowerCase().includes("telegram") ? "primary-chat" : "none";
-      data.telegramMode = await ask(rl, "Telegram mode (none|primary-chat|intake-channel|notifications-only|operator-control)", options.telegram || telegramDefault);
-      data.expectedHosting = await ask(rl, "Expected hosting", options.hosting || "local Mac");
-      data.runtimePlacementProfile = await ask(rl, "Runtime placement profile (deterministic-first|frontier-first|local-first|hybrid|unknown)", options["runtime-placement"] || options.placement || "");
-      data.multiModelRoutingRequested = await ask(rl, "Multi-model routing requested (no|yes|only-if-needed)", options["multi-model"] || "only-if-needed");
-      data.localInferenceRequired = await ask(rl, "Local inference required (no|optional|required|later)", options["local-inference"] || "later");
-      data.localInferenceAdapter = await ask(rl, "Local inference adapter (none|LM Studio|Ollama|vLLM|custom|unknown)", options["local-adapter"] || "none");
-      data.providerFallbacks = await ask(rl, "Provider fallbacks", options.fallbacks || "frontier hosted model or manual review");
-      data.privacyRoutingRules = await ask(rl, "Privacy routing rules", options.privacy || "do not send sensitive data to external providers unless explicitly allowed");
-      data.modelBudgetPolicy = await ask(rl, "Model budget policy", options.budget || "TBD before production usage");
-      data.deploymentTarget = await ask(rl, "Deployment target (local Mac|Mac mini|VPS|cloud|embedded|user device|none)", options.deployTarget || options["deployment-target"] || data.expectedHosting);
-      data.deploymentProfile = await ask(rl, "Deployment profile (local-development|mac-mini-service|cloud-service|embedded|external)", options.deployProfile || options["deployment-profile"] || "local-development");
-      data.serviceMode = await ask(rl, "Service mode (none|manual|launchd|external)", options.service || "none");
-      data.autostart = await ask(rl, "Autostart (disabled|optional|launchd-on-approval|external)", options.autostart || "disabled");
-      data.healthcheckCommand = await ask(rl, "Healthcheck command", options.healthcheck || "node scripts/smoke-test.mjs");
-      data.startCommand = await ask(rl, "Start command", options.start || "node scripts/agent-cli.mjs status");
-      data.stopCommand = await ask(rl, "Stop command", options.stop || "not-applicable");
-      data.proactiveMode = await ask(rl, "Proactive mode (none|manual|scheduled|heartbeat|event-driven|queue-watcher|hybrid)", options.proactive || "none");
-      data.triggerSources = await ask(rl, "Trigger sources", options.triggers || "manual user request");
-      data.schedule = await ask(rl, "Schedule", options.schedule || "not-applicable");
-      data.heartbeatInterval = await ask(rl, "Heartbeat interval", options.heartbeat || "not-applicable");
-      data.idleBehavior = await ask(rl, "Idle behavior", options.idle || "sleep until trigger");
-      data.skillNeeds = await ask(rl, "Skill needs (auto|none|selected)", options["skill-needs"] || "auto");
-      data.allowedSkillSources = await ask(rl, "Allowed skill sources (local-only|trusted-only|external-with-approval)", options["skill-sources"] || "local-only");
-      data.skillInstallMode = await ask(rl, "Skill install mode (recommend|vendor|link|runtime-install)", options["skill-install"] || "recommend");
-      data.skillMutationPolicy = await ask(rl, "Skill mutation policy (read-only|patch-with-approval|agent-managed)", options["skill-mutation"] || "read-only");
-      data.installedSkills = data.skillNeeds === "selected"
-        ? await ask(rl, "Installed skills (comma-separated canonical local catalog names)", options["installed-skills"] || "")
-        : options["installed-skills"] || "none";
-      data.repositoryResearchPolicy = await ask(rl, "Repository research policy (auto|required|registry-only|not-applicable)", options["repository-policy"] || "auto");
-      data.repositoryResearchTopics = await ask(rl, "Repository research topics (allowlisted scopes or auto)", options["repository-topics"] || "auto from contract and pattern pack");
-      data.repositoryResearchWaiverReason = data.repositoryResearchPolicy === "not-applicable"
-        ? await ask(rl, "Repository research waiver reason", options["repository-waiver"] || "")
-        : "not-applicable";
-      data.selectedGitHubRepositories = await ask(rl, "Selected GitHub repositories (canonical URLs or none)", options["github-repositories"] || "none");
-      data.repositoryAdoptionMode = await ask(rl, "Repository adoption mode (none|reference-only|selected-module)", options["repository-adoption"] || "none");
-      if (data.repositoryAdoptionMode === "selected-module") {
-        data.selectedRepositoryModule = await ask(rl, "Selected repository module", options["repository-module"] || "pending");
-        data.repositoryPin = await ask(rl, "Exact repository pin (40-hex commit SHA or tree-sha:<40-hex>)", options["repository-pin"] || "pending");
-        data.repositoryLicenseDecision = await ask(rl, "Repository license decision", options["repository-license"] || "pending");
-        data.repositorySecurityReview = await ask(rl, "Repository security review", options["repository-security"] || "pending");
-        data.repositoryPermissions = await ask(rl, "Repository permissions", options["repository-permissions"] || "pending");
-        data.repositoryEvalStatus = await ask(rl, "Repository eval status", options["repository-eval"] || "pending");
-        data.repositoryUserApproval = await ask(rl, "Repository user approval", options["repository-approval"] || "pending");
-      }
-      data.inputDataTypes = await ask(rl, "Input data types", options.inputs || "text");
-      data.storedData = await ask(rl, "Stored data", options.stored || "Markdown artifacts");
-      data.sensitiveData = await ask(rl, "Sensitive data", options.sensitive || "unknown");
-      data.memoryModel = await ask(rl, "Memory model", options.memory || "Markdown-first");
-      data.toolSystem = await ask(rl, "Tool system", options.tools || "minimal CLI/script tools");
-      data.executionOrchestration = await ask(rl, "Execution orchestration", options.orchestration || "step-by-step workflow with explicit checkpoints");
-      data.testsHealthchecks = await ask(rl, "Tests/healthchecks", options.tests || "structure validation and smoke test");
-      data.userTrainingGuide = await ask(rl, "User training guide", options.training || "first exercise proving the main v1 function");
+      data.primaryMission = await ask(rl, "What final result should the agent produce?", options.mission || "");
+      data.targetUser = await ask(rl, "Who will use this result?", options.user || "single operator");
+      data.successCriteria = await ask(rl, "What observable evidence means the result is done?", options.success || "");
+      data.primaryInterface = await ask(rl, "Where should the user start (Codex project|Telegram|CLI|web|API|headless)?", options.interface || "Codex project");
+      data.coreFunctions = listFromText(await ask(rl, "Essential V1 outcomes (; separated)", options.core || data.primaryMission), [data.primaryMission]);
+      data.criticalWorkflows = listFromText(await ask(rl, "One realistic user journey (; separated)", options.workflows || "request result; review evidence; correct or accept"));
+      data.outOfScope = await ask(rl, "What must V1 explicitly not do?", options["out-of-scope"] || "functions not required for the approved V1 outcome");
+      data.sensitiveData = await ask(rl, "Sensitive data or consequential actions that change the design", options.sensitive || "none known yet");
+      applyInterviewTechnicalProposal(data, options);
     } finally {
       rl.close();
     }
@@ -747,57 +809,10 @@ async function interview(options) {
     data.successCriteria = options.success || "TBD";
     data.outOfScope = options["out-of-scope"] || "TBD";
     data.coreFunctions = listFromText(options.core, ["TBD"]);
-    data.deferredFunctions = listFromText(options.deferred, ["TBD"]);
-    data.criticalWorkflows = listFromText(options.workflows, ["TBD"]);
-    data.runtimeFamily = options.runtime || "codex-native";
+    data.criticalWorkflows = listFromText(options.workflows, ["Request the outcome, review evidence, then correct or accept the result"]);
     data.primaryInterface = options.interface || "Codex project";
-    data.secondaryInterfaces = options.secondary || "none";
-    data.telegramMode = options.telegram || (String(data.primaryInterface).toLowerCase().includes("telegram") ? "primary-chat" : "none");
-    data.expectedHosting = options.hosting || "local Mac";
-    data.runtimePlacementProfile = options["runtime-placement"] || options.placement || "";
-    data.multiModelRoutingRequested = options["multi-model"] || "only-if-needed";
-    data.localInferenceRequired = options["local-inference"] || "later";
-    data.localInferenceAdapter = options["local-adapter"] || "none";
-    data.providerFallbacks = options.fallbacks || "frontier hosted model or manual review";
-    data.privacyRoutingRules = options.privacy || "do not send sensitive data to external providers unless explicitly allowed";
-    data.modelBudgetPolicy = options.budget || "TBD before production usage";
-    data.deploymentTarget = options.deployTarget || options["deployment-target"] || data.expectedHosting;
-    data.deploymentProfile = options.deployProfile || options["deployment-profile"] || "local-development";
-    data.serviceMode = options.service || "none";
-    data.autostart = options.autostart || "disabled";
-    data.healthcheckCommand = options.healthcheck || "node scripts/smoke-test.mjs";
-    data.startCommand = options.start || "node scripts/agent-cli.mjs status";
-    data.stopCommand = options.stop || "not-applicable";
-    data.proactiveMode = options.proactive || "none";
-    data.triggerSources = options.triggers || "manual user request";
-    data.schedule = options.schedule || "not-applicable";
-    data.heartbeatInterval = options.heartbeat || "not-applicable";
-    data.idleBehavior = options.idle || "sleep until trigger";
-    data.skillNeeds = options["skill-needs"] || "auto";
-    data.allowedSkillSources = options["skill-sources"] || "local-only";
-    data.skillInstallMode = options["skill-install"] || "recommend";
-    data.skillMutationPolicy = options["skill-mutation"] || "read-only";
-    data.installedSkills = options["installed-skills"] || "none";
-    data.repositoryResearchPolicy = options["repository-policy"] || "auto";
-    data.repositoryResearchTopics = options["repository-topics"] || "auto from contract and pattern pack";
-    data.repositoryResearchWaiverReason = options["repository-waiver"] || (data.repositoryResearchPolicy === "not-applicable" ? "TBD" : "not-applicable");
-    data.selectedGitHubRepositories = options["github-repositories"] || "none";
-    data.repositoryAdoptionMode = options["repository-adoption"] || "none";
-    data.selectedRepositoryModule = options["repository-module"] || "not-applicable";
-    data.repositoryPin = options["repository-pin"] || "pending";
-    data.repositoryLicenseDecision = options["repository-license"] || "pending";
-    data.repositorySecurityReview = options["repository-security"] || "pending";
-    data.repositoryPermissions = options["repository-permissions"] || "pending";
-    data.repositoryEvalStatus = options["repository-eval"] || "pending";
-    data.repositoryUserApproval = options["repository-approval"] || "pending";
-    data.inputDataTypes = options.inputs || "text";
-    data.storedData = options.stored || "Markdown artifacts";
-    data.sensitiveData = options.sensitive || "unknown";
-    data.memoryModel = options.memory || "Markdown-first";
-    data.toolSystem = options.tools || "minimal CLI/script tools";
-    data.executionOrchestration = options.orchestration || "step-by-step workflow with explicit checkpoints";
-    data.testsHealthchecks = options.tests || "structure validation and smoke test";
-    data.userTrainingGuide = options.training || "first exercise proving the main v1 function";
+    data.sensitiveData = options.sensitive || "unknown; resolve before production use";
+    applyInterviewTechnicalProposal(data, options);
   }
 
   const date = today();
@@ -807,6 +822,9 @@ async function interview(options) {
   );
   const outPath = writtenContract.path;
   console.log(`Created: ${path.relative(ROOT, outPath)}`);
+
+  const writtenOutcome = createOutcomeSpec(outPath, { root: ROOT, date });
+  console.log(`Proposed Outcome Spec: ${path.relative(ROOT, writtenOutcome.path)}`);
 
   const issues = validateContract(outPath, { print: false });
   if (issues.length > 0) {
@@ -1649,18 +1667,64 @@ async function improveProjectTask(projectPath, options = {}) {
 function questions() {
   console.log(`# Pritha interview outline
 
-1. Purpose: agent name, mission, target user, success criteria, out of scope.
-2. Scope: v1 core functions, deferred functions, critical workflows.
-3. Runtime: codex-native, CLI, API, local model, hybrid or environment-specific.
-4. Interface: Codex project, Telegram, CLI, web, API or mixed.
-5. Telegram: none, primary-chat, intake-channel, notifications-only or operator-control.
-6. Harness: tools, orchestration, memory/state, evals, recovery, human approvals.
-7. Data/security: inputs, stored data, sensitive data, secrets, network/filesystem access.
-8. Deployment: target environment, deployment profile, service mode and autostart policy.
-9. Proactivity: manual, scheduled, heartbeat, event-driven, queue-watcher or hybrid; triggers and interruption policy.
-10. Skills: needs, allowed sources, install mode and mutation policy.
-11. Repository research: policy, allowlisted capability scopes, explicit repository candidates and adoption mode.
-12. Scaffold: target folder, generated files, dependencies, setup/run commands, tests and training guide.`);
+1. Outcome: who uses the agent, what they receive, and what observable result means done.
+2. Experience: entry point, one realistic example session or headless input/output, progress and recovery.
+3. V1 boundary: core functions, required deliverables and explicit non-goals.
+4. Trials: Pritha proposes coverage and asks only where the result cannot be judged without the user.
+5. Material constraints: sensitive data, consequential actions, deployment and required integrations.
+6. Technical proposal: Pritha proposes runtime, memory, tools, isolation, research and operations from its standards.
+7. Approval: the contract and Outcome Spec are reviewed separately before autonomous delivery.`);
+}
+
+function positiveCliInteger(value, fallback = undefined) {
+  if (value === undefined || value === true || String(value).trim() === "") return fallback;
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error(`Expected a positive integer, received: ${value}`);
+  return number;
+}
+
+function deliveryCliOptions(options) {
+  const maxIterations = positiveCliInteger(options["max-iterations"]);
+  const maxElapsedMs = positiveCliInteger(options["max-elapsed-ms"]);
+  const repeatedFailureThreshold = positiveCliInteger(options["repeated-failure-threshold"]);
+  return {
+    root: ROOT,
+    runId: options["run-id"],
+    allowDraft: Boolean(options["allow-draft"]),
+    trialBackend: options["trial-backend"] || options.backend,
+    buildExecutor: options.executor,
+    buildExecutorOptions: {
+      codexBin: options["codex-bin"],
+      model: options.model,
+      effort: options.effort,
+      serviceTier: options["service-tier"],
+    },
+    executorTimeoutMs: positiveCliInteger(options["executor-timeout-ms"]),
+    answer: options.answer,
+    guidance: options.guidance,
+    extendIterations: positiveCliInteger(options["extend-iterations"]),
+    extendElapsedMs: positiveCliInteger(options["extend-elapsed-ms"]),
+    projectPath: options.project ? path.resolve(ROOT, options.project) : undefined,
+    budget: {
+      maxIterations,
+      maxElapsedMs,
+      repeatedFailureThreshold,
+    },
+  };
+}
+
+function printDeliveryState(state, worktree = null) {
+  console.log(`Delivery run: ${state.run_id}`);
+  console.log(`Status: ${state.status}`);
+  console.log(`Phase: ${state.phase}`);
+  console.log(`Iterations: ${state.iteration}/${state.budget.max_iterations}`);
+  if (worktree?.branch) console.log(`Branch: ${worktree.branch}`);
+  if (state.last_trial_result) console.log(`Verification evidence: ${state.last_trial_result.status} (${state.last_trial_result.evidence_lock})`);
+  for (const blocker of state.blockers || []) {
+    console.log(`Blocker: ${blocker.code} — ${blocker.summary}`);
+    console.log(`Question: ${blocker.question}`);
+    for (const option of blocker.options) console.log(`- ${option.id}: ${option.label} — ${option.effect}`);
+  }
 }
 
 async function main() {
@@ -1674,6 +1738,125 @@ async function main() {
   if (command === "questions") {
     questions();
     return;
+  }
+  if (command === "outcome") {
+    const subcommand = options._[0] || "status";
+    const target = options._[1];
+    if (!target) throw new Error("Missing contract or Outcome Spec path.");
+    if (subcommand === "init") {
+      const written = createOutcomeSpec(target, { root: ROOT, interactionMode: options["interaction-mode"] });
+      console.log(`Proposed Outcome Spec: ${path.relative(ROOT, written.path)}`);
+      const result = outcomeSpecFile(written.path, { root: ROOT });
+      if (!result.ok) {
+        console.log("Outcome Spec still needs attention before approval:");
+        for (const line of formatOutcomeIssues(result.issues)) console.log(`- ${line}`);
+      }
+      return;
+    }
+    if (subcommand === "validate") {
+      const result = outcomeSpecFile(target, { root: ROOT });
+      if (result.ok) {
+        console.log(`Outcome Spec validation passed: ${result.relPath}`);
+      } else {
+        console.error(`Outcome Spec validation failed: ${result.relPath}`);
+        for (const line of formatOutcomeIssues(result.issues)) console.error(`- ${line}`);
+        process.exitCode = 1;
+      }
+      return;
+    }
+    if (subcommand === "status") {
+      const result = outcomeSpecFile(target, { root: ROOT });
+      const approval = verifyOutcomeApproval(target, { root: ROOT });
+      console.log(`Outcome Spec: ${result.relPath}`);
+      console.log(`Status: ${result.parsed.frontmatter.status || "unknown"}`);
+      console.log(`Validation: ${result.ok ? "pass" : "fail"}`);
+      console.log(`Approval evidence: ${approval.ok ? "valid" : approval.reasons.join(", ")}`);
+      console.log(`Trials: ${result.parsed.trials.length} (${result.automatedTrials} automated)`);
+      console.log(`Coverage: ${result.coverage.filter((entry) => entry.covered).length}/${result.coverage.length}`);
+      return;
+    }
+    if (subcommand === "revise") {
+      const result = reviseOutcomeSpec(target, { root: ROOT });
+      console.log(`Outcome revision draft: ${path.relative(ROOT, result.path)}`);
+      console.log(`Supersedes: ${result.previousRelPath}`);
+      console.log("Edit the correction, validate it, then approve it separately before starting a new delivery run.");
+      return;
+    }
+    if (subcommand === "approve") {
+      const result = approveOutcomeSpec(target, { root: ROOT, approvedBy: options["approved-by"] });
+      console.log(`Outcome Spec approved: ${path.relative(ROOT, result.path)}`);
+      console.log(`Approval evidence: ${path.relative(ROOT, result.evidencePath)}`);
+      return;
+    }
+    if (subcommand === "compile") {
+      const result = compileOutcomeSpec(target, {
+        root: ROOT,
+        runId: options["run-id"],
+        allowDraft: Boolean(options["allow-draft"]),
+      });
+      console.log(`Trial plan: ${path.relative(ROOT, result.planPath)}`);
+      console.log(`Run id: ${result.runId}`);
+      return;
+    }
+    throw new Error(`Unknown outcome command: ${subcommand}`);
+  }
+  if (command === "trial") {
+    const subcommand = options._[0] || "run";
+    const target = options._[1];
+    if (subcommand !== "run") throw new Error(`Unknown trial command: ${subcommand}`);
+    if (!target) throw new Error("Missing Outcome Spec path.");
+    if (!options.project) throw new Error("Missing --project path.");
+    const compiled = compileOutcomeSpec(target, {
+      root: ROOT,
+      runId: options["run-id"],
+      allowDraft: Boolean(options["allow-draft"]),
+    });
+    const executed = await runTrialPlan(compiled.plan, {
+      projectPath: path.resolve(ROOT, options.project),
+      backend: options.backend || "local",
+      runRoot: compiled.runRoot,
+      root: ROOT,
+      codexBin: options["codex-bin"],
+    });
+    console.log(`Trial result: ${executed.result.verification_status}`);
+    console.log(`Evidence lock: ${executed.result.evidence_lock}`);
+    console.log(`Passed automated Trials: ${executed.result.counts.passed}/${executed.result.counts.automated}`);
+    if (executed.result.verification_status === "failed") process.exitCode = 1;
+    return;
+  }
+  if (command === "deliver") {
+    const target = options._[0];
+    if (!target) throw new Error("Missing Outcome Spec path.");
+    if (!options.project) throw new Error("Missing --project path.");
+    const result = await deliverOutcome(target, path.resolve(ROOT, options.project), deliveryCliOptions(options));
+    printDeliveryState(result.state, result.worktree);
+    if (result.reportPath) console.log(`Delivery report: ${path.relative(ROOT, result.reportPath)}`);
+    if (result.state.status === "blocked") process.exitCode = 2;
+    return;
+  }
+  if (command === "delivery") {
+    const subcommand = options._[0] || "status";
+    const runId = options._[1];
+    if (!runId) throw new Error("Missing delivery run id.");
+    if (subcommand === "status") {
+      const result = deliveryStatus(runId, { root: ROOT });
+      printDeliveryState(result.state, result.worktree);
+      return;
+    }
+    if (subcommand === "resume") {
+      const result = await resumeDelivery(runId, deliveryCliOptions(options));
+      printDeliveryState(result.state, result.worktree);
+      if (result.reportPath) console.log(`Delivery report: ${path.relative(ROOT, result.reportPath)}`);
+      if (result.state.status === "blocked") process.exitCode = 2;
+      return;
+    }
+    if (subcommand === "accept") {
+      const result = acceptDelivery(runId, { ...deliveryCliOptions(options), acceptedBy: options["accepted-by"] });
+      printDeliveryState(result.state, result.worktree);
+      if (result.reportPath) console.log(`Delivery report: ${path.relative(ROOT, result.reportPath)}`);
+      return;
+    }
+    throw new Error(`Unknown delivery command: ${subcommand}`);
   }
   if (command === "voice-kit") {
     execFileSync("node", ["scripts/voice-control-kit.mjs", ...process.argv.slice(3)], {
@@ -1816,7 +1999,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  usage();
+  console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`Run \`${CLI_COMMAND} help\` for command usage.`);
   process.exit(1);
 });

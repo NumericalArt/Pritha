@@ -82,6 +82,11 @@ Tracked `11_agents/` is historical shared knowledge, not a live registry. A
 local artifact can enter shared knowledge only through explicit review and
 `node scripts/pritha-promote.mjs plan` followed by an approved apply.
 
+If instance configuration is temporarily unavailable, live child-agent
+artifacts fall back to gitignored `.private/agents/`, never to tracked
+`11_agents/`. The Pritha CLI loads `.env` and `.env.local` before initializing
+Agents Mother so a checkout-local instance pointer is honored consistently.
+
 ## Migration
 
 ```sh

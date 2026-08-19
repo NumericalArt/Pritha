@@ -1,3 +1,4 @@
+import os from "node:os";
 import { isIP } from "node:net";
 
 const SENSITIVE_KEY_TOKENS = new Set([
@@ -415,4 +416,36 @@ export function redactSensitiveText(value) {
     .replace(/\b(?:[A-Za-z0-9-]+\.)*ts\.net\b/gi, "[REDACTED_TAILSCALE_HOST]"));
   if (containsSensitiveDecodedVariant(redacted)) return "[REDACTED_ENCODED_SECRET]";
   return redacted;
+}
+
+function literalPattern(value) {
+  return new RegExp(String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+}
+
+function normalizedFilesystemPath(value) {
+  return String(value || "").trim().replaceAll("\\", "/").replace(/\/$/, "");
+}
+
+export function redactFilesystemPaths(value, options = {}) {
+  let output = redactSensitiveText(value);
+  const mappings = [
+    [options.projectRoot, "<PROJECT_ROOT>"],
+    [options.stateRoot, "<PRITHA_STATE_ROOT>"],
+    [options.root, "<TECHSCOPE_ROOT>"],
+    [options.homeDir || os.homedir(), "<USER_HOME>"],
+  ]
+    .map(([candidate, replacement]) => [normalizedFilesystemPath(candidate), replacement])
+    .filter(([candidate], index, values) => candidate && values.findIndex(([other]) => other === candidate) === index)
+    .sort((left, right) => right[0].length - left[0].length);
+
+  for (const [candidate, replacement] of mappings) {
+    const variants = new Set([candidate, candidate.replaceAll("/", "\\")]);
+    for (const variant of variants) output = output.replace(literalPattern(variant), replacement);
+  }
+  return output
+    .replace(/file:\/\/(?:<[^>]+>)/g, (match) => match.slice("file://".length))
+    .replace(/\/(?:Users|home)\/[A-Za-z0-9._-]+/g, "<USER_HOME>")
+    .replace(/[A-Za-z]:\\Users\\[A-Za-z0-9._-]+/gi, "<USER_HOME>")
+    .replace(/\/(?:private\/)?var\/(?:folders|tmp)\/[A-Za-z0-9._~+/@%=-]+(?:\/[A-Za-z0-9._~+/@%=-]+)*/g, "<TEMP_PATH>")
+    .replace(/\/tmp\/[A-Za-z0-9._~+/@%=-]+(?:\/[A-Za-z0-9._~+/@%=-]+)*/g, "<TEMP_PATH>");
 }

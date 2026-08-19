@@ -377,7 +377,9 @@ test("contract-aware GitHub research reaches scaffold through verified gates wit
     assert.equal(manifest.immutable_pin, "commit:0123456789abcdef0123456789abcdef01234567");
     assert.equal(manifest.verification_status, "experimental-unverified");
     assert.equal(manifest.experimental_scaffold, true);
-    assert.equal(existsSync(path.join(outputDir, ".git")), false);
+    assert.equal(existsSync(path.join(outputDir, ".git")), true);
+    assert.equal(execFileSync("git", ["remote"], { cwd: outputDir, encoding: "utf8" }).trim(), "");
+    assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: outputDir, encoding: "utf8" }).trim(), "");
     assert.equal(existsSync(path.join(outputDir, "node_modules")), false);
     assert.equal(readFileSync(path.join(registryDir, "github-agent-building-repos.md"), "utf8"), registryBefore);
 

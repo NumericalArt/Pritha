@@ -3,6 +3,8 @@
 07_workflows/agent-operating-workflow.md
 AGENTS.md
 README.md
+delivery/README.md
+delivery/outcome-lineage.json
 docs/user-training-guide.md
 interfaces/README.md
 interfaces/cli/README.md

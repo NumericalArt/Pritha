@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-07-13
-last_reviewed: 2026-07-13
+updated: 2026-08-16
+last_reviewed: 2026-08-16
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -82,8 +82,11 @@ sources:
   - 01_sources/registries/github-agent-building-repos.md
   - 01_sources/signals/2026-06-28-open-source-agent-building-repos-signal.md
   - 03_reviews/2026-06-28-open-source-agent-building-repos-review.md
+  - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
+  - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
 related:
-  decisions: []
+  decisions:
+    - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
   reviews:
     - 03_reviews/2026-05-18-techscope-agents-mother-scenario-review.md
     - 03_reviews/2026-05-31-openai-harness-engineering-agent-readable-repo-assessment.md
@@ -104,14 +107,15 @@ related:
     - 04_standards/agent-proactivity-scheduling.md
     - 04_standards/agent-ai-safe-security-checklist.md
     - 04_standards/agent-minimal-core-extension-surface.md
+    - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-07-13
-source_version: Techscope draft standard v15 + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update + card-first Control Center readiness + contract-aware GitHub repository research and selected-module adoption gates
+source_updated: 2026-08-16
+source_version: Pritha draft standard v16 + outcome-driven agent delivery decision and implementation + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update + card-first Control Center readiness + contract-aware GitHub repository research and selected-module adoption gates
 retrieved: 2026-05-18
-verified: 2026-07-13
+verified: 2026-08-16
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -120,17 +124,42 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-07-13
+Last reviewed: 2026-08-16
 
 ## Rule
 
-Every new agent created by TechScope must start from an explicit `agent-contract` and must be delivered as a working, testable scaffold with a documented harness.
+Every new agent created by Pritha must start from an explicit `agent-contract`
+and a separate `agent-outcome-spec`. It must be delivered as a working,
+independently verified agent rather than merely as a generated scaffold.
+
+The two artifacts answer different questions and have independent approvals and
+content locks:
+
+- the contract defines architecture, boundaries, permissions and operating
+  shape;
+- the Outcome Spec defines the observable final result, user journey,
+  deliverables, exclusions and executable Trials that prove the result.
+
+The Outcome Spec is locked before implementation. A build executor may change
+the descendant source but must not edit the Outcome Spec, compiled Trial plan or
+verifier. `verified` means that the locked Trials passed for the exact committed
+workspace revision; `accepted` remains a separate user decision.
 
 TechScope may use its own architecture as a reference, but it must not clone itself blindly. The new agent's runtime, interface, memory, tools and security model must follow the contract.
 
 Pritha descendants are assembled from contract-selected modules, not from one universal bundle. Every future agent should receive the harness, memory, data, skills, MCP servers, interface adapters, tools, evals and operations modules that its contract actually needs, and no more. A pattern marked `adopt-in-scaffold` means "available for Pritha to select and compose", not "automatically copied into every descendant".
 
-The initial scaffold is a starting point, not the final boundary of the agent. A descendant can always be evolved through its native interface, especially Codex App/Codex thread for Codex-native agents, plus any other interface selected in its contract. When a descendant receives an internet resource that is not directly relevant to its domain mission, it should treat the resource as meta-improvement input rather than domain memory: evaluate whether the material improves the agent's harness, memory, tools, skills, MCP, UX, evals, safety or operations, then record a brief/review/decision locally or send a distilled lesson back to Pritha/Techscope.
+The initial scaffold is a starting point, not completion. After scaffold, Pritha
+runs the compiled Trials, gives failures to the selected build executor, applies
+bounded fixes in a disposable `pritha/build-*` Git worktree and independently
+reruns the Trials. A descendant can always be evolved through its native
+interface, especially Codex App/Codex thread for Codex-native agents, plus any
+other interface selected in its contract. When a descendant receives an
+internet resource that is not directly relevant to its domain mission, it
+should treat the resource as meta-improvement input rather than domain memory:
+evaluate whether the material improves the agent's harness, memory, tools,
+skills, MCP, UX, evals, safety or operations, then record a
+brief/review/decision locally or send a distilled lesson back to Pritha.
 
 Scaffold readiness is gated: the contract must be `accepted`, Pritha memory
 research must produce a dedicated pattern-pack, relevant
@@ -286,6 +315,23 @@ credential UI or placeholder docs.
 ## Required practices
 
 - Create an `agent-contract` before generating project files.
+- Create a separate `agent-outcome-spec` before production implementation.
+  Capture the final user-visible result, observable done conditions, journey,
+  deliverables, non-goals and safety boundaries there rather than hiding them
+  among architecture fields.
+- Start from a concrete Pritha proposal. Ask the user only questions whose
+  answers materially change the product outcome, permissions or irreversible
+  choices; infer routine technical defaults and expose them for correction.
+- Approve and lock the contract and Outcome Spec independently. Approval must
+  be recorded as host-controlled evidence outside the authored Markdown; a
+  matching hash receipt is tamper-evident lineage, not a cryptographic identity
+  proof.
+- Compile signed Markdown Trial blocks into generated `trial-plan.json`. The
+  authored Markdown remains the source of truth; generated JSON is never edited
+  by hand.
+- Require executable Trial coverage for every core outcome and declared
+  deliverable, plus applicable safety and recovery behavior. A waiver must be
+  explicit and prevents autonomous transition to user acceptance.
 - Require `status: accepted` before production scaffold; use
   `--allow-draft-scaffold` only for an explicit experimental scaffold.
 - Run Pritha memory research before scaffold and record whether current
@@ -382,6 +428,24 @@ credential UI or placeholder docs.
   modules, trust levels, activation mode, permissions, readiness and evals.
 - Apply `agent-environment-compatibility` before borrowing patterns from non-Codex tools.
 - Generate a `scaffold-report` after files are created and tests are run.
+- Treat scaffold as an intermediate lifecycle state. Run delivery in a clean,
+  disposable Git worktree; keep the active checkout unchanged; use structured
+  argv rather than shell command strings; and deny network, push, merge,
+  deployment, secret access and protected verifier/spec mutations unless a
+  later explicit gate authorizes them.
+- For a newly generated empty target with `Build Git mode:
+  disposable-worktree`, create a local clean scaffold baseline commit so the
+  first delivery run has a rollback anchor. Do not add a remote or push it.
+- Maintain a single-writer runtime delivery ledger with compare-and-swap
+  updates. In every non-terminal state it must contain exactly one actionable
+  `next_action` or a non-empty list of typed blockers. A blocker must name its
+  owner and give the user a concrete question with bounded answer choices.
+- Bind Trial evidence to an exact workspace revision, cap and redact output,
+  reject symlink escapes, and rerun the full Trial plan after the verified Git
+  checkpoint is created. Never accept a result solely from executor claims.
+- Keep lifecycle states distinct: `verified` is machine evidence,
+  `awaiting_acceptance` is a user gate, and `accepted` is the user's decision.
+  The build loop cannot accept its own work.
 - After the first meaningful working version, create a post-creation review and preserve the user interaction path that shaped the agent.
 - Index contracts and scaffold reports into TechScope memory.
 - For agents that may run across multiple sessions or context windows, scaffold
@@ -445,14 +509,15 @@ Each created agent must document:
 ## Temporal validity
 
 - Source published: 2026-05-18 user scenario and current external docs.
-- Source updated: 2026-07-13.
-- Source version: Techscope draft standard v15 plus Funny Teacher reference
+- Source updated: 2026-08-16.
+- Source version: Pritha draft standard v16 plus outcome-driven agent delivery,
+  Funny Teacher reference
   evidence, OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv
   harness source batch, Codex surfaces/AWS batch, scheduling/heartbeat batch and
   Agent Skills, agentic UI and AI-SAFE child-agent checklist source batches,
   Pi minimal-core evidence and contract-aware GitHub repository research.
 - Retrieved: 2026-05-18.
-- Verified: 2026-07-13.
+- Verified: 2026-08-16.
 - Valid for: TechScope agent creation workflow from 2026-05-18 onward.
 - Freshness status: current.
 - Temporal status: current.
@@ -468,5 +533,6 @@ Each created agent must document:
 
 ## Related decisions
 
+- `05_decisions/2026-08-16-outcome-driven-agent-delivery.md`
 - `04_standards/agent-environment-compatibility.md`
 - `04_standards/agent-tool-integration-selection.md`

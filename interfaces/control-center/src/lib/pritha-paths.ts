@@ -28,7 +28,10 @@ export function resolvePrithaAgentParent(root = resolveTechscopeRoot()) {
 
 export function resolvePrithaAgentMemoryRoot(root = resolveTechscopeRoot()) {
   const stateRoot = resolvePrithaStateRoot(root);
-  return stateRoot === root ? path.join(root, "11_agents") : path.join(stateRoot, "agents");
+  if (stateRoot !== root) return path.join(stateRoot, "agents");
+  return existsSync(path.join(root, ".git"))
+    ? path.join(root, ".private", "agents")
+    : path.join(root, "11_agents");
 }
 
 export function isPrithaCodeCheckout(candidate: string) {
@@ -49,6 +52,7 @@ const stateLayout = {
   snapshots: "snapshots",
   voiceDrafts: "voice-drafts",
   agents: "agents",
+  builds: "builds",
   releases: "releases",
 } as const;
 
@@ -62,7 +66,8 @@ const legacyStateLayout: Record<keyof typeof stateLayout, string> = {
   audit: path.join(".snapshots", "audit"),
   snapshots: ".snapshots",
   voiceDrafts: "03_reviews",
-  agents: "11_agents",
+  agents: path.join(".private", "agents"),
+  builds: path.join(".private", "builds"),
   releases: path.join(".snapshots", "releases"),
 };
 

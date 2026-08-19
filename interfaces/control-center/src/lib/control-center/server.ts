@@ -1,5 +1,6 @@
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -547,7 +548,7 @@ function markdownFiles(root: string, segments: string[]) {
   return readdirSync(directory)
     .filter((entry) => entry.endsWith(".md"))
     .map((entry) => path.join(directory, entry))
-    .sort((a, b) => path.basename(b).localeCompare(path.basename(a)));
+    .sort((a, b) => path.basename(b).localeCompare(path.basename(a), undefined, { numeric: true, sensitivity: "base" }));
 }
 
 function fileMatchesAgent(filePath: string, agentName: string) {
@@ -582,6 +583,99 @@ function numberValue(text: string, key: string) {
   if (!raw) return undefined;
   const value = Number(raw);
   return Number.isFinite(value) ? value : undefined;
+}
+
+const mutableOutcomeDocumentFields = new Set([
+  "status",
+  "outcome_spec_status",
+  "updated",
+  "outcome_semantic_lock",
+  "outcome_document_lock",
+  "approved_by",
+  "approved_at",
+  "review_status",
+]);
+
+function sha256(value: string | Buffer) {
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function currentOutcomeDocumentLock(text: string) {
+  const source = String(text || "").replace(/\r\n?/g, "\n");
+  if (!source.startsWith("---\n")) return sha256(source.trimEnd());
+  const end = source.indexOf("\n---\n", 4);
+  if (end === -1) return sha256(source.trimEnd());
+  const lockedFrontmatter = source.slice(4, end).split("\n").map((line) => {
+    const match = line.match(/^([A-Za-z0-9_-]+):/);
+    return match && mutableOutcomeDocumentFields.has(match[1]) ? `${match[1]}: [MUTABLE]` : line;
+  }).join("\n");
+  return sha256(`---\n${lockedFrontmatter}\n---\n${source.slice(end + 5)}`.trimEnd());
+}
+
+function currentContractFingerprint(text: string) {
+  const source = String(text || "").replace(/\r\n/g, "\n");
+  const normalized = source.replace(/^---\n([\s\S]*?)\n---\n/, (_match, rawFrontmatter: string) => {
+    const stableFrontmatter = rawFrontmatter
+      .split("\n")
+      .filter((line) => !/^(?:status|updated|review_status):\s*/.test(line))
+      .join("\n");
+    return `---\n${stableFrontmatter}\n---\n`;
+  }).trimEnd();
+  return sha256(normalized);
+}
+
+function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackContractPath: string | null, outcomeText: string) {
+  const outcomeFront = frontmatter(outcomeText);
+  if (scalarValue(outcomeFront, "outcome_spec_status") !== "approved" || scalarValue(outcomeFront, "approved_by") !== "user") {
+    return { valid: false, reason: "Outcome Spec is not independently approved" };
+  }
+  const semanticLock = scalarValue(outcomeFront, "outcome_semantic_lock");
+  const documentLock = scalarValue(outcomeFront, "outcome_document_lock");
+  if (!semanticLock?.startsWith("sha256:") || documentLock !== currentOutcomeDocumentLock(outcomeText)) {
+    return { valid: false, reason: "Outcome Spec content locks are missing or stale" };
+  }
+
+  const boundContractValue = scalarValue(outcomeFront, "contract_path");
+  const boundContractPath = boundContractValue
+    ? (path.isAbsolute(boundContractValue) ? path.resolve(boundContractValue) : path.resolve(root, boundContractValue))
+    : fallbackContractPath;
+  if (!boundContractPath || !existsSync(boundContractPath)) {
+    return { valid: false, reason: "The Outcome Spec contract binding is unavailable" };
+  }
+  const contractText = readText(boundContractPath);
+  const contractFront = frontmatter(contractText);
+  const contractFingerprint = scalarValue(outcomeFront, "contract_fingerprint");
+  if (
+    scalarValue(contractFront, "type") !== "agent-contract"
+    || scalarValue(contractFront, "status") !== "accepted"
+    || currentContractFingerprint(contractText) !== contractFingerprint
+  ) {
+    return { valid: false, reason: "The accepted contract changed after Outcome approval" };
+  }
+
+  const evidencePath = resolvePrithaStatePath("audit", "outcome-approvals.jsonl");
+  if (!existsSync(evidencePath) || statSync(evidencePath).size > 5_000_000) {
+    return { valid: false, reason: "Host approval evidence is missing or unreadable" };
+  }
+  const events = readText(evidencePath).split(/\r?\n/).filter(Boolean).map((line) => {
+    try {
+      return JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }).filter((event): event is Record<string, unknown> => Boolean(event));
+  const matched = events.reverse().find((event) => (
+    event.schema === "pritha-outcome-approval-v1"
+    && event.spec_path === relativePath(root, outcomePath)
+    && event.spec_id === scalarValue(outcomeFront, "id")
+    && event.contract_fingerprint === contractFingerprint
+    && event.semantic_lock === semanticLock
+    && event.document_lock === documentLock
+    && event.approved_by === "user"
+  ));
+  return matched
+    ? { valid: true, reason: undefined }
+    : { valid: false, reason: "Host approval evidence does not match the current Outcome Spec" };
 }
 
 function bodyFieldValue(text: string, field: string) {
@@ -635,8 +729,69 @@ function findContract(root: string, agent: RegistryRecord) {
   const contracts = [
     ...markdownFiles(liveRoot, ["contracts"]),
     ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "contracts"])),
-  ].filter((file) => fileMatchesAgent(file, agent.name));
+  ].filter((file) => fileMatchesAgent(file, agent.name) && scalarValue(frontmatter(readText(file)), "type") === "agent-contract");
   return contracts[0] || null;
+}
+
+function findOutcomeSpec(root: string, agent: RegistryRecord) {
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  return [
+    ...markdownFiles(liveRoot, ["contracts"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "contracts"])),
+  ].find((file) => fileMatchesAgent(file, agent.name) && scalarValue(frontmatter(readText(file)), "type") === "agent-outcome-spec") || null;
+}
+
+function findDeliveryReport(root: string, agent: RegistryRecord) {
+  const liveRoot = resolvePrithaAgentMemoryRoot(root);
+  return [
+    ...markdownFiles(liveRoot, ["reports"]),
+    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "reports"])),
+  ].find((file) => fileMatchesAgent(file, agent.name) && scalarValue(frontmatter(readText(file)), "type") === "agent-delivery-report") || null;
+}
+
+function findLiveDeliveryState(root: string, agent: RegistryRecord) {
+  const buildsRoot = resolvePrithaStatePath("builds");
+  if (!existsSync(buildsRoot)) return null;
+  const agentKey = compactKey(agent.name);
+  const candidates: Array<{
+    status: ControlCenterAgent["lifecycle"]["delivery"]["status"];
+    runId: string;
+    phase?: string;
+    blockerCount: number;
+    updatedAt?: string;
+    statePath: string;
+  }> = [];
+  const activeStatuses = new Set(["created", "preparing", "building", "verifying", "correcting", "paused"]);
+  const knownStatuses = new Set([
+    ...activeStatuses,
+    "blocked",
+    "verified",
+    "awaiting_acceptance",
+    "accepted",
+    "failed",
+    "abandoned",
+    "cancelled",
+  ]);
+  for (const agentDir of readdirSync(buildsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== ".targets").slice(0, 1_000)) {
+    const directory = path.join(buildsRoot, agentDir.name);
+    for (const runDir of readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isDirectory()).slice(0, 1_000)) {
+      const statePath = path.join(directory, runDir.name, "build-state.json");
+      const state = readJson<Record<string, unknown>>(statePath);
+      if (state?.schema !== "pritha-delivery-ledger-v1") continue;
+      if (![state.agent_slug, state.target_label, agentDir.name].some((value) => compactKey(String(value || "")) === agentKey)) continue;
+      const rawStatus = String(state.status || "unknown");
+      const status = (knownStatuses.has(rawStatus) ? rawStatus : "unknown") as ControlCenterAgent["lifecycle"]["delivery"]["status"];
+      candidates.push({
+        status,
+        runId: String(state.run_id || runDir.name),
+        phase: String(state.phase || "") || undefined,
+        blockerCount: Array.isArray(state.blockers) ? state.blockers.length : 0,
+        updatedAt: String(state.updated_at || "") || undefined,
+        statePath,
+      });
+    }
+  }
+  return candidates.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))[0] || null;
 }
 
 function findReports(root: string, agent: RegistryRecord) {
@@ -820,6 +975,23 @@ function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: Operat
   const profileText = profilePath ? readText(profilePath) : "";
   const profileFront = frontmatter(profileText);
   const contractPath = findContract(root, agent);
+  const outcomePath = findOutcomeSpec(root, agent);
+  const outcomeText = outcomePath ? readText(outcomePath) : "";
+  const outcomeFront = frontmatter(outcomeText);
+  const rawOutcomeStatus = scalarValue(outcomeFront, "outcome_spec_status") || scalarValue(outcomeFront, "status") || "unknown";
+  const outcomeStatus: ControlCenterAgent["lifecycle"]["outcome"]["status"] =
+    (["draft", "approved", "superseded"] as const).find((value) => value === rawOutcomeStatus) || "unknown";
+  const outcomeApproval = outcomePath
+    ? outcomeApprovalIntegrity(root, outcomePath, contractPath, outcomeText)
+    : { valid: false, reason: "No separate Outcome Spec found" };
+  const outcomeApproved = outcomeStatus === "approved" && outcomeApproval.valid;
+  const deliveryPath = findDeliveryReport(root, agent);
+  const deliveryText = deliveryPath ? readText(deliveryPath) : "";
+  const rawDeliveryStatus = scalarValue(frontmatter(deliveryText), "status") || "unknown";
+  const deliveryStatus: ControlCenterAgent["lifecycle"]["delivery"]["status"] = (
+    ["running", "blocked", "verified", "awaiting_acceptance", "accepted", "failed", "abandoned", "cancelled"] as const
+  ).find((value) => value === rawDeliveryStatus) || "unknown";
+  const liveDelivery = findLiveDeliveryState(root, agent);
   const reportPaths = findReports(root, agent);
   const readableVersionSources = [
     ...(profilePath ? [profilePath] : []),
@@ -882,6 +1054,38 @@ function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: Operat
     contract: contractPath
       ? { status: "ready" as const, path: relativePath(root, contractPath) }
       : { status: "unavailable" as const, reason: "No agent contract found" },
+    outcome: outcomePath
+      ? {
+          status: outcomeStatus,
+          path: relativePath(root, outcomePath),
+          approved: outcomeApproved,
+          reason: outcomeApproved ? undefined : outcomeApproval.reason,
+        }
+      : {
+          status: "missing" as const,
+          approved: false,
+          reason: "No separate Outcome Spec found",
+        },
+    delivery: liveDelivery
+      ? {
+          status: liveDelivery.status,
+          runId: liveDelivery.runId,
+          phase: liveDelivery.phase,
+          blockerCount: liveDelivery.blockerCount,
+          updatedAt: liveDelivery.updatedAt,
+          source: "live-ledger" as const,
+        }
+      : deliveryPath
+      ? {
+          status: deliveryStatus,
+          path: relativePath(root, deliveryPath),
+          source: "delivery-report" as const,
+          reason: deliveryStatus === "unknown" ? "Delivery report has an unknown lifecycle status" : undefined,
+        }
+      : {
+          status: "not_started" as const,
+          reason: "No outcome delivery report found",
+        },
     reports: {
       status: reportPaths.length ? ("ready" as const) : ("unavailable" as const),
       count: reportPaths.length,

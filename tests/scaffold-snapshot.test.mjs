@@ -14,6 +14,7 @@ function listFiles(root) {
   const out = [];
   function walk(dir) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === ".git") continue;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         walk(fullPath);
@@ -264,6 +265,8 @@ test("Agents Mother scaffold output matches the frozen file-list snapshot", () =
     encoding: "utf8",
   });
   assert.match(smoke, /Smoke test passed/);
+  assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: outputDir, encoding: "utf8" }).trim(), "");
+  assert.match(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: outputDir, encoding: "utf8" }), /Pritha scaffold baseline/);
 
   const reportPath = path.join(root, "11_agents", "reports");
   const reportFiles = listFiles(reportPath).filter((filePath) => filePath.endsWith("scaffold-report.md"));
@@ -273,6 +276,7 @@ test("Agents Mother scaffold output matches the frozen file-list snapshot", () =
   assert.match(report, /contract_fingerprint: sha256:[a-f0-9]{64}/);
   assert.match(report, /research_gate_status: complete/);
   assert.match(report, /repository_research_status: not-applicable/);
+  assert.match(report, /delivery_git_status: initialized/);
   assert.match(report, /experimental_scaffold: false/);
   assert.match(report, /## Control Center Card Readiness/);
   assert.match(report, /node scripts\/pritha\.mjs card-readiness snapshot-agent/);

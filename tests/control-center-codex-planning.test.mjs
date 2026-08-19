@@ -63,10 +63,13 @@ test("Agent creation Codex tasks carry mandatory research gate metadata", () => 
   assert.match(runtimeSource, /research_gate_status: complete/);
   assert.match(runtimeSource, /separate pattern-pack artifact, external current-source evidence and memory-vs-external synthesis are mandatory before scaffold/);
   assert.match(runtimeSource, /current instance private state/);
-  assert.match(runtimeSource, /card-first completion/);
+  assert.match(runtimeSource, /outcome-and-card completion/);
+  assert.match(runtimeSource, /node scripts\/pritha\.mjs deliver <outcome-spec> --project <child-project>/);
+  assert.match(runtimeSource, /contract_outcome_research_gate/);
+  assert.match(runtimeSource, /deliver_outcome/);
   assert.match(runtimeSource, /node scripts\/pritha\.mjs card-readiness <agent-slug>/);
   assert.match(runtimeSource, /verify_control_center_card/);
-  assert.match(runtimeSource, /creation is not complete if card status is missing/);
+  assert.match(runtimeSource, /creation is not complete without verified outcome evidence or a typed blocker, and a visible card/);
 });
 
 test("Step orchestrator remains policy gated", () => {
@@ -92,7 +95,9 @@ test("Realtime Codex handoff waits for explicit full-brief confirmation", () => 
   assert.match(runtimeSource, /handoff_confirmation_required/);
   assert.match(runtimeSource, /ТЗ полностью проговорено\? Передавать это в Codex\?/);
   assert.match(runtimeSource, /brief is complete and ready for Codex/);
-  assert.match(runtimeSource, /ask only for missing information that blocks a useful Codex handoff/);
+  assert.match(runtimeSource, /be proposal-first/);
+  assert.match(runtimeSource, /ask only for missing product decisions/);
+  assert.match(runtimeSource, /Infer routine runtime, deployment, memory, tools, skills, MCP and test defaults/);
   assert.match(runtimeSource, /Do not announce a fixed number of questions/);
   assert.match(runtimeSource, /Ask one concise question per turn/);
   assert.match(runtimeSource, /use up to five total only for genuinely complex or risky tasks/i);

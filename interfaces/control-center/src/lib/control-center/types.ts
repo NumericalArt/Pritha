@@ -227,6 +227,38 @@ export type ControlCenterAgent = {
       path?: string;
       reason?: string;
     };
+    outcome: {
+      status: "missing" | "draft" | "approved" | "superseded" | "unknown";
+      path?: string;
+      approved: boolean;
+      reason?: string;
+    };
+    delivery: {
+      status:
+        | "not_started"
+        | "created"
+        | "preparing"
+        | "building"
+        | "verifying"
+        | "correcting"
+        | "paused"
+        | "running"
+        | "blocked"
+        | "verified"
+        | "awaiting_acceptance"
+        | "accepted"
+        | "failed"
+        | "abandoned"
+        | "cancelled"
+        | "unknown";
+      path?: string;
+      runId?: string;
+      phase?: string;
+      blockerCount?: number;
+      updatedAt?: string;
+      source?: "live-ledger" | "delivery-report";
+      reason?: string;
+    };
     reports: {
       status: CapabilityStatus;
       count: number;

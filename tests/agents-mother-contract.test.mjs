@@ -11,6 +11,7 @@ import {
   isExplicitRepositoryApproval,
   isRepositoryLicenseApproved,
   isRepositoryPermissionsBounded,
+  sectionItems,
   validateContract,
 } from "../scripts/agents-mother/contract.mjs";
 
@@ -96,6 +97,27 @@ test("contract module extracts structured contract data", () => {
   assert.equal(data.repositoryAdoptionMode, "none");
   assert.match(data.fingerprint, /^sha256:[a-f0-9]{64}$/);
   assert.ok(data.coreFunctions.length > 0);
+});
+
+test("contract section parser preserves every list item until the next peer heading", () => {
+  const markdown = `### V1 core functions
+
+- First function
+- Second function
+
+#### Nested note
+
+- Nested evidence
+
+### Deferred functions
+
+- Later function
+`;
+  assert.deepEqual(sectionItems(markdown, "V1 core functions"), [
+    "First function",
+    "Second function",
+    "Nested evidence",
+  ]);
 });
 
 test("generated contracts keep sources and related as separate frontmatter fields", () => {

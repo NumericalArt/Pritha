@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { isPrithaCodeCheckout, resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { bodyValue } from "./contract.mjs";
 
 function controlCenterSlug(value) {
   return String(value || "")
@@ -55,6 +57,24 @@ function findRegistryRecord(records, target) {
   return records.find((record) => comparableKey(record.name) === key || controlCenterSlug(record.name) === target) || null;
 }
 
+function findRegistryRecordByContract(root, records, target) {
+  const direct = findRegistryRecord(records, target);
+  if (direct) return direct;
+  const contractDir = path.join(resolvePrithaAgentMemoryRoot({ root }), "contracts");
+  for (const filePath of listMarkdownFiles(contractDir)) {
+    try {
+      const text = readFileSync(filePath, "utf8");
+      if (comparableKey(bodyValue(text, "Technical slug")) !== comparableKey(target)) continue;
+      const agentName = bodyValue(text, "Agent name");
+      const matched = records.find((record) => comparableKey(record.name) === comparableKey(agentName));
+      if (matched) return matched;
+    } catch {
+      // Ignore unreadable contract artifacts and continue with fail-closed readiness.
+    }
+  }
+  return null;
+}
+
 function listMarkdownFiles(directory) {
   if (!existsSync(directory)) return [];
   return readdirSync(directory)
@@ -85,6 +105,44 @@ function evidencePaths(root, target, record) {
   };
 }
 
+function artifactSummary(root, relativePath) {
+  try {
+    const text = readFileSync(path.resolve(root, relativePath), "utf8");
+    const fm = parseFrontmatterData(text) || {};
+    return {
+      id: fm.id || path.basename(relativePath, ".md"),
+      type: fm.type || "unknown",
+      status: fm.outcome_spec_status || fm.status || "unknown",
+      path: relativePath,
+      updated: fm.updated || fm.created || "unknown",
+      approved: fm.type === "agent-outcome-spec" && fm.approved_by === "user" && fm.outcome_spec_status === "approved",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function latestArtifact(artifacts, type) {
+  return artifacts
+    .filter((artifact) => artifact?.type === type)
+    .sort((left, right) => `${right.updated}:${right.path}`.localeCompare(`${left.updated}:${left.path}`))[0] || null;
+}
+
+function deliveryLifecycle(root, evidence) {
+  const contracts = evidence.contracts.map((filePath) => artifactSummary(root, filePath)).filter(Boolean);
+  const reports = evidence.reports.map((filePath) => artifactSummary(root, filePath)).filter(Boolean);
+  const outcome = latestArtifact(contracts, "agent-outcome-spec");
+  const delivery = latestArtifact(reports, "agent-delivery-report");
+  return {
+    outcome: outcome
+      ? { present: true, id: outcome.id, path: outcome.path, status: outcome.status, approved: outcome.approved }
+      : { present: false, status: "missing", approved: false },
+    delivery: delivery
+      ? { present: true, id: delivery.id, path: delivery.path, status: delivery.status }
+      : { present: false, status: "not-started" },
+  };
+}
+
 function findSiblingFolder(root, target, record) {
   const parent = resolvePrithaAgentParent({ root });
   const keys = [...new Set([target, record?.name].filter(Boolean).map(comparableKey))];
@@ -107,6 +165,29 @@ function findSiblingFolder(root, target, record) {
   } catch {
     return null;
   }
+}
+
+function findDeclaredProjectFolder(root, target, record) {
+  const memoryRoot = resolvePrithaAgentMemoryRoot({ root });
+  const keys = [...new Set([target, record?.name].filter(Boolean).map(comparableKey))];
+  const files = [
+    ...listMarkdownFiles(path.join(memoryRoot, "contracts")),
+    ...listMarkdownFiles(path.join(memoryRoot, "reports")),
+  ].filter((filePath) => evidenceMatches(filePath, keys));
+  for (const filePath of files) {
+    try {
+      const text = readFileSync(filePath, "utf8");
+      const declared = bodyValue(text, "Target folder") || bodyValue(text, "Project path");
+      if (!declared) continue;
+      const absolutePath = path.isAbsolute(declared) ? path.resolve(declared) : path.resolve(root, declared);
+      if (!existsSync(absolutePath) || !statSync(absolutePath).isDirectory()) continue;
+      if (path.resolve(absolutePath) === path.resolve(root) || isPrithaCodeCheckout(absolutePath)) continue;
+      return { name: path.basename(absolutePath), absolutePath };
+    } catch {
+      // Ignore invalid or stale declared paths and continue searching.
+    }
+  }
+  return null;
 }
 
 function readJson(filePath) {
@@ -222,11 +303,12 @@ export async function checkCardReadiness(target, options = {}) {
   const root = options.root || resolveTechscopeRoot();
   const normalizedTarget = controlCenterSlug(target);
   const registry = parseRegistry(root);
-  const record = findRegistryRecord(registry.records, normalizedTarget);
-  const folder = findSiblingFolder(root, normalizedTarget, record);
+  const record = findRegistryRecordByContract(root, registry.records, normalizedTarget);
+  const folder = findSiblingFolder(root, normalizedTarget, record) || findDeclaredProjectFolder(root, normalizedTarget, record);
   const manifestPath = folder ? path.join(folder.absolutePath, "operations", "manifest.json") : "";
   const manifest = manifestPath && existsSync(manifestPath) ? readJson(manifestPath) : null;
   const evidence = evidencePaths(root, normalizedTarget, record);
+  const lifecycle = deliveryLifecycle(root, evidence);
   const blockers = [];
   const nextActions = [];
 
@@ -241,6 +323,15 @@ export async function checkCardReadiness(target, options = {}) {
   if (folder && !manifest) {
     blockers.push("operations/manifest.json is missing or invalid.");
     nextActions.push("Generate a card-ready operations/manifest.json for the child agent.");
+  }
+  if (!lifecycle.outcome.present) {
+    nextActions.push("Create and separately approve an Outcome Spec before autonomous delivery.");
+  } else if (!lifecycle.outcome.approved) {
+    nextActions.push("Review and approve the Outcome Spec before autonomous delivery.");
+  } else if (!lifecycle.delivery.present) {
+    nextActions.push("Run outcome delivery to produce revision-bound verification evidence.");
+  } else if (["blocked", "awaiting_acceptance", "verified"].includes(lifecycle.delivery.status)) {
+    nextActions.push(`Continue the delivery lifecycle from ${lifecycle.delivery.status}.`);
   }
   const runtimeSelected = controlCenterRuntimeSelected(manifest);
   if (manifest) {
@@ -301,7 +392,7 @@ export async function checkCardReadiness(target, options = {}) {
     ok: status !== "missing",
     status,
     target: normalizedTarget,
-    agentId: live.agentId || (record ? controlCenterSlug(record.name) : normalizedTarget),
+    agentId: live.agentId || normalizedTarget,
     registryPresent: Boolean(record),
     registryPath: path.relative(root, registry.registryPath),
     folderPresent: Boolean(folder),
@@ -318,6 +409,7 @@ export async function checkCardReadiness(target, options = {}) {
     blockers,
     nextActions: [...new Set(nextActions)],
     evidence,
+    lifecycle,
     warnings: live.visible === "unknown" ? [live.reason] : [],
   };
 }

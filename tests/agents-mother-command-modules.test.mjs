@@ -110,3 +110,70 @@ Phase: 0 - Baseline And Acceptance
   assert.match(registry, /Reports: 1/);
   assert.doesNotMatch(registry, /Pritha GitHub Install Reproducibility Baseline \| unknown/);
 });
+
+test("registry classifies Outcome Specs separately from agent contracts", () => {
+  const root = mkdtemp();
+  write(
+    root,
+    "11_agents/contracts/2026-08-16-alpha-agent-contract.md",
+    `---
+id: 2026-08-16-alpha-agent-contract
+type: agent-contract
+status: accepted
+created: 2026-08-16
+---
+
+# Agent Project Contract: Alpha Agent
+
+- Agent name: Alpha Agent
+- Primary mission: Complete the alpha outcome
+- Runtime family: codex-native
+- Primary interface: Codex project
+- Telegram mode: none
+- Deployment target: local Mac
+- Proactive mode: manual
+`,
+  );
+  write(
+    root,
+    "11_agents/contracts/2026-08-16-alpha-agent-outcome-spec.md",
+    `---
+id: 2026-08-16-alpha-agent-outcome-spec
+type: agent-outcome-spec
+status: approved
+outcome_spec_status: approved
+agent_slug: alpha-agent
+approved_by: user
+created: 2026-08-16
+---
+
+# Agent Outcome Spec: Alpha Agent
+`,
+  );
+  write(
+    root,
+    "11_agents/reports/2026-08-16-alpha-agent-delivery-report.md",
+    `---
+id: 2026-08-16-alpha-agent-delivery-report
+type: agent-delivery-report
+status: verified
+created: 2026-08-16
+subject:
+  kind: child-agent
+  id: alpha-agent
+---
+
+# Agent delivery report: Alpha Agent
+
+- Agent name: Alpha Agent
+`,
+  );
+
+  const result = run(root, ["registry"]);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const registry = readFileSync(path.join(root, "11_agents", "registry.md"), "utf8");
+  assert.match(registry, /Agents tracked: 1/);
+  assert.match(registry, /Contracts: 1/);
+  assert.match(registry, /Outcome specs: 1/);
+  assert.match(registry, /contracts:1 outcome:1 scaffold:0 delivery:1/);
+});

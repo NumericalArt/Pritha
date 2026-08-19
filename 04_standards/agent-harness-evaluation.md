@@ -3,8 +3,8 @@ id: agent-harness-evaluation
 type: standard
 status: draft
 created: 2026-05-27
-updated: 2026-06-02
-last_reviewed: 2026-06-02
+updated: 2026-08-16
+last_reviewed: 2026-08-16
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -31,6 +31,7 @@ sources:
   - https://opencode.ai/docs/providers/
   - https://github.com/earendil-works/pi
   - 03_reviews/2026-06-02-agent-harness-engineering-source-batch-review.md
+  - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
 related:
   decisions: []
   reviews:
@@ -44,10 +45,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-26
-source_updated: 2026-06-02
-source_version: Techscope draft standard v2; benchmark repo/runtime docs plus 2026 harness engineering source batch
+source_updated: 2026-08-16
+source_version: Techscope draft standard v3; outcome-bound Trials and protected verifier inputs
 retrieved: 2026-05-27
-verified: 2026-06-02
+verified: 2026-08-16
 valid_for: Agents Mother harness and runtime-family selection from 2026-05-27 onward
 temporal_status: current
 ---
@@ -56,7 +57,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-02
+Last reviewed: 2026-08-16
 
 ## Rule
 
@@ -139,6 +140,33 @@ For Agents Mother-created coding agents, use:
 For non-coding agents, replace coding tasks with the agent's true workload but
 keep isolation, hidden checks, timeout/error taxonomy and run metadata.
 
+## Outcome-bound delivery Trials
+
+For Pritha delivery, write product acceptance intent in a separate authored
+Outcome Spec and compile it into a deterministic Trial plan. Coverage should be
+bounded to V1 core functions, required deliverables, critical side-effect
+boundaries and critical recovery paths. The user reviews the proposed matrix;
+they should not have to invent its technical identifiers.
+
+- Bind each result to the contract fingerprint, Outcome Spec semantic/document
+  locks, approval evidence id and post-Trial workspace revision.
+- Keep the Trial plan, approval evidence, ledger and verifier outside the build
+  executor's writable roots.
+- Protect explicit Trial entrypoints and fixtures by content hash. An executor
+  change to those inputs is a policy violation, not a passing result.
+- Use argv arrays, never executable shell strings.
+- Record the effective backend, isolation policy, writable roots, network
+  policy, runtime version, bounded output and timeout result.
+- A local backend reports `isolation: none`. A sandbox-required Trial must fail
+  closed when the requested isolation cannot be demonstrated.
+- Operator-judged Trials are legitimate, but their price is
+  `awaiting_acceptance`; they cannot produce autonomous user acceptance.
+- After a verified checkpoint commit, rerun Trials so final evidence binds the
+  committed revision. Repeatedly workspace-mutating Trials are a typed blocker,
+  not a reason to loop forever.
+- An executor summary is a claim. Only host-run Trials and fresh workspace
+  evidence may change delivery state to `verified`.
+
 ## Evaluation dimensions
 
 | Dimension | What to record |
@@ -173,11 +201,11 @@ Use eval results as input to harness changes, not only model choice:
 ## Temporal validity
 
 - Source published: 2026-05-26.
-- Source updated: 2026-06-02.
-- Source version: Techscope draft standard v2; benchmark repo/runtime docs plus
-  2026 harness engineering source batch.
+- Source updated: 2026-08-16.
+- Source version: Techscope draft standard v3; outcome-bound Trials and
+  protected verifier inputs.
 - Retrieved: 2026-05-27.
-- Verified: 2026-06-02.
+- Verified: 2026-08-16.
 - Valid for: Agents Mother harness and runtime-family selection from 2026-05-27
   onward.
 - Freshness status: current.

@@ -18,6 +18,9 @@ export const SKILL_MUTATION_POLICIES = new Set(["read-only", "patch-with-approva
 export const STATUS_VALUES = new Set(["draft", "accepted", "superseded"]);
 export const REPOSITORY_RESEARCH_POLICIES = new Set(["auto", "required", "registry-only", "not-applicable"]);
 export const REPOSITORY_ADOPTION_MODES = new Set(["none", "reference-only", "selected-module"]);
+export const BUILD_GIT_MODES = new Set(["disposable-worktree", "no-git-in-place"]);
+export const BUILD_EXECUTORS = new Set(["codex-app-server", "manual"]);
+export const TRIAL_BACKEND_POLICIES = new Set(["local-or-app-server", "app-server-required", "local-trusted-only"]);
 export const REPOSITORY_RESEARCH_SCOPES = new Set([
   "agent-harness",
   "agent-memory",
@@ -60,11 +63,16 @@ export function bodyValue(text, label) {
 }
 
 export function sectionItems(text, heading) {
-  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = text.match(new RegExp(`^### ${escaped}\\s+([\\s\\S]*?)(?:\\n### |\\n## |$)`, "mi"));
-  if (!match) return [];
-  return match[1]
-    .split(/\r?\n/)
+  const expected = String(heading || "").trim().toLowerCase();
+  const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  const start = lines.findIndex((line) => line.trim().toLowerCase() === `### ${expected}`);
+  if (start === -1) return [];
+  const section = [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (/^#{1,3}\s+/.test(lines[index])) break;
+    section.push(lines[index]);
+  }
+  return section
     .map((line) => line.trim())
     .filter((line) => line.startsWith("- "))
     .map((line) => line.replace(/^- /, "").trim())
@@ -209,6 +217,9 @@ export function validateContract(contractPath, options = {}) {
   const repositoryResearchPolicy = bodyValue(text, "Repository research policy");
   const repositoryResearchTopics = bodyValue(text, "Repository research topics");
   const repositoryAdoptionMode = bodyValue(text, "Repository adoption mode");
+  const buildGitMode = bodyValue(text, "Build Git mode");
+  const buildExecutor = bodyValue(text, "Build executor");
+  const trialBackendPolicy = bodyValue(text, "Trial backend policy");
   const requiredLabels = [
     "Agent name",
     "Primary mission",
@@ -285,6 +296,21 @@ export function validateContract(contractPath, options = {}) {
   }
   if (repositoryAdoptionMode && !REPOSITORY_ADOPTION_MODES.has(repositoryAdoptionMode)) {
     issues.push(invalidEnumIssue("Repository adoption mode", REPOSITORY_ADOPTION_MODES));
+  }
+  if (buildGitMode && !BUILD_GIT_MODES.has(buildGitMode)) {
+    issues.push(invalidEnumIssue("Build Git mode", BUILD_GIT_MODES));
+  }
+  if (buildExecutor && !BUILD_EXECUTORS.has(buildExecutor)) {
+    issues.push(invalidEnumIssue("Build executor", BUILD_EXECUTORS));
+  }
+  if (trialBackendPolicy && !TRIAL_BACKEND_POLICIES.has(trialBackendPolicy)) {
+    issues.push(invalidEnumIssue("Trial backend policy", TRIAL_BACKEND_POLICIES));
+  }
+  for (const [label, minimum] of [["Build iteration budget", 1], ["Build elapsed budget ms", 60_000], ["Repeated failure threshold", 2]]) {
+    const raw = bodyValue(text, label);
+    if (!raw) continue;
+    const value = Number(raw);
+    if (!Number.isSafeInteger(value) || value < minimum) issues.push(`${label} must be an integer >= ${minimum}`);
   }
   if (repositoryResearchPolicy === "not-applicable" && isMissing(bodyValue(text, "Repository research waiver reason"))) {
     issues.push("Repository research policy not-applicable requires Repository research waiver reason");
@@ -398,6 +424,8 @@ export function contractData(contractPath, options = {}) {
     primaryMission: bodyValue(text, "Primary mission"),
     targetUser: bodyValue(text, "Target user"),
     successCriteria: bodyValue(text, "Success criteria"),
+    outOfScope: bodyValue(text, "Out of scope"),
+    technicalSlug: bodyValue(text, "Technical slug"),
     runtimeFamily: bodyValue(text, "Runtime family"),
     runtimePlacementProfile: bodyValue(text, "Runtime placement profile"),
     primaryInterface: bodyValue(text, "Primary interface"),
@@ -445,10 +473,21 @@ export function contractData(contractPath, options = {}) {
     repositoryPermissions: bodyValue(text, "Repository permissions"),
     repositoryEvalStatus: bodyValue(text, "Repository eval status"),
     repositoryUserApproval: bodyValue(text, "Repository user approval"),
+    outcomeSpecRequired: bodyValue(text, "Outcome Spec required") || "yes",
+    outcomeApprovalPolicy: bodyValue(text, "Outcome approval policy") || "separate-explicit-user",
+    buildGitMode: bodyValue(text, "Build Git mode") || "disposable-worktree",
+    buildExecutor: bodyValue(text, "Build executor") || "codex-app-server",
+    trialBackendPolicy: bodyValue(text, "Trial backend policy") || "local-or-app-server",
+    buildIterationBudget: Number(bodyValue(text, "Build iteration budget") || 6),
+    buildElapsedBudgetMs: Number(bodyValue(text, "Build elapsed budget ms") || 5_400_000),
+    repeatedFailureThreshold: Number(bodyValue(text, "Repeated failure threshold") || 3),
+    autonomousEffectsDenied: bodyValue(text, "Autonomous effects denied") || "push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation",
+    acceptancePolicy: bodyValue(text, "Acceptance policy") || "verified is distinct from accepted; operator-judged Trials require explicit user acceptance",
     memoryModel: bodyValue(text, "Memory model"),
     indexingSearchNeeds: bodyValue(text, "Indexing/search needs"),
     toolSystem: bodyValue(text, "Tool system"),
     inputDataTypes: bodyValue(text, "Input data types"),
+    storedData: bodyValue(text, "Stored data"),
     sensitiveData: bodyValue(text, "Sensitive data"),
     targetFolder: bodyValue(text, "Target folder"),
     filesToGenerate: bodyValue(text, "Files to generate"),

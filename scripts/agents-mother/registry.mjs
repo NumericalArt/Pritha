@@ -43,6 +43,7 @@ export function listContracts() {
     .filter((entry) => entry.endsWith(".md"))
     .map((entry) => path.join(CONTRACT_DIR, entry))
     .filter((file) => statSync(file).isFile())
+    .filter((file) => readFrontmatter(readFileSync(file, "utf8")).type === "agent-contract")
     .sort();
   if (files.length === 0) {
     console.log("No agent contracts yet.");
@@ -96,6 +97,21 @@ function contractSummaryFromFile(file) {
   };
 }
 
+function outcomeSummaryFromFile(file) {
+  const text = readFileSync(file, "utf8");
+  const fm = readFrontmatter(text);
+  const agentSlug = scalar(fm.agent_slug, slug(markdownTitle(text, path.basename(file, ".md")).replace(/^Agent Outcome Spec:\s*/i, "")));
+  return {
+    kind: "outcome",
+    path: path.relative(ROOT, file),
+    id: fm.id || path.basename(file, ".md"),
+    status: fm.outcome_spec_status || fm.status || "unknown",
+    slug: slug(agentSlug),
+    created: fm.created || "unknown",
+    approvedBy: fm.approved_by || "pending",
+  };
+}
+
 function reportSummaryFromFile(file) {
   const text = readFileSync(file, "utf8");
   const fm = readFrontmatter(text);
@@ -103,7 +119,7 @@ function reportSummaryFromFile(file) {
   const relPath = path.relative(ROOT, file);
   const projectPath = bodyValue(text, "Project path") || bodyValue(text, "Target folder") || "";
   const agentName = bodyValue(text, "Agent name");
-  const nameFromTitle = title.replace(/^Agent\s+(Scaffold|Test|Handoff|Operations|Deployment)\s+Report:\s*/i, "").trim();
+  const nameFromTitle = title.replace(/^Agent\s+(Scaffold|Test|Handoff|Operations|Deployment|Delivery)\s+Report:\s*/i, "").trim();
   const name = agentName || nameFromTitle || path.basename(file, ".md");
   return {
     kind: "report",
@@ -127,7 +143,9 @@ function reportRepresentsChildAgent(report) {
 }
 
 function collectAgentLifecycle() {
-  const contracts = listMarkdownFilesFlat(CONTRACT_DIR).map(contractSummaryFromFile);
+  const contractArtifacts = listMarkdownFilesFlat(CONTRACT_DIR).map((file) => ({ file, type: readFrontmatter(readFileSync(file, "utf8")).type }));
+  const contracts = contractArtifacts.filter((entry) => entry.type === "agent-contract").map((entry) => contractSummaryFromFile(entry.file));
+  const outcomes = contractArtifacts.filter((entry) => entry.type === "agent-outcome-spec").map((entry) => outcomeSummaryFromFile(entry.file));
   const reports = listMarkdownFilesFlat(REPORT_DIR)
     .filter((file) => path.basename(file) !== ".gitkeep")
     .map(reportSummaryFromFile);
@@ -155,8 +173,28 @@ function collectAgentLifecycle() {
       deploymentTarget: contract.deploymentTarget,
       proactiveMode: contract.proactiveMode,
       contracts: [contract],
+      outcomes: [],
       reports: [],
     });
+  }
+  for (const outcome of outcomes) {
+    const key = [...bySlug.keys()].find((item) => comparableOutcomeSlug(item, outcome.slug)) || outcome.slug;
+    if (!bySlug.has(key)) {
+      bySlug.set(key, {
+        slug: key,
+        name: outcome.slug,
+        mission: "unknown",
+        runtime: "unknown",
+        interface: "unknown",
+        telegram: "unknown",
+        deploymentTarget: "unknown",
+        proactiveMode: "unknown",
+        contracts: [],
+        outcomes: [],
+        reports: [],
+      });
+    }
+    bySlug.get(key).outcomes.push(outcome);
   }
   for (const report of reports) {
     if (!reportRepresentsChildAgent(report)) continue;
@@ -172,13 +210,19 @@ function collectAgentLifecycle() {
         deploymentTarget: "unknown",
         proactiveMode: "unknown",
         contracts: [],
+        outcomes: [],
         reports: [],
       });
     }
     bySlug.get(key).reports.push(report);
   }
 
-  return { agents: [...bySlug.values()].sort((a, b) => a.slug.localeCompare(b.slug)), contracts, reports, research };
+  return { agents: [...bySlug.values()].sort((a, b) => a.slug.localeCompare(b.slug)), contracts, outcomes, reports, research };
+}
+
+function comparableOutcomeSlug(left, right) {
+  const normalize = (value) => slug(value).replaceAll("-", "");
+  return normalize(left) === normalize(right);
 }
 
 function reportTypeCount(reports, type) {
@@ -225,7 +269,9 @@ related:
     - 07_workflows/agents-mother.md
     - 07_workflows/agents-mother-roadmap.md
   agent_contracts: []
+  outcome_specs: []
   scaffold_reports: []
+  agent_delivery_reports: []
   agent_test_reports: []
   agent_handoff_reports: []
   agent_operations_reports: []
@@ -252,6 +298,7 @@ Status: active
 
 - Agents tracked: ${lifecycle.agents.length}
 - Contracts: ${lifecycle.contracts.length}
+- Outcome specs: ${lifecycle.outcomes.length}
 - Reports: ${lifecycle.reports.length}
 - Research reports: ${lifecycle.research.length}
 
@@ -262,7 +309,9 @@ Status: active
 ${lifecycle.agents.map((agent) => {
   const evidence = [
     `contracts:${agent.contracts.length}`,
+    `outcome:${agent.outcomes.length}`,
     `scaffold:${reportTypeCount(agent.reports, "scaffold-report")}`,
+    `delivery:${reportTypeCount(agent.reports, "agent-delivery-report")}`,
     `test:${reportTypeCount(agent.reports, "agent-test-report")}`,
     `handoff:${reportTypeCount(agent.reports, "agent-handoff-report")}`,
     `ops:${reportTypeCount(agent.reports, "agent-operations-report")}`,

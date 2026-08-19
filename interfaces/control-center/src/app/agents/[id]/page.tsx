@@ -18,8 +18,13 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
   const clientStatus = controlCenterStatusForClient(status);
   const directUrl = agent.url.tailscale || agent.url.local;
   const canOpenDirect = agent.ui.activity === "active" && Boolean(directUrl);
+  const deliveryDetail = agent.lifecycle.delivery.runId
+    ? `run ${agent.lifecycle.delivery.runId}${agent.lifecycle.delivery.phase ? ` · ${agent.lifecycle.delivery.phase}` : ""}`
+    : agent.lifecycle.delivery.path || agent.lifecycle.delivery.reason || "not started";
   const readinessRows = [
     ["Folder", agent.folder.status, agent.folder.relativePath || agent.folder.name || "not available"],
+    ["Outcome Spec", agent.lifecycle.outcome.status, agent.lifecycle.outcome.path || agent.lifecycle.outcome.reason || "not available"],
+    ["Outcome delivery", agent.lifecycle.delivery.status, deliveryDetail],
     ["Health", agent.health.status, agent.health.checkedUrl || agent.health.detail || "not checked"],
     ["Readiness", agent.readiness.status, agent.readiness.summary],
     ["Runtime service", agent.readiness.runtime.status, agent.readiness.runtime.detail],

@@ -1,0 +1,91 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, realpathSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { CodexAppServerBuildExecutor, FunctionBuildExecutor, ManualBuildExecutor } from "../scripts/agents-mother/build-executors.mjs";
+
+function plan() {
+  return {
+    spec_id: "fixture-outcome",
+    agent_slug: "fixture",
+    contract_fingerprint: "sha256:contract",
+    semantic_lock: "sha256:semantic",
+    interaction_mode: "interface",
+    trials: [{ id: "main", statement: "Produce ready output", kind: "automated", covers: ["core:main"], thenExitCode: 0, thenStdoutContains: ["READY"] }],
+    demo: ["run main"],
+  };
+}
+
+class FakeConnection {
+  constructor() {
+    this.calls = [];
+  }
+
+  async start() {}
+
+  async request(method, params) {
+    this.calls.push({ method, params });
+    if (method === "initialize") return { userAgent: "codex-fixture/2", platformOs: "macos", platformFamily: "unix" };
+    if (method === "thread/start") return { thread: { id: "thread-1" } };
+    if (method === "turn/start") return { turn: { id: "turn-1" } };
+    throw new Error(`unexpected method ${method}`);
+  }
+
+  async waitForNotification(predicate) {
+    const message = {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "completed",
+          items: [{ type: "agentMessage", text: '{"summary":"implemented","changed_files":["agent.mjs"],"remaining_risks":[]}' }],
+        },
+      },
+    };
+    assert.equal(predicate(message), true);
+    return message;
+  }
+
+  stop() {}
+}
+
+test("App Server build executor constrains the turn to the worktree and immutable outcome", async () => {
+  const worktree = mkdtempSync(path.join(os.tmpdir(), "pritha-build-executor-"));
+  const connection = new FakeConnection();
+  const executor = new CodexAppServerBuildExecutor({ connection });
+  const result = await executor.execute({
+    runId: "run-1",
+    iteration: 1,
+    remainingIterations: 5,
+    worktree,
+    plan: plan(),
+    failures: [{ id: "main", error: "not ready" }],
+    protectedPaths: [{ path: "scripts/eval.mjs" }],
+    timeoutMs: 30_000,
+  });
+
+  const thread = connection.calls.find((entry) => entry.method === "thread/start");
+  const turn = connection.calls.find((entry) => entry.method === "turn/start");
+  assert.equal(thread.params.ephemeral, true);
+  assert.equal(thread.params.approvalPolicy, "never");
+  assert.deepEqual(turn.params.sandboxPolicy, { type: "workspaceWrite", writableRoots: [realpathSync(worktree)], networkAccess: false });
+  assert.equal(turn.params.input[0].text.includes("scripts/eval.mjs"), true);
+  assert.equal(turn.params.input[0].text.includes("Do not push, merge, deploy"), true);
+  assert.equal(result.summary, "implemented");
+  assert.deepEqual(result.changed_files, ["agent.mjs"]);
+});
+
+test("function executor provides the same bounded result contract", async () => {
+  const executor = new FunctionBuildExecutor(async () => ({ summary: "done", changed_files: ["one.mjs"] }));
+  const result = await executor.execute({});
+  assert.equal(result.status, "completed");
+  assert.equal(result.summary, "done");
+  assert.deepEqual(result.changed_files, ["one.mjs"]);
+});
+
+test("manual build policy returns a typed implementation boundary", async () => {
+  const executor = new ManualBuildExecutor();
+  await assert.rejects(executor.execute({}), (error) => error.code === "manual_build_required");
+});

@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-07-13
+updated: 2026-08-16
 topics:
   - agent-engineering
   - agent-factory
@@ -43,6 +43,8 @@ sources:
   - 01_sources/registries/github-agent-building-repos.md
   - 01_sources/signals/2026-06-28-open-source-agent-building-repos-signal.md
   - 03_reviews/2026-06-28-open-source-agent-building-repos-review.md
+  - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
+  - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
 related:
   standards:
     - 04_standards/agent-creation-harness.md
@@ -59,10 +61,13 @@ related:
     - 04_standards/agent-ai-safe-security-checklist.md
   templates:
     - 08_templates/agent-project-contract.md
+    - 08_templates/agent-outcome-spec.md
     - 08_templates/agent-scaffold-report.md
+    - 08_templates/agent-delivery-report.md
     - 08_templates/github-source-registry-entry.md
   workflows:
     - 07_workflows/agents-mother-roadmap.md
+    - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
     - 07_workflows/agent-skill-pack-selection.md
     - 07_workflows/agent-mcp-connector-selection.md
     - 07_workflows/agent-a2a-communication-selection.md
@@ -76,7 +81,9 @@ Status: experimental
 
 ## Goal
 
-Use TechScope as an agent factory: design, validate, scaffold, test and hand off new working agents from a user request or jointly developed specification.
+Use Pritha as an outcome-driven agent factory: jointly define the desired
+product, design its architecture, build it to executable acceptance evidence,
+and hand off a working agent from a user request.
 
 Pritha is the public alias and product name for this layer. Existing `agents-mother` paths and artifact types remain valid for compatibility; new user-facing CLI/docs should prefer Pritha vocabulary.
 
@@ -103,11 +110,18 @@ when comparing a future voice or learning agent against proven lineage evidence.
 
 ## Core rule
 
-Do not scaffold a new agent directly from a vague idea. First create an
-`agent-contract`, validate it against TechScope/Pritha memory and current
-sources, accept the contract, then generate a working scaffold with tests and a
-handoff guide. A draft contract may be scaffolded only with an explicit
-experimental `--allow-draft-scaffold` override.
+Do not scaffold a new agent directly from a vague idea. First turn the idea into
+a concrete proposal, then create two separately approved and locked artifacts:
+an `agent-contract` for the architecture and an `agent-outcome-spec` for the
+observable final result. Validate them against Pritha memory and current
+sources, compile the Outcome Spec into executable Trials, and continue through
+the bounded delivery loop until the Trials pass for a committed revision or a
+typed blocker requires a user decision. A scaffold is an intermediate result,
+not the completion condition. The low-level compatibility scaffold may still
+run from an accepted contract before Outcome approval, but it must report the
+missing lifecycle gate and cannot be presented as delivered. A draft contract
+may be scaffolded only with an explicit experimental
+`--allow-draft-scaffold` override.
 
 For Voice Control and Predictive Voice Control creation tasks, a visible Agents
 card is part of the minimum successful outcome. The card can show explicit
@@ -117,44 +131,28 @@ runtime blockers, but creation is not complete while the agent is missing from
 ## Workflow
 
 1. Capture the request as an intake or direct thread brief.
-2. Run a staged interview:
-   - purpose, target user and success criteria;
-   - core v1 functions and deferred functions;
-   - runtime family: Codex-native, CLI, API, local model, hybrid or environment-specific;
-   - interaction interface: Telegram, CLI, web, API, Codex project or mixed;
-   - interface experience: chat/thread, operator console, workflow UI, embedded
-     chat app, event-stream UI, MCP App/UI widget, declarative generated UI or
-     realtime voice UI;
-   - UI framework and AI UI layer only when a user-facing web/app interface is
-     selected; do not infer them from backend agent frameworks;
-   - raster visual asset layer only when generated or edited bitmap assets help
-     a concrete workflow state, preview, comparison, consequence or operator
-     control;
-   - 3D visual layer only when the user-facing workflow needs scene inspection,
-     spatial simulation, 3D explanation, avatar/state visualization or 3D
-     artifact creation;
-   - Codex account/rate-limit telemetry only when the Codex surface profile is
-     app-server or another app-server-backed integration;
-   - team mode: single agent, coordinator plus workers, specialist team or external harness team;
-   - data, memory, tools, permissions, secrets and operational constraints;
-   - runtime placement: deterministic code, local model, small hosted model,
-     frontier hosted model, Codex sidecar or manual/human;
-   - whether the user explicitly wants different models for different task
-     classes, or whether multi-model routing should be avoided for v1;
-   - untrusted input sources, quarantine rules, token/media budget caps and approval gates;
-   - AI-SAFE security profile: interface, reasoning/planning, knowledge,
-     execution/tools and infrastructure/orchestration controls;
-   - skill needs, allowed skill sources, install mode and mutation policy;
-   - MCP needs, allowed connector sources, auth policy, toolset scope and side-effect policy;
-   - GitHub repository research policy, capability scopes and whether any
-     repository is only a reference or supplies a selected scaffold module;
-   - A2A needs, peer-agent role, discovery mode, Agent Card visibility, trust registry and task policy;
-   - acceptance tests and training expectations.
-   If the first user description is not enough to fill these fields, ask concise
-   clarifying questions before handing the task to Codex. Creation,
-   improvement, fixing and harness evolution are the same class of
-   agent-development task and need the same quality of brief.
+2. Run a proposal-first product interview. Pritha first synthesizes a concrete
+   candidate and asks only about choices that materially change the result:
+   - final user-visible result and primary user;
+   - observable done conditions;
+   - main interface and first end-to-end journey;
+   - core v1 outcomes and deliberately excluded outcomes;
+   - sensitive data, consequential actions and approval boundaries.
+   Routine technical choices are filled by Pritha as an editable architecture
+   proposal: runtime family and placement, team mode, memory, tools, skills,
+   MCP/A2A, isolation, interface implementation, Git/repository research,
+   operations and test strategy. Ask a follow-up only when uncertainty changes
+   product behavior, material cost, privacy/security, an irreversible action or
+   an external dependency. Creation, improvement, fixing and harness evolution
+   are the same class of agent-development task and need the same quality of
+   brief.
 3. Create an `agent-contract` from `08_templates/agent-project-contract.md`.
+3a. Create an `agent-outcome-spec` from
+    `08_templates/agent-outcome-spec.md`. It must describe the final experience,
+    observable success, deliverables, non-goals and Trial blocks. Validate its
+    coverage, approve it independently from the contract, record host-side
+    approval evidence, lock its content and compile it to `trial-plan.json` in
+    `PRITHA_STATE_ROOT`.
 4. Create a reusable `agent-pattern-pack` artifact in `11_agents/research/`.
    The pack must combine FTS search, domain-routed memory search and an
    attempted semantic/embedding search:
@@ -226,12 +224,20 @@ runtime blockers, but creation is not complete while the agent is missing from
      contract-specific eval result, current `github-repository-review` evidence,
      completed synthesis and explicit user approval;
    - testing and observability model.
-7. Mark the contract `accepted` before production scaffold.
+7. Mark the contract `accepted` before scaffold. Separately approve the Outcome
+   Spec before autonomous delivery, and verify both content locks immediately
+   before use. A compatibility scaffold created before Outcome approval remains
+   an intermediate artifact only.
    If `Repository adoption mode` is `selected-module`, keep scaffold blocked until
    the repository research is current and the selected-module gates above are
    complete. `candidate`, `accepted-for-review` and `reference-only` never grant
    runtime or vendoring permission.
-8. Scaffold the new agent in a sibling folder unless the contract explicitly chooses another location.
+8. Scaffold the new agent in a sibling folder unless the contract explicitly
+   chooses another location. Embed contract/Outcome lineage in the generated
+   child, but keep approval evidence and live delivery state outside the child
+   repository. When `Build Git mode` is `disposable-worktree`, initialize a
+   local repository and clean scaffold baseline commit without adding a remote,
+   pushing or bypassing hooks.
 9. Generate minimum project files:
    - `AGENTS.md` or runtime-native equivalent;
    - `README.md`;
@@ -249,19 +255,49 @@ runtime blockers, but creation is not complete while the agent is missing from
    - concise human-readable replies;
    - processing log;
    - token and user id only through environment variables.
-11. Run tests and healthchecks.
+11. Run the compiled Trials once before a build attempt. Use this as independent
+    baseline evidence, not as a prompt-authored claim.
 12. Create a `scaffold-report` from `08_templates/agent-scaffold-report.md`.
-13. Rebuild the Pritha child-agent registry with `node scripts/pritha.mjs registry`.
-14. Run `node scripts/pritha.mjs card-readiness <agent-slug>`. If the status is `missing`, treat the creation task as blocked. If the status is `blocked`, report the card blockers and next operator tasks; do not hide the card behind unfinished runtime work.
-15. After the first meaningful working version, create an `agent-post-creation-review`.
-16. Record a user interaction review: initial prompt, clarifications, user feedback, failed assumptions and product decisions discovered during the build.
-17. Rebuild TechScope memory indexes so the new contract and reports become searchable.
+13. Start delivery in a clean disposable Git worktree and a single-writer run
+    ledger. Refuse to use a dirty active target checkout because Pritha cannot
+    safely distinguish user changes from build changes.
+14. Repeat until verified or blocked:
+    - run the immutable Trial plan through the selected portable backend;
+    - give only bounded failure evidence and the locked goal to the build
+      executor;
+    - reject protected-spec/verifier mutation, stale evidence, symlink escapes,
+      non-progress, repeated failure and budget overruns;
+    - commit a green checkpoint on `pritha/build-*` without bypassing hooks;
+    - rerun every Trial against that exact commit.
+15. Create an `agent-delivery-report` at every typed blocker and at final
+    verification. Redact absolute paths and keep the live ledger exclusively in
+    runtime state. Every non-terminal ledger state must contain exactly one
+    `next_action` or a non-empty typed blocker list.
+16. Move a fully verified result to `awaiting_acceptance`. Only the user may
+    transition it to `accepted`; Pritha must not push, merge, deploy or publish
+    during delivery.
+17. Rebuild the Pritha child-agent registry and run
+    `node scripts/pritha.mjs card-readiness <agent-slug>`. If the status is
+    `missing`, treat the creation task as blocked. If the status is `blocked`,
+    report the card blockers and next operator tasks; do not hide the card
+    behind unfinished runtime work.
+18. After the first meaningful accepted version, create an
+    `agent-post-creation-review` and record the interaction path: initial prompt,
+    clarifications, user feedback, failed assumptions and product decisions
+    discovered during the build.
+19. Rebuild Pritha memory indexes so the contract, Outcome Spec and lifecycle
+    reports become searchable.
 
 ## Current commands
 
 ```sh
 node scripts/pritha.mjs questions
 node scripts/pritha.mjs init --name "agent-name" --mission "mission"
+node scripts/pritha.mjs outcome init 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
+node scripts/pritha.mjs outcome validate 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md
+node scripts/pritha.mjs outcome revise 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md
+node scripts/pritha.mjs outcome approve 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md --approved-by user
+node scripts/pritha.mjs outcome compile 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md
 node scripts/pritha.mjs create --name "agent-name" --mission "mission"
 node scripts/pritha.mjs research 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md --github-mode auto --github-limit 5
 node scripts/pritha.mjs create 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
@@ -273,11 +309,20 @@ node scripts/pritha.mjs publish ../existing-or-generated-agent
 node scripts/pritha.mjs lineage
 node scripts/pritha.mjs registry
 node scripts/pritha.mjs card-readiness agent-name
+node scripts/pritha.mjs trial run 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md --project ../agent-name
+node scripts/pritha.mjs deliver 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md --project ../agent-name
+node scripts/pritha.mjs delivery status <run-id>
+node scripts/pritha.mjs delivery resume <run-id> --answer <option-id>
+node scripts/pritha.mjs delivery accept <run-id> --accepted-by user
 
 # Compatibility aliases retained for v0.1:
 node scripts/agents-mother.mjs questions
 node scripts/agents-mother.mjs interview
 node scripts/agents-mother.mjs init --name "agent-name" --mission "mission"
+node scripts/agents-mother.mjs outcome init 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
+node scripts/agents-mother.mjs outcome validate 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md
+node scripts/agents-mother.mjs outcome revise 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md
+node scripts/agents-mother.mjs outcome approve 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md --approved-by user
 node scripts/agents-mother.mjs research 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/agents-mother.mjs scaffold 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/agents-mother.mjs test ../existing-or-generated-agent
@@ -287,6 +332,10 @@ node scripts/agents-mother.mjs deploy ../existing-or-generated-agent plan
 node scripts/agents-mother.mjs evolve ../existing-or-generated-agent --notes "lessons"
 node scripts/agents-mother.mjs registry
 node scripts/agents-mother.mjs card-readiness agent-name
+node scripts/agents-mother.mjs deliver 11_agents/contracts/YYYY-MM-DD-agent-name-agent-outcome-spec.md --project ../agent-name
+node scripts/agents-mother.mjs delivery status <run-id>
+node scripts/agents-mother.mjs delivery resume <run-id> --answer <option-id>
+node scripts/agents-mother.mjs delivery accept <run-id> --accepted-by user
 node scripts/agents-mother.mjs validate 11_agents/contracts/YYYY-MM-DD-agent-name-agent-contract.md
 node scripts/agents-mother.mjs list
 ```
@@ -752,16 +801,26 @@ sandbox behavior changes.
 An Agents Mother run is complete only when:
 
 - an `agent-contract` exists and validates;
+- a separate `agent-outcome-spec` exists, validates, has independent approval
+  evidence and has a content lock that still matches;
+- every core outcome and required deliverable has executable Trial coverage,
+  with safety and recovery coverage where applicable;
 - the selected architecture is grounded in TechScope memory, a pattern-pack
   artifact and current sources;
 - any contract-relevant GitHub shortlist is recorded as advisory evidence, and
   every selected repository module has passed exact-pin, license, security,
   permission, eval, `github-repository-review`, synthesis and
   explicit-user-approval gates;
-- a working scaffold exists in the chosen folder;
+- a working scaffold exists in the chosen folder, but is not mistaken for the
+  final result;
+- the delivery ledger is either terminal or contains exactly one actionable
+  next step or a non-empty typed blocker list;
+- all required Trials pass against the exact verified commit after the final
+  checkpoint, or a typed blocker states what decision or authority is missing;
+- machine verification and user acceptance remain separate lifecycle states;
 - environment setup instructions are present;
 - smoke tests or healthchecks pass, or failures are documented;
-- the user has a short handoff guide explaining how to run and test the new agent.
+- the user has a short handoff guide explaining how to run and test the new agent;
 - post-creation lessons are captured when the agent has meaningful lifecycle evidence.
 - the user interaction/revision path is captured after the first successful working version.
 

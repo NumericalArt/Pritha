@@ -3,8 +3,8 @@ id: agent-trajectory-control-and-evidence
 type: standard
 status: draft
 created: 2026-07-24
-updated: 2026-08-09
-last_reviewed: 2026-08-09
+updated: 2026-08-16
+last_reviewed: 2026-08-16
 owner: Pritha/user
 topics:
   - agent-engineering
@@ -40,6 +40,9 @@ config_surfaces:
   - spec.md
   - plan.md
   - run contract
+  - agent-outcome-spec
+  - delivery ledger
+  - trial-plan.json
   - trajectory events
   - evidence bundle
 portability: portable
@@ -59,7 +62,10 @@ sources:
   - https://arxiv.org/abs/2607.26637
   - https://arxiv.org/abs/2608.02499
   - https://github.com/Trae1ounG/SWE-Touch
+  - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
 related:
+  decisions:
+    - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
   assessments:
     - 03_reviews/2026-07-24-production-agent-operating-layer-assessment.md
     - 03_reviews/2026-06-01-production-agent-controls-assessment.md
@@ -77,10 +83,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-07-13
-source_updated: 2026-08-05
-source_version: Pritha trajectory control standard v2; execution-ledger, workspace-freshness and typed-lifecycle evidence verified 2026-08-09
+source_updated: 2026-08-16
+source_version: Pritha trajectory control standard v3; Outcome Spec, immutable Trials, single-writer delivery ledger and post-commit verification integrated 2026-08-16
 retrieved: 2026-07-24
-verified: 2026-08-09
+verified: 2026-08-16
 valid_for: Pritha and child-agent runs that are long-running, proactive, parallel, permission-bearing or capable of external side effects
 temporal_status: current
 memory_domain: agent-building-knowledge
@@ -100,7 +106,7 @@ confidence: high
 
 Status: draft
 Owner: Pritha/user
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-16
 
 ## Rule
 
@@ -216,6 +222,33 @@ independent evidence.
 The ledger is an execution primitive, not authored long-term knowledge. Store it
 in runtime state with the privacy and retention policy of the run. Promote only
 curated, non-sensitive lessons to tracked Markdown.
+
+For Pritha agent delivery, the ledger has a stronger liveness invariant. Every
+non-terminal state contains exactly one actionable `next_action` or a non-empty
+list of typed blockers. Each blocker records an owner, a bounded question and
+answer choices; free text such as “something failed” is not a valid pause state.
+Ledger updates are single-writer, stale-lock recoverable and compare-and-swap
+guarded so that two resume attempts cannot silently overwrite each other.
+
+## Document Outcome, Thread Goal and Trial Plan
+
+Pritha uses three related but non-interchangeable control surfaces:
+
+- the approved `agent-outcome-spec` is the durable product outcome and source of
+  truth across threads;
+- a Codex thread Goal, when used, controls one bounded implementation session
+  and must cite rather than replace the Outcome Spec;
+- generated `trial-plan.json` is the deterministic executable projection of the
+  signed Trial blocks and is never hand-edited.
+
+The build executor may propose source changes but cannot revise the Outcome
+Spec, its compiled plan, approval evidence or verifier. Changing the product
+goal requires a new user-reviewed Outcome Spec revision and invalidates stale
+evidence. Changing only an implementation tactic does not.
+
+Machine verification and human acceptance are also separate. Passing every
+Trial for an exact committed revision yields `verified` or
+`awaiting_acceptance`; only explicit user evidence yields `accepted`.
 
 ## Workspace and External-State Freshness
 
@@ -402,6 +435,9 @@ untrusted-input controls.
   external content and supply-chain boundaries.
 - `agent-harness-evaluation` determines whether the whole harness succeeds
   reliably in its actual environment.
+- `outcome-driven-agent-delivery` separates the durable Outcome Spec from the
+  thread Goal and implements the ledger, immutable Trial and acceptance
+  invariants for Pritha-created agents.
 - This standard joins those decisions into one controlled run and evidence
   trail.
 
@@ -422,8 +458,8 @@ Before this standard becomes active:
 
 ## Temporal Validity
 
-- Primary evidence window: 2026-07-13 through 2026-08-05.
-- Retrieved and verified: 2026-08-09.
+- Primary evidence window: 2026-07-13 through 2026-08-16.
+- Retrieved and verified: 2026-08-16.
 - Valid for: Pritha and child-agent production architecture from 2026-07-24
   until a material change in runtime, monitoring, workspace-concurrency or
   incident evidence.

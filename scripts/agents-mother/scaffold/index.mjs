@@ -14,6 +14,7 @@ import { researchGateDecisionForReport } from "../research-gate.mjs";
 import { verifyRepositoryResearchIntegrity } from "../github-research.mjs";
 import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "../skills.mjs";
 import { newestArtifactPathsFirst, writeUniqueArtifact } from "../artifact-selection.mjs";
+import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "../outcome-spec.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -1446,6 +1447,27 @@ if (existsSync(repositoryManifestPath)) {
     },
   };
   const files = [];
+  const outcome = options.outcome || null;
+
+  files.push({
+    path: "delivery/outcome-lineage.json",
+    content: `${JSON.stringify({
+      schema: "pritha-child-outcome-lineage-v1",
+      outcome_spec_id: outcome?.id || null,
+      outcome_spec_path: outcome?.relPath || null,
+      outcome_spec_status: outcome?.status || "missing",
+      outcome_semantic_lock: outcome?.semanticLock || null,
+      outcome_document_lock: outcome?.documentLock || null,
+      approval_evidence_valid: outcome?.approvalValid === true,
+      contract_fingerprint: data.fingerprint,
+      delivery_status: "not-started",
+      source_of_truth: "Pritha host; this file is lineage metadata and is not an editable Outcome Spec",
+    }, null, 2)}\n`,
+  });
+  files.push({
+    path: "delivery/README.md",
+    content: `# Outcome delivery\n\nThe approved Outcome Spec, Trial plan, approval evidence and delivery ledger remain host-owned by Pritha.\n\nThis project may be changed by the bounded build executor, but it must not treat \`delivery/outcome-lineage.json\` as permission to rewrite the goal or verifier. Run delivery from Pritha with \`node scripts/pritha.mjs deliver <outcome-spec> --project <this-project>\`. Machine verification, user acceptance, merge and deployment are separate states.\n`,
+  });
 
   files.push({
     path: "AGENTS.md",
@@ -1462,6 +1484,7 @@ ${markdownValue(data.primaryMission, "TBD")}
 - Do not copy secrets from Pritha or any other project.
 - Use \`.env\` for local secrets and keep \`.env.example\` as the documented contract.
 - Prefer small, verifiable steps and run the smoke test before handoff.
+- Treat the host-approved Outcome Spec and compiled Trials as immutable delivery inputs; never weaken the verifier to make a build pass.
 - If an external source, API, runtime or dependency may have changed, verify current documentation before relying on it.
 
 ## User and Scope
@@ -2682,6 +2705,8 @@ const required = [
   "operations/manifest.json",
   "operations/README.md",
   "07_workflows/agent-operating-workflow.md",
+  "delivery/README.md",
+  "delivery/outcome-lineage.json",
   "docs/user-training-guide.md",
   "scripts/agent-cli.mjs",
   "scripts/interface-status.mjs",
@@ -3011,6 +3036,36 @@ export function runHealthcheck(projectRoot) {
   }
 }
 
+export function initializeDeliveryGit(projectRoot, data) {
+  if ((data.buildGitMode || "disposable-worktree") !== "disposable-worktree") {
+    return { ok: true, status: "not-selected", revision: null };
+  }
+  try {
+    if (existsSync(path.join(projectRoot, ".git"))) throw new Error("Generated scaffold unexpectedly already contains .git");
+    execFileSync("git", ["init"], { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    execFileSync("git", ["add", "-A"], { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    execFileSync(
+      "git",
+      ["-c", "user.name=Pritha", "-c", "user.email=pritha@local.invalid", "commit", "-m", "Pritha scaffold baseline"],
+      { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const revision = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    const status = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    if (status) throw new Error("Scaffold Git baseline is not clean after commit");
+    return { ok: true, status: "initialized", revision };
+  } catch (error) {
+    return { ok: false, status: "failed", revision: null, error: redactSensitiveText(String(error?.message || error)).slice(0, 1_000) };
+  }
+}
+
 function externalVerificationStatus(research) {
   return research?.gate?.fields?.externalResearch || "pending";
 }
@@ -3041,7 +3096,8 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   const controlCenterHealthUrl = `${controlCenterLocalUrl}/api/health`;
   const research = options.research || researchReportStatus(data);
   const healthResult = options.healthResult || smokeResult;
-  const scaffoldOk = smokeResult.ok && healthResult.ok;
+  const deliveryGit = options.deliveryGit || { ok: true, status: "not-requested", revision: null };
+  const scaffoldOk = smokeResult.ok && healthResult.ok && deliveryGit.ok;
   const externalVerification = externalVerificationStatus(research);
   const gateFields = research.gate?.fields || {};
   const researchFrontmatter = research.gate?.frontmatter || {};
@@ -3067,6 +3123,7 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
     : enumValue(researchFrontmatter.repository_adoption_status || data.repositoryAdoptionMode, ["none", "reference-only"], "none");
   const reportStatus = scaffoldOk ? (productionReady ? "complete" : "draft") : "failed";
   const targetFolder = path.relative(ROOT, projectRoot) || ".";
+  const outcome = options.outcome || null;
   return `---
 id: ${yamlScalar(options.artifactId || `${date}-${agentSlug}-scaffold-report`)}
 type: scaffold-report
@@ -3141,6 +3198,13 @@ synthesis_lock: ${yamlScalar(researchFrontmatter.synthesis_lock || "pending")}
 research_content_lock: ${yamlScalar(researchFrontmatter.research_content_lock || "pending")}
 experimental_scaffold: ${experimental ? "true" : "false"}
 experimental_overrides:${experimentalOverrides.length ? `\n${experimentalOverrides.map((item) => `  - ${yamlScalar(item)}`).join("\n")}` : " []"}
+outcome_spec_status: ${outcome?.status || "missing"}
+outcome_spec_id: ${yamlScalar(outcome?.id || "missing")}
+outcome_semantic_lock: ${yamlScalar(outcome?.semanticLock || "pending")}
+outcome_document_lock: ${yamlScalar(outcome?.documentLock || "pending")}
+outcome_approval_evidence: ${outcome?.approvalValid ? "valid" : "pending"}
+delivery_git_status: ${deliveryGit.status}
+delivery_git_revision: ${deliveryGit.revision || "pending"}
 control_center_card_status: pending-registry
 card_refs:
   - operations/manifest.json
@@ -3164,6 +3228,9 @@ Status: ${reportStatus}
 - Agent name: ${markdownValue(data.agentName || "unknown", "unknown", 300)}
 - Target folder: ${markdownValue(targetFolder, ".", 500)}
 - Contract: ${markdownValue(data.relPath, "missing", 500)}
+- Outcome Spec: ${markdownValue(outcome ? `${outcome.status} (${outcome.relPath})` : "missing; create a proposal before outcome delivery", "missing", 700)}
+- Outcome approval evidence: ${outcome?.approvalValid ? "valid" : "pending"}
+- Delivery Git baseline: ${deliveryGit.status}${deliveryGit.revision ? ` (${deliveryGit.revision})` : ""}
 - Runtime family: ${markdownValue(data.runtimeFamily || "unknown", "unknown", 120)}
 - Interfaces: ${markdownValue(data.primaryInterface || "unknown", "unknown", 500)}
 - Telegram mode: ${markdownValue(data.telegramMode || "none", "none", 120)}
@@ -3234,6 +3301,7 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 | Control Center runtime contract | ${healthResult.ok ? "pass" : "fail"} | Managed structured start/stop plus ${controlCenterHealthUrl} |
 | Control Center card readiness | pending-registry | Run \`node scripts/pritha.mjs registry\`, then \`node scripts/pritha.mjs card-readiness ${agentSlug}\` |
 | Documentation review | pass | README and training guide generated |
+| Outcome Spec lineage | ${outcome ? "recorded" : "missing"} | Scaffold readiness is separate from outcome verification and acceptance |
 
 ## Research and repository gate
 
@@ -3294,8 +3362,9 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 
 ## Next steps
 
-- Open the target folder in Codex.
-- Run the smoke test.
+- Review and explicitly approve the separate Outcome Spec if it is still a proposal.
+- From Pritha, run \`node scripts/pritha.mjs deliver <outcome-spec> --project ${markdownValue(targetFolder, ".", 500)}\` to enter the build/fix/verify loop.
+- Treat \`verified\`, \`awaiting_acceptance\`, \`accepted\`, merge and deployment as distinct states.
 - If Telegram is selected, run \`chmod 600 .env\`, configure it, and run Telegram healthcheck.
 `;
 }
@@ -3303,6 +3372,11 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 export function scaffoldContract(contractPath, options = {}) {
   ensureDirs();
   const data = contractData(contractPath);
+  const outcomeCandidate = latestOutcomeSpecForContract(data.fullPath, { root: ROOT });
+  const outcomeApproval = outcomeCandidate?.status === "approved"
+    ? verifyOutcomeApproval(outcomeCandidate.path, { root: ROOT })
+    : { ok: false };
+  const outcome = outcomeCandidate ? { ...outcomeCandidate, approvalValid: outcomeApproval.ok } : null;
   const issues = validateContract(data.fullPath, { print: false });
   if (issues.length > 0) {
     throw new Error(`Contract is not ready for scaffold:\n- ${issues.join("\n- ")}`);
@@ -3344,18 +3418,24 @@ export function scaffoldContract(contractPath, options = {}) {
     research,
     experimental: experimentalOverrides.length > 0,
     voiceCopyTarget,
+    outcome,
   })) {
     createdFiles.push(writeProjectFile(targetPath, file.path, file.content));
   }
 
   const smokeResult = runSmoke(targetPath);
   const healthResult = runHealthcheck(targetPath);
+  const deliveryGit = smokeResult.ok && healthResult.ok
+    ? initializeDeliveryGit(targetPath, data)
+    : { ok: false, status: "skipped-structural-failure", revision: null };
   const writtenReport = writeUniqueArtifact(
     path.join(REPORT_DIR, `${today()}-${slug(data.agentName)}-scaffold-report.md`),
     ({ artifactId }) => scaffoldReportMarkdown(data, targetPath, createdFiles, smokeResult, {
       research,
       healthResult,
+      deliveryGit,
       experimentalOverrides,
+      outcome,
       artifactId,
     }),
   );
@@ -3365,15 +3445,18 @@ export function scaffoldContract(contractPath, options = {}) {
   console.log(`Created files: ${createdFiles.length}`);
   console.log(`Smoke test: ${smokeResult.ok ? "pass" : "fail"}`);
   console.log(`Healthcheck: ${healthResult.ok ? "pass" : "fail"}`);
+  console.log(`Delivery Git baseline: ${deliveryGit.status}`);
   console.log(`Scaffold report: ${path.relative(ROOT, reportPath)}`);
+  console.log(`Outcome Spec: ${outcome ? `${outcome.status}${outcome.approvalValid ? " (approval valid)" : " (approval pending)"}` : "missing; run outcome init"}`);
   if (contractStatus(data) !== "accepted") {
     console.log(`Warning: scaffold created from ${contractStatus(data) || "unknown"} contract because --allow-draft-scaffold was set.`);
   }
   if (experimentalOverrides.length) {
     console.log(`Warning: experimental scaffold overrides: ${experimentalOverrides.join(", ")}. This is not production readiness evidence.`);
   }
-  if (!smokeResult.ok || !healthResult.ok) {
-    console.log([smokeResult.ok ? "" : smokeResult.output, healthResult.ok ? "" : healthResult.output].filter(Boolean).join("\n"));
+  if (!smokeResult.ok || !healthResult.ok || !deliveryGit.ok) {
+    console.log([smokeResult.ok ? "" : smokeResult.output, healthResult.ok ? "" : healthResult.output, deliveryGit.ok ? "" : deliveryGit.error].filter(Boolean).join("\n"));
     process.exitCode = 1;
   }
+  return { targetPath, reportPath, createdFiles, smokeResult, healthResult, deliveryGit, outcome, experimentalOverrides };
 }

@@ -67,6 +67,63 @@ function writeManifest(projectRoot, overrides = {}) {
   );
 }
 
+function writeContract(root, { name, technicalSlug, targetFolder }) {
+  const contractDir = path.join(root, "11_agents", "contracts");
+  mkdirSync(contractDir, { recursive: true });
+  writeFileSync(
+    path.join(contractDir, `${technicalSlug}-agent-contract.md`),
+    [
+      "---",
+      `id: ${technicalSlug}-agent-contract`,
+      "type: agent-contract",
+      "status: accepted",
+      "---",
+      "",
+      `- Agent name: ${name}`,
+      `- Technical slug: ${technicalSlug}`,
+      `- Target folder: ${targetFolder}`,
+      "",
+    ].join("\n"),
+  );
+}
+
+function writeOutcomeLifecycle(root, { name, technicalSlug, deliveryStatus = "awaiting_acceptance" }) {
+  const contractDir = path.join(root, "11_agents", "contracts");
+  const reportDir = path.join(root, "11_agents", "reports");
+  mkdirSync(contractDir, { recursive: true });
+  mkdirSync(reportDir, { recursive: true });
+  writeFileSync(
+    path.join(contractDir, `${technicalSlug}-agent-outcome-spec.md`),
+    [
+      "---",
+      `id: ${technicalSlug}-agent-outcome-spec`,
+      "type: agent-outcome-spec",
+      "status: approved",
+      "outcome_spec_status: approved",
+      "approved_by: user",
+      "created: 2026-08-16",
+      "updated: 2026-08-16",
+      "---",
+      "",
+      `# Agent Outcome Spec: ${name}`,
+    ].join("\n"),
+  );
+  writeFileSync(
+    path.join(reportDir, `${technicalSlug}-agent-delivery-report.md`),
+    [
+      "---",
+      `id: ${technicalSlug}-agent-delivery-report`,
+      "type: agent-delivery-report",
+      `status: ${deliveryStatus}`,
+      "created: 2026-08-16",
+      "updated: 2026-08-16",
+      "---",
+      "",
+      `# Agent delivery report: ${name}`,
+    ].join("\n"),
+  );
+}
+
 test("card readiness reports missing when registry row is absent", async () => {
   const parent = mkdtempSync(path.join(os.tmpdir(), "pritha-card-missing-"));
   const root = path.join(parent, "Pritha");
@@ -91,11 +148,67 @@ test("card readiness reports ready for registered scaffold with card-ready manif
   const result = await checkCardReadiness("alpha-agent", { root, baseUrl: false });
 
   assert.equal(result.status, "ready");
+  assert.equal(result.agentId, "alpha-agent");
   assert.equal(result.registryPresent, true);
   assert.equal(result.folderPresent, true);
   assert.equal(result.manifestPresent, true);
   assert.equal(result.controlCenterVisible, "unknown");
   assert.deepEqual(result.blockers, []);
+});
+
+test("card readiness resolves a technical slug and explicit target folder outside the sibling naming convention", async () => {
+  const parent = mkdtempSync(path.join(os.tmpdir(), "pritha-card-explicit-target-"));
+  const root = path.join(parent, "Pritha");
+  const projectRoot = path.join(parent, "Documents", "OperationsAgent");
+  mkdirSync(projectRoot, { recursive: true });
+  writeRegistry(root, ["| Operations Agent | fixture mission | codex-native | Codex project / Telegram none | local Mac | manual | contracts:1 scaffold:1 |"]);
+  writeContract(root, { name: "Operations Agent", technicalSlug: "operations-agent", targetFolder: projectRoot });
+  writeManifest(projectRoot, {
+    agent: "Operations Agent",
+    service_mode: "none",
+    control_center_managed: false,
+    control_center_contract: { mode: "readiness-card-only" },
+    control_center_runtime: undefined,
+    start_command: { argv: ["node", "scripts/agent-cli.mjs", "status"] },
+    stop_command: { argv: [] },
+    local_upstream_url: undefined,
+    health_url: undefined,
+  });
+
+  const result = await checkCardReadiness("operations-agent", { root, baseUrl: false });
+
+  assert.equal(result.status, "ready");
+  assert.equal(result.agentId, "operations-agent");
+  assert.equal(result.registryPresent, true);
+  assert.equal(result.folderPresent, true);
+  assert.equal(result.folderPath, path.relative(root, projectRoot));
+  assert.equal(result.manifestPresent, true);
+  assert.deepEqual(result.blockers, []);
+});
+
+test("card readiness exposes Outcome Spec and delivery as separate lifecycle states", async () => {
+  const parent = mkdtempSync(path.join(os.tmpdir(), "pritha-card-outcome-lifecycle-"));
+  const root = path.join(parent, "Pritha");
+  const projectRoot = path.join(parent, "AlphaAgent");
+  mkdirSync(projectRoot, { recursive: true });
+  writeRegistry(root, ["| AlphaAgent | fixture mission | codex-native | cli / Telegram none | local Mac | manual | contracts:1 outcome:1 scaffold:1 delivery:1 |"]);
+  writeContract(root, { name: "AlphaAgent", technicalSlug: "alpha-agent", targetFolder: projectRoot });
+  writeOutcomeLifecycle(root, { name: "AlphaAgent", technicalSlug: "alpha-agent" });
+  writeManifest(projectRoot);
+
+  const result = await checkCardReadiness("alpha-agent", { root, baseUrl: false });
+
+  assert.equal(result.status, "ready");
+  assert.deepEqual(result.lifecycle.outcome, {
+    present: true,
+    id: "alpha-agent-agent-outcome-spec",
+    path: "11_agents/contracts/alpha-agent-agent-outcome-spec.md",
+    status: "approved",
+    approved: true,
+  });
+  assert.equal(result.lifecycle.delivery.present, true);
+  assert.equal(result.lifecycle.delivery.status, "awaiting_acceptance");
+  assert.match(result.nextActions.join("\n"), /Continue the delivery lifecycle from awaiting_acceptance/);
 });
 
 test("card readiness normalizes executable manual_only action plans to ready", async () => {
