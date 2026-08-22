@@ -22,10 +22,12 @@ import {
 } from "./delivery-ledger.mjs";
 import {
   captureProtectedTrialInputs,
+  cleanupDeliveryWorktree,
   commitVerifiedCheckpoint,
   discardDeliveryIteration,
   DeliveryWorkspaceError,
   prepareDeliveryWorktree,
+  planDeliveryWorktreeCleanup,
   readDeliveryWorktree,
   verifyProtectedTrialInputs,
 } from "./delivery-worktree.mjs";
@@ -380,6 +382,17 @@ function releaseTarget(runRoot, state, options = {}) {
   return releaseDeliveryTarget(claimPath, state.run_id);
 }
 
+const AUTO_CLEANUP_TERMINAL_STATUSES = new Set(["accepted", "failed", "abandoned", "cancelled"]);
+
+function automaticTerminalCleanup(runRoot, state) {
+  if (!AUTO_CLEANUP_TERMINAL_STATUSES.has(state.status)) return null;
+  try {
+    return cleanupDeliveryWorktree(runRoot, { apply: true, yes: true });
+  } catch (error) {
+    return { applied: false, error: error?.code || "cleanup_error", message: bounded(error?.message || error, 1_000) };
+  }
+}
+
 function blockDelivery(runRoot, plan, worktree, blocker, options = {}) {
   const current = readDeliveryLedger(runRoot);
   const transitioned = current.status === "blocked"
@@ -699,7 +712,8 @@ export async function resumeDelivery(runId, options = {}) {
     if (state.status === "blocked") return { state, worktree: status.worktree, blocked: true, reportPath: null };
     if (state.status === "abandoned") {
       releaseTarget(status.runRoot, state, options);
-      return { state, worktree: status.worktree, blocked: false, reportPath: null };
+      const cleanup = automaticTerminalCleanup(status.runRoot, state);
+      return { state, worktree: status.worktree, cleanup, blocked: false, reportPath: null };
     }
   }
   const worktree = readDeliveryWorktree(status.runRoot);
@@ -767,6 +781,111 @@ export function acceptDelivery(runId, options = {}) {
     eventType: "delivery_accepted_by_user",
   });
   releaseTarget(status.runRoot, accepted.state, options);
+  const cleanup = automaticTerminalCleanup(status.runRoot, accepted.state);
   const reportPath = emitDeliveryReport(accepted.state, plan, status.worktree, options);
-  return { state: accepted.state, worktree: status.worktree, reportPath };
+  return { state: accepted.state, worktree: readDeliveryWorktree(status.runRoot), cleanup, reportPath };
+}
+
+function occupiedTargetClaim(buildsRoot, state) {
+  const claimPath = deliveryTargetClaimPath(buildsRoot, state.target_key);
+  if (!existsSync(claimPath)) return false;
+  try {
+    const claim = JSON.parse(readFileSync(claimPath, "utf8"));
+    return !claim.released_at;
+  } catch {
+    return true;
+  }
+}
+
+export function cleanupDeliveryRun(runId, options = {}) {
+  const status = deliveryStatus(runId, options);
+  const buildsRoot = options.buildsRoot || path.resolve(status.runRoot, "..", "..");
+  if (!AUTO_CLEANUP_TERMINAL_STATUSES.has(status.state.status)) {
+    return {
+      run_id: runId,
+      status: status.state.status,
+      eligible: false,
+      applied: false,
+      reason: new Set(["verified", "awaiting_acceptance"]).has(status.state.status)
+        ? "acceptance_pending"
+        : "run_active",
+    };
+  }
+  if (occupiedTargetClaim(buildsRoot, status.state)) {
+    return { run_id: runId, status: status.state.status, eligible: false, applied: false, reason: "target_claim_active" };
+  }
+  const plan = planDeliveryWorktreeCleanup(status.runRoot);
+  if (!options.apply) return { ...plan, status: status.state.status, applied: false };
+  if (!options.yes) throw new DeliveryLoopError("cleanup_confirmation_required", "Cleanup apply requires --yes");
+  return { ...cleanupDeliveryWorktree(status.runRoot, { apply: true, yes: true }), status: status.state.status };
+}
+
+function deliveryRunRoots(buildsRoot) {
+  if (!existsSync(buildsRoot)) return [];
+  return readdirSync(buildsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== ".targets")
+    .slice(0, 1_000)
+    .flatMap((agent) => {
+      const agentRoot = path.join(buildsRoot, agent.name);
+      return readdirSync(agentRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .slice(0, 5_000)
+        .map((entry) => path.join(agentRoot, entry.name))
+        .filter((runRoot) => existsSync(path.join(runRoot, "build-state.json")));
+    });
+}
+
+export function cleanupStaleDeliveryRuns(options = {}) {
+  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const buildsRoot = options.buildsRoot || resolvePrithaStatePathFrom({ root, stateRoot: options.stateRoot }, "builds");
+  const olderThanDays = Number(options.olderThanDays);
+  if (!Number.isSafeInteger(olderThanDays) || olderThanDays < 1) {
+    throw new DeliveryLoopError("cleanup_age_invalid", "Bulk cleanup requires --older-than-days with a positive integer");
+  }
+  if (options.apply && !options.yes) throw new DeliveryLoopError("cleanup_confirmation_required", "Bulk cleanup apply requires --yes");
+  const cutoff = Number(options.now || Date.now()) - olderThanDays * 86_400_000;
+  const candidates = [];
+  const skipped = [];
+  for (const runRoot of deliveryRunRoots(buildsRoot)) {
+    let state;
+    try {
+      state = readDeliveryLedger(runRoot);
+    } catch (error) {
+      skipped.push({ run_id: path.basename(runRoot), reason: "ledger_invalid" });
+      continue;
+    }
+    if (!AUTO_CLEANUP_TERMINAL_STATUSES.has(state.status)) {
+      skipped.push({ run_id: state.run_id, reason: new Set(["verified", "awaiting_acceptance"]).has(state.status) ? "acceptance_pending" : "run_active" });
+      continue;
+    }
+    const updatedAt = Date.parse(state.updated_at || state.created_at);
+    if (!Number.isFinite(updatedAt) || updatedAt > cutoff) {
+      skipped.push({ run_id: state.run_id, reason: "not_stale" });
+      continue;
+    }
+    if (occupiedTargetClaim(buildsRoot, state)) {
+      skipped.push({ run_id: state.run_id, reason: "target_claim_active" });
+      continue;
+    }
+    try {
+      const plan = planDeliveryWorktreeCleanup(runRoot);
+      if (!plan.eligible) {
+        skipped.push({ run_id: state.run_id, reason: plan.reason });
+        continue;
+      }
+      const result = options.apply
+        ? cleanupDeliveryWorktree(runRoot, { apply: true, yes: true })
+        : { ...plan, applied: false };
+      candidates.push({ ...result, status: state.status });
+    } catch (error) {
+      skipped.push({ run_id: state.run_id, reason: error?.code || "cleanup_error" });
+    }
+  }
+  return {
+    schema: "pritha-delivery-bulk-cleanup-v1",
+    mode: options.apply ? "apply" : "plan",
+    older_than_days: olderThanDays,
+    candidates,
+    skipped,
+  };
 }

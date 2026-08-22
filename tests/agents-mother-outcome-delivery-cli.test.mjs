@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -72,6 +72,12 @@ test("CLI carries an accepted contract through Outcome approval, scaffold, verif
   const ledger = JSON.parse(readFileSync(path.join(stateRoot, "builds", "snapshot-agent", "cli-outcome-run", "build-state.json"), "utf8"));
   assert.equal(ledger.status, "accepted");
   assert.equal(ledger.accepted_by, "user");
+  const runRoot = path.join(stateRoot, "builds", "snapshot-agent", "cli-outcome-run");
+  const worktree = JSON.parse(readFileSync(path.join(runRoot, "delivery-worktree.json"), "utf8"));
+  assert.equal(worktree.cleanup_status, "cleaned");
+  assert.equal(existsSync(path.join(runRoot, "worktree")), false);
+  const branch = spawnSync("git", ["branch", "--list", "pritha/build-cli-outcome-run"], { cwd: projectPath, encoding: "utf8" });
+  assert.match(branch.stdout, /pritha\/build-cli-outcome-run/);
   const reports = readdirSync(path.join(stateRoot, "agents", "reports")).filter((entry) => entry.includes("agent-delivery-report"));
   assert.equal(reports.length >= 2, true);
 });

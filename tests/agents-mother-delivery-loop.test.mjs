@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { FunctionBuildExecutor } from "../scripts/agents-mother/build-executors.mjs";
-import { readDeliveryLedger } from "../scripts/agents-mother/delivery-ledger.mjs";
-import { resumeDelivery, runDeliveryLoop } from "../scripts/agents-mother/delivery-loop.mjs";
+import { readDeliveryLedger, transitionDelivery } from "../scripts/agents-mother/delivery-ledger.mjs";
+import {
+  cleanupDeliveryRun,
+  cleanupStaleDeliveryRuns,
+  resumeDelivery,
+  runDeliveryLoop,
+} from "../scripts/agents-mother/delivery-loop.mjs";
 import { TRIAL_PLAN_SCHEMA } from "../scripts/agents-mother/outcome-spec.mjs";
 
 function git(cwd, args) {
@@ -272,4 +277,55 @@ test("resume preserves the approved Trial backend policy before changing blocker
   );
   assert.equal(readDeliveryLedger(runRoot).version, version);
   assert.equal(readDeliveryLedger(runRoot).status, "blocked");
+});
+
+test("cleanup policy preserves verified runs and bulk-cleans only stale clean terminal runs", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-cleanup-state-"));
+  const executor = new FunctionBuildExecutor(async ({ worktree }) => {
+    writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+    return { summary: "implemented", changed_files: ["implementation.txt"] };
+  });
+  const runs = [];
+  for (const runId of ["run-clean-old", "run-dirty-old"]) {
+    const runRoot = path.join(stateRoot, "builds", "fixture-agent", runId);
+    const result = await runDeliveryLoop({
+      plan: plan(), projectPath: project, runRoot, runId,
+      buildExecutor: executor, trialBackend: "local", reportDir: false,
+    });
+    assert.equal(result.state.status, "verified");
+    runs.push({ runId, runRoot, worktree: result.worktree.worktree });
+  }
+
+  const verifiedPlan = cleanupDeliveryRun(runs[0].runId, { root: project, stateRoot, apply: true, yes: true });
+  assert.equal(verifiedPlan.eligible, false);
+  assert.equal(verifiedPlan.reason, "acceptance_pending");
+  assert.equal(existsSync(runs[0].worktree), true);
+
+  for (const run of runs) {
+    transitionDelivery(run.runRoot, "accepted", { acceptedAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z" });
+  }
+  writeFileSync(path.join(runs[1].worktree, "preserve-untracked.txt"), "user work\n");
+
+  const planned = cleanupStaleDeliveryRuns({
+    root: project,
+    stateRoot,
+    olderThanDays: 7,
+    now: Date.parse("2026-08-22T00:00:00.000Z"),
+  });
+  assert.deepEqual(planned.candidates.map((entry) => entry.run_id), ["run-clean-old"]);
+  assert.equal(planned.skipped.some((entry) => entry.run_id === "run-dirty-old" && entry.reason === "dirty_worktree"), true);
+  assert.equal(existsSync(runs[0].worktree), true, "plan mode is read-only");
+
+  const applied = cleanupStaleDeliveryRuns({
+    root: project,
+    stateRoot,
+    olderThanDays: 7,
+    now: Date.parse("2026-08-22T00:00:00.000Z"),
+    apply: true,
+    yes: true,
+  });
+  assert.equal(applied.candidates[0].removed, true);
+  assert.equal(existsSync(runs[0].worktree), false);
+  assert.equal(existsSync(runs[1].worktree), true);
 });

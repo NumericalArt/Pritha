@@ -64,6 +64,8 @@ import {
 } from "./outcome-spec.mjs";
 import {
   acceptDelivery,
+  cleanupDeliveryRun,
+  cleanupStaleDeliveryRuns,
   deliverOutcome,
   deliveryStatus,
   resumeDelivery,
@@ -99,6 +101,8 @@ function usage() {
   ${CLI_COMMAND} delivery status <run-id>
   ${CLI_COMMAND} delivery resume <run-id> [--answer <option-id>] [--guidance <text>] [--project <path>]
   ${CLI_COMMAND} delivery accept <run-id> --accepted-by user
+  ${CLI_COMMAND} delivery cleanup <run-id> [--apply --yes]
+  ${CLI_COMMAND} delivery cleanup --all-stale --older-than-days <N> [--apply --yes]
   ${CLI_COMMAND} research <contract-path> [--limit 12] [--github-mode auto|online|registry-only|skip] [--github-limit 5] [--github-timeout-ms 15000] [--github-fixture <json>]
   ${CLI_COMMAND} pattern-research <contract-path> [--limit 12] [--semantic-mode auto|skip]
   ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days] [--input evidence.json]
@@ -1719,6 +1723,7 @@ function printDeliveryState(state, worktree = null) {
   console.log(`Phase: ${state.phase}`);
   console.log(`Iterations: ${state.iteration}/${state.budget.max_iterations}`);
   if (worktree?.branch) console.log(`Branch: ${worktree.branch}`);
+  if (worktree?.cleanup_status) console.log(`Worktree cleanup: ${worktree.cleanup_status}${worktree.cleanup_reason ? ` (${worktree.cleanup_reason})` : ""}`);
   if (state.last_trial_result) console.log(`Verification evidence: ${state.last_trial_result.status} (${state.last_trial_result.evidence_lock})`);
   for (const blocker of state.blockers || []) {
     console.log(`Blocker: ${blocker.code} — ${blocker.summary}`);
@@ -1837,6 +1842,23 @@ async function main() {
   if (command === "delivery") {
     const subcommand = options._[0] || "status";
     const runId = options._[1];
+    if (subcommand === "cleanup") {
+      if (!options["all-stale"] && !runId) throw new Error("Missing delivery run id.");
+      const result = options["all-stale"]
+        ? cleanupStaleDeliveryRuns({
+            root: ROOT,
+            olderThanDays: positiveCliInteger(options["older-than-days"]),
+            apply: Boolean(options.apply),
+            yes: Boolean(options.yes),
+          })
+        : cleanupDeliveryRun(runId || "", {
+            root: ROOT,
+            apply: Boolean(options.apply),
+            yes: Boolean(options.yes),
+          });
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
     if (!runId) throw new Error("Missing delivery run id.");
     if (subcommand === "status") {
       const result = deliveryStatus(runId, { root: ROOT });
