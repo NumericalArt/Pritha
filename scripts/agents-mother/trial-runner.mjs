@@ -227,6 +227,13 @@ async function runAutomatedTrial(trial, context) {
   }
 
   try {
+    if (trial.isolation === "sandbox" && (
+      context.probe?.available !== true
+      || context.probe?.isolation !== "sandboxed"
+      || context.probe?.capabilities?.sandbox !== true
+    )) {
+      throw new ExecutionBackendError("isolation_unavailable", "Backend probe did not confirm required sandbox isolation");
+    }
     const execution = await context.backend.execute({
       argv: trial.argv,
       cwd,
@@ -285,7 +292,17 @@ export async function runTrialPlan(planOrPath, options = {}) {
   const startedAt = new Date().toISOString();
   const trials = [];
   const redaction = { projectRoot, stateRoot: options.stateRoot, root: options.root };
+  let runtimeProbe;
   try {
+    runtimeProbe = typeof backend.probe === "function"
+      ? await backend.probe({ timeoutMs: options.probeTimeoutMs })
+      : {
+          backend: backend.name || "custom-trial-backend",
+          available: true,
+          isolation: "unknown",
+          runtimeVersion: "unknown",
+          capabilities: { structuredArgv: true, commandExec: "unknown", sandbox: false },
+        };
     for (const trial of plan.trials) {
       if (trial.kind === "operator-judged") {
         trials.push({
@@ -303,6 +320,7 @@ export async function runTrialPlan(planOrPath, options = {}) {
         trials.push(await runAutomatedTrial(trial, {
           projectRoot,
           backend,
+          probe: runtimeProbe,
           outputBytesCap: options.outputBytesCap || 1_048_576,
           maxArtifactBytes: options.maxArtifactBytes || MAX_ARTIFACT_BYTES,
           redaction,
@@ -339,6 +357,7 @@ export async function runTrialPlan(planOrPath, options = {}) {
     workspace_before: before,
     workspace_after: after,
     workspace_changed_during_trials: !workspaceRevisionMatches(before, after),
+    runtime_probe: sanitizeEvidence(runtimeProbe, redaction),
     trials,
     started_at: startedAt,
     finished_at: new Date().toISOString(),

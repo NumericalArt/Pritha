@@ -77,6 +77,18 @@ test("App Server build executor constrains the turn to the worktree and immutabl
   assert.deepEqual(result.changed_files, ["agent.mjs"]);
 });
 
+test("App Server build probe records runtime and thread/start capability before a turn", async () => {
+  const worktree = mkdtempSync(path.join(os.tmpdir(), "pritha-build-probe-"));
+  const connection = new FakeConnection();
+  const executor = new CodexAppServerBuildExecutor({ connection });
+  const probe = await executor.probe({ cwd: worktree, timeoutMs: 30_000 });
+  assert.equal(probe.available, true);
+  assert.equal(probe.runtimeVersion, "codex-fixture/2");
+  assert.equal(probe.capabilities.threadStart, true);
+  assert.equal(probe.capabilities.goal, "unprobed");
+  assert.deepEqual(connection.calls.map((entry) => entry.method), ["initialize", "thread/start"]);
+});
+
 test("function executor provides the same bounded result contract", async () => {
   const executor = new FunctionBuildExecutor(async () => ({ summary: "done", changed_files: ["one.mjs"] }));
   const result = await executor.execute({});

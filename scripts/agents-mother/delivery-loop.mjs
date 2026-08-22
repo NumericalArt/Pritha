@@ -55,6 +55,41 @@ function sanitize(value, context) {
   return value;
 }
 
+function normalizedRuntimeProbe(kind, probe, context) {
+  const capabilities = probe?.capabilities || {};
+  return sanitize({
+    kind,
+    backend: bounded(probe?.backend || "unknown", 160),
+    runtime_version: bounded(probe?.runtimeVersion || "unknown", 240),
+    isolation: bounded(probe?.isolation || "unknown", 80),
+    available: probe?.available === true,
+    command_exec: capabilities.commandExec ?? false,
+    thread_start: capabilities.threadStart ?? false,
+    goal: capabilities.goal ?? "unprobed",
+    error: probe?.error ? bounded(probe.error, 2_000) : null,
+    probed_at: new Date().toISOString(),
+  }, context);
+}
+
+function recordRuntimeProbe(runRoot, kind, probe, context) {
+  const entry = normalizedRuntimeProbe(kind, probe, context);
+  const current = readDeliveryLedger(runRoot);
+  const duplicate = (current.runtime_probes || []).some((candidate) => (
+    candidate.kind === entry.kind
+    && candidate.backend === entry.backend
+    && candidate.runtime_version === entry.runtime_version
+    && candidate.available === entry.available
+    && candidate.command_exec === entry.command_exec
+    && candidate.thread_start === entry.thread_start
+    && candidate.goal === entry.goal
+  ));
+  if (duplicate) return current;
+  return updateDeliveryLedger(runRoot, (state) => ({
+    ...state,
+    runtime_probes: [...(state.runtime_probes || []), entry].slice(-100),
+  }), { eventType: "runtime_probe_recorded", payload: entry }).state;
+}
+
 function assertPlan(plan) {
   if (!plan || plan.schema !== TRIAL_PLAN_SCHEMA || !plan.spec_id || !plan.agent_slug || !Array.isArray(plan.trials)) {
     throw new DeliveryLoopError("trial_plan_invalid", "Delivery requires a compiled Trial plan");
@@ -188,6 +223,22 @@ function blockerForError(error) {
         { id: "restore-approved-spec", label: "Restore approved spec", effect: "Restore the exact approved Outcome Spec and contract binding, then re-run verification." },
         { id: "revise-outcome", label: "Revise outcome", effect: "Create and approve a new Outcome Spec revision, then start a new delivery run." },
         { id: "stop-run", label: "Stop run", effect: "Abandon this run without accepting, merging, pushing or deploying stale evidence." },
+      ],
+    },
+    isolation_unavailable: {
+      question: "Which runtime should Pritha use to satisfy the required isolation before executing commands?",
+      options: [
+        { id: "retry-after-upgrade", label: "Upgrade and retry", effect: "Update the selected runtime, then repeat its capability probe before any command executes." },
+        { id: "revise-contract", label: "Revise contract", effect: "Revise the approved runtime/isolation policy and start a newly approved delivery run." },
+        { id: "stop-run", label: "Stop run", effect: "Abandon delivery without executing the unconfirmed backend." },
+      ],
+    },
+    build_runtime_unavailable: {
+      question: "How should Pritha obtain a working build runtime before the next implementation turn?",
+      options: [
+        { id: "retry-after-upgrade", label: "Upgrade and retry", effect: "Repair or update Codex, then repeat the build runtime probe." },
+        { id: "replace-executor", label: "Replace executor", effect: "Select another approved build executor and re-probe it before use." },
+        { id: "stop-run", label: "Stop run", effect: "Abandon delivery without starting a build turn." },
       ],
     },
   };
@@ -413,6 +464,14 @@ async function verifyIteration(plan, runRoot, worktree, protectedInputs, trialBa
     root: options.root,
     closeBackend: options.closeTrialBackend,
   });
+  recordRuntimeProbe(runRoot, "trial-execution", run.result.runtime_probe, {
+    projectRoot: worktree.worktree,
+    stateRoot: options.stateRoot,
+    root: options.root,
+  });
+  if ((run.result.trials || []).some((trial) => trial.error?.code === "isolation_unavailable")) {
+    throw new DeliveryLoopError("isolation_unavailable", "Trial backend probe did not confirm the isolation required by the approved Outcome Spec");
+  }
   const freshness = verifyTrialResultFreshness(run.result, worktree.worktree, {
     outcomeSpecPath: options.outcomeSpecPath,
     root: options.root,
@@ -514,6 +573,7 @@ export async function runDeliveryLoop(input = {}) {
     ? input.buildExecutor
     : createBuildExecutor(input.buildExecutor || "codex-app-server", input.buildExecutorOptions || {});
   const trialBackend = input.trialBackend || "local";
+  let buildProbeCompleted = false;
   let failures = [];
   let verificationSequence = 0;
   try {
@@ -577,6 +637,26 @@ export async function runDeliveryLoop(input = {}) {
 
       let executorResult;
       try {
+        if (!buildProbeCompleted) {
+          const probe = typeof buildExecutor.probe === "function"
+            ? await buildExecutor.probe({ cwd: worktree.worktree, worktree: worktree.worktree, timeoutMs: input.probeTimeoutMs })
+            : {
+                backend: buildExecutor.name || "custom-build-executor",
+                available: true,
+                isolation: "unknown",
+                runtimeVersion: "unknown",
+                capabilities: { commandExec: "unknown", threadStart: "unknown", goal: "unprobed" },
+              };
+          recordRuntimeProbe(runRoot, "build-executor", probe, {
+            projectRoot: worktree.worktree,
+            stateRoot: input.stateRoot,
+            root: input.root,
+          });
+          buildProbeCompleted = true;
+          if (probe.available !== true) {
+            throw new DeliveryLoopError("build_runtime_unavailable", probe.error || "Build executor capability probe failed");
+          }
+        }
         executorResult = await buildExecutor.execute({
           runId: state.run_id,
           iteration: state.iteration,
@@ -595,7 +675,7 @@ export async function runDeliveryLoop(input = {}) {
           payload: { iteration: state.iteration, executor_result: executorPath },
         });
       } catch (error) {
-        if (["manual_build_required", "no_git_in_place_not_implemented"].includes(error?.code)) {
+        if (["manual_build_required", "no_git_in_place_not_implemented", "build_runtime_unavailable"].includes(error?.code)) {
           return blockDelivery(runRoot, plan, worktree, blockerForError(error), input);
         }
         const synthetic = [{ id: "build-executor", assertions: [], error: { code: error.code || "executor_failed" } }];

@@ -147,6 +147,16 @@ export class FunctionBuildExecutor {
     };
   }
 
+  async probe() {
+    return {
+      backend: this.name,
+      available: true,
+      isolation: "caller-defined",
+      runtimeVersion: "fixture",
+      capabilities: { commandExec: true, threadStart: false, goal: false },
+    };
+  }
+
   close() {}
 }
 
@@ -160,6 +170,17 @@ export class ManualBuildExecutor {
       "manual_build_required",
       "The approved contract selects manual implementation; Pritha cannot autonomously repair the failing Trials",
     );
+  }
+
+  async probe() {
+    return {
+      backend: this.name,
+      available: true,
+      isolation: "none",
+      runtimeVersion: "manual",
+      capabilities: { commandExec: false, threadStart: false, goal: false },
+      error: "Manual build executor requires operator implementation.",
+    };
   }
 
   close() {}
@@ -189,6 +210,42 @@ export class CodexAppServerBuildExecutor {
       },
     }, Math.min(timeoutMs, 10_000));
     return this.initializeResponse;
+  }
+
+  async probe(options = {}) {
+    const cwd = worktreeRoot(options.cwd || options.worktree);
+    const timeoutMs = Number.isSafeInteger(options.timeoutMs) ? Math.min(Math.max(options.timeoutMs, 10_000), 30_000) : 30_000;
+    try {
+      const initialized = await this.ensureReady(cwd, timeoutMs);
+      const response = await this.connection.request("thread/start", {
+        cwd,
+        ephemeral: true,
+        approvalPolicy: "never",
+        sandbox: "workspace-write",
+        runtimeWorkspaceRoots: [cwd],
+        personality: "pragmatic",
+        threadSource: "user",
+        developerInstructions: "Capability probe only. Do not start a turn or modify files.",
+      }, timeoutMs);
+      const threadStart = Boolean(response?.thread?.id);
+      return {
+        backend: this.name,
+        available: threadStart,
+        isolation: "sandboxed",
+        runtimeVersion: String(initialized?.userAgent || "codex-app-server/unknown"),
+        capabilities: { commandExec: false, threadStart, goal: "unprobed" },
+        error: threadStart ? null : "App Server did not return a probe thread id.",
+      };
+    } catch (error) {
+      return {
+        backend: this.name,
+        available: false,
+        isolation: "unavailable",
+        runtimeVersion: String(this.initializeResponse?.userAgent || "unknown"),
+        capabilities: { commandExec: false, threadStart: false, goal: "unprobed" },
+        error: bounded(error instanceof Error ? error.message : String(error), 2_000),
+      };
+    }
   }
 
   async execute(input) {

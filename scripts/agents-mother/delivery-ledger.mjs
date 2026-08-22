@@ -196,6 +196,7 @@ export function createDeliveryLedger(runRoot, input = {}) {
     consecutive_failure_signature: null,
     consecutive_failure_count: 0,
     failure_history: [],
+    runtime_probes: [],
     workspace: input.workspace || null,
     last_trial_result: null,
     next_action: "prepare_delivery_workspace",

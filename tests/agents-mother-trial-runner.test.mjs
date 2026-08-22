@@ -162,6 +162,32 @@ test("required isolation fails closed on the local backend", async () => {
   assert.equal(result.trials[0].error.code, "isolation_unavailable");
 });
 
+test("required isolation blocks before execute when the runtime probe is unconfirmed", async () => {
+  const project = projectFixture();
+  let executions = 0;
+  const backend = {
+    name: "unconfirmed-sandbox-fixture",
+    async probe() {
+      return {
+        backend: this.name,
+        available: true,
+        isolation: "unknown",
+        runtimeVersion: "fixture/1",
+        capabilities: { commandExec: true, sandbox: false },
+      };
+    },
+    async execute() {
+      executions += 1;
+      throw new Error("execute must not be called");
+    },
+    close() {},
+  };
+  const { result } = await runTrialPlan(plan([automated({ isolation: "sandbox" })]), { projectPath: project, backend });
+  assert.equal(executions, 0);
+  assert.equal(result.trials[0].error.code, "isolation_unavailable");
+  assert.equal(result.runtime_probe.runtimeVersion, "fixture/1");
+});
+
 test("artifact assertions reject symlink evidence", async () => {
   const project = projectFixture();
   const outside = mkdtempSync(path.join(os.tmpdir(), "pritha-outside-artifact-"));

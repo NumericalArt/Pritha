@@ -104,6 +104,9 @@ test("delivery loop repairs a failing fixture, independently verifies, commits a
   assert.equal(git(result.worktree.worktree, ["status", "--porcelain"]), "");
   assert.equal(git(result.worktree.worktree, ["branch", "--show-current"]), "pritha/build-run-success");
   assert.equal(Boolean(result.worktree.verified_checkpoint), true);
+  const probes = readDeliveryLedger(runRoot).runtime_probes;
+  assert.equal(probes.some((entry) => entry.kind === "trial-execution" && entry.command_exec === true), true);
+  assert.equal(probes.some((entry) => entry.kind === "build-executor" && entry.available === true), true);
 });
 
 test("repeated non-progress becomes a typed blocker instead of hanging", async () => {
