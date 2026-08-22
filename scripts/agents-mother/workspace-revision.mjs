@@ -26,6 +26,14 @@ function isGitWorkspace(projectRoot) {
   }
 }
 
+function hasGitHead(projectRoot) {
+  try {
+    return Boolean(git(projectRoot, ["rev-parse", "--verify", "HEAD"]).trim());
+  } catch {
+    return false;
+  }
+}
+
 function hashRegularFile(hash, filePath, maxBytes) {
   const descriptor = openSync(filePath, "r");
   const buffer = Buffer.allocUnsafe(64 * 1024);
@@ -134,7 +142,7 @@ export function workspaceRevision(projectPath, options = {}) {
   const stat = lstatSync(requested);
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("Workspace must be a regular directory, not a symlink");
   const projectRoot = realpathSync(requested);
-  return isGitWorkspace(projectRoot)
+  return isGitWorkspace(projectRoot) && hasGitHead(projectRoot)
     ? gitWorkspaceRevision(projectRoot, options)
     : directoryWorkspaceRevision(projectRoot, options);
 }

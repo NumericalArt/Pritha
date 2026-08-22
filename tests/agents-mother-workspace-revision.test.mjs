@@ -19,6 +19,20 @@ test("non-Git workspace revision changes with authored content", () => {
   assert.equal(workspaceRevisionMatches(first, second), false);
 });
 
+test("unborn Git repository uses a directory revision without requiring a commit", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-unborn-git-revision-"));
+  execFileSync("git", ["init", "-b", "main"], { cwd: root, stdio: "ignore" });
+  writeFileSync(path.join(root, "README.md"), "first\n");
+  const first = workspaceRevision(root);
+  writeFileSync(path.join(root, "README.md"), "second\n");
+  const second = workspaceRevision(root);
+
+  assert.equal(first.kind, "directory");
+  assert.equal(first.head, null);
+  assert.notEqual(first.token, second.token);
+  assert.equal(workspaceRevisionMatches(first, second), false);
+});
+
 test("Git workspace revision binds HEAD, tracked diff and untracked content", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-git-revision-"));
   execFileSync("git", ["init", "-b", "main"], { cwd: root, stdio: "ignore" });
