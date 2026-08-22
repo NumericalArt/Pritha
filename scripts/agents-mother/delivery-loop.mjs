@@ -180,6 +180,14 @@ function blockerForError(error) {
         { id: "stop-run", label: "Stop run", effect: "Abandon this run without merging, pushing or deploying its worktree." },
       ],
     },
+    outcome_spec_changed: {
+      question: "Which approved Outcome Spec should replace the stale delivery evidence?",
+      options: [
+        { id: "restore-approved-spec", label: "Restore approved spec", effect: "Restore the exact approved Outcome Spec and contract binding, then re-run verification." },
+        { id: "revise-outcome", label: "Revise outcome", effect: "Create and approve a new Outcome Spec revision, then start a new delivery run." },
+        { id: "stop-run", label: "Stop run", effect: "Abandon this run without accepting, merging, pushing or deploying stale evidence." },
+      ],
+    },
   };
   const definition = definitions[code] || {
     question: "How should Pritha proceed with this delivery blocker?",
@@ -391,6 +399,17 @@ async function verifyIteration(plan, runRoot, worktree, protectedInputs, trialBa
     root: options.root,
     closeBackend: options.closeTrialBackend,
   });
+  const freshness = verifyTrialResultFreshness(run.result, worktree.worktree, {
+    outcomeSpecPath: options.outcomeSpecPath,
+    root: options.root,
+    stateRoot: options.stateRoot,
+  });
+  if (!freshness.ok) {
+    throw new DeliveryLoopError(
+      freshness.reason === "outcome_spec_changed" ? "outcome_spec_changed" : "verification_stale",
+      `Delivery evidence is stale: ${freshness.reason}`,
+    );
+  }
   const reference = storeTrialResult(runRoot, run.result, sequence);
   updateDeliveryLedger(runRoot, (state) => ({
     ...state,
@@ -408,6 +427,17 @@ async function finalizePassingResult(plan, runRoot, worktree, protectedInputs, t
   let result = initialResult;
   let verificationSequence = sequence;
   for (let checkpointAttempt = 0; checkpointAttempt < 3; checkpointAttempt += 1) {
+    const preCheckpointFreshness = verifyTrialResultFreshness(result, worktree.worktree, {
+      outcomeSpecPath: options.outcomeSpecPath,
+      root: options.root,
+      stateRoot: options.stateRoot,
+    });
+    if (!preCheckpointFreshness.ok) {
+      throw new DeliveryLoopError(
+        preCheckpointFreshness.reason === "outcome_spec_changed" ? "outcome_spec_changed" : "verification_stale",
+        `Delivery evidence became stale before checkpoint: ${preCheckpointFreshness.reason}`,
+      );
+    }
     try {
       worktree = commitVerifiedCheckpoint(runRoot);
     } catch (error) {
@@ -596,6 +626,7 @@ export async function deliverOutcome(specPath, projectPath, options = {}) {
     runRoot: compiled.runRoot,
     plan: compiled.plan,
     projectPath,
+    outcomeSpecPath: compiled.path || path.resolve(root, specPath),
   });
 }
 
@@ -681,12 +712,36 @@ export async function resumeDelivery(runId, options = {}) {
   } catch (error) {
     return blockDelivery(status.runRoot, plan, worktree, blockerForError(error), options);
   }
+  if (state.last_trial_result?.path && worktree?.worktree) {
+    const freshness = verifyTrialResultFreshness(
+      path.join(status.runRoot, state.last_trial_result.path),
+      worktree.worktree,
+      {
+        outcomeSpecPath: options.outcomeSpecPath || (plan.approval_id ? plan.spec_path : null),
+        root: options.root,
+        stateRoot: options.stateRoot,
+      },
+    );
+    if (!freshness.ok) {
+      return blockDelivery(
+        status.runRoot,
+        plan,
+        worktree,
+        blockerForError(new DeliveryLoopError(
+          freshness.reason === "outcome_spec_changed" ? "outcome_spec_changed" : "verification_stale",
+          `Delivery evidence is stale after resume: ${freshness.reason}`,
+        )),
+        options,
+      );
+    }
+  }
   return runDeliveryLoop({
     ...bound,
     runId,
     runRoot: status.runRoot,
     plan,
     projectPath,
+    outcomeSpecPath: options.outcomeSpecPath || (plan.approval_id ? plan.spec_path : null),
   });
 }
 
@@ -700,7 +755,11 @@ export function acceptDelivery(runId, options = {}) {
   const plan = JSON.parse(readFileSync(path.join(status.runRoot, "trial-plan.json"), "utf8"));
   approvedPlanBinding(plan, { ...options, allowDraft: false });
   const resultPath = path.join(status.runRoot, status.state.last_trial_result.path);
-  const freshness = verifyTrialResultFreshness(resultPath, status.worktree.worktree);
+  const freshness = verifyTrialResultFreshness(resultPath, status.worktree.worktree, {
+    outcomeSpecPath: options.outcomeSpecPath || plan.spec_path,
+    root: options.root,
+    stateRoot: options.stateRoot,
+  });
   if (!freshness.ok) throw new DeliveryLoopError("verification_stale", `Delivery evidence is stale: ${freshness.reason}`);
   const accepted = transitionDelivery(status.runRoot, "accepted", {
     acceptedAt: options.acceptedAt,

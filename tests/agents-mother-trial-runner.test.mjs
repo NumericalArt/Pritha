@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { TRIAL_PLAN_SCHEMA } from "../scripts/agents-mother/outcome-spec.mjs";
+import {
+  approveOutcomeSpec,
+  compileOutcomeSpec,
+  createOutcomeSpec,
+  TRIAL_PLAN_SCHEMA,
+} from "../scripts/agents-mother/outcome-spec.mjs";
 import { runTrialPlan, verifyTrialResultFreshness } from "../scripts/agents-mother/trial-runner.mjs";
 
 function projectFixture() {
@@ -66,6 +71,55 @@ function automated(overrides = {}) {
     timeoutMs: 5_000,
     ...overrides,
   };
+}
+
+function approvedOutcomeFixture() {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-live-outcome-"));
+  const stateRoot = path.join(root, "state");
+  const contractPath = path.join(root, "11_agents", "contracts", "fixture-agent-contract.md");
+  mkdirSync(path.dirname(contractPath), { recursive: true });
+  writeFileSync(contractPath, `---
+id: fixture-agent-contract
+type: agent-contract
+status: accepted
+created: 2026-08-16
+updated: 2026-08-16
+---
+
+# Agent Project Contract: Fixture Agent
+
+## Purpose
+
+- Agent name: Fixture Agent
+- Primary mission: Produce a verified result
+- Target user: operator
+- Success criteria: The result is verified
+- Out of scope: deployment
+
+## Functional scope
+
+### V1 core functions
+
+- Produce the result
+
+### Critical user workflows
+
+- Run and inspect the result
+
+## Runtime and interface
+
+- Primary interface: Codex project
+- Proactive mode: none
+
+## Data, memory and sources
+
+- Input data types: text
+- Stored data: result
+`);
+  const created = createOutcomeSpec(path.relative(root, contractPath), { root, date: "2026-08-16" });
+  approveOutcomeSpec(created.path, { root, stateRoot, approvedBy: "user", approvedAt: "2026-08-16T12:00:00.000Z" });
+  const compiled = compileOutcomeSpec(created.path, { root, stateRoot, runId: "live-binding" });
+  return { root, stateRoot, contractPath, specPath: created.path, compiled };
 }
 
 test("Trial runner evaluates all assertion families and persists revision-bound evidence", async () => {
@@ -160,4 +214,45 @@ test("freshness binds content-asserted artifacts even when Git ignores them", as
 
   writeFileSync(path.join(project, "result.txt"), "tampered artifact", "utf8");
   assert.equal(verifyTrialResultFreshness(result, project).reason, "asserted_artifact_changed");
+});
+
+test("freshness rejects changed, superseded, missing, invalid, or contract-stale live Outcome Specs", async () => {
+  const project = projectFixture();
+  const fixture = approvedOutcomeFixture();
+  const originalSpec = readFileSync(fixture.specPath, "utf8");
+  const originalContract = readFileSync(fixture.contractPath, "utf8");
+  const boundPlan = {
+    ...fixture.compiled.plan,
+    trials: [automated()],
+    counts: { trials: 1, automated: 1, operator_judged: 0 },
+  };
+  const { result } = await runTrialPlan(boundPlan, { projectPath: project });
+  const options = { outcomeSpecPath: fixture.specPath, root: fixture.root, stateRoot: fixture.stateRoot };
+  try {
+    assert.equal(verifyTrialResultFreshness(result, project, options).ok, true);
+
+    writeFileSync(fixture.specPath, originalSpec.replace("approved_at: 2026-08-16T12:00:00.000Z", "approved_at: 2026-08-16T13:00:00.000Z"));
+    assert.equal(verifyTrialResultFreshness(result, project, options).ok, true, "approved_at alone is mutable metadata");
+
+    writeFileSync(fixture.specPath, originalSpec.replace("Produce the result", "Produce a materially different result"));
+    assert.equal(verifyTrialResultFreshness(result, project, options).reason, "outcome_spec_changed");
+
+    writeFileSync(fixture.specPath, originalSpec.replace("status: approved", "status: superseded").replace("outcome_spec_status: approved", "outcome_spec_status: superseded"));
+    assert.equal(verifyTrialResultFreshness(result, project, options).reason, "outcome_spec_changed");
+
+    writeFileSync(fixture.specPath, originalSpec);
+    writeFileSync(fixture.contractPath, originalContract.replace("Produce a verified result", "Produce two verified results"));
+    assert.equal(verifyTrialResultFreshness(result, project, options).reason, "outcome_spec_changed");
+
+    writeFileSync(fixture.contractPath, originalContract);
+    writeFileSync(fixture.specPath, "not a valid outcome spec\n");
+    assert.equal(verifyTrialResultFreshness(result, project, options).reason, "outcome_spec_changed");
+
+    rmSync(fixture.specPath);
+    const missing = verifyTrialResultFreshness(result, project, options);
+    assert.equal(missing.reason, "outcome_spec_changed");
+    assert.equal(JSON.stringify(missing).includes(fixture.specPath), false, "freshness result must not disclose an absolute spec path");
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
 });

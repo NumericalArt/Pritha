@@ -5,7 +5,12 @@ import { atomicWriteFile } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { createExecutionBackend, ExecutionBackendError } from "./execution-backends.mjs";
-import { TRIAL_PLAN_SCHEMA } from "./outcome-spec.mjs";
+import {
+  outcomeDocumentLock,
+  outcomeSemanticLock,
+  TRIAL_PLAN_SCHEMA,
+  validateOutcomeSpecText,
+} from "./outcome-spec.mjs";
 import { workspaceRevision, workspaceRevisionMatches } from "./workspace-revision.mjs";
 
 export const TRIAL_RESULT_SCHEMA = "pritha-trial-result-v1";
@@ -358,6 +363,36 @@ export function verifyTrialResultFreshness(resultOrPath, projectPathValue, optio
   if (!result || result.schema !== TRIAL_RESULT_SCHEMA) return { ok: false, reason: "unsupported_result_schema", current: null };
   const expectedLock = sha256(JSON.stringify(evidenceProjection(result)));
   if (expectedLock !== result.evidence_lock) return { ok: false, reason: "evidence_lock_mismatch", current: null };
+  if (options.outcomeSpecPath) {
+    try {
+      const root = path.resolve(options.root || process.cwd());
+      const specPath = path.isAbsolute(options.outcomeSpecPath)
+        ? path.resolve(options.outcomeSpecPath)
+        : path.resolve(root, options.outcomeSpecPath);
+      if (!existsSync(specPath)) return { ok: false, reason: "outcome_spec_changed", current: null, detail: "spec_missing" };
+      const text = readFileSync(specPath, "utf8");
+      const validation = validateOutcomeSpecText(text, { root });
+      const fm = validation.parsed.frontmatter;
+      const currentBinding = {
+        spec_id: String(fm.id || ""),
+        contract_fingerprint: String(validation.contract?.fingerprint || fm.contract_fingerprint || ""),
+        semantic_lock: outcomeSemanticLock(validation.parsed),
+        document_lock: outcomeDocumentLock(text),
+        status: String(fm.status || ""),
+      };
+      const bindingMatches = validation.ok
+        && currentBinding.status === "approved"
+        && currentBinding.spec_id === result.spec_id
+        && currentBinding.contract_fingerprint === result.contract_fingerprint
+        && currentBinding.semantic_lock === result.semantic_lock
+        && currentBinding.document_lock === result.document_lock;
+      if (!bindingMatches) {
+        return { ok: false, reason: "outcome_spec_changed", current: null, detail: "binding_mismatch" };
+      }
+    } catch {
+      return { ok: false, reason: "outcome_spec_changed", current: null, detail: "spec_invalid" };
+    }
+  }
   const projectRoot = projectRootFor(projectPathValue);
   const maxArtifactBytes = options.maxArtifactBytes || MAX_ARTIFACT_BYTES;
   for (const trial of result.trials || []) {
