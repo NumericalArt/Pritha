@@ -3,7 +3,7 @@ import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 
-const BACKEND_RESULT_SCHEMA = "pritha-trial-execution-result-v1";
+const BACKEND_RESULT_SCHEMA = "pritha-trial-execution-result-v2";
 const SANDBOX_TYPES = new Set(["none", "readOnly", "workspaceWrite", "externalSandbox"]);
 const SHELL_EXECUTABLES = new Set([
   "sh",
@@ -411,6 +411,13 @@ function appServerPolicy(sandbox, cwd) {
   throw new ExecutionBackendError("sandbox_policy_invalid", `Unsupported App Server sandbox type: ${sandbox.type}`);
 }
 
+function appServerEvidencePolicy(policy) {
+  const networkAccess = policy.type === "externalSandbox"
+    ? policy.networkAccess
+    : policy.networkAccess ? "enabled" : "disabled";
+  return { ...policy, networkAccess };
+}
+
 function methodUnavailable(error) {
   return error?.details?.rpcCode === -32601 || /method.*(?:not found|unknown)|command\/exec.*(?:unavailable|unsupported)/i.test(error?.message || "");
 }
@@ -502,7 +509,7 @@ export class CodexAppServerCommandBackend {
         backend: this.name,
         isolation: policy.type === "dangerFullAccess" ? "none" : "sandboxed",
         effectivePolicy: {
-          ...policy,
+          ...appServerEvidencePolicy(policy),
           writableRoots: policy.type === "workspaceWrite" ? policy.writableRoots : [],
         },
         exitCode: Number.isInteger(response?.exitCode) ? response.exitCode : 127,

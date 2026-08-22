@@ -27,7 +27,9 @@ test("local backend executes structured argv and records no isolation", async ()
   assert.equal(result.exitCode, 0);
   assert.equal(result.stdout, "ready");
   assert.equal(result.isolation, "none");
+  assert.equal(result.schema, "pritha-trial-execution-result-v2");
   assert.equal(result.effectivePolicy.type, "none");
+  assert.equal(result.effectivePolicy.networkAccess, "host");
 });
 
 test("local backend fails closed when sandbox isolation is required", async () => {
@@ -97,8 +99,29 @@ test("App Server backend negotiates experimental API and uses command/exec with 
   assert.equal(connection.calls[1].method, "command/exec");
   assert.deepEqual(connection.calls[1].params.command, [process.execPath, "-e", "process.exit(0)"]);
   assert.equal(connection.calls[1].params.sandboxPolicy.type, "workspaceWrite");
+  assert.equal(connection.calls[1].params.sandboxPolicy.networkAccess, false, "wire policy remains boolean for workspaceWrite");
   assert.equal(result.isolation, "sandboxed");
+  assert.equal(result.schema, "pritha-trial-execution-result-v2");
+  assert.equal(result.effectivePolicy.networkAccess, "disabled");
   assert.equal(result.runtimeVersion, "codex-test/1.2.3");
+});
+
+test("App Server evidence normalizes enabled and restricted network policy without changing wire values", async () => {
+  const enabledConnection = new FakeConnection();
+  const enabled = await new CodexAppServerCommandBackend({ connection: enabledConnection }).execute({
+    argv: [process.execPath, "-e", "process.exit(0)"], cwd: process.cwd(),
+    sandbox: { ...sandbox("workspaceWrite", true, process.cwd()), networkAccess: true },
+  });
+  assert.equal(enabledConnection.calls[1].params.sandboxPolicy.networkAccess, true);
+  assert.equal(enabled.effectivePolicy.networkAccess, "enabled");
+
+  const restrictedConnection = new FakeConnection();
+  const restricted = await new CodexAppServerCommandBackend({ connection: restrictedConnection }).execute({
+    argv: [process.execPath, "-e", "process.exit(0)"], cwd: process.cwd(),
+    sandbox: sandbox("externalSandbox", true, process.cwd()),
+  });
+  assert.equal(restrictedConnection.calls[1].params.sandboxPolicy.networkAccess, "restricted");
+  assert.equal(restricted.effectivePolicy.networkAccess, "restricted");
 });
 
 test("App Server backend reports missing command/exec as unavailable isolation", async () => {

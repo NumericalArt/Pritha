@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -255,4 +256,15 @@ test("freshness rejects changed, superseded, missing, invalid, or contract-stale
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
+});
+
+test("legacy Trial evidence with a v1 nested execution result remains self-verifying", async () => {
+  const project = projectFixture();
+  const { result } = await runTrialPlan(plan([automated()]), { projectPath: project });
+  result.trials[0].execution.schema = "pritha-trial-execution-result-v1";
+  const { started_at: _startedAt, finished_at: _finishedAt, evidence_lock: _oldLock, ...projection } = result;
+  result.evidence_lock = `sha256:${createHash("sha256").update(JSON.stringify(projection)).digest("hex")}`;
+  const before = JSON.stringify(result);
+  assert.equal(verifyTrialResultFreshness(result, project).ok, true);
+  assert.equal(JSON.stringify(result), before, "legacy evidence is verified in place and is not rewritten or upgraded");
 });
