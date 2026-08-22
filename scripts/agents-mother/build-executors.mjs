@@ -123,6 +123,11 @@ function parseSummary(text) {
   return { summary: bounded(source, 4_000), changed_files: [], remaining_risks: [] };
 }
 
+function goalMethodUnavailable(error) {
+  return error?.details?.rpcCode === -32601
+    || /thread\/goal\/(?:set|get)|method.*(?:not found|unknown)|goal.*(?:unavailable|unsupported)/i.test(error?.message || "");
+}
+
 export class FunctionBuildExecutor {
   constructor(callback, options = {}) {
     if (typeof callback !== "function") throw new Error("FunctionBuildExecutor requires a callback");
@@ -144,6 +149,8 @@ export class FunctionBuildExecutor {
       runtime_version: value?.runtime_version || "fixture",
       thread_id: value?.thread_id || null,
       turn_id: value?.turn_id || null,
+      tokens_used: Number.isSafeInteger(value?.tokens_used) ? value.tokens_used : 0,
+      goal_enforcement: value?.goal_enforcement || "not-applicable",
     };
   }
 
@@ -227,14 +234,26 @@ export class CodexAppServerBuildExecutor {
         threadSource: "user",
         developerInstructions: "Capability probe only. Do not start a turn or modify files.",
       }, timeoutMs);
-      const threadStart = Boolean(response?.thread?.id);
+      const threadId = String(response?.thread?.id || "");
+      const threadStart = Boolean(threadId);
+      let goal = false;
+      let goalError = null;
+      if (threadStart) {
+        try {
+          await this.connection.request("thread/goal/get", { threadId }, timeoutMs);
+          goal = true;
+        } catch (error) {
+          goal = false;
+          goalError = bounded(error instanceof Error ? error.message : String(error), 2_000);
+        }
+      }
       return {
         backend: this.name,
         available: threadStart,
         isolation: "sandboxed",
         runtimeVersion: String(initialized?.userAgent || "codex-app-server/unknown"),
-        capabilities: { commandExec: false, threadStart, goal: "unprobed" },
-        error: threadStart ? null : "App Server did not return a probe thread id.",
+        capabilities: { commandExec: false, threadStart, goal },
+        error: threadStart ? goalError : "App Server did not return a probe thread id.",
       };
     } catch (error) {
       return {
@@ -265,6 +284,29 @@ export class CodexAppServerBuildExecutor {
     }, Math.min(timeoutMs, 30_000));
     const threadId = String(threadResponse?.thread?.id || "");
     if (!threadId) throw new ExecutionBackendError("app_server_thread_missing", "Codex App Server did not return a build thread id");
+
+    const goalRequired = input.goalRequired !== false;
+    const tokenBudget = Number(input.tokenBudget);
+    if (goalRequired) {
+      if (!Number.isSafeInteger(tokenBudget) || tokenBudget < 1) {
+        throw new ExecutionBackendError("token_budget_exhausted", "Build turn has no positive remaining token budget");
+      }
+      const objective = bounded(input.goalObjective, 4_000);
+      if (!objective) throw new ExecutionBackendError("goal_objective_invalid", "Build Goal objective is required");
+      try {
+        await this.connection.request("thread/goal/set", {
+          threadId,
+          objective,
+          status: "active",
+          tokenBudget,
+        }, Math.min(timeoutMs, 30_000));
+      } catch (error) {
+        if (goalMethodUnavailable(error)) {
+          throw new ExecutionBackendError("goal_api_unavailable", "Installed Codex App Server does not expose thread Goal enforcement", { cause: bounded(error?.message || error, 2_000) });
+        }
+        throw error;
+      }
+    }
 
     const turnResponse = await this.connection.request("turn/start", {
       threadId,
@@ -299,6 +341,35 @@ export class CodexAppServerBuildExecutor {
     }
     const summary = parseSummary(this.connection.agentTextForTurn?.(turnId) || extractAgentText(turn));
     const context = { projectRoot: cwd, stateRoot: input.stateRoot, root: input.root };
+    let goal = null;
+    if (goalRequired) {
+      try {
+        const response = await this.connection.request("thread/goal/get", { threadId }, Math.min(timeoutMs, 30_000));
+        goal = response?.goal || null;
+        if (!goal || !Number.isSafeInteger(goal.tokensUsed) || goal.tokensUsed < 0) {
+          throw new ExecutionBackendError("goal_usage_unavailable", "Codex App Server returned no valid Goal token usage");
+        }
+      } catch (error) {
+        const partial = sanitized({
+          schema: BUILD_EXECUTOR_RESULT_SCHEMA,
+          executor: this.name,
+          status: "completed-goal-usage-unavailable",
+          ...summary,
+          duration_ms: Date.now() - started,
+          runtime_version: String(initialized?.userAgent || "codex-app-server/unknown"),
+          thread_id: threadId,
+          turn_id: turnId,
+          token_budget: tokenBudget,
+          tokens_used: null,
+          goal_enforcement: "required",
+          goal_status: "unavailable",
+        }, context);
+        throw new ExecutionBackendError("goal_usage_unavailable", "Build turn completed, but Goal token usage could not be read; no next iteration is allowed", {
+          cause: bounded(error?.message || error, 2_000),
+          executorResult: partial,
+        });
+      }
+    }
     return sanitized({
       schema: BUILD_EXECUTOR_RESULT_SCHEMA,
       executor: this.name,
@@ -308,6 +379,10 @@ export class CodexAppServerBuildExecutor {
       runtime_version: String(initialized?.userAgent || "codex-app-server/unknown"),
       thread_id: threadId,
       turn_id: turnId,
+      token_budget: goalRequired ? tokenBudget : null,
+      tokens_used: goalRequired ? goal.tokensUsed : 0,
+      goal_enforcement: goalRequired ? "required" : "waived-once",
+      goal_status: goalRequired ? goal.status : "waived",
     }, context);
   }
 

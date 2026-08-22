@@ -312,6 +312,20 @@ export function validateContract(contractPath, options = {}) {
     const value = Number(raw);
     if (!Number.isSafeInteger(value) || value < minimum) issues.push(`${label} must be an integer >= ${minimum}`);
   }
+  const rawBuildTokenBudget = bodyValue(text, "Build token budget");
+  const buildTokenConfirmation = bodyValue(text, "Build token budget confirmation");
+  if (rawBuildTokenBudget) {
+    const value = Number(rawBuildTokenBudget);
+    if (!Number.isSafeInteger(value) || value < 1) issues.push("Build token budget must be a positive JavaScript-safe integer compatible with App Server int64");
+    if (!new Set(["user", "pending", "legacy-default"]).has(buildTokenConfirmation)) {
+      issues.push("Build token budget confirmation must be user, pending, or legacy-default");
+    }
+    const contractStatus = String(fm.status || "").toLowerCase();
+    const autonomousBuild = (buildExecutor || "codex-app-server") !== "manual";
+    if (contractStatus === "accepted" && autonomousBuild && buildTokenConfirmation === "pending") {
+      issues.push("Accepted autonomous contract requires user-confirmed Build token budget");
+    }
+  }
   if (repositoryResearchPolicy === "not-applicable" && isMissing(bodyValue(text, "Repository research waiver reason"))) {
     issues.push("Repository research policy not-applicable requires Repository research waiver reason");
   }
@@ -480,6 +494,11 @@ export function contractData(contractPath, options = {}) {
     trialBackendPolicy: bodyValue(text, "Trial backend policy") || "local-or-app-server",
     buildIterationBudget: Number(bodyValue(text, "Build iteration budget") || 6),
     buildElapsedBudgetMs: Number(bodyValue(text, "Build elapsed budget ms") || 5_400_000),
+    buildTokenBudget: Number(bodyValue(text, "Build token budget") || 1_000_000),
+    buildTokenBudgetConfirmation: bodyValue(text, "Build token budget confirmation") || "legacy-default",
+    buildTokenBudgetSource: bodyValue(text, "Build token budget")
+      ? (bodyValue(text, "Build token budget confirmation") || "pending")
+      : "legacy-default",
     repeatedFailureThreshold: Number(bodyValue(text, "Repeated failure threshold") || 3),
     autonomousEffectsDenied: bodyValue(text, "Autonomous effects denied") || "push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation",
     acceptancePolicy: bodyValue(text, "Acceptance policy") || "verified is distinct from accepted; operator-judged Trials require explicit user acceptance",

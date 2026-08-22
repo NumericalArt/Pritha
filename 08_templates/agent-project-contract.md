@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-07-13
+updated: 2026-08-22
 template_for: agent-contract
 topics: []
 tools: []
@@ -22,9 +22,11 @@ related:
     - 04_standards/agent-ai-safe-security-checklist.md
     - 04_standards/agent-a2a-interoperability.md
     - 04_standards/agent-creation-harness.md
+    - 04_standards/agent-feedback-sensors-and-evaluation-loops.md
     - 04_standards/agent-untrusted-input-security.md
   workflows:
     - 07_workflows/agents-mother.md
+    - 07_workflows/agent-sensor-and-eval-design.md
 supersedes: []
 superseded_by: []
 freshness_status: current | changed | outdated | uncertain
@@ -98,6 +100,8 @@ Status: draft | accepted | superseded
 - Trial backend policy: local-or-app-server | app-server-required | local-trusted-only
 - Build iteration budget: 6
 - Build elapsed budget ms: 5400000
+- Build token budget: 1000000
+- Build token budget confirmation: pending
 - Repeated failure threshold: 3
 - Automated Trial waiver: none | concrete reason requiring user acceptance
 - Autonomous effects denied: push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation
@@ -350,6 +354,25 @@ values remain non-authorizing.
 - Completion criteria:
 - Harness evolution protocol: inspect local project/contract, consult Pritha memory, verify current docs when needed, implement minimal change with tests
 
+## Sensor and feedback design
+
+- Critical completion state:
+- Independent completion verifier:
+- Verifier integrity boundary:
+- Pre-action permission and irreversible-action controls:
+- In-loop budgets and non-progress detection:
+- Retry, backoff, circuit-breaker and degradation policy:
+- Post-action durable-state or artifact read-back:
+- Fast local sensors:
+- Domain regression and capability evals:
+- Inferential grader and human-calibration policy:
+- Production signals and SLOs, or not-applicable reason:
+- Primary outcome metric:
+- Safety, quality, cost and integrity guardrails:
+- Sensor readiness: planned | implemented | ready | degraded | blocked
+- Incident-to-regression owner and review cadence:
+- Human judgment and acceptance boundary:
+
 ## Data, memory and sources
 
 - Memory domains selected:
@@ -449,6 +472,7 @@ values remain non-authorizing.
 - [ ] Skills policy selected.
 - [ ] MCP policy selected or explicitly skipped.
 - [ ] Harness inventory complete.
+- [ ] Sensor and feedback design covers completion verification, consequential actions, loop bounds, critical side effects, eval integrity, metrics and human judgment boundaries.
 - [ ] Security model documented.
 - [ ] AI-SAFE security profile completed or explicitly marked minimal/not-applicable.
 - [ ] Tests/healthchecks defined.

@@ -88,8 +88,8 @@ function usage() {
   console.log(`Usage:
   ${CLI_COMMAND} help
   ${CLI_COMMAND} questions
-  ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
-  ${CLI_COMMAND} init --name <name> --mission <text> [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
+  ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--build-token-budget 1000000] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
+  ${CLI_COMMAND} init --name <name> --mission <text> [--build-token-budget <positive-int> --token-budget-confirmed-by user] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} outcome init <contract-path> [--interaction-mode interface|headless|hybrid]
   ${CLI_COMMAND} outcome validate <outcome-spec-path>
   ${CLI_COMMAND} outcome status <outcome-spec-path>
@@ -99,7 +99,7 @@ function usage() {
   ${CLI_COMMAND} trial run <outcome-spec-path> --project <path> [--backend local|app-server] [--run-id <id>]
   ${CLI_COMMAND} deliver <outcome-spec-path> --project <path> [--executor codex-app-server] [--trial-backend local|app-server] [--run-id <id>]
   ${CLI_COMMAND} delivery status <run-id>
-  ${CLI_COMMAND} delivery resume <run-id> [--answer <option-id>] [--guidance <text>] [--project <path>]
+  ${CLI_COMMAND} delivery resume <run-id> [--answer <option-id>] [--answered-by user] [--guidance <text>] [--project <path>]
   ${CLI_COMMAND} delivery accept <run-id> --accepted-by user
   ${CLI_COMMAND} delivery cleanup <run-id> [--apply --yes]
   ${CLI_COMMAND} delivery cleanup --all-stale --older-than-days <N> [--apply --yes]
@@ -544,6 +544,8 @@ ${bulletList(data.criticalWorkflows)}
 - Trial backend policy: ${scalar(data.trialBackendPolicy, "local-or-app-server")}
 - Build iteration budget: ${scalar(data.buildIterationBudget, "6")}
 - Build elapsed budget ms: ${scalar(data.buildElapsedBudgetMs, "5400000")}
+- Build token budget: ${scalar(data.buildTokenBudget, "1000000")}
+- Build token budget confirmation: ${scalar(data.buildTokenBudgetConfirmation, "pending")}
 - Repeated failure threshold: ${scalar(data.repeatedFailureThreshold, "3")}
 - Autonomous effects denied: push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation
 - Acceptance policy: verified is distinct from accepted; operator-judged Trials require explicit user acceptance
@@ -781,6 +783,12 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   data.trialBackendPolicy = options["trial-backend-policy"] || "local-or-app-server";
   data.buildIterationBudget = options["build-iterations"] || "6";
   data.buildElapsedBudgetMs = options["build-elapsed-ms"] || "5400000";
+  data.buildTokenBudget = data.buildTokenBudget || options["build-token-budget"] || "1000000";
+  data.buildTokenBudgetConfirmation = data.buildTokenBudgetConfirmation || (
+    options["build-token-budget"] && options["token-budget-confirmed-by"] === "user"
+      ? "user"
+      : "pending"
+  );
   data.repeatedFailureThreshold = options["repeated-failure-threshold"] || "3";
   return data;
 }
@@ -802,6 +810,8 @@ async function interview(options) {
       data.criticalWorkflows = listFromText(await ask(rl, "One realistic user journey (; separated)", options.workflows || "request result; review evidence; correct or accept"));
       data.outOfScope = await ask(rl, "What must V1 explicitly not do?", options["out-of-scope"] || "functions not required for the approved V1 outcome");
       data.sensitiveData = await ask(rl, "Sensitive data or consequential actions that change the design", options.sensitive || "none known yet");
+      data.buildTokenBudget = await ask(rl, "Build token budget (confirm 1000000 or enter another positive integer)", options["build-token-budget"] || "1000000");
+      data.buildTokenBudgetConfirmation = "user";
       applyInterviewTechnicalProposal(data, options);
     } finally {
       rl.close();
@@ -1705,6 +1715,7 @@ function deliveryCliOptions(options) {
     },
     executorTimeoutMs: positiveCliInteger(options["executor-timeout-ms"]),
     answer: options.answer,
+    answeredBy: options["answered-by"],
     guidance: options.guidance,
     extendIterations: positiveCliInteger(options["extend-iterations"]),
     extendElapsedMs: positiveCliInteger(options["extend-elapsed-ms"]),
@@ -1722,6 +1733,7 @@ function printDeliveryState(state, worktree = null) {
   console.log(`Status: ${state.status}`);
   console.log(`Phase: ${state.phase}`);
   console.log(`Iterations: ${state.iteration}/${state.budget.max_iterations}`);
+  console.log(`Build tokens: ${state.budget.tokens_used}/${state.budget.max_tokens} (${state.budget.token_budget_source}; Goal ${state.budget.goal_enforcement})`);
   if (worktree?.branch) console.log(`Branch: ${worktree.branch}`);
   if (worktree?.cleanup_status) console.log(`Worktree cleanup: ${worktree.cleanup_status}${worktree.cleanup_reason ? ` (${worktree.cleanup_reason})` : ""}`);
   if (state.last_trial_result) console.log(`Verification evidence: ${state.last_trial_result.status} (${state.last_trial_result.evidence_lock})`);

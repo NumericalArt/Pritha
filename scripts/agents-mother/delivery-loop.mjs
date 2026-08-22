@@ -90,6 +90,79 @@ function recordRuntimeProbe(runRoot, kind, probe, context) {
   }), { eventType: "runtime_probe_recorded", payload: entry }).state;
 }
 
+function goalObjective(state, plan) {
+  return bounded(
+    `Pritha delivery run ${state.run_id}; Outcome Spec ${plan.spec_id}; semantic lock ${plan.semantic_lock}; objective: implement the approved outcome and pass its immutable Trials.`,
+    4_000,
+  );
+}
+
+function accountExecutorResult(runRoot, result, executorPath) {
+  return updateDeliveryLedger(runRoot, (current) => {
+    const budget = { ...current.budget };
+    const threadId = String(result?.thread_id || "");
+    const turnId = String(result?.turn_id || "");
+    const tokensUsed = result?.tokens_used;
+    const key = threadId && turnId ? `${threadId}:${turnId}` : "";
+    if (key && Number.isSafeInteger(tokensUsed) && tokensUsed >= 0) {
+      const accounted = (budget.accounted_turns || []).some((entry) => entry.key === key);
+      if (!accounted) {
+        const nextTokensUsed = budget.tokens_used + tokensUsed;
+        if (!Number.isSafeInteger(nextTokensUsed) || nextTokensUsed > budget.max_tokens) {
+          throw new DeliveryLoopError("token_usage_invalid", "Recorded Goal usage exceeds the confirmed delivery token budget");
+        }
+        budget.tokens_used = nextTokensUsed;
+        budget.accounted_turns = [...(budget.accounted_turns || []), {
+          key,
+          thread_id: threadId,
+          turn_id: turnId,
+          tokens_used: tokensUsed,
+          executor_result: executorPath,
+        }];
+      }
+    }
+    if (result?.goal_enforcement === "waived-once" && budget.goal_enforcement === "waived-once") {
+      budget.goal_enforcement = "required";
+      budget.goal_waiver = { ...(budget.goal_waiver || {}), used_at: new Date().toISOString() };
+    }
+    return {
+      ...current,
+      budget,
+      executor_last_result: executorPath,
+      next_action: current.status === "building" ? "verify_executor_changes" : current.next_action,
+    };
+  }, {
+    eventType: "build_iteration_completed",
+    payload: {
+      iteration: readDeliveryLedger(runRoot).iteration,
+      executor_result: executorPath,
+      thread_id: result?.thread_id || null,
+      turn_id: result?.turn_id || null,
+      tokens_used: Number.isSafeInteger(result?.tokens_used) ? result.tokens_used : null,
+    },
+  }).state;
+}
+
+function reconcileExecutorAccounting(runRoot) {
+  const directory = path.join(runRoot, "executor");
+  if (!existsSync(directory)) return readDeliveryLedger(runRoot);
+  for (const name of readdirSync(directory).filter((entry) => /^iteration-\d+\.json$/.test(entry)).sort()) {
+    const relative = path.join("executor", name).replaceAll(path.sep, "/");
+    let result;
+    try {
+      result = JSON.parse(readFileSync(path.join(directory, name), "utf8"));
+    } catch {
+      continue;
+    }
+    const key = result?.thread_id && result?.turn_id ? `${result.thread_id}:${result.turn_id}` : "";
+    const state = readDeliveryLedger(runRoot);
+    if (!key || (state.budget.accounted_turns || []).some((entry) => entry.key === key)) continue;
+    if (!Number.isSafeInteger(result.tokens_used) || result.tokens_used < 0) continue;
+    accountExecutorResult(runRoot, result, relative);
+  }
+  return readDeliveryLedger(runRoot);
+}
+
 function assertPlan(plan) {
   if (!plan || plan.schema !== TRIAL_PLAN_SCHEMA || !plan.spec_id || !plan.agent_slug || !Array.isArray(plan.trials)) {
     throw new DeliveryLoopError("trial_plan_invalid", "Delivery requires a compiled Trial plan");
@@ -135,9 +208,12 @@ function policyBoundOptions(plan, options = {}) {
     buildGitMode: policy.build_git_mode || "disposable-worktree",
     allowNoGitInPlace: policy.build_git_mode === "no-git-in-place",
     budget: {
-      maxIterations: options.budget?.maxIterations || policy.max_iterations || 6,
-      maxElapsedMs: options.budget?.maxElapsedMs || policy.max_elapsed_ms || 5_400_000,
-      repeatedFailureThreshold: options.budget?.repeatedFailureThreshold || policy.repeated_failure_threshold || 3,
+      maxIterations: options.budget?.maxIterations ?? policy.max_iterations ?? 6,
+      maxElapsedMs: options.budget?.maxElapsedMs ?? policy.max_elapsed_ms ?? 5_400_000,
+      maxTokens: options.budget?.maxTokens ?? policy.max_tokens ?? 1_000_000,
+      tokenBudgetSource: options.budget?.tokenBudgetSource ?? policy.token_budget_source ?? "legacy-default",
+      goalEnforcement: options.budget?.goalEnforcement ?? "required",
+      repeatedFailureThreshold: options.budget?.repeatedFailureThreshold ?? policy.repeated_failure_threshold ?? 3,
     },
   };
 }
@@ -241,6 +317,29 @@ function blockerForError(error) {
         { id: "stop-run", label: "Stop run", effect: "Abandon delivery without starting a build turn." },
       ],
     },
+    goal_api_unavailable: {
+      question: "How should Pritha proceed when the installed Codex runtime cannot enforce this delivery Goal?",
+      options: [
+        { id: "retry-after-upgrade", label: "Upgrade and retry", effect: "Update Codex, then re-probe Goal capability before starting a turn." },
+        { id: "continue-without-goal", label: "Continue once", effect: "Grant one explicit user-only build turn without Goal enforcement while iteration and elapsed limits remain active." },
+        { id: "abandon", label: "Abandon", effect: "Abandon the delivery run without starting an unenforced build turn." },
+      ],
+    },
+    goal_usage_unavailable: {
+      question: "How should Pritha preserve the completed turn now that its Goal usage cannot be accounted safely?",
+      options: [
+        { id: "inspect-worktree", label: "Inspect worktree", effect: "Keep the run blocked and inspect the saved executor result and worktree without starting another iteration." },
+        { id: "abandon", label: "Abandon", effect: "Abandon the run while preserving its worktree, branch and saved executor result." },
+      ],
+    },
+    token_budget_exhausted: {
+      question: "How should Pritha proceed after the confirmed token budget was exhausted?",
+      options: [
+        { id: "revise-contract", label: "Revise budget", effect: "Approve a revised contract budget and begin a new bound delivery run." },
+        { id: "review-failures", label: "Review evidence", effect: "Keep the run blocked and inspect the existing evidence." },
+        { id: "stop-run", label: "Stop run", effect: "Abandon the run without merge or deployment." },
+      ],
+    },
   };
   const definition = definitions[code] || {
     question: "How should Pritha proceed with this delivery blocker?",
@@ -305,7 +404,7 @@ superseded_by: []
 freshness_status: current
 source_published: ${date}
 source_updated: ${date}
-source_version: delivery ledger v1
+source_version: delivery ledger v2
 retrieved: ${date}
 verified: ${["verified", "awaiting_acceptance", "accepted"].includes(state.status) ? date : "pending"}
 valid_for: ${JSON.stringify(`delivery run ${state.run_id}`)}
@@ -331,6 +430,7 @@ confidence: ${["verified", "awaiting_acceptance", "accepted"].includes(state.sta
 - Status: ${state.status}
 - Phase: ${state.phase}
 - Iterations: ${state.iteration}/${state.budget.max_iterations}
+- Build tokens: ${state.budget.tokens_used}/${state.budget.max_tokens} (${state.budget.token_budget_source}; Goal ${state.budget.goal_enforcement})
 - Branch: ${worktree?.branch || "not-created"}
 - Base revision: ${worktree?.base_revision || "not-created"}
 - Verified checkpoint: ${worktree?.verified_checkpoint || "pending"}
@@ -532,6 +632,7 @@ export async function runDeliveryLoop(input = {}) {
   mkdirSync(runRoot, { recursive: true });
   ensureRunPlan(runRoot, plan);
   let state = ensureLedger(runRoot, plan, projectPath, runId, input);
+  state = reconcileExecutorAccounting(runRoot);
   let worktree = readDeliveryWorktree(runRoot);
   if (["verified", "awaiting_acceptance", "accepted", "failed", "abandoned", "cancelled"].includes(state.status)) {
     return { state, worktree, reportPath: null, blocked: false };
@@ -656,7 +757,21 @@ export async function runDeliveryLoop(input = {}) {
           if (probe.available !== true) {
             throw new DeliveryLoopError("build_runtime_unavailable", probe.error || "Build executor capability probe failed");
           }
+          const currentBudget = readDeliveryLedger(runRoot).budget;
+          if (
+            buildExecutor.name === "codex-app-server-build"
+            && currentBudget.goal_enforcement === "required"
+            && probe.capabilities?.goal !== true
+          ) {
+            throw new DeliveryLoopError("goal_api_unavailable", probe.error || "Codex Goal capability is unavailable");
+          }
         }
+        const executionState = readDeliveryLedger(runRoot);
+        const remainingTokens = executionState.budget.max_tokens - executionState.budget.tokens_used;
+        if (remainingTokens <= 0) {
+          return blockDelivery(runRoot, plan, worktree, blockerForError(new DeliveryLoopError("token_budget_exhausted", "The confirmed build token budget is exhausted")), input);
+        }
+        const goalRequired = executionState.budget.goal_enforcement !== "waived-once";
         executorResult = await buildExecutor.execute({
           runId: state.run_id,
           iteration: state.iteration,
@@ -668,14 +783,28 @@ export async function runDeliveryLoop(input = {}) {
           timeoutMs: input.executorTimeoutMs,
           stateRoot: input.stateRoot,
           root: input.root,
+          tokenBudget: remainingTokens,
+          goalRequired,
+          goalObjective: goalObjective(executionState, plan),
         });
         const executorPath = storeExecutorResult(runRoot, executorResult, state.iteration);
-        updateDeliveryLedger(runRoot, (current) => ({ ...current, executor_last_result: executorPath, next_action: "verify_executor_changes" }), {
-          eventType: "build_iteration_completed",
-          payload: { iteration: state.iteration, executor_result: executorPath },
-        });
+        accountExecutorResult(runRoot, executorResult, executorPath);
       } catch (error) {
-        if (["manual_build_required", "no_git_in_place_not_implemented", "build_runtime_unavailable"].includes(error?.code)) {
+        if (error?.code === "goal_usage_unavailable" && error?.details?.executorResult) {
+          const executorPath = storeExecutorResult(runRoot, error.details.executorResult, state.iteration);
+          updateDeliveryLedger(runRoot, (current) => ({ ...current, executor_last_result: executorPath }), {
+            eventType: "goal_usage_unavailable",
+            payload: { iteration: state.iteration, executor_result: executorPath },
+          });
+        }
+        if ([
+          "manual_build_required",
+          "no_git_in_place_not_implemented",
+          "build_runtime_unavailable",
+          "goal_api_unavailable",
+          "goal_usage_unavailable",
+          "token_budget_exhausted",
+        ].includes(error?.code)) {
           return blockDelivery(runRoot, plan, worktree, blockerForError(error), input);
         }
         const synthetic = [{ id: "build-executor", assertions: [], error: { code: error.code || "executor_failed" } }];
@@ -750,7 +879,7 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
   const selected = String(answer || "").trim();
   const option = state.blockers[0].options.find((entry) => entry.id === selected);
   if (!option) throw new DeliveryLoopError("blocker_answer_invalid", "Answer must match one of the blocker option ids");
-  if (["stop-run", "stop-new-run", "resume-existing", "use-clean-clone", "revise-contract"].includes(selected)) {
+  if (["stop-run", "stop-new-run", "resume-existing", "use-clean-clone", "revise-contract", "abandon"].includes(selected)) {
     return transitionDelivery(runRoot, "abandoned", { eventType: "delivery_abandoned_by_user" }).state;
   }
   if (selected === "revise-outcome") return transitionDelivery(runRoot, "abandoned", { eventType: "outcome_revision_requested" }).state;
@@ -760,6 +889,32 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
       ...current,
       operator_guidance: guidance,
     }), { eventType: "blocker_review_requested", payload: { blocker_code: state.blockers[0].code, answer: selected } }).state;
+  }
+  if (selected === "continue-without-goal") {
+    if (options.answeredBy !== "user") {
+      throw new DeliveryLoopError("goal_waiver_actor_invalid", "Goal waiver requires explicit --answered-by user");
+    }
+    return updateDeliveryLedger(runRoot, (current) => {
+      if (current.budget.goal_waiver) {
+        throw new DeliveryLoopError("goal_waiver_already_used", "This delivery run already recorded its one-time Goal waiver");
+      }
+      return {
+        ...current,
+        status: "correcting",
+        phase: "operator_resolution",
+        next_action: "resume_delivery_without_goal_once",
+        blockers: [],
+        budget: {
+          ...current.budget,
+          goal_enforcement: "waived-once",
+          goal_waiver: {
+            granted_by: "user",
+            granted_at: new Date().toISOString(),
+            used_at: null,
+          },
+        },
+      };
+    }, { eventType: "goal_waiver_granted_by_user", payload: { answer: selected } }).state;
   }
   if (selected === "discard-iteration") discardDeliveryIteration(runRoot);
   return updateDeliveryLedger(runRoot, (current) => {

@@ -11,7 +11,8 @@ import { atomicWriteFile, withFileLock } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 
-export const DELIVERY_LEDGER_SCHEMA = "pritha-delivery-ledger-v1";
+export const DELIVERY_LEDGER_SCHEMA = "pritha-delivery-ledger-v2";
+export const LEGACY_DELIVERY_LEDGER_SCHEMA = "pritha-delivery-ledger-v1";
 export const DELIVERY_EVENT_SCHEMA = "pritha-delivery-event-v1";
 export const DELIVERY_TARGET_CLAIM_SCHEMA = "pritha-delivery-target-claim-v1";
 
@@ -94,7 +95,28 @@ export function typedBlocker(value = {}) {
   return { code, summary, question, options, evidence_refs: normalizeEvidenceRefs(value.evidence_refs || []) };
 }
 
-export function validateDeliveryLedger(value) {
+export function normalizeDeliveryLedger(value) {
+  if (!value || typeof value !== "object") return value;
+  if (![DELIVERY_LEDGER_SCHEMA, LEGACY_DELIVERY_LEDGER_SCHEMA].includes(value.schema)) return value;
+  const budget = value.budget && typeof value.budget === "object" ? value.budget : {};
+  return {
+    ...value,
+    schema: DELIVERY_LEDGER_SCHEMA,
+    runtime_probes: Array.isArray(value.runtime_probes) ? value.runtime_probes : [],
+    budget: {
+      ...budget,
+      max_tokens: Number.isSafeInteger(budget.max_tokens) ? budget.max_tokens : 1_000_000,
+      tokens_used: Number.isSafeInteger(budget.tokens_used) ? budget.tokens_used : 0,
+      token_budget_source: String(budget.token_budget_source || "legacy-default"),
+      goal_enforcement: String(budget.goal_enforcement || "required"),
+      accounted_turns: Array.isArray(budget.accounted_turns) ? budget.accounted_turns : [],
+      goal_waiver: budget.goal_waiver || null,
+    },
+  };
+}
+
+export function validateDeliveryLedger(input) {
+  const value = normalizeDeliveryLedger(input);
   const issues = [];
   if (!value || typeof value !== "object" || value.schema !== DELIVERY_LEDGER_SCHEMA) issues.push("unsupported ledger schema");
   if (!DELIVERY_STATUSES.has(value?.status)) issues.push("unsupported delivery status");
@@ -123,13 +145,40 @@ export function validateDeliveryLedger(value) {
   if (!value?.budget || !Number.isSafeInteger(value.budget.max_iterations) || value.budget.max_iterations < 1) issues.push("budget.max_iterations must be positive");
   if (!Number.isSafeInteger(value?.budget?.max_elapsed_ms) || value.budget.max_elapsed_ms < 1) issues.push("budget.max_elapsed_ms must be positive");
   if (!Number.isSafeInteger(value?.budget?.repeated_failure_threshold) || value.budget.repeated_failure_threshold < 2) issues.push("budget.repeated_failure_threshold must be at least 2");
+  if (!Number.isSafeInteger(value?.budget?.max_tokens) || value.budget.max_tokens < 1) issues.push("budget.max_tokens must be a positive safe integer");
+  if (!Number.isSafeInteger(value?.budget?.tokens_used) || value.budget.tokens_used < 0) issues.push("budget.tokens_used must be a non-negative safe integer");
+  if (value?.budget?.tokens_used > value?.budget?.max_tokens) issues.push("budget.tokens_used must not exceed budget.max_tokens");
+  if (!new Set(["required", "waived-once", "not-applicable"]).has(value?.budget?.goal_enforcement)) issues.push("budget.goal_enforcement is invalid");
+  if (!Array.isArray(value?.budget?.accounted_turns)) issues.push("budget.accounted_turns must be an array");
+  const turnKeys = (value?.budget?.accounted_turns || []).map((entry) => entry?.key).filter(Boolean);
+  if (new Set(turnKeys).size !== turnKeys.length) issues.push("budget.accounted_turns keys must be unique");
+  const accountedTokenTotal = (value?.budget?.accounted_turns || []).reduce((total, entry) => {
+    if (
+      typeof entry?.key !== "string"
+      || !entry.key
+      || typeof entry?.thread_id !== "string"
+      || !entry.thread_id
+      || typeof entry?.turn_id !== "string"
+      || !entry.turn_id
+      || !Number.isSafeInteger(entry?.tokens_used)
+      || entry.tokens_used < 0
+    ) {
+      issues.push("budget.accounted_turns entries must contain a key, thread, turn and non-negative safe token count");
+      return total;
+    }
+    return total + entry.tokens_used;
+  }, 0);
+  if (Number.isSafeInteger(accountedTokenTotal) && accountedTokenTotal !== value?.budget?.tokens_used) {
+    issues.push("budget.tokens_used must equal the sum of accounted turns");
+  }
   return { ok: issues.length === 0, issues };
 }
 
 function assertValidLedger(value) {
-  const result = validateDeliveryLedger(value);
+  const normalized = normalizeDeliveryLedger(value);
+  const result = validateDeliveryLedger(normalized);
   if (!result.ok) throw new Error(`Invalid delivery ledger: ${result.issues.join("; ")}`);
-  return value;
+  return normalized;
 }
 
 export function deliveryLedgerPaths(runRoot) {
@@ -191,6 +240,12 @@ export function createDeliveryLedger(runRoot, input = {}) {
       max_iterations: Number.isSafeInteger(input.budget?.maxIterations) ? input.budget.maxIterations : 6,
       max_elapsed_ms: Number.isSafeInteger(input.budget?.maxElapsedMs) ? input.budget.maxElapsedMs : 90 * 60 * 1_000,
       repeated_failure_threshold: Number.isSafeInteger(input.budget?.repeatedFailureThreshold) ? input.budget.repeatedFailureThreshold : 3,
+      max_tokens: Number.isSafeInteger(input.budget?.maxTokens) ? input.budget.maxTokens : 1_000_000,
+      tokens_used: 0,
+      token_budget_source: input.budget?.tokenBudgetSource || "legacy-default",
+      goal_enforcement: input.budget?.goalEnforcement || "required",
+      accounted_turns: [],
+      goal_waiver: null,
     },
     iteration: 0,
     consecutive_failure_signature: null,
@@ -357,6 +412,19 @@ export function recordDeliveryFailure(runRoot, failures, options = {}) {
 
 export function budgetBlocker(state, now = Date.now()) {
   const elapsed = now - Date.parse(state.created_at);
+  if (state.budget.tokens_used >= state.budget.max_tokens) {
+    return typedBlocker({
+      code: "token_budget_exhausted",
+      summary: `The build used its ${state.budget.max_tokens}-token budget.`,
+      question: "How should Pritha proceed after the confirmed build token budget was exhausted?",
+      options: [
+        { id: "revise-contract", label: "Revise budget", effect: "Revise and approve the contract with a new token budget, then start a new delivery run." },
+        { id: "review-failures", label: "Review evidence", effect: "Keep the run blocked and inspect the current worktree and Trial evidence." },
+        { id: "stop-run", label: "Stop run", effect: "Abandon this run without merging or deploying changes." },
+      ],
+      evidence_refs: ["ledger:budget.tokens_used"],
+    });
+  }
   if (state.iteration >= state.budget.max_iterations) {
     return typedBlocker({
       code: "iteration_budget_exhausted",

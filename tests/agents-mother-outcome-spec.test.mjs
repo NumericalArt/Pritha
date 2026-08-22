@@ -151,6 +151,8 @@ test("compiled Trial plan is deterministic and contains no compilation timestamp
     trial_backend_policy: "local-or-app-server",
     max_iterations: 6,
     max_elapsed_ms: 5_400_000,
+    max_tokens: 1_000_000,
+    token_budget_source: "legacy-default",
     repeated_failure_threshold: 3,
     autonomous_effects_denied: "push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation",
     acceptance_policy: "verified is distinct from accepted; operator-judged Trials require explicit user acceptance",

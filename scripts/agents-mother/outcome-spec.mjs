@@ -859,6 +859,8 @@ export function compileOutcomeSpec(specPath, options = {}) {
       trial_backend_policy: validation.contract?.trialBackendPolicy || "local-or-app-server",
       max_iterations: validation.contract?.buildIterationBudget || 6,
       max_elapsed_ms: validation.contract?.buildElapsedBudgetMs || 5_400_000,
+      max_tokens: validation.contract?.buildTokenBudget || 1_000_000,
+      token_budget_source: validation.contract?.buildTokenBudgetSource || "legacy-default",
       repeated_failure_threshold: validation.contract?.repeatedFailureThreshold || 3,
       autonomous_effects_denied: validation.contract?.autonomousEffectsDenied || "push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation",
       acceptance_policy: validation.contract?.acceptancePolicy || "verified is distinct from accepted",

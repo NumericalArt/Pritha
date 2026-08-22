@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -331,4 +331,114 @@ test("cleanup policy preserves verified runs and bulk-cleans only stale clean te
   assert.equal(applied.candidates[0].removed, true);
   assert.equal(existsSync(runs[0].worktree), false);
   assert.equal(existsSync(runs[1].worktree), true);
+});
+
+test("Goal absence requires an explicit user-only one-turn waiver", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-goal-waiver-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-goal-waiver");
+  let executions = 0;
+  const executor = {
+    name: "codex-app-server-build",
+    async probe() {
+      return {
+        backend: this.name,
+        available: true,
+        isolation: "sandboxed",
+        runtimeVersion: "codex-fixture/no-goal",
+        capabilities: { commandExec: false, threadStart: true, goal: false },
+        error: "Method not found: thread/goal/get",
+      };
+    },
+    async execute(input) {
+      executions += 1;
+      assert.equal(input.goalRequired, false);
+      writeFileSync(path.join(input.worktree, "implementation.txt"), "ready\n");
+      return {
+        schema: "pritha-build-executor-result-v1",
+        executor: this.name,
+        status: "completed",
+        summary: "implemented with explicit waiver",
+        changed_files: ["implementation.txt"],
+        remaining_risks: [],
+        thread_id: "waiver-thread",
+        turn_id: "waiver-turn",
+        tokens_used: 0,
+        goal_enforcement: "waived-once",
+      };
+    },
+    close() {},
+  };
+  const blocked = await runDeliveryLoop({
+    plan: plan(), projectPath: project, runRoot, runId: "run-goal-waiver",
+    buildExecutor: executor, trialBackend: "local", reportDir: false,
+  });
+  assert.equal(blocked.state.blockers[0].code, "goal_api_unavailable");
+  assert.equal(executions, 0);
+
+  await assert.rejects(
+    resumeDelivery("run-goal-waiver", {
+      root: project, stateRoot, allowDraft: true,
+      answer: "continue-without-goal", buildExecutor: executor, trialBackend: "local", reportDir: false,
+    }),
+    (error) => error.code === "goal_waiver_actor_invalid",
+  );
+  const resumed = await resumeDelivery("run-goal-waiver", {
+    root: project, stateRoot, allowDraft: true,
+    answer: "continue-without-goal", answeredBy: "user",
+    buildExecutor: executor, trialBackend: "local", reportDir: false,
+  });
+  assert.equal(resumed.state.status, "verified");
+  assert.equal(executions, 1);
+  const budget = readDeliveryLedger(runRoot).budget;
+  assert.equal(budget.goal_enforcement, "required");
+  assert.equal(budget.goal_waiver.granted_by, "user");
+  assert.ok(budget.goal_waiver.used_at);
+});
+
+test("resume reconciles a crash-saved executor result into token usage exactly once", async () => {
+  const project = repository();
+  writeFileSync(path.join(project, "dirty.txt"), "preserve\n");
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-token-reconcile-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-token-reconcile");
+  const executor = new FunctionBuildExecutor(async ({ worktree }) => {
+    writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+    return { summary: "ready", changed_files: ["implementation.txt"] };
+  });
+  const blocked = await runDeliveryLoop({
+    plan: plan(), projectPath: project, runRoot, runId: "run-token-reconcile",
+    buildExecutor: executor, trialBackend: "local", reportDir: false,
+  });
+  assert.equal(blocked.state.blockers[0].code, "dirty_workspace");
+
+  const executorDir = path.join(runRoot, "executor");
+  mkdirSync(executorDir, { recursive: true });
+  writeFileSync(path.join(executorDir, "iteration-001.json"), `${JSON.stringify({
+    schema: "pritha-build-executor-result-v1",
+    executor: "codex-app-server-build",
+    status: "completed",
+    thread_id: "crash-thread",
+    turn_id: "crash-turn",
+    tokens_used: 321,
+    goal_enforcement: "required",
+  }, null, 2)}\n`);
+  git(project, ["add", "dirty.txt"]);
+  git(project, ["commit", "-m", "preserve dirty fixture"]);
+
+  const resumed = await resumeDelivery("run-token-reconcile", {
+    root: project, stateRoot, allowDraft: true, answer: "retry-after-clean",
+    buildExecutor: executor, trialBackend: "local", reportDir: false,
+  });
+  assert.equal(resumed.state.status, "verified");
+  let budget = readDeliveryLedger(runRoot).budget;
+  assert.equal(budget.tokens_used, 321);
+  assert.equal(budget.accounted_turns.filter((entry) => entry.key === "crash-thread:crash-turn").length, 1);
+
+  await runDeliveryLoop({
+    plan: plan(), projectPath: project, runRoot, runId: "run-token-reconcile",
+    buildExecutor: executor, trialBackend: "local", reportDir: false,
+  });
+  budget = readDeliveryLedger(runRoot).budget;
+  assert.equal(budget.tokens_used, 321);
+  assert.equal(budget.accounted_turns.filter((entry) => entry.key === "crash-thread:crash-turn").length, 1);
 });

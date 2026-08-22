@@ -101,6 +101,25 @@ test("recovery ignores only a crash-truncated final event line", () => {
   assert.equal(recovered.status, "preparing");
 });
 
+test("legacy v1 ledgers normalize to the 1000000-token v2 budget", () => {
+  const { runRoot } = fixture();
+  const { statePath } = deliveryLedgerPaths(runRoot);
+  const legacy = JSON.parse(readFileSync(statePath, "utf8"));
+  legacy.schema = "pritha-delivery-ledger-v1";
+  delete legacy.budget.max_tokens;
+  delete legacy.budget.tokens_used;
+  delete legacy.budget.token_budget_source;
+  delete legacy.budget.goal_enforcement;
+  delete legacy.budget.accounted_turns;
+  writeFileSync(statePath, `${JSON.stringify(legacy, null, 2)}\n`);
+  const normalized = readDeliveryLedger(runRoot);
+  assert.equal(normalized.schema, "pritha-delivery-ledger-v2");
+  assert.equal(normalized.budget.max_tokens, 1_000_000);
+  assert.equal(normalized.budget.tokens_used, 0);
+  assert.equal(normalized.budget.token_budget_source, "legacy-default");
+  assert.deepEqual(normalized.budget.accounted_turns, []);
+});
+
 test("one active run may own a delivery target", () => {
   const { root, runRoot, project } = fixture();
   const buildsRoot = path.join(root, "builds");
