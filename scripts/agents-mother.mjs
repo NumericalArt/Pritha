@@ -2,7 +2,7 @@
 
 import path from "node:path";
 import process from "node:process";
-import { loadEnv, loadEnvFile } from "./lib/env.mjs";
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 if (!process.env.PRITHA_SUPPRESS_DEPRECATION_NOTE) {
@@ -10,9 +10,6 @@ if (!process.env.PRITHA_SUPPRESS_DEPRECATION_NOTE) {
 }
 
 const root = resolveTechscopeRoot();
-loadEnv({ root });
-if (process.env.PRITHA_STATE_ROOT) {
-  loadEnvFile(path.join(path.resolve(process.env.PRITHA_STATE_ROOT), "config", "runtime.env"));
-}
+loadPrithaRuntimeEnv({ root });
 
 await import("./agents-mother/index.mjs");

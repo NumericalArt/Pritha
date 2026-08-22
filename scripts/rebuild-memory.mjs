@@ -4,11 +4,14 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { parseFrontmatter } from "./lib/frontmatter.mjs";
-import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug } from "./lib/slug.mjs";
 
 const ROOT = resolveTechscopeRoot();
+loadPrithaRuntimeEnv({ root: ROOT });
+const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const MEMORY_DIR = resolvePrithaStatePath("memory");
 const DB_PATH = path.join(MEMORY_DIR, "techscope.sqlite");
 const SCHEMA_PATH = path.join(ROOT, ".memory", "schema.sql");
@@ -89,6 +92,54 @@ function listMarkdownFiles(dir) {
     }
   }
   return out;
+}
+
+function documentIdForFile(filePath) {
+  const raw = readFileSync(filePath, "utf8");
+  const { data } = parseFrontmatter(raw);
+  return data.id || path.relative(ROOT, filePath).replace(/\.md$/, "").replaceAll(path.sep, "/");
+}
+
+function canonicalMarkdownFiles() {
+  const byDocumentId = new Map();
+  const trackedAgentRoot = path.join(ROOT, "11_agents");
+  const isInside = (parent, child) => {
+    const relative = path.relative(parent, child);
+    return relative === "" || (!relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  };
+  const chooseCandidate = (candidate, existing) => candidate.modifiedAt > existing.modifiedAt
+    || (candidate.modifiedAt === existing.modifiedAt && candidate.file.localeCompare(existing.file) > 0);
+  const addFiles = (sourceFiles, sourceName, precedence) => {
+    for (const file of sourceFiles) {
+      const id = documentIdForFile(file);
+      const candidate = { file, sourceName, precedence, modifiedAt: statSync(file).mtimeMs };
+      const existing = byDocumentId.get(id);
+      if (sourceName === "instance-agent-state" && existing?.sourceName === "tracked" && !isInside(trackedAgentRoot, existing.file)) {
+        throw new Error(`Instance-local agent document id collides with tracked platform knowledge: ${id}`);
+      }
+      if (sourceName === "instance-agent-state" && existing?.sourceName === "instance-agent-state") {
+        const selected = chooseCandidate(candidate, existing) ? candidate : existing;
+        console.warn(`Warning: duplicate instance-local document id "${id}"; selected ${path.basename(selected.file)} by mtime/path precedence.`);
+      }
+      if (!existing
+        || candidate.precedence > existing.precedence
+        || (candidate.precedence === existing.precedence && chooseCandidate(candidate, existing))) {
+        byDocumentId.set(id, candidate);
+      }
+    }
+  };
+
+  const trackedFiles = INCLUDE_DIRS.flatMap((dir) => listMarkdownFiles(path.join(ROOT, dir))).sort();
+  addFiles(trackedFiles, "tracked", 1);
+
+  if (path.resolve(AGENT_MEMORY_ROOT) !== path.resolve(trackedAgentRoot)) {
+    const instanceAgentFiles = listMarkdownFiles(AGENT_MEMORY_ROOT).sort();
+    addFiles(instanceAgentFiles, "instance-agent-state", 2);
+  }
+
+  return [...byDocumentId.values()]
+    .map((entry) => entry.file)
+    .sort((left, right) => path.relative(ROOT, left).localeCompare(path.relative(ROOT, right)));
 }
 
 function extractTitle(body, fallback) {
@@ -305,7 +356,7 @@ function main() {
 
   const startedAt = new Date().toISOString();
   const runId = randomUUID();
-  const files = INCLUDE_DIRS.flatMap((dir) => listMarkdownFiles(path.join(ROOT, dir))).sort();
+  const files = canonicalMarkdownFiles();
 
   let documentsChanged = 0;
   let chunksChanged = 0;

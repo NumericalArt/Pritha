@@ -3,7 +3,29 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { parseFrontmatterData } from "./lib/frontmatter.mjs";
 import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+
+const PROMOTABLE_TYPES = new Map([
+  ["assessment", "03_reviews/"],
+  ["review", "03_reviews/"],
+  ["standard", "04_standards/"],
+  ["decision", "05_decisions/"],
+  ["workflow", "07_workflows/"],
+]);
+const CHILD_AGENT_TYPES = new Set([
+  "agent-contract",
+  "agent-outcome-spec",
+  "scaffold-report",
+  "agent-delivery-report",
+  "agent-test-report",
+  "agent-handoff-report",
+  "agent-operations-report",
+  "agent-deployment-report",
+  "agent-post-creation-review",
+  "agent-registry",
+  "child-agent-profile",
+]);
 
 function option(name) {
   const index = process.argv.indexOf(name);
@@ -35,6 +57,20 @@ try {
   if (!inside(localAgentsRoot, source) || !existsSync(source)) throw new Error("Source must be an existing file inside the local instance agents directory");
   if (!inside(root, target)) throw new Error("Target must be inside the Pritha checkout");
   const raw = readFileSync(source, "utf8");
+  const metadata = parseFrontmatterData(raw) || {};
+  const artifactType = String(metadata.type || "").trim();
+  const subjectKind = String(metadata.subject?.kind || "").trim();
+  if (subjectKind === "child-agent" || CHILD_AGENT_TYPES.has(artifactType)) {
+    throw new Error("Refusing promotion: child-agent lifecycle artifacts are instance-local and cannot enter tracked knowledge");
+  }
+  const allowedTargetPrefix = PROMOTABLE_TYPES.get(artifactType);
+  const targetRelative = path.relative(root, target).replaceAll(path.sep, "/");
+  if (!allowedTargetPrefix || !targetRelative.startsWith(allowedTargetPrefix)) {
+    throw new Error("Refusing promotion: publish a separately authored assessment, review, standard, decision, or workflow in its canonical domain");
+  }
+  if (targetRelative.startsWith("11_agents/")) {
+    throw new Error("Refusing promotion: tracked 11_agents is a historical platform reference layer");
+  }
   if (/privacy:\s*local-private/i.test(raw)) throw new Error("Refusing promotion: change privacy classification through explicit review first");
   if (/(?:sk-[A-Za-z0-9_-]{12,}|api[_-]?key\s*[:=]\s*\S+|token\s*[:=]\s*\S+)/i.test(raw)) throw new Error("Refusing promotion: secret-shaped content detected");
   const content = sanitize(raw);

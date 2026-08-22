@@ -19,11 +19,13 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { loadEnvFile, loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import {
   PRITHA_STATE_LAYOUT,
   isPrithaCodeCheckout,
   prithaInstanceConfig,
   resolvePrithaStatePath,
+  resolveTechscopeRoot,
 } from "./lib/paths.mjs";
 
 function parseArgs(argv) {
@@ -45,21 +47,8 @@ function parseArgs(argv) {
 const options = parseArgs(process.argv.slice(2));
 if (options.root) process.env.TECHSCOPE_ROOT = path.resolve(String(options.root));
 
-function loadEnvFile(filePath) {
-  if (!filePath || !existsSync(filePath)) return false;
-  for (const line of readFileSync(filePath, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-    if (!match) continue;
-    const value = match[2].trim().replace(/^["']|["']$/g, "");
-    if (process.env[match[1]] === undefined) process.env[match[1]] = value;
-  }
-  return true;
-}
-
 loadEnvFile(String(options.env || process.env.PRITHA_CONTROL_CENTER_ENV_FILE || ""));
-if (process.env.PRITHA_STATE_ROOT) {
-  loadEnvFile(path.join(path.resolve(process.env.PRITHA_STATE_ROOT), "config", "runtime.env"));
-}
+loadPrithaRuntimeEnv({ root: resolveTechscopeRoot() });
 
 const config = prithaInstanceConfig({
   root: process.env.TECHSCOPE_ROOT,
@@ -199,17 +188,6 @@ function migrationOperations() {
     }
   }
 
-  const names = childAgentFolders().map((entry) => entry.name.toLowerCase().replace(/[^a-z0-9]+/g, ""));
-  for (const section of ["contracts", "profiles", "reports", "research"]) {
-    const sourceDir = path.join(config.codeRoot, "11_agents", section);
-    if (!existsSync(sourceDir)) continue;
-    for (const file of readdirSync(sourceDir)) {
-      const compact = file.toLowerCase().replace(/[^a-z0-9]+/g, "");
-      if (names.some((name) => name && compact.includes(name))) {
-        add(path.join(sourceDir, file), path.join(config.stateRoot, "agents", section, file), "agent-artifact");
-      }
-    }
-  }
   return operations;
 }
 
@@ -251,27 +229,17 @@ function writeRuntimeEnv() {
   return target;
 }
 
-function parseSharedRegistry() {
-  const registry = path.join(config.codeRoot, "11_agents", "registry.md");
-  if (!existsSync(registry)) return [];
-  const lines = readFileSync(registry, "utf8").split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === "## Agents");
-  if (start < 0) return [];
-  return lines.slice(start + 1)
-    .filter((line) => line.trim().startsWith("|"))
-    .slice(2)
-    .map((line) => line.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()))
-    .filter((cells) => cells.length >= 7);
-}
-
 function writeLocalRegistry() {
   const folders = childAgentFolders();
-  const shared = parseSharedRegistry();
-  const rows = folders.map((folder) => {
-    const key = folder.name.toLowerCase().replace(/[^a-z0-9]+/g, "");
-    const row = shared.find((cells) => cells[0].toLowerCase().replace(/[^a-z0-9]+/g, "") === key);
-    return row || [folder.name, "Local sibling child agent", "local project", "project-defined", "local", "manual", "local sibling scan"];
-  });
+  const rows = folders.map((folder) => [
+    folder.name,
+    "Local sibling child agent",
+    "local project",
+    "project-defined",
+    "local",
+    "manual",
+    "local sibling scan",
+  ]);
   const registryPath = path.join(config.stateRoot, "agents", "registry.md");
   mkdirSync(path.dirname(registryPath), { recursive: true });
   const date = new Date().toISOString().slice(0, 10);

@@ -15,7 +15,7 @@ function fixture(base, name, voiceText) {
   mkdirSync(path.join(checkout, ".memory"), { recursive: true });
   mkdirSync(path.join(checkout, ".snapshots", "audit"), { recursive: true });
   mkdirSync(path.join(checkout, "03_reviews"), { recursive: true });
-  mkdirSync(path.join(checkout, "11_agents"), { recursive: true });
+  mkdirSync(path.join(checkout, "11_agents", "contracts"), { recursive: true });
   mkdirSync(path.join(agentParent, `${name}-agent`), { recursive: true });
   writeFileSync(path.join(checkout, "AGENTS.md"), "# Pritha\n");
   writeFileSync(path.join(agentParent, `${name}-agent`, "AGENTS.md"), "# Agent\n");
@@ -24,6 +24,7 @@ function fixture(base, name, voiceText) {
   writeFileSync(path.join(checkout, ".snapshots", "audit", "events.jsonl"), `${JSON.stringify({ instance: name })}\n`);
   writeFileSync(path.join(checkout, "03_reviews", `2026-07-13-${name}-voice-session-memory.md`), voiceText);
   writeFileSync(path.join(checkout, ".env.local"), "OPENAI_API_KEY=fixture-secret-never-printed\n");
+  writeFileSync(path.join(checkout, "11_agents", "contracts", `${name}-historical-agent-contract.md`), `---\nid: ${name}-historical-agent-contract\ntype: agent-contract\nstatus: accepted\n---\n\n# Historical fixture\n`);
   return { checkout, agentParent, stateRoot };
 }
 
@@ -62,6 +63,7 @@ test("migration plan is read-only and apply keeps two instance roots isolated", 
       assert.ok(existsSync(path.join(instance.stateRoot, "memory", "last-self-test.json")));
       assert.ok(existsSync(path.join(instance.stateRoot, "audit", "events.jsonl")));
       assert.ok(existsSync(path.join(instance.stateRoot, "agents", "registry.md")));
+      assert.equal(existsSync(path.join(instance.stateRoot, "agents", "contracts", `${path.basename(path.dirname(instance.checkout))}-historical-agent-contract.md`)), false);
     }
 
     assert.equal(readFileSync(path.join(alpha.stateRoot, "voice-drafts", "2026-07-13-alpha-voice-session-memory.md"), "utf8"), "alpha-only");

@@ -177,3 +177,77 @@ subject:
   assert.match(registry, /Outcome specs: 1/);
   assert.match(registry, /contracts:1 outcome:1 scaffold:0 delivery:1/);
 });
+
+test("registry joins display names, technical slugs and contract-bound revisions into one lineage", () => {
+  const root = mkdtemp();
+  for (const [date, revision] of [["2026-08-14", 3], ["2026-08-19", 4]]) {
+    write(
+      root,
+      `11_agents/contracts/${date}-fixture-executive-agent-contract.md`,
+      `---
+id: ${date}-fixture-executive-agent-contract-revision-${revision}
+type: agent-contract
+status: accepted
+created: ${date}
+subject:
+  kind: child-agent
+  id: fixture-executive-agent
+---
+
+# Agent Project Contract: Fixture Executive Agent
+
+- Agent name: Fixture Executive Agent
+- Technical slug: fixture-executive-agent
+- Primary mission: Revision ${revision} mission
+- Runtime family: codex-native
+- Primary interface: Codex project
+- Telegram mode: none
+- Deployment target: Mac mini
+- Proactive mode: scheduled
+`,
+    );
+  }
+  write(
+    root,
+    "11_agents/contracts/2026-08-19-fixture-executive-agent-outcome-spec.md",
+    `---
+id: 2026-08-19-fixture-executive-agent-outcome-spec
+type: agent-outcome-spec
+status: approved
+outcome_spec_status: approved
+agent_slug: fixture-executive-agent
+contract_path: 11_agents/contracts/2026-08-19-fixture-executive-agent-contract.md
+approved_by: user
+created: 2026-08-19
+---
+
+# Agent Outcome Spec: Fixture Executive Agent
+`,
+  );
+  write(
+    root,
+    "11_agents/reports/2026-08-19-fixture-executive-agent-handoff-report.md",
+    `---
+id: 2026-08-19-fixture-executive-agent-handoff-report
+type: agent-handoff-report
+status: complete
+created: 2026-08-19
+subject:
+  kind: child-agent
+  id: fixture-executive-agent
+---
+
+# Agent Handoff Report: Fixture Executive Agent
+
+- Agent name: Fixture Executive Agent
+- Project path: /tmp/fixture-executive-agent
+`,
+  );
+
+  const result = run(root, ["registry"]);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const registry = readFileSync(path.join(root, "11_agents", "registry.md"), "utf8");
+  assert.match(registry, /Agents tracked: 1/);
+  assert.match(registry, /\| Fixture Executive Agent \| Revision 4 mission/);
+  assert.match(registry, /contracts:2 outcome:1 scaffold:0 delivery:0 test:0 handoff:1/);
+});

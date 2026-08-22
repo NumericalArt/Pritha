@@ -79,13 +79,16 @@ function markdownTitle(text, fallback) {
 function contractSummaryFromFile(file) {
   const text = readFileSync(file, "utf8");
   const fm = readFrontmatter(text);
-  const name = bodyValue(text, "Agent name") || markdownTitle(text, path.basename(file, ".md"));
+  const name = (bodyValue(text, "Agent name") || markdownTitle(text, path.basename(file, ".md"))).replace(/[.;]+$/, "");
+  const subjectId = typeof fm.subject === "object" && fm.subject ? String(fm.subject.id || "").trim() : "";
+  const technicalSlug = bodyValue(text, "Technical slug");
   return {
     kind: "contract",
     path: path.relative(ROOT, file),
     id: fm.id || path.basename(file, ".md"),
     status: fm.status || "unknown",
-    slug: slug(name),
+    slug: slug(subjectId || technicalSlug || name),
+    aliases: [...new Set([name, technicalSlug, subjectId].filter(Boolean).map((value) => slug(value)))],
     name,
     mission: bodyValue(text, "Primary mission") || "unknown",
     runtime: bodyValue(text, "Runtime family") || "unknown",
@@ -107,6 +110,7 @@ function outcomeSummaryFromFile(file) {
     id: fm.id || path.basename(file, ".md"),
     status: fm.outcome_spec_status || fm.status || "unknown",
     slug: slug(agentSlug),
+    contractPath: String(fm.contract_path || "").trim(),
     created: fm.created || "unknown",
     approvedBy: fm.approved_by || "pending",
   };
@@ -128,6 +132,7 @@ function reportSummaryFromFile(file) {
     type: fm.type || "unknown",
     status: fm.status || "unknown",
     subjectKind: typeof fm.subject === "object" && fm.subject ? fm.subject.kind || "" : "",
+    subjectId: typeof fm.subject === "object" && fm.subject ? String(fm.subject.id || "").trim() : "",
     agentName,
     slug: slug(name || projectPath || relPath),
     name,
@@ -162,23 +167,40 @@ function collectAgentLifecycle() {
   });
 
   const bySlug = new Map();
+  const aliasToSlug = new Map();
   for (const contract of contracts) {
-    bySlug.set(contract.slug, {
-      slug: contract.slug,
-      name: contract.name,
-      mission: contract.mission,
-      runtime: contract.runtime,
-      interface: contract.interface,
-      telegram: contract.telegram,
-      deploymentTarget: contract.deploymentTarget,
-      proactiveMode: contract.proactiveMode,
-      contracts: [contract],
-      outcomes: [],
-      reports: [],
-    });
+    if (!bySlug.has(contract.slug)) {
+      bySlug.set(contract.slug, {
+        slug: contract.slug,
+        name: contract.name,
+        mission: contract.mission,
+        runtime: contract.runtime,
+        interface: contract.interface,
+        telegram: contract.telegram,
+        deploymentTarget: contract.deploymentTarget,
+        proactiveMode: contract.proactiveMode,
+        contracts: [],
+        outcomes: [],
+        reports: [],
+      });
+    }
+    const agent = bySlug.get(contract.slug);
+    agent.name = contract.name;
+    agent.mission = contract.mission;
+    agent.runtime = contract.runtime;
+    agent.interface = contract.interface;
+    agent.telegram = contract.telegram;
+    agent.deploymentTarget = contract.deploymentTarget;
+    agent.proactiveMode = contract.proactiveMode;
+    agent.contracts.push(contract);
+    for (const alias of [contract.slug, ...contract.aliases]) aliasToSlug.set(alias, contract.slug);
   }
   for (const outcome of outcomes) {
-    const key = [...bySlug.keys()].find((item) => comparableOutcomeSlug(item, outcome.slug)) || outcome.slug;
+    const boundContract = contracts.find((contract) => contractPathsMatch(contract.path, outcome.contractPath));
+    const key = boundContract?.slug
+      || aliasToSlug.get(outcome.slug)
+      || [...bySlug.keys()].find((item) => comparableOutcomeSlug(item, outcome.slug))
+      || outcome.slug;
     if (!bySlug.has(key)) {
       bySlug.set(key, {
         slug: key,
@@ -198,7 +220,11 @@ function collectAgentLifecycle() {
   }
   for (const report of reports) {
     if (!reportRepresentsChildAgent(report)) continue;
-    const key = [...bySlug.keys()].find((item) => report.path.includes(item) || report.slug.includes(item)) || report.slug;
+    const subjectSlug = report.subjectId ? slug(report.subjectId) : "";
+    const key = aliasToSlug.get(subjectSlug)
+      || aliasToSlug.get(report.slug)
+      || [...bySlug.keys()].find((item) => report.path.includes(item) || report.slug.includes(item))
+      || report.slug;
     if (!bySlug.has(key)) {
       bySlug.set(key, {
         slug: key,
@@ -223,6 +249,14 @@ function collectAgentLifecycle() {
 function comparableOutcomeSlug(left, right) {
   const normalize = (value) => slug(value).replaceAll("-", "");
   return normalize(left) === normalize(right);
+}
+
+function contractPathsMatch(contractPath, outcomeContractPath) {
+  if (!outcomeContractPath) return false;
+  const normalizedContract = path.normalize(contractPath);
+  const normalizedOutcome = path.normalize(outcomeContractPath);
+  return normalizedContract === normalizedOutcome
+    || path.basename(normalizedContract) === path.basename(normalizedOutcome);
 }
 
 function reportTypeCount(reports, type) {

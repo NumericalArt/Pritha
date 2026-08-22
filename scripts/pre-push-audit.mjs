@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { parseFrontmatterData } from "./lib/frontmatter.mjs";
 import { containsForbiddenText, isForbiddenRawPath, isMemorySnapshotPath, isPrivacyTextTarget } from "./lib/privacy.mjs";
 
 const ROOT = resolveTechscopeRoot();
@@ -41,6 +42,49 @@ function trackedFiles() {
   return result.stdout.split("\0").filter(Boolean);
 }
 
+const CHILD_AGENT_TYPES = new Set([
+  "agent-contract",
+  "agent-outcome-spec",
+  "scaffold-report",
+  "agent-delivery-report",
+  "agent-test-report",
+  "agent-handoff-report",
+  "agent-operations-report",
+  "agent-deployment-report",
+  "agent-post-creation-review",
+  "agent-registry",
+  "child-agent-profile",
+]);
+
+function publicationBase() {
+  const mergeBase = git(["merge-base", "HEAD", "origin/main"]);
+  return mergeBase.ok ? mergeBase.stdout.trim() : "";
+}
+
+function changedAgentArtifacts() {
+  const base = publicationBase();
+  if (!base) return [];
+  const diff = git(["diff", "--name-only", "--diff-filter=ACDMRTUXB", "-z", base, "--", "11_agents"]);
+  if (!diff.ok) throw new Error(diff.stderr || "git diff publication guard failed");
+  const untracked = git(["ls-files", "--others", "--exclude-standard", "-z", "--", "11_agents"]);
+  if (!untracked.ok) throw new Error(untracked.stderr || "git ls-files publication guard failed");
+  return [...new Set([...diff.stdout.split("\0"), ...untracked.stdout.split("\0")].filter(Boolean))];
+}
+
+function prohibitedChildAgentChanges() {
+  return changedAgentArtifacts().filter((relPath) => {
+    const fullPath = path.join(ROOT, relPath);
+    if (!existsSync(fullPath)) return true;
+    try {
+      const metadata = parseFrontmatterData(readFileSync(fullPath, "utf8")) || {};
+      return String(metadata.subject?.kind || "") === "child-agent"
+        || CHILD_AGENT_TYPES.has(String(metadata.type || ""));
+    } catch {
+      return true;
+    }
+  });
+}
+
 function textFilesWithMatches(files, pattern) {
   const matches = [];
   for (const relPath of files) {
@@ -72,6 +116,7 @@ function compact(matches, limit = 80) {
 }
 
 const files = trackedFiles();
+const childAgentPublicationChanges = prohibitedChildAgentChanges();
 const rawMediaPattern = /^01_sources\/raw\/.*\.(mp4|wav|mov|mkv|webm|mp3|m4a|avi|flac)$/i;
 const maxRegularFileBytes = 95 * 1024 * 1024;
 const requiredMemorySnapshotFiles = [
@@ -143,6 +188,13 @@ const optionalScanners = {
 };
 
 const checks = [
+  {
+    id: "instance-local-child-agent-publication",
+    status: childAgentPublicationChanges.length ? "fail" : "pass",
+    detail: childAgentPublicationChanges.length
+      ? childAgentPublicationChanges.join("\n")
+      : "no new, modified, renamed, or deleted child-agent lifecycle artifacts under tracked 11_agents",
+  },
   {
     id: "secret-history",
     status: secretHistory.stdout.trim() ? "fail" : "pass",

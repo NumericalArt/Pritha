@@ -19,6 +19,21 @@ export function loadEnvFile(filePath, target = process.env) {
 
 export function loadEnv(options = {}) {
   const root = options.root || resolveTechscopeRoot();
-  loadEnvFile(path.join(root, ".env"), options.target || process.env);
-  loadEnvFile(path.join(root, ".env.local"), options.target || process.env);
+  const target = options.target || process.env;
+  loadEnvFile(path.join(root, ".env"), target);
+  loadEnvFile(path.join(root, ".env.local"), target);
+  return target;
+}
+
+export function loadPrithaRuntimeEnv(options = {}) {
+  const root = path.resolve(options.root || resolveTechscopeRoot());
+  const target = options.target || process.env;
+  loadEnv({ root, target });
+  const stateRoot = target.PRITHA_STATE_ROOT
+    ? path.resolve(target.PRITHA_STATE_ROOT)
+    : root;
+  if (stateRoot !== root) {
+    loadEnvFile(path.join(stateRoot, "config", "runtime.env"), target);
+  }
+  return { root, stateRoot, target };
 }
