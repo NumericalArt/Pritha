@@ -38,6 +38,7 @@ data/logs/
 node_modules/
 .next/
 .next-pritha-staging/
+.next-pritha-previous/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]

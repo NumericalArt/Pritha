@@ -7,10 +7,14 @@ import {
   closeSync,
   copyFileSync,
   cpSync,
+  createReadStream,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
+  readlinkSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -97,6 +101,118 @@ function walkFiles(directory) {
   return readdirSync(directory).flatMap((entry) => walkFiles(path.join(directory, entry)));
 }
 
+const CHILD_PROJECT_EXCLUDED_DIRECTORIES = new Set([
+  ".git",
+  ".logs",
+  ".next",
+  ".queue",
+  ".state",
+  ".venv",
+  "__pycache__",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+]);
+
+const PROTECTED_STATE_EXCLUDED_DIRECTORIES = new Set([
+  "audit",
+  "cache",
+  "logs",
+  "memory",
+  "private",
+  "queue",
+  "releases",
+  "setup",
+  "snapshots",
+  "tmp",
+  "voice-drafts",
+]);
+
+function canonicalExistingPath(value) {
+  const resolved = path.resolve(value);
+  try { return realpathSync(resolved); } catch { return resolved; }
+}
+
+async function fileDigest(filePath) {
+  const hash = createHash("sha256");
+  await new Promise((resolve, reject) => {
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", resolve);
+  });
+  return hash.digest("hex");
+}
+
+async function directoryFingerprint(directory, excludedDirectories = new Set()) {
+  const root = path.resolve(directory);
+  const entries = [];
+  const excluded = new Set();
+  async function visit(current, relative = "") {
+    if (!existsSync(current)) return;
+    const stat = lstatSync(current);
+    if (stat.isSymbolicLink()) {
+      entries.push({ path: relative || ".", type: "symlink", target: readlinkSync(current) });
+      return;
+    }
+    if (stat.isFile()) {
+      entries.push({ path: relative || ".", type: "file", bytes: stat.size, sha256: await fileDigest(current) });
+      return;
+    }
+    if (!stat.isDirectory()) return;
+    for (const name of readdirSync(current).sort((a, b) => a.localeCompare(b))) {
+      const childRelative = relative ? `${relative}/${name}` : name;
+      const child = path.join(current, name);
+      const childStat = lstatSync(child);
+      if (childStat.isDirectory() && !childStat.isSymbolicLink() && excludedDirectories.has(name)) {
+        excluded.add(childRelative);
+        continue;
+      }
+      await visit(child, childRelative);
+    }
+  }
+  await visit(root);
+  const payload = entries.map((entry) => JSON.stringify(entry)).join("\n");
+  return {
+    sha256: createHash("sha256").update(payload).digest("hex"),
+    entries: entries.length,
+    excluded: [...excluded].sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+async function isolationSnapshot() {
+  const stateAgents = path.join(config.stateRoot, "agents");
+  const registryPath = path.join(stateAgents, "registry.md");
+  const folders = [];
+  for (const entry of childAgentFolders()) {
+    folders.push({
+      name: entry.name,
+      directory: canonicalExistingPath(entry.directory),
+      fingerprint: await directoryFingerprint(entry.directory, CHILD_PROJECT_EXCLUDED_DIRECTORIES),
+    });
+  }
+  return {
+    schema: "pritha-instance-isolation-snapshot-v1",
+    state_root: canonicalExistingPath(config.stateRoot),
+    agent_parent: canonicalExistingPath(config.agentParent),
+    protected_state: await directoryFingerprint(config.stateRoot, PROTECTED_STATE_EXCLUDED_DIRECTORIES),
+    agent_state: await directoryFingerprint(stateAgents),
+    registry_sha256: existsSync(registryPath) ? sha256(registryPath) : null,
+    child_agent_folders: folders,
+  };
+}
+
+function isolationSnapshotMatches(before, after) {
+  return Boolean(before && after)
+    && before.state_root === after.state_root
+    && before.agent_parent === after.agent_parent
+    && before.protected_state.sha256 === after.protected_state.sha256
+    && before.agent_state.sha256 === after.agent_state.sha256
+    && before.registry_sha256 === after.registry_sha256
+    && JSON.stringify(before.child_agent_folders) === JSON.stringify(after.child_agent_folders);
+}
+
 function childAgentFolders() {
   if (!existsSync(config.agentParent)) return [];
   return readdirSync(config.agentParent)
@@ -138,6 +254,7 @@ async function instanceStatus() {
   const branch = git(["branch", "--show-current"]);
   const dirty = git(["status", "--porcelain=v1", "--untracked-files=all"]);
   const origin = git(["rev-parse", "origin/main"]);
+  const [health, isolation] = await Promise.all([httpStatus(), isolationSnapshot()]);
   return {
     schema: "pritha-instance-status-v1",
     ok: head.ok,
@@ -158,10 +275,11 @@ async function instanceStatus() {
       matches_origin_main: Boolean(head.stdout && origin.stdout && head.stdout === origin.stdout),
     },
     runtime: {
-      health: await httpStatus(),
+      health,
       memory_documents: memoryDocuments(),
       state_exists: existsSync(config.stateRoot),
     },
+    isolation,
     child_agents: childAgentFolders().map((entry) => ({ name: entry.name, directory: entry.directory })),
   };
 }
@@ -370,20 +488,66 @@ function copyNext(source, destination) {
   return true;
 }
 
+function restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild) {
+  rmSync(liveNext, { recursive: true, force: true });
+  if (existsSync(displacedNext)) {
+    renameSync(displacedNext, liveNext);
+    return true;
+  }
+  return hadPreviousBuild ? copyNext(previousNext, liveNext) : false;
+}
+
+function writePrivateJson(filePath, value) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  chmodSync(filePath, 0o600);
+}
+
+function commandEvidence(result) {
+  return {
+    ok: result.ok,
+    status: result.status,
+    stdout: result.stdout.slice(-2_000),
+    stderr: result.stderr.slice(-4_000),
+  };
+}
+
+function runInstanceBootstrap() {
+  const steps = [];
+  const execute = (id, command, args, timeoutMs) => {
+    const result = run(command, args, { timeoutMs });
+    steps.push({ id, ...commandEvidence(result) });
+    return result.ok;
+  };
+  if (!execute("control-center-dependencies", "npm", ["--prefix", "interfaces/control-center", "ci", "--ignore-scripts"], 900_000)) return { ok: false, steps };
+  if (!execute("environment", "node", ["scripts/env-doctor.mjs", "--profile", "control-center", "--json"], 120_000)) return { ok: false, steps };
+  if (!execute("memory-rebuild", "node", ["scripts/rebuild-memory.mjs"], 300_000)) return { ok: false, steps };
+  if (!execute("memory-embeddings", "python3", ["scripts/embed-memory.py"], 900_000)) return { ok: false, steps };
+  if (!execute("memory-validation", "node", ["scripts/validate-memory.mjs"], 240_000)) return { ok: false, steps };
+  return { ok: true, steps, memory_documents: memoryDocuments() };
+}
+
 async function updateInstance() {
   const status = await instanceStatus();
   const remote = git(["ls-remote", "origin", "refs/heads/main"], { timeoutMs: 30_000 });
   const remoteCommit = remote.stdout.split(/\s+/)[0] || null;
+  const expectedCommit = options["expected-commit"] ? String(options["expected-commit"]).trim().toLowerCase() : null;
+  if (expectedCommit && !/^[a-f0-9]{40}$/.test(expectedCommit)) throw new Error("--expected-commit must be a full 40-character Git commit SHA");
   const plan = {
-    schema: "pritha-instance-update-plan-v1",
-    ok: status.git.clean && status.git.branch === "main" && Boolean(remoteCommit),
+    schema: "pritha-instance-update-plan-v2",
+    ok: status.git.clean
+      && status.git.branch === "main"
+      && Boolean(remoteCommit)
+      && (!expectedCommit || expectedCommit === remoteCommit),
     mode: options.apply ? "apply" : "plan",
     instance: config,
     current: status.git.head,
     target: remoteCommit,
+    expected_commit: expectedCommit,
     branch: status.git.branch,
     clean: status.git.clean,
-    steps: ["fetch origin main", "fast-forward only", "save previous .next", "build staged .next", "stop only configured port", "atomic build swap", "start", "healthcheck", "rollback .next on failure"],
+    pre_isolation: status.isolation,
+    steps: ["fetch pinned origin main", "fast-forward only", "instance-scoped dependencies and memory rebuild", "verify agent-state fingerprints", "save previous .next", "build staged .next", "stop only configured port", "atomic build swap", "start", "healthcheck", "verify final fingerprints", "rollback .next on failure"],
   };
   if (!options.apply) return plan;
   if (!options.yes) throw new Error("update --apply requires --yes");
@@ -392,6 +556,7 @@ async function updateInstance() {
   const fetch = git(["fetch", "origin", "main"], { timeoutMs: 120_000 });
   if (!fetch.ok) throw new Error(fetch.stderr || "git fetch failed");
   const target = git(["rev-parse", "origin/main"]).stdout;
+  if (expectedCommit && target !== expectedCommit) throw new Error("Refusing update: origin/main does not match the pinned release commit");
   const ancestor = git(["merge-base", "--is-ancestor", status.git.head, target]);
   if (!ancestor.ok) throw new Error("Refusing update: local main diverged or cannot fast-forward to origin/main");
   const ff = git(["merge", "--ff-only", "origin/main"], { timeoutMs: 120_000 });
@@ -400,10 +565,33 @@ async function updateInstance() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const releaseDir = resolvePrithaStatePath("releases", stamp);
   mkdirSync(releaseDir, { recursive: true });
+  const manifest = path.join(releaseDir, "release.json");
+  const bootstrap = runInstanceBootstrap();
+  const releaseBase = {
+    schema: "pritha-instance-release-v2",
+    created_at: new Date().toISOString(),
+    instance: config.instanceId,
+    previous_commit: status.git.head,
+    target_commit: target,
+    expected_commit: expectedCommit,
+    pre_isolation: status.isolation,
+    bootstrap,
+  };
+  if (!bootstrap.ok || !Number.isSafeInteger(bootstrap.memory_documents) || bootstrap.memory_documents < 1) {
+    writePrivateJson(manifest, { ...releaseBase, status: "bootstrap-or-memory-failed-running-previous-release" });
+    return { ...plan, ok: false, applied: true, status: "bootstrap-or-memory-failed", bootstrap, manifest };
+  }
+  const afterBootstrapIsolation = await isolationSnapshot();
+  const bootstrapIsolationMatch = isolationSnapshotMatches(status.isolation, afterBootstrapIsolation);
+  if (!bootstrapIsolationMatch) {
+    writePrivateJson(manifest, { ...releaseBase, status: "instance-isolation-changed-before-swap", after_bootstrap_isolation: afterBootstrapIsolation });
+    return { ...plan, ok: false, applied: true, status: "instance-isolation-changed", isolationMatch: false, manifest };
+  }
   const liveNext = path.join(config.codeRoot, "interfaces", "control-center", ".next");
   const previousNext = path.join(releaseDir, "previous.next");
   const stagedName = ".next-pritha-staging";
   const stagedNext = path.join(config.codeRoot, "interfaces", "control-center", stagedName);
+  const displacedNext = path.join(config.codeRoot, "interfaces", "control-center", ".next-pritha-previous");
   const buildMetadataPaths = [
     path.join(config.codeRoot, "interfaces", "control-center", "next-env.d.ts"),
     path.join(config.codeRoot, "interfaces", "control-center", "tsconfig.json"),
@@ -424,38 +612,43 @@ async function updateInstance() {
     else if (!item.existed) rmSync(item.file, { force: true });
   }
   const release = {
-    schema: "pritha-instance-release-v1",
-    created_at: new Date().toISOString(),
-    instance: config.instanceId,
-    previous_commit: status.git.head,
-    target_commit: target,
+    ...releaseBase,
     had_previous_build: hadPreviousBuild,
     staged_build: stagedName,
     build: { ok: build.ok, status: build.status, stderr: build.stderr.slice(-4_000) },
+    after_bootstrap_isolation: afterBootstrapIsolation,
   };
-  const manifest = path.join(releaseDir, "release.json");
   if (!build.ok) {
     rmSync(stagedNext, { recursive: true, force: true });
-    writeFileSync(manifest, `${JSON.stringify({ ...release, status: "build-failed-running-previous-release" }, null, 2)}\n`);
+    writePrivateJson(manifest, { ...release, status: "build-failed-running-previous-release" });
     return { ...plan, ok: false, applied: true, status: "build-failed", manifest };
+  }
+
+  const postBuildDirty = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+  const postBuildHead = git(["rev-parse", "HEAD"]);
+  if (!postBuildDirty.ok || postBuildDirty.stdout || postBuildHead.stdout !== target) {
+    rmSync(stagedNext, { recursive: true, force: true });
+    writePrivateJson(manifest, { ...release, status: "post-build-git-invariant-failed", git_dirty: postBuildDirty.stdout.split(/\r?\n/).filter(Boolean), head: postBuildHead.stdout });
+    return { ...plan, ok: false, applied: true, status: "post-build-git-invariant-failed", manifest };
   }
 
   const stopped = await stopPort(config.controlCenterPort);
   try {
-    rmSync(liveNext, { recursive: true, force: true });
+    rmSync(displacedNext, { recursive: true, force: true });
+    if (existsSync(liveNext)) renameSync(liveNext, displacedNext);
     renameSync(stagedNext, liveNext);
   } catch (error) {
-    if (hadPreviousBuild) copyNext(previousNext, liveNext);
+    restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
     const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
     const rollbackHealth = hadPreviousBuild ? await waitForHealth(30_000) : { ok: false, status: 0 };
-    writeFileSync(manifest, `${JSON.stringify({
+    writePrivateJson(manifest, {
       ...release,
       status: "swap-failed-rolled-back",
       stopped,
       error: error instanceof Error ? error.message : String(error),
       rollback_pid: rollbackPid,
       rollback_health: rollbackHealth,
-    }, null, 2)}\n`);
+    });
     return { ...plan, ok: false, applied: true, status: "swap-failed-rolled-back", rollbackPid, rollbackHealth, manifest };
   }
   const pid = startControlCenter();
@@ -464,10 +657,10 @@ async function updateInstance() {
   const health = await waitForHealth(healthTimeout);
   if (!health.ok) {
     await stopPort(config.controlCenterPort);
-    if (hadPreviousBuild) copyNext(previousNext, liveNext);
+    restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
     const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
     const rollbackHealth = hadPreviousBuild ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
-    writeFileSync(manifest, `${JSON.stringify({ ...release, status: "health-failed-rolled-back", stopped, failed_pid: pid, health, rollback_pid: rollbackPid, rollback_health: rollbackHealth }, null, 2)}\n`);
+    writePrivateJson(manifest, { ...release, status: "health-failed-rolled-back", stopped, failed_pid: pid, health, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
     return {
       ...plan,
       ok: false,
@@ -479,8 +672,31 @@ async function updateInstance() {
       manifest,
     };
   }
-  writeFileSync(manifest, `${JSON.stringify({ ...release, status: "deployed", stopped, pid, health }, null, 2)}\n`);
-  return { ...plan, ok: true, applied: true, status: "deployed", stopped, pid, health, manifest };
+  const postIsolation = await isolationSnapshot();
+  const isolationMatch = isolationSnapshotMatches(status.isolation, postIsolation);
+  if (!isolationMatch) {
+    await stopPort(config.controlCenterPort);
+    restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
+    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
+    writePrivateJson(manifest, { ...release, status: "instance-isolation-changed-rolled-back", stopped, failed_pid: pid, health, post_isolation: postIsolation, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
+    return { ...plan, ok: false, applied: true, status: "instance-isolation-changed-rolled-back", isolationMatch, rollbackPid, rollbackHealth, manifest };
+  }
+  const finalHead = git(["rev-parse", "HEAD"]).stdout;
+  const finalDirty = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+  const finalGitClean = finalDirty.ok && !finalDirty.stdout;
+  const releaseOk = finalHead === target && finalGitClean;
+  if (!releaseOk) {
+    await stopPort(config.controlCenterPort);
+    restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
+    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
+    writePrivateJson(manifest, { ...release, status: "final-git-invariant-failed-rolled-back", stopped, failed_pid: pid, health, post_isolation: postIsolation, isolation_match: isolationMatch, final_head: finalHead, final_git_clean: finalGitClean, final_git_dirty: finalDirty.stdout.split(/\r?\n/).filter(Boolean), memory_documents: bootstrap.memory_documents, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
+    return { ...plan, ok: false, applied: true, status: "final-git-invariant-failed-rolled-back", stopped, health, isolationMatch, postIsolation, finalHead, finalGitClean, memoryDocuments: bootstrap.memory_documents, rollbackPid, rollbackHealth, manifest };
+  }
+  rmSync(displacedNext, { recursive: true, force: true });
+  writePrivateJson(manifest, { ...release, status: "deployed", stopped, pid, health, post_isolation: postIsolation, isolation_match: isolationMatch, final_head: finalHead, final_git_clean: finalGitClean, final_git_dirty: [], memory_documents: bootstrap.memory_documents });
+  return { ...plan, ok: true, applied: true, status: "deployed", stopped, pid, health, isolationMatch, postIsolation, finalHead, finalGitClean, memoryDocuments: bootstrap.memory_documents, manifest };
 }
 
 function print(payload) {
