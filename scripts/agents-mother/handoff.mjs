@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { yamlList } from "../lib/frontmatter.mjs";
 import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { checkResult, detectProject, fileExists, recommendationForProject } from "./test.mjs";
+import { writeLifecycleReport } from "./lifecycle-report.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(resolvePrithaAgentMemoryRoot({ root: ROOT }), "reports");
@@ -12,17 +13,6 @@ const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 
 function ensureDirs() {
   mkdirSync(REPORT_DIR, { recursive: true });
-}
-
-function uniquePath(filePath) {
-  if (!existsSync(filePath)) return filePath;
-  const ext = path.extname(filePath);
-  const base = filePath.slice(0, -ext.length);
-  for (let i = 2; i < 100; i += 1) {
-    const candidate = `${base}-${i}${ext}`;
-    if (!existsSync(candidate)) return candidate;
-  }
-  throw new Error(`Could not create unique path for ${filePath}`);
 }
 
 function scalar(value, fallback = "TBD") {
@@ -69,8 +59,11 @@ export function handoffProject(projectPath, options = {}) {
 
   const projectName = path.basename(projectRoot);
   const status = detection.classification === "project-without-agent-harness" ? "partial" : "complete";
-  const reportPath = uniquePath(path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-handoff-report.md`));
-  writeFileSync(reportPath, agentHandoffReportMarkdown(projectRoot, projectName, detection, checks, status));
+  const reportPath = writeLifecycleReport(
+    path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-handoff-report.md`),
+    ({ artifactId }) => agentHandoffReportMarkdown(projectRoot, projectName, detection, checks, status, artifactId),
+    { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
+  ).path;
 
   console.log(`Project: ${projectRoot}`);
   console.log(`Classification: ${detection.classification}`);
@@ -130,7 +123,7 @@ function firstExerciseForHandoff(projectRoot, detection) {
   ];
 }
 
-function agentHandoffReportMarkdown(projectRoot, projectName, detection, checks, status) {
+function agentHandoffReportMarkdown(projectRoot, projectName, detection, checks, status, artifactId) {
   const date = today();
   const commands = commandListForHandoff(projectRoot, detection);
   const envNeeds = envNeedsForHandoff(projectRoot);
@@ -139,7 +132,7 @@ function agentHandoffReportMarkdown(projectRoot, projectName, detection, checks,
   if (fileExists(projectRoot, "scripts/telegram-bot.mjs")) tools.push("Telegram");
   if (fileExists(projectRoot, "operations/manifest.json")) tools.push("operations");
   return `---
-id: ${date}-${slug(projectName)}-agent-handoff-report
+id: ${artifactId || `${date}-${slug(projectName)}-agent-handoff-report`}
 type: agent-handoff-report
 status: ${status}
 created: ${date}

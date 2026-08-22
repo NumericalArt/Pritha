@@ -6,6 +6,7 @@ import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { bodyValue } from "./contract.mjs";
 import { detectProject, fileExists } from "./test.mjs";
+import { writeLifecycleReport } from "./lifecycle-report.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -20,17 +21,6 @@ function ensureDirs() {
   mkdirSync(CONTRACT_DIR, { recursive: true });
   mkdirSync(REPORT_DIR, { recursive: true });
   mkdirSync(RESEARCH_DIR, { recursive: true });
-}
-
-function uniquePath(filePath) {
-  if (!existsSync(filePath)) return filePath;
-  const ext = path.extname(filePath);
-  const base = filePath.slice(0, -ext.length);
-  for (let i = 2; i < 100; i += 1) {
-    const candidate = `${base}-${i}${ext}`;
-    if (!existsSync(candidate)) return candidate;
-  }
-  throw new Error(`Could not create unique path for ${filePath}`);
 }
 
 function scalar(value, fallback = "TBD") {
@@ -425,8 +415,11 @@ export function evolveProject(projectPath, options = {}) {
   const detection = detectProject(projectRoot);
   const reports = relatedReportsForProject(projectRoot, projectName);
   const lessons = inferLessonsFromProject(projectRoot, detection, reports);
-  const reportPath = uniquePath(path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-post-creation-review.md`));
-  writeFileSync(reportPath, agentPostCreationReviewMarkdown(projectRoot, projectName, detection, reports, lessons, options));
+  const reportPath = writeLifecycleReport(
+    path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-post-creation-review.md`),
+    ({ artifactId }) => agentPostCreationReviewMarkdown(projectRoot, projectName, detection, reports, lessons, { ...options, artifactId }),
+    { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
+  ).path;
   rebuildRegistry();
   console.log(`Post-creation review: ${path.relative(ROOT, reportPath)}`);
 }
@@ -437,7 +430,7 @@ function agentPostCreationReviewMarkdown(projectRoot, projectName, detection, re
   if (fileExists(projectRoot, "scripts/telegram-bot.mjs")) tools.push("Telegram");
   if (fileExists(projectRoot, "operations/manifest.json")) tools.push("operations");
   return `---
-id: ${date}-${slug(projectName)}-agent-post-creation-review
+id: ${options.artifactId || `${date}-${slug(projectName)}-agent-post-creation-review`}
 type: agent-post-creation-review
 status: draft
 created: ${date}

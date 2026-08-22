@@ -13,7 +13,8 @@ import { AUTOSTART_MODES, PROACTIVE_MODES, RUNTIME_PLACEMENT_PROFILES, SERVICE_M
 import { researchGateDecisionForReport } from "../research-gate.mjs";
 import { verifyRepositoryResearchIntegrity } from "../github-research.mjs";
 import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "../skills.mjs";
-import { newestArtifactPathsFirst, writeUniqueArtifact } from "../artifact-selection.mjs";
+import { newestArtifactPathsFirst } from "../artifact-selection.mjs";
+import { writeLifecycleReport } from "../lifecycle-report.mjs";
 import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "../outcome-spec.mjs";
 
 const ROOT = resolveTechscopeRoot();
@@ -3428,7 +3429,7 @@ export function scaffoldContract(contractPath, options = {}) {
   const deliveryGit = smokeResult.ok && healthResult.ok
     ? initializeDeliveryGit(targetPath, data)
     : { ok: false, status: "skipped-structural-failure", revision: null };
-  const writtenReport = writeUniqueArtifact(
+  const writtenReport = writeLifecycleReport(
     path.join(REPORT_DIR, `${today()}-${slug(data.agentName)}-scaffold-report.md`),
     ({ artifactId }) => scaffoldReportMarkdown(data, targetPath, createdFiles, smokeResult, {
       research,
@@ -3438,6 +3439,7 @@ export function scaffoldContract(contractPath, options = {}) {
       outcome,
       artifactId,
     }),
+    { projectRoot: targetPath, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
   );
   const reportPath = writtenReport.path;
 

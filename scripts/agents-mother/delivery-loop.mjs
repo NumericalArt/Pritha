@@ -5,7 +5,7 @@ import { today } from "../lib/date.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { slug } from "../lib/slug.mjs";
-import { writeUniqueArtifact } from "./artifact-selection.mjs";
+import { writeLifecycleReport } from "./lifecycle-report.mjs";
 import { createBuildExecutor } from "./build-executors.mjs";
 import {
   budgetBlocker,
@@ -311,9 +311,10 @@ function emitDeliveryReport(state, plan, worktree, options = {}) {
   const directory = reportsDirectory(options);
   if (!directory) return null;
   mkdirSync(directory, { recursive: true });
-  const written = writeUniqueArtifact(
+  const written = writeLifecycleReport(
     path.join(directory, `${options.date || today()}-${slug(plan.agent_slug)}-agent-delivery-report.md`),
     ({ artifactId }) => deliveryReportMarkdown(state, plan, worktree, { ...options, artifactId }),
+    { projectRoot: worktree?.worktree, stateRoot: options.stateRoot, root: options.root },
   );
   return written.path;
 }

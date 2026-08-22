@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { yamlList } from "../lib/frontmatter.mjs";
 import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
@@ -6,6 +6,7 @@ import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, SERVICE_MODES } from "./contract.mjs";
 import { checkResult, detectProject, fileExists, readJsonIfExists, runProjectCommand } from "./test.mjs";
+import { writeLifecycleReport } from "./lifecycle-report.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(resolvePrithaAgentMemoryRoot({ root: ROOT }), "reports");
@@ -19,16 +20,6 @@ function ensureDirs() {
   mkdirSync(REPORT_DIR, { recursive: true });
 }
 
-function uniquePath(filePath) {
-  if (!existsSync(filePath)) return filePath;
-  const ext = path.extname(filePath);
-  const base = filePath.slice(0, -ext.length);
-  for (let i = 2; i < 100; i += 1) {
-    const candidate = `${base}-${i}${ext}`;
-    if (!existsSync(candidate)) return candidate;
-  }
-  throw new Error(`Could not create unique path for ${filePath}`);
-}
 export function operationsProject(projectPath, options = {}) {
   ensureDirs();
   const projectRoot = path.resolve(ROOT, projectPath);
@@ -134,8 +125,11 @@ export function operationsProject(projectPath, options = {}) {
   const warnings = checks.filter((item) => item.result === "warning").length;
   const status = failed > 0 ? "failed" : missing > 0 || warnings > 0 ? "partial" : "complete";
   const projectName = path.basename(projectRoot);
-  const reportPath = uniquePath(path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-operations-report.md`));
-  writeFileSync(reportPath, agentOperationsReportMarkdown(projectRoot, projectName, detection, manifest, checks, status));
+  const reportPath = writeLifecycleReport(
+    path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-operations-report.md`),
+    ({ artifactId }) => agentOperationsReportMarkdown(projectRoot, projectName, detection, manifest, checks, status, artifactId),
+    { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
+  ).path;
 
   console.log(`Project: ${projectRoot}`);
   console.log(`Operations: ${status}`);
@@ -143,12 +137,12 @@ export function operationsProject(projectPath, options = {}) {
   if (failed > 0) process.exitCode = 1;
 }
 
-function agentOperationsReportMarkdown(projectRoot, projectName, detection, manifest, checks, status) {
+function agentOperationsReportMarkdown(projectRoot, projectName, detection, manifest, checks, status, artifactId) {
   const date = today();
   const tools = ["Codex", "AGENTS.md", "operations"];
   if (manifest?.service_mode === "launchd" || manifest?.launchd_template) tools.push("launchd");
   return `---
-id: ${date}-${slug(projectName)}-agent-operations-report
+id: ${artifactId || `${date}-${slug(projectName)}-agent-operations-report`}
 type: agent-operations-report
 status: ${status}
 created: ${date}
@@ -275,8 +269,11 @@ export function deployProject(projectPath, options = {}) {
   const manifest = readJsonIfExists(projectRoot, "operations/manifest.json");
   const status = result.result === "pass" ? "complete" : "failed";
   const projectName = path.basename(projectRoot);
-  const reportPath = uniquePath(path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-deployment-report.md`));
-  writeFileSync(reportPath, agentDeploymentReportMarkdown(projectRoot, projectName, manifest, action, result, status));
+  const reportPath = writeLifecycleReport(
+    path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-deployment-report.md`),
+    ({ artifactId }) => agentDeploymentReportMarkdown(projectRoot, projectName, manifest, action, result, status, artifactId),
+    { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
+  ).path;
 
   console.log(`Project: ${projectRoot}`);
   console.log(`Deploy action: ${action}`);
@@ -286,12 +283,12 @@ export function deployProject(projectPath, options = {}) {
   if (result.result !== "pass") process.exitCode = 1;
 }
 
-function agentDeploymentReportMarkdown(projectRoot, projectName, manifest, action, result, status) {
+function agentDeploymentReportMarkdown(projectRoot, projectName, manifest, action, result, status, artifactId) {
   const date = today();
   const tools = ["Codex", "AGENTS.md", "operations"];
   if (manifest?.service_mode === "launchd" || manifest?.launchd_template) tools.push("launchd");
   return `---
-id: ${date}-${slug(projectName)}-agent-deployment-report
+id: ${artifactId || `${date}-${slug(projectName)}-agent-deployment-report`}
 type: agent-deployment-report
 status: ${status}
 created: ${date}

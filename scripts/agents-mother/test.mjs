@@ -1,27 +1,17 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { yamlList } from "../lib/frontmatter.mjs";
 import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
+import { writeLifecycleReport } from "./lifecycle-report.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(resolvePrithaAgentMemoryRoot({ root: ROOT }), "reports");
 
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
-
-function uniquePath(filePath) {
-  if (!existsSync(filePath)) return filePath;
-  const ext = path.extname(filePath);
-  const base = filePath.slice(0, -ext.length);
-  for (let i = 2; i < 100; i += 1) {
-    const candidate = `${base}-${i}${ext}`;
-    if (!existsSync(candidate)) return candidate;
-  }
-  throw new Error(`Could not create unique path for ${filePath}`);
-}
 
 export function fileExists(projectRoot, relPath) {
   return existsSync(path.join(projectRoot, relPath));
@@ -282,8 +272,11 @@ export function testProject(projectPath, options = {}) {
   const projectName = path.basename(projectRoot);
   let reportPath = null;
   if (!options["no-report"]) {
-    reportPath = uniquePath(path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-test-report.md`));
-    writeFileSync(reportPath, agentTestReportMarkdown(projectRoot, projectName, detection, checks, status, reportPath));
+    reportPath = writeLifecycleReport(
+      path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-test-report.md`),
+      ({ artifactId }) => agentTestReportMarkdown(projectRoot, projectName, detection, checks, status, artifactId),
+      { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
+    ).path;
   }
 
   console.log(`Project: ${projectRoot}`);
@@ -319,15 +312,14 @@ export function recommendationForProject(detection, checks) {
   return items;
 }
 
-function agentTestReportMarkdown(projectRoot, projectName, detection, checks, status, reportPath) {
+function agentTestReportMarkdown(projectRoot, projectName, detection, checks, status, artifactId) {
   const date = today();
-  const reportId = reportPath ? path.basename(reportPath, ".md") : `${date}-${slug(projectName)}-agent-test-report`;
   const signals = detection.signals.length > 0 ? detection.signals : ["No explicit agent signals detected."];
   const tools = ["Codex", "AGENTS.md"];
   if (fileExists(projectRoot, "scripts/telegram-bot.mjs")) tools.push("Telegram");
   if (fileExists(projectRoot, "operations/manifest.json")) tools.push("operations");
   return `---
-id: ${reportId}
+id: ${artifactId || `${date}-${slug(projectName)}-agent-test-report`}
 type: agent-test-report
 status: ${status}
 created: ${date}
