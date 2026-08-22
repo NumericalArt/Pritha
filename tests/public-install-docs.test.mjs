@@ -79,6 +79,25 @@ test("README.ru points to the canonical public README instead of duplicating sta
   assert.doesNotMatch(body, /agents-mother\.mjs/);
 });
 
+test("canonical public docs explain outcome delivery, Goals, cleanup and instance isolation", () => {
+  const readme = text("README.md");
+  const gettingStarted = text("docs/getting-started.md");
+  const architecture = text("docs/architecture.md");
+  const canonical = `${readme}\n${gettingStarted}\n${architecture}`;
+
+  assert.match(readme, /outcome init → outcome approve → deliver → delivery accept/);
+  assert.match(canonical, /separately approved Outcome Spec/i);
+  assert.match(canonical, /verified.*distinct.*accepted/is);
+  assert.match(canonical, /disposable.*worktree/is);
+  assert.match(canonical, /typed blocker/i);
+  assert.match(canonical, /1,000,000/);
+  assert.match(canonical, /Goal/i);
+  assert.match(canonical, /local Trial backend.*not.*sandbox/is);
+  assert.match(canonical, /instance-local/i);
+  assert.match(canonical, /not.*copied.*Pritha instances/is);
+  assert.match(gettingStarted, /delivery cleanup <run-id> --apply --yes/);
+});
+
 test("local Markdown links in the public packaging files resolve", () => {
   const files = ["README.md", "README.ru.md", "docs/getting-started.md", "docs/architecture.md"];
   const markdownLink = /(?<!!)\[[^\]]+\]\(([^)]+)\)/g;

@@ -82,6 +82,45 @@ scaffold. The CLI fallback for the same interview is:
 node scripts/pritha.mjs interview
 ```
 
+For an autonomous agent build, the contract and the user-visible Outcome Spec
+are reviewed separately. The interview proposes a `1,000,000` build-token
+budget and requires the user to confirm or change it before an accepted
+autonomous contract can enter delivery. Legacy accepted contracts use the same
+default.
+
+## Outcome-Driven Delivery
+
+The canonical delivery sequence is:
+
+```text
+outcome init → outcome approve → deliver → delivery accept
+```
+
+```sh
+node scripts/pritha.mjs outcome init <accepted-contract-path>
+node scripts/pritha.mjs outcome approve <outcome-spec-path> --approved-by user
+node scripts/pritha.mjs deliver <outcome-spec-path> --project <clean-git-project>
+node scripts/pritha.mjs delivery accept <run-id> --accepted-by user
+```
+
+Delivery compiles the approved Outcome Spec into immutable Trials, implements
+inside a disposable `pritha/build-*` Git worktree, and independently records
+revision-bound evidence. `verified` means the machine-verifiable Trials passed;
+it is deliberately distinct from the user's `accepted` decision. A delivery
+worktree is never merged, pushed, or deployed automatically.
+
+The source project must be clean before a disposable worktree is created. Dirty
+delivery worktrees are preserved for inspection and are never force-removed.
+Missing runtime, isolation, Goal, evidence, or budget capabilities produce typed
+blockers instead of silently weakening the run. Codex build turns use an
+ephemeral thread with a bounded Goal and the remaining confirmed token budget.
+If the installed Codex lacks Goal support, only the user may authorize one
+explicit turn without it; retry after upgrade and abandon remain available.
+
+A trusted local Trial backend proves only that the command passed on the local
+host. It is not evidence of sandbox isolation. Contracts that require isolation
+must use a backend whose capability probe confirms that boundary.
+
 ## Core And Optional Surfaces
 
 | Layer | Includes | Required to start? |
@@ -98,15 +137,25 @@ does not mean that Control Center or Voice is experimental or unfinished.
 ```text
 user intent or material
 → Codex + Pritha repository rules
-→ reviewed knowledge or an accepted agent contract
+→ accepted agent contract + separately approved Outcome Spec
 → gated memory, external-source, and repository research
-→ a focused sibling-agent scaffold
-→ tests, handoff, lifecycle reports, and registry updates
+→ disposable-worktree implementation + immutable Trials
+→ verified evidence → explicit user acceptance
+→ scaffold, handoff, lifecycle reports, and instance-local registry updates
 ```
 
-Tracked Markdown is the authored source of truth. SQLite, FTS, relations, and
-embeddings are generated local indexes that can be rebuilt from that knowledge.
+Authored Markdown is the source of truth: platform knowledge is tracked, while
+live child-agent documents remain in instance-local state. SQLite, FTS,
+relations, and embeddings are generated local indexes rebuilt from those
+allowed sources.
 See [Architecture](docs/architecture.md) for the system boundaries.
+
+Child-agent contracts, Outcome Specs, research, lifecycle reports, profiles,
+and registries are runtime state of exactly one Pritha instance. They live under
+`PRITHA_STATE_ROOT/agents/` (or the ignored `.private/agents/` compatibility
+fallback), are not published through GitHub, and are never copied between
+Pritha instances. Tracked `11_agents/` is a historical/reference platform layer,
+not a live child-agent registry.
 
 ## Optional Control Center And Voice
 
