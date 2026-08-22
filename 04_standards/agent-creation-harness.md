@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-08-16
-last_reviewed: 2026-08-16
+updated: 2026-08-22
+last_reviewed: 2026-08-22
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -84,6 +84,8 @@ sources:
   - 03_reviews/2026-06-28-open-source-agent-building-repos-review.md
   - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
   - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
+  - 04_standards/agent-feedback-sensors-and-evaluation-loops.md
+  - 07_workflows/agent-sensor-and-eval-design.md
 related:
   decisions:
     - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
@@ -97,7 +99,10 @@ related:
     - 03_reviews/2026-06-02-agentic-ui-source-batch-review.md
     - 03_reviews/2026-06-07-yandex-ai-safe-agent-security-assessment.md
     - 03_reviews/2026-06-11-pi-agent-architecture-assessment.md
+    - 03_reviews/2026-08-22-agent-feedback-sensors-and-evaluation-loops-assessment.md
   briefs: []
+  standards:
+    - 04_standards/agent-feedback-sensors-and-evaluation-loops.md
   workflows:
     - 07_workflows/agents-mother.md
     - 04_standards/agent-untrusted-input-security.md
@@ -108,14 +113,15 @@ related:
     - 04_standards/agent-ai-safe-security-checklist.md
     - 04_standards/agent-minimal-core-extension-surface.md
     - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
+    - 07_workflows/agent-sensor-and-eval-design.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
-source_updated: 2026-08-16
-source_version: Pritha draft standard v16 + outcome-driven agent delivery decision and implementation + Funny Teacher reference example + OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv harness source batch + Codex surfaces/AWS batch + scheduling/heartbeat batch + Agent Skills batch + agentic UI batch + AI-SAFE child-agent checklist + Pi minimal-core/extension-surface assessment + Pritha Voice/Codex approval-gate update + card-first Control Center readiness + contract-aware GitHub repository research and selected-module adoption gates
+source_updated: 2026-08-22
+source_version: Pritha draft standard v17 + outcome-driven delivery + explicit sensor, evaluation and rapid-feedback design
 retrieved: 2026-05-18
-verified: 2026-08-16
+verified: 2026-08-22
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
 temporal_status: current
 ---
@@ -124,7 +130,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-22
 
 ## Rule
 
@@ -495,6 +501,9 @@ Each created agent must document:
   a future session resume without raw chat history.
 - improvement loop: how traces, eval failures, review comments and user
   corrections become harness changes.
+- sensor and feedback design: completion verifier, pre-action controls,
+  non-progress detection, post-action read-back, verification ladder, protected
+  evaluator boundary, balanced metrics and incident-to-regression ownership.
 
 ## Agent environment compatibility
 
@@ -509,15 +518,15 @@ Each created agent must document:
 ## Temporal validity
 
 - Source published: 2026-05-18 user scenario and current external docs.
-- Source updated: 2026-08-16.
-- Source version: Pritha draft standard v16 plus outcome-driven agent delivery,
+- Source updated: 2026-08-22.
+- Source version: Pritha draft standard v17 plus outcome-driven agent delivery,
   Funny Teacher reference
-  evidence, OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv
+  evidence, explicit sensor/eval/rapid-feedback design, OpenAI/OpenAI Codex/Anthropic/LangChain/Cursor/Thoughtworks/arXiv
   harness source batch, Codex surfaces/AWS batch, scheduling/heartbeat batch and
   Agent Skills, agentic UI and AI-SAFE child-agent checklist source batches,
   Pi minimal-core evidence and contract-aware GitHub repository research.
 - Retrieved: 2026-05-18.
-- Verified: 2026-08-16.
+- Verified: 2026-08-22.
 - Valid for: TechScope agent creation workflow from 2026-05-18 onward.
 - Freshness status: current.
 - Temporal status: current.

@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-08-16
+updated: 2026-08-22
 topics:
   - agent-engineering
   - agent-factory
@@ -45,6 +45,8 @@ sources:
   - 03_reviews/2026-06-28-open-source-agent-building-repos-review.md
   - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
   - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
+  - 04_standards/agent-feedback-sensors-and-evaluation-loops.md
+  - 07_workflows/agent-sensor-and-eval-design.md
 related:
   standards:
     - 04_standards/agent-creation-harness.md
@@ -59,6 +61,7 @@ related:
     - 04_standards/agent-mcp-connector-lifecycle.md
     - 04_standards/agent-a2a-interoperability.md
     - 04_standards/agent-ai-safe-security-checklist.md
+    - 04_standards/agent-feedback-sensors-and-evaluation-loops.md
   templates:
     - 08_templates/agent-project-contract.md
     - 08_templates/agent-outcome-spec.md
@@ -71,6 +74,7 @@ related:
     - 07_workflows/agent-skill-pack-selection.md
     - 07_workflows/agent-mcp-connector-selection.md
     - 07_workflows/agent-a2a-communication-selection.md
+    - 07_workflows/agent-sensor-and-eval-design.md
 supersedes: []
 superseded_by: []
 ---
@@ -210,6 +214,9 @@ runtime blockers, but creation is not complete while the agent is missing from
      boundary when an app-server-backed UI is selected;
    - harness evaluation plan when a non-Codex or local-model harness is being considered;
    - harness inventory;
+   - sensor and feedback design: critical completion verifier, pre-action
+     controls, in-loop budgets/non-progress detection, post-action read-back,
+     eval integrity, balanced metrics and human judgment boundaries;
    - security and permission model;
    - AI-SAFE layer review status for selected modules;
    - untrusted-input risk tier and scanner/quarantine path;
@@ -608,6 +615,23 @@ The research step should define a small project-relevant eval pack before
 choosing the harness. Exact public benchmark rankings are treated as temporal
 evidence, not as a standing rule.
 
+## Sensor and Feedback Design Decision Point
+
+For every non-trivial new agent or material harness change, apply:
+
+```text
+04_standards/agent-feedback-sensors-and-evaluation-loops.md
+07_workflows/agent-sensor-and-eval-design.md
+```
+
+Before accepting the contract, require an explicit sensor map. It must prove
+completion from fresh durable state, prevent consequential invalid actions
+before tool execution, bound repeated or stalled loops, verify critical side
+effects after execution, protect evaluator integrity and name the remaining
+human judgment boundary. Small local/manual agents may mark production or
+periodic sensors not applicable with reasons, but cannot waive completion
+verification, permission checks or bounded execution.
+
 ## Agent Team Decision Point
 
 If the user wants one agent to cover multiple durable domains, or if the project
@@ -818,6 +842,9 @@ An Agents Mother run is complete only when:
 - all required Trials pass against the exact verified commit after the final
   checkpoint, or a typed blocker states what decision or authority is missing;
 - machine verification and user acceptance remain separate lifecycle states;
+- the contract's sensor map covers completion verification, consequential
+  actions, loop bounds, critical side effects, protected eval evidence,
+  balanced metrics and human judgment boundaries;
 - environment setup instructions are present;
 - smoke tests or healthchecks pass, or failures are documented;
 - the user has a short handoff guide explaining how to run and test the new agent;

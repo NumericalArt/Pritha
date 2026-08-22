@@ -3,8 +3,8 @@ id: agent-harness-evaluation
 type: standard
 status: draft
 created: 2026-05-27
-updated: 2026-08-16
-last_reviewed: 2026-08-16
+updated: 2026-08-22
+last_reviewed: 2026-08-22
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -32,6 +32,7 @@ sources:
   - https://github.com/earendil-works/pi
   - 03_reviews/2026-06-02-agent-harness-engineering-source-batch-review.md
   - 05_decisions/2026-08-16-outcome-driven-agent-delivery.md
+  - 04_standards/agent-feedback-sensors-and-evaluation-loops.md
 related:
   decisions: []
   reviews:
@@ -41,14 +42,15 @@ related:
     - 02_briefs/2026-05-27-local-harness-benchmark-brief.md
   workflows:
     - 07_workflows/agents-mother.md
+    - 07_workflows/agent-sensor-and-eval-design.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-05-26
-source_updated: 2026-08-16
-source_version: Techscope draft standard v3; outcome-bound Trials and protected verifier inputs
+source_updated: 2026-08-22
+source_version: Techscope draft standard v4; outcome-bound Trials, protected verifier inputs and layered sensor design
 retrieved: 2026-05-27
-verified: 2026-08-16
+verified: 2026-08-22
 valid_for: Agents Mother harness and runtime-family selection from 2026-05-27 onward
 temporal_status: current
 ---
@@ -57,7 +59,7 @@ temporal_status: current
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-22
 
 ## Rule
 
@@ -90,6 +92,9 @@ repository, UI, memory or external system ended in the intended condition.
 
 ## Required practices
 
+- Apply `04_standards/agent-feedback-sensors-and-evaluation-loops.md` to place
+  deterministic invariants, domain evals and human judgment at the earliest
+  adequate verification layer.
 - Define eval vocabulary before running comparisons: task, trial, agent
   harness, eval harness, grader, transcript or trace, expected outcome, failure
   class and eval suite.
@@ -201,11 +206,11 @@ Use eval results as input to harness changes, not only model choice:
 ## Temporal validity
 
 - Source published: 2026-05-26.
-- Source updated: 2026-08-16.
-- Source version: Techscope draft standard v3; outcome-bound Trials and
-  protected verifier inputs.
+- Source updated: 2026-08-22.
+- Source version: Techscope draft standard v4; outcome-bound Trials, protected
+  verifier inputs and layered sensor design.
 - Retrieved: 2026-05-27.
-- Verified: 2026-08-16.
+- Verified: 2026-08-22.
 - Valid for: Agents Mother harness and runtime-family selection from 2026-05-27
   onward.
 - Freshness status: current.
@@ -219,3 +224,4 @@ Use eval results as input to harness changes, not only model choice:
 - `04_standards/agent-creation-harness.md`
 - `04_standards/agent-runtime-placement.md`
 - `04_standards/agent-tool-integration-selection.md`
+- `04_standards/agent-feedback-sensors-and-evaluation-loops.md`
