@@ -5,7 +5,8 @@ import path from "node:path";
 import { atomicWriteFile } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 
-export const DELIVERY_WORKTREE_SCHEMA = "pritha-delivery-worktree-v1";
+export const DELIVERY_WORKTREE_SCHEMA = "pritha-delivery-worktree-v2";
+export const LEGACY_DELIVERY_WORKTREE_SCHEMA = "pritha-delivery-worktree-v1";
 export const PROTECTED_TRIAL_INPUTS_SCHEMA = "pritha-protected-trial-inputs-v1";
 const SCRIPT_RUNNERS = new Set(["node", "node.exe", "python", "python3", "python.exe", "ruby", "ruby.exe", "deno", "bun"]);
 
@@ -55,8 +56,17 @@ export function readDeliveryWorktree(runRoot) {
   const filePath = metadataPath(runRoot);
   if (!existsSync(filePath)) return null;
   const value = parseBoundedJson(readFileSync(filePath, "utf8"), { maxBytes: 128 * 1024, maxDepth: 12, maxNodes: 512 });
-  if (value.schema !== DELIVERY_WORKTREE_SCHEMA) throw new DeliveryWorkspaceError("worktree_metadata_invalid", "Delivery worktree metadata has an unsupported schema");
-  return value;
+  if (![DELIVERY_WORKTREE_SCHEMA, LEGACY_DELIVERY_WORKTREE_SCHEMA].includes(value.schema)) {
+    throw new DeliveryWorkspaceError("worktree_metadata_invalid", "Delivery worktree metadata has an unsupported schema");
+  }
+  return {
+    ...value,
+    schema: DELIVERY_WORKTREE_SCHEMA,
+    cleanup_status: value.cleanup_status || "active",
+    cleanup_required: Boolean(value.cleanup_required),
+    cleanup_reason: value.cleanup_reason || null,
+    cleaned_at: value.cleaned_at || null,
+  };
 }
 
 export function prepareDeliveryWorktree(projectPath, runRoot, runId, options = {}) {
@@ -103,10 +113,140 @@ export function prepareDeliveryWorktree(projectPath, runRoot, runId, options = {
     base_revision: baseRevision,
     verified_checkpoint: null,
     created_at: options.createdAt || new Date().toISOString(),
+    cleanup_status: "active",
+    cleanup_required: false,
+    cleanup_reason: null,
+    cleaned_at: null,
   };
   const filePath = metadataPath(root);
   atomicWriteFile(filePath, `${JSON.stringify(metadata, null, 2)}\n`);
   return { ...metadata, resumed: false, metadataPath: filePath };
+}
+
+function listedWorktrees(sourceProject) {
+  const output = git(sourceProject, ["worktree", "list", "--porcelain"]);
+  const records = [];
+  let current = null;
+  for (const line of output.split(/\r?\n/)) {
+    if (line.startsWith("worktree ")) {
+      if (current) records.push(current);
+      current = { worktree: line.slice("worktree ".length), branch: null };
+    } else if (current && line.startsWith("branch ")) {
+      current.branch = line.slice("branch ".length);
+    } else if (!line && current) {
+      records.push(current);
+      current = null;
+    }
+  }
+  if (current) records.push(current);
+  return records;
+}
+
+function validatedCleanupContext(runRoot) {
+  const root = regularDirectory(runRoot, "run_root");
+  const metadata = readDeliveryWorktree(root);
+  if (!metadata) throw new DeliveryWorkspaceError("worktree_metadata_missing", "Delivery worktree metadata is missing");
+  const runId = safeRunId(metadata.run_id);
+  const sourceProject = regularDirectory(metadata.source_project, "source_project");
+  const sourceGitRoot = realpathSync(git(sourceProject, ["rev-parse", "--show-toplevel"]).trim());
+  if (sourceGitRoot !== sourceProject) {
+    throw new DeliveryWorkspaceError("worktree_source_mismatch", "Delivery source metadata is not the canonical Git root");
+  }
+  const expectedWorktree = path.join(root, "worktree");
+  if (path.resolve(metadata.worktree) !== expectedWorktree) {
+    throw new DeliveryWorkspaceError("worktree_path_mismatch", "Delivery worktree metadata does not match the canonical run path");
+  }
+  const expectedBranch = `pritha/build-${runId}`;
+  if (metadata.branch !== expectedBranch) {
+    throw new DeliveryWorkspaceError("worktree_branch_mismatch", "Delivery branch metadata does not match the run id");
+  }
+  return { root, metadata, runId, sourceProject, expectedWorktree, expectedBranch };
+}
+
+export function planDeliveryWorktreeCleanup(runRoot) {
+  const context = validatedCleanupContext(runRoot);
+  const records = listedWorktrees(context.sourceProject);
+  const registration = records.find((entry) => path.resolve(entry.worktree) === context.expectedWorktree) || null;
+  if (!existsSync(context.expectedWorktree)) {
+    return {
+      schema: "pritha-delivery-worktree-cleanup-plan-v1",
+      run_id: context.runId,
+      action: registration ? "prune" : "none",
+      eligible: true,
+      cleanup_required: false,
+      reason: registration ? "worktree_directory_missing" : "already_cleaned",
+      branch: context.expectedBranch,
+      branch_preserved: true,
+    };
+  }
+  const stat = lstatSync(context.expectedWorktree);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new DeliveryWorkspaceError("worktree_path_invalid", "Delivery worktree must be a regular directory, not a symlink");
+  }
+  if (realpathSync(context.expectedWorktree) !== context.expectedWorktree) {
+    throw new DeliveryWorkspaceError("worktree_path_mismatch", "Delivery worktree does not resolve to its canonical run path");
+  }
+  if (!registration) {
+    throw new DeliveryWorkspaceError("worktree_registration_missing", "Delivery worktree is not registered in Git metadata");
+  }
+  if (registration.branch !== `refs/heads/${context.expectedBranch}`) {
+    throw new DeliveryWorkspaceError("worktree_branch_mismatch", "Registered delivery worktree branch does not match metadata");
+  }
+  const currentBranch = git(context.expectedWorktree, ["branch", "--show-current"]).trim();
+  if (currentBranch !== context.expectedBranch) {
+    throw new DeliveryWorkspaceError("worktree_branch_mismatch", "Delivery worktree is on an unexpected branch");
+  }
+  const dirty = git(context.expectedWorktree, ["status", "--porcelain=v1", "--untracked-files=all"]).trim();
+  return {
+    schema: "pritha-delivery-worktree-cleanup-plan-v1",
+    run_id: context.runId,
+    action: dirty ? "retain" : "remove",
+    eligible: !dirty,
+    cleanup_required: Boolean(dirty),
+    reason: dirty ? "dirty_worktree" : "clean_terminal_worktree",
+    branch: context.expectedBranch,
+    branch_preserved: true,
+    dirty_entries: dirty ? dirty.split(/\r?\n/).length : 0,
+  };
+}
+
+function writeCleanupMetadata(runRoot, metadata, updates) {
+  const next = { ...metadata, ...updates, schema: DELIVERY_WORKTREE_SCHEMA };
+  atomicWriteFile(metadataPath(runRoot), `${JSON.stringify(next, null, 2)}\n`);
+  return next;
+}
+
+export function cleanupDeliveryWorktree(runRoot, options = {}) {
+  const context = validatedCleanupContext(runRoot);
+  const plan = planDeliveryWorktreeCleanup(context.root);
+  if (!options.apply) return { ...plan, applied: false };
+  if (!options.yes) throw new DeliveryWorkspaceError("cleanup_confirmation_required", "Cleanup apply requires explicit --yes");
+  if (plan.action === "retain") {
+    const metadata = writeCleanupMetadata(context.root, context.metadata, {
+      cleanup_status: "required",
+      cleanup_required: true,
+      cleanup_reason: plan.reason,
+      cleaned_at: null,
+    });
+    return { ...plan, applied: true, removed: false, metadata };
+  }
+  if (plan.action === "prune") {
+    git(context.sourceProject, ["worktree", "prune", "--expire", "now"]);
+  } else if (plan.action === "remove") {
+    git(context.sourceProject, ["worktree", "remove", context.expectedWorktree]);
+  }
+  const stillRegistered = listedWorktrees(context.sourceProject)
+    .some((entry) => path.resolve(entry.worktree) === context.expectedWorktree);
+  if (stillRegistered || existsSync(context.expectedWorktree)) {
+    throw new DeliveryWorkspaceError("worktree_cleanup_incomplete", "Git worktree cleanup did not fully remove the registered worktree");
+  }
+  const metadata = writeCleanupMetadata(context.root, context.metadata, {
+    cleanup_status: "cleaned",
+    cleanup_required: false,
+    cleanup_reason: null,
+    cleaned_at: options.cleanedAt || new Date().toISOString(),
+  });
+  return { ...plan, applied: true, removed: plan.action === "remove", metadata };
 }
 
 function safeRelativePath(value) {
