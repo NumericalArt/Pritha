@@ -217,6 +217,7 @@ function childAgentFolders() {
   if (!existsSync(config.agentParent)) return [];
   return readdirSync(config.agentParent)
     .map((name) => ({ name, directory: path.join(config.agentParent, name) }))
+    .filter((entry) => !entry.name.startsWith("."))
     .filter((entry) => path.resolve(entry.directory) !== path.resolve(config.codeRoot))
     .filter((entry) => {
       try {

@@ -104,6 +104,8 @@ case "$1" in
   scripts/rebuild-memory.mjs)
     mkdir -p "$PRITHA_STATE_ROOT/memory"
     : > "$PRITHA_STATE_ROOT/memory/techscope.sqlite"
+    mkdir -p "$PRITHA_AGENT_PARENT/.codex"
+    printf 'runtime changed during bootstrap\n' > "$PRITHA_AGENT_PARENT/.codex/runtime-state"
     if [ "$PRITHA_TEST_MUTATE_AGENT_STATE" = "1" ]; then
       printf 'mutated registry\\n' > "$PRITHA_STATE_ROOT/agents/registry.md"
     fi
@@ -128,9 +130,12 @@ function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mu
   mkdirSync(agentParent, { recursive: true });
   mkdirSync(path.join(stateRoot, "agents"), { recursive: true });
   mkdirSync(path.join(agentParent, "FixtureChild"), { recursive: true });
+  mkdirSync(path.join(agentParent, ".codex"), { recursive: true });
   if (!existsSync(path.join(stateRoot, "agents", "registry.md"))) writeFileSync(path.join(stateRoot, "agents", "registry.md"), "fixture registry\n");
   if (!existsSync(path.join(agentParent, "FixtureChild", "AGENTS.md"))) writeFileSync(path.join(agentParent, "FixtureChild", "AGENTS.md"), "# Fixture child\n");
   if (!existsSync(path.join(agentParent, "FixtureChild", "agent.mjs"))) writeFileSync(path.join(agentParent, "FixtureChild", "agent.mjs"), "export const ready = true;\n");
+  if (!existsSync(path.join(agentParent, ".codex", "AGENTS.md"))) writeFileSync(path.join(agentParent, ".codex", "AGENTS.md"), "# Runtime metadata, not a child agent\n");
+  writeFileSync(path.join(agentParent, ".codex", "runtime-state"), `${Date.now()}\n`);
   return run(process.execPath, [
     path.join(fixture.checkout, "scripts", "pritha-instance.mjs"),
     "update", "--apply", "--yes", ...(expectedCommit ? ["--expected-commit", expectedCommit] : []), "--json",
