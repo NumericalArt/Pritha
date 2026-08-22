@@ -200,17 +200,30 @@ test("contract revision invalidates previously approved outcome evidence", () =>
 test("user correction creates a new draft revision and supersedes the old approval", () => {
   const { root, stateRoot, specPath } = fixture();
   approveOutcomeSpec(specPath, { root, stateRoot, approvedBy: "user", approvedAt: "2026-08-16T12:00:00.000Z" });
+  const approvedText = readFileSync(specPath, "utf8");
+  const approved = parseOutcomeSpecText(approvedText);
+  const approvedSemanticLock = outcomeSemanticLock(approved);
+  const approvedDocumentLock = outcomeDocumentLock(approvedText);
 
   const revision = reviseOutcomeSpec(specPath, { root, stateRoot, date: "2026-08-17" });
-  const previous = parseOutcomeSpecText(readFileSync(specPath, "utf8"));
+  const previousText = readFileSync(specPath, "utf8");
+  const previous = parseOutcomeSpecText(previousText);
   const nextText = readFileSync(revision.path, "utf8");
   const next = parseOutcomeSpecText(nextText);
+  const previousApproval = verifyOutcomeApproval(specPath, { root, stateRoot });
 
   assert.equal(previous.frontmatter.status, "superseded");
   assert.deepEqual(previous.frontmatter.superseded_by, [revision.relPath]);
-  assert.equal(verifyOutcomeApproval(specPath, { root, stateRoot }).ok, false);
+  assert.equal(outcomeSemanticLock(previous), approvedSemanticLock);
+  assert.equal(outcomeDocumentLock(previousText), approvedDocumentLock);
+  assert.equal(previous.frontmatter.outcome_semantic_lock, approved.frontmatter.outcome_semantic_lock);
+  assert.equal(previous.frontmatter.outcome_document_lock, approved.frontmatter.outcome_document_lock);
+  assert.equal(previousApproval.ok, false);
+  assert.equal(previousApproval.reasons.includes("spec_not_approved"), true);
+  assert.equal(previousApproval.reasons.includes("os015"), false, "supersession is not lock tampering");
   assert.equal(next.frontmatter.status, "draft");
   assert.deepEqual(next.frontmatter.supersedes, [revision.previousRelPath]);
+  assert.deepEqual(previous.frontmatter.superseded_by, [revision.relPath]);
   assert.equal(next.frontmatter.outcome_semantic_lock, "pending");
   assert.equal(validateOutcomeSpecText(nextText, { root }).ok, true);
 

@@ -28,6 +28,7 @@ const MUTABLE_DOCUMENT_FIELDS = new Set([
   "approved_by",
   "approved_at",
   "review_status",
+  "superseded_by",
 ]);
 const SHELL_EXECUTABLES = new Set(["sh", "bash", "zsh", "fish", "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe"]);
 const SHELL_OPERATOR_TOKENS = new Set(["&&", "||", ";", "|", ">", ">>", "<", "<<", "`"]);
@@ -268,9 +269,16 @@ export function canonicalOutcomeDocument(value) {
   if (!source.startsWith("---\n")) return source.trimEnd();
   const end = source.indexOf("\n---\n", 4);
   if (end === -1) return source.trimEnd();
-  const frontmatter = source.slice(4, end).split("\n").map((line) => {
+  let mutableBlock = false;
+  const frontmatter = source.slice(4, end).split("\n").flatMap((line) => {
     const match = line.match(/^([A-Za-z0-9_-]+):/);
-    return match && MUTABLE_DOCUMENT_FIELDS.has(match[1]) ? `${match[1]}: [MUTABLE]` : line;
+    if (match) {
+      mutableBlock = MUTABLE_DOCUMENT_FIELDS.has(match[1]);
+      return mutableBlock ? [`${match[1]}: [MUTABLE]`] : [line];
+    }
+    if (mutableBlock && /^\s+/.test(line)) return [];
+    mutableBlock = false;
+    return [line];
   }).join("\n");
   return `---\n${frontmatter}\n---\n${source.slice(end + 5)}`.trimEnd();
 }
