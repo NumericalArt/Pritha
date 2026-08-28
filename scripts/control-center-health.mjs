@@ -53,7 +53,7 @@ function compact(value, max = 240) {
   return `${text.slice(0, max - 3).trim()}...`;
 }
 
-async function fetchText(url, timeoutMs) {
+async function fetchTextOnce(url, timeoutMs) {
   try {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(timeoutMs),
@@ -77,6 +77,18 @@ async function fetchText(url, timeoutMs) {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+function isTransientFailure(result) {
+  return result.status === 0 || [502, 503, 504].includes(result.status);
+}
+
+async function fetchText(url, timeoutMs, retries = 0) {
+  let result = await fetchTextOnce(url, timeoutMs);
+  for (let attempt = 0; attempt < retries && isTransientFailure(result); attempt += 1) {
+    result = await fetchTextOnce(url, Math.min(timeoutMs, 2000));
+  }
+  return result;
 }
 
 function extractScriptUrls(html, pageUrl, baseOrigin) {
@@ -112,6 +124,7 @@ async function runHealthcheck(options) {
   const baseUrl = normalizeBaseUrl(options);
   const base = new URL(baseUrl);
   const timeoutMs = Number(options["timeout-ms"] || 8000);
+  const retries = Math.min(1, Math.max(0, Number(options.retries || 0)));
   const strict = Boolean(options.strict);
   const pages = normalizePages(options);
   const checks = [];
@@ -119,7 +132,7 @@ async function runHealthcheck(options) {
   const chunkResults = [];
 
   const healthUrl = new URL("/api/health", base).href;
-  const health = await fetchText(healthUrl, timeoutMs);
+  const health = await fetchText(healthUrl, timeoutMs, retries);
   if (!health.ok) {
     const skipped = health.status === 0 && !strict;
     checks.push(check(
@@ -186,7 +199,7 @@ async function runHealthcheck(options) {
   const scripts = new Map();
   for (const page of pages) {
     const pageUrl = new URL(page, base).href;
-    const response = await fetchText(pageUrl, timeoutMs);
+    const response = await fetchText(pageUrl, timeoutMs, retries);
     const pageResult = {
       path: page,
       url: pageUrl,
@@ -223,7 +236,7 @@ async function runHealthcheck(options) {
   }
 
   for (const scriptUrl of scripts.keys()) {
-    const response = await fetchText(scriptUrl, timeoutMs);
+    const response = await fetchText(scriptUrl, timeoutMs, retries);
     const url = new URL(scriptUrl);
     const result = {
       path: `${url.pathname}${url.search}`,
@@ -287,6 +300,7 @@ if (options.help) {
   node scripts/control-center-health.mjs
   node scripts/control-center-health.mjs --json
   node scripts/control-center-health.mjs --strict --port 3420
+  node scripts/control-center-health.mjs --strict --retries 1
   node scripts/control-center-health.mjs --base-url http://127.0.0.1:3420
 
 Read-only check. If Control Center is running, verifies that key UI pages and

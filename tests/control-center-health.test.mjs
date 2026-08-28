@@ -30,9 +30,15 @@ async function withServer(handler, fn) {
   }
 }
 
-function runHealth(baseUrl) {
+function runHealth(baseUrl, extraArgs = []) {
   return new Promise((resolve) => {
-    const child = spawn("node", ["scripts/control-center-health.mjs", "--base-url", baseUrl, "--json"], {
+    const child = spawn("node", [
+      "scripts/control-center-health.mjs",
+      "--base-url",
+      baseUrl,
+      "--json",
+      ...extraArgs,
+    ], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -119,6 +125,41 @@ test("control-center health fails when rendered HTML points at a missing chunk",
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.status, "fail");
     assert.ok(payload.checks.some((item) => item.id.includes("stale.js") && item.status === "fail"));
+  });
+});
+
+test("control-center health retries one transient page response when requested", async () => {
+  let voiceAttempts = 0;
+  await withServer((request, response) => {
+    if (request.url === "/api/health") return jsonResponse(response, 200, {
+      schema: "pritha-control-center-health-v2",
+      ok: true,
+      service: "pritha-control-center",
+      status: "ready",
+      instance: { id: "fixture", role: "developer", port: Number(request.headers.host?.split(":").at(-1)) },
+      release: { commit: "abcdef123456", buildId: "fixture-build" },
+    });
+    if (request.url === "/voice" && voiceAttempts++ === 0) {
+      response.writeHead(503, { "content-type": "text/plain" });
+      response.end("temporarily unavailable");
+      return;
+    }
+    if (["/voice", "/agents", "/codex", "/settings"].includes(request.url)) {
+      return htmlResponse(response, "/_next/static/chunks/current.js");
+    }
+    if (request.url === "/_next/static/chunks/current.js") {
+      response.writeHead(200, { "content-type": "application/javascript; charset=UTF-8" });
+      response.end("window.__PRITHA_TEST_CHUNK__ = true;");
+      return;
+    }
+    response.writeHead(404, { "content-type": "text/plain" });
+    response.end("not found");
+  }, async (baseUrl) => {
+    const result = await runHealth(baseUrl, ["--retries", "1"]);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.status, "pass");
+    assert.equal(voiceAttempts, 2);
   });
 });
 

@@ -146,7 +146,13 @@ function runSelfTest() {
     || controlCenterRuntime.json?.service?.installed === true;
   const controlCenterHealth = runJson(
     "node",
-    ["scripts/control-center-health.mjs", "--json", ...(serviceRequired ? ["--strict"] : [])],
+    [
+      "scripts/control-center-health.mjs",
+      "--json",
+      "--retries",
+      "1",
+      ...(serviceRequired ? ["--strict"] : []),
+    ],
     { timeoutMs: 60000 },
   );
   const currentStats = stats();
