@@ -167,6 +167,27 @@ test("runtime refuses to install over an unowned listener", () => {
   }
 });
 
+test("runtime gives launchd children a stable executable path for the Codex CLI fallback", () => {
+  const item = fixture();
+  try {
+    const capture = path.join(item.directory, "child-path.txt");
+    writeFileSync(item.nextBinary, `require("node:fs").writeFileSync(process.env.PRITHA_TEST_PATH_CAPTURE, process.env.PATH || "");\n`);
+    item.env.PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
+    item.env.PRITHA_TEST_PATH_CAPTURE = capture;
+
+    const result = invoke(item, "run");
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    assert.equal(JSON.parse(result.stdout).childExitCode, 0);
+    const entries = readFileSync(capture, "utf8").split(path.delimiter);
+    assert.equal(entries[0], path.dirname(process.execPath));
+    assert.ok(entries.includes(path.join(item.testHome, ".local", "bin")));
+    assert.ok(entries.includes("/usr/bin"));
+    assert.equal(entries.some((entry) => !path.isAbsolute(entry)), false);
+  } finally {
+    rmSync(item.directory, { recursive: true, force: true });
+  }
+});
+
 test("five rapid process exits open the circuit until an explicit start clears it", () => {
   const item = fixture();
   try {

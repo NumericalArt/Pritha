@@ -180,6 +180,24 @@ function run(command, args, runOptions = {}) {
   };
 }
 
+function runtimeExecutablePath() {
+  const configured = String(process.env.PATH || "")
+    .split(path.delimiter)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry && path.isAbsolute(entry));
+  return [...new Set([
+    path.dirname(process.execPath),
+    path.join(os.homedir(), ".local", "bin"),
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    ...configured,
+    "/usr/bin",
+    "/bin",
+    "/usr/sbin",
+    "/sbin",
+  ])].join(path.delimiter);
+}
+
 function processExists(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 1) return false;
   try { process.kill(pid, 0); return true; } catch { return false; }
@@ -526,6 +544,7 @@ async function runService() {
       cwd: appRoot,
       env: {
         ...process.env,
+        PATH: runtimeExecutablePath(),
         TECHSCOPE_ROOT: config.codeRoot,
         PRITHA_STATE_ROOT: config.stateRoot,
         PRITHA_INSTANCE_ID: config.instanceId,
