@@ -1,17 +1,15 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   chmodSync,
-  closeSync,
   copyFileSync,
   cpSync,
   createReadStream,
   existsSync,
   lstatSync,
   mkdirSync,
-  openSync,
   readlinkSync,
   readFileSync,
   realpathSync,
@@ -238,13 +236,25 @@ function memoryDocuments() {
   return result.ok ? Number(result.stdout || 0) : null;
 }
 
-async function httpStatus() {
+async function httpStatus(options = {}) {
   try {
     const response = await fetch(`http://127.0.0.1:${config.controlCenterPort}/api/health`, {
       signal: AbortSignal.timeout(2_000),
       cache: "no-store",
     });
-    return { ok: response.ok, status: response.status };
+    const text = (await response.text()).slice(0, 64 * 1024);
+    let payload = null;
+    try { payload = text ? JSON.parse(text) : null; } catch { /* normalized below */ }
+    const instanceMatch = payload?.schema === "pritha-control-center-health-v2"
+      && payload?.instance?.id === config.instanceId
+      && payload?.instance?.port === config.controlCenterPort;
+    return {
+      ok: response.ok && payload?.ok === true && (!options.requireIdentity || instanceMatch),
+      status: response.status,
+      instanceMatch,
+      release: payload?.release || null,
+      error: payload ? null : "invalid_health_response",
+    };
   } catch (error) {
     return { ok: false, status: 0, error: error instanceof Error ? error.message : String(error) };
   }
@@ -435,47 +445,45 @@ async function migrate() {
   return { ...plan, applied: true, runtime_env: runtimeEnv, registry, manifest: manifestPath, checksums: checksums.length };
 }
 
-function portPids(port) {
-  const result = run("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], { timeoutMs: 10_000 });
-  return result.stdout.split(/\s+/).map(Number).filter((pid) => Number.isFinite(pid) && pid > 1);
+function controlCenterRuntime(action) {
+  const result = run(process.execPath, [
+    "scripts/control-center-runtime.mjs",
+    action,
+    ...(action === "status" ? [] : ["--yes"]),
+    "--json",
+  ], { timeoutMs: action === "stop" ? 45_000 : 30_000 });
+  let payload = null;
+  try { payload = result.stdout ? JSON.parse(result.stdout) : null; } catch { /* normalized below */ }
+  return {
+    ok: result.ok && payload?.ok !== false,
+    action,
+    payload,
+    error: payload?.error || result.stderr || (payload ? "runtime_action_failed" : "invalid_runtime_manager_response"),
+  };
 }
 
-async function stopPort(port) {
-  const pids = portPids(port);
-  for (const pid of pids) {
-    try { process.kill(pid, "SIGTERM"); } catch { /* already stopped */ }
-  }
-  for (let attempt = 0; attempt < 20 && portPids(port).length; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  for (const pid of portPids(port)) {
-    try { process.kill(pid, "SIGKILL"); } catch { /* already stopped */ }
-  }
-  return pids;
+async function stopControlCenter() {
+  return controlCenterRuntime("stop");
 }
 
 function startControlCenter() {
-  const logDir = resolvePrithaStatePath("logs");
-  mkdirSync(logDir, { recursive: true });
-  const stdout = openSync(path.join(logDir, "control-center.stdout.log"), "a");
-  const stderr = openSync(path.join(logDir, "control-center.stderr.log"), "a");
-  const child = spawn("npm", ["--prefix", "interfaces/control-center", "run", "start"], {
-    cwd: config.codeRoot,
-    env: { ...process.env },
-    detached: true,
-    stdio: ["ignore", stdout, stderr],
-  });
-  child.unref();
-  closeSync(stdout);
-  closeSync(stderr);
-  return child.pid;
+  return controlCenterRuntime("start");
+}
+
+function controlCenterProcessIdentity() {
+  const result = controlCenterRuntime("status");
+  return {
+    result,
+    wrapperPid: result.payload?.process?.wrapperPid || null,
+    childPid: result.payload?.process?.childPid || null,
+  };
 }
 
 async function waitForHealth(timeoutMs = 45_000) {
   const started = Date.now();
   let last = null;
   while (Date.now() - started < timeoutMs) {
-    last = await httpStatus();
+    last = await httpStatus({ requireIdentity: true });
     if (last.ok) return last;
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
@@ -548,7 +556,7 @@ async function updateInstance() {
     branch: status.git.branch,
     clean: status.git.clean,
     pre_isolation: status.isolation,
-    steps: ["fetch pinned origin main", "fast-forward only", "instance-scoped dependencies and memory rebuild", "verify agent-state fingerprints", "save previous .next", "build staged .next", "stop only configured port", "atomic build swap", "start", "healthcheck", "verify final fingerprints", "rollback .next on failure"],
+    steps: ["fetch pinned origin main", "fast-forward only", "instance-scoped dependencies and memory rebuild", "verify agent-state fingerprints", "save previous .next", "build staged .next", "bootout verified instance service", "atomic build swap", "start verified launchd service", "strict identity and chunk healthcheck", "verify final fingerprints", "rollback build and service state on failure"],
   };
   if (!options.apply) return plan;
   if (!options.yes) throw new Error("update --apply requires --yes");
@@ -633,35 +641,46 @@ async function updateInstance() {
     return { ...plan, ok: false, applied: true, status: "post-build-git-invariant-failed", manifest };
   }
 
-  const stopped = await stopPort(config.controlCenterPort);
+  const stopped = await stopControlCenter();
+  if (!stopped.ok) {
+    writePrivateJson(manifest, { ...release, status: "service-stop-failed-running-previous-release", stopped });
+    return { ...plan, ok: false, applied: true, status: "service-stop-failed", stopped, manifest };
+  }
   try {
     rmSync(displacedNext, { recursive: true, force: true });
     if (existsSync(liveNext)) renameSync(liveNext, displacedNext);
     renameSync(stagedNext, liveNext);
   } catch (error) {
     restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
-    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
-    const rollbackHealth = hadPreviousBuild ? await waitForHealth(30_000) : { ok: false, status: 0 };
+    const rollbackStart = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild && rollbackStart?.ok ? await waitForHealth(30_000) : { ok: false, status: 0 };
+    const rollbackProcess = hadPreviousBuild ? controlCenterProcessIdentity() : null;
+    const rollbackPid = rollbackProcess?.childPid || null;
     writePrivateJson(manifest, {
       ...release,
       status: "swap-failed-rolled-back",
       stopped,
       error: error instanceof Error ? error.message : String(error),
       rollback_pid: rollbackPid,
+      rollback_start: rollbackStart,
       rollback_health: rollbackHealth,
     });
     return { ...plan, ok: false, applied: true, status: "swap-failed-rolled-back", rollbackPid, rollbackHealth, manifest };
   }
-  const pid = startControlCenter();
+  const started = startControlCenter();
   const healthTimeout = Number(process.env.PRITHA_UPDATE_HEALTH_TIMEOUT_MS || 45_000);
   const rollbackHealthTimeout = Number(process.env.PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS || 30_000);
-  const health = await waitForHealth(healthTimeout);
+  const health = started.ok ? await waitForHealth(healthTimeout) : { ok: false, status: 0, error: started.error };
+  const deployedProcess = controlCenterProcessIdentity();
+  const pid = deployedProcess.childPid;
   if (!health.ok) {
-    await stopPort(config.controlCenterPort);
+    const failedStop = await stopControlCenter();
     restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
-    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
-    const rollbackHealth = hadPreviousBuild ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
-    writePrivateJson(manifest, { ...release, status: "health-failed-rolled-back", stopped, failed_pid: pid, health, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
+    const rollbackStart = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild && rollbackStart?.ok ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
+    const rollbackProcess = hadPreviousBuild ? controlCenterProcessIdentity() : null;
+    const rollbackPid = rollbackProcess?.childPid || null;
+    writePrivateJson(manifest, { ...release, status: "health-failed-rolled-back", stopped, started, failed_stop: failedStop, failed_pid: pid, health, rollback_start: rollbackStart, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
     return {
       ...plan,
       ok: false,
@@ -676,11 +695,13 @@ async function updateInstance() {
   const postIsolation = await isolationSnapshot();
   const isolationMatch = isolationSnapshotMatches(status.isolation, postIsolation);
   if (!isolationMatch) {
-    await stopPort(config.controlCenterPort);
+    const failedStop = await stopControlCenter();
     restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
-    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
-    const rollbackHealth = hadPreviousBuild ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
-    writePrivateJson(manifest, { ...release, status: "instance-isolation-changed-rolled-back", stopped, failed_pid: pid, health, post_isolation: postIsolation, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
+    const rollbackStart = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild && rollbackStart?.ok ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
+    const rollbackProcess = hadPreviousBuild ? controlCenterProcessIdentity() : null;
+    const rollbackPid = rollbackProcess?.childPid || null;
+    writePrivateJson(manifest, { ...release, status: "instance-isolation-changed-rolled-back", stopped, started, failed_stop: failedStop, failed_pid: pid, health, post_isolation: postIsolation, rollback_start: rollbackStart, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
     return { ...plan, ok: false, applied: true, status: "instance-isolation-changed-rolled-back", isolationMatch, rollbackPid, rollbackHealth, manifest };
   }
   const finalHead = git(["rev-parse", "HEAD"]).stdout;
@@ -688,15 +709,17 @@ async function updateInstance() {
   const finalGitClean = finalDirty.ok && !finalDirty.stdout;
   const releaseOk = finalHead === target && finalGitClean;
   if (!releaseOk) {
-    await stopPort(config.controlCenterPort);
+    const failedStop = await stopControlCenter();
     restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
-    const rollbackPid = hadPreviousBuild ? startControlCenter() : null;
-    const rollbackHealth = hadPreviousBuild ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
-    writePrivateJson(manifest, { ...release, status: "final-git-invariant-failed-rolled-back", stopped, failed_pid: pid, health, post_isolation: postIsolation, isolation_match: isolationMatch, final_head: finalHead, final_git_clean: finalGitClean, final_git_dirty: finalDirty.stdout.split(/\r?\n/).filter(Boolean), memory_documents: bootstrap.memory_documents, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
+    const rollbackStart = hadPreviousBuild ? startControlCenter() : null;
+    const rollbackHealth = hadPreviousBuild && rollbackStart?.ok ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
+    const rollbackProcess = hadPreviousBuild ? controlCenterProcessIdentity() : null;
+    const rollbackPid = rollbackProcess?.childPid || null;
+    writePrivateJson(manifest, { ...release, status: "final-git-invariant-failed-rolled-back", stopped, started, failed_stop: failedStop, failed_pid: pid, health, post_isolation: postIsolation, isolation_match: isolationMatch, final_head: finalHead, final_git_clean: finalGitClean, final_git_dirty: finalDirty.stdout.split(/\r?\n/).filter(Boolean), memory_documents: bootstrap.memory_documents, rollback_start: rollbackStart, rollback_pid: rollbackPid, rollback_health: rollbackHealth });
     return { ...plan, ok: false, applied: true, status: "final-git-invariant-failed-rolled-back", stopped, health, isolationMatch, postIsolation, finalHead, finalGitClean, memoryDocuments: bootstrap.memory_documents, rollbackPid, rollbackHealth, manifest };
   }
   rmSync(displacedNext, { recursive: true, force: true });
-  writePrivateJson(manifest, { ...release, status: "deployed", stopped, pid, health, post_isolation: postIsolation, isolation_match: isolationMatch, final_head: finalHead, final_git_clean: finalGitClean, final_git_dirty: [], memory_documents: bootstrap.memory_documents });
+  writePrivateJson(manifest, { ...release, status: "deployed", stopped, started, pid, health, post_isolation: postIsolation, isolation_match: isolationMatch, final_head: finalHead, final_git_clean: finalGitClean, final_git_dirty: [], memory_documents: bootstrap.memory_documents });
   return { ...plan, ok: true, applied: true, status: "deployed", stopped, pid, health, isolationMatch, postIsolation, finalHead, finalGitClean, memoryDocuments: bootstrap.memory_documents, manifest };
 }
 

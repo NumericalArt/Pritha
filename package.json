@@ -33,6 +33,8 @@
     "control-center:build": "npm --prefix interfaces/control-center run build",
     "control-center:start": "npm --prefix interfaces/control-center run start",
     "control-center:health": "node scripts/control-center-health.mjs",
+    "control-center:runtime": "node scripts/control-center-runtime.mjs status",
+    "control-center:runtime:plan": "node scripts/control-center-runtime.mjs plan",
     "pre-push-audit": "node scripts/pre-push-audit.mjs",
     "release-status": "node scripts/github-release-status.mjs",
     "instance": "node scripts/pritha-instance.mjs status",

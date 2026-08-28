@@ -3,18 +3,18 @@
   "type": "interface",
   "status": "active",
   "created": "2026-06-04",
-  "updated": "2026-08-13",
+  "updated": "2026-08-27",
   "owner": "Pritha",
   "purpose": "Local web control center for Pritha and child agents: agents overview, voice control surface, settings-lite and read-only developer diagnostics.",
   "runtime": {
     "framework": "Next.js",
-    "entrypoint": "npm --prefix interfaces/control-center run serve",
+    "entrypoint": "node scripts/control-center-runtime.mjs run",
     "development_entrypoint": "npm --prefix interfaces/control-center run dev",
     "default_host": "127.0.0.1",
     "default_port": 3420,
     "external_mode": "Use production build/start for Tailscale or other non-local browser access. Next dev is local-only because the dev client can fail to hydrate behind HTTPS proxying."
   },
-  "routes": ["/agents", "/voice", "/settings", "/dev"],
+  "routes": ["/agents", "/voice", "/codex", "/settings", "/dev"],
   "privacy_boundary": {
     "browser_must_not_receive": ["OPENAI_API_KEY", "private Codex outputs", "raw voice transcripts"],
     "tracked_policy": "Do not commit real Tailscale URLs, tailnet names, device hostnames or local secrets."
@@ -22,7 +22,9 @@
   "mvp_policy": {
     "cron": "not-enabled",
     "heartbeat": "not-enabled",
-    "launchd": "not-enabled",
+    "launchd": "launchd-on-approval",
+    "production_lifecycle": "runtime-manager-only",
+    "restart_policy": "process-exit-only-with-circuit-breaker",
     "durable_actions": "confirmation-required-after-backend"
   }
 }

@@ -405,7 +405,8 @@ test("Control Center wires rolling summaries to private storage and debounced cl
   assert.match(runtimeSource, /"rolling-summary"/);
   assert.match(runtimeSource, /"current\.json"/);
   assert.match(runtimeSource, /writeRollingSummaryAtomic/);
-  assert.match(runtimeSource, /await rename\(tmpPath, checkpointPath\)/);
+  assert.match(runtimeSource, /atomicWritePrivateJson/);
+  assert.match(runtimeSource, /resourceKey: `rolling-summary:\$\{checkpointPath\}`/);
   assert.doesNotMatch(runtimeSource, /rollingSummaryIsExpired/);
   assert.doesNotMatch(runtimeSource, /await unlink\(checkpointPath\)/);
   assert.match(runtimeSource, /rollingSummaryDebounceDecision/);

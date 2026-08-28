@@ -5,6 +5,7 @@ import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/prom
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
+import { atomicWritePrivateJson } from "../private-json";
 import {
   codexCliConfigEntries,
   codexModelSupportsFast,
@@ -3502,10 +3503,13 @@ function rollingSummaryInputFromArgs(args: RollingSummaryArgs): RollingSummaryCh
 }
 
 async function writeRollingSummaryAtomic(checkpointPath: string, serialized: string) {
-  await mkdir(path.dirname(checkpointPath), { recursive: true });
-  const tmpPath = `${checkpointPath}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmpPath, `${serialized}\n`, "utf8");
-  await rename(tmpPath, checkpointPath);
+  const root = resolveTechscopeRoot();
+  await atomicWritePrivateJson({
+    stateRoot: resolvePrithaStateRoot(root),
+    filePath: checkpointPath,
+    resourceKey: `rolling-summary:${checkpointPath}`,
+    value: JSON.parse(serialized) as RollingSummaryCheckpoint,
+  });
 }
 
 export async function upsertPrithaRollingSummary(args: RollingSummaryArgs = {}) {

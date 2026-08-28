@@ -7,9 +7,13 @@ import http from "node:http";
 
 const healthRouteSource = readFileSync("interfaces/control-center/src/app/api/health/route.ts", "utf8");
 
-test("Control Center health contract reports the maintained interface as active", () => {
-  assert.match(healthRouteSource, /status:\s*"active"/);
+test("Control Center health contract reports v2 ready identity without private paths", () => {
+  assert.match(healthRouteSource, /pritha-control-center-health-v2/);
+  assert.match(healthRouteSource, /status:\s*"ready"/);
+  assert.match(healthRouteSource, /instance:/);
+  assert.match(healthRouteSource, /release:/);
   assert.doesNotMatch(healthRouteSource, /status:\s*"experimental"/);
+  assert.doesNotMatch(healthRouteSource, /stateRoot|codeRoot|OPENAI_API_KEY/);
 });
 
 async function withServer(handler, fn) {
@@ -60,8 +64,15 @@ function htmlResponse(response, scriptPath) {
 
 test("control-center health passes when rendered pages reference served JavaScript chunks", async () => {
   await withServer((request, response) => {
-    if (request.url === "/api/health") return jsonResponse(response, 200, { ok: true });
-    if (["/voice", "/agents", "/settings"].includes(request.url)) {
+    if (request.url === "/api/health") return jsonResponse(response, 200, {
+      schema: "pritha-control-center-health-v2",
+      ok: true,
+      service: "pritha-control-center",
+      status: "ready",
+      instance: { id: "fixture", role: "developer", port: Number(request.headers.host?.split(":").at(-1)) },
+      release: { commit: "abcdef123456", buildId: "fixture-build" },
+    });
+    if (["/voice", "/agents", "/codex", "/settings"].includes(request.url)) {
       return htmlResponse(response, "/_next/static/chunks/current.js");
     }
     if (request.url === "/_next/static/chunks/current.js") {
@@ -77,15 +88,22 @@ test("control-center health passes when rendered pages reference served JavaScri
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.schema, "pritha-control-center-health-v1");
     assert.equal(payload.status, "pass");
-    assert.equal(payload.pages.length, 3);
+    assert.equal(payload.pages.length, 4);
     assert.equal(payload.chunks.length, 1);
   });
 });
 
 test("control-center health fails when rendered HTML points at a missing chunk", async () => {
   await withServer((request, response) => {
-    if (request.url === "/api/health") return jsonResponse(response, 200, { ok: true });
-    if (["/voice", "/agents", "/settings"].includes(request.url)) {
+    if (request.url === "/api/health") return jsonResponse(response, 200, {
+      schema: "pritha-control-center-health-v2",
+      ok: true,
+      service: "pritha-control-center",
+      status: "ready",
+      instance: { id: "fixture", role: "developer", port: Number(request.headers.host?.split(":").at(-1)) },
+      release: { commit: "abcdef123456", buildId: "fixture-build" },
+    });
+    if (["/voice", "/agents", "/codex", "/settings"].includes(request.url)) {
       return htmlResponse(response, "/_next/static/chunks/stale.js");
     }
     if (request.url === "/_next/static/chunks/stale.js") {

@@ -2,7 +2,7 @@
 
 import process from "node:process";
 
-const DEFAULT_PAGES = ["/voice", "/agents", "/settings"];
+const DEFAULT_PAGES = ["/voice", "/agents", "/codex", "/settings"];
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -150,6 +150,38 @@ async function runHealthcheck(options) {
     url: healthUrl,
     httpStatus: health.status,
   }));
+
+  let healthPayload = null;
+  try { healthPayload = JSON.parse(health.text); } catch { /* contract check below */ }
+  const expectedInstance = String(process.env.PRITHA_INSTANCE_ID || "").trim();
+  const expectedPort = Number(process.env.PRITHA_CONTROL_CENTER_PORT || base.port || 0);
+  const healthContractValid = healthPayload?.schema === "pritha-control-center-health-v2"
+    && healthPayload?.ok === true
+    && healthPayload?.service === "pritha-control-center"
+    && healthPayload?.status === "ready"
+    && typeof healthPayload?.instance?.id === "string"
+    && Number.isSafeInteger(healthPayload?.instance?.port)
+    && typeof healthPayload?.release?.commit === "string"
+    && typeof healthPayload?.release?.buildId === "string";
+  const instanceMatch = healthContractValid
+    && (!expectedInstance || healthPayload.instance.id === expectedInstance)
+    && (!expectedPort || healthPayload.instance.port === expectedPort);
+  if (!healthContractValid) {
+    checks.push(check("fail", "health-contract", "Control Center returned an invalid health-v2 contract"));
+  } else if (!instanceMatch) {
+    checks.push(check("fail", "health-identity", "Control Center health identity does not match the configured instance", {
+      expectedInstance: expectedInstance || null,
+      expectedPort: expectedPort || null,
+      actualInstance: healthPayload.instance.id,
+      actualPort: healthPayload.instance.port,
+    }));
+  } else {
+    checks.push(check("pass", "health-contract", "Control Center health-v2 identity and release contract is valid", {
+      instance: healthPayload.instance.id,
+      port: healthPayload.instance.port,
+      release: healthPayload.release,
+    }));
+  }
 
   const scripts = new Map();
   for (const page of pages) {

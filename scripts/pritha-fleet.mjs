@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 function parseArgs(argv) {
@@ -19,6 +20,7 @@ function parseArgs(argv) {
 
 const options = parseArgs(process.argv.slice(2));
 const root = resolveTechscopeRoot();
+loadPrithaRuntimeEnv({ root });
 const stateRoot = resolvePrithaStateRoot({ root });
 const manifestPath = path.resolve(String(options.manifest || process.env.PRITHA_FLEET_CONFIG || path.join(stateRoot, "config", "fleet.json")));
 const instanceScript = path.join(root, "scripts", "pritha-instance.mjs");
@@ -32,6 +34,15 @@ function loadManifest() {
     throw new Error("Fleet manifest instance ids must be unique safe identifiers");
   }
   return manifest;
+}
+
+function releaseOrderedInstances(manifest) {
+  const priority = new Map(["main", "dasha", "sasha", "marina"].map((id, index) => [id, index]));
+  return [...manifest.instances].sort((left, right) => {
+    const leftPriority = priority.get(String(left.id)) ?? Number.MAX_SAFE_INTEGER;
+    const rightPriority = priority.get(String(right.id)) ?? Number.MAX_SAFE_INTEGER;
+    return leftPriority - rightPriority;
+  });
 }
 
 function invoke(instance, commandArgs) {
@@ -104,23 +115,24 @@ function print(payload) {
 
 try {
   const manifest = loadManifest();
+  const orderedInstances = releaseOrderedInstances(manifest);
   const command = options._[0] || "status";
   const instances = [];
   let preflight = [];
   let targetCommit = null;
   if (command === "status") {
-    for (const instance of manifest.instances) instances.push(invoke(instance, ["status"]));
+    for (const instance of orderedInstances) instances.push(invoke(instance, ["status"]));
   } else if (command === "rollout") {
     const apply = Boolean(options.apply);
     if (apply && !options.yes) throw new Error("fleet rollout --apply requires --yes");
     targetCommit = releaseCommit();
-    preflight = manifest.instances.map((instance) => {
+    preflight = orderedInstances.map((instance) => {
       const result = invoke(instance, ["status"]);
       const issues = preflightIssues(result, instance);
       return { ...result, ok: issues.length === 0, issues };
     });
     if (preflight.every((item) => item.ok)) {
-      for (const instance of manifest.instances) {
+      for (const instance of orderedInstances) {
         const result = invoke(instance, ["update", apply ? "--apply" : "--plan", "--expected-commit", targetCommit, ...(apply ? ["--yes"] : [])]);
         if (apply && result.ok) {
           const payload = result.payload || {};
@@ -142,10 +154,11 @@ try {
   const preflightOk = command !== "rollout" || preflight.every((item) => item.ok);
   const payload = {
     schema: "pritha-fleet-result-v2",
-    ok: preflightOk && instances.length === manifest.instances.length && instances.every((item) => item.ok),
+    ok: preflightOk && instances.length === orderedInstances.length && instances.every((item) => item.ok),
     command,
     manifest: manifestPath,
     target_commit: targetCommit,
+    rollout_order: orderedInstances.map((instance) => instance.id),
     preflight,
     instances,
     stopped_after: preflight.find((item) => !item.ok)?.id || instances.find((item) => !item.ok)?.id || null,

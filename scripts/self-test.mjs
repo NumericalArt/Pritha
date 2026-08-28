@@ -141,7 +141,14 @@ function runSelfTest() {
     : { ok: true, status: 0, stdout: "", stderr: "", skipped: true };
   const queue = runJson("node", ["scripts/queue-health.mjs", "--json"]);
   const launchdRoot = runCommand("node", ["scripts/launchd-root-audit.mjs", "status", "--json"], { timeoutMs: 60000 });
-  const controlCenterHealth = runJson("node", ["scripts/control-center-health.mjs", "--json"], { timeoutMs: 60000 });
+  const controlCenterRuntime = runJson("node", ["scripts/control-center-runtime.mjs", "status", "--json"], { timeoutMs: 60000 });
+  const serviceRequired = /^(?:1|true|yes)$/i.test(String(process.env.PRITHA_CONTROL_CENTER_SERVICE_REQUIRED || ""))
+    || controlCenterRuntime.json?.service?.installed === true;
+  const controlCenterHealth = runJson(
+    "node",
+    ["scripts/control-center-health.mjs", "--json", ...(serviceRequired ? ["--strict"] : [])],
+    { timeoutMs: 60000 },
+  );
   const currentStats = stats();
   const previous = previousBaseline();
 
@@ -187,6 +194,21 @@ function runSelfTest() {
       detail: controlCenterHealth.json,
     });
   }
+  if (!controlCenterRuntime.json) {
+    warnings.push({
+      id: "control-center-runtime-status-unavailable",
+      severity: "warning",
+      message: "Control Center runtime manager returned no machine-readable status",
+      detail: { stdout: controlCenterRuntime.stdout, stderr: controlCenterRuntime.stderr },
+    });
+  } else if (serviceRequired && controlCenterRuntime.json.service?.running !== true) {
+    regressions.push({
+      id: "control-center-service-required",
+      severity: "critical",
+      message: "Control Center service is required for this instance but is not running",
+      detail: controlCenterRuntime.json,
+    });
+  }
   const expectedQualityStatus = dryRun ? "planned" : "pass";
   if (!quality.ok || quality.json?.status !== expectedQualityStatus) {
     regressions.push({
@@ -230,6 +252,8 @@ function runSelfTest() {
     embeddings_restore: embeddingsRestore,
     queue_health: queue.json || { status: "fail", stdout: queue.stdout, stderr: queue.stderr },
     launchd_root_audit: launchdRootAudit,
+    control_center_runtime: controlCenterRuntime.json || { status: "unknown", stdout: controlCenterRuntime.stdout, stderr: controlCenterRuntime.stderr },
+    control_center_service_required: serviceRequired,
     control_center_health: controlCenterHealth.json || { status: "unknown", stdout: controlCenterHealth.stdout, stderr: controlCenterHealth.stderr },
     warnings,
     regressions,

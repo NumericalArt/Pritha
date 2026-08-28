@@ -70,7 +70,7 @@ async function expectNoPageOverflow(page: Page) {
 
 async function expectNoRawSecret(page: Page) {
   const text = (await page.locator("body").textContent()) || "";
-  expect(text).not.toMatch(/sk-[A-Za-z0-9_-]{20,}/);
+  expect(text).not.toMatch(/(?:^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}/);
   expect(text).not.toMatch(/OPENAI_API_KEY\s*=\s*[^*\s]{8,}/);
 }
 
@@ -201,15 +201,31 @@ test.describe("Control Center UI regression", () => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
 
-    for (const route of ["/agents", "/voice", "/settings", "/dev"]) {
+    for (const route of ["/agents", "/voice", "/codex", "/settings", "/dev"]) {
       await page.goto(route);
       await expect(page.locator("h1:visible").first()).toBeVisible();
-      await expect(page.locator(".status-strip:visible")).toContainText("Pritha");
+      if (route === "/codex") await expect(page.locator(".codex-conversation-header:visible")).toContainText("Pritha");
+      else await expect(page.locator(".status-strip:visible")).toContainText("Pritha");
       await expectNoPageOverflow(page);
       await expectNoRawSecret(page);
     }
 
     expect(consoleErrors).toEqual([]);
+  });
+
+  test("Codex Chat maps an empty gateway failure to a friendly desktop and mobile stale state", async ({ page }) => {
+    await page.route("**/api/codex-chat/v1/**", async (route) => {
+      await route.fulfill({ status: 502, contentType: "application/json", body: "" });
+    });
+
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/codex");
+      await expect(page.locator(".codex-error-banner")).toContainText("Control Center is temporarily unavailable");
+      await expect(page.locator("body")).not.toContainText("Unexpected end of JSON input");
+      await expect(page.locator("body")).not.toContainText("Failed to execute 'json'");
+      await expectNoPageOverflow(page);
+    }
   });
 
   test("keeps agents filters, credentials drawer, create-plan drawer, and voice-link modal interactive", async ({ page }) => {

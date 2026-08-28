@@ -11,6 +11,7 @@ Codex without running a web server.
 
 - `/agents` - child agents overview.
 - `/voice` - voice control surface.
+- `/codex` - persistent direct chat with the selected Codex runtime.
 - `/settings` - compact settings.
 - `/dev` - read-only diagnostics.
 
@@ -31,12 +32,20 @@ npm --prefix interfaces/control-center ci --ignore-scripts
 npm --prefix interfaces/control-center run dev
 ```
 
-For the Pritha Tailscale link or any non-local browser access, use the
-production server on the same port:
+For production or Tailscale-facing access, inspect the instance-managed
+runtime first:
 
 ```sh
-npm --prefix interfaces/control-center run serve
+node scripts/control-center-runtime.mjs plan
+node scripts/control-center-runtime.mjs status --json
 ```
+
+Production lifecycle and staged releases use
+`scripts/control-center-runtime.mjs` and the instance-specific launchd service.
+Installing, starting, stopping, restarting or uninstalling that service
+requires a separate immediate operator approval and `--yes`. Direct
+`npm run dev`, `npm run serve` and `npm run start` are limited to local
+development or bounded testing; they are not the production lifecycle.
 
 Default local URL:
 
@@ -55,6 +64,10 @@ Do not expose `next dev` through Tailscale. The dev client can render the page
 while failing to hydrate React event handlers behind HTTPS proxying; production
 `build` + `start` keeps filters, credentials drawers, Voice controls and the
 Three.js web active.
+
+Never stop a process merely because it listens on an expected port. The runtime
+manager verifies the instance, checkout, state-root, port, process group,
+launchd label and health identity before a lifecycle mutation.
 
 Optional local env:
 

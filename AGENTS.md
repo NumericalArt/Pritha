@@ -174,6 +174,14 @@ node scripts/self-test.mjs
 
 `self-test` и `queue-health` являются ручными проверками по умолчанию. Не включать cron, heartbeat, launchd, background service или scheduled pulse без явного подтверждения пользователя и отдельного deployment/operations report. `queue-health` только сообщает stale/failed jobs и не меняет очередь автоматически.
 
+Production и Tailscale-facing Control Center не запускаются из временной
+Codex-сессии. Использовать только `scripts/control-center-runtime.mjs` и
+workflow `07_workflows/control-center-staged-release.md`: никаких raw kill по
+порту, live-build swap, cron или network health watchdog. `plan`/`status`
+read-only; `install`/`start`/`stop`/`restart`/`uninstall` требуют отдельного
+непосредственного approval и `--yes`. После UI-изменений обязательны strict
+health с `/codex` и проверка JavaScript chunks.
+
 ## Good State Baseline
 
 Если после внесенных изменений пользователь явно или неформально дает понятный позитивный acceptance-сигнал о текущем состоянии Pritha, выбранного clone, feature surface или child agent, нужно предложить или выполнить workflow `07_workflows/pritha-good-state-baseline.md`. Не привязываться к фиксированным фразам: сигнал может быть техническим, бытовым, эмоциональным или ласковым, если смысл ясен - это состояние нравится и его стоит сохранить.

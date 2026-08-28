@@ -43,6 +43,38 @@ function makeFixture() {
   mkdirSync(lib, { recursive: true });
   mkdirSync(path.join(checkout, "interfaces", "control-center", ".next"), { recursive: true });
   copyFileSync(path.join(sourceRoot, "scripts", "pritha-instance.mjs"), path.join(scripts, "pritha-instance.mjs"));
+  writeFileSync(path.join(scripts, "control-center-runtime.mjs"), `
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import path from "node:path";
+const action = process.argv[2] || "status";
+const stateRoot = process.env.PRITHA_STATE_ROOT;
+const pidPath = path.join(stateRoot, "setup", "fixture-runtime.pid");
+const readPid = () => existsSync(pidPath) ? Number(readFileSync(pidPath, "utf8")) : null;
+if (action === "start") {
+  mkdirSync(path.dirname(pidPath), { recursive: true });
+  const child = spawn("npm", ["--prefix", "interfaces/control-center", "run", "start"], {
+    cwd: process.env.TECHSCOPE_ROOT,
+    env: process.env,
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+  writeFileSync(pidPath, String(child.pid));
+  console.log(JSON.stringify({ ok: true, action, started: true }));
+} else if (action === "stop") {
+  const pid = readPid();
+  if (pid) { try { process.kill(pid, "SIGTERM"); } catch {} }
+  rmSync(pidPath, { force: true });
+  console.log(JSON.stringify({ ok: true, action, stopped: true }));
+} else if (action === "status") {
+  const pid = readPid();
+  console.log(JSON.stringify({ ok: true, process: { wrapperPid: null, childPid: pid, processGroupId: pid } }));
+} else {
+  console.log(JSON.stringify({ ok: false, error: "unsupported" }));
+  process.exitCode = 1;
+}
+`);
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "env.mjs"), path.join(lib, "env.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
   writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "version"), "good\n");
@@ -92,7 +124,14 @@ if (command.includes("run start")) {
   const port = Number(process.env.PRITHA_CONTROL_CENTER_PORT);
   http.createServer((request, response) => {
     response.writeHead(request.url === "/api/health" ? 200 : 404, { "content-type": "application/json" });
-    response.end(JSON.stringify({ ok: request.url === "/api/health" }));
+    response.end(JSON.stringify({
+      schema: "pritha-control-center-health-v2",
+      ok: request.url === "/api/health",
+      service: "pritha-control-center",
+      status: "ready",
+      instance: { id: process.env.PRITHA_INSTANCE_ID, role: process.env.PRITHA_INSTANCE_ROLE, port },
+      release: { commit: "fixture", buildId: version },
+    }));
   }).listen(port, "127.0.0.1");
 }
 `);

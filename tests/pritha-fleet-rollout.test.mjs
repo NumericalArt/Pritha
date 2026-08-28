@@ -85,3 +85,38 @@ if (command === "status") {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("fleet discovers the private manifest from the primary runtime environment", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-fleet-env-"));
+  const stateRoot = path.join(root, "private-state");
+  const checkout = path.join(root, "instance", "Pritha");
+  const agentParent = path.join(root, "instance");
+  try {
+    mkdirSync(path.join(root, "scripts"), { recursive: true });
+    mkdirSync(path.join(stateRoot, "config"), { recursive: true });
+    mkdirSync(checkout, { recursive: true });
+    writeFileSync(path.join(root, ".env.local"), `PRITHA_STATE_ROOT=${stateRoot}\n`);
+    writeFileSync(path.join(root, "scripts", "pritha-instance.mjs"), `
+console.log(JSON.stringify({ ok: true, instance: { state_root: process.env.PRITHA_STATE_ROOT, agent_parent: process.env.PRITHA_AGENT_PARENT }, git: { branch: "main", clean: true }, runtime: { memory_documents: 1 }, isolation: { agent_state: { sha256: "agent" }, protected_state: { sha256: "state" } } }));
+`);
+    const manifestPath = path.join(stateRoot, "config", "fleet.json");
+    writeFileSync(manifestPath, `${JSON.stringify({
+      schema: "pritha-fleet-v1",
+      instances: [{ id: "main", role: "primary", checkout, state_root: stateRoot, agent_parent: agentParent, port: 3420 }],
+    })}\n`);
+    const env = { ...process.env, TECHSCOPE_ROOT: root };
+    delete env.PRITHA_STATE_ROOT;
+    delete env.PRITHA_FLEET_CONFIG;
+    const result = spawnSync(process.execPath, [FLEET_SCRIPT, "status", "--json"], {
+      cwd: root,
+      env,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.manifest, manifestPath);
+    assert.deepEqual(payload.rollout_order, ["main"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
