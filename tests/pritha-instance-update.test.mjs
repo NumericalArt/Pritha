@@ -295,3 +295,10 @@ test("instance update stops before the UI swap when bootstrap changes local agen
     rmSync(fixture.fixture, { recursive: true, force: true });
   }
 });
+
+test("instance update gives post-start health more time than read-only status probes", () => {
+  const source = readFileSync(path.join(sourceRoot, "scripts", "pritha-instance.mjs"), "utf8");
+  assert.match(source, /AbortSignal\.timeout\(Number\(options\.timeoutMs \|\| 2_000\)\)/);
+  assert.match(source, /PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS \|\| 8_000/);
+  assert.match(source, /httpStatus\(\{ requireIdentity: true, timeoutMs: requestTimeoutMs \}\)/);
+});

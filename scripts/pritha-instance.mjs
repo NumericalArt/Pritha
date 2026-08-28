@@ -239,7 +239,7 @@ function memoryDocuments() {
 async function httpStatus(options = {}) {
   try {
     const response = await fetch(`http://127.0.0.1:${config.controlCenterPort}/api/health`, {
-      signal: AbortSignal.timeout(2_000),
+      signal: AbortSignal.timeout(Number(options.timeoutMs || 2_000)),
       cache: "no-store",
     });
     const text = (await response.text()).slice(0, 64 * 1024);
@@ -482,8 +482,9 @@ function controlCenterProcessIdentity() {
 async function waitForHealth(timeoutMs = 45_000) {
   const started = Date.now();
   let last = null;
+  const requestTimeoutMs = Number(process.env.PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS || 8_000);
   while (Date.now() - started < timeoutMs) {
-    last = await httpStatus({ requireIdentity: true });
+    last = await httpStatus({ requireIdentity: true, timeoutMs: requestTimeoutMs });
     if (last.ok) return last;
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
