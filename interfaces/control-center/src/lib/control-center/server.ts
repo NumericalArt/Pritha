@@ -245,8 +245,8 @@ const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
 const APP_HOST = process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1";
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
-const TAILSCALE_PROBE_TIMEOUT_MS = 1_500;
-const ACCESS_LINKS_CACHE_MS = 30_000;
+const TAILSCALE_PROBE_TIMEOUT_MS = 1_000;
+const ACCESS_LINKS_CACHE_MS = 120_000;
 let accessLinksCache: { key: string; expiresAt: number; value: AccessLinkState } | null = null;
 
 function slug(value: string) {
