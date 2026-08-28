@@ -17,6 +17,7 @@ const eventsRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads/[c
 const threadRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads/route.ts`, "utf8");
 const turnsRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads/[chatId]/turns/route.ts`, "utf8");
 const chatPageSource = readFileSync(`${root}/components/codex/CodexChatPage.tsx`, "utf8");
+const dictationPreferencesSource = readFileSync(`${root}/lib/codex-chat/dictation-preferences.ts`, "utf8");
 const routesSource = readFileSync(`${root}/lib/routes.ts`, "utf8");
 const stylesSource = readFileSync(`${root}/styles/globals.css`, "utf8");
 
@@ -247,10 +248,33 @@ test("Codex Chat navigation, editable dictation and 320px-safe layout are presen
   assert.match(chatPageSource, /SpeechRecognition/);
   assert.match(chatPageSource, /setDraft\(\(current\) =>/);
   assert.doesNotMatch(chatPageSource, /recognition\.onresult[\s\S]{0,700}sendMessage\(/);
+  assert.doesNotMatch(chatPageSource, /navigator\.language/);
+  assert.match(chatPageSource, /if \(languageTag\) recognition\.lang = languageTag/);
+  assert.match(chatPageSource, /aria-label="Dictation language"/);
   assert.match(chatPageSource, /new EventSource\(streamUrl\)/);
   assert.match(stylesSource, /grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(stylesSource, /\.codex-conversation \{[\s\S]{0,180}display: flex;[\s\S]{0,80}flex-direction: column;/);
+  assert.match(stylesSource, /\.codex-transcript \{[\s\S]{0,80}flex: 1 1 auto;[\s\S]{0,120}overflow-y: auto;/);
+  assert.match(stylesSource, /\.codex-composer-wrap \{[\s\S]{0,80}flex: 0 0 auto;/);
+  assert.match(stylesSource, /\.content-shell:has\(\.codex-page\) \{[\s\S]{0,100}height: 100dvh;[\s\S]{0,100}overflow: hidden;/);
   assert.match(stylesSource, /@media \(max-width: 390px\)/);
   assert.match(stylesSource, /\.codex-history-overlay/);
+});
+
+test("Codex Chat dictation keeps browser auto mode and explicit language choices separate from transcripts", async () => {
+  const loaded = await transpileModule(dictationPreferencesSource, "pritha-codex-chat-dictation-");
+  try {
+    assert.equal(loaded.module.recognitionLanguageTag("browser"), null);
+    for (const language of ["en-US", "de-DE", "ru-RU", "fr-FR", "it-IT", "es-ES"]) {
+      assert.equal(loaded.module.isDictationLanguage(language), true);
+      assert.equal(loaded.module.recognitionLanguageTag(language), language);
+    }
+    assert.equal(loaded.module.isDictationLanguage("all"), false);
+    assert.match(dictationPreferencesSource, /pritha\.codexDictationLanguage/);
+    assert.doesNotMatch(dictationPreferencesSource, /transcript|draft|message/i);
+  } finally {
+    loaded.cleanup();
+  }
 });
 
 test("Codex Chat reconciles missed completion events and exposes explicit recovery", () => {

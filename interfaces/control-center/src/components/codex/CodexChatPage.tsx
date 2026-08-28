@@ -25,6 +25,14 @@ import {
   controlCenterRequest as api,
   deliveryMayBeUnknown,
 } from "@/lib/control-center-request";
+import {
+  DICTATION_LANGUAGE_CHANGED_EVENT,
+  DICTATION_LANGUAGE_OPTIONS,
+  type DictationLanguage,
+  readStoredDictationLanguage,
+  recognitionLanguageTag,
+  writeStoredDictationLanguage,
+} from "@/lib/codex-chat/dictation-preferences";
 import type {
   AcceptedTurn,
   ChatEvent,
@@ -236,6 +244,7 @@ export function CodexChatPage() {
   const [pendingDelivery, setPendingDelivery] = useState<PendingDelivery | null>(null);
   const [dictation, setDictation] = useState<DictationState>("idle");
   const [dictationSupported, setDictationSupported] = useState(false);
+  const [dictationLanguage, setDictationLanguage] = useState<DictationLanguage>("browser");
   const recognitionRef = useRef<RecognitionLike | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
@@ -355,6 +364,17 @@ export function CodexChatPage() {
     const SpeechRecognition = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition;
     setDictationSupported(Boolean(SpeechRecognition));
     return () => recognitionRef.current?.stop();
+  }, []);
+
+  useEffect(() => {
+    const synchronizeDictationLanguage = () => setDictationLanguage(readStoredDictationLanguage());
+    synchronizeDictationLanguage();
+    window.addEventListener("storage", synchronizeDictationLanguage);
+    window.addEventListener(DICTATION_LANGUAGE_CHANGED_EVENT, synchronizeDictationLanguage);
+    return () => {
+      window.removeEventListener("storage", synchronizeDictationLanguage);
+      window.removeEventListener(DICTATION_LANGUAGE_CHANGED_EVENT, synchronizeDictationLanguage);
+    };
   }, []);
 
   useEffect(() => {
@@ -642,7 +662,8 @@ export function CodexChatPage() {
       return;
     }
     const recognition = new SpeechRecognition();
-    recognition.lang = navigator.language || "en-US";
+    const languageTag = recognitionLanguageTag(dictationLanguage);
+    if (languageTag) recognition.lang = languageTag;
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.onresult = (event) => {
@@ -664,6 +685,13 @@ export function CodexChatPage() {
     recognitionRef.current = recognition;
     setDictation("listening");
     recognition.start();
+  }
+
+  function changeDictationLanguage(value: string) {
+    const option = DICTATION_LANGUAGE_OPTIONS.find((candidate) => candidate.value === value);
+    if (!option) return;
+    setDictationLanguage(option.value);
+    writeStoredDictationLanguage(option.value);
   }
 
   const history = (
@@ -785,17 +813,39 @@ export function CodexChatPage() {
               maxLength={64_000}
             />
             <div className="codex-composer-actions">
-              <small>Enter to send · Shift+Enter for newline · dictation stays editable</small>
-              <div>
+              <small>
+                {dictationSupported
+                  ? "Enter to send · Dictation stays editable · browser speech may use an online service"
+                  : "Enter to send · Browser dictation unavailable; use system dictation"}
+              </small>
+              <div className="codex-composer-controls">
+                <label
+                  className="codex-dictation-language"
+                  title="Auto uses the browser default. Choose one language when recognition guesses incorrectly."
+                >
+                  <Globe2 size={15} aria-hidden="true" />
+                  <select
+                    aria-label="Dictation language"
+                    value={dictationLanguage}
+                    onChange={(event) => changeDictationLanguage(event.target.value)}
+                    disabled={!dictationSupported || dictation === "listening"}
+                  >
+                    {DICTATION_LANGUAGE_OPTIONS.map((option) => (
+                      <option value={option.value} title={option.description} key={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   className={`codex-dictation ${dictation === "listening" ? "active" : ""}`}
                   type="button"
                   onClick={toggleDictation}
                   disabled={!dictationSupported}
                   aria-pressed={dictation === "listening"}
-                  title={dictationSupported ? "Dictate into the message" : "Browser dictation is unavailable"}
+                  title={dictationSupported
+                    ? "Dictate into the message. Audio processing is controlled by the browser and may use an online service."
+                    : "This browser does not expose speech recognition. Use system dictation instead."}
                 >
-                  <Mic size={16} /> {dictation === "listening" ? "Listening" : "Dictate"}
+                  <Mic size={16} /> {!dictationSupported ? "Unavailable" : dictation === "listening" ? "Listening" : dictation === "error" ? "Try again" : "Dictate"}
                 </button>
                 <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={!draft.trim() || sending || hasActiveTurn || Boolean(pendingDelivery) || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} Send

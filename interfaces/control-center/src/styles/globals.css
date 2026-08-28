@@ -6266,9 +6266,8 @@ button:active,
 .codex-conversation {
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: color-mix(in srgb, var(--surface-panel-flat) 78%, transparent);
 }
@@ -6278,6 +6277,7 @@ button:active,
 }
 
 .codex-conversation-header {
+  flex: 0 0 auto;
   min-height: 79px;
   padding: 14px 18px;
   display: flex;
@@ -6426,6 +6426,7 @@ button:active,
 }
 
 .codex-transcript {
+  flex: 1 1 auto;
   min-height: 0;
   padding: 26px clamp(18px, 4vw, 48px) 22px;
   overflow-y: auto;
@@ -6712,6 +6713,7 @@ button:active,
 }
 
 .codex-composer-wrap {
+  flex: 0 0 auto;
   padding: 0 clamp(14px, 3vw, 34px) 18px;
   background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-panel-raised) 94%, transparent) 28%);
 }
@@ -6778,13 +6780,53 @@ button:active,
 }
 
 .codex-composer-actions > small {
+  min-width: 0;
+  flex: 1 1 auto;
   color: var(--text-muted);
   font-size: 11px;
 }
 
-.codex-composer-actions > div {
+.codex-composer-controls {
+  min-width: 0;
+  flex: 0 0 auto;
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.codex-dictation-language {
+  min-width: 116px;
+  flex: 0 0 116px;
+  min-height: 39px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-medium);
+  border-radius: 9px;
+  color: var(--text-secondary);
+  background: var(--surface-control);
+}
+
+.codex-dictation-language select {
+  width: 76px;
+  min-width: 0;
+  max-width: 76px;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.codex-dictation-language:has(select:focus-visible) {
+  outline: 2px solid color-mix(in srgb, var(--accent-purple) 68%, transparent);
+  outline-offset: 2px;
+}
+
+.codex-dictation-language:has(select:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .codex-dictation,
@@ -6827,6 +6869,12 @@ button:active,
 }
 
 @media (max-width: 767px) {
+  .content-shell:has(.codex-page) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .app-main:has(.codex-page) {
     min-height: 0;
     padding: 0 0 calc(92px + env(safe-area-inset-bottom));
@@ -6836,8 +6884,8 @@ button:active,
 
   .codex-page {
     min-height: 0;
-    height: 100%;
-    flex: 1;
+    height: auto;
+    flex: 1 1 auto;
     display: block;
     border-right: 0;
     border-left: 0;
@@ -6888,22 +6936,34 @@ button:active,
   }
 
   .codex-composer-actions {
-    align-items: flex-end;
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .codex-composer-actions > small {
-    max-width: 43%;
+    max-width: none;
   }
 
-  .codex-composer-actions > div {
-    flex: 1;
+  .codex-composer-controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   }
 
+  .codex-dictation-language,
   .codex-dictation,
   .codex-send {
     min-width: 0;
-    flex: 1;
     padding-inline: 9px;
+  }
+
+  .codex-dictation-language {
+    flex-basis: auto;
+  }
+
+  .codex-dictation-language select {
+    width: 100%;
+    max-width: none;
   }
 
   .codex-history-overlay {

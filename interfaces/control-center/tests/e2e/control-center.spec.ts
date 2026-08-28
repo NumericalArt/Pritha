@@ -228,6 +228,174 @@ test.describe("Control Center UI regression", () => {
     }
   });
 
+  test("keeps a long Codex transcript scrollable, the composer reachable, and dictation language browser-local", async ({ page }) => {
+    await page.addInitScript(() => {
+      class TestSpeechRecognition {
+        lang = "";
+        continuous = false;
+        interimResults = false;
+        onresult: null = null;
+        onend: null = null;
+        onerror: null = null;
+        start() {}
+        stop() {}
+      }
+      Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: TestSpeechRecognition });
+    });
+
+    const now = new Date().toISOString();
+    const capabilities = {
+      fullChat: true,
+      nativeHistory: true,
+      listThreads: true,
+      readThread: true,
+      forkThread: false,
+      archiveThread: false,
+      unarchiveThread: false,
+      renameThread: false,
+      pinThread: false,
+      steerTurn: false,
+      interruptTurn: false,
+      commandApprovals: false,
+      fileChangeApprovals: false,
+      permissionApprovals: false,
+      requestUserInput: false,
+      historyPagination: true,
+      audioInput: false,
+    };
+    const runtime = {
+      preferredProvider: "auto",
+      effectiveProvider: "desktop_bundled",
+      effectiveProtocol: "app_server",
+      availability: "ready",
+      fallbackEnabled: true,
+      providers: [{
+        providerId: "desktop_bundled",
+        label: "Desktop bundled",
+        availability: "ready",
+        version: "test",
+        protocol: "app_server",
+        locationLabel: "Desktop bundled",
+        stateIdentityHash: "test",
+        capabilities,
+        warning: null,
+      }],
+      models: [],
+      selected: {
+        modelId: "gpt-test",
+        effortId: null,
+        serviceTierId: null,
+        sandboxMode: "read_only",
+        approvalMode: "never",
+      },
+      probedAt: now,
+    };
+    const thread = {
+      chatId: "chat-long",
+      title: "Long layout verification",
+      preview: "Long transcript",
+      group: "my_chats",
+      origin: "chat",
+      status: "idle",
+      activeFlags: [],
+      pinned: false,
+      archived: false,
+      historyKind: "native",
+      createdAt: now,
+      updatedAt: now,
+      runtime: {
+        providerId: "desktop_bundled",
+        version: "test",
+        protocol: "app_server",
+        stateIdentityHash: "test",
+        compatibility: "bound",
+      },
+      taskLinks: [],
+    };
+    const turns = Array.from({ length: 18 }, (_, index) => ({
+      turnId: `turn-${index}`,
+      clientMessageId: `client-${index}`,
+      status: "completed",
+      userMessage: {
+        id: `user-${index}`,
+        role: "user",
+        markdown: `User message ${index + 1}: verify that a long conversation keeps its input visible.`,
+        status: "completed",
+        createdAt: now,
+      },
+      items: [{
+        id: `assistant-item-${index}`,
+        kind: "assistant_message",
+        status: "completed",
+        startedAt: now,
+        completedAt: now,
+        message: {
+          id: `assistant-${index}`,
+          role: "assistant",
+          markdown: `Assistant response ${index + 1}. This intentionally adds enough content to require internal transcript scrolling.`,
+          status: "completed",
+          createdAt: now,
+        },
+      }],
+      pendingRequestIds: [],
+      startedAt: now,
+      completedAt: now,
+      error: null,
+    }));
+
+    await page.route("**/api/codex-chat/v1/**", async (route) => {
+      const url = new URL(route.request().url());
+      const requestId = `e2e-${url.pathname}`;
+      if (url.pathname.endsWith("/events")) {
+        await route.fulfill({ status: 200, contentType: "text/event-stream", body: ": ready\n\n" });
+        return;
+      }
+      let data: unknown;
+      if (url.pathname.endsWith("/runtime")) data = runtime;
+      else if (url.pathname.endsWith("/threads")) data = { data: [thread], nextCursor: null };
+      else if (url.pathname.endsWith("/turns")) data = { data: turns, olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
+      else if (url.pathname.endsWith("/chat-long")) data = { thread, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-long/events" };
+      else {
+        await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", error: { code: "not_found", message: "Not found", retryable: false, requestId } }) });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId, data }) });
+    });
+
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/codex");
+      const transcript = page.locator(".codex-transcript");
+      const composer = page.locator(".codex-composer-wrap");
+      await expect(page.getByText("Assistant response 18.")).toBeVisible();
+      await expect(composer).toBeVisible();
+      const layout = await transcript.evaluate((element) => {
+        const transcriptRect = element.getBoundingClientRect();
+        const composerElement = document.querySelector<HTMLElement>(".codex-composer-wrap");
+        const composerRect = composerElement?.getBoundingClientRect();
+        return {
+          transcriptClientHeight: element.clientHeight,
+          transcriptScrollHeight: element.scrollHeight,
+          transcriptBottom: transcriptRect.bottom,
+          composerTop: composerRect?.top || 0,
+          composerBottom: composerRect?.bottom || 0,
+          viewportHeight: window.innerHeight,
+        };
+      });
+      expect(layout.transcriptScrollHeight).toBeGreaterThan(layout.transcriptClientHeight);
+      expect(layout.transcriptBottom).toBeLessThanOrEqual(layout.composerTop + 1);
+      expect(layout.composerBottom).toBeLessThanOrEqual(layout.viewportHeight + 1);
+      await transcript.evaluate((element) => { element.scrollTop = 0; });
+      await expect(composer).toBeVisible();
+      await expectNoPageOverflow(page);
+    }
+
+    const language = page.getByLabel("Dictation language");
+    await language.selectOption("ru-RU");
+    await page.reload();
+    await expect(language).toHaveValue("ru-RU");
+  });
+
   test("keeps agents filters, credentials drawer, create-plan drawer, and voice-link modal interactive", async ({ page }) => {
     const status = await getStatus(page);
     await page.goto("/agents");

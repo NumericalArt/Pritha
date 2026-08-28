@@ -137,7 +137,7 @@ export function Sidebar({ initialStatus }: { initialStatus: ControlCenterStatus 
       <div className="sidebar-spacer" />
 
       <div className="sidebar-language-field">
-        <label htmlFor="sidebar-language">Language</label>
+        <label htmlFor="sidebar-language">Interface language</label>
         <LanguageDropdown id="sidebar-language" ariaLabel="Sidebar interface language" />
       </div>
 
