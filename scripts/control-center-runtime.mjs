@@ -633,6 +633,14 @@ async function stopService() {
 }
 
 function installService() {
+  const state = readJson(statePath);
+  const ownership = listenerOwnership(state);
+  if (ownership.listenerPids.length) {
+    if (!ownership.ownerMatch) throw new Error("owner_mismatch:configured_port_already_has_a_listener");
+    const currentService = launchdStatus();
+    if (currentService.loaded) return { installed: true, loaded: true, alreadyRunning: true, label };
+    throw new Error("runtime_already_running_outside_launchd");
+  }
   const privatePlist = writePrivatePlist();
   prepareLaunchdLogs();
   mkdirSync(path.dirname(installedPlistPath), { recursive: true, mode: 0o700 });

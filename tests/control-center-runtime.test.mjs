@@ -150,6 +150,23 @@ test("runtime refuses to stop a listener that lacks the exact instance ownership
   }
 });
 
+test("runtime refuses to install over an unowned listener", () => {
+  const item = fixture();
+  try {
+    const foreignLsof = path.join(item.fakeBin, "foreign-lsof");
+    executable(foreignLsof, "#!/bin/sh\nprintf '99999\\n'\n");
+    item.env.PRITHA_LSOF_BINARY = foreignLsof;
+    const result = invoke(item, "install", ["--yes"]);
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.code, "owner_mismatch");
+    assert.equal(existsSync(item.launchctlLog), false);
+    assert.equal(existsSync(path.join(item.testHome, "Library", "LaunchAgents", "com.numericalart.pritha.control-center.main.plist")), false);
+  } finally {
+    rmSync(item.directory, { recursive: true, force: true });
+  }
+});
+
 test("five rapid process exits open the circuit until an explicit start clears it", () => {
   const item = fixture();
   try {

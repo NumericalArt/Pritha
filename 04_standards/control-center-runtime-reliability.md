@@ -86,6 +86,11 @@ An operation that cannot prove the complete owner returns `owner_mismatch` and
 does not signal the process. Occupying the expected port is never sufficient
 proof of ownership. Locks are private and scoped to one state-root.
 
+Installation also refuses to load a competing service over an unowned
+listener. A legacy terminal-launched process may be removed only as a one-time,
+separately approved migration after its process group, cwd, port and checkout
+identity have all been verified read-only.
+
 ## Restart boundary
 
 launchd may restart the wrapper only after the process exits. HTTP failures,

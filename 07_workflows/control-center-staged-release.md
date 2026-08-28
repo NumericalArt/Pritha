@@ -103,6 +103,21 @@ Do not modify legacy `com.techscope.web` or Telegram jobs as part of this
 workflow. Do not add cron, heartbeat, a network health watchdog, Funnel or
 public exposure.
 
+## First manager adoption
+
+`install --yes` fails closed with `owner_mismatch` when the configured port is
+already held by a process that has no valid manager state. It must not install
+or load a competing launchd job.
+
+For a one-time transition from an old terminal-launched Control Center, collect
+read-only evidence for the exact listener PID, process group, Control Center
+working directory, configured port and the checkout root reported by the old
+`/api/status`. Stopping that exact verified legacy process group requires a
+separate immediate operator approval. A port number by itself is never enough.
+After it exits, confirm that the port is free, install the new instance service,
+and continue the staged transaction. This migration exception does not become
+a supported production lifecycle path.
+
 ## Release gates
 
 Before apply and again after a successful instance/fleet release, require:
