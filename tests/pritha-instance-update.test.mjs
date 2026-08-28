@@ -53,6 +53,9 @@ const pidPath = path.join(stateRoot, "setup", "fixture-runtime.pid");
 const readPid = () => existsSync(pidPath) ? Number(readFileSync(pidPath, "utf8")) : null;
 if (action === "start") {
   mkdirSync(path.dirname(pidPath), { recursive: true });
+  const codexChatRoot = path.join(stateRoot, "codex-chat");
+  mkdirSync(codexChatRoot, { recursive: true });
+  writeFileSync(path.join(codexChatRoot, "registry.audit.jsonl"), "fixture audit event\\n");
   const child = spawn("npm", ["--prefix", "interfaces/control-center", "run", "start"], {
     cwd: process.env.TECHSCOPE_ROOT,
     env: process.env,

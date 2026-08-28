@@ -116,6 +116,7 @@ const CHILD_PROJECT_EXCLUDED_DIRECTORIES = new Set([
 const PROTECTED_STATE_EXCLUDED_DIRECTORIES = new Set([
   "audit",
   "cache",
+  "codex-chat",
   "logs",
   "memory",
   "private",
