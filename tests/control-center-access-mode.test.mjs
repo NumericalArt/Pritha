@@ -95,6 +95,14 @@ test("Control Center carries served agent Tailscale links into agent cards", () 
   assert.match(agentsPageSource, /tailscaleUrl: agent\.url\.tailscale/);
 });
 
+test("Control Center bounds and caches read-only Tailscale probes", () => {
+  assert.match(controlCenterServerSource, /const TAILSCALE_PROBE_TIMEOUT_MS = 1_500/);
+  assert.match(controlCenterServerSource, /const ACCESS_LINKS_CACHE_MS = 30_000/);
+  assert.match(controlCenterServerSource, /timeout: TAILSCALE_PROBE_TIMEOUT_MS/g);
+  assert.match(controlCenterServerSource, /accessLinksCache\?\.key === cacheKey/);
+  assert.match(controlCenterServerSource, /expiresAt: now \+ ACCESS_LINKS_CACHE_MS/);
+});
+
 test("Settings Tailscale guidance uses the current instance port", () => {
   assert.match(settingsSource, /new URL\(access\?\.localhost/);
   assert.match(settingsSource, /--port \$\{controlCenterPort\}/);

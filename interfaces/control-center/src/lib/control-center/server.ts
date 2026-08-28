@@ -245,6 +245,9 @@ const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
 const APP_HOST = process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1";
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
+const TAILSCALE_PROBE_TIMEOUT_MS = 1_500;
+const ACCESS_LINKS_CACHE_MS = 30_000;
+let accessLinksCache: { key: string; expiresAt: number; value: AccessLinkState } | null = null;
 
 function slug(value: string) {
   return value
@@ -310,7 +313,7 @@ function tailscaleSelfDnsName() {
   const result = spawnSync("tailscale", ["status", "--json"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    timeout: 5_000,
+    timeout: TAILSCALE_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0 || !result.stdout.trim()) return undefined;
   try {
@@ -325,7 +328,7 @@ function tailscaleServeStatusOutput() {
   const result = spawnSync("tailscale", ["serve", "status"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    timeout: 5_000,
+    timeout: TAILSCALE_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0) return "";
   return result.stdout;
@@ -335,7 +338,7 @@ function tailscaleServeStatusJson() {
   const result = spawnSync("tailscale", ["serve", "status", "--json"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    timeout: 5_000,
+    timeout: TAILSCALE_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0 || !result.stdout.trim()) return null;
   try {
@@ -364,6 +367,9 @@ function canonicalTailscaleServeConfigured(dnsName: string, serveStatus: string)
 }
 
 function accessLinks(): AccessLinkState {
+  const cacheKey = `${APP_PORT}:${process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || "auto"}`;
+  const now = Date.now();
+  if (accessLinksCache?.key === cacheKey && accessLinksCache.expiresAt > now) return accessLinksCache.value;
   const lanIp = firstLanIPv4();
   const lanReady = false;
   const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || tailscaleSelfDnsName();
@@ -375,7 +381,7 @@ function accessLinks(): AccessLinkState {
   const explicitConfigured = explicitTailscaleUrl ? tailscaleServeConfigured(explicitTailscaleUrl, serveStatus) : false;
   const tailscaleUrl = canonicalConfigured ? canonicalTailscaleUrl : explicitTailscaleUrl;
   const serveConfigured = canonicalConfigured || explicitConfigured;
-  return {
+  const value: AccessLinkState = {
     localhost: `http://127.0.0.1:${APP_PORT}`,
     lanUrl: lanIp ? `http://${lanIp}:${APP_PORT}` : undefined,
     lanReady,
@@ -387,6 +393,8 @@ function accessLinks(): AccessLinkState {
     tailscaleDnsName: dnsName,
     tailscaleServeStatusJson: serveStatusJson,
   };
+  accessLinksCache = { key: cacheKey, expiresAt: now + ACCESS_LINKS_CACHE_MS, value };
+  return value;
 }
 
 function appStatus() {
