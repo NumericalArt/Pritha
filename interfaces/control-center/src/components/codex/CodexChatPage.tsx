@@ -117,6 +117,23 @@ function relativeTime(value: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
+async function loadThreadGroup(group: ChatGroup) {
+  const rows: ThreadSummary[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: string | null = null;
+  for (let page = 0; page < 20; page += 1) {
+    const query = new URLSearchParams({ group, limit: "50" });
+    if (cursor) query.set("cursor", cursor);
+    const response = await api<ThreadPage>(`/api/codex-chat/v1/threads?${query.toString()}`);
+    rows.push(...response.data.data.filter((thread) => thread.group === group));
+    cursor = response.data.nextCursor;
+    if (!cursor) return rows;
+    if (seenCursors.has(cursor)) throw new Error("Task Chat history returned a repeated cursor.");
+    seenCursors.add(cursor);
+  }
+  throw new Error("Task Chat history exceeds the safe pagination limit.");
+}
+
 function upsertTurn(rows: TurnView[], turn: TurnView) {
   const index = rows.findIndex((row) => row.turnId === turn.turnId);
   if (index < 0) return [...rows, turn].sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt));
@@ -272,9 +289,8 @@ export function CodexChatPage() {
   }, []);
 
   const refreshThreads = useCallback(async () => {
-    const response = await api<ThreadPage>("/api/codex-chat/v1/threads?limit=50");
-    setThreads(response.data.data);
-    const groupRows = response.data.data.filter((thread) => thread.group === activeGroup);
+    const groupRows = await loadThreadGroup(activeGroup);
+    setThreads((current) => [...current.filter((thread) => thread.group !== activeGroup), ...groupRows]);
     setSelectedChatId((current) => {
       const requested = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chat") : null;
       const next = [requested, current, selectedByGroupRef.current[activeGroup], groupRows[0]?.chatId]
@@ -282,7 +298,7 @@ export function CodexChatPage() {
       selectedByGroupRef.current[activeGroup] = next;
       return next;
     });
-    return response.data.data;
+    return groupRows;
   }, [activeGroup]);
 
   useEffect(() => {

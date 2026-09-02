@@ -239,13 +239,22 @@ test.describe("Control Center UI regression", () => {
     const base = { preview: "", status: "idle", activeFlags: [], pinned: false, archived: false, historyKind: "native", createdAt: now, updatedAt: now, runtime: { providerId: "desktop_bundled", version: "test", protocol: "app_server", stateIdentityHash: "test", compatibility: "bound" } };
     const direct = { ...base, chatId: "chat-direct", title: "Direct example", group: "my_chats", origin: "chat", taskLinks: [], continuationState: "continuation_enabled" };
     const voice = () => ({ ...base, chatId: "chat-voice", title: "Voice example", group: "voice_work", origin: "voice", taskLinks: [{ taskId: "task-one", shortId: "ONE", label: "Voice task", origin: "voice", mode: continuationEnabled ? "shared_thread" : "result_reference", subjectScope: { kind: "pritha", id: "pritha", label: "Pritha", generation: 1 }, status: "complete", linkedAt: now }], continuationState: continuationEnabled ? "continuation_enabled" : "read_only" });
+    const secondVoice = { ...voice(), chatId: "chat-voice-second", title: "Voice pagination example", taskLinks: [{ ...voice().taskLinks[0], taskId: "task-two", shortId: "TWO" }] };
     await page.route("**/api/codex-chat/v1/**", async (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith("/events")) return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": ready\n\n" });
       if (route.request().method() === "POST" && url.pathname.endsWith("/task-links")) continuationEnabled = true;
       let data: unknown;
       if (url.pathname.endsWith("/runtime")) data = runtime;
-      else if (url.pathname.endsWith("/threads")) data = { data: [direct, voice()], nextCursor: null };
+      else if (url.pathname.endsWith("/threads")) {
+        const group = url.searchParams.get("group");
+        const cursor = url.searchParams.get("cursor");
+        data = group === "voice_work"
+          ? cursor === "voice-page-2"
+            ? { data: [secondVoice], nextCursor: null }
+            : { data: [voice()], nextCursor: "voice-page-2" }
+          : { data: [direct], nextCursor: null };
+      }
       else if (url.pathname.endsWith("/turns")) data = { data: [], olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
       else if (url.pathname.endsWith("/chat-direct")) data = { thread: direct, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-direct/events", continuationState: "continuation_enabled" };
       else if (url.pathname.endsWith("/chat-voice") || url.pathname.endsWith("/task-links")) data = { thread: voice(), activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-voice/events", continuationState: continuationEnabled ? "continuation_enabled" : "read_only" };
@@ -258,6 +267,7 @@ test.describe("Control Center UI regression", () => {
     await expect(page.getByText("Voice example")).toHaveCount(0);
     await page.getByRole("tab", { name: "Voice Tasks" }).click();
     await expect(page.getByRole("button", { name: /Voice example/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Voice pagination example/ })).toBeVisible();
     await page.getByRole("button", { name: /Voice example/ }).click();
     await expect(page.getByRole("button", { name: "Continue in Task Chat" })).toBeVisible();
     await page.getByRole("button", { name: "Continue in Task Chat" }).click();
