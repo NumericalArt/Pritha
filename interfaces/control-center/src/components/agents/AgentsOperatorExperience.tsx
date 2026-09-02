@@ -119,7 +119,7 @@ function executionLabel(plan?: ControlCenterOperatorActionPlan) {
   if (!plan) return "Plan only";
   if (plan.control.executionMode === "executable") return "Executable";
   if (plan.control.executionMode === "manual_only") return "Manual only";
-  if (plan.control.executionMode === "codex_plan") return "Codex plan";
+  if (plan.control.executionMode === "codex_plan") return "Task Chat plan";
   if (plan.control.executionMode === "unavailable") return "Unavailable";
   return "Plan only";
 }
@@ -143,7 +143,7 @@ function secretProviderLabel(definition: ControlCenterSecretDefinition) {
   if (definition.provider === "telegram") return "Telegram";
   if (definition.provider === "anthropic") return "Anthropic";
   if (definition.provider === "whatsapp") return "WhatsApp";
-  if (definition.provider === "codex_external") return "Codex external";
+  if (definition.provider === "codex_external") return "External task runtime";
   return "Generic";
 }
 
@@ -729,7 +729,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
               </div>
               <div className="operator-safety-note muted">
                 <Activity size={17} />
-                <span>Codex App/CLI auth stays external. Do not paste Codex subscription credentials here.</span>
+                <span>Task runtime authentication stays external. Do not paste subscription credentials here.</span>
               </div>
             </section>
 
@@ -748,14 +748,14 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
 
       {createPlanOpen ? (
         <div className="operator-action-overlay" role="presentation" onMouseDown={(event) => (event.target === event.currentTarget ? setCreatePlanOpen(false) : undefined)}>
-          <aside className="operator-action-panel create-plan-panel" aria-label="Open in Codex / Create Plan">
+          <aside className="operator-action-panel create-plan-panel" aria-label="Open in Task Chat / Create Plan">
             <div className="operator-action-header">
               <div className="operator-action-icon check">
                 <ExternalLink size={18} />
               </div>
               <div>
                 <span>Planning Handoff</span>
-                <h2>Open in Codex / Create Plan</h2>
+                <h2>Open in Task Chat / Create Plan</h2>
               </div>
               <button className="icon-button" type="button" aria-label="Close create plan panel" onClick={() => setCreatePlanOpen(false)}>
                 <X size={18} />
@@ -775,7 +775,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
               <h3>Safety</h3>
               <div className="operator-safety-note">
                 <ShieldCheck size={17} />
-                <span>Codex prepares a plan or manifest proposal. Runtime actions require later confirmation.</span>
+                <span>Task Chat prepares a plan or manifest proposal. Runtime actions require later confirmation.</span>
               </div>
             </section>
 

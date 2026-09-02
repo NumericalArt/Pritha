@@ -94,7 +94,7 @@ export function MobileAgents({
         {agents.map((agent) => (
           <AgentCard agent={agent} access={access} accessMode={accessMode} mobile key={agent.id} onAction={onAgentAction} onCredentials={onAgentCredentials} />
         ))}
-        <button className="mobile-add-agent-card" type="button" onClick={onCreatePlan} title="Open a safe Codex planning handoff">
+        <button className="mobile-add-agent-card" type="button" onClick={onCreatePlan} title="Open a safe Task Chat planning handoff">
           + Create Plan
         </button>
       </div>

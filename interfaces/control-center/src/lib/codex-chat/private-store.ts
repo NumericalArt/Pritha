@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { appendPrivateAuditEvent, atomicWritePrivateJson } from "@/lib/private-json";
-import type { RuntimeProviderId, TaskLinkView, ThreadStatus } from "./types";
+import type { RuntimeProviderId, TaskLinkView, ThreadGroup, ThreadOrigin, ThreadStatus } from "./types";
 
 export type MessageReceipt = {
   clientMessageId: string;
@@ -18,6 +18,11 @@ export type ChatBinding = {
   createHash: string;
   nativeThreadId: string;
   providerId: RuntimeProviderId;
+  stateIdentityHash: string | null;
+  group: ThreadGroup;
+  origin: ThreadOrigin;
+  continuationEnabled: boolean;
+  continuationEnabledAt: string | null;
   title: string;
   preview: string;
   createdAt: string;
@@ -60,7 +65,12 @@ function normalizeBinding(value: unknown): ChatBinding | null {
     createHash: String(row.createHash || ""),
     nativeThreadId: String(row.nativeThreadId),
     providerId: row.providerId,
-    title: String(row.title || "New Codex chat").slice(0, 120),
+    stateIdentityHash: typeof row.stateIdentityHash === "string" ? row.stateIdentityHash : null,
+    group: row.group === "voice_work" || row.group === "other_sessions" ? row.group : "my_chats",
+    origin: row.origin === "voice" || row.origin === "external" || row.origin === "exec_fallback" ? row.origin : "chat",
+    continuationEnabled: row.continuationEnabled === true || (row.group == null && row.origin == null),
+    continuationEnabledAt: typeof row.continuationEnabledAt === "string" ? row.continuationEnabledAt : null,
+    title: String(row.title || "New task chat").slice(0, 120),
     preview: String(row.preview || "").slice(0, 500),
     createdAt,
     updatedAt: String(row.updatedAt || createdAt),
@@ -98,7 +108,7 @@ async function readOptional(filePath: string) {
 export class CodexChatRegistryError extends Error {
   readonly code = "codex_chat_registry_corrupt";
   constructor() {
-    super("Codex Chat history bindings are temporarily read-only because the private registry is damaged.");
+    super("Task Chat history bindings are temporarily read-only because the private registry is damaged.");
   }
 }
 
@@ -132,6 +142,11 @@ export class CodexChatPrivateStore {
   async findByClientThreadId(clientThreadId: string) {
     const rows = await this.all();
     return rows.find((row) => row.clientThreadId === clientThreadId) || null;
+  }
+
+  async findByTaskId(taskId: string) {
+    const rows = await this.all();
+    return rows.find((row) => row.taskLinks.some((link) => link.taskId === taskId)) || null;
   }
 
   async recordRuntimeEvent(event: string, detail: Record<string, unknown>) {

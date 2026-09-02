@@ -64,6 +64,12 @@ export type ThreadGroup = "my_chats" | "voice_work" | "other_sessions";
 export type ThreadOrigin = "chat" | "voice" | "external" | "exec_fallback";
 export type HistoryKind = "native" | "mirrored" | "task_only";
 export type ThreadStatus = "not_loaded" | "idle" | "active" | "system_error" | "archived";
+export type ThreadContinuationState =
+  | "read_only"
+  | "continuation_enabled"
+  | "blocked_active_turn"
+  | "blocked_runtime_mismatch"
+  | "blocked_history_unavailable";
 
 export type RuntimeBindingView = {
   providerId: RuntimeProviderId | null;
@@ -104,6 +110,7 @@ export type ThreadSummary = {
   updatedAt: string;
   runtime: RuntimeBindingView;
   taskLinks: TaskLinkView[];
+  continuationState: ThreadContinuationState;
 };
 
 export type TurnStatus =
@@ -182,6 +189,12 @@ export type ThreadDetail = {
   activeTurnId: string | null;
   pendingRequests: PendingRequestView[];
   streamUrl: string;
+  continuationState: ThreadContinuationState;
+};
+
+export type CreateTaskLinkRequest = {
+  taskId: string;
+  mode: "shared_thread" | "result_reference";
 };
 
 export type ThreadPage = {

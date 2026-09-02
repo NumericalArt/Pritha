@@ -6,6 +6,7 @@ import path from "node:path";
 import readline from "node:readline";
 import type { CodexAppThreadRoutingMode, CodexReasoningEffort, CodexServiceTier } from "../pritha-runtime";
 import { codexAppTurnSettings } from "../../settings/codex-model-catalog";
+import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "../../codex-chat/native-turn-coordinator";
 import type { PrithaCodexTaskClient, PrithaCodexTaskPayload, PrithaCodexTaskRunOptions, PrithaCodexThreadScope, PrithaCodexThreadScopeKind } from "./types";
 
 type RpcMessage = {
@@ -110,6 +111,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     const startedAt = Date.now();
     let target: CodexAppThreadTarget | null = null;
     let turnId = "";
+    let releaseTurnLease: (() => void) | null = null;
     const emitProgress = async (phase: string, message: string, extra: Record<string, unknown> = {}) => {
       await options.onProgress?.({
         timestamp: new Date().toISOString(),
@@ -157,10 +159,14 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       await emitProgress("thread_resolved", "Codex App task thread resolved.", {
         thread_id: target.threadId,
         thread_name: target.threadName,
+        provider_id: this.codexBin.includes(".app/Contents/Resources/codex") ? "desktop_bundled" : "standalone_cli",
         thread_role: target.role,
         thread_scope: target.scope,
         routing_mode: target.routingMode,
       });
+      const providerId = this.codexBin.includes(".app/Contents/Resources/codex") ? "desktop_bundled" : "standalone_cli";
+      releaseTurnLease = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(providerId, target.threadId), `voice:${payload.requestId}`);
+      if (!releaseTurnLease) throw new Error("The task thread already has an active turn. Retry this Voice task after it finishes.");
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
       throwIfAborted(options.signal);
       const runtimeSettings = this.getRuntimeSettings?.();
@@ -215,6 +221,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       }
       throw error;
     } finally {
+      releaseTurnLease?.();
       options.signal?.removeEventListener("abort", abortHandler);
       connection.close();
     }

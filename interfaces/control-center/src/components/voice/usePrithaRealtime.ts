@@ -472,12 +472,12 @@ function formatVoiceIntakeClarificationPrompt(metadata: VoiceIntakeClarification
     "Detected links:",
     links,
     "",
-    "Attached file metadata only; file bytes are still local in the browser and have not been uploaded to Codex:",
+    "Attached file metadata only; file bytes are still local in the browser and have not been sent to the task runtime:",
     files,
     "",
-    "Ask the operator in Russian what to do with this intake before Codex runs.",
+    "Ask the operator in Russian what to do with this intake before the task runtime runs.",
     hasAudioFiles
-      ? "Audio files are present. Offer the Local Folder option: import supported audio files into the Music Local Folder library for playback in Music mode. If the operator chooses it, call confirm_voice_intake with intent=music_local_folder; do not upload those audio files to Codex."
+      ? "Audio files are present. Offer the Local Folder option: import supported audio files into the Music Local Folder library for playback in Music mode. If the operator chooses it, call confirm_voice_intake with intent=music_local_folder; do not send those audio files to the task runtime."
       : "",
     "Offer concise options when useful: quick analysis for this conversation, extract important ideas as a Pritha memory candidate, prepare context for a specific child agent, transcribe/summarize video or audio, research/cite sources, import audio to Music Local Folder when audio is present, or cancel.",
     "Clarify whether pasted text is an instruction, context, or content to analyze when that is ambiguous.",
@@ -608,7 +608,7 @@ function buildRealtimeSessionSection(sessionId: string, events: VoiceSessionEven
     recentEvents
       .filter((event) => event.kind !== "user")
       .map((event) => {
-        const label = event.kind === "assistant" ? "Pritha" : event.kind === "task" ? "Codex task" : event.kind;
+        const label = event.kind === "assistant" ? "Pritha" : event.kind === "task" ? "Voice task" : event.kind;
         return `${label}: ${stickyText(event.text, 170)}`;
       }),
     4,
@@ -618,7 +618,7 @@ function buildRealtimeSessionSection(sessionId: string, events: VoiceSessionEven
     [
       userIntents.length ? `Operator asked/discussed: ${userIntents.join("; ")}` : "",
       keyPoints.length ? `Session signals: ${keyPoints.slice(0, 2).join("; ")}` : "",
-      activeTask?.title ? `Recent Codex context: ${activeTask.title} (${activeTask.status || "unknown"}).` : "",
+      activeTask?.title ? `Recent task context: ${activeTask.title} (${activeTask.status || "unknown"}).` : "",
     ].filter(Boolean).join(" "),
     420,
   ) || "No spoken Realtime session content captured yet.";
@@ -632,7 +632,7 @@ function buildRealtimeSessionSection(sessionId: string, events: VoiceSessionEven
     nextStep: latestUserIntent
       ? stickyText(`Continue from operator intent: ${latestUserIntent}`, 220)
       : activeTask?.title
-        ? stickyText(`Continue around latest Codex task: ${activeTask.title}`, 220)
+        ? stickyText(`Continue around latest Voice task: ${activeTask.title}`, 220)
         : "Ask the operator what to continue.",
   };
 }
@@ -866,7 +866,7 @@ function usePrithaRealtimeController() {
         shortId: task.shortId || existing?.shortId,
         title: task.title || task.id,
         status: task.status || existing?.status || "queued",
-        summary: task.summary || existing?.summary || "Codex task queued.",
+        summary: task.summary || existing?.summary || "Voice task queued.",
         progress: typeof task.progress === "number" ? task.progress : existing?.progress || 0,
         progressDetail: task.progressDetail || existing?.progressDetail,
         createdAt: task.createdAt || existing?.createdAt || timestamp,
@@ -1079,7 +1079,7 @@ function usePrithaRealtimeController() {
       pending.handlers.status?.("awaiting_instruction");
       appendSessionEvent(
         "system",
-        `Voice intake ${pending.metadata.intakeId} is waiting for spoken clarification before Codex upload.`,
+        `Voice intake ${pending.metadata.intakeId} is waiting for spoken clarification before task-runtime upload.`,
       );
       logClientEvent("voice_intake_clarification_prompt_sent", {
         intake_id: pending.metadata.intakeId,
@@ -1274,20 +1274,20 @@ function usePrithaRealtimeController() {
       );
       const confirmedAccesses = uniqueLimited(
         [
-          snapshot?.approval?.status === "approved" || activeTask?.approval?.status === "approved" ? "UI approval recorded for current Codex task" : undefined,
-          snapshot?.approval?.status === "rejected" || activeTask?.approval?.status === "rejected" ? "UI rejection recorded for current Codex task" : undefined,
-          snapshot?.codex_app_thread_routing_mode || activeTask?.threadRoutingMode ? `Codex App routing: ${snapshot?.codex_app_thread_routing_mode || activeTask?.threadRoutingMode}` : undefined,
+          snapshot?.approval?.status === "approved" || activeTask?.approval?.status === "approved" ? "UI approval recorded for current Voice task" : undefined,
+          snapshot?.approval?.status === "rejected" || activeTask?.approval?.status === "rejected" ? "UI rejection recorded for current Voice task" : undefined,
+          snapshot?.codex_app_thread_routing_mode || activeTask?.threadRoutingMode ? `Task-thread routing: ${snapshot?.codex_app_thread_routing_mode || activeTask?.threadRoutingMode}` : undefined,
         ],
         5,
       );
 	      const nextStep = statusText === "aborted"
-	        ? "The Codex task was aborted by the operator; ask what to do next only if needed."
+	        ? "The Voice task was aborted by the operator; ask what to do next only if needed."
 	        : snapshot?.complete || isTerminalCodexTaskStatus(statusText)
-	        ? "Review the terminal Codex result and continue only if the operator asks."
+	        ? "Review the terminal task result and continue only if the operator asks."
         : statusText === "waiting_for_operator"
-          ? "Ask the operator for the pending answer, then resume the same Codex task."
+          ? "Ask the operator for the pending answer, then resume the same Voice task."
           : statusText === "decision_required"
-            ? "Wait for the UI decision gate before continuing the Codex task."
+            ? "Wait for the UI decision gate before continuing the Voice task."
             : "Continue the current voice task from the latest saved step.";
       const latestRealtimeSession = buildRealtimeSessionSection(sessionIdRef.current, sessionSnapshot, activeTask);
       const latestCodexTask = {
@@ -1302,7 +1302,7 @@ function usePrithaRealtimeController() {
             activeTask?.lastActivity ||
             activeTask?.resultExcerpt ||
             activeTask?.summary ||
-            "No Codex task result captured.",
+            "No task result captured.",
           320,
         ),
         refs: keyRefs.slice(0, 4),
@@ -1444,14 +1444,14 @@ function usePrithaRealtimeController() {
       const summary = operatorBrief
         ? operatorBrief
         : terminal
-        ? resultText || voiceFeedbackText || (failed ? "Codex task failed. Open task logs for details." : "Codex task completed.")
+        ? resultText || voiceFeedbackText || (failed ? "Voice task failed. Open task logs for details." : "Voice task completed.")
         : voiceFeedbackText
           ? voiceFeedbackText
         : decisionRequired
           ? snapshot.approval?.summary || "Waiting for operator approval in Pritha UI."
         : snapshot.paths?.status
-          ? `Codex task ${statusText}. Status: ${snapshot.paths.status}`
-          : `Codex task ${statusText}.`;
+          ? `Voice task ${statusText}. Status: ${snapshot.paths.status}`
+          : `Voice task ${statusText}.`;
 
       upsertCodexTask({
         id: snapshot.task_id,
@@ -1495,8 +1495,8 @@ function usePrithaRealtimeController() {
       if (recordSessionEvent && terminal && snapshot.task_id && !sessionLoggedCodexTaskResultsRef.current.has(snapshot.task_id)) {
         sessionLoggedCodexTaskResultsRef.current.add(snapshot.task_id);
         const eventText = operatorBrief || resultText || voiceFeedbackText || displayTaskId;
-        addTranscript("tool", `Codex task ${statusText}: ${eventText.slice(0, 900)}`);
-        appendSessionEvent("task", `Codex task ${displayTaskId} ${statusText}${eventText ? `: ${eventText.slice(0, 900)}` : ""}`, {
+        addTranscript("tool", `Voice task ${statusText}: ${eventText.slice(0, 900)}`);
+        appendSessionEvent("task", `Voice task ${displayTaskId} ${statusText}${eventText ? `: ${eventText.slice(0, 900)}` : ""}`, {
           taskId: snapshot.task_id,
           status: statusText,
         });
@@ -1557,11 +1557,11 @@ function usePrithaRealtimeController() {
         `Update reason: ${reason}`,
         "Use this as pinned context for the live operator dialogue. Prefer the operator's newest direct instruction over older context.",
         `Session journal events: ${sessionEvents.length}`,
-        `Visible Codex tasks: ${visibleTasks.length}; active Codex tasks: ${activeTasks.length}`,
+        `Visible Voice tasks: ${visibleTasks.length}; active tasks: ${activeTasks.length}`,
       ];
 
       if (visibleTasks.length) {
-        lines.push("", "Codex task state:");
+        lines.push("", "Voice task state:");
         for (const task of visibleTasks) {
           const result = stickyText(task.latestVoiceFeedback?.voice_text || task.operatorBrief || task.summary || task.resultExcerpt, 260);
           lines.push(
@@ -1649,8 +1649,8 @@ function usePrithaRealtimeController() {
       const displayTaskId = snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id;
       const message =
         approvalStatus === "approved"
-          ? `UI approval received for Codex task ${displayTaskId}. Status is now ${statusText}. Briefly acknowledge only that approve was received and the Codex task started.`
-          : `UI rejection received for Codex task ${displayTaskId}. Status is now ${statusText}. Briefly acknowledge only that the Codex task was rejected.`;
+          ? `UI approval received for Voice task ${displayTaskId}. Status is now ${statusText}. Briefly acknowledge only that approval was received and the task started.`
+          : `UI rejection received for Voice task ${displayTaskId}. Status is now ${statusText}. Briefly acknowledge only that the task was rejected.`;
       appendSessionEvent("task", message, { taskId: snapshot.task_id, status: statusText });
       queueRollingSummaryCheckpoint(approvalStatus === "approved" ? "codex_task_approval_received" : "codex_task_rejected", {
         snapshot,
@@ -1726,7 +1726,7 @@ function usePrithaRealtimeController() {
             operatorBrief ||
             voiceFeedbackText ||
             (snapshot.status?.startsWith("failed")
-              ? `Codex sidecar task ${displayTaskId} finished with status ${snapshot.status}. Open the task card for details.`
+              ? `Voice task ${displayTaskId} finished with status ${snapshot.status}. Open the task card for details.`
               : "");
           const channelState = channel?.readyState || "missing";
           const responseBusy = responseInProgressRef.current || processingToolBatchRef.current;
@@ -1748,7 +1748,7 @@ function usePrithaRealtimeController() {
                   content: [
                     {
                       type: "input_text",
-                      text: `Codex sidecar task ${displayTaskId} finished with status ${snapshot.status || "complete"}.\n\nResult:\n${handoffText}`,
+                      text: `Voice task ${displayTaskId} finished with status ${snapshot.status || "complete"}.\n\nResult:\n${handoffText}`,
                     },
                   ],
                 },
@@ -1800,7 +1800,7 @@ function usePrithaRealtimeController() {
                     content: [
                       {
                         type: "input_text",
-                        text: `Codex sidecar task ${snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id} progress update.\n\nStatus:\n${progressText}`,
+                        text: `Voice task ${snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id} progress update.\n\nStatus:\n${progressText}`,
                       },
                     ],
                   },
@@ -1821,12 +1821,12 @@ function usePrithaRealtimeController() {
 
       const timer = window.setInterval(() => {
         void poll().catch((err) => {
-          setToolStatus(err instanceof Error ? err.message : "Could not poll Codex task");
+          setToolStatus(err instanceof Error ? err.message : "Could not poll Voice task");
         });
       }, 4_000);
       codexTaskPollTimersRef.current.set(safeTaskId, timer);
       void poll().catch((err) => {
-        setToolStatus(err instanceof Error ? err.message : "Could not poll Codex task");
+        setToolStatus(err instanceof Error ? err.message : "Could not poll Voice task");
       });
     },
     [applyCodexTaskSnapshot, clearCodexTaskPolling, logClientEvent, refreshCodexTask, requestResponse, sendCodexTaskApprovalHandoff, sendStickyContext, upsertCodexTask],
@@ -1913,7 +1913,7 @@ function usePrithaRealtimeController() {
         queueRollingSummaryCheckpoint("voice_intake_submitted", { task: nextTask });
       }
 
-      appendSessionEvent("task", `Voice intake ${confirmedIntakeId} handled${taskId ? ` by Codex as ${taskId}` : ""}.`, {
+      appendSessionEvent("task", `Voice intake ${confirmedIntakeId} handled${taskId ? ` as task ${taskId}` : ""}.`, {
         taskId: taskId || undefined,
         status: String(output.status || output.mode || "submitted"),
       });
@@ -1964,10 +1964,10 @@ function usePrithaRealtimeController() {
             shortId: typeof output.short_id === "string" ? output.short_id : undefined,
             title: taskId,
             status: String(output.status || output.mode || "queued"),
-            summary: String(output.operator_note || "Codex handoff created."),
+            summary: String(output.operator_note || "Task handoff created."),
             progress: output.status === "running" ? 35 : 10,
             phase: String(output.status || output.mode || "queued"),
-            lastActivity: String(output.operator_note || "Codex handoff created."),
+            lastActivity: String(output.operator_note || "Task handoff created."),
             operatorBrief: String(output.operator_note || ""),
             resultPath: typeof output.result_path === "string" ? output.result_path : undefined,
             statusPath: typeof output.status_path === "string" ? output.status_path : undefined,
@@ -2324,7 +2324,7 @@ function usePrithaRealtimeController() {
       handlers.status?.(phase === "idle" || phase === "error" ? "starting_voice" : "awaiting_instruction");
       appendSessionEvent(
         "system",
-        `Voice intake ${metadata.intakeId} prepared for spoken clarification before Codex upload.`,
+        `Voice intake ${metadata.intakeId} prepared for spoken clarification before task-runtime upload.`,
       );
       logClientEvent("voice_intake_clarification_started", {
         intake_id: metadata.intakeId,

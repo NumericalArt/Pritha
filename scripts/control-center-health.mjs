@@ -2,7 +2,7 @@
 
 import process from "node:process";
 
-const DEFAULT_PAGES = ["/voice", "/agents", "/codex", "/settings"];
+const DEFAULT_PAGES = ["/voice", "/agents", "/task-chat", "/codex", "/settings"];
 
 function parseArgs(argv) {
   const out = { _: [] };

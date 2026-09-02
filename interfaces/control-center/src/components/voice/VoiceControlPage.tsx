@@ -69,6 +69,12 @@ type CodexTaskDetail = {
   continuation?: Record<string, unknown> | null;
   codex_app_thread_routing_mode?: string;
   paths?: Record<string, string>;
+  task_chat?: {
+    chatId: string;
+    href: string;
+    historyAvailable: boolean;
+    continuationState: string;
+  } | null;
   error?: string;
 };
 
@@ -234,8 +240,8 @@ const ACTIVE_TOOL_DETAILS: Record<string, ActiveToolDetail> = {
     summary: "Reads safe project files, folder trees, and text search results without changing the filesystem.",
   },
   inspect_codex_task: {
-    label: "Inspect Codex Task",
-    summary: "Checks Codex sidecar task status, progress, approvals, stale state, and failure details.",
+    label: "Inspect Voice Task",
+    summary: "Checks task status, progress, approvals, stale state, and failure details.",
   },
   recall_rolling_summary: {
     label: "Rolling Summary",
@@ -246,16 +252,16 @@ const ACTIVE_TOOL_DETAILS: Record<string, ActiveToolDetail> = {
     summary: "Captures positive operator acceptance as a private Good State Alignment signal.",
   },
   answer_codex_task: {
-    label: "Answer Codex Task",
-    summary: "Sends your spoken answer back to a Codex task that is waiting for clarification.",
+    label: "Answer Voice Task",
+    summary: "Sends your spoken answer back to a task that is waiting for clarification.",
   },
   run_codex_task: {
-    label: "Run Codex Task",
-    summary: "Starts or queues deeper Codex work for implementation, research, review, or repo analysis.",
+    label: "Run Voice Task",
+    summary: "Starts or queues deeper task work for implementation, research, review, or repo analysis.",
   },
   confirm_voice_intake: {
     label: "Confirm Voice Intake",
-    summary: "Confirms, cancels, or clarifies pasted files and links before uploading them to Codex.",
+    summary: "Confirms, cancels, or clarifies pasted files and links before sending them to the task runtime.",
   },
   web_search: {
     label: "Web Search",
@@ -458,7 +464,7 @@ function TaskListCard({
   return (
     <section className="side-card task-list-card">
       <div className="card-title-row">
-        <h2>Codex Tasks</h2>
+        <h2>Voice Tasks</h2>
         <span className={`inline-status ${activeCount ? "blue" : ""}`}>{activeCount ? `${activeCount} active` : "Idle"}</span>
       </div>
       {tasks.length ? (
@@ -495,7 +501,7 @@ function TaskListCard({
               {taskNeedsApproval(task) ? (
                 <div className="task-approval-note">
                   <strong>{task.approval?.action_type || "Approval required"}</strong>
-                  <span>{task.approval?.summary || "Approve this task before Codex starts."}</span>
+                  <span>{task.approval?.summary || "Approve this task before the task runtime starts."}</span>
                 </div>
               ) : null}
               <div className="task-row-meta">
@@ -512,7 +518,7 @@ function TaskListCard({
                   type="button"
                   onClick={() => onAbortTask(task.id)}
                   disabled={taskIsTerminal(task)}
-                  title={taskIsTerminal(task) ? "Task is already terminal" : "Abort this Codex task"}
+                  title={taskIsTerminal(task) ? "Task is already terminal" : "Abort this task"}
                 >
                   <Square size={15} />
                   Abort
@@ -536,7 +542,7 @@ function TaskListCard({
       ) : (
         <p>{toolStatus}</p>
       )}
-      <p className="task-limit-note">Voice queue target: up to 5 parallel Codex tasks.</p>
+      <p className="task-limit-note">Voice queue target: up to 5 parallel tasks.</p>
     </section>
   );
 }
@@ -633,10 +639,10 @@ function TaskDetailDrawer({
 
   return (
     <div className="voice-drawer-overlay" role="presentation" onMouseDown={(event) => (event.target === event.currentTarget ? onClose() : undefined)}>
-      <aside className="voice-drawer" role="dialog" aria-modal="true" aria-label="Codex task details">
+      <aside className="voice-drawer" role="dialog" aria-modal="true" aria-label="Voice task details">
         <div className="voice-drawer-header">
           <div>
-            <span className="muted-label">Codex Task</span>
+            <span className="muted-label">Voice Task</span>
             <h2>{detail?.short_id ? `#${detail.short_id}` : detail?.task_id || "Loading..."}</h2>
             {detail?.task_id ? <code className="drawer-subtitle">{detail.task_id}</code> : null}
           </div>
@@ -740,6 +746,11 @@ function TaskDetailDrawer({
           </div>
         ) : null}
         <div className="drawer-actions">
+          {detail?.task_chat?.historyAvailable ? (
+            <button className="approve-button compact" type="button" onClick={() => { window.location.href = detail.task_chat?.href || "/task-chat?group=voice_work"; }}>
+              Open in Task Chat
+            </button>
+          ) : detail?.task_chat ? <span className="drawer-muted">Task chat is temporarily unavailable for this runtime.</span> : detail?.task_id ? <span className="drawer-muted">{detail.complete ? "No persistent chat" : "Preparing task chat…"}</span> : null}
           <button className="secondary-button compact" type="button" onClick={onRefresh} disabled={!detail?.task_id}>
             Refresh
           </button>
@@ -936,7 +947,7 @@ function PasteCommandPanel({
   useEffect(() => {
     if (!pendingIntake || pendingIntake.status === "failed" || phase !== "error") return;
     setPendingIntake((current) => (current?.id === pendingIntake.id ? { ...current, status: "failed" } : current));
-    setNote(voiceError || "Voice Control could not start. The intake was not uploaded to Codex.");
+    setNote(voiceError || "Voice Control could not start. The intake was not sent to the task runtime.");
   }, [pendingIntake, pendingIntake?.id, pendingIntake?.status, phase, voiceError]);
 
   function addFiles(nextFiles: Iterable<File>) {
@@ -1004,7 +1015,7 @@ function PasteCommandPanel({
       }
       setText("");
       setFiles([]);
-      setNote(payload.operator_note || "Sent to Codex.");
+      setNote(payload.operator_note || "Sent to the task runtime.");
       setPendingIntake(null);
       return payload;
     } finally {
@@ -1093,7 +1104,7 @@ function PasteCommandPanel({
       },
       cancel: () => {
         setPendingIntake({ id: intakeId, status: "cancelled" });
-        setNote("Intake cancelled. Nothing was uploaded to Codex.");
+        setNote("Intake cancelled. Nothing was sent to the task runtime.");
       },
       submit: async (confirmation) => submitConfirmedCodexIntake({ intakeId, intakeText, intakeFiles, confirmation }),
     });
@@ -1310,7 +1321,7 @@ function ConnectionCard({
           <dd className={connected || keyReady ? "good" : ""}>{realtimeLabel}</dd>
         </div>
         <div>
-          <dt>Codex</dt>
+          <dt>Task runtime</dt>
           <dd className={status?.codex.available ? "good" : ""}>{codexLabel}</dd>
         </div>
         <div>
@@ -1486,7 +1497,7 @@ function MobileStatusChips({ status }: { status: PrithaRealtimeStatus | null }) 
       </div>
       <div className="mobile-status-chip">
         <span className="mobile-status-title">
-          Codex <span className={`dot ${codexReady ? "green" : status ? "orange" : ""}`} />
+          Task runtime <span className={`dot ${codexReady ? "green" : status ? "orange" : ""}`} />
         </span>
         <strong className={`mobile-status-value ${codexReady ? "" : "muted"}`}>{status ? (codexReady ? "Connected" : "Queue") : "Checking"}</strong>
       </div>

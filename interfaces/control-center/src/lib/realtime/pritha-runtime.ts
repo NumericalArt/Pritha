@@ -7316,7 +7316,20 @@ export async function getPrithaCodexTask(taskId: string) {
       plan: rootRelative(root, planPath),
       voice_feedback: rootRelative(root, voiceFeedbackPath),
     },
-    progress_timeline: progress,
+    progress_timeline: progress.map((event) => ({
+      timestamp: event.timestamp,
+      phase: event.phase,
+      level: event.level,
+      message: event.message,
+      status: event.status,
+      transport: event.transport,
+      elapsed_ms: event.elapsed_ms,
+      step_id: event.step_id,
+      step_title: event.step_title,
+      voice_text: event.voice_text,
+      speakable: event.speakable,
+      requires_response: event.requires_response,
+    })),
   };
 }
 

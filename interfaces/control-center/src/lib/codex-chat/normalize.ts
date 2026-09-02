@@ -81,12 +81,21 @@ export function summarizeThread(binding: ChatBinding, provider: RuntimeProviderV
   const native = asObject(nativeThread);
   const status = native ? threadStatusFromNative(native.status, binding.archived) : binding.archived ? "archived" : binding.lastStatus;
   const providerReady = provider?.availability === "ready";
+  const identityMatches = Boolean(binding.stateIdentityHash && provider?.stateIdentityHash === binding.stateIdentityHash);
+  const active = status === "active";
+  const compatibility = !providerReady
+    ? "probe_required"
+    : !binding.stateIdentityHash
+      ? "probe_required"
+      : identityMatches
+        ? "bound"
+        : "mismatch";
   return {
     chatId: binding.chatId,
     title: binding.title,
     preview: binding.preview || boundedText(native?.preview, 500),
-    group: "my_chats",
-    origin: "chat",
+    group: binding.group,
+    origin: binding.origin,
     status,
     activeFlags: activeFlags(status),
     pinned: binding.pinned,
@@ -99,9 +108,18 @@ export function summarizeThread(binding: ChatBinding, provider: RuntimeProviderV
       version: provider?.version || null,
       protocol: "app_server",
       stateIdentityHash: provider?.stateIdentityHash || null,
-      compatibility: providerReady ? "bound" : "probe_required",
+      compatibility,
     },
     taskLinks: binding.taskLinks,
+    continuationState: active
+      ? "blocked_active_turn"
+      : compatibility === "mismatch"
+        ? "blocked_runtime_mismatch"
+        : compatibility !== "bound"
+          ? "blocked_history_unavailable"
+          : binding.continuationEnabled
+            ? "continuation_enabled"
+            : "read_only",
   };
 }
 

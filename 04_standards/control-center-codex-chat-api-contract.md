@@ -3,8 +3,8 @@ id: control-center-codex-chat-api-contract
 type: standard
 status: active
 created: 2026-08-26
-updated: 2026-08-27
-last_reviewed: 2026-08-27
+updated: 2026-09-02
+last_reviewed: 2026-09-02
 owner: Pritha/user
 topics:
   - pritha-control-center
@@ -754,7 +754,9 @@ Rules:
 ## 11. Voice task linking
 
 `POST /threads/{chatId}/task-links` is used only after the operator explicitly
-chooses a relationship such as `Continue in this chat`.
+chooses a relationship such as `Continue in Task Chat`. Internal Voice discovery
+may create a read-only `result_reference`; only this explicit request may upgrade
+the thread to `shared_thread` continuation.
 
 Body:
 

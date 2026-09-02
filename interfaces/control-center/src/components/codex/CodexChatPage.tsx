@@ -47,6 +47,7 @@ import type {
 
 type ConnectionState = "idle" | "connecting" | "ready" | "reconnecting";
 type DictationState = "idle" | "listening" | "error";
+type ChatGroup = "my_chats" | "voice_work";
 type ChatFailure = {
   message: string;
   source: "bootstrap" | "history" | "mutation" | "turn";
@@ -171,7 +172,7 @@ function ActivityItem({ item }: { item: ChatItemView }) {
   if (item.kind === "assistant_message") {
     return (
       <article className={`codex-message codex-assistant-message ${item.message.status === "streaming" ? "streaming" : ""}`}>
-        <div className="codex-message-label"><Bot size={15} /> Codex</div>
+        <div className="codex-message-label"><Bot size={15} /> Pritha</div>
         <CodexMarkdown markdown={item.message.markdown || "…"} />
       </article>
     );
@@ -221,6 +222,7 @@ function ThreadRow({ thread, active, onSelect }: { thread: ThreadSummary; active
         <span>{thread.status === "active" ? "Working" : thread.preview || "No messages yet"}</span>
         <time>{relativeTime(thread.updatedAt)}</time>
       </span>
+      {thread.taskLinks.length ? <span className="codex-thread-task-links">{thread.taskLinks.slice(-3).map((link) => `#${link.shortId || link.taskId.slice(-6)}`).join(" · ")}</span> : null}
     </button>
   );
 }
@@ -228,6 +230,8 @@ function ThreadRow({ thread, active, onSelect }: { thread: ThreadSummary; active
 export function CodexChatPage() {
   const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [activeGroup, setActiveGroup] = useState<ChatGroup>("my_chats");
+  const selectedByGroupRef = useRef<Record<ChatGroup, string | null>>({ my_chats: null, voice_work: null });
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [turns, setTurns] = useState<TurnView[]>([]);
@@ -270,21 +274,48 @@ export function CodexChatPage() {
   const refreshThreads = useCallback(async () => {
     const response = await api<ThreadPage>("/api/codex-chat/v1/threads?limit=50");
     setThreads(response.data.data);
-    setSelectedChatId((current) => current && response.data.data.some((thread) => thread.chatId === current)
-      ? current
-      : response.data.data[0]?.chatId || null);
+    const groupRows = response.data.data.filter((thread) => thread.group === activeGroup);
+    setSelectedChatId((current) => {
+      const requested = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chat") : null;
+      const next = [requested, current, selectedByGroupRef.current[activeGroup], groupRows[0]?.chatId]
+        .find((candidate) => candidate && groupRows.some((thread) => thread.chatId === candidate)) || null;
+      selectedByGroupRef.current[activeGroup] = next;
+      return next;
+    });
     return response.data.data;
+  }, [activeGroup]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("group") === "voice_work") setActiveGroup("voice_work");
   }, []);
+
+  useEffect(() => {
+    if (activeGroup !== "voice_work") return;
+    let stopped = false;
+    let timer: number | null = null;
+    const schedule = () => {
+      timer = window.setTimeout(async () => {
+        if (!stopped && document.visibilityState === "visible") await refreshThreads().catch(() => undefined);
+        if (!stopped) schedule();
+      }, 4_000);
+    };
+    schedule();
+    return () => {
+      stopped = true;
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [activeGroup, refreshThreads]);
 
   const reconcileChat = useCallback((chatId: string) => {
     const current = reconcileRequestRef.current;
     if (current?.chatId === chatId) return current.promise;
 
     const token = Symbol(chatId);
-    const request = Promise.all([
-      api<ThreadDetail>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}`),
-      api<TurnPage>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50`),
-    ]).then(([detailResponse, turnsResponse]) => {
+    const request = api<ThreadDetail>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}`).then(async (detailResponse) => {
+      const historyBlocked = detailResponse.data.continuationState === "blocked_runtime_mismatch"
+        || detailResponse.data.continuationState === "blocked_history_unavailable";
+      const turnsResponse = historyBlocked ? { data: { data: [] } as Pick<TurnPage, "data"> } : await api<TurnPage>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50`);
       if (selectedChatIdRef.current === chatId) {
         setDetail(detailResponse.data);
         setTurns(turnsResponse.data.data);
@@ -339,7 +370,7 @@ export function CodexChatPage() {
         if (!cancelled) setError((current) => current?.source === "bootstrap" ? null : current);
       } catch (cause) {
         if (cancelled) return;
-        setError(failure(cause, "Codex Chat could not load.", "bootstrap"));
+        setError(failure(cause, "Task Chat could not load.", "bootstrap"));
         const schedule = [1_000, 2_000, 5_000, 10_000, 30_000];
         const base = schedule[Math.min(attempt, schedule.length - 1)];
         const delay = Math.round(base * (0.8 + Math.random() * 0.4));
@@ -502,8 +533,9 @@ export function CodexChatPage() {
 
   const visibleThreads = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return query ? threads.filter((thread) => `${thread.title} ${thread.preview}`.toLowerCase().includes(query)) : threads;
-  }, [search, threads]);
+    const grouped = threads.filter((thread) => thread.group === activeGroup);
+    return query ? grouped.filter((thread) => `${thread.title} ${thread.preview} ${thread.taskLinks.map((link) => link.label).join(" ")}`.toLowerCase().includes(query)) : grouped;
+  }, [activeGroup, search, threads]);
 
   const hasActiveTurn = turns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
   const effectiveProvider = runtime?.providers.find((provider) => provider.providerId === (detail?.thread.runtime.providerId || runtime.effectiveProvider));
@@ -548,7 +580,7 @@ export function CodexChatPage() {
       if (restartStream) setStreamRevision((current) => current + 1);
     } catch (cause) {
       setConnection(selectedChatIdRef.current ? "reconnecting" : "idle");
-      setError(failure(cause, "Codex Chat could not reconnect.", "history"));
+      setError(failure(cause, "Task Chat could not reconnect.", "history"));
     } finally {
       setRecovering(false);
     }
@@ -565,6 +597,8 @@ export function CodexChatPage() {
         body: JSON.stringify({ clientThreadId, source: "chat" }),
       });
       setThreads((rows) => [response.data.thread, ...rows.filter((thread) => thread.chatId !== response.data.thread.chatId)]);
+      setActiveGroup("my_chats");
+      selectedByGroupRef.current.my_chats = response.data.thread.chatId;
       setSelectedChatId(response.data.thread.chatId);
       setDrawerOpen(false);
       return response.data;
@@ -575,6 +609,44 @@ export function CodexChatPage() {
       setCreating(false);
     }
   }, []);
+
+  const continueInTaskChat = useCallback(async () => {
+    if (!detail?.thread.taskLinks.length) return;
+    const task = detail.thread.taskLinks.at(-1);
+    if (!task) return;
+    setRecovering(true);
+    setError(null);
+    try {
+      const mode = "shared_thread" as const;
+      const key = `${detail.thread.chatId}:${task.taskId}:${mode}`;
+      const response = await api<ThreadDetail>(`/api/codex-chat/v1/threads/${encodeURIComponent(detail.thread.chatId)}/task-links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+        body: JSON.stringify({ taskId: task.taskId, mode }),
+      });
+      setDetail(response.data);
+      setThreads((rows) => rows.map((row) => row.chatId === response.data.thread.chatId ? response.data.thread : row));
+    } catch (cause) {
+      setError(failure(cause, "This Voice task cannot be continued safely yet.", "mutation"));
+    } finally {
+      setRecovering(false);
+    }
+  }, [detail]);
+
+  function switchGroup(group: ChatGroup) {
+    if (group === activeGroup) return;
+    selectedByGroupRef.current[activeGroup] = selectedChatId;
+    setActiveGroup(group);
+    const next = selectedByGroupRef.current[group] || threads.find((thread) => thread.group === group)?.chatId || null;
+    setSelectedChatId(next);
+    setDetail(null);
+    setTurns([]);
+    setSearch("");
+    const params = new URLSearchParams(window.location.search);
+    params.set("group", group);
+    if (next) params.set("chat", next); else params.delete("chat");
+    window.history.replaceState(null, "", `/task-chat?${params.toString()}`);
+  }
 
   async function deliverMessage(delivery: PendingDelivery) {
     setSending(true);
@@ -697,42 +769,49 @@ export function CodexChatPage() {
   const history = (
     <div className="codex-history-content">
       <div className="codex-history-title-row">
-        <h2>Codex chats</h2>
+        <h2>Task Chat</h2>
         <button type="button" className="codex-icon-button codex-drawer-close" aria-label="Close chat history" onClick={() => setDrawerOpen(false)}><X size={18} /></button>
       </div>
-      <button className="codex-new-chat" type="button" onClick={() => void createChat()} disabled={creating || runtime?.availability === "unavailable"}>
+      <div className="codex-history-tabs" role="tablist" aria-label="Task Chat sources">
+        <button type="button" role="tab" aria-selected={activeGroup === "my_chats"} className={activeGroup === "my_chats" ? "active" : ""} onClick={() => switchGroup("my_chats")}>Direct Chats</button>
+        <button type="button" role="tab" aria-selected={activeGroup === "voice_work"} className={activeGroup === "voice_work" ? "active" : ""} onClick={() => switchGroup("voice_work")}>Voice Tasks</button>
+      </div>
+      {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={() => void createChat()} disabled={creating || runtime?.availability === "unavailable"}>
         {creating ? <LoaderCircle className="spin" size={17} /> : <Plus size={17} />} New chat
-      </button>
+      </button> : null}
       <label className="codex-search">
         <Search size={16} />
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search chats…" aria-label="Search Codex chats" />
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={activeGroup === "voice_work" ? "Search Voice tasks…" : "Search chats…"} aria-label="Search Task Chat" />
       </label>
       <section className="codex-thread-group">
-        <h3>My chats</h3>
         {visibleThreads.length ? visibleThreads.map((thread) => (
-          <ThreadRow key={thread.chatId} thread={thread} active={thread.chatId === selectedChatId} onSelect={() => { setSelectedChatId(thread.chatId); setDrawerOpen(false); }} />
-        )) : <p className="codex-history-empty">{search ? "No matching chats" : "Create a chat to start working with Codex."}</p>}
+          <ThreadRow key={thread.chatId} thread={thread} active={thread.chatId === selectedChatId} onSelect={() => {
+            setSelectedChatId(thread.chatId);
+            selectedByGroupRef.current[activeGroup] = thread.chatId;
+            const params = new URLSearchParams({ group: activeGroup, chat: thread.chatId });
+            window.history.replaceState(null, "", `/task-chat?${params.toString()}`);
+            setDrawerOpen(false);
+          }} />
+        )) : <p className="codex-history-empty">{search ? "No matching items" : activeGroup === "voice_work" ? "Persistent Voice task threads will appear here after their work environment is resolved." : "Create a chat to start working with Pritha."}</p>}
       </section>
-      <section className="codex-thread-group codex-thread-group-muted"><h3>Voice work</h3><p>Linked Voice tasks will appear here.</p></section>
-      <section className="codex-thread-group codex-thread-group-muted"><h3>Other sessions</h3><p>Project sessions arrive in the history phase.</p></section>
     </div>
   );
 
   return (
     <div className="codex-page">
-      <aside className="codex-history" aria-label="Codex chat history">{history}</aside>
-      {drawerOpen ? <div className="codex-history-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setDrawerOpen(false)}><aside className="codex-history-drawer" aria-label="Codex chat history drawer">{history}</aside></div> : null}
+      <aside className="codex-history" aria-label="Task Chat history">{history}</aside>
+      {drawerOpen ? <div className="codex-history-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setDrawerOpen(false)}><aside className="codex-history-drawer" aria-label="Task Chat history drawer">{history}</aside></div> : null}
 
-      <section className="codex-conversation" aria-label="Codex conversation">
+      <section className="codex-conversation" aria-label="Task Chat conversation">
         <header className="codex-conversation-header">
           <button className="codex-icon-button codex-history-open" type="button" aria-label="Open chat history" onClick={() => setDrawerOpen(true)}><Menu size={19} /></button>
           <div className="codex-conversation-heading">
             <div className="codex-title-line">
-              <h1>{detail?.thread.title || "Codex Chat"}</h1>
+              <h1>{detail?.thread.title || "Task Chat"}</h1>
               <span className={`codex-runtime-pill ${backendOffline ? "unavailable" : runtime?.availability || "unavailable"}`}>{backendOffline ? "Offline" : runtime?.availability === "ready" ? "Ready" : runtime?.availability || "Checking"}</span>
             </div>
             <p>
-              Pritha · {runtime?.selected.modelId || "Codex"} · {effectiveProvider?.locationLabel || "Resolving runtime"}
+              Pritha · {runtime?.selected.modelId || "Task runtime"} · {effectiveProvider?.locationLabel || "Resolving runtime"}
               {effectiveProvider?.protocol === "app_server" ? " · App Server" : ""}
               {runtime?.selected.sandboxMode ? ` · ${runtime.selected.sandboxMode.replaceAll("_", " ")}` : ""}
             </p>
@@ -741,7 +820,7 @@ export function CodexChatPage() {
         </header>
 
         {runtime?.availability !== "ready" ? (
-          <div className="codex-runtime-warning"><AlertTriangle size={17} /><span>{runtime?.availability === "degraded" ? "Codex runtime is installed but the full chat capability probe did not pass." : "No compatible Codex App Server runtime is available."}</span></div>
+          <div className="codex-runtime-warning"><AlertTriangle size={17} /><span>{runtime?.availability === "degraded" ? "The task runtime is installed but the full chat capability probe did not pass." : "No compatible task runtime is available."}</span></div>
         ) : null}
         {connection === "reconnecting" && !backendOffline ? (
           <div className="codex-runtime-warning"><LoaderCircle className="spin" size={17} /><span>Event stream is reconnecting. The last synchronized history remains visible and read-only.</span></div>
@@ -757,18 +836,18 @@ export function CodexChatPage() {
           </div>
         ) : null}
 
-        <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} role="log" aria-live="polite" aria-label="Codex messages" aria-busy={connection === "connecting"}>
-          {loading ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Codex Chat</h2></div> : null}
+        <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={connection === "connecting"}>
+          {loading ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Task Chat</h2></div> : null}
           {!loading && !selectedChatId ? (
             <div className="codex-empty-state">
               <Bot size={34} />
-              <h2>Work directly with Codex</h2>
+              <h2>{activeGroup === "voice_work" ? "Voice task threads" : "Work directly with Pritha"}</h2>
               <p>Start a persistent conversation with the runtime selected in Settings.</p>
-              <button className="codex-new-chat codex-empty-action" type="button" onClick={() => void createChat()} disabled={creating || runtime?.availability !== "ready"}><Plus size={17} /> New chat</button>
+              {activeGroup === "my_chats" ? <button className="codex-new-chat codex-empty-action" type="button" onClick={() => void createChat()} disabled={creating || runtime?.availability !== "ready"}><Plus size={17} /> New chat</button> : null}
             </div>
           ) : null}
           {selectedChatId && !loading && turns.length === 0 ? (
-            <div className="codex-empty-state compact"><Bot size={30} /><h2>What should Codex do?</h2><p>Messages and activity remain attached to this native Codex thread.</p></div>
+            <div className="codex-empty-state compact"><Bot size={30} /><h2>{activeGroup === "voice_work" ? "Voice task thread" : "What should Pritha do?"}</h2><p>Messages and activity remain attached to this native task thread.</p></div>
           ) : null}
           {turns.map((turn) => (
             <section className="codex-turn" key={turn.turnId} aria-label={`Turn ${turn.status}`}>
@@ -779,7 +858,7 @@ export function CodexChatPage() {
               <div className="codex-turn-items">
                 {turn.items.map((item) => <ActivityItem item={item} key={item.id} />)}
                 {turn.status === "in_progress" && !turn.items.some((item) => item.kind === "assistant_message") ? (
-                  <div className="codex-thinking"><LoaderCircle className="spin" size={16} /> Codex is working…</div>
+                  <div className="codex-thinking"><LoaderCircle className="spin" size={16} /> Pritha is working…</div>
                 ) : null}
                 {turn.error ? <div className="codex-inline-notice error">{turn.error.message}</div> : null}
               </div>
@@ -791,14 +870,19 @@ export function CodexChatPage() {
         <div className="codex-composer-wrap">
           {pendingDelivery?.status === "delivery_unknown" ? (
             <div className="codex-inline-notice warning codex-delivery-unknown">
-              Delivery is unknown. History will be checked first; Codex will never replay this turn automatically.
+              Delivery is unknown. History will be checked first; Task Chat will never replay this turn automatically.
               <button type="button" onClick={() => void retryUnknownDelivery()} disabled={recovering || sending || draft.trim() !== pendingDelivery.text}>
                 {recovering ? "Checking…" : "Check and retry same message"}
               </button>
             </div>
           ) : null}
-          <label className="codex-composer">
-            <span>Message Codex</span>
+          {detail?.thread.origin === "voice" && detail.continuationState !== "continuation_enabled" ? (
+            <div className="codex-continuation-gate">
+              <div><strong>{detail.continuationState === "blocked_active_turn" ? "Voice task is running" : "Voice task history is read-only"}</strong><p>{detail.continuationState === "blocked_active_turn" ? "Wait for the active Voice turn to finish before continuing here." : "Enable continuation only when you want to add a typed turn to this same task thread."}</p></div>
+              <button className="codex-new-chat" type="button" onClick={() => void continueInTaskChat()} disabled={recovering || detail.continuationState !== "read_only"}>{recovering ? "Checking…" : "Continue in Task Chat"}</button>
+            </div>
+          ) : <label className="codex-composer">
+            <span>Message Pritha</span>
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -808,7 +892,7 @@ export function CodexChatPage() {
                   void sendMessage();
                 }
               }}
-              placeholder={pendingDelivery?.status === "delivery_unknown" ? "Delivery confirmation is pending…" : hasActiveTurn ? "Codex is working…" : "Ask Codex…"}
+              placeholder={pendingDelivery?.status === "delivery_unknown" ? "Delivery confirmation is pending…" : hasActiveTurn ? "Pritha is working…" : "Ask Pritha…"}
               rows={3}
               maxLength={64_000}
             />
@@ -852,7 +936,7 @@ export function CodexChatPage() {
                 </button>
               </div>
             </div>
-          </label>
+          </label>}
         </div>
       </section>
     </div>

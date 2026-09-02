@@ -16,6 +16,9 @@ const requestClientSource = readFileSync(`${root}/lib/control-center-request.ts`
 const eventsRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads/[chatId]/events/route.ts`, "utf8");
 const threadRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads/route.ts`, "utf8");
 const turnsRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads/[chatId]/turns/route.ts`, "utf8");
+const taskLinksRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads/[chatId]/task-links/route.ts`, "utf8");
+const voiceLinksSource = readFileSync(`${root}/lib/codex-chat/voice-links.ts`, "utf8");
+const nativeTurnCoordinatorSource = readFileSync(`${root}/lib/codex-chat/native-turn-coordinator.ts`, "utf8");
 const chatPageSource = readFileSync(`${root}/components/codex/CodexChatPage.tsx`, "utf8");
 const dictationPreferencesSource = readFileSync(`${root}/lib/codex-chat/dictation-preferences.ts`, "utf8");
 const routesSource = readFileSync(`${root}/lib/routes.ts`, "utf8");
@@ -199,6 +202,11 @@ export const resolvePrithaStateRoot = () => ${JSON.stringify(stateRoot)};
     createHash: "hash",
     nativeThreadId: "native-thread-recovered",
     providerId: "desktop_bundled",
+    stateIdentityHash: null,
+    group: "my_chats",
+    origin: "chat",
+    continuationEnabled: true,
+    continuationEnabledAt: null,
     title: "Recovered",
     preview: "History survives",
     createdAt: "2026-08-27T00:00:00.000Z",
@@ -241,10 +249,13 @@ test("Codex Chat routes enforce bounded input, idempotent mutations and resumabl
   assert.match(eventsRouteSource, /"Content-Type": "text\/event-stream; charset=utf-8"/);
   assert.match(eventsRouteSource, /"X-Accel-Buffering": "no"/);
   assert.match(eventsRouteSource, /15_000/);
+  assert.match(taskLinksRouteSource, /requireIdempotencyKey\(request\)/);
+  assert.match(taskLinksRouteSource, /createTaskLink\(chatId, body\)/);
 });
 
 test("Codex Chat navigation, editable dictation and 320px-safe layout are present", () => {
-  assert.match(routesSource, /href: "\/codex"/);
+  assert.match(routesSource, /href: "\/task-chat"/);
+  assert.match(routesSource, /label: "Task Chat"/);
   assert.match(chatPageSource, /SpeechRecognition/);
   assert.match(chatPageSource, /setDraft\(\(current\) =>/);
   assert.doesNotMatch(chatPageSource, /recognition\.onresult[\s\S]{0,700}sendMessage\(/);
@@ -259,6 +270,21 @@ test("Codex Chat navigation, editable dictation and 320px-safe layout are presen
   assert.match(stylesSource, /\.content-shell:has\(\.codex-page\) \{[\s\S]{0,100}height: 100dvh;[\s\S]{0,100}overflow: hidden;/);
   assert.match(stylesSource, /@media \(max-width: 390px\)/);
   assert.match(stylesSource, /\.codex-history-overlay/);
+});
+
+test("Voice task threads are privately reconciled and require explicit continuation", () => {
+  assert.match(voiceLinksSource, /thread_resolved/);
+  assert.match(voiceLinksSource, /thread-links\.json/);
+  assert.match(voiceLinksSource, /group: "voice_work"/);
+  assert.match(voiceLinksSource, /continuationEnabled: false/);
+  assert.match(gatewaySource, /continuation_confirmation_required/);
+  assert.match(gatewaySource, /providerView\.stateIdentityHash !== binding\.stateIdentityHash/);
+  assert.match(chatPageSource, /Direct Chats/);
+  assert.match(chatPageSource, /Voice Tasks/);
+  assert.match(chatPageSource, /Continue in Task Chat/);
+  assert.match(nativeTurnCoordinatorSource, /if \(leases\.has\(key\)\) return null/);
+  assert.match(gatewaySource, /tryAcquireNativeThreadTurn/);
+  assert.match(appServerSource + readFileSync(`${root}/lib/realtime/codex-task/codex-app-server-client.ts`, "utf8"), /nativeThreadLeaseKey/);
 });
 
 test("Codex Chat dictation keeps browser auto mode and explicit language choices separate from transcripts", async () => {

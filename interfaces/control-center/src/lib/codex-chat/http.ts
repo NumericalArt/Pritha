@@ -29,8 +29,8 @@ export function apiError(error: unknown) {
       message: known
         ? error.message
         : registryCorrupt
-          ? "Codex Chat history bindings are read-only until the private registry is recovered."
-          : "Codex Chat encountered an internal error.",
+          ? "Task Chat history bindings are read-only until the private registry is recovered."
+          : "Task Chat encountered an internal error.",
       retryable: known ? error.retryable : registryCorrupt,
       requestId,
     },

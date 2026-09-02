@@ -23,9 +23,9 @@ export function AgentsGrid({
       {agents.map((agent) => (
         <AgentCard agent={agent} access={access} accessMode={accessMode} key={agent.id} onAction={onAgentAction} onCredentials={onAgentCredentials} />
       ))}
-      <button className="add-agent-card" type="button" data-testid="create-agent-plan-button" onClick={onCreatePlan} title="Open a safe Codex planning handoff">
+      <button className="add-agent-card" type="button" data-testid="create-agent-plan-button" onClick={onCreatePlan} title="Open a safe Task Chat planning handoff">
         <span className="add-symbol">+</span>
-        <span>Open in Codex / Create Plan</span>
+        <span>Open in Task Chat / Create Plan</span>
         <small>Contract first</small>
       </button>
     </div>

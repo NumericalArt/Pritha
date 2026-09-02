@@ -201,10 +201,10 @@ test.describe("Control Center UI regression", () => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
 
-    for (const route of ["/agents", "/voice", "/codex", "/settings", "/dev"]) {
+    for (const route of ["/agents", "/voice", "/task-chat", "/settings", "/dev"]) {
       await page.goto(route);
       await expect(page.locator("h1:visible").first()).toBeVisible();
-      if (route === "/codex") await expect(page.locator(".codex-conversation-header:visible")).toContainText("Pritha");
+      if (route === "/task-chat") await expect(page.locator(".codex-conversation-header:visible")).toContainText("Pritha");
       else await expect(page.locator(".status-strip:visible")).toContainText("Pritha");
       await expectNoPageOverflow(page);
       await expectNoRawSecret(page);
@@ -220,12 +220,58 @@ test.describe("Control Center UI regression", () => {
 
     for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(viewport);
-      await page.goto("/codex");
+      await page.goto("/task-chat");
       await expect(page.locator(".codex-error-banner")).toContainText("Control Center is temporarily unavailable");
       await expect(page.locator("body")).not.toContainText("Unexpected end of JSON input");
       await expect(page.locator("body")).not.toContainText("Failed to execute 'json'");
       await expectNoPageOverflow(page);
     }
+  });
+
+  test("Task Chat separates direct chats from Voice tasks and explicitly enables continuation", async ({ page }) => {
+    const now = new Date().toISOString();
+    let continuationEnabled = false;
+    const runtime = {
+      preferredProvider: "auto", effectiveProvider: "desktop_bundled", effectiveProtocol: "app_server", availability: "ready", fallbackEnabled: true,
+      providers: [{ providerId: "desktop_bundled", label: "Desktop bundled", availability: "ready", version: "test", protocol: "app_server", locationLabel: "Desktop bundled", stateIdentityHash: "test", capabilities: { fullChat: true, nativeHistory: true, listThreads: true, readThread: true, forkThread: false, archiveThread: false, unarchiveThread: false, renameThread: false, pinThread: false, steerTurn: false, interruptTurn: false, commandApprovals: false, fileChangeApprovals: false, permissionApprovals: false, requestUserInput: false, historyPagination: true, audioInput: false }, warning: null }],
+      models: [], selected: { modelId: "gpt-test", effortId: null, serviceTierId: null, sandboxMode: "read_only", approvalMode: "never" }, probedAt: now,
+    };
+    const base = { preview: "", status: "idle", activeFlags: [], pinned: false, archived: false, historyKind: "native", createdAt: now, updatedAt: now, runtime: { providerId: "desktop_bundled", version: "test", protocol: "app_server", stateIdentityHash: "test", compatibility: "bound" } };
+    const direct = { ...base, chatId: "chat-direct", title: "Direct example", group: "my_chats", origin: "chat", taskLinks: [], continuationState: "continuation_enabled" };
+    const voice = () => ({ ...base, chatId: "chat-voice", title: "Voice example", group: "voice_work", origin: "voice", taskLinks: [{ taskId: "task-one", shortId: "ONE", label: "Voice task", origin: "voice", mode: continuationEnabled ? "shared_thread" : "result_reference", subjectScope: { kind: "pritha", id: "pritha", label: "Pritha", generation: 1 }, status: "complete", linkedAt: now }], continuationState: continuationEnabled ? "continuation_enabled" : "read_only" });
+    await page.route("**/api/codex-chat/v1/**", async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/events")) return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": ready\n\n" });
+      if (route.request().method() === "POST" && url.pathname.endsWith("/task-links")) continuationEnabled = true;
+      let data: unknown;
+      if (url.pathname.endsWith("/runtime")) data = runtime;
+      else if (url.pathname.endsWith("/threads")) data = { data: [direct, voice()], nextCursor: null };
+      else if (url.pathname.endsWith("/turns")) data = { data: [], olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
+      else if (url.pathname.endsWith("/chat-direct")) data = { thread: direct, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-direct/events", continuationState: "continuation_enabled" };
+      else if (url.pathname.endsWith("/chat-voice") || url.pathname.endsWith("/task-links")) data = { thread: voice(), activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-voice/events", continuationState: continuationEnabled ? "continuation_enabled" : "read_only" };
+      else return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId: "task-chat-e2e", data }) });
+    });
+
+    await page.goto("/task-chat");
+    await expect(page.getByRole("button", { name: /Direct example/ })).toBeVisible();
+    await expect(page.getByText("Voice example")).toHaveCount(0);
+    await page.getByRole("tab", { name: "Voice Tasks" }).click();
+    await expect(page.getByRole("button", { name: /Voice example/ })).toBeVisible();
+    await page.getByRole("button", { name: /Voice example/ }).click();
+    await expect(page.getByRole("button", { name: "Continue in Task Chat" })).toBeVisible();
+    await page.getByRole("button", { name: "Continue in Task Chat" }).click();
+    await expect(page.getByText("Message Pritha")).toBeVisible();
+    await page.goto("/codex?group=voice_work&chat=chat-voice");
+    await expect(page).toHaveURL(/\/task-chat\?group=voice_work&chat=chat-voice$/);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/task-chat?group=voice_work&chat=chat-voice");
+    await page.getByRole("button", { name: "Open chat history" }).click();
+    const mobileHistory = page.locator('[aria-label="Task Chat history drawer"]');
+    await expect(mobileHistory.getByRole("tab", { name: "Voice Tasks" })).toHaveAttribute("aria-selected", "true");
+    await expect(mobileHistory.getByRole("button", { name: /Voice example/ })).toBeVisible();
+    await expectNoPageOverflow(page);
   });
 
   test("keeps a long Codex transcript scrollable, the composer reachable, and dictation language browser-local", async ({ page }) => {
@@ -364,7 +410,7 @@ test.describe("Control Center UI regression", () => {
 
     for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(viewport);
-      await page.goto("/codex");
+      await page.goto("/task-chat");
       const transcript = page.locator(".codex-transcript");
       const composer = page.locator(".codex-composer-wrap");
       await expect(page.getByText("Assistant response 18.")).toBeVisible();
@@ -418,7 +464,7 @@ test.describe("Control Center UI regression", () => {
 
     await page.getByRole("button", { name: "Close credentials panel" }).click();
     await desktopAgents.getByTestId("create-agent-plan-button").click();
-    await expect(page.locator('[aria-label="Open in Codex / Create Plan"]')).toBeVisible();
+    await expect(page.locator('[aria-label="Open in Task Chat / Create Plan"]')).toBeVisible();
 
     await page.getByRole("button", { name: "Close create plan panel" }).click();
     await page.locator(".access-card button").click();

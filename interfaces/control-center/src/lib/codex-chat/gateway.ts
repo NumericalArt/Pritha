@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage } from "./app-server";
 import { CodexChatPrivateStore, type ChatBinding } from "./private-store";
+import { reconcileVoiceTaskChatLinks } from "./voice-links";
+import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
 import {
   asObject,
   itemIdFor,
@@ -24,6 +26,7 @@ import type {
   ThreadSummary,
   TurnPage,
   TurnView,
+  CreateTaskLinkRequest,
 } from "./types";
 
 type CreateThreadInput = {
@@ -56,7 +59,7 @@ function newId(prefix: "chat" | "turn") {
   return `${prefix}_${randomUUID().replace(/-/g, "")}`;
 }
 
-function titleText(value: unknown, fallback = "New Codex chat") {
+function titleText(value: unknown, fallback = "New task chat") {
   const title = Array.from(String(value || "").trim()).slice(0, 120).join("");
   return title || fallback;
 }
@@ -67,9 +70,9 @@ function previewText(value: unknown) {
 
 function publicMessage(value: unknown) {
   const text = String(value instanceof Error ? value.message : value || "");
-  if (/timed out/i.test(text)) return "Codex did not answer within the operation timeout.";
-  if (/unavailable|not found|exited/i.test(text)) return "The selected Codex runtime is unavailable.";
-  return "Codex Chat could not complete the operation.";
+  if (/timed out/i.test(text)) return "The task runtime did not answer within the operation timeout.";
+  if (/unavailable|not found|exited/i.test(text)) return "The selected task runtime is unavailable.";
+  return "Task Chat could not complete the operation.";
 }
 
 function encodeCursor(offset: number) {
@@ -107,6 +110,7 @@ export class CodexChatGateway {
   private readonly root = resolveTechscopeRoot();
   private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message) => this.handleNotification(providerId, message), this.root);
   private readonly activeTurns = new Map<string, ActiveAttempt>();
+  private readonly activeTurnLeases = new Map<string, () => void>();
   private readonly events = new Map<string, ChatEventRecord[]>();
   private readonly subscribers = new Map<string, Set<EventSubscriber>>();
   private eventSequence = 0;
@@ -122,6 +126,7 @@ export class CodexChatGateway {
     cursor?: string;
     limit?: number;
   } = {}): Promise<ThreadPage> {
+    await reconcileVoiceTaskChatLinks(this.store, this.runtime);
     const bindings = await this.store.all();
     const providerViews = new Map<RuntimeProviderId, RuntimeProviderView>();
     for (const providerId of ["desktop_bundled", "standalone_cli"] as const) {
@@ -176,6 +181,11 @@ export class CodexChatGateway {
         createHash,
         nativeThreadId,
         providerId: provider.providerId,
+        stateIdentityHash: provider.view.stateIdentityHash,
+        group: "my_chats",
+        origin: "chat",
+        continuationEnabled: true,
+        continuationEnabledAt: now,
         title: requestedTitle,
         preview: "",
         createdAt: now,
@@ -199,12 +209,78 @@ export class CodexChatGateway {
   async threadDetail(chatId: string): Promise<ThreadDetail> {
     const binding = await this.requireBinding(chatId);
     const provider = (await this.runtime.provider(binding.providerId)).view;
+    let current = binding;
+    let nativeThread: unknown;
+    if (!binding.stateIdentityHash && provider.availability === "ready" && provider.stateIdentityHash) {
+      try {
+        nativeThread = await this.readNativeThread(binding, false);
+        current = await this.store.patch(chatId, { stateIdentityHash: provider.stateIdentityHash }) || binding;
+      } catch {
+        // Preserve the binding as read-only until the native thread can be verified.
+      }
+    }
+    if (current.origin === "voice" && current.stateIdentityHash === provider.stateIdentityHash) {
+      try {
+        nativeThread = await this.readNativeThread(current, false);
+        const nativeStatus = threadStatusFromNative(asObject(nativeThread)?.status, current.archived);
+        if (nativeStatus !== current.lastStatus) current = await this.store.patch(chatId, { lastStatus: nativeStatus }) || current;
+      } catch {
+        // The existing metadata remains visible but continuation stays guarded by the runtime binding.
+      }
+    }
+    const summary = summarizeThread(current, provider, nativeThread);
     return {
-      thread: summarizeThread(binding, provider),
+      thread: summary,
       activeTurnId: this.activeTurns.get(chatId)?.turnId || null,
       pendingRequests: [],
       streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events`,
+      continuationState: summary.continuationState,
     };
+  }
+
+  async taskChatLinkForTask(taskId: string) {
+    await reconcileVoiceTaskChatLinks(this.store, this.runtime);
+    const binding = await this.store.findByTaskId(taskId);
+    if (!binding) return null;
+    const detail = await this.threadDetail(binding.chatId);
+    return {
+      chatId: binding.chatId,
+      href: `/task-chat?group=voice_work&chat=${encodeURIComponent(binding.chatId)}`,
+      historyAvailable: detail.thread.runtime.compatibility === "bound",
+      continuationState: detail.continuationState,
+    };
+  }
+
+  async createTaskLink(chatId: string, input: CreateTaskLinkRequest) {
+    if (!input.taskId || !["shared_thread", "result_reference"].includes(input.mode)) {
+      throw new CodexChatGatewayError("invalid_request", "A valid taskId and link mode are required.", 400);
+    }
+    await reconcileVoiceTaskChatLinks(this.store, this.runtime);
+    const binding = await this.requireBinding(chatId);
+    const existing = binding.taskLinks.find((link) => link.taskId === input.taskId);
+    if (!existing) throw new CodexChatGatewayError("task_not_linked", "This task is not linked to the selected chat.", 404);
+    if (input.mode === "shared_thread") {
+      const provider = (await this.runtime.provider(binding.providerId)).view;
+      if (!binding.stateIdentityHash || provider.stateIdentityHash !== binding.stateIdentityHash) {
+        throw new CodexChatGatewayError("runtime_identity_mismatch", "The task runtime does not match this chat binding.", 409);
+      }
+      const native = await this.readNativeThread(binding, false);
+      if (threadStatusFromNative(native.status, binding.archived) === "active" || this.activeTurns.has(chatId)) {
+        throw new CodexChatGatewayError("turn_active", "This task thread already has an active turn.", 409, true);
+      }
+    }
+    const now = new Date().toISOString();
+    const taskLinks = binding.taskLinks.map((link) => link.taskId === input.taskId ? { ...link, mode: input.mode } : link);
+    const next = await this.store.patch(chatId, {
+      taskLinks,
+      continuationEnabled: input.mode === "shared_thread" ? true : binding.continuationEnabled,
+      continuationEnabledAt: input.mode === "shared_thread" ? now : binding.continuationEnabledAt,
+      updatedAt: now,
+    });
+    if (!next) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
+    const detail = await this.threadDetail(chatId);
+    this.emit(chatId, "thread.updated", { thread: detail.thread });
+    return detail;
   }
 
   async listTurns(chatId: string, input: { cursor?: string; direction?: "older" | "newer"; limit?: number } = {}): Promise<TurnPage> {
@@ -226,7 +302,7 @@ export class CodexChatGateway {
 
     const recoveredActive = active && turns.find((turn) => turn.turnId === active.turnId);
     if (recoveredActive && ["completed", "interrupted", "failed"].includes(recoveredActive.status)) {
-      this.activeTurns.delete(chatId);
+      this.releaseActiveTurn(chatId);
     }
     const stillActive = Boolean(this.activeTurns.get(chatId)) || turns.some((turn) =>
       turn.status === "queued"
@@ -264,6 +340,13 @@ export class CodexChatGateway {
 
   async startTurn(chatId: string, input: StartTurnInput) {
     const binding = await this.requireBinding(chatId);
+    if (binding.origin === "voice" && !binding.continuationEnabled) {
+      throw new CodexChatGatewayError("continuation_confirmation_required", "Choose Continue in Task Chat before sending a message.", 409);
+    }
+    const providerView = (await this.runtime.provider(binding.providerId)).view;
+    if (!binding.stateIdentityHash || providerView.stateIdentityHash !== binding.stateIdentityHash) {
+      throw new CodexChatGatewayError("runtime_identity_mismatch", "The selected runtime does not match this chat binding.", 409);
+    }
     if (!validClientId(input.clientMessageId)) throw new CodexChatGatewayError("invalid_request", "A valid clientMessageId is required.", 400);
     const text = String(input.input?.[0]?.text || "").trim();
     if (!text || input.input?.length !== 1 || input.input[0].type !== "text") {
@@ -325,10 +408,15 @@ export class CodexChatGateway {
       };
     }
     if (threadStatusFromNative(native.status, binding.archived) === "active") {
-      throw new CodexChatGatewayError("turn_active", "Codex reports an active turn for this chat.", 409);
+      throw new CodexChatGatewayError("turn_active", "The task runtime reports an active turn for this chat.", 409);
     }
 
     const startedAt = new Date().toISOString();
+    const releaseLease = tryAcquireNativeThreadTurn(
+      nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId),
+      `task-chat:${chatId}:${input.clientMessageId}`,
+    );
+    if (!releaseLease) throw new CodexChatGatewayError("turn_active", "This task thread already has an active turn.", 409, true);
     const active: ActiveAttempt = {
       turnId: newId("turn"),
       nativeTurnId: "",
@@ -339,6 +427,7 @@ export class CodexChatGateway {
       acknowledged: false,
     };
     this.activeTurns.set(chatId, active);
+    this.activeTurnLeases.set(chatId, releaseLease);
     try {
       const connection = await this.runtime.connection(binding.providerId);
       await connection.ensureThreadLoaded(binding.nativeThreadId);
@@ -358,7 +447,7 @@ export class CodexChatGateway {
       active.nativeTurnId = nativeTurnId;
       active.acknowledged = true;
       const firstMessage = Object.keys(binding.messageReceipts).length === 0;
-      const nextTitle = firstMessage && binding.title === "New Codex chat" ? titleText(previewText(text).slice(0, 72)) : binding.title;
+      const nextTitle = firstMessage && ["New Codex chat", "New task chat"].includes(binding.title) ? titleText(previewText(text).slice(0, 72)) : binding.title;
       const nextBinding = await this.store.patch(chatId, {
         title: nextTitle,
         preview: previewText(text),
@@ -384,7 +473,7 @@ export class CodexChatGateway {
       const accepted: AcceptedTurn = { turn, streamUrl: detail.streamUrl };
       return { accepted, replayed: false };
     } catch (error) {
-      this.activeTurns.delete(chatId);
+      this.releaseActiveTurn(chatId);
       await this.store.patch(chatId, { lastStatus: "system_error", updatedAt: new Date().toISOString() });
       throw new CodexChatGatewayError(active.acknowledged ? "fallback_confirmation_required" : "runtime_incompatible", publicMessage(error), active.acknowledged ? 409 : 503, !active.acknowledged);
     }
@@ -410,7 +499,7 @@ export class CodexChatGateway {
       for (const subscriber of subscribers) subscriber.close?.();
     }
     this.subscribers.clear();
-    this.activeTurns.clear();
+    for (const chatId of [...this.activeTurns.keys()]) this.releaseActiveTurn(chatId);
     this.events.clear();
     await this.runtime.dispose();
   }
@@ -438,11 +527,16 @@ export class CodexChatGateway {
 
   private async readNativeThread(binding: ChatBinding, includeTurns: boolean) {
     try {
+      const provider = (await this.runtime.provider(binding.providerId)).view;
+      if (binding.stateIdentityHash && provider.stateIdentityHash !== binding.stateIdentityHash) {
+        throw new CodexChatGatewayError("runtime_identity_mismatch", "The selected runtime does not match this chat binding.", 409);
+      }
       const result = asObject(await this.runtime.readThread(binding.providerId, binding.nativeThreadId, includeTurns));
       const thread = asObject(result?.thread);
       if (!thread) throw new Error("missing_thread");
       return thread;
     } catch (error) {
+      if (error instanceof CodexChatGatewayError) throw error;
       throw new CodexChatGatewayError("runtime_unavailable", publicMessage(error), 503, true);
     }
   }
@@ -452,6 +546,12 @@ export class CodexChatGateway {
     const binding = await this.store.get(chatId);
     if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     return binding;
+  }
+
+  private releaseActiveTurn(chatId: string) {
+    this.activeTurns.delete(chatId);
+    this.activeTurnLeases.get(chatId)?.();
+    this.activeTurnLeases.delete(chatId);
   }
 
   private emit(
@@ -528,7 +628,7 @@ export class CodexChatGateway {
         const eventName = turn.status === "interrupted" ? "turn.interrupted" : turn.status === "failed" ? "turn.failed" : "turn.completed";
         const payload = eventName === "turn.failed" ? { turn, retryMode: "resume" } : { turn };
         this.emit(binding.chatId, eventName, payload, { turnId: turn.turnId });
-        this.activeTurns.delete(binding.chatId);
+        this.releaseActiveTurn(binding.chatId);
         const next = await this.store.patch(binding.chatId, {
           lastStatus: turn.status === "failed" ? "system_error" : "idle",
           updatedAt: new Date().toISOString(),
@@ -558,7 +658,7 @@ export class CodexChatGateway {
           error: { code: "codex_turn_failed", message: "Codex could not complete this turn." },
         };
         this.emit(binding.chatId, "turn.failed", { turn: failed, retryMode: "resume" }, { turnId: active.turnId });
-        this.activeTurns.delete(binding.chatId);
+        this.releaseActiveTurn(binding.chatId);
         await this.store.patch(binding.chatId, { lastStatus: "system_error", updatedAt: new Date().toISOString() });
       }
     } catch {

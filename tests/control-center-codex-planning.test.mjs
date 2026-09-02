@@ -146,8 +146,8 @@ test("Voice Codex confirmations can be synthesized from short spoken approval", 
 test("Voice UI keeps watching approval-gated tasks and handoffs approval decisions once", () => {
   assert.match(realtimeHookSource, /reportedCodexTaskApprovalDecisionsRef/);
   assert.match(realtimeHookSource, /lastCodexTaskApprovalStatusRef/);
-  assert.match(realtimeHookSource, /UI approval received for Codex task/);
-  assert.match(realtimeHookSource, /UI rejection received for Codex task/);
+  assert.match(realtimeHookSource, /UI approval received for Voice task/);
+  assert.match(realtimeHookSource, /UI rejection received for Voice task/);
   assert.doesNotMatch(realtimeHookSource, /do not ask for this approval again/);
   assert.match(realtimeHookSource, /codex_task_approval_handoff_sent/);
   assert.match(realtimeHookSource, /requestResponse\("codex_task_approval_received"\)/);

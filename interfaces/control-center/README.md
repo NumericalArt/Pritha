@@ -11,7 +11,8 @@ Codex without running a web server.
 
 - `/agents` - child agents overview.
 - `/voice` - voice control surface.
-- `/codex` - persistent direct chat with the selected Codex runtime.
+- `/task-chat` - persistent Task Chat with separate Direct Chats and Voice Tasks views.
+- `/codex` - compatibility redirect to `/task-chat`.
 - `/settings` - compact settings.
 - `/dev` - read-only diagnostics.
 

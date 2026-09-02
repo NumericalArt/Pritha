@@ -3,7 +3,7 @@ id: 2026-08-26-control-center-codex-chat-architecture
 type: decision
 status: accepted
 created: 2026-08-26
-updated: 2026-08-27
+updated: 2026-09-02
 topics:
   - pritha-control-center
   - codex-chat
@@ -248,6 +248,11 @@ A Codex thread and a Pritha task card are different entities:
 - a Voice task link records the Pritha `chat_id`, `codex_thread_id` when one
   exists and every associated `turn_id` in order;
 - CLI ephemeral or queue-only work has a task card but no native thread.
+
+The user-facing surface is named **Task Chat**; `/task-chat` is canonical while
+the historical `/codex` path remains a compatibility redirect. Internal gateway,
+provider and API identifiers retain Codex terminology where it is technically
+precise.
 
 Voice Control keeps its accepted `subject_scoped` routing. Direct chat creates
 ordinary chat threads by default and does not silently inject itself into the

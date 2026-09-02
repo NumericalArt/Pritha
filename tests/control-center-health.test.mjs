@@ -78,7 +78,7 @@ test("control-center health passes when rendered pages reference served JavaScri
       instance: { id: "fixture", role: "developer", port: Number(request.headers.host?.split(":").at(-1)) },
       release: { commit: "abcdef123456", buildId: "fixture-build" },
     });
-    if (["/voice", "/agents", "/codex", "/settings"].includes(request.url)) {
+    if (["/voice", "/agents", "/task-chat", "/codex", "/settings"].includes(request.url)) {
       return htmlResponse(response, "/_next/static/chunks/current.js");
     }
     if (request.url === "/_next/static/chunks/current.js") {
@@ -94,7 +94,7 @@ test("control-center health passes when rendered pages reference served JavaScri
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.schema, "pritha-control-center-health-v1");
     assert.equal(payload.status, "pass");
-    assert.equal(payload.pages.length, 4);
+    assert.equal(payload.pages.length, 5);
     assert.equal(payload.chunks.length, 1);
   });
 });
@@ -109,7 +109,7 @@ test("control-center health fails when rendered HTML points at a missing chunk",
       instance: { id: "fixture", role: "developer", port: Number(request.headers.host?.split(":").at(-1)) },
       release: { commit: "abcdef123456", buildId: "fixture-build" },
     });
-    if (["/voice", "/agents", "/codex", "/settings"].includes(request.url)) {
+    if (["/voice", "/agents", "/task-chat", "/codex", "/settings"].includes(request.url)) {
       return htmlResponse(response, "/_next/static/chunks/stale.js");
     }
     if (request.url === "/_next/static/chunks/stale.js") {
@@ -144,7 +144,7 @@ test("control-center health retries one transient page response when requested",
       response.end("temporarily unavailable");
       return;
     }
-    if (["/voice", "/agents", "/codex", "/settings"].includes(request.url)) {
+    if (["/voice", "/agents", "/task-chat", "/codex", "/settings"].includes(request.url)) {
       return htmlResponse(response, "/_next/static/chunks/current.js");
     }
     if (request.url === "/_next/static/chunks/current.js") {
