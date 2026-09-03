@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import { getPrithaRuntimeSettings } from "@/lib/realtime/pritha-runtime";
+import { DESKTOP_CODEX_BIN_CANDIDATES } from "@/lib/settings/codex-binaries";
 import { codexAppTurnSettings } from "@/lib/settings/codex-model-catalog";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { CodexChatPrivateStore } from "./private-store";
@@ -34,10 +35,6 @@ type ProviderProbe = {
 type NotificationHandler = (providerId: RuntimeProviderId, message: RpcMessage) => void | Promise<void>;
 type ExitHandler = (providerId: RuntimeProviderId, exitCode: number | null, signal: NodeJS.Signals | null) => void | Promise<void>;
 
-const DESKTOP_BIN_CANDIDATES = [
-  "/Applications/ChatGPT.app/Contents/Resources/codex",
-  "/Applications/Codex.app/Contents/Resources/codex",
-];
 const PROBE_TTL_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -107,7 +104,7 @@ function resolveProviderBinary(providerId: RuntimeProviderId) {
     return firstExisting([
       process.env.PRITHA_CODEX_CHAT_DESKTOP_BIN,
       process.env.PRITHA_DESKTOP_CODEX_BIN,
-      ...DESKTOP_BIN_CANDIDATES,
+      ...DESKTOP_CODEX_BIN_CANDIDATES,
     ]);
   }
   return firstExisting([

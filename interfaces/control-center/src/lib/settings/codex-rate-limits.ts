@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import readline from "node:readline";
 import { resolveTechscopeRoot } from "@/lib/realtime/pritha-runtime";
+import { resolveCodexAppBinary } from "./codex-binaries";
 
 type RpcMessage = {
   id?: string | number;
@@ -96,20 +97,10 @@ export async function readCodexRateLimits(options: { force?: boolean } = {}): Pr
 }
 
 function codexBin() {
-  const configured =
-    process.env.PRITHA_REALTIME_CODEX_BIN?.trim() || process.env.TECHSCOPE_VOICE_CODEX_BIN?.trim() || process.env.CODEX_BIN?.trim();
-  if (configured) return configured;
-  if (cachedCodexAppServerBin !== undefined) return cachedCodexAppServerBin || "codex";
-
-  const candidates = [
-    "codex",
-    "/Applications/Codex.app/Contents/Resources/codex",
-    process.env.HOME ? `${process.env.HOME}/Applications/Codex.app/Contents/Resources/codex` : "",
-    process.env.HOME ? `${process.env.HOME}/.codex/plugins/.plugin-appserver/codex` : "",
-  ].filter(Boolean);
-
-  cachedCodexAppServerBin = candidates.find((candidate) => codexSupportsAppServer(candidate)) || null;
-  return cachedCodexAppServerBin || "codex";
+  if (cachedCodexAppServerBin !== undefined) return cachedCodexAppServerBin || "";
+  const candidate = resolveCodexAppBinary();
+  cachedCodexAppServerBin = candidate && codexSupportsAppServer(candidate) ? candidate : null;
+  return cachedCodexAppServerBin || "";
 }
 
 async function runCodexRateLimitsProbe(): Promise<CodexRateLimitsProbe> {
@@ -118,9 +109,9 @@ async function runCodexRateLimitsProbe(): Promise<CodexRateLimitsProbe> {
   }
 
   const selectedCodexBin = codexBin();
-  if (!codexSupportsAppServer(selectedCodexBin)) {
+  if (!selectedCodexBin || !codexSupportsAppServer(selectedCodexBin)) {
     return unavailableProbe(
-      `Codex app-server unavailable: ${selectedCodexBin} does not support the app-server command. Set PRITHA_REALTIME_CODEX_BIN to the Codex.app bundled binary.`,
+      "Codex App Server unavailable: install the desktop Codex/ChatGPT app or set PRITHA_REALTIME_CODEX_BIN to its bundled Codex binary.",
     );
   }
 

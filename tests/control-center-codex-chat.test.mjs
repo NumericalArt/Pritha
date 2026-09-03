@@ -10,6 +10,7 @@ import ts from "../interfaces/control-center/node_modules/typescript/lib/typescr
 
 const root = "interfaces/control-center/src";
 const appServerSource = readFileSync(`${root}/lib/codex-chat/app-server.ts`, "utf8");
+const codexBinariesSource = readFileSync(`${root}/lib/settings/codex-binaries.ts`, "utf8");
 const gatewaySource = readFileSync(`${root}/lib/codex-chat/gateway.ts`, "utf8");
 const privateStoreSource = readFileSync(`${root}/lib/codex-chat/private-store.ts`, "utf8");
 const privateJsonSource = readFileSync(`${root}/lib/private-json.ts`, "utf8");
@@ -65,8 +66,9 @@ async function transpileModule(source, prefix) {
 }
 
 test("Codex Chat runtime uses a persistent App Server handshake for both installed runtime families", () => {
-  assert.match(appServerSource, /ChatGPT\.app\/Contents\/Resources\/codex/);
-  assert.match(appServerSource, /Codex\.app\/Contents\/Resources\/codex/);
+  assert.match(appServerSource, /DESKTOP_CODEX_BIN_CANDIDATES/);
+  assert.match(codexBinariesSource, /ChatGPT\.app\/Contents\/Resources\/codex/);
+  assert.match(codexBinariesSource, /Codex\.app\/Contents\/Resources\/codex/);
   assert.match(appServerSource, /\["app-server", "--listen", "stdio:\/\/"\]/);
   assert.match(appServerSource, /\["app-server", "generate-json-schema", "--out", schemaRoot\]/);
 

@@ -1,9 +1,8 @@
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import readline from "node:readline";
+import { resolveCodexAppBinary } from "./codex-binaries";
 import { createCodexModelCatalogLoader } from "./codex-model-catalog";
 
-const BUNDLED_CODEX_APP_BIN = "/Applications/Codex.app/Contents/Resources/codex";
 const CODEX_MODEL_LIST_TIMEOUT_MS = 3_000;
 const CODEX_MODEL_CATALOG_TTL_MS = 5 * 60_000;
 
@@ -13,17 +12,10 @@ type RpcResponse = {
   error?: { message?: string };
 };
 
-function resolveCodexBinary() {
-  const configured = process.env.PRITHA_REALTIME_CODEX_BIN?.trim()
-    || process.env.TECHSCOPE_VOICE_CODEX_BIN?.trim()
-    || process.env.CODEX_BIN?.trim();
-  if (configured) return configured;
-  if (fs.existsSync(BUNDLED_CODEX_APP_BIN)) return BUNDLED_CODEX_APP_BIN;
-  return "codex";
-}
-
 async function requestCodexModelList(timeoutMs = CODEX_MODEL_LIST_TIMEOUT_MS) {
-  const child = spawn(resolveCodexBinary(), ["app-server", "--listen", "stdio://"], {
+  const codexBin = resolveCodexAppBinary();
+  if (!codexBin) throw new Error("Codex App bundled binary is unavailable");
+  const child = spawn(codexBin, ["app-server", "--listen", "stdio://"], {
     cwd: process.env.TECHSCOPE_ROOT?.trim() || process.cwd(),
     env: process.env,
     stdio: ["pipe", "pipe", "ignore"],

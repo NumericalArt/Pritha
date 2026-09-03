@@ -1,13 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { checkCodexAppServerAvailable, resolveCodexBinary } from "@/lib/realtime/codex-task/codex-app-server-client";
+import { checkCodexAppServerAvailable } from "@/lib/realtime/codex-task/codex-app-server-client";
 import { resolveTechscopeRoot } from "@/lib/realtime/pritha-runtime";
-
-function codexBin() {
-  return resolveCodexBinary();
-}
+import { resolveCodexAppBinary, resolveCodexCliBinary } from "./codex-binaries";
 
 function runCodexVersion() {
-  const result = spawnSync(codexBin(), ["--version"], {
+  const result = spawnSync(resolveCodexCliBinary(), ["--version"], {
     cwd: resolveTechscopeRoot(),
     encoding: "utf8",
     timeout: 5_000,
@@ -21,9 +18,13 @@ function runCodexVersion() {
 export function getCodexAuthStatus() {
   const root = resolveTechscopeRoot();
   const cli = runCodexVersion();
-  const appServer = checkCodexAppServerAvailable(codexBin(), root);
+  const codexAppBin = resolveCodexAppBinary();
+  const appServer = codexAppBin
+    ? checkCodexAppServerAvailable(codexAppBin, root)
+    : { available: false, detail: "Codex desktop bundled binary is unavailable." };
   return {
-    codexBin: codexBin(),
+    codexBin: resolveCodexCliBinary(),
+    codexAppBin: codexAppBin || null,
     root,
     cli,
     appServer,

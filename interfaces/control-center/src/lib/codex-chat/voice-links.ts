@@ -3,8 +3,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { atomicWritePrivateJson } from "@/lib/private-json";
 import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { isDesktopCodexBinary, resolveCodexAppBinary } from "@/lib/settings/codex-binaries";
 import type { CodexRuntimeManager } from "./app-server";
-import { resolveCodexBinary } from "@/lib/realtime/codex-task/codex-app-server-client";
 import { CodexChatPrivateStore, type ChatBinding } from "./private-store";
 import type { RuntimeProviderId, TaskLinkView } from "./types";
 
@@ -49,7 +49,7 @@ function taskRoot() {
 }
 
 function configuredVoiceProvider(): RuntimeProviderId {
-  return resolveCodexBinary().includes(".app/Contents/Resources/codex") ? "desktop_bundled" : "standalone_cli";
+  return isDesktopCodexBinary(resolveCodexAppBinary()) ? "desktop_bundled" : "standalone_cli";
 }
 
 function scopeFrom(value: unknown): TaskLinkView["subjectScope"] {

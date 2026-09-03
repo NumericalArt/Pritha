@@ -13,8 +13,9 @@ import {
   normalizeCodexReasoningEffortToken,
   type CodexReasoningEffort as CatalogCodexReasoningEffort,
 } from "../settings/codex-model-catalog";
+import { resolveCodexAppBinary, resolveCodexCliBinary } from "../settings/codex-binaries";
 import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
-import { checkCodexAppServerAvailable, PrithaCodexAppServerClient, resolveCodexBinary } from "./codex-task/codex-app-server-client";
+import { checkCodexAppServerAvailable, PrithaCodexAppServerClient } from "./codex-task/codex-app-server-client";
 import {
   isActiveCodexTaskStatus,
   resolveCodexTaskContinuation,
@@ -4278,7 +4279,7 @@ function codexMode() {
 }
 
 function codexAvailable() {
-  const result = spawnSync(codexBin(), ["--version"], {
+  const result = spawnSync(codexCliBin(), ["--version"], {
     cwd: resolveTechscopeRoot(),
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -4290,12 +4291,16 @@ function codexAvailable() {
   };
 }
 
-function codexBin() {
-  return resolveCodexBinary();
+function codexCliBin() {
+  return resolveCodexCliBinary();
+}
+
+function codexAppBin() {
+  return resolveCodexAppBinary();
 }
 
 function codexExecHelp() {
-  const result = spawnSync(codexBin(), ["exec", "--help"], {
+  const result = spawnSync(codexCliBin(), ["exec", "--help"], {
     cwd: resolveTechscopeRoot(),
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -4310,8 +4315,15 @@ function codexExecSupportsEphemeral() {
 
 function codexAppAvailable() {
   const root = resolveTechscopeRoot();
+  const binary = codexAppBin();
+  if (!binary) {
+    return {
+      available: false,
+      detail: "Codex desktop bundled binary is unavailable; standalone CLI remains available only as fallback.",
+    };
+  }
   try {
-    const result = checkCodexAppServerAvailable(codexBin(), root);
+    const result = checkCodexAppServerAvailable(binary, root);
     return {
       available: result.available,
       detail: compactText(result.detail, 1_200),
@@ -5723,7 +5735,7 @@ function codexAppSandboxPolicyForTask(task: Record<string, unknown>, sandbox: st
 function codexAppClientForTask(task: Record<string, unknown>, sandbox: string, writableRoots: Array<{ absolute_path: string }>) {
   const root = resolveTechscopeRoot();
   return new PrithaCodexAppServerClient({
-    codexBin: codexBin(),
+    codexBin: codexAppBin(),
     cwd: root,
     clientName: "pritha-voice-control",
     buildSandboxPolicy: () => codexAppSandboxPolicyForTask(task, sandbox, writableRoots),
@@ -6342,7 +6354,7 @@ async function startCodexExec(
   const taskId = String(task.id || "");
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, paths.progressPath, event);
   let killedByTimeout = false;
-  const child = spawn(codexBin(), args, {
+  const child = spawn(codexCliBin(), args, {
     cwd: root,
     env:
       env("PRITHA_REALTIME_CODEX_USE_PROXY", env("TECHSCOPE_VOICE_CODEX_USE_PROXY", "0")) === "1"

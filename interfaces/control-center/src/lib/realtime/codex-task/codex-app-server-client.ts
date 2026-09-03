@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import type { CodexAppThreadRoutingMode, CodexReasoningEffort, CodexServiceTier } from "../pritha-runtime";
+import { isDesktopCodexBinary, resolveCodexAppBinary } from "../../settings/codex-binaries";
 import { codexAppTurnSettings } from "../../settings/codex-model-catalog";
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "../../codex-chat/native-turn-coordinator";
 import type { PrithaCodexTaskClient, PrithaCodexTaskPayload, PrithaCodexTaskRunOptions, PrithaCodexThreadScope, PrithaCodexThreadScopeKind } from "./types";
@@ -48,7 +49,6 @@ type CodexAppThreadTarget = {
   routingMode: CodexAppThreadRoutingMode;
 };
 
-const BUNDLED_CODEX_APP_BIN = "/Applications/Codex.app/Contents/Resources/codex";
 const CODEX_APP_RECONNECT_FINAL_ATTEMPT = 5;
 
 const RESULT_SCHEMA = {
@@ -93,7 +93,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
   private readonly getRuntimeSettings?: CodexAppServerClientOptions["getRuntimeSettings"];
 
   constructor(options: CodexAppServerClientOptions) {
-    this.codexBin = resolveCodexBinary(options.codexBin);
+    this.codexBin = resolveCodexAppBinary(options.codexBin);
     this.cwd = path.resolve(options.cwd);
     this.branch = options.branch || currentBranch(this.cwd);
     this.registryPath = options.registryPath;
@@ -159,12 +159,12 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       await emitProgress("thread_resolved", "Codex App task thread resolved.", {
         thread_id: target.threadId,
         thread_name: target.threadName,
-        provider_id: this.codexBin.includes(".app/Contents/Resources/codex") ? "desktop_bundled" : "standalone_cli",
+        provider_id: isDesktopCodexBinary(this.codexBin) ? "desktop_bundled" : "standalone_cli",
         thread_role: target.role,
         thread_scope: target.scope,
         routing_mode: target.routingMode,
       });
-      const providerId = this.codexBin.includes(".app/Contents/Resources/codex") ? "desktop_bundled" : "standalone_cli";
+      const providerId = isDesktopCodexBinary(this.codexBin) ? "desktop_bundled" : "standalone_cli";
       releaseTurnLease = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(providerId, target.threadId), `voice:${payload.requestId}`);
       if (!releaseTurnLease) throw new Error("The task thread already has an active turn. Retry this Voice task after it finishes.");
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
@@ -631,13 +631,6 @@ export function checkCodexAppServerAvailable(codexBin: string, cwd: string) {
     available: result.status === 0 && hasAppServerHelp && !/unknown|unrecognized|invalid/i.test(detail),
     detail,
   };
-}
-
-export function resolveCodexBinary(explicit?: string) {
-  const configured = explicit?.trim() || process.env.PRITHA_REALTIME_CODEX_BIN?.trim() || process.env.TECHSCOPE_VOICE_CODEX_BIN?.trim() || process.env.CODEX_BIN?.trim();
-  if (configured) return configured;
-  if (fs.existsSync(BUNDLED_CODEX_APP_BIN)) return BUNDLED_CODEX_APP_BIN;
-  return "codex";
 }
 
 function buildPrompt(payload: PrithaCodexTaskPayload) {
