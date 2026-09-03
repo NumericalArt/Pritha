@@ -46,6 +46,7 @@ import type {
   AcceptedTurn,
   ChatEvent,
   ChatItemView,
+  CreatedThreadTurn,
   RuntimeStatus,
   ThreadDetail,
   ThreadPage,
@@ -70,6 +71,13 @@ type ChatFailure = {
 
 type PendingDelivery = {
   chatId: string;
+  clientMessageId: string;
+  text: string;
+  status: "sending" | "delivery_unknown";
+};
+
+type PendingNewChatDelivery = {
+  clientThreadId: string;
   clientMessageId: string;
   text: string;
   status: "sending" | "delivery_unknown";
@@ -286,7 +294,6 @@ export function CodexChatPage() {
   const [legacyCursor, setLegacyCursor] = useState<string | null>(null);
   const [legacyLoading, setLegacyLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<ChatFailure | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -298,6 +305,7 @@ export function CodexChatPage() {
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [streamRevision, setStreamRevision] = useState(0);
   const [pendingDeliveries, setPendingDeliveries] = useState<Record<string, PendingDelivery>>({});
+  const [pendingNewChatDelivery, setPendingNewChatDelivery] = useState<PendingNewChatDelivery | null>(null);
   const [dictation, setDictation] = useState<DictationState>("idle");
   const [dictationSupported, setDictationSupported] = useState(false);
   const [dictationLanguage, setDictationLanguage] = useState<DictationLanguage>("browser");
@@ -308,6 +316,7 @@ export function CodexChatPage() {
   const displayedChatIdRef = useRef<string | null>(null);
   const draftsByChatRef = useRef<Record<string, string>>({});
   const pendingDeliveriesRef = useRef<Record<string, PendingDelivery>>({});
+  const pendingNewChatDeliveryRef = useRef<PendingNewChatDelivery | null>(null);
   const detailRequestRef = useRef<{ chatId: string; token: symbol; controller: AbortController } | null>(null);
   const historyRequestRef = useRef<{ chatId: string; token: symbol; controller: AbortController } | null>(null);
   const navigationRef = useRef<TaskChatNavigationContext | null>(null);
@@ -317,10 +326,11 @@ export function CodexChatPage() {
   selectedChatIdRef.current = selectedChatId;
   activeGroupRef.current = activeGroup;
   connectionRef.current = connection;
+  pendingNewChatDeliveryRef.current = pendingNewChatDelivery;
 
   const draftKey = selectedChatId || NEW_CHAT_DRAFT_KEY;
   const draft = draftsByChat[draftKey] || "";
-  const pendingDelivery = selectedChatId ? pendingDeliveries[selectedChatId] || null : null;
+  const pendingDelivery = selectedChatId ? pendingDeliveries[selectedChatId] || null : pendingNewChatDelivery;
 
   const updateDraftForChat = useCallback((chatId: string | null, value: SetStateAction<string>) => {
     const key = chatId || NEW_CHAT_DRAFT_KEY;
@@ -372,6 +382,7 @@ export function CodexChatPage() {
       reportControlCenterUiActivity({ event: "thread_list_first_page_loaded", interactionId, source: "thread_list", durationMs: Date.now() - startedAt, group: requestedGroup, view: "current", count: Math.min(50, groupRows.length) });
       if (activeGroupRef.current !== requestedGroup) return groupRows;
       setSelectedChatId((current) => {
+        if (requestedGroup === "my_chats" && pendingNewChatDeliveryRef.current) return null;
         const requested = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chat") : null;
         const next = requested || [current, selectedByGroupRef.current[requestedGroup], groupRows[0]?.chatId]
           .find((candidate) => candidate && groupRows.some((thread) => thread.chatId === candidate)) || null;
@@ -903,30 +914,6 @@ export function CodexChatPage() {
     }
   }, [beginNavigation, connection, loadThreadDetail, loadThreadHistory, refreshRuntime, refreshThreads]);
 
-  const createChat = useCallback(async () => {
-    setCreating(true);
-    setError(null);
-    try {
-      const clientThreadId = crypto.randomUUID();
-      const response = await api<ThreadDetail>("/api/codex-chat/v1/threads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": clientThreadId },
-        body: JSON.stringify({ clientThreadId, source: "chat" }),
-      });
-      setThreads((rows) => [response.data.thread, ...rows.filter((thread) => thread.chatId !== response.data.thread.chatId)]);
-      setActiveGroup("my_chats");
-      selectedByGroupRef.current.my_chats = response.data.thread.chatId;
-      setSelectedChatId(response.data.thread.chatId);
-      setDrawerOpen(false);
-      return response.data;
-    } catch (cause) {
-      setError(failure(cause, "New chat could not be created.", "mutation"));
-      return null;
-    } finally {
-      setCreating(false);
-    }
-  }, []);
-
   const startNewDraft = useCallback(() => {
     selectedByGroupRef.current.my_chats = null;
     setActiveGroup("my_chats");
@@ -938,6 +925,18 @@ export function CodexChatPage() {
     setDrawerOpen(false);
     window.history.replaceState(null, "", "/task-chat?group=my_chats");
   }, []);
+
+  const startReplacementDraft = useCallback(() => {
+    const chatId = selectedChatIdRef.current;
+    const pending = chatId ? pendingDeliveriesRef.current[chatId] : null;
+    const replacementText = chatId ? draftsByChatRef.current[chatId] || pending?.text || "" : "";
+    if (chatId) {
+      updateDraftForChat(chatId, "");
+      setPendingForChat(chatId, null);
+    }
+    updateDraftForChat(null, replacementText);
+    startNewDraft();
+  }, [setPendingForChat, startNewDraft, updateDraftForChat]);
 
   const backToThreadList = useCallback(() => {
     selectedByGroupRef.current[activeGroupRef.current] = null;
@@ -978,7 +977,9 @@ export function CodexChatPage() {
     if (group === activeGroup) return;
     selectedByGroupRef.current[activeGroup] = selectedChatId;
     setActiveGroup(group);
-    const next = selectedByGroupRef.current[group] || threads.find((thread) => thread.group === group)?.chatId || null;
+    const next = group === "my_chats" && pendingNewChatDeliveryRef.current
+      ? null
+      : selectedByGroupRef.current[group] || threads.find((thread) => thread.group === group)?.chatId || null;
     if (next) beginNavigation(next, "group_restore");
     setSelectedChatId(next);
     setDetail(null);
@@ -1022,18 +1023,65 @@ export function CodexChatPage() {
     }
   }
 
+  async function deliverNewChatMessage(delivery: PendingNewChatDelivery) {
+    setSending(true);
+    setError(null);
+    setPendingNewChatDelivery({ ...delivery, status: "sending" });
+    try {
+      const response = await api<CreatedThreadTurn>("/api/codex-chat/v1/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": delivery.clientThreadId },
+        body: JSON.stringify({
+          clientThreadId: delivery.clientThreadId,
+          source: "chat",
+          initialTurn: {
+            clientMessageId: delivery.clientMessageId,
+            input: [{ type: "text", text: delivery.text }],
+          },
+        }),
+      }, { timeoutMs: TURN_START_TIMEOUT_MS });
+      const { detail: nextDetail, accepted } = response.data;
+      setPendingNewChatDelivery(null);
+      updateDraftForChat(null, "");
+      setThreads((rows) => [nextDetail.thread, ...rows.filter((thread) => thread.chatId !== nextDetail.thread.chatId)]);
+      setActiveGroup("my_chats");
+      selectedByGroupRef.current.my_chats = nextDetail.thread.chatId;
+      setSelectedChatId(nextDetail.thread.chatId);
+      setDetail(nextDetail);
+      setTurns((rows) => upsertTurn(rows, accepted.turn));
+      setDrawerOpen(false);
+      window.history.replaceState(null, "", `/task-chat?group=my_chats&chat=${encodeURIComponent(nextDetail.thread.chatId)}`);
+    } catch (cause) {
+      if (deliveryMayBeUnknown(cause)) {
+        setPendingNewChatDelivery({ ...delivery, status: "delivery_unknown" });
+        setError({
+          message: "The connection ended before the first message could be confirmed. Check and retry the same request safely.",
+          source: "turn",
+          kind: cause instanceof ControlCenterRequestError && cause.kind !== "api" ? "backend_offline" : "turn_failed",
+          chatId: null,
+        });
+      } else {
+        setPendingNewChatDelivery(null);
+        setError(failure(cause, "The new chat was not created because its first message was not accepted.", "turn"));
+      }
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function sendMessage() {
     const text = draft.trim();
-    if (!text || sending || hasActiveTurn || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
-    let chatId = selectedChatId;
+    if (!text || sending || hasActiveTurn || pendingNewChatDelivery || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
+    const chatId = selectedChatId;
     if (!chatId) {
-      chatId = (await createChat())?.thread.chatId || null;
-      if (chatId) {
-        updateDraftForChat(chatId, text);
-        updateDraftForChat(null, "");
-      }
+      await deliverNewChatMessage({
+        clientThreadId: crypto.randomUUID(),
+        clientMessageId: crypto.randomUUID(),
+        text,
+        status: "sending",
+      });
+      return;
     }
-    if (!chatId) return;
     const delivery: PendingDelivery = {
       chatId,
       clientMessageId: crypto.randomUUID(),
@@ -1046,6 +1094,30 @@ export function CodexChatPage() {
 
   async function retryUnknownDelivery() {
     const chatId = selectedChatIdRef.current;
+    if (!chatId) {
+      const delivery = pendingNewChatDelivery;
+      if (!delivery || delivery.status !== "delivery_unknown" || sending) return;
+      if ((draftsByChatRef.current[NEW_CHAT_DRAFT_KEY] || "").trim() !== delivery.text) {
+        setError({
+          message: "The draft changed. Restore the original message before retrying its delivery.",
+          source: "turn",
+          kind: "turn_failed",
+          chatId: null,
+        });
+        return;
+      }
+      setRecovering(true);
+      try {
+        await checkControlCenterHealth();
+        await refreshRuntime();
+        await deliverNewChatMessage(delivery);
+      } catch (cause) {
+        setError(failure(cause, "First-message delivery could not be reconciled.", "turn"));
+      } finally {
+        setRecovering(false);
+      }
+      return;
+    }
     const delivery = chatId ? pendingDeliveriesRef.current[chatId] : null;
     if (!delivery || delivery.status !== "delivery_unknown" || sending) return;
     setRecovering(true);
@@ -1126,7 +1198,7 @@ export function CodexChatPage() {
         <button type="button" role="tab" aria-selected={activeGroup === "my_chats"} className={activeGroup === "my_chats" ? "active" : ""} onClick={() => switchGroup("my_chats")}>Direct Chats</button>
         <button type="button" role="tab" aria-selected={activeGroup === "voice_work"} className={activeGroup === "voice_work" ? "active" : ""} onClick={() => switchGroup("voice_work")}>Voice Tasks</button>
       </div>
-      {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={startNewDraft} disabled={creating || runtime?.availability === "unavailable"}>
+      {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={startNewDraft} disabled={Boolean(pendingNewChatDelivery) || runtime?.availability === "unavailable"}>
         <Plus size={17} /> New chat
       </button> : null}
       <label className="codex-search">
@@ -1207,7 +1279,7 @@ export function CodexChatPage() {
             <AlertTriangle size={17} />
             <span>{visibleError.message}</span>
             <div className="codex-error-actions">
-              {visibleError.retryable !== false ? <button type="button" onClick={() => void retryNow()} disabled={recovering}>{recovering ? "Retrying…" : "Retry"}</button> : null}
+              {visibleError.retryable !== false && pendingDelivery?.status !== "delivery_unknown" ? <button type="button" onClick={() => void retryNow()} disabled={recovering}>{recovering ? "Retrying…" : "Retry"}</button> : null}
               <button type="button" onClick={() => setError(null)}>Dismiss</button>
             </div>
           </div>
@@ -1220,7 +1292,7 @@ export function CodexChatPage() {
               <Bot size={34} />
               <h2>{activeGroup === "voice_work" ? "Voice task threads" : "Work directly with Pritha"}</h2>
               <p>Start a persistent conversation with the runtime selected in Settings.</p>
-              {activeGroup === "my_chats" ? <button className="codex-new-chat codex-empty-action" type="button" onClick={startNewDraft} disabled={creating || runtime?.availability !== "ready"}><Plus size={17} /> New chat</button> : null}
+              {activeGroup === "my_chats" ? <button className="codex-new-chat codex-empty-action" type="button" onClick={startNewDraft} disabled={Boolean(pendingNewChatDelivery) || runtime?.availability !== "ready"}><Plus size={17} /> New chat</button> : null}
             </div>
           ) : null}
           {selectedChatId && displayedTurns.length === 0 && historyBusy ? (
@@ -1238,7 +1310,7 @@ export function CodexChatPage() {
               <p>{historyError || "Retry without leaving the selected thread."}</p>
               <div className="codex-empty-actions">
                 {historyIssue?.retryable !== false ? <button className="outline-button compact" type="button" onClick={() => void retryNow()} disabled={recovering}>{recovering ? "Retrying…" : "Retry history"}</button> : null}
-                {historyIssue?.replacementAllowed ? <button className="primary-action-button compact" type="button" onClick={startNewDraft}>Start replacement draft</button> : null}
+                {historyIssue?.replacementAllowed ? <button className="primary-action-button compact" type="button" onClick={startReplacementDraft}>Start replacement draft</button> : null}
                 {historyIssue?.retryable === false && !historyIssue.replacementAllowed ? <button className="outline-button compact" type="button" onClick={backToThreadList}>Back to list</button> : null}
               </div>
             </div>
@@ -1273,7 +1345,9 @@ export function CodexChatPage() {
         <div className="codex-composer-wrap">
           {pendingDelivery?.status === "delivery_unknown" ? (
             <div className="codex-inline-notice warning codex-delivery-unknown">
-              Delivery is unknown. History will be checked first; Task Chat will never replay this turn automatically.
+              {pendingNewChatDelivery
+                ? "First-message delivery is unknown. The same idempotent create request will be reconciled before anything new is sent."
+                : "Delivery is unknown. History will be checked first; Task Chat will never replay this turn automatically."}
               <button type="button" onClick={() => void retryUnknownDelivery()} disabled={recovering || sending || draft.trim() !== pendingDelivery.text}>
                 {recovering ? "Checking…" : "Check and retry same message"}
               </button>
@@ -1343,7 +1417,7 @@ export function CodexChatPage() {
                 >
                   <Mic size={16} /> {!dictationSupported ? "Unavailable" : dictation === "listening" ? "Listening" : dictation === "error" ? "Try again" : "Dictate"}
                 </button>
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={!draft.trim() || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={!draft.trim() || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(pendingNewChatDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} Send
                 </button>
               </div>

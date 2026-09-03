@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage } from "./app-server";
+import { classifyNativeThreadReadFailure } from "./native-thread-errors";
 import { CodexChatPrivateStore, type ChatBinding } from "./private-store";
 import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
@@ -40,6 +41,10 @@ type StartTurnInput = {
   clientMessageId: string;
   input: [{ type: "text"; text: string }];
   settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
+};
+
+type CreateThreadWithFirstTurnInput = CreateThreadInput & {
+  initialTurn: StartTurnInput;
 };
 
 type ActiveAttempt = ActiveAttemptSnapshot & {
@@ -107,6 +112,33 @@ function decodeCursor(cursor: string | undefined) {
 
 function validClientId(value: string) {
   return /^[A-Za-z0-9_-]{8,128}$/.test(value);
+}
+
+function replaceableEmptyDirectChat(binding: ChatBinding) {
+  return binding.origin === "chat"
+    && binding.group === "my_chats"
+    && binding.preview === ""
+    && Object.keys(binding.messageReceipts).length === 0
+    && binding.taskLinks.length === 0;
+}
+
+function firstTurnDeliveryIsUncertain(error: unknown) {
+  return error instanceof CodexChatGatewayError
+    && (error.code === "fallback_confirmation_required" || error.code === "turn_active");
+}
+
+function validatedTurnText(input: StartTurnInput) {
+  if (!validClientId(input?.clientMessageId)) {
+    throw new CodexChatGatewayError("invalid_request", "A valid clientMessageId is required.", 400);
+  }
+  const text = String(input.input?.[0]?.text || "").trim();
+  if (!text || input.input?.length !== 1 || input.input[0].type !== "text") {
+    throw new CodexChatGatewayError("invalid_request", "Exactly one non-empty text input is required.", 400);
+  }
+  if (Buffer.byteLength(text, "utf8") > 64_000) {
+    throw new CodexChatGatewayError("field_limit_exceeded", "Turn text exceeds 64,000 UTF-8 bytes.", 400);
+  }
+  return text;
 }
 
 export class CodexChatGatewayError extends Error {
@@ -249,6 +281,85 @@ export class CodexChatGateway {
       this.emit(binding.chatId, "thread.updated", { thread: detail.thread });
       return { detail, replayed: false };
     } catch (error) {
+      throw new CodexChatGatewayError("runtime_incompatible", publicMessage(error), 503, true);
+    }
+  }
+
+  async createThreadWithFirstTurn(input: CreateThreadWithFirstTurnInput) {
+    validatedTurnText(input.initialTurn);
+    const created = await this.createThread(input);
+    let binding = await this.requireBinding(created.detail.thread.chatId);
+    let ownsFreshEmptyBinding = !created.replayed;
+    let freshlyCreatedNativeThread = !created.replayed;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const started = await this.startTurn(binding.chatId, input.initialTurn, { freshlyCreatedNativeThread });
+        return {
+          data: {
+            detail: await this.threadDetail(binding.chatId),
+            accepted: started.accepted,
+          },
+          replayed: created.replayed && started.replayed,
+        };
+      } catch (error) {
+        const canReplace = attempt === 0
+          && error instanceof CodexChatGatewayError
+          && error.code === "native_thread_missing"
+          && replaceableEmptyDirectChat(binding);
+        if (canReplace) {
+          const active = this.activeTurns.get(binding.chatId);
+          if (active && (active.clientMessageId !== input.initialTurn.clientMessageId || active.acknowledged)) throw error;
+          if (active) this.releaseActiveTurn(binding.chatId);
+          binding = await this.replaceEmptyDirectThread(binding, input);
+          ownsFreshEmptyBinding = true;
+          freshlyCreatedNativeThread = true;
+          continue;
+        }
+        if (ownsFreshEmptyBinding && !firstTurnDeliveryIsUncertain(error)) {
+          await this.store.removeEmptyDirectChat(binding.chatId, binding.nativeThreadId).catch(() => false);
+        }
+        throw error;
+      }
+    }
+    throw new CodexChatGatewayError("turn_start_rejected", "The first message was not accepted.", 409, true);
+  }
+
+  private async replaceEmptyDirectThread(binding: ChatBinding, input: CreateThreadInput) {
+    if (!replaceableEmptyDirectChat(binding)) {
+      throw new CodexChatGatewayError("native_thread_missing", "This task thread is no longer available in the selected runtime.", 410);
+    }
+    const provider = await this.runtime.effectiveProvider();
+    if (!provider) throw new CodexChatGatewayError("runtime_unavailable", "No compatible task runtime is available.", 503, true);
+    try {
+      const connection = await this.runtime.connection(provider.providerId);
+      const defaults = this.runtime.threadDefaults();
+      const response = asObject(await connection.request("thread/start", {
+        ...defaults,
+        model: input.settings?.modelId || defaults.model,
+        ephemeral: false,
+      }));
+      const nativeThreadId = String(asObject(response?.thread)?.id || "");
+      if (!nativeThreadId) throw new Error("missing_thread_id");
+      connection.markThreadLoaded(nativeThreadId);
+      const next = await this.store.patch(binding.chatId, {
+        nativeThreadId,
+        providerId: provider.providerId,
+        stateIdentityHash: provider.view.stateIdentityHash,
+        updatedAt: new Date().toISOString(),
+        lastStatus: "idle",
+      });
+      if (!next) throw new Error("missing_binding");
+      await this.store.recordRuntimeEvent("empty-direct-chat-replaced", {
+        chatRef: hash({ chatId: binding.chatId }).slice(0, 16),
+        providerId: provider.providerId,
+      }).catch(() => undefined);
+      if (!['New task chat', 'New Codex chat'].includes(next.title)) {
+        void connection.request("thread/name/set", { threadId: nativeThreadId, name: next.title }, 5_000).catch(() => undefined);
+      }
+      return next;
+    } catch (error) {
+      if (error instanceof CodexChatGatewayError) throw error;
       throw new CodexChatGatewayError("runtime_incompatible", publicMessage(error), 503, true);
     }
   }
@@ -396,7 +507,7 @@ export class CodexChatGateway {
     };
   }
 
-  async startTurn(chatId: string, input: StartTurnInput) {
+  async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean } = {}) {
     const binding = await this.requireBinding(chatId);
     if (binding.origin === "voice" && !binding.continuationEnabled) {
       throw new CodexChatGatewayError("continuation_confirmation_required", "Choose Continue in Task Chat before sending a message.", 409);
@@ -405,14 +516,7 @@ export class CodexChatGateway {
     if (!binding.stateIdentityHash || providerView.stateIdentityHash !== binding.stateIdentityHash) {
       throw new CodexChatGatewayError("runtime_identity_mismatch", "The selected runtime does not match this chat binding.", 409);
     }
-    if (!validClientId(input.clientMessageId)) throw new CodexChatGatewayError("invalid_request", "A valid clientMessageId is required.", 400);
-    const text = String(input.input?.[0]?.text || "").trim();
-    if (!text || input.input?.length !== 1 || input.input[0].type !== "text") {
-      throw new CodexChatGatewayError("invalid_request", "Exactly one non-empty text input is required.", 400);
-    }
-    if (Buffer.byteLength(text, "utf8") > 64_000) throw new CodexChatGatewayError("field_limit_exceeded", "Turn text exceeds 64,000 UTF-8 bytes.", 400);
-    if (this.activeTurns.has(chatId)) throw new CodexChatGatewayError("turn_active", "This chat already has an active turn.", 409);
-
+    const text = validatedTurnText(input);
     const requestHash = hash(input);
     const prior = binding.messageReceipts[input.clientMessageId];
     if (prior) {
@@ -435,7 +539,9 @@ export class CodexChatGateway {
       return { accepted: { turn: replayTurn, streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events` }, replayed: true };
     }
 
-    const native = await this.readNativeThread(binding, true);
+    const native = options.freshlyCreatedNativeThread
+      ? { turns: [], status: "idle" }
+      : await this.readNativeThread(binding, true);
     const recoveredNativeTurn = (Array.isArray(native.turns) ? native.turns : [])
       .map((candidate) => normalizeNativeTurn(binding, candidate, this.root, null))
       .find((candidate): candidate is TurnView => candidate?.clientMessageId === input.clientMessageId);
@@ -465,6 +571,7 @@ export class CodexChatGateway {
         replayed: true,
       };
     }
+    if (this.activeTurns.has(chatId)) throw new CodexChatGatewayError("turn_active", "This chat already has an active turn.", 409);
     if (threadStatusFromNative(native.status, binding.archived) === "active") {
       throw new CodexChatGatewayError("turn_active", "The task runtime reports an active turn for this chat.", 409);
     }
@@ -627,12 +734,12 @@ export class CodexChatGateway {
       return thread;
     } catch (error) {
       if (error instanceof CodexChatGatewayError) throw error;
-      const message = String(error instanceof Error ? error.message : error || "");
-      if (/timed out/i.test(message)) {
+      const failure = classifyNativeThreadReadFailure(error);
+      if (failure === "history_timeout") {
         throw new CodexChatGatewayError("history_timeout", "The task history did not answer within the operation timeout.", 504, true);
       }
-      if (/not found|missing_thread|unknown thread|thread.*does not exist/i.test(message)) {
-        const replaceable = binding.origin === "chat" && !binding.preview && Object.keys(binding.messageReceipts).length === 0 && binding.taskLinks.length === 0;
+      if (failure === "native_thread_missing") {
+        const replaceable = replaceableEmptyDirectChat(binding);
         throw new CodexChatGatewayError(
           "native_thread_missing",
           "This task thread is no longer available in the selected runtime.",
@@ -641,7 +748,7 @@ export class CodexChatGateway {
           { retryable: false, replacementAllowed: replaceable, origin: binding.origin === "voice" ? "voice" : "chat" },
         );
       }
-      if (/unavailable|exited|connection closed|broken pipe|EPIPE|write after end|socket|transport/i.test(message)) {
+      if (failure === "runtime_unavailable") {
         throw new CodexChatGatewayError("runtime_unavailable", "The selected task runtime is unavailable.", 503, true);
       }
       throw new CodexChatGatewayError("history_unavailable", "Task Chat could not read this thread history.", 503, true);

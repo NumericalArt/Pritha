@@ -220,6 +220,11 @@ export type AcceptedTurn = {
   streamUrl: string;
 };
 
+export type CreatedThreadTurn = {
+  detail: ThreadDetail;
+  accepted: AcceptedTurn;
+};
+
 export type ApiSuccess<T> = {
   apiVersion: "1";
   requestId: string;

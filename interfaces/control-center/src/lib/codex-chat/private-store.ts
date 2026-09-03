@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
@@ -173,6 +174,28 @@ export class CodexChatPrivateStore {
       registry.chats[chatId] = next;
       await this.persist();
       return next;
+    });
+  }
+
+  async removeEmptyDirectChat(chatId: string, nativeThreadId: string) {
+    return this.enqueueMutation(async () => {
+      if (this.readOnlyError) throw this.readOnlyError;
+      const registry = await this.load();
+      const current = registry.chats[chatId];
+      const removable = current
+        && current.nativeThreadId === nativeThreadId
+        && current.origin === "chat"
+        && current.group === "my_chats"
+        && current.preview === ""
+        && Object.keys(current.messageReceipts).length === 0
+        && current.taskLinks.length === 0;
+      if (!removable) return false;
+      delete registry.chats[chatId];
+      await this.persist();
+      await this.audit("empty-direct-chat-removed", {
+        chatRef: createHash("sha256").update(chatId).digest("hex").slice(0, 16),
+      });
+      return true;
     });
   }
 

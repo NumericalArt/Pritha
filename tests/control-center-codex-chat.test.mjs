@@ -12,6 +12,7 @@ const root = "interfaces/control-center/src";
 const appServerSource = readFileSync(`${root}/lib/codex-chat/app-server.ts`, "utf8");
 const codexBinariesSource = readFileSync(`${root}/lib/settings/codex-binaries.ts`, "utf8");
 const gatewaySource = readFileSync(`${root}/lib/codex-chat/gateway.ts`, "utf8");
+const nativeThreadErrorsSource = readFileSync(`${root}/lib/codex-chat/native-thread-errors.ts`, "utf8");
 const privateStoreSource = readFileSync(`${root}/lib/codex-chat/private-store.ts`, "utf8");
 const privateJsonSource = readFileSync(`${root}/lib/private-json.ts`, "utf8");
 const requestClientSource = readFileSync(`${root}/lib/control-center-request.ts`, "utf8");
@@ -97,6 +98,8 @@ test("Codex Chat core keeps native history, stable browser ids and safe turn rep
   assert.doesNotMatch(gatewaySource, /--ephemeral/);
   assert.match(gatewaySource, /if \(this\.activeTurns\.has\(chatId\)\)/);
   assert.match(gatewaySource, /fallback_confirmation_required/);
+  assert.match(gatewaySource, /createThreadWithFirstTurn/);
+  assert.match(gatewaySource, /created\.replayed && started\.replayed/);
   assert.match(gatewaySource, /messageReceipts/);
   assert.match(gatewaySource, /idempotency_conflict/);
   assert.match(gatewaySource, /recoveredNativeTurn/);
@@ -121,6 +124,8 @@ test("Codex Chat private linkage remains outside tracked knowledge and uses atom
   assert.match(privateStoreSource, /registry\.last-known-good\.json/);
   assert.match(privateStoreSource, /registry-read-only/);
   assert.match(privateStoreSource, /registry-restored/);
+  assert.match(privateStoreSource, /removeEmptyDirectChat/);
+  assert.match(privateStoreSource, /Object\.keys\(current\.messageReceipts\)\.length === 0/);
   assert.match(privateJsonSource, /randomUUID\(\)/);
   assert.match(privateJsonSource, /await handle\.sync\(\)/);
   assert.match(privateJsonSource, /await rename\(temporary, target\)/);
@@ -285,6 +290,22 @@ export const resolvePrithaStateRoot = () => ${JSON.stringify(stateRoot)};
     assert.deepEqual(JSON.parse(readFileSync(path.join(chatRoot, "registry.json"), "utf8")), valid);
     assert.match(readFileSync(path.join(chatRoot, "registry.audit.jsonl"), "utf8"), /registry-restored/);
 
+    const emptyBinding = {
+      ...binding,
+      chatId: "chat_empty_direct",
+      clientThreadId: "client-empty-direct",
+      nativeThreadId: "native-empty-direct",
+      title: "New task chat",
+      preview: "",
+    };
+    await recovered.put(emptyBinding);
+    assert.equal(await recovered.removeEmptyDirectChat(emptyBinding.chatId, "wrong-native-thread"), false);
+    assert.equal(await recovered.removeEmptyDirectChat(emptyBinding.chatId, emptyBinding.nativeThreadId), true);
+    assert.equal(await recovered.get(emptyBinding.chatId), null);
+    const removalAudit = readFileSync(path.join(chatRoot, "registry.audit.jsonl"), "utf8");
+    assert.match(removalAudit, /empty-direct-chat-removed/);
+    assert.doesNotMatch(removalAudit, /chat_empty_direct|native-empty-direct/);
+
     writeFileSync(path.join(chatRoot, "registry.json"), "{broken-primary", "utf8");
     writeFileSync(path.join(chatRoot, "registry.last-known-good.json"), "{broken-backup", "utf8");
     const failedModule = await import(`${pathToFileURL(path.join(tmp, "private-store.mjs")).href}?failed`);
@@ -300,6 +321,9 @@ export const resolvePrithaStateRoot = () => ${JSON.stringify(stateRoot)};
 test("Codex Chat routes enforce bounded input, idempotent mutations and resumable SSE", () => {
   assert.match(threadRouteSource, /requireIdempotencyKey\(request\)/);
   assert.match(threadRouteSource, /Thread title exceeds 120 characters/);
+  assert.match(threadRouteSource, /body\.initialTurn/);
+  assert.match(threadRouteSource, /createThreadWithFirstTurn/);
+  assert.match(threadRouteSource, /status: result\.replayed \? 200 : 202/);
   assert.match(turnsRouteSource, /requireIdempotencyKey\(request\)/);
   assert.match(turnsRouteSource, /status: 202/);
   assert.match(eventsRouteSource, /request\.headers\.get\("last-event-id"\)/);
@@ -362,15 +386,37 @@ test("Voice task lists are incremental, indexed and preserve legacy bindings", (
   assert.doesNotMatch(chatPageSource, /for \(let page = 0; page < 20/);
 });
 
-test("missing native history is explicit and replacement remains draft-only", () => {
+test("missing native history is explicit and replacement preserves a draft", async () => {
+  const loaded = await transpileModule(nativeThreadErrorsSource, "pritha-native-thread-errors-");
+  try {
+    assert.equal(loaded.module.classifyNativeThreadReadFailure(new Error("thread not loaded: test")), "native_thread_missing");
+    assert.equal(loaded.module.classifyNativeThreadReadFailure(new Error("no rollout found for thread id test")), "native_thread_missing");
+    assert.equal(loaded.module.classifyNativeThreadReadFailure(new Error("request timed out")), "history_timeout");
+    assert.equal(loaded.module.classifyNativeThreadReadFailure(new Error("connection closed")), "runtime_unavailable");
+  } finally {
+    loaded.cleanup();
+  }
   assert.match(gatewaySource, /"native_thread_missing"/);
   assert.match(gatewaySource, /replacementAllowed: replaceable/);
   assert.match(gatewaySource, /"history_timeout"/);
   assert.match(gatewaySource, /"history_unavailable"/);
   assert.match(chatPageSource, /Start replacement draft/);
-  assert.match(chatPageSource, /onClick=\{startNewDraft\}/);
-  assert.match(chatPageSource, /if \(!chatId\) \{\s+chatId = \(await createChat\(\)\)/);
+  assert.match(chatPageSource, /onClick=\{startReplacementDraft\}/);
+  assert.match(chatPageSource, /updateDraftForChat\(null, replacementText\)/);
   assert.doesNotMatch(chatPageSource, /onClick=\{\(\) => void createChat\(\)\}/);
+});
+
+test("a new Direct Chat sends its first turn through one idempotent request", () => {
+  assert.match(chatPageSource, /api<CreatedThreadTurn>\("\/api\/codex-chat\/v1\/threads"/);
+  assert.match(chatPageSource, /"Idempotency-Key": delivery\.clientThreadId/);
+  assert.match(chatPageSource, /initialTurn: \{\s+clientMessageId: delivery\.clientMessageId/);
+  assert.match(chatPageSource, /pendingNewChatDelivery/);
+  assert.match(chatPageSource, /First-message delivery is unknown/);
+  assert.match(chatPageSource, /await deliverNewChatMessage\(delivery\)/);
+  assert.doesNotMatch(chatPageSource, /if \(!chatId\) \{[\s\S]{0,300}createChat/);
+  assert.match(gatewaySource, /for \(let attempt = 0; attempt < 2; attempt \+= 1\)/);
+  assert.match(gatewaySource, /replaceEmptyDirectThread/);
+  assert.match(gatewaySource, /firstTurnDeliveryIsUncertain/);
 });
 
 test("mobile navigation reuses one status snapshot and exposes immediate progress", () => {

@@ -239,6 +239,8 @@ test.describe("Control Center UI regression", () => {
     let voiceListRequests = 0;
     let secondVoiceHistoryAttempts = 0;
     let createThreadRequests = 0;
+    let existingThreadTurnRequests = 0;
+    const newThreadBodies: Array<Record<string, unknown>> = [];
     const uiActivity: Array<Record<string, unknown>> = [];
     const runtime = {
       preferredProvider: "auto", effectiveProvider: "desktop_bundled", effectiveProtocol: "app_server", availability: "ready", fallbackEnabled: true,
@@ -247,6 +249,15 @@ test.describe("Control Center UI regression", () => {
     };
     const base = { preview: "", status: "idle", activeFlags: [], pinned: false, archived: false, historyKind: "native", createdAt: now, updatedAt: now, runtime: { providerId: "desktop_bundled", version: "test", protocol: "app_server", stateIdentityHash: "test", compatibility: "bound" } };
     const direct = { ...base, chatId: "chat-direct", title: "Direct example", group: "my_chats", origin: "chat", taskLinks: [], continuationState: "continuation_enabled" };
+    const newDirect = { ...base, chatId: "chat-new", title: "First atomic task", preview: "First atomic task", status: "active", group: "my_chats", origin: "chat", taskLinks: [], continuationState: "continuation_enabled" };
+    const newTurn = {
+      turnId: "turn-new",
+      clientMessageId: "client-message-new",
+      status: "in_progress",
+      userMessage: { id: "message-new", role: "user", markdown: "First atomic task", status: "completed", createdAt: now },
+      items: [], pendingRequestIds: [], startedAt: now, completedAt: null, error: null,
+    };
+    const newDetail = { thread: newDirect, activeTurnId: "turn-new", pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-new/events", continuationState: "continuation_enabled" };
     const voice = () => ({ ...base, chatId: "chat-voice", title: "Voice example", group: "voice_work", origin: "voice", taskLinks: [{ taskId: "task-one", shortId: "ONE", label: "Voice task", origin: "voice", mode: continuationEnabled ? "shared_thread" : "result_reference", subjectScope: { kind: "pritha", id: "pritha", label: "Pritha", generation: 1 }, status: "complete", linkedAt: now }], continuationState: continuationEnabled ? "continuation_enabled" : "read_only" });
     const secondVoice = { ...voice(), chatId: "chat-voice-second", title: "Voice pagination example", taskLinks: [{ ...voice().taskLinks[0], taskId: "task-two", shortId: "TWO" }] };
     await page.route("**/api/codex-chat/v1/**", async (route) => {
@@ -257,9 +268,22 @@ test.describe("Control Center UI regression", () => {
       }
       if (route.request().method() === "POST" && url.pathname.endsWith("/threads")) {
         createThreadRequests += 1;
-        return route.fulfill({ status: 500, contentType: "application/json", body: "{}" });
+        newThreadBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+        if (createThreadRequests === 1) {
+          return route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({ apiVersion: "1", error: { code: "fallback_confirmation_required", message: "First-message delivery is unknown.", retryable: true, requestId: "new-chat-unknown" } }),
+          });
+        }
+        return route.fulfill({
+          status: 202,
+          contentType: "application/json",
+          body: JSON.stringify({ apiVersion: "1", requestId: "new-chat-accepted", replayed: true, data: { detail: newDetail, accepted: { turn: newTurn, streamUrl: newDetail.streamUrl } } }),
+        });
       }
       if (route.request().method() === "POST" && url.pathname.endsWith("/turns")) {
+        existingThreadTurnRequests += 1;
         const knownRejection = url.pathname.includes("/chat-direct/");
         return route.fulfill({
           status: 409,
@@ -292,6 +316,10 @@ test.describe("Control Center UI regression", () => {
           : { data: [direct], nextCursor: null };
       }
       else if (url.pathname.endsWith("/turns")) {
+        if (url.pathname.includes("/chat-new/")) {
+          data = { data: [newTurn], olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
+          return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId: "task-chat-new-history", data }) });
+        }
         if (url.pathname.includes("/chat-voice-second/")) {
           secondVoiceHistoryAttempts += 1;
           if (secondVoiceHistoryAttempts === 1) {
@@ -302,6 +330,7 @@ test.describe("Control Center UI regression", () => {
         data = { data: [], olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
       }
       else if (url.pathname.endsWith("/chat-direct")) data = { thread: direct, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-direct/events", continuationState: "continuation_enabled" };
+      else if (url.pathname.endsWith("/chat-new")) data = newDetail;
       else if (url.pathname.endsWith("/chat-voice") || url.pathname.endsWith("/task-links")) data = { thread: voice(), activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-voice/events", continuationState: continuationEnabled ? "continuation_enabled" : "read_only" };
       else if (url.pathname.endsWith("/chat-voice-second")) data = { thread: secondVoice, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-voice-second/events", continuationState: "read_only" };
       else return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
@@ -373,6 +402,21 @@ test.describe("Control Center UI regression", () => {
     await mobileHistory.getByRole("tab", { name: "Direct Chats" }).click();
     await mobileHistory.getByRole("button", { name: "New chat" }).click();
     expect(createThreadRequests).toBe(0);
+    const existingTurnRequestsBeforeNewChat = existingThreadTurnRequests;
+    await page.locator(".codex-composer textarea").fill("First atomic task");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.locator(".codex-delivery-unknown")).toBeVisible();
+    expect(createThreadRequests).toBe(1);
+    expect(existingThreadTurnRequests).toBe(existingTurnRequestsBeforeNewChat);
+    await page.getByRole("button", { name: "Check and retry same message" }).click();
+    await expect(page.locator(".codex-title-line h1")).toHaveText("First atomic task");
+    expect(createThreadRequests).toBe(2);
+    expect(existingThreadTurnRequests).toBe(existingTurnRequestsBeforeNewChat);
+    expect(newThreadBodies[1]).toEqual(newThreadBodies[0]);
+    expect(newThreadBodies[0]).toMatchObject({
+      source: "chat",
+      initialTurn: { input: [{ type: "text", text: "First atomic task" }] },
+    });
   });
 
   test("keeps a long Codex transcript scrollable, the composer reachable, and dictation language browser-local", async ({ page }) => {

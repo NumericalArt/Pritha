@@ -41,12 +41,21 @@ export async function POST(request: Request) {
       title?: string;
       source: "chat";
       settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
+      initialTurn?: {
+        clientMessageId: string;
+        input: [{ type: "text"; text: string }];
+        settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
+      };
     }>(request);
     if (idempotencyKey !== body.clientThreadId) {
       throw new CodexChatGatewayError("idempotency_conflict", "Idempotency-Key must match clientThreadId.", 409);
     }
     if (body.title != null && Array.from(String(body.title)).length > 120) {
       throw new CodexChatGatewayError("field_limit_exceeded", "Thread title exceeds 120 characters.", 400);
+    }
+    if (body.initialTurn) {
+      const result = await getCodexChatGateway().createThreadWithFirstTurn({ ...body, initialTurn: body.initialTurn });
+      return apiSuccess(result.data, { status: result.replayed ? 200 : 202, replayed: result.replayed });
     }
     const result = await getCodexChatGateway().createThread(body);
     return apiSuccess(result.detail, { status: result.replayed ? 200 : 201, replayed: result.replayed });
