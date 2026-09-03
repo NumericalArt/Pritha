@@ -411,6 +411,8 @@ test("a new Direct Chat sends its first turn through one idempotent request", ()
   assert.match(chatPageSource, /"Idempotency-Key": delivery\.clientThreadId/);
   assert.match(chatPageSource, /initialTurn: \{\s+clientMessageId: delivery\.clientMessageId/);
   assert.match(chatPageSource, /pendingNewChatDelivery/);
+  assert.match(chatPageSource, /newChatDraftActiveRef\.current \|\| pendingNewChatDeliveryRef\.current/);
+  assert.match(chatPageSource, /newChatDraftActiveRef\.current = true/);
   assert.match(chatPageSource, /First-message delivery is unknown/);
   assert.match(chatPageSource, /await deliverNewChatMessage\(delivery\)/);
   assert.doesNotMatch(chatPageSource, /if \(!chatId\) \{[\s\S]{0,300}createChat/);

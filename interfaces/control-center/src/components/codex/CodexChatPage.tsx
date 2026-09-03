@@ -317,6 +317,7 @@ export function CodexChatPage() {
   const draftsByChatRef = useRef<Record<string, string>>({});
   const pendingDeliveriesRef = useRef<Record<string, PendingDelivery>>({});
   const pendingNewChatDeliveryRef = useRef<PendingNewChatDelivery | null>(null);
+  const newChatDraftActiveRef = useRef(false);
   const detailRequestRef = useRef<{ chatId: string; token: symbol; controller: AbortController } | null>(null);
   const historyRequestRef = useRef<{ chatId: string; token: symbol; controller: AbortController } | null>(null);
   const navigationRef = useRef<TaskChatNavigationContext | null>(null);
@@ -382,7 +383,7 @@ export function CodexChatPage() {
       reportControlCenterUiActivity({ event: "thread_list_first_page_loaded", interactionId, source: "thread_list", durationMs: Date.now() - startedAt, group: requestedGroup, view: "current", count: Math.min(50, groupRows.length) });
       if (activeGroupRef.current !== requestedGroup) return groupRows;
       setSelectedChatId((current) => {
-        if (requestedGroup === "my_chats" && pendingNewChatDeliveryRef.current) return null;
+        if (requestedGroup === "my_chats" && (newChatDraftActiveRef.current || pendingNewChatDeliveryRef.current)) return null;
         const requested = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chat") : null;
         const next = requested || [current, selectedByGroupRef.current[requestedGroup], groupRows[0]?.chatId]
           .find((candidate) => candidate && groupRows.some((thread) => thread.chatId === candidate)) || null;
@@ -915,6 +916,8 @@ export function CodexChatPage() {
   }, [beginNavigation, connection, loadThreadDetail, loadThreadHistory, refreshRuntime, refreshThreads]);
 
   const startNewDraft = useCallback(() => {
+    newChatDraftActiveRef.current = true;
+    selectedChatIdRef.current = null;
     selectedByGroupRef.current.my_chats = null;
     setActiveGroup("my_chats");
     setSelectedChatId(null);
@@ -977,7 +980,7 @@ export function CodexChatPage() {
     if (group === activeGroup) return;
     selectedByGroupRef.current[activeGroup] = selectedChatId;
     setActiveGroup(group);
-    const next = group === "my_chats" && pendingNewChatDeliveryRef.current
+    const next = group === "my_chats" && (newChatDraftActiveRef.current || pendingNewChatDeliveryRef.current)
       ? null
       : selectedByGroupRef.current[group] || threads.find((thread) => thread.group === group)?.chatId || null;
     if (next) beginNavigation(next, "group_restore");
@@ -1041,6 +1044,7 @@ export function CodexChatPage() {
         }),
       }, { timeoutMs: TURN_START_TIMEOUT_MS });
       const { detail: nextDetail, accepted } = response.data;
+      newChatDraftActiveRef.current = false;
       setPendingNewChatDelivery(null);
       updateDraftForChat(null, "");
       setThreads((rows) => [nextDetail.thread, ...rows.filter((thread) => thread.chatId !== nextDetail.thread.chatId)]);
@@ -1210,6 +1214,7 @@ export function CodexChatPage() {
         {visibleThreads.length ? visibleThreads.map((thread) => (
           <ThreadRow key={thread.chatId} thread={thread} active={thread.chatId === selectedChatId} onSelect={() => {
             if (thread.chatId !== selectedChatId) {
+              if (thread.group === "my_chats") newChatDraftActiveRef.current = false;
               beginNavigation(thread.chatId, "history_row", { selected: true });
               setSelectedChatId(thread.chatId);
               selectedByGroupRef.current[activeGroup] = thread.chatId;

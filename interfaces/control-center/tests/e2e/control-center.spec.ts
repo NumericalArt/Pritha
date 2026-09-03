@@ -241,6 +241,10 @@ test.describe("Control Center UI regression", () => {
     let createThreadRequests = 0;
     let existingThreadTurnRequests = 0;
     const newThreadBodies: Array<Record<string, unknown>> = [];
+    let delayNextDirectList = false;
+    let resolveDelayedDirectListStarted: (() => void) | null = null;
+    let releaseDelayedDirectList: () => void = () => undefined;
+    let delayedDirectListGate: Promise<void> = Promise.resolve();
     const uiActivity: Array<Record<string, unknown>> = [];
     const runtime = {
       preferredProvider: "auto", effectiveProvider: "desktop_bundled", effectiveProtocol: "app_server", availability: "ready", fallbackEnabled: true,
@@ -309,6 +313,11 @@ test.describe("Control Center UI regression", () => {
         const group = url.searchParams.get("group");
         const cursor = url.searchParams.get("cursor");
         if (group === "voice_work") voiceListRequests += 1;
+        if (group === "my_chats" && delayNextDirectList) {
+          delayNextDirectList = false;
+          resolveDelayedDirectListStarted?.();
+          await delayedDirectListGate;
+        }
         data = group === "voice_work"
           ? cursor === "voice-page-2"
             ? { data: [secondVoice], nextCursor: null }
@@ -399,11 +408,19 @@ test.describe("Control Center UI regression", () => {
     await expect(mobileHistory.getByRole("tab", { name: "Voice Tasks" })).toHaveAttribute("aria-selected", "true");
     await expect(mobileHistory.getByRole("button", { name: /Voice example/ })).toBeVisible();
     await expectNoPageOverflow(page);
+    const delayedDirectListStarted = new Promise<void>((resolve) => { resolveDelayedDirectListStarted = resolve; });
+    delayedDirectListGate = new Promise<void>((resolve) => { releaseDelayedDirectList = resolve; });
+    delayNextDirectList = true;
     await mobileHistory.getByRole("tab", { name: "Direct Chats" }).click();
+    await delayedDirectListStarted;
     await mobileHistory.getByRole("button", { name: "New chat" }).click();
     expect(createThreadRequests).toBe(0);
     const existingTurnRequestsBeforeNewChat = existingThreadTurnRequests;
     await page.locator(".codex-composer textarea").fill("First atomic task");
+    releaseDelayedDirectList();
+    await expect(page.locator(".codex-title-line h1")).toHaveText("Task Chat");
+    await expect(page.locator(".codex-composer textarea")).toHaveValue("First atomic task");
+    await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.locator(".codex-delivery-unknown")).toBeVisible();
     expect(createThreadRequests).toBe(1);
