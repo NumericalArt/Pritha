@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage } from "./app-server";
 import { CodexChatPrivateStore, type ChatBinding } from "./private-store";
-import { reconcileVoiceTaskChatLinks } from "./voice-links";
+import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
 import {
   asObject,
@@ -115,6 +115,7 @@ export class CodexChatGatewayError extends Error {
     message: string,
     readonly status: number,
     readonly retryable = false,
+    readonly details?: Record<string, string | number | boolean | null>,
   ) {
     super(message);
   }
@@ -141,8 +142,9 @@ export class CodexChatGateway {
     search?: string;
     cursor?: string;
     limit?: number;
+    view?: "current" | "legacy";
   } = {}): Promise<ThreadPage> {
-    await reconcileVoiceTaskChatLinks(this.store, this.runtime);
+    if (input.group === "voice_work") queueVoiceTaskChatIndexRefresh(this.store, this.runtime);
     const bindings = await this.store.all();
     const providerViews = new Map<RuntimeProviderId, RuntimeProviderView>();
     for (const providerId of ["desktop_bundled", "standalone_cli"] as const) {
@@ -150,18 +152,47 @@ export class CodexChatGateway {
     }
     const search = String(input.search || "").trim().toLowerCase();
     const archived = input.archived === true;
-    let rows = bindings
+    const summaries = bindings
       .filter((binding) => binding.archived === archived)
       .map((binding) => summarizeThread(binding, providerViews.get(binding.providerId) || null))
-      .filter((thread) => input.group == null || input.group === "all" || thread.group === input.group)
-      .filter((thread) => !search || `${thread.title} ${thread.preview}`.toLowerCase().includes(search));
+      .filter((thread) => input.group == null || input.group === "all" || thread.group === input.group);
+    const view = input.view || "current";
+    const voiceRows = summaries.filter((thread) => thread.group === "voice_work");
+    const currentVoiceIds = new Set<string>();
+    const voiceByNative = new Map<string, ThreadSummary[]>();
+    for (const thread of voiceRows) {
+      const binding = bindings.find((candidate) => candidate.chatId === thread.chatId);
+      if (!binding) continue;
+      const rows = voiceByNative.get(binding.nativeThreadId) || [];
+      rows.push(thread);
+      voiceByNative.set(binding.nativeThreadId, rows);
+    }
+    const compatibilityRank = (value: ThreadSummary["runtime"]["compatibility"]) => value === "bound" ? 3 : value === "compatible" ? 2 : value === "probe_required" ? 1 : 0;
+    for (const candidates of voiceByNative.values()) {
+      const winner = [...candidates]
+        .filter((thread) => compatibilityRank(thread.runtime.compatibility) >= 2)
+        .sort((left, right) =>
+          compatibilityRank(right.runtime.compatibility) - compatibilityRank(left.runtime.compatibility)
+          || Number(right.runtime.providerId === this.runtime.preferredProvider()) - Number(left.runtime.providerId === this.runtime.preferredProvider())
+          || Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+          || left.chatId.localeCompare(right.chatId))[0];
+      if (winner) currentVoiceIds.add(winner.chatId);
+    }
+    let rows = summaries.filter((thread) => {
+      if (thread.group !== "voice_work") return true;
+      return view === "legacy" ? !currentVoiceIds.has(thread.chatId) : currentVoiceIds.has(thread.chatId);
+    }).filter((thread) => !search || `${thread.title} ${thread.preview} ${thread.taskLinks.map((link) => link.label).join(" ")}`.toLowerCase().includes(search));
     rows = rows.sort((left, right) => Number(right.pinned) - Number(left.pinned) || Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
     const requestedOffset = input.cursor ? decodeCursor(input.cursor) : 0;
     if (requestedOffset == null || requestedOffset > rows.length) throw new CodexChatGatewayError("invalid_cursor", "The thread cursor is invalid.", 400);
     const limit = Math.max(1, Math.min(input.limit || 30, 50));
     const data = rows.slice(requestedOffset, requestedOffset + limit);
     const nextOffset = requestedOffset + data.length;
-    return { data, nextCursor: nextOffset < rows.length ? encodeCursor(nextOffset) : null };
+    return {
+      data,
+      nextCursor: nextOffset < rows.length ? encodeCursor(nextOffset) : null,
+      ...(input.group === "voice_work" ? { sync: voiceTaskChatIndexStatus() } : {}),
+    };
   }
 
   async createThread(input: CreateThreadInput) {
@@ -255,8 +286,19 @@ export class CodexChatGateway {
   }
 
   async taskChatLinkForTask(taskId: string) {
-    await reconcileVoiceTaskChatLinks(this.store, this.runtime);
-    const binding = await this.store.findByTaskId(taskId);
+    await reconcileVoiceTaskChatLink(this.store, this.runtime, taskId);
+    const candidates = (await this.store.all()).filter((row) => row.taskLinks.some((link) => link.taskId === taskId));
+    const views = new Map<RuntimeProviderId, RuntimeProviderView>();
+    for (const providerId of ["desktop_bundled", "standalone_cli"] as const) views.set(providerId, (await this.runtime.provider(providerId)).view);
+    const effective = (await this.runtime.effectiveProvider())?.providerId || this.runtime.preferredProvider();
+    const binding = candidates.sort((left, right) => {
+      const leftView = summarizeThread(left, views.get(left.providerId) || null);
+      const rightView = summarizeThread(right, views.get(right.providerId) || null);
+      const rank = (value: ThreadSummary["runtime"]["compatibility"]) => value === "bound" ? 3 : value === "compatible" ? 2 : value === "probe_required" ? 1 : 0;
+      return rank(rightView.runtime.compatibility) - rank(leftView.runtime.compatibility)
+        || Number(right.providerId === effective) - Number(left.providerId === effective)
+        || Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+    })[0] || null;
     if (!binding) return null;
     const detail = await this.threadDetail(binding.chatId);
     return {
@@ -271,7 +313,7 @@ export class CodexChatGateway {
     if (!input.taskId || !["shared_thread", "result_reference"].includes(input.mode)) {
       throw new CodexChatGatewayError("invalid_request", "A valid taskId and link mode are required.", 400);
     }
-    await reconcileVoiceTaskChatLinks(this.store, this.runtime);
+    await reconcileVoiceTaskChatLink(this.store, this.runtime, input.taskId);
     const binding = await this.requireBinding(chatId);
     const existing = binding.taskLinks.find((link) => link.taskId === input.taskId);
     if (!existing) throw new CodexChatGatewayError("task_not_linked", "This task is not linked to the selected chat.", 404);
@@ -585,7 +627,24 @@ export class CodexChatGateway {
       return thread;
     } catch (error) {
       if (error instanceof CodexChatGatewayError) throw error;
-      throw new CodexChatGatewayError("runtime_unavailable", publicMessage(error), 503, true);
+      const message = String(error instanceof Error ? error.message : error || "");
+      if (/timed out/i.test(message)) {
+        throw new CodexChatGatewayError("history_timeout", "The task history did not answer within the operation timeout.", 504, true);
+      }
+      if (/not found|missing_thread|unknown thread|thread.*does not exist/i.test(message)) {
+        const replaceable = binding.origin === "chat" && !binding.preview && Object.keys(binding.messageReceipts).length === 0 && binding.taskLinks.length === 0;
+        throw new CodexChatGatewayError(
+          "native_thread_missing",
+          "This task thread is no longer available in the selected runtime.",
+          410,
+          false,
+          { retryable: false, replacementAllowed: replaceable, origin: binding.origin === "voice" ? "voice" : "chat" },
+        );
+      }
+      if (/unavailable|exited|connection closed|broken pipe|EPIPE|write after end|socket|transport/i.test(message)) {
+        throw new CodexChatGatewayError("runtime_unavailable", "The selected task runtime is unavailable.", 503, true);
+      }
+      throw new CodexChatGatewayError("history_unavailable", "Task Chat could not read this thread history.", 503, true);
     }
   }
 

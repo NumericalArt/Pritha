@@ -200,6 +200,10 @@ export type CreateTaskLinkRequest = {
 export type ThreadPage = {
   data: ThreadSummary[];
   nextCursor: string | null;
+  sync?: {
+    state: "ready" | "refreshing" | "degraded";
+    lastCompletedAt: string | null;
+  };
 };
 
 export type TurnPage = {

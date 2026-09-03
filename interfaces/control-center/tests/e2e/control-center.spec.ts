@@ -66,6 +66,11 @@ async function expectNoPageOverflow(page: Page) {
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2))
     .toBeTruthy();
+  await expect
+    .poll(() => page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".codex-transcript")]
+      .filter((element) => element.offsetParent !== null)
+      .every((element) => element.scrollWidth <= element.clientWidth + 2)))
+    .toBeTruthy();
 }
 
 async function expectNoRawSecret(page: Page) {
@@ -233,6 +238,7 @@ test.describe("Control Center UI regression", () => {
     let continuationEnabled = false;
     let voiceListRequests = 0;
     let secondVoiceHistoryAttempts = 0;
+    let createThreadRequests = 0;
     const uiActivity: Array<Record<string, unknown>> = [];
     const runtime = {
       preferredProvider: "auto", effectiveProvider: "desktop_bundled", effectiveProtocol: "app_server", availability: "ready", fallbackEnabled: true,
@@ -248,6 +254,10 @@ test.describe("Control Center UI regression", () => {
       if (route.request().method() === "POST" && url.pathname.endsWith("/ui-activity")) {
         uiActivity.push(route.request().postDataJSON() as Record<string, unknown>);
         return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId: "task-chat-telemetry", data: { recorded: true } }) });
+      }
+      if (route.request().method() === "POST" && url.pathname.endsWith("/threads")) {
+        createThreadRequests += 1;
+        return route.fulfill({ status: 500, contentType: "application/json", body: "{}" });
       }
       if (route.request().method() === "POST" && url.pathname.endsWith("/turns")) {
         const knownRejection = url.pathname.includes("/chat-direct/");
@@ -360,6 +370,9 @@ test.describe("Control Center UI regression", () => {
     await expect(mobileHistory.getByRole("tab", { name: "Voice Tasks" })).toHaveAttribute("aria-selected", "true");
     await expect(mobileHistory.getByRole("button", { name: /Voice example/ })).toBeVisible();
     await expectNoPageOverflow(page);
+    await mobileHistory.getByRole("tab", { name: "Direct Chats" }).click();
+    await mobileHistory.getByRole("button", { name: "New chat" }).click();
+    expect(createThreadRequests).toBe(0);
   });
 
   test("keeps a long Codex transcript scrollable, the composer reachable, and dictation language browser-local", async ({ page }) => {

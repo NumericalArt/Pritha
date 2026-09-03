@@ -904,6 +904,7 @@ function MaintenanceSettingsSection() {
         if (!payload.action) payload.action = action;
         setLastResult(payload);
         await loadMaintenance();
+        window.dispatchEvent(new Event("pritha:status-refresh"));
       } finally {
         setBusyAction(null);
       }

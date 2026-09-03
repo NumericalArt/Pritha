@@ -1,11 +1,3 @@
-import { SettingsControlPage } from "@/components/settings/SettingsControlPage";
-import { controlCenterStatusForClient, getControlCenterStatus } from "@/lib/control-center/server";
+import { SettingsStatusPage } from "@/components/shell/StatusPages";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
-
-export default async function SettingsPage() {
-  const status = controlCenterStatusForClient(await getControlCenterStatus());
-  return <SettingsControlPage access={status.access} status={status} />;
-}
+export default function SettingsPage() { return <SettingsStatusPage />; }

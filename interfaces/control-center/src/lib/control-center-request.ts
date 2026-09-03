@@ -10,6 +10,7 @@ export class ControlCenterRequestError extends Error {
     readonly retryable: boolean,
     readonly httpStatus: number | null,
     readonly requestId: string | null,
+    readonly details?: Record<string, string | number | boolean | null>,
   ) {
     super(message);
     this.name = "ControlCenterRequestError";
@@ -33,8 +34,9 @@ function requestError(
   retryable: boolean,
   httpStatus: number | null,
   requestId: string | null = null,
+  details?: Record<string, string | number | boolean | null>,
 ) {
-  return new ControlCenterRequestError(kind, code, message, retryable, httpStatus, requestId);
+  return new ControlCenterRequestError(kind, code, message, retryable, httpStatus, requestId, details);
 }
 
 async function readBoundedText(response: Response, maxBodyBytes: number) {
@@ -109,7 +111,7 @@ export async function controlCenterRequest<T>(url: string, init: RequestInit = {
     }
 
     if (validApiError(payload)) {
-      throw requestError("api", payload.error.code, payload.error.message, payload.error.retryable, response.status, payload.error.requestId);
+      throw requestError("api", payload.error.code, payload.error.message, payload.error.retryable, response.status, payload.error.requestId, payload.error.details);
     }
     if (!response.ok || !validApiSuccess<T>(payload)) throw gatewayError(response.status);
     return payload;

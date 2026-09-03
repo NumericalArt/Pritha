@@ -362,6 +362,7 @@ export class AppServerConnection {
 
 export class CodexRuntimeManager {
   private probes = new Map<RuntimeProviderId, ProviderProbe>();
+  private probePromises = new Map<RuntimeProviderId, Promise<ProviderProbe>>();
   private connections = new Map<RuntimeProviderId, AppServerConnection>();
 
   constructor(
@@ -533,6 +534,14 @@ export class CodexRuntimeManager {
   private async probe(providerId: RuntimeProviderId) {
     const cached = this.probes.get(providerId);
     if (cached && Date.now() - cached.probedAt < PROBE_TTL_MS) return cached;
+    const inFlight = this.probePromises.get(providerId);
+    if (inFlight) return inFlight;
+    const promise = this.runProbe(providerId).finally(() => this.probePromises.delete(providerId));
+    this.probePromises.set(providerId, promise);
+    return promise;
+  }
+
+  private async runProbe(providerId: RuntimeProviderId) {
     const binary = resolveProviderBinary(providerId);
     const label = providerId === "desktop_bundled" ? "Codex Desktop runtime" : "Codex CLI runtime";
     const locationLabel = providerId === "desktop_bundled" ? "Desktop bundled" : "Standalone CLI";

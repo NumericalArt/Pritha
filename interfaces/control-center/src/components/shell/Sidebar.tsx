@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Copy, ExternalLink, Link2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { desktopNavItems } from "@/lib/routes";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type { ControlCenterStatus } from "@/lib/control-center/types";
 import { PrithaLogoPlaceholder } from "@/components/primitives/PrithaLogoPlaceholder";
 import { LanguageDropdown } from "@/components/primitives/LanguageDropdown";
+import { useControlCenterStatus } from "./ControlCenterStatusProvider";
 
 const CONTROL_CENTER_PRODUCT = "Control Center";
 
@@ -80,26 +81,13 @@ function accessView(status: ControlCenterStatus | null): AccessView {
   };
 }
 
-export function Sidebar({ initialStatus }: { initialStatus: ControlCenterStatus }) {
+export function Sidebar() {
   const pathname = usePathname();
-  const [status, setStatus] = useState<ControlCenterStatus | null>(initialStatus);
+  const { status } = useControlCenterStatus();
   const [accessOpen, setAccessOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const access = useMemo(() => accessView(status), [status]);
-  const appVersion = status?.app.version || initialStatus.app.version;
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/status", { cache: "no-store" })
-      .then((response) => response.json() as Promise<ControlCenterStatus>)
-      .then((payload) => {
-        if (!cancelled) setStatus(payload);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const appVersion = status.app.version;
 
   async function copyVoiceUrl() {
     if (!access.voiceUrl) return;

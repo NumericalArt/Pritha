@@ -33,6 +33,7 @@ export function apiError(error: unknown) {
           : "Task Chat encountered an internal error.",
       retryable: known ? error.retryable : registryCorrupt,
       requestId,
+      ...(known && error.details ? { details: error.details } : {}),
     },
   };
   return Response.json(payload, { status, headers: { "Cache-Control": "no-store" } });

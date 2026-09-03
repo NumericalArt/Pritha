@@ -46,6 +46,27 @@ export function reportTaskChatUiActivity(
   }).catch(() => undefined);
 }
 
+export function reportControlCenterUiActivity(input: {
+  event: "primary_navigation_started" | "primary_navigation_completed" | "primary_navigation_timeout" | "thread_list_started" | "thread_list_first_page_loaded" | "thread_list_page_failed";
+  interactionId: string;
+  source: "mobile_bottom_nav" | "thread_list";
+  durationMs?: number;
+  errorCode?: string;
+  fromRoute?: "voice" | "agents" | "task_chat" | "settings" | "other";
+  toRoute?: "voice" | "agents" | "task_chat" | "settings" | "other";
+  group?: "my_chats" | "voice_work";
+  view?: "current" | "legacy";
+  count?: number;
+}) {
+  if (typeof window === "undefined") return;
+  void fetch("/api/codex-chat/v1/ui-activity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, stage: "navigation", clientClass: clientClass() }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 export function beginTaskChatHandoff(chatId: string) {
   const context = createTaskChatNavigation(chatId, "voice_task_card");
   reportTaskChatUiActivity(context, "thread_selected", { stage: "navigation", durationMs: 0 });

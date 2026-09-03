@@ -28,6 +28,9 @@ const uiActivityRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/ui-act
 const dictationPreferencesSource = readFileSync(`${root}/lib/codex-chat/dictation-preferences.ts`, "utf8");
 const routesSource = readFileSync(`${root}/lib/routes.ts`, "utf8");
 const stylesSource = readFileSync(`${root}/styles/globals.css`, "utf8");
+const mobileShellSource = readFileSync(`${root}/components/shell/MobileShell.tsx`, "utf8");
+const appShellSource = readFileSync(`${root}/components/shell/AppShell.tsx`, "utf8");
+const statusProviderSource = readFileSync(`${root}/components/shell/ControlCenterStatusProvider.tsx`, "utf8");
 
 async function loadNormalizeModule() {
   const source = readFileSync(`${root}/lib/codex-chat/normalize.ts`, "utf8");
@@ -148,11 +151,11 @@ test("Codex Chat HTTP client normalizes gateways, malformed JSON and API envelop
     }));
     assert.deepEqual(success.data, { ok: true });
     await assert.rejects(
-      invoke(new Response(JSON.stringify({ apiVersion: "1", error: { code: "runtime_unavailable", message: "Runtime unavailable.", retryable: true, requestId: "request-2" } }), {
+      invoke(new Response(JSON.stringify({ apiVersion: "1", error: { code: "runtime_unavailable", message: "Runtime unavailable.", retryable: true, requestId: "request-2", details: { replacementAllowed: false } } }), {
         status: 503,
         headers: { "content-type": "application/json" },
       })),
-      (error) => error.kind === "api" && error.code === "runtime_unavailable" && error.requestId === "request-2",
+      (error) => error.kind === "api" && error.code === "runtime_unavailable" && error.requestId === "request-2" && error.details.replacementAllowed === false,
     );
     await assert.rejects(
       request("/api/test", {}, {
@@ -340,6 +343,52 @@ test("Voice task threads are privately reconciled and require explicit continuat
   assert.match(nativeTurnCoordinatorSource, /if \(leases\.has\(key\)\) return null/);
   assert.match(gatewaySource, /tryAcquireNativeThreadTurn/);
   assert.match(appServerSource + readFileSync(`${root}/lib/realtime/codex-task/codex-app-server-client.ts`, "utf8"), /nativeThreadLeaseKey/);
+});
+
+test("Voice task lists are incremental, indexed and preserve legacy bindings", () => {
+  const listSource = gatewaySource.slice(gatewaySource.indexOf("async listThreads"), gatewaySource.indexOf("async createThread"));
+  assert.doesNotMatch(listSource, /await reconcileVoiceTaskChatLinks/);
+  assert.match(listSource, /queueVoiceTaskChatIndexRefresh/);
+  assert.match(listSource, /view === "legacy"/);
+  assert.match(threadRouteSource, /view !== "current" && view !== "legacy"/);
+  assert.match(voiceLinksSource, /pritha-voice-task-chat-index-v1/);
+  assert.match(voiceLinksSource, /previous\?\.signatures\?\.\[taskId\] === signature/);
+  assert.match(voiceLinksSource, /if \(await reconcileTask\(store, runtime, taskId\)\) signatures\[taskId\] = signature/);
+  assert.match(voiceLinksSource, /reconcileVoiceTaskChatLink/);
+  assert.match(chatPageSource, /loadThreadPage/);
+  assert.match(chatPageSource, /IntersectionObserver/);
+  assert.match(chatPageSource, /Load more/);
+  assert.match(chatPageSource, /Legacy/);
+  assert.doesNotMatch(chatPageSource, /for \(let page = 0; page < 20/);
+});
+
+test("missing native history is explicit and replacement remains draft-only", () => {
+  assert.match(gatewaySource, /"native_thread_missing"/);
+  assert.match(gatewaySource, /replacementAllowed: replaceable/);
+  assert.match(gatewaySource, /"history_timeout"/);
+  assert.match(gatewaySource, /"history_unavailable"/);
+  assert.match(chatPageSource, /Start replacement draft/);
+  assert.match(chatPageSource, /onClick=\{startNewDraft\}/);
+  assert.match(chatPageSource, /if \(!chatId\) \{\s+chatId = \(await createChat\(\)\)/);
+  assert.doesNotMatch(chatPageSource, /onClick=\{\(\) => void createChat\(\)\}/);
+});
+
+test("mobile navigation reuses one status snapshot and exposes immediate progress", () => {
+  assert.match(appShellSource, /ControlCenterStatusProvider initialStatus=\{initialStatus\}/);
+  assert.match(statusProviderSource, /if \(inFlight\.current\) return inFlight\.current/);
+  assert.match(statusProviderSource, /window\.addEventListener\("focus"/);
+  assert.match(mobileShellSource, /useLinkStatus/);
+  assert.match(mobileShellSource, /primary_navigation_started/);
+  assert.match(mobileShellSource, /primary_navigation_completed/);
+  assert.match(mobileShellSource, /primary_navigation_timeout/);
+  assert.match(mobileShellSource, /15_000/);
+});
+
+test("Task Chat confines horizontal overflow to code and tables", () => {
+  assert.match(stylesSource, /\.codex-transcript \{[\s\S]{0,180}overflow-x: hidden;/);
+  assert.match(stylesSource, /\.codex-turn \{[\s\S]{0,80}min-width: 0;[\s\S]{0,80}max-width: 100%;/);
+  assert.match(stylesSource, /overflow-wrap: anywhere/);
+  assert.match(stylesSource, /\.codex-message pre,[\s\S]{0,180}overflow-x: auto/);
 });
 
 test("Codex Chat dictation keeps browser auto mode and explicit language choices separate from transcripts", async () => {

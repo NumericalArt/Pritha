@@ -77,6 +77,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     const message = json && typeof json === "object" && "error" in json ? String((json as { error?: unknown }).error) : response.statusText;
     throw new Error(message || `HTTP ${response.status}`);
   }
+  if (init?.method && init.method !== "GET") window.dispatchEvent(new Event("pritha:status-refresh"));
   return json;
 }
 

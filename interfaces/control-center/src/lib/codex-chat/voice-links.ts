@@ -25,8 +25,16 @@ type ResolvedVoiceThread = {
   updatedAt: string;
 };
 
-let lastReconcileSignature = "";
-let reconcilePromise: Promise<void> | null = null;
+type VoiceIndexCheckpoint = {
+  schema: "pritha-voice-task-chat-index-v1";
+  completed_at: string;
+  signatures: Record<string, string>;
+};
+
+let refreshPromise: Promise<void> | null = null;
+let refreshState: "ready" | "refreshing" | "degraded" = "ready";
+let lastCompletedAt: string | null = null;
+const REFRESH_MIN_INTERVAL_MS = 15_000;
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -46,6 +54,10 @@ function readEvents(filePath: string) {
 
 function taskRoot() {
   return resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "realtime", "codex-tasks");
+}
+
+function indexPath() {
+  return resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "codex-chat", "voice-index.json");
 }
 
 function configuredVoiceProvider(): RuntimeProviderId {
@@ -128,7 +140,98 @@ async function resolveProvider(runtime: CodexRuntimeManager, root: string, threa
   return matches.length === 1 ? matches[0] : null;
 }
 
-async function reconcile(store: CodexChatPrivateStore, runtime: CodexRuntimeManager) {
+function taskSignature(taskId: string) {
+  const directory = path.join(taskRoot(), taskId);
+  const progress = path.join(directory, "progress.jsonl");
+  const status = path.join(directory, "status.json");
+  const request = path.join(directory, "request.json");
+  return createHash("sha256").update([
+    taskId,
+    existsSync(request) ? statSync(request).mtimeMs : 0,
+    existsSync(progress) ? statSync(progress).mtimeMs : 0,
+    existsSync(status) ? statSync(status).mtimeMs : 0,
+  ].join(":"), "utf8").digest("hex");
+}
+
+async function reconcileTask(store: CodexChatPrivateStore, runtime: CodexRuntimeManager, taskId: string) {
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(taskId)) return false;
+  const directory = path.join(taskRoot(), taskId);
+  if (!existsSync(path.join(directory, "request.json"))) return false;
+  const root = resolveTechscopeRoot();
+  const stateRoot = resolvePrithaStateRoot(root);
+  const rows = resolvedThreads(taskId);
+  if (!rows.length) return true;
+  const ledger: Array<Record<string, unknown>> = [];
+  for (const row of rows) {
+    const resolved = await resolveProvider(runtime, root, row.threadId, row.providerId);
+    if (!resolved) continue;
+    const chatId = stableChatId(stateRoot, resolved.providerId, row.threadId);
+    const existing = await store.findByNative(resolved.providerId, row.threadId);
+    const link: TaskLinkView = {
+      taskId: row.taskId,
+      shortId: row.shortId,
+      label: row.label,
+      origin: "voice",
+      mode: existing?.taskLinks.find((candidate) => candidate.taskId === row.taskId)?.mode || "result_reference",
+      subjectScope: row.scope,
+      status: row.status,
+      linkedAt: row.resolvedAt,
+    };
+    const links = [...(existing?.taskLinks || []).filter((candidate) => candidate.taskId !== row.taskId), link];
+    const now = row.updatedAt || new Date().toISOString();
+    const binding: ChatBinding = existing ? {
+      ...existing,
+      stateIdentityHash: existing.stateIdentityHash || resolved.stateIdentityHash,
+      taskLinks: links,
+      updatedAt: now,
+      lastStatus: String(asObject(resolved.native.status)?.type || resolved.native.status) === "active" ? "active" : existing.lastStatus,
+    } : {
+      chatId,
+      clientThreadId: `voice-${chatId.slice(5)}`,
+      createHash: createHash("sha256").update(`voice:${row.threadId}`).digest("hex"),
+      nativeThreadId: row.threadId,
+      providerId: resolved.providerId,
+      stateIdentityHash: resolved.stateIdentityHash,
+      group: "voice_work",
+      origin: "voice",
+      continuationEnabled: false,
+      continuationEnabledAt: null,
+      title: row.threadName || row.scope?.label || "Voice task",
+      preview: row.label,
+      createdAt: row.resolvedAt,
+      updatedAt: now,
+      pinned: false,
+      archived: false,
+      lastStatus: String(asObject(resolved.native.status)?.type || resolved.native.status) === "active" ? "active" : "idle",
+      messageReceipts: {},
+      taskLinks: links,
+    };
+    await store.put(binding);
+    ledger.push({
+      chat_id: binding.chatId,
+      native_thread_id: row.threadId,
+      provider_id: resolved.providerId,
+      state_identity_hash: resolved.stateIdentityHash,
+      native_turn_ids: row.turnIds,
+      thread_name: row.threadName,
+      thread_scope: row.scope,
+      routing_mode: row.routingMode,
+      linked_at: row.resolvedAt,
+      updated_at: now,
+    });
+  }
+  if (ledger.length) {
+    await atomicWritePrivateJson({
+      stateRoot,
+      filePath: path.join(directory, "thread-links.json"),
+      resourceKey: `voice-task-thread-links:${taskId}`,
+      value: { schema: "pritha-voice-task-thread-links-v1", task_id: taskId, links: ledger },
+    });
+  }
+  return ledger.length > 0;
+}
+
+async function refreshIndex(store: CodexChatPrivateStore, runtime: CodexRuntimeManager, force = false) {
   const tasksDirectory = taskRoot();
   if (!existsSync(tasksDirectory)) return;
   const root = resolveTechscopeRoot();
@@ -137,90 +240,55 @@ async function reconcile(store: CodexChatPrivateStore, runtime: CodexRuntimeMana
     .filter((entry) => existsSync(path.join(tasksDirectory, entry, "request.json")))
     .sort((left, right) => statSync(path.join(tasksDirectory, right)).mtimeMs - statSync(path.join(tasksDirectory, left)).mtimeMs)
     .slice(0, 200);
-  const signature = createHash("sha256").update(taskIds.map((taskId) => {
-    const directory = path.join(tasksDirectory, taskId);
-    const progress = path.join(directory, "progress.jsonl");
-    const status = path.join(directory, "status.json");
-    return `${taskId}:${existsSync(progress) ? statSync(progress).mtimeMs : 0}:${existsSync(status) ? statSync(status).mtimeMs : 0}`;
-  }).join("|")).digest("hex");
-  if (signature === lastReconcileSignature) return;
-
+  const previous = readJson(indexPath()) as VoiceIndexCheckpoint | null;
+  const signatures: Record<string, string> = {};
   for (const taskId of taskIds) {
-    const rows = resolvedThreads(taskId);
-    if (!rows.length) continue;
-    const ledger: Array<Record<string, unknown>> = [];
-    for (const row of rows) {
-      const resolved = await resolveProvider(runtime, root, row.threadId, row.providerId);
-      if (!resolved) continue;
-      const chatId = stableChatId(stateRoot, resolved.providerId, row.threadId);
-      const existing = await store.findByNative(resolved.providerId, row.threadId);
-      const link: TaskLinkView = {
-        taskId: row.taskId,
-        shortId: row.shortId,
-        label: row.label,
-        origin: "voice",
-        mode: existing?.taskLinks.find((candidate) => candidate.taskId === row.taskId)?.mode || "result_reference",
-        subjectScope: row.scope,
-        status: row.status,
-        linkedAt: row.resolvedAt,
-      };
-      const links = [...(existing?.taskLinks || []).filter((candidate) => candidate.taskId !== row.taskId), link];
-      const now = row.updatedAt || new Date().toISOString();
-      const binding: ChatBinding = existing ? {
-        ...existing,
-        stateIdentityHash: existing.stateIdentityHash || resolved.stateIdentityHash,
-        taskLinks: links,
-        updatedAt: now,
-        lastStatus: String(asObject(resolved.native.status)?.type || resolved.native.status) === "active" ? "active" : existing.lastStatus,
-      } : {
-        chatId,
-        clientThreadId: `voice-${chatId.slice(5)}`,
-        createHash: createHash("sha256").update(`voice:${row.threadId}`).digest("hex"),
-        nativeThreadId: row.threadId,
-        providerId: resolved.providerId,
-        stateIdentityHash: resolved.stateIdentityHash,
-        group: "voice_work",
-        origin: "voice",
-        continuationEnabled: false,
-        continuationEnabledAt: null,
-        title: row.threadName || row.scope?.label || "Voice task",
-        preview: row.label,
-        createdAt: row.resolvedAt,
-        updatedAt: now,
-        pinned: false,
-        archived: false,
-        lastStatus: String(asObject(resolved.native.status)?.type || resolved.native.status) === "active" ? "active" : "idle",
-        messageReceipts: {},
-        taskLinks: links,
-      };
-      await store.put(binding);
-      ledger.push({
-        chat_id: binding.chatId,
-        native_thread_id: row.threadId,
-        provider_id: resolved.providerId,
-        state_identity_hash: resolved.stateIdentityHash,
-        native_turn_ids: row.turnIds,
-        thread_name: row.threadName,
-        thread_scope: row.scope,
-        routing_mode: row.routingMode,
-        linked_at: row.resolvedAt,
-        updated_at: now,
-      });
+    const signature = taskSignature(taskId);
+    if (!force && previous?.signatures?.[taskId] === signature) {
+      signatures[taskId] = signature;
+      continue;
     }
-    if (ledger.length) {
-      await atomicWritePrivateJson({
-        stateRoot,
-        filePath: path.join(tasksDirectory, taskId, "thread-links.json"),
-        resourceKey: `voice-task-thread-links:${taskId}`,
-        value: { schema: "pritha-voice-task-thread-links-v1", task_id: taskId, links: ledger },
-      });
-    }
+    if (await reconcileTask(store, runtime, taskId)) signatures[taskId] = signature;
   }
-  lastReconcileSignature = signature;
+  const completedAt = new Date().toISOString();
+  await atomicWritePrivateJson({
+    stateRoot,
+    filePath: indexPath(),
+    resourceKey: "voice-task-chat-index",
+    value: { schema: "pritha-voice-task-chat-index-v1", completed_at: completedAt, signatures },
+  });
+  lastCompletedAt = completedAt;
+}
+
+export async function reconcileVoiceTaskChatLink(store: CodexChatPrivateStore, runtime: CodexRuntimeManager, taskId: string) {
+  await reconcileTask(store, runtime, taskId);
+}
+
+export function queueVoiceTaskChatIndexRefresh(store: CodexChatPrivateStore, runtime: CodexRuntimeManager) {
+  if (refreshPromise) return;
+  voiceTaskChatIndexStatus();
+  if (lastCompletedAt && Date.now() - Date.parse(lastCompletedAt) < REFRESH_MIN_INTERVAL_MS) return;
+  refreshState = "refreshing";
+  refreshPromise = refreshIndex(store, runtime)
+    .then(() => { refreshState = "ready"; })
+    .catch(() => { refreshState = "degraded"; })
+    .finally(() => { refreshPromise = null; });
 }
 
 export async function reconcileVoiceTaskChatLinks(store: CodexChatPrivateStore, runtime: CodexRuntimeManager) {
-  if (reconcilePromise) return reconcilePromise;
-  reconcilePromise = reconcile(store, runtime).finally(() => { reconcilePromise = null; });
-  return reconcilePromise;
+  if (refreshPromise) return refreshPromise;
+  refreshState = "refreshing";
+  refreshPromise = refreshIndex(store, runtime, true)
+    .then(() => { refreshState = "ready"; })
+    .catch((error) => { refreshState = "degraded"; throw error; })
+    .finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+export function voiceTaskChatIndexStatus() {
+  if (!lastCompletedAt) {
+    const checkpoint = readJson(indexPath());
+    lastCompletedAt = typeof checkpoint?.completed_at === "string" ? checkpoint.completed_at : null;
+  }
+  return { state: refreshState, lastCompletedAt } as const;
 }
