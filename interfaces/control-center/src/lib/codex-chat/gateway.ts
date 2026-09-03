@@ -44,12 +44,14 @@ type StartTurnInput = {
 
 type ActiveAttempt = ActiveAttemptSnapshot & {
   clientMessageId: string;
+  requestHash: string;
   acknowledged: boolean;
 };
 
 type EventSubscriber = { send: (event: ChatEventRecord) => void; close: (() => void) | null };
 
 const MAX_EVENTS_PER_CHAT = 10_000;
+const UNCERTAIN_TURN_LEASE_MS = 30_000;
 
 function hash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -73,6 +75,19 @@ function publicMessage(value: unknown) {
   if (/timed out/i.test(text)) return "The task runtime did not answer within the operation timeout.";
   if (/unavailable|not found|exited/i.test(text)) return "The selected task runtime is unavailable.";
   return "Task Chat could not complete the operation.";
+}
+
+function uncertainTurnStartFailure(value: unknown) {
+  const text = String(value instanceof Error ? value.message : value || "");
+  return /timed out|unavailable|exited|connection closed|broken pipe|EPIPE|write after end|socket|transport/i.test(text);
+}
+
+function turnStartFailureReason(value: unknown, stage: "connection" | "resume" | "turn_start", acknowledged: boolean) {
+  if (acknowledged) return "accepted_response_incomplete";
+  if (stage !== "turn_start") return stage === "resume" ? "thread_resume_failed" : "runtime_connection_failed";
+  if (/timed out/i.test(String(value instanceof Error ? value.message : value || ""))) return "turn_start_timeout";
+  if (uncertainTurnStartFailure(value)) return "turn_start_transport_failed";
+  return "turn_start_rejected";
 }
 
 function encodeCursor(offset: number) {
@@ -111,6 +126,7 @@ export class CodexChatGateway {
   private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message) => this.handleNotification(providerId, message), this.root);
   private readonly activeTurns = new Map<string, ActiveAttempt>();
   private readonly activeTurnLeases = new Map<string, () => void>();
+  private readonly uncertainTurnTimers = new Map<string, NodeJS.Timeout>();
   private readonly events = new Map<string, ChatEventRecord[]>();
   private readonly subscribers = new Map<string, Set<EventSubscriber>>();
   private eventSequence = 0;
@@ -294,7 +310,7 @@ export class CodexChatGateway {
         return normalizeNativeTurn(binding, turn, this.root, active && active.nativeTurnId === nativeId ? active : null);
       })
       .filter((turn): turn is TurnView => Boolean(turn));
-    if (active && !turns.some((turn) => turn.turnId === active.turnId)) {
+    if (active?.acknowledged && !turns.some((turn) => turn.turnId === active.turnId)) {
       const normalized = normalizeNativeTurn(binding, { id: active.nativeTurnId || active.turnId, status: "inProgress", items: [] }, this.root, active);
       if (normalized) turns.push(normalized);
     }
@@ -424,28 +440,30 @@ export class CodexChatGateway {
       startedAt,
       assistantText: "",
       clientMessageId: input.clientMessageId,
+      requestHash,
       acknowledged: false,
     };
     this.activeTurns.set(chatId, active);
     this.activeTurnLeases.set(chatId, releaseLease);
+    let failureStage: "connection" | "resume" | "turn_start" = "connection";
     try {
       const connection = await this.runtime.connection(binding.providerId);
+      failureStage = "resume";
       await connection.ensureThreadLoaded(binding.nativeThreadId);
-      const defaults = this.runtime.turnDefaults();
+      failureStage = "turn_start";
       const response = asObject(await connection.request("turn/start", {
-        ...defaults,
         threadId: binding.nativeThreadId,
         clientUserMessageId: input.clientMessageId,
         input: [{ type: "text", text, text_elements: [] }],
-        model: input.settings?.modelId || defaults.model,
-        effort: input.settings?.effortId || defaults.effort,
-        serviceTier: input.settings?.serviceTierId || defaults.serviceTier,
+        ...(input.settings?.modelId ? { model: input.settings.modelId } : {}),
+        ...(input.settings?.effortId ? { effort: input.settings.effortId } : {}),
+        ...(input.settings?.serviceTierId ? { serviceTier: input.settings.serviceTierId } : {}),
       }));
+      active.acknowledged = true;
       const nativeTurn = asObject(response?.turn);
       const nativeTurnId = String(nativeTurn?.id || "");
       if (!nativeTurnId) throw new Error("missing_turn_id");
       active.nativeTurnId = nativeTurnId;
-      active.acknowledged = true;
       const firstMessage = Object.keys(binding.messageReceipts).length === 0;
       const nextTitle = firstMessage && ["New Codex chat", "New task chat"].includes(binding.title) ? titleText(previewText(text).slice(0, 72)) : binding.title;
       const nextBinding = await this.store.patch(chatId, {
@@ -473,9 +491,39 @@ export class CodexChatGateway {
       const accepted: AcceptedTurn = { turn, streamUrl: detail.streamUrl };
       return { accepted, replayed: false };
     } catch (error) {
-      this.releaseActiveTurn(chatId);
-      await this.store.patch(chatId, { lastStatus: "system_error", updatedAt: new Date().toISOString() });
-      throw new CodexChatGatewayError(active.acknowledged ? "fallback_confirmation_required" : "runtime_incompatible", publicMessage(error), active.acknowledged ? 409 : 503, !active.acknowledged);
+      const deliveryUnknown = active.acknowledged || (failureStage === "turn_start" && uncertainTurnStartFailure(error));
+      const failureReason = turnStartFailureReason(error, failureStage, active.acknowledged);
+      if (deliveryUnknown) this.deferUncertainTurnRelease(chatId, active);
+      else this.releaseActiveTurn(chatId);
+      await this.store.patch(chatId, {
+        lastStatus: deliveryUnknown ? "active" : "system_error",
+        updatedAt: new Date().toISOString(),
+      });
+      await this.store.recordRuntimeEvent("turn-start-failed", {
+        chatRef: hash({ chatId }).slice(0, 16),
+        providerId: binding.providerId,
+        stage: failureStage,
+        deliveryState: deliveryUnknown ? "unknown" : "not_accepted",
+        failureReason,
+        elapsedMs: Math.max(0, Date.now() - Date.parse(startedAt)),
+      }).catch(() => undefined);
+      if (deliveryUnknown) {
+        throw new CodexChatGatewayError(
+          "fallback_confirmation_required",
+          "The connection ended before delivery could be confirmed. Check history before retrying the same message.",
+          409,
+          true,
+        );
+      }
+      if (failureStage === "turn_start") {
+        throw new CodexChatGatewayError(
+          "turn_start_rejected",
+          "The task runtime rejected the message before accepting it. The thread was not changed.",
+          409,
+          true,
+        );
+      }
+      throw new CodexChatGatewayError("runtime_incompatible", publicMessage(error), 503, true);
     }
   }
 
@@ -549,9 +597,25 @@ export class CodexChatGateway {
   }
 
   private releaseActiveTurn(chatId: string) {
+    const uncertainTimer = this.uncertainTurnTimers.get(chatId);
+    if (uncertainTimer) clearTimeout(uncertainTimer);
+    this.uncertainTurnTimers.delete(chatId);
     this.activeTurns.delete(chatId);
     this.activeTurnLeases.get(chatId)?.();
     this.activeTurnLeases.delete(chatId);
+  }
+
+  private deferUncertainTurnRelease(chatId: string, active: ActiveAttempt) {
+    const previous = this.uncertainTurnTimers.get(chatId);
+    if (previous) clearTimeout(previous);
+    const timer = setTimeout(() => {
+      this.uncertainTurnTimers.delete(chatId);
+      if (this.activeTurns.get(chatId) === active && !(active.acknowledged && active.nativeTurnId)) {
+        this.releaseActiveTurn(chatId);
+      }
+    }, UNCERTAIN_TURN_LEASE_MS);
+    timer.unref?.();
+    this.uncertainTurnTimers.set(chatId, timer);
   }
 
   private emit(
@@ -596,6 +660,21 @@ export class CodexChatGateway {
       if (method === "turn/started" && active && nativeTurnId) {
         active.nativeTurnId = nativeTurnId;
         active.acknowledged = true;
+        const latest = await this.store.get(binding.chatId);
+        await this.store.patch(binding.chatId, {
+          messageReceipts: {
+            ...(latest || binding).messageReceipts,
+            [active.clientMessageId]: {
+              clientMessageId: active.clientMessageId,
+              requestHash: active.requestHash,
+              turnId: active.turnId,
+              nativeTurnId,
+              startedAt: active.startedAt,
+            },
+          },
+          lastStatus: "active",
+          updatedAt: active.startedAt,
+        });
         return;
       }
 

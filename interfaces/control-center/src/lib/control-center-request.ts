@@ -159,8 +159,18 @@ export async function checkControlCenterHealth(options: RequestOptions = {}) {
 export function deliveryMayBeUnknown(error: unknown) {
   if (!(error instanceof ControlCenterRequestError)) return true;
   if (error.kind === "network" || error.kind === "gateway" || error.kind === "invalid_response") return true;
-  return error.code === "fallback_confirmation_required"
-    || error.code === "turn_active"
-    || error.httpStatus === null
-    || error.httpStatus >= 500;
+  if (error.code === "fallback_confirmation_required" || error.code === "turn_active") return true;
+  if ([
+    "continuation_confirmation_required",
+    "field_limit_exceeded",
+    "idempotency_conflict",
+    "invalid_request",
+    "payload_too_large",
+    "runtime_identity_mismatch",
+    "runtime_incompatible",
+    "runtime_unavailable",
+    "thread_not_found",
+    "turn_start_rejected",
+  ].includes(error.code)) return false;
+  return error.httpStatus === null || error.httpStatus >= 500;
 }

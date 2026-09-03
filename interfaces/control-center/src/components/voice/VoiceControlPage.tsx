@@ -38,6 +38,7 @@ import {
   type VoiceIntakeSubmitResult,
   type VoiceSessionEvent,
 } from "./usePrithaRealtime";
+import { beginTaskChatHandoff } from "@/lib/codex-chat/ui-activity-client";
 
 type CodexTaskDetail = {
   ok: boolean;
@@ -747,7 +748,11 @@ function TaskDetailDrawer({
         ) : null}
         <div className="drawer-actions">
           {detail?.task_chat?.historyAvailable ? (
-            <button className="approve-button compact" type="button" onClick={() => { window.location.href = detail.task_chat?.href || "/task-chat?group=voice_work"; }}>
+            <button className="approve-button compact" type="button" onClick={() => {
+              const taskChat = detail.task_chat;
+              if (taskChat?.chatId) beginTaskChatHandoff(taskChat.chatId);
+              window.location.href = taskChat?.href || "/task-chat?group=voice_work";
+            }}>
               Open in Task Chat
             </button>
           ) : detail?.task_chat ? <span className="drawer-muted">Task chat is temporarily unavailable for this runtime.</span> : detail?.task_id ? <span className="drawer-muted">{detail.complete ? "No persistent chat" : "Preparing task chat…"}</span> : null}

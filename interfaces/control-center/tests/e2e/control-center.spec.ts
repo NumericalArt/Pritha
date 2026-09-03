@@ -231,6 +231,9 @@ test.describe("Control Center UI regression", () => {
   test("Task Chat separates direct chats from Voice tasks and explicitly enables continuation", async ({ page }) => {
     const now = new Date().toISOString();
     let continuationEnabled = false;
+    let voiceListRequests = 0;
+    let secondVoiceHistoryAttempts = 0;
+    const uiActivity: Array<Record<string, unknown>> = [];
     const runtime = {
       preferredProvider: "auto", effectiveProvider: "desktop_bundled", effectiveProtocol: "app_server", availability: "ready", fallbackEnabled: true,
       providers: [{ providerId: "desktop_bundled", label: "Desktop bundled", availability: "ready", version: "test", protocol: "app_server", locationLabel: "Desktop bundled", stateIdentityHash: "test", capabilities: { fullChat: true, nativeHistory: true, listThreads: true, readThread: true, forkThread: false, archiveThread: false, unarchiveThread: false, renameThread: false, pinThread: false, steerTurn: false, interruptTurn: false, commandApprovals: false, fileChangeApprovals: false, permissionApprovals: false, requestUserInput: false, historyPagination: true, audioInput: false }, warning: null }],
@@ -242,6 +245,28 @@ test.describe("Control Center UI regression", () => {
     const secondVoice = { ...voice(), chatId: "chat-voice-second", title: "Voice pagination example", taskLinks: [{ ...voice().taskLinks[0], taskId: "task-two", shortId: "TWO" }] };
     await page.route("**/api/codex-chat/v1/**", async (route) => {
       const url = new URL(route.request().url());
+      if (route.request().method() === "POST" && url.pathname.endsWith("/ui-activity")) {
+        uiActivity.push(route.request().postDataJSON() as Record<string, unknown>);
+        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId: "task-chat-telemetry", data: { recorded: true } }) });
+      }
+      if (route.request().method() === "POST" && url.pathname.endsWith("/turns")) {
+        const knownRejection = url.pathname.includes("/chat-direct/");
+        return route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({
+            apiVersion: "1",
+            error: {
+              code: knownRejection ? "turn_start_rejected" : "fallback_confirmation_required",
+              message: knownRejection
+                ? "The task runtime rejected the message before accepting it. The thread was not changed."
+                : "The connection ended before delivery could be confirmed. Check history before retrying the same message.",
+              retryable: true,
+              requestId: knownRejection ? "task-chat-not-accepted" : "task-chat-delivery-unknown",
+            },
+          }),
+        });
+      }
       if (url.pathname.endsWith("/events")) return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": ready\n\n" });
       if (route.request().method() === "POST" && url.pathname.endsWith("/task-links")) continuationEnabled = true;
       let data: unknown;
@@ -249,15 +274,26 @@ test.describe("Control Center UI regression", () => {
       else if (url.pathname.endsWith("/threads")) {
         const group = url.searchParams.get("group");
         const cursor = url.searchParams.get("cursor");
+        if (group === "voice_work") voiceListRequests += 1;
         data = group === "voice_work"
           ? cursor === "voice-page-2"
             ? { data: [secondVoice], nextCursor: null }
             : { data: [voice()], nextCursor: "voice-page-2" }
           : { data: [direct], nextCursor: null };
       }
-      else if (url.pathname.endsWith("/turns")) data = { data: [], olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
+      else if (url.pathname.endsWith("/turns")) {
+        if (url.pathname.includes("/chat-voice-second/")) {
+          secondVoiceHistoryAttempts += 1;
+          if (secondVoiceHistoryAttempts === 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1_500));
+            return route.fulfill({ status: 504, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", error: { code: "history_timeout_test", message: "History test timeout.", retryable: true, requestId: "task-chat-history-timeout" } }) });
+          }
+        }
+        data = { data: [], olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
+      }
       else if (url.pathname.endsWith("/chat-direct")) data = { thread: direct, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-direct/events", continuationState: "continuation_enabled" };
       else if (url.pathname.endsWith("/chat-voice") || url.pathname.endsWith("/task-links")) data = { thread: voice(), activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-voice/events", continuationState: continuationEnabled ? "continuation_enabled" : "read_only" };
+      else if (url.pathname.endsWith("/chat-voice-second")) data = { thread: secondVoice, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-voice-second/events", continuationState: "read_only" };
       else return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId: "task-chat-e2e", data }) });
     });
@@ -268,14 +304,56 @@ test.describe("Control Center UI regression", () => {
     await page.getByRole("tab", { name: "Voice Tasks" }).click();
     await expect(page.getByRole("button", { name: /Voice example/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Voice pagination example/ })).toBeVisible();
-    await page.getByRole("button", { name: /Voice example/ }).click();
+    await expect(page.getByRole("button", { name: "Continue in Task Chat" })).toBeVisible();
+    const listRequestsBeforeTap = voiceListRequests;
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Open chat history" }).click();
+    await page.locator('[aria-label="Task Chat history drawer"]').getByRole("button", { name: /Voice pagination example/ }).click();
+    await expect(page.locator(".codex-title-line h1")).toHaveText("Voice pagination example");
+    await expect(page.locator(".codex-history-loading")).toBeVisible();
+    await expect(page.locator(".codex-history-failed")).toBeVisible();
+    expect(voiceListRequests).toBe(listRequestsBeforeTap);
+    await expect.poll(() => uiActivity.find((event) => event.event === "thread_selected" && event.source === "history_row") || null).not.toBeNull();
+    const failedInteractionId = uiActivity.find((event) => event.event === "thread_selected" && event.source === "history_row")?.interactionId;
+    expect(uiActivity.some((event) => event.interactionId === failedInteractionId && event.event === "navigation_started")).toBe(true);
+    await expect.poll(() => uiActivity.some((event) => event.interactionId === failedInteractionId && event.event === "history_failed")).toBe(true);
+    await page.getByRole("button", { name: "Retry history" }).click();
+    await expect(page.getByRole("button", { name: "Continue in Task Chat" })).toBeVisible();
+    await expect.poll(() => uiActivity.some((event) => event.source === "retry" && event.event === "history_loaded")).toBe(true);
+    expect(voiceListRequests).toBe(listRequestsBeforeTap);
+
+    await page.getByRole("button", { name: "Open chat history" }).click();
+    await page.locator('[aria-label="Task Chat history drawer"]').getByRole("button", { name: /^Voice example/ }).click();
     await expect(page.getByRole("button", { name: "Continue in Task Chat" })).toBeVisible();
     await page.getByRole("button", { name: "Continue in Task Chat" }).click();
     await expect(page.getByText("Message Pritha")).toBeVisible();
+
+    const voiceDraft = "Keep this retry attached only to the Voice thread";
+    await page.locator(".codex-composer textarea").fill(voiceDraft);
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.locator(".codex-delivery-unknown")).toBeVisible();
+    await page.getByRole("button", { name: "Open chat history" }).click();
+    await page.locator('[aria-label="Task Chat history drawer"]').getByRole("tab", { name: "Direct Chats" }).click();
+    await page.locator('[aria-label="Task Chat history drawer"]').getByRole("button", { name: /Direct example/ }).click();
+    await expect(page.locator(".codex-title-line h1")).toHaveText("Direct example");
+    await expect(page.locator(".codex-delivery-unknown")).toHaveCount(0);
+    await expect(page.locator(".codex-error-banner")).toHaveCount(0);
+    await expect(page.locator(".codex-composer textarea")).toHaveValue("");
+    await page.locator(".codex-composer textarea").fill("This rejection is known not to be delivered");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.locator(".codex-error-banner")).toContainText("rejected the message before accepting it");
+    await expect(page.locator(".codex-delivery-unknown")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
+
+    await page.getByRole("button", { name: "Open chat history" }).click();
+    await page.locator('[aria-label="Task Chat history drawer"]').getByRole("tab", { name: "Voice Tasks" }).click();
+    await page.locator('[aria-label="Task Chat history drawer"]').getByRole("button", { name: /^Voice example/ }).click();
+    await expect(page.locator(".codex-delivery-unknown")).toBeVisible();
+    await expect(page.locator(".codex-composer textarea")).toHaveValue(voiceDraft);
     await page.goto("/codex?group=voice_work&chat=chat-voice");
     await expect(page).toHaveURL(/\/task-chat\?group=voice_work&chat=chat-voice$/);
 
-    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/task-chat?group=voice_work&chat=chat-voice");
     await page.getByRole("button", { name: "Open chat history" }).click();
     const mobileHistory = page.locator('[aria-label="Task Chat history drawer"]');

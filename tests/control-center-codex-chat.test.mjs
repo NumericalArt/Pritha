@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -20,6 +21,9 @@ const taskLinksRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/threads
 const voiceLinksSource = readFileSync(`${root}/lib/codex-chat/voice-links.ts`, "utf8");
 const nativeTurnCoordinatorSource = readFileSync(`${root}/lib/codex-chat/native-turn-coordinator.ts`, "utf8");
 const chatPageSource = readFileSync(`${root}/components/codex/CodexChatPage.tsx`, "utf8");
+const uiActivityClientSource = readFileSync(`${root}/lib/codex-chat/ui-activity-client.ts`, "utf8");
+const uiActivitySource = readFileSync(`${root}/lib/codex-chat/ui-activity.ts`, "utf8");
+const uiActivityRouteSource = readFileSync(`${root}/app/api/codex-chat/v1/ui-activity/route.ts`, "utf8");
 const dictationPreferencesSource = readFileSync(`${root}/lib/codex-chat/dictation-preferences.ts`, "utf8");
 const routesSource = readFileSync(`${root}/lib/routes.ts`, "utf8");
 const stylesSource = readFileSync(`${root}/styles/globals.css`, "utf8");
@@ -80,6 +84,7 @@ test("Codex Chat runtime uses a persistent App Server handshake for both install
 });
 
 test("Codex Chat core keeps native history, stable browser ids and safe turn replay boundaries", () => {
+  const startTurnSource = gatewaySource.slice(gatewaySource.indexOf("async startTurn"), gatewaySource.indexOf("async assertChat"));
   assert.match(gatewaySource, /connection\.request\("thread\/start"/);
   assert.match(gatewaySource, /this\.runtime\.readThread\(binding\.providerId, binding\.nativeThreadId, includeTurns\)/);
   assert.match(gatewaySource, /connection\.request\("turn\/start"/);
@@ -94,6 +99,13 @@ test("Codex Chat core keeps native history, stable browser ids and safe turn rep
   assert.match(gatewaySource, /MAX_EVENTS_PER_CHAT = 10_000/);
   assert.match(gatewaySource, /this\.activeTurns\.delete\(chatId\)/);
   assert.match(gatewaySource, /reconciledStatus !== binding\.lastStatus/);
+  assert.doesNotMatch(startTurnSource, /const defaults = this\.runtime\.turnDefaults\(\)/);
+  assert.doesNotMatch(startTurnSource, /input\.settings\?\.modelId \|\| defaults\.model/);
+  assert.match(startTurnSource, /input\.settings\?\.modelId \? \{ model: input\.settings\.modelId \} : \{\}/);
+  assert.match(gatewaySource, /active\?\.acknowledged && !turns\.some/);
+  assert.match(gatewaySource, /UNCERTAIN_TURN_LEASE_MS = 30_000/);
+  assert.match(gatewaySource, /event\("turn-start-failed"|recordRuntimeEvent\("turn-start-failed"/);
+  assert.doesNotMatch(gatewaySource, /recordRuntimeEvent\("turn-start-failed"[\s\S]{0,500}(?:userText|nativeThreadId|clientMessageId|\btext\b)/);
 });
 
 test("Codex Chat private linkage remains outside tracked knowledge and uses atomic private writes", () => {
@@ -140,6 +152,15 @@ test("Codex Chat HTTP client normalizes gateways, malformed JSON and API envelop
       })),
       (error) => error.kind === "api" && error.code === "runtime_unavailable" && error.requestId === "request-2",
     );
+    await assert.rejects(
+      request("/api/test", {}, {
+        timeoutMs: 10,
+        fetchImpl: async (_url, init) => await new Promise((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        }),
+      }),
+      (error) => error.kind === "network" && error.code === "request_timeout" && error.retryable === true,
+    );
     assert.equal(loaded.module.deliveryMayBeUnknown(new loaded.module.ControlCenterRequestError(
       "api",
       "turn_active",
@@ -147,6 +168,38 @@ test("Codex Chat HTTP client normalizes gateways, malformed JSON and API envelop
       false,
       409,
       "request-3",
+    )), true);
+    assert.equal(loaded.module.deliveryMayBeUnknown(new loaded.module.ControlCenterRequestError(
+      "api",
+      "fallback_confirmation_required",
+      "Delivery is unknown.",
+      true,
+      409,
+      "request-4",
+    )), true);
+    assert.equal(loaded.module.deliveryMayBeUnknown(new loaded.module.ControlCenterRequestError(
+      "api",
+      "runtime_incompatible",
+      "Runtime rejected the request before delivery.",
+      true,
+      503,
+      "request-5",
+    )), false);
+    assert.equal(loaded.module.deliveryMayBeUnknown(new loaded.module.ControlCenterRequestError(
+      "api",
+      "turn_start_rejected",
+      "Message was not accepted.",
+      true,
+      409,
+      "request-6",
+    )), false);
+    assert.equal(loaded.module.deliveryMayBeUnknown(new loaded.module.ControlCenterRequestError(
+      "network",
+      "request_timeout",
+      "Timed out.",
+      true,
+      null,
+      null,
     )), true);
   } finally {
     loaded.cleanup();
@@ -303,18 +356,105 @@ test("Codex Chat dictation keeps browser auto mode and explicit language choices
   }
 });
 
-test("Codex Chat reconciles missed completion events and exposes explicit recovery", () => {
+test("Codex Chat loads selected history independently and exposes explicit bounded recovery", () => {
   assert.match(chatPageSource, /\[1_000, 2_000, 5_000, 10_000, 30_000\]/);
   assert.doesNotMatch(chatPageSource, /window\.setInterval/);
   assert.match(chatPageSource, /window\.addEventListener\("focus", onFocus\)/);
   assert.match(chatPageSource, /window\.addEventListener\("online", onOnline\)/);
   assert.match(chatPageSource, /document\.addEventListener\("visibilitychange", onVisibility\)/);
   assert.match(chatPageSource, /await checkControlCenterHealth\(\)/);
-  assert.match(chatPageSource, /await synchronize\(selectedChatIdRef\.current, true\)/);
+  assert.match(chatPageSource, /const loadThreadDetail = useCallback/);
+  assert.match(chatPageSource, /const loadThreadHistory = useCallback/);
+  assert.match(chatPageSource, /Promise\.allSettled\(\[refreshRuntime\(\), refreshThreads\(\)\]\)/);
+  assert.match(chatPageSource, /HISTORY_SLOW_MS = 2_500/);
+  assert.match(chatPageSource, /HISTORY_TIMEOUT_MS = 12_000/);
+  assert.match(chatPageSource, /VOICE_LIST_REFRESH_MS = 30_000/);
+  assert.match(chatPageSource, /TURN_START_TIMEOUT_MS = 30_000/);
+  assert.match(chatPageSource, /draftsByChat/);
+  assert.match(chatPageSource, /pendingDeliveries/);
+  assert.match(chatPageSource, /pendingDeliveries\[selectedChatId\]/);
+  assert.match(chatPageSource, /error\.chatId === selectedChatId/);
+  assert.match(chatPageSource, /selectedChatIdRef\.current === delivery\.chatId/);
+  assert.match(chatPageSource, /Still loading history…/);
+  assert.match(chatPageSource, /Retry history/);
+  assert.doesNotMatch(chatPageSource, /synchronize\(/);
   assert.match(chatPageSource, /recovering \? "Retrying…" : "Retry"/);
   assert.match(chatPageSource, /delivery_unknown/);
   assert.match(chatPageSource, /clientMessageId: delivery\.clientMessageId/);
   assert.doesNotMatch(chatPageSource, /localStorage|indexedDB/i);
+});
+
+test("Task Chat interaction telemetry is private, bounded and content-free", async () => {
+  assert.match(uiActivityRouteSource, /readJsonBody<TaskChatUiActivityInput>\(request\)/);
+  assert.match(uiActivitySource, /task-chat-ui-actions\.jsonl/);
+  assert.match(uiActivitySource, /createHash\("sha256"\)\.update\(input\.chatId\)/);
+  assert.match(uiActivitySource, /new CodexChatPrivateStore\(\)/);
+  assert.match(uiActivitySource, /duration > 120_000/);
+  assert.match(uiActivityClientSource, /keepalive: true/);
+  assert.match(uiActivityClientSource, /sessionStorage\.removeItem\(HANDOFF_KEY\)/);
+  assert.match(chatPageSource, /"thread_selected"/);
+  assert.match(chatPageSource, /"navigation_started"/);
+  assert.match(chatPageSource, /"history_loaded"/);
+  assert.match(chatPageSource, /"history_failed"/);
+  assert.doesNotMatch(uiActivitySource, /task_text|message_text|native_thread|href|url:/i);
+  assert.doesNotMatch(uiActivitySource, /chat_id\s*:/i);
+
+  const tmp = mkdtempSync(path.join(os.tmpdir(), "pritha-task-chat-ui-activity-"));
+  const output = ts.transpileModule(uiActivitySource, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022, isolatedModules: true },
+  }).outputText
+    .replace('"@/lib/private-json"', '"./private-json.mjs"')
+    .replace('"@/lib/pritha-paths"', '"./pritha-paths.mjs"')
+    .replace('"./gateway"', '"./gateway.mjs"')
+    .replace('"./private-store"', '"./private-store.mjs"');
+  writeFileSync(path.join(tmp, "ui-activity.mjs"), output);
+  writeFileSync(path.join(tmp, "private-json.mjs"), "export async function appendPrivateAuditEvent(value) { globalThis.__taskChatUiActivity = value; }\n");
+  writeFileSync(path.join(tmp, "pritha-paths.mjs"), `
+export const resolveTechscopeRoot = () => ${JSON.stringify(tmp)};
+export const resolvePrithaStateRoot = () => ${JSON.stringify(tmp)};
+export const resolvePrithaStatePath = (...segments) => segments.join("/");
+`);
+  writeFileSync(path.join(tmp, "gateway.mjs"), `
+export class CodexChatGatewayError extends Error {
+  constructor(code, message, httpStatus) { super(message); this.code = code; this.httpStatus = httpStatus; }
+}
+`);
+  writeFileSync(path.join(tmp, "private-store.mjs"), `
+export class CodexChatPrivateStore {
+  async get(chatId) { return chatId === "chat_valid_123" ? { group: "voice_work", origin: "voice" } : null; }
+}
+`);
+  try {
+    const loaded = await import(`${pathToFileURL(path.join(tmp, "ui-activity.mjs")).href}?functional`);
+    const result = await loaded.recordTaskChatUiActivity({
+      event: "history_loaded",
+      chatId: "chat_valid_123",
+      interactionId: "interaction-valid-123",
+      source: "voice_task_card",
+      stage: "history",
+      durationMs: 2310.4,
+      clientClass: "mobile",
+    });
+    assert.deepEqual(result, { recorded: true });
+    const saved = globalThis.__taskChatUiActivity;
+    assert.equal(saved.event.chat_ref, createHash("sha256").update("chat_valid_123").digest("hex").slice(0, 24));
+    assert.equal(saved.event.duration_ms, 2310);
+    assert.equal(saved.event.group, "voice_work");
+    assert.doesNotMatch(JSON.stringify(saved.event), /chat_valid_123/);
+    await assert.rejects(
+      loaded.recordTaskChatUiActivity({
+        event: "history_loaded",
+        chatId: "chat_valid_123",
+        interactionId: "interaction-valid-123",
+        source: "voice_task_card",
+        durationMs: 120_001,
+      }),
+      (error) => error.code === "invalid_request" && error.httpStatus === 400,
+    );
+  } finally {
+    delete globalThis.__taskChatUiActivity;
+    rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test("Codex Chat item normalization bounds output and hides private absolute paths and raw reasoning", async () => {
