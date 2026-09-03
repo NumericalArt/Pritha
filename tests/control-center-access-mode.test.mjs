@@ -10,6 +10,7 @@ import ts from "../interfaces/control-center/node_modules/typescript/lib/typescr
 const accessModeSource = readFileSync("interfaces/control-center/src/lib/access-mode.ts", "utf8");
 const agentCardSource = readFileSync("interfaces/control-center/src/components/agents/AgentCard.tsx", "utf8");
 const agentsPageSource = readFileSync("interfaces/control-center/src/app/agents/page.tsx", "utf8");
+const agentsMapperSource = readFileSync("interfaces/control-center/src/components/shell/StatusPages.tsx", "utf8");
 const agentStatusPageSource = readFileSync("interfaces/control-center/src/app/agents/[id]/page.tsx", "utf8");
 const controlCenterServerSource = readFileSync("interfaces/control-center/src/lib/control-center/server.ts", "utf8");
 const settingsSource = readFileSync("interfaces/control-center/src/components/settings/SettingsControlPage.tsx", "utf8");
@@ -38,7 +39,8 @@ test("Agent cards render URLs through the selected Control Center access mode", 
   assert.match(agentCardSource, /Status page/);
   assert.match(agentCardSource, /data-testid="agent-url-link"/);
   assert.match(agentCardSource, /data-url=\{displayUrl\}/);
-  assert.match(agentsPageSource, /statusUrl: `\/agents\/\$\{agent\.id\}`/);
+  assert.match(agentsPageSource, /AgentsStatusPage/);
+  assert.match(agentsMapperSource, /statusUrl: `\/agents\/\$\{agent\.id\}`/);
 });
 
 test("Managed active web agents keep plan control as the primary action", () => {
@@ -92,7 +94,7 @@ test("Control Center carries served agent Tailscale links into agent cards", () 
   assert.match(controlCenterServerSource, /url\.protocol !== "https:" \|\| !url\.hostname\.endsWith\("\.ts\.net"\)/);
   assert.match(controlCenterServerSource, /const tailscaleUrl = agentTailscaleUrl\(manifest,\s*localUrl,\s*access\)/);
   assert.match(controlCenterServerSource, /tailscale: tailscaleUrl/);
-  assert.match(agentsPageSource, /tailscaleUrl: agent\.url\.tailscale/);
+  assert.match(agentsMapperSource, /tailscaleUrl: agent\.url\.tailscale/);
 });
 
 test("Control Center bounds and caches read-only Tailscale probes", () => {
