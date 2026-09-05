@@ -6,8 +6,9 @@ import os
 import sqlite3
 import sys
 
-from pritha_python_compat import apply_runtime_compat
+from pritha_python_compat import apply_runtime_compat, load_pritha_runtime_env
 
+load_pritha_runtime_env()
 apply_runtime_compat()
 
 from sentence_transformers import SentenceTransformer

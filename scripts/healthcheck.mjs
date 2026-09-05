@@ -4,9 +4,11 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const root = resolveTechscopeRoot();
+loadPrithaRuntimeEnv({ root });
 const stateRoot = resolvePrithaStateRoot({ root });
 const platform = process.env.TECHSCOPE_HEALTHCHECK_PLATFORM || process.platform;
 const isDarwin = platform === "darwin";
