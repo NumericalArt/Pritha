@@ -37,6 +37,11 @@ the changes as already installed in NeuralDeep.
 | B | `a1fd2faa54817fa847307f0738d51236eaa25739` | One Voice list, local archive, full response copy |
 | C | `71f5be857702227acedc9a89f7c72b07a7af11a7` | Original attachments, model checks, earlier history pages |
 
+For C, include the typed history fixture correction
+`854a4203c7241bc274e6a12ebaca7265d80faf7e`. This is the cumulative C candidate
+after the transfer documentation commit. Its standalone typecheck passes.
+Inspect the complete B-to-C-candidate diff when mapping source tests.
+
 Read each exact diff with `git show <commit>` after fetching the reviewed
 mother remote. Fetch is inspection, not permission to merge. Before EACH stage,
 write a local coding plan with touched files, data/API changes, migration,

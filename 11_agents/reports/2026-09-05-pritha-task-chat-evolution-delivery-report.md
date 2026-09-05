@@ -38,6 +38,11 @@ implementation evidence and a release handoff, not production acceptance.
 | B | `a1fd2faa54817fa847307f0738d51236eaa25739` | Unified Voice list; local Archive/Restore; complete response copy |
 | C | `71f5be857702227acedc9a89f7c72b07a7af11a7` | Original file upload/history; multimodal checks; retry safety; earlier pages |
 
+Cumulative C candidate: `854a4203c7241bc274e6a12ebaca7265d80faf7e`, including
+transfer documentation and the typed restored-history fixture correction.
+Standalone typecheck passes at this pin. Use this candidate or an explicitly
+recorded later documentation-only descendant for the final C release gates.
+
 The roadmap and separate coding plans record sequencing, contracts, migration
 and rollback. The reliable Control Center Good State Baseline dated 2026-08-28
 was read directly alongside the Voice alignment result. Native transcript

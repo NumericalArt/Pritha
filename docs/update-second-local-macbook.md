@@ -34,7 +34,8 @@ memory, queues and sibling agents are never copied from another machine.
 Obtain the full 40-character commit from the current release report. Task Chat
 source anchors are A `79ee5a403f813f483768850213481f7433cc1609`,
 B `a1fd2faa54817fa847307f0738d51236eaa25739`, and
-C `71f5be857702227acedc9a89f7c72b07a7af11a7`.
+C `854a4203c7241bc274e6a12ebaca7265d80faf7e` (includes the attachment
+implementation, transfer documentation and typed test fixture correction).
 These are implementation anchors, not claims of fleet deployment. Use the
 actual published, accepted release target from the coordinator.
 

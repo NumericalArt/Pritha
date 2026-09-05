@@ -76,6 +76,8 @@ multimodality must be explained, never assumed.
 - A: `79ee5a4` — verified history binding recovery.
 - B: `a1fd2fa` — unified local archive and complete response copy.
 - C: `71f5be8` — original attachments, capability checks and earlier history pages.
+- C cumulative candidate: `854a420` — includes transfer documentation and the
+  typed history fixture correction; standalone typecheck passes at this pin.
 
 Each is an implementation anchor. No production deployment is claimed. Keep
 these releases sequential and publish the next main target only after the
