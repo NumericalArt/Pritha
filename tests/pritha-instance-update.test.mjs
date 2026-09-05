@@ -67,6 +67,18 @@ if (action === "start") {
   console.log(JSON.stringify({ ok: true, action, started: true }));
 } else if (action === "stop") {
   const pid = readPid();
+  if (pid && process.env.PRITHA_TEST_STOP_MODE) {
+    const attemptsPath = path.join(stateRoot, "setup", "rollback-stop-attempts");
+    const attempts = (existsSync(attemptsPath) ? Number(readFileSync(attemptsPath, "utf8")) : 0) + 1;
+    writeFileSync(attemptsPath, String(attempts));
+    const mode = process.env.PRITHA_TEST_STOP_MODE;
+    if (mode === "malformed") { console.log("{"); process.exit(0); }
+    if (mode === "missing-ok") { console.log("{}"); process.exit(0); }
+    if (mode === "owner" || mode === "delay-always" || (mode === "delay-once" && attempts === 1)) {
+      console.log(JSON.stringify({ ok: false, error: mode === "owner" ? "owner_mismatch:refusing_to_stop_foreign_listener" : "control_center_did_not_stop_within_grace_period" }));
+      process.exit(1);
+    }
+  }
   if (pid) { try { process.kill(pid, "SIGTERM"); } catch {} }
   rmSync(pidPath, { force: true });
   console.log(JSON.stringify({ ok: true, action, stopped: true }));
@@ -170,7 +182,7 @@ exec ${JSON.stringify(process.execPath)} "$@"
   return { fixture, checkout, remoteWork, fakeBin };
 }
 
-function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mutateAgentState = false, finderMetadata = false) {
+function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mutateAgentState = false, finderMetadata = false, stopMode = "") {
   const stateRoot = path.join(fixture.fixture, "state");
   const agentParent = path.join(fixture.fixture, "agents");
   mkdirSync(agentParent, { recursive: true });
@@ -200,6 +212,7 @@ function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mu
       PRITHA_TEST_RELEASE_VERSION: releaseVersion,
       PRITHA_TEST_MUTATE_AGENT_STATE: mutateAgentState ? "1" : "0",
       PRITHA_TEST_FINDER_METADATA: finderMetadata ? "1" : "0",
+      PRITHA_TEST_STOP_MODE: stopMode,
       PRITHA_UPDATE_HEALTH_TIMEOUT_MS: "1000",
       PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS: "3000",
     },
@@ -343,6 +356,55 @@ test("Finder exception protects other dotfiles and similarly named directories o
     assert.notEqual(snapshot(), protectedFile);
   } finally { rmSync(fixture.fixture, { recursive: true, force: true }); }
 });
+
+test("rollback retries an owned child's delayed stop once before restoring the previous build", async () => {
+  const fixture = makeFixture();
+  let pid = null;
+  try {
+    const result = invoke(fixture, await freePort(), "bad", null, false, false, "delay-once");
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    const payload = JSON.parse(result.stdout);
+    pid = payload.rollbackPid;
+    assert.equal(payload.status, "health-failed-rolled-back");
+    assert.equal(payload.rollbackHealth.ok, true);
+    const manifest = JSON.parse(readFileSync(payload.manifest, "utf8"));
+    assert.equal(manifest.failed_stop.ok, true);
+    assert.equal(manifest.failed_stop.error, null);
+    assert.equal(manifest.failed_stop.previousAttempt.payload.error, "control_center_did_not_stop_within_grace_period");
+    assert.equal(readFileSync(path.join(fixture.fixture, "state", "setup", "rollback-stop-attempts"), "utf8"), "2");
+    assert.equal(readFileSync(path.join(fixture.checkout, "interfaces", "control-center", ".next", "version"), "utf8"), "good\n");
+  } finally {
+    if (pid) { try { process.kill(pid, "SIGTERM"); } catch { /* already stopped */ } }
+    rmSync(fixture.fixture, { recursive: true, force: true });
+  }
+});
+
+for (const mode of ["delay-always", "owner", "malformed", "missing-ok"]) {
+  test(`rollback preserves both builds when managed stop is unconfirmed: ${mode}`, async () => {
+    const fixture = makeFixture();
+    try {
+      const result = invoke(fixture, await freePort(), "bad", null, false, false, mode);
+      assert.equal(result.status, 1, result.stderr || result.stdout);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.status, "rollback-stop-failed");
+      assert.equal(payload.failureReason, "health-failed");
+      assert.equal(payload.rollbackPerformed, false);
+      assert.equal(payload.rollbackPid, undefined);
+      const manifest = JSON.parse(readFileSync(payload.manifest, "utf8"));
+      assert.equal(manifest.rollback_performed, false);
+      assert.equal(manifest.failed_stop.ok, false);
+      assert.equal(readFileSync(path.join(fixture.fixture, "state", "setup", "rollback-stop-attempts"), "utf8"), mode === "delay-always" ? "2" : "1");
+      const ui = path.join(fixture.checkout, "interfaces", "control-center");
+      assert.equal(readFileSync(path.join(ui, ".next", "version"), "utf8"), "bad\n");
+      assert.equal(readFileSync(path.join(ui, ".next-pritha-previous", "version"), "utf8"), "good\n");
+      assert.equal(readFileSync(path.join(path.dirname(payload.manifest), "previous.next", "version"), "utf8"), "good\n");
+    } finally {
+      const pidFile = path.join(fixture.fixture, "state", "setup", "fixture-runtime.pid");
+      if (existsSync(pidFile)) { try { process.kill(Number(readFileSync(pidFile, "utf8")), "SIGTERM"); } catch { /* fixture child already exited */ } }
+      rmSync(fixture.fixture, { recursive: true, force: true });
+    }
+  });
+}
 
 test("instance update gives post-start health more time than read-only status probes", () => {
   const source = readFileSync(path.join(sourceRoot, "scripts", "pritha-instance.mjs"), "utf8");

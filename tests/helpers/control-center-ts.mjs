@@ -37,7 +37,9 @@ function rewriteTsImports(source) {
 
 async function transpileMusicModules() {
   const ts = loadTypeScript();
-  const outRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-control-center-ts-"));
+  const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-control-center-ts-"));
+  const outRoot = path.join(fixtureRoot, "music");
+  await mkdir(outRoot);
   const files = await collectTsFiles(musicSourceRoot);
   for (const sourcePath of files) {
     const relativePath = path.relative(musicSourceRoot, sourcePath);
@@ -65,7 +67,7 @@ async function transpileMusicModules() {
     },
     fileName: prithaPathsSource,
   });
-  await writeFile(path.join(path.dirname(outRoot), "pritha-paths.mjs"), pathCompiled.outputText, "utf8");
+  await writeFile(path.join(fixtureRoot, "pritha-paths.mjs"), pathCompiled.outputText, "utf8");
   return outRoot;
 }
 

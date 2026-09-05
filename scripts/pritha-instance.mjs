@@ -462,16 +462,22 @@ function controlCenterRuntime(action) {
   ], { timeoutMs: action === "stop" ? 45_000 : 30_000 });
   let payload = null;
   try { payload = result.stdout ? JSON.parse(result.stdout) : null; } catch { /* normalized below */ }
+  const ok = result.ok && payload?.ok === true;
   return {
-    ok: result.ok && payload?.ok !== false,
+    ok,
     action,
     payload,
-    error: payload?.error || result.stderr || (payload ? "runtime_action_failed" : "invalid_runtime_manager_response"),
+    error: ok ? null : payload?.error || result.stderr || (payload ? "runtime_action_failed" : "invalid_runtime_manager_response"),
   };
 }
 
 async function stopControlCenter() {
-  return controlCenterRuntime("stop");
+  const first = controlCenterRuntime("stop");
+  if (first.ok || first.payload?.error !== "control_center_did_not_stop_within_grace_period") return first;
+  // The owned child may exit just after bootout's grace period. Ask the same
+  // manager to verify again; never turn ownership refusal into a raw port kill.
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+  return { ...controlCenterRuntime("stop"), previousAttempt: first };
 }
 
 function startControlCenter() {
@@ -682,8 +688,17 @@ async function updateInstance() {
   const health = started.ok ? await waitForHealth(healthTimeout) : { ok: false, status: 0, error: started.error };
   const deployedProcess = controlCenterProcessIdentity();
   const pid = deployedProcess.childPid;
+  function blockedRollback(failedStop, reason, evidence = {}) {
+    writePrivateJson(manifest, {
+      ...release, status: "rollback-stop-failed", failure_reason: reason,
+      stopped, started, failed_stop: failedStop, failed_pid: pid, health,
+      rollback_performed: false, ...evidence,
+    });
+    return { ...plan, ok: false, applied: true, status: "rollback-stop-failed", failureReason: reason, failedStop, health, rollbackPerformed: false, manifest };
+  }
   if (!health.ok) {
     const failedStop = await stopControlCenter();
+    if (!failedStop.ok) return blockedRollback(failedStop, "health-failed");
     restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
     const rollbackStart = hadPreviousBuild ? startControlCenter() : null;
     const rollbackHealth = hadPreviousBuild && rollbackStart?.ok ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
@@ -705,6 +720,7 @@ async function updateInstance() {
   const isolationMatch = isolationSnapshotMatches(status.isolation, postIsolation);
   if (!isolationMatch) {
     const failedStop = await stopControlCenter();
+    if (!failedStop.ok) return blockedRollback(failedStop, "instance-isolation-changed", { post_isolation: postIsolation });
     restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
     const rollbackStart = hadPreviousBuild ? startControlCenter() : null;
     const rollbackHealth = hadPreviousBuild && rollbackStart?.ok ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };
@@ -719,6 +735,7 @@ async function updateInstance() {
   const releaseOk = finalHead === target && finalGitClean;
   if (!releaseOk) {
     const failedStop = await stopControlCenter();
+    if (!failedStop.ok) return blockedRollback(failedStop, "final-git-invariant-failed", { post_isolation: postIsolation, final_head: finalHead, final_git_clean: finalGitClean });
     restorePreviousNext(liveNext, displacedNext, previousNext, hadPreviousBuild);
     const rollbackStart = hadPreviousBuild ? startControlCenter() : null;
     const rollbackHealth = hadPreviousBuild && rollbackStart?.ok ? await waitForHealth(rollbackHealthTimeout) : { ok: false, status: 0 };

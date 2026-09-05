@@ -1,7 +1,7 @@
 ---
 id: pritha-integrated-release-plan-2026-09-05
 type: review
-status: in-progress
+status: completed
 created: 2026-09-05
 updated: 2026-09-05
 topics: [task-chat, memory, settings, fleet, macbook]
@@ -159,3 +159,47 @@ build, standalone typecheck, privacy/Markdown checks and 15 desktop/mobile
 browser scenarios pass. Strict three-page health validates all 13 chunks. An
 actual Next image optimization request returned a 64-pixel WebP using sharp
 0.35.0/libvips 8.18.3. npm audit reports zero findings at this verification time.
+
+## Bounded rollback stop correction
+
+The first new MacBook build exceeded the initial health budget. During rollback,
+the owned child exceeded the manager's stop grace period. The updater ignored
+that failure, restored the old build while shutdown was incomplete and treated
+an already-running response as recovery. The child then exited. Managed start
+restored the previous service; a new staged transaction with 180-second startup,
+20-second request and 120-second rollback budgets deployed the new build with
+matching private fingerprints. These are invocation budgets, not saved settings.
+
+Before further publication, require an explicit valid manager `ok: true` result.
+Retry stop once, after one second, only for the specific grace-period error; do
+not retry ownership refusal or malformed responses. In every post-start rollback
+branch, require verified stop before restoring any build or starting the service.
+If stop remains unconfirmed, record `rollback-stop-failed`, preserve both builds
+and report the original failure. Never claim a rollback occurred in that state.
+Use fixtures to prove delayed-stop recovery, bounded permanent failure,
+ownership refusal, malformed replies and preservation of rollback artifacts.
+This strengthens the August 28 managed ownership/recovery baseline without
+changing permissions, application APIs, private data or the compiled UI.
+
+Publish this release-tool correction with the final report. Fast-forward the
+five clean checkouts to that commit, rebuild their authored-memory indexes, and
+verify the compiled UI/dependency tree is unchanged from the deployed source
+pin. This documentation/tooling synchronization does not require a UI restart.
+Keep the exact compiled UI pin and repository head distinct in release evidence.
+
+The final full test run exposed an existing fixture race: separate music test
+processes transpiled `pritha-paths.mjs` into the shared OS temporary directory,
+so one could import the other process's partially written module. Give each
+transpilation its own parent directory containing both `music/` and its sibling
+path module. No production module changes. Re-run the existing music/library
+tests and canonical self-test; do not dismiss the failed run as a product pass.
+
+The MacBook serial recheck passed all 513 source-pin unit tests and normal-timeout
+live UI health after warm-up. The standalone CLI and bundled App Server help
+probes succeeded, and the original preferred transport remains Codex App.
+
+Final isolated verification after the rollback and fixture corrections: self-test
+passes all 518 unit tests, privacy/Markdown validation, memory and smoke gates,
+with no critical regressions. The existing music/library tests now use isolated
+transpilation output. All ten focused updater scenarios pass. No compiled UI or
+dependency file changed after the successful five-instance source-pin rollout.
