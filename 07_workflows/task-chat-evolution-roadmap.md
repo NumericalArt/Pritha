@@ -62,7 +62,9 @@ Preserve unrelated work and instance isolation. Run focused tests, typecheck,
 production build, desktop/mobile UI, privacy audit, self-test and strict page
 and chunk health. Commit and push tested code. Prepare staged releases in order
 main, dasha, sasha, marina; stop on failure and roll back the affected instance.
-Immediate lifecycle approval remains required before modifying running services.
+The operator authorized the integrated main/fleet/MacBook update on 2026-09-05 after
+reviewing the lifecycle boundary. That approval covers this prepared transaction;
+future unrelated lifecycle actions still use the staged-release workflow.
 The MacBook updates locally to the same pinned commit without copying private data.
 
 NeuralDeep receives a behavior/contract/test porting guide tied to actual
@@ -79,10 +81,12 @@ multimodality must be explained, never assumed.
 - C cumulative candidate: `854a420` — includes transfer documentation and the
   typed history fixture correction; standalone typecheck passes at this pin.
 
-Each is an implementation anchor. No production deployment is claimed. Keep
-these releases sequential and publish the next main target only after the
-previous release passes its staged rollout. The updater pins exact origin/main;
-do not bypass that check to deploy an arbitrary ancestor or newer commit.
+Each remains an independently reviewable implementation anchor. On 2026-09-05
+the operator explicitly requested committing all pending changes and releasing
+the combined result. The integrated release plan supersedes the earlier proposal
+to publish three separate origin/main targets. Pin one reviewed full commit for
+main, Dasha, Sasha, Marina and the running MacBook instance. Do not bypass the
+updater's exact origin/main check.
 
 ## Plans, evidence and transfer
 
@@ -93,10 +97,11 @@ do not bypass that check to deploy an arbitrary ancestor or newer commit.
 - [MacBook update procedure](../docs/update-second-local-macbook.md)
 - [NeuralDeep adaptation guide](../docs/neuraldeep-task-chat-adaptation.md)
 
-Final isolated self-test passed: 508 unit tests, no critical regressions.
-Desktop/mobile Task Chat verification passed 12 scenarios; strict /codex and
-/task-chat health passed including 11 JavaScript chunks. A local legacy-service
-audit warning is recorded in the delivery report. Production rollout is held
-by pre-existing uncommitted memory work in the primary checkout, plus the
-workflow's immediate lifecycle approval boundary. No private state was copied
-to replicas and no running production service was changed.
+The feature-stage isolated self-test passed 508 tests and 12 Task Chat browser
+scenarios. The integrated release adds verified instance-memory fixes and
+Settings draft/validation tests; final evidence and per-instance deployment
+results are recorded in the integrated release report. The nine original memory
+edits were committed as `8be310d89ce530aecbab470ba4d339295b8af40e` and merged into
+the release branch. Private state remains local to each instance.
+
+- [Integrated release plan](../03_reviews/2026-09-05-pritha-integrated-release-plan.md)

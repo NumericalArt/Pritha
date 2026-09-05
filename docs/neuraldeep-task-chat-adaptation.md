@@ -172,3 +172,23 @@ and private backup location without publishing it. Obtain the immediate service
 lifecycle approval required by the local workflow. Finish with a local delivery
 report mapping mother commits to NeuralDeep commits, test evidence, remaining
 limitations and an explicit list of preserved architectural differences.
+
+## Integrated memory and Settings follow-up
+
+The ordinary Pritha release also includes memory commit
+`8be310d89ce530aecbab470ba4d339295b8af40e` and numeric Settings improvements.
+Map memory environment resolution onto NeuralDeep's own instance/profile roots;
+Python entrypoints should load only required path configuration before choosing
+indexes or importing ML libraries. Preserve explicit environment precedence and
+never load or copy unrelated credentials.
+
+For Settings, reuse the pure `settings/runtime-numbers.ts` contract only where
+its fields and limits match the local implementation. Keep editable string
+drafts, including an empty field, until Save; reject invalid types/ranges before
+persisting and retain drafts after network/JSON/API failure. Task Timeout can be
+entered in seconds or milliseconds with exact millisecond precision. The unit
+selector does not introduce a new runtime delay or change timeout semantics.
+Test desktop/mobile, units, bounds, save/reload and rejected saves. Preserve
+NeuralDeep's CLI-first routing: the mother's Codex App default is specific to the
+mother and ordinary copies and must not replace NeuralDeep's provider adapter.
+Use the integrated operations report for the final tested source commit.

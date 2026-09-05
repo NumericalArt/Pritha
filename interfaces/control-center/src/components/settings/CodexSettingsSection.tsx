@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bot, Code2, Save, Terminal, Zap } from "lucide-react";
+import { runtimeNumberDrafts, parseRuntimeNumberDrafts, type RuntimeNumberKey, type TimeoutUnit } from "@/lib/settings/runtime-numbers";
 import {
   FALLBACK_CODEX_MODELS,
   codexModelSupportsFast,
@@ -64,12 +65,6 @@ const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   updatedAt: "",
 };
 
-function clampPlanSteps(value: unknown, fallback = DEFAULT_RUNTIME_SETTINGS.codexMaxPlanSteps) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
-  return Math.max(1, Math.min(10, Math.round(numeric)));
-}
-
 export function CodexSettingsSection() {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const [modelCatalog, setModelCatalog] = useState<CodexModelCatalog>(() => fallbackCodexModelCatalog(new Date(0)));
@@ -77,7 +72,8 @@ export function CodexSettingsSection() {
   const [transportStatus, setTransportStatus] = useState<TransportStatus>({});
   const [runtimeStatus, setRuntimeStatus] = useState("");
   const [saving, setSaving] = useState(false);
-  const [maxPlanStepsDraft, setMaxPlanStepsDraft] = useState(String(DEFAULT_RUNTIME_SETTINGS.codexMaxPlanSteps));
+  const [timeoutUnit, setTimeoutUnit] = useState<TimeoutUnit>("seconds");
+  const [numberDrafts, setNumberDrafts] = useState(() => runtimeNumberDrafts(DEFAULT_RUNTIME_SETTINGS, "seconds"));
   const [selectionNotice, setSelectionNotice] = useState("");
 
   useEffect(() => {
@@ -115,7 +111,7 @@ export function CodexSettingsSection() {
     const forcedInline = loadedSettings.codexReasoningEffort === "ultra" && loadedSettings.codexExecutionMode !== "inline_only";
     const nextSettings = forcedInline ? { ...loadedSettings, codexExecutionMode: "inline_only" as const } : loadedSettings;
     setRuntimeSettings(nextSettings);
-    setMaxPlanStepsDraft(String(clampPlanSteps(nextSettings.codexMaxPlanSteps)));
+    setNumberDrafts(runtimeNumberDrafts(nextSettings, timeoutUnit));
     setTransportStatus(payload.transports || {});
     setRuntimeSettingsLoaded(true);
     setRuntimeStatus("");
@@ -123,14 +119,14 @@ export function CodexSettingsSection() {
   }
 
   async function saveRuntimeSettings() {
+    const parsed = parseRuntimeNumberDrafts(numberDrafts, timeoutUnit);
+    if (!parsed.values) { setRuntimeStatus(parsed.error); return; }
     setSaving(true);
     setRuntimeStatus("");
     const settingsToSave = {
       ...runtimeSettings,
-      codexMaxPlanSteps: clampPlanSteps(runtimeSettings.codexMaxPlanSteps),
+      ...parsed.values,
     };
-    setRuntimeSettings(settingsToSave);
-    setMaxPlanStepsDraft(String(settingsToSave.codexMaxPlanSteps));
     const response = await fetch("/api/realtime/runtime-settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -154,15 +150,15 @@ export function CodexSettingsSection() {
         codexAppThreadMaxAgeHours: settingsToSave.codexAppThreadMaxAgeHours,
       }),
     }).catch(() => null);
+    const payload = (await response?.json().catch(() => null)) as { settings?: RuntimeSettings; transports?: TransportStatus; error?: string; message?: string; ok?: boolean } | null;
     setSaving(false);
-    const payload = (await response?.json().catch(() => null)) as { settings?: RuntimeSettings; transports?: TransportStatus; error?: string } | null;
-    if (!response?.ok || !payload) {
-      setRuntimeStatus(payload?.error ? `Failed to save: ${payload.error}` : "Failed to save Codex runtime settings");
+    if (!response?.ok || !payload?.settings || payload.ok === false) {
+      setRuntimeStatus(payload?.message || (payload?.error ? `Failed to save: ${payload.error}` : "Failed to save Codex runtime settings"));
       return;
     }
     const nextSettings = { ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings };
     setRuntimeSettings(nextSettings);
-    setMaxPlanStepsDraft(String(clampPlanSteps(nextSettings.codexMaxPlanSteps)));
+    setNumberDrafts(runtimeNumberDrafts(nextSettings, timeoutUnit));
     setTransportStatus(payload.transports || {});
     setRuntimeStatus("Codex runtime settings saved");
     setSelectionNotice("");
@@ -207,18 +203,18 @@ export function CodexSettingsSection() {
     });
   }
 
-  function updateMaxPlanStepsDraft(value: string) {
-    setMaxPlanStepsDraft(value);
-    if (value.trim() === "") return;
-    const nextValue = clampPlanSteps(value, runtimeSettings.codexMaxPlanSteps);
-    setMaxPlanStepsDraft(String(nextValue));
-    updateRuntimeSetting("codexMaxPlanSteps", nextValue);
+  function updateNumberDraft(key: RuntimeNumberKey, value: string) {
+    setNumberDrafts(current => ({ ...current, [key]: value }));
+    setRuntimeStatus("");
   }
 
-  function commitMaxPlanStepsDraft() {
-    const nextValue = maxPlanStepsDraft.trim() === "" ? runtimeSettings.codexMaxPlanSteps : clampPlanSteps(maxPlanStepsDraft, runtimeSettings.codexMaxPlanSteps);
-    updateRuntimeSetting("codexMaxPlanSteps", nextValue);
-    setMaxPlanStepsDraft(String(nextValue));
+  function changeTimeoutUnit(next: TimeoutUnit) {
+    const text = numberDrafts.codexTimeoutMs;
+    const factor = next === "milliseconds" ? 1000 : 0.001;
+    if (next !== timeoutUnit && text.trim() && Number.isFinite(Number(text))) {
+      updateNumberDraft("codexTimeoutMs", String(Number((Number(text) * factor).toFixed(6))));
+    }
+    setTimeoutUnit(next);
   }
 
   const appAvailable = transportStatus.codex_app?.available;
@@ -284,7 +280,7 @@ export function CodexSettingsSection() {
           </div>
         </div>
       ) : (
-        <>
+        <fieldset className="settings-fields" disabled={saving}>
           <div className="settings-rowline codex-transport-row">
             <div>
               <strong>Deep Task Transport</strong>
@@ -345,9 +341,9 @@ export function CodexSettingsSection() {
                 min={4}
                 max={100}
                 step={1}
-                value={runtimeSettings.codexAppThreadMaxTurns}
+                value={numberDrafts.codexAppThreadMaxTurns}
                 aria-label="Codex App thread max turns"
-                onChange={(event) => updateRuntimeSetting("codexAppThreadMaxTurns", Math.max(4, Math.min(100, Number(event.currentTarget.value) || 24)))}
+                onChange={(event) => updateNumberDraft("codexAppThreadMaxTurns", event.currentTarget.value)}
               />
               <input
                 className="settings-number-input"
@@ -355,9 +351,9 @@ export function CodexSettingsSection() {
                 min={1}
                 max={720}
                 step={1}
-                value={runtimeSettings.codexAppThreadMaxAgeHours}
+                value={numberDrafts.codexAppThreadMaxAgeHours}
                 aria-label="Codex App thread max age hours"
-                onChange={(event) => updateRuntimeSetting("codexAppThreadMaxAgeHours", Math.max(1, Math.min(720, Number(event.currentTarget.value) || 168)))}
+                onChange={(event) => updateNumberDraft("codexAppThreadMaxAgeHours", event.currentTarget.value)}
               />
             </div>
           </div>
@@ -453,16 +449,23 @@ export function CodexSettingsSection() {
               <strong>Task Timeout</strong>
               <span>Maximum runtime for Codex App or CLI deep task execution.</span>
             </div>
-            <input
-              className="settings-number-input"
-              type="number"
-              min={10}
-              max={3600}
-              step={10}
-              value={Math.round(runtimeSettings.codexTimeoutMs / 1000)}
-              aria-label="Codex task timeout seconds"
-              onChange={(event) => updateRuntimeSetting("codexTimeoutMs", Math.max(10, Number(event.currentTarget.value) || 300) * 1000)}
-            />
+            <div className="settings-inline-fields">
+              <input
+                className="settings-number-input"
+                type="number"
+                inputMode={timeoutUnit === "seconds" ? "decimal" : "numeric"}
+                min={timeoutUnit === "seconds" ? 10 : 10000}
+                max={timeoutUnit === "seconds" ? 3600 : 3600000}
+                step={timeoutUnit === "seconds" ? 0.001 : 1}
+                value={numberDrafts.codexTimeoutMs}
+                aria-label={`Codex task timeout ${timeoutUnit}`}
+                onChange={(event) => updateNumberDraft("codexTimeoutMs", event.currentTarget.value)}
+              />
+              <select value={timeoutUnit} aria-label="Task timeout unit" onChange={event => changeTimeoutUnit(event.currentTarget.value as TimeoutUnit)}>
+                <option value="seconds">Seconds</option>
+                <option value="milliseconds">Milliseconds</option>
+              </select>
+            </div>
           </div>
           <div className="settings-rowline">
             <div>
@@ -475,9 +478,9 @@ export function CodexSettingsSection() {
               min={4000}
               max={120000}
               step={1000}
-              value={runtimeSettings.codexPromptTokenBudget}
+              value={numberDrafts.codexPromptTokenBudget}
               aria-label="Codex prompt token budget"
-              onChange={(event) => updateRuntimeSetting("codexPromptTokenBudget", Math.max(4000, Math.min(120000, Number(event.currentTarget.value) || 24000)))}
+              onChange={(event) => updateNumberDraft("codexPromptTokenBudget", event.currentTarget.value)}
             />
           </div>
           <div className="settings-rowline">
@@ -527,10 +530,9 @@ export function CodexSettingsSection() {
               min={1}
               max={10}
               step={1}
-              value={maxPlanStepsDraft}
+              value={numberDrafts.codexMaxPlanSteps}
               aria-label="Codex maximum plan steps"
-              onBlur={commitMaxPlanStepsDraft}
-              onChange={(event) => updateMaxPlanStepsDraft(event.currentTarget.value)}
+              onChange={(event) => updateNumberDraft("codexMaxPlanSteps", event.currentTarget.value)}
             />
           </div>
           <div className="settings-rowline">
@@ -567,9 +569,9 @@ export function CodexSettingsSection() {
               <Save size={16} />
               {saving ? "Saving" : "Save Codex Runtime"}
             </button>
-            <span>{runtimeStatus || `Approval: ${runtimeSettings.codexApproval}`}</span>
+            <span role="status">{runtimeStatus || `Approval: ${runtimeSettings.codexApproval}`}</span>
           </div>
-        </>
+        </fieldset>
       )}
     </section>
   );

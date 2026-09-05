@@ -25,10 +25,11 @@ confidence: high
 
 # Task Chat evolution: implementation delivery
 
-All three feature stages are implemented and verified in an isolated worktree
-on `codex/task-chat-reliability`. Production services, native history, primary
-checkout changes and replica private state were not modified. This report is
-implementation evidence and a release handoff, not production acceptance.
+All three feature stages were implemented and verified in an isolated worktree
+on `codex/task-chat-reliability`. This report records the initial implementation
+evidence. The subsequent operator-authorized integrated release combines these
+features with verified memory fixes and Settings improvements; its plan and
+operations report supersede the initial release blockers below.
 
 ## Implementation anchors
 
@@ -110,41 +111,21 @@ a subsequent upload; referenced originals never expire automatically. Browser
 reload requires reselecting unsent files; sent history survives reload/restart.
 No automatic extraction, transcription, unpacking or code execution occurs.
 
-## Release transaction still required
+## Integrated release follow-up
 
-Read-only fleet preflight stopped at main with `checkout_dirty`: nine existing
-memory implementation/test files are uncommitted. They were present before this
-work and are preserved. Dasha, Sasha and Marina passed the corresponding
-preflight checks. No release transaction was started. The current main release
-remains the prior accepted code.
+The initial read-only preflight found nine pre-existing memory edits and stopped
+before service changes. On 2026-09-05 the operator explicitly authorized committing
+all pending work, updating main/GitHub and deploying the combined result to the
+four ordinary instances and the running MacBook instance. Memory changes are
+preserved in `8be310d89ce530aecbab470ba4d339295b8af40e`. The release branch includes
+that commit through a normal merge; no reset, stash or force-push was used.
 
-1. Coordinate completion/preservation of the existing primary memory work.
-   Do not reset or automatically stash another task's changes. If that work
-   produces new main commits, reconcile/retest the release branch and refresh
-   all target pins; do not force-push main or conceal divergence.
-2. Publish and stage A, then B, then C, holding each next main advancement until
-   the previous release passes. The current updater requires the target to
-   equal origin/main. Feature commits may be published to the review branch
-   together without switching running services. Documentation follow-ups can
-   accompany the final accepted target; record its full SHA explicitly.
-3. Run the per-release plan and isolated build/verification for that exact pin.
-   Back up each instance's private registry/native history according to policy.
-   Keep migration backups and originals private and instance-local.
-4. Immediately before service mutation, obtain explicit approval under
-   `07_workflows/control-center-staged-release.md`. Apply main first, then Dasha,
-   Sasha and Marina to the same pin, stopping on the first failure. Check exact
-   health-v2 release identity, /codex, /task-chat and all referenced chunks, plus
-   isolation fingerprints and Git cleanliness. Do not skip explicit strict
-   page/chunk checks merely because the manager's health endpoint passed.
-5. Verify real old history read/recovery without replay, active Voice archive,
-   clipboard and a synthetic attachment delivery with the selected model.
-   Repeat after each instance. Keep rollback builds until acceptance.
-6. Run the MacBook update locally on that machine to the accepted pin using
-   `docs/update-second-local-macbook.md`. Peer access remains unverified until
-   tested there. Do not copy private settings, history or originals.
-7. Give NeuralDeep `docs/neuraldeep-task-chat-adaptation.md` together with the
-   final release result. Its separate CLI/Voice/provider architecture is
-   adapted by capability and contract, never overwritten wholesale.
+[The integrated plan](../../03_reviews/2026-09-05-pritha-integrated-release-plan.md)
+supersedes the earlier sequential A/B/C publication proposal and the now-resolved
+memory/approval blockers. Deployment still uses one exact origin/main pin,
+private snapshots, staged builds, verified manager ownership, main → Dasha →
+Sasha → Marina, then MacBook, strict page/chunk checks and isolation fingerprints.
+NeuralDeep remains separate and receives the adaptation guide.
 
 Rollback restores the managed prior build/service state. Restore a migration's
 private registry snapshot only before new activity makes it stale; otherwise

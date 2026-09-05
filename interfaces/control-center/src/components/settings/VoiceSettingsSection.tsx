@@ -74,7 +74,8 @@ export function VoiceSettingsSection() {
       setRuntimeStatus("Failed to save runtime settings");
       return;
     }
-    const payload = (await response.json()) as { settings?: RuntimeSettings };
+    const payload = (await response.json().catch(() => null)) as { settings?: RuntimeSettings; ok?: boolean } | null;
+    if (!payload?.settings || payload.ok === false) { setRuntimeStatus("Failed to save runtime settings"); return; }
     setRuntimeSettings({ ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings });
     setRuntimeStatus("Runtime settings saved");
   }
@@ -154,7 +155,7 @@ export function VoiceSettingsSection() {
               <Save size={16} />
               {saving ? "Saving" : "Save Voice Runtime"}
             </button>
-            <span>{runtimeStatus || "Changes apply on the next voice session or reconnect."}</span>
+            <span role="status">{runtimeStatus || "Changes apply on the next voice session or reconnect."}</span>
           </div>
         </>
       )}

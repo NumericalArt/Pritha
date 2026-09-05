@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validateRuntimeNumbers } from "@/lib/settings/runtime-numbers";
 import {
   getPrithaRealtimeStatus,
   getPrithaRuntimeSettings,
@@ -80,7 +81,18 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const payload = (await request.json().catch(() => ({}))) as RuntimeSettingsPayload;
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ ok: false, error: "invalid_request", message: "Settings must be a JSON object." }, { status: 400 });
+  const numericError = validateRuntimeNumbers(body);
+  if (numericError) return NextResponse.json({ ok: false, ...numericError }, { status: 400 });
+  for (const [key, choices] of Object.entries({ deepTaskPrimaryTransport: ["codex-app", "codex-cli"], codexSandbox: ["auto", "read-only", "workspace-write", "danger-full-access"] })) {
+    if (key in body && !choices.includes(body[key])) return NextResponse.json({ ok: false, error: `invalid_${key}`, message: "Choose one of the available settings options." }, { status: 400 });
+  }
+  for (const key of ["codexNetworkAccess", "codexAskBeforeOrchestration"]) {
+    if (key in body && typeof body[key] !== "boolean") return NextResponse.json({ ok: false, error: `invalid_${key}`, message: "This setting must be enabled or disabled." }, { status: 400 });
+  }
+  if ("codexWorkdir" in body && typeof body.codexWorkdir !== "string") return NextResponse.json({ ok: false, error: "invalid_codex_workdir" }, { status: 400 });
+  const payload = body as RuntimeSettingsPayload;
   const patch: Parameters<typeof updatePrithaRuntimeSettings>[0] = {};
   const currentSettings = getPrithaRuntimeSettings();
 
