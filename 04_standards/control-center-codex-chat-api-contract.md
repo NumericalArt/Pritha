@@ -252,6 +252,31 @@ type RuntimeStatus = {
 root/account/profile. The browser never receives the underlying path or auth
 identifier.
 
+### Implemented storage binding recovery (2026-09-04, release A)
+
+The `storage-v2:` identity hashes the canonical effective Codex home. Runtime
+version and transport provider remain separate metadata and cannot invalidate
+the same storage on upgrade. Legacy hashes are never blindly replaced: recovery
+requires a hash derived for this home from an observed cached runtime version,
+plus read-only verification of the exact native thread ID and project cwd.
+
+`ThreadDetail.history` adds `{state, code, recoverable}` with state `available`,
+`recovery_available`, or `blocked`. `available` metadata does not assert that a
+later full history read will succeed. GET turns must always report its actual
+result; a blocked read cannot return a successful empty conversation.
+
+`POST /threads/{chatId}/restore-access` with `{}` verifies the full native read,
+preserves an immutable private pre-conversion registry snapshot, and converts
+the known legacy binding to storage v2. It returns `ThreadDetail`; repeating it
+does not duplicate history or backup. It never starts/resumes a native turn.
+Unsupported native formats return `history_format_unsupported`; this endpoint
+does not rewrite or claim to convert arbitrary native rollout formats.
+
+Typed history errors include `history_recovery_available`,
+`runtime_identity_mismatch`, `native_thread_missing`,
+`history_format_unsupported`, `history_timeout` and `history_unavailable`.
+Only a verified successful empty history response permits the empty-chat UI.
+
 ## 5. Thread, turn and item types
 
 ```ts

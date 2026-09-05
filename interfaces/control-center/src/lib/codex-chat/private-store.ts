@@ -177,6 +177,25 @@ export class CodexChatPrivateStore {
     });
   }
 
+  async migrateIdentity(chatId: string, expected: string | null, replacement: string) {
+    return this.enqueueMutation(async () => {
+      if (this.readOnlyError) throw this.readOnlyError;
+      const registry = await this.load();
+      const current = registry.chats[chatId];
+      if (!current) throw new Error("chat_not_found");
+      if (current.stateIdentityHash === replacement) return current;
+      if (current.stateIdentityHash !== expected) throw new Error("identity_changed_during_recovery");
+      const key = createHash("sha256").update(`${chatId}:${expected}`).digest("hex");
+      const backup = path.join(this.root, "identity-migrations", `${key}.json`);
+      if (await readOptional(backup) == null) await this.writeRegistry(backup, registry);
+      const next = { ...current, stateIdentityHash: replacement };
+      registry.chats[chatId] = next;
+      try { await this.persist(); } catch (error) { registry.chats[chatId] = current; throw error; }
+      await this.audit("identity-converted-v2", { chatRef: key.slice(0, 16), sourcePreserved: true });
+      return next;
+    });
+  }
+
   async removeEmptyDirectChat(chatId: string, nativeThreadId: string) {
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;

@@ -9,6 +9,7 @@ import { DESKTOP_CODEX_BIN_CANDIDATES } from "@/lib/settings/codex-binaries";
 import { codexAppTurnSettings } from "@/lib/settings/codex-model-catalog";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { CodexChatPrivateStore } from "./private-store";
+import { effectiveCodexHome, legacyIdentityMatches, storageIdentity } from "./storage-identity";
 import type { RuntimeCapabilityMap, RuntimeProviderId, RuntimeProviderView, RuntimeStatus } from "./types";
 
 export type RpcMessage = {
@@ -74,8 +75,8 @@ function emptyCapabilities(): RuntimeCapabilityMap {
   };
 }
 
-function childEnvironment() {
-  const env = { ...process.env };
+function childEnvironment(home = effectiveCodexHome()) {
+  const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home };
   if (process.env.PRITHA_REALTIME_CODEX_USE_PROXY === "1" || process.env.TECHSCOPE_VOICE_CODEX_USE_PROXY === "1") return env;
   for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) delete env[key];
   env.NO_PROXY = env.NO_PROXY || "127.0.0.1,localhost";
@@ -174,6 +175,7 @@ function sandboxModeForView(value: string): RuntimeStatus["selected"]["sandboxMo
 }
 
 export class AppServerConnection {
+  readonly codexHome = effectiveCodexHome();
   private child: ChildProcessWithoutNullStreams | null = null;
   private nextId = 1;
   private pending = new Map<string | number, PendingRequest>();
@@ -280,7 +282,7 @@ export class AppServerConnection {
   private async startConnection() {
     const child = spawn(this.binary, ["app-server", "--listen", "stdio://"], {
       cwd: this.cwd,
-      env: childEnvironment(),
+      env: childEnvironment(this.codexHome),
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.child = child;
@@ -432,10 +434,29 @@ export class CodexRuntimeManager {
     return this.probe(providerId);
   }
 
+  async canRecoverIdentity(providerId: RuntimeProviderId, identity: string | null) {
+    const probe = await this.probe(providerId);
+    const versions = new Set<string>(probe.view.version ? [probe.view.version] : []);
+    if (existsSync(this.store.capabilitiesRoot)) {
+      for (const entry of readdirSync(this.store.capabilitiesRoot, { withFileTypes: true })) {
+        if (!entry.isDirectory() || !/^[a-f0-9]{20}$/.test(entry.name)) continue;
+        try {
+          const saved = JSON.parse(readFileSync(path.join(this.store.capabilitiesRoot, entry.name, "capabilities.json"), "utf8"));
+          if (typeof saved.version === "string" && saved.version.length <= 120) versions.add(saved.version);
+        } catch { /* damaged caches cannot authorize recovery */ }
+      }
+    }
+    return legacyIdentityMatches(identity, providerId, [...versions], effectiveCodexHome());
+  }
+
   async connection(providerId: RuntimeProviderId) {
     const probe = await this.probe(providerId);
     if (probe.view.availability !== "ready") throw new Error("Selected Codex runtime is unavailable.");
-    const existing = this.connections.get(providerId);
+    let existing = this.connections.get(providerId);
+    if (existing && (existing.codexHome !== effectiveCodexHome() || existing.binary !== probe.binary)) {
+      this.discardConnection(providerId, existing, new Error("Runtime environment changed."));
+      existing = undefined;
+    }
     if (existing) {
       existing.setNotificationHandler(this.onNotification);
       try {
@@ -602,9 +623,7 @@ export class CodexRuntimeManager {
       warning = "The installed Codex runtime did not report a version.";
     }
 
-    const stateIdentityHash = version
-      ? createHash("sha256").update(`${providerId}:${version}:${process.env.CODEX_HOME || "default"}`).digest("hex").slice(0, 20)
-      : null;
+    const stateIdentityHash = version ? storageIdentity(effectiveCodexHome()) : null;
     const ready = Boolean(version && capabilities.fullChat);
     const probe: ProviderProbe = {
       providerId,

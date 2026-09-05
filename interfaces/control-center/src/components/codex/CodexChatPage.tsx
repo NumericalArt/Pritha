@@ -581,15 +581,11 @@ export function CodexChatPage() {
       if (historyRequestRef.current?.token === token && selectedChatIdRef.current === chatId) setHistoryState("slow");
     }, HISTORY_SLOW_MS);
     try {
-      const historyBlocked = threadDetail.continuationState === "blocked_runtime_mismatch"
-        || threadDetail.continuationState === "blocked_history_unavailable";
-      const rows = historyBlocked
-        ? []
-        : (await api<TurnPage>(
-          `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50`,
-          { signal: controller.signal },
-          { timeoutMs: HISTORY_TIMEOUT_MS },
-        )).data.data;
+      const rows = (await api<TurnPage>(
+        `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50`,
+        { signal: controller.signal },
+        { timeoutMs: HISTORY_TIMEOUT_MS },
+      )).data.data;
       if (historyRequestRef.current?.token !== token) return false;
       if (selectedChatIdRef.current === chatId) {
         setTurns(rows);
@@ -618,10 +614,10 @@ export function CodexChatPage() {
         const missing = code === "native_thread_missing";
         setHistoryIssue({ code, retryable: requestError?.retryable ?? true, replacementAllowed: requestError?.details?.replacementAllowed === true });
         setHistoryError(missing
-          ? "This chat is no longer available in the selected runtime. It may have been created before the runtime restarted."
+          ? "The original thread was not found in the selected storage. The chat record has been preserved."
           : code === "request_timeout" || code === "history_timeout"
             ? "History took too long to load. The thread is safe; retry when the connection is ready."
-            : "History could not load. Retry without leaving this thread.");
+            : requestError?.message || "History could not load. Retry without leaving this thread.");
       }
       completeNavigation(context, "history_failed", {
         stage: "history",
@@ -851,7 +847,7 @@ export function CodexChatPage() {
   const effectiveProvider = runtime?.providers.find((provider) => provider.providerId === (displayedThread?.runtime.providerId || runtime.effectiveProvider));
   const visibleError = error && (error.chatId == null || error.chatId === selectedChatId) ? error : null;
   const backendOffline = visibleError?.kind === "backend_offline";
-  const threadUnavailable = historyIssue?.code === "native_thread_missing";
+  const threadUnavailable = Boolean(historyIssue && !historyIssue.retryable);
   const transcriptStale = backendOffline || connection === "reconnecting";
   const historyBusy = selectionChanging || detailLoading || historyState === "loading" || historyState === "slow";
 
@@ -1192,6 +1188,18 @@ export function CodexChatPage() {
     writeStoredDictationLanguage(option.value);
   }
 
+  const restoreAccess = async () => {
+    if (!selectedChatId || recovering) return;
+    const chatId = selectedChatId;
+    setRecovering(true);
+    try {
+      await api<ThreadDetail>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/restore-access`, { method: "POST", body: "{}" });
+      if (selectedChatIdRef.current === chatId) await retryNow();
+    } catch (cause) {
+      if (selectedChatIdRef.current === chatId) setHistoryError(cause instanceof Error ? cause.message : "Access could not be restored.");
+    } finally { setRecovering(false); }
+  };
+
   const history = (
     <div className="codex-history-content">
       <div className="codex-history-title-row">
@@ -1315,6 +1323,7 @@ export function CodexChatPage() {
               <p>{historyError || "Retry without leaving the selected thread."}</p>
               <div className="codex-empty-actions">
                 {historyIssue?.retryable !== false ? <button className="outline-button compact" type="button" onClick={() => void retryNow()} disabled={recovering}>{recovering ? "Retrying…" : "Retry history"}</button> : null}
+                {historyIssue?.code === "history_recovery_available" ? <button className="primary-action-button compact" type="button" onClick={() => void restoreAccess()} disabled={recovering}>{recovering ? "Restoring…" : "Restore access"}</button> : null}
                 {historyIssue?.replacementAllowed ? <button className="primary-action-button compact" type="button" onClick={startReplacementDraft}>Start replacement draft</button> : null}
                 {historyIssue?.retryable === false && !historyIssue.replacementAllowed ? <button className="outline-button compact" type="button" onClick={backToThreadList}>Back to list</button> : null}
               </div>

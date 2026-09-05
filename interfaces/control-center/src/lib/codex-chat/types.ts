@@ -190,6 +190,7 @@ export type ThreadDetail = {
   pendingRequests: PendingRequestView[];
   streamUrl: string;
   continuationState: ThreadContinuationState;
+  history?: { state: "available" | "recovery_available" | "blocked"; code: string | null; recoverable: boolean };
 };
 
 export type CreateTaskLinkRequest = {

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage } from "./app-server";
+import { verifyNativeThreadIdentity } from "./storage-identity";
 import { classifyNativeThreadReadFailure } from "./native-thread-errors";
 import { CodexChatPrivateStore, type ChatBinding } from "./private-store";
 import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
@@ -367,24 +368,14 @@ export class CodexChatGateway {
   async threadDetail(chatId: string): Promise<ThreadDetail> {
     const binding = await this.requireBinding(chatId);
     const provider = (await this.runtime.provider(binding.providerId)).view;
-    let current = binding;
+    const current = binding;
     let nativeThread: unknown;
-    if (!binding.stateIdentityHash && provider.availability === "ready" && provider.stateIdentityHash) {
-      try {
-        nativeThread = await this.readNativeThread(binding, false);
-        current = await this.store.patch(chatId, { stateIdentityHash: provider.stateIdentityHash }) || binding;
-      } catch {
-        // Preserve the binding as read-only until the native thread can be verified.
-      }
-    }
-    if (current.origin === "voice" && current.stateIdentityHash === provider.stateIdentityHash) {
-      try {
-        nativeThread = await this.readNativeThread(current, false);
-        const nativeStatus = threadStatusFromNative(asObject(nativeThread)?.status, current.archived);
-        if (nativeStatus !== current.lastStatus) current = await this.store.patch(chatId, { lastStatus: nativeStatus }) || current;
-      } catch {
-        // The existing metadata remains visible but continuation stays guarded by the runtime binding.
-      }
+    let history: NonNullable<ThreadDetail["history"]> = { state: "available", code: null, recoverable: false };
+    try {
+      nativeThread = await this.readNativeThread(current, false);
+    } catch (error) {
+      const code = error instanceof CodexChatGatewayError ? error.code : "history_unavailable";
+      history = { state: code === "history_recovery_available" ? "recovery_available" : "blocked", code, recoverable: code === "history_recovery_available" };
     }
     const summary = summarizeThread(current, provider, nativeThread);
     return {
@@ -393,7 +384,19 @@ export class CodexChatGateway {
       pendingRequests: [],
       streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events`,
       continuationState: summary.continuationState,
+      history,
     };
+  }
+
+  async restoreAccess(chatId: string) {
+    const binding = await this.requireBinding(chatId);
+    const provider = (await this.runtime.provider(binding.providerId)).view;
+    if (!provider.stateIdentityHash) throw new CodexChatGatewayError("runtime_unavailable", "The selected runtime is unavailable.", 503, true);
+    if (binding.stateIdentityHash !== provider.stateIdentityHash) {
+      await this.readNativeThread(binding, true, true);
+      await this.store.migrateIdentity(chatId, binding.stateIdentityHash, provider.stateIdentityHash);
+    }
+    return this.threadDetail(chatId);
   }
 
   async taskChatLinkForTask(taskId: string) {
@@ -722,19 +725,29 @@ export class CodexChatGateway {
     return this.emit(chatId, "stream.reset", { reason, refresh: true });
   }
 
-  private async readNativeThread(binding: ChatBinding, includeTurns: boolean) {
+  private async readNativeThread(binding: ChatBinding, includeTurns: boolean, allowRecovery = false) {
     try {
       const provider = (await this.runtime.provider(binding.providerId)).view;
-      if (binding.stateIdentityHash && provider.stateIdentityHash !== binding.stateIdentityHash) {
-        throw new CodexChatGatewayError("runtime_identity_mismatch", "The selected runtime does not match this chat binding.", 409);
+      const mismatch = !binding.stateIdentityHash || provider.stateIdentityHash !== binding.stateIdentityHash;
+      if (provider.availability !== "ready") throw new CodexChatGatewayError("runtime_unavailable", "The selected runtime is unavailable. Retry when it is ready.", 503, true);
+      if (mismatch && !await this.runtime.canRecoverIdentity(binding.providerId, binding.stateIdentityHash)) {
+        throw new CodexChatGatewayError("runtime_identity_mismatch", "This chat belongs to a different or unverified storage location. Its history has been preserved.", 409);
       }
       const result = asObject(await this.runtime.readThread(binding.providerId, binding.nativeThreadId, includeTurns));
       const thread = asObject(result?.thread);
       if (!thread) throw new Error("missing_thread");
+      if (mismatch && !verifyNativeThreadIdentity(thread, binding.nativeThreadId, this.root)) {
+        throw new CodexChatGatewayError("runtime_identity_mismatch", "The original chat could not be verified in this workspace. Its history has been preserved.", 409);
+      }
+      if (includeTurns && !Array.isArray(thread.turns)) throw new Error("history_format_unsupported");
+      if (mismatch && !allowRecovery) throw new CodexChatGatewayError("history_recovery_available", "This chat uses an older storage binding. Restore access to open the verified original conversation.", 409, false, { recoverable: true });
       return thread;
     } catch (error) {
       if (error instanceof CodexChatGatewayError) throw error;
       const failure = classifyNativeThreadReadFailure(error);
+      if (failure === "history_format_unsupported") {
+        throw new CodexChatGatewayError("history_format_unsupported", "This history format is not supported by the selected runtime. The original has been preserved; you can keep or archive this chat.", 422);
+      }
       if (failure === "history_timeout") {
         throw new CodexChatGatewayError("history_timeout", "The task history did not answer within the operation timeout.", 504, true);
       }
