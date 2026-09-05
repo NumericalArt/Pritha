@@ -32,8 +32,8 @@ version change. Preserve unavailable chats until the operator archives them.
 | --- | --- | --- | --- |
 | 0 | none | Roadmap and per-stage implementation plans | recorded |
 | A | 0 | Stable storage identity, verified recovery, truthful history states | implemented; release pending |
-| B1 | A | Unified Voice list and instance-local Archive / Show archived / Restore from archive | pending |
-| B2 | B1 | Complete Markdown Copy response | pending |
+| B1 | A | Unified Voice list and instance-local Archive / Show archived / Restore from archive | implemented; release pending |
+| B2 | B1 | Complete Markdown Copy response | implemented; release pending |
 | C | B2 | File selection, drop, clipboard images, all original file types and model capability checks | pending |
 | Transfer | each tested release | Pinned fleet/MacBook release and NeuralDeep adaptation instructions | pending |
 
@@ -70,3 +70,7 @@ release commits. Preserve its CLI runner, Voice routing, isolated storage,
 credentials and provider errors. Validate each provider/model's attachment
 capabilities, including model changes in existing conversations. Unknown
 multimodality must be explained, never assumed.
+
+## Release anchors
+
+- A: `f4e446c` — verified history binding recovery.

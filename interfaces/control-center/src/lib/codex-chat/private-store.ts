@@ -40,6 +40,12 @@ type RegistryFile = {
   chats: Record<string, ChatBinding>;
 };
 
+export function logicalChatKey(binding: ChatBinding) {
+  return binding.stateIdentityHash?.startsWith("storage-v2:")
+    ? `${binding.group}:${binding.stateIdentityHash}:${binding.nativeThreadId}`
+    : binding.chatId;
+}
+
 function privateChatLocations() {
   const root = resolveTechscopeRoot();
   const stateRoot = resolvePrithaStateRoot(root);
@@ -193,6 +199,21 @@ export class CodexChatPrivateStore {
       try { await this.persist(); } catch (error) { registry.chats[chatId] = current; throw error; }
       await this.audit("identity-converted-v2", { chatRef: key.slice(0, 16), sourcePreserved: true });
       return next;
+    });
+  }
+
+  async setArchived(chatId: string, archived: boolean) {
+    return this.enqueueMutation(async () => {
+      if (this.readOnlyError) throw this.readOnlyError;
+      const registry = await this.load();
+      const selected = registry.chats[chatId];
+      if (!selected) return null;
+      const key = logicalChatKey(selected);
+      const original = registry.chats;
+      registry.chats = Object.fromEntries(Object.entries(original).map(([id, row]) =>
+        [id, logicalChatKey(row) === key ? { ...row, archived } : row]));
+      try { await this.persist(); } catch (error) { registry.chats = original; throw error; }
+      return registry.chats[chatId];
     });
   }
 

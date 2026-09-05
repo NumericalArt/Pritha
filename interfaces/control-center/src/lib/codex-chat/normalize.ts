@@ -79,7 +79,7 @@ export function threadStatusFromNative(value: unknown, archived = false): Thread
 
 export function summarizeThread(binding: ChatBinding, provider: RuntimeProviderView | null, nativeThread?: unknown): ThreadSummary {
   const native = asObject(nativeThread);
-  const status = native ? threadStatusFromNative(native.status, binding.archived) : binding.archived ? "archived" : binding.lastStatus;
+  const status = native ? threadStatusFromNative(native.status) : binding.lastStatus;
   const providerReady = provider?.availability === "ready";
   const identityMatches = Boolean(binding.stateIdentityHash && provider?.stateIdentityHash === binding.stateIdentityHash);
   const active = status === "active";
@@ -182,7 +182,7 @@ export function normalizeNativeItem(
     const message: MessageView = {
       id,
       role: "assistant",
-      markdown: boundedText(item.text, 256_000),
+      markdown: String(item.text || ""),
       status: item.status === "failed" ? "failed" : item.status === "inProgress" ? "streaming" : "completed",
       createdAt,
     };

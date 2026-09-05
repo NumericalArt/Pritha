@@ -15,7 +15,7 @@ export async function fixtureModules() {
   writeFileSync(path.join(tmp, "paths.mjs"), `export const resolveTechscopeRoot=()=>${JSON.stringify(root)}; export const resolvePrithaStateRoot=()=>${JSON.stringify(state)};`);
   writeFileSync(path.join(tmp, "app-server.mjs"), "export class AppServerConnection {} export class CodexRuntimeManager {}");
   writeFileSync(path.join(tmp, "voice-links.mjs"), "export const queueVoiceTaskChatIndexRefresh=()=>{}; export const reconcileVoiceTaskChatLink=async()=>{}; export const voiceTaskChatIndexStatus=()=>({state:'ready'});");
-  for (const name of ["storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "private-store", "gateway", "../private-json"]) {
+  for (const name of ["copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "private-store", "gateway", "../private-json"]) {
     const source = readFileSync(`interfaces/control-center/src/lib/codex-chat/${name}.ts`, "utf8");
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
@@ -80,5 +80,50 @@ test("recovery verifies native history and preserves original registry, receipts
     const original = JSON.parse(readFileSync(path.join(store.root, "identity-migrations", backups[0]), "utf8"));
     assert.deepEqual(original.chats.chat_one, binding);
     assert.deepEqual((await gateway.listTurns("chat_one")).data, []);
+  } finally { f.cleanup(); }
+});
+
+test("local archive preserves active work and deduplicates only verified storage aliases", async () => {
+  const f = await fixtureModules();
+  try {
+    const { CodexChatPrivateStore } = await f.load("private-store");
+    const { CodexChatGateway } = await f.load("gateway");
+    let store = new CodexChatPrivateStore();
+    const first = await store.put({ chatId: "chat_first", nativeThreadId: "same", providerId: "desktop_bundled", stateIdentityHash: "storage-v2:one", group: "voice_work", origin: "voice", title: "Active original", lastStatus: "active", taskLinks: [{ taskId: "task1", label: "First task" }], messageReceipts: { keep: { turnId: "turn1" } } });
+    await store.put({ ...first, chatId: "chat_alias", taskLinks: [{ taskId: "task2", label: "Second task" }] });
+    await store.put({ ...first, chatId: "chat_other", stateIdentityHash: "storage-v2:other" });
+    await store.put({ ...first, chatId: "chat_legacy", stateIdentityHash: "old" });
+    const gateway = Object.create(CodexChatGateway.prototype);
+    Object.assign(gateway, { store, root: f.root, emit: () => {}, runtime: { provider: async () => ({ view: { availability: "ready", stateIdentityHash: "storage-v2:one" } }) } });
+    const list = () => gateway.listThreads({ group: "voice_work", view: "all" });
+    const rows = (await list()).data;
+    assert.equal(rows.length, 3);
+    assert.equal(rows.find(row => row.runtime.compatibility === "bound").taskLinks.length, 2);
+    await gateway.archiveThread("chat_first", true);
+    assert.equal((await list()).data.length, 2);
+    assert.deepEqual((await store.get("chat_first")).messageReceipts, first.messageReceipts);
+    assert.equal((await store.get("chat_first")).lastStatus, "active");
+    await store.put({ ...first, chatId: "chat_late", archived: false });
+    assert.equal((await list()).data.length, 2, "a late alias cannot resurrect an archived chat");
+    const archived = await gateway.listThreads({ group: "voice_work", view: "all", archived: true, search: "Second task", limit: 1 });
+    assert.equal(archived.data.length, 1);
+    await gateway.archiveThread("chat_late", false);
+    store = new CodexChatPrivateStore(); gateway.store = store;
+    assert.equal((await list()).data.length, 3);
+    assert.equal((await store.all()).filter(row => row.archived).length, 0);
+  } finally { f.cleanup(); }
+});
+
+test("copy includes complete assistant Markdown in order, excluding activity", async () => {
+  const f = await fixtureModules();
+  try {
+    const { responseMarkdown, responseComplete } = await f.load("copy-response");
+    const { normalizeNativeItem } = await f.load("normalize");
+    const text = "Русский текст\n```js\nconst a = 1;\n```\n" + "x".repeat(300_000);
+    const item = normalizeNativeItem("chat_one", { id: "message", type: "agentMessage", text }, f.root, "2026-09-04T00:00:00Z");
+    const turn = { status: "interrupted", items: [item, { kind: "command", commandPreview: "private tool output" }, { kind: "assistant_message", message: { markdown: "Last paragraph" } }] };
+    assert.equal(responseMarkdown(turn), text + "\n\nLast paragraph");
+    assert.equal(responseComplete(turn), true);
+    assert.equal(responseComplete({ ...turn, status: "in_progress" }), false);
   } finally { f.cleanup(); }
 });

@@ -7199,3 +7199,12 @@ button:active,
     width: 94%;
   }
 }
+.codex-thread-entry { min-width: 0; }
+.codex-text-action { display: inline-flex; align-items: center; gap: 6px; padding: 7px 8px; border: 0; background: transparent; color: #b9adff; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
+.codex-text-action:hover { color: #e4deff; text-decoration: underline; }
+.codex-text-action:focus-visible { outline: 2px solid #a78bfa; outline-offset: 2px; border-radius: 4px; }
+.codex-text-action:disabled { opacity: .5; cursor: default; }
+.codex-archive-action { margin: 0 8px 6px; }
+.codex-thread-status { color: #e9bc72; font-size: 11px; }
+.codex-copy-response { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.codex-copy-response [role="status"] { color: #e9bc72; font-size: 12px; }

@@ -3,7 +3,7 @@ import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage } from "./app-server";
 import { verifyNativeThreadIdentity } from "./storage-identity";
 import { classifyNativeThreadReadFailure } from "./native-thread-errors";
-import { CodexChatPrivateStore, type ChatBinding } from "./private-store";
+import { CodexChatPrivateStore, logicalChatKey, type ChatBinding } from "./private-store";
 import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
 import {
@@ -175,7 +175,7 @@ export class CodexChatGateway {
     search?: string;
     cursor?: string;
     limit?: number;
-    view?: "current" | "legacy";
+    view?: "current" | "legacy" | "all";
   } = {}): Promise<ThreadPage> {
     if (input.group === "voice_work") queueVoiceTaskChatIndexRefresh(this.store, this.runtime);
     const bindings = await this.store.all();
@@ -185,11 +185,29 @@ export class CodexChatGateway {
     }
     const search = String(input.search || "").trim().toLowerCase();
     const archived = input.archived === true;
+    const archivedKeys = new Set(bindings.filter(row => row.archived).map(logicalChatKey));
     const summaries = bindings
-      .filter((binding) => binding.archived === archived)
-      .map((binding) => summarizeThread(binding, providerViews.get(binding.providerId) || null))
+      .map((binding) => summarizeThread({ ...binding, archived: archivedKeys.has(logicalChatKey(binding)) }, providerViews.get(binding.providerId) || null))
+      .filter((thread) => thread.archived === archived)
       .filter((thread) => input.group == null || input.group === "all" || thread.group === input.group);
     const view = input.view || "current";
+    if (view === "all") {
+      const groups = new Map<string, ThreadSummary[]>();
+      const byId = new Map(bindings.map(binding => [binding.chatId, binding]));
+      for (const summary of summaries) {
+        const key = logicalChatKey(byId.get(summary.chatId)!);
+        groups.set(key, [...(groups.get(key) || []), summary]);
+      }
+      const merged = [...groups.values()].map(rows => {
+        const ordered = [...rows].sort((a, b) => Number(b.runtime.compatibility === "bound") - Number(a.runtime.compatibility === "bound") || Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.chatId.localeCompare(b.chatId));
+        return { ...ordered[0], taskLinks: [...new Map(ordered.flatMap(row => row.taskLinks).map(link => [link.taskId, link])).values()] };
+      }).filter(thread => !search || `${thread.title} ${thread.preview} ${thread.taskLinks.map(link => link.label).join(" ")}`.toLowerCase().includes(search))
+        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.chatId.localeCompare(b.chatId));
+      const offset = input.cursor ? decodeCursor(input.cursor) : 0;
+      if (offset == null || offset > merged.length) throw new CodexChatGatewayError("invalid_cursor", "The thread cursor is invalid.", 400);
+      const limit = Math.max(1, Math.min(input.limit || 30, 50));
+      return { data: merged.slice(offset, offset + limit), nextCursor: offset + limit < merged.length ? encodeCursor(offset + limit) : null, ...(input.group === "voice_work" ? { sync: voiceTaskChatIndexStatus() } : {}) };
+    }
     const voiceRows = summaries.filter((thread) => thread.group === "voice_work");
     const currentVoiceIds = new Set<string>();
     const voiceByNative = new Map<string, ThreadSummary[]>();
@@ -388,6 +406,14 @@ export class CodexChatGateway {
     };
   }
 
+  async archiveThread(chatId: string, archived: boolean) {
+    const binding = await this.store.setArchived(chatId, archived);
+    if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
+    const summary = summarizeThread(binding, null);
+    this.emit(chatId, archived ? "thread.archived" : "thread.unarchived", { archived });
+    return summary;
+  }
+
   async restoreAccess(chatId: string) {
     const binding = await this.requireBinding(chatId);
     const provider = (await this.runtime.provider(binding.providerId)).view;
@@ -437,7 +463,7 @@ export class CodexChatGateway {
         throw new CodexChatGatewayError("runtime_identity_mismatch", "The task runtime does not match this chat binding.", 409);
       }
       const native = await this.readNativeThread(binding, false);
-      if (threadStatusFromNative(native.status, binding.archived) === "active" || this.activeTurns.has(chatId)) {
+      if (threadStatusFromNative(native.status) === "active" || this.activeTurns.has(chatId)) {
         throw new CodexChatGatewayError("turn_active", "This task thread already has an active turn.", 409, true);
       }
     }
@@ -481,7 +507,7 @@ export class CodexChatGateway {
       || turn.status === "in_progress"
       || turn.status === "waiting_for_approval"
       || turn.status === "waiting_for_input");
-    const nativeStatus = threadStatusFromNative(nativeThread.status, binding.archived);
+    const nativeStatus = threadStatusFromNative(nativeThread.status);
     const reconciledStatus = stillActive
       ? "active"
       : nativeStatus === "not_loaded"
@@ -512,6 +538,7 @@ export class CodexChatGateway {
 
   async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean } = {}) {
     const binding = await this.requireBinding(chatId);
+    if (binding.archived) throw new CodexChatGatewayError("chat_archived", "Restore this chat from archive before sending a message.", 409);
     if (binding.origin === "voice" && !binding.continuationEnabled) {
       throw new CodexChatGatewayError("continuation_confirmation_required", "Choose Continue in Task Chat before sending a message.", 409);
     }
@@ -575,7 +602,7 @@ export class CodexChatGateway {
       };
     }
     if (this.activeTurns.has(chatId)) throw new CodexChatGatewayError("turn_active", "This chat already has an active turn.", 409);
-    if (threadStatusFromNative(native.status, binding.archived) === "active") {
+    if (threadStatusFromNative(native.status) === "active") {
       throw new CodexChatGatewayError("turn_active", "The task runtime reports an active turn for this chat.", 409);
     }
 
@@ -772,7 +799,8 @@ export class CodexChatGateway {
     if (!/^chat_[A-Za-z0-9]+$/.test(chatId)) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     const binding = await this.store.get(chatId);
     if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
-    return binding;
+    const aliases = await this.store.all();
+    return { ...binding, archived: aliases.some(row => logicalChatKey(row) === logicalChatKey(binding) && row.archived) };
   }
 
   private releaseActiveTurn(chatId: string) {

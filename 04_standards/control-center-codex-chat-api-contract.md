@@ -660,7 +660,23 @@ type ForkThreadRequest = {
 Response data is `ThreadDetail` with `201`.
 
 Archive and unarchive bodies are empty JSON objects `{}`. Response data is the
-updated `ThreadSummary`. Archiving an active thread returns `409 turn_active`.
+updated `ThreadSummary`. Since release B (2026-09-04), these are instance-local
+visibility operations and are allowed for active tasks. They never invoke
+native archive/unarchive, stop a turn or change native history. `archived` is
+independent of runtime status. Sending to a locally archived chat returns
+`409 chat_archived`; reading remains available.
+
+`GET /threads?view=all` supplies the unified UI list. It merges only bindings
+with the same verified storage-v2 identity, native thread ID and group, retaining
+all private source rows and combining task links. An archived alias hides the
+logical chat; restoring updates all aliases. Search and pagination follow this
+visibility rule. The old current/legacy query values remain accepted for older
+clients, but the new UI has no Legacy section.
+
+Copy response joins all assistant_message Markdown in one turn in order,
+excluding user and activity items. It is available for completed, interrupted
+and failed turns. Assistant Markdown is not silently truncated by normalization;
+bounded HTTP responses still fail explicitly if the response exceeds its limit.
 
 ## 9. Turn routes
 

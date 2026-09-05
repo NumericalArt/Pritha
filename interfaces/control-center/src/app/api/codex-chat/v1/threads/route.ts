@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const search = url.searchParams.get("search") || "";
     if (Array.from(search).length > 200) throw new CodexChatGatewayError("field_limit_exceeded", "Thread search exceeds 200 characters.", 400);
     const view = url.searchParams.get("view") || "current";
-    if (view !== "current" && view !== "legacy") throw new CodexChatGatewayError("invalid_request", "Unknown thread view.", 400);
+    if (view !== "current" && view !== "legacy" && view !== "all") throw new CodexChatGatewayError("invalid_request", "Unknown thread view.", 400);
     if (view === "legacy" && group !== "voice_work") throw new CodexChatGatewayError("invalid_request", "Legacy view is only available for Voice Tasks.", 400);
     return apiSuccess(await getCodexChatGateway().listThreads({
       group,

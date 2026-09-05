@@ -382,7 +382,8 @@ test("Voice task lists are incremental, indexed and preserve legacy bindings", (
   assert.match(chatPageSource, /loadThreadPage/);
   assert.match(chatPageSource, /IntersectionObserver/);
   assert.match(chatPageSource, /Load more/);
-  assert.match(chatPageSource, /Legacy/);
+  assert.doesNotMatch(chatPageSource, /> Legacy/);
+  assert.match(chatPageSource, /Show archived/);
   assert.doesNotMatch(chatPageSource, /for \(let page = 0; page < 20/);
 });
 

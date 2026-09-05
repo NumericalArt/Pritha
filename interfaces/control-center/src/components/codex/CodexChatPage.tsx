@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { CopyResponse } from "./CopyResponse";
 import { CodexMarkdown } from "./CodexMarkdown";
 import {
   checkControlCenterHealth,
@@ -154,8 +155,8 @@ function relativeTime(value: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
-async function loadThreadPage(group: ChatGroup, options: { cursor?: string | null; search?: string; view?: "current" | "legacy" } = {}) {
-  const query = new URLSearchParams({ group, limit: "50", view: options.view || "current" });
+async function loadThreadPage(group: ChatGroup, options: { cursor?: string | null; search?: string; view?: "current" | "legacy" | "all"; archived?: boolean } = {}) {
+  const query = new URLSearchParams({ group, limit: "50", view: options.view || "all", archived: String(options.archived === true) });
   if (options.cursor) query.set("cursor", options.cursor);
   if (options.search) query.set("search", options.search);
   const response = await api<ThreadPage>(`/api/codex-chat/v1/threads?${query.toString()}`);
@@ -259,16 +260,19 @@ function ActivityItem({ item }: { item: ChatItemView }) {
   return <div className="codex-activity-row"><Wrench size={15} /><span>{item.label}</span></div>;
 }
 
-function ThreadRow({ thread, active, onSelect }: { thread: ThreadSummary; active: boolean; onSelect: () => void }) {
+function ThreadRow({ thread, active, onSelect, onArchive, busy }: { thread: ThreadSummary; active: boolean; onSelect: () => void; onArchive: () => void; busy: boolean }) {
   return (
-    <button className={`codex-thread-row ${active ? "active" : ""}`} type="button" onClick={onSelect}>
+    <div className="codex-thread-entry"><button className={`codex-thread-row ${active ? "active" : ""}`} type="button" onClick={onSelect}>
       <span className="codex-thread-title">{thread.title}</span>
       <span className="codex-thread-meta">
         <span>{thread.status === "active" ? "Working" : thread.preview || "No messages yet"}</span>
         <time>{relativeTime(thread.updatedAt)}</time>
       </span>
       {thread.taskLinks.length ? <span className="codex-thread-task-links">{thread.taskLinks.slice(-3).map((link) => `#${link.shortId || link.taskId.slice(-6)}`).join(" · ")}</span> : null}
+      {thread.runtime.compatibility === "mismatch" ? <span className="codex-thread-status">Needs attention</span> : null}
     </button>
+    {active ? <button type="button" className="codex-text-action codex-archive-action" onClick={onArchive} disabled={busy}>{thread.archived ? "Restore from archive" : "Archive"}</button> : null}
+    </div>
   );
 }
 
@@ -289,10 +293,6 @@ export function CodexChatPage() {
   const [listPageLoading, setListPageLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [voiceSync, setVoiceSync] = useState<ThreadPage["sync"]>(undefined);
-  const [legacyOpen, setLegacyOpen] = useState(false);
-  const [legacyThreads, setLegacyThreads] = useState<ThreadSummary[]>([]);
-  const [legacyCursor, setLegacyCursor] = useState<string | null>(null);
-  const [legacyLoading, setLegacyLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<ChatFailure | null>(null);
@@ -301,6 +301,11 @@ export function CodexChatPage() {
   const [historyState, setHistoryState] = useState<HistoryState>("idle");
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyIssue, setHistoryIssue] = useState<{ code: string; retryable: boolean; replacementAllowed: boolean } | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const archiveViewRef = useRef(false);
+  archiveViewRef.current = showArchived;
+  const listRequestVersion = useRef(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [streamRevision, setStreamRevision] = useState(0);
@@ -368,14 +373,17 @@ export function CodexChatPage() {
   }, []);
 
   const refreshThreads = useCallback(async () => {
+    if (showArchived !== archiveViewRef.current) return [];
     const requestedGroup = activeGroup;
+    const requestVersion = ++listRequestVersion.current;
     const interactionId = crypto.randomUUID();
     const startedAt = Date.now();
     reportControlCenterUiActivity({ event: "thread_list_started", interactionId, source: "thread_list", durationMs: 0, group: requestedGroup, view: "current" });
     setListLoading(true);
     setListError(null);
     try {
-      const page = await loadThreadPage(requestedGroup, { search: debouncedSearch });
+      const page = await loadThreadPage(requestedGroup, { search: debouncedSearch, archived: showArchived });
+      if (requestVersion !== listRequestVersion.current) return [];
       const groupRows = page.data.filter((thread) => thread.group === requestedGroup);
       setThreads((current) => [...current.filter((thread) => thread.group !== requestedGroup), ...groupRows]);
       setNextCursorByGroup((current) => ({ ...current, [requestedGroup]: page.nextCursor }));
@@ -396,9 +404,9 @@ export function CodexChatPage() {
       reportControlCenterUiActivity({ event: "thread_list_page_failed", interactionId, source: "thread_list", durationMs: Date.now() - startedAt, group: requestedGroup, view: "current", errorCode: requestErrorCode(cause) });
       throw cause;
     } finally {
-      if (activeGroupRef.current === requestedGroup) setListLoading(false);
+      if (requestVersion === listRequestVersion.current) setListLoading(false);
     }
-  }, [activeGroup, debouncedSearch]);
+  }, [activeGroup, debouncedSearch, showArchived]);
 
   const loadMoreThreads = useCallback(async () => {
     const group = activeGroupRef.current;
@@ -407,7 +415,9 @@ export function CodexChatPage() {
     setListPageLoading(true);
     setListError(null);
     try {
-      const page = await loadThreadPage(group, { cursor, search: debouncedSearch });
+      const version = listRequestVersion.current;
+      const page = await loadThreadPage(group, { cursor, search: debouncedSearch, archived: archiveViewRef.current });
+      if (version !== listRequestVersion.current) return;
       setThreads((current) => {
         const ids = new Set(current.map((row) => row.chatId));
         return [...current, ...page.data.filter((row) => !ids.has(row.chatId))];
@@ -420,23 +430,6 @@ export function CodexChatPage() {
       setListPageLoading(false);
     }
   }, [debouncedSearch, listLoading, listPageLoading, nextCursorByGroup]);
-
-  const loadMoreLegacy = useCallback(async () => {
-    if (!legacyCursor || legacyLoading) return;
-    setLegacyLoading(true);
-    try {
-      const page = await loadThreadPage("voice_work", { cursor: legacyCursor, search: debouncedSearch, view: "legacy" });
-      setLegacyThreads((current) => {
-        const ids = new Set(current.map((row) => row.chatId));
-        return [...current, ...page.data.filter((row) => !ids.has(row.chatId))];
-      });
-      setLegacyCursor(page.nextCursor);
-    } catch {
-      setListError("More legacy Voice tasks could not load.");
-    } finally {
-      setLegacyLoading(false);
-    }
-  }, [debouncedSearch, legacyCursor, legacyLoading]);
 
   const completeNavigation = useCallback((
     context: TaskChatNavigationContext | null,
@@ -495,25 +488,6 @@ export function CodexChatPage() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [activeGroup, loadMoreThreads, nextCursorByGroup]);
-
-  useEffect(() => {
-    if (!legacyOpen || activeGroup !== "voice_work") return;
-    let cancelled = false;
-    setLegacyLoading(true);
-    void loadThreadPage("voice_work", { search: debouncedSearch, view: "legacy" })
-      .then((page) => {
-        if (cancelled) return;
-        setLegacyThreads(page.data);
-        setLegacyCursor(page.nextCursor);
-      })
-      .catch(() => {
-        if (!cancelled) setListError("Legacy Voice tasks could not load.");
-      })
-      .finally(() => {
-        if (!cancelled) setLegacyLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [activeGroup, debouncedSearch, legacyOpen]);
 
   useEffect(() => {
     if (activeGroup !== "voice_work") return;
@@ -755,6 +729,7 @@ export function CodexChatPage() {
         if (item && payload.turnId) setTurns((rows) => upsertItem(rows, payload.turnId || "", item));
       }
       if (message.type === "message.completed") void reload();
+      if (message.type === "thread.archived" || message.type === "thread.unarchived") { void reload(); void refreshThreads(); }
       if (message.type === "thread.updated") {
         const thread = payload.payload.thread as ThreadSummary | undefined;
         if (thread) {
@@ -773,7 +748,7 @@ export function CodexChatPage() {
         if (!cancelled) setConnection("connecting");
       };
       for (const name of [
-        "connection.ready", "stream.reset", "thread.updated", "turn.started", "turn.completed", "turn.interrupted", "turn.failed",
+        "connection.ready", "stream.reset", "thread.updated", "thread.archived", "thread.unarchived", "turn.started", "turn.completed", "turn.interrupted", "turn.failed",
         "message.delta", "message.completed", "item.started", "item.completed",
       ]) source.addEventListener(name, event as EventListener);
       source.onerror = () => {
@@ -839,7 +814,7 @@ export function CodexChatPage() {
     transcriptEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [displayedTurns.length, lastTranscriptText]);
 
-  const visibleThreads = useMemo(() => threads.filter((thread) => thread.group === activeGroup), [activeGroup, threads]);
+  const visibleThreads = useMemo(() => threads.filter((thread) => thread.group === activeGroup && thread.archived === showArchived), [activeGroup, threads, showArchived]);
 
   const hasActiveTurn = displayedTurns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
   const displayedDetail = selectionChanging ? null : detail;
@@ -1200,6 +1175,35 @@ export function CodexChatPage() {
     } finally { setRecovering(false); }
   };
 
+  const changeArchiveView = () => {
+    listRequestVersion.current++;
+    newChatDraftActiveRef.current = false;
+    setShowArchived(value => !value);
+    setThreads([]);
+    setNextCursorByGroup({ my_chats: null, voice_work: null });
+    selectedByGroupRef.current = { my_chats: null, voice_work: null };
+    selectedChatIdRef.current = null;
+    setSelectedChatId(null);
+    window.history.replaceState(null, "", `/task-chat?group=${activeGroup}`);
+  };
+
+  const archiveChat = async (thread: ThreadSummary) => {
+    if (archiveBusy) return;
+    setArchiveBusy(true);
+    try {
+      await api<ThreadSummary>(`/api/codex-chat/v1/threads/${encodeURIComponent(thread.chatId)}/${thread.archived ? "unarchive" : "archive"}`, { method: "POST", body: "{}" });
+      if (selectedChatIdRef.current === thread.chatId) {
+        selectedChatIdRef.current = null;
+        selectedByGroupRef.current[activeGroup] = null;
+        setSelectedChatId(null);
+        window.history.replaceState(null, "", `/task-chat?group=${activeGroup}`);
+      }
+      setThreads(rows => rows.filter(row => row.chatId !== thread.chatId));
+      await refreshThreads();
+    } catch (cause) { setListError(cause instanceof Error ? cause.message : "Archive could not be updated."); }
+    finally { setArchiveBusy(false); }
+  };
+
   const history = (
     <div className="codex-history-content">
       <div className="codex-history-title-row">
@@ -1213,6 +1217,7 @@ export function CodexChatPage() {
       {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={startNewDraft} disabled={Boolean(pendingNewChatDelivery) || runtime?.availability === "unavailable"}>
         <Plus size={17} /> New chat
       </button> : null}
+      <button type="button" className="codex-text-action" onClick={changeArchiveView}>{showArchived ? "Show active" : "Show archived"}</button>
       <label className="codex-search">
         <Search size={16} />
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={activeGroup === "voice_work" ? "Search Voice tasks…" : "Search chats…"} aria-label="Search Task Chat" />
@@ -1220,7 +1225,7 @@ export function CodexChatPage() {
       <section className="codex-thread-group">
         {listLoading && visibleThreads.length === 0 ? <div className="codex-list-loading"><LoaderCircle className="spin" size={20} /><span>Loading {activeGroup === "voice_work" ? "Voice tasks" : "chats"}…</span></div> : null}
         {visibleThreads.length ? visibleThreads.map((thread) => (
-          <ThreadRow key={thread.chatId} thread={thread} active={thread.chatId === selectedChatId} onSelect={() => {
+          <ThreadRow key={thread.chatId} thread={thread} active={thread.chatId === selectedChatId} onArchive={() => void archiveChat(thread)} busy={archiveBusy} onSelect={() => {
             if (thread.chatId !== selectedChatId) {
               if (thread.group === "my_chats") newChatDraftActiveRef.current = false;
               beginNavigation(thread.chatId, "history_row", { selected: true });
@@ -1231,31 +1236,12 @@ export function CodexChatPage() {
             }
             setDrawerOpen(false);
           }} />
-        )) : !listLoading && !(activeGroup === "voice_work" && voiceSync?.state === "refreshing") ? <p className="codex-history-empty">{debouncedSearch ? "No matching items" : activeGroup === "voice_work" ? "Persistent Voice task threads will appear here after their work environment is resolved." : "Create a chat to start working with Pritha."}</p> : null}
+        )) : !listLoading && !(activeGroup === "voice_work" && voiceSync?.state === "refreshing") ? <p className="codex-history-empty">{debouncedSearch ? "No matching items" : showArchived ? "No archived chats." : activeGroup === "voice_work" ? "Persistent Voice task threads will appear here after their work environment is resolved." : "Create a chat to start working with Pritha."}</p> : null}
         {listError ? <div className="codex-list-error"><span>{listError}</span><button type="button" onClick={() => void refreshThreads()}>Retry</button></div> : null}
         {nextCursorByGroup[activeGroup] ? <button className="codex-load-more" type="button" onClick={() => void loadMoreThreads()} disabled={listPageLoading}>{listPageLoading ? "Loading…" : "Load more"}</button> : null}
         <div ref={listSentinelRef} aria-hidden="true" />
       </section>
-      {activeGroup === "voice_work" ? (
-        <section className="codex-legacy-section">
-          {voiceSync?.state !== "ready" ? <p className={`codex-index-state ${voiceSync?.state || "refreshing"}`}>{voiceSync?.state === "degraded" ? "Voice index update failed; showing saved tasks." : "Updating Voice tasks…"}</p> : null}
-          <button className="codex-legacy-toggle" type="button" aria-expanded={legacyOpen} onClick={() => setLegacyOpen((value) => !value)}>
-            <ChevronDown size={16} className={legacyOpen ? "open" : ""} /> Legacy
-          </button>
-          {legacyOpen ? <div className="codex-legacy-list">
-            {legacyThreads.map((thread) => <ThreadRow key={thread.chatId} thread={thread} active={thread.chatId === selectedChatId} onSelect={() => {
-              beginNavigation(thread.chatId, "history_row", { selected: true });
-              setSelectedChatId(thread.chatId);
-              selectedByGroupRef.current.voice_work = thread.chatId;
-              window.history.replaceState(null, "", `/task-chat?group=voice_work&chat=${encodeURIComponent(thread.chatId)}`);
-              setDrawerOpen(false);
-            }} />)}
-            {legacyLoading ? <div className="codex-list-loading"><LoaderCircle className="spin" size={18} /><span>Loading legacy tasks…</span></div> : null}
-            {!legacyLoading && legacyThreads.length === 0 ? <p className="codex-history-empty">No legacy bindings.</p> : null}
-            {legacyCursor ? <button className="codex-load-more" type="button" onClick={() => void loadMoreLegacy()} disabled={legacyLoading}>Load more legacy</button> : null}
-          </div> : null}
-        </section>
-      ) : null}
+      {activeGroup === "voice_work" && voiceSync?.state !== "ready" ? <p className="codex-history-empty">{voiceSync?.state === "degraded" ? "Voice index update failed; showing saved tasks." : "Updating Voice tasks…"}</p> : null}
     </div>
   );
 
@@ -1349,6 +1335,7 @@ export function CodexChatPage() {
                 {turn.status === "in_progress" && !turn.items.some((item) => item.kind === "assistant_message") ? (
                   <div className="codex-thinking"><LoaderCircle className="spin" size={16} /> Pritha is working…</div>
                 ) : null}
+                <CopyResponse turn={turn} />
                 {turn.error ? <div className="codex-inline-notice error">{turn.error.message}</div> : null}
               </div>
             </section>
@@ -1369,6 +1356,8 @@ export function CodexChatPage() {
           ) : null}
           {selectedChatId && !displayedDetail ? (
             <div className="codex-composer-status"><LoaderCircle className="spin" size={17} /><span>Opening thread controls…</span></div>
+          ) : displayedDetail?.thread.archived ? (
+            <div className="codex-continuation-gate"><p>This chat is archived. Restore it to continue.</p><button type="button" className="codex-text-action" onClick={() => void archiveChat(displayedDetail.thread)} disabled={archiveBusy}>Restore from archive</button></div>
           ) : displayedDetail?.thread.origin === "voice" && displayedDetail.continuationState !== "continuation_enabled" ? (
             <div className="codex-continuation-gate">
               <div><strong>{displayedDetail.continuationState === "blocked_active_turn" ? "Voice task is running" : "Voice task history is read-only"}</strong><p>{displayedDetail.continuationState === "blocked_active_turn" ? "Wait for the active Voice turn to finish before continuing here." : "Enable continuation only when you want to add a typed turn to this same task thread."}</p></div>
