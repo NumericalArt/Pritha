@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 const rebuildScript = path.resolve("scripts/rebuild-memory.mjs");
+const queryScript = path.resolve("scripts/query-memory.mjs");
 const validateScript = path.resolve("scripts/validate-memory.mjs");
 const schema = readFileSync(path.resolve(".memory/schema.sql"), "utf8");
 
@@ -160,6 +161,10 @@ test("memory entrypoints load PRITHA_STATE_ROOT from checkout .env.local", () =>
     assert.equal(rebuilt.status, 0, rebuilt.stderr);
     assert.equal(existsSync(path.join(stateRoot, "memory", "techscope.sqlite")), true);
     assert.equal(existsSync(path.join(codeRoot, ".memory", "techscope.sqlite")), false);
+
+    const queried = run("node", [queryScript, "stats"], { env });
+    assert.equal(queried.status, 0, queried.stderr);
+    assert.match(queried.stdout, /documents\s+1/);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

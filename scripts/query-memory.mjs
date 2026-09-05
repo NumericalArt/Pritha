@@ -2,9 +2,11 @@
 
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
+loadPrithaRuntimeEnv({ root: ROOT });
 const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
 
 function sqlString(value) {

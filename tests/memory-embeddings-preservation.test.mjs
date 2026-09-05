@@ -14,6 +14,8 @@ test("memory rebuild preserves usable embeddings instead of clearing the table",
 });
 
 test("embedding generation is non-destructive and patches local Python import compatibility", () => {
+  assert.match(embedSource, /load_pritha_runtime_env\(\)/);
+  assert.match(semanticSearchSource, /load_pritha_runtime_env\(\)/);
   assert.match(embedSource, /apply_runtime_compat\(\)/);
   assert.match(semanticSearchSource, /apply_runtime_compat\(\)/);
   assert.match(embedSource, /model\.encode\(/);
