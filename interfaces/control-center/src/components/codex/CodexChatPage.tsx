@@ -12,6 +12,7 @@ import {
   Menu,
   Mic,
   Plus,
+  Paperclip,
   Search,
   Send,
   Terminal,
@@ -19,6 +20,8 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useChatAttachments } from "./useChatAttachments";
+import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { CopyResponse } from "./CopyResponse";
 import { CodexMarkdown } from "./CodexMarkdown";
 import {
@@ -71,6 +74,8 @@ type ChatFailure = {
 };
 
 type PendingDelivery = {
+  attachments?: string[];
+  modelId?: string;
   chatId: string;
   clientMessageId: string;
   text: string;
@@ -78,6 +83,8 @@ type PendingDelivery = {
 };
 
 type PendingNewChatDelivery = {
+  attachments?: string[];
+  modelId?: string;
   clientThreadId: string;
   clientMessageId: string;
   text: string;
@@ -299,6 +306,13 @@ export function CodexChatPage() {
   const [recovering, setRecovering] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [historyState, setHistoryState] = useState<HistoryState>("idle");
+  const [historyHasImages, setHistoryHasImages] = useState(false);
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [olderLoading, setOlderLoading] = useState(false);
+  const [olderError, setOlderError] = useState<string | null>(null);
+  const expandedHistoryRef = useRef(false);
+  const olderRequestRef = useRef<AbortController | null>(null);
+  const olderScrollRef = useRef<{ element: HTMLElement; height: number; top: number } | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyIssue, setHistoryIssue] = useState<{ code: string; retryable: boolean; replacementAllowed: boolean } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -336,6 +350,12 @@ export function CodexChatPage() {
 
   const draftKey = selectedChatId || NEW_CHAT_DRAFT_KEY;
   const draft = draftsByChat[draftKey] || "";
+  const attachmentDraft = useChatAttachments(draftKey);
+  const filePickerRef = useRef<HTMLInputElement | null>(null);
+  const attachmentIds = attachmentDraft.items.flatMap(file => file.state === "ready" ? [file.id] : []);
+  const attachmentsIncomplete = attachmentDraft.items.some(file => file.state !== "ready");
+  const selectedModalities = runtime?.models.find(model => model.id === runtime.selected.modelId)?.inputModalities;
+  const imageCapabilityMissing = attachmentDraft.items.some(file => file.view?.kind === "image") && !selectedModalities?.includes("image");
   const pendingDelivery = selectedChatId ? pendingDeliveries[selectedChatId] || null : pendingNewChatDelivery;
 
   const updateDraftForChat = useCallback((chatId: string | null, value: SetStateAction<string>) => {
@@ -555,14 +575,17 @@ export function CodexChatPage() {
       if (historyRequestRef.current?.token === token && selectedChatIdRef.current === chatId) setHistoryState("slow");
     }, HISTORY_SLOW_MS);
     try {
-      const rows = (await api<TurnPage>(
+      const historyPage = (await api<TurnPage>(
         `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50`,
         { signal: controller.signal },
-        { timeoutMs: HISTORY_TIMEOUT_MS },
-      )).data.data;
+        { timeoutMs: HISTORY_TIMEOUT_MS, maxBodyBytes: 16 * 1024 * 1024 },
+      )).data;
+      const rows = historyPage.data;
       if (historyRequestRef.current?.token !== token) return false;
       if (selectedChatIdRef.current === chatId) {
-        setTurns(rows);
+        setTurns(current => expandedHistoryRef.current ? rows.reduce(upsertTurn, current) : rows);
+        if (!expandedHistoryRef.current) setOlderCursor(historyPage.olderCursor || null);
+        setHistoryHasImages(historyPage.hasImageInputs === true);
         setHistoryState("ready");
         setHistoryError(null);
         setHistoryIssue(null);
@@ -571,6 +594,7 @@ export function CodexChatPage() {
       const pending = pendingDeliveriesRef.current[chatId];
       if (pending && rows.some((turn) => turn.clientMessageId === pending.clientMessageId)) {
         setPendingForChat(chatId, null);
+        attachmentDraft.clear(chatId, pending.attachments);
         updateDraftForChat(chatId, (current) => current.trim() === pending.text ? "" : current);
         setError((current) => current?.source === "turn" && current.chatId === chatId ? null : current);
       }
@@ -604,6 +628,28 @@ export function CodexChatPage() {
       if (historyRequestRef.current?.token === token) historyRequestRef.current = null;
     }
   }, [completeNavigation, setPendingForChat, updateDraftForChat]);
+
+  const loadOlderHistory = async () => {
+    const chatId = selectedChatIdRef.current;
+    if (!chatId || !olderCursor || olderRequestRef.current) return;
+    const controller = new AbortController();
+    olderRequestRef.current = controller;
+    setOlderLoading(true);
+    setOlderError(null);
+    try {
+      const page = (await api<TurnPage>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50&cursor=${encodeURIComponent(olderCursor)}`, { signal: controller.signal }, { timeoutMs: HISTORY_TIMEOUT_MS, maxBodyBytes: 16 * 1024 * 1024 })).data;
+      if (controller.signal.aborted || selectedChatIdRef.current !== chatId) return;
+      const element = transcriptEndRef.current?.parentElement;
+      if (element) olderScrollRef.current = { element, height: element.scrollHeight, top: element.scrollTop };
+      expandedHistoryRef.current = true;
+      setTurns(current => current.reduce(upsertTurn, page.data));
+      setOlderCursor(page.olderCursor || null);
+    } catch (cause) {
+      if (!controller.signal.aborted && selectedChatIdRef.current === chatId) setOlderError(cause instanceof Error ? cause.message : "Earlier messages could not load. Retry below.");
+    } finally {
+      if (olderRequestRef.current === controller) { olderRequestRef.current = null; setOlderLoading(false); }
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -669,10 +715,18 @@ export function CodexChatPage() {
     displayedChatIdRef.current = selectedChatId;
     detailRequestRef.current?.controller.abort();
     historyRequestRef.current?.controller.abort();
+    olderRequestRef.current?.abort();
+    olderRequestRef.current = null;
+    olderScrollRef.current = null;
+    expandedHistoryRef.current = false;
+    setOlderCursor(null);
+    setOlderLoading(false);
+    setOlderError(null);
     setDetail(null);
     setTurns([]);
     setDetailLoading(Boolean(selectedChatId));
     setHistoryState(selectedChatId ? "loading" : "idle");
+    setHistoryHasImages(false);
     setHistoryError(null);
     setHistoryIssue(null);
     setConnection(selectedChatId ? "connecting" : "idle");
@@ -811,6 +865,12 @@ export function CodexChatPage() {
   const displayedTurns = selectionChanging ? [] : turns;
   const lastTranscriptText = displayedTurns.at(-1)?.items.at(-1);
   useEffect(() => {
+    const position = olderScrollRef.current;
+    if (position) {
+      position.element.scrollTop = position.top + position.element.scrollHeight - position.height;
+      olderScrollRef.current = null;
+      return;
+    }
     transcriptEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [displayedTurns.length, lastTranscriptText]);
 
@@ -972,9 +1032,10 @@ export function CodexChatPage() {
       const response = await api<AcceptedTurn>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/turns`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": delivery.clientMessageId },
-        body: JSON.stringify({ clientMessageId: delivery.clientMessageId, input: [{ type: "text", text: delivery.text }] }),
+        body: JSON.stringify({ clientMessageId: delivery.clientMessageId, input: [{ type: "text", text: delivery.text }], ...(delivery.attachments?.length || delivery.modelId ? { attachments: delivery.attachments, settings: { modelId: delivery.modelId } } : {}) }),
       }, { timeoutMs: TURN_START_TIMEOUT_MS });
       setPendingForChat(delivery.chatId, null);
+      attachmentDraft.clear(delivery.chatId, delivery.attachments);
       updateDraftForChat(delivery.chatId, (current) => current.trim() === delivery.text ? "" : current);
       if (selectedChatIdRef.current === delivery.chatId) setTurns((rows) => upsertTurn(rows, response.data.turn));
       void refreshThreads();
@@ -1011,6 +1072,7 @@ export function CodexChatPage() {
           initialTurn: {
             clientMessageId: delivery.clientMessageId,
             input: [{ type: "text", text: delivery.text }],
+            ...(delivery.attachments?.length || delivery.modelId ? { attachments: delivery.attachments, settings: { modelId: delivery.modelId } } : {}),
           },
         }),
       }, { timeoutMs: TURN_START_TIMEOUT_MS });
@@ -1018,6 +1080,7 @@ export function CodexChatPage() {
       newChatDraftActiveRef.current = false;
       setPendingNewChatDelivery(null);
       updateDraftForChat(null, "");
+      attachmentDraft.clear(NEW_CHAT_DRAFT_KEY, delivery.attachments);
       setThreads((rows) => [nextDetail.thread, ...rows.filter((thread) => thread.chatId !== nextDetail.thread.chatId)]);
       setActiveGroup("my_chats");
       selectedByGroupRef.current.my_chats = nextDetail.thread.chatId;
@@ -1046,13 +1109,15 @@ export function CodexChatPage() {
 
   async function sendMessage() {
     const text = draft.trim();
-    if (!text || sending || hasActiveTurn || pendingNewChatDelivery || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
+    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || pendingNewChatDelivery || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
     const chatId = selectedChatId;
     if (!chatId) {
       await deliverNewChatMessage({
         clientThreadId: crypto.randomUUID(),
         clientMessageId: crypto.randomUUID(),
         text,
+        attachments: attachmentIds,
+        modelId: attachmentIds.length || historyHasImages ? runtime?.selected.modelId || undefined : undefined,
         status: "sending",
       });
       return;
@@ -1061,6 +1126,8 @@ export function CodexChatPage() {
       chatId,
       clientMessageId: crypto.randomUUID(),
       text,
+      attachments: attachmentIds,
+      modelId: attachmentIds.length || historyHasImages ? runtime?.selected.modelId || undefined : undefined,
       status: "sending",
     };
     setPendingForChat(chatId, delivery);
@@ -1324,11 +1391,16 @@ export function CodexChatPage() {
               {historyIssue?.retryable !== false ? <button type="button" onClick={() => void retryNow()} disabled={recovering}>{recovering ? "Retrying…" : "Retry history"}</button> : null}
             </div>
           ) : null}
+          {selectedChatId && olderCursor ? <div className="codex-inline-notice">
+            {olderError ? <span role="status">{olderError}</span> : null}
+            <button type="button" className="codex-text-action" onClick={() => void loadOlderHistory()} disabled={olderLoading}>{olderLoading ? "Loading earlier messages…" : "Load earlier messages"}</button>
+          </div> : null}
           {displayedTurns.map((turn) => (
             <section className="codex-turn" key={turn.turnId} aria-label={`Turn ${turn.status}`}>
               <article className="codex-message codex-user-message">
                 <div className="codex-message-label">You</div>
                 <CodexMarkdown markdown={turn.userMessage.markdown} />
+                {turn.userMessage.attachments?.length ? <AttachmentLinks files={turn.userMessage.attachments} /> : null}
               </article>
               <div className="codex-turn-items">
                 {turn.items.map((item) => <ActivityItem item={item} key={item.id} />)}
@@ -1363,9 +1435,19 @@ export function CodexChatPage() {
               <div><strong>{displayedDetail.continuationState === "blocked_active_turn" ? "Voice task is running" : "Voice task history is read-only"}</strong><p>{displayedDetail.continuationState === "blocked_active_turn" ? "Wait for the active Voice turn to finish before continuing here." : "Enable continuation only when you want to add a typed turn to this same task thread."}</p></div>
               <button className="codex-new-chat" type="button" onClick={() => void continueInTaskChat()} disabled={recovering || historyState !== "ready" || displayedDetail.continuationState !== "read_only"}>{recovering ? "Checking…" : historyBusy ? "Loading history…" : "Continue in Task Chat"}</button>
             </div>
-          ) : <label className="codex-composer">
-            <span>Message Pritha</span>
+          ) : <div className="codex-composer" role="group" aria-label="Message composer" onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={event => {
+            if (event.dataTransfer.files.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(Array.from(event.dataTransfer.files)); }
+          }}>
+            <span id="codex-message-label">Message Pritha</span>
+            <DraftAttachments items={attachmentDraft.items} locked={Boolean(pendingDelivery) || sending} remove={attachmentDraft.remove} retry={attachmentDraft.retry} />
+            {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
+            {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
             <textarea
+              aria-labelledby="codex-message-label"
+              onPaste={event => {
+                const images = Array.from(event.clipboardData.files).filter(file => file.type.startsWith("image/"));
+                if (images.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(images); }
+              }}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -1383,7 +1465,7 @@ export function CodexChatPage() {
                     : hasActiveTurn ? "Pritha is working…" : "Ask Pritha…"}
               rows={3}
               maxLength={64_000}
-              disabled={Boolean(selectedChatId && historyState !== "ready")}
+              disabled={Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready")}
             />
             <div className="codex-composer-actions">
               <small>
@@ -1392,6 +1474,8 @@ export function CodexChatPage() {
                   : "Enter to send · Browser dictation unavailable; use system dictation"}
               </small>
               <div className="codex-composer-controls">
+                <input ref={filePickerRef} type="file" multiple hidden aria-label="Attach files" onChange={event => { attachmentDraft.add(Array.from(event.target.files || [])); event.target.value = ""; }} />
+                <button type="button" className="codex-text-action" title="Up to 10 files; 100 MiB each, 250 MiB per message. Originals are processed on request." disabled={Boolean(pendingDelivery) || sending} onClick={() => filePickerRef.current?.click()}><Paperclip size={16} /> Attach files</button>
                 <label
                   className="codex-dictation-language"
                   title="Auto uses the browser default. Choose one language when recognition guesses incorrectly."
@@ -1420,12 +1504,13 @@ export function CodexChatPage() {
                 >
                   <Mic size={16} /> {!dictationSupported ? "Unavailable" : dictation === "listening" ? "Listening" : dictation === "error" ? "Try again" : "Dictate"}
                 </button>
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={!draft.trim() || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(pendingNewChatDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(pendingNewChatDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} Send
                 </button>
               </div>
             </div>
-          </label>}
+            <small className="codex-attachment-limits">Up to 10 files · 100 MiB each · 250 MiB total</small>
+          </div>}
         </div>
       </section>
     </div>

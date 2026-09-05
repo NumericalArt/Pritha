@@ -43,6 +43,7 @@ export async function POST(request: Request) {
       settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
       initialTurn?: {
         clientMessageId: string;
+        attachments?: string[];
         input: [{ type: "text"; text: string }];
         settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
       };

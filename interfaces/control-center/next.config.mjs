@@ -9,6 +9,7 @@ const nextConfig = {
   ...(configuredDistDir ? { distDir: configuredDistDir } : {}),
   allowedDevOrigins: ["localhost", "127.0.0.1", "**.ts.net", ...configuredDevOrigins],
   devIndicators: false,
+  experimental: { proxyClientMaxBodySize: 101 * 1024 * 1024 },
   async headers() {
     return [
       {

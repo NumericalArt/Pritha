@@ -3,7 +3,7 @@ id: task-chat-evolution-roadmap
 type: workflow
 status: in-progress
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 topics: [task-chat, native-history, attachments, fleet, neuraldeep]
 tools: [Pritha, Codex, Next.js]
 sources: [operator-approved-task-chat-roadmap-2026-09-04]
@@ -34,7 +34,7 @@ version change. Preserve unavailable chats until the operator archives them.
 | A | 0 | Stable storage identity, verified recovery, truthful history states | implemented; release pending |
 | B1 | A | Unified Voice list and instance-local Archive / Show archived / Restore from archive | implemented; release pending |
 | B2 | B1 | Complete Markdown Copy response | implemented; release pending |
-| C | B2 | File selection, drop, clipboard images, all original file types and model capability checks | pending |
+| C | B2 | File selection, drop, clipboard images, all original file types and model capability checks | implemented; release pending |
 | Transfer | each tested release | Pinned fleet/MacBook release and NeuralDeep adaptation instructions | pending |
 
 Before each stage, author a coding plan under `03_reviews/` describing behavior,
@@ -74,3 +74,4 @@ multimodality must be explained, never assumed.
 ## Release anchors
 
 - A: `f4e446c` — verified history binding recovery.
+- B: `21cf1f5` — unified local archive and complete response copy.

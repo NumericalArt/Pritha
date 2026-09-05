@@ -26,6 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
     const { chatId } = await context.params;
     const body = await readJsonBody<{
       clientMessageId: string;
+        attachments?: string[];
       input: [{ type: "text"; text: string }];
       settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
     }>(request);

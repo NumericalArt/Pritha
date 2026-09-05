@@ -363,6 +363,7 @@ export class AppServerConnection {
 }
 
 export class CodexRuntimeManager {
+  private modelViews = new Map<string, { at: number; rows: Record<string, unknown>[] }>();
   private probes = new Map<RuntimeProviderId, ProviderProbe>();
   private probePromises = new Map<RuntimeProviderId, Promise<ProviderProbe>>();
   private connections = new Map<RuntimeProviderId, AppServerConnection>();
@@ -379,6 +380,7 @@ export class CodexRuntimeManager {
     const providers = await Promise.all([this.probe("desktop_bundled"), this.probe("standalone_cli")]);
     const ordered = preferredProvider === "standalone_cli" ? [...providers].reverse() : providers;
     const effective = ordered.find((row) => row.view.availability === "ready")?.view || null;
+    const modalities = effective ? await this.modelInputModalities(effective.providerId, settings.codexModel) : null;
     const turnSettings = codexAppTurnSettings({
       model: settings.codexModel,
       effort: settings.codexReasoningEffort,
@@ -398,6 +400,7 @@ export class CodexRuntimeManager {
             effortIds: [settings.codexReasoningEffort],
             serviceTierIds: [settings.codexServiceTier],
             defaultEffortId: settings.codexReasoningEffort,
+            inputModalities: modalities,
           }]
         : [],
       selected: {
@@ -432,6 +435,30 @@ export class CodexRuntimeManager {
 
   async provider(providerId: RuntimeProviderId) {
     return this.probe(providerId);
+  }
+
+  async modelInputModalities(providerId: RuntimeProviderId, modelId: string | undefined): Promise<string[] | null> {
+    if (!modelId) return null;
+    try {
+      const probe = await this.probe(providerId);
+      const key = `${providerId}:${probe.view.stateIdentityHash}:${probe.view.version}`;
+      let cached = this.modelViews.get(key);
+      if (!cached || Date.now() - cached.at > PROBE_TTL_MS) {
+        const connection = await this.connection(providerId);
+        const rows: Record<string, unknown>[] = [];
+        let cursor: string | null = null;
+        for (let page = 0; page < 10; page++) {
+          const result = await connection.request("model/list", { includeHidden: true, ...(cursor ? { cursor } : {}) }, 5000) as { data?: Record<string, unknown>[]; nextCursor?: string | null };
+          if (!Array.isArray(result.data)) return null;
+          rows.push(...result.data);
+          cursor = result.nextCursor || null;
+          if (!cursor) break;
+        }
+        cached = { at: Date.now(), rows }; this.modelViews.set(key, cached);
+      }
+      const model = cached.rows.find(row => row.id === modelId || row.model === modelId);
+      return Array.isArray(model?.inputModalities) ? model.inputModalities.filter((value): value is string => typeof value === "string").map(value => value.toLowerCase()) : null;
+    } catch { return null; }
   }
 
   async canRecoverIdentity(providerId: RuntimeProviderId, identity: string | null) {
@@ -615,6 +642,11 @@ export class CodexRuntimeManager {
         }
         const saved = JSON.parse(readFileSync(markerPath, "utf8")) as { capabilities?: RuntimeCapabilityMap };
         capabilities = saved.capabilities || capabilitiesFromSchema(fileNamesRecursively(schemaRoot));
+        capabilities.fileMetadata = has(fileNamesRecursively(schemaRoot), "FsGetMetadataParams");
+        try {
+          const schema = JSON.parse(readFileSync(path.join(schemaRoot, "v2", "TurnStartParams.json"), "utf8"));
+          capabilities.imageInput = schema.definitions?.UserInput?.oneOf?.some((variant: { properties?: { type?: { enum?: string[] } } }) => variant.properties?.type?.enum?.includes("localImage")) === true;
+        } catch { capabilities.imageInput = false; }
         if (!capabilities.fullChat) warning = "This Codex runtime does not expose the required stable chat core.";
       } catch {
         warning = "The installed Codex runtime schema could not be verified.";

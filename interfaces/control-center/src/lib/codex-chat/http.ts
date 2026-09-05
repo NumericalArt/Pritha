@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { CodexChatGatewayError } from "./gateway";
+import { AttachmentError } from "./attachment-store";
 import type { ApiErrorEnvelope, ApiSuccess } from "./types";
 
 const JSON_BODY_LIMIT = 256 * 1024;
@@ -19,7 +20,7 @@ export function apiSuccess<T>(data: T, options: { status?: number; replayed?: bo
 
 export function apiError(error: unknown) {
   const requestId = randomUUID();
-  const known = error instanceof CodexChatGatewayError;
+  const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError;
   const registryCorrupt = !known && (error as { code?: unknown } | null)?.code === "codex_chat_registry_corrupt";
   const status = known ? error.status : registryCorrupt ? 503 : 500;
   const payload: ApiErrorEnvelope = {
@@ -33,7 +34,7 @@ export function apiError(error: unknown) {
           : "Task Chat encountered an internal error.",
       retryable: known ? error.retryable : registryCorrupt,
       requestId,
-      ...(known && error.details ? { details: error.details } : {}),
+      ...(error instanceof CodexChatGatewayError && error.details ? { details: error.details } : {}),
     },
   };
   return Response.json(payload, { status, headers: { "Cache-Control": "no-store" } });

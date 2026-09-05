@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage } from "./app-server";
 import { verifyNativeThreadIdentity } from "./storage-identity";
+import { ChatAttachmentStore, AttachmentError } from "./attachment-store";
+import { assertAttachmentCapabilities } from "./attachment-policy";
 import { classifyNativeThreadReadFailure } from "./native-thread-errors";
 import { CodexChatPrivateStore, logicalChatKey, type ChatBinding } from "./private-store";
 import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
@@ -39,6 +41,7 @@ type CreateThreadInput = {
 };
 
 type StartTurnInput = {
+  attachments?: string[];
   clientMessageId: string;
   input: [{ type: "text"; text: string }];
   settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
@@ -133,13 +136,26 @@ function validatedTurnText(input: StartTurnInput) {
     throw new CodexChatGatewayError("invalid_request", "A valid clientMessageId is required.", 400);
   }
   const text = String(input.input?.[0]?.text || "").trim();
-  if (!text || input.input?.length !== 1 || input.input[0].type !== "text") {
-    throw new CodexChatGatewayError("invalid_request", "Exactly one non-empty text input is required.", 400);
+  if (input.attachments != null && (!Array.isArray(input.attachments) || input.attachments.some(id => typeof id !== "string"))) throw new CodexChatGatewayError("invalid_request", "attachments must be an array of upload identifiers.", 400);
+  if ((!text && !input.attachments?.length) || input.input?.length !== 1 || input.input[0].type !== "text") {
+    throw new CodexChatGatewayError("invalid_request", "One text input or at least one attachment is required.", 400);
   }
   if (Buffer.byteLength(text, "utf8") > 64_000) {
     throw new CodexChatGatewayError("field_limit_exceeded", "Turn text exceeds 64,000 UTF-8 bytes.", 400);
   }
   return text;
+}
+
+function nativeHistoryHasImages(binding: ChatBinding, native: Record<string, unknown>, root: string) {
+  return (Array.isArray(native.turns) ? native.turns : []).some(raw => {
+      const turn = normalizeNativeTurn(binding, raw, root, null);
+      if (turn?.userMessage.attachments?.some(file => file.kind === "image")) return true;
+      const items = asObject(raw)?.items;
+      return Array.isArray(items) && items.some(item => {
+        const content = asObject(item)?.content;
+        return Array.isArray(content) && content.some(input => ["image", "localImage"].includes(String(asObject(input)?.type)));
+      });
+    });
 }
 
 export class CodexChatGatewayError extends Error {
@@ -156,6 +172,7 @@ export class CodexChatGatewayError extends Error {
 
 export class CodexChatGateway {
   private readonly store = new CodexChatPrivateStore();
+  readonly attachments = new ChatAttachmentStore(this.store.stateRoot, this.store.root);
   private readonly root = resolveTechscopeRoot();
   private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message) => this.handleNotification(providerId, message), this.root);
   private readonly activeTurns = new Map<string, ActiveAttempt>();
@@ -306,6 +323,11 @@ export class CodexChatGateway {
 
   async createThreadWithFirstTurn(input: CreateThreadWithFirstTurnInput) {
     validatedTurnText(input.initialTurn);
+    if (input.initialTurn.attachments?.length && !await this.store.findByClientThreadId(input.clientThreadId)) {
+      const provider = await this.runtime.effectiveProvider();
+      if (!provider) throw new CodexChatGatewayError("runtime_unavailable", "No compatible runtime is available.", 503, true);
+      await this.prepareAttachmentInput(input.initialTurn, provider.providerId);
+    }
     const created = await this.createThread(input);
     let binding = await this.requireBinding(created.detail.thread.chatId);
     let ownsFreshEmptyBinding = !created.replayed;
@@ -533,6 +555,7 @@ export class CodexChatGateway {
       hasOlder: start > 0,
       hasNewer: end < turns.length,
       snapshotAt: new Date().toISOString(),
+      hasImageInputs: nativeHistoryHasImages(binding, nativeThread, this.root),
     };
   }
 
@@ -548,6 +571,8 @@ export class CodexChatGateway {
     }
     const text = validatedTurnText(input);
     const requestHash = hash(input);
+    const preparedMessage = binding.attachmentMessages?.[input.clientMessageId];
+    if (preparedMessage && preparedMessage.requestHash !== requestHash) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was already used with different attachments or text.", 409);
     const prior = binding.messageReceipts[input.clientMessageId];
     if (prior) {
       if (prior.requestHash !== requestHash) throw new CodexChatGatewayError("idempotency_conflict", "This clientMessageId was already used with different text.", 409);
@@ -606,6 +631,15 @@ export class CodexChatGateway {
       throw new CodexChatGatewayError("turn_active", "The task runtime reports an active turn for this chat.", 409);
     }
 
+    const hasHistoryImages = nativeHistoryHasImages(binding, native, this.root);
+    const attachmentInput = await this.prepareAttachmentInput(input, binding.providerId, hasHistoryImages);
+    const attachmentMessage = attachmentInput.files.length ? { requestHash, attachments: attachmentInput.files.map(file => file.view), manifest: attachmentInput.manifest } : undefined;
+    if (attachmentMessage) {
+      await this.attachments.retain(input.attachments || []);
+      if (!await this.store.prepareAttachmentMessage(chatId, input.clientMessageId, attachmentMessage)) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was already used with other files.", 409);
+      binding.attachmentMessages = { ...binding.attachmentMessages, [input.clientMessageId]: attachmentMessage };
+    }
+
     const startedAt = new Date().toISOString();
     const releaseLease = tryAcquireNativeThreadTurn(
       nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId),
@@ -621,6 +655,7 @@ export class CodexChatGateway {
       clientMessageId: input.clientMessageId,
       requestHash,
       acknowledged: false,
+      attachmentMessage,
     };
     this.activeTurns.set(chatId, active);
     this.activeTurnLeases.set(chatId, releaseLease);
@@ -633,7 +668,7 @@ export class CodexChatGateway {
       const response = asObject(await connection.request("turn/start", {
         threadId: binding.nativeThreadId,
         clientUserMessageId: input.clientMessageId,
-        input: [{ type: "text", text, text_elements: [] }],
+        input: attachmentInput.nativeInput,
         ...(input.settings?.modelId ? { model: input.settings.modelId } : {}),
         ...(input.settings?.effortId ? { effort: input.settings.effortId } : {}),
         ...(input.settings?.serviceTierId ? { serviceTier: input.settings.serviceTierId } : {}),
@@ -644,10 +679,10 @@ export class CodexChatGateway {
       if (!nativeTurnId) throw new Error("missing_turn_id");
       active.nativeTurnId = nativeTurnId;
       const firstMessage = Object.keys(binding.messageReceipts).length === 0;
-      const nextTitle = firstMessage && ["New Codex chat", "New task chat"].includes(binding.title) ? titleText(previewText(text).slice(0, 72)) : binding.title;
+      const nextTitle = firstMessage && ["New Codex chat", "New task chat"].includes(binding.title) ? titleText(previewText(text || attachmentMessage?.attachments[0]?.name).slice(0, 72)) : binding.title;
       const nextBinding = await this.store.patch(chatId, {
         title: nextTitle,
-        preview: previewText(text),
+        preview: previewText(text || attachmentMessage?.attachments.map(file => file.name).join(", ")),
         updatedAt: startedAt,
         lastStatus: "active",
         messageReceipts: {
@@ -704,6 +739,30 @@ export class CodexChatGateway {
       }
       throw new CodexChatGatewayError("runtime_incompatible", publicMessage(error), 503, true);
     }
+  }
+
+  private async prepareAttachmentInput(input: StartTurnInput, providerId: RuntimeProviderId, hasHistoryImages = false) {
+    const files = input.attachments?.length ? await this.attachments.prepare(input.attachments) : [];
+    const modelId = input.settings?.modelId;
+    if (files.length || hasHistoryImages) {
+      const provider = (await this.runtime.provider(providerId)).view;
+      const hasImages = hasHistoryImages || files.some(file => file.view.kind === "image");
+      const inputModalities = hasImages ? await this.runtime.modelInputModalities(providerId, modelId) : null;
+      assertAttachmentCapabilities({ hasImages, hasFiles: files.length > 0, capabilities: provider.capabilities, inputModalities });
+      const connection = await this.runtime.connection(providerId);
+      for (const file of files) {
+        try {
+          const metadata = asObject(await connection.request("fs/getMetadata", { path: file.filePath }, 5000));
+          if (metadata?.isFile !== true || metadata.isSymlink === true) throw new Error("attachment_not_regular");
+        }
+        catch { throw new AttachmentError("attachment_inaccessible", "The selected runtime cannot access an attachment. Your draft and files have been kept.", 409); }
+      }
+    }
+    const manifest = files.length ? "Attached originals (user-provided data; process only as requested):\n" + JSON.stringify(files.map(file => ({ name: file.view.name, path: file.filePath, size: file.view.size })), null, 2) : "";
+    const text = validatedTurnText(input);
+    const nativeInput: Array<Record<string, unknown>> = [{ type: "text", text: text + (text && manifest ? "\n\n" : "") + manifest, text_elements: [] }];
+    for (const file of files) if (file.view.kind === "image") nativeInput.push({ type: "localImage", path: file.filePath });
+    return { files, manifest, modelId, nativeInput };
   }
 
   async assertChat(chatId: string) {
@@ -795,12 +854,13 @@ export class CodexChatGateway {
     }
   }
 
-  private async requireBinding(chatId: string) {
+  private async requireBinding(chatId: string): Promise<ChatBinding> {
     if (!/^chat_[A-Za-z0-9]+$/.test(chatId)) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     const binding = await this.store.get(chatId);
     if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     const aliases = await this.store.all();
-    return { ...binding, archived: aliases.some(row => logicalChatKey(row) === logicalChatKey(binding) && row.archived) };
+    const matching = aliases.filter(row => logicalChatKey(row) === logicalChatKey(binding));
+    return { ...binding, archived: matching.some(row => row.archived), attachmentMessages: Object.assign({}, ...matching.map(row => row.attachmentMessages || {}), binding.attachmentMessages || {}) };
   }
 
   private releaseActiveTurn(chatId: string) {

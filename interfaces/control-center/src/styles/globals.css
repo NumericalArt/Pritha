@@ -7135,7 +7135,7 @@ button:active,
   .codex-composer-controls {
     width: 100%;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .codex-dictation-language,
@@ -7208,3 +7208,13 @@ button:active,
 .codex-thread-status { color: #e9bc72; font-size: 11px; }
 .codex-copy-response { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .codex-copy-response [role="status"] { color: #e9bc72; font-size: 12px; }
+.codex-attachments { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.codex-draft-attachments { max-height: 160px; overflow: auto; }
+.codex-attachments:empty { display: none; }
+.codex-attachment { display: flex; align-items: center; gap: 8px; border: 1px solid #334155; border-radius: 8px; padding: 8px; max-width: 100%; min-width: 0; color: inherit; font-size: 12px; text-decoration: none; }
+.codex-attachment > span { min-width: 0; overflow-wrap: anywhere; }
+.codex-attachment img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; border-radius: 4px; }
+.codex-attachment small { display: block; color: #94a3b8; margin-top: 3px; }
+.codex-attachment-notice { font-size: 12px; color: #e9bc72; }
+
+.codex-attachment-limits { color: #94a3b8; font-size: 11px; }

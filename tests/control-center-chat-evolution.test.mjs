@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, readdirSync, symlinkSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,7 +15,7 @@ export async function fixtureModules() {
   writeFileSync(path.join(tmp, "paths.mjs"), `export const resolveTechscopeRoot=()=>${JSON.stringify(root)}; export const resolvePrithaStateRoot=()=>${JSON.stringify(state)};`);
   writeFileSync(path.join(tmp, "app-server.mjs"), "export class AppServerConnection {} export class CodexRuntimeManager {}");
   writeFileSync(path.join(tmp, "voice-links.mjs"), "export const queueVoiceTaskChatIndexRefresh=()=>{}; export const reconcileVoiceTaskChatLink=async()=>{}; export const voiceTaskChatIndexStatus=()=>({state:'ready'});");
-  for (const name of ["copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "private-store", "gateway", "../private-json"]) {
+  for (const name of ["attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "private-store", "gateway", "../private-json"]) {
     const source = readFileSync(`interfaces/control-center/src/lib/codex-chat/${name}.ts`, "utf8");
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
@@ -125,5 +125,142 @@ test("copy includes complete assistant Markdown in order, excluding activity", a
     assert.equal(responseMarkdown(turn), text + "\n\nLast paragraph");
     assert.equal(responseComplete(turn), true);
     assert.equal(responseComplete({ ...turn, status: "in_progress" }), false);
+  } finally { f.cleanup(); }
+});
+
+test("attachments preserve originals, enforce limits and reject conflicting or incomplete uploads", async () => {
+  const f = await fixtureModules();
+  try {
+    const { ChatAttachmentStore, ATTACHMENT_LIMITS } = await f.load("attachment-store");
+    const store = new ChatAttachmentStore(f.state, path.join(f.state, "codex-chat"));
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2qYIAAAAASUVORK5CYII=", "base64");
+    const samples = [["pixel.png", png], ["note.md", Buffer.from("# hello")], ["source.js", Buffer.from("throw 'never execute me'")], ["document.pdf", Buffer.from("%PDF-test")], ["audio.mp3", Buffer.from("ID3sample")], ["video.mp4", Buffer.from("binary-video")], ["files.zip", Buffer.from("PKarchive")], ["arbitrary.bin", Buffer.from([0, 1, 254, 255])]];
+    const ids = [];
+    for (const [name, bytes] of samples) {
+      const id = randomUUID(); ids.push(id);
+      const upload = () => store.upload(id, name, new Request("http://localhost/upload", { method: "PUT", body: bytes }));
+      const first = await upload();
+      assert.deepEqual(await upload(), first);
+      assert.equal(first.kind, name === "pixel.png" ? "image" : "file");
+      const resolved = await store.resolve(id);
+      assert.deepEqual(readFileSync(resolved.filePath), bytes);
+      assert.doesNotMatch(JSON.stringify(first), /\/tmp\//);
+      await assert.rejects(store.upload(id, name, new Request("http://localhost/upload", { method: "PUT", body: "other" })), e => e.code === "attachment_conflict");
+    }
+    assert.equal((await store.prepare(ids)).length, samples.length);
+    await assert.rejects(store.prepare([ids[0], ids[0]]), e => e.code === "attachment_limit");
+    await assert.rejects(store.resolve("../outside"), e => e.code === "attachment_not_found");
+    await assert.rejects(store.upload(randomUUID(), "large", new Request("http://localhost/upload", { method: "PUT", headers: { "content-length": String(ATTACHMENT_LIMITS.fileBytes + 1) }, body: "small" })), e => e.code === "attachment_too_large");
+    const incomplete = randomUUID();
+    await assert.rejects(store.upload(incomplete, "partial", new Request("http://localhost/upload", { method: "PUT", headers: { "content-length": "100" }, body: "short" })), e => e.code === "attachment_upload_interrupted");
+    await assert.rejects(store.resolve(incomplete), e => e.code === "attachment_not_found");
+    const escaped = randomUUID(); symlinkSync(f.root, path.join(store.root, escaped));
+    await assert.rejects(store.upload(escaped, "outside", new Request("http://localhost/upload", { method: "PUT", body: "no" })), e => e.code === "attachment_storage_unavailable");
+    assert.deepEqual(readdirSync(f.root), []);
+    const corrupted = await store.resolve(ids[0]);
+    writeFileSync(corrupted.filePath, Buffer.alloc(png.length));
+    await assert.rejects(store.prepare([ids[0]]), e => e.code === "attachment_corrupt");
+  } finally { f.cleanup(); }
+});
+
+test("referenced attachments survive expiry, and corrupt metadata never triggers deletion", async () => {
+  const f = await fixtureModules();
+  try {
+    const { ChatAttachmentStore, ATTACHMENT_LIMITS } = await f.load("attachment-store");
+    const store = new ChatAttachmentStore(f.state, path.join(f.state, "codex-chat"));
+    const first = randomUUID(), unused = randomUUID();
+    for (const id of [first, unused]) await store.upload(id, "original.txt", new Request("http://localhost/upload", { method: "PUT", body: "original" }));
+    await store.retain([first]);
+    for (const id of [first, unused]) {
+      const p = path.join(store.root, id, "metadata.json");
+      const r = JSON.parse(readFileSync(p, "utf8")); r.createdAt = "2000-01-01T00:00:00Z"; writeFileSync(p, JSON.stringify(r));
+    }
+    await store.upload(randomUUID(), "next", new Request("http://localhost/upload", { method: "PUT", body: "x" }));
+    assert.equal((await store.resolve(first)).view.size, 8);
+    await assert.rejects(store.resolve(unused), e => e.code === "attachment_not_found");
+    ATTACHMENT_LIMITS.storageBytes = 9;
+    await assert.rejects(store.upload(randomUUID(), "quota", new Request("http://localhost/upload", { method: "PUT", body: "xx" })), e => e.code === "attachment_storage_full");
+    assert.equal((await store.resolve(first)).view.size, 8);
+    writeFileSync(path.join(store.root, first, "metadata.json"), "damaged");
+    await assert.rejects(store.upload(randomUUID(), "new", new Request("http://localhost/upload", { method: "PUT", body: "x" })), e => e.code === "attachment_storage_unavailable");
+    assert.equal(readFileSync(path.join(store.root, first, "original.txt"), "utf8"), "original");
+  } finally { f.cleanup(); }
+});
+
+test("image capability must be verified and attachment history retains exact user text", async () => {
+  const f = await fixtureModules();
+  try {
+    const { assertAttachmentCapabilities } = await f.load("attachment-policy");
+    const capabilities = { imageInput: true, fileMetadata: true };
+    for (const inputModalities of [null, ["text"]]) assert.throws(() => assertAttachmentCapabilities({ capabilities, inputModalities, hasImages: true, hasFiles: false }), e => e.code === "model_image_unsupported");
+    assert.doesNotThrow(() => assertAttachmentCapabilities({ capabilities, inputModalities: ["text", "image"], hasImages: true, hasFiles: true }));
+    assert.throws(() => assertAttachmentCapabilities({ capabilities: {}, inputModalities: ["image"], hasImages: true, hasFiles: true }), e => e.code === "attachment_runtime_unsupported");
+    const { normalizeNativeTurn } = await f.load("normalize");
+    const attachment = { id: randomUUID(), name: "file.txt", kind: "file", href: "/api/attachment" };
+    const binding = { chatId: "chat_one", messageReceipts: {}, attachmentMessages: { "message-123": { attachments: [attachment], manifest: "generated manifest" } } };
+    const raw = { id: "turn-one", items: [{ type: "userMessage", clientId: "message-123", content: [{ type: "text", text: "User text\n\ngenerated manifest" }] }] };
+    const turn = normalizeNativeTurn(binding, raw, f.root);
+    assert.equal(turn.userMessage.markdown, "User text");
+    assert.deepEqual(turn.userMessage.attachments, [attachment]);
+    raw.items[0].content[0].text = "generated manifest";
+    assert.equal(normalizeNativeTurn(binding, raw, f.root).userMessage.markdown, "");
+  } finally { f.cleanup(); }
+});
+
+test("attachment-only first messages reconcile unknown delivery without a second native turn", async () => {
+  const f = await fixtureModules();
+  try {
+    const { ChatAttachmentStore } = await f.load("attachment-store");
+    const { CodexChatPrivateStore } = await f.load("private-store");
+    const { CodexChatGateway } = await f.load("gateway");
+    const store = new CodexChatPrivateStore();
+    const attachments = new ChatAttachmentStore(store.stateRoot, store.root);
+    const id = randomUUID();
+    await attachments.upload(id, "pixel.png", new Request("http://localhost/upload", { method: "PUT", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2qYIAAAAASUVORK5CYII=", "base64") }));
+    let starts = 0, creates = 0, modalities = ["text", "image"], regularFile = true;
+    const native = { id: "native", cwd: f.root, status: "idle", turns: [] };
+    let sentInput;
+    const connection = { markThreadLoaded: () => {}, ensureThreadLoaded: async () => {}, request: async (method, params) => {
+      if (method === "thread/start") { creates++; return { thread: native }; }
+      if (method === "fs/getMetadata") { assert.ok(params.path.startsWith(await import('node:fs/promises').then(fs => fs.realpath(f.state)))); return { isFile: regularFile, isSymlink: false }; }
+      if (method === "turn/start") {
+        starts++; sentInput = params.input;
+        native.turns.push({ id: "native-turn", status: "completed", items: [{ id: "user", type: "userMessage", clientId: params.clientUserMessageId, content: params.input }] });
+        throw new Error("Codex App Server request timed out: turn/start");
+      }
+      return {};
+    } };
+    const view = { stateIdentityHash: "storage-v2:fixture", availability: "ready", capabilities: { fullChat: true, fileMetadata: true, imageInput: true } };
+    const gateway = Object.create(CodexChatGateway.prototype);
+    Object.assign(gateway, { store, attachments, root: f.root, activeTurns: new Map(), activeTurnLeases: new Map(), uncertainTurnTimers: new Map(), emit: () => {}, runtime: {
+      provider: async () => ({ providerId: "desktop_bundled", view }), effectiveProvider: async () => ({ providerId: "desktop_bundled", view }),
+      connection: async () => connection, threadDefaults: () => ({ model: "test", cwd: f.root }), modelInputModalities: async () => modalities,
+      readThread: async () => ({ thread: native }),
+    } });
+    const input = { clientThreadId: randomUUID(), source: "chat", initialTurn: { clientMessageId: randomUUID(), input: [{ type: "text", text: "" }], attachments: [id], settings: { modelId: "test" } } };
+    modalities = ["text"];
+    await assert.rejects(gateway.createThreadWithFirstTurn(input), e => e.code === "model_image_unsupported");
+    assert.equal(creates, 0, "invalid attachments must fail before a new native chat exists");
+    modalities = ["text", "image"];
+    regularFile = false;
+    await assert.rejects(gateway.createThreadWithFirstTurn(input), e => e.code === "attachment_inaccessible");
+    assert.equal(creates, 0, "inaccessible originals must not create a native chat");
+    regularFile = true;
+    await assert.rejects(gateway.createThreadWithFirstTurn(input), e => e.code === "fallback_confirmation_required");
+    assert.equal(starts, 1);
+    assert.equal(sentInput[1].type, "localImage");
+    assert.match(sentInput[0].text, /Attached originals/);
+    const firstBinding = (await store.all())[0];
+    gateway.releaseActiveTurn(firstBinding.chatId);
+    gateway.store = new CodexChatPrivateStore();
+    const replay = await gateway.createThreadWithFirstTurn(input);
+    assert.equal(creates, 1); assert.equal(starts, 1); assert.equal(replay.replayed, true);
+    assert.equal(replay.data.accepted.turn.userMessage.markdown, "");
+    assert.equal(replay.data.accepted.turn.userMessage.attachments[0].id, id);
+    const page = await gateway.listTurns(firstBinding.chatId);
+    assert.equal(page.hasImageInputs, true);
+    modalities = ["text"];
+    await assert.rejects(gateway.startTurn(firstBinding.chatId, { clientMessageId: randomUUID(), input: [{ type: "text", text: "Follow up" }], settings: { modelId: "text-only" } }), e => e.code === "model_image_unsupported");
+    assert.equal(starts, 1, "an incompatible follow-up cannot discard previous images");
   } finally { f.cleanup(); }
 });

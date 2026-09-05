@@ -3,8 +3,8 @@ id: control-center-codex-chat-api-contract
 type: standard
 status: active
 created: 2026-08-26
-updated: 2026-09-02
-last_reviewed: 2026-09-02
+updated: 2026-09-05
+last_reviewed: 2026-09-05
 owner: Pritha/user
 topics:
   - pritha-control-center
@@ -57,9 +57,9 @@ superseded_by: []
 freshness_status: current
 source_published: unknown
 source_updated: unknown
-source_version: "Pritha Codex Chat API v1; verified against Codex App Server docs and local schemas from bundled 0.149.0-alpha.4.1 and standalone 0.135.0"
+source_version: "Pritha Codex Chat API v1; attachment input and filesystem metadata verified against installed Codex 0.153.4 schemas; earlier core verification covered bundled 0.149.0-alpha.4.1 and standalone 0.135.0"
 retrieved: 2026-08-26
-verified: 2026-08-26
+verified: 2026-09-05
 valid_for: Pritha Control Center Codex Chat API v1
 temporal_status: version-bound
 memory_domain: governance
@@ -139,8 +139,8 @@ type ApiSuccess<T> = {
 };
 ```
 
-All JSON error responses use the envelope defined in section 13. SSE is the
-only route that does not use a JSON envelope.
+All JSON error responses use the envelope defined in section 13. SSE and
+successful original attachment downloads do not use a JSON envelope.
 
 ## 2. Security boundary
 
@@ -207,6 +207,8 @@ type RuntimeCapabilityMap = {
   requestUserInput: boolean;
   historyPagination: boolean;
   audioInput: boolean;
+  imageInput?: boolean;   // exact native localImage input is supported
+  fileMetadata?: boolean; // runtime can verify an original's filesystem access
 };
 
 type RuntimeModelOption = {
@@ -215,6 +217,7 @@ type RuntimeModelOption = {
   effortIds: string[];
   serviceTierIds: string[];
   defaultEffortId: string | null;
+  inputModalities?: string[] | null; // null/absent means unverified
 };
 
 type RuntimeProviderView = {
@@ -347,6 +350,16 @@ type MessageView = {
   markdown: string;
   status: "streaming" | "completed" | "failed";
   createdAt: string;
+  attachments?: AttachmentView[];
+};
+
+type AttachmentView = {
+  id: string; // opaque per-instance UUID
+  name: string;
+  size: number;
+  mediaType: string;
+  kind: "image" | "file";
+  href: string; // same-origin original download, never an absolute server path
 };
 
 type BaseItemView = {
@@ -497,9 +510,12 @@ does not lose an approval or question.
 | Method | Route | Purpose | Success |
 | --- | --- | --- | --- |
 | `GET` | `/runtime` | effective runtime and capabilities | `200` |
+| `PUT` | `/attachments/{attachmentId}` | upload an original, idempotent by ID/content/name | `201` |
+| `GET` | `/attachments/{attachmentId}` | stream the original file | `200` |
 | `GET` | `/threads` | grouped/searchable thread page | `200` |
 | `POST` | `/threads` | create a Pritha chat binding | `201` or idempotent `200` |
 | `GET` | `/threads/{chatId}` | thread metadata and pending requests | `200` |
+| `POST` | `/threads/{chatId}/restore-access` | verify and migrate a legacy storage binding | `200` |
 | `PATCH` | `/threads/{chatId}` | rename and/or pin | `200` |
 | `GET` | `/threads/{chatId}/turns` | normalized turn history page | `200` |
 | `POST` | `/threads/{chatId}/fork` | fork native/mirrored history | `201` |
@@ -532,6 +548,7 @@ Query:
 type ListThreadsQuery = {
   group?: ThreadGroup | "all"; // default "all"
   archived?: "true" | "false"; // default "false"
+  view?: "all" | "current" | "legacy"; // new UI uses all; older clients remain supported
   search?: string;
   cursor?: string;
   limit?: string;               // integer 1..50, default 30
@@ -635,6 +652,7 @@ type TurnPage = {
   hasOlder: boolean;
   hasNewer: boolean;
   snapshotAt: string;
+  hasImageInputs?: boolean; // entire native history, including older pages
 };
 ```
 
@@ -690,6 +708,7 @@ Body:
 type StartTurnRequest = {
   clientMessageId: string; // UUID, unique inside chat
   input: [{ type: "text"; text: string }];
+  attachments?: string[]; // uploaded same-instance attachment IDs
   settings?: {
     modelId?: string;
     effortId?: string;
@@ -698,8 +717,12 @@ type StartTurnRequest = {
 };
 ```
 
-Exactly one non-empty text item is accepted in v1. Browser voice dictation edits
-this text before submit and does not change the API shape.
+Exactly one text item is accepted. It may be empty when attachments are present.
+Existing text-only clients retain their request shape and bound model behavior.
+Browser voice dictation edits text before submit. Clients submitting images, or
+continuing image-bearing history, explicitly provide `settings.modelId` for
+capability validation; unknown capability fails without dispatch. The UI shows
+the selected model's limitation and preserves the draft.
 
 Response data with `202`:
 
@@ -1032,7 +1055,7 @@ such as `Unexpected end of JSON input` are never shown.
 | fork | `thread/fork` | create a new mirrored chat with compact explicit handoff |
 | rename | `thread/name/set` | private mirrored title |
 | pin | `thread/metadata/update` | private mirrored pin |
-| archive/unarchive | native methods | private mirrored state |
+| archive/unarchive | private instance state only | private instance state only |
 | resolve request | response to the matching server-initiated JSON-RPC request | unavailable; surface degraded limitation |
 | stream | normalize App Server notifications/server requests | normalize JSONL events |
 
@@ -1102,6 +1125,59 @@ standards and manually curated decisions—not transcripts, ids, runtime paths o
 operator messages.
 
 ## 18. Required tests
+
+### Original attachments (release C, 2026-09-05)
+
+`PUT /attachments/{UUID-v4}` accepts a raw binary body and URL-encoded
+`X-Attachment-Name`. The existing API guard protects uploads and downloads.
+Limits are 10 attachments/message, 100 MiB/file, 250 MiB/message and 10 GiB
+retained originals per instance. The HTTP proxy limit is 101 MiB; the upload
+handler independently enforces the stricter file limit while streaming.
+
+Private storage is `codex-chat/attachments/{id}/` under the instance state root,
+or `.private/codex-chat/attachments/` in legacy checkout layout. Directories are
+created with mode 0700 and originals/metadata with mode 0600. IDs, relative
+names, real paths, symlinks, original byte length and SHA-256 are checked.
+Published metadata is atomic; interrupted temporary data is removed. Repeating
+an ID with identical bytes/name returns the existing original; a conflict fails.
+Download responses use no-store, nosniff, restrictive CSP and same-origin
+resource policy. Only detected PNG/JPEG/GIF/WebP use inline image previews;
+other formats download as originals. No extraction, transcription or execution
+happens during upload.
+
+At send time, the gateway verifies files, exact protocol input support, runtime
+filesystem metadata and model `inputModalities`. Supported images use native
+`localImage` inputs; other originals are listed in an explicit file manifest
+for Codex tools to access on request. The tool/runtime sandbox is not widened.
+Native history is scanned for image inputs before continuing with another
+model. There is no automatic model substitution or file discard. Attachment
+capability failures occur before creating a first-message native chat.
+
+The registry retains attachment IDs, public metadata and the generated manifest
+by client message ID before dispatch. This is not a duplicate transcript. Exact
+manifest suffixes are omitted from the rendered user message; native history
+remains canonical. Request hashing includes attachment IDs and captured model
+settings. Unknown-delivery retries reconcile receipts/native client IDs before
+any new dispatch, including after gateway restart.
+
+Unreferenced uploads expire after 24 hours, with opportunistic cleanup on the
+next upload. Referenced originals never expire automatically, including in
+archived chats. A removed unsent draft file becomes eligible for expiry; no
+delete-history or delete-original feature is introduced. Metadata corruption
+blocks cleanup and preserves originals. Browser File objects survive retries
+and chat switches within the mounted page; a browser reload requires reselecting
+unsent files. Sent attachment links persist across reloads and restarts.
+
+`Load earlier messages` reads additional history pages without discarding
+already loaded turns. A failed page keeps visible messages and can be retried.
+History responses have a 16 MiB browser transport ceiling; an oversized page is
+reported explicitly, never silently truncated. Full assistant Markdown is
+retained for copying; tool previews remain bounded as described above.
+
+History format conversion is not generic: release A converts only proven old
+storage bindings. The installed runtime reads the verified old native history
+directly. Unknown rollout formats are preserved and explained; they are not
+invented, replayed, auto-archived or rewritten into a claimed conversion.
 
 Contract tests must cover:
 

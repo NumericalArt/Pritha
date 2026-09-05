@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ChatBinding } from "./private-store";
 import type {
   ChatItemView,
+  AttachmentMessage,
   MessageView,
   RuntimeProviderView,
   ThreadStatus,
@@ -12,6 +13,7 @@ import type {
 } from "./types";
 
 export type ActiveAttemptSnapshot = {
+  attachmentMessage?: AttachmentMessage;
   turnId: string;
   nativeTurnId: string;
   userText: string;
@@ -267,7 +269,11 @@ export function normalizeNativeTurn(
   const nativeClientMessageId = /^[A-Za-z0-9_-]{8,128}$/.test(String(userItem?.clientId || ""))
     ? String(userItem?.clientId)
     : null;
-  const text = active?.userText || userText(userItem) || "Codex request";
+  const clientMessageId = active?.clientMessageId || storedReceipt?.clientMessageId || nativeClientMessageId;
+  const attachmentMessage = active?.attachmentMessage || (clientMessageId ? binding.attachmentMessages?.[clientMessageId] : undefined);
+  let text = active ? active.userText : userText(userItem);
+  if (!active && attachmentMessage?.manifest && text.endsWith(attachmentMessage.manifest)) text = text.slice(0, -attachmentMessage.manifest.length).trimEnd();
+  if (!text && !attachmentMessage?.attachments.length) text = "Codex request";
   const items = nativeItems
     .map((item) => normalizeNativeItem(binding.chatId, item, root, startedAt))
     .filter((item): item is ChatItemView => Boolean(item));
@@ -288,12 +294,13 @@ export function normalizeNativeTurn(
   const status = active && nativeStatus === "in_progress" ? "in_progress" : nativeStatus;
   return {
     turnId,
-    clientMessageId: active?.clientMessageId || storedReceipt?.clientMessageId || nativeClientMessageId,
+    clientMessageId,
     status,
     userMessage: {
       id: itemIdFor(binding.chatId, `${nativeTurnId}:user`),
       role: "user",
       markdown: text,
+      ...(attachmentMessage ? { attachments: attachmentMessage.attachments } : {}),
       status: "completed",
       createdAt: startedAt,
     },

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { appendPrivateAuditEvent, atomicWritePrivateJson } from "@/lib/private-json";
-import type { RuntimeProviderId, TaskLinkView, ThreadGroup, ThreadOrigin, ThreadStatus } from "./types";
+import type { AttachmentMessage, RuntimeProviderId, TaskLinkView, ThreadGroup, ThreadOrigin, ThreadStatus } from "./types";
 
 export type MessageReceipt = {
   clientMessageId: string;
@@ -32,6 +32,7 @@ export type ChatBinding = {
   archived: boolean;
   lastStatus: ThreadStatus;
   messageReceipts: Record<string, MessageReceipt>;
+  attachmentMessages?: Record<string, AttachmentMessage>;
   taskLinks: TaskLinkView[];
 };
 
@@ -87,6 +88,7 @@ function normalizeBinding(value: unknown): ChatBinding | null {
       ? (row.lastStatus as ThreadStatus)
       : "not_loaded",
     messageReceipts: row.messageReceipts && typeof row.messageReceipts === "object" ? row.messageReceipts : {},
+    ...(row.attachmentMessages && typeof row.attachmentMessages === "object" ? { attachmentMessages: row.attachmentMessages } : {}),
     taskLinks: Array.isArray(row.taskLinks) ? row.taskLinks : [],
   };
 }
@@ -214,6 +216,20 @@ export class CodexChatPrivateStore {
         [id, logicalChatKey(row) === key ? { ...row, archived } : row]));
       try { await this.persist(); } catch (error) { registry.chats = original; throw error; }
       return registry.chats[chatId];
+    });
+  }
+
+  async prepareAttachmentMessage(chatId: string, messageId: string, message: AttachmentMessage) {
+    return this.enqueueMutation(async () => {
+      if (this.readOnlyError) throw this.readOnlyError;
+      const registry = await this.load();
+      const current = registry.chats[chatId];
+      if (!current) throw new Error("chat_not_found");
+      const prior = current.attachmentMessages?.[messageId];
+      if (prior) return prior.requestHash === message.requestHash;
+      registry.chats[chatId] = { ...current, attachmentMessages: { ...current.attachmentMessages, [messageId]: message } };
+      try { await this.persist(); } catch (error) { registry.chats[chatId] = current; throw error; }
+      return true;
     });
   }
 

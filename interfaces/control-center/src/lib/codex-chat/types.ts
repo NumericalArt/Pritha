@@ -3,6 +3,8 @@ export type RuntimeProtocol = "app_server" | "exec_resume" | "queue";
 export type Availability = "ready" | "degraded" | "unavailable";
 
 export type RuntimeCapabilityMap = {
+  imageInput?: boolean;
+  fileMetadata?: boolean;
   fullChat: boolean;
   nativeHistory: boolean;
   listThreads: boolean;
@@ -23,6 +25,7 @@ export type RuntimeCapabilityMap = {
 };
 
 export type RuntimeModelOption = {
+  inputModalities?: string[] | null;
   id: string;
   label: string;
   effortIds: string[];
@@ -122,7 +125,12 @@ export type TurnStatus =
   | "interrupted"
   | "failed";
 
+export type AttachmentView = { id: string; name: string; size: number; kind: "image" | "file"; mediaType: string; href: string };
+
+export type AttachmentMessage = { requestHash: string; attachments: AttachmentView[]; manifest: string };
+
 export type MessageView = {
+  attachments?: AttachmentView[];
   id: string;
   role: "user" | "assistant";
   markdown: string;
@@ -208,6 +216,7 @@ export type ThreadPage = {
 };
 
 export type TurnPage = {
+  hasImageInputs?: boolean;
   data: TurnView[];
   olderCursor: string | null;
   newerCursor: string | null;
