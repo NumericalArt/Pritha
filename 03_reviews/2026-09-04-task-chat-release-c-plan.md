@@ -1,7 +1,7 @@
 ---
 id: task-chat-release-c-plan-2026-09-04
 type: review
-status: implemented-release-pending
+status: delivered
 created: 2026-09-04
 updated: 2026-09-05
 topics: [task-chat, attachments, multimodality, privacy]
@@ -110,8 +110,16 @@ never silently truncated.
 Semantic processing by live models and trusted-peer/mobile-device access remain
 release smoke checks; fixture tests do not claim to verify model output quality.
 Full self-test, privacy and strict health evidence are recorded in the delivery
-report. Production lifecycle and fleet rollout remain pending.
+report. Production lifecycle and fleet rollout were pending at that implementation checkpoint.
 
 Implementation commit: `71f5be8`. Final verification passed all 508 project unit
 tests, 12 Task Chat browser scenarios, privacy audit, memory validation/rebuild,
 self-test and strict /codex + /task-chat health with 11 JavaScript chunks.
+
+## Deployment completion
+
+The operator authorized the cumulative release on 2026-09-05. Main, Dasha,
+Sasha, Marina and the running MacBook use the integrated UI release
+`1c0ed2c42a20e02f1d1bf931001544e5eb113315`. See [the deployment report](../11_agents/reports/2026-09-05-pritha-integrated-fleet-release-report.md)
+for actual checks, investigated failures, managed recovery and final source
+synchronization. The stage commit remains an implementation review anchor.

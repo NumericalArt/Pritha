@@ -1,7 +1,7 @@
 ---
 id: task-chat-release-b-plan-2026-09-04
 type: review
-status: implemented-release-pending
+status: delivered
 created: 2026-09-04
 updated: 2026-09-05
 topics: [task-chat, archive, clipboard, voice]
@@ -66,7 +66,15 @@ flags and original bindings. No native transcript migration is involved.
 
 Implemented. Targeted unit tests: 22/22 pass. Desktop/mobile history, archive,
 copy and existing Task Chat flow: 6/6 pass. Typecheck and isolated production
-build pass (existing NFT trace warning). Production remains unchanged.
+build pass (existing NFT trace warning). Production was unchanged at this isolated verification point.
 
 Implementation commit: `a1fd2fa`. Final cross-stage release checks and fleet
 preflight are recorded in the Task Chat delivery report.
+
+## Deployment completion
+
+The operator authorized the cumulative release on 2026-09-05. Main, Dasha,
+Sasha, Marina and the running MacBook use the integrated UI release
+`1c0ed2c42a20e02f1d1bf931001544e5eb113315`. See [the deployment report](../11_agents/reports/2026-09-05-pritha-integrated-fleet-release-report.md)
+for actual checks, investigated failures, managed recovery and final source
+synchronization. The stage commit remains an implementation review anchor.

@@ -1,7 +1,7 @@
 ---
 id: update-second-local-macbook
 type: workflow
-status: prepared-release-pending
+status: active
 created: 2026-09-05
 updated: 2026-09-05
 topics: [macbook, staged-release, task-chat, fleet]
@@ -127,3 +127,24 @@ clipboard, file picker and network access. A desktop viewport test is not a
 claim that this device check passed. Record commit, build, checks, permitted
 warnings and rollback outcome privately where they reveal local identifiers.
 Leave the previous service/build recovery artifacts until acceptance.
+
+If this release fixes the updater itself (for example, the Finder metadata guard),
+ensure the transaction runs the new updater code. After preserving a clean
+checkout and recording the currently running build, fetch and verify the exact
+pin, fast-forward the source checkout only, and then invoke the updated manager
+transaction. Do not build into the live `.next` or substitute a raw server start.
+The old compiled service remains the rollback reference until the staged swap.
+
+For a slow cold start, use explicit bounded invocation budgets rather than
+persistently weakening checks: `PRITHA_UPDATE_HEALTH_TIMEOUT_MS=180000`,
+`PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS=20000` and
+`PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS=120000` were verified on the MacBook.
+A health endpoint alone is insufficient: verify all pages/chunks and the actual
+compiled build ID against the release manifest. Current Git HEAD alone does not
+prove which build is serving after a rollback.
+
+The updater retries the specific managed stop grace-period error once. If stop
+is still unconfirmed, `rollback-stop-failed` preserves both build directories
+and the private backup. Inspect manager ownership, complete the managed stop,
+then restore/start the verified previous build; never swap a build under a
+process that may still be running or treat this status as successful rollback.

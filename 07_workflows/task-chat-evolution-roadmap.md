@@ -1,7 +1,7 @@
 ---
 id: task-chat-evolution-roadmap
 type: workflow
-status: in-progress
+status: delivered
 created: 2026-09-04
 updated: 2026-09-05
 topics: [task-chat, native-history, attachments, fleet, neuraldeep]
@@ -31,11 +31,11 @@ version change. Preserve unavailable chats until the operator archives them.
 | Stage | Dependency | Delivery | Status |
 | --- | --- | --- | --- |
 | 0 | none | Roadmap and per-stage implementation plans | recorded |
-| A | 0 | Stable storage identity, verified recovery, truthful history states | implemented; release pending |
-| B1 | A | Unified Voice list and instance-local Archive / Show archived / Restore from archive | implemented; release pending |
-| B2 | B1 | Complete Markdown Copy response | implemented; release pending |
-| C | B2 | File selection, drop, clipboard images, all original file types and model capability checks | implemented; release pending |
-| Transfer | each tested release | Pinned fleet/MacBook release and NeuralDeep adaptation instructions | instructions prepared; rollout pending |
+| A | 0 | Stable storage identity, verified recovery, truthful history states | deployed |
+| B1 | A | Unified Voice list and instance-local Archive / Show archived / Restore from archive | deployed |
+| B2 | B1 | Complete Markdown Copy response | deployed |
+| C | B2 | File selection, drop, clipboard images, all original file types and model capability checks | deployed |
+| Transfer | each tested release | Pinned fleet/MacBook release and NeuralDeep adaptation instructions | ordinary fleet deployed; NeuralDeep guide delivered |
 
 Before each stage, author a coding plan under `03_reviews/` describing behavior,
 data/API changes, migration, acceptance tests and rollback. Update its evidence
@@ -105,3 +105,5 @@ edits were committed as `8be310d89ce530aecbab470ba4d339295b8af40e` and merged in
 the release branch. Private state remains local to each instance.
 
 - [Integrated release plan](../03_reviews/2026-09-05-pritha-integrated-release-plan.md)
+
+- [Integrated deployment report](../11_agents/reports/2026-09-05-pritha-integrated-fleet-release-report.md) — all five ordinary instances run the cumulative UI release `1c0ed2c42a20e02f1d1bf931001544e5eb113315`; later tooling/documentation synchronization is recorded separately. NeuralDeep implementation remains its own local task.

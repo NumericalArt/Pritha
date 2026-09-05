@@ -1,7 +1,7 @@
 ---
 id: pritha-task-chat-evolution-delivery-report-2026-09-05
 type: agent-delivery-report
-status: implemented-release-pending
+status: delivered
 created: 2026-09-05
 updated: 2026-09-05
 topics: [task-chat, history-recovery, archive, clipboard, attachments, fleet]
@@ -134,5 +134,4 @@ new receipts, links, archive decisions and attachment metadata. Preserve every
 referenced original. Rollback is not permission to rewrite native history or
 restore an entire old state directory over newer user activity.
 
-Production acceptance, per-instance rollout results and NeuralDeep's own local
-implementation commit must be appended after those actions actually occur.
+The ordinary fleet deployment is recorded in [the integrated release report](2026-09-05-pritha-integrated-fleet-release-report.md). NeuralDeep's own local implementation remains separate; this report does not claim it has been updated.

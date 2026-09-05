@@ -1,7 +1,7 @@
 ---
 id: neuraldeep-task-chat-adaptation
 type: workflow
-status: prepared-release-pending
+status: ready-for-local-adaptation
 created: 2026-09-05
 updated: 2026-09-05
 topics: [task-chat, neuraldeep, attachments, model-capabilities]
@@ -24,10 +24,9 @@ confidence: high
 
 # NeuralDeep: adapt the verified Task Chat changes
 
-This guide transfers behavior, contracts and tests. The mother implementation
-is verified in isolation; production A/B/C acceptance is still pending. Update
-this status after the release report records actual deployment. Do not describe
-the changes as already installed in NeuralDeep.
+This guide transfers behavior, contracts and tests from the implemented and
+deployed mother release. See the integrated fleet release report for actual
+per-instance outcomes. These changes have not been installed in NeuralDeep.
 
 ## Source commits and order
 
@@ -59,6 +58,23 @@ Voice topic and task relationships, state isolation, Keychain credentials,
 Responses adapter behavior, authorization, billing/rate-limit errors and
 provider diagnostics. The mother's App Server manager is not a replacement for
 this architecture.
+
+The complete integrated feature/Settings source is
+`4c52125c7c29bea4b6ac8ffea09644acdc794424`. The final executable mother release is
+`1c0ed2c42a20e02f1d1bf931001544e5eb113315`, including the narrow Finder metadata
+exception in release fingerprints and updated web dependencies. Both contain
+all stage anchors above. Review the local lockfile and Node/native image
+compatibility independently; do not overwrite a newer or provider-specific
+NeuralDeep dependency configuration. The Finder exception applies only to
+regular `.DS_Store` files and preserves detection of other data and symlinks.
+
+Review the release-tool correction
+`4467828d6b8e92dfbf0c360a1804f2809f4ce296` separately if the local updater shares
+this implementation: require confirmed managed shutdown before swapping a
+rollback build; preserve both builds when ownership or stop is unconfirmed.
+Its bounded retry applies only to the stop-grace error. It is not permission
+to replace NeuralDeep's runtime supervisor. Final mother verification passes
+518 tests; see [the actual fleet report](../11_agents/reports/2026-09-05-pritha-integrated-fleet-release-report.md).
 
 ## A: storage and history
 

@@ -1,7 +1,7 @@
 ---
 id: task-chat-release-a-plan-2026-09-04
 type: review
-status: implemented-release-pending
+status: delivered
 created: 2026-09-04
 updated: 2026-09-05
 topics: [task-chat, native-history, migration]
@@ -79,7 +79,15 @@ unit tests: 20/20 pass. Desktop/mobile recovery fixtures: 2/2 pass. Typecheck
 and isolated production build pass (existing NFT trace warning only). A
 read-only check of the reported original thread verified its workspace, ID,
 legacy hash evidence and six native turns. No source transcript was copied and
-no turn was replayed. Production/fleet lifecycle approval is still pending.
+no turn was replayed. At that preflight point, production/fleet approval was pending; the operator subsequently approved the integrated deployment on 2026-09-05.
 
 Implementation commit: `79ee5a4`. Final cross-stage release checks and fleet
 preflight are recorded in the Task Chat delivery report.
+
+## Deployment completion
+
+The operator authorized the cumulative release on 2026-09-05. Main, Dasha,
+Sasha, Marina and the running MacBook use the integrated UI release
+`1c0ed2c42a20e02f1d1bf931001544e5eb113315`. See [the deployment report](../11_agents/reports/2026-09-05-pritha-integrated-fleet-release-report.md)
+for actual checks, investigated failures, managed recovery and final source
+synchronization. The stage commit remains an implementation review anchor.
