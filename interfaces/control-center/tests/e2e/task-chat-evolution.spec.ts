@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import type { AttachmentView, TurnView } from "../../src/lib/codex-chat/types";
 import { expect, test, type Page } from "@playwright/test";
 
-async function mockChat(page: Page) {
+async function mockChat(page: Page, initiallyRestored = false) {
   const now = new Date().toISOString();
-  let restored = false;
+  let restored = initiallyRestored;
   let archived = false;
   const control = { rejectSend: false, failUpload: false, inputModalities: ["text", "image"], sent: [] as Array<Record<string, unknown>> };
   const uploads = new Map<string, AttachmentView>();
