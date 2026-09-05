@@ -1,9 +1,9 @@
 ---
 id: task-chat-release-a-plan-2026-09-04
 type: review
-status: in-progress
+status: implemented-release-pending
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 topics: [task-chat, native-history, migration]
 tools: [Pritha, Codex, TypeScript]
 sources: [operator-approved-task-chat-roadmap-2026-09-04]
@@ -80,3 +80,6 @@ and isolated production build pass (existing NFT trace warning only). A
 read-only check of the reported original thread verified its workspace, ID,
 legacy hash evidence and six native turns. No source transcript was copied and
 no turn was replayed. Production/fleet lifecycle approval is still pending.
+
+Implementation commit: `79ee5a4`. Final cross-stage release checks and fleet
+preflight are recorded in the Task Chat delivery report.

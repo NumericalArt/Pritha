@@ -1,103 +1,116 @@
-# Update A Second Local MacBook
+---
+id: update-second-local-macbook
+type: workflow
+status: prepared-release-pending
+created: 2026-09-05
+updated: 2026-09-05
+topics: [macbook, staged-release, task-chat, fleet]
+tools: [Pritha, Codex, Git]
+sources: [operator-approved-task-chat-roadmap-2026-09-04]
+related:
+  workflows: [07_workflows/task-chat-evolution-roadmap.md, 07_workflows/control-center-staged-release.md]
+  standards: [04_standards/control-center-codex-chat-api-contract.md]
+supersedes: []
+superseded_by: []
+memory_domain: pritha-self
+subject:
+  kind: workflow
+  id: update-second-local-macbook
+privacy: public
+retention: durable
+review_status: reviewed
+confidence: high
+---
 
-Use this procedure to update another trusted MacBook that already has an older
-Pritha checkout. It is written to preserve local child agents, local runtime
-state and private configuration.
+# Update the local MacBook to a tested Pritha release
 
-## Scope
+Run this procedure on the MacBook itself. It replaces the former raw terminal
+start/build procedure. Use the MacBook's own saved runtime environment and
+managed Control Center service. Private history, attachments, credentials,
+memory, queues and sibling agents are never copied from another machine.
 
-- Update only the Pritha git checkout from GitHub.
-- Do not copy `.private/`, `.env*`, local credentials, runtime queues, logs or
-  sibling child-agent folders between machines.
-- Keep sibling child agents next to Pritha, outside the Pritha checkout, unless
-  a specific agent has its own explicit update procedure.
-- Use `main` as the update target after the tested Pritha state has been
-  fast-forwarded and pushed there.
+## Select the release
 
-## Before Pulling
+Obtain the full 40-character commit from the current release report. Task Chat
+source anchors are A `79ee5a403f813f483768850213481f7433cc1609`,
+B `a1fd2faa54817fa847307f0738d51236eaa25739`, and
+C `71f5be857702227acedc9a89f7c72b07a7af11a7`.
+These are implementation anchors, not claims of fleet deployment. Use the
+actual published, accepted release target from the coordinator.
 
-On the second MacBook:
+The current updater deliberately requires the pinned target to equal
+`origin/main`. Do not bypass this check, force a reset, or substitute a newer
+commit silently. For staged A → B → C distribution, publish each target to main
+only after the preceding release has passed its rollout gates. If the MacBook
+missed an intermediate release, obtain the currently accepted cumulative target
+and perform the same local migration/recovery checks.
+
+## Prepare without touching the running service
+
+From the existing Pritha checkout, inspect the branch, uncommitted changes and
+remote. Preserve any local work; do not automatically stash another task's
+changes. Resolve divergence before update. Run:
 
 ```sh
-cd /path/to/Pritha
 git status --short --branch
-git branch -vv
-git remote -v
+git log -3 --oneline
+node scripts/good-state-alignment.mjs --scope "Task Chat and Control Center" --limit 3
+node scripts/control-center-runtime.mjs plan
+node scripts/control-center-runtime.mjs status --json
+node scripts/pritha-instance.mjs update --plan --expected-commit <full-release-commit> --json
 ```
 
-If there are local edits, either commit them locally or stash them before the
-update:
+Check local state-root, instance ID, agent parent, port, manager ownership and
+available disk space against the MacBook's private runtime configuration.
+Use placeholders in shared reports. If the service is unmanaged or missing,
+follow the first-manager-adoption section of
+`07_workflows/control-center-staged-release.md`; never kill a port owner blindly.
+
+Before applying, record the old commit/build and privately back up the Task Chat
+registry and migration metadata, plus the native history store according to
+local backup policy. Preserve attachment originals. The updater's build rollback
+does not substitute for a history backup. Do not copy live state over a newer
+registry after users have resumed work.
+
+## Managed update
+
+Prepare the exact target and checks in an isolated worktree if needed; never
+overwrite the running checkout's live build during preparation. Immediately
+before the lifecycle transaction, obtain the operator's explicit approval.
+Then, with the local instance environment already resolved:
 
 ```sh
-git stash push -u -m "local pre-update backup $(date +%Y-%m-%d)"
+node scripts/pritha-instance.mjs update --apply --yes --expected-commit <full-release-commit> --json
 ```
 
-If Control Center is running locally, stop it before installing or rebuilding.
+The transaction fetches and fast-forwards only, rebuilds local dependencies and
+memory, verifies state isolation, builds a separate staging directory, uses the
+manager to switch builds, verifies health, and restores the displaced build on
+failure. Stop at the first failure. Do not launch production with
+`npm run start`, use raw process kills, or modify Tailscale/Telegram services.
 
-## Update
-
-Fetch the current GitHub state and switch to `main`:
-
-```sh
-git fetch origin
-git switch main
-git pull --ff-only origin main
-```
-
-If `git pull --ff-only` refuses because the second MacBook has local commits,
-stop and inspect those commits before merging or rebasing:
+## Verify locally and from the trusted device
 
 ```sh
-git log --oneline --decorate --graph --max-count=20 --all
-git status --short --branch
-```
-
-Install Control Center dependencies if `interfaces/control-center/package-lock.json`
-changed:
-
-```sh
-npm --prefix interfaces/control-center install
-```
-
-Run focused verification:
-
-```sh
-node --test tests/control-center-rolling-summary.test.mjs
-node --test tests/control-center-codex-planning.test.mjs
-node --test tests/control-center-codex-thread-routing.test.mjs
+node --test tests/control-center-chat-evolution.test.mjs tests/control-center-codex-chat.test.mjs tests/control-center-codex-chat-registry.test.mjs
 npm --prefix interfaces/control-center run typecheck
+node scripts/privacy-audit.mjs --strict
+node scripts/self-test.mjs
+node scripts/control-center-runtime.mjs status --json
+node scripts/control-center-health.mjs --strict --port <local-port> --page /codex,/task-chat --json
+git status --short --branch
+git rev-parse HEAD
 ```
 
-Build before starting the production server:
+Strict health checks page JavaScript chunks as well as the health endpoint.
+Check the returned release identity matches the target. Open a known old chat
+read-only; use Restore access only when its original is verified. Check Voice
+history, Archive/Restore, full Markdown copy, original upload/download and an
+attachment-only draft. Verify the selected model's capabilities. Use synthetic
+files for any live model test and never replay historical prompts.
 
-```sh
-npm --prefix interfaces/control-center run build
-```
-
-Start Control Center on the expected local port:
-
-```sh
-PRITHA_CONTROL_CENTER_HOST=127.0.0.1 \
-PRITHA_CONTROL_CENTER_PORT=3420 \
-npm --prefix interfaces/control-center run start
-```
-
-## After Update
-
-Check the local server:
-
-```sh
-curl -fsS http://127.0.0.1:3420/api/health
-curl -fsS -X POST http://127.0.0.1:3420/api/realtime/session
-```
-
-If the second MacBook uses Tailscale, verify its own local Tailscale status.
-Do not copy a Tailscale URL, tailnet name, device name or auth key from another
-machine into tracked files.
-
-Rolling summary handoff is local to each machine. The file
-`.private/interface-lab/pritha-control-center/realtime/rolling-summary/current.json`
-is intentionally private and should not be synced through Git.
-
-The old standalone voice experiment on port `3401` is deprecated. The supported
-voice entry point is Control Center `/voice` on the instance-configured port.
+Open the instance's own private URL from a trusted phone/peer for real mobile
+clipboard, file picker and network access. A desktop viewport test is not a
+claim that this device check passed. Record commit, build, checks, permitted
+warnings and rollback outcome privately where they reveal local identifiers.
+Leave the previous service/build recovery artifacts until acceptance.

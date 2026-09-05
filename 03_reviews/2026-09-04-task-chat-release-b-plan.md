@@ -1,9 +1,9 @@
 ---
 id: task-chat-release-b-plan-2026-09-04
 type: review
-status: in-progress
+status: implemented-release-pending
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 topics: [task-chat, archive, clipboard, voice]
 tools: [Pritha, Codex, TypeScript]
 sources: [operator-approved-task-chat-roadmap-2026-09-04]
@@ -67,3 +67,6 @@ flags and original bindings. No native transcript migration is involved.
 Implemented. Targeted unit tests: 22/22 pass. Desktop/mobile history, archive,
 copy and existing Task Chat flow: 6/6 pass. Typecheck and isolated production
 build pass (existing NFT trace warning). Production remains unchanged.
+
+Implementation commit: `a1fd2fa`. Final cross-stage release checks and fleet
+preflight are recorded in the Task Chat delivery report.

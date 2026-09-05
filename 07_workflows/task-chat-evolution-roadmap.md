@@ -35,7 +35,7 @@ version change. Preserve unavailable chats until the operator archives them.
 | B1 | A | Unified Voice list and instance-local Archive / Show archived / Restore from archive | implemented; release pending |
 | B2 | B1 | Complete Markdown Copy response | implemented; release pending |
 | C | B2 | File selection, drop, clipboard images, all original file types and model capability checks | implemented; release pending |
-| Transfer | each tested release | Pinned fleet/MacBook release and NeuralDeep adaptation instructions | pending |
+| Transfer | each tested release | Pinned fleet/MacBook release and NeuralDeep adaptation instructions | instructions prepared; rollout pending |
 
 Before each stage, author a coding plan under `03_reviews/` describing behavior,
 data/API changes, migration, acceptance tests and rollback. Update its evidence
@@ -73,5 +73,28 @@ multimodality must be explained, never assumed.
 
 ## Release anchors
 
-- A: `f4e446c` — verified history binding recovery.
-- B: `21cf1f5` — unified local archive and complete response copy.
+- A: `79ee5a4` — verified history binding recovery.
+- B: `a1fd2fa` — unified local archive and complete response copy.
+- C: `71f5be8` — original attachments, capability checks and earlier history pages.
+
+Each is an implementation anchor. No production deployment is claimed. Keep
+these releases sequential and publish the next main target only after the
+previous release passes its staged rollout. The updater pins exact origin/main;
+do not bypass that check to deploy an arbitrary ancestor or newer commit.
+
+## Plans, evidence and transfer
+
+- [Release A coding plan](../03_reviews/2026-09-04-task-chat-release-a-plan.md)
+- [Release B coding plan](../03_reviews/2026-09-04-task-chat-release-b-plan.md)
+- [Release C coding plan](../03_reviews/2026-09-04-task-chat-release-c-plan.md)
+- [Delivery evidence and next release transaction](../11_agents/reports/2026-09-05-pritha-task-chat-evolution-delivery-report.md)
+- [MacBook update procedure](../docs/update-second-local-macbook.md)
+- [NeuralDeep adaptation guide](../docs/neuraldeep-task-chat-adaptation.md)
+
+Final isolated self-test passed: 508 unit tests, no critical regressions.
+Desktop/mobile Task Chat verification passed 12 scenarios; strict /codex and
+/task-chat health passed including 11 JavaScript chunks. A local legacy-service
+audit warning is recorded in the delivery report. Production rollout is held
+by pre-existing uncommitted memory work in the primary checkout, plus the
+workflow's immediate lifecycle approval boundary. No private state was copied
+to replicas and no running production service was changed.
