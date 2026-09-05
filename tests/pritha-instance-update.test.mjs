@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -151,6 +151,10 @@ case "$1" in
     if [ "$PRITHA_TEST_MUTATE_AGENT_STATE" = "1" ]; then
       printf 'mutated registry\\n' > "$PRITHA_STATE_ROOT/agents/registry.md"
     fi
+    if [ "$PRITHA_TEST_FINDER_METADATA" = "1" ]; then
+      printf 'Finder display metadata\\n' > "$PRITHA_STATE_ROOT/.DS_Store"
+      printf 'Finder display metadata\\n' > "$PRITHA_AGENT_PARENT/FixtureChild/.DS_Store"
+    fi
     exit 0
     ;;
 esac
@@ -166,7 +170,7 @@ exec ${JSON.stringify(process.execPath)} "$@"
   return { fixture, checkout, remoteWork, fakeBin };
 }
 
-function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mutateAgentState = false) {
+function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mutateAgentState = false, finderMetadata = false) {
   const stateRoot = path.join(fixture.fixture, "state");
   const agentParent = path.join(fixture.fixture, "agents");
   mkdirSync(agentParent, { recursive: true });
@@ -195,6 +199,7 @@ function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mu
       PRITHA_CONTROL_CENTER_PORT: String(port),
       PRITHA_TEST_RELEASE_VERSION: releaseVersion,
       PRITHA_TEST_MUTATE_AGENT_STATE: mutateAgentState ? "1" : "0",
+      PRITHA_TEST_FINDER_METADATA: finderMetadata ? "1" : "0",
       PRITHA_UPDATE_HEALTH_TIMEOUT_MS: "1000",
       PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS: "3000",
     },
@@ -259,7 +264,7 @@ test("instance update pins the target and preserves agent fingerprints through a
   let pid = null;
   try {
     const target = git(fixture.remoteWork, "rev-parse", "HEAD");
-    const deployed = invoke(fixture, port, "good", target);
+    const deployed = invoke(fixture, port, "good", target, false, true);
     assert.equal(deployed.status, 0, deployed.stderr || deployed.stdout);
     const payload = JSON.parse(deployed.stdout);
     assert.equal(payload.status, "deployed");
@@ -270,6 +275,9 @@ test("instance update pins the target and preserves agent fingerprints through a
     assert.equal(payload.memoryDocuments, 1);
     assert.equal(payload.pre_isolation.agent_state.sha256, payload.postIsolation.agent_state.sha256);
     assert.equal(payload.pre_isolation.protected_state.sha256, payload.postIsolation.protected_state.sha256);
+    assert.deepEqual(payload.postIsolation.protected_state.ignored_regular_files, [".DS_Store"]);
+    assert.equal(readFileSync(path.join(fixture.fixture, "state", ".DS_Store"), "utf8"), "Finder display metadata\n");
+    assert.equal(readFileSync(path.join(fixture.fixture, "agents", "FixtureChild", ".DS_Store"), "utf8"), "Finder display metadata\n");
     assert.equal(readFileSync(path.join(fixture.fixture, "state", "agents", "registry.md"), "utf8"), "fixture registry\n");
     assert.equal(readFileSync(path.join(fixture.fixture, "agents", "FixtureChild", "agent.mjs"), "utf8"), "export const ready = true;\n");
     pid = payload.pid;
@@ -297,6 +305,43 @@ test("instance update stops before the UI swap when bootstrap changes local agen
   } finally {
     rmSync(fixture.fixture, { recursive: true, force: true });
   }
+});
+
+test("Finder exception protects other dotfiles and similarly named directories or symlinks", async () => {
+  const fixture = makeFixture();
+  const state = path.join(fixture.fixture, "state");
+  const agents = path.join(fixture.fixture, "agents");
+  mkdirSync(state);
+  mkdirSync(agents);
+  const port = await freePort();
+  const snapshot = () => {
+    const result = run(process.execPath, [path.join(fixture.checkout, "scripts/pritha-instance.mjs"), "status", "--json"], {
+      cwd: fixture.checkout,
+      env: { ...process.env, TECHSCOPE_ROOT: fixture.checkout, PRITHA_STATE_ROOT: state, PRITHA_AGENT_PARENT: agents, PRITHA_INSTANCE_ID: "fixture", PRITHA_CONTROL_CENTER_PORT: String(port) },
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    return JSON.parse(result.stdout).isolation.protected_state.sha256;
+  };
+  try {
+    const empty = snapshot();
+    const metadata = path.join(state, ".DS_Store");
+    writeFileSync(metadata, "Finder");
+    assert.equal(snapshot(), empty);
+    writeFileSync(path.join(state, ".operator-state"), "private setting");
+    const protectedFile = snapshot();
+    assert.notEqual(protectedFile, empty);
+    rmSync(metadata);
+    symlinkSync("first", metadata);
+    const firstLink = snapshot();
+    assert.notEqual(firstLink, protectedFile);
+    rmSync(metadata);
+    symlinkSync("second", metadata);
+    assert.notEqual(snapshot(), firstLink);
+    rmSync(metadata);
+    mkdirSync(metadata);
+    writeFileSync(path.join(metadata, "settings.json"), "{}");
+    assert.notEqual(snapshot(), protectedFile);
+  } finally { rmSync(fixture.fixture, { recursive: true, force: true }); }
 });
 
 test("instance update gives post-start health more time than read-only status probes", () => {

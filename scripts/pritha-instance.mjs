@@ -149,8 +149,11 @@ async function directoryFingerprint(directory, excludedDirectories = new Set()) 
   const entries = [];
   const excluded = new Set();
   async function visit(current, relative = "") {
-    if (!existsSync(current)) return;
-    const stat = lstatSync(current);
+    let stat;
+    try { stat = lstatSync(current); } catch (error) {
+      if (error?.code === "ENOENT" && relative === "") return;
+      throw error;
+    }
     if (stat.isSymbolicLink()) {
       entries.push({ path: relative || ".", type: "symlink", target: readlinkSync(current) });
       return;
@@ -164,6 +167,9 @@ async function directoryFingerprint(directory, excludedDirectories = new Set()) 
       const childRelative = relative ? `${relative}/${name}` : name;
       const child = path.join(current, name);
       const childStat = lstatSync(child);
+      // Finder can update this display metadata while a release folder is created.
+      // Symlinks, directories and all other dotfiles remain part of the fingerprint.
+      if (name === ".DS_Store" && childStat.isFile() && !childStat.isSymbolicLink()) continue;
       if (childStat.isDirectory() && !childStat.isSymbolicLink() && excludedDirectories.has(name)) {
         excluded.add(childRelative);
         continue;
@@ -176,6 +182,7 @@ async function directoryFingerprint(directory, excludedDirectories = new Set()) 
   return {
     sha256: createHash("sha256").update(payload).digest("hex"),
     entries: entries.length,
+    ignored_regular_files: [".DS_Store"],
     excluded: [...excluded].sort((a, b) => a.localeCompare(b)),
   };
 }

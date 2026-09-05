@@ -41,15 +41,27 @@ actual published, accepted release target from the coordinator.
 
 The current updater deliberately requires the pinned target to equal
 `origin/main`. Do not bypass this check, force a reset, or substitute a newer
-commit silently. For staged A → B → C distribution, publish each target to main
-only after the preceding release has passed its rollout gates. If the MacBook
-missed an intermediate release, obtain the currently accepted cumulative target
-and perform the same local migration/recovery checks.
+commit silently. The operator authorized one integrated A/B/C + memory + Settings release on
+2026-09-05. Use its recorded cumulative target and perform the same local
+migration/recovery checks; the feature commits remain review anchors.
 
 ## Prepare without touching the running service
 
-From the existing Pritha checkout, inspect the branch, uncommitted changes and
-remote. Preserve any local work; do not automatically stash another task's
+Identify the running checkout and state-root from the verified manager's saved
+service configuration. An old study checkout may coexist on the same MacBook;
+do not update it merely because its name contains Pritha. From the running
+checkout in a fresh terminal, set only the verified local paths (never paste
+another machine's paths):
+
+```sh
+export TECHSCOPE_ROOT="$PWD"
+export PRITHA_STATE_ROOT="<verified-instance-state-root>"
+export PRITHA_CONTROL_CENTER_ENV_FILE="$PRITHA_STATE_ROOT/config/runtime.env"
+```
+
+The memory commands load the external runtime.env through PRITHA_STATE_ROOT;
+setting only PRITHA_CONTROL_CENTER_ENV_FILE is insufficient for every script.
+Inspect the branch, uncommitted changes and remote. Preserve any local work; do not automatically stash another task's
 changes. Resolve divergence before update. Run:
 
 ```sh
@@ -93,12 +105,12 @@ failure. Stop at the first failure. Do not launch production with
 ## Verify locally and from the trusted device
 
 ```sh
-node --test tests/control-center-chat-evolution.test.mjs tests/control-center-codex-chat.test.mjs tests/control-center-codex-chat-registry.test.mjs
+node --test tests/control-center-chat-evolution.test.mjs tests/control-center-codex-chat.test.mjs tests/control-center-settings-numbers.test.mjs
 npm --prefix interfaces/control-center run typecheck
 node scripts/privacy-audit.mjs --strict
 node scripts/self-test.mjs
 node scripts/control-center-runtime.mjs status --json
-node scripts/control-center-health.mjs --strict --port <local-port> --page /codex,/task-chat --json
+node scripts/control-center-health.mjs --strict --port <local-port> --page /codex,/task-chat,/settings --json
 git status --short --branch
 git rev-parse HEAD
 ```

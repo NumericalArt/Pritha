@@ -108,3 +108,54 @@ recovery data and defer any destructive cleanup.
 
 Deployment results and exact source pin are recorded in the integrated
 operations report after the transaction.
+
+## MacBook release guard correction
+
+The first MacBook transaction stopped before build/swap because Finder changed
+its regular `.DS_Store` file while the updater created its private release folder.
+The protected-state inventory had exactly three files; runtime.env and agent
+registry matched the preflight private backup, and agent/child fingerprints were
+unchanged. No service action or native history migration occurred in that attempt.
+
+Ignore only regular files named exactly `.DS_Store` in directory fingerprints,
+record the fixed exclusion in evidence, and keep symlinks/directories of that
+name and every other hidden/config/agent file protected. Do not delete Finder
+metadata, relax the comparison, or exclude the state root. Add a fixture that
+creates Finder metadata during bootstrap and still deploys with equal protected
+fingerprints; retain the existing real-registry-change rejection/rollback tests.
+Validate before publishing a new exact pin, then re-run the managed sequence.
+This preserves the accepted isolation behavior for application data and avoids
+mistaking filesystem display metadata for a Pritha configuration change.
+
+## Dependency security follow-up
+
+During the MacBook bootstrap, npm reported four high-severity vulnerable packages
+in the existing lockfile (not four new source-code defects). Registry/advisory
+metadata verified 2026-09-05 identifies Next 16.2.11, PostCSS 8.5.23, nanoid 3.3.18
+and sharp 0.35.0 as fixed versions for the installed advisories. Pin Next within
+the existing 16.2 line, update the existing PostCSS override, and constrain nanoid
+and sharp to those exact fixes. sharp 0.35 requires Node >=20.9, satisfied by the
+verified Node 24 primary/fleet and Node 22 MacBook runtimes. Keep npm installs
+script-free as required by the existing bootstrap.
+
+Sources: [Next middleware advisory](https://github.com/advisories/GHSA-6gpp-xcg3-4w24),
+[PostCSS advisory](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp),
+[sharp/libvips advisory](https://github.com/advisories/GHSA-f88m-g3jw-g9cj),
+[nanoid advisory](https://github.com/advisories/GHSA-2v37-7h3g-55p8).
+These version bounds are evidence dated above, not a permanent security claim.
+
+Regenerate the lockfile in isolation; require zero npm audit findings, all unit
+and browser regressions, typecheck, production build, privacy/Markdown checks,
+strict pages/chunks and an actual image optimization request. Verify binary
+image dependencies on both Macs. Roll back through the saved previous build and
+its matching lockfile if a dependency fails; do not mutate private chat data.
+
+Follow-up verification: all 513 unit tests pass through the isolated self-test;
+7 focused rollout/isolation tests pass, including Finder metadata creation,
+protected dotfiles, dangling symlink changes, registry-change rejection and
+failed-health rollback. The fingerprint now records dangling symlinks instead
+of losing them through an existence check that follows the link. Production
+build, standalone typecheck, privacy/Markdown checks and 15 desktop/mobile
+browser scenarios pass. Strict three-page health validates all 13 chunks. An
+actual Next image optimization request returned a 64-pixel WebP using sharp
+0.35.0/libvips 8.18.3. npm audit reports zero findings at this verification time.
