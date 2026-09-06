@@ -861,6 +861,7 @@ async function runDeliveryLoopLocked(input = {}) {
           tokenBudget: remainingTokens,
           goalRequired,
           goalObjective: goalObjective(executionState, plan),
+          guidance: executionState.operator_guidance || "",
           onCheckpoint: async (receipt) => {
             const reference = storeExecutorResult(runRoot, receipt, state.iteration);
             accountExecutorResult(runRoot, receipt, reference);
@@ -1023,6 +1024,8 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
       blockers: [],
       budget,
       operator_guidance: guidance,
+      ...(selected === "add-guidance" && state.blockers[0].code === "repeated_trial_failure"
+        ? { consecutive_failure_signature: null, consecutive_failure_count: 0 } : {}),
     };
   }, { eventType: "blocker_resolved", payload: { blocker_code: state.blockers[0].code, answer: selected } }).state;
 }

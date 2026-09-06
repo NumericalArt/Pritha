@@ -131,6 +131,28 @@ test("repeated non-progress becomes a typed blocker instead of hanging", async (
   assert.equal(result.state.blockers[0].code, "repeated_trial_failure");
   assert.equal(result.state.blockers[0].question.endsWith("?"), true);
   assert.equal(result.state.blockers[0].options.length >= 2, true);
+  const stateRoot = path.resolve(runRoot, "../../..");
+  const budgetBefore = result.state.budget;
+  const historyBefore = result.state.failure_history.length;
+  const stillStuck = await resumeDelivery("run-stuck", {
+    root: project, stateRoot, allowDraft: true, answer: "add-guidance",
+    guidance: "Repair implementation.txt using the unchanged evaluator.",
+    buildExecutor: executor, trialBackend: "local", reportDir: false,
+  });
+  assert.equal(stillStuck.state.blockers[0].code, "repeated_trial_failure");
+  assert.equal(stillStuck.state.iteration, result.state.iteration + 1);
+  assert.ok(stillStuck.state.failure_history.length > historyBefore);
+  assert.equal(stillStuck.state.budget.max_iterations, budgetBefore.max_iterations);
+  const repaired = await resumeDelivery("run-stuck", {
+    root: project, stateRoot, allowDraft: true, answer: "add-guidance",
+    guidance: "Write ready to implementation.txt.", trialBackend: "local", reportDir: false,
+    buildExecutor: new FunctionBuildExecutor(async ({ worktree, guidance }) => {
+      assert.equal(guidance, "Write ready to implementation.txt.");
+      writeFileSync(path.join(worktree, "implementation.txt"), "ready\n", "utf8");
+      return { summary: "implemented" };
+    }),
+  });
+  assert.equal(repaired.state.status, "verified");
 });
 
 test("executor modification of the protected evaluator is blocked and a user-approved discard restores the verifier", async () => {

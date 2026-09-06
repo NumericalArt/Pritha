@@ -63,6 +63,7 @@ function buildPrompt(input) {
     approved_outcome: outcomeProjection(input.plan),
     latest_trial_failures: input.failures || [],
     protected_trial_inputs: protectedPaths,
+    operator_guidance: bounded(input.guidance, 2_000),
   };
   return [
     "You are the bounded implementation executor for a Pritha agent-delivery run.",
