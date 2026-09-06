@@ -1316,8 +1316,8 @@ function credentialsForAgent(root: string, folder: { absolutePath: string } | nu
       configured,
       maskedValue: maskSecretValue(value),
       lastUpdated: configured ? lastUpdated : undefined,
-      canWrite: definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
-      canRemove: configured && definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
+      canWrite: !unavailable && definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
+      canRemove: !unavailable && configured && definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
       note:
         definition.note ||
         (definition.provider === "codex_external"
@@ -2224,8 +2224,13 @@ function readinessIssueText(readiness: ControlCenterAgent["readiness"]) {
 
 async function buildAgent(root: string, record: RegistryRecord, access: AccessLinkState): Promise<ControlCenterAgent> {
   const folder = record.projectPath ? { name: path.basename(record.projectPath), absolutePath: record.projectPath } : null;
-  const projectMetadata = folder && record.identityStatus !== "conflict"
-    ? await readProjectMetadataAsync(folder.absolutePath, { codeRoot: root }) : unavailableProjectMetadata();
+  const [projectMetadata, resultReadiness] = await Promise.all([
+    folder && record.identityStatus !== "conflict"
+      ? readProjectMetadataAsync(folder.absolutePath, { codeRoot: root }) : unavailableProjectMetadata(),
+    readAgentResultReadinessAsync(record.id, {
+      root, codeRoot: root, stateRoot: resolvePrithaStateRoot(root), agentParent: resolvePrithaAgentParent(root),
+    }),
+  ]);
   const manifestRead = projectMetadata.manifest;
   const manifest = manifestRead.manifest as OperationsManifest | null;
   const applicability = agentOperationsApplicability(record, manifest, { root });
@@ -2236,9 +2241,6 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const localUrl = manifest?.local_upstream_url;
   const tailscaleUrl = agentTailscaleUrl(manifest, localUrl, access);
   const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
-  const resultReadiness = await readAgentResultReadinessAsync(record.id, {
-    root, codeRoot: root, stateRoot: resolvePrithaStateRoot(root), agentParent: resolvePrithaAgentParent(root),
-  });
   const readiness = await operationalReadiness({
     folderPresent: Boolean(folder),
     applicability, manifestIssue: manifestRead.issue,
@@ -2373,8 +2375,11 @@ export async function getControlCenterStatus(options: { freshIdentity?: boolean 
   const root = resolveTechscopeRoot();
   const registry = parseRegistry(root, options.freshIdentity);
   const records = liveRegistryRecords(root, registry.records);
-  const [access, selfTest, launchdWarnings] = await Promise.all([accessLinks(options.freshIdentity), selfTestStatus(root), launchdRootWarnings(root)]);
-  const allAgents = await Promise.all(records.map((record) => buildAgent(root, record, access)));
+  const accessPromise = accessLinks(options.freshIdentity);
+  const [access, selfTest, launchdWarnings, allAgents] = await Promise.all([
+    accessPromise, selfTestStatus(root), launchdRootWarnings(root),
+    accessPromise.then(access => Promise.all(records.map(record => buildAgent(root, record, access)))),
+  ]);
   const childAgents = allAgents.filter((agent) => agent.name !== "Techscope" && agent.name !== "Pritha");
   const voiceRuntime = getPrithaRealtimeStatus();
   const caps = capabilities(root, records.length > 0, childAgents, voiceRuntime);

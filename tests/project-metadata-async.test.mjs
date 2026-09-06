@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { readProjectMetadataAsync } from "../scripts/agents-mother/project-metadata-async.mjs";
+import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
 
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-project-metadata-"));
@@ -59,4 +60,20 @@ test("blocked OS file opens cannot freeze the host or outlive the queued request
     assert.ok(results.every(result => result.manifest.issue === "project-metadata-timeout"));
     assert.ok(results.every(result => result.envLocal.status === "unavailable" && !result.envLocal.text));
   } finally { clearInterval(ticker); }
+});
+
+test("production card starts result verification while project metadata is still pending", async () => {
+  const source = readFileSync("interfaces/control-center/src/lib/control-center/server.ts", "utf8");
+  const tree = ts.createSourceFile("server.ts", source, ts.ScriptTarget.Latest, true);
+  const declaration = tree.statements.find(item => ts.isFunctionDeclaration(item) && item.name?.text === "buildAgent");
+  const code = ts.transpileModule(declaration.getText(tree), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  let rejectMetadata, readinessStarted = false;
+  const pendingMetadata = new Promise((_, reject) => { rejectMetadata = reject; });
+  const build = new Function("path", "readProjectMetadataAsync", "readAgentResultReadinessAsync", "resolvePrithaStateRoot", "resolvePrithaAgentParent", `${code}\nreturn buildAgent;`)(
+    path, () => pendingMetadata, () => { readinessStarted = true; return Promise.resolve({}); }, () => "/state", () => "/children",
+  );
+  const sentinel = new Error("end isolated probe scenario");
+  const pending = build("/host", { id: "fixture", projectPath: "/children/project", identityStatus: "current" }, {});
+  try { assert.equal(readinessStarted, true, "independent deadlines must overlap, not add to page latency"); }
+  finally { rejectMetadata(sentinel); await assert.rejects(pending, error => error === sentinel); }
 });
