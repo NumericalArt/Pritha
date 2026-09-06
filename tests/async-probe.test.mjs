@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runAsyncProbe, createProbeCache } from '../scripts/lib/async-probe.mjs';
+import { runAsyncProbe, createProbeCache, createAsyncProbeRunner } from '../scripts/lib/async-probe.mjs';
 import { projectAgentCardIdentity } from '../scripts/agents-mother/card-projection.mjs';
 
 test('separate host bundles share an in-flight cache without mixing instance keys', async () => {
@@ -32,6 +32,26 @@ test('async diagnostics release the event loop and bound queue, output and stubb
   assert.throws(() => runAsyncProbe(process.execPath, ['--version'], { timeout: 0 }), /integer between/);
   const failed = await runAsyncProbe(process.execPath, ['-e', 'process.exit(7)'], { timeout: 1000 });
   assert.equal(failed.status, 7);
+});
+
+test('diagnostic deadline does not wait for late OS reaping or release occupied worker slots', async () => {
+  const reaped = [];
+  const run = createAsyncProbeRunner({ execute: () => new Promise(resolve => reaped.push(resolve)) });
+  const started = Date.now();
+  const results = await Promise.all(Array.from({ length: 8 }, () => run('fixture', [], { timeout: 80 })));
+  assert.ok(Date.now() - started < 1000);
+  assert.ok(results.every(result => result.error?.code === 'ETIMEDOUT'));
+  assert.equal(reaped.length, 4, 'timed-out but unreaped processes retain all four slots');
+  const queued = await run('fixture', [], { timeout: 80 });
+  assert.equal(queued.error?.code, 'ETIMEDOUT');
+  assert.equal(reaped.length, 4, 'expired callers cannot cause additional process creation');
+  const ok = { exitCode: 0, stdout: 'late', stderr: '' };
+  reaped.forEach(resolve => resolve(ok));
+  await new Promise(resolve => setImmediate(resolve));
+  const next = run('fixture', [], { timeout: 1000 });
+  assert.equal(reaped.length, 5, 'a slot becomes available only after backend cleanup');
+  reaped[4]({ ...ok, stdout: 'fresh' });
+  assert.equal((await next).stdout, 'fresh');
 });
 
 test('access cache deduplicates requests, expires, invalidates and cannot resurrect an old in-flight value', async () => {

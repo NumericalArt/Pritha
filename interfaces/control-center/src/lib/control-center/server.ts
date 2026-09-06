@@ -520,7 +520,9 @@ async function launchdRootWarnings(root: string) {
   const auditScript = path.join(/* turbopackIgnore: true */ root, "scripts", "launchd-root-audit.mjs");
   const result = await runAsyncProbe(process.execPath, [auditScript, "status", "--json"], {
     cwd: root,
-    policy: "launchdAudit",
+    // The full operator audit may take 30 seconds. Page reads use the shorter
+    // runtime budget and explicitly show unavailable diagnostics on expiry.
+    policy: "runtimeRead",
     env: { ...process.env, TECHSCOPE_ROOT: root },
   });
   if (result.error) {

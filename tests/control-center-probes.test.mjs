@@ -133,7 +133,11 @@ test("partial diagnostic output after timeout cannot report a healthy audit or r
     response.stdout = '{"ok":true}';
     const audit = await import(moduleUrl(`
       import path from 'node:path';
-      const runAsyncProbe = async () => (${JSON.stringify(response)});
+      import assert from 'node:assert/strict';
+      const runAsyncProbe = async (_command, _args, options) => {
+        assert.equal(options.policy, 'runtimeRead', 'page diagnostics must not inherit the full operator audit deadline');
+        return (${JSON.stringify(response)});
+      };
       export ${serverFunction("launchdRootWarnings").getText(serverTree)}
     `));
     const warnings = await audit.launchdRootWarnings("fixture-root");

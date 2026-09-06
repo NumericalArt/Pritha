@@ -1,37 +1,49 @@
 import { LocalExecBackend } from '../agents-mother/execution-backends.mjs';
 import { timeoutPolicy } from './timeout-policy.mjs';
 
-const backend = new LocalExecBackend({ killGraceMs: 100 });
-const queue = [];
-let active = 0;
 const unavailable = code => ({ status: null, stdout: '', stderr: '', error: { code } });
-function drain() {
-  while (active < 4 && queue.length) {
-    const job = queue.shift();
-    clearTimeout(job.timer);
-    const remaining = job.deadline - Date.now();
-    if (remaining <= 0) { job.resolve(unavailable('ETIMEDOUT')); continue; }
-    active++;
-    backend.execute({ argv: job.argv, cwd: job.cwd, env: job.env, timeoutMs: remaining, outputBytesCap: 256_000 })
-      .then(result => job.resolve({ status: result.stdoutTruncated || result.stderrTruncated ? null : result.exitCode, stdout: result.stdout, stderr: result.stderr,
-        error: result.timedOut ? { code: 'ETIMEDOUT' } : result.stdoutTruncated || result.stderrTruncated ? { code: 'OUTPUT_LIMIT' } : result.exitCode === 127 ? { code: 'EXEC_FAILED' } : null }))
-      .catch(() => job.resolve(unavailable('EXEC_FAILED')))
-      .finally(() => { active--; drain(); });
+
+export function createAsyncProbeRunner(backend = new LocalExecBackend({ killGraceMs: 100 })) {
+  const queue = [];
+  let active = 0;
+  function drain() {
+    while (active < 4 && queue.length) {
+      const job = queue.shift();
+      const remaining = job.deadline - Date.now();
+      if (remaining <= 0) { job.resolve(unavailable('ETIMEDOUT')); continue; }
+      active++;
+      backend.execute({ argv: job.argv, cwd: job.cwd, env: job.env, timeoutMs: remaining, outputBytesCap: 256_000 })
+        .then(result => job.resolve({ status: result.stdoutTruncated || result.stderrTruncated ? null : result.exitCode, stdout: result.stdout, stderr: result.stderr,
+          error: result.timedOut ? { code: 'ETIMEDOUT' } : result.stdoutTruncated || result.stderrTruncated ? { code: 'OUTPUT_LIMIT' } : result.exitCode === 127 ? { code: 'EXEC_FAILED' } : null }))
+        .catch(() => job.resolve(unavailable('EXEC_FAILED')))
+        .finally(() => { active--; drain(); });
+    }
   }
+
+  // Host diagnostic argv only; caller-controlled agent commands use command-probe.
+  // The deadline includes queue time. No Next.js import or request-lifetime process.
+  return function runAsyncProbe(command, args, options = {}) {
+    const timeout = timeoutPolicy(options.policy || 'diagnostic', { value: options.timeout });
+    if (queue.length >= 64) return Promise.resolve(unavailable('EBUSY'));
+    return new Promise(resolve => {
+      let settled = false;
+      const job = { argv: [command, ...args], cwd: options.cwd || process.cwd(), env: options.env || process.env,
+        deadline: Date.now() + timeout, timer: null,
+        resolve(result) { if (!settled) { settled = true; clearTimeout(job.timer); resolve(result); } },
+      };
+      // Returning an unavailable diagnostic must not wait for the OS to reap a
+      // killed process or close its pipes. Keep its execution slot occupied until
+      // backend cleanup finishes, so late reaping cannot create unbounded workers.
+      job.timer = setTimeout(() => {
+        const index = queue.indexOf(job); if (index >= 0) queue.splice(index, 1);
+        job.resolve(unavailable('ETIMEDOUT'));
+      }, timeout);
+      queue.push(job); drain();
+    });
+  };
 }
 
-// Host diagnostic argv only; caller-controlled agent commands use command-probe.
-// The deadline includes queue time. No Next.js import or request-lifetime process.
-export function runAsyncProbe(command, args, options = {}) {
-  const timeout = timeoutPolicy(options.policy || 'diagnostic', { value: options.timeout });
-  if (queue.length >= 64) return Promise.resolve(unavailable('EBUSY'));
-  return new Promise(resolve => {
-    const job = { argv: [command, ...args], cwd: options.cwd || process.cwd(), env: options.env || process.env,
-      deadline: Date.now() + timeout, resolve, timer: null };
-    job.timer = setTimeout(() => { const index = queue.indexOf(job); if (index >= 0) { queue.splice(index, 1); resolve(unavailable('ETIMEDOUT')); } }, timeout);
-    queue.push(job); drain();
-  });
-}
+export const runAsyncProbe = createAsyncProbeRunner();
 
 export function createProbeCache({ ttlMs = 120_000, maxEntries = 16, now = Date.now } = {}) {
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1 || ttlMs > 300_000 || !Number.isSafeInteger(maxEntries) || maxEntries < 1 || maxEntries > 128) throw new Error('Invalid probe cache bounds');
