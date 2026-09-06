@@ -25,6 +25,7 @@ test("quality-gate exposes a serialized dry-run contract", () => {
     ],
   );
   assert.ok(payload.checks.every((check) => check.status === "planned"));
+  assert.match(payload.checks.find(check => check.id === "unit-tests").command, /node --test --test-concurrency=1 /);
 });
 
 test("quality-gate simulated failure returns a clear failing check", () => {

@@ -109,8 +109,8 @@ const allCheckSpecs = [
   ["validate-memory", "Markdown memory validation", "node", ["scripts/validate-memory.mjs"]],
   ["rebuild-memory", "Memory rebuild", "node", ["scripts/rebuild-memory.mjs"], { timeoutMs: 180000 }],
   ["smoke-test", "Smoke test", "node", ["scripts/smoke-test.mjs"]],
-  ["unit-tests", "Unit tests", "node", ["--test", ...unitTestFiles], {
-    timeoutMs: 180000,
+  ["unit-tests", "Unit tests", "node", ["--test", "--test-concurrency=1", ...unitTestFiles], {
+    timeoutMs: 900000,
     env: { PRITHA_QUALITY_GATE_CHILD: "1" },
     unsetEnv: [
       "PRITHA_STATE_ROOT",

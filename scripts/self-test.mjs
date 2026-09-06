@@ -135,7 +135,7 @@ function sanitizePayload(value) {
 function runSelfTest() {
   const quality = dryRun
     ? runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--dry-run", "--json"])
-    : runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--json"], { timeoutMs: 240000 });
+    : runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--json"], { timeoutMs: 1200000 });
   const embeddingsRestore = !dryRun
     ? runCommand("python3", ["scripts/embed-memory.py"], { timeoutMs: 600000 })
     : { ok: true, status: 0, stdout: "", stderr: "", skipped: true };
