@@ -32,7 +32,7 @@ import {
   runProjectCommand,
   testProject,
 } from "./test.mjs";
-import { scaffoldContract } from "./scaffold/index.mjs";
+import { planScaffoldContract, scaffoldContract } from "./scaffold/index.mjs";
 import { handoffProject } from "./handoff.mjs";
 import { deployProject, operationsProject } from "./operations.mjs";
 import { evolveProject, listContracts, rebuildRegistry } from "./registry.mjs";
@@ -120,6 +120,7 @@ function usage() {
   ${CLI_COMMAND} pattern-research <contract-path> [--limit 12] [--semantic-mode auto|skip]
   ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days] [--input evidence.json]
   ${CLI_COMMAND} scaffold <contract-path> [--output <folder>] [--allow-draft-scaffold] [--allow-missing-research] [--allow-pending-external-verification]
+  ${CLI_COMMAND} scaffold-plan <contract-path>
   ${CLI_COMMAND} test <project-path>
   ${CLI_COMMAND} handoff <project-path>
   ${CLI_COMMAND} operations <project-path>
@@ -154,7 +155,7 @@ Layer 3 status:
   external-research updates a research report with curated current-source evidence
 
 Layer 4 status:
-  scaffold creates a Codex-native sibling project and scaffold report
+  scaffold creates a supported sibling project scaffold and its report
 
 Layer 7 status:
   test inspects existing folders, detects agent harnesses and creates agent-test-report
@@ -2012,6 +2013,12 @@ async function main() {
     const target = options._[0];
     if (!target) throw new Error("Missing contract path.");
     externalResearchContract(target, options);
+    return;
+  }
+  if (command === "scaffold-plan") {
+    const target = options._[0];
+    if (!target) throw new Error("Missing contract path.");
+    console.log(JSON.stringify(planScaffoldContract(target), null, 2));
     return;
   }
   if (command === "scaffold") {

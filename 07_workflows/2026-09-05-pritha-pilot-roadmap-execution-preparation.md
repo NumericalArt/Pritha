@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: preparation v11; full completion work from cf11419 in codex/roadmap-completion
+source_version: preparation v12; full completion work from cf11419 in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -337,3 +337,10 @@ replay/recovery и reviewable demo без изменения Goal/acceptance. Bu
 1.3 и scoped accounting 1.5 реализованы и проверены локально. Следующий вход — независимые readiness и
 handoff по типу результата. Финальный main/push,
 managed rollout и синхронизация ND выполняются после завершения полного пакета.
+
+
+Локальный пакет 4.0 добавляет capability preflight и минимальный headless CLI
+scaffold с сохранением accepted runtime, чистым Git baseline и честным
+scaffold-only report. Полный self-test 679/679 и 23 профильные scaffold checks
+проходят. Следующий вход — независимый verifier/waiver, approved command probe
+и authored handoff. Полный объём и границы доказательств сохраняет tracker.

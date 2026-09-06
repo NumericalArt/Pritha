@@ -16,6 +16,8 @@ import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "..
 import { newestArtifactPathsFirst } from "../artifact-selection.mjs";
 import { writeLifecycleReport } from "../lifecycle-report.mjs";
 import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "../outcome-spec.mjs";
+import { assertScaffoldCapability, scaffoldCapability } from "./capabilities.mjs";
+import { headlessCliFiles } from "./headless-cli.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -3002,7 +3004,8 @@ data/telegram-state.json
 `,
   });
   files.push({ path: "logs/.gitkeep", content: "" });
-  return files;
+  const capability = scaffoldCapability(data);
+  return capability.adapter === "headless-cli-v1" ? headlessCliFiles(files, data, capability) : files;
 }
 
 export function runSmoke(projectRoot) {
@@ -3091,10 +3094,12 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   const agentSlug = slug(data.agentName);
   const telegramApplicable = data.telegramMode && data.telegramMode !== "none";
   const operationProfile = operationProfileFor(data);
-  const controlCenterServiceMode = operationProfile.serviceMode === "none" ? "manual" : operationProfile.serviceMode;
+  const capability = options.capability || scaffoldCapability(data);
+  const headless = capability.adapter === "headless-cli-v1";
+  const controlCenterServiceMode = headless ? "none" : operationProfile.serviceMode === "none" ? "manual" : operationProfile.serviceMode;
   const controlCenterPort = stableLocalPort(agentSlug);
-  const controlCenterLocalUrl = `http://127.0.0.1:${controlCenterPort}`;
-  const controlCenterHealthUrl = `${controlCenterLocalUrl}/api/health`;
+  const controlCenterLocalUrl = headless ? "not-applicable" : `http://127.0.0.1:${controlCenterPort}`;
+  const controlCenterHealthUrl = headless ? "not-applicable" : `${controlCenterLocalUrl}/api/health`;
   const research = options.research || researchReportStatus(data);
   const healthResult = options.healthResult || smokeResult;
   const deliveryGit = options.deliveryGit || { ok: true, status: "not-requested", revision: null };
@@ -3129,7 +3134,9 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
 id: ${yamlScalar(options.artifactId || `${date}-${agentSlug}-scaffold-report`)}
 type: scaffold-report
 agent_id: ${yamlScalar(data.agentId || slug(data.agentName))}
-project_path: ${yamlScalar(path.relative(ROOT, targetFolder))}
+project_path: ${yamlScalar(path.relative(ROOT, projectRoot))}
+scaffold_adapter: ${capability.adapter || "unknown"}
+readiness_scope: scaffold-only
 status: ${reportStatus}
 created: ${date}
 updated: ${date}
@@ -3152,7 +3159,7 @@ config_surfaces:
   - AGENTS.md
   - .env.example
   - scripts
-portability: codex-native
+portability: ${headless ? "adapter-needed" : "codex-native"}
 sources:
   - ${yamlScalar(data.relPath)}
 ${research.path ? `  - ${yamlScalar(research.path)}\n` : ""}  - 07_workflows/agents-mother.md
@@ -3208,16 +3215,12 @@ outcome_document_lock: ${yamlScalar(outcome?.documentLock || "pending")}
 outcome_approval_evidence: ${outcome?.approvalValid ? "valid" : "pending"}
 delivery_git_status: ${deliveryGit.status}
 delivery_git_revision: ${deliveryGit.revision || "pending"}
-control_center_card_status: pending-registry
+control_center_card_status: ${headless ? "pending-live-check" : "pending-registry"}
 card_refs:
-  - operations/manifest.json
-  - scripts/control-center-runtime.mjs
-  - scripts/control-center-agent-service.mjs
-  - scripts/healthcheck.mjs
-card_blockers:
-  - Registry must be rebuilt after scaffold before the card appears in Agents.
+${headless ? "  - interfaces/manifest.json\n  - scripts/agent-cli.mjs\n  - scripts/healthcheck.mjs" : "  - operations/manifest.json\n  - scripts/control-center-runtime.mjs\n  - scripts/control-center-agent-service.mjs\n  - scripts/healthcheck.mjs"}
+card_blockers:${headless ? " []" : "\n  - Registry must be rebuilt after scaffold before the card appears in Agents."}
 next_card_actions:
-  - node scripts/pritha.mjs registry
+${headless ? "  - Inspect the own-instance identity catalog and current result readiness." : "  - node scripts/pritha.mjs registry"}
   - node scripts/pritha.mjs card-readiness ${agentSlug}
 ---
 
@@ -3235,6 +3238,7 @@ Status: ${reportStatus}
 - Outcome approval evidence: ${outcome?.approvalValid ? "valid" : "pending"}
 - Delivery Git baseline: ${deliveryGit.status}${deliveryGit.revision ? ` (${deliveryGit.revision})` : ""}
 - Runtime family: ${markdownValue(data.runtimeFamily || "unknown", "unknown", 120)}
+- Scaffold adapter: ${capability.adapter || "unknown"}; readiness scope: scaffold-only
 - Interfaces: ${markdownValue(data.primaryInterface || "unknown", "unknown", 500)}
 - Telegram mode: ${markdownValue(data.telegramMode || "none", "none", 120)}
 - Deployment target: ${markdownValue(operationProfile.deploymentTarget, "unknown", 500)}
@@ -3254,7 +3258,7 @@ Status: ${reportStatus}
 - Health URL: ${controlCenterHealthUrl}
 - Proactive mode: ${operationProfile.proactiveMode}
 - Result: ${productionReady
-  ? "scaffold created; structural checks and production readiness gates passed"
+  ? "scaffold created; structural and research gates passed; Outcome verification and user acceptance remain separate"
   : scaffoldOk
     ? "scaffold created; structural checks passed, but production gates are pending or failed"
     : "scaffold created, but structural checks failed"}
@@ -3301,8 +3305,8 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 | Selected repository security/permissions | ${data.repositoryAdoptionMode === "selected-module" ? (research.gate?.ok ? "pass" : "pending") : "not-applicable"} | ${markdownValue(`${data.repositorySecurityReview || ""}; ${data.repositoryPermissions || ""}`)} |
 | Selected repository eval/user approval | ${data.repositoryAdoptionMode === "selected-module" ? (research.gate?.ok ? "pass" : "pending") : "not-applicable"} | ${markdownValue(`${data.repositoryEvalStatus || ""}; ${data.repositoryUserApproval || ""}`)} |
 | Selected repository evidence/synthesis | ${data.repositoryAdoptionMode === "selected-module" ? (research.gate?.ok ? "pass" : "pending") : "not-applicable"} | github-repository-review=${evidenceTopics.includes("github-repository-review") ? "present" : "missing"}; synthesis=${gateFields.synthesis || "pending"} |
-| Control Center runtime contract | ${healthResult.ok ? "pass" : "fail"} | Managed structured start/stop plus ${controlCenterHealthUrl} |
-| Control Center card readiness | pending-registry | Run \`node scripts/pritha.mjs registry\`, then \`node scripts/pritha.mjs card-readiness ${agentSlug}\` |
+| Control Center runtime contract | ${headless ? "not-applicable" : healthResult.ok ? "pass" : "fail"} | ${headless ? "No persistent service or Control Center server selected" : `Managed structured start/stop plus ${controlCenterHealthUrl}`} |
+| Control Center card readiness | ${headless ? "pending-live-check" : "pending-registry"} | ${headless ? "Own-instance catalog discovers authored lineage; check configuration and Outcome separately" : "Rebuild registry and check live card"}; \`node scripts/pritha.mjs card-readiness ${agentSlug}\` |
 | Documentation review | pass | README and training guide generated |
 | Outcome Spec lineage | ${outcome ? "recorded" : "missing"} | Scaffold readiness is separate from outcome verification and acceptance |
 
@@ -3336,13 +3340,13 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 
 ## Control Center Card Readiness
 
-- Status: pending-registry.
-- Card refs: \`operations/manifest.json\`, \`scripts/control-center-runtime.mjs\`, \`scripts/control-center-agent-service.mjs\`, \`scripts/healthcheck.mjs\`.
-- Expected first card state: visible in Agents after registry rebuild; Start Plan should be available for the generated project-local runtime.
+- Status: ${headless ? "pending-live-check" : "pending-registry"}.
+- Card refs: ${headless ? "CLI interface manifest and healthcheck; no service manifest is required" : "operations manifest, managed runtime scripts and healthcheck"}.
+- Expected first card state: ${headless ? "discoverable from own authored lineage, runtime not-applicable, Outcome still unverified" : "visible in Agents after registry rebuild; Start Plan should be available for the generated project-local runtime"}.
 - Card blockers:
-  - Registry must be rebuilt after scaffold.
+  - ${headless ? "Check live card availability separately; scaffold alone does not establish Outcome readiness." : "Registry must be rebuilt after scaffold."}
 - Next card actions:
-  - From Pritha root, run \`node scripts/pritha.mjs registry\`.
+  - ${headless ? "Use the shared own-instance identity catalog." : "From Pritha root, rebuild the registry."}
   - From Pritha root, run \`node scripts/pritha.mjs card-readiness ${agentSlug}\`.
 
 ## Handoff
@@ -3350,12 +3354,12 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 - How to run: \`node scripts/agent-cli.mjs status\`
 - How to test: \`node scripts/smoke-test.mjs\`
 - How to healthcheck: \`node scripts/healthcheck.mjs\`
-- How to start local runtime: \`node scripts/control-center-runtime.mjs start\`
-- How to stop local runtime: \`node scripts/control-center-runtime.mjs stop\`
-- How to inspect operations: \`node scripts/operations-status.mjs\`
+- How to start local runtime: ${headless ? "not-applicable; use the on-demand CLI" : "node scripts/control-center-runtime.mjs start"}
+- How to stop local runtime: ${headless ? "not-applicable; a command exits after its result" : "node scripts/control-center-runtime.mjs stop"}
+- How to inspect operations: ${headless ? "no service or schedule selected" : "node scripts/operations-status.mjs"}
 - How to inspect skills: \`node scripts/skills-status.mjs\`
-- How to stop: no long-running process is started during scaffold; use the Control Center stop action or \`node scripts/control-center-runtime.mjs stop\` after starting it
-- How to inspect logs: see \`logs/\`
+- How to stop: ${headless ? "Ctrl+C interrupts an explicitly running foreground command" : "no long-running process is started during scaffold; use the Control Center stop action after starting it"}
+- How to inspect logs: ${headless ? "read command stdout/stderr and the private host Trial receipts" : "see logs/"}
 - First user exercise: follow \`docs/user-training-guide.md\`
 
 ## Open issues
@@ -3372,9 +3376,16 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 `;
 }
 
-export function scaffoldContract(contractPath, options = {}) {
-  ensureDirs();
+export function planScaffoldContract(contractPath) {
   const data = contractData(contractPath);
+  const issues = validateContract(data.fullPath, { print: false });
+  return { schema: "pritha-scaffold-preflight-v1", readinessScope: "scaffold-capability-only", contractFingerprint: data.fingerprint,
+    contractStatus: contractStatus(data), issues, capability: scaffoldCapability(data) };
+}
+
+export function scaffoldContract(contractPath, options = {}) {
+  const data = contractData(contractPath);
+  const capability = assertScaffoldCapability(data);
   const outcomeCandidate = latestOutcomeSpecForContract(data.fullPath, { root: ROOT });
   const outcomeApproval = outcomeCandidate?.status === "approved"
     ? verifyOutcomeApproval(outcomeCandidate.path, { root: ROOT })
@@ -3404,12 +3415,9 @@ export function scaffoldContract(contractPath, options = {}) {
     ...(research.status !== "found" && options["allow-missing-research"] ? ["allow-missing-research"] : []),
     ...(!researchGate.ok && options["allow-pending-external-verification"] ? ["allow-pending-external-verification"] : []),
   ];
-  if (data.runtimeFamily !== "codex-native") {
-    throw new Error(`Layer 4 scaffold currently supports codex-native only, got: ${data.runtimeFamily}`);
-  }
-
   const requestedTargetPath = resolveTargetPath(data, options);
   const targetPath = ensureWritableTarget(requestedTargetPath);
+  ensureDirs();
   const logicalSiblingTarget = !scalar(options.output || "", "")
     && (!scalar(data.targetFolder || "", "") || /^sibling of (?:pritha|techscope)$/i.test(scalar(data.targetFolder || "", "")));
   const voiceCopyTarget = logicalSiblingTarget
@@ -3440,6 +3448,7 @@ export function scaffoldContract(contractPath, options = {}) {
       experimentalOverrides,
       outcome,
       artifactId,
+      capability,
     }),
     { projectRoot: targetPath, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
   );
@@ -3462,5 +3471,5 @@ export function scaffoldContract(contractPath, options = {}) {
     console.log([smokeResult.ok ? "" : smokeResult.output, healthResult.ok ? "" : healthResult.output, deliveryGit.ok ? "" : deliveryGit.error].filter(Boolean).join("\n"));
     process.exitCode = 1;
   }
-  return { targetPath, reportPath, createdFiles, smokeResult, healthResult, deliveryGit, outcome, experimentalOverrides };
+  return { targetPath, reportPath, createdFiles, smokeResult, healthResult, deliveryGit, outcome, experimentalOverrides, capability };
 }

@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 15; released base cf11419; completion work in codex/roadmap-completion
+source_version: pilot roadmap revision 16; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -579,6 +579,16 @@ family, interface, operations, generated files и поддержку scaffold.
 Готовность: headless-only контракт получает соответствующий scaffold без
 Control Center/service заготовок; unsupported комбинация останавливается
 до записи файлов с конкретным следующим действием.
+
+**Локальный результат 2026-09-06:** `scaffold-plan` показывает capability без
+записи; actual scaffold проверяет её до создания папок. `cli` и `codex-native`
+с CLI-only/no-managed-operations получают headless-cli-v1, выбранные общие
+модули и локальный Git baseline. Service/Control Center scripts не создаются.
+Unsupported комбинации дают следующий adapter step и сохраняют контракт.
+Run entrypoint до реализации возвращает implementation-required; structural
+checks не объявляют Outcome готовым. Report отражает реальные файлы/adapter;
+неверный двойной relative project_path исправлен. Workflow:
+`07_workflows/scaffold-capability-preflight.md`.
 
 ### 4.1 Preflight protected verifier inputs — M, после 4.0
 

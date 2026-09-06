@@ -3,7 +3,7 @@ id: AGENTS
 type: artifact
 status: processed
 created: 2026-06-01
-updated: 2026-07-13
+updated: 2026-09-06
 topics:
   - privacy-preserving-intake
 tools:[]
@@ -435,7 +435,7 @@ credential UI child agent или `.env.example` placeholders.
 
 Проактивность агента также должна быть отдельным архитектурным решением. Контракт должен явно выбрать `none`, `manual`, `scheduled`, `heartbeat`, `event-driven`, `queue-watcher` или `hybrid`, а также указать trigger sources, schedule/heartbeat interval, idle behavior и user interruption policy. Нельзя добавлять фоновый “пульс”, heartbeat, queue watcher, cron/хронос или proactive notifications без явной записи в контракте.
 
-Deployment должен быть максимально автоматизирован, но отделен от scaffold. Каждый новый агент получает `scripts/deploy-service.mjs` с командами `plan`, `status`, `install`, `uninstall`. `plan` и `status` являются read-only. `install` и `uninstall` требуют явный флаг `--yes`; install допустим только если контракт и `operations/manifest.json` выбрали `service_mode: launchd` и `autostart: launchd-on-approval`. После deployment-команд создавать `agent-deployment-report`.
+Deployment должен быть максимально автоматизирован, но отделен от scaffold. Агент с выбранными service operations получает `scripts/deploy-service.mjs` с командами `plan`, `status`, `install`, `uninstall`. Headless CLI без service/autostart/schedule не получает ненужные Control Center/service заготовки. До записи файлов проверять runtime/interface/operations capability; принятый runtime не переписывать ради существующего adapter. `plan` и `status` являются read-only. `install` и `uninstall` требуют явный флаг `--yes`; install допустим только если контракт и `operations/manifest.json` выбрали `service_mode: launchd` и `autostart: launchd-on-approval`. После deployment-команд создавать `agent-deployment-report`.
 
 После создания, тестирования, handoff, operations или deployment нового агента нужно фиксировать обратную связь через `agent-post-creation-review` и обновлять `11_agents/registry.md`. Удачные scaffold/deployment/proactivity patterns не становятся стандартами автоматически: сначала нужен evidence в lifecycle reports и post-creation review, затем отдельное решение о промоции в `04_standards/`.
 

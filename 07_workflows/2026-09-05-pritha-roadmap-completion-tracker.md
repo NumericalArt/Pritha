@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: aacc3b3 plus delivery reconciliation v1 work
+source_version: 94979f4 plus scaffold capability and headless CLI adapter work
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -73,7 +73,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 3.1 | Реализован локально; adoption впереди | Общий каталог CLI/UI; 34 targeted tests, legacy и current-state compatibility; exact run/Spec/approval projection |
 | 3.2 | Реализован локально | Own authored profile/contract; bounded parsed cache, immediate selected mission read; fresh host lookup; staged build |
 | 3.3 | Открыт | CLI/service/job/tool/library handoff соответствует реальному первому сценарию и revision evidence |
-| 4.0 | Открыт | Runtime/interface/operations capability preflight до mutation; headless scaffold, конкретный adapter для unsupported |
+| 4.0 | Реализован и проверен локально; adoption впереди | Runtime/interface/operations preflight до записи; headless-cli-v1, local Git baseline, отдельный scaffold-only report и конкретный adapter для unsupported; contract не переписывается |
 | 4.1 | Открыт | Host-owned verifier provenance/hash до lock; заведомо неверный продукт проваливает Trial |
 | 4.2 | Открыт | Один automated_trial_waiver contract, actor/reason/scope, waiver не даёт ложного verified |
 | 5.1 | Открыт; начальный private status исключён из prerender | Async bounded probes, access cache/card projection, invalidation, прежний API/UX |
@@ -323,5 +323,21 @@ Staged production build и финальный typecheck проходят; privat
 — pass. Старый warning launchd-root-drift сохранён. Managed runtime и fleet
 остаются на предыдущем release до завершения полного объёма.
 
-Следующий вход: 4.0 preflight и минимальный CLI scaffold, затем approved command
-probe 2.4, protected verifier 4.1 и authored handoff/profile 0.5/2.6/3.3.
+Следующий вход: protected verifier 4.1 и waiver 4.2, approved command probe 2.4,
+затем authored handoff/profile 0.5/2.6/3.3.
+
+
+## Scaffold capability и минимальный CLI
+
+4.0 реализован: preflight до записи, headless CLI adapter, выбранные общие
+модули, локальный Git baseline и scaffold-only report. Runtime и accepted
+contract сохранены. Составные интерфейсы CLI + Web/Telegram/API не теряют
+вторую поверхность при выборе adapter. Unsupported возвращает конкретный
+следующий шаг до создания project/report.
+
+Полный self-test проходит **679/679**, все семь quality checks — pass. После
+уточнения разбора составных интерфейсов повторены 23 профильные проверки
+scaffold и прежних snapshots. CLI run до реализации возвращает exit 78;
+structural checks не подменяют продуктовые Trials. End-to-end adapter fixture
+использует явно отмеченные research overrides; approved clean path остаётся
+в 4.1/7.1. Live runtime не менялся, старый launchd-root-drift сохранён.

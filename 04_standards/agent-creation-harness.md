@@ -3,8 +3,8 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-08-22
-last_reviewed: 2026-08-22
+updated: 2026-09-06
+last_reviewed: 2026-09-06
 owner: Techscope/user
 topics:
   - agent-engineering
@@ -119,7 +119,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
 source_updated: 2026-08-22
-source_version: Pritha draft standard v17 + outcome-driven delivery + explicit sensor, evaluation and rapid-feedback design
+source_version: Pritha draft standard v18; local scaffold capability and headless CLI revision; previous external evidence unchanged
 retrieved: 2026-05-18
 verified: 2026-08-22
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
@@ -131,6 +131,9 @@ temporal_status: current
 Status: draft
 Owner: Techscope/user
 Last reviewed: 2026-08-22
+
+Local scaffold capability and CLI amendment reviewed: 2026-09-06. This amendment
+does not revalidate the dates or versions of earlier external sources.
 
 ## Rule
 
@@ -213,6 +216,15 @@ Pritha's registry and Control Center model. A card may honestly show blocked or
 manual-only runtime state, but it must expose the child folder, manifest,
 contract/report lineage, planned start/check path, blockers and next actions. A
 missing card is a creation blocker, not a follow-up polish item.
+
+Runtime/interface/operations capability must be checked before scaffold writes.
+A CLI/headless-only contract with no selected persistent operations uses the
+minimal CLI adapter: it does not receive Control Center server, service or
+deployment scaffolding. Its manifest describes the selected CLI interface;
+an operations manifest is required only by selected operations. Unsupported
+combinations identify the missing adapter without rewriting the accepted
+runtime. See `07_workflows/scaffold-capability-preflight.md`. Structural
+help/smoke results do not establish product Outcome verification.
 
 Card-first readiness does not authorize background runtime changes. Scaffold may
 generate planned structured `start_command`/`stop_command`, health URL and
