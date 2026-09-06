@@ -39,6 +39,7 @@ class FakeConnection {
       if (thread.ephemeral || this.options.goalUnavailable) throw new ExecutionBackendError("app_server_rpc_error", "Unsupported thread/goal/get for this thread", { rpcCode: -32601 });
       if (method === "thread/goal/set") {
         thread.goal = { ...thread.goal, threadId: thread.id, tokensUsed: thread.goal?.tokensUsed || 0, ...params };
+        if (this.options.goalStartsTurn && params.status === "active") thread.turns.push({ id: "turn-1", status: "inProgress", items: [] });
         return { goal: { ...thread.goal } };
       }
       if (method === "thread/goal/get") {
@@ -50,6 +51,14 @@ class FakeConnection {
       if (method === "thread/goal/clear") { thread.goal = null; return {}; }
     }
     if (method === "turn/start") {
+      if (this.options.goalStartsTurn && thread.turns.length) {
+        if (params.outputSchema) throw new ExecutionBackendError("app_server_rpc_error", "failed to submit turn input: ActiveTurnOutputSchemaMismatch");
+        thread.turns[0].status = "completed";
+        thread.goal.tokensUsed = 123;
+        thread.goal.status = "complete";
+        this.current = thread;
+        return { turn: thread.turns[0] };
+      }
       const turn = { id: `turn-${thread.turns.length + 1}`, status: this.options.terminalStatus || "completed", items: [{ type: "agentMessage", text: '{"summary":"implemented","changed_files":["agent.mjs"],"remaining_risks":[]}' }] };
       thread.turns.push(turn);
       this.current = thread;
@@ -103,7 +112,7 @@ test("App Server build executor constrains a persisted attempt and saves intent 
   assert.deepEqual(turn.params.sandboxPolicy, { type: "workspaceWrite", writableRoots: [request.worktree], networkAccess: false });
   assert.match(turn.params.input[0].text, /scripts\/eval.mjs/);
   assert.match(turn.params.input[0].text, /Do not push, merge, deploy/);
-  assert.equal(connection.calls.filter(call => call.method === "thread/goal/get").length, 2);
+  assert.equal(connection.calls.filter(call => call.method === "thread/goal/get").length, 3);
   assert.ok(receipts.some(receipt => receipt.status === "running" && receipt.turn_id === "turn-1"));
   assert.equal(result.summary, "implemented");
   assert.equal(result.tokens_used, 123);
@@ -114,6 +123,20 @@ test("App Server build executor constrains a persisted attempt and saves intent 
   assert.equal(result.model_observed, "fixture-default");
   assert.equal(result.provider_observed, "fixture-provider");
   assert.equal(result.effort_requested, "high");
+});
+
+test("Goal activation may start the single bound turn after durable intent and full payload", async () => {
+  const { connection, build } = executor({ goalStartsTurn: true });
+  const request = input({ onCheckpoint: async receipt => {
+    if (receipt.status === "dispatching") assert.equal(connection.calls.some(call => call.method === "thread/goal/set" && call.params.status === "active"), false);
+  } });
+  const result = await build.execute(request);
+  assert.match(connection.calls.find(call => call.method === "thread/start").params.developerInstructions, /protected_trial_inputs/);
+  assert.equal(connection.calls.find(call => call.method === "turn/start").params.outputSchema, undefined);
+  assert.equal(connection.threads.get("thread-1").turns.length, 1);
+  assert.equal(result.turn_id, "turn-1");
+  assert.equal(result.tokens_used, 123);
+  assert.equal(result.thread_cleanup, "archived");
 });
 
 test("App Server build probe verifies persisted Goal capability and archives its empty thread", async () => {

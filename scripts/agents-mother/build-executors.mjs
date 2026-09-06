@@ -79,19 +79,6 @@ function buildPrompt(input) {
   ].join("\n");
 }
 
-function outputSchema() {
-  return {
-    type: "object",
-    additionalProperties: false,
-    required: ["summary", "changed_files", "remaining_risks"],
-    properties: {
-      summary: { type: "string" },
-      changed_files: { type: "array", items: { type: "string" } },
-      remaining_risks: { type: "array", items: { type: "string" } },
-    },
-  };
-}
-
 function extractAgentText(turn) {
   const values = [];
   for (const item of turn?.items || []) {
@@ -443,7 +430,7 @@ export class CodexAppServerBuildExecutor {
         cwd, ephemeral: false, approvalPolicy: "never", sandbox: "workspace-write",
         model: this.options.model || undefined,
         runtimeWorkspaceRoots: [cwd], personality: "pragmatic", threadSource: "user",
-        developerInstructions: "Implement only the approved delivery payload in the current worktree. Never modify verifier inputs, budgets or Goal, or perform push, merge, deployment, service enablement, secret provisioning, remote changes, or hook bypasses.",
+        developerInstructions: "Implement only the approved delivery payload in the current worktree. Never modify verifier inputs, budgets or Goal, or perform push, merge, deployment, service enablement, secret provisioning, remote changes, or hook bypasses.\n\n" + buildPrompt(input),
       }, Math.min(timeoutMs, 30_000));
       receipt.thread_id = String(response?.thread?.id || "");
       receipt.model_observed = typeof response?.model === "string" ? response.model : null;
@@ -453,9 +440,9 @@ export class CodexAppServerBuildExecutor {
       await this.checkpoint(input, receipt);
       if (goalRequired) {
         try {
-          await this.connection.request("thread/goal/set", { threadId: receipt.thread_id, objective, status: "active", tokenBudget }, Math.min(timeoutMs, 30_000));
+          await this.connection.request("thread/goal/set", { threadId: receipt.thread_id, objective, status: "paused", tokenBudget }, Math.min(timeoutMs, 30_000));
           const goal = (await this.connection.request("thread/goal/get", { threadId: receipt.thread_id }, Math.min(timeoutMs, 30_000)))?.goal;
-          if (!validGoal(goal, receipt) || goal.tokensUsed !== 0 || goal.status !== "active") {
+          if (!validGoal(goal, receipt) || goal.tokensUsed !== 0 || goal.status !== "paused") {
             throw new ExecutionBackendError("goal_state_mismatch", "Build Goal readback does not match the authorized objective, budget and initial usage");
           }
         } catch (error) {
@@ -469,11 +456,20 @@ export class CodexAppServerBuildExecutor {
       // This durable intent must precede the potentially charged RPC.
       await this.checkpoint(input, receipt);
       dispatched = true;
+      if (goalRequired) {
+        // Activation can start a native turn immediately. The payload and
+        // durable charge intent must already exist before this RPC.
+        await this.connection.request("thread/goal/set", { threadId: receipt.thread_id, status: "active" }, Math.min(timeoutMs, 30_000));
+        const goal = (await this.connection.request("thread/goal/get", { threadId: receipt.thread_id }, Math.min(timeoutMs, 30_000)))?.goal;
+        if (!validGoal(goal, receipt) || goal.status !== "active") throw new ExecutionBackendError("goal_state_mismatch", "Activated build Goal does not match its authorized projection");
+      }
       const turnResponse = await this.connection.request("turn/start", {
         threadId: receipt.thread_id, input: [{ type: "text", text: buildPrompt(input), text_elements: [] }],
         cwd, approvalPolicy: "never", sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: false },
         runtimeWorkspaceRoots: [cwd], model: this.options.model || undefined, effort: this.options.effort || "high",
-        serviceTier: this.options.serviceTier || undefined, personality: "pragmatic", summary: "none", outputSchema: outputSchema(),
+        // Do not impose an output schema on a turn already started by Goal.
+        // The summary is advisory; only host Trials authorize verification.
+        serviceTier: this.options.serviceTier || undefined, personality: "pragmatic", summary: "none",
       }, Math.min(timeoutMs, 30_000));
       receipt.turn_id = String(turnResponse?.turn?.id || "");
       if (!receipt.turn_id) throw new ExecutionBackendError("app_server_turn_missing", "Codex App Server did not return a build turn id");
