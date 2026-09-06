@@ -144,6 +144,7 @@ function usesRealtimeVoice(data) {
 
 function memoryProfileFor(data) {
   const memoryText = String(data.memoryModel || "").toLowerCase();
+  if (data.runtimeFamily === "api" && data.serviceMode === "process" && memoryText.trim() === "ephemeral") return "ephemeral";
   const indexText = String(data.indexingSearchNeeds || "").toLowerCase();
   const text = `${memoryText} ${indexText}`;
   if (/(external|qdrant|lancedb|neo4j|kuzu|graph|vector)/.test(text)) return "external-or-specialized";
@@ -155,6 +156,11 @@ function memoryProfileFor(data) {
 
 function memoryProfileDetails(profile) {
   const profiles = {
+    ephemeral: {
+      directories: [],
+      description: "Bounded process-memory state only; no persistent memory, database, indexes or embeddings.",
+      generated_files: ["memory/README.md", "memory/manifest.json"],
+    },
     "minimal-markdown": {
       directories: ["memory/notes"],
       description: "Minimal Markdown notes. No database or embeddings by default.",
@@ -1315,7 +1321,7 @@ if (existsSync(repositoryManifestPath)) {
     agent: agentName,
     profile: memoryProfile,
     description: memoryDetails.description,
-    source_of_truth: "Markdown",
+    source_of_truth: memoryProfile === "ephemeral" ? "ephemeral process memory" : "Markdown",
     directories: memoryDetails.directories,
     indexing_search_needs: safeScalar(data.indexingSearchNeeds, "none for v1 unless contract is updated"),
     rules: [

@@ -65,6 +65,10 @@ test("API files preserve process contract, planned endpoints and non-running str
   assert.deepEqual(ops.start_command.argv, ["node", "scripts/service-control.mjs", "start"]);
   assert.match(readFileSync(path.join(f.target, "AGENTS.md"), "utf8"), /Harness evolution protocol/);
   assert.equal(existsSync(path.join(f.target, ".state")), false); assert.equal(readFileSync(f.file, "utf8"), f.source);
+  const ephemeral = generatedAgentFiles({ ...data, memoryModel: "ephemeral", indexingSearchNeeds: "none; no SQLite/embeddings copied" });
+  const memory = JSON.parse(ephemeral.find(file => file.path === "memory/manifest.json").content);
+  assert.equal(memory.profile, "ephemeral"); assert.deepEqual(memory.directories, []);
+  assert.equal(ephemeral.some(file => /memory\/(?:embeddings|index|notes|decisions)\//.test(file.path)), false);
 });
 
 test("API scaffold CLI preserves acceptance/research gates then makes a clean baseline and truthful report", t => {
