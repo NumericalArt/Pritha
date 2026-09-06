@@ -641,12 +641,31 @@ async function stopService() {
     process.kill(state.wrapperPid, "SIGTERM");
   }
   if (state?.childPid) await waitForExit(state.childPid, STOP_GRACE_MS + 3_000);
-  const remaining = listenerPids();
+  let remaining = listenerPids();
   if (remaining.pids.length) {
-    const ownership = listenerOwnership(state, remaining);
-    if (!ownership.ownerMatch) throw new Error("owner_mismatch:listener_changed_during_stop");
-    throw new Error("control_center_did_not_stop_within_grace_period");
+    // launchd may exit the wrapper before its forced-stop timer fires. The
+    // manager must re-establish ownership before recovering that orphan group.
+    const currentState = readJson(statePath);
+    const ownership = listenerOwnership(currentState, remaining);
+    const child = processInfo(state?.childPid);
+    if (!identityMatches(currentState) || !ownership.ownerMatch
+      || currentState.startedAt !== state?.startedAt
+      || currentState.wrapperPid !== state?.wrapperPid
+      || currentState.childPid !== state?.childPid
+      || currentState.processGroupId !== state?.processGroupId
+      || !Number.isSafeInteger(state?.childPid) || state.childPid <= 1
+      || state.processGroupId !== state.childPid
+      || child?.pgid !== state.childPid || path.resolve(child?.cwd || ".") !== path.resolve(appRoot)) {
+      throw new Error("owner_mismatch:listener_changed_during_stop");
+    }
+    try { process.kill(-state.processGroupId, "SIGKILL"); }
+    catch (error) { if (error?.code !== "ESRCH") throw error; }
+    appendLifecycle("manager-forced-stop", { childPid: state.childPid, processGroupId: state.processGroupId });
+    await waitForExit(state.childPid, 3_000);
+    remaining = listenerPids();
+    if (remaining.error || remaining.pids.length) throw new Error("control_center_did_not_stop_within_grace_period");
   }
+  if (remaining.error) throw new Error(remaining.error);
   appendLifecycle("stop-complete");
   return { stopped: true };
 }

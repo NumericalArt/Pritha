@@ -143,3 +143,24 @@ dependencies нет private/state файлов; prerender содержит то�
 Активная `.next` этой проверкой не заменялась. ND roadmap revision 8 сохранена
 локальным commit `45be624` поверх независимого theme update `a3820b5`; own-state
 memory validation проходит (752 Markdown, 7416 embeddings).
+
+## Проверка реального фонового запуска
+
+Первое применение `bd9b5af` прошло build/unit gates, но strict live gate
+выявил зависание синхронного `open` при чтении manifest дочернего проекта в
+защищённом системном каталоге. Изолированный CLI read это не воспроизводил.
+Managed rollback отказался менять активную сборку, пока её дочерний процесс
+оставался жив после выхода launchd wrapper. Остальные экземпляры не обновлялись.
+
+Исправлены обе границы: manifest и credential metadata читаются в bounded
+worker с общей runtimeRead policy, а manager восстанавливает остановку только
+после повторного доказательства ownership. Истечение read budget означает
+неизвестную готовность конкретного проекта, а не остановку HTTP сервиса.
+Синтетический блокирующий OS open проверяет event-loop responsiveness и общий
+queue deadline; отдельный процессный тест проверяет owned orphan recovery.
+Материнский сервис восстановлен штатным менеджером на прежней сборке;
+окончательное применение исправления и версии фиксирует release report.
+
+После исправления: **705/705 unit tests**, семь quality checks pass,
+regressions пусты; staged build, последующий typecheck и Markdown validation
+проходят. Tracing по-прежнему содержит 1199 файлов без private/state inputs.

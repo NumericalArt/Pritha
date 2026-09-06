@@ -167,6 +167,46 @@ test("runtime refuses to install over an unowned listener", () => {
   }
 });
 
+test("manager recovers an owned stubborn child after its wrapper has exited", async () => {
+  const item = fixture();
+  let child;
+  try {
+    const appRoot = path.join(item.checkout, "interfaces", "control-center");
+    child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); process.stdout.write('ready'); setInterval(() => {}, 1000)"], {
+      cwd: appRoot, detached: true, stdio: ["ignore", "pipe", "ignore"],
+    });
+    await new Promise(resolve => child.stdout.once("data", resolve));
+    const runtimeRoot = path.join(item.stateRoot, "setup", "control-center-runtime");
+    mkdirSync(runtimeRoot, { recursive: true });
+    const record = {
+      schema: "pritha-control-center-runtime-state-v1", instanceId: item.instanceId,
+      codeRoot: item.checkout, stateRoot: item.stateRoot, port: item.port,
+      label: `com.numericalart.pritha.control-center.${item.instanceId}`,
+      wrapperPid: 99999999, childPid: child.pid, processGroupId: child.pid,
+      startedAt: new Date().toISOString(),
+    };
+    writeFileSync(path.join(runtimeRoot, "state.json"), JSON.stringify(record));
+    const ownedLsof = path.join(item.fakeBin, "owned-lsof");
+    executable(ownedLsof, `#!${process.execPath}\ntry { process.kill(${child.pid}, 0); } catch { process.exit(1); }\nprocess.stdout.write(process.argv.includes('cwd') ? ${JSON.stringify(`n${appRoot}\n`)} : '${child.pid}\\n');\n`);
+    item.env.PRITHA_LSOF_BINARY = ownedLsof;
+    const result = await new Promise((resolve, reject) => {
+      const manager = spawn(process.execPath, [runtimeScript, "stop", "--yes", "--json"], { cwd: item.checkout, env: item.env });
+      let stdout = "", stderr = "";
+      manager.stdout.on("data", chunk => { stdout += chunk; });
+      manager.stderr.on("data", chunk => { stderr += chunk; });
+      manager.on("error", reject);
+      manager.on("close", status => resolve({ status, stdout, stderr }));
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(JSON.parse(result.stdout).stopped, true);
+    assert.match(readFileSync(path.join(item.stateRoot, "logs", "control-center.lifecycle.jsonl"), "utf8"), /manager-forced-stop/);
+    assert.throws(() => process.kill(child.pid, 0), { code: "ESRCH" });
+  } finally {
+    if (child?.pid) { try { process.kill(-child.pid, "SIGKILL"); } catch { /* fixture already stopped */ } }
+    rmSync(item.directory, { recursive: true, force: true });
+  }
+});
+
 test("runtime gives launchd children a stable executable path for the Codex CLI fallback", () => {
   const item = fixture();
   try {

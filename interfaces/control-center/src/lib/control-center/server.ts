@@ -54,10 +54,11 @@ import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
 import { runAsyncProbe, createProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
 import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
 import { deliveryStateView } from "./delivery-state";
-import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, readAgentOperationsManifest, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
+import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
 
 import { outcomeDocumentLock as currentOutcomeDocumentLock } from "../../../../../scripts/agents-mother/outcome-lock.mjs";
 import { readAgentResultReadinessAsync } from "../../../../../scripts/agents-mother/result-readiness-async.mjs";
+import { readProjectMetadataAsync, unavailableProjectMetadata, type ProjectMetadata, type ProjectMetadataFile } from "../../../../../scripts/agents-mother/project-metadata-async.mjs";
 
 type RegistryRecord = CatalogAgent & { routeAliases: string[] };
 
@@ -1125,10 +1126,8 @@ function secretDefinitionFromManifest(definition: OperationsCredentialDefinition
   };
 }
 
-function envExampleSecretNames(folderPath: string) {
-  const envExamplePath = path.join(folderPath, ".env.example");
-  if (!existsSync(envExamplePath)) return [];
-  return readText(envExamplePath)
+function envExampleSecretNames(text: string) {
+  return text
     .split(/\r?\n/)
     .map((line) => line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=/)?.[1])
     .filter((name): name is string => Boolean(name && isCredentialLikeName(name)));
@@ -1148,13 +1147,13 @@ function secretDefinitionFromEnvExample(name: string): SecretDefinitionBase {
   };
 }
 
-function mergeSecretDefinitions(folderPath: string, manifest: OperationsManifest | null) {
+function mergeSecretDefinitions(manifest: OperationsManifest | null, envExampleText: string) {
   const definitions = new Map<string, SecretDefinitionBase>();
   for (const definition of manifest?.credentials || []) {
     const normalized = secretDefinitionFromManifest(definition);
     if (normalized) definitions.set(normalized.name, normalized);
   }
-  for (const name of envExampleSecretNames(folderPath)) {
+  for (const name of envExampleSecretNames(envExampleText)) {
     if (!definitions.has(name)) definitions.set(name, secretDefinitionFromEnvExample(name));
   }
   return [...definitions.values()].sort((a, b) => Number(b.required) - Number(a.required) || a.name.localeCompare(b.name));
@@ -1264,28 +1263,27 @@ function maskSecretValue(value: string | undefined) {
   return suffix ? `••••${suffix}` : "••••";
 }
 
-function credentialStorage(root: string, folderPath: string): ControlCenterAgentCredentials["storage"] {
+function credentialStorage(root: string, folderPath: string, file: ProjectMetadataFile): ControlCenterAgentCredentials["storage"] {
   const filePath = envLocalPath(folderPath);
   const backupPath = envBackupDir(folderPath);
-  if (!existsSync(filePath)) {
+  if (file.status !== "read") {
     return {
-      status: "manual_only",
+      status: file.status === "missing" ? "manual_only" : "unavailable",
       target: ".env.local",
       relativePath: relativePath(root, filePath),
       backupRelativePath: relativePath(root, backupPath),
     };
   }
-  const stat = statSync(filePath);
   return {
     status: "ready",
     target: ".env.local",
     relativePath: relativePath(root, filePath),
-    mode: `0${(stat.mode & 0o777).toString(8)}`,
+    mode: file.mode || undefined,
     backupRelativePath: relativePath(root, backupPath),
   };
 }
 
-function credentialsForAgent(root: string, folder: { absolutePath: string } | null, manifest: OperationsManifest | null): ControlCenterAgentCredentials {
+function credentialsForAgent(root: string, folder: { absolutePath: string } | null, manifest: OperationsManifest | null, metadata: ProjectMetadata): ControlCenterAgentCredentials {
   if (!folder) {
     return {
       status: "unavailable",
@@ -1303,11 +1301,11 @@ function credentialsForAgent(root: string, folder: { absolutePath: string } | nu
     };
   }
 
-  const definitionBases = mergeSecretDefinitions(folder.absolutePath, manifest);
-  const filePath = envLocalPath(folder.absolutePath);
-  const envValues = existsSync(filePath) ? parseEnvValues(readText(filePath)) : new Map<string, string>();
-  const lastUpdated = existsSync(filePath) ? statSync(filePath).mtime.toISOString() : undefined;
-  const storage = credentialStorage(root, folder.absolutePath);
+  const definitionBases = mergeSecretDefinitions(manifest, metadata.envExample.text);
+  const envValues = parseEnvValues(metadata.envLocal.text);
+  const lastUpdated = metadata.envLocal.mtime || undefined;
+  const storage = credentialStorage(root, folder.absolutePath, metadata.envLocal);
+  const unavailable = metadata.envExample.status === "unavailable" || metadata.envLocal.status === "unavailable";
   const definitions: ControlCenterSecretDefinition[] = definitionBases.map((definition) => {
     const value = envValues.get(definition.name);
     const configured = Boolean(value);
@@ -1337,7 +1335,7 @@ function credentialsForAgent(root: string, folder: { absolutePath: string } | nu
   const missingRequired = required - configuredRequired;
 
   return {
-    status: missingRequired ? "pending_auth" : definitions.length ? "ready" : "unavailable",
+    status: unavailable ? "unavailable" : missingRequired ? "pending_auth" : definitions.length ? "ready" : "unavailable",
     required,
     configuredRequired,
     missingRequired,
@@ -1345,7 +1343,7 @@ function credentialsForAgent(root: string, folder: { absolutePath: string } | nu
     configuredOptional,
     definitions,
     storage,
-    warnings: definitions.length ? [] : ["No credential definitions were found in operations manifest or .env.example."],
+    warnings: unavailable ? ["Child-project credential metadata could not be read within the host policy."] : definitions.length ? [] : ["No credential definitions were found in operations manifest or .env.example."],
   };
 }
 
@@ -2226,7 +2224,9 @@ function readinessIssueText(readiness: ControlCenterAgent["readiness"]) {
 
 async function buildAgent(root: string, record: RegistryRecord, access: AccessLinkState): Promise<ControlCenterAgent> {
   const folder = record.projectPath ? { name: path.basename(record.projectPath), absolutePath: record.projectPath } : null;
-  const manifestRead = readAgentOperationsManifest(record);
+  const projectMetadata = folder && record.identityStatus !== "conflict"
+    ? await readProjectMetadataAsync(folder.absolutePath, { codeRoot: root }) : unavailableProjectMetadata();
+  const manifestRead = projectMetadata.manifest;
   const manifest = manifestRead.manifest as OperationsManifest | null;
   const applicability = agentOperationsApplicability(record, manifest, { root });
   const noRuntimeRequired = Boolean(folder && !manifest && applicability.manifestRequired === false && !manifestRead.issue);
@@ -2250,7 +2250,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
     access,
   });
   const control = buildAgentControl(record, folder, manifest, lifecycle, uiState.state, uiState.activity, readiness);
-  const credentials = credentialsForAgent(root, folder, manifest);
+  const credentials = credentialsForAgent(root, folder, manifest, projectMetadata);
 
   return {
     ...projectAgentCardIdentity(record, currentAgentMission(record, { root }).text),

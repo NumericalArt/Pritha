@@ -128,6 +128,12 @@ node scripts/control-center-runtime.mjs restart --yes
 node scripts/control-center-runtime.mjs uninstall --yes
 ```
 
+If launchd exits the wrapper before a stubborn child stops, the runtime
+manager rechecks the unchanged instance record, exact child process group and
+working directory before forcing that owned group to exit. A foreign listener
+or changed ownership still prevents both termination and a build swap. The
+private lifecycle log records `manager-forced-stop`.
+
 Do not modify legacy `com.techscope.web` or Telegram jobs as part of this
 workflow. Do not add cron, heartbeat, a network health watchdog, Funnel or
 public exposure.
