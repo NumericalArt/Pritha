@@ -33,7 +33,7 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: ND roadmap revision 4; NeuralDeep code 31b438e with local plan commit 87cc59a; mother identity catalog v1
+source_version: ND roadmap revision 5; NeuralDeep code 31b438e with local plan commit 87cc59a; mother scoped delivery budget actions
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -206,6 +206,22 @@ Codex Goal. Токены, модель, оценка рублей и огран�
 и outage. Retry-After/ожидание не разрешает платный replay. Альтернативная модель
 предлагается с объяснением совместимости, без молчаливой замены текущей.
 Account API timeout не стирает историю или локальный ledger.
+
+Mother 1.3 теперь даёт проверенный локальный pattern отдельного build budget
+intent. Для ND сохранить explicit run → selected run → единственный bound run;
+неверный explicit scope никогда не заменяется другим. Сначала записать private
+typed request и разрешённый размер изменения, затем изменить ledger. Add/set
+total различаются; iteration/time amendments не сбрасывают исходную дату или
+spent. Прямое изменение бюджета не должно запускать CLI. Resume, явно выбранный
+пользователем, имеет собственный receipt до возможного платного spawn. После
+потери ответа или уже отправленного resume новый CLI процесс не создаётся.
+Повтор старого запроса после нового прогресса сверяет сохранённый run.
+
+В ND повторить негативные проверки неверного/чужого run, нескольких связанных
+run, alias conflict, ошибочного account scope, unknown usage при понижении cap,
+crash между budget commit и ответом. Panel selection, raw text hash и run binding
+живут в своём private state. Проверенный mother UX и ledger contract переносимы;
+native Goal endpoint и App Server RPC остаются неприменимыми к ND backend.
 
 Готовность: desktop/mobile, lost response/reload, active/read-only session,
 401/402/403/429/5xx, unknown price и stale account snapshot. Реальная

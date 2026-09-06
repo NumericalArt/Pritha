@@ -4,7 +4,7 @@ type: workflow
 status: active
 created: 2026-09-06
 updated: 2026-09-06
-topics: [agents-mother, task-chat, delivery, goal-budget, host-verification]
+topics: [agents-mother, task-chat, delivery, goal-budget, host-verification, budget-continuation]
 tools: [Pritha, Codex, Node.js, Control Center]
 sources:
   - scripts/agents-mother/task-delivery.mjs
@@ -25,7 +25,7 @@ privacy: public
 retention: durable
 review_status: reviewed
 confidence: high
-source_version: task-delivery control v1; immutable Trial plan v1 retained
+source_version: task-delivery control v1 with scoped budget actions; immutable Trial plan v1 retained
 ---
 
 # Проверки и подготовка передачи из Task Chat
@@ -84,6 +84,52 @@ unknown accounting сохраняются. Временная недоступн
 checkout. Новая подготовка повторяет проверку свежести. Merge, deployment,
 публикация и запись user acceptance остаются отдельными действиями.
 
+## Продление бюджета той же сборки
+
+Для связанного run панель позволяет добавить токены, установить общий token
+cap, добавить сборочные итерации и время. Пустые дополнительные поля не меняют
+соответствующий лимит. Продление времени после истёкшего срока даёт новый запас
+от текущего момента; исходная дата, потраченные токены и выполненные итерации
+сохраняются. Результат остаётся в той же рабочей копии и том же run.
+
+В composer поддерживаются полные прямые команды:
+
+```text
+Добавь 100 000 токенов к бюджету сборки
+Установи бюджет сборки example-run до 500 000 токенов и продолжай
+Add 100,000 tokens to this build budget
+```
+
+Run, указанный в тексте, имеет приоритет. Иначе используется выбранный в панели
+run или единственная связанная сборка. Несколько связей без выбора требуют
+конкретизации. Неверный или чужой выбранный run не заменяется другим. Команда
+для «бюджета этой задачи» остаётся отдельным native Goal действием.
+
+По умолчанию изменение бюджета не запускает работу. «И продолжай» или checkbox
+в панели явно разрешает продолжение delivery loop. Этот путь может вызвать
+сборочную модель в пределах approved contract; parent Goal RPC не используется.
+Когда другие условия уже выполнены, run доходит до проверенного результата,
+сохраняя отдельную пользовательскую приёмку. При оставшемся ограничении панель
+показывает состояние текущего run и позволяет выбрать следующее действие.
+
+CLI имеет те же add/set semantics:
+
+```sh
+node scripts/pritha.mjs delivery budget example-run --set-tokens 500000 --answered-by user --request-id budget-example-1
+node scripts/pritha.mjs delivery resume example-run --add-iterations 3 --add-elapsed-ms 1800000 --answered-by user --request-id budget-example-2
+```
+
+Private registry сохраняет разрешённый scope запроса до изменения ledger.
+Run receipt и budget amendment имеют постоянные request IDs; повтор не повышает
+лимит и не увеличивает версию ledger второй раз. После обрыва между ledger commit
+и ответом восстанавливается исходный amendment. Отдельная запись до dispatch
+продолжения предотвращает автоматический повтор уже запущенного build. Если
+run продвинулся после amendment, старый запрос не запускает новую работу.
+Unknown usage остаётся unknown; понижение cap при неполном учёте не разрешается.
+История native задачи с binding или budget receipts не считается пустой даже
+при отсутствии обычного model turn. Конфликт scope между alias одной задачи
+не перенаправляет команду и не отключает чтение истории.
+
 ## Проверки и границы текущего этапа
 
 Синтетические интеграционные тесты создают accepted contract, отдельную
@@ -96,6 +142,7 @@ Production gateway проверяется с runtime без Goal control; люб
 
 Browser fixture использует настоящий Task Chat source и CSS с синтетическим
 HTTP на desktop/mobile. Он не заменяет проверку deployed release или платный
-provider pilot. Полный accounting parent/Trials, текстовое изменение бюджета
-конкретной сборки, readiness по типам агента и окончательный handoff/reconcile
-продолжаются в следующих пунктах mother roadmap.
+provider pilot. Проверяются также add/set, continuation, потерянный ответ,
+несколько run, смена выбора между отправкой и retry, reload и CLI set-tokens.
+Полный accounting parent/Trials, readiness по типам агента и окончательный
+handoff/reconcile продолжаются в следующих пунктах mother roadmap.

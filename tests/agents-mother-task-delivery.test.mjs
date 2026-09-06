@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { acquireFileLock } from "../scripts/lib/atomic-file.mjs";
-import { budgetBlocker, createDeliveryLedger, readDeliveryLedger, targetKey, transitionDelivery, updateDeliveryLedger } from "../scripts/agents-mother/delivery-ledger.mjs";
+import { budgetBlocker, createDeliveryLedger, grantDeliveryBudget, readDeliveryLedger, targetKey, transitionDelivery, updateDeliveryLedger } from "../scripts/agents-mother/delivery-ledger.mjs";
 import { approveOutcomeSpec, compileOutcomeSpec, createOutcomeSpec, verifyCompiledTrialPlan } from "../scripts/agents-mother/outcome-spec.mjs";
 import { listTaskDeliveries, performTaskDeliveryAction, readTaskDelivery } from "../scripts/agents-mother/task-delivery.mjs";
 import { resumeDelivery } from "../scripts/agents-mother/delivery-loop.mjs";
@@ -14,7 +14,7 @@ import { resumeDelivery } from "../scripts/agents-mother/delivery-loop.mjs";
 const task = { chatId: "chat_fixture", nativeThreadId: "native-fixture", providerId: "desktop_bundled", stateIdentityHash: "storage-v2:fixture" };
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-function fixture(t, runId = "controlled-run", isolation = "none") {
+function fixture(t, runId = "controlled-run", isolation = "none", createdAt) {
   const parent = realpathSync(mkdtempSync(path.join(os.tmpdir(), "pritha-task-delivery-")));
   t.after(() => rmSync(parent, { recursive: true, force: true }));
   const root = path.join(parent, "mother"), stateRoot = path.join(parent, "state"), agentParent = path.join(parent, "children"), project = path.join(agentParent, "fixture-agent");
@@ -33,7 +33,7 @@ function fixture(t, runId = "controlled-run", isolation = "none") {
   if (isolation === "sandbox") writeFileSync(specPath, readFileSync(specPath, "utf8").replace("- Isolation: none", "- Isolation: sandbox"));
   approveOutcomeSpec(specPath, { ...options, approvedBy: "user" });
   const { plan, runRoot } = compileOutcomeSpec(specPath, { ...options, runId });
-  createDeliveryLedger(runRoot, { runId, agentSlug: plan.agent_slug, targetKey: targetKey(project), sourceProject: project, budget: { maxTokens: 100 },
+  createDeliveryLedger(runRoot, { runId, agentSlug: plan.agent_slug, targetKey: targetKey(project), sourceProject: project, createdAt, budget: { maxTokens: 100 },
     spec: { id: plan.spec_id, semanticLock: plan.semantic_lock, documentLock: plan.document_lock, contractFingerprint: plan.contract_fingerprint, approvalId: plan.approval_id } });
   updateDeliveryLedger(runRoot, state => ({ ...state, budget: { ...state.budget, tokens_used: 101, accounted_turns: [{ key: "synthetic-thread:synthetic-turn", thread_id: "synthetic-thread", turn_id: "synthetic-turn", tokens_used: 101 }] } }));
   transitionDelivery(runRoot, "blocked", { blockers: [budgetBlocker(readDeliveryLedger(runRoot))] });
@@ -155,8 +155,8 @@ test("handoff preparation detects changed verified revision without inventing ac
 
 // Execute the production gateway with the real host controller and a native
 // thread reader. Any model/Goal RPC is an immediate test failure.
-async function gatewayFixture(t) {
-  const f = fixture(t);
+async function gatewayFixture(t, createdAt) {
+  const f = fixture(t, "controlled-run", "none", createdAt);
   const ts = (await import("../interfaces/control-center/node_modules/typescript/lib/typescript.js")).default;
   const { createRequire } = await import("node:module"), require = createRequire(import.meta.url);
   function load(name, dependencies = {}) {
@@ -169,14 +169,14 @@ async function gatewayFixture(t) {
   const nativeCoordinator = load("native-turn-coordinator");
   const { CodexChatGateway } = load("gateway", {
     "../../../../../scripts/agents-mother/task-delivery.mjs": await import("../scripts/agents-mother/task-delivery.mjs"),
-    "./storage-identity": load("storage-identity"), "./normalize": load("normalize"), "./native-turn-coordinator": nativeCoordinator,
+    "./storage-identity": load("storage-identity"), "./normalize": load("normalize"), "./native-turn-coordinator": nativeCoordinator, "./budget-intent": load("budget-intent"),
     "./private-store": { logicalChatKey: row => `${row.stateIdentityHash}:${row.nativeThreadId}` },
   });
   const binding = { ...task, archived: false, origin: "chat", continuationEnabled: true, messageReceipts: {} };
   const provider = { availability: "ready", stateIdentityHash: task.stateIdentityHash, capabilities: { goalControl: false } };
   const native = { id: task.nativeThreadId, cwd: f.root, status: { type: "idle" }, ephemeral: false };
   const gateway = Object.create(CodexChatGateway.prototype);
-  Object.assign(gateway, { root: f.root, activeTurns: new Map(), store: { stateRoot: f.stateRoot, get: async () => binding, all: async () => [binding] }, runtime: {
+  Object.assign(gateway, { root: f.root, activeTurns: new Map(), store: { stateRoot: f.stateRoot, get: async () => binding, all: async () => [binding], patch: async (_id, patch) => Object.assign(binding, patch) }, runtime: {
     provider: async () => ({ view: provider }), readThread: async () => ({ thread: native }),
     connection: async () => assert.fail("Host actions must not request a model turn or Goal RPC"),
   } });
@@ -195,6 +195,177 @@ test("Task Chat gateway performs approved host checks with unavailable Goal cont
   assert.equal(result.run.status, "awaiting_acceptance");
   assert.equal(readDeliveryLedger(f.runRoot).iteration, 0);
   assert.deepEqual((await f.gateway.taskDeliveries(task.chatId)).runs.map(row => row.runId), [f.runId]);
+});
+
+test("build budget add and total keep observed usage, progress and the same native task", async t => {
+  const f = await gatewayFixture(t); await f.gateway.deliveryAction(task.chatId, f.action("bind"));
+  const add = { clientMessageId: "build-budget-add", text: "Добавь 200 токенов к бюджету сборки" };
+  let result = await f.gateway.applyDeliveryBudgetIntent(task.chatId, add);
+  assert.equal(result.run.budget.maxTokens, 300);
+  assert.equal(result.run.budget.tokensUsed, 101);
+  assert.equal(result.run.status, "correcting");
+  assert.equal(result.run.receipts.at(-1).result.resume, "not_requested");
+  assert.equal(result.replayed, false);
+  assert.equal(existsSync(path.join(f.runRoot, "worktree")), false, "a budget change alone starts no build or Trial");
+  const version = readDeliveryLedger(f.runRoot).version;
+  const saved = structuredClone(f.binding.deliveryBudgetRequests);
+  assert.match(saved[add.clientMessageId].sourceTextHash, /^[a-f0-9]{64}$/);
+  f.binding.deliveryBudgetRequests = JSON.parse(JSON.stringify(saved)); // registry reload
+  result = await f.gateway.applyDeliveryBudgetIntent(task.chatId, add);
+  assert.equal(result.replayed, true);
+  assert.equal(readDeliveryLedger(f.runRoot).version, version);
+  result = await f.gateway.applyDeliveryBudgetIntent(task.chatId, { clientMessageId: "build-budget-total", text: "Установи бюджет сборки до 250 токенов" });
+  assert.equal(result.run.budget.maxTokens, 250);
+  assert.equal(result.run.budget.tokensUsed, 101);
+  assert.equal(readDeliveryLedger(f.runRoot).budget.amendments.at(-1).token_target, 250);
+  assert.equal(readDeliveryLedger(f.runRoot).iteration, 0);
+  assert.equal(f.binding.nativeThreadId, task.nativeThreadId);
+  assert.equal(f.binding.hasDeliveryBinding, true, "binding retains native task history even without a model turn");
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, { ...add, text: add.text.replace("200", "300") }), { code: "idempotency_conflict" });
+  await assert.rejects(f.gateway.startTurn(task.chatId, { clientMessageId: add.clientMessageId, input: [{ type: "text", text: "Continue" }] }), { code: "idempotency_conflict" });
+  await assert.rejects(f.gateway.updateGoalBudget(task.chatId, { requestId: add.clientMessageId }), { code: "idempotency_conflict" });
+});
+
+function addBoundRun(f, runId) {
+  const { plan, runRoot } = compileOutcomeSpec(f.specPath, { ...f.options, runId });
+  createDeliveryLedger(runRoot, { runId, agentSlug: plan.agent_slug, targetKey: targetKey(f.project), sourceProject: f.project, budget: { maxTokens: 100 },
+    spec: { id: plan.spec_id, semanticLock: plan.semantic_lock, documentLock: plan.document_lock, contractFingerprint: plan.contract_fingerprint, approvalId: plan.approval_id } });
+  return { runRoot, bind: () => performTaskDeliveryAction(task, { requestId: `bind-${runId}`, runId, action: "bind", expectedRevision: readTaskDelivery(runId, task, f.options).revision }, f.options) };
+}
+
+test("budget scope never falls through to another run and same-message replay survives a newly bound run", async t => {
+  const f = await gatewayFixture(t); await f.bind();
+  const first = { clientMessageId: "original-budget-request", text: "Добавь 100 токенов к бюджету сборки" };
+  await f.gateway.applyDeliveryBudgetIntent(task.chatId, first);
+  const second = addBoundRun(f, "second-run"); await second.bind();
+  const version = readDeliveryLedger(f.runRoot).version;
+  assert.equal((await f.gateway.applyDeliveryBudgetIntent(task.chatId, first)).replayed, true);
+  assert.equal(readDeliveryLedger(f.runRoot).version, version);
+  assert.equal(readDeliveryLedger(second.runRoot).budget.max_tokens, 100);
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, { ...first, clientMessageId: "ambiguous-new-request" }), { code: "delivery_scope_ambiguous" });
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, { ...first, runId: "second-run" }), { code: "idempotency_conflict" });
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, { ...first, clientMessageId: "nonexistent-run-request", runId: "missing-run" }), { code: "delivery_run_unavailable" });
+  const explicit = await f.gateway.applyDeliveryBudgetIntent(task.chatId, { clientMessageId: "explicit-text-selection", text: "Добавь 50 токенов к бюджету сборки second-run", runId: f.runId });
+  assert.equal(explicit.run.runId, "second-run", "a run named in the command is the explicit target");
+  assert.equal(readDeliveryLedger(second.runRoot).budget.max_tokens, 150);
+  assert.equal(readDeliveryLedger(f.runRoot).budget.max_tokens, 200);
+});
+
+test("saved budget survives the ledger-to-receipt crash window without adding twice", async t => {
+  const f = fixture(t); await f.bind();
+  const request = f.action("budget", task, { requestId: "crash-budget-request", budget: { mode: "add", tokens: 150, resume: false } });
+  await performTaskDeliveryAction(task, request, f.options);
+  const file = path.join(f.runRoot, "task-control.json"), control = JSON.parse(readFileSync(file, "utf8"));
+  const receipt = control.requests[request.requestId]; receipt.status = "started";
+  delete receipt.finishedAt; delete receipt.budgetAppliedVersion; delete receipt.result;
+  writeFileSync(file, JSON.stringify(control));
+  const before = readDeliveryLedger(f.runRoot);
+  const replay = await performTaskDeliveryAction(task, request, f.options);
+  assert.equal(replay.replayed, true);
+  assert.equal(replay.run.receipts.at(-1).status, "completed");
+  assert.deepEqual(readDeliveryLedger(f.runRoot), before);
+  assert.equal(existsSync(path.join(f.runRoot, "worktree")), false);
+});
+
+test("budget replay never dispatches an already-started resume or overrides newer run progress", async t => {
+  for (const interrupted of [true, false]) {
+    const f = fixture(t); await f.bind();
+    const request = f.action("budget", task, { requestId: "resume-budget-request", budget: { mode: "add", tokens: 200, resume: true } });
+    const file = path.join(f.runRoot, "task-control.json"), control = JSON.parse(readFileSync(file, "utf8"));
+    const key = hash([task.providerId, task.stateIdentityHash, task.nativeThreadId]);
+    const budgetRequestId = `task-budget-${hash([key, request.requestId]).slice(0, 40)}`;
+    const versionBefore = readDeliveryLedger(f.runRoot).version;
+    grantDeliveryBudget(f.runRoot, { approvedBy: "user", requestId: budgetRequestId, addTokens: 200, expectedVersion: versionBefore });
+    control.requests[request.requestId] = { action: "budget", status: "started", request, versionBefore, budgetRequestId,
+      requestHash: hash(["budget", f.runId, request.expectedRevision, key, request.budget, null]), ...(interrupted ? { resumeStartedAt: new Date().toISOString() } : {}) };
+    writeFileSync(file, JSON.stringify(control));
+    if (!interrupted) updateDeliveryLedger(f.runRoot, state => ({ ...state, phase: "newer-progress" }));
+    const before = readDeliveryLedger(f.runRoot);
+    const replay = await performTaskDeliveryAction(task, request, f.options);
+    assert.equal(replay.run.receipts.at(-1).result.resume, interrupted ? "unconfirmed_review_existing_run" : "superseded_by_run_progress");
+    assert.equal(existsSync(path.join(f.runRoot, "worktree")), false, "recovery must never dispatch an unconfirmed paid continuation twice");
+    assert.deepEqual(readDeliveryLedger(f.runRoot), before);
+  }
+});
+
+test("explicit build continuation reaches the same approved result without touching parent Goal", async t => {
+  const f = await gatewayFixture(t); await f.bind();
+  const request = { clientMessageId: "continue-build-request", text: "Добавь 200 токенов к бюджету сборки и продолжай" };
+  const result = await f.gateway.applyDeliveryBudgetIntent(task.chatId, request);
+  assert.equal(result.run.status, "awaiting_acceptance");
+  assert.equal(result.run.acceptance, "not_accepted");
+  assert.equal(result.run.receipts.at(-1).result.resume, "returned");
+  assert.equal(result.run.budget.maxTokens, 300);
+  const state = readDeliveryLedger(f.runRoot);
+  assert.equal((await f.gateway.applyDeliveryBudgetIntent(task.chatId, request)).replayed, true);
+  assert.deepEqual(readDeliveryLedger(f.runRoot), state);
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, { ...request, clientMessageId: "completed-build-request" }), { code: "delivery_budget_complete" });
+});
+
+test("budget controls enforce ownership, lifecycle, unknown usage and request scope", async t => {
+  const f = await gatewayFixture(t); await f.bind();
+  const input = { clientMessageId: "guarded-build-request", text: "Добавь 100 токенов к бюджету сборки" };
+  for (const [object, field, value, code] of [
+    [f.provider, "stateIdentityHash", "storage-v2:other", "delivery_task_unverified"],
+    [f.native, "status", { type: "active" }, "turn_active"],
+    [f.binding, "archived", true, "chat_archived"],
+  ]) {
+    const original = object[field]; object[field] = value;
+    await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, input), { code }); object[field] = original;
+  }
+  updateDeliveryLedger(f.runRoot, state => ({ ...state, budget: { ...state.budget, max_tokens: 500, legacy_usage_unverified: true } }));
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, { ...input, text: "Установи бюджет сборки до 250 токенов" }), { code: "delivery_usage_unknown" });
+  const uiRequest = f.action("budget", task, { requestId: "ui-budget-request", budget: { mode: "add", tokens: 100, resume: false } });
+  const result = await f.gateway.deliveryAction(task.chatId, uiRequest);
+  assert.equal(result.run.budget.maxTokens, 600);
+  assert.equal(result.run.budget.usageStatus, "legacy-unknown");
+  await assert.rejects(f.gateway.updateGoalBudget(task.chatId, { requestId: uiRequest.requestId }), { code: "idempotency_conflict" });
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, { ...input, clientMessageId: uiRequest.requestId }), { code: "idempotency_conflict" });
+  assert.equal((await f.gateway.deliveryAction(task.chatId, uiRequest)).replayed, true);
+});
+
+test("conflicting alias budget receipts cannot silently retarget a saved command", async t => {
+  const f = await gatewayFixture(t); await f.bind();
+  const input = { clientMessageId: "alias-budget-request", text: "Добавь 100 токенов к бюджету сборки" };
+  await f.gateway.applyDeliveryBudgetIntent(task.chatId, input);
+  const alias = structuredClone(f.binding); alias.chatId = "chat_alias";
+  alias.deliveryBudgetRequests[input.clientMessageId].request.runId = "another-run";
+  f.gateway.store.all = async () => [f.binding, alias];
+  const before = readDeliveryLedger(f.runRoot);
+  await assert.rejects(f.gateway.applyDeliveryBudgetIntent(task.chatId, input), { code: "idempotency_conflict" });
+  assert.deepEqual(readDeliveryLedger(f.runRoot), before);
+  assert.equal((await f.gateway.taskDeliveries(task.chatId, f.runId)).run.runId, f.runId, "history and readback stay available while a request conflict is reviewed");
+});
+
+test("iteration and elapsed extensions recover the existing run without resetting usage or time", async t => {
+  const f = await gatewayFixture(t, new Date(Date.now() - 10 * 60000).toISOString()); await f.bind();
+  updateDeliveryLedger(f.runRoot, state => ({ ...state, iteration: 2,
+    budget: { ...state.budget, max_tokens: 500, max_iterations: 2, max_elapsed_ms: 60000 } }));
+  const request = f.action("budget", task, { requestId: "iteration-time-budget", budget: { mode: "add", tokens: 0, addIterations: 2, addElapsedMs: 60000, resume: false } });
+  const result = await f.gateway.deliveryAction(task.chatId, request);
+  const state = readDeliveryLedger(f.runRoot);
+  assert.equal(result.run.status, "correcting");
+  assert.equal(result.run.budget.iterations, 2);
+  assert.equal(result.run.budget.maxIterations, 4);
+  assert.equal(state.budget.max_tokens, 500);
+  assert.equal(state.budget.tokens_used, 101);
+  assert.ok(state.budget.max_elapsed_ms >= 11 * 60000);
+  assert.ok(state.budget.max_elapsed_ms - result.run.budget.elapsedMs > 59000);
+  assert.equal(existsSync(path.join(f.runRoot, "worktree")), false);
+  assert.equal((await f.gateway.deliveryAction(task.chatId, request)).replayed, true);
+  assert.deepEqual(readDeliveryLedger(f.runRoot), state);
+});
+
+test("the CLI accepts an absolute token cap and retains its idempotent budget history", t => {
+  const f = fixture(t);
+  const args = [path.resolve("scripts/pritha.mjs"), "delivery", "budget", f.runId, "--set-tokens", "350", "--answered-by", "user", "--request-id", "cli-absolute-budget"];
+  const options = { cwd: f.root, env: { ...process.env, TECHSCOPE_ROOT: f.root, PRITHA_STATE_ROOT: f.stateRoot, PRITHA_AGENT_PARENT: f.agentParent }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  const output = execFileSync(process.execPath, args, options);
+  assert.match(output, /Build tokens observed: 101\/350/);
+  const before = readDeliveryLedger(f.runRoot);
+  execFileSync(process.execPath, args, options);
+  assert.deepEqual(readDeliveryLedger(f.runRoot), before);
+  assert.equal(existsSync(path.join(f.runRoot, "worktree")), false);
 });
 
 test("Task Chat gateway keeps native cwd, storage, ephemeral, active turn, archive and voice permission gates", async t => {

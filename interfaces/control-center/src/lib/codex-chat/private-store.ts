@@ -5,6 +5,7 @@ import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths
 import { appendPrivateAuditEvent, atomicWritePrivateJson } from "@/lib/private-json";
 import type { AttachmentMessage, RuntimeProviderId, TaskLinkView, ThreadGroup, ThreadOrigin, ThreadStatus } from "./types";
 import type { GoalBudgetReceipt } from "./goal-control";
+import type { DeliveryBudgetReceipt } from "./delivery-types";
 
 export type MessageReceipt = {
   clientMessageId: string;
@@ -35,6 +36,8 @@ export type ChatBinding = {
   messageReceipts: Record<string, MessageReceipt>;
   attachmentMessages?: Record<string, AttachmentMessage>;
   goalBudgetRequests?: Record<string, GoalBudgetReceipt>;
+  deliveryBudgetRequests?: Record<string, DeliveryBudgetReceipt>;
+  hasDeliveryBinding?: boolean;
   taskLinks: TaskLinkView[];
 };
 
@@ -69,6 +72,7 @@ function normalizeBinding(value: unknown): ChatBinding | null {
   if (!String(row.nativeThreadId || "")) return null;
   if (row.providerId !== "desktop_bundled" && row.providerId !== "standalone_cli") return null;
   if (row.goalBudgetRequests !== undefined && (!row.goalBudgetRequests || typeof row.goalBudgetRequests !== "object" || Array.isArray(row.goalBudgetRequests))) return null;
+  if (row.deliveryBudgetRequests !== undefined && (!row.deliveryBudgetRequests || typeof row.deliveryBudgetRequests !== "object" || Array.isArray(row.deliveryBudgetRequests))) return null;
   const createdAt = String(row.createdAt || new Date(0).toISOString());
   return {
     chatId: String(row.chatId),
@@ -93,6 +97,8 @@ function normalizeBinding(value: unknown): ChatBinding | null {
     messageReceipts: row.messageReceipts && typeof row.messageReceipts === "object" ? row.messageReceipts : {},
     ...(row.attachmentMessages && typeof row.attachmentMessages === "object" ? { attachmentMessages: row.attachmentMessages } : {}),
     ...(row.goalBudgetRequests ? { goalBudgetRequests: row.goalBudgetRequests } : {}),
+    ...(row.deliveryBudgetRequests ? { deliveryBudgetRequests: row.deliveryBudgetRequests } : {}),
+    ...(row.hasDeliveryBinding ? { hasDeliveryBinding: true } : {}),
     taskLinks: Array.isArray(row.taskLinks) ? row.taskLinks : [],
   };
 }

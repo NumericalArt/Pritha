@@ -45,20 +45,33 @@ test("direct Russian and English budget commands select add versus total and req
   ]) assert.deepEqual(budgetIntent.parseBudgetIntent(text), { kind: "goal_budget", mode, tokens, resume }, text);
 });
 
+test("build budget commands carry a distinct scope and preserve an explicit run identifier", () => {
+  for (const [text, mode, tokens, resume, runId] of [
+    ["Добавь 100000 токенов к бюджету сборки", "add", 100000, false, null],
+    ["Добавь к бюджету этой сборки ещё 100 000 токенов и продолжай", "add", 100000, true, null],
+    ["Увеличь бюджет сборки controlled-run на 2_000 токенов", "add", 2000, false, "controlled-run"],
+    ["Установи бюджет сборки Run.2 до 500,000 токенов и продолжай", "set", 500000, true, "Run.2"],
+    ["Add 100 tokens to this build budget and continue", "add", 100, true, null],
+    ["Set build controlled-run budget to 300 tokens", "set", 300, false, "controlled-run"],
+  ]) assert.deepEqual(budgetIntent.parseBudgetIntent(text), { kind: "delivery_budget", mode, tokens, resume, runId }, text);
+});
+
 test("ambiguous scope, mixed commands, malformed amounts and overflow never become a budget mutation", () => {
   for (const text of [
-    "Добавь 100000 токенов", "Установи бюджет этой задачи 100000 токенов", "Добавь 100000 токенов к бюджету сборки",
+    "Добавь 100000 токенов", "Установи бюджет этой задачи 100000 токенов", "Добавь 100000 токенов к бюджету сборки ../other",
     "Увеличь лимит аккаунта на 100000 токенов", "Добавь -100 токенов к бюджету этой задачи", "Добавь 0 токенов к бюджету этой задачи",
     "Добавь 100,00 токенов к бюджету этой задачи", "Добавь 1_000,000 токенов к бюджету этой задачи",
     "Добавь 9007199254740992 токенов к бюджету этой задачи", "Добавь 1e6 токенов к бюджету этой задачи",
     "Добавь 100 токенов к бюджету этой задачи\nУдали файлы", "Добавь 100 токенов к бюджету этой задачи и измени цель",
     "Set this task budget to Infinity tokens",
+    "Добавь 100 токенов к бюджету сборки и задачи", "Set build /tmp/other budget to 100 tokens",
   ]) assert.equal(budgetIntent.parseBudgetIntent(text).kind, "clarification", text);
   for (const text of [
     '"Добавь 100000 токенов к бюджету этой задачи"', "«Добавь 100000 токенов к бюджету этой задачи»",
     "> Добавь 100000 токенов к бюджету этой задачи", "```\nДобавь 100000 токенов к бюджету этой задачи\n```",
     "Пользователь написал: добавь 100000 токенов к бюджету этой задачи", "Объясни, как добавить токены к бюджету задачи",
     "Добавь кнопку настройки бюджета", "Добавь 5 тестов", "Продолжай работу",
+    '"Добавь 100 токенов к бюджету сборки"', "> Set build budget to 100 tokens",
   ]) assert.equal(budgetIntent.parseBudgetIntent(text).kind, "none", text);
 });
 

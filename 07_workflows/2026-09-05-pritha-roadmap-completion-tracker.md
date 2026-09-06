@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: 31e6f93 plus task-delivery control v1 completion work
+source_version: 82c5820 plus Task Chat build budget completion work
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -60,7 +60,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 1.0 | Предыдущий persisted protocol пакет | Сохранение installed CLI/App lifecycle evidence; модельное поведение отдельно в 1.7 |
 | 1.1 | Ядро выпущено; прогноз открыт | Lease/reservations/amendments, известный расход, оценка только по сопоставимым данным |
 | 1.2 | Выпущен | Native Goal GET/add/set/readback и desktop/mobile regression, сохранение usage/objective |
-| 1.3 | Native task intent реализован локально | Прямой текст → typed Goal action; 34 Goal/Chat tests и actual page browser pass; delivery scope после точного binding 1.4 |
+| 1.3 | Native и delivery intent реализованы локально | Exact task/run scope, add/set total, same-ID recovery, отдельный resume; UI также продлевает итерации и время; adoption впереди |
 | 1.4 | Реализован локально; adoption впереди | Exact task/run/instance; host verification и reviewable demo, whole compiled-plan check, durable replay/recovery; provider pilot отдельно |
 | 1.5 | Build ledger выпущен; полный scope открыт | Раздельный parent/build/Trials accounting, coverage/unknown, version-bound receipts и отсутствие double-counting |
 | 1.6 | Открыт; нужны измеримые повторы | N, модель/effort/version/task scope, диапазон и отдельное обоснование любого default |
@@ -76,7 +76,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 4.0 | Открыт | Runtime/interface/operations capability preflight до mutation; headless scaffold, конкретный adapter для unsupported |
 | 4.1 | Открыт | Host-owned verifier provenance/hash до lock; заведомо неверный продукт проваливает Trial |
 | 4.2 | Открыт | Один automated_trial_waiver contract, actor/reason/scope, waiver не даёт ложного verified |
-| 5.1 | Открыт; отдельный refactor после semantics | Async bounded probes, access cache/card projection, invalidation, прежний API/UX |
+| 5.1 | Открыт; начальный private status исключён из prerender | Async bounded probes, access cache/card projection, invalidation, прежний API/UX |
 | 5.2 | Release policy реализована локально; остальные классы открыты | Общий MJS/TS источник, bounded validated overrides для подходящих классов probes, документация |
 | 5.3 | Открыт | Достижимые terminal states, cleanup error diagnostics, идемпотентность, сохранение dirty/foreign/recoverable worktrees |
 | 5.4 | Открыт | Inventory каждого research/improve writer, redaction до locks, path/private identifier fixtures и strict audit |
@@ -126,7 +126,7 @@ same-message retry, quote, reload, сохранение предыдущего �
 горизонтального overflow и JavaScript errors. Это UI evidence, а не реальный
 provider pilot. Staged build не заменяет активную `.next`.
 
-Далее: budget intent для связанной сборки (1.3), полный accounting (1.5),
+Далее: полный accounting (1.5),
 applicability/readiness/handoff (2–3), scaffold/Trials
 (4), необходимые runtime/privacy изменения (5), подготовку pilots и public
 path (6–7). После итогового review — опубликованный pinned release и обновление
@@ -190,3 +190,32 @@ live health проходят. Staged build и typecheck проходят; browse
 проверяет также показ demo и replay старого receipt вне краткой истории.
 Publication audit и обновление памяти завершают локальный пакет. Live runtime и fleet
 пока сохраняют предыдущий deployed release.
+
+## Пакет Task Chat build budget
+
+1.3 завершён локально для native Goal и точной связанной сборки. Общий token cap
+и дополнительные токены различаются. Дополнительные iteration/time разрешения
+доступны в панели и CLI; завершённые шаги, расход и исходная дата не сбрасываются.
+Explicit resume продолжает ту же сборку и может вызвать её approved executor.
+Изменение бюджета само по себе не запускает работу; parent Goal не изменяется.
+
+Private task mapping записывается до mutation и повторно используется даже при
+новой связанной сборке. Ledger amendment idempotent без новых событий на retry.
+Отдельно проверены crash после ledger commit, ранее отправленный resume и более
+новый прогресс run: сохранённый запрос не даёт повторного dispatch. UI/form и
+text request IDs нельзя повторно использовать для native Goal или model turn.
+Conflicting alias receipts не выбирают другую цель; история остаётся доступна.
+
+54 профильных теста и полный self-test **637/637** проходят. Actual Task Chat
+page/CSS browser fixture проходит на 1280 и 390 px: шесть HTTP запросов дают три
+различных budget actions, parent Goal и native model turns не затронуты. Это
+синтетическое evidence, а реальный mid-turn/provider scope остаётся в 1.7.
+
+Первый staged build выявил build-time чтение локальной SQLite во время
+пересборки памяти. `AppShell` получает private initial status; root layout теперь
+dynamic, чтобы этот status не попадал в prerender artifact и не требовал live
+БД при компиляции. Финальный staged build и typecheck проходят; в prerender
+manifest нет страниц экземпляра, среди 1198 файлов зависимостей нет private/state
+файлов. Build проверен отдельно от memory rebuild. Это точечное исправление;
+полный async/cache refactor 5.1 остаётся открытым.
+Публикация `main` и managed fleet adoption сохраняются на конец полного объёма.

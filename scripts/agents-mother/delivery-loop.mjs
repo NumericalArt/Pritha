@@ -1012,6 +1012,15 @@ export async function withDeliveryHostControl(runId, options, work) {
   }));
 }
 
+// Budget control has a distinct capability: only its explicitly authorized
+// continuation may call the build loop. Host verification never receives it.
+export async function withDeliveryBudgetControl(runId, options, work) {
+  const status = deliveryStatus(runId, options);
+  return withDeliveryExecution(status.runRoot, () => work({
+    resume: () => resumeDeliveryLocked(runId, { root: options.root, stateRoot: options.stateRoot }),
+  }));
+}
+
 export async function amendDeliveryBudget(runId, options = {}) {
   const { runRoot } = deliveryStatus(runId, options);
   return withDeliveryExecution(runRoot, () => {
@@ -1019,7 +1028,7 @@ export async function amendDeliveryBudget(runId, options = {}) {
     approvedPlanBinding(plan, options);
     const state = grantDeliveryBudget(runRoot, {
       approvedBy: options.answeredBy, requestId: options.budgetRequestId,
-      addTokens: options.addTokens, addIterations: options.addIterations,
+      addTokens: options.addTokens, setTokens: options.setTokens, addIterations: options.addIterations,
       addElapsedMs: options.addElapsedMs, expectedVersion: options.expectedVersion,
     });
     return { state, worktree: readDeliveryWorktree(runRoot) };
@@ -1033,11 +1042,11 @@ async function resumeDeliveryLocked(runId, options) {
   const hostOnly = options.hostOnly === true || options.answer === "verify-only";
   const bound = policyBoundOptions(plan, { ...options, hostOnly });
   let state = status.state;
-  if (options.addTokens || options.addIterations || options.addElapsedMs) {
+  if (options.addTokens || options.setTokens !== undefined || options.addIterations || options.addElapsedMs) {
     approvedPlanBinding(plan, options);
     state = grantDeliveryBudget(status.runRoot, {
       approvedBy: options.answeredBy, requestId: options.budgetRequestId,
-      addTokens: options.addTokens, addIterations: options.addIterations,
+      addTokens: options.addTokens, setTokens: options.setTokens, addIterations: options.addIterations,
       addElapsedMs: options.addElapsedMs, expectedVersion: options.expectedVersion,
     });
   }

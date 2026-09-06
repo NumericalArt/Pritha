@@ -25,6 +25,7 @@ import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
 import { DeliveryPanel } from "./DeliveryPanel";
+import type { TaskDeliveryView } from "@/lib/codex-chat/delivery-types";
 import { parseBudgetIntent } from "@/lib/codex-chat/budget-intent";
 import { CodexMarkdown } from "./CodexMarkdown";
 import {
@@ -78,6 +79,7 @@ type ChatFailure = {
 };
 
 type PendingDelivery = {
+  runId?: string;
   attachments?: string[];
   modelId?: string;
   chatId: string;
@@ -310,6 +312,12 @@ export function CodexChatPage() {
   const [recovering, setRecovering] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [goalRevision, setGoalRevision] = useState(0);
+  const [deliveryRevision, setDeliveryRevision] = useState(0);
+  const [deliveryBudgetResult, setDeliveryBudgetResult] = useState<{ chatId: string; run: TaskDeliveryView } | null>(null);
+  const [deliverySelections, setDeliverySelections] = useState<Record<string, string | null>>({});
+  const selectDeliveryRun = useCallback((chatId: string, runId: string | null) => {
+    setDeliverySelections(current => current[chatId] === runId ? current : { ...current, [chatId]: runId });
+  }, []);
   const [budgetNotice, setBudgetNotice] = useState<{ chatId: string; text: string } | null>(null);
   const [historyState, setHistoryState] = useState<HistoryState>("idle");
   const [historyHasImages, setHistoryHasImages] = useState(false);
@@ -1036,7 +1044,7 @@ export function CodexChatPage() {
     setSending(true);
     setError(null);
     const intent = parseBudgetIntent(delivery.text);
-    const budgetCommand = intent.kind === "goal_budget" && !delivery.attachments?.length;
+    const budgetCommand = (intent.kind === "goal_budget" || intent.kind === "delivery_budget") && !delivery.attachments?.length;
     try {
       if (intent.kind === "goal_budget" && budgetCommand) {
         const response = await api<ThreadGoalView>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/goal/intent`, {
@@ -1050,6 +1058,19 @@ export function CodexChatPage() {
         setGoalRevision(value => value + 1);
         return;
       }
+      if (intent.kind === "delivery_budget" && budgetCommand) {
+        const response = await api<TaskDeliveryView>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/delivery/intent`, {
+          method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": delivery.clientMessageId },
+          body: JSON.stringify({ clientMessageId: delivery.clientMessageId, text: delivery.text, ...(delivery.runId ? { runId: delivery.runId } : {}) }),
+        }, { timeoutMs: TURN_START_TIMEOUT_MS });
+        setPendingForChat(delivery.chatId, null);
+        updateDraftForChat(delivery.chatId, current => current.trim() === delivery.text ? "" : current);
+        const result = response.data.receipts.find(receipt => receipt.requestId === delivery.clientMessageId);
+        setDeliveryBudgetResult({ chatId: delivery.chatId, run: response.data });
+        setBudgetNotice({ chatId: delivery.chatId, text: `Сборка ${response.data.agentName}: подтверждённый расход ${response.data.budget.tokensUsed.toLocaleString("ru-RU")} / ${response.data.budget.maxTokens.toLocaleString("ru-RU")} токенов. ${result?.status === "failed" || result?.status === "interrupted" ? "Сохранённое действие требует сверки в панели сборки." : intent.resume ? "Продолжение этой сборки запрошено; текущее состояние показано в панели." : "Бюджет сверён; продолжение отдельно."}` });
+        setDeliveryRevision(value => value + 1);
+        return;
+      }
       const response = await api<AcceptedTurn>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/turns`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": delivery.clientMessageId },
@@ -1061,7 +1082,7 @@ export function CodexChatPage() {
       if (selectedChatIdRef.current === delivery.chatId) setTurns((rows) => upsertTurn(rows, response.data.turn));
       void refreshThreads();
     } catch (cause) {
-      if (deliveryMayBeUnknown(cause)) {
+      if (deliveryMayBeUnknown(cause) || (budgetCommand && cause instanceof ControlCenterRequestError && ["turn_active", "delivery_running", "delivery_unconfirmed"].includes(cause.code))) {
         const unknown = { ...delivery, status: "delivery_unknown" as const };
         setPendingForChat(delivery.chatId, unknown);
         setError({
@@ -1133,8 +1154,8 @@ export function CodexChatPage() {
     if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || pendingNewChatDelivery || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
     const chatId = selectedChatId;
     const intent = parseBudgetIntent(text);
-    if (intent.kind === "clarification" || (intent.kind === "goal_budget" && (!chatId || attachmentIds.length > 0))) {
-      setError({ message: intent.kind === "clarification" ? intent.message : "Select the task whose Goal you want to change and send the budget command without attachments.", source: "mutation", kind: "request_failed", chatId, retryable: false });
+    if (intent.kind === "clarification" || ((intent.kind === "goal_budget" || intent.kind === "delivery_budget") && (!chatId || attachmentIds.length > 0))) {
+      setError({ message: intent.kind === "clarification" ? intent.message : "Выберите задачу с нужным бюджетом и отправьте команду без вложений.", source: "mutation", kind: "request_failed", chatId, retryable: false });
       return;
     }
     setBudgetNotice(null);
@@ -1151,6 +1172,7 @@ export function CodexChatPage() {
     }
     const delivery: PendingDelivery = {
       chatId,
+      ...(intent.kind === "delivery_budget" && deliverySelections[chatId] ? { runId: deliverySelections[chatId]! } : {}),
       clientMessageId: crypto.randomUUID(),
       text,
       attachments: attachmentIds,
@@ -1193,7 +1215,7 @@ export function CodexChatPage() {
     try {
       await checkControlCenterHealth();
       await refreshRuntime();
-      if (parseBudgetIntent(delivery.text).kind === "goal_budget" && !delivery.attachments?.length) {
+      if (["goal_budget", "delivery_budget"].includes(parseBudgetIntent(delivery.text).kind) && !delivery.attachments?.length) {
         await deliverMessage(delivery);
         return;
       }
@@ -1386,6 +1408,8 @@ export function CodexChatPage() {
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} />
         <DeliveryPanel key={`delivery-${displayedDetail.thread.chatId}`} chatId={displayedDetail.thread.chatId}
+          refreshKey={deliveryRevision} onSelectedRun={selectDeliveryRun}
+          budgetResult={deliveryBudgetResult?.chatId === displayedDetail.thread.chatId ? deliveryBudgetResult.run : null}
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} /></div> : null}
         {budgetNotice?.chatId === selectedChatId ? <div className="codex-attachment-notice" role="status">{budgetNotice.text}</div> : null}
@@ -1458,7 +1482,7 @@ export function CodexChatPage() {
             <div className="codex-inline-notice warning codex-delivery-unknown">
               {pendingNewChatDelivery
                 ? "First-message delivery is unknown. The same idempotent create request will be reconciled before anything new is sent."
-                : parseBudgetIntent(pendingDelivery.text).kind === "goal_budget"
+                : ["goal_budget", "delivery_budget"].includes(parseBudgetIntent(pendingDelivery.text).kind)
                   ? "Budget confirmation is pending. Check the saved request to avoid adding tokens twice."
                   : "Delivery is unknown. History will be checked first; Task Chat will never replay this turn automatically."}
               <button type="button" onClick={() => void retryUnknownDelivery()} disabled={recovering || sending || draft.trim() !== pendingDelivery.text}>

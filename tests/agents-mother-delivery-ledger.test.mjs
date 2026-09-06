@@ -103,10 +103,31 @@ test("budget amendments are explicit, idempotent, scoped and preserve approval a
   assert.deepEqual(retry.spec, before.spec);
   assert.equal(retry.budget.amendments.length, 1);
   assert.deepEqual(first.budget.amendments, retry.budget.amendments);
+  assert.deepEqual(first, retry, "same-ID replay does not advance the ledger version or event history");
   assert.throws(() => grantDeliveryBudget(runRoot, { ...input, addTokens: 501 }), /different additions/);
   assert.throws(() => grantDeliveryBudget(runRoot, { ...input, approvedBy: "agent" }), /user authorization/);
   assert.throws(() => grantDeliveryBudget(runRoot, { ...input, requestId: "budget-2", expectedVersion: 1 }), /changed/);
   assert.throws(() => grantDeliveryBudget(runRoot, { ...input, requestId: "budget-3", addTokens: Number.MAX_SAFE_INTEGER }), /supported range/);
+});
+
+test("an absolute cap preserves usage, supports bounded reduction and rejects unsafe totals", () => {
+  const { runRoot } = fixture();
+  const observed = accountDeliveryExecutorResult(runRoot, receipt({ tokens_used: 120 }), "executor/iteration-001.json");
+  const input = { requestId: "absolute-budget", approvedBy: "user", setTokens: 300 };
+  const next = grantDeliveryBudget(runRoot, input);
+  assert.equal(next.budget.max_tokens, 300);
+  assert.equal(next.budget.tokens_used, 120);
+  assert.equal(next.budget.amendments[0].applied_version, next.version);
+  assert.equal(next.budget.amendments[0].token_target, 300);
+  assert.deepEqual(next.spec, observed.spec);
+  assert.deepEqual(grantDeliveryBudget(runRoot, input), next);
+  for (const setTokens of [0, -1, 120, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => grantDeliveryBudget(runRoot, { ...input, requestId: "invalid-budget", setTokens }));
+  }
+  assert.throws(() => grantDeliveryBudget(runRoot, { ...input, requestId: "mixed-budget", addTokens: 10 }), /either/);
+  updateDeliveryLedger(runRoot, state => ({ ...state, budget: { ...state.budget, legacy_usage_unverified: true } }));
+  assert.throws(() => grantDeliveryBudget(runRoot, { ...input, requestId: "unknown-reduction", setTokens: 250 }), /unknown/);
+  assert.equal(grantDeliveryBudget(runRoot, { ...input, requestId: "unknown-extension", setTokens: 500 }).budget.max_tokens, 500);
 });
 
 test("an explicit time extension grants future time without spending or resetting token accounting", () => {

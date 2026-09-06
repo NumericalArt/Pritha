@@ -4,8 +4,8 @@ import path from "node:path";
 import { atomicWriteFile } from "../lib/atomic-file.mjs";
 import { resolvePrithaStateRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, readCatalogArtifact, readIdentityEvidence } from "./identity.mjs";
-import { deliveryUsageStatus, readDeliveryLedger, targetKey } from "./delivery-ledger.mjs";
-import { defaultDeliveryTrialBackend, withDeliveryHostControl } from "./delivery-loop.mjs";
+import { DELIVERY_ACTIVE_STATUSES, deliveryUsageStatus, grantDeliveryBudget, readDeliveryLedger, targetKey } from "./delivery-ledger.mjs";
+import { defaultDeliveryTrialBackend, withDeliveryBudgetControl, withDeliveryHostControl } from "./delivery-loop.mjs";
 import { approvalEvidencePath, verifyCompiledTrialPlan } from "./outcome-spec.mjs";
 import { verifyTrialResultFreshness } from "./trial-runner.mjs";
 
@@ -144,8 +144,9 @@ function view(target) {
   return {
     runId: state.run_id, agentId: target.agent.id, agentName: target.agent.name,
     status: state.status, bindingStatus: target.bindingStatus, revision: target.revision,
-    specId: plan.spec_id, budget: { tokensUsed: state.budget.tokens_used, maxTokens: state.budget.max_tokens, scope: "build-executor", usageStatus: deliveryUsageStatus(state.budget) },
-    actions: { verify: paused || ["created", "paused", "preparing", "building", "correcting", "verifying"].includes(state.status), prepareHandoff: finished.has(state.status) },
+    specId: plan.spec_id, budget: { tokensUsed: state.budget.tokens_used, maxTokens: state.budget.max_tokens, scope: "build-executor", usageStatus: deliveryUsageStatus(state.budget),
+      iterations: state.iteration, maxIterations: state.budget.max_iterations, elapsedMs: Math.max(0, Date.now() - Date.parse(state.created_at)), maxElapsedMs: state.budget.max_elapsed_ms },
+    actions: { verify: paused || ["created", "paused", "preparing", "building", "correcting", "verifying"].includes(state.status), prepareHandoff: finished.has(state.status), budget: DELIVERY_ACTIVE_STATUSES.has(state.status) },
     plan: actionPlan(target),
     receipts: Object.entries(control?.requests || {}).slice(-10).map(([requestId, receipt]) => ({ requestId, action: receipt.action, status: receipt.status, request: receipt.request || null, result: receipt.result || null })),
     acceptance: state.accepted_by === "user" ? "accepted_by_user" : "not_accepted",
@@ -173,8 +174,85 @@ function requireBound(target) {
   if (target.bindingStatus !== "bound") fail("delivery_task_mismatch", "Link this exact run to the selected task before using a host action.");
 }
 function validateRequest(input) {
-  if (!input || !id(input.runId) || !id(input.requestId) || !["bind", "verify", "prepare_handoff"].includes(input.action)
+  if (!input || !id(input.runId) || !id(input.requestId) || !["bind", "verify", "prepare_handoff", "budget"].includes(input.action)
     || !/^[a-f0-9]{64}$/.test(input.expectedRevision || "")) fail("delivery_action_invalid", "Refresh the run and choose a supported host action.", 400);
+  if (input.action === "budget") {
+    const change = input.budget;
+    if (!change || !["add", "set"].includes(change.mode) || !Number.isSafeInteger(change.tokens) || change.tokens < 0 || typeof change.resume !== "boolean"
+      || [change.addIterations ?? 0, change.addElapsedMs ?? 0].some(value => !Number.isSafeInteger(value) || value < 0)
+      || (change.tokens === 0 && (change.mode === "set" || !(change.addIterations || change.addElapsedMs)))
+      || (input.sourceTextHash !== undefined && !/^[a-f0-9]{64}$/.test(input.sourceTextHash))) fail("delivery_budget_invalid", "Choose positive whole budget amounts and an explicit continuation preference.", 400);
+  }
+}
+export function normalizeTaskDeliveryBudgetRequest(input) {
+  validateRequest(input);
+  if (input.action !== "budget") fail("delivery_budget_invalid", "Choose a build budget action.", 400);
+  return { requestId: input.requestId, runId: input.runId, expectedRevision: input.expectedRevision, action: "budget",
+    budget: { mode: input.budget.mode, tokens: input.budget.tokens, resume: input.budget.resume,
+      ...(input.budget.addIterations ? { addIterations: input.budget.addIterations } : {}), ...(input.budget.addElapsedMs ? { addElapsedMs: input.budget.addElapsedMs } : {}) },
+    ...(input.sourceTextHash ? { sourceTextHash: input.sourceTextHash } : {}) };
+}
+
+async function budgetAction(target, task, input, resume) {
+  requireBound(target);
+  const control = target.control;
+  const change = normalizeTaskDeliveryBudgetRequest(input).budget;
+  const requestHash = hash([input.action, input.runId, input.expectedRevision, taskKey(task), change, input.sourceTextHash || null]);
+  let receipt = Object.hasOwn(control.requests, input.requestId) ? control.requests[input.requestId] : null;
+  const replayed = Boolean(receipt);
+  if (receipt) {
+    if (receipt.requestHash !== requestHash) fail("idempotency_conflict", "This budget request was already used with a different change.");
+    if (receipt.status !== "started") return { run: view(target), replayed: true };
+  } else {
+    if (Object.values(control.requests).some(row => row.status === "started")) fail("delivery_action_pending", "Reconcile the saved action before changing the build budget.");
+    if (input.expectedRevision !== target.revision) fail("delivery_changed", "The run changed. Refresh it before choosing its budget.");
+    if (!DELIVERY_ACTIVE_STATUSES.has(target.state.status)) fail("delivery_budget_complete", "This delivery result no longer needs a build budget.");
+    const total = change.mode === "set" ? change.tokens : target.state.budget.max_tokens + change.tokens;
+    if (!Number.isSafeInteger(total) || ((change.tokens || change.mode === "set") && total <= target.state.budget.tokens_used)) fail("delivery_budget_invalid", "The total build budget must exceed the observed usage.", 400);
+    if (change.mode === "set" && total < target.state.budget.max_tokens && deliveryUsageStatus(target.state.budget) !== "complete") fail("delivery_usage_unknown", "Reconcile unknown build usage before reducing the total budget.");
+    receipt = { action: "budget", request: { runId: input.runId, requestId: input.requestId, expectedRevision: input.expectedRevision, action: "budget", budget: change,
+      ...(input.sourceTextHash ? { sourceTextHash: input.sourceTextHash } : {}) }, requestHash, status: "started", startedAt: new Date().toISOString(), versionBefore: target.state.version,
+      budgetRequestId: `task-budget-${hash([taskKey(task), input.requestId]).slice(0, 40)}` };
+    control.requests[input.requestId] = receipt;
+    saveControl(target, control);
+  }
+  try {
+    // The ledger's original request ID makes both add and absolute-set retries
+    // idempotent, including a crash between ledger commit and receipt update.
+    const state = grantDeliveryBudget(target.runRoot, { approvedBy: "user", requestId: receipt.budgetRequestId, expectedVersion: receipt.versionBefore,
+      ...(change.mode === "set" ? { setTokens: change.tokens } : { addTokens: change.tokens }), addIterations: change.addIterations, addElapsedMs: change.addElapsedMs });
+    const amendment = state.budget.amendments.find(row => row.request_id === receipt.budgetRequestId);
+    target = { ...target, state };
+    receipt.budgetAppliedVersion = amendment.applied_version;
+    receipt.result = { status: state.status, maxTokens: state.budget.max_tokens, tokensUsed: state.budget.tokens_used, resume: "not_requested" };
+    saveControl(target, control);
+    if (change.resume) {
+      if (receipt.resumeStartedAt) {
+        receipt.status = "interrupted";
+        receipt.result.resume = "unconfirmed_review_existing_run";
+      } else if (state.version !== receipt.budgetAppliedVersion) {
+        receipt.result.resume = "superseded_by_run_progress";
+      } else {
+        receipt.resumeStartedAt = new Date().toISOString();
+        receipt.result.resume = "dispatching";
+        saveControl(target, control); // before a possible paid build turn
+        await resume();
+        receipt.result.resume = "returned";
+      }
+    }
+    target = targetFor(input.runId, task, target.options);
+    receipt.result.status = target.state.status;
+    receipt.result.maxTokens = target.state.budget.max_tokens;
+    receipt.result.tokensUsed = target.state.budget.tokens_used;
+    if (receipt.status === "started") receipt.status = "completed";
+  } catch (error) {
+    try { target = targetFor(input.runId, task, target.options); } catch { /* Keep the last confirmed run snapshot. */ }
+    receipt.status = "failed";
+    receipt.result = { ...(receipt.result || {}), code: error instanceof TaskDeliveryError ? error.code : "delivery_budget_unconfirmed", status: "review_required" };
+  }
+  receipt.finishedAt = new Date().toISOString();
+  saveControl(target, control);
+  return { run: view({ ...target, control }), replayed };
 }
 function freshHandoff(target) {
   if (!finished.has(target.state.status) || !target.worktree || !/^trial-results\/verification-\d+\.json$/.test(target.state.last_trial_result?.path || "")) {
@@ -198,8 +276,10 @@ export async function performTaskDeliveryAction(taskInput, input, options = {}) 
   // Validate paths before acquiring a writer's lease; repeat authorization while
   // holding the same lease used by the CLI and all host actions.
   targetFor(input.runId, task, context);
-  return withDeliveryHostControl(input.runId, context, async ({ verify }) => {
+  const withControl = input.action === "budget" ? withDeliveryBudgetControl : withDeliveryHostControl;
+  return withControl(input.runId, context, async ({ verify, resume }) => {
     let target = targetFor(input.runId, task, context);
+    if (input.action === "budget") return budgetAction(target, task, input, resume);
     const requestHash = hash([input.action, input.runId, input.expectedRevision, taskKey(task)]);
     let control = target.control;
     if (input.action === "bind") {

@@ -104,6 +104,7 @@ function usage() {
   ${CLI_COMMAND} delivery status <run-id>
   ${CLI_COMMAND} delivery resume <run-id> [--answer <option-id>] [--answered-by user] [--guidance <text>] [--project <path>]
   ${CLI_COMMAND} delivery budget <run-id> --add-tokens <N> --request-id <id> --answered-by user
+  ${CLI_COMMAND} delivery budget <run-id> --set-tokens <N> --request-id <id> --answered-by user
   ${CLI_COMMAND} delivery resume <run-id> --add-tokens <N> --request-id <id> --answered-by user
   ${CLI_COMMAND} delivery verify <run-id>
   ${CLI_COMMAND} delivery accept <run-id> --accepted-by user
@@ -1725,6 +1726,7 @@ function deliveryCliOptions(options) {
     answeredBy: options["answered-by"],
     guidance: options.guidance,
     addTokens: positiveCliInteger(options["add-tokens"]),
+    setTokens: positiveCliInteger(options["set-tokens"]),
     addIterations: positiveCliInteger(options["add-iterations"] ?? options["extend-iterations"]),
     addElapsedMs: positiveCliInteger(options["add-elapsed-ms"] ?? options["extend-elapsed-ms"]),
     budgetRequestId: options["request-id"],

@@ -349,6 +349,7 @@ export function updateDeliveryLedger(runRoot, update, options = {}) {
       throw new Error(`Delivery ledger changed: expected version ${options.expectedVersion}, found ${current.version}`);
     }
     const proposed = typeof update === "function" ? update(structuredClone(current)) : { ...current, ...update };
+    if (options.skipUnchanged && JSON.stringify(proposed) === JSON.stringify(current)) return { state: current, event: null, ...paths };
     const now = options.updatedAt || new Date().toISOString();
     const next = assertValidLedger({
       ...proposed,
@@ -516,10 +517,13 @@ export function grantDeliveryBudget(runRoot, input = {}) {
   if (input.approvedBy !== "user") throw new Error("A budget extension requires explicit user authorization");
   const requestId = safeIdentifier(input.requestId, "budget request id");
   const additions = { tokens: input.addTokens ?? 0, iterations: input.addIterations ?? 0, elapsed_ms: input.addElapsedMs ?? 0 };
-  if (Object.values(additions).some(value => !Number.isSafeInteger(value) || value < 0) || !Object.values(additions).some(value => value > 0)) {
+  const hasTarget = input.setTokens !== undefined;
+  if (hasTarget && (!Number.isSafeInteger(input.setTokens) || input.setTokens < 1 || additions.tokens !== 0)) throw new Error("Choose either a positive total token budget or additional tokens");
+  if (Object.values(additions).some(value => !Number.isSafeInteger(value) || value < 0) || (!hasTarget && !Object.values(additions).some(value => value > 0))) {
     throw new Error("Specify positive safe integer budget additions");
   }
-  const requestHash = sha256(JSON.stringify(additions));
+  // Existing additive receipts keep their original hashes and wire shape.
+  const requestHash = sha256(JSON.stringify(hasTarget ? { ...additions, token_target: input.setTokens } : additions));
   return updateDeliveryLedger(runRoot, current => {
     const prior = current.budget.amendments.find(entry => entry.request_id === requestId);
     if (prior) {
@@ -531,16 +535,17 @@ export function grantDeliveryBudget(runRoot, input = {}) {
     const now = input.now ?? Date.now();
     const elapsed = Math.max(0, now - Date.parse(current.created_at));
     const before = { max_tokens: current.budget.max_tokens, max_iterations: current.budget.max_iterations, max_elapsed_ms: current.budget.max_elapsed_ms };
+    if (hasTarget && input.setTokens < before.max_tokens && deliveryUsageStatus(current.budget) !== "complete") throw new Error("Resolve unknown build usage before reducing its budget");
     const after = {
-      max_tokens: before.max_tokens + additions.tokens,
+      max_tokens: hasTarget ? input.setTokens : before.max_tokens + additions.tokens,
       max_iterations: before.max_iterations + additions.iterations,
       max_elapsed_ms: additions.elapsed_ms ? Math.max(before.max_elapsed_ms, elapsed) + additions.elapsed_ms : before.max_elapsed_ms,
     };
     if (Object.values(after).some(value => !Number.isSafeInteger(value))) throw new Error("The extended budget exceeds the supported range");
-    if (additions.tokens && after.max_tokens <= current.budget.tokens_used) throw new Error("The extended token cap must exceed the observed usage");
+    if ((hasTarget || additions.tokens) && after.max_tokens <= current.budget.tokens_used) throw new Error("The token cap must exceed the observed usage");
     const budget = {
       ...current.budget, ...after,
-      amendments: [...current.budget.amendments, { request_id: requestId, request_hash: requestHash, approved_by: "user", approved_at: new Date(now).toISOString(), additions, before, after }],
+      amendments: [...current.budget.amendments, { request_id: requestId, request_hash: requestHash, approved_by: "user", approved_at: new Date(now).toISOString(), additions, ...(hasTarget ? { token_target: input.setTokens } : {}), before, after, applied_version: current.version + 1 }],
     };
     const recoverable = current.status === "blocked" && ["token_budget_exhausted", "iteration_budget_exhausted", "elapsed_budget_exhausted"].includes(current.blockers[0]?.code);
     const remaining = budgetBlocker({ ...current, budget }, now);
@@ -551,7 +556,7 @@ export function grantDeliveryBudget(runRoot, input = {}) {
         : { status: "correcting", phase: "budget_extended", next_action: "resume_delivery", blockers: [] }
         : {}),
     };
-  }, { eventType: "delivery_budget_authorized", payload: { request_id: requestId, additions } }).state;
+  }, { skipUnchanged: true, eventType: "delivery_budget_authorized", payload: { request_id: requestId, additions, ...(hasTarget ? { token_target: input.setTokens } : {}) } }).state;
 }
 
 export function accountDeliveryExecutorResult(runRoot, result, executorPath) {

@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: preparation v8; full completion work from cf11419 in codex/roadmap-completion
+source_version: preparation v9; full completion work from cf11419 in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -77,8 +77,11 @@ Marina и latency warnings MacBook записаны в
 общая publication policy 0.4 и обязательный page/chunk/build-identity gate 0.7
 с ограниченными timeout policies для выпуска. Browser desktop/mobile,
 профильные tests, typecheck и staged build проходят; managed adoption этого
-кандидата ещё не выполнен. Следующий вход: точное task/agent/run binding для
-build budget intent/accounting 1.3/1.5, затем readiness/scaffold и остальные требования
+кандидата ещё не выполнен. Task/agent/run binding и build budget intent 1.3/1.4
+теперь реализованы локально: add/set total, дополнительные итерации/время,
+private replay receipts и explicit continuation того же run. Профильные проверки
+54/54 и полный self-test 637/637 проходят; actual page проверена на desktop/mobile.
+Следующий вход: полный accounting 1.5, затем readiness/scaffold и остальные требования
 полного roadmap. Общая цель не закрывается по результатам этого пакета.
 
 ## 1. Граница экземпляра

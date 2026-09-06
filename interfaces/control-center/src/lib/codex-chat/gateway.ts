@@ -10,7 +10,8 @@ import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskCh
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
 import { changeThreadGoalBudget, emptyGoalView, GoalControlError, readThreadGoal, type GoalBudgetReceipt } from "./goal-control";
 import { parseBudgetIntent } from "./budget-intent";
-import { listTaskDeliveries, performTaskDeliveryAction, readTaskDelivery, TaskDeliveryError, type TaskDeliveryRequest } from "../../../../../scripts/agents-mother/task-delivery.mjs";
+import { listTaskDeliveries, normalizeTaskDeliveryBudgetRequest, performTaskDeliveryAction, readTaskDelivery, TaskDeliveryError, type TaskDeliveryRequest } from "../../../../../scripts/agents-mother/task-delivery.mjs";
+import type { DeliveryBudgetReceipt } from "./delivery-types";
 import {
   asObject,
   itemIdFor,
@@ -128,6 +129,9 @@ function replaceableEmptyDirectChat(binding: ChatBinding) {
     && binding.group === "my_chats"
     && binding.preview === ""
     && Object.keys(binding.messageReceipts).length === 0
+    && Object.keys(binding.goalBudgetRequests || {}).length === 0
+    && Object.keys(binding.deliveryBudgetRequests || {}).length === 0
+    && !binding.hasDeliveryBinding
     && binding.taskLinks.length === 0;
 }
 
@@ -493,10 +497,24 @@ export class CodexChatGateway {
 
   async deliveryAction(chatId: string, input: TaskDeliveryRequest) {
     const binding = await this.requireBinding(chatId);
+    if (input?.action === "budget" && (binding.goalBudgetRequests?.[input.requestId] || binding.messageReceipts[input.requestId] || binding.attachmentMessages?.[input.requestId])) {
+      throw new CodexChatGatewayError("idempotency_conflict", "This request identifier already belongs to another task operation.", 409);
+    }
     const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `delivery:${chatId}`);
     if (!release) throw new CodexChatGatewayError("turn_active", "This task has an active operation. Read its progress before trying another action.", 409, true);
     try {
       const current = await this.deliveryContext(chatId, true);
+      if (input?.action === "budget") {
+        input = normalizeTaskDeliveryBudgetRequest(input);
+        const prior = await this.deliveryBudgetReceipt(current, input.requestId);
+        if (prior && hash(normalizeTaskDeliveryBudgetRequest(prior.request)) !== hash(input)) {
+          throw new CodexChatGatewayError("idempotency_conflict", "This budget action was saved with a different request or run.", 409);
+        }
+        if (!prior) await this.saveDeliveryBudgetRequest(current, input);
+      }
+      // This is only a conservative history-retention hint. Authorization is
+      // still verified from the exact run binding by the host controller.
+      if (input?.action === "bind") await this.store.patch(chatId, { hasDeliveryBinding: true });
       return await performTaskDeliveryAction(current, input, { root: this.root, stateRoot: this.store.stateRoot });
     } catch (error) {
       if (error instanceof CodexChatGatewayError) throw error;
@@ -504,6 +522,66 @@ export class CodexChatGateway {
       if ((error as { code?: string })?.code === "delivery_running") throw new CodexChatGatewayError("delivery_running", "This delivery already has an active host operation. Read its current progress.", 409, true);
       throw new CodexChatGatewayError("delivery_unconfirmed", "Read the saved host action before trying another request.", 503, true);
     } finally { release(); }
+  }
+
+  async applyDeliveryBudgetIntent(chatId: string, input: { clientMessageId: string; text: string; runId?: string }) {
+    if (!validClientId(input?.clientMessageId) || typeof input?.text !== "string" || (input.runId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(input.runId))) {
+      throw new CodexChatGatewayError("invalid_request", "A valid message identifier, text and selected run are required.", 400);
+    }
+    const intent = parseBudgetIntent(input.text);
+    if (intent.kind !== "delivery_budget") throw new CodexChatGatewayError("budget_intent_ambiguous", intent.kind === "clarification" ? intent.message : "Send a direct build budget command.", 422);
+    const binding = await this.requireBinding(chatId);
+    if (binding.goalBudgetRequests?.[input.clientMessageId] || binding.messageReceipts[input.clientMessageId] || binding.attachmentMessages?.[input.clientMessageId]) {
+      throw new CodexChatGatewayError("idempotency_conflict", "This message identifier already belongs to another task operation.", 409);
+    }
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `delivery-budget:${chatId}`);
+    if (!release) throw new CodexChatGatewayError("turn_active", "This task has an active operation. Read its saved progress before retrying the budget command.", 409, true);
+    try {
+      const current = await this.deliveryContext(chatId, true);
+      const options = { root: this.root, stateRoot: this.store.stateRoot };
+      const sourceTextHash = hash(input.text.trim());
+      const prior = await this.deliveryBudgetReceipt(current, input.clientMessageId);
+      const requestedRun = intent.runId || input.runId;
+      if (prior && (prior.sourceTextHash !== sourceTextHash || prior.request?.action !== "budget" || !prior.request.runId
+        || (requestedRun && prior.request.runId !== requestedRun))) throw new CodexChatGatewayError("idempotency_conflict", "This budget message was saved with a different text or run.", 409);
+      let request = prior?.request;
+      if (!request) {
+        const runs = requestedRun ? [{ runId: requestedRun }] : listTaskDeliveries(current, options);
+        if (runs.length !== 1) throw new CodexChatGatewayError("delivery_scope_ambiguous", "Выберите одну связанную сборку в панели или укажите её run ID в команде бюджета.", 422);
+        const run = readTaskDelivery(runs[0].runId, current, options);
+        if (run.bindingStatus !== "bound") throw new CodexChatGatewayError("delivery_task_mismatch", "Link the selected build to this task before changing its budget.", 409);
+        request = { runId: run.runId, requestId: input.clientMessageId, expectedRevision: run.revision, action: "budget", sourceTextHash,
+          budget: { mode: intent.mode, tokens: intent.tokens, resume: intent.resume } };
+        // Persist the resolved run before mutation. A retry never re-selects a
+        // newer run, changes scope or grants the same additive budget twice.
+        await this.saveDeliveryBudgetRequest(current, request);
+      }
+      return await performTaskDeliveryAction(current, request, options);
+    } catch (error) {
+      if (error instanceof CodexChatGatewayError) throw error;
+      if (error instanceof TaskDeliveryError) throw new CodexChatGatewayError(error.code, error.message, error.status);
+      if ((error as { code?: string })?.code === "delivery_running") throw new CodexChatGatewayError("delivery_running", "This delivery has an active operation. Retry this same budget message after reading its progress.", 409, true);
+      throw new CodexChatGatewayError("delivery_unconfirmed", "Read the saved build budget action before trying another request.", 503, true);
+    } finally { release(); }
+  }
+
+  private async deliveryBudgetReceipt(binding: ChatBinding, requestId: string): Promise<DeliveryBudgetReceipt | undefined> {
+    const aliases = (await this.store.all()).filter(row => logicalChatKey(row) === logicalChatKey(binding));
+    const receipts = aliases.flatMap(row => Object.hasOwn(row.deliveryBudgetRequests || {}, requestId) ? [row.deliveryBudgetRequests![requestId]] : []);
+    if (!receipts.length) return undefined;
+    const signature = (receipt: DeliveryBudgetReceipt) => hash([receipt.sourceTextHash || null, normalizeTaskDeliveryBudgetRequest(receipt.request)]);
+    const expected = signature(receipts[0]);
+    if (receipts.some(receipt => signature(receipt) !== expected)) {
+      throw new CodexChatGatewayError("idempotency_conflict", "The aliases of this task contain conflicting budget requests. Review the original run before choosing a new action.", 409);
+    }
+    return receipts[0];
+  }
+
+  private async saveDeliveryBudgetRequest(binding: ChatBinding, request: TaskDeliveryRequest) {
+    if (!await this.store.patch(binding.chatId, { deliveryBudgetRequests: { ...binding.deliveryBudgetRequests,
+      [request.requestId]: { ...(request.sourceTextHash ? { sourceTextHash: request.sourceTextHash } : {}), request } } })) {
+      throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
+    }
   }
 
   async threadGoal(chatId: string): Promise<ThreadGoalView> {
@@ -517,6 +595,7 @@ export class CodexChatGateway {
 
   async updateGoalBudget(chatId: string, input: GoalBudgetRequest) {
     const binding = await this.requireBinding(chatId);
+    if (binding.deliveryBudgetRequests?.[input?.requestId]) throw new CodexChatGatewayError("idempotency_conflict", "This request identifier was used for a build budget.", 409);
     const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `goal-budget:${chatId}`);
     if (!release) throw new CodexChatGatewayError("turn_active", "This task already has an active operation. Reconcile it before changing its budget.", 409, true);
     try {
@@ -535,6 +614,7 @@ export class CodexChatGateway {
     const intent = parseBudgetIntent(input.text);
     if (intent.kind !== "goal_budget") throw new CodexChatGatewayError("budget_intent_ambiguous", intent.kind === "clarification" ? intent.message : "Send a direct budget command for this task.", 422);
     const binding = await this.requireBinding(chatId);
+    if (binding.deliveryBudgetRequests?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was used for a build budget.", 409);
     if (binding.messageReceipts[input.clientMessageId] || binding.attachmentMessages?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was already used for a model turn.", 409);
     const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `budget-intent:${chatId}`);
     if (!release) throw new CodexChatGatewayError("turn_active", "This task already has an active operation. Reconcile it before changing its budget.", 409, true);
@@ -705,7 +785,7 @@ export class CodexChatGateway {
       throw new CodexChatGatewayError("runtime_identity_mismatch", "The selected runtime does not match this chat binding.", 409);
     }
     const text = validatedTurnText(input);
-    if (binding.goalBudgetRequests?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was used for a budget change.", 409);
+    if (binding.goalBudgetRequests?.[input.clientMessageId] || binding.deliveryBudgetRequests?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was used for a budget change.", 409);
     if (parseBudgetIntent(text).kind !== "none") throw new CodexChatGatewayError("budget_control_required", "Use the task budget control for this command; it does not require a model turn.", 422);
     const requestHash = hash(input);
     const preparedMessage = binding.attachmentMessages?.[input.clientMessageId];
@@ -997,8 +1077,9 @@ export class CodexChatGateway {
     if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     const aliases = await this.store.all();
     const matching = aliases.filter(row => logicalChatKey(row) === logicalChatKey(binding));
-    return { ...binding, archived: matching.some(row => row.archived), attachmentMessages: Object.assign({}, ...matching.map(row => row.attachmentMessages || {}), binding.attachmentMessages || {}),
-      goalBudgetRequests: Object.assign({}, ...matching.map(row => row.goalBudgetRequests || {}), binding.goalBudgetRequests || {}) };
+    return { ...binding, archived: matching.some(row => row.archived), hasDeliveryBinding: matching.some(row => row.hasDeliveryBinding), attachmentMessages: Object.assign({}, ...matching.map(row => row.attachmentMessages || {}), binding.attachmentMessages || {}),
+      goalBudgetRequests: Object.assign({}, ...matching.map(row => row.goalBudgetRequests || {}), binding.goalBudgetRequests || {}),
+      deliveryBudgetRequests: Object.assign({}, ...matching.map(row => row.deliveryBudgetRequests || {}), binding.deliveryBudgetRequests || {}) };
   }
 
   private releaseActiveTurn(chatId: string) {

@@ -6589,6 +6589,8 @@ button:active,
 .codex-delivery-panel input, .codex-delivery-panel select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--border-medium); border-radius: 6px; background: var(--surface-panel-raised); color: var(--text-primary); }
 .codex-delivery-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .codex-delivery-panel li { overflow-wrap: anywhere; margin: 8px 0; }
+.codex-delivery-panel .codex-goal-resume { flex-direction: row; flex-basis: 100%; }
+.codex-delivery-panel .codex-goal-resume input { width: auto; }
 
 .codex-turn {
   min-width: 0;

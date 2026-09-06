@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 10; released base cf11419; completion work in codex/roadmap-completion
+source_version: pilot roadmap revision 11; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -356,8 +356,17 @@ Task Chat превращает однозначную команду польз�
 и invalid/overflow требуют конкретизации. Потерянный ответ повторяет тот же
 request; нет нового model turn, нового chat или сброса usage/objective.
 Actual Task Chat page проверен на 1280 и 390 px с mocked HTTP, включая
-lost-response retry и reload. Сборочный budget из текста не перенаправляется
-на native Goal; его точная связь с run относится к оставшейся части 1.4.
+lost-response retry и reload.
+
+**Дополнение 2026-09-06:** после exact binding 1.4 реализован budget intent
+конкретной сборки. Run выбирается по явно названному ID, панели или единственной
+связи; неверный выбор не перенаправляется на другую сборку. Typed action
+сохраняется до mutation; UI/text/CLI поддерживают add и set total, ledger
+сохраняет usage, iterations и дату начала. В панели также доступны дополнительные
+итерации и минуты. Resume отдельный: явная команда продолжает существующий run,
+повтор запроса не добавляет бюджет и не повторяет уже отправленную работу.
+Browser actual page на 1280/390 px проверяет потерянный ответ, смену выбора,
+explicit run, reload и неизменный parent Goal. Managed adoption впереди.
 
 ### 1.4 Завершение host-owned шагов при ограниченном Goal — M
 

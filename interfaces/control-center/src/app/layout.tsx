@@ -3,6 +3,10 @@ import Script from "next/script";
 import { AppShell } from "@/components/shell/AppShell";
 import "@/styles/globals.css";
 
+// AppShell reads the current instance's private status. Never bake that state
+// into a release artifact or require a live memory database during compilation.
+export const dynamic = "force-dynamic";
+
 const themeInitScript = `
 (() => {
   const storageKey = "pritha-control-center-theme";
