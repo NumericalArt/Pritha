@@ -25,6 +25,7 @@ sources:
   - 03_reviews/2026-09-05-pritha-pilot-roadmap-current-state-assessment.md
   - 03_reviews/2026-08-22-outcome-delivery-remediation-plan-applicability-assessment.md
   - 11_agents/reports/2026-09-05-pritha-integrated-fleet-release-report.md
+  - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 related:
   intakes: [00_inbox/texts/2026-09-05-pilot-driven-improvement-planning.md]
   reviews:
@@ -57,7 +58,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-05
-source_version: pilot roadmap revision 6; baseline Pritha 43baa16; continuation packet approved for canonical fleet release
+source_version: pilot roadmap revision 7; code release 68147d8 on five canonical instances; post-release gates recorded
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -91,13 +92,15 @@ fixtures; mid-turn поведение 1.7 остаётся runtime-unverified. �
 [review продолжения](../03_reviews/2026-09-05-pritha-budget-continuation-implementation-review.md).
 Текущий полный self-test: 581/581 тест, семь quality checks и strict live
 health pass. Privacy/pre-push audit проходит для всего локального diff.
-Пользователь отдельно разрешил обновление `main`, push в GitHub и выпуск
-на основной Pritha и четырёх канонических экземплярах. Deployment фиксируется
-отдельным release report; он не закрывает весь roadmap. Для архитектуры
+По отдельной команде пользователя `main` обновлён, пакет `68147d8` опубликован
+в GitHub и установлен на основной Pritha и четырёх канонических экземплярах.
+Self-test 581/581 и strict UI прошли на всех пяти; cold-start/latency exceptions
+зафиксированы в [release report](../03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md).
+Это не закрывает весь roadmap. Для архитектуры
 CLI-only и провайдера NeuralDeep подготовлен
 [отдельный roadmap ND](2026-09-05-pritha-neuraldeep-improvement-roadmap.md).
 
-**Оставшийся объём:** 0.3/0.4 и профили; текстовый budget intent 1.3,
+**Оставшийся объём:** 0.3/0.4, новый 0.7 и профили; текстовый budget intent 1.3,
 Task Chat → delivery binding и host action 1.4, live-проверка 1.7 и калибровка;
 readiness/identity/handoff фаз 2–3; scaffold/Trials фазы 4; выбранные runtime
 исправления фазы 5; повторные пилоты фазы 6; публичный путь фазы 7.
@@ -163,7 +166,7 @@ Contract/Outcome Spec для неизменного результата. Это
 
 ## 3. Как исполнять план
 
-Исходные IDs 0.1–7.3 сохранены для трассировки; добавлены 0.6, 1.0 и 4.0.
+Исходные IDs 0.1–7.3 сохранены для трассировки; добавлены 0.6, 0.7, 1.0 и 4.0.
 Номер фазы группирует тему, а не задаёт календарную очередь. Размеры S/M/L
 означают относительный объём и уточняются после первого failing test;
 обещаний по неделям и точной длительности здесь нет.
@@ -187,7 +190,7 @@ E1 подтверждён в `server.ts`. Проверить каждую timeou
 **Результат 2026-09-05: реализовано и проверено локально.** Семь диагностик
 используют общий helper с обязательным timeout и SIGKILL. Ошибка не позволяет
 признать частичный вывод здоровым; tests и staged build проходят. Runtime
-adoption ожидает отдельного release. Event loop и деревья потомков остаются
+adoption выполнен на пяти экземплярах в `68147d8`. Event loop и деревья потомков остаются
 вне доказанного scope этого fix; подробности — в review первого пакета.
 
 ### 0.2 Publication guard при неизвестной базе — S
@@ -239,6 +242,21 @@ baseline нужного экземпляра; чужая память не чи�
 на main возвращает актуальные accepted baselines. Предварительная ручная
 загрузка env больше не требуется.
 
+### 0.7 Реальный page/chunk gate внутри обновлятора — M, до следующего UI release
+
+Post-release inspection `68147d8` показал: `pritha-instance.mjs` проверяет
+внутри transaction только `/api/health`; декларация steps о strict chunks
+не соответствует коду. В текущем выпуске полные проверки выполнены отдельно.
+Следующий пакет должен проверять обязательные страницы, все их JavaScript
+chunks и build ID до признания update успешным, сохраняя verified shutdown
+перед rollback. ND local updater и его regression tests — reference для
+адаптации, без замены mother remote/pin semantics.
+
+Готовность: недоступный chunk, неверный build ID/instance и page failure
+вызывают проверенный rollback и остановку fleet. Cold-start budget явно
+ограничен; одиночный медленный ответ не превращается в вечный retry или
+network watchdog. Наблюдения Marina/MacBook связываются также с 5.1/5.2.
+
 ## 5. Фаза 1 — Goal, бюджет и продолжение
 
 ### 1.0 Согласовать срок жизни build thread и Goal — M, первый архитектурный gate
@@ -278,12 +296,12 @@ user-authorized budget amendments и resume без новой задачи. Doub
 
 ### 1.2 Управление Goal из Task Chat — M
 
-UI/API реализованы в staged candidate: отдельный GET, add/set total, явное
+UI/API реализованы и выпущены в `68147d8`: отдельный GET, add/set total, явное
 resume, private receipt перед RPC, readback/reconnect, сохранение objective и
 usage. Reader v2 и отображение полноты учёта доступны на странице агента.
 Actual component проверен в desktop/mobile browser с mocked HTTP; controller
 проверен на обоих установленных runtime в paused probes без модели.
-Полный `/codex` candidate ждёт managed adoption; scope native Goal не
+Полный `/codex` прошёл managed adoption и strict проверки; scope native Goal не
 смешивается с budget amendment отдельного delivery run.
 
 A2: конкретная native задача показывает used/cap/status и расширение бюджета.
@@ -602,10 +620,10 @@ release evidence; push/settings/publication выполняются по отде
 | Очередь | Пакет | Условие перехода |
 | --- | --- | --- |
 | Подготовка — выполнена | Текущий assessment, baseline, self-test, probe и эта редакция | Документы валидны и доступны в памяти main |
-| Сессия 1 — локальная реализация выполнена | 0.1 + 0.2 + малый 0.6 | 533 tests, typecheck, staged build и live health pass; adoption кандидата отдельно |
+| Сессия 1 — выполнена | 0.1 + 0.2 + малый 0.6 | Локальные проверки; затем общий выпуск `68147d8` |
 | Сессия 2 — локальный и protocol пакет выполнен | 1.0 + 1.5 + границы 1.7; отдельно 0.3/0.4 при необходимости | 561 tests и live health pass; lifecycle проверен на CLI/App; mid-turn live pilot отдельно |
-| Сессия 3 — локальный candidate | Ядро 1.1, UI/API 1.2, delivery часть 1.4 | Same-run extension и host verification проходят fixtures; native paused budget controls и desktop/mobile component pass |
-| Следующий пакет | 1.3, task → run binding для host action 1.4; отдельно managed adoption | Явный текстовый intent меняет правильный бюджет; host action сохраняет права и evidence; candidate проверяется после deployment |
+| Сессия 3 — выпущена на пяти экземплярах | Ядро 1.1, UI/API 1.2, delivery часть 1.4 | 581 tests, native paused controls, browser и post-release strict health pass |
+| Следующий пакет | 1.3, task → run binding для host action 1.4; 0.7 до нового UI rollout | Явный intent меняет правильный бюджет; host action сохраняет права/evidence; обновлятор проверяет настоящие страницы/chunks |
 | Следующий блок | 3.1 → 2.5; 2.1 → 2.3 → 2.2/2.4; 0.5/2.6/3.2/3.3 | Identity, verification и runtime не смешиваются |
 | До повторного пилота | 4.0 → 4.1/4.2; 5.4 и нужные 5.3 fixes | Нет обхода scaffold/verifier/privacy |
 | Пилотный блок | 6.1 → повтор CLI → новые типы 6.2 | Факты завершения и telemetry полны |

@@ -16,6 +16,7 @@ sources:
   - 07_workflows/2026-09-05-pritha-pilot-driven-improvement-roadmap.md
 related:
   reviews:
+    - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
     - 03_reviews/2026-09-05-pritha-pilot-guardrails-implementation-review.md
     - 03_reviews/2026-09-05-pritha-goal-lifecycle-accounting-implementation-review.md
     - 03_reviews/2026-09-05-pritha-budget-continuation-implementation-review.md
@@ -34,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-05
-source_version: preparation v4; baseline Pritha 43baa16; local continuation and Goal controls candidate
+source_version: preparation v5; continuation code release 68147d8 on five canonical instances
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -66,8 +67,13 @@ host verification и панель native Goal в Task Chat. Его резуль�
 [review продолжения](../03_reviews/2026-09-05-pritha-budget-continuation-implementation-review.md).
 Итоговый self-test текущего кода проходит 581/581 тест; typecheck, staged
 build, browser component scenarios и strict live health также проходят.
+По следующей команде пользователя пакет `68147d8` включён в `main`, опубликован
+и установлен на пяти канонических экземплярах. Итоговые проверки, rollback
+Marina и latency warnings MacBook записаны в
+[release report](../03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md).
 Следующая сессия продолжает раздел 4: natural-language intent и task/run
-binding для узкого host action; deployment остаётся отдельным действием.
+binding для узкого host action. До следующего UI rollout также закрывается
+реальный page/chunk gate обновлятора, пункт 0.7 общего roadmap.
 
 ## 1. Граница экземпляра
 
