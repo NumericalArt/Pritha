@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-05
-source_version: preparation v5; continuation code release 68147d8 on five canonical instances
+source_version: preparation v6; full completion work from cf11419 in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -71,9 +71,15 @@ build, browser component scenarios и strict live health также проход
 и установлен на пяти канонических экземплярах. Итоговые проверки, rollback
 Marina и latency warnings MacBook записаны в
 [release report](../03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md).
-Следующая сессия продолжает раздел 4: natural-language intent и task/run
-binding для узкого host action. До следующего UI rollout также закрывается
-реальный page/chunk gate обновлятора, пункт 0.7 общего roadmap.
+Полный оставшийся объём теперь ведётся в
+[completion tracker](2026-09-05-pritha-roadmap-completion-tracker.md).
+В ветке `codex/roadmap-completion` реализованы native Goal intent 1.3,
+общая publication policy 0.4 и обязательный page/chunk/build-identity gate 0.7
+с ограниченными timeout policies для выпуска. Browser desktop/mobile,
+профильные tests, typecheck и staged build проходят; managed adoption этого
+кандидата ещё не выполнен. Следующий вход: точное task/agent/run binding для
+host actions 1.4, затем identity/readiness/scaffold и остальные требования
+полного roadmap. Общая цель не закрывается по результатам этого пакета.
 
 ## 1. Граница экземпляра
 

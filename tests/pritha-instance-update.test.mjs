@@ -43,6 +43,7 @@ function makeFixture() {
   mkdirSync(lib, { recursive: true });
   mkdirSync(path.join(checkout, "interfaces", "control-center", ".next"), { recursive: true });
   copyFileSync(path.join(sourceRoot, "scripts", "pritha-instance.mjs"), path.join(scripts, "pritha-instance.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "control-center-health.mjs"), path.join(scripts, "control-center-health.mjs"));
   writeFileSync(path.join(scripts, "control-center-runtime.mjs"), `
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -92,7 +93,9 @@ if (action === "start") {
 `);
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "env.mjs"), path.join(lib, "env.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "timeout-policy.mjs"), path.join(lib, "timeout-policy.mjs"));
   writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "version"), "good\n");
+  writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "BUILD_ID"), "previous-build\n");
   writeFileSync(path.join(checkout, "interfaces", "control-center", "next-env.d.ts"), "stable next env\n");
   writeFileSync(path.join(checkout, "interfaces", "control-center", "tsconfig.json"), "{}\n");
   writeFileSync(path.join(checkout, "README.md"), "base\n");
@@ -129,6 +132,7 @@ if (command.includes("run build")) {
   const target = path.join(process.cwd(), "interfaces", "control-center", process.env.PRITHA_CONTROL_CENTER_DIST_DIR || ".next");
   fs.mkdirSync(target, { recursive: true });
   fs.writeFileSync(path.join(target, "version"), (process.env.PRITHA_TEST_RELEASE_VERSION || "bad") + "\\n");
+  if (process.env.PRITHA_TEST_HEALTH_FAULT !== "missing-build-id") fs.writeFileSync(path.join(target, "BUILD_ID"), "candidate-build\\n");
   fs.writeFileSync(path.join(process.cwd(), "interfaces", "control-center", "next-env.d.ts"), "generated next env\\n");
   fs.writeFileSync(path.join(process.cwd(), "interfaces", "control-center", "tsconfig.json"), "generated tsconfig\\n");
   process.exit(0);
@@ -137,15 +141,29 @@ if (command.includes("run start")) {
   const version = fs.readFileSync(path.join(live, "version"), "utf8").trim();
   if (version !== "good") process.exit(0);
   const port = Number(process.env.PRITHA_CONTROL_CENTER_PORT);
+  const buildId = fs.readFileSync(path.join(live, "BUILD_ID"), "utf8").trim();
+  const fault = buildId === "candidate-build" ? process.env.PRITHA_TEST_HEALTH_FAULT : "";
+  const commit = require("node:child_process").execFileSync("git", ["rev-parse", "--short=12", "HEAD"], { encoding: "utf8" }).trim();
   http.createServer((request, response) => {
+    if (["/voice", "/agents", "/task-chat", "/codex", "/settings"].includes(request.url)) {
+      if (fault === "timeout" && request.url === "/codex") return;
+      response.writeHead(fault === "page" && request.url === "/codex" ? 500 : 200, { "content-type": "text/html" });
+      response.end(fault === "no-chunks" ? "<html>Loading</html>" : '<html><script src="/_next/static/chunks/fixture.js"></script></html>');
+      return;
+    }
+    if (request.url === "/_next/static/chunks/fixture.js") {
+      response.writeHead(fault === "chunk" ? 404 : 200, { "content-type": fault === "chunk-html" ? "text/html" : "application/javascript" });
+      response.end("window.fixture = true;");
+      return;
+    }
     response.writeHead(request.url === "/api/health" ? 200 : 404, { "content-type": "application/json" });
     response.end(JSON.stringify({
       schema: "pritha-control-center-health-v2",
       ok: request.url === "/api/health",
       service: "pritha-control-center",
       status: "ready",
-      instance: { id: process.env.PRITHA_INSTANCE_ID, role: process.env.PRITHA_INSTANCE_ROLE, port },
-      release: { commit: "fixture", buildId: version },
+      instance: { id: fault === "instance" ? "other-instance" : process.env.PRITHA_INSTANCE_ID, role: process.env.PRITHA_INSTANCE_ROLE, port },
+      release: { commit: fault === "commit" ? "000000000000" : commit, buildId: fault === "build" ? "stale-build" : buildId },
     }));
   }).listen(port, "127.0.0.1");
 }
@@ -182,7 +200,7 @@ exec ${JSON.stringify(process.execPath)} "$@"
   return { fixture, checkout, remoteWork, fakeBin };
 }
 
-function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mutateAgentState = false, finderMetadata = false, stopMode = "") {
+function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mutateAgentState = false, finderMetadata = false, stopMode = "", extraEnv = {}) {
   const stateRoot = path.join(fixture.fixture, "state");
   const agentParent = path.join(fixture.fixture, "agents");
   mkdirSync(agentParent, { recursive: true });
@@ -215,6 +233,9 @@ function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mu
       PRITHA_TEST_STOP_MODE: stopMode,
       PRITHA_UPDATE_HEALTH_TIMEOUT_MS: "1000",
       PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS: "3000",
+      PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS: "500",
+      PRITHA_UPDATE_STRICT_HEALTH_TIMEOUT_MS: "4000",
+      ...extraEnv,
     },
   });
 }
@@ -284,6 +305,11 @@ test("instance update pins the target and preserves agent fingerprints through a
     assert.equal(payload.finalHead, target);
     assert.equal(payload.finalGitClean, true);
     assert.equal(payload.health.ok, true);
+    assert.equal(payload.health.strict.ok, true);
+    assert.equal(payload.health.strict.releaseMatch, true);
+    assert.equal(payload.health.strict.payload.pages.length, 5);
+    assert.equal(payload.health.strict.payload.chunks.length, 1);
+    assert.equal(payload.health.strict.payload.checks.find((item) => item.id === "health-contract").release.buildId, "candidate-build");
     assert.equal(payload.isolationMatch, true);
     assert.equal(payload.memoryDocuments, 1);
     assert.equal(payload.pre_isolation.agent_state.sha256, payload.postIsolation.agent_state.sha256);
@@ -302,6 +328,55 @@ test("instance update pins the target and preserves agent fingerprints through a
     }
     rmSync(fixture.fixture, { recursive: true, force: true });
   }
+});
+
+for (const fault of ["chunk", "chunk-html", "page", "no-chunks", "build", "commit", "instance", "timeout"]) {
+  test(`instance update rolls back after a ${fault} fault despite a reachable health endpoint`, async () => {
+    const fixture = makeFixture();
+    let pid;
+    try {
+      const result = invoke(fixture, await freePort(), "good", null, false, false, "", { PRITHA_TEST_HEALTH_FAULT: fault });
+      const payload = JSON.parse(result.stdout);
+      pid = payload.rollbackPid || payload.pid;
+      assert.equal(result.status, 1, result.stderr || result.stdout);
+      assert.equal(payload.status, "health-failed-rolled-back");
+      assert.equal(payload.health.ok, false);
+      assert.equal(payload.rollbackHealth.ok, true);
+      assert.equal(payload.rollbackHealth.strict.releaseMatch, true);
+      assert.equal(payload.rollbackHealth.strict.payload.pages.length, 5);
+      assert.equal(readFileSync(path.join(fixture.checkout, "interfaces/control-center/.next/BUILD_ID"), "utf8").trim(), "previous-build");
+      const receipt = JSON.parse(readFileSync(payload.manifest, "utf8"));
+      assert.equal(receipt.failed_stop.ok, true);
+      assert.equal(receipt.build_id, "candidate-build");
+      assert.equal(receipt.previous_build_id, "previous-build");
+    } finally {
+      if (pid) { try { process.kill(pid, "SIGTERM"); } catch {} }
+      rmSync(fixture.fixture, { recursive: true, force: true });
+    }
+  });
+}
+
+test("instance update requires a staged build identity before stopping the service", async () => {
+  const fixture = makeFixture();
+  try {
+    const result = invoke(fixture, await freePort(), "good", null, false, false, "", { PRITHA_TEST_HEALTH_FAULT: "missing-build-id" });
+    assert.equal(result.status, 1);
+    assert.equal(JSON.parse(result.stdout).status, "build-identity-unavailable");
+    assert.equal(existsSync(path.join(fixture.fixture, "state/setup/fixture-runtime.pid")), false);
+    assert.equal(readFileSync(path.join(fixture.checkout, "interfaces/control-center/.next/BUILD_ID"), "utf8").trim(), "previous-build");
+  } finally { rmSync(fixture.fixture, { recursive: true, force: true }); }
+});
+
+test("invalid release timeout stops before advancing the checkout or rebuilding memory", async () => {
+  const fixture = makeFixture();
+  try {
+    const before = git(fixture.checkout, "rev-parse", "HEAD");
+    const result = invoke(fixture, await freePort(), "good", null, false, false, "", { PRITHA_UPDATE_STRICT_HEALTH_TIMEOUT_MS: "Infinity" });
+    assert.equal(result.status, 1);
+    assert.match(JSON.parse(result.stdout).error, /PRITHA_UPDATE_STRICT_HEALTH_TIMEOUT_MS must be/);
+    assert.equal(git(fixture.checkout, "rev-parse", "HEAD"), before);
+    assert.equal(existsSync(path.join(fixture.fixture, "state/memory/techscope.sqlite")), false);
+  } finally { rmSync(fixture.fixture, { recursive: true, force: true }); }
 });
 
 test("instance update stops before the UI swap when bootstrap changes local agent state", async () => {
@@ -405,10 +480,3 @@ for (const mode of ["delay-always", "owner", "malformed", "missing-ok"]) {
     }
   });
 }
-
-test("instance update gives post-start health more time than read-only status probes", () => {
-  const source = readFileSync(path.join(sourceRoot, "scripts", "pritha-instance.mjs"), "utf8");
-  assert.match(source, /AbortSignal\.timeout\(Number\(options\.timeoutMs \|\| 2_000\)\)/);
-  assert.match(source, /PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS \|\| 8_000/);
-  assert.match(source, /httpStatus\(\{ requireIdentity: true, timeoutMs: requestTimeoutMs \}\)/);
-});

@@ -9,6 +9,7 @@ import { CodexChatPrivateStore, logicalChatKey, type ChatBinding } from "./priva
 import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
 import { changeThreadGoalBudget, emptyGoalView, GoalControlError, readThreadGoal, type GoalBudgetReceipt } from "./goal-control";
+import { parseBudgetIntent } from "./budget-intent";
 import {
   asObject,
   itemIdFor,
@@ -325,7 +326,8 @@ export class CodexChatGateway {
   }
 
   async createThreadWithFirstTurn(input: CreateThreadWithFirstTurnInput) {
-    validatedTurnText(input.initialTurn);
+    const firstText = validatedTurnText(input.initialTurn);
+    if (parseBudgetIntent(firstText).kind !== "none") throw new CodexChatGatewayError("budget_control_required", "Select an existing task before changing its Goal budget.", 422);
     if (input.initialTurn.attachments?.length && !await this.store.findByClientThreadId(input.clientThreadId)) {
       const provider = await this.runtime.effectiveProvider();
       if (!provider) throw new CodexChatGatewayError("runtime_unavailable", "No compatible runtime is available.", 503, true);
@@ -481,6 +483,39 @@ export class CodexChatGateway {
     } finally { release(); }
   }
 
+  async applyBudgetIntent(chatId: string, input: { clientMessageId: string; text: string }) {
+    if (!validClientId(input?.clientMessageId) || typeof input?.text !== "string") throw new CodexChatGatewayError("invalid_request", "A valid message identifier and text are required.", 400);
+    const intent = parseBudgetIntent(input.text);
+    if (intent.kind !== "goal_budget") throw new CodexChatGatewayError("budget_intent_ambiguous", intent.kind === "clarification" ? intent.message : "Send a direct budget command for this task.", 422);
+    const binding = await this.requireBinding(chatId);
+    if (binding.messageReceipts[input.clientMessageId] || binding.attachmentMessages?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was already used for a model turn.", 409);
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `budget-intent:${chatId}`);
+    if (!release) throw new CodexChatGatewayError("turn_active", "This task already has an active operation. Reconcile it before changing its budget.", 409, true);
+    try {
+      const context = await this.goalContext(chatId, true);
+      const sourceTextHash = hash(input.text.trim());
+      const receipts = await context.receipts();
+      const prior = receipts[input.clientMessageId];
+      if (prior && prior.sourceTextHash !== sourceTextHash) throw new CodexChatGatewayError("idempotency_conflict", "This budget message identifier was used with different text.", 409);
+      const goal = prior ? null : await readThreadGoal(context);
+      if (!prior && !goal?.revision) throw new CodexChatGatewayError("goal_missing", "This task has no Goal to extend.", 409);
+      const request = prior?.request || {
+        requestId: input.clientMessageId, expectedRevision: goal!.revision!,
+        mode: intent.mode, tokens: intent.tokens, resume: intent.resume,
+      };
+      const result = await changeThreadGoalBudget({
+        ...context,
+        save: (id, receipt) => context.save(id, { ...receipt, sourceTextHash }),
+      }, request);
+      this.emit(chatId, "goal.updated", { goal: result.goal });
+      return result;
+    } catch (error) {
+      if (error instanceof CodexChatGatewayError) throw error;
+      if (error instanceof GoalControlError) throw new CodexChatGatewayError(error.code, error.message, error.status, error.retryable);
+      throw new CodexChatGatewayError("goal_update_unconfirmed", "The runtime did not confirm the budget change. Retry the same message to reconcile it.", 503, true);
+    } finally { release(); }
+  }
+
   async archiveThread(chatId: string, archived: boolean) {
     const binding = await this.store.setArchived(chatId, archived);
     if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
@@ -623,6 +658,8 @@ export class CodexChatGateway {
       throw new CodexChatGatewayError("runtime_identity_mismatch", "The selected runtime does not match this chat binding.", 409);
     }
     const text = validatedTurnText(input);
+    if (binding.goalBudgetRequests?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was used for a budget change.", 409);
+    if (parseBudgetIntent(text).kind !== "none") throw new CodexChatGatewayError("budget_control_required", "Use the task budget control for this command; it does not require a model turn.", 422);
     const requestHash = hash(input);
     const preparedMessage = binding.attachmentMessages?.[input.clientMessageId];
     if (preparedMessage && preparedMessage.requestHash !== requestHash) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was already used with different attachments or text.", 409);

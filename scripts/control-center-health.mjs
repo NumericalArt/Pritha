@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import process from "node:process";
+import { timeoutPolicy } from "./lib/timeout-policy.mjs";
 
 const DEFAULT_PAGES = ["/voice", "/agents", "/task-chat", "/codex", "/settings"];
 
@@ -123,7 +124,7 @@ function summarizeStatus(checks, skipped) {
 async function runHealthcheck(options) {
   const baseUrl = normalizeBaseUrl(options);
   const base = new URL(baseUrl);
-  const timeoutMs = Number(options["timeout-ms"] || 8000);
+  const timeoutMs = timeoutPolicy("releaseRequest", { value: options["timeout-ms"] });
   const retries = Math.min(1, Math.max(0, Number(options.retries || 0)));
   const strict = Boolean(options.strict);
   const pages = normalizePages(options);
@@ -217,13 +218,20 @@ async function runHealthcheck(options) {
       pageResults.push(pageResult);
       continue;
     }
+    if (!/\btext\/html\b/i.test(response.contentType)) {
+      pageResult.status = "fail";
+      pageResult.detail = `Unexpected content-type: ${response.contentType || "unknown"}`;
+      checks.push(check("fail", `page:${page}`, "Control Center page did not return HTML", pageResult));
+      pageResults.push(pageResult);
+      continue;
+    }
 
     const pageScripts = extractScriptUrls(response.text, pageUrl, base.origin);
     pageResult.scripts = pageScripts.map((scriptUrl) => new URL(scriptUrl).pathname);
     if (pageScripts.length === 0) {
-      pageResult.status = "warn";
+      pageResult.status = strict ? "fail" : "warn";
       pageResult.detail = "No same-origin JavaScript chunks found in rendered HTML";
-      checks.push(check("warn", `page:${page}`, pageResult.detail, pageResult));
+      checks.push(check(pageResult.status, `page:${page}`, pageResult.detail, pageResult));
     } else {
       checks.push(check("pass", `page:${page}`, "Control Center page loaded and references JavaScript chunks", {
         ...pageResult,
@@ -266,7 +274,7 @@ async function runHealthcheck(options) {
   }
 
   if (chunkResults.length === 0) {
-    checks.push(check("warn", "chunks-present", "No JavaScript chunks were discovered across checked pages"));
+    checks.push(check(strict ? "fail" : "warn", "chunks-present", "No JavaScript chunks were discovered across checked pages"));
   }
 
   return {

@@ -3,6 +3,7 @@ import type { GoalBudgetRequest, ThreadGoalView } from "./types";
 
 type NativeGoal = { threadId: string; objective: string; status: string; tokensUsed: number; tokenBudget: number | null; createdAt: number };
 export type GoalBudgetReceipt = {
+  sourceTextHash?: string;
   request: GoalBudgetRequest;
   requestHash: string;
   objectiveIdentity: string;
@@ -54,7 +55,8 @@ function view(goal: NativeGoal | null, pending: GoalBudgetReceipt | null): Threa
 
 function validateReceipt(receipt: GoalBudgetReceipt) {
   if (!receipt || !["prepared", "applied", "superseded"].includes(receipt.status) || !receipt.requestHash || !receipt.objectiveIdentity
-    || !Number.isSafeInteger(receipt.targetBudget) || receipt.targetBudget < 1 || !Number.isSafeInteger(receipt.usageFloor) || !receipt.request?.requestId) {
+    || !Number.isSafeInteger(receipt.targetBudget) || receipt.targetBudget < 1 || !Number.isSafeInteger(receipt.usageFloor) || !receipt.request?.requestId
+    || (receipt.sourceTextHash !== undefined && !/^[a-f0-9]{64}$/.test(receipt.sourceTextHash))) {
     throw new GoalControlError("goal_receipt_invalid", "The saved budget change needs recovery before another change can be made.", 503, true);
   }
 }

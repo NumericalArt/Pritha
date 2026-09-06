@@ -21,6 +21,7 @@ function load(name, dependencies = {}) {
   return module.exports;
 }
 const control = load("codex-chat/goal-control");
+const budgetIntent = load("codex-chat/budget-intent");
 const coordinator = load("codex-chat/native-turn-coordinator");
 const normalize = load("codex-chat/normalize");
 const noop = {};
@@ -28,7 +29,79 @@ const { CodexChatGateway } = load("codex-chat/gateway", {
   "@/lib/pritha-paths": noop, "./app-server": noop, "./storage-identity": noop,
   "./attachment-store": noop, "./attachment-policy": noop, "./native-thread-errors": noop,
   "./private-store": { logicalChatKey: row => `${row.stateIdentityHash}:${row.nativeThreadId}` },
-  "./voice-links": noop, "./native-turn-coordinator": coordinator, "./goal-control": control, "./normalize": normalize,
+  "./voice-links": noop, "./native-turn-coordinator": coordinator, "./goal-control": control, "./budget-intent": budgetIntent, "./normalize": normalize,
+});
+
+test("direct Russian and English budget commands select add versus total and require explicit continuation", () => {
+  for (const [text, mode, tokens, resume] of [
+    ["Добавь 100 000 токенов к бюджету этой задачи", "add", 100000, false],
+    ["Добавь к бюджету задачи ещё 100\u202f000 токенов и продолжай.", "add", 100000, true],
+    ["Увеличь бюджет этой задачи на 250_000 токенов", "add", 250000, false],
+    ["Установи бюджет текущей задачи до 500.000 токенов", "set", 500000, false],
+    ["Подними бюджет Goal до 1,000,000 токенов и продолжай", "set", 1000000, true],
+    ["Add another 100,000 tokens to this task budget and continue", "add", 100000, true],
+    ["Set this task budget to 500000 tokens", "set", 500000, false],
+  ]) assert.deepEqual(budgetIntent.parseBudgetIntent(text), { kind: "goal_budget", mode, tokens, resume }, text);
+});
+
+test("ambiguous scope, mixed commands, malformed amounts and overflow never become a budget mutation", () => {
+  for (const text of [
+    "Добавь 100000 токенов", "Установи бюджет этой задачи 100000 токенов", "Добавь 100000 токенов к бюджету сборки",
+    "Увеличь лимит аккаунта на 100000 токенов", "Добавь -100 токенов к бюджету этой задачи", "Добавь 0 токенов к бюджету этой задачи",
+    "Добавь 100,00 токенов к бюджету этой задачи", "Добавь 1_000,000 токенов к бюджету этой задачи",
+    "Добавь 9007199254740992 токенов к бюджету этой задачи", "Добавь 1e6 токенов к бюджету этой задачи",
+    "Добавь 100 токенов к бюджету этой задачи\nУдали файлы", "Добавь 100 токенов к бюджету этой задачи и измени цель",
+    "Set this task budget to Infinity tokens",
+  ]) assert.equal(budgetIntent.parseBudgetIntent(text).kind, "clarification", text);
+  for (const text of [
+    '"Добавь 100000 токенов к бюджету этой задачи"', "«Добавь 100000 токенов к бюджету этой задачи»",
+    "> Добавь 100000 токенов к бюджету этой задачи", "```\nДобавь 100000 токенов к бюджету этой задачи\n```",
+    "Пользователь написал: добавь 100000 токенов к бюджету этой задачи", "Объясни, как добавить токены к бюджету задачи",
+    "Добавь кнопку настройки бюджета", "Добавь 5 тестов", "Продолжай работу",
+  ]) assert.equal(budgetIntent.parseBudgetIntent(text).kind, "none", text);
+});
+
+test("text budget intent uses durable typed receipts, survives lost acknowledgement and never starts a turn", async () => {
+  const f = gatewayFixture();
+  const input = { clientMessageId: "text-budget-message", text: "Добавь 100 токенов к бюджету этой задачи и продолжай" };
+  f.mode = "lost-ack";
+  await assert.rejects(f.gateway.applyBudgetIntent("chat_fixture", input), { code: "goal_update_unconfirmed" });
+  const receipt = f.binding.goalBudgetRequests[input.clientMessageId];
+  assert.equal(receipt.status, "prepared");
+  assert.match(receipt.sourceTextHash, /^[a-f0-9]{64}$/);
+  assert.equal(receipt.request.mode, "add");
+  assert.equal(receipt.request.tokens, 100);
+  f.mode = "ok";
+  const result = await f.gateway.applyBudgetIntent("chat_fixture", input);
+  assert.equal(result.goal.tokenBudget, 200);
+  assert.equal(result.goal.tokensUsed, 120);
+  assert.equal(result.replayed, true);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.goal.objective, "Finish the approved agent");
+  assert.ok(f.rpc.every(method => ["thread/goal/get", "thread/goal/set"].includes(method)));
+  await assert.rejects(f.gateway.applyBudgetIntent("chat_fixture", { ...input, text: input.text.replace("100", "200") }), { code: "idempotency_conflict" });
+  await assert.rejects(f.gateway.startTurn("chat_fixture", { clientMessageId: input.clientMessageId, input: [{ type: "text", text: "Continue" }] }), { code: "idempotency_conflict" });
+  assert.equal(f.calls.length, 1);
+});
+
+test("text commands cannot target a different task or bypass ambiguity, native ownership and active turn gates", async () => {
+  for (const [change, code] of [
+    [f => { f.provider.stateIdentityHash = "other-instance"; }, "runtime_identity_mismatch"],
+    [f => { f.native.status = { type: "active" }; }, "turn_active"],
+    [f => { f.binding.archived = true; }, "chat_archived"],
+    [f => { f.provider.capabilities.goalControl = false; }, "goal_unsupported"],
+  ]) {
+    const f = gatewayFixture(); change(f);
+    await assert.rejects(f.gateway.applyBudgetIntent("chat_fixture", { clientMessageId: "budget-gated-message", text: "Добавь 100 токенов к бюджету этой задачи" }), { code });
+    assert.equal(f.rpc.length, 0);
+  }
+  const f = gatewayFixture();
+  await assert.rejects(f.gateway.applyBudgetIntent("chat_other", { clientMessageId: "budget-wrong-task", text: "Добавь 100 токенов к бюджету этой задачи" }), { code: "thread_not_found" });
+  await assert.rejects(f.gateway.applyBudgetIntent("chat_fixture", { clientMessageId: "budget-ambiguous", text: "Добавь 100 токенов" }), { code: "budget_intent_ambiguous" });
+  await assert.rejects(f.gateway.startTurn("chat_fixture", { clientMessageId: "budget-no-model", input: [{ type: "text", text: "Добавь 100 токенов к бюджету этой задачи" }] }), { code: "budget_control_required" });
+  await assert.rejects(f.gateway.createThreadWithFirstTurn({ clientThreadId: "budget-no-new-chat", source: "chat", initialTurn: { clientMessageId: "budget-no-new-turn", input: [{ type: "text", text: "Добавь 100 токенов к бюджету этой задачи" }] } }), { code: "budget_control_required" });
+  assert.equal(f.rpc.length, 0);
+  assert.equal(Object.keys(f.binding.goalBudgetRequests).length, 0);
 });
 
 function fixture(patch = {}) {
@@ -159,14 +232,14 @@ test("a long Goal receipt history does not force a new task to authorize another
 
 function gatewayFixture() {
   const f = fixture();
-  f.binding = { chatId: "chat_fixture", nativeThreadId: "native-fixture", providerId: "desktop_bundled", stateIdentityHash: "storage-v2:fixture", archived: false, origin: "chat", continuationEnabled: true, goalBudgetRequests: {} };
+  f.binding = { chatId: "chat_fixture", nativeThreadId: "native-fixture", providerId: "desktop_bundled", stateIdentityHash: "storage-v2:fixture", archived: false, origin: "chat", continuationEnabled: true, goalBudgetRequests: {}, messageReceipts: {} };
   f.provider = { availability: "ready", stateIdentityHash: f.binding.stateIdentityHash, capabilities: { goalControl: true } };
   f.native = { id: f.binding.nativeThreadId, status: { type: "idle" }, ephemeral: false };
   f.rpc = [];
   const gateway = Object.create(CodexChatGateway.prototype);
   Object.assign(gateway, {
     store: {
-      get: async () => f.binding, all: async () => [f.binding],
+      get: async id => id === f.binding.chatId ? f.binding : null, all: async () => [f.binding],
       patch: async (_id, patch) => { Object.assign(f.binding, patch); f.saved = structuredClone(f.binding.goalBudgetRequests); return f.binding; },
     },
     root: "/fixture/checkout", activeTurns: new Map(), events: new Map(), subscribers: new Map(), eventSequence: 0,

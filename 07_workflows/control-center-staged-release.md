@@ -3,7 +3,7 @@ id: control-center-staged-release
 type: workflow
 status: active
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-09-05
 topics:
   - control-center
   - staged-release
@@ -25,10 +25,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-08-27
-source_updated: 2026-08-27
-source_version: control-center-staged-release-v1
+source_updated: 2026-09-05
+source_version: control-center-staged-release-v2; required page/chunk and build-identity gate
 retrieved: 2026-08-27
-verified: 2026-08-27
+verified: 2026-09-05
 valid_for: Pritha Control Center production and fleet releases
 temporal_status: current
 memory_domain: pritha-self
@@ -76,7 +76,9 @@ transaction after the separate lifecycle approval exists:
 5. boot out only the manager-verified instance service;
 6. atomically swap staged and live builds;
 7. start the launchd service;
-8. validate health-v2 identity, required pages and JavaScript chunks;
+8. validate health-v2 identity, exact target commit and staged `BUILD_ID`, then
+   `/voice`, `/agents`, `/task-chat`, `/codex`, `/settings` and every referenced
+   same-origin JavaScript chunk; HTML without chunks is a failure;
 9. re-check Git and instance isolation;
 10. remove the displaced build only after all checks pass.
 
@@ -84,6 +86,33 @@ If any check fails, boot out the current service, restore the displaced build
 and previous private service state, restart that instance, verify rollback
 health, and stop fleet progression. Instances later in the order remain
 untouched.
+
+The private release receipt records candidate and previous build IDs plus the
+complete strict health result. Rollback health checks the previous build ID,
+instance, pages and chunks. It does not confuse the checkout's current Git HEAD
+with the identity of the restored compiled build. A missing build ID is detected
+before stopping the service. An unconfirmed managed stop still prevents swapping
+or restoring files under a live process.
+
+### Bounded release timeouts
+
+The single policy source is `scripts/lib/timeout-policy.mjs`. Both the updater
+and `control-center-health.mjs` use its request policy. All overrides are whole
+milliseconds; invalid, fractional, negative, empty or out-of-range values fail
+before update mutations. Overrides are invocation-scoped unless the operator
+explicitly saves an environment change.
+
+| Environment override | Default | Allowed range | Scope |
+| --- | ---: | ---: | --- |
+| `PRITHA_UPDATE_HEALTH_TIMEOUT_MS` | 45000 | 100–300000 | Readiness polling after start |
+| `PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS` | 30000 | 100–300000 | Readiness polling after rollback |
+| `PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS` | 8000 | 50–60000 | Each HTTP request, including strict pages/chunks |
+| `PRITHA_UPDATE_STRICT_HEALTH_TIMEOUT_MS` | 180000 | 100–600000 | Whole strict checker process per build |
+
+Readiness requests and poll delays are capped by the remaining readiness
+deadline. Once ready, strict verification has its separate total deadline and
+is terminated with SIGKILL on expiry. A failed strict check causes rollback;
+there is no continuous watchdog, automatic restart loop or unlimited retry.
 
 ## Apply approval boundary
 

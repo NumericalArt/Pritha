@@ -33,7 +33,7 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-05
-source_version: NeuralDeep main 31b438e; installed CLI 0.153.0; mother pilot continuation packet
+source_version: ND roadmap revision 2; NeuralDeep code 31b438e with local plan commit 87cc59a; mother completion work from cf11419
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -282,3 +282,106 @@ ND-5 A/B может предшествовать ND-4 по пользовате�
 
 Закрытие roadmap требует доказанного end-to-end outcome и acceptance.
 Публикация плана или выпуск материнской Pritha сами по себе его не закрывают.
+
+## 11. Полная трассировка mother roadmap и оставшиеся ND пакеты
+
+План охватывает весь mother roadmap, включая небольшие helpers и public path.
+Таблица задаёт требования переноса, а не утверждает, что mother или ND уже
+прошли перечисленные проверки. На 2026-09-05 ND checkout содержит только
+документационный commit `87cc59a` поверх code baseline `31b438e`; проверенный
+ранее runtime остаётся отдельным evidence. Материнская ветка completion
+уже добавила локальные 0.4/0.7 и native task intent 1.3, но эти изменения ещё
+не являются установленным ND кодом.
+
+| Mother ID | ND пакет | Что именно реализовать/проверить |
+| --- | --- | --- |
+| 0.1, 0.6 | ND-0 / runtime | Bounded probes и env-first Good State из собственного state-root; не читать main mother memory |
+| 0.2, 0.4 | ND public package | Общая child-artifact policy. У ND нет обычного origin/main: publication base задаётся проверенным локальным ref либо будущим ND remote; отсутствие базы остаётся явным отказом, без фиктивного успешного audit |
+| 0.3, 7.1 | ND getting-started | Реальные launcher/auth prerequisites → Contract/Outcome → CLI scaffold → Trials → handoff. Guide проверяется clean fixture с ND config, без OpenAI fallback |
+| 0.5, 2.6, 3.2, 3.3 | ND-4 | Instance-local profile и authored mission, идемпотентность, handoff по типу результата, operations manifest только по выбранным возможностям |
+| 0.7 | ND release | Сохранить уже работающий pinned local updater. Добавить проверку предыдущего BUILD_ID и страниц/chunks после rollback, validated readiness/request/strict deadlines. Не переносить mother fetch/origin semantics |
+| 1.0, 1.7 | ND-0 | Host budget capability contract. Не вызывать отсутствующие Goal RPC и не требовать waiver для штатного CLI пути; mid-call token cutoff проверяется отдельно на ND provider |
+| 1.1, 1.5 | ND-1 | Shared reservation/receipt на каждый paid attempt; parent Task Chat, delivery build, summary, probes и прочие phases имеют явный scope/coverage |
+| 1.2, 1.3 | ND-3 | Run budget UI/typed intent с explicit target, add/set/units, pending recovery и сохранением drafted amount. Native task Goal endpoint матери не является ND API |
+| 1.4 | ND-2 / ND-4 | Exact task/run/instance binding и узкое host действие approved verification/handoff; общий admission, отсутствие нового CLI/model spawn только ради изменения лимита |
+| 1.6 | ND-6 | Калибровка по одинаковой модели/версии/effort/классу задачи; source, N и диапазон. Tokens, рублей estimate и wallet charge не смешиваются |
+| 2.1 | ND-4 | Versioned agent_kind независимо от transport/provider; accepted legacy contracts сохраняют прежние locks |
+| 2.2, 2.3, 2.4 | ND-4 | Раздельные evidence/runtime/action states; CLI не требует web/service; approved argv и path boundary, никакого выполнения команды из GET |
+| 2.5, 3.1 | ND-4 | Stable identity и reconciliation по exact revision/Trial/approval/receipt, без substring attribution, самодельного acceptance или auto merge |
+| 4.0, 4.1, 4.2 | ND-4 | Совместимый scaffold до mutation, protected host verifier с provenance/hash и negative-control Trial, один согласованный automated_trial_waiver |
+| 5.1, 5.2 | ND runtime | Разделить probe execution/access cache/card projection после их semantic fixes. Общая policy для MJS/TS, bounded async I/O и invalidation; не связывать HTTP account timeout с уничтожением CLI задачи |
+| 5.3 | ND runtime | Cleanup по terminal receipt и process ownership; failure виден, повтор идемпотентен, dirty/recoverable/foreign worktrees и session history сохраняются |
+| 5.4 | ND privacy | Проверить каждый research/improve/summary writer, adapter error и usage export; redaction до locks, private host/provider IDs и credentials не публикуются |
+| 5.5 | ND documentation | Sensors inventory: shipped claims → actual code/evals; отсутствующий harness явно остаётся предложением |
+| 5.6 | Deferred | Сохранить Techscope env/index compatibility; отдельная миграция не нужна для создания агента |
+| 6.1 | ND preparation | Ретроспектива mother и имеющихся ND попыток: source/version, measured/reported/unknown; отсутствие данных не заполняется нулями |
+| 6.2 | ND-6 | Сначала измеренный CLI, затем service/job-runner/tool-server по capability gates; реальные расписания/службы — отдельные actions |
+| 6.3 | ND-6 | Scope-specific empirical decision после наблюдений; success одного типа/модели не переносится на весь provider |
+| 7.2, 7.3 | ND public package | Synthetic demo, changelog, explicit publication target, privacy guards, immutable release evidence. Не создавать ND remote и публичный release из одного факта подготовки roadmap |
+
+Runtime/privacy/public packages имеют те же проверки, что ND-0…ND-6, и
+входят в итоговую подготовку. Они не исключаются из плана словом «адаптация».
+Порядок: сначала ND-0/1/2, затем identity/readiness и UI по зависимостям;
+рефакторинг server отдельно после стабилизации semantics; public guide/demo
+после рабочего scaffold и проверки полного сценария.
+
+## 12. Evidence contract и приёмочные сценарии ND
+
+### Граница task/run/attempt
+
+Private binding должен связывать instance/state identity, native CLI session,
+Task Chat ID, Voice topic/generation (если выбран), delivery run, target project
+и approved spec/contract fingerprints. Agent display name, последняя открытая
+карточка и текст ответа модели не разрешают выбрать run. Конфликт IDs и
+неполное legacy evidence дают диагностируемый recovery path; новый run не
+создаётся для обхода лимита или дефекта связывания.
+
+У каждого paid attempt есть immutable request identity, phase/substep,
+reservation, dispatched/terminal timestamps, observed process/session identity,
+usage source и coverage. Частичное provider событие не подтверждает завершение
+CLI процесса. Terminal CLI event не доказывает сохранение provider billing
+snapshot. Host evidence сохраняет оба факта, включая рассогласование.
+
+### Матрица отказов
+
+| Сценарий | Обязательное наблюдаемое поведение | Где расширять существующие tests |
+| --- | --- | --- |
+| Ошибка capability probe до build | Расход/unknown probe сохранён, дальнейшее действие определено, агент/Contract не пересоздаются | `neuraldeep-cli-runner`, Agents Mother budget/executor tests |
+| Build изменил файлы, summary упал | Build evidence и worktree доступны; summary не аннулирует продукт и не запускает build повторно | CLI runner, usage ledger, delivery loop |
+| CLI timeout при незавершённом provider request | Own process state и receipt сверяются; неизвестный расход видим; нет автоматического replay | `neuraldeep-cli-runner`, `neuraldeep-responses-adapter` |
+| Потерян HTTP ответ на grant/continue | Повтор с тем же request ID не меняет cap и не создаёт второй процесс | `neuraldeep-admission-coordinator`, `neuraldeep-task-chat-registry`, UI browser |
+| Два UI/Voice/host controller | Один reservation/dispatch по точному binding; второй видит pending действие | Admission coordinator, `neuraldeep-task-chat-voice-invariants` |
+| Смена effective Codex home | Подтверждённое происхождение session/registry; старое соответствие пути не угадывается | `neuraldeep-state-migration`, `neuraldeep-memory-runtime` |
+| Модель сменилась или provider counter сбросился | Новый measurement segment; старый расход не уменьшается и не суммируется дважды | `neuraldeep-usage-ledger`, `control-center-neuraldeep-billing` |
+| Rate/billing/auth/API failure | Typed reason, сохранённый draft/history/run; account error не лечится скрытым token extension | `neuraldeep-provider-errors`, `neuraldeep-account-snapshot` |
+| Оригинал файла сохранён, модель его не приняла | Draft/attachment identity сохраняются; UI не утверждает, что файл прочитан | Responses adapter, registry, ND Task Chat browser |
+| Trials после лимита | Approved argv/cwd/isolation и неизменные verifier inputs; outcome может стать verified при неполном accounting, но не автоматически accepted | Delivery loop, immutable Trial runner |
+| Candidate health зелёный, chunk отсутствует | Verified stop → previous build restore → strict rollback health; следующий instance не обновляется | `pritha-instance-update` |
+
+Имена в последней колонке относятся к существующим ND test surfaces, а не к
+заявлению, что все новые cases уже реализованы. Для UI добавлять browser
+сценарии на actual components/served candidate, а не только проверки строк.
+
+### Provider evidence перед живым прогоном
+
+Сохранить приватно: launcher/CLI version, adapter commit, model ID, reasoning
+settings, dated primary provider source либо содержательный schema/version
+context, supported input/output modalities, timeout/retry semantics и pricing
+source с валютой/датой. Недоступная цена остаётся unknown; не подставлять
+тариф OpenAI. Сам факт custom provider configuration не подтверждает поддержку
+всех Responses полей, native Goal или App Server.
+
+Измеримый прогон имеет явно выбранные ограничения на tokens/time/iterations,
+учитывает probe и summary и использует синтетические данные. В отчёте отдельно:
+implementation complete, runtime verified, pilot validated и user accepted.
+Ручное тестирование пользователя начинается после технической подготовки;
+до него нельзя отмечать соответствующие empirical/acceptance строки как pass.
+
+### Финальный review пакета
+
+Перед ND adoption сверить фактический local pin, Good State, own state/children,
+focused provider/CLI/admission/ledger tests, полный self-test, typecheck,
+staged build, desktop/mobile и strict health `/voice,/agents,/task-chat,/codex,/settings,/dev`
+с JS chunks и build identity. Все failed/unknown проверки остаются явными.
+Shared roadmap в матери и рабочая копия ND получают согласованную revision;
+проверенные локальные ND implementation commits не смешиваются с mother history.

@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
+import { CHILD_AGENT_TYPES } from "./lib/child-agent-artifacts.mjs";
 import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const PROMOTABLE_TYPES = new Map([
@@ -13,20 +14,6 @@ const PROMOTABLE_TYPES = new Map([
   ["decision", "05_decisions/"],
   ["workflow", "07_workflows/"],
 ]);
-const CHILD_AGENT_TYPES = new Set([
-  "agent-contract",
-  "agent-outcome-spec",
-  "scaffold-report",
-  "agent-delivery-report",
-  "agent-test-report",
-  "agent-handoff-report",
-  "agent-operations-report",
-  "agent-deployment-report",
-  "agent-post-creation-review",
-  "agent-registry",
-  "child-agent-profile",
-]);
-
 function option(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] || "" : "";

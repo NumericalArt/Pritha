@@ -24,6 +24,7 @@ import { useChatAttachments } from "./useChatAttachments";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
+import { parseBudgetIntent } from "@/lib/codex-chat/budget-intent";
 import { CodexMarkdown } from "./CodexMarkdown";
 import {
   checkControlCenterHealth,
@@ -58,6 +59,7 @@ import type {
   ThreadSummary,
   TurnPage,
   TurnView,
+  ThreadGoalView,
 } from "@/lib/codex-chat/types";
 
 type ConnectionState = "idle" | "connecting" | "ready" | "reconnecting";
@@ -307,6 +309,7 @@ export function CodexChatPage() {
   const [recovering, setRecovering] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [goalRevision, setGoalRevision] = useState(0);
+  const [budgetNotice, setBudgetNotice] = useState<{ chatId: string; text: string } | null>(null);
   const [historyState, setHistoryState] = useState<HistoryState>("idle");
   const [historyHasImages, setHistoryHasImages] = useState(false);
   const [olderCursor, setOlderCursor] = useState<string | null>(null);
@@ -1031,7 +1034,21 @@ export function CodexChatPage() {
   async function deliverMessage(delivery: PendingDelivery) {
     setSending(true);
     setError(null);
+    const intent = parseBudgetIntent(delivery.text);
+    const budgetCommand = intent.kind === "goal_budget" && !delivery.attachments?.length;
     try {
+      if (intent.kind === "goal_budget" && budgetCommand) {
+        const response = await api<ThreadGoalView>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/goal/intent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": delivery.clientMessageId },
+          body: JSON.stringify({ clientMessageId: delivery.clientMessageId, text: delivery.text }),
+        }, { timeoutMs: TURN_START_TIMEOUT_MS });
+        setPendingForChat(delivery.chatId, null);
+        updateDraftForChat(delivery.chatId, (current) => current.trim() === delivery.text ? "" : current);
+        setBudgetNotice({ chatId: delivery.chatId, text: `Task budget updated: ${response.data.tokensUsed?.toLocaleString()} / ${response.data.tokenBudget?.toLocaleString()} tokens.${intent.resume ? " Continuation requested." : ""}` });
+        setGoalRevision(value => value + 1);
+        return;
+      }
       const response = await api<AcceptedTurn>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/turns`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": delivery.clientMessageId },
@@ -1047,7 +1064,7 @@ export function CodexChatPage() {
         const unknown = { ...delivery, status: "delivery_unknown" as const };
         setPendingForChat(delivery.chatId, unknown);
         setError({
-          message: "The connection ended before delivery could be confirmed. Check history before retrying the same message.",
+          message: budgetCommand ? "The budget change is unconfirmed. Check the same request before making another change." : "The connection ended before delivery could be confirmed. Check history before retrying the same message.",
           source: "turn",
           kind: cause instanceof ControlCenterRequestError && cause.kind !== "api" ? "backend_offline" : "turn_failed",
           chatId: delivery.chatId,
@@ -1114,6 +1131,12 @@ export function CodexChatPage() {
     const text = draft.trim();
     if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || pendingNewChatDelivery || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
     const chatId = selectedChatId;
+    const intent = parseBudgetIntent(text);
+    if (intent.kind === "clarification" || (intent.kind === "goal_budget" && (!chatId || attachmentIds.length > 0))) {
+      setError({ message: intent.kind === "clarification" ? intent.message : "Select the task whose Goal you want to change and send the budget command without attachments.", source: "mutation", kind: "request_failed", chatId, retryable: false });
+      return;
+    }
+    setBudgetNotice(null);
     if (!chatId) {
       await deliverNewChatMessage({
         clientThreadId: crypto.randomUUID(),
@@ -1169,6 +1192,10 @@ export function CodexChatPage() {
     try {
       await checkControlCenterHealth();
       await refreshRuntime();
+      if (parseBudgetIntent(delivery.text).kind === "goal_budget" && !delivery.attachments?.length) {
+        await deliverMessage(delivery);
+        return;
+      }
       const nextDetail = await loadThreadDetail(delivery.chatId);
       await loadThreadHistory(delivery.chatId, nextDetail);
       const unresolved = pendingDeliveriesRef.current[delivery.chatId];
@@ -1357,6 +1384,7 @@ export function CodexChatPage() {
         {displayedDetail ? <GoalBudgetPanel key={displayedDetail.thread.chatId} chatId={displayedDetail.thread.chatId} refreshKey={goalRevision}
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} /> : null}
+        {budgetNotice?.chatId === selectedChatId ? <div className="codex-attachment-notice" role="status">{budgetNotice.text}</div> : null}
         <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
           {loading && !selectedChatId ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Task Chat</h2></div> : null}
           {!loading && !selectedChatId ? (
@@ -1426,7 +1454,9 @@ export function CodexChatPage() {
             <div className="codex-inline-notice warning codex-delivery-unknown">
               {pendingNewChatDelivery
                 ? "First-message delivery is unknown. The same idempotent create request will be reconciled before anything new is sent."
-                : "Delivery is unknown. History will be checked first; Task Chat will never replay this turn automatically."}
+                : parseBudgetIntent(pendingDelivery.text).kind === "goal_budget"
+                  ? "Budget confirmation is pending. Check the saved request to avoid adding tokens twice."
+                  : "Delivery is unknown. History will be checked first; Task Chat will never replay this turn automatically."}
               <button type="button" onClick={() => void retryUnknownDelivery()} disabled={recovering || sending || draft.trim() !== pendingDelivery.text}>
                 {recovering ? "Checking…" : "Check and retry same message"}
               </button>

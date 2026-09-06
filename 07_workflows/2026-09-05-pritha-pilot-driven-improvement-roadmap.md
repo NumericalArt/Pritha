@@ -58,7 +58,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-05
-source_version: pilot roadmap revision 7; code release 68147d8 on five canonical instances; post-release gates recorded
+source_version: pilot roadmap revision 8; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -100,7 +100,15 @@ Self-test 581/581 и strict UI прошли на всех пяти; cold-start/l
 CLI-only и провайдера NeuralDeep подготовлен
 [отдельный roadmap ND](2026-09-05-pritha-neuraldeep-improvement-roadmap.md).
 
-**Оставшийся объём:** 0.3/0.4, новый 0.7 и профили; текстовый budget intent 1.3,
+**Продолжение по полному roadmap:** пользователь поручил завершить необходимые
+изменения, подготовить и обновить канонические экземпляры, расширить план ND
+и опубликовать итог в GitHub перед ручным тестированием создания агентов на
+материнской Pritha. Полный объём сохраняется. Текущая ветка
+`codex/roadmap-completion` начинается от `cf11419`; список доказательств и
+незакрытых требований ведётся в
+[completion tracker](2026-09-05-pritha-roadmap-completion-tracker.md).
+
+**Оставшийся объём:** 0.3, adoption локальных 0.4/0.7 и профили; adoption текстового budget intent 1.3,
 Task Chat → delivery binding и host action 1.4, live-проверка 1.7 и калибровка;
 readiness/identity/handoff фаз 2–3; scaffold/Trials фазы 4; выбранные runtime
 исправления фазы 5; повторные пилоты фазы 6; публичный путь фазы 7.
@@ -220,6 +228,11 @@ F2: вынести одинаковую policy в общий модуль script
 Готовность: один экспорт; поведенческие publication tests продолжают ловить
 запрещённые типы. Удалять только тест дублирования, не coverage запрета.
 
+**Результат 2026-09-05: реализовано локально.** `CHILD_AGENT_TYPES` вынесен в общий
+`scripts/lib/child-agent-artifacts.mjs`; оба consumer используют один экспорт.
+Семь publication regression tests проходят. Runtime adoption нового пакета
+ещё не выполнен.
+
 ### 0.5 Canonical profile при handoff — M, после 3.1
 
 C3 подтверждён. Профиль создавать в instance-local `agents/profiles/`, с
@@ -256,6 +269,14 @@ chunks и build ID до признания update успешным, сохран
 вызывают проверенный rollback и остановку fleet. Cold-start budget явно
 ограничен; одиночный медленный ответ не превращается в вечный retry или
 network watchdog. Наблюдения Marina/MacBook связываются также с 5.1/5.2.
+
+**Результат 2026-09-05 в ветке completion:** строгая проверка обязательных страниц,
+всех найденных JS chunks, exact commit и staged BUILD_ID теперь включена в
+release transaction. Rollback проверяет предыдущий BUILD_ID и страницы;
+неподтверждённый managed stop по-прежнему запрещает замену файлов. Сроки
+readiness, request, strict checker и rollback ограничены общей именованной
+policy и валидируются до mutation. Профиль release/health/policy: 25/25 pass;
+fleet stop-on-failure также проходит. Adoption ещё предстоит.
 
 ## 5. Фаза 1 — Goal, бюджет и продолжение
 
@@ -325,6 +346,17 @@ Task Chat превращает однозначную команду польз�
 однозначный уже авторизованный intent не требует повторных подтверждений.
 Готовность: кириллица, разделители чисел, invalid/overflow, цитата чужой команды,
 повтор сообщения и несколько активных run'ов не изменяют неверную цель.
+
+**Результат 2026-09-05 в ветке completion:** прямой текстовый intent для
+бюджета выбранной native задачи преобразуется в те же Goal receipts и RPC.
+`добавь 100 000 токенов к бюджету этой задачи` и
+`установи бюджет этой задачи до 500 000 токенов` различаются; `и продолжай`
+явно запрашивает resume. Цитаты не исполняются control plane, неясный scope
+и invalid/overflow требуют конкретизации. Потерянный ответ повторяет тот же
+request; нет нового model turn, нового chat или сброса usage/objective.
+Actual Task Chat page проверен на 1280 и 390 px с mocked HTTP, включая
+lost-response retry и reload. Сборочный budget из текста не перенаправляется
+на native Goal; его точная связь с run относится к оставшейся части 1.4.
 
 ### 1.4 Завершение host-owned шагов при ограниченном Goal — M
 
@@ -623,7 +655,8 @@ release evidence; push/settings/publication выполняются по отде
 | Сессия 1 — выполнена | 0.1 + 0.2 + малый 0.6 | Локальные проверки; затем общий выпуск `68147d8` |
 | Сессия 2 — локальный и protocol пакет выполнен | 1.0 + 1.5 + границы 1.7; отдельно 0.3/0.4 при необходимости | 561 tests и live health pass; lifecycle проверен на CLI/App; mid-turn live pilot отдельно |
 | Сессия 3 — выпущена на пяти экземплярах | Ядро 1.1, UI/API 1.2, delivery часть 1.4 | 581 tests, native paused controls, browser и post-release strict health pass |
-| Следующий пакет | 1.3, task → run binding для host action 1.4; 0.7 до нового UI rollout | Явный intent меняет правильный бюджет; host action сохраняет права/evidence; обновлятор проверяет настоящие страницы/chunks |
+| Completion пакет — локально реализован | Native Goal intent 1.3, shared policy 0.4, strict updater 0.7 | Text/API/browser и release rollback fixtures проходят; реальный rollout предстоит |
+| Следующий пакет | Task/agent/run binding для host action 1.4, необходимые identity foundations 3.1 | Явный intent меняет правильный бюджет; host action сохраняет права/evidence; legacy linkage не авторизует чужой run |
 | Следующий блок | 3.1 → 2.5; 2.1 → 2.3 → 2.2/2.4; 0.5/2.6/3.2/3.3 | Identity, verification и runtime не смешиваются |
 | До повторного пилота | 4.0 → 4.1/4.2; 5.4 и нужные 5.3 fixes | Нет обхода scaffold/verifier/privacy |
 | Пилотный блок | 6.1 → повтор CLI → новые типы 6.2 | Факты завершения и telemetry полны |

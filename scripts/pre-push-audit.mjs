@@ -5,6 +5,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
+import { CHILD_AGENT_TYPES } from "./lib/child-agent-artifacts.mjs";
 import { containsForbiddenText, isForbiddenRawPath, isMemorySnapshotPath, isPrivacyTextTarget } from "./lib/privacy.mjs";
 
 const ROOT = resolveTechscopeRoot();
@@ -41,20 +42,6 @@ function trackedFiles() {
   if (!result.ok) throw new Error(result.stderr || "git ls-files failed");
   return result.stdout.split("\0").filter(Boolean);
 }
-
-const CHILD_AGENT_TYPES = new Set([
-  "agent-contract",
-  "agent-outcome-spec",
-  "scaffold-report",
-  "agent-delivery-report",
-  "agent-test-report",
-  "agent-handoff-report",
-  "agent-operations-report",
-  "agent-deployment-report",
-  "agent-post-creation-review",
-  "agent-registry",
-  "child-agent-profile",
-]);
 
 function publicationBase() {
   const mergeBase = git(["merge-base", "HEAD", "origin/main"]);
