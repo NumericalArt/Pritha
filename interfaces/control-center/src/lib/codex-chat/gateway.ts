@@ -10,6 +10,7 @@ import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskCh
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
 import { changeThreadGoalBudget, emptyGoalView, GoalControlError, readThreadGoal, type GoalBudgetReceipt } from "./goal-control";
 import { parseBudgetIntent } from "./budget-intent";
+import { listTaskDeliveries, performTaskDeliveryAction, readTaskDelivery, TaskDeliveryError, type TaskDeliveryRequest } from "../../../../../scripts/agents-mother/task-delivery.mjs";
 import {
   asObject,
   itemIdFor,
@@ -457,6 +458,52 @@ export class CodexChatGateway {
         if (!await this.store.patch(chatId, { goalBudgetRequests: { ...current.goalBudgetRequests, [requestId]: receipt } })) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
       },
     };
+  }
+
+  private async deliveryContext(chatId: string, writable: boolean) {
+    const binding = await this.requireBinding(chatId);
+    const provider = (await this.runtime.provider(binding.providerId)).view;
+    if (provider.availability !== "ready" || !binding.stateIdentityHash || provider.stateIdentityHash !== binding.stateIdentityHash) {
+      throw new CodexChatGatewayError("delivery_task_unverified", "Restore access to the original native task before using delivery actions.", 409);
+    }
+    const native = await this.readNativeThread(binding, false);
+    if (!verifyNativeThreadIdentity(native, binding.nativeThreadId, this.root) || native.ephemeral === true) {
+      throw new CodexChatGatewayError("delivery_task_unverified", "The delivery action could not be bound to this saved task.", 409);
+    }
+    if (writable) {
+      if (binding.archived) throw new CodexChatGatewayError("chat_archived", "Restore this task before using a host action.", 409);
+      if (binding.origin === "voice" && !binding.continuationEnabled) throw new CodexChatGatewayError("continuation_confirmation_required", "Choose Continue in Task Chat before using a host action.", 409);
+      if (this.activeTurns.has(chatId) || threadStatusFromNative(native.status) === "active") throw new CodexChatGatewayError("turn_active", "Wait for the active turn or pending approval before using a host action.", 409, true);
+    }
+    // Goal availability and budget status do not authorize or block a host job.
+    // Native history is read for ownership only; there is no Goal RPC or turn.
+    return binding;
+  }
+
+  async taskDeliveries(chatId: string, runId?: string) {
+    const binding = await this.deliveryContext(chatId, false);
+    try {
+      const options = { root: this.root, stateRoot: this.store.stateRoot };
+      return runId ? { run: readTaskDelivery(runId, binding, options) } : { runs: listTaskDeliveries(binding, options) };
+    } catch (error) {
+      if (error instanceof TaskDeliveryError) throw new CodexChatGatewayError(error.code, error.message, error.status);
+      throw new CodexChatGatewayError("delivery_unavailable", "The saved delivery evidence is temporarily unavailable.", 503, true);
+    }
+  }
+
+  async deliveryAction(chatId: string, input: TaskDeliveryRequest) {
+    const binding = await this.requireBinding(chatId);
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `delivery:${chatId}`);
+    if (!release) throw new CodexChatGatewayError("turn_active", "This task has an active operation. Read its progress before trying another action.", 409, true);
+    try {
+      const current = await this.deliveryContext(chatId, true);
+      return await performTaskDeliveryAction(current, input, { root: this.root, stateRoot: this.store.stateRoot });
+    } catch (error) {
+      if (error instanceof CodexChatGatewayError) throw error;
+      if (error instanceof TaskDeliveryError) throw new CodexChatGatewayError(error.code, error.message, error.status);
+      if ((error as { code?: string })?.code === "delivery_running") throw new CodexChatGatewayError("delivery_running", "This delivery already has an active host operation. Read its current progress.", 409, true);
+      throw new CodexChatGatewayError("delivery_unconfirmed", "Read the saved host action before trying another request.", 503, true);
+    } finally { release(); }
   }
 
   async threadGoal(chatId: string): Promise<ThreadGoalView> {

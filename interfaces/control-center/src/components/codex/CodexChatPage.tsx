@@ -24,6 +24,7 @@ import { useChatAttachments } from "./useChatAttachments";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
+import { DeliveryPanel } from "./DeliveryPanel";
 import { parseBudgetIntent } from "@/lib/codex-chat/budget-intent";
 import { CodexMarkdown } from "./CodexMarkdown";
 import {
@@ -1381,9 +1382,12 @@ export function CodexChatPage() {
           </div>
         ) : null}
 
-        {displayedDetail ? <GoalBudgetPanel key={displayedDetail.thread.chatId} chatId={displayedDetail.thread.chatId} refreshKey={goalRevision}
+        {displayedDetail ? <div className="codex-task-controls"><GoalBudgetPanel key={displayedDetail.thread.chatId} chatId={displayedDetail.thread.chatId} refreshKey={goalRevision}
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
-          editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} /> : null}
+          editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} />
+        <DeliveryPanel key={`delivery-${displayedDetail.thread.chatId}`} chatId={displayedDetail.thread.chatId}
+          active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
+          editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} /></div> : null}
         {budgetNotice?.chatId === selectedChatId ? <div className="codex-attachment-notice" role="status">{budgetNotice.text}</div> : null}
         <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
           {loading && !selectedChatId ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Task Chat</h2></div> : null}

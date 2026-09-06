@@ -801,7 +801,9 @@ function safeRunId(value) {
   return runId;
 }
 
-export function compileOutcomeSpec(specPath, options = {}) {
+// Read-only compiler shared by the writer and host execution gates. Preserve the
+// v1 wire shape so existing immutable plans and evidence locks remain valid.
+export function approvedTrialPlan(specPath, options = {}) {
   const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
   const fullPath = path.resolve(root, specPath);
   const text = readFileSync(fullPath, "utf8");
@@ -847,8 +849,26 @@ export function compileOutcomeSpec(specPath, options = {}) {
     trials: parsed.trials.map(({ argvError: _argvError, ...trial }) => trial),
     demo: parsed.demo,
   };
-  const runId = safeRunId(options.runId || `plan-${semanticLock.slice(7, 19)}`);
-  const runRoot = resolvePrithaStatePathFrom({ root, stateRoot: options.stateRoot }, "builds", parsed.frontmatter.agent_slug, runId);
+  return plan;
+}
+
+export function verifyCompiledTrialPlan(plan, options = {}) {
+  if (!plan || typeof plan.spec_path !== "string") return false;
+  try {
+    const expected = approvedTrialPlan(plan.spec_path, options);
+    // Object key order is serialization, not permission. Unknown fields,
+    // commands, assertions, policy and demo changes all invalidate the plan.
+    const canonical = (value) => Array.isArray(value) ? value.map(canonical)
+      : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+    return JSON.stringify(canonical(expected)) === JSON.stringify(canonical(plan));
+  } catch { return false; }
+}
+
+export function compileOutcomeSpec(specPath, options = {}) {
+  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const plan = approvedTrialPlan(specPath, options);
+  const runId = safeRunId(options.runId || `plan-${plan.semantic_lock.slice(7, 19)}`);
+  const runRoot = resolvePrithaStatePathFrom({ root, stateRoot: options.stateRoot }, "builds", plan.agent_slug, runId);
   const planPath = path.join(runRoot, "trial-plan.json");
   const planText = `${JSON.stringify(plan, null, 2)}\n`;
   mkdirSync(runRoot, { recursive: true });

@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: preparation v7; full completion work from cf11419 in codex/roadmap-completion
+source_version: preparation v8; full completion work from cf11419 in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -78,7 +78,7 @@ Marina и latency warnings MacBook записаны в
 с ограниченными timeout policies для выпуска. Browser desktop/mobile,
 профильные tests, typecheck и staged build проходят; managed adoption этого
 кандидата ещё не выполнен. Следующий вход: точное task/agent/run binding для
-host actions 1.4, затем identity/readiness/scaffold и остальные требования
+build budget intent/accounting 1.3/1.5, затем readiness/scaffold и остальные требования
 полного roadmap. Общая цель не закрывается по результатам этого пакета.
 
 ## 1. Граница экземпляра
@@ -316,6 +316,9 @@ Git commit/tag, публикация, rollout, изменение старых G
 наследуют ID; формат immutable Trial plan v1 сохранён; legacy metadata сопровождаются диагностикой. Сверка с текущей
 mother не требует изменения accepted contracts или approval history.
 Найденный конфликт document-lock алгоритмов CLI и UI устранён общим модулем
-с сохранением canonical v1. Следующий вход — exact Task Chat/run binding 1.4,
-затем независимые readiness и handoff по типу результата. Финальный main/push,
+с сохранением canonical v1. Task Chat/run binding и host control 1.4 также
+реализованы локально: exact native ownership, полный approved plan, request
+replay/recovery и reviewable demo без изменения Goal/acceptance. Следующий
+вход — build intent 1.3, полный accounting 1.5, затем независимые readiness и
+handoff по типу результата. Финальный main/push,
 managed rollout и синхронизация ND выполняются после завершения полного пакета.

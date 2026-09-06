@@ -39,7 +39,7 @@ import {
   readDeliveryWorktree,
   verifyProtectedTrialInputs,
 } from "./delivery-worktree.mjs";
-import { compileOutcomeSpec, TRIAL_PLAN_SCHEMA, verifyOutcomeApproval } from "./outcome-spec.mjs";
+import { compileOutcomeSpec, TRIAL_PLAN_SCHEMA, verifyCompiledTrialPlan, verifyOutcomeApproval } from "./outcome-spec.mjs";
 import { runTrialPlan, verifyTrialResultFreshness } from "./trial-runner.mjs";
 
 export class DeliveryLoopError extends Error {
@@ -185,13 +185,21 @@ function approvedPlanBinding(plan, options = {}) {
       `The approved Outcome Spec binding is no longer current${approval.reasons?.length ? `: ${approval.reasons.join(", ")}` : ""}`,
     );
   }
+  if (!verifyCompiledTrialPlan(plan, options)) {
+    throw new DeliveryLoopError("trial_plan_changed", "The saved Trial plan differs from the approved Outcome Spec. Existing evidence is preserved.");
+  }
   return approval;
+}
+
+export function defaultDeliveryTrialBackend(plan) {
+  const policy = plan.delivery_policy?.trial_backend_policy;
+  return policy === "app-server-required" || (policy !== "local-trusted-only" && plan.trials?.some(trial => trial.kind === "automated" && trial.isolation === "sandbox"))
+    ? "app-server" : "local";
 }
 
 function policyBoundOptions(plan, options = {}) {
   const policy = plan.delivery_policy || {};
-  const trialBackend = options.trialBackend
-    || (policy.trial_backend_policy === "app-server-required" ? "app-server" : "local");
+  const trialBackend = options.trialBackend || defaultDeliveryTrialBackend(plan);
   if (policy.trial_backend_policy === "app-server-required" && trialBackend !== "app-server") {
     throw new DeliveryLoopError("trial_backend_policy_conflict", "The approved contract requires the App Server Trial backend");
   }
@@ -993,6 +1001,15 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
 export async function resumeDelivery(runId, options = {}) {
   const status = deliveryStatus(runId, options);
   return withDeliveryExecution(status.runRoot, () => resumeDeliveryLocked(runId, options));
+}
+
+// The callback runs under the same cross-process lease as CLI delivery. Its
+// verify capability cannot dispatch a build turn or change the Goal budget.
+export async function withDeliveryHostControl(runId, options, work) {
+  const status = deliveryStatus(runId, options);
+  return withDeliveryExecution(status.runRoot, () => work({
+    verify: () => resumeDeliveryLocked(runId, { root: options.root, stateRoot: options.stateRoot, hostOnly: true }),
+  }));
 }
 
 export async function amendDeliveryBudget(runId, options = {}) {

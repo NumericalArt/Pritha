@@ -33,7 +33,7 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: ND roadmap revision 3; NeuralDeep code 31b438e with local plan commit 87cc59a; mother identity catalog v1
+source_version: ND roadmap revision 4; NeuralDeep code 31b438e with local plan commit 87cc59a; mother identity catalog v1
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -213,6 +213,24 @@ Account API timeout не стирает историю или локальный
 результат и путь восстановления остаются доступны.
 
 ## 7. ND-4 — identity, readiness, scaffold и handoff
+
+Mother host control v1 даёт дополнительный переносимый contract: immutable
+task/run/project/Spec/approval/whole-plan binding, общий run lease и durable
+request receipt до выполнения. В ND native identity должна подтверждаться
+собственным CLI/session evidence, canonical cwd и выбранным provider profile.
+App Server `thread/read`, `thread/goal/*` или mother TS gateway не переносятся
+как обязательная зависимость. Host-only verification не запускает новый CLI
+model process; approved commands могут иметь собственные побочные эффекты и
+проверяются по argv/cwd/isolation/timeout/output/concurrency.
+
+Сохранённый Trial plan нужно сверять целиком read-only компилятором с approved
+Outcome, включая policy, assertions и demo. Старые locks, переписанные на
+изменённый argv, не авторизуют команду. Формат v1 и старые immutable evidence
+сохраняются. Lost response возвращает receipt; interrupted subprocess не
+повторяется автоматически. Новый явный запуск допускается после сверки
+terminal/ownership state. ND tests должны доказать exact binding, отсутствие
+платного replay, no-goal-capability host completion и stale revision rejection.
+Подготовленный demo остаётся reviewable; он не меняет acceptance/merge/deployment.
 
 Адаптировать mother 3.1 → 2.5 → 2.1/2.3 → 2.2/2.4, затем 0.5/2.6/3.2/3.3.
 Stable ID берётся из authored inputs; путь/отчёт не подменяет identity.

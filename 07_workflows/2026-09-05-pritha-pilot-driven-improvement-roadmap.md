@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 9; released base cf11419; completion work in codex/roadmap-completion
+source_version: pilot roadmap revision 10; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -110,7 +110,7 @@ CLI-only и провайдера NeuralDeep подготовлен
 [completion tracker](2026-09-05-pritha-roadmap-completion-tracker.md).
 
 **Оставшийся объём:** 0.3, adoption локальных 0.4/0.7 и профили; adoption текстового budget intent 1.3,
-Task Chat → delivery binding и host action 1.4, live-проверка 1.7 и калибровка;
+budget intent для связанной сборки 1.3, полный accounting 1.5, live-проверка 1.7 и калибровка;
 readiness/identity/handoff фаз 2–3; scaffold/Trials фазы 4; выбранные runtime
 исправления фазы 5; повторные пилоты фазы 6; публичный путь фазы 7.
 
@@ -365,14 +365,20 @@ Delivery часть реализована: после известного over
 Trials, а `delivery verify` позволяет повторить проверку без build turn.
 Для unknown расхода требуется подтверждённый terminal + archived attempt;
 готовность результата не меняет unknown на complete accounting.
-Следующая часть — узкое host action из Task Chat с проверенной связью с run.
+Task Chat часть реализована локально через `task-control.json` и узкие host
+actions: exact native task/storage/provider/instance → agent/project/run/approved
+plan. Для verification не нужен Goal RPC или новый model turn. Подготовленный
+demo доступен в панели с отдельным acceptance; deployed adoption впереди.
 
-В CLI handoff/accept общего Goal gate не найдено. Проверить, где остановка
-происходит в native Task Chat. Уже разрешённые host jobs должны иметь путь
+В CLI handoff/accept общего Goal gate не найдено. Новый Task Chat host путь
+не проверяет Goal budget или наличие Goal capability; он проверяет native
+ownership и разрешения конкретного run. Уже разрешённые host jobs должны иметь путь
 через узкое действие control plane, не требующее нового модельного turn.
-Готовность: после budgetLimited разрешённая проверка/подготовка handoff
-запускается через тот же task binding, не создаёт `turn/start` и не сбрасывает
-лимит. Все прежние permission/evidence/acceptance gates сохраняются.
+Проверено в synthetic integration: exhausted budget → approved Trials →
+handoff preparation, без build iteration/Goal mutation; exact binding и
+сохранённые request receipts переживают повтор/обрыв. Actual page browser
+fixture проходит desktop/mobile. Реальный provider pilot относится к 1.7.
+Workflow: `07_workflows/task-chat-delivery-host-actions.md`. Все прежние permission/evidence/acceptance gates сохраняются.
 
 «Не создаёт turn» не значит «бесплатно и безопасно»: npm scripts, Trials и
 подпроцессы способны вызвать модель, сеть или побочный эффект. Классифицировать
@@ -500,7 +506,8 @@ agent_id/subject.id и связи contract/outcome/run, квалифициров
 
 Реализация: общий `identity.mjs`, новые authored ID, exact own-instance
 catalog, узкий legacy adapter, diagnosis конфликтов и тесты production
-selectors. Native Task Chat → delivery binding остаётся задачей 1.4.
+selectors. Native Task Chat → delivery binding реализован локально в 1.4;
+production adoption и freshness/reconcile остаются отдельными gates.
 
 ### 3.2 Миссия из authored контракта/профиля — реализовано локально
 
@@ -667,7 +674,8 @@ release evidence; push/settings/publication выполняются по отде
 | Сессия 3 — выпущена на пяти экземплярах | Ядро 1.1, UI/API 1.2, delivery часть 1.4 | 581 tests, native paused controls, browser и post-release strict health pass |
 | Completion пакет — локально реализован | Native Goal intent 1.3, shared policy 0.4, strict updater 0.7 | Text/API/browser и release rollback fixtures проходят; реальный rollout предстоит |
 | Identity пакет — локально реализован | 3.1 + 3.2, единый Outcome document lock CLI/UI | 34 targeted tests; compatibility прежних карточек; production adoption впереди |
-| Следующий пакет | Task/agent/run binding для host action 1.4 | Явный intent меняет правильный бюджет; host action сохраняет права/evidence; legacy linkage не авторизует чужой run |
+| Локальный пакет 1.4 | Exact task/agent/run binding, host verification и подготовка demo | Shared delivery lease, compiled-plan verification, request replay/recovery; acceptance отдельно; adoption впереди |
+| Следующий пакет | Build budget intent 1.3 / полный accounting 1.5, затем readiness 2–3 | Точный scope бюджета; unknown coverage не превращается в нулевой расход; readiness следует типу агента |
 | Следующий блок | 3.1 → 2.5; 2.1 → 2.3 → 2.2/2.4; 0.5/2.6/3.2/3.3 | Identity, verification и runtime не смешиваются |
 | До повторного пилота | 4.0 → 4.1/4.2; 5.4 и нужные 5.3 fixes | Нет обхода scaffold/verifier/privacy |
 | Пилотный блок | 6.1 → повтор CLI → новые типы 6.2 | Факты завершения и telemetry полны |

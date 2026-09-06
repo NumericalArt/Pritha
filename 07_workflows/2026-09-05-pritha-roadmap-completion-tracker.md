@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: 7c7f172 plus identity catalog v1 completion work
+source_version: 31e6f93 plus task-delivery control v1 completion work
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -61,7 +61,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 1.1 | Ядро выпущено; прогноз открыт | Lease/reservations/amendments, известный расход, оценка только по сопоставимым данным |
 | 1.2 | Выпущен | Native Goal GET/add/set/readback и desktop/mobile regression, сохранение usage/objective |
 | 1.3 | Native task intent реализован локально | Прямой текст → typed Goal action; 34 Goal/Chat tests и actual page browser pass; delivery scope после точного binding 1.4 |
-| 1.4 | Delivery verification выпущена; Task Chat binding открыт | Exact task/run/instance связь; approved host verification/handoff без нового модельного turn и без ослабления locks |
+| 1.4 | Реализован локально; adoption впереди | Exact task/run/instance; host verification и reviewable demo, whole compiled-plan check, durable replay/recovery; provider pilot отдельно |
 | 1.5 | Build ledger выпущен; полный scope открыт | Раздельный parent/build/Trials accounting, coverage/unknown, version-bound receipts и отсутствие double-counting |
 | 1.6 | Открыт; нужны измеримые повторы | N, модель/effort/version/task scope, диапазон и отдельное обоснование любого default |
 | 1.7 | Host/protocol evidence есть; mid-turn открыт | Bounded model/runtime observation overshoot/interruption/recovery с явным бюджетом |
@@ -89,7 +89,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 7.2 | Открыт | Отдельная синтетическая демонстрация, без реальных private history/endpoints/identifiers |
 | 7.3 | Открыт | GitHub inventory, актуальный changelog/public package, guards, commit/push и release evidence |
 | Канонические экземпляры | Предыдущий пакет установлен на пяти | Новый exact commit, self-test, build/page/chunk health, own state/children на mother, Dasha, Sasha, Marina, MacBook |
-| ND roadmap | Shared revision 3 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
+| ND roadmap | Shared revision 4 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
 
 ## Текущий пакет и следующий вход
 
@@ -126,8 +126,8 @@ same-message retry, quote, reload, сохранение предыдущего �
 горизонтального overflow и JavaScript errors. Это UI evidence, а не реальный
 provider pilot. Staged build не заменяет активную `.next`.
 
-Далее: завершить связь Task Chat → delivery run и narrow host actions (1.4),
-используя подготовленную identity (3.1); applicability/readiness/handoff (2–3), scaffold/Trials
+Далее: budget intent для связанной сборки (1.3), полный accounting (1.5),
+applicability/readiness/handoff (2–3), scaffold/Trials
 (4), необходимые runtime/privacy изменения (5), подготовку pilots и public
 path (6–7). После итогового review — опубликованный pinned release и обновление
 пяти обычных канонических экземпляров. ND исполняемый код не получает mother
@@ -149,7 +149,8 @@ Card projection проверяет current contract fingerprint, Outcome ID, о�
 CLI/UI document-lock algorithm: теперь один `outcome-lock.mjs` сохраняет
 канонический v1 алгоритм, включая mutable `superseded_by` и nested block.
 Сам по себе этот пакет не доказывает HEAD/Trial freshness, acceptance или
-Task Chat binding — соответствующие пункты остаются открытыми.
+Task Chat binding. Binding закрыт локально следующим пакетом 1.4;
+HEAD/Trial freshness и acceptance в карточках ещё остаются открытыми.
 
 Синтетические проверки проходят через реальное создание и approval Outcome
 Spec, затем подменяют один binding за раз. Параллельная read-only сверка с
@@ -164,3 +165,28 @@ release; новый runtime не подменялся во время прове
 проходит от Outcome approval через delivery до acceptance с новым ID, сохраняя
 старую wire shape Trial plan v1. Strict publication audit и обновление памяти
 завершают локальный пакет; main/push/fleet adoption остаются следующим выпуском.
+
+
+## Пакет Task Chat host control v1
+
+1.4 реализован локально: явный binding связывает exact native task, provider,
+storage, instance, agent/project/run и полный approved plan. Нет Goal capability
+gate; общий task/delivery lease защищает от параллельного исполнения. GET не
+запускает команды агента. Сохранённый request даёт same-ID replay без повторных
+Trials, а interrupted receipt имеет явный путь сверки и нового действия.
+
+Readonly compiler теперь сравнивает целиком сохранённый Trial plan с текущей
+одобренной Outcome Spec. Immutable v1 wire shape сохранён. Перед подготовкой
+handoff проверяются revision и Trial evidence; demo виден в панели, acceptance
+не устанавливается. Один и тот же подготовленный документ не переписывается
+повторным запросом. Бюджеты parent/build/Trials остаются раздельными; здесь
+показан подтверждённый build расход и unknown status, а полный scope — в 1.5.
+
+Девять новых интеграционных тестов выполняют реальные CLI/Trial/worktree шаги
+на синтетическом проекте и production gateway с запретом model/Goal RPC.
+Browser fixture настоящей страницы с CSS проверяет desktop/mobile, lost reply,
+replay, reload, сохранение истории и отдельную приёмку. Полный self-test pass: **626/626 unit tests**, семь quality checks и strict
+live health проходят. Staged build и typecheck проходят; browser fixture
+проверяет также показ demo и replay старого receipt вне краткой истории.
+Publication audit и обновление памяти завершают локальный пакет. Live runtime и fleet
+пока сохраняют предыдущий deployed release.

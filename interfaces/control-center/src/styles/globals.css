@@ -6582,6 +6582,13 @@ button:active,
 .codex-goal-resume { display: flex; gap: 8px; align-items: start; margin: 10px 0; }
 .codex-goal-resume input { margin-top: 3px; }
 .codex-goal-body > button { margin-top: 8px; }
+.codex-task-controls { flex: 0 0 auto; max-height: 42vh; overflow: auto; }
+.codex-task-controls .codex-goal-panel { max-height: none; overflow: visible; }
+.codex-delivery-panel form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 12px 0; }
+.codex-delivery-panel label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.codex-delivery-panel input, .codex-delivery-panel select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--border-medium); border-radius: 6px; background: var(--surface-panel-raised); color: var(--text-primary); }
+.codex-delivery-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.codex-delivery-panel li { overflow-wrap: anywhere; margin: 8px 0; }
 
 .codex-turn {
   min-width: 0;
