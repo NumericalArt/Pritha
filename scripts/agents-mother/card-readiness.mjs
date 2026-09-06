@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, findCatalogAgent, agentAlias, agentOperationsApplicability, readAgentOperationsManifest } from "./identity.mjs";
+import { readAgentResultReadinessAsync, unavailableResultReadiness } from "./result-readiness-async.mjs";
 
 function controlCenterSlug(value) {
   return String(value || "")
@@ -258,6 +259,8 @@ export async function checkCardReadiness(target, options = {}) {
 
   const localCardReady = Boolean(record && folder && (manifest || applicability.manifestRequired === false) && blockers.length === 0);
   const status = !record || live.visible === false ? "missing" : localCardReady ? "ready" : "blocked";
+  const { timeoutMs: _httpTimeout, ...readinessOptions } = options;
+  const resultReadiness = record ? await readAgentResultReadinessAsync(record.id, { ...readinessOptions, root }) : unavailableResultReadiness("agent-identity-unavailable");
 
   return {
     ok: status !== "missing",
@@ -273,6 +276,7 @@ export async function checkCardReadiness(target, options = {}) {
     agentKind: record?.agentKind || null,
     operationsApplicability: applicability,
     readinessScope: "card-configuration-only",
+    resultReadiness,
     manifestPath: manifest ? path.relative(root, manifestPath) : undefined,
     controlCenterVisible: live.visible,
     actionPlanAvailable: live.actionPlanAvailable ?? false,

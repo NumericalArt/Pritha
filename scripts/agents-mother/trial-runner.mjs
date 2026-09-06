@@ -296,6 +296,10 @@ function evidenceProjection(result) {
   return projection;
 }
 
+export function verifyTrialResultIntegrity(result) {
+  return result?.schema === TRIAL_RESULT_SCHEMA && sha256(JSON.stringify(evidenceProjection(result))) === result.evidence_lock;
+}
+
 export async function runTrialPlan(planOrPath, options = {}) {
   const loaded = loadPlan(planOrPath);
   const plan = validatePlan(loaded.plan);
@@ -399,8 +403,7 @@ export function verifyTrialResultFreshness(resultOrPath, projectPathValue, optio
     ? parseBoundedJson(readFileSync(path.resolve(resultOrPath), "utf8"), { maxBytes: 20 * 1024 * 1024, maxDepth: 32, maxNodes: 100_000 })
     : resultOrPath;
   if (!result || result.schema !== TRIAL_RESULT_SCHEMA) return { ok: false, reason: "unsupported_result_schema", current: null };
-  const expectedLock = sha256(JSON.stringify(evidenceProjection(result)));
-  if (expectedLock !== result.evidence_lock) return { ok: false, reason: "evidence_lock_mismatch", current: null };
+  if (!verifyTrialResultIntegrity(result)) return { ok: false, reason: "evidence_lock_mismatch", current: null };
   if (options.outcomeSpecPath) {
     try {
       const root = path.resolve(options.root || process.cwd());

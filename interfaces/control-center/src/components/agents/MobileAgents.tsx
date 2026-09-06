@@ -57,7 +57,7 @@ export function MobileAgents({
           <strong>{agents.length}</strong>
         </div>
         <div className="mobile-summary-chip wide">
-          <span><span className="dot green" />Alive</span>
+          <span><span className="dot green" />Настроены</span>
           <strong>{alive}</strong>
           <span><span className="dot red" />Missing</span>
           <strong>{missing}</strong>

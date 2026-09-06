@@ -13,4 +13,5 @@ test("release timeout overrides are bounded integers and reject invalid values w
   }
   assert.throws(() => timeoutPolicy("unknown"), /Unknown timeout policy/);
   assert.equal(releaseTimeouts({}).releaseStrict, 180_000);
+  assert.equal(Object.hasOwn(releaseTimeouts({ PRITHA_RESULT_READINESS_TIMEOUT_MS: "invalid" }), "resultReadiness"), false);
 });

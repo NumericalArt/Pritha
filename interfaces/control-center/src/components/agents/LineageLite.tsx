@@ -39,7 +39,7 @@ export function LineageLite({ counts }: LineageLiteProps) {
           ))}
         </svg>
         <div className="lineage-legend">
-          <Legend tone="green" label="Alive" value={String(counts?.alive ?? 0)} />
+          <Legend tone="green" label="Настроены" value={String(counts?.alive ?? 0)} />
           <Legend tone="orange" label="Needs Check" value={String(counts?.needsCheck ?? 0)} />
           <Legend tone="red" label="Missing" value={String(counts?.missing ?? 0)} />
           <Legend tone="dim" label="Unknown" value="0" />

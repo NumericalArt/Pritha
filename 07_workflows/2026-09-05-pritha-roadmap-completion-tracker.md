@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: 081cd61 plus contract type and operations applicability work
+source_version: a70bc4d plus result readiness v1 work
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -66,8 +66,8 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 1.6 | Открыт; нужны измеримые повторы | N, модель/effort/version/task scope, диапазон и отдельное обоснование любого default |
 | 1.7 | Host/protocol evidence есть; mid-turn открыт | Bounded model/runtime observation overshoot/interruption/recovery с явным бюджетом |
 | 2.1 | Реализован и проверен локально; adoption впереди | Contract v2 с явным agent_kind и interactive-agent для диалога; legacy-unclassified/advisory mapping, roundtrip, invalid values и прежние locks |
-| 2.2 | Открыт | Независимые verification/acceptance, runtime, actions; revision freshness; все типы результата |
-| 2.3 | Базовая применимость реализована локально; readiness 2.2 впереди | Общий reader/selection для CLI и UI; manifest следует operations contract, CLI без managed runtime не получает ложный blocker; повреждённые metadata остаются диагностикой |
+| 2.2 | Read model, карточки и detail page реализованы локально; adoption впереди | Exact approval/plan/result/revision, отдельные canonical/candidate/acceptance, runtime и actions; browser для шести типов; commands и первый сценарий относятся к 2.4/3.3 |
+| 2.3 | Применимость и readiness реализованы локально; adoption впереди | Общий reader/selection для CLI и UI; manifest следует operations contract, CLI без managed runtime не получает ложный blocker; повреждённые metadata остаются диагностикой |
 | 2.4 | Открыт | Явный approved argv probe, cwd/symlink/timeout, GET не исполняет agent-controlled код |
 | 2.5 | Открыт; после 3.1 | Read-only reconcile plan и идемпотентный apply по exact HEAD/spec/approval/Trial/receipt; нет поддельного acceptance |
 | 3.1 | Реализован локально; adoption впереди | Общий каталог CLI/UI; 34 targeted tests, legacy и current-state compatibility; exact run/Spec/approval projection |
@@ -77,7 +77,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 4.1 | Открыт | Host-owned verifier provenance/hash до lock; заведомо неверный продукт проваливает Trial |
 | 4.2 | Открыт | Один automated_trial_waiver contract, actor/reason/scope, waiver не даёт ложного verified |
 | 5.1 | Открыт; начальный private status исключён из prerender | Async bounded probes, access cache/card projection, invalidation, прежний API/UX |
-| 5.2 | Release policy реализована локально; остальные классы открыты | Общий MJS/TS источник, bounded validated overrides для подходящих классов probes, документация |
+| 5.2 | Release, workspace read и result readiness policies реализованы локально; остальные классы открыты | Общий MJS/TS источник, bounded validated overrides для подходящих классов probes, документация |
 | 5.3 | Открыт | Достижимые terminal states, cleanup error diagnostics, идемпотентность, сохранение dirty/foreign/recoverable worktrees |
 | 5.4 | Открыт | Inventory каждого research/improve writer, redaction до locks, path/private identifier fixtures и strict audit |
 | 5.5 | Открыт | Shipped sensors claims привязаны к коду/evals; proposed части явно помечены |
@@ -265,3 +265,34 @@ live health проходит на прежнем release; старое пред�
 недостающих служебных поля нового стандарта; финальная проверка выполнена
 после их исправления. Main/push и managed adoption ещё впереди.
 Подробности: `04_standards/agent-result-type.md`.
+
+## Ревизия, результат и приёмка
+
+2.2 связывает текущие собственные contract/Spec/approval с целым Trial plan,
+result lock и canonical revision. Отдельная candidate ветка не считается
+внесённой в основной проект. Host acceptance event проверяется по тому же run,
+Spec и result; Markdown status не даёт права показать accepted. Cleanup
+candidate не стирает подтверждённый результат canonical project. При changed
+HEAD/files видно stale; при неполном или недоступном revision — unknown.
+
+Reader использует отдельный worker, FIFO с четырьмя местами и общий конечный
+deadline включая очередь. GET не запускает agent commands и не исправляет
+ledger. Git fsmonitor/textconv отключены, неполный snapshot отвергается.
+Это необходимая граница новой проверки, общий async/cache refactor 5.1
+остаётся самостоятельным. Policies описаны в
+`07_workflows/agent-result-readiness.md`.
+
+39 профильных тестов и полный self-test **667/667** проходят, все семь quality
+checks — pass. Staged production build и typecheck проходят; prerender содержит
+только global error, 1199 traced dependencies не включают private/state файлы.
+Browser actual AgentCard/CSS проверяет шесть типов результата на 1280/390 px,
+отдельную приёмку, состояние процесса, stale candidate, unknown и сохранение
+действий. Проверена также читаемая ширина мобильных details. Это synthetic UI
+и host evidence, без build model и без ручного acceptance pilot.
+
+Strict live health относится к предыдущему deployed release; прежний warning
+launchd-root-drift остаётся отдельным операционным пунктом. Main/push/fleet ещё
+не выполнялись. При подготовке теста выявлен следующий конкретный вход 2.5:
+повторный `delivery verify` изменённой candidate может сначала отклонить старое
+Trial evidence. Нужен явный fresh verification/reconcile путь с сохранением
+истории и verifier guards, а не автоматическое исправление при GET.

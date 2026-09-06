@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 13; released base cf11419; completion work in codex/roadmap-completion
+source_version: pilot roadmap revision 14; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -467,6 +467,16 @@ service: process/health; job-runner: последний job и только ре
 Готовность: CLI понятен без URL; legacy «Alive» не выдаётся за проверенный
 Outcome. Freshness утрачивается при изменении HEAD/spec. Run… появляется
 только при проверенном command contract; произвольный текст Spec не исполняется.
+
+**Локальный результат 2026-09-06:** общий readonly reader CLI/Control Center
+проверяет current approval, весь Trial plan, result lock и revision. Canonical
+checkout и candidate различаются; acceptance требует собственного host receipt.
+Timeout/неполное покрытие дают unknown. Карточка и detail page показывают
+результат отдельно от runtime и истории run, шесть типов проверены в browser
+fixture на 1280/390 px. GET не запускает Trials/agent commands. Async worker и
+FIFO deadline необходимы для этой проверки; общий server refactor остаётся 5.1.
+Workflow: `07_workflows/agent-result-readiness.md`. Command probe и type-specific
+первое действие остаются в 2.4/3.3; managed adoption впереди.
 
 ### 2.3 Manifest обязателен только по выбранным операциям — S/M
 

@@ -56,6 +56,7 @@ import { deliveryStateView } from "./delivery-state";
 import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, readAgentOperationsManifest, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
 
 import { outcomeDocumentLock as currentOutcomeDocumentLock } from "../../../../../scripts/agents-mother/outcome-lock.mjs";
+import { readAgentResultReadinessAsync } from "../../../../../scripts/agents-mother/result-readiness-async.mjs";
 
 type RegistryRecord = CatalogAgent & { routeAliases: string[] };
 
@@ -2231,12 +2232,16 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const manifestRead = readAgentOperationsManifest(record);
   const manifest = manifestRead.manifest as OperationsManifest | null;
   const applicability = agentOperationsApplicability(record, manifest, { root });
+  const noRuntimeRequired = Boolean(folder && !manifest && applicability.manifestRequired === false && !manifestRead.issue);
   const health = folder ? await probeHealth(manifest) : { status: "not_checked" as const, detail: "Missing folder" };
-  const uiState = agentUiState(Boolean(folder), manifest, health.status);
+  const uiState = noRuntimeRequired ? { state: "alive" as const, activity: "unknown" as const } : agentUiState(Boolean(folder), manifest, health.status);
   const operations = operationsStatus(manifest);
   const localUrl = manifest?.local_upstream_url;
   const tailscaleUrl = agentTailscaleUrl(manifest, localUrl, access);
   const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
+  const resultReadiness = await readAgentResultReadinessAsync(record.id, {
+    root, codeRoot: root, stateRoot: resolvePrithaStateRoot(root), agentParent: resolvePrithaAgentParent(root),
+  });
   const readiness = operationalReadiness({
     folderPresent: Boolean(folder),
     applicability, manifestIssue: manifestRead.issue,
@@ -2253,6 +2258,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   return {
     id: record.id,
     agentKind: record.agentKind,
+    resultReadiness,
     identity: { agentId: record.agentId, instanceKey: record.instanceKey, status: record.identityStatus, diagnostics: record.diagnostics, routeAliases: record.routeAliases },
     name: record.name,
     mission: currentAgentMission(record, { root }).text,
@@ -2272,7 +2278,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
         }
       : { status: "missing" },
     operations: {
-      status: !manifest && applicability.manifestRequired === false && !manifestRead.issue ? "disabled" : operations,
+      status: noRuntimeRequired ? "disabled" : operations,
       applicability,
       serviceMode: manifest?.service_mode,
       autostart: manifest?.autostart,
@@ -2292,7 +2298,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       primaryAction: legacyPlanAction(control),
       actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
-      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : !manifest && applicability.manifestRequired === false && !manifestRead.issue ? undefined : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
+      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : noRuntimeRequired ? undefined : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
     },
     control,

@@ -4,6 +4,8 @@ export const TIMEOUT_POLICIES = Object.freeze({
   releaseRollback: Object.freeze({ defaultMs: 30_000, minMs: 100, maxMs: 300_000, env: "PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS" }),
   releaseRequest: Object.freeze({ defaultMs: 8_000, minMs: 50, maxMs: 60_000, env: "PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS" }),
   releaseStrict: Object.freeze({ defaultMs: 180_000, minMs: 100, maxMs: 600_000, env: "PRITHA_UPDATE_STRICT_HEALTH_TIMEOUT_MS" }),
+  workspaceRead: Object.freeze({ defaultMs: 5_000, minMs: 50, maxMs: 30_000, env: "PRITHA_WORKSPACE_READ_TIMEOUT_MS" }),
+  resultReadiness: Object.freeze({ defaultMs: 5_000, minMs: 100, maxMs: 30_000, env: "PRITHA_RESULT_READINESS_TIMEOUT_MS" }),
 });
 
 export function timeoutPolicy(name, { env = process.env, value } = {}) {
@@ -19,5 +21,5 @@ export function timeoutPolicy(name, { env = process.env, value } = {}) {
 }
 
 export function releaseTimeouts(env = process.env) {
-  return Object.fromEntries(Object.keys(TIMEOUT_POLICIES).map((name) => [name, timeoutPolicy(name, { env })]));
+  return Object.fromEntries(Object.keys(TIMEOUT_POLICIES).filter(name => name.startsWith("release")).map((name) => [name, timeoutPolicy(name, { env })]));
 }

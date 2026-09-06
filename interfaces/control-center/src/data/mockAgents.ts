@@ -1,4 +1,4 @@
-import type { ControlCenterAgentControl, ControlCenterCardAction, ControlCenterOperatorAction } from "@/lib/control-center/types";
+import type { ControlCenterAgent, ControlCenterAgentControl, ControlCenterCardAction, ControlCenterOperatorAction } from "@/lib/control-center/types";
 
 export type AgentState = "alive" | "missing" | "needs-check" | "unknown";
 export type AgentActivity = "active" | "inactive" | "unknown";
@@ -20,6 +20,10 @@ export type AgentCardModel = {
   issueText?: string;
   lifecycleNote?: string;
   lifecycleTone?: "ok" | "muted" | "update";
+  agentKind?: ControlCenterAgent["agentKind"];
+  resultReadiness?: ControlCenterAgent["resultReadiness"];
+  runtimeReadiness?: ControlCenterAgent["readiness"]["runtime"];
+  healthStatus?: ControlCenterAgent["health"]["status"];
   restorePlanStatus?: "ready" | "unavailable" | "planned";
   rollbackStatus?: "ready" | "unavailable" | "planned";
   credentials?: {

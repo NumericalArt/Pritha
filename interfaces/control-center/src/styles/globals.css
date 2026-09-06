@@ -1328,6 +1328,13 @@ a {
   color: var(--text-muted);
 }
 
+.agent-result-readiness { margin: 12px 0; font-size: 13px; overflow-wrap: anywhere; }
+.agent-result-readiness summary { cursor: pointer; color: var(--text-primary); line-height: 1.5; }
+.agent-result-readiness dl { display: grid; grid-template-columns: minmax(0, 90px) minmax(0, 1fr); gap: 7px 12px; margin: 12px 0; }
+.agent-result-readiness dt, .agent-result-readiness p { color: var(--text-muted); }
+.agent-result-readiness dd { margin: 0; }
+.agent-result-readiness p { font-size: 12px; margin: 8px 0; }
+
 .add-agent-card {
   min-height: 344px;
   border-radius: 12px;

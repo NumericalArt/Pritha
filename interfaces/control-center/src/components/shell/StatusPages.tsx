@@ -15,6 +15,10 @@ function iconForAgent(agent: ControlCenterAgent): AgentIconType {
 }
 
 function deliveryLifecycleCard(agent: ControlCenterAgent): Pick<AgentCardModel, "lifecycleNote" | "lifecycleTone"> | null {
+  if (agent.resultReadiness) {
+    const run = agent.resultReadiness.run;
+    return { lifecycleNote: run ? `Сборка ${run.id} · ${run.status.replaceAll("_", " ")}` : "Нет актуального результата delivery", lifecycleTone: "muted" };
+  }
   const value = agent.lifecycle.delivery.status;
   if (value === "accepted") return { lifecycleNote: "Delivery accepted", lifecycleTone: "ok" };
   if (value === "awaiting_acceptance") return { lifecycleNote: "Awaiting user acceptance", lifecycleTone: "update" };
@@ -33,6 +37,7 @@ function toCardAgent(agent: ControlCenterAgent): AgentCardModel {
   return {
     id: agent.id, name: agent.name, version: agent.version, versionStatus: agent.versionStatus, versionSource: agent.versionSource,
     description: agent.mission, state: agent.ui.state, activity: agent.ui.activity, url: agent.url.local, tailscaleUrl: agent.url.tailscale,
+    agentKind: agent.agentKind, resultReadiness: agent.resultReadiness, runtimeReadiness: agent.readiness.runtime, healthStatus: agent.health.status,
     statusUrl: `/agents/${agent.id}`, updateStatus: agent.ui.updateStatus,
     issueText: agent.ui.issueText || (agent.versionStatus === "unavailable" ? "Assigned version unavailable" : undefined),
     lifecycleNote: delivery?.lifecycleNote || (agent.lifecycle.rollback.status === "ready" ? "Rollback snapshots available" : agent.lifecycle.snapshotPlan.status === "manual_only" ? "Snapshot draft available" : agent.lifecycle.snapshots.status === "unavailable" || agent.lifecycle.snapshots.count === 0 ? "No rollback snapshots" : undefined),

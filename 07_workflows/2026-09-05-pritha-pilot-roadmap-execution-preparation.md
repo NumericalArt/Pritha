@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: preparation v9; full completion work from cf11419 in codex/roadmap-completion
+source_version: preparation v10; full completion work from cf11419 in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -85,7 +85,11 @@ Scoped accounting 1.5 также реализован локально: parent c
 и Trial invocations представлены раздельно, unknown остаётся unknown. Self-test
 646/646, staged build и typecheck проходят. Следом реализованы contract schema
 v2/agent_kind и базовая operations applicability 2.1/2.3: 656/656, staged build
-и typecheck проходят. Следующий вход: revision-bound readiness/scaffold,
+и typecheck проходят. Revision-bound readiness 2.2 также реализован локально:
+самостоятельные verification/acceptance/runtime, host event и exact revision;
+полный self-test 667/667, staged build/typecheck и browser desktop/mobile проходят.
+Workflow: `07_workflows/agent-result-readiness.md`. Следующий вход: approved CLI probe,
+reconcile, scaffold,
 orphan recovery и остальные требования полного roadmap. Общая цель не
 закрывается по результатам этого пакета.
 

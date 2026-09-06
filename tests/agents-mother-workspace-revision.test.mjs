@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -55,4 +55,37 @@ test("Git workspace revision binds HEAD, tracked diff and untracked content", ()
   assert.notEqual(tracked.token, untrackedOne.token);
   assert.notEqual(untrackedOne.token, untrackedTwo.token);
   assert.doesNotMatch(JSON.stringify(untrackedTwo), new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("strict revisions reject partial coverage rather than treating unseen content as verified", t => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-complete-revision-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(path.join(root, "one.txt"), "large enough\n");
+  writeFileSync(path.join(root, "two.txt"), "second\n");
+  assert.throws(() => workspaceRevision(root, { requireComplete: true, maxEntries: 1 }), /complete directory coverage/);
+  assert.throws(() => workspaceRevision(root, { requireComplete: true, maxFileBytes: 2 }), /complete file coverage/);
+  execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["add", "one.txt"], { cwd: root });
+  execFileSync("git", ["-c", "user.name=Pritha Test", "-c", "user.email=pritha-test@local", "commit", "-m", "fixture"], { cwd: root, stdio: "ignore" });
+  assert.throws(() => workspaceRevision(root, { requireComplete: true, maxUntracked: 0 }), /complete untracked coverage/);
+  execFileSync("git", ["update-index", "--assume-unchanged", "one.txt"], { cwd: root });
+  writeFileSync(path.join(root, "one.txt"), "hidden change\n");
+  assert.throws(() => workspaceRevision(root, { requireComplete: true }), /index hides file changes/);
+});
+
+test("revision reads never execute repository-controlled fsmonitor or textconv programs", t => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-safe-revision-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+  const script = path.join(root, "unsafe-helper.sh");
+  writeFileSync(script, "#!/bin/sh\ntouch helper-executed\ncat\n"); chmodSync(script, 0o755);
+  writeFileSync(path.join(root, "result.dat"), "initial\n");
+  writeFileSync(path.join(root, ".gitattributes"), "*.dat diff=unsafe\n");
+  execFileSync("git", ["add", "."], { cwd: root });
+  execFileSync("git", ["-c", "user.name=Pritha Test", "-c", "user.email=pritha-test@local", "commit", "-m", "fixture"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["config", "core.fsmonitor", script], { cwd: root });
+  execFileSync("git", ["config", "diff.unsafe.textconv", script], { cwd: root });
+  writeFileSync(path.join(root, "result.dat"), "changed\n");
+  assert.equal(workspaceRevision(root, { requireComplete: true }).dirty, true);
+  assert.equal(existsSync(path.join(root, "helper-executed")), false);
 });

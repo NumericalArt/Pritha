@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, openSync, readSync, closeSync, readdirSync, readlinkSync, realpathSync } from "node:fs";
 import path from "node:path";
+import { timeoutPolicy } from "../lib/timeout-policy.mjs";
 
 const DEFAULT_EXCLUDES = new Set([".git", ".next", ".cache", ".logs", ".private", ".queue", ".snapshots", "node_modules"]);
 
@@ -10,11 +11,14 @@ function digestText(value) {
 }
 
 function git(projectRoot, args) {
-  return execFileSync("git", args, {
+  return execFileSync("git", ["-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", ...args], {
     cwd: projectRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 64 * 1024 * 1024,
+    timeout: timeoutPolicy("workspaceRead"),
+    killSignal: "SIGKILL",
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
   });
 }
 
@@ -61,6 +65,7 @@ function hashPath(hash, root, relPath, options = {}) {
   }
   if (stat.isFile()) {
     const maxFileBytes = Number.isFinite(options.maxFileBytes) ? options.maxFileBytes : 128 * 1024 * 1024;
+    if (options.requireComplete && stat.size > maxFileBytes) throw new Error("Workspace revision exceeds complete file coverage");
     const read = hashRegularFile(hash, fullPath, maxFileBytes);
     if (read < stat.size) hash.update(`truncated\0${stat.size - read}\0`);
   }
@@ -76,14 +81,19 @@ function untrackedPaths(status) {
 }
 
 function gitWorkspaceRevision(projectRoot, options = {}) {
+  if (options.requireComplete) {
+    const flags = git(projectRoot, ["ls-files", "-v", "-z"]).split("\0").filter(Boolean);
+    if (flags.some(entry => /^[a-zS] /.test(entry))) throw new Error("Workspace index hides file changes");
+  }
   const head = git(projectRoot, ["rev-parse", "HEAD"]).trim();
   const status = git(projectRoot, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
-  const unstaged = git(projectRoot, ["diff", "--binary", "--no-ext-diff", "HEAD", "--", "."]);
-  const staged = git(projectRoot, ["diff", "--binary", "--cached", "--no-ext-diff", "HEAD", "--", "."]);
+  const unstaged = git(projectRoot, ["diff", "--binary", "--no-ext-diff", "--no-textconv", "HEAD", "--", "."]);
+  const staged = git(projectRoot, ["diff", "--binary", "--cached", "--no-ext-diff", "--no-textconv", "HEAD", "--", "."]);
   const hash = createHash("sha256");
   hash.update(`head\0${head}\0status\0${status}\0unstaged\0${unstaged}\0staged\0${staged}\0`);
   const untracked = untrackedPaths(status);
   const maxUntracked = Number.isSafeInteger(options.maxUntracked) ? options.maxUntracked : 2000;
+  if (options.requireComplete && untracked.length > maxUntracked) throw new Error("Workspace revision exceeds complete untracked coverage");
   for (const relPath of untracked.slice(0, maxUntracked)) {
     const fullPath = path.join(projectRoot, relPath);
     if (existsSync(fullPath)) hashPath(hash, projectRoot, relPath, options);
@@ -111,6 +121,7 @@ function directoryEntries(root, options = {}) {
       if (!relativeDir && excludes.has(entry.name)) continue;
       const relPath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
       result.push(relPath);
+      if (options.requireComplete && result.length > (options.maxEntries ?? 20_000)) throw new Error("Workspace revision exceeds complete directory coverage");
       if (entry.isDirectory() && !entry.isSymbolicLink()) visit(relPath);
     }
   }
@@ -137,6 +148,7 @@ function directoryWorkspaceRevision(projectRoot, options = {}) {
 }
 
 export function workspaceRevision(projectPath, options = {}) {
+  timeoutPolicy("workspaceRead"); // reject invalid policy before falling back from a Git probe
   const requested = path.resolve(projectPath);
   if (!existsSync(requested)) throw new Error("Workspace does not exist");
   const stat = lstatSync(requested);
