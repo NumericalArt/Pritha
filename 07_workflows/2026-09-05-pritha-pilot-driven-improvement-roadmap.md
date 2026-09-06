@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 16; released base cf11419; completion work in codex/roadmap-completion
+source_version: preparation revision 17; completion candidate based on 8a26775
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -76,6 +76,17 @@ confidence: medium
 ---
 
 # Roadmap: проверяемое завершение агентов, начиная с материнской Pritha
+
+Текущий итог подготовки (2026-09-06): implementation пакет завершает
+`03_reviews/2026-09-06-pritha-pre-pilot-readiness-review.md`, поштучные статусы —
+`07_workflows/2026-09-05-pritha-roadmap-completion-tracker.md`.
+Русский CLI guide, чистый synthetic delivery, private authored handoff,
+protected verifier/waiver, async diagnostics и redaction готовы к финальному
+release gate. Ручные пилоты, сопоставимая калибровка и empirical promotion
+идут после объявления готовности по отдельному manual-pilot protocol.
+История ниже сохраняет результаты прежних пакетов; финальный installed pin
+и self-test приводятся в release report, а не выводятся из старых чисел.
+
 
 **Реализация начата на материнской Pritha `main` на Mac mini.** Исходная
 сверка выполнена по checkout `43baa16` от 2026-09-05. Пункты 0.1, 0.2 и 0.6

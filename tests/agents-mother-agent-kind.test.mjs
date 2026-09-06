@@ -158,11 +158,11 @@ test("production readiness adapter skips irrelevant service probes and preserves
   const compiled = ts.transpileModule(`const operationalRuntimeManager=()=>null; const launchdRuntimeState=()=>{throw new Error('unexpected service probe')}; ${fn.getText(tree)}; export { operationalReadiness };`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
   const { operationalReadiness } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
   const params = { folderPresent: true, manifest: null, operations: "not_installed", health: { status: "not_checked" }, access: {} };
-  const cli = operationalReadiness({ ...params, applicability: operationsApplicability(typed("one-shot-cli")) });
+  const cli = await operationalReadiness({ ...params, applicability: operationsApplicability(typed("one-shot-cli")) });
   assert.equal(cli.status, "ready");
   assert.equal(cli.runtime.status, "not_applicable");
   assert.deepEqual(cli.blockers, []);
-  assert.equal(operationalReadiness({ ...params, applicability: operationsApplicability(typed("service").replace("- Service mode: none", "- Service mode: launchd")) }).status, "blocked");
-  assert.equal(operationalReadiness({ ...params, applicability: operationsApplicability(typed("library")), manifestIssue: "invalid" }).status, "blocked");
-  assert.equal(operationalReadiness({ ...params, folderPresent: false, applicability: operationsApplicability(typed("library")) }).status, "missing");
+  assert.equal((await operationalReadiness({ ...params, applicability: operationsApplicability(typed("service").replace("- Service mode: none", "- Service mode: launchd")) })).status, "blocked");
+  assert.equal((await operationalReadiness({ ...params, applicability: operationsApplicability(typed("library")), manifestIssue: "invalid" })).status, "blocked");
+  assert.equal((await operationalReadiness({ ...params, folderPresent: false, applicability: operationsApplicability(typed("library")) })).status, "missing");
 });

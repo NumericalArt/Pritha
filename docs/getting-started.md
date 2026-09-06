@@ -1,5 +1,12 @@
 # Getting Started
 
+Русская инструкция: [Первый CLI-агент](getting-started.ru.md).
+
+A no-service CLI uses the headless adapter. Its initial run exits 78 until the
+approved product is implemented. See the complete synthetic path in
+`tests/agents-mother-cli-readiness.test.mjs`; it uses a deterministic executor,
+not a model benchmark.
+
 ## Core: Start In Codex
 
 The simplest path is to use Codex as the Pritha workbench and installer:

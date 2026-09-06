@@ -2,7 +2,7 @@ import { appendFileSync, chmodSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { quarantineUntrustedInstructionText, redactSensitiveText } from "../lib/redaction.mjs";
+import { quarantineUntrustedInstructionText, redactSensitiveText, redactStructuredText } from "../lib/redaction.mjs";
 import { today } from "../lib/date.mjs";
 import { resolvePrithaStateRoot } from "../lib/paths.mjs";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
@@ -201,6 +201,7 @@ export function buildAgentDevelopmentQuery(data = {}) {
 }
 
 export function logSemanticFailure(root, failure = {}) {
+  failure = redactStructuredText(failure, { root, stateRoot: resolvePrithaStateRoot({ root }) });
   const stateRoot = resolvePrithaStateRoot({ root });
   const relativePath = stateRoot === path.resolve(root) ? SEMANTIC_FAILURE_LOG_REL : ISOLATED_SEMANTIC_FAILURE_LOG_REL;
   const logPath = path.join(stateRoot, relativePath);
@@ -432,6 +433,8 @@ function formatPattern(pattern) {
 }
 
 export function patternPackMarkdown(data = {}, inputs = {}, options = {}) {
+  data = redactStructuredText(data, options);
+  inputs = redactStructuredText(inputs, options);
   const date = today();
   const agentSlug = slug(data.agentName, "agent");
   const query = inputs.query || buildAgentDevelopmentQuery(data);

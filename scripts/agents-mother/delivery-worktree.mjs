@@ -4,6 +4,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from "no
 import path from "node:path";
 import { atomicWriteFile } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
+import { trialInputDeclarationIssues } from "./trial-input-declarations.mjs";
 
 export const DELIVERY_WORKTREE_SCHEMA = "pritha-delivery-worktree-v2";
 export const LEGACY_DELIVERY_WORKTREE_SCHEMA = "pritha-delivery-worktree-v1";
@@ -212,7 +213,8 @@ export function planDeliveryWorktreeCleanup(runRoot) {
 
 function writeCleanupMetadata(runRoot, metadata, updates) {
   const next = { ...metadata, ...updates, schema: DELIVERY_WORKTREE_SCHEMA };
-  atomicWriteFile(metadataPath(runRoot), `${JSON.stringify(next, null, 2)}\n`);
+  const serialized = `${JSON.stringify(next, null, 2)}\n`;
+  if (readFileSync(metadataPath(runRoot), "utf8") !== serialized) atomicWriteFile(metadataPath(runRoot), serialized);
   return next;
 }
 
@@ -257,22 +259,42 @@ function safeRelativePath(value) {
 
 function referencedTrialInputPaths(plan, worktree) {
   const candidates = new Map();
+  const products = new Set();
   for (const trial of plan.trials || []) {
+    if (trialInputDeclarationIssues(trial).length) throw new DeliveryWorkspaceError("trial_input_declaration_invalid", "Protected Trial input declarations are invalid");
     if (trial.kind !== "automated") continue;
+    if (trial.cwd && trial.cwd !== "." && !safeRelativePath(trial.cwd)) throw new DeliveryWorkspaceError("trial_input_path_invalid", "Trial cwd must stay project-relative");
+    for (const product of trial.productTargets || []) products.add(product);
+    const productTarget = value => (trial.productTargets || []).includes(value);
+    const argvPath = value => trial.cwd && trial.cwd !== "." ? path.posix.join(trial.cwd, value) : value;
     if (trial.fixture) candidates.set(trial.fixture, { path: trial.fixture, required: true, sources: [`trial:${trial.id}:fixture`] });
     const argv = Array.isArray(trial.argv) ? trial.argv : [];
     const runner = path.basename(argv[0] || "").toLowerCase();
-    if (SCRIPT_RUNNERS.has(runner) && safeRelativePath(argv[1])) {
-      candidates.set(argv[1], { path: argv[1], required: true, sources: [`trial:${trial.id}:entrypoint`] });
+    if (SCRIPT_RUNNERS.has(runner) && safeRelativePath(argv[1]) && !productTarget(argvPath(argv[1]))) {
+      const filePath = argvPath(argv[1]);
+      candidates.set(filePath, { path: filePath, required: true, sources: [`trial:${trial.id}:entrypoint`] });
     }
     for (const token of argv.slice(1)) {
       if (!safeRelativePath(token)) continue;
-      const fullPath = path.join(worktree, token);
+      const filePath = argvPath(token);
+      if (productTarget(filePath)) continue;
+      const fullPath = path.join(worktree, filePath);
       if (!existsSync(fullPath)) continue;
-      const current = candidates.get(token) || { path: token, required: true, sources: [] };
+      const current = candidates.get(filePath) || { path: filePath, required: true, sources: [] };
       current.sources.push(`trial:${trial.id}:argv`);
-      candidates.set(token, current);
+      candidates.set(filePath, current);
     }
+  }
+  for (const trial of plan.trials || []) for (const verifier of trial.verifierInputs || []) {
+    const current = candidates.get(verifier.path) || { path: verifier.path, required: true, sources: [] };
+    if (current.declared_hash && (current.declared_hash !== verifier.hash || current.provenance !== verifier.provenance)) {
+      throw new DeliveryWorkspaceError("trial_input_declaration_conflict", "Trials disagree on a protected verifier identity");
+    }
+    current.sources.push(`trial:${trial.id}:host-verifier`);
+    candidates.set(verifier.path, { ...current, declared_hash: verifier.hash, provenance: verifier.provenance });
+  }
+  if ([...products].some(product => [...candidates.keys()].some(input => product === input || product.startsWith(`${input}/`) || input.startsWith(`${product}/`)))) {
+    throw new DeliveryWorkspaceError("trial_input_declaration_conflict", "A product target is also a protected input in this plan");
   }
   return [...candidates.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
@@ -283,15 +305,34 @@ function hashFile(worktree, relativePath) {
   const rel = path.relative(worktree, fullPath);
   if (rel.startsWith("..") || path.isAbsolute(rel)) throw new DeliveryWorkspaceError("trial_input_path_invalid", "Protected Trial input escapes the worktree");
   if (!existsSync(fullPath)) throw new DeliveryWorkspaceError("trial_input_missing", `Protected Trial input is missing: ${relativePath}`);
+  let ancestor = worktree;
+  for (const part of relativePath.split("/")) {
+    ancestor = path.join(ancestor, part);
+    if (lstatSync(ancestor).isSymbolicLink()) throw new DeliveryWorkspaceError("trial_input_invalid", "Protected Trial input may not cross a symlink");
+  }
   const stat = lstatSync(fullPath);
   if (!stat.isFile() || stat.isSymbolicLink()) throw new DeliveryWorkspaceError("trial_input_invalid", `Protected Trial input must be a regular file: ${relativePath}`);
   if (stat.size > 16 * 1024 * 1024) throw new DeliveryWorkspaceError("trial_input_too_large", `Protected Trial input exceeds 16 MiB: ${relativePath}`);
   return { size: stat.size, hash: `sha256:${createHash("sha256").update(readFileSync(fullPath)).digest("hex")}` };
 }
 
+export function inspectProtectedTrialInputs(plan, projectValue) {
+  const project = regularDirectory(projectValue, "project");
+  const inputs = referencedTrialInputPaths(plan, project);
+  if (inputs.length > 256) throw new DeliveryWorkspaceError("trial_input_inventory_too_large", "Protected Trial inputs exceed 256 files");
+  let totalBytes = 0;
+  return inputs.map(entry => {
+    const actual = hashFile(project, entry.path);
+    totalBytes += actual.size;
+    if (totalBytes > 64 * 1024 * 1024) throw new DeliveryWorkspaceError("trial_input_inventory_too_large", "Protected Trial inputs exceed 64 MiB in total");
+    if (entry.declared_hash && entry.declared_hash !== actual.hash) throw new DeliveryWorkspaceError("trial_input_provenance_mismatch", `Protected verifier differs from its reviewed hash: ${entry.path}`);
+    return { ...entry, ...actual };
+  });
+}
+
 export function captureProtectedTrialInputs(plan, worktreeValue, runRoot) {
   const worktree = regularDirectory(worktreeValue, "worktree");
-  const entries = referencedTrialInputPaths(plan, worktree).map((entry) => ({ ...entry, ...hashFile(worktree, entry.path) }));
+  const entries = inspectProtectedTrialInputs(plan, worktree);
   const snapshot = {
     schema: PROTECTED_TRIAL_INPUTS_SCHEMA,
     plan_lock: `sha256:${createHash("sha256").update(JSON.stringify(plan)).digest("hex")}`,

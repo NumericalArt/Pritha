@@ -6,6 +6,7 @@ import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { checkResult, detectProject, fileExists, recommendationForProject } from "./test.mjs";
 import { writeLifecycleReport } from "./lifecycle-report.mjs";
+import { prepareAuthoredHandoff } from "./authored-handoff.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(resolvePrithaAgentMemoryRoot({ root: ROOT }), "reports");
@@ -20,6 +21,11 @@ function scalar(value, fallback = "TBD") {
   return text || fallback;
 }
 export function handoffProject(projectPath, options = {}) {
+  const authored = prepareAuthoredHandoff(path.resolve(ROOT, projectPath), { ...options, root: ROOT });
+  if (authored) {
+    console.log(`Handoff: ${authored.status}\nProfile: ${authored.profilePath}\nReport: ${authored.reportPath}\nUnchanged: ${authored.unchanged}`);
+    return authored;
+  }
   ensureDirs();
   const projectRoot = path.resolve(ROOT, projectPath);
   if (!existsSync(projectRoot) || !statSync(projectRoot).isDirectory()) {
@@ -58,7 +64,7 @@ export function handoffProject(projectPath, options = {}) {
   }
 
   const projectName = path.basename(projectRoot);
-  const status = detection.classification === "project-without-agent-harness" ? "partial" : "complete";
+  const status = "partial";
   const reportPath = writeLifecycleReport(
     path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-handoff-report.md`),
     ({ artifactId }) => agentHandoffReportMarkdown(projectRoot, projectName, detection, checks, status, artifactId),

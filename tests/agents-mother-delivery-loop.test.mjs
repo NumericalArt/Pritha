@@ -9,6 +9,7 @@ import { ExecutionBackendError } from "../scripts/agents-mother/execution-backen
 import { readDeliveryLedger, transitionDelivery } from "../scripts/agents-mother/delivery-ledger.mjs";
 import {
   cleanupDeliveryRun,
+  deliveryStatus,
   cleanupStaleDeliveryRuns,
   amendDeliveryBudget,
   resumeDelivery,
@@ -332,6 +333,18 @@ test("cleanup policy preserves verified runs and bulk-cleans only stale clean te
   });
   assert.equal(applied.candidates[0].removed, true);
   assert.equal(existsSync(runs[0].worktree), false);
+  assert.equal(existsSync(runs[1].worktree), true);
+  assert.equal(deliveryStatus(runs[1].runId, { root: project, stateRoot }).cleanup.status, "preserved");
+  const unchangedLedger = readFileSync(path.join(runs[1].runRoot, "build-state.json"), "utf8");
+  git(runs[1].worktree, ["switch", "-c", "foreign-branch-fixture"]);
+  const failed = cleanupDeliveryRun(runs[1].runId, { root: project, stateRoot, apply: true, yes: true });
+  assert.ok(failed.error);
+  const receiptPath = path.join(runs[1].runRoot, "cleanup-status.json");
+  const receipt = readFileSync(receiptPath, "utf8");
+  assert.equal(JSON.parse(receipt).status, "failed");
+  cleanupDeliveryRun(runs[1].runId, { root: project, stateRoot, apply: true, yes: true });
+  assert.equal(readFileSync(receiptPath, "utf8"), receipt);
+  assert.equal(readFileSync(path.join(runs[1].runRoot, "build-state.json"), "utf8"), unchangedLedger);
   assert.equal(existsSync(runs[1].worktree), true);
 });
 

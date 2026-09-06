@@ -7,6 +7,7 @@ import {
   isPrivateNetworkHostname,
   isSensitiveUrlKey,
   redactSensitiveText,
+  redactStructuredText,
   quarantineUntrustedInstructionText,
 } from "../lib/redaction.mjs";
 
@@ -1165,6 +1166,7 @@ function formatScaffoldDecision(status, coverage, synthesis, repositoryBindingRe
 }
 
 export function applyExternalResearchEvidence(reportMarkdown, contractData, input, options = {}) {
+  input = redactStructuredText(boundedInputObject(input), options);
   const topics = options.topics || deriveExternalResearchTopics(contractData, options);
   const payload = boundedInputObject(input);
   const evidence = normalizeExternalResearchEvidence(payload, {

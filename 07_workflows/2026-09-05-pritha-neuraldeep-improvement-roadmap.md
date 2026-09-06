@@ -33,9 +33,9 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: ND roadmap revision 7; NeuralDeep code 31b438e with local plan commit 87cc59a; mother type and operations applicability
+source_version: ND roadmap revision 8; own baseline a3820b5; mother final pre-pilot preparation
 retrieved: 2026-09-05
-verified: 2026-09-05
+verified: 2026-09-06
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
 temporal_status: version-bound
 memory_domain: agent-building-knowledge
@@ -453,3 +453,52 @@ staged build, desktop/mobile и strict health `/voice,/agents,/task-chat,/codex,
 с JS chunks и build identity. Все failed/unknown проверки остаются явными.
 Shared roadmap в матери и рабочая копия ND получают согласованную revision;
 проверенные локальные ND implementation commits не смешиваются с mother history.
+
+
+## 13. Итоговый перенос требований после mother preparation — revision 8
+
+Mother final package подготовил full clean CLI fixture, private authored
+handoff, `probe-plan`/approved argv, protected verifier declarations и один
+structured waiver. ND переносит контракт поведения, сохраняя собственный
+Codex CLI executor и NeuralDeep adapter. Нельзя заменять их mother App Server,
+Goal RPC, OpenAI authentication или тарифами OpenAI.
+
+- **ND-0/1/2:** кроме build учитывать отдельные model probe, summary и retries;
+  durable attempt записывается до CLI spawn. Interrupted/unknown не равны нулю.
+  Продолжение после лимита сохраняет task/run, previous spend и checkpoint;
+  менять только бюджет не означает запускать модель. Host verification,
+  handoff и cleanup не требуют ненужного provider call.
+- **ND-4:** approved `Verifier input` хранит provenance/hash до lock, mutable
+  product отделён от verifier; negative-control fail обязателен. Headless
+  scaffold сохраняет выбранный CLI/runtime и service-none. Authored profile
+  и отчёт хранятся только в own state-root; handoff идемпотентен, не меняет
+  продукт и не выдаёт guide-prepared за accepted.
+- **ND runtime:** argv probe связывает reviewed plan с manifest/revision/cwd,
+  ограничивает timeout/output, не выполняется из GET. Async diagnostic queue
+  и access cache имеют bounded size, inflight deduplication и invalidation.
+  Завершать можно только собственный дочерний процесс/group; SDK/HTTP timeout
+  не даёт права уничтожить чужой Codex CLI или весь session tree.
+- **ND privacy:** JSON очищается по текстовым значениям до serialization/locks;
+  regex по готовому JSON может повредить числа и schema. Отдельно покрыть
+  provider error, model identifiers, summary, repository/pattern payload и
+  публичную проекцию. Private evidence остаётся private, даже после redaction.
+- **ND-6/public:** повторить собственный clean fixture без overrides, затем
+  измеренный CLI pilot. Mother synthetic executor и interruption observation
+  не подтверждают ND provider usage или active-Goal enforcement. Guide обязан
+  описать собственные launcher/auth, model choice, response/usage support,
+  recovery, run limits и ясный путь до canonical результата.
+
+Provider failure matrix раздела 12 остаётся обязательной: 401/auth, 429/rate
+limit, quota/balance, timeout, interrupted CLI, lost response, malformed output,
+usage missing/conflicting, retry/duplicate dispatch и orphan process. Reconnect
+не повторяет уже выполненный provider request без подтверждённого состояния.
+По каждой строке нужны fixture, durable receipt и понятный операторский путь.
+
+Статус этого deliverable: roadmap готов к отдельной ND реализации; код ND
+не обновлён пакетом mother. Существующий `pritha-upstream` остаётся справочным
+remote, `origin` не создаётся. Shared revision и локальная ND copy должны быть
+побайтово одинаковы; версия ND engine и commit документации учитываются отдельно.
+
+На финальной сверке 2026-09-06 обнаружен более новый независимый ND commit
+`a3820b5` (dark/light/classic themes). Он сохраняется; roadmap копируется поверх
+него отдельным документационным commit. Mother rollout не меняет эти темы.

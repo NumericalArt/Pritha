@@ -74,7 +74,7 @@ function normalizeSandbox(value = {}) {
   };
 }
 
-function normalizeRequest(request = {}) {
+export function normalizeRequest(request = {}) {
   return {
     argv: validateArgv(request.argv),
     cwd: validatedCwd(request.cwd),
@@ -172,14 +172,24 @@ export class LocalExecBackend {
         shell: false,
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
+        detached: process.platform !== "win32",
       });
+      // Only the process group created by this invocation may be signalled.
+      // Bounded commands may not leave a background descendant behind.
+      const signalOwned = signal => {
+        try {
+          if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
+          else child.kill(signal);
+        } catch (error) { if (error.code !== "ESRCH") child.kill(signal); }
+      };
+      child.once("exit", () => signalOwned("SIGKILL"));
       child.stdout?.on("data", (chunk) => stdoutCapture.add(chunk));
       child.stderr?.on("data", (chunk) => stderrCapture.add(chunk));
 
       const timer = setTimeout(() => {
         timedOut = true;
-        child.kill("SIGTERM");
-        forceKillTimer = setTimeout(() => child.kill("SIGKILL"), this.killGraceMs);
+        signalOwned("SIGTERM");
+        forceKillTimer = setTimeout(() => signalOwned("SIGKILL"), this.killGraceMs);
         forceKillTimer.unref?.();
       }, request.timeoutMs);
 

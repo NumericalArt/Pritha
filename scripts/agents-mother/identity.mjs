@@ -300,6 +300,10 @@ export function readAgentCatalog(options = {}) {
 }
 
 export function findCatalogAgent(catalog, target) {
+  if (typeof target === "string" && path.isAbsolute(target)) {
+    const projects = catalog.agents.filter((agent) => agent.projectPath === path.resolve(target));
+    return projects.length === 1 ? projects[0] : null;
+  }
   const exact = catalog.agents.filter((agent) => agent.id === target || agent.agentId === target);
   if (exact.length === 1) return exact[0];
   if (exact.length > 1) return null;

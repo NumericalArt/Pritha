@@ -3,7 +3,7 @@ id: agent-feedback-sensors-and-evaluation-loops
 type: standard
 status: draft
 created: 2026-08-22
-updated: 2026-08-22
+updated: 2026-09-06
 last_reviewed: 2026-08-22
 owner: Pritha/user
 topics:
@@ -64,6 +64,22 @@ temporal_status: current
 Status: draft
 Owner: Pritha/user
 Last reviewed: 2026-08-22
+
+## Implementation inventory — 2026-09-06
+
+This remains a draft design, not a claim that a universal sensor harness ships.
+Implemented primitives: contract/outcome validation (`contract.mjs`,
+`outcome-spec.mjs`), deterministic Trials and protected inputs (`trial-runner.mjs`,
+`trial-input-declarations.mjs`), command timeout/output controls
+(`execution-backends.mjs`), result/revision/acceptance projection
+(`result-readiness.mjs`), explicit operator probes (`command-probe.mjs`) and
+manual platform self-test. Their corresponding `tests/agents-mother-*.test.mjs`
+and `tests/async-probe.test.mjs` provide regression evidence.
+
+A generic sensor manifest/runtime, automated sensor decay remediation,
+calibrated LLM judges, entropy scoring and periodic sensor jobs are proposed;
+they are not enabled or required merely because this document describes them.
+No background sensor service is installed by this roadmap preparation.
 
 ## Rule
 

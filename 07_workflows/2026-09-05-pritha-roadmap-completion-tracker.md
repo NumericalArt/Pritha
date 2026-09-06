@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: 94979f4 plus scaffold capability and headless CLI adapter work
+source_version: completion candidate based on 8a26775; pre-pilot preparation
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -53,43 +53,62 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | ID | Текущее состояние | Необходимое доказательство завершения |
 | --- | --- | --- |
 | 0.1, 0.2, 0.6 | Выпущены в предыдущем пакете | Сохраняющиеся regression tests, self-test и релевантные baseline invariants |
-| 0.3 | Открыт; после 4.0 | Русский getting-started, реальные CLI help и clean fixture полного пути |
+| 0.3 | Реализован: русский guide и clean CLI fixture | Русский getting-started, реальные CLI help и clean fixture полного пути |
 | 0.4 | Реализован локально | Один `scripts/lib/child-agent-artifacts.mjs`, оба consumer, 7 publication tests pass |
-| 0.5 / 2.6 | Открыт; после 3.1 | Authored profile/provenance, идемпотентный handoff, manifest только по выбранным operations |
+| 0.5 / 2.6 | Реализован: private authored profile, идемпотентный handoff, применимые operations | Authored profile/provenance, идемпотентный handoff, manifest только по выбранным operations |
 | 0.7 | Реализован локально | 25 release/health/policy tests pass; ещё нужен managed release на реальных экземплярах |
 | 1.0 | Предыдущий persisted protocol пакет | Сохранение installed CLI/App lifecycle evidence; модельное поведение отдельно в 1.7 |
-| 1.1 | Ядро выпущено; прогноз открыт | Lease/reservations/amendments, известный расход, оценка только по сопоставимым данным |
+| 1.1 | Preflight выпущен; прогноз после сопоставимых пилотов | Lease/reservations/amendments, известный расход, оценка только по сопоставимым данным |
 | 1.2 | Выпущен | Native Goal GET/add/set/readback и desktop/mobile regression, сохранение usage/objective |
 | 1.3 | Native и delivery intent реализованы локально | Exact task/run scope, add/set total, same-ID recovery, отдельный resume; UI также продлевает итерации и время; adoption впереди |
 | 1.4 | Реализован локально; adoption впереди | Exact task/run/instance; host verification и reviewable demo, whole compiled-plan check, durable replay/recovery; provider pilot отдельно |
 | 1.5 | Scoped overview реализован и проверен локально; adoption впереди | Parent cumulative snapshots, build receipts и Trial invocation receipts раздельны; unknown/partial и version/identity сохранены; общий total не выдумывается; orphan recovery относится к 5.3 |
-| 1.6 | Открыт; нужны измеримые повторы | N, модель/effort/version/task scope, диапазон и отдельное обоснование любого default |
-| 1.7 | Host/protocol evidence есть; mid-turn открыт | Bounded model/runtime observation overshoot/interruption/recovery с явным бюджетом |
+| 1.6 | Подготовлен протокол; эмпирическая калибровка после ручных пилотов | N, модель/effort/version/task scope, диапазон и отдельное обоснование любого default |
+| 1.7 | Interruption/reconnect наблюдены на CLI 0.153.0; active-Goal mid-turn и overshoot остаются unknown | Bounded model/runtime observation overshoot/interruption/recovery с явным бюджетом |
 | 2.1 | Реализован и проверен локально; adoption впереди | Contract v2 с явным agent_kind и interactive-agent для диалога; legacy-unclassified/advisory mapping, roundtrip, invalid values и прежние locks |
 | 2.2 | Read model, карточки и detail page реализованы локально; adoption впереди | Exact approval/plan/result/revision, отдельные canonical/candidate/acceptance, runtime и actions; browser для шести типов; commands и первый сценарий относятся к 2.4/3.3 |
 | 2.3 | Применимость и readiness реализованы локально; adoption впереди | Общий reader/selection для CLI и UI; manifest следует operations contract, CLI без managed runtime не получает ложный blocker; повреждённые metadata остаются диагностикой |
-| 2.4 | Открыт | Явный approved argv probe, cwd/symlink/timeout, GET не исполняет agent-controlled код |
+| 2.4 | Реализован: reviewed plan → bounded argv; отдельный private receipt | Явный approved argv probe, cwd/symlink/timeout, GET не исполняет agent-controlled код |
 | 2.5 | Реализован и проверен локально; adoption впереди | Read-only plan и идемпотентный apply по exact revision/spec/approval/Trial/receipt; fresh host verification прежнего run, история сохраняется; нет поддельного acceptance |
 | 3.1 | Реализован локально; adoption впереди | Общий каталог CLI/UI; 34 targeted tests, legacy и current-state compatibility; exact run/Spec/approval projection |
 | 3.2 | Реализован локально | Own authored profile/contract; bounded parsed cache, immediate selected mission read; fresh host lookup; staged build |
-| 3.3 | Открыт | CLI/service/job/tool/library handoff соответствует реальному первому сценарию и revision evidence |
+| 3.3 | Реализован: шесть типов, authored первый сценарий | CLI/service/job/tool/library handoff соответствует реальному первому сценарию и revision evidence |
 | 4.0 | Реализован и проверен локально; adoption впереди | Runtime/interface/operations preflight до записи; headless-cli-v1, local Git baseline, отдельный scaffold-only report и конкретный adapter для unsupported; contract не переписывается |
-| 4.1 | Открыт | Host-owned verifier provenance/hash до lock; заведомо неверный продукт проваливает Trial |
-| 4.2 | Открыт | Один automated_trial_waiver contract, actor/reason/scope, waiver не даёт ложного verified |
-| 5.1 | Открыт; начальный private status исключён из prerender | Async bounded probes, access cache/card projection, invalidation, прежний API/UX |
-| 5.2 | Release, workspace read и result readiness policies реализованы локально; остальные классы открыты | Общий MJS/TS источник, bounded validated overrides для подходящих классов probes, документация |
-| 5.3 | Открыт | Достижимые terminal states, cleanup error diagnostics, идемпотентность, сохранение dirty/foreign/recoverable worktrees |
-| 5.4 | Открыт | Inventory каждого research/improve writer, redaction до locks, path/private identifier fixtures и strict audit |
-| 5.5 | Открыт | Shipped sensors claims привязаны к коду/evals; proposed части явно помечены |
+| 4.1 | Реализован: provenance/hash до approval; negative controls проходят | Host-owned verifier provenance/hash до lock; заведомо неверный продукт проваливает Trial |
+| 4.2 | Реализован: один structured waiver, отдельная операторская приёмка | Один automated_trial_waiver contract, actor/reason/scope, waiver не даёт ложного verified |
+| 5.1 | Реализован: async host diagnostics, bounded cache/invalidation и card identity projection | Async bounded probes, access cache/card projection, invalidation, прежний API/UX |
+| 5.2 | Реализован: общий MJS/TS policy source и документация | Общий MJS/TS источник, bounded validated overrides для подходящих классов probes, документация |
+| 5.3 | Реализован: durable cleanup receipt, safe retry, dirty/foreign preservation | Достижимые terminal states, cleanup error diagnostics, идемпотентность, сохранение dirty/foreign/recoverable worktrees |
+| 5.4 | Реализован: writer inventory, text-leaf redaction до locks, decoded-payload fixtures | Inventory каждого research/improve writer, redaction до locks, path/private identifier fixtures и strict audit |
+| 5.5 | Inventory проверен; непоставленные sensors явно proposed | Shipped sensors claims привязаны к коду/evals; proposed части явно помечены |
 | 5.6 | Deferred самим roadmap | TECHSCOPE compatibility сохраняется; отдельная миграция не включается без нового решения |
-| 6.1 | Открыт | Ретроспектива CLI-пилота: measured/reported/unknown и раздельные product/run результаты |
-| 6.2 | Открыт; после implementation gates | Подготовленные автоматические сценарии и private telemetry; ручные pilots/acceptance после готовности mother |
-| 6.3 | Открыт; после pilot evidence | Scope-specific decision по наблюдениям; fixtures не подменяют эмпирическое подтверждение |
-| 7.1 | Открыт; после 4.0 | Рабочий минимальный CLI guide с prerequisites, auth, approvals и clean fixture |
-| 7.2 | Открыт | Отдельная синтетическая демонстрация, без реальных private history/endpoints/identifiers |
-| 7.3 | Открыт | GitHub inventory, актуальный changelog/public package, guards, commit/push и release evidence |
+| 6.1 | Обезличенная ретроспектива готова; product и исходный run разделены | Ретроспектива CLI-пилота: measured/reported/unknown и раздельные product/run результаты |
+| 6.2 | Подготовлен протокол; реальные ручные пилоты начинаются после готовности mother | Подготовленные автоматические сценарии и private telemetry; ручные pilots/acceptance после готовности mother |
+| 6.3 | После измеренных повторов; эмпирических promotion сейчас нет | Scope-specific decision по наблюдениям; fixtures не подменяют эмпирическое подтверждение |
+| 7.1 | Реализован: русский CLI guide, реальные команды и clean fixture без overrides | Рабочий минимальный CLI guide с prerequisites, auth, approvals и clean fixture |
+| 7.2 | Синтетический demo fixture и публичный текст готовы | Отдельная синтетическая демонстрация, без реальных private history/endpoints/identifiers |
+| 7.3 | Inventory/changelog подготовлены; GitHub и managed rollout завершают пакет | GitHub inventory, актуальный changelog/public package, guards, commit/push и release evidence |
 | Канонические экземпляры | Предыдущий пакет установлен на пяти | Новый exact commit, self-test, build/page/chunk health, own state/children на mother, Dasha, Sasha, Marina, MacBook |
-| ND roadmap | Shared revision 7 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
+| ND roadmap | Revision 8 готова; отдельная ND copy при финальной синхронизации | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
+
+## Завершающий пакет подготовки — 2026-09-06
+
+Актуальный обзор: `03_reviews/2026-09-06-pritha-pre-pilot-readiness-review.md`.
+Рабочая русская инструкция: `docs/getting-started.ru.md`. Clean fixture проходит
+полный путь без research/scaffold overrides, включая отдельную Outcome approval,
+независимый verifier, canonical fast-forward и synthetic acceptance/handoff.
+Он не объявляется модельным пилотом. Финальный self-test: 701/701 tests и семь quality checks pass, regressions нет.
+Staged build и transactional adoption пяти экземпляров фиксирует release report.
+
+Граница завершения подготовки: пользователь может начать ручное создание
+агентов на mother. Прогноз по повторным данным, калибровка 1.6, реальные 6.2
+и эмпирическая промоция 6.3 начинаются после этого по
+`07_workflows/2026-09-06-pritha-manual-pilot-protocol.md`. Они остаются открытыми
+как следующий наблюдательный этап; 5.6 deferred. Active-Goal mid-turn enforcement
+не считается доказанным по одному interruption/reconnect observation.
+
+Далее в документе сохранена история локальных пакетов и их тогдашних проверок.
+Их старые количества tests не обозначают итоговую версию.
 
 ## Текущий пакет и следующий вход
 

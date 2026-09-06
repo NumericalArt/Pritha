@@ -6,6 +6,11 @@ export const TIMEOUT_POLICIES = Object.freeze({
   releaseStrict: Object.freeze({ defaultMs: 180_000, minMs: 100, maxMs: 600_000, env: "PRITHA_UPDATE_STRICT_HEALTH_TIMEOUT_MS" }),
   workspaceRead: Object.freeze({ defaultMs: 5_000, minMs: 50, maxMs: 30_000, env: "PRITHA_WORKSPACE_READ_TIMEOUT_MS" }),
   resultReadiness: Object.freeze({ defaultMs: 5_000, minMs: 100, maxMs: 30_000, env: "PRITHA_RESULT_READINESS_TIMEOUT_MS" }),
+  healthCommand: Object.freeze({ defaultMs: 5_000, minMs: 50, maxMs: 30_000, env: "PRITHA_HEALTH_COMMAND_TIMEOUT_MS" }),
+  privateAccess: Object.freeze({ defaultMs: 1_000, minMs: 50, maxMs: 10_000, env: "PRITHA_PRIVATE_ACCESS_TIMEOUT_MS" }),
+  runtimeRead: Object.freeze({ defaultMs: 2_500, minMs: 50, maxMs: 30_000, env: "PRITHA_RUNTIME_READ_TIMEOUT_MS" }),
+  launchdAudit: Object.freeze({ defaultMs: 30_000, minMs: 100, maxMs: 60_000, env: "PRITHA_LAUNCHD_AUDIT_TIMEOUT_MS" }),
+  diagnostic: Object.freeze({ defaultMs: 8_000, minMs: 50, maxMs: 30_000, env: "PRITHA_DIAGNOSTIC_TIMEOUT_MS" }),
 });
 
 export function timeoutPolicy(name, { env = process.env, value } = {}) {

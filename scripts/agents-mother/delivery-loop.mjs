@@ -69,6 +69,7 @@ export function canHostVerifyDelivery(state) {
   return state?.status === "blocked" && [
     "token_budget_exhausted", "iteration_budget_exhausted", "elapsed_budget_exhausted", "goal_usage_unavailable",
     "verification_stale", "verification_needs_implementation", "checkpoint_commit_failed", "verifier_modified", "trial_input_baseline_changed",
+    "trial_input_missing", "trial_input_invalid", "trial_input_provenance_mismatch",
   ].includes(state.blockers?.[0]?.code);
 }
 
@@ -264,6 +265,14 @@ function blockerForError(error) {
         { id: "repair-scaffold", label: "Repair scaffold", effect: "Create or restore the verifier outside the autonomous build executor, then resume." },
         { id: "revise-outcome", label: "Revise outcome", effect: "Create and approve a new Outcome Spec with a different Trial." },
         { id: "stop-run", label: "Stop run", effect: "Abandon this run without weakening verification." },
+      ],
+    },
+    trial_input_provenance_mismatch: {
+      question: "How should Pritha restore the reviewed verifier identity?",
+      options: [
+        { id: "restore-verifier", label: "Restore reviewed verifier", effect: "Restore the exact hash recorded in the approved Outcome, then verify this same run without a model turn." },
+        { id: "revise-outcome", label: "Review a new verifier", effect: "Review and approve a new Outcome revision with its new verifier hash; the current approval is preserved." },
+        { id: "stop-run", label: "Stop run", effect: "Abandon the run without weakening its verification evidence." },
       ],
     },
     verifier_modified: {
@@ -570,13 +579,21 @@ function releaseTarget(runRoot, state, options = {}) {
 
 const AUTO_CLEANUP_TERMINAL_STATUSES = new Set(["accepted", "failed", "abandoned", "cancelled"]);
 
+function cleanupWithReceipt(runRoot, state) {
+  let result;
+  try { result = cleanupDeliveryWorktree(runRoot, { apply: true, yes: true }); }
+  catch (error) { result = { applied: false, error: error?.code || "cleanup_error", message: redactFilesystemPaths(bounded(error?.message || error, 1_000)) }; }
+  const receipt = { schema: "pritha-delivery-cleanup-v1", run_id: state.run_id, ledger_version: state.version,
+    status: result.error ? "failed" : result.removed || result.metadata?.cleanup_status === "cleaned" ? "cleaned" : "preserved",
+    reason: result.error || result.reason || null, applied: Boolean(result.applied) };
+  const file = path.join(runRoot, "cleanup-status.json"), serialized = `${JSON.stringify(receipt, null, 2)}\n`;
+  if (!existsSync(file) || readFileSync(file, "utf8") !== serialized) atomicWriteFile(file, serialized);
+  return result;
+}
+
 function automaticTerminalCleanup(runRoot, state) {
   if (!AUTO_CLEANUP_TERMINAL_STATUSES.has(state.status)) return null;
-  try {
-    return cleanupDeliveryWorktree(runRoot, { apply: true, yes: true });
-  } catch (error) {
-    return { applied: false, error: error?.code || "cleanup_error", message: bounded(error?.message || error, 1_000) };
-  }
+  return cleanupWithReceipt(runRoot, state);
 }
 
 function blockDelivery(runRoot, plan, worktree, blocker, options = {}) {
@@ -674,7 +691,7 @@ async function runDeliveryLoopLocked(input = {}) {
   state = reconcileExecutorAccounting(runRoot);
   let worktree = readDeliveryWorktree(runRoot);
   if (["verified", "awaiting_acceptance", "accepted", "failed", "abandoned", "cancelled"].includes(state.status)) {
-    return { state, worktree, reportPath: null, blocked: false };
+    return { state, worktree, reportPath: null, blocked: false, cleanup: automaticTerminalCleanup(runRoot, state) };
   }
   if (state.status === "blocked") return { state, worktree, reportPath: null, blocked: true };
   if (input.buildGitMode && input.buildGitMode !== "disposable-worktree") {
@@ -938,7 +955,9 @@ export function findDeliveryRun(runId, options = {}) {
 export function deliveryStatus(runId, options = {}) {
   const runRoot = findDeliveryRun(runId, options);
   if (!runRoot) throw new DeliveryLoopError("run_not_found", `Delivery run not found: ${runId}`);
-  return { runRoot, state: readDeliveryLedger(runRoot), worktree: readDeliveryWorktree(runRoot) };
+  let cleanup = null;
+  try { cleanup = JSON.parse(readBoundedRegularFile(path.join(runRoot, "cleanup-status.json"), { maxBytes: 16_384, allowedRoots: [runRoot] }).text); } catch { /* Legacy runs have no receipt. */ }
+  return { runRoot, state: readDeliveryLedger(runRoot), worktree: readDeliveryWorktree(runRoot), cleanup };
 }
 
 export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
@@ -1187,10 +1206,9 @@ export function cleanupDeliveryRun(runId, options = {}) {
   if (occupiedTargetClaim(buildsRoot, status.state)) {
     return { run_id: runId, status: status.state.status, eligible: false, applied: false, reason: "target_claim_active" };
   }
-  const plan = planDeliveryWorktreeCleanup(status.runRoot);
-  if (!options.apply) return { ...plan, status: status.state.status, applied: false };
+  if (!options.apply) return { ...planDeliveryWorktreeCleanup(status.runRoot), status: status.state.status, applied: false };
   if (!options.yes) throw new DeliveryLoopError("cleanup_confirmation_required", "Cleanup apply requires --yes");
-  return { ...cleanupDeliveryWorktree(status.runRoot, { apply: true, yes: true }), status: status.state.status };
+  return { ...cleanupWithReceipt(status.runRoot, status.state), status: status.state.status };
 }
 
 function deliveryRunRoots(buildsRoot) {
@@ -1243,14 +1261,16 @@ export function cleanupStaleDeliveryRuns(options = {}) {
     try {
       const plan = planDeliveryWorktreeCleanup(runRoot);
       if (!plan.eligible) {
+        if (options.apply) cleanupWithReceipt(runRoot, state);
         skipped.push({ run_id: state.run_id, reason: plan.reason });
         continue;
       }
       const result = options.apply
-        ? cleanupDeliveryWorktree(runRoot, { apply: true, yes: true })
+        ? cleanupWithReceipt(runRoot, state)
         : { ...plan, applied: false };
       candidates.push({ ...result, status: state.status });
     } catch (error) {
+      if (options.apply) cleanupWithReceipt(runRoot, state);
       skipped.push({ run_id: state.run_id, reason: error?.code || "cleanup_error" });
     }
   }

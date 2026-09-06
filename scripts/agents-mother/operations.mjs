@@ -7,6 +7,7 @@ import { today } from "../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, SERVICE_MODES } from "./contract.mjs";
 import { checkResult, detectProject, fileExists, readJsonIfExists, runProjectCommand } from "./test.mjs";
 import { writeLifecycleReport } from "./lifecycle-report.mjs";
+import { readAgentCatalog, findCatalogAgent, agentOperationsApplicability } from "./identity.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const REPORT_DIR = path.join(resolvePrithaAgentMemoryRoot({ root: ROOT }), "reports");
@@ -30,6 +31,15 @@ export function operationsProject(projectPath, options = {}) {
   const detection = detectProject(projectRoot);
   const manifest = readJsonIfExists(projectRoot, "operations/manifest.json");
   const checks = [];
+  const agent = findCatalogAgent(readAgentCatalog({ root: ROOT, fresh: true }), projectRoot);
+  if (agent && agentOperationsApplicability(agent, manifest, { root: ROOT }).manifestRequired === false) {
+    checks.push(checkResult("Operations", "not-applicable", "The accepted contract selects no managed service, autostart or schedule. Commands were not executed."));
+    const report = writeLifecycleReport(path.join(REPORT_DIR, `${today()}-${slug(path.basename(projectRoot))}-agent-operations-report.md`),
+      ({ artifactId }) => agentOperationsReportMarkdown(projectRoot, path.basename(projectRoot), detection, manifest, checks, "not-applicable", artifactId),
+      { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT });
+    console.log(`Operations: not-applicable\nReport: ${path.relative(ROOT, report.path)}`);
+    return { status: "not-applicable", reportPath: report.path };
+  }
 
   checks.push(checkResult(
     "Operations manifest",

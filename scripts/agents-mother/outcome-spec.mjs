@@ -12,6 +12,9 @@ import { writeUniqueArtifact } from "./artifact-selection.mjs";
 import { contractData, contractFingerprint } from "./contract.mjs";
 import { authoredAgentId } from "./identity.mjs";
 import { outcomeDocumentLock } from "./outcome-lock.mjs";
+import { automatedTrialWaiver, automatedTrialWaiverIssues, hasAutomatedTrialWaiver } from "./automated-trial-waiver.mjs";
+import { trialInputDeclarations, trialInputDeclarationIssues } from "./trial-input-declarations.mjs";
+import { inspectProtectedTrialInputs } from "./delivery-worktree.mjs";
 export { outcomeDocumentLock, canonicalOutcomeDocument } from "./outcome-lock.mjs";
 
 export const OUTCOME_SPEC_SCHEMA = "pritha-agent-outcome-spec-v1";
@@ -168,6 +171,7 @@ function parseTrials(text) {
       passCriteria: labelValue(block, "Pass criteria"),
       fixture: labelValue(block, "Fixture"),
       timeoutMs: integerValue(labelValue(block, "Timeout ms"), 120_000),
+      ...trialInputDeclarations({ verifierInputs: labelValues(block, "Verifier input"), productTargets: labelValues(block, "Product target") }),
     };
   });
 }
@@ -237,7 +241,7 @@ export function outcomeSemanticProjection(value) {
     contract_fingerprint: String(parsed.frontmatter.contract_fingerprint || ""),
     agent_slug: String(parsed.frontmatter.agent_slug || ""),
     interaction_mode: parsed.interactionMode,
-    automated_trial_waiver: String(parsed.frontmatter.automated_trial_waiver || "none"),
+    automated_trial_waiver: automatedTrialWaiver(parsed.frontmatter.automated_trial_waiver),
     shape: parsed.shape,
     user_facing: parsed.userFacing,
     headless: parsed.headless,
@@ -389,8 +393,14 @@ export function validateOutcomeSpecText(text, options = {}) {
     }
   }
 
-  const waiver = String(fm.automated_trial_waiver || "none").trim();
-  if (automated === 0 && (notApplicable(waiver) || missing(waiver))) {
+  for (const trial of parsed.trials) {
+    for (const message of trialInputDeclarationIssues(trial)) issues.push(issue("OS020", message, `Trials.${trial.id}`));
+  }
+  const waiver = automatedTrialWaiver(fm.automated_trial_waiver);
+  for (const message of automatedTrialWaiverIssues(waiver, parsed.trials, { allowLegacy: status === "approved" })) {
+    issues.push(issue("OS021", message, "frontmatter.automated_trial_waiver"));
+  }
+  if (automated === 0 && !hasAutomatedTrialWaiver(waiver)) {
     issues.push(issue("OS017", "at least one automated Trial is required unless a concrete waiver is recorded", "frontmatter.automated_trial_waiver"));
   }
 
@@ -761,6 +771,11 @@ export function approveOutcomeSpec(specPath, options = {}) {
   if (!validation.contract || validation.contract.fm.status !== "accepted") {
     throw new Error("Outcome Spec approval requires an accepted agent contract");
   }
+  // Explicit verifier identities are reviewed before approval locks are written.
+  // This reads files only and never executes a project command.
+  if (validation.parsed.trials.some(trial => trial.verifierInputs || trial.productTargets)) {
+    inspectProtectedTrialInputs({ trials: validation.parsed.trials }, path.resolve(root, options.projectPath || validation.contract.targetFolder));
+  }
   const approvedAt = options.approvedAt || new Date().toISOString();
   const semanticLock = outcomeSemanticLock(validation.parsed);
   let next = replaceFrontmatterFields(original, {
@@ -795,6 +810,26 @@ export function approveOutcomeSpec(specPath, options = {}) {
   return { path: fullPath, text: next, event, evidencePath, unchanged: false };
 }
 
+export function preflightOutcomeTrialInputs(specPath, options = {}) {
+  const root = path.resolve(options.root || resolveTechscopeRoot());
+  const validation = outcomeSpecFile(specPath, { ...options, root });
+  const base = { schema: "pritha-trial-input-preflight-v1", scope: "verification-inputs-only",
+    specId: validation.parsed.frontmatter.id, semanticLock: outcomeSemanticLock(validation.parsed),
+    documentLock: outcomeDocumentLock(validation.text), executesCommands: false, writesFiles: false };
+  if (!validation.ok) return { ...base, status: "blocked", issues: validation.issues, inputs: [] };
+  try {
+    const selected = options.projectPath || validation.contract?.targetFolder;
+    if (!selected) throw new Error("Select the project with --project before verifier preflight");
+    const project = path.resolve(root, selected);
+    const inputs = inspectProtectedTrialInputs({ trials: validation.parsed.trials }, project);
+    return { ...base, status: "ready", issues: [], inputs,
+      productTargets: [...new Set(validation.parsed.trials.flatMap(trial => trial.productTargets || []))],
+      nextAction: "Review the verifier, exercise a wrong-product negative control, then approve this exact Outcome revision. Product verification remains separate." };
+  } catch (error) {
+    return { ...base, status: "blocked", inputs: [], issues: [{ code: error.code || "trial_input_preflight_failed", message: redactSensitiveText(error.message) }] };
+  }
+}
+
 function safeRunId(value) {
   const runId = String(value || "").trim();
   if (!/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(runId)) throw new Error("run-id must use only letters, digits, dot, underscore and dash");
@@ -814,7 +849,7 @@ export function approvedTrialPlan(specPath, options = {}) {
   const parsed = validation.parsed;
   const semanticLock = outcomeSemanticLock(parsed);
   const operatorTrials = parsed.trials.filter((trial) => trial.kind === "operator-judged").length;
-  const waiver = String(parsed.frontmatter.automated_trial_waiver || "none");
+  const waiver = automatedTrialWaiver(parsed.frontmatter.automated_trial_waiver);
   const plan = {
     schema: TRIAL_PLAN_SCHEMA,
     spec_id: parsed.frontmatter.id,
@@ -827,7 +862,7 @@ export function approvedTrialPlan(specPath, options = {}) {
     approval_id: approval.event?.approval_id || null,
     interaction_mode: parsed.interactionMode,
     automated_trial_waiver: waiver,
-    autonomous_verification_allowed: validation.automatedTrials > 0 && operatorTrials === 0 && notApplicable(waiver),
+    autonomous_verification_allowed: validation.automatedTrials > 0 && operatorTrials === 0 && !hasAutomatedTrialWaiver(waiver),
     delivery_policy: {
       build_git_mode: validation.contract?.buildGitMode || "disposable-worktree",
       build_executor: validation.contract?.buildExecutor || "codex-app-server",

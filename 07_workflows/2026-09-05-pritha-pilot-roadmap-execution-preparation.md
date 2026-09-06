@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: preparation v12; full completion work from cf11419 in codex/roadmap-completion
+source_version: preparation revision 13; completion candidate based on 8a26775
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -52,6 +52,17 @@ confidence: high
 ---
 
 # Execution preparation: первые сессии на материнской Pritha
+
+Текущий итог подготовки (2026-09-06): implementation пакет завершает
+`03_reviews/2026-09-06-pritha-pre-pilot-readiness-review.md`, поштучные статусы —
+`07_workflows/2026-09-05-pritha-roadmap-completion-tracker.md`.
+Русский CLI guide, чистый synthetic delivery, private authored handoff,
+protected verifier/waiver, async diagnostics и redaction готовы к финальному
+release gate. Ручные пилоты, сопоставимая калибровка и empirical promotion
+идут после объявления готовности по отдельному manual-pilot protocol.
+История ниже сохраняет результаты прежних пакетов; финальный installed pin
+и self-test приводятся в release report, а не выводятся из старых чисел.
+
 
 Подготовка завершена; первая локальная реализация пунктов 0.1/0.2/0.6
 также выполнена. Результат: 533/533 tests, typecheck, staged build и strict

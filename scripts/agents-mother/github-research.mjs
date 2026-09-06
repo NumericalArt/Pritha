@@ -6,6 +6,7 @@ import {
   containsHighRiskInstruction,
   quarantineUntrustedInstructionText,
   redactSensitiveText,
+  redactStructuredText,
 } from "../lib/redaction.mjs";
 import { contentSha256 } from "../lib/markdown-content-lock.mjs";
 import {
@@ -1018,6 +1019,7 @@ export async function runRepositoryResearch(root, data, externalTopics, options 
 }
 
 export function repositoryResearchFrontmatter(research) {
+  research = redactStructuredText(research);
   return [
     `repository_research_required: ${research.plan.required ? "true" : "false"}`,
     `repository_research_policy: ${yamlScalar(research.plan.policy)}`,
@@ -1073,6 +1075,7 @@ ${candidates}
 }
 
 export function repositoryResearchMarkdown(research) {
+  research = redactStructuredText(research);
   const machineComment = repositoryResearchMachineComment(research);
   const rendered = repositoryResearchRenderedMarkdown(research);
   return `${machineComment ? `${machineComment}\n\n` : ""}${rendered}`;

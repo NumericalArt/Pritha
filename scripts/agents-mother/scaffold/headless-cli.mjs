@@ -13,7 +13,8 @@ export function headlessCliFiles(baseFiles, data, capability) {
   const manifest = { schema: "pritha-cli-interface-v1", version: 1, generated_by: "Pritha", agent: agentName,
     runtime_family: capability.runtime, primary_interface: text(data.primaryInterface), adapters: [{ name: "cli", enabled: true,
       status: "scaffold", command_argv: ["node", "scripts/agent-cli.mjs"], status_command: "node scripts/agent-cli.mjs status", required_secrets: [] }],
-    scaffold_adapter: capability.adapter, outcome_status: "implementation-required" };
+    scaffold_adapter: capability.adapter, outcome_status: "implementation-required",
+    healthcheck_argv: ["node", "scripts/healthcheck.mjs"] };
   const cli = `import { readFileSync } from "node:fs";
 const manifest = JSON.parse(readFileSync(new URL("../interfaces/manifest.json", import.meta.url), "utf8"));
 const command = process.argv[2] || "help";

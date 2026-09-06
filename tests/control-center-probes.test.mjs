@@ -98,7 +98,7 @@ test("sync probes cannot disable the timeout with invalid options", () => {
   }
 });
 
-test("all synchronous diagnostics use the bounded probe helper; service actions remain separate", () => {
+test("all status diagnostics use the bounded asynchronous helper; service actions remain separate", () => {
   const names = ["tailscaleSelfDnsName", "tailscaleServeStatusOutput", "tailscaleServeStatusJson", "sqliteMemoryStats", "launchdRootWarnings", "launchdRuntimeState", "screenSessionRunning"];
   for (const name of names) {
     const calls = [];
@@ -107,7 +107,7 @@ test("all synchronous diagnostics use the bounded probe helper; service actions 
       ts.forEachChild(node, visit);
     };
     visit(serverFunction(name));
-    assert.ok(calls.includes("runSyncProbe"), `${name} must use the bounded probe policy`);
+    assert.ok(calls.includes("runAsyncProbe"), `${name} must use the bounded probe policy`);
     assert.ok(!calls.includes("spawnSync"), `${name} must not bypass the bounded probe policy`);
   }
   // The remaining raw spawnSync executes an operator-authorized service action.
@@ -125,18 +125,18 @@ test("partial diagnostic output after timeout cannot report a healthy audit or r
   for (const error of [undefined, { code: "ETIMEDOUT" }, { code: "ENOENT" }]) {
     const response = { status: error ? null : 0, stdout: '{"ok":true}\n42.fixture\n', stderr: "", error };
     const screen = await import(moduleUrl(`
-      const runSyncProbe = () => (${JSON.stringify(response)});
+      const runAsyncProbe = async () => (${JSON.stringify(response)});
       export ${serverFunction("screenSessionRunning").getText(serverTree)}
     `));
-    assert.equal(screen.screenSessionRunning("fixture"), !error);
+    assert.equal(await screen.screenSessionRunning("fixture"), !error);
 
     response.stdout = '{"ok":true}';
     const audit = await import(moduleUrl(`
       import path from 'node:path';
-      const runSyncProbe = () => (${JSON.stringify(response)});
+      const runAsyncProbe = async () => (${JSON.stringify(response)});
       export ${serverFunction("launchdRootWarnings").getText(serverTree)}
     `));
-    const warnings = audit.launchdRootWarnings("fixture-root");
+    const warnings = await audit.launchdRootWarnings("fixture-root");
     if (error) assert.match(warnings[0], /audit unavailable: probe (timed out|failed)/);
     else assert.deepEqual(warnings, []);
   }

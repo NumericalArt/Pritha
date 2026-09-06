@@ -51,7 +51,8 @@ import type {
   ControlCenterStatus,
 } from "./types";
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
-import { runSyncProbe } from "./sync-probe";
+import { runAsyncProbe, createProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
+import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
 import { deliveryStateView } from "./delivery-state";
 import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, readAgentOperationsManifest, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
 
@@ -243,9 +244,7 @@ const APP_PORT = Number(process.env.PRITHA_CONTROL_CENTER_PORT || 3420);
 const APP_HOST = process.env.PRITHA_CONTROL_CENTER_HOST || "127.0.0.1";
 const SNAPSHOT_SCHEMA_VERSION = "pritha_child_agent_snapshot_v1";
 const APP_STARTED_AT = new Date();
-const TAILSCALE_PROBE_TIMEOUT_MS = 1_000;
-const ACCESS_LINKS_CACHE_MS = 120_000;
-let accessLinksCache: { key: string; expiresAt: number; value: AccessLinkState } | null = null;
+const accessLinksCache = createProbeCache({ ttlMs: 120_000 });
 
 function slug(value: string) {
   return value
@@ -307,9 +306,9 @@ function firstLanIPv4() {
   return undefined;
 }
 
-function tailscaleSelfDnsName() {
-  const result = runSyncProbe("tailscale", ["status", "--json"], {
-    timeout: TAILSCALE_PROBE_TIMEOUT_MS,
+async function tailscaleSelfDnsName() {
+  const result = await runAsyncProbe("tailscale", ["status", "--json"], {
+    policy: "privateAccess",
   });
   if (result.status !== 0 || !result.stdout.trim()) return undefined;
   try {
@@ -320,17 +319,17 @@ function tailscaleSelfDnsName() {
   }
 }
 
-function tailscaleServeStatusOutput() {
-  const result = runSyncProbe("tailscale", ["serve", "status"], {
-    timeout: TAILSCALE_PROBE_TIMEOUT_MS,
+async function tailscaleServeStatusOutput() {
+  const result = await runAsyncProbe("tailscale", ["serve", "status"], {
+    policy: "privateAccess",
   });
   if (result.status !== 0) return "";
   return result.stdout;
 }
 
-function tailscaleServeStatusJson() {
-  const result = runSyncProbe("tailscale", ["serve", "status", "--json"], {
-    timeout: TAILSCALE_PROBE_TIMEOUT_MS,
+async function tailscaleServeStatusJson() {
+  const result = await runAsyncProbe("tailscale", ["serve", "status", "--json"], {
+    policy: "privateAccess",
   });
   if (result.status !== 0 || !result.stdout.trim()) return null;
   try {
@@ -349,7 +348,7 @@ function tailscaleServeEndpointBlock(tailscaleUrl: string, serveStatus: string) 
   return serveStatus.match(pattern)?.[0] || "";
 }
 
-function tailscaleServeConfigured(tailscaleUrl: string, serveStatus = tailscaleServeStatusOutput()) {
+function tailscaleServeConfigured(tailscaleUrl: string, serveStatus: string) {
   return tailscaleServeEndpointBlock(tailscaleUrl, serveStatus).includes(`http://127.0.0.1:${APP_PORT}`);
 }
 
@@ -358,15 +357,13 @@ function canonicalTailscaleServeConfigured(dnsName: string, serveStatus: string)
   return tailscaleServeEndpointBlock(canonicalUrl, serveStatus).includes(`http://127.0.0.1:${APP_PORT}`);
 }
 
-function accessLinks(): AccessLinkState {
+async function accessLinks(fresh = false): Promise<AccessLinkState> {
   const cacheKey = `${APP_PORT}:${process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || "auto"}`;
-  const now = Date.now();
-  if (accessLinksCache?.key === cacheKey && accessLinksCache.expiresAt > now) return accessLinksCache.value;
+  return accessLinksCache.get(cacheKey, async () => {
   const lanIp = firstLanIPv4();
   const lanReady = false;
-  const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || tailscaleSelfDnsName();
-  const serveStatus = dnsName ? tailscaleServeStatusOutput() : "";
-  const serveStatusJson = dnsName ? tailscaleServeStatusJson() : null;
+  const dnsName = process.env.PRITHA_CONTROL_CENTER_TAILSCALE_HOST || await tailscaleSelfDnsName();
+  const [serveStatus, serveStatusJson] = dnsName ? await Promise.all([tailscaleServeStatusOutput(), tailscaleServeStatusJson()]) : ["", null];
   const explicitTailscaleUrl = dnsName ? `https://${dnsName}:${APP_PORT}` : undefined;
   const canonicalTailscaleUrl = dnsName ? `https://${dnsName}` : undefined;
   const canonicalConfigured = dnsName ? canonicalTailscaleServeConfigured(dnsName, serveStatus) : false;
@@ -385,8 +382,8 @@ function accessLinks(): AccessLinkState {
     tailscaleDnsName: dnsName,
     tailscaleServeStatusJson: serveStatusJson,
   };
-  accessLinksCache = { key: cacheKey, expiresAt: now + ACCESS_LINKS_CACHE_MS, value };
   return value;
+  }, { fresh });
 }
 
 function appStatus() {
@@ -442,10 +439,10 @@ function emptyMemoryStats(): MemoryStats {
   };
 }
 
-function sqliteMemoryStats(root: string): MemoryStats | null {
+async function sqliteMemoryStats(root: string): Promise<MemoryStats | null> {
   const databasePath = resolvePrithaStatePath("memory", "techscope.sqlite");
   if (!existsSync(databasePath)) return null;
-  const result = runSyncProbe(
+  const result = await runAsyncProbe(
     "sqlite3",
     [
       "-json",
@@ -459,7 +456,7 @@ UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
 `,
     ],
     {
-      timeout: 5_000,
+      policy: "workspaceRead",
     },
   );
   if (result.status !== 0 || !result.stdout.trim()) return null;
@@ -477,9 +474,9 @@ UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
   }
 }
 
-function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
+async function selfTestStatus(root: string): Promise<ControlCenterStatus["selfTest"]> {
   const baseline = readJson<SelfTestBaseline>(resolvePrithaStatePath("memory", "last-self-test.json"));
-  const sqliteStats = sqliteMemoryStats(root);
+  const sqliteStats = await sqliteMemoryStats(root);
   const baselineStats = baseline?.memory_stats;
   const memoryStats = sqliteStats || {
     documents: Number(baselineStats?.documents || 0),
@@ -518,11 +515,11 @@ function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
   };
 }
 
-function launchdRootWarnings(root: string) {
+async function launchdRootWarnings(root: string) {
   const auditScript = path.join(/* turbopackIgnore: true */ root, "scripts", "launchd-root-audit.mjs");
-  const result = runSyncProbe(process.execPath, [auditScript, "status", "--json"], {
+  const result = await runAsyncProbe(process.execPath, [auditScript, "status", "--json"], {
     cwd: root,
-    timeout: 30_000,
+    policy: "launchdAudit",
     env: { ...process.env, TECHSCOPE_ROOT: root },
   });
   if (result.error) {
@@ -1792,7 +1789,7 @@ function operationalRuntimeManager(manifest: OperationsManifest | null) {
   return String(manifest?.control_center_runtime?.manager || manifest?.service_mode || "").trim();
 }
 
-function launchdRuntimeState(manifest: OperationsManifest | null) {
+async function launchdRuntimeState(manifest: OperationsManifest | null) {
   const manager = operationalRuntimeManager(manifest);
   if (manager !== "launchd") return null;
   const label = String(manifest?.control_center_runtime?.launchd_label || manifest?.service_label || "").trim();
@@ -1802,9 +1799,9 @@ function launchdRuntimeState(manifest: OperationsManifest | null) {
   const target = label && uid !== undefined ? `gui/${uid}/${label}` : label;
   const loaded =
     Boolean(target) &&
-    runSyncProbe("launchctl", ["print", target], {
-      timeout: 2500,
-    }).status === 0;
+    (await runAsyncProbe("launchctl", ["print", target], {
+      policy: "runtimeRead",
+    })).status === 0;
 
   return {
     label,
@@ -1814,17 +1811,17 @@ function launchdRuntimeState(manifest: OperationsManifest | null) {
   };
 }
 
-function screenSessionRunning(session: string | undefined) {
+async function screenSessionRunning(session: string | undefined) {
   if (!session) return false;
-  const result = runSyncProbe("screen", ["-ls"], {
-    timeout: 2500,
+  const result = await runAsyncProbe("screen", ["-ls"], {
+    policy: "runtimeRead",
   });
   if (result.error) return false;
   const output = `${result.stdout || ""}\n${result.stderr || ""}`;
   return output.split(/\r?\n/).some((line) => line.includes(`.${session}`) || line.trim() === session);
 }
 
-function operationalReadiness(params: {
+async function operationalReadiness(params: {
   folderPresent: boolean;
   applicability?: ControlCenterAgent["operations"]["applicability"];
   manifestIssue?: string | null;
@@ -1834,7 +1831,7 @@ function operationalReadiness(params: {
   localUrl?: string;
   tailscaleUrl?: string;
   access: AccessLinkState;
-}): ControlCenterAgent["readiness"] {
+}): Promise<ControlCenterAgent["readiness"]> {
   const { folderPresent, manifest, operations, health, localUrl, tailscaleUrl, access } = params;
   const checks: ControlCenterOperatorActionCheck[] = [];
   const blockers: string[] = [];
@@ -1895,7 +1892,7 @@ function operationalReadiness(params: {
     blockers.push("Operations manifest is present but does not declare a usable runtime, command or local URL.");
   }
 
-  const launchd = launchdRuntimeState(manifest);
+  const launchd = await launchdRuntimeState(manifest);
   if (launchd) {
     runtime = {
       manager: "launchd",
@@ -1922,7 +1919,7 @@ function operationalReadiness(params: {
     }
   } else if (manager === "screen") {
     const session = manifest.control_center_runtime?.screen_session;
-    const running = screenSessionRunning(session);
+    const running = await screenSessionRunning(session);
     unmanagedLocalRuntime = Boolean(session && !running && health.status === "ok");
     const detail = session
       ? unmanagedLocalRuntime
@@ -2242,7 +2239,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const resultReadiness = await readAgentResultReadinessAsync(record.id, {
     root, codeRoot: root, stateRoot: resolvePrithaStateRoot(root), agentParent: resolvePrithaAgentParent(root),
   });
-  const readiness = operationalReadiness({
+  const readiness = await operationalReadiness({
     folderPresent: Boolean(folder),
     applicability, manifestIssue: manifestRead.issue,
     manifest,
@@ -2256,12 +2253,8 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const credentials = credentialsForAgent(root, folder, manifest);
 
   return {
-    id: record.id,
-    agentKind: record.agentKind,
+    ...projectAgentCardIdentity(record, currentAgentMission(record, { root }).text),
     resultReadiness,
-    identity: { agentId: record.agentId, instanceKey: record.instanceKey, status: record.identityStatus, diagnostics: record.diagnostics, routeAliases: record.routeAliases },
-    name: record.name,
-    mission: currentAgentMission(record, { root }).text,
     runtime: record.runtime,
     interface: record.interface,
     deployment: record.deployment,
@@ -2380,13 +2373,11 @@ export async function getControlCenterStatus(options: { freshIdentity?: boolean 
   const root = resolveTechscopeRoot();
   const registry = parseRegistry(root, options.freshIdentity);
   const records = liveRegistryRecords(root, registry.records);
-  const access = accessLinks();
+  const [access, selfTest, launchdWarnings] = await Promise.all([accessLinks(options.freshIdentity), selfTestStatus(root), launchdRootWarnings(root)]);
   const allAgents = await Promise.all(records.map((record) => buildAgent(root, record, access)));
   const childAgents = allAgents.filter((agent) => agent.name !== "Techscope" && agent.name !== "Pritha");
   const voiceRuntime = getPrithaRealtimeStatus();
   const caps = capabilities(root, records.length > 0, childAgents, voiceRuntime);
-  const selfTest = selfTestStatus(root);
-  const launchdWarnings = launchdRootWarnings(root);
   const warnings = [
     ...childAgents.flatMap((agent) => (agent.ui.issueText ? [`${agent.name}: ${agent.ui.issueText}`] : [])),
     ...(selfTest.warnings || []).map((warning) => `Self-test: ${warning.message}`),

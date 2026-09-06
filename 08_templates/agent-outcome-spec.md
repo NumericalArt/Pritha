@@ -3,7 +3,7 @@ id: template-agent-outcome-spec
 type: template
 status: draft
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-09-06
 template_for: agent-outcome-spec
 topics:
   - agent-engineering
@@ -44,6 +44,13 @@ approved_at: pending
 ---
 
 # Agent Outcome Spec: agent-name
+
+Host preparation: for a mutable product entrypoint, add explicit Product target
+and reviewed Verifier input declarations before approval. Record hashes and
+negative-control evidence using `07_workflows/protected-trial-verifier-preflight.md`.
+New automated_trial_waiver values use actor user, a concrete reason and a scope
+list of operator-judged Trial IDs. A waiver never substitutes for verification
+or user acceptance. Keep none when no exception is selected.
 
 ## Shape
 

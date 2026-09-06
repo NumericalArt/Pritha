@@ -97,12 +97,13 @@ test("Control Center carries served agent Tailscale links into agent cards", () 
   assert.match(agentsMapperSource, /tailscaleUrl: agent\.url\.tailscale/);
 });
 
-test("Control Center bounds and caches read-only Tailscale probes", () => {
-  assert.match(controlCenterServerSource, /const TAILSCALE_PROBE_TIMEOUT_MS = 1_000/);
-  assert.match(controlCenterServerSource, /const ACCESS_LINKS_CACHE_MS = 120_000/);
-  assert.match(controlCenterServerSource, /timeout: TAILSCALE_PROBE_TIMEOUT_MS/g);
-  assert.match(controlCenterServerSource, /accessLinksCache\?\.key === cacheKey/);
-  assert.match(controlCenterServerSource, /expiresAt: now \+ ACCESS_LINKS_CACHE_MS/);
+test("Control Center uses bounded async diagnostics and the shared private access cache", () => {
+  const server = controlCenterServerSource;
+  assert.match(server, /runAsyncProbe/);
+  assert.match(server, /policy: "privateAccess"/);
+  assert.match(server, /createProbeCache/);
+  assert.match(server, /accessLinksCache\.get/);
+  assert.doesNotMatch(server, /runSyncProbe/);
 });
 
 test("Settings Tailscale guidance uses the current instance port", () => {

@@ -13,6 +13,8 @@ import {
   validateOutcomeSpecText,
 } from "./outcome-spec.mjs";
 import { workspaceRevision, workspaceRevisionMatches } from "./workspace-revision.mjs";
+import { hasAutomatedTrialWaiver } from "./automated-trial-waiver.mjs";
+import { inspectProtectedTrialInputs, verifyProtectedTrialInputs, PROTECTED_TRIAL_INPUTS_SCHEMA } from "./delivery-worktree.mjs";
 
 export const TRIAL_RESULT_SCHEMA = "pritha-trial-result-v1";
 const MAX_PLAN_BYTES = 5 * 1024 * 1024;
@@ -304,6 +306,8 @@ export async function runTrialPlan(planOrPath, options = {}) {
   const loaded = loadPlan(planOrPath);
   const plan = validatePlan(loaded.plan);
   const projectRoot = projectRootFor(options.projectPath);
+  const protectedInputs = plan.trials.some(trial => trial.verifierInputs || trial.productTargets)
+    ? { schema: PROTECTED_TRIAL_INPUTS_SCHEMA, entries: inspectProtectedTrialInputs(plan, projectRoot) } : null;
   const backend = typeof options.backend === "object" && options.backend
     ? options.backend
     : createExecutionBackend(options.backend || "local", { cwd: projectRoot, codexBin: options.codexBin });
@@ -354,10 +358,15 @@ export async function runTrialPlan(planOrPath, options = {}) {
     if (options.closeBackend !== false) backend.close?.();
   }
   const after = workspaceRevision(projectRoot, options.workspaceRevisionOptions);
+  if (protectedInputs && !verifyProtectedTrialInputs(protectedInputs, projectRoot).ok) {
+    throw new Error("Protected Trial inputs changed during verification");
+  }
   const automated = trials.filter((entry) => entry.kind === "automated");
   const operator = trials.filter((entry) => entry.kind === "operator-judged");
   const failed = automated.filter((entry) => entry.status !== "passed");
-  const verificationStatus = failed.length > 0 ? "failed" : operator.length > 0 ? "awaiting_acceptance" : "verified";
+  const verificationStatus = failed.length > 0 ? "failed"
+    : operator.length > 0 || automated.length === 0 || plan.autonomous_verification_allowed === false || hasAutomatedTrialWaiver(plan.automated_trial_waiver)
+      ? "awaiting_acceptance" : "verified";
   const result = {
     schema: TRIAL_RESULT_SCHEMA,
     spec_id: plan.spec_id,

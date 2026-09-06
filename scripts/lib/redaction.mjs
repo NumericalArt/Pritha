@@ -449,3 +449,17 @@ export function redactFilesystemPaths(value, options = {}) {
     .replace(/\/(?:private\/)?var\/(?:folders|tmp)\/[A-Za-z0-9._~+/@%=-]+(?:\/[A-Za-z0-9._~+/@%=-]+)*/g, "<TEMP_PATH>")
     .replace(/\/tmp\/[A-Za-z0-9._~+/@%=-]+(?:\/[A-Za-z0-9._~+/@%=-]+)*/g, "<TEMP_PATH>");
 }
+
+// Redact text leaves before serialization and content locks. JSON numbers,
+// booleans and schema field names must never be rewritten by text regexes.
+export function redactStructuredText(value, options = {}) {
+  let nodes = 0;
+  const visit = (item, depth) => {
+    if (++nodes > 50_000 || depth > 24) throw new Error('Redaction input exceeds structural bounds');
+    if (typeof item === 'string') return redactFilesystemPaths(item, options);
+    if (Array.isArray(item)) return item.map(child => visit(child, depth + 1));
+    if (item && typeof item === 'object' && Object.getPrototypeOf(item) === Object.prototype) return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, visit(child, depth + 1)]));
+    return item;
+  };
+  return visit(value, 0);
+}
