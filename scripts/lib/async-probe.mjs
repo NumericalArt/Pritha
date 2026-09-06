@@ -49,3 +49,17 @@ export function createProbeCache({ ttlMs = 120_000, maxEntries = 16, now = Date.
     },
   };
 }
+
+// Next may evaluate API and server-rendered modules in separate bundles in the
+// same process. Share only explicitly named host caches; each value still has
+// an instance-scoped key and the normal bounded TTL/invalidation rules.
+export function sharedProbeCache(namespace, options = {}) {
+  if (!/^[a-z0-9-]{1,64}$/.test(namespace)) throw new Error('Invalid probe cache namespace');
+  const key = Symbol.for('pritha.shared-probe-caches.v1');
+  const caches = globalThis[key] ||= new Map();
+  if (!caches.has(namespace)) {
+    if (caches.size >= 16) throw new Error('Shared probe cache limit exceeded');
+    caches.set(namespace, createProbeCache(options));
+  }
+  return caches.get(namespace);
+}

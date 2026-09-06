@@ -4,3 +4,4 @@ export function createProbeCache(options?: { ttlMs?: number; maxEntries?: number
   invalidate(key?: string): void;
   get<T>(key: string, loader: () => T | Promise<T>, options?: { fresh?: boolean }): Promise<T>;
 };
+export function sharedProbeCache(namespace: string, options?: { ttlMs?: number; maxEntries?: number; now?: () => number }): ReturnType<typeof createProbeCache>;

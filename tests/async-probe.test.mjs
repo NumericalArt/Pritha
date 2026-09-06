@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 import { runAsyncProbe, createProbeCache } from '../scripts/lib/async-probe.mjs';
 import { projectAgentCardIdentity } from '../scripts/agents-mother/card-projection.mjs';
 
+test('separate host bundles share an in-flight cache without mixing instance keys', async () => {
+  const first = await import('../scripts/lib/async-probe.mjs?bundle=api');
+  const second = await import('../scripts/lib/async-probe.mjs?bundle=ssr');
+  const namespace = `test-status-${Date.now()}`;
+  const a = first.sharedProbeCache(namespace, { ttlMs: 1000, maxEntries: 8 });
+  const b = second.sharedProbeCache(namespace, { ttlMs: 1000, maxEntries: 8 });
+  let finish, calls = 0;
+  const one = a.get('instance-a', () => { calls++; return new Promise(resolve => { finish = resolve; }); });
+  const duplicate = b.get('instance-a', () => { throw new Error('duplicate status scan'); });
+  assert.equal(await b.get('instance-b', () => 'other instance'), 'other instance');
+  finish('first instance');
+  assert.deepEqual(await Promise.all([one, duplicate]), ['first instance', 'first instance']);
+  assert.equal(calls, 1);
+  assert.equal(await b.get('instance-a', () => 'fresh evidence', { fresh: true }), 'fresh evidence');
+  assert.equal(await a.get('instance-a', () => 'unexpected stale read'), 'fresh evidence');
+});
+
 test('async diagnostics release the event loop and bound queue, output and stubborn execution', async () => {
   let ticked = false;
   setTimeout(() => { ticked = true; }, 10);

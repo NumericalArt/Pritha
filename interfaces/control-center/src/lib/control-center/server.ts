@@ -51,7 +51,7 @@ import type {
   ControlCenterStatus,
 } from "./types";
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
-import { runAsyncProbe, createProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
+import { runAsyncProbe, createProbeCache, sharedProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
 import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
 import { deliveryStateView } from "./delivery-state";
 import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
@@ -2371,7 +2371,15 @@ function latestReports(root: string) {
     .slice(0, 8);
 }
 
+const statusReadCache = sharedProbeCache("control-center-status-v1", { ttlMs: 1_000, maxEntries: 8 });
+
 export async function getControlCenterStatus(options: { freshIdentity?: boolean } = {}): Promise<ControlCenterStatus> {
+  const root = resolveTechscopeRoot();
+  const key = JSON.stringify([root, resolvePrithaStateRoot(root), resolvePrithaAgentParent(root), process.env.PRITHA_INSTANCE_ID, process.env.PRITHA_CONTROL_CENTER_PORT]);
+  return statusReadCache.get(key, () => readControlCenterStatus(options), { fresh: options.freshIdentity });
+}
+
+async function readControlCenterStatus(options: { freshIdentity?: boolean } = {}): Promise<ControlCenterStatus> {
   const root = resolveTechscopeRoot();
   const registry = parseRegistry(root, options.freshIdentity);
   const records = liveRegistryRecords(root, registry.records);
