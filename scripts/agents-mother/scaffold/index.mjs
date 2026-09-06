@@ -18,6 +18,7 @@ import { writeLifecycleReport } from "../lifecycle-report.mjs";
 import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "../outcome-spec.mjs";
 import { assertScaffoldCapability, scaffoldCapability } from "./capabilities.mjs";
 import { headlessCliFiles } from "./headless-cli.mjs";
+import { apiProcessFiles, apiProcessManifest } from "./api-process.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -3005,7 +3006,9 @@ data/telegram-state.json
   });
   files.push({ path: "logs/.gitkeep", content: "" });
   const capability = scaffoldCapability(data);
-  return capability.adapter === "headless-cli-v1" ? headlessCliFiles(files, data, capability) : files;
+  if (capability.adapter === "headless-cli-v1") return headlessCliFiles(files, data, capability);
+  if (capability.adapter === "api-process-v1") return apiProcessFiles(files, data, capability);
+  return files;
 }
 
 export function runSmoke(projectRoot) {
@@ -3096,10 +3099,12 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   const operationProfile = operationProfileFor(data);
   const capability = options.capability || scaffoldCapability(data);
   const headless = capability.adapter === "headless-cli-v1";
+  const apiProcess = capability.adapter === "api-process-v1";
+  const apiManifest = apiProcess ? apiProcessManifest(data) : null;
   const controlCenterServiceMode = headless ? "none" : operationProfile.serviceMode === "none" ? "manual" : operationProfile.serviceMode;
   const controlCenterPort = stableLocalPort(agentSlug);
-  const controlCenterLocalUrl = headless ? "not-applicable" : `http://127.0.0.1:${controlCenterPort}`;
-  const controlCenterHealthUrl = headless ? "not-applicable" : `${controlCenterLocalUrl}/api/health`;
+  const controlCenterLocalUrl = headless ? "not-applicable" : apiProcess ? apiManifest.local_upstream_url : `http://127.0.0.1:${controlCenterPort}`;
+  const controlCenterHealthUrl = headless ? "not-applicable" : apiProcess ? apiManifest.health_url : `${controlCenterLocalUrl}/api/health`;
   const research = options.research || researchReportStatus(data);
   const healthResult = options.healthResult || smokeResult;
   const deliveryGit = options.deliveryGit || { ok: true, status: "not-requested", revision: null };
@@ -3217,7 +3222,7 @@ delivery_git_status: ${deliveryGit.status}
 delivery_git_revision: ${deliveryGit.revision || "pending"}
 control_center_card_status: ${headless ? "pending-live-check" : "pending-registry"}
 card_refs:
-${headless ? "  - interfaces/manifest.json\n  - scripts/agent-cli.mjs\n  - scripts/healthcheck.mjs" : "  - operations/manifest.json\n  - scripts/control-center-runtime.mjs\n  - scripts/control-center-agent-service.mjs\n  - scripts/healthcheck.mjs"}
+${headless ? "  - interfaces/manifest.json\n  - scripts/agent-cli.mjs\n  - scripts/healthcheck.mjs" : apiProcess ? "  - operations/manifest.json\n  - scripts/service-control.mjs\n  - scripts/server.mjs\n  - scripts/healthcheck.mjs" : "  - operations/manifest.json\n  - scripts/control-center-runtime.mjs\n  - scripts/control-center-agent-service.mjs\n  - scripts/healthcheck.mjs"}
 card_blockers:${headless ? " []" : "\n  - Registry must be rebuilt after scaffold before the card appears in Agents."}
 next_card_actions:
 ${headless ? "  - Inspect the own-instance identity catalog and current result readiness." : "  - node scripts/pritha.mjs registry"}
@@ -3287,7 +3292,7 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 | Smoke test | ${smokeResult.ok ? "pass" : "fail"} | ${markdownValue(smokeResult.output, "no output", 1200)} |
 | Healthcheck | ${healthResult.ok ? "pass" : "fail"} | ${markdownValue(healthResult.output, "no output", 1200)} |
 | Telegram adapter test | ${telegramApplicable ? "pending" : "not-applicable"} | ${telegramApplicable ? "Fill .env and run npm run telegram:healthcheck" : "Telegram not selected"} |
-| Operations status | pending | \`node scripts/operations-status.mjs\` |
+| Operations status | pending | \`${apiProcess ? "node scripts/deploy-service.mjs status (scaffold-only)" : "node scripts/operations-status.mjs"}\` |
 | Skills status | pending | \`node scripts/skills-status.mjs\` |
 | Pritha memory research | ${research.status} | ${research.path || "Run `node scripts/pritha.mjs research <contract>` before production scaffold decisions"} |
 | Research gate | ${markdownValue(researchGateResultLabel(research), "pending", 80)} | ${markdownValue(researchGateReasons(research), "none", 1200)} |
@@ -3305,7 +3310,7 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 | Selected repository security/permissions | ${data.repositoryAdoptionMode === "selected-module" ? (research.gate?.ok ? "pass" : "pending") : "not-applicable"} | ${markdownValue(`${data.repositorySecurityReview || ""}; ${data.repositoryPermissions || ""}`)} |
 | Selected repository eval/user approval | ${data.repositoryAdoptionMode === "selected-module" ? (research.gate?.ok ? "pass" : "pending") : "not-applicable"} | ${markdownValue(`${data.repositoryEvalStatus || ""}; ${data.repositoryUserApproval || ""}`)} |
 | Selected repository evidence/synthesis | ${data.repositoryAdoptionMode === "selected-module" ? (research.gate?.ok ? "pass" : "pending") : "not-applicable"} | github-repository-review=${evidenceTopics.includes("github-repository-review") ? "present" : "missing"}; synthesis=${gateFields.synthesis || "pending"} |
-| Control Center runtime contract | ${headless ? "not-applicable" : healthResult.ok ? "pass" : "fail"} | ${headless ? "No persistent service or Control Center server selected" : `Managed structured start/stop plus ${controlCenterHealthUrl}`} |
+| Control Center runtime contract | ${headless ? "not-applicable" : apiProcess ? "implementation-required" : healthResult.ok ? "pass" : "fail"} | ${headless ? "No persistent service or Control Center server selected" : apiProcess ? "Process operations metadata only; lifecycle implementation and live verification remain" : `Managed structured start/stop plus ${controlCenterHealthUrl}`} |
 | Control Center card readiness | ${headless ? "pending-live-check" : "pending-registry"} | ${headless ? "Own-instance catalog discovers authored lineage; check configuration and Outcome separately" : "Rebuild registry and check live card"}; \`node scripts/pritha.mjs card-readiness ${agentSlug}\` |
 | Documentation review | pass | README and training guide generated |
 | Outcome Spec lineage | ${outcome ? "recorded" : "missing"} | Scaffold readiness is separate from outcome verification and acceptance |
@@ -3351,16 +3356,16 @@ ${createdFiles.map((file) => `- ${markdownValue(file, "unknown", 500)}`).join("\
 
 ## Handoff
 
-- How to run: \`node scripts/agent-cli.mjs status\`
+- How to run: \`${apiProcess ? "node scripts/server.mjs (exits 78 until implemented)" : "node scripts/agent-cli.mjs status"}\`
 - How to test: \`node scripts/smoke-test.mjs\`
 - How to healthcheck: \`node scripts/healthcheck.mjs\`
-- How to start local runtime: ${headless ? "not-applicable; use the on-demand CLI" : "node scripts/control-center-runtime.mjs start"}
-- How to stop local runtime: ${headless ? "not-applicable; a command exits after its result" : "node scripts/control-center-runtime.mjs stop"}
-- How to inspect operations: ${headless ? "no service or schedule selected" : "node scripts/operations-status.mjs"}
+- How to start local runtime: ${headless ? "not-applicable; use the on-demand CLI" : apiProcess ? "node scripts/service-control.mjs start (implementation-required)" : "node scripts/control-center-runtime.mjs start"}
+- How to stop local runtime: ${headless ? "not-applicable; a command exits after its result" : apiProcess ? "node scripts/service-control.mjs stop (implementation-required)" : "node scripts/control-center-runtime.mjs stop"}
+- How to inspect operations: ${headless ? "no service or schedule selected" : apiProcess ? "read operations/manifest.json; plan/status via scripts/deploy-service.mjs" : "node scripts/operations-status.mjs"}
 - How to inspect skills: \`node scripts/skills-status.mjs\`
 - How to stop: ${headless ? "Ctrl+C interrupts an explicitly running foreground command" : "no long-running process is started during scaffold; use the Control Center stop action after starting it"}
 - How to inspect logs: ${headless ? "read command stdout/stderr and the private host Trial receipts" : "see logs/"}
-- First user exercise: follow \`docs/user-training-guide.md\`
+- First user exercise: follow \`${apiProcess ? "workflows/user-training.md" : "docs/user-training-guide.md"}\`
 
 ## Open issues
 

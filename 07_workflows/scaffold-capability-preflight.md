@@ -51,8 +51,9 @@ Scaffold повторяет capability preflight до создания ката�
 | --- | --- |
 | Runtime cli или codex-native, только CLI/headless, service none, autostart disabled/optional, proactivity none/manual | headless-cli-v1 |
 | Codex-native с поддерживаемыми workspace/interface слоями | Существующий codex-workspace-v1; placeholders не становятся готовым интерфейсом |
+| API, service process, только web/API, proactivity none, autostart disabled/optional, adoption none | api-process-v1: HTTP/operations заготовки без запуска; независимые Outcome Trials обязательны |
 | CLI с сервером, расписанием или вторым интерфейсом | Конкретный дополнительный adapter требуется до записи файлов |
-| API/local-model/hybrid/environment-specific runtime, неизвестный custom interface | Runtime/interface adapter требуется до записи файлов |
+| Остальные API/local-model/hybrid/environment-specific сочетания, неизвестный custom interface | Runtime/interface adapter требуется до записи файлов |
 | Headless CLI с selected-module adoption | Отдельный проверенный module-install adapter требуется до записи файлов |
 
 Unsupported сообщает недостающую комбинацию и следующий шаг. Принятый runtime

@@ -220,7 +220,7 @@ Existing accepted v1 contracts retain their original locks and are not rewritten
 
 - Deployment target: local Mac | Mac mini | VPS | cloud | embedded | user device | none | unknown
 - Deployment profile: local-development | mac-mini-service | cloud-service | embedded | external | unknown
-- Service mode: none | manual | launchd | external
+- Service mode: none | manual | process | launchd | external
 - Autostart: disabled | optional | launchd-on-approval | external
 - Start command:
 - Stop command:

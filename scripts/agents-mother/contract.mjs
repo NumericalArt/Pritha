@@ -9,7 +9,7 @@ import { readAgentKind } from "./agent-kind.mjs";
 
 export const RUNTIME_FAMILIES = new Set(["codex-native", "cli", "api", "local-model", "hybrid", "environment-specific"]);
 export const TELEGRAM_MODES = new Set(["none", "primary-chat", "intake-channel", "notifications-only", "operator-control"]);
-export const SERVICE_MODES = new Set(["none", "manual", "launchd", "external"]);
+export const SERVICE_MODES = new Set(["none", "manual", "process", "launchd", "external"]);
 export const AUTOSTART_MODES = new Set(["disabled", "optional", "launchd-on-approval", "external"]);
 export const PROACTIVE_MODES = new Set(["none", "manual", "scheduled", "heartbeat", "event-driven", "queue-watcher", "hybrid"]);
 export const RUNTIME_PLACEMENT_PROFILES = new Set(["deterministic-first", "frontier-first", "local-first", "hybrid", "unknown"]);

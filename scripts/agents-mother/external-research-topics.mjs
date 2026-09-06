@@ -94,7 +94,13 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
   const proactiveMode = String(data.proactiveMode || "none").trim();
   const repositoryAdoptionMode = String(data.repositoryAdoptionMode || "none").trim();
 
-  if (runtime === "api" || /\bopenai agents sdk\b|\bagents sdk\b/.test(text)) {
+  if (runtime === "api" && serviceMode === "process") {
+    pushTopic(topics, "node-http-runtime", "Node.js HTTP process service and host APIs",
+      "Node.js current HTTP server lifecycle os fs statfs child_process execFile documentation",
+      "Explicit API process service requires HTTP/runtime evidence, without implying a model SDK.",
+      { preferredSources: ["official-docs", "changelog"] });
+  }
+  if ((runtime === "api" && serviceMode !== "process") || /\bopenai agents sdk\b|\bagents sdk\b/.test(text)) {
     pushTopic(
       topics,
       "openai-agents-sdk",

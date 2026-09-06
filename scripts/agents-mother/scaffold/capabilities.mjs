@@ -29,6 +29,15 @@ export function scaffoldCapability(data = {}) {
     primaryInterface: primary, interfaces, operationsSelected: !noManagedOperations, readinessScope: "scaffold-only" };
   const unsupported = (reason, nextAction) => ({ ...base, supported: false, adapter: null, reason, nextAction });
   if (!runtimeFamilies.has(runtime)) return unsupported("runtime-unknown", "Choose a supported runtime in a reviewed contract revision.");
+  if (runtime === "api" && data.serviceMode === "process") {
+    if (!interfaces.length || interfaces.some(name => !["web", "api"].includes(name))
+      || (data.autostart && !["disabled", "optional"].includes(data.autostart))
+      || (data.proactiveMode && data.proactiveMode !== "none")
+      || (data.repositoryAdoptionMode && data.repositoryAdoptionMode !== "none")) {
+      return unsupported("api-process-combination-adapter-missing", "The API process adapter supports only web/API, no proactivity or repository adoption, and disabled/optional autostart.");
+    }
+    return { ...base, supported: true, adapter: "api-process-v1", reason: "api-process-service-scaffold", nextAction: "Implement the approved HTTP service and managed lifecycle, then run independent Outcome Trials; no service starts during scaffold." };
+  }
   if (!["codex-native", "cli"].includes(runtime)) return unsupported("runtime-adapter-missing", `Implement and review a ${runtime} scaffold adapter; the accepted contract is preserved.`);
   if (primary === "cli" && interfaces.length === 1 && noManagedOperations) {
     if (data.repositoryAdoptionMode === "selected-module") return unsupported("cli-module-adapter-missing", "Prepare a reviewed CLI module-install adapter for the selected repository before scaffold.");
