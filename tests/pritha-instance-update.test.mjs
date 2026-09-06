@@ -144,8 +144,16 @@ if (command.includes("run start")) {
   const buildId = fs.readFileSync(path.join(live, "BUILD_ID"), "utf8").trim();
   const fault = buildId === "candidate-build" ? process.env.PRITHA_TEST_HEALTH_FAULT : "";
   const commit = require("node:child_process").execFileSync("git", ["rev-parse", "--short=12", "HEAD"], { encoding: "utf8" }).trim();
+  let warmed = false;
   http.createServer((request, response) => {
+    if (request.url === "/api/status") {
+      warmed = true;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: true }));
+      return;
+    }
     if (["/voice", "/agents", "/task-chat", "/codex", "/settings"].includes(request.url)) {
+      if (!warmed) { response.writeHead(503); response.end("cold dynamic status"); return; }
       if (fault === "timeout" && request.url === "/codex") return;
       response.writeHead(fault === "page" && request.url === "/codex" ? 500 : 200, { "content-type": "text/html" });
       response.end(fault === "no-chunks" ? "<html>Loading</html>" : '<html><script src="/_next/static/chunks/fixture.js"></script></html>');
@@ -305,6 +313,7 @@ test("instance update pins the target and preserves agent fingerprints through a
     assert.equal(payload.finalHead, target);
     assert.equal(payload.finalGitClean, true);
     assert.equal(payload.health.ok, true);
+    assert.equal(payload.health.warmup.ok, true);
     assert.equal(payload.health.strict.ok, true);
     assert.equal(payload.health.strict.releaseMatch, true);
     assert.equal(payload.health.strict.payload.pages.length, 5);

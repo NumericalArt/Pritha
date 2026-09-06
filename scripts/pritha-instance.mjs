@@ -520,6 +520,20 @@ function readBuildId(directory) {
 async function verifyReleaseHealth({ buildId, commit = null, timeouts, rollback = false }) {
   const health = await waitForHealth(rollback ? timeouts.releaseRollback : timeouts.releaseReady, timeouts.releaseRequest);
   if (!health.ok) return health;
+  // Liveness precedes the first dynamic status render after a cold build.
+  // Prime that read once within the existing request budget; it never replaces
+  // the exact release identity, all-page and all-chunk gates below.
+  const warmStarted = Date.now();
+  let warmup;
+  try {
+    const response = await fetch(`http://127.0.0.1:${config.controlCenterPort}/api/status`, {
+      headers: { accept: "application/json" }, signal: AbortSignal.timeout(timeouts.releaseRequest),
+    });
+    await response.body?.cancel();
+    warmup = { ok: response.ok, status: response.status, durationMs: Date.now() - warmStarted };
+  } catch {
+    warmup = { ok: false, status: 0, durationMs: Date.now() - warmStarted };
+  }
   const result = run(process.execPath, [
     "scripts/control-center-health.mjs", "--strict", "--json",
     "--timeout-ms", String(timeouts.releaseRequest),
@@ -534,7 +548,7 @@ async function verifyReleaseHealth({ buildId, commit = null, timeouts, rollback 
     payload?.pages?.some((item) => item.path === page && item.status === "pass" && item.scripts?.length > 0));
   const chunksComplete = payload?.chunks?.length > 0 && payload.chunks.every((item) => item.status === "pass");
   const ok = result.ok && payload?.status === "pass" && releaseMatch && pagesComplete && chunksComplete;
-  return { ...health, ok, strict: { ok, releaseMatch, pagesComplete, chunksComplete, payload, error: result.ok ? null : result.stderr.slice(-2_000) || "strict_health_failed_or_timed_out" } };
+  return { ...health, ok, warmup, strict: { ok, releaseMatch, pagesComplete, chunksComplete, payload, error: result.ok ? null : result.stderr.slice(-2_000) || "strict_health_failed_or_timed_out" } };
 }
 
 function copyNext(source, destination) {
