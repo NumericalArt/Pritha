@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "../lib/paths.mjs";
-import { readAgentCatalog, findCatalogAgent, agentAlias } from "./identity.mjs";
+import { readAgentCatalog, findCatalogAgent, agentAlias, agentOperationsApplicability, readAgentOperationsManifest } from "./identity.mjs";
 
 function controlCenterSlug(value) {
   return String(value || "")
@@ -60,14 +60,6 @@ function deliveryLifecycle(root, evidence) {
       ? { present: true, id: delivery.id, path: delivery.path, status: delivery.status }
       : { present: false, status: "not-started" },
   };
-}
-
-function readJson(filePath) {
-  try {
-    return JSON.parse(readFileSync(filePath, "utf8"));
-  } catch {
-    return null;
-  }
 }
 
 function structuredCommand(command) {
@@ -180,7 +172,9 @@ export async function checkCardReadiness(target, options = {}) {
   const record = findCatalogAgent(registry, String(target || ""));
   const folder = record?.projectPath ? { name: path.basename(record.projectPath), absolutePath: record.projectPath } : null;
   const manifestPath = folder ? path.join(folder.absolutePath, "operations", "manifest.json") : "";
-  const manifest = manifestPath && existsSync(manifestPath) ? readJson(manifestPath) : null;
+  const manifestRead = readAgentOperationsManifest(record);
+  const manifest = manifestRead.manifest;
+  const applicability = agentOperationsApplicability(record, manifest, { ...options, root });
   const evidence = evidencePaths(root, record);
   const lifecycle = deliveryLifecycle(root, evidence);
   const blockers = [];
@@ -195,10 +189,12 @@ export async function checkCardReadiness(target, options = {}) {
     blockers.push("Sibling child-agent folder is missing.");
     nextActions.push("Create or repair the sibling child-agent scaffold.");
   }
-  if (folder && !manifest) {
-    blockers.push("operations/manifest.json is missing or invalid.");
-    nextActions.push("Generate a card-ready operations/manifest.json for the child agent.");
+  if (folder && !manifest && applicability.manifestRequired !== false) {
+    blockers.push(applicability.status === "unknown" ? "Operations applicability needs an accepted contract or operations metadata." : "operations/manifest.json is missing or invalid for the selected operations.");
+    nextActions.push("Review the selected operations contract before preparing required metadata.");
   }
+  if (applicability.status === "invalid-contract") blockers.push("Agent type metadata needs contract schema review.");
+  if (manifestRead.issue) blockers.push("operations/manifest.json is invalid or unsafe to read.");
   if (!lifecycle.outcome.present) {
     nextActions.push("Create and separately approve an Outcome Spec before autonomous delivery.");
   } else if (!lifecycle.outcome.approved) {
@@ -260,7 +256,7 @@ export async function checkCardReadiness(target, options = {}) {
     nextActions.push("Resolve runtime blockers when Start/Stop should become executable.");
   }
 
-  const localCardReady = Boolean(record && folder && manifest && blockers.length === 0);
+  const localCardReady = Boolean(record && folder && (manifest || applicability.manifestRequired === false) && blockers.length === 0);
   const status = !record || live.visible === false ? "missing" : localCardReady ? "ready" : "blocked";
 
   return {
@@ -274,6 +270,9 @@ export async function checkCardReadiness(target, options = {}) {
     folderPresent: Boolean(folder),
     folderPath: folder ? path.relative(root, folder.absolutePath) : undefined,
     manifestPresent: Boolean(manifest),
+    agentKind: record?.agentKind || null,
+    operationsApplicability: applicability,
+    readinessScope: "card-configuration-only",
     manifestPath: manifest ? path.relative(root, manifestPath) : undefined,
     controlCenterVisible: live.visible,
     actionPlanAvailable: live.actionPlanAvailable ?? false,

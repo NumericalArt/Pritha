@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: e724068 plus scoped phase usage completion work
+source_version: 081cd61 plus contract type and operations applicability work
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -65,9 +65,9 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 1.5 | Scoped overview реализован и проверен локально; adoption впереди | Parent cumulative snapshots, build receipts и Trial invocation receipts раздельны; unknown/partial и version/identity сохранены; общий total не выдумывается; orphan recovery относится к 5.3 |
 | 1.6 | Открыт; нужны измеримые повторы | N, модель/effort/version/task scope, диапазон и отдельное обоснование любого default |
 | 1.7 | Host/protocol evidence есть; mid-turn открыт | Bounded model/runtime observation overshoot/interruption/recovery с явным бюджетом |
-| 2.1 | Открыт; после 3.1 | Versioned agent_kind, legacy adapter, roundtrip, semantic lock compatibility |
+| 2.1 | Реализован и проверен локально; adoption впереди | Contract v2 с явным agent_kind и interactive-agent для диалога; legacy-unclassified/advisory mapping, roundtrip, invalid values и прежние locks |
 | 2.2 | Открыт | Независимые verification/acceptance, runtime, actions; revision freshness; все типы результата |
-| 2.3 | Открыт | Manifest applicability следует operations contract; CLI без service manifest не получает ложный blocker |
+| 2.3 | Базовая применимость реализована локально; readiness 2.2 впереди | Общий reader/selection для CLI и UI; manifest следует operations contract, CLI без managed runtime не получает ложный blocker; повреждённые metadata остаются диагностикой |
 | 2.4 | Открыт | Явный approved argv probe, cwd/symlink/timeout, GET не исполняет agent-controlled код |
 | 2.5 | Открыт; после 3.1 | Read-only reconcile plan и идемпотентный apply по exact HEAD/spec/approval/Trial/receipt; нет поддельного acceptance |
 | 3.1 | Реализован локально; adoption впереди | Общий каталог CLI/UI; 34 targeted tests, legacy и current-state compatibility; exact run/Spec/approval projection |
@@ -89,7 +89,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 7.2 | Открыт | Отдельная синтетическая демонстрация, без реальных private history/endpoints/identifiers |
 | 7.3 | Открыт | GitHub inventory, актуальный changelog/public package, guards, commit/push и release evidence |
 | Канонические экземпляры | Предыдущий пакет установлен на пяти | Новый exact commit, self-test, build/page/chunk health, own state/children на mother, Dasha, Sasha, Marina, MacBook |
-| ND roadmap | Shared revision 6 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
+| ND roadmap | Shared revision 7 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
 
 ## Текущий пакет и следующий вход
 
@@ -240,3 +240,28 @@ Task Chat page/CSS проверены в Chromium на 1280 и 390 px, без mo
 Strict live health относится к предыдущему deployed release. Publication audit
 и пересборка памяти завершают локальный пакет; main/push/fleet ещё впереди.
 Подробности и границы: `07_workflows/delivery-usage-accounting.md`.
+
+## Тип результата и operations applicability
+
+Новые контракты используют schema v2 и явный `agent_kind`. Помимо пяти
+исходных кандидатов добавлен `interactive-agent` для диалогового результата.
+Тип не разрешает operations; legacy остаётся неклассифицированным с advisory
+предложением. Profile/report не могут заменить тип своего контракта.
+
+CLI `card-readiness` и Control Center читают общую применимость operations.
+Accepted no-managed-operations contract допускает отсутствие service manifest;
+неизвестные/selected операции и unsafe существующий manifest остаются видимой
+диагностикой. Готовность относится только к конфигурации карточки. Revision-bound
+Outcome/acceptance, type-specific controls и handoff — отдельные 2.2/2.4/2.5/3.3.
+
+Профильные проверки проходят: шесть типов, реальный interview, отдельная Outcome
+approval, сохранение v1 fingerprint и wire shape, type revision invalidation,
+CLI без manifest, selected operations, symlink/corrupt file и production adapter.
+Полный self-test проходит: **656/656** тестов и семь quality checks; staged build
+и финальный typecheck проходят. Private страницы отсутствуют в prerender,
+1198 traced dependencies не содержат state/private файлов. Existing strict
+live health проходит на прежнем release; старое предупреждение launchd-root-drift
+сохраняется отдельно от результата тестов. Первая проверка выявила два
+недостающих служебных поля нового стандарта; финальная проверка выполнена
+после их исправления. Main/push и managed adoption ещё впереди.
+Подробности: `04_standards/agent-result-type.md`.

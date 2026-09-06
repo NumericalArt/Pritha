@@ -5,6 +5,7 @@ import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "../lib/paths.mjs";
 import { normalizeGitHubRepositoryUrl, normalizeRepositoryModulePath } from "../lib/github-repository-radar.mjs";
 import { authoredAgentId } from "./identity.mjs";
+import { readAgentKind } from "./agent-kind.mjs";
 
 export const RUNTIME_FAMILIES = new Set(["codex-native", "cli", "api", "local-model", "hybrid", "environment-specific"]);
 export const TELEGRAM_MODES = new Set(["none", "primary-chat", "intake-channel", "notifications-only", "operator-control"]);
@@ -201,6 +202,7 @@ export function validateContract(contractPath, options = {}) {
   const text = readFileSync(fullPath, "utf8");
   const fm = parseFrontmatterData(text) || {};
   if (fm.type !== "agent-contract") issues.push('frontmatter "type" must be agent-contract');
+  issues.push(...readAgentKind(text).issues.map(issue => `agent type: ${issue}`));
   if (authoredAgentId(fm).issue) issues.push(`agent identity: ${authoredAgentId(fm).issue}`);
   if (!STATUS_VALUES.has(fm.status)) issues.push(`status must be one of: ${Array.from(STATUS_VALUES).join(", ")}`);
 
@@ -436,6 +438,7 @@ export function contractData(contractPath, options = {}) {
     relPath: path.relative(root, fullPath),
     text,
     fm,
+    agentKind: readAgentKind(text),
     agentId: authoredAgentId(fm).id,
     agentName: bodyValue(text, "Agent name"),
     primaryMission: bodyValue(text, "Primary mission"),

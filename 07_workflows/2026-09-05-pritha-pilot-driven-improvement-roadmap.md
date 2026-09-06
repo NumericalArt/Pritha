@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 12; released base cf11419; completion work in codex/roadmap-completion
+source_version: pilot roadmap revision 13; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -446,7 +446,8 @@ fixed. Не редактировать отсутствующий remediation pl
 
 ### 2.1 Тип агента с совместимостью старых контрактов — M, после 3.1
 
-Кандидат `agent_kind`: service, one-shot-cli, job-runner, tool-server, library.
+`agent_kind`: service, one-shot-cli, job-runner, tool-server, library,
+interactive-agent. Последний тип нужен для диалогового результата в Codex project.
 Это характеристика результата, отдельная от runtime family, interface и
 service mode; сама по себе не разрешает запуск процесса/расписания.
 Существующие поля сначала картировать; неизвестный legacy тип отображать как
@@ -454,6 +455,8 @@ legacy-unclassified без массовой переинтерпретации �
 Готовность: versioned schema, adapter старых документов, roundtrip, unknown
 значения и сохранение semantic locks проверены. Обязательность — для новой
 версии authored contract, не для всех существующих accepted artifacts.
+Локально реализованы contract schema v2, proposal-first выбор и общий adapter;
+точные правила — `04_standards/agent-result-type.md`. Production adoption впереди.
 
 ### 2.2 Карточка с независимыми состояниями — M/L
 
@@ -473,6 +476,9 @@ Outcome. Freshness утрачивается при изменении HEAD/spec.
 Готовность: отсутствие service manifest у one-shot CLI не блокирует
 подтверждённый результат; отсутствие выбранного managed runtime остаётся
 blocker. Stale/missing evidence не становится ready из-за типа агента.
+Локально CLI/UI используют общую operations applicability и bounded manifest
+reader. No-managed-operations contract допускает отсутствие manifest; состояние
+Outcome проверяется отдельно в 2.2, а не выводится из card configuration readiness.
 
 ### 2.4 Безопасная проверка CLI — M
 

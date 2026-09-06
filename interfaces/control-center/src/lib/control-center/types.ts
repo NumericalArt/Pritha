@@ -1,3 +1,5 @@
+import type { AgentKindView, OperationsApplicability } from "../../../../../scripts/agents-mother/agent-kind.mjs";
+
 export type CapabilityStatus =
   | "ready"
   | "disabled"
@@ -169,6 +171,7 @@ export type ControlCenterAgentOperationalReadiness = {
 
 export type ControlCenterAgent = {
   id: string;
+  agentKind?: AgentKindView;
   identity?: { agentId: string | null; instanceKey: string; status: "identified" | "legacy" | "conflict"; diagnostics: string[]; routeAliases: string[] };
   name: string;
   mission: string;
@@ -187,6 +190,7 @@ export type ControlCenterAgent = {
   };
   operations: {
     status: CapabilityStatus;
+    applicability?: OperationsApplicability;
     serviceMode?: string;
     autostart?: string;
     startAvailable: boolean;

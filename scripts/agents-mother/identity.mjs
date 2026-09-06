@@ -5,6 +5,7 @@ import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStateRoot, resolveTechscopeRoot, isPrithaCodeCheckout } from "../lib/paths.mjs";
 import { CHILD_AGENT_TYPES } from "../lib/child-agent-artifacts.mjs";
+import { readAgentKind, operationsApplicability } from "./agent-kind.mjs";
 
 // Identity is attribution, never proof of approval, verification or ownership of
 // a running process. Those decisions still require their host-owned receipts.
@@ -86,6 +87,7 @@ function artifact(file, text, context) {
     standalone: Boolean(identity.id || projectRef || bodyValue(text, "Agent name") || ["agent-contract", "child-agent-profile"].includes(fm.type)),
     aliases: [...new Set([name, bodyValue(text, "Technical slug"), value(fm.agent_slug), identity.id].map(agentAlias).filter(Boolean))],
     mission: missionText(text, fm),
+    agentKind: fm.type === "agent-contract" ? readAgentKind(text) : null,
     runtime: bodyValue(text, "Runtime family"), interface: bodyValue(text, "Primary interface"),
     deployment: bodyValue(text, "Deployment target") || bodyValue(text, "Expected hosting"),
     proactivity: bodyValue(text, "Proactive mode"),
@@ -188,6 +190,8 @@ function assemble(artifacts, folders, rows, context, diagnostics) {
     // Report titles and registry rows cannot replace authored product purpose.
     group.mission = profile?.mission || contract?.mission || "";
     group.missionSource = profile?.mission ? profile.path : contract?.mission ? contract.path : null;
+    group.agentKind = contract?.agentKind || readAgentKind();
+    group.contractSource = contract?.path || null;
     for (const field of ["runtime", "interface", "deployment", "proactivity"]) group[field] = profile?.[field] || contract?.[field] || "unknown";
     const possibleDeclarations = group.artifacts.filter((item) => item.projectRef).map((item) => ({ item, resolved: projectFolder(item.projectRef, context, folders) }));
     const declarations = possibleDeclarations.filter(({ item, resolved }) => resolved || value(item.fm.project_path) || concreteProjectRef(item.projectRef));
@@ -243,6 +247,7 @@ function assemble(artifacts, folders, rows, context, diagnostics) {
       mission: group.mission || "Mission is not documented",
       runtime: group.runtime || "unknown", interface: group.interface || "unknown",
       deployment: group.deployment || "unknown", proactivity: group.proactivity || "unknown",
+      agentKind: group.agentKind || readAgentKind(), contractSource: group.contractSource || null,
       evidence: `contracts:${group.artifacts.filter((item) => item.type === "agent-contract").length} reports:${group.artifacts.filter((item) => item.type.endsWith("report")).length}`,
       identityStatus: conflict ? "conflict" : group.agentId ? "identified" : "legacy",
       diagnostics: [...new Set(group.diagnostics)],
@@ -333,4 +338,21 @@ export function readCatalogArtifact(agent, file, options = {}) {
 
 export function readIdentityEvidence(file, stateRoot, maxBytes = 1024 * 1024) {
   return safeText(file, stateRoot, maxBytes);
+}
+
+export function agentOperationsApplicability(agent, manifest = null, options = {}) {
+  const text = agent?.contractSource ? readCatalogArtifact(agent, agent.contractSource, options) : "";
+  return operationsApplicability(text, manifest);
+}
+
+export function readAgentOperationsManifest(agent) {
+  if (!agent?.projectPath || agent.identityStatus === "conflict") return { manifest: null, present: false, issue: null };
+  const file = path.join(agent.projectPath, "operations", "manifest.json");
+  try { lstatSync(file); }
+  catch (error) { return { manifest: null, present: false, issue: error.code === "ENOENT" ? null : "operations-manifest-unavailable" }; }
+  try {
+    const manifest = JSON.parse(safeText(file, agent.projectPath));
+    if (!manifest || Array.isArray(manifest) || typeof manifest !== "object") throw new Error("invalid");
+    return { manifest, present: true, issue: null };
+  } catch { return { manifest: null, present: true, issue: "operations-manifest-invalid-or-unsafe" }; }
 }

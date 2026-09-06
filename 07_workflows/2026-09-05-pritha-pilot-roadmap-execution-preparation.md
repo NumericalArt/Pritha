@@ -83,7 +83,9 @@ private replay receipts и explicit continuation того же run. Профил
 54/54 и полный self-test 637/637 проходят; actual page проверена на desktop/mobile.
 Scoped accounting 1.5 также реализован локально: parent counter, build receipts
 и Trial invocations представлены раздельно, unknown остаётся unknown. Self-test
-646/646, staged build и typecheck проходят. Следующий вход: readiness/scaffold,
+646/646, staged build и typecheck проходят. Следом реализованы contract schema
+v2/agent_kind и базовая operations applicability 2.1/2.3: 656/656, staged build
+и typecheck проходят. Следующий вход: revision-bound readiness/scaffold,
 orphan recovery и остальные требования полного roadmap. Общая цель не
 закрывается по результатам этого пакета.
 

@@ -3,8 +3,10 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-08-22
+updated: 2026-09-06
 template_for: agent-contract
+contract_schema_version: 2
+agent_kind: service | one-shot-cli | job-runner | tool-server | library | interactive-agent
 topics: []
 tools: []
 agent_platforms: []
@@ -56,6 +58,10 @@ Date: YYYY-MM-DD
 Status: draft | accepted | superseded
 
 ## Purpose
+
+Choose one `agent_kind` in frontmatter. This describes the result, independently
+of runtime family and interface; it does not authorize service or scheduler actions.
+Existing accepted v1 contracts retain their original locks and are not rewritten.
 
 - Agent name:
 - Technical slug:

@@ -53,7 +53,7 @@ import type {
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
 import { runSyncProbe } from "./sync-probe";
 import { deliveryStateView } from "./delivery-state";
-import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
+import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, readAgentOperationsManifest, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
 
 import { outcomeDocumentLock as currentOutcomeDocumentLock } from "../../../../../scripts/agents-mother/outcome-lock.mjs";
 
@@ -1825,6 +1825,8 @@ function screenSessionRunning(session: string | undefined) {
 
 function operationalReadiness(params: {
   folderPresent: boolean;
+  applicability?: ControlCenterAgent["operations"]["applicability"];
+  manifestIssue?: string | null;
   manifest: OperationsManifest | null;
   operations: CapabilityStatus;
   health: AgentHealthProbe;
@@ -1860,10 +1862,22 @@ function operationalReadiness(params: {
     };
   }
 
-  if (!manifest) {
+  if (!manifest && params.applicability?.manifestRequired === false && !params.manifestIssue) {
+    return {
+      status: "ready", summary: "The accepted contract selects no managed operations; a service manifest is not required.",
+      runtime: { status: "not_applicable", detail: "No persistent local runtime is selected; Outcome verification is separate." },
+      access: { localhost: "unavailable", tailscale: "not_configured", detail: "No local service access is selected." },
+      checks, blockers, nextActions,
+    };
+  }
+  if (!manifest || params.applicability?.status === "invalid-contract" || params.manifestIssue) {
+    const reason = params.applicability?.status === "invalid-contract" ? "Agent type metadata needs contract schema review."
+      : params.manifestIssue ? "operations/manifest.json is invalid or unsafe to read."
+      : params.applicability?.status === "unknown" ? "Operations applicability needs an accepted contract or operations metadata."
+      : "operations/manifest.json is missing for the selected operations.";
     return {
       status: "blocked",
-      summary: "operations/manifest.json is missing.",
+      summary: reason,
       runtime,
       access: {
         localhost: "unavailable",
@@ -1871,8 +1885,8 @@ function operationalReadiness(params: {
         detail: "No local runtime can be checked without operations metadata.",
       },
       checks,
-      blockers: ["operations/manifest.json is missing."],
-      nextActions: ["Add an operations manifest with structured start, stop, health and access settings."],
+      blockers: [reason],
+      nextActions: ["Review the selected operations contract and prepare only its required metadata."],
     };
   }
 
@@ -2214,7 +2228,9 @@ function readinessIssueText(readiness: ControlCenterAgent["readiness"]) {
 
 async function buildAgent(root: string, record: RegistryRecord, access: AccessLinkState): Promise<ControlCenterAgent> {
   const folder = record.projectPath ? { name: path.basename(record.projectPath), absolutePath: record.projectPath } : null;
-  const manifest = folder ? readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")) : null;
+  const manifestRead = readAgentOperationsManifest(record);
+  const manifest = manifestRead.manifest as OperationsManifest | null;
+  const applicability = agentOperationsApplicability(record, manifest, { root });
   const health = folder ? await probeHealth(manifest) : { status: "not_checked" as const, detail: "Missing folder" };
   const uiState = agentUiState(Boolean(folder), manifest, health.status);
   const operations = operationsStatus(manifest);
@@ -2223,6 +2239,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const lifecycle = lifecycleForAgent(root, record, manifest, Boolean(folder));
   const readiness = operationalReadiness({
     folderPresent: Boolean(folder),
+    applicability, manifestIssue: manifestRead.issue,
     manifest,
     operations,
     health,
@@ -2235,6 +2252,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
 
   return {
     id: record.id,
+    agentKind: record.agentKind,
     identity: { agentId: record.agentId, instanceKey: record.instanceKey, status: record.identityStatus, diagnostics: record.diagnostics, routeAliases: record.routeAliases },
     name: record.name,
     mission: currentAgentMission(record, { root }).text,
@@ -2254,7 +2272,8 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
         }
       : { status: "missing" },
     operations: {
-      status: operations,
+      status: !manifest && applicability.manifestRequired === false && !manifestRead.issue ? "disabled" : operations,
+      applicability,
       serviceMode: manifest?.service_mode,
       autostart: manifest?.autostart,
       startAvailable: Boolean(manifest?.start_command),
@@ -2273,7 +2292,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       primaryAction: legacyPlanAction(control),
       actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
-      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
+      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : !manifest && applicability.manifestRequired === false && !manifestRead.issue ? undefined : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
     },
     control,

@@ -344,7 +344,7 @@ test("card readiness blocks selected Control Center runtime without a health con
   assert.match(result.blockers.join("\n"), /requires health_url, local_upstream_url, or healthcheck_argv/);
 });
 
-test("card readiness reports blocked for registered scaffold missing operations manifest", async () => {
+test("card readiness reports unknown operations applicability without an authored contract or manifest", async () => {
   const parent = mkdtempSync(path.join(os.tmpdir(), "pritha-card-blocked-"));
   const root = path.join(parent, "Pritha");
   mkdirSync(path.join(parent, "AlphaAgent"), { recursive: true });
@@ -356,5 +356,5 @@ test("card readiness reports blocked for registered scaffold missing operations 
   assert.equal(result.registryPresent, true);
   assert.equal(result.folderPresent, true);
   assert.equal(result.manifestPresent, false);
-  assert.match(result.blockers.join("\n"), /operations\/manifest\.json is missing or invalid/);
+  assert.match(result.blockers.join("\n"), /Operations applicability needs an accepted contract/);
 });

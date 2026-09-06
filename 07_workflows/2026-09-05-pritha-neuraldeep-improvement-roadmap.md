@@ -33,7 +33,7 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: ND roadmap revision 6; NeuralDeep code 31b438e with local plan commit 87cc59a; mother scoped phase accounting
+source_version: ND roadmap revision 7; NeuralDeep code 31b438e with local plan commit 87cc59a; mother type and operations applicability
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -338,6 +338,15 @@ ND-5 A/B может предшествовать ND-4 по пользовате�
 от ND-1/2. Server refactor, timeout policies, cleanup/redaction, Sensors docs
 и CLI getting-started соответствуют mother 0.3/0.4, 5.1–5.5 и 7.1–7.3, но
 внедряются по конкретному ND diff. Techscope rename остаётся отложенным.
+
+Mother contract schema v2 теперь отдельно задаёт `agent_kind`, включая
+`interactive-agent` для диалога через Codex CLI. Для ND-4 перенести совместимый
+adapter и operations applicability с сохранением ND CLI/provider полей. Старые
+принятые контракты не переклассифицировать: legacy-unclassified и advisory
+предложение не дают readiness. Тип не назначает App Server и не разрешает
+local service; отсутствие manifest допустимо по выбранным operations, а
+повреждённый существующий manifest остаётся диагностикой. Изменение типа в
+новой ревизии должно инвалидировать прежнюю Outcome approval.
 
 Закрытие roadmap требует доказанного end-to-end outcome и acceptance.
 Публикация плана или выпуск материнской Pritha сами по себе его не закрывают.

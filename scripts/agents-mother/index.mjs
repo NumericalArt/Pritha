@@ -37,6 +37,7 @@ import { handoffProject } from "./handoff.mjs";
 import { deployProject, operationsProject } from "./operations.mjs";
 import { evolveProject, listContracts, rebuildRegistry } from "./registry.mjs";
 import { checkCardReadiness, printCardReadiness } from "./card-readiness.mjs";
+import { CONTRACT_SCHEMA_VERSION, proposeAgentKind } from "./agent-kind.mjs";
 import { applyExternalResearchEvidence } from "./external-research.mjs";
 import { newestArtifactPathsFirst, writeUniqueArtifact } from "./artifact-selection.mjs";
 import { runLast30DaysBackend } from "./external-research-last30days.mjs";
@@ -138,6 +139,7 @@ Pritha aliases:
 
 Layer 2 status:
   interview proposes a draft agent-contract and a separate user-visible Outcome Spec
+  --agent-kind service|one-shot-cli|job-runner|tool-server|library|interactive-agent overrides the proposed result type
   validate checks whether the contract is ready for research/scaffold planning
 
 Outcome delivery status:
@@ -449,6 +451,7 @@ function contractMarkdown(data) {
   const serviceMode = normalizeServiceMode(data.serviceMode || data.service || "none");
   const autostart = normalizeAutostartMode(data.autostart || "disabled", serviceMode);
   const proactiveMode = normalizeProactiveMode(data.proactiveMode || "none");
+  const agentKind = proposeAgentKind({ ...data, primaryInterface, serviceMode, proactiveMode });
   const skillNeeds = scalar(data.skillNeeds, "auto");
   const allowedSkillSources = scalar(data.allowedSkillSources, "local-only");
   const skillInstallMode = scalar(data.skillInstallMode, "recommend");
@@ -468,6 +471,8 @@ function contractMarkdown(data) {
   const report = `---
 id: ${data.artifactId || `${date}-${agentSlug}-agent-contract`}
 type: agent-contract
+contract_schema_version: ${CONTRACT_SCHEMA_VERSION}
+agent_kind: ${agentKind}
 agent_id: agent-${createHash("sha256").update(data.artifactId || `${date}-${agentSlug}-agent-contract`).digest("hex").slice(0, 24)}
 status: draft
 created: ${date}
@@ -511,7 +516,7 @@ superseded_by: []
 freshness_status: current
 source_published: ${date}
 source_updated: ${date}
-source_version: contract draft v1
+source_version: contract draft v2
 retrieved: ${date}
 verified: pending
 valid_for: initial agent design
@@ -740,6 +745,7 @@ function applyInterviewTechnicalProposal(data, options = {}) {
     ? data.criticalWorkflows
     : listFromText(options.workflows, ["Request the outcome, review evidence, then correct or accept the result"]);
   data.runtimeFamily = options.runtime || "codex-native";
+  data.agentKind = options["agent-kind"];
   data.primaryInterface = data.primaryInterface || options.interface || "Codex project";
   data.secondaryInterfaces = options.secondary || "none";
   data.telegramMode = options.telegram || (String(data.primaryInterface).toLowerCase().includes("telegram") ? "primary-chat" : "none");
