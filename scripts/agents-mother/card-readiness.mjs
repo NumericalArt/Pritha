@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
-import { isPrithaCodeCheckout, resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../lib/paths.mjs";
-import { bodyValue } from "./contract.mjs";
+import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { readAgentCatalog, findCatalogAgent, agentAlias } from "./identity.mjs";
 
 function controlCenterSlug(value) {
   return String(value || "")
@@ -14,94 +14,13 @@ function controlCenterSlug(value) {
 }
 
 function comparableKey(value) {
-  return controlCenterSlug(value).replaceAll("-", "");
+  return agentAlias(String(value || ""));
 }
 
-function parseTableLine(line) {
-  return line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((cell) => cell.trim());
-}
-
-function parseRegistry(root) {
-  const registryPath = path.join(resolvePrithaAgentMemoryRoot({ root }), "registry.md");
-  if (!existsSync(registryPath)) return { registryPath, records: [] };
-
-  const lines = readFileSync(registryPath, "utf8").split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === "## Agents");
-  if (start === -1) return { registryPath, records: [] };
-
-  const tableLines = lines.slice(start + 1).filter((line) => line.trim().startsWith("|"));
-  const records = tableLines
-    .slice(2)
-    .map(parseTableLine)
-    .filter((cells) => cells.length >= 7)
-    .map(([name, mission, runtime, iface, deployment, proactivity, evidence]) => ({
-      name,
-      mission,
-      runtime,
-      interface: iface,
-      deployment,
-      proactivity,
-      evidence,
-    }));
-
-  return { registryPath, records };
-}
-
-function findRegistryRecord(records, target) {
-  const key = comparableKey(target);
-  return records.find((record) => comparableKey(record.name) === key || controlCenterSlug(record.name) === target) || null;
-}
-
-function findRegistryRecordByContract(root, records, target) {
-  const direct = findRegistryRecord(records, target);
-  if (direct) return direct;
-  const contractDir = path.join(resolvePrithaAgentMemoryRoot({ root }), "contracts");
-  for (const filePath of listMarkdownFiles(contractDir)) {
-    try {
-      const text = readFileSync(filePath, "utf8");
-      if (comparableKey(bodyValue(text, "Technical slug")) !== comparableKey(target)) continue;
-      const agentName = bodyValue(text, "Agent name");
-      const matched = records.find((record) => comparableKey(record.name) === comparableKey(agentName));
-      if (matched) return matched;
-    } catch {
-      // Ignore unreadable contract artifacts and continue with fail-closed readiness.
-    }
-  }
-  return null;
-}
-
-function listMarkdownFiles(directory) {
-  if (!existsSync(directory)) return [];
-  return readdirSync(directory)
-    .filter((entry) => entry.endsWith(".md"))
-    .map((entry) => path.join(directory, entry));
-}
-
-function evidenceMatches(filePath, keys) {
-  const filename = comparableKey(path.basename(filePath, ".md"));
-  if (keys.some((key) => filename.includes(key))) return true;
-  try {
-    const text = readFileSync(filePath, "utf8");
-    return keys.some((key) => comparableKey(text).includes(key));
-  } catch {
-    return false;
-  }
-}
-
-function evidencePaths(root, target, record) {
-  const keys = [...new Set([target, record?.name].filter(Boolean).map(comparableKey))];
+function evidencePaths(root, record) {
   return {
-    contracts: listMarkdownFiles(path.join(resolvePrithaAgentMemoryRoot({ root }), "contracts"))
-      .filter((filePath) => evidenceMatches(filePath, keys))
-      .map((filePath) => path.relative(root, filePath)),
-    reports: listMarkdownFiles(path.join(resolvePrithaAgentMemoryRoot({ root }), "reports"))
-      .filter((filePath) => evidenceMatches(filePath, keys))
-      .map((filePath) => path.relative(root, filePath)),
+    contracts: (record?.artifacts || []).filter((item) => ["agent-contract", "agent-outcome-spec"].includes(item.type)).map((item) => path.relative(root, item.path)),
+    reports: (record?.artifacts || []).filter((item) => item.type.endsWith("report")).map((item) => path.relative(root, item.path)),
   };
 }
 
@@ -141,53 +60,6 @@ function deliveryLifecycle(root, evidence) {
       ? { present: true, id: delivery.id, path: delivery.path, status: delivery.status }
       : { present: false, status: "not-started" },
   };
-}
-
-function findSiblingFolder(root, target, record) {
-  const parent = resolvePrithaAgentParent({ root });
-  const keys = [...new Set([target, record?.name].filter(Boolean).map(comparableKey))];
-  try {
-    return readdirSync(parent)
-      .map((entry) => {
-        const absolutePath = path.join(parent, entry);
-        return { name: entry, absolutePath };
-      })
-      .filter((entry) => {
-        try {
-          return statSync(entry.absolutePath).isDirectory()
-            && path.resolve(entry.absolutePath) !== path.resolve(root)
-            && !isPrithaCodeCheckout(entry.absolutePath);
-        } catch {
-          return false;
-        }
-      })
-      .find((entry) => keys.includes(comparableKey(entry.name))) || null;
-  } catch {
-    return null;
-  }
-}
-
-function findDeclaredProjectFolder(root, target, record) {
-  const memoryRoot = resolvePrithaAgentMemoryRoot({ root });
-  const keys = [...new Set([target, record?.name].filter(Boolean).map(comparableKey))];
-  const files = [
-    ...listMarkdownFiles(path.join(memoryRoot, "contracts")),
-    ...listMarkdownFiles(path.join(memoryRoot, "reports")),
-  ].filter((filePath) => evidenceMatches(filePath, keys));
-  for (const filePath of files) {
-    try {
-      const text = readFileSync(filePath, "utf8");
-      const declared = bodyValue(text, "Target folder") || bodyValue(text, "Project path");
-      if (!declared) continue;
-      const absolutePath = path.isAbsolute(declared) ? path.resolve(declared) : path.resolve(root, declared);
-      if (!existsSync(absolutePath) || !statSync(absolutePath).isDirectory()) continue;
-      if (path.resolve(absolutePath) === path.resolve(root) || isPrithaCodeCheckout(absolutePath)) continue;
-      return { name: path.basename(absolutePath), absolutePath };
-    } catch {
-      // Ignore invalid or stale declared paths and continue searching.
-    }
-  }
-  return null;
 }
 
 function readJson(filePath) {
@@ -277,7 +149,9 @@ async function liveControlCenterCard(params) {
       ? agentsResponse.value.childAgents
       : [];
   const key = comparableKey(params.record?.name || params.target);
-  const agent = agents.find((item) => comparableKey(item.name) === key || comparableKey(item.id) === key);
+  const exact = agents.filter((item) => item.id === params.record?.id);
+  const legacy = agents.filter((item) => comparableKey(item.name) === key || comparableKey(item.id) === key);
+  const agent = exact.length === 1 ? exact[0] : legacy.length === 1 ? legacy[0] : null;
   if (!agent) return { visible: false, reason: "Agent is absent from /api/agents", baseUrl };
 
   const action = planActionForAgent(agent);
@@ -302,15 +176,16 @@ async function liveControlCenterCard(params) {
 export async function checkCardReadiness(target, options = {}) {
   const root = options.root || resolveTechscopeRoot();
   const normalizedTarget = controlCenterSlug(target);
-  const registry = parseRegistry(root);
-  const record = findRegistryRecordByContract(root, registry.records, normalizedTarget);
-  const folder = findSiblingFolder(root, normalizedTarget, record) || findDeclaredProjectFolder(root, normalizedTarget, record);
+  const registry = readAgentCatalog({ ...options, root, fresh: true });
+  const record = findCatalogAgent(registry, String(target || ""));
+  const folder = record?.projectPath ? { name: path.basename(record.projectPath), absolutePath: record.projectPath } : null;
   const manifestPath = folder ? path.join(folder.absolutePath, "operations", "manifest.json") : "";
   const manifest = manifestPath && existsSync(manifestPath) ? readJson(manifestPath) : null;
-  const evidence = evidencePaths(root, normalizedTarget, record);
+  const evidence = evidencePaths(root, record);
   const lifecycle = deliveryLifecycle(root, evidence);
   const blockers = [];
   const nextActions = [];
+  if (record?.identityStatus === "conflict") blockers.push(`Agent identity needs reconciliation: ${record.diagnostics.join(", ")}`);
 
   if (!record) {
     blockers.push("Agent is missing from the current instance registry; rebuild the registry after scaffold.");
@@ -392,7 +267,8 @@ export async function checkCardReadiness(target, options = {}) {
     ok: status !== "missing",
     status,
     target: normalizedTarget,
-    agentId: live.agentId || normalizedTarget,
+    agentId: live.agentId || record?.id || normalizedTarget,
+    identity: record ? { status: record.identityStatus, agentId: record.agentId, instanceKey: record.instanceKey, diagnostics: record.diagnostics } : null,
     registryPresent: Boolean(record),
     registryPath: path.relative(root, registry.registryPath),
     folderPresent: Boolean(folder),

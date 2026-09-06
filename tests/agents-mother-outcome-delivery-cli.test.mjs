@@ -21,6 +21,7 @@ test("CLI carries an accepted contract through Outcome approval, scaffold, verif
   const contractPath = path.join(contractDir, "fixture-agent-contract.md");
   mkdirSync(contractDir, { recursive: true });
   cpSync(path.resolve("tests/fixtures/contracts/valid-agent-contract.md"), contractPath);
+  writeFileSync(contractPath, readFileSync(contractPath, "utf8").replace("type: agent-contract", "type: agent-contract\nagent_id: fixture-stable-identity"));
 
   const initialized = run(root, stateRoot, ["outcome", "init", contractPath]);
   assert.equal(initialized.status, 0, `${initialized.stdout}\n${initialized.stderr}`);
@@ -80,4 +81,5 @@ test("CLI carries an accepted contract through Outcome approval, scaffold, verif
   assert.match(branch.stdout, /pritha\/build-cli-outcome-run/);
   const reports = readdirSync(path.join(stateRoot, "agents", "reports")).filter((entry) => entry.includes("agent-delivery-report"));
   assert.equal(reports.length >= 2, true);
+  for (const report of reports) assert.match(readFileSync(path.join(stateRoot, "agents", "reports", report), "utf8"), /\n  id: fixture-stable-identity\n/);
 });

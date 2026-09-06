@@ -1,3 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const codeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
 /** @type {import('next').NextConfig} */
 const configuredDevOrigins = (process.env.PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIGINS || "")
   .split(",")
@@ -6,6 +11,8 @@ const configuredDevOrigins = (process.env.PRITHA_CONTROL_CENTER_ALLOWED_DEV_ORIG
 const configuredDistDir = String(process.env.PRITHA_CONTROL_CENTER_DIST_DIR || "").trim();
 
 const nextConfig = {
+  turbopack: { root: codeRoot },
+  outputFileTracingRoot: codeRoot,
   ...(configuredDistDir ? { distDir: configuredDistDir } : {}),
   allowedDevOrigins: ["localhost", "127.0.0.1", "**.ts.net", ...configuredDevOrigins],
   devIndicators: false,

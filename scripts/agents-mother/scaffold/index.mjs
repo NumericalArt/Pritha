@@ -3128,6 +3128,8 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   return `---
 id: ${yamlScalar(options.artifactId || `${date}-${agentSlug}-scaffold-report`)}
 type: scaffold-report
+agent_id: ${yamlScalar(data.agentId || slug(data.agentName))}
+project_path: ${yamlScalar(path.relative(ROOT, targetFolder))}
 status: ${reportStatus}
 created: ${date}
 updated: ${date}

@@ -3,7 +3,7 @@ id: 2026-09-05-pritha-pilot-driven-improvement-roadmap
 type: workflow
 status: in-progress
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 topics: [agents-mother, outcome-spec, autonomous-delivery, goal-budget, card-readiness, control-center, registry-identity, runtime-hardening, pilot-metrics]
 tools: [Pritha, Codex, Codex App Server, Node.js, Next.js, Markdown]
 agent_platforms: [Codex, Pritha Control Center]
@@ -43,6 +43,7 @@ related:
     - 04_standards/agent-harness-evaluation.md
     - 04_standards/agent-interface-experience.md
     - 04_standards/child-agent-lifecycle-metadata.md
+    - 04_standards/child-agent-identity.md
     - 04_standards/agent-trajectory-control-and-evidence.md
     - 04_standards/pritha-good-state-alignment.md
   workflows:
@@ -57,10 +58,10 @@ superseded_by: []
 refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
-source_updated: 2026-09-05
-source_version: pilot roadmap revision 8; released base cf11419; completion work in codex/roadmap-completion
+source_updated: 2026-09-06
+source_version: pilot roadmap revision 9; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
-verified: 2026-09-05
+verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
 temporal_status: version-bound
 memory_domain: agent-building-knowledge
@@ -487,7 +488,7 @@ cleanup или acceptance из одного наличия handoff.
 
 ## 7. Фаза 3 — Идентичность и передача результата
 
-### 3.1 Stable ID и точное сопоставление — M, до профилей/readiness
+### 3.1 Stable ID и точное сопоставление — реализовано локально
 
 Исправить body-only gate reportRepresentsChildAgent. Определить precedence
 agent_id/subject.id и связи contract/outcome/run, квалифицированные экземпляром.
@@ -497,13 +498,22 @@ agent_id/subject.id и связи contract/outcome/run, квалифициров
 чужой instance, conflicting IDs и неполный metadata не смешивают агентов.
 Изменение identity не зависит от agent_kind; исходная зависимость удалена.
 
-### 3.2 Миссия из authored контракта/профиля — S
+Реализация: общий `identity.mjs`, новые authored ID, exact own-instance
+catalog, узкий legacy adapter, diagnosis конфликтов и тесты production
+selectors. Native Task Chat → delivery binding остаётся задачей 1.4.
+
+### 3.2 Миссия из authored контракта/профиля — реализовано локально
 
 Registry — generated projection. Card reader получает миссию из текущего
 instance-local authored источника с явным fallback и invalidation кэша.
 Готовность: после scaffold миссия появляется без ручного rebuild; неверный
 путь и чужая instance память не читаются. Не добавлять частый полный обход
 всех Markdown на каждый UI request.
+
+Реализованы bounded parsed cache и отдельное чтение выбранной миссии; новые
+артефакты видны без ручного registry rebuild. Host lookup выполняется fresh;
+read model не заменяет approval/verification. Детали — стандарт
+`04_standards/child-agent-identity.md`.
 
 ### 3.3 Handoff по типу результата — M
 
@@ -656,7 +666,8 @@ release evidence; push/settings/publication выполняются по отде
 | Сессия 2 — локальный и protocol пакет выполнен | 1.0 + 1.5 + границы 1.7; отдельно 0.3/0.4 при необходимости | 561 tests и live health pass; lifecycle проверен на CLI/App; mid-turn live pilot отдельно |
 | Сессия 3 — выпущена на пяти экземплярах | Ядро 1.1, UI/API 1.2, delivery часть 1.4 | 581 tests, native paused controls, browser и post-release strict health pass |
 | Completion пакет — локально реализован | Native Goal intent 1.3, shared policy 0.4, strict updater 0.7 | Text/API/browser и release rollback fixtures проходят; реальный rollout предстоит |
-| Следующий пакет | Task/agent/run binding для host action 1.4, необходимые identity foundations 3.1 | Явный intent меняет правильный бюджет; host action сохраняет права/evidence; legacy linkage не авторизует чужой run |
+| Identity пакет — локально реализован | 3.1 + 3.2, единый Outcome document lock CLI/UI | 34 targeted tests; compatibility прежних карточек; production adoption впереди |
+| Следующий пакет | Task/agent/run binding для host action 1.4 | Явный intent меняет правильный бюджет; host action сохраняет права/evidence; legacy linkage не авторизует чужой run |
 | Следующий блок | 3.1 → 2.5; 2.1 → 2.3 → 2.2/2.4; 0.5/2.6/3.2/3.3 | Identity, verification и runtime не смешиваются |
 | До повторного пилота | 4.0 → 4.1/4.2; 5.4 и нужные 5.3 fixes | Нет обхода scaffold/verifier/privacy |
 | Пилотный блок | 6.1 → повтор CLI → новые типы 6.2 | Факты завершения и telemetry полны |

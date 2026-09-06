@@ -3,8 +3,8 @@ id: child-agent-lifecycle-metadata
 type: standard
 status: draft
 created: 2026-06-04
-updated: 2026-06-08
-last_reviewed: 2026-06-08
+updated: 2026-09-06
+last_reviewed: 2026-09-06
 owner: Techscope/user
 topics:
   - child-agents
@@ -36,16 +36,17 @@ sources:
 related:
   standards:
     - 04_standards/memory-domains.md
+    - 04_standards/child-agent-identity.md
   templates:
     - 08_templates/child-agent-profile.md
 supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-06-04
-source_updated: 2026-06-08
-source_version: Pritha Control Center lifecycle metadata contract v6
+source_updated: 2026-09-06
+source_version: lifecycle metadata v7; identity catalog v1
 retrieved: 2026-06-04
-verified: 2026-06-05
+verified: 2026-09-06
 valid_for: Pritha Control Center read-only lifecycle metadata and future restore/rollback workflows
 temporal_status: current
 memory_domain: governance
@@ -66,7 +67,7 @@ confidence: medium
 
 Status: draft
 Owner: Techscope/user
-Last reviewed: 2026-06-08
+Last reviewed: 2026-09-05
 
 ## Rule
 
@@ -75,9 +76,13 @@ metadata before falling back to inferred reports.
 
 The canonical authored layer is:
 
-- `11_agents/profiles/<agent-id>.md` for the current child-agent profile;
-- `.snapshots/child-agents/<agent-id>/<snapshot-id>/snapshot.json` for
-  rollback/restore snapshot metadata, when snapshots exist.
+- `<PRITHA_STATE_ROOT>/agents/profiles/<agent-id>.md` for the current child-agent
+  profile; the legacy runtime fallback is gitignored `.private/agents/`;
+- `<PRITHA_STATE_ROOT>/snapshots/child-agents/<agent-id>/<snapshot-id>/snapshot.json`
+  for rollback/restore metadata; legacy `.snapshots/` applies without external state.
+
+Tracked `11_agents/` remains platform history. Current identity, exact matching,
+legacy diagnostics and mission projection follow `04_standards/child-agent-identity.md`.
 
 Reports and contracts remain evidence. Profiles summarize current state.
 Snapshot metadata describes a restorable point. The UI must not present

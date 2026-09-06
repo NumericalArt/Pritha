@@ -4,8 +4,12 @@ import { acquireFileLock, atomicWriteFile } from "../lib/atomic-file.mjs";
 import { today } from "../lib/date.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
+import { parseFrontmatterData } from "../lib/frontmatter.mjs";
+import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 import { slug } from "../lib/slug.mjs";
 import { writeLifecycleReport } from "./lifecycle-report.mjs";
+import { authoredAgentId } from "./identity.mjs";
+import { contractFingerprint } from "./contract.mjs";
 import { createBuildExecutor } from "./build-executors.mjs";
 import {
   accountDeliveryExecutorResult as accountExecutorResult,
@@ -372,6 +376,17 @@ function deliveryReportMarkdown(state, plan, worktree, options = {}) {
   const date = options.date || today();
   const context = { projectRoot: worktree?.worktree, stateRoot: options.stateRoot, root: options.root };
   const safeState = sanitize(state, context);
+  let agentId = null;
+  try {
+    const contract = readBoundedRegularFile(path.resolve(options.root, plan.contract_path), {
+      maxBytes: 1_000_000,
+      allowedRoots: [options.root, options.stateRoot].filter(Boolean),
+    }).text;
+    if (contractFingerprint(contract) === plan.contract_fingerprint) agentId = authoredAgentId(parseFrontmatterData(contract) || {}).id;
+  } catch {
+    // A missing/stale identity is not repaired by guessing from the run label.
+    // The exact contract link remains available for legacy attribution.
+  }
   const blockers = (safeState.blockers || []).map((blocker) => [
     `### ${blocker.code}`,
     "",
@@ -416,10 +431,7 @@ memory_domain: child-agents
 memory_domains:
   - child-agents
   - agent-building-knowledge
-subject:
-  kind: child-agent
-  id: ${slug(plan.agent_slug)}
-privacy: public
+${agentId ? `subject:\n  kind: child-agent\n  id: ${agentId}\n` : ""}privacy: public
 retention: durable
 review_status: ${state.status === "accepted" ? "accepted" : "draft"}
 confidence: ${["verified", "awaiting_acceptance", "accepted"].includes(state.status) ? "high" : "medium"}

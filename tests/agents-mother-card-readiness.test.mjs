@@ -148,7 +148,8 @@ test("card readiness reports ready for registered scaffold with card-ready manif
   const result = await checkCardReadiness("alpha-agent", { root, baseUrl: false });
 
   assert.equal(result.status, "ready");
-  assert.equal(result.agentId, "alpha-agent");
+  assert.match(result.agentId, /^agent-[a-f0-9]{24}$/);
+  assert.equal(result.identity.status, "legacy");
   assert.equal(result.registryPresent, true);
   assert.equal(result.folderPresent, true);
   assert.equal(result.manifestPresent, true);
@@ -178,7 +179,7 @@ test("card readiness resolves a technical slug and explicit target folder outsid
   const result = await checkCardReadiness("operations-agent", { root, baseUrl: false });
 
   assert.equal(result.status, "ready");
-  assert.equal(result.agentId, "operations-agent");
+  assert.match(result.agentId, /^agent-[a-f0-9]{24}$/);
   assert.equal(result.registryPresent, true);
   assert.equal(result.folderPresent, true);
   assert.equal(result.folderPath, path.relative(root, projectRoot));

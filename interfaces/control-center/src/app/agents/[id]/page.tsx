@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { controlCenterStatusForClient, getControlCenterStatus } from "@/lib/control-center/server";
+import { controlCenterStatusForClient, getControlCenterAgent } from "@/lib/control-center/server";
 import { deliveryBudgetText } from "@/lib/control-center/delivery-state";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +12,7 @@ function statusText(value: string | undefined) {
 
 export default async function AgentStatusPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const status = await getControlCenterStatus();
-  const agent = status.childAgents.find((item) => item.id === id);
+  const { status, agent } = await getControlCenterAgent(id);
   if (!agent) notFound();
 
   const clientStatus = controlCenterStatusForClient(status);
@@ -23,6 +22,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
     ? `run ${agent.lifecycle.delivery.runId}${agent.lifecycle.delivery.phase ? ` · ${agent.lifecycle.delivery.phase}` : ""}`
     : agent.lifecycle.delivery.path || agent.lifecycle.delivery.reason || "not started";
   const readinessRows = [
+    ...(agent.identity ? [["Identity", agent.identity.status, agent.identity.status === "conflict" ? "Contract and project identity need review" : agent.identity.status === "legacy" ? "Legacy attribution; approval is checked separately" : "Stable ID within this Pritha instance"]] : []),
     ["Folder", agent.folder.status, agent.folder.relativePath || agent.folder.name || "not available"],
     ["Outcome Spec", agent.lifecycle.outcome.status, agent.lifecycle.outcome.path || agent.lifecycle.outcome.reason || "not available"],
     ["Outcome delivery", agent.lifecycle.delivery.status, deliveryDetail],

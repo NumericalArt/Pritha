@@ -53,16 +53,11 @@ import type {
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
 import { runSyncProbe } from "./sync-probe";
 import { deliveryStateView } from "./delivery-state";
+import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
 
-type RegistryRecord = {
-  name: string;
-  mission: string;
-  runtime: string;
-  interface: string;
-  deployment: string;
-  proactivity: string;
-  evidence: string;
-};
+import { outcomeDocumentLock as currentOutcomeDocumentLock } from "../../../../../scripts/agents-mother/outcome-lock.mjs";
+
+type RegistryRecord = CatalogAgent & { routeAliases: string[] };
 
 type OperationsCommand =
   | string
@@ -555,15 +550,6 @@ function markdownFiles(root: string, segments: string[]) {
     .sort((a, b) => path.basename(b).localeCompare(path.basename(a), undefined, { numeric: true, sensitivity: "base" }));
 }
 
-function fileMatchesAgent(filePath: string, agentName: string) {
-  const name = path.basename(filePath, ".md");
-  const agentSlug = slug(agentName);
-  const agentCompact = compactKey(agentName);
-  const fileSlug = slug(name);
-  const fileCompact = compactKey(name);
-  return fileSlug.includes(agentSlug) || fileCompact.includes(agentCompact);
-}
-
 function readText(filePath: string) {
   try {
     return readFileSync(filePath, "utf8");
@@ -589,31 +575,8 @@ function numberValue(text: string, key: string) {
   return Number.isFinite(value) ? value : undefined;
 }
 
-const mutableOutcomeDocumentFields = new Set([
-  "status",
-  "outcome_spec_status",
-  "updated",
-  "outcome_semantic_lock",
-  "outcome_document_lock",
-  "approved_by",
-  "approved_at",
-  "review_status",
-]);
-
 function sha256(value: string | Buffer) {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
-}
-
-function currentOutcomeDocumentLock(text: string) {
-  const source = String(text || "").replace(/\r\n?/g, "\n");
-  if (!source.startsWith("---\n")) return sha256(source.trimEnd());
-  const end = source.indexOf("\n---\n", 4);
-  if (end === -1) return sha256(source.trimEnd());
-  const lockedFrontmatter = source.slice(4, end).split("\n").map((line) => {
-    const match = line.match(/^([A-Za-z0-9_-]+):/);
-    return match && mutableOutcomeDocumentFields.has(match[1]) ? `${match[1]}: [MUTABLE]` : line;
-  }).join("\n");
-  return sha256(`---\n${lockedFrontmatter}\n---\n${source.slice(end + 5)}`.trimEnd());
 }
 
 function currentContractFingerprint(text: string) {
@@ -628,7 +591,7 @@ function currentContractFingerprint(text: string) {
   return sha256(normalized);
 }
 
-function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackContractPath: string | null, outcomeText: string) {
+function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackContractPath: string | null, outcomeText: string): { valid: boolean; reason?: string; approvalId?: string } {
   const outcomeFront = frontmatter(outcomeText);
   if (scalarValue(outcomeFront, "outcome_spec_status") !== "approved" || scalarValue(outcomeFront, "approved_by") !== "user") {
     return { valid: false, reason: "Outcome Spec is not independently approved" };
@@ -643,10 +606,10 @@ function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackCon
   const boundContractPath = boundContractValue
     ? (path.isAbsolute(boundContractValue) ? path.resolve(boundContractValue) : path.resolve(root, boundContractValue))
     : fallbackContractPath;
-  if (!boundContractPath || !existsSync(boundContractPath)) {
+  if (!boundContractPath || !fallbackContractPath || path.resolve(boundContractPath) !== path.resolve(fallbackContractPath)) {
     return { valid: false, reason: "The Outcome Spec contract binding is unavailable" };
   }
-  const contractText = readText(boundContractPath);
+  const contractText = readIdentityEvidence(boundContractPath, resolvePrithaAgentMemoryRoot(root));
   const contractFront = frontmatter(contractText);
   const contractFingerprint = scalarValue(outcomeFront, "contract_fingerprint");
   if (
@@ -661,7 +624,7 @@ function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackCon
   if (!existsSync(evidencePath) || statSync(evidencePath).size > 5_000_000) {
     return { valid: false, reason: "Host approval evidence is missing or unreadable" };
   }
-  const events = readText(evidencePath).split(/\r?\n/).filter(Boolean).map((line) => {
+  const events = readIdentityEvidence(evidencePath, resolvePrithaStateRoot(root), 5_000_000).split(/\r?\n/).filter(Boolean).map((line) => {
     try {
       return JSON.parse(line) as Record<string, unknown>;
     } catch {
@@ -676,9 +639,10 @@ function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackCon
     && event.semantic_lock === semanticLock
     && event.document_lock === documentLock
     && event.approved_by === "user"
+    && typeof event.approval_id === "string" && event.approval_id.length > 0
   ));
   return matched
-    ? { valid: true, reason: undefined }
+    ? { valid: true, reason: undefined, approvalId: String(matched.approval_id) }
     : { valid: false, reason: "Host approval evidence does not match the current Outcome Spec" };
 }
 
@@ -719,67 +683,58 @@ function explicitVersionFromText(text: string, agentName: string) {
   return null;
 }
 
-function findProfile(root: string, agent: RegistryRecord) {
-  const liveRoot = resolvePrithaAgentMemoryRoot(root);
-  const profiles = [
-    ...markdownFiles(liveRoot, ["profiles"]),
-    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "profiles"])),
-  ];
-  return profiles.find((file) => fileMatchesAgent(file, agent.name)) || null;
+function findProfile(_root: string, agent: RegistryRecord) {
+  return agent.artifacts.find((artifact) => artifact.type === "child-agent-profile")?.path || null;
 }
 
-function findContract(root: string, agent: RegistryRecord) {
-  const liveRoot = resolvePrithaAgentMemoryRoot(root);
-  const contracts = [
-    ...markdownFiles(liveRoot, ["contracts"]),
-    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "contracts"])),
-  ].filter((file) => fileMatchesAgent(file, agent.name) && scalarValue(frontmatter(readText(file)), "type") === "agent-contract");
-  return contracts[0] || null;
+function findContract(_root: string, agent: RegistryRecord) {
+  return agent.artifacts.find((artifact) => artifact.type === "agent-contract")?.path || null;
 }
 
-function findOutcomeSpec(root: string, agent: RegistryRecord) {
-  const liveRoot = resolvePrithaAgentMemoryRoot(root);
-  return [
-    ...markdownFiles(liveRoot, ["contracts"]),
-    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "contracts"])),
-  ].find((file) => fileMatchesAgent(file, agent.name) && scalarValue(frontmatter(readText(file)), "type") === "agent-outcome-spec") || null;
+function findOutcomeSpec(_root: string, agent: RegistryRecord) {
+  return agent.artifacts.find((artifact) => artifact.type === "agent-outcome-spec")?.path || null;
 }
 
-function findDeliveryReport(root: string, agent: RegistryRecord) {
-  const liveRoot = resolvePrithaAgentMemoryRoot(root);
-  return [
-    ...markdownFiles(liveRoot, ["reports"]),
-    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "reports"])),
-  ].find((file) => fileMatchesAgent(file, agent.name) && scalarValue(frontmatter(readText(file)), "type") === "agent-delivery-report") || null;
+function findDeliveryReport(_root: string, agent: RegistryRecord) {
+  return agent.artifacts.find((artifact) => artifact.type === "agent-delivery-report" && artifact.attribution !== "legacy")?.path || null;
 }
 
 function findLiveDeliveryState(root: string, agent: RegistryRecord) {
   const buildsRoot = resolvePrithaStatePath("builds");
   if (!existsSync(buildsRoot)) return null;
-  const agentKey = compactKey(agent.name);
+  if (!agent.projectPath || agent.identityStatus === "conflict") return null;
+  const contractPath = findContract(root, agent);
+  if (!contractPath) return null;
+  const contractFingerprint = currentContractFingerprint(readCatalogArtifact(agent, contractPath, { root }));
+  const outcomePath = findOutcomeSpec(root, agent);
+  const outcomeText = outcomePath ? readCatalogArtifact(agent, outcomePath, { root }) : "";
+  const outcomeFront = frontmatter(outcomeText);
+  const approval = outcomePath ? outcomeApprovalIntegrity(root, outcomePath, contractPath, outcomeText) : null;
+  if (!approval?.valid) return null;
   const candidates: Array<NonNullable<ReturnType<typeof deliveryStateView>>> = [];
   for (const agentDir of readdirSync(buildsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== ".targets").slice(0, 1_000)) {
     const directory = path.join(buildsRoot, agentDir.name);
     for (const runDir of readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isDirectory()).slice(0, 1_000)) {
       const statePath = path.join(directory, runDir.name, "build-state.json");
-      const state = readJson<Record<string, unknown>>(statePath);
+      let state: Record<string, unknown> | null = null;
+      try { state = JSON.parse(readIdentityEvidence(statePath, resolvePrithaStateRoot(root))); } catch { continue; }
       const view = deliveryStateView(state);
       if (!state || !view) continue;
-      if (![state.agent_slug, state.target_label, agentDir.name].some((value) => compactKey(String(value || "")) === agentKey)) continue;
+      if (typeof state.source_project !== "string" || path.resolve(state.source_project) !== agent.projectPath) continue;
+      const spec = state.spec as { id?: string; contract_fingerprint?: string; document_lock?: string; semantic_lock?: string; approval_id?: string } | undefined;
+      if (spec?.contract_fingerprint !== contractFingerprint
+        || spec?.id !== scalarValue(outcomeFront, "id")
+        || spec?.document_lock !== currentOutcomeDocumentLock(outcomeText)
+        || spec?.semantic_lock !== scalarValue(outcomeFront, "outcome_semantic_lock")
+        || spec?.approval_id !== approval.approvalId) continue;
       candidates.push({ ...view, runId: view.runId || runDir.name });
     }
   }
   return candidates.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))[0] || null;
 }
 
-function findReports(root: string, agent: RegistryRecord) {
-  const liveRoot = resolvePrithaAgentMemoryRoot(root);
-  return [
-    ...markdownFiles(liveRoot, ["reports"]),
-    ...(liveRoot === path.join(root, "11_agents") ? [] : markdownFiles(root, ["11_agents", "reports"])),
-  ]
-    .filter((file) => fileMatchesAgent(file, agent.name))
-    .slice(0, 8);
+function findReports(_root: string, agent: RegistryRecord) {
+  return agent.artifacts.filter((artifact) => artifact.type.endsWith("report")).slice(0, 8).map((artifact) => artifact.path);
 }
 
 function resolveProfilePath(root: string, value: string | undefined) {
@@ -885,7 +840,7 @@ function snapshotValidationStatus(agent: ControlCenterAgent): ControlCenterAgent
   };
 }
 
-function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = ""): ControlCenterAgent["lifecycle"]["snapshots"] {
+function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = "", legacyIds: string[] = []): ControlCenterAgent["lifecycle"]["snapshots"] {
   const stateRoot = resolvePrithaStateRoot(root);
   const configuredStoreRaw = scalarValue(profileFrontmatter, "snapshot_store");
   const configuredStore = stateRoot === root
@@ -897,6 +852,7 @@ function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = "
     ...(profileStore ? [profileStore] : []),
     resolvePrithaStatePath("snapshots", "child-agents", agentId),
     resolvePrithaStatePath("snapshots", "child-agents", compactKey(agentId)),
+    ...legacyIds.flatMap((id) => [resolvePrithaStatePath("snapshots", "child-agents", id), resolvePrithaStatePath("snapshots", "child-agents", compactKey(id))]),
   ];
   const store = candidates.find((candidate) => existsSync(candidate));
   if (!store) {
@@ -950,11 +906,11 @@ function snapshotsForAgent(root: string, agentId: string, profileFrontmatter = "
 
 function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: OperationsManifest | null, folderPresent: boolean): LifecycleMetadata {
   const profilePath = findProfile(root, agent);
-  const profileText = profilePath ? readText(profilePath) : "";
+  const profileText = profilePath ? readCatalogArtifact(agent, profilePath, { root }) : "";
   const profileFront = frontmatter(profileText);
   const contractPath = findContract(root, agent);
   const outcomePath = findOutcomeSpec(root, agent);
-  const outcomeText = outcomePath ? readText(outcomePath) : "";
+  const outcomeText = outcomePath ? readCatalogArtifact(agent, outcomePath, { root }) : "";
   const outcomeFront = frontmatter(outcomeText);
   const rawOutcomeStatus = scalarValue(outcomeFront, "outcome_spec_status") || scalarValue(outcomeFront, "status") || "unknown";
   const outcomeStatus: ControlCenterAgent["lifecycle"]["outcome"]["status"] =
@@ -964,7 +920,7 @@ function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: Operat
     : { valid: false, reason: "No separate Outcome Spec found" };
   const outcomeApproved = outcomeStatus === "approved" && outcomeApproval.valid;
   const deliveryPath = findDeliveryReport(root, agent);
-  const deliveryText = deliveryPath ? readText(deliveryPath) : "";
+  const deliveryText = deliveryPath ? readCatalogArtifact(agent, deliveryPath, { root }) : "";
   const rawDeliveryStatus = scalarValue(frontmatter(deliveryText), "status") || "unknown";
   const deliveryStatus: ControlCenterAgent["lifecycle"]["delivery"]["status"] = (
     ["running", "blocked", "verified", "awaiting_acceptance", "accepted", "failed", "abandoned", "cancelled"] as const
@@ -982,14 +938,14 @@ function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: Operat
 
   for (const file of readableVersionSources) {
     if (version) break;
-    const candidate = explicitVersionFromText(file === profilePath ? profileText : readText(file), agent.name);
+    const candidate = explicitVersionFromText(file === profilePath ? profileText : readCatalogArtifact(agent, file, { root }), agent.name);
     if (candidate) {
       version = candidate;
       versionSource = relativePath(root, file);
     }
   }
 
-  const snapshots = snapshotsForAgent(root, slug(agent.name), profileFront);
+  const snapshots = snapshotsForAgent(root, agent.id, profileFront, agent.routeAliases);
   const hasRollbackCapableSnapshot = snapshots.items?.some((item) => item.restoreMode && item.restoreMode !== "metadata-only") || false;
   const rollback =
     hasRollbackCapableSnapshot
@@ -1013,7 +969,7 @@ function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: Operat
     !folderPresent && contractPath
       ? {
           status: "ready" as const,
-          endpoint: `/api/agents/${slug(agent.name)}/restore-plan`,
+          endpoint: `/api/agents/${agent.id}/restore-plan`,
           reason: "Missing folder can be reconstructed from contract and lifecycle reports after confirmation",
         }
       : folderPresent
@@ -1076,7 +1032,7 @@ function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: Operat
     restorePlan,
   };
   const agentForLifecycleStatus = {
-    id: slug(agent.name),
+    id: agent.id,
     name: agent.name,
     folder: { status: folderPresent ? ("present" as const) : ("missing" as const) },
     lifecycle: baseLifecycle,
@@ -1567,80 +1523,24 @@ function parseTableLine(line: string) {
     .map((cell) => cell.trim());
 }
 
-function parseRegistry(root: string) {
-  const registryPath = path.join(resolvePrithaAgentMemoryRoot(root), "registry.md");
-  if (!existsSync(registryPath)) return { registryPath, records: [] as RegistryRecord[] };
-
-  const text = readFileSync(registryPath, "utf8");
-  const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === "## Agents");
-  if (start === -1) return { registryPath, records: [] as RegistryRecord[] };
-
-  const tableLines = lines.slice(start + 1).filter((line) => line.trim().startsWith("|"));
-  const rows = tableLines.slice(2);
-  const records = rows
-    .map(parseTableLine)
-    .filter((cells) => cells.length >= 7)
-    .map(([name, mission, runtime, iface, deployment, proactivity, evidence]) => ({
-      name,
-      mission,
-      runtime,
-      interface: iface,
-      deployment,
-      proactivity,
-      evidence,
-    }));
-
-  return { registryPath, records };
+function parseRegistry(root: string, fresh = false) {
+  const catalog = readAgentCatalog({ root, fresh });
+  const records: RegistryRecord[] = catalog.agents.map((agent) => {
+    const legacyId = slug(agent.name);
+    const unique = catalog.agents.filter((candidate) => slug(candidate.name) === legacyId).length === 1;
+    return { ...agent, routeAliases: unique && agent.identityStatus !== "conflict" ? [legacyId] : [] };
+  });
+  return { registryPath: catalog.registryPath, records };
 }
 
-function siblingFolders(root: string) {
-  const parent = resolvePrithaAgentParent(root);
-  const codeRoot = path.resolve(root);
-  try {
-    return readdirSync(parent)
-      .map((entry) => {
-        const absolutePath = path.join(parent, entry);
-        return { name: entry, absolutePath };
-      })
-      .filter((entry) => {
-        try {
-          if (!statSync(entry.absolutePath).isDirectory() || entry.name.startsWith(".")) return false;
-          if (path.resolve(entry.absolutePath) === codeRoot) return false;
-          if (isPrithaCodeCheckout(entry.absolutePath)) return false;
-          return existsSync(path.join(entry.absolutePath, "AGENTS.md"));
-        } catch {
-          return false;
-        }
-      });
-  } catch {
-    return [];
-  }
+function liveRegistryRecords(_root: string, records: RegistryRecord[]) {
+  return records;
 }
 
-function liveRegistryRecords(root: string, records: RegistryRecord[]) {
-  const folders = siblingFolders(root);
-  const folderKeys = new Set(folders.map((folder) => compactKey(folder.name)));
-  const localRecords = records.filter((record) => folderKeys.has(compactKey(record.name)));
-  const recordKeys = new Set(localRecords.map((record) => compactKey(record.name)));
-  const scannedRecords = folders
-    .filter((folder) => !recordKeys.has(compactKey(folder.name)))
-    .map<RegistryRecord>((folder) => ({
-      name: folder.name,
-      mission: "Local sibling child agent",
-      runtime: "local project",
-      interface: "project-defined",
-      deployment: "local",
-      proactivity: "manual",
-      evidence: "local sibling scan",
-    }));
-  return [...localRecords, ...scannedRecords].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function findSiblingFolder(root: string, agentName: string) {
-  const expected = compactKey(agentName);
-  const folders = siblingFolders(root);
-  return folders.find((folder) => compactKey(folder.name) === expected) || null;
+function findSiblingFolder(root: string, agentId: string) {
+  const agent = findCatalogAgent(readAgentCatalog({ root, fresh: true }), agentId);
+  return agent?.projectPath && agent.identityStatus !== "conflict"
+    ? { name: path.basename(agent.projectPath), absolutePath: agent.projectPath } : null;
 }
 
 function localHealthUrls(manifest: OperationsManifest | null) {
@@ -2313,7 +2213,7 @@ function readinessIssueText(readiness: ControlCenterAgent["readiness"]) {
 }
 
 async function buildAgent(root: string, record: RegistryRecord, access: AccessLinkState): Promise<ControlCenterAgent> {
-  const folder = findSiblingFolder(root, record.name);
+  const folder = record.projectPath ? { name: path.basename(record.projectPath), absolutePath: record.projectPath } : null;
   const manifest = folder ? readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")) : null;
   const health = folder ? await probeHealth(manifest) : { status: "not_checked" as const, detail: "Missing folder" };
   const uiState = agentUiState(Boolean(folder), manifest, health.status);
@@ -2334,9 +2234,10 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
   const credentials = credentialsForAgent(root, folder, manifest);
 
   return {
-    id: slug(record.name),
+    id: record.id,
+    identity: { agentId: record.agentId, instanceKey: record.instanceKey, status: record.identityStatus, diagnostics: record.diagnostics, routeAliases: record.routeAliases },
     name: record.name,
-    mission: record.mission,
+    mission: currentAgentMission(record, { root }).text,
     runtime: record.runtime,
     interface: record.interface,
     deployment: record.deployment,
@@ -2372,7 +2273,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       primaryAction: legacyPlanAction(control),
       actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
-      issueText: readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
+      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
     },
     control,
@@ -2450,9 +2351,9 @@ function latestReports(root: string) {
     .slice(0, 8);
 }
 
-export async function getControlCenterStatus(): Promise<ControlCenterStatus> {
+export async function getControlCenterStatus(options: { freshIdentity?: boolean } = {}): Promise<ControlCenterStatus> {
   const root = resolveTechscopeRoot();
-  const registry = parseRegistry(root);
+  const registry = parseRegistry(root, options.freshIdentity);
   const records = liveRegistryRecords(root, registry.records);
   const access = accessLinks();
   const allAgents = await Promise.all(records.map((record) => buildAgent(root, record, access)));
@@ -2525,17 +2426,21 @@ export function controlCenterStatusForClient(status: ControlCenterStatus): Contr
   };
 }
 
+function selectAgent(agents: ControlCenterAgent[], id: string) {
+  const exact = agents.find((agent) => agent.id === id);
+  if (exact) return exact;
+  const legacy = agents.filter((agent) => agent.identity?.routeAliases.includes(id));
+  return legacy.length === 1 ? legacy[0] : null;
+}
+
 export async function getControlCenterAgent(agentId: string) {
-  const status = await getControlCenterStatus();
-  return {
-    status,
-    agent: status.childAgents.find((item) => item.id === agentId) || status.allRegistryAgents.find((item) => item.id === agentId) || null,
-  };
+  const status = await getControlCenterStatus({ freshIdentity: true });
+  return { status, agent: selectAgent(status.childAgents, agentId) || selectAgent(status.allRegistryAgents, agentId) };
 }
 
 export async function getAgentCredentials(agentId: string): Promise<ControlCenterAgentCredentialsResponse | null> {
-  const status = await getControlCenterStatus();
-  const agent = status.childAgents.find((item) => item.id === agentId);
+  const status = await getControlCenterStatus({ freshIdentity: true });
+  const agent = selectAgent(status.childAgents, agentId);
   if (!agent) return null;
 
   return {
@@ -2556,8 +2461,8 @@ export async function setAgentCredentialSecret(
   value: unknown,
   options: { dryRun?: boolean } = {},
 ): Promise<ControlCenterSecretMutationResult | null> {
-  const status = await getControlCenterStatus();
-  const agent = status.childAgents.find((item) => item.id === agentId);
+  const status = await getControlCenterStatus({ freshIdentity: true });
+  const agent = selectAgent(status.childAgents, agentId);
   if (!agent) return null;
   const definition = findCredential(agent, name);
   if (!definition) throw new Error("unknown_secret");
@@ -2603,8 +2508,8 @@ export async function removeAgentCredentialSecret(
   name: string,
   options: { dryRun?: boolean } = {},
 ): Promise<ControlCenterSecretMutationResult | null> {
-  const status = await getControlCenterStatus();
-  const agent = status.childAgents.find((item) => item.id === agentId);
+  const status = await getControlCenterStatus({ freshIdentity: true });
+  const agent = selectAgent(status.childAgents, agentId);
   if (!agent) return null;
   const definition = findCredential(agent, name);
   if (!definition) throw new Error("unknown_secret");
@@ -2644,8 +2549,8 @@ export async function removeAgentCredentialSecret(
 }
 
 export async function validateAgentCredentialSecret(agentId: string, name: string): Promise<ControlCenterSecretValidationResult | null> {
-  const status = await getControlCenterStatus();
-  const agent = status.childAgents.find((item) => item.id === agentId);
+  const status = await getControlCenterStatus({ freshIdentity: true });
+  const agent = selectAgent(status.childAgents, agentId);
   if (!agent) return null;
   const definition = findCredential(agent, name);
   if (!definition) throw new Error("unknown_secret");
@@ -3110,7 +3015,7 @@ function blockedOperatorActionResult(params: {
 }
 
 function operationManifestForAgent(root: string, agent: ControlCenterAgent) {
-  const folder = findSiblingFolder(root, agent.name);
+  const folder = findSiblingFolder(root, agent.id);
   if (!folder) return { folder: null, manifest: null };
   return {
     folder,
@@ -4073,7 +3978,10 @@ function validateSnapshotMetadataFile(root: string, agent: ControlCenterAgent, f
 
   if (json.schema_version !== SNAPSHOT_SCHEMA_VERSION) errors.push(`schema_version must be ${SNAPSHOT_SCHEMA_VERSION}`);
   if (!json.snapshot_id && !json.id) errors.push("snapshot_id is required");
-  if (json.agent_id !== agent.id) errors.push(`agent_id must be ${agent.id}`);
+  const legacyIdentity = agent.identity?.routeAliases.includes(json.agent_id || "")
+    && json.agent_folder === projectRelativeAgentFolder(agent)
+    && json.source_contract === agent.lifecycle.contract.path;
+  if (json.agent_id !== agent.id && !legacyIdentity) errors.push(`agent_id must be ${agent.id}`);
   if (json.agent_name !== agent.name) errors.push(`agent_name must be ${agent.name}`);
   if (!json.created_at && !json.created) errors.push("created_at is required");
   if (json.source_profile !== agent.lifecycle.profile.path) errors.push(`source_profile must be ${agent.lifecycle.profile.path || "defined"}`);

@@ -3,7 +3,7 @@ id: 2026-09-05-pritha-pilot-roadmap-execution-preparation
 type: workflow
 status: in-progress
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 topics: [pritha, agents-mother, roadmap, runtime, goal-budget, execution-preparation]
 tools: [Pritha, Codex, Node.js, Git, Next.js]
 agent_platforms: [Codex, Pritha Control Center]
@@ -34,10 +34,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
-source_updated: 2026-09-05
-source_version: preparation v6; full completion work from cf11419 in codex/roadmap-completion
+source_updated: 2026-09-06
+source_version: preparation v7; full completion work from cf11419 in codex/roadmap-completion
 retrieved: 2026-09-05
-verified: 2026-09-05
+verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -307,3 +307,15 @@ controls реализованы локально; открыты live mid-turn v
 budget intent и связанный с task/run host action.
 Git commit/tag, публикация, rollout, изменение старых Goal, запуск новых
 пилотов и включение scheduler в подготовку не входят.
+
+
+## Identity foundation перед следующей сессией
+
+3.1/3.2 реализованы локально: CLI и Control Center используют один каталог
+с собственным state-root и постоянными ID. Новые Outcome/scaffold и delivery reports
+наследуют ID; формат immutable Trial plan v1 сохранён; legacy metadata сопровождаются диагностикой. Сверка с текущей
+mother не требует изменения accepted contracts или approval history.
+Найденный конфликт document-lock алгоритмов CLI и UI устранён общим модулем
+с сохранением canonical v1. Следующий вход — exact Task Chat/run binding 1.4,
+затем независимые readiness и handoff по типу результата. Финальный main/push,
+managed rollout и синхронизация ND выполняются после завершения полного пакета.

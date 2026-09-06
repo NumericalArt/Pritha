@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData, yamlList } from "../lib/frontmatter.mjs";
 import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
@@ -7,6 +7,7 @@ import { today } from "../lib/date.mjs";
 import { bodyValue } from "./contract.mjs";
 import { detectProject, fileExists } from "./test.mjs";
 import { writeLifecycleReport } from "./lifecycle-report.mjs";
+import { readAgentCatalog, findCatalogAgent, readIdentityEvidence } from "./identity.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -29,18 +30,15 @@ function scalar(value, fallback = "TBD") {
 }
 export function listContracts() {
   ensureDirs();
-  const files = readdirSync(CONTRACT_DIR)
-    .filter((entry) => entry.endsWith(".md"))
-    .map((entry) => path.join(CONTRACT_DIR, entry))
-    .filter((file) => statSync(file).isFile())
-    .filter((file) => readFrontmatter(readFileSync(file, "utf8")).type === "agent-contract")
+  const files = listMarkdownFilesFlat(CONTRACT_DIR)
+    .filter((file) => readFrontmatter(readIdentityEvidence(file, AGENT_MEMORY_ROOT)).type === "agent-contract")
     .sort();
   if (files.length === 0) {
     console.log("No agent contracts yet.");
     return;
   }
   for (const file of files) {
-    const text = readFileSync(file, "utf8");
+    const text = readIdentityEvidence(file, AGENT_MEMORY_ROOT);
     const fm = readFrontmatter(text);
     const name = bodyValue(text, "Agent name") || path.basename(file, ".md");
     console.log(`${fm.status || "unknown"}\t${path.relative(ROOT, file)}\t${name}`);
@@ -48,11 +46,11 @@ export function listContracts() {
 }
 
 function listMarkdownFilesFlat(dir) {
-  if (!existsSync(dir)) return [];
+  if (!existsSync(dir) || lstatSync(dir).isSymbolicLink() || !lstatSync(AGENT_MEMORY_ROOT).isDirectory() || lstatSync(AGENT_MEMORY_ROOT).isSymbolicLink()) return [];
   return readdirSync(dir)
     .filter((entry) => entry.endsWith(".md"))
     .map((entry) => path.join(dir, entry))
-    .filter((file) => statSync(file).isFile())
+    .filter((file) => lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink())
     .sort();
 }
 
@@ -67,7 +65,7 @@ function markdownTitle(text, fallback) {
 }
 
 function contractSummaryFromFile(file) {
-  const text = readFileSync(file, "utf8");
+  const text = readIdentityEvidence(file, AGENT_MEMORY_ROOT);
   const fm = readFrontmatter(text);
   const name = (bodyValue(text, "Agent name") || markdownTitle(text, path.basename(file, ".md"))).replace(/[.;]+$/, "");
   const subjectId = typeof fm.subject === "object" && fm.subject ? String(fm.subject.id || "").trim() : "";
@@ -91,7 +89,7 @@ function contractSummaryFromFile(file) {
 }
 
 function outcomeSummaryFromFile(file) {
-  const text = readFileSync(file, "utf8");
+  const text = readIdentityEvidence(file, AGENT_MEMORY_ROOT);
   const fm = readFrontmatter(text);
   const agentSlug = scalar(fm.agent_slug, slug(markdownTitle(text, path.basename(file, ".md")).replace(/^Agent Outcome Spec:\s*/i, "")));
   return {
@@ -107,7 +105,7 @@ function outcomeSummaryFromFile(file) {
 }
 
 function reportSummaryFromFile(file) {
-  const text = readFileSync(file, "utf8");
+  const text = readIdentityEvidence(file, AGENT_MEMORY_ROOT);
   const fm = readFrontmatter(text);
   const title = markdownTitle(text, path.basename(file, ".md"));
   const relPath = path.relative(ROOT, file);
@@ -132,121 +130,21 @@ function reportSummaryFromFile(file) {
   };
 }
 
-function reportRepresentsChildAgent(report) {
-  if (report.subjectKind && !["agent", "child-agent"].includes(report.subjectKind)) return false;
-  return Boolean(report.agentName || report.projectPath);
-}
-
 function collectAgentLifecycle() {
-  const contractArtifacts = listMarkdownFilesFlat(CONTRACT_DIR).map((file) => ({ file, type: readFrontmatter(readFileSync(file, "utf8")).type }));
-  const contracts = contractArtifacts.filter((entry) => entry.type === "agent-contract").map((entry) => contractSummaryFromFile(entry.file));
-  const outcomes = contractArtifacts.filter((entry) => entry.type === "agent-outcome-spec").map((entry) => outcomeSummaryFromFile(entry.file));
-  const reports = listMarkdownFilesFlat(REPORT_DIR)
-    .filter((file) => path.basename(file) !== ".gitkeep")
-    .map(reportSummaryFromFile);
-  const research = listMarkdownFilesFlat(RESEARCH_DIR).map((file) => {
-    const text = readFileSync(file, "utf8");
-    const fm = readFrontmatter(text);
-    return {
-      path: path.relative(ROOT, file),
-      id: fm.id || path.basename(file, ".md"),
-      status: fm.status || "unknown",
-      title: markdownTitle(text, path.basename(file, ".md")),
-      created: fm.created || "unknown",
-    };
-  });
-
-  const bySlug = new Map();
-  const aliasToSlug = new Map();
-  for (const contract of contracts) {
-    if (!bySlug.has(contract.slug)) {
-      bySlug.set(contract.slug, {
-        slug: contract.slug,
-        name: contract.name,
-        mission: contract.mission,
-        runtime: contract.runtime,
-        interface: contract.interface,
-        telegram: contract.telegram,
-        deploymentTarget: contract.deploymentTarget,
-        proactiveMode: contract.proactiveMode,
-        contracts: [],
-        outcomes: [],
-        reports: [],
-      });
-    }
-    const agent = bySlug.get(contract.slug);
-    agent.name = contract.name;
-    agent.mission = contract.mission;
-    agent.runtime = contract.runtime;
-    agent.interface = contract.interface;
-    agent.telegram = contract.telegram;
-    agent.deploymentTarget = contract.deploymentTarget;
-    agent.proactiveMode = contract.proactiveMode;
-    agent.contracts.push(contract);
-    for (const alias of [contract.slug, ...contract.aliases]) aliasToSlug.set(alias, contract.slug);
-  }
-  for (const outcome of outcomes) {
-    const boundContract = contracts.find((contract) => contractPathsMatch(contract.path, outcome.contractPath));
-    const key = boundContract?.slug
-      || aliasToSlug.get(outcome.slug)
-      || [...bySlug.keys()].find((item) => comparableOutcomeSlug(item, outcome.slug))
-      || outcome.slug;
-    if (!bySlug.has(key)) {
-      bySlug.set(key, {
-        slug: key,
-        name: outcome.slug,
-        mission: "unknown",
-        runtime: "unknown",
-        interface: "unknown",
-        telegram: "unknown",
-        deploymentTarget: "unknown",
-        proactiveMode: "unknown",
-        contracts: [],
-        outcomes: [],
-        reports: [],
-      });
-    }
-    bySlug.get(key).outcomes.push(outcome);
-  }
-  for (const report of reports) {
-    if (!reportRepresentsChildAgent(report)) continue;
-    const subjectSlug = report.subjectId ? slug(report.subjectId) : "";
-    const key = aliasToSlug.get(subjectSlug)
-      || aliasToSlug.get(report.slug)
-      || [...bySlug.keys()].find((item) => report.path.includes(item) || report.slug.includes(item))
-      || report.slug;
-    if (!bySlug.has(key)) {
-      bySlug.set(key, {
-        slug: key,
-        name: report.name,
-        mission: "unknown",
-        runtime: "unknown",
-        interface: "unknown",
-        telegram: "unknown",
-        deploymentTarget: "unknown",
-        proactiveMode: "unknown",
-        contracts: [],
-        outcomes: [],
-        reports: [],
-      });
-    }
-    bySlug.get(key).reports.push(report);
-  }
-
-  return { agents: [...bySlug.values()].sort((a, b) => a.slug.localeCompare(b.slug)), contracts, outcomes, reports, research };
-}
-
-function comparableOutcomeSlug(left, right) {
-  const normalize = (value) => slug(value).replaceAll("-", "");
-  return normalize(left) === normalize(right);
-}
-
-function contractPathsMatch(contractPath, outcomeContractPath) {
-  if (!outcomeContractPath) return false;
-  const normalizedContract = path.normalize(contractPath);
-  const normalizedOutcome = path.normalize(outcomeContractPath);
-  return normalizedContract === normalizedOutcome
-    || path.basename(normalizedContract) === path.basename(normalizedOutcome);
+  const catalog = readAgentCatalog({ root: ROOT, fresh: true });
+  const contracts = listMarkdownFilesFlat(CONTRACT_DIR)
+    .filter((file) => readFrontmatter(readIdentityEvidence(file, AGENT_MEMORY_ROOT)).type === "agent-contract").map(contractSummaryFromFile);
+  const outcomes = listMarkdownFilesFlat(CONTRACT_DIR)
+    .filter((file) => readFrontmatter(readIdentityEvidence(file, AGENT_MEMORY_ROOT)).type === "agent-outcome-spec").map(outcomeSummaryFromFile);
+  const reports = listMarkdownFilesFlat(REPORT_DIR).map(reportSummaryFromFile);
+  const research = listMarkdownFilesFlat(RESEARCH_DIR).map((file) => ({ path: path.relative(ROOT, file) }));
+  const match = (items, agent) => items.filter((item) => agent.artifacts.some((artifact) => artifact.path === path.resolve(ROOT, item.path)));
+  const agents = catalog.agents.filter((agent) => agent.artifacts.length).map((agent) => ({
+    ...agent, slug: agent.agentId || agent.id, telegram: "contract-defined",
+    deploymentTarget: agent.deployment, proactiveMode: agent.proactivity,
+    contracts: match(contracts, agent), outcomes: match(outcomes, agent), reports: match(reports, agent),
+  }));
+  return { agents, contracts, outcomes, reports, research, diagnostics: catalog.diagnostics };
 }
 
 function reportTypeCount(reports, type) {
@@ -256,15 +154,16 @@ function reportTypeCount(reports, type) {
 function registryMarkdown(lifecycle) {
   const date = today();
   const sources = [
-    "11_agents/contracts/",
-    "11_agents/research/",
-    "11_agents/reports/",
+    path.relative(ROOT, CONTRACT_DIR),
+    path.relative(ROOT, RESEARCH_DIR),
+    path.relative(ROOT, REPORT_DIR),
     "07_workflows/agents-mother.md",
     "07_workflows/agents-mother-roadmap.md",
   ];
   return `---
 id: agents-mother-registry
 type: agent-registry
+identity_schema_version: 1
 status: active
 created: 2026-05-18
 updated: ${date}
@@ -345,6 +244,17 @@ ${lifecycle.agents.map((agent) => {
   return `| ${agent.name.replace(/\|/g, "/")} | ${agent.mission.replace(/\|/g, "/").slice(0, 120)} | ${agent.runtime} | ${agent.interface} / Telegram ${agent.telegram} | ${agent.deploymentTarget} | ${agent.proactiveMode} | ${evidence} |`;
 }).join("\n")}
 
+## Agent Identities
+
+| Agent ID | Instance key | Attribution | Status |
+| --- | --- | --- | --- |
+${lifecycle.agents.map((agent) => `| ${agent.agentId || agent.id} | ${agent.instanceKey} | ${agent.source} | ${agent.identityStatus} |`).join("\n")}
+
+## Identity Diagnostics
+
+${lifecycle.agents.filter((agent) => agent.diagnostics.length).map((agent) => `- ${agent.id}: ${agent.diagnostics.join(", ")}`).join("\n") || "- No agent identity diagnostics."}
+${lifecycle.diagnostics.map((diagnostic) => `- ${diagnostic.code}: ${path.relative(ROOT, diagnostic.path || AGENT_MEMORY_ROOT)}`).join("\n")}
+
 ## Recent Reports
 
 ${lifecycle.reports.slice(-30).reverse().map((report) => `- ${report.created} ${report.type}/${report.status}: ${report.path}`).join("\n") || "- No reports yet."}
@@ -367,11 +277,12 @@ export function rebuildRegistry() {
 }
 
 function relatedReportsForProject(projectRoot, projectName) {
-  const projectSlug = slug(projectName);
-  return listMarkdownFilesFlat(REPORT_DIR)
-    .map(reportSummaryFromFile)
-    .filter((report) => report.path.includes(projectSlug) || report.projectPath === projectRoot || report.projectPath.includes(projectName))
-    .sort((a, b) => a.path.localeCompare(b.path));
+  const catalog = readAgentCatalog({ root: ROOT, fresh: true });
+  const matches = catalog.agents.filter((agent) => agent.projectPath === path.resolve(projectRoot));
+  const agent = matches.length === 1 ? matches[0] : findCatalogAgent(catalog, projectName);
+  if (!agent || agent.identityStatus === "conflict" || (agent.projectPath && agent.projectPath !== path.resolve(projectRoot))) return [];
+  return agent.artifacts.filter((artifact) => artifact.type.endsWith("report"))
+    .map((artifact) => reportSummaryFromFile(artifact.path)).sort((a, b) => a.path.localeCompare(b.path));
 }
 
 function inferLessonsFromProject(projectRoot, detection, reports) {

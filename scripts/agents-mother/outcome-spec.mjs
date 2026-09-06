@@ -10,6 +10,9 @@ import { redactSensitiveText } from "../lib/redaction.mjs";
 import { slug } from "../lib/slug.mjs";
 import { writeUniqueArtifact } from "./artifact-selection.mjs";
 import { contractData, contractFingerprint } from "./contract.mjs";
+import { authoredAgentId } from "./identity.mjs";
+import { outcomeDocumentLock } from "./outcome-lock.mjs";
+export { outcomeDocumentLock, canonicalOutcomeDocument } from "./outcome-lock.mjs";
 
 export const OUTCOME_SPEC_SCHEMA = "pritha-agent-outcome-spec-v1";
 export const TRIAL_PLAN_SCHEMA = "pritha-trial-plan-v1";
@@ -19,17 +22,6 @@ export const INTERACTION_MODES = new Set(["interface", "headless", "hybrid"]);
 export const TRIAL_KINDS = new Set(["automated", "operator-judged"]);
 export const TRIAL_ISOLATION = new Set(["none", "sandbox"]);
 
-const MUTABLE_DOCUMENT_FIELDS = new Set([
-  "status",
-  "outcome_spec_status",
-  "updated",
-  "outcome_semantic_lock",
-  "outcome_document_lock",
-  "approved_by",
-  "approved_at",
-  "review_status",
-  "superseded_by",
-]);
 const SHELL_EXECUTABLES = new Set(["sh", "bash", "zsh", "fish", "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe"]);
 const SHELL_OPERATOR_TOKENS = new Set(["&&", "||", ";", "|", ">", ">>", "<", "<<", "`"]);
 
@@ -264,29 +256,6 @@ export function outcomeSemanticLock(value) {
   return sha256(JSON.stringify(outcomeSemanticProjection(value)));
 }
 
-export function canonicalOutcomeDocument(value) {
-  const source = normalizedText(value);
-  if (!source.startsWith("---\n")) return source.trimEnd();
-  const end = source.indexOf("\n---\n", 4);
-  if (end === -1) return source.trimEnd();
-  let mutableBlock = false;
-  const frontmatter = source.slice(4, end).split("\n").flatMap((line) => {
-    const match = line.match(/^([A-Za-z0-9_-]+):/);
-    if (match) {
-      mutableBlock = MUTABLE_DOCUMENT_FIELDS.has(match[1]);
-      return mutableBlock ? [`${match[1]}: [MUTABLE]`] : [line];
-    }
-    if (mutableBlock && /^\s+/.test(line)) return [];
-    mutableBlock = false;
-    return [line];
-  }).join("\n");
-  return `---\n${frontmatter}\n---\n${source.slice(end + 5)}`.trimEnd();
-}
-
-export function outcomeDocumentLock(value) {
-  return sha256(canonicalOutcomeDocument(value));
-}
-
 function issue(code, message, location = "") {
   return { code, message, location };
 }
@@ -342,6 +311,10 @@ export function validateOutcomeSpecText(text, options = {}) {
   const status = String(fm.status || "").toLowerCase();
 
   if (fm.type !== "agent-outcome-spec") issues.push(issue("OS001", 'frontmatter "type" must be agent-outcome-spec', "frontmatter.type"));
+  const identity = authoredAgentId(fm);
+  if (identity.issue || (contract?.agentId && identity.id !== contract.agentId)) {
+    issues.push(issue("OS020", "Outcome identity must match its exact agent contract", "frontmatter.agent_id/subject.id"));
+  }
   if (!OUTCOME_STATUSES.has(status) || String(fm.outcome_spec_status || "").toLowerCase() !== status) {
     issues.push(issue("OS002", "status and outcome_spec_status must match an allowed value", "frontmatter.status"));
   }
@@ -542,7 +515,7 @@ memory_domains:
   - agent-building-knowledge
 subject:
   kind: child-agent
-  id: ${agentSlug}
+  id: ${data.agentId || agentSlug}
 privacy: public
 retention: durable
 review_status: draft

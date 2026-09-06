@@ -112,7 +112,7 @@ test("Settings Tailscale guidance uses the current instance port", () => {
 });
 
 test("Agent status page gives inactive runtimes a human-readable fallback", () => {
-  assert.match(agentStatusPageSource, /getControlCenterStatus/);
+  assert.match(agentStatusPageSource, /getControlCenterAgent/);
   assert.match(agentStatusPageSource, /Child agent status/);
   assert.match(agentStatusPageSource, /Runtime not open/);
   assert.match(agentStatusPageSource, /Open Runtime/);

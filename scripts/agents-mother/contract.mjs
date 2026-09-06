@@ -4,6 +4,7 @@ import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "../lib/paths.mjs";
 import { normalizeGitHubRepositoryUrl, normalizeRepositoryModulePath } from "../lib/github-repository-radar.mjs";
+import { authoredAgentId } from "./identity.mjs";
 
 export const RUNTIME_FAMILIES = new Set(["codex-native", "cli", "api", "local-model", "hybrid", "environment-specific"]);
 export const TELEGRAM_MODES = new Set(["none", "primary-chat", "intake-channel", "notifications-only", "operator-control"]);
@@ -200,6 +201,7 @@ export function validateContract(contractPath, options = {}) {
   const text = readFileSync(fullPath, "utf8");
   const fm = parseFrontmatterData(text) || {};
   if (fm.type !== "agent-contract") issues.push('frontmatter "type" must be agent-contract');
+  if (authoredAgentId(fm).issue) issues.push(`agent identity: ${authoredAgentId(fm).issue}`);
   if (!STATUS_VALUES.has(fm.status)) issues.push(`status must be one of: ${Array.from(STATUS_VALUES).join(", ")}`);
 
   const runtime = bodyValue(text, "Runtime family");
@@ -434,6 +436,7 @@ export function contractData(contractPath, options = {}) {
     relPath: path.relative(root, fullPath),
     text,
     fm,
+    agentId: authoredAgentId(fm).id,
     agentName: bodyValue(text, "Agent name"),
     primaryMission: bodyValue(text, "Primary mission"),
     targetUser: bodyValue(text, "Target user"),

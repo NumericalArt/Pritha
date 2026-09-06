@@ -3,7 +3,7 @@ id: 2026-09-05-pritha-roadmap-completion-tracker
 type: workflow
 status: in-progress
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 topics: [pritha, agents-mother, roadmap, completion-evidence, neuraldeep, release]
 tools: [Pritha, Codex, Node.js, Next.js, Git]
 sources:
@@ -17,8 +17,8 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: cf11419 plus codex/roadmap-completion work
-verified: 2026-09-05
+source_version: 7c7f172 plus identity catalog v1 completion work
+verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
 memory_domains: [pritha-self, agent-building-knowledge]
@@ -70,8 +70,8 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 2.3 | Открыт | Manifest applicability следует operations contract; CLI без service manifest не получает ложный blocker |
 | 2.4 | Открыт | Явный approved argv probe, cwd/symlink/timeout, GET не исполняет agent-controlled код |
 | 2.5 | Открыт; после 3.1 | Read-only reconcile plan и идемпотентный apply по exact HEAD/spec/approval/Trial/receipt; нет поддельного acceptance |
-| 3.1 | Открыт | Instance-qualified stable identity; frontmatter-only, rename, совпадающие имена, чужой instance, ID/path conflict |
-| 3.2 | Открыт | Mission из instance-local authored profile/contract, точное invalidation и отсутствие полного обхода на GET |
+| 3.1 | Реализован локально; adoption впереди | Общий каталог CLI/UI; 34 targeted tests, legacy и current-state compatibility; exact run/Spec/approval projection |
+| 3.2 | Реализован локально | Own authored profile/contract; bounded parsed cache, immediate selected mission read; fresh host lookup; staged build |
 | 3.3 | Открыт | CLI/service/job/tool/library handoff соответствует реальному первому сценарию и revision evidence |
 | 4.0 | Открыт | Runtime/interface/operations capability preflight до mutation; headless scaffold, конкретный adapter для unsupported |
 | 4.1 | Открыт | Host-owned verifier provenance/hash до lock; заведомо неверный продукт проваливает Trial |
@@ -89,7 +89,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 7.2 | Открыт | Отдельная синтетическая демонстрация, без реальных private history/endpoints/identifiers |
 | 7.3 | Открыт | GitHub inventory, актуальный changelog/public package, guards, commit/push и release evidence |
 | Канонические экземпляры | Предыдущий пакет установлен на пяти | Новый exact commit, self-test, build/page/chunk health, own state/children на mother, Dasha, Sasha, Marina, MacBook |
-| ND roadmap | Shared revision 2 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
+| ND roadmap | Shared revision 3 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
 
 ## Текущий пакет и следующий вход
 
@@ -127,8 +127,40 @@ same-message retry, quote, reload, сохранение предыдущего �
 provider pilot. Staged build не заменяет активную `.next`.
 
 Далее: завершить связь Task Chat → delivery run и narrow host actions (1.4),
-потом identity (3.1), applicability/readiness/handoff (2–3), scaffold/Trials
+используя подготовленную identity (3.1); applicability/readiness/handoff (2–3), scaffold/Trials
 (4), необходимые runtime/privacy изменения (5), подготовку pilots и public
 path (6–7). После итогового review — опубликованный pinned release и обновление
 пяти обычных канонических экземпляров. ND исполняемый код не получает mother
 runtime путём общего merge; специализированный план остаётся самостоятельным.
+
+
+## Пакет identity catalog v1
+
+3.1 и 3.2 реализованы общей MJS моделью для registry, CLI card-readiness и
+Control Center. Новые контракты получают постоянный ID; Outcome Spec, scaffold
+и delivery report сохраняют его. Immutable Trial plan v1 не меняет формат;
+run использует существующий exact contract/Spec/approval binding. Existing accepted Markdown, approval audit, run
+history и private registry не переписаны. Body-only и substring matching
+удалены. Legacy adapter ограничен точным project/alias и известным старым
+memory prefix; он не выдаёт approval.
+
+Card projection проверяет current contract fingerprint, Outcome ID, оба locks
+и approval receipt вместе с точным project path. Найдено и устранено различие
+CLI/UI document-lock algorithm: теперь один `outcome-lock.mjs` сохраняет
+канонический v1 алгоритм, включая mutable `superseded_by` и nested block.
+Сам по себе этот пакет не доказывает HEAD/Trial freshness, acceptance или
+Task Chat binding — соответствующие пункты остаются открытыми.
+
+Синтетические проверки проходят через реальное создание и approval Outcome
+Spec, затем подменяют один binding за раз. Параллельная read-only сверка с
+собственным state mother сохранила прежние карточки и выявила дополнительно
+один authored проект во вложенном каталоге; foreign instance не сканируется.
+Неполные legacy metadata остаются диагностикой. Shared Next imports требуют
+code-root для Turbopack; staged build проходит, runtime/private files не попали
+в NFT dependency traces. Итоговый self-test pass: **617/617 unit tests**,
+семь quality checks и strict live health проходят. Typecheck и финальный
+staged production build pass. Live health относится к предыдущему deployed
+release; новый runtime не подменялся во время проверки. Повторный CLI fixture
+проходит от Outcome approval через delivery до acceptance с новым ID, сохраняя
+старую wire shape Trial plan v1. Strict publication audit и обновление памяти
+завершают локальный пакет; main/push/fleet adoption остаются следующим выпуском.

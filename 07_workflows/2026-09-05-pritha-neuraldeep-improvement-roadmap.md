@@ -3,7 +3,7 @@ id: 2026-09-05-pritha-neuraldeep-improvement-roadmap
 type: workflow
 status: ready-for-implementation
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 topics: [neuraldeep, agents-mother, codex-cli, delivery-budget, usage-accounting, recovery, task-chat]
 tools: [Pritha, NeuralDeep, Codex CLI, Node.js, SQLite, Next.js]
 agent_platforms: [Pritha NeuralDeep, Codex]
@@ -32,8 +32,8 @@ superseded_by: []
 refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
-source_updated: 2026-09-05
-source_version: ND roadmap revision 2; NeuralDeep code 31b438e with local plan commit 87cc59a; mother completion work from cf11419
+source_updated: 2026-09-06
+source_version: ND roadmap revision 3; NeuralDeep code 31b438e with local plan commit 87cc59a; mother identity catalog v1
 retrieved: 2026-09-05
 verified: 2026-09-05
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -216,6 +216,21 @@ Account API timeout не стирает историю или локальный
 
 Адаптировать mother 3.1 → 2.5 → 2.1/2.3 → 2.2/2.4, затем 0.5/2.6/3.2/3.3.
 Stable ID берётся из authored inputs; путь/отчёт не подменяет identity.
+Использовать общий принцип mother `identity.mjs`: `agent_id`/child `subject.id`,
+instance-qualified key, exact contract/Spec/project binding. Legacy attribution
+и перенесённый префикс memory остаются диагностикой, а не основанием для
+approval или платного CLI вызова. Проверить одинаковые имена, rename, чужой
+Codex home/instance и ID/path conflict на ND fixtures. Identity не определяется
+строкой provider/model и сохраняется при смене разрешённой модели.
+
+Mother выявила различие CLI/UI Outcome document-lock algorithm. В ND сверить
+его с canonical v1, включая `superseded_by` и вложенные mutable fields; применить
+общий модуль только после проверки прежних locks. Не менять wire shape старого
+immutable Trial plan ради нового ID. CLI run связывается существующими exact
+Spec/contract/approval receipts. Не переносить App Server Goal RPC или иной
+исполнитель ради совместимости read model; Task Chat ND остаётся оболочкой
+собственного Codex CLI runner.
+
 CLI агент не требует web UI или service manifest без выбранной операции.
 Readiness разделяет verification, runtime, acceptance и handoff. CLI probe
 не исполняет произвольные команды непроверенного документа.

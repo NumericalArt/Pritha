@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -463,6 +464,7 @@ function contractMarkdown(data) {
   const report = `---
 id: ${data.artifactId || `${date}-${agentSlug}-agent-contract`}
 type: agent-contract
+agent_id: agent-${createHash("sha256").update(data.artifactId || `${date}-${agentSlug}-agent-contract`).digest("hex").slice(0, 24)}
 status: draft
 created: ${date}
 updated: ${date}

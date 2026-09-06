@@ -169,6 +169,7 @@ export type ControlCenterAgentOperationalReadiness = {
 
 export type ControlCenterAgent = {
   id: string;
+  identity?: { agentId: string | null; instanceKey: string; status: "identified" | "legacy" | "conflict"; diagnostics: string[]; routeAliases: string[] };
   name: string;
   mission: string;
   runtime: string;
