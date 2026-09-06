@@ -391,8 +391,24 @@ export class CodexAppServerBuildExecutor {
       return this.checkpoint(input, receipt);
     }
     receipt.turn_id ||= turn?.id || null;
-    if (turn && !TERMINAL_TURN_STATUSES.has(turn.status)) {
-      await this.connection.request("thread/resume", { threadId: receipt.thread_id, cwd, approvalPolicy: "never", sandbox: "workspace-write" }, 10_000);
+    if (read.thread.status?.type === "notLoaded" || (turn && !TERMINAL_TURN_STATUSES.has(turn.status))) {
+      // Persisted Goal reads require a loaded thread in Codex 0.153. A terminal
+      // archived attempt may therefore need loading too; this never sends input.
+      const params = { threadId: receipt.thread_id, cwd, approvalPolicy: "never", sandbox: "workspace-write" };
+      try {
+        await this.connection.request("thread/resume", params, 10_000);
+      } catch (error) {
+        if (!/session .* is archived/i.test(error?.message || "")) throw error;
+        receipt.thread_cleanup = "pending";
+        await this.checkpoint(input, receipt);
+        await this.connection.request("thread/unarchive", { threadId: receipt.thread_id }, 10_000);
+        try { await this.connection.request("thread/resume", params, 10_000); }
+        catch (resumeError) {
+          receipt.thread_cleanup = await this.archiveAttempt(receipt, cwd, 10_000);
+          await this.checkpoint(input, receipt);
+          throw resumeError;
+        }
+      }
     }
     // Reading/resuming is recovery only. Never resend turn/start.
     return this.settle(input, receipt, turn, 10_000);
@@ -470,6 +486,8 @@ export class CodexAppServerBuildExecutor {
       }
     } catch (error) {
       failure = error;
+      receipt.failure_code = bounded(error?.code || "app_server_turn_failed", 200);
+      receipt.failure_message = bounded(error?.message || "Build attempt failed", 2_000);
       if (!dispatched) {
         receipt.usage_status = "not-started";
         receipt.turn_status = "not-started";

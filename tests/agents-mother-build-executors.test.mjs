@@ -35,6 +35,7 @@ class FakeConnection {
     const thread = this.threads.get(params.threadId);
     assert.ok(thread, "Request must target an existing fixture thread");
     if (method.startsWith("thread/goal/")) {
+      if (this.options.requireLoadedGoal && !this.loaded) throw new ExecutionBackendError("app_server_rpc_error", `thread not found: ${thread.id}`, { rpcCode: -32600 });
       if (thread.ephemeral || this.options.goalUnavailable) throw new ExecutionBackendError("app_server_rpc_error", "Unsupported thread/goal/get for this thread", { rpcCode: -32601 });
       if (method === "thread/goal/set") {
         thread.goal = { ...thread.goal, threadId: thread.id, tokensUsed: thread.goal?.tokensUsed || 0, ...params };
@@ -57,7 +58,15 @@ class FakeConnection {
       return { turn };
     }
     if (method === "turn/interrupt") { thread.turns[0].status = "interrupted"; this.interrupted = true; return {}; }
-    if (method === "thread/read" || method === "thread/resume") { this.current = thread; return { thread: { ...thread, cwd: this.options.wrongCwd || thread.cwd } }; }
+    if (method === "thread/unarchive") { thread.archived = false; return { thread }; }
+    if (method === "thread/read" || method === "thread/resume") {
+      if (method === "thread/resume") {
+        if (this.options.requireLoadedGoal && thread.archived) throw new ExecutionBackendError("app_server_rpc_error", `session ${thread.id} is archived. Run codex unarchive first.`, { rpcCode: -32600 });
+        this.loaded = true;
+      }
+      this.current = thread;
+      return { thread: { ...thread, cwd: this.options.wrongCwd || thread.cwd, ...(this.options.requireLoadedGoal ? { status: { type: this.loaded ? "idle" : "notLoaded" } } : {}) } };
+    }
     if (method === "thread/archive") {
       if (this.options.archiveFailure) throw new Error("archive unavailable");
       if (thread.archived && this.options.rejectRepeatedArchive) throw new Error("no rollout found for thread id fixture");
@@ -269,6 +278,22 @@ test("recovery confirms an already archived attempt without unarchiving or dispa
   assert.equal(result.thread_cleanup, "archived");
   assert.equal(resumed.calls.some(call => ["thread/unarchive", "turn/start"].includes(call.method)), false);
   assert.equal(resumed.calls.find(call => call.method === "thread/list").params.cwd, request.worktree);
+});
+
+test("recovery loads a terminal archived thread to measure its Goal without another dispatch", async () => {
+  const { connection, build } = executor({ lostDispatchResponse: true });
+  const request = input();
+  let saved;
+  await assert.rejects(build.execute(request), error => { saved = error.details.executorResult; return true; });
+  assert.equal(saved.failure_code, "app_server_request_timeout");
+  const resumed = new FakeConnection({ requireLoadedGoal: true }, connection.threads);
+  const result = await new CodexAppServerBuildExecutor({ connection: resumed }).recover(request, saved);
+  assert.equal(result.usage_status, "measured");
+  assert.equal(result.tokens_used, 123);
+  assert.equal(result.thread_cleanup, "archived");
+  assert.equal(connection.threads.get("thread-1").archived, true);
+  assert.equal(resumed.calls.filter(call => call.method === "thread/unarchive").length, 1);
+  assert.equal(resumed.calls.some(call => ["thread/start", "turn/start", "turn/interrupt"].includes(call.method)), false);
 });
 
 test("nonpositive budgets fail before creating a native thread, including waived attempts", async () => {
