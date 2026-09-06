@@ -74,6 +74,8 @@ import {
 } from "./delivery-loop.mjs";
 import { runTrialPlan } from "./trial-runner.mjs";
 import { deliveryUsageStatus, deliveryTokenPreflight } from "./delivery-ledger.mjs";
+import { readDeliveryUsage } from "./phase-usage.mjs";
+import { readTaskDelivery } from "./task-delivery.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -102,6 +104,7 @@ function usage() {
   ${CLI_COMMAND} trial run <outcome-spec-path> --project <path> [--backend local|app-server] [--run-id <id>]
   ${CLI_COMMAND} deliver <outcome-spec-path> --project <path> [--executor codex-app-server] [--trial-backend local|app-server] [--run-id <id>]
   ${CLI_COMMAND} delivery status <run-id>
+  ${CLI_COMMAND} delivery usage <run-id>
   ${CLI_COMMAND} delivery resume <run-id> [--answer <option-id>] [--answered-by user] [--guidance <text>] [--project <path>]
   ${CLI_COMMAND} delivery budget <run-id> --add-tokens <N> --request-id <id> --answered-by user
   ${CLI_COMMAND} delivery budget <run-id> --set-tokens <N> --request-id <id> --answered-by user
@@ -1891,6 +1894,19 @@ async function main() {
     if (subcommand === "status") {
       const result = deliveryStatus(runId, { root: ROOT });
       printDeliveryState(result.state, result.worktree);
+      return;
+    }
+    if (subcommand === "usage") {
+      const result = deliveryStatus(runId, { root: ROOT });
+      const controlPath = path.join(result.runRoot, "task-control.json");
+      let usage = readDeliveryUsage(result.runRoot, result.state, null, { root: ROOT });
+      if (existsSync(controlPath)) {
+        // This is only an identity hint: the host reader revalidates ownership,
+        // current approval and the whole compiled plan before exposing its view.
+        const control = JSON.parse(readBoundedRegularFile(controlPath, { maxBytes: 2_000_000, allowedRoots: [result.runRoot] }).text);
+        usage = readTaskDelivery(runId, control.binding?.task, { root: ROOT }).usage;
+      }
+      console.log(JSON.stringify(usage, null, 2));
       return;
     }
     if (subcommand === "resume") {

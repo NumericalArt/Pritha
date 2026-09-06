@@ -33,7 +33,8 @@ type ProviderProbe = {
   probedAt: number;
 };
 
-type NotificationHandler = (providerId: RuntimeProviderId, message: RpcMessage) => void | Promise<void>;
+export type RuntimeNotificationOrigin = { stateIdentityHash: string; runtimeVersion: string | null };
+type NotificationHandler = (providerId: RuntimeProviderId, message: RpcMessage, origin: RuntimeNotificationOrigin) => void | Promise<void>;
 type ExitHandler = (providerId: RuntimeProviderId, exitCode: number | null, signal: NodeJS.Signals | null) => void | Promise<void>;
 
 const PROBE_TTL_MS = 60_000;
@@ -176,7 +177,9 @@ function sandboxModeForView(value: string): RuntimeStatus["selected"]["sandboxMo
 }
 
 export class AppServerConnection {
+  runtimeVersion: string | null = null;
   readonly codexHome = effectiveCodexHome();
+  readonly stateIdentityHash = storageIdentity(this.codexHome);
   private child: ChildProcessWithoutNullStreams | null = null;
   private nextId = 1;
   private pending = new Map<string | number, PendingRequest>();
@@ -197,6 +200,10 @@ export class AppServerConnection {
 
   setNotificationHandler(handler: NotificationHandler) {
     this.notificationHandler = handler;
+  }
+
+  notificationOrigin(): RuntimeNotificationOrigin {
+    return { stateIdentityHash: this.stateIdentityHash, runtimeVersion: this.runtimeVersion };
   }
 
   isRunning() {
@@ -304,7 +311,7 @@ export class AppServerConnection {
         reject(error);
       });
     });
-    await this.requestWithoutStart(
+    const initialized = await this.requestWithoutStart(
       "initialize",
       {
         clientInfo: { name: "pritha_control_center", title: "Pritha Control Center", version: "0.1.0" },
@@ -316,6 +323,7 @@ export class AppServerConnection {
       },
       15_000,
     );
+    this.runtimeVersion = typeof (initialized as { userAgent?: unknown })?.userAgent === "string" ? (initialized as { userAgent: string }).userAgent.slice(0, 200) : null;
     this.notify("initialized", {});
   }
 
@@ -354,12 +362,12 @@ export class AppServerConnection {
     }
 
     if (message.id !== undefined && message.method) {
-      void this.notificationHandler(this.providerId, message);
+      void this.notificationHandler(this.providerId, message, this.notificationOrigin());
       this.child?.stdin.write(`${JSON.stringify({ id: message.id, error: { code: -32601, message: "Unsupported in Codex Chat core v1" } })}\n`);
       return;
     }
 
-    if (message.method) void this.notificationHandler(this.providerId, message);
+    if (message.method) void this.notificationHandler(this.providerId, message, this.notificationOrigin());
   }
 }
 
@@ -436,6 +444,10 @@ export class CodexRuntimeManager {
 
   async provider(providerId: RuntimeProviderId) {
     return this.probe(providerId);
+  }
+
+  liveRuntimeOrigin(providerId: RuntimeProviderId) {
+    return this.connections.get(providerId)?.notificationOrigin() || null;
   }
 
   async modelInputModalities(providerId: RuntimeProviderId, modelId: string | undefined): Promise<string[] | null> {

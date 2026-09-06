@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
-import { AppServerConnection, CodexRuntimeManager, type RpcMessage } from "./app-server";
+import { AppServerConnection, CodexRuntimeManager, type RpcMessage, type RuntimeNotificationOrigin } from "./app-server";
 import { verifyNativeThreadIdentity } from "./storage-identity";
 import { ChatAttachmentStore, AttachmentError } from "./attachment-store";
 import { assertAttachmentCapabilities } from "./attachment-policy";
@@ -12,6 +12,7 @@ import { changeThreadGoalBudget, emptyGoalView, GoalControlError, readThreadGoal
 import { parseBudgetIntent } from "./budget-intent";
 import { listTaskDeliveries, normalizeTaskDeliveryBudgetRequest, performTaskDeliveryAction, readTaskDelivery, TaskDeliveryError, type TaskDeliveryRequest } from "../../../../../scripts/agents-mother/task-delivery.mjs";
 import type { DeliveryBudgetReceipt } from "./delivery-types";
+import { recordParentUsage } from "../../../../../scripts/agents-mother/phase-usage.mjs";
 import {
   asObject,
   itemIdFor,
@@ -183,7 +184,7 @@ export class CodexChatGateway {
   private readonly store = new CodexChatPrivateStore();
   readonly attachments = new ChatAttachmentStore(this.store.stateRoot, this.store.root);
   private readonly root = resolveTechscopeRoot();
-  private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message) => this.handleNotification(providerId, message), this.root);
+  private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message, origin) => this.handleNotification(providerId, message, origin), this.root);
   private readonly activeTurns = new Map<string, ActiveAttempt>();
   private readonly activeTurnLeases = new Map<string, () => void>();
   private readonly uncertainTurnTimers = new Map<string, NodeJS.Timeout>();
@@ -882,6 +883,7 @@ export class CodexChatGateway {
       failureStage = "resume";
       await connection.ensureThreadLoaded(binding.nativeThreadId);
       failureStage = "turn_start";
+      this.recordUsage(binding, { attemptId: input.clientMessageId, turnStatus: "dispatching", modelRequested: input.settings?.modelId, effortRequested: input.settings?.effortId });
       const response = asObject(await connection.request("turn/start", {
         threadId: binding.nativeThreadId,
         clientUserMessageId: input.clientMessageId,
@@ -895,6 +897,7 @@ export class CodexChatGateway {
       const nativeTurnId = String(nativeTurn?.id || "");
       if (!nativeTurnId) throw new Error("missing_turn_id");
       active.nativeTurnId = nativeTurnId;
+      this.recordUsage(binding, { attemptId: input.clientMessageId, turnId: nativeTurnId, turnStatus: "running" });
       const firstMessage = Object.keys(binding.messageReceipts).length === 0;
       const nextTitle = firstMessage && ["New Codex chat", "New task chat"].includes(binding.title) ? titleText(previewText(text || attachmentMessage?.attachments[0]?.name).slice(0, 72)) : binding.title;
       const nextBinding = await this.store.patch(chatId, {
@@ -1130,7 +1133,7 @@ export class CodexChatGateway {
     return record;
   }
 
-  private async handleNotification(providerId: RuntimeProviderId, message: RpcMessage) {
+  private async handleNotification(providerId: RuntimeProviderId, message: RpcMessage, origin?: RuntimeNotificationOrigin) {
     try {
       const params = message.params || {};
       const thread = asObject(params.thread);
@@ -1143,6 +1146,14 @@ export class CodexChatGateway {
       const nativeTurnId = String(params.turnId || nativeTurn?.id || "");
       const active = this.activeTurns.get(binding.chatId) || null;
 
+      const attemptId = nativeTurnId && Object.entries(binding.messageReceipts).find(([, receipt]) => receipt.nativeTurnId === nativeTurnId)?.[0];
+      const usageAttempt = attemptId || (active?.nativeTurnId === nativeTurnId ? active.clientMessageId : nativeTurnId ? `native:${nativeTurnId}` : null);
+      if (method === "thread/tokenUsage/updated" && nativeTurnId && usageAttempt) {
+        const tokenUsage = asObject(params.tokenUsage), total = asObject(tokenUsage?.total);
+        this.recordUsage(binding, { attemptId: usageAttempt, turnId: nativeTurnId, counterTotal: total?.totalTokens as number }, origin || null);
+        return; // Goal snapshots are intentionally never added to this counter.
+      }
+
       if (method === "thread/goal/updated" || method === "thread/goal/cleared") {
         this.emit(binding.chatId, "goal.updated", {});
         return;
@@ -1151,6 +1162,7 @@ export class CodexChatGateway {
       if (method === "turn/started" && active && nativeTurnId) {
         active.nativeTurnId = nativeTurnId;
         active.acknowledged = true;
+        this.recordUsage(binding, { attemptId: active.clientMessageId, turnId: nativeTurnId, turnStatus: "running" }, origin || null);
         const latest = await this.store.get(binding.chatId);
         await this.store.patch(binding.chatId, {
           messageReceipts: {
@@ -1193,6 +1205,7 @@ export class CodexChatGateway {
       }
 
       if (method === "turn/completed" && nativeTurn) {
+        if (usageAttempt) this.recordUsage(binding, { attemptId: usageAttempt, turnId: nativeTurnId, turnStatus: String(nativeTurn.status || "unknown") }, origin || null);
         const turn = normalizeNativeTurn(binding, nativeTurn, this.root, active);
         if (!turn) return;
         const eventName = turn.status === "interrupted" ? "turn.interrupted" : turn.status === "failed" ? "turn.failed" : "turn.completed";
@@ -1234,6 +1247,15 @@ export class CodexChatGateway {
     } catch {
       // Upstream notifications are best-effort; request responses remain authoritative.
     }
+  }
+
+  private recordUsage(binding: ChatBinding, observation: Parameters<typeof recordParentUsage>[1], origin?: RuntimeNotificationOrigin | null) {
+    if (typeof this.store.stateRoot !== "string") return;
+    try {
+      const source = origin === undefined ? this.runtime.liveRuntimeOrigin?.(binding.providerId) : origin;
+      if (!source || source.stateIdentityHash !== binding.stateIdentityHash) return;
+      recordParentUsage(binding, { ...observation, runtimeVersion: source.runtimeVersion }, { root: this.root, stateRoot: this.store.stateRoot });
+    } catch { /* Accounting coverage stays partial when an observation cannot be saved; conversation progress is preserved. */ }
   }
 }
 

@@ -169,6 +169,7 @@ async function gatewayFixture(t, createdAt) {
   const nativeCoordinator = load("native-turn-coordinator");
   const { CodexChatGateway } = load("gateway", {
     "../../../../../scripts/agents-mother/task-delivery.mjs": await import("../scripts/agents-mother/task-delivery.mjs"),
+    "../../../../../scripts/agents-mother/phase-usage.mjs": await import("../scripts/agents-mother/phase-usage.mjs"),
     "./storage-identity": load("storage-identity"), "./normalize": load("normalize"), "./native-turn-coordinator": nativeCoordinator, "./budget-intent": load("budget-intent"),
     "./private-store": { logicalChatKey: row => `${row.stateIdentityHash}:${row.nativeThreadId}` },
   });
@@ -176,8 +177,9 @@ async function gatewayFixture(t, createdAt) {
   const provider = { availability: "ready", stateIdentityHash: task.stateIdentityHash, capabilities: { goalControl: false } };
   const native = { id: task.nativeThreadId, cwd: f.root, status: { type: "idle" }, ephemeral: false };
   const gateway = Object.create(CodexChatGateway.prototype);
-  Object.assign(gateway, { root: f.root, activeTurns: new Map(), store: { stateRoot: f.stateRoot, get: async () => binding, all: async () => [binding], patch: async (_id, patch) => Object.assign(binding, patch) }, runtime: {
+  Object.assign(gateway, { root: f.root, activeTurns: new Map(), activeTurnLeases: new Map(), uncertainTurnTimers: new Map(), emit: () => {}, store: { stateRoot: f.stateRoot, get: async () => binding, all: async () => [binding], patch: async (_id, patch) => Object.assign(binding, patch), findByNative: async (providerId, threadId) => providerId === task.providerId && threadId === task.nativeThreadId ? binding : null }, runtime: {
     provider: async () => ({ view: provider }), readThread: async () => ({ thread: native }),
+    liveRuntimeOrigin: () => ({ stateIdentityHash: task.stateIdentityHash, runtimeVersion: "codex/fixture-native-version" }),
     connection: async () => assert.fail("Host actions must not request a model turn or Goal RPC"),
   } });
   const previous = process.env.PRITHA_AGENT_PARENT;
@@ -195,6 +197,31 @@ test("Task Chat gateway performs approved host checks with unavailable Goal cont
   assert.equal(result.run.status, "awaiting_acceptance");
   assert.equal(readDeliveryLedger(f.runRoot).iteration, 0);
   assert.deepEqual((await f.gateway.taskDeliveries(task.chatId)).runs.map(row => row.runId), [f.runId]);
+});
+
+test("native notifications retain one cumulative parent counter and separate Trial command evidence", async t => {
+  const f = await gatewayFixture(t);await f.bind();
+  const origin = f.gateway.runtime.liveRuntimeOrigin();
+  const update = (turnId, total, source = origin) => f.gateway.handleNotification(task.providerId, { method: "thread/tokenUsage/updated", params: { threadId: task.nativeThreadId, turnId, tokenUsage: { total: { totalTokens: total }, last: { totalTokens: 90000 } } } }, source);
+  await update("first-turn", 100);await update("second-turn", 250);await update("second-turn", 250);
+  await update("foreign-turn", 999, { ...origin, stateIdentityHash: "storage-v2:foreign" });
+  await f.gateway.handleNotification(task.providerId, { method: "thread/goal/updated", params: { threadId: task.nativeThreadId, goal: { tokensUsed: 700 } } });
+  await f.gateway.handleNotification(task.providerId, { method: "turn/completed", params: { threadId: task.nativeThreadId, turn: { id: "second-turn", status: "completed", items: [] } } }, origin);
+  const before = await f.gateway.taskDeliveries(task.chatId, f.runId);
+  assert.equal(before.run.usage.parent.observedTokens, 250);
+  assert.equal(before.run.usage.build.tokensUsed, 101);
+  assert.equal(before.run.usage.totalTokens, null);
+  assert.deepEqual(before.run.usage.parent.runtimeVersions, ["codex/fixture-native-version"]);
+  const input = f.action("verify");
+  const verified = await f.gateway.deliveryAction(task.chatId, input);
+  assert.ok(verified.run.usage.trials.attempts > 0);
+  assert.equal(verified.run.usage.trials.unconfirmedTerminals, 0);
+  assert.equal(verified.run.usage.trials.tokensUsed, null, "successful approved commands do not imply free model usage");
+  assert.equal(verified.run.usage.build.tokensUsed, 101);
+  const state = readDeliveryLedger(f.runRoot), resultPath = path.join(f.runRoot, state.last_trial_result.path), original = readFileSync(resultPath, "utf8");
+  const replay = await f.gateway.deliveryAction(task.chatId, input);
+  assert.equal(replay.run.usage.trials.attempts, verified.run.usage.trials.attempts);
+  assert.equal(readFileSync(resultPath, "utf8"), original, "accounting never rewrites locked Trial evidence");
 });
 
 test("build budget add and total keep observed usage, progress and the same native task", async t => {
@@ -356,7 +383,7 @@ test("iteration and elapsed extensions recover the existing run without resettin
   assert.deepEqual(readDeliveryLedger(f.runRoot), state);
 });
 
-test("the CLI accepts an absolute token cap and retains its idempotent budget history", t => {
+test("the CLI accepts an absolute token cap and retains its idempotent budget history", async t => {
   const f = fixture(t);
   const args = [path.resolve("scripts/pritha.mjs"), "delivery", "budget", f.runId, "--set-tokens", "350", "--answered-by", "user", "--request-id", "cli-absolute-budget"];
   const options = { cwd: f.root, env: { ...process.env, TECHSCOPE_ROOT: f.root, PRITHA_STATE_ROOT: f.stateRoot, PRITHA_AGENT_PARENT: f.agentParent }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
@@ -366,6 +393,10 @@ test("the CLI accepts an absolute token cap and retains its idempotent budget hi
   execFileSync(process.execPath, args, options);
   assert.deepEqual(readDeliveryLedger(f.runRoot), before);
   assert.equal(existsSync(path.join(f.runRoot, "worktree")), false);
+  await f.bind();
+  const usage = JSON.parse(execFileSync(process.execPath, [path.resolve("scripts/pritha.mjs"), "delivery", "usage", f.runId], options));
+  assert.equal(usage.runId, f.runId);assert.equal(usage.build.tokensUsed, 101);assert.equal(usage.totalTokens, null);
+  assert.equal(usage.parent.coverage, "unknown");
 });
 
 test("Task Chat gateway keeps native cwd, storage, ephemeral, active turn, archive and voice permission gates", async t => {

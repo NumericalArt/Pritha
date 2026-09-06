@@ -412,6 +412,8 @@ export class CodexAppServerBuildExecutor {
       schema: BUILD_EXECUTOR_RESULT_SCHEMA, executor: this.name, run_id: input.runId, iteration: input.iteration,
       worktree_identity: worktreeIdentity(cwd), thread_lifetime: "persisted-per-attempt",
       runtime_version: String(initialized?.userAgent || "codex-app-server/unknown"),
+      model_requested: this.options.model || null, effort_requested: this.options.effort || "high",
+      model_observed: null, provider_observed: null,
       status: "prepared", turn_status: "not-started", thread_id: null, turn_id: null,
       goal_enforcement: goalRequired ? "required" : "waived-once", goal_objective: objective,
       token_budget: tokenBudget, tokens_used: null, usage_scope: "build-executor", usage_status: "not-started", usage_source: "not-started",
@@ -423,10 +425,13 @@ export class CodexAppServerBuildExecutor {
     try {
       const response = await this.connection.request("thread/start", {
         cwd, ephemeral: false, approvalPolicy: "never", sandbox: "workspace-write",
+        model: this.options.model || undefined,
         runtimeWorkspaceRoots: [cwd], personality: "pragmatic", threadSource: "user",
         developerInstructions: "Implement only the approved delivery payload in the current worktree. Never modify verifier inputs, budgets or Goal, or perform push, merge, deployment, service enablement, secret provisioning, remote changes, or hook bypasses.",
       }, Math.min(timeoutMs, 30_000));
       receipt.thread_id = String(response?.thread?.id || "");
+      receipt.model_observed = typeof response?.model === "string" ? response.model : null;
+      receipt.provider_observed = typeof response?.modelProvider === "string" ? response.modelProvider : null;
       if (!receipt.thread_id || response.thread.ephemeral === true) throw new ExecutionBackendError("app_server_thread_missing", "A persisted build thread is required");
       receipt.thread_cleanup = "pending";
       await this.checkpoint(input, receipt);

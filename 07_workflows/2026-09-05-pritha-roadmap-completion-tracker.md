@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: 82c5820 plus Task Chat build budget completion work
+source_version: e724068 plus scoped phase usage completion work
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -62,7 +62,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 1.2 | Выпущен | Native Goal GET/add/set/readback и desktop/mobile regression, сохранение usage/objective |
 | 1.3 | Native и delivery intent реализованы локально | Exact task/run scope, add/set total, same-ID recovery, отдельный resume; UI также продлевает итерации и время; adoption впереди |
 | 1.4 | Реализован локально; adoption впереди | Exact task/run/instance; host verification и reviewable demo, whole compiled-plan check, durable replay/recovery; provider pilot отдельно |
-| 1.5 | Build ledger выпущен; полный scope открыт | Раздельный parent/build/Trials accounting, coverage/unknown, version-bound receipts и отсутствие double-counting |
+| 1.5 | Scoped overview реализован и проверен локально; adoption впереди | Parent cumulative snapshots, build receipts и Trial invocation receipts раздельны; unknown/partial и version/identity сохранены; общий total не выдумывается; orphan recovery относится к 5.3 |
 | 1.6 | Открыт; нужны измеримые повторы | N, модель/effort/version/task scope, диапазон и отдельное обоснование любого default |
 | 1.7 | Host/protocol evidence есть; mid-turn открыт | Bounded model/runtime observation overshoot/interruption/recovery с явным бюджетом |
 | 2.1 | Открыт; после 3.1 | Versioned agent_kind, legacy adapter, roundtrip, semantic lock compatibility |
@@ -89,7 +89,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 7.2 | Открыт | Отдельная синтетическая демонстрация, без реальных private history/endpoints/identifiers |
 | 7.3 | Открыт | GitHub inventory, актуальный changelog/public package, guards, commit/push и release evidence |
 | Канонические экземпляры | Предыдущий пакет установлен на пяти | Новый exact commit, self-test, build/page/chunk health, own state/children на mother, Dasha, Sasha, Marina, MacBook |
-| ND roadmap | Shared revision 4 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
+| ND roadmap | Shared revision 6 расширена; итоговая сверка и ND copy открыты | Полная трассировка всех mother IDs, task/run/attempt evidence contract, provider failure matrix, dependencies и release gates; синхронизация после итоговой mother реализации |
 
 ## Текущий пакет и следующий вход
 
@@ -219,3 +219,24 @@ manifest нет страниц экземпляра, среди 1198 файло�
 файлов. Build проверен отдельно от memory rebuild. Это точечное исправление;
 полный async/cache refactor 5.1 остаётся открытым.
 Публикация `main` и managed fleet adoption сохраняются на конец полного объёма.
+
+## Scoped phase usage
+
+Добавлен private `phase-usage-v1` без переписывания Trial plan/result locks.
+Parent counter привязан к physical storage/thread и наблюдающему соединению;
+snapshot не суммируется по turn/alias, Goal events не прибавляются. Source context
+передаётся transport отдельно от входящего payload. Partial history и unknown
+attempts остаются явными. Состояние native задачи и её budget не меняются.
+
+Trial invocation receipt появляется до dispatch, затем сохраняет известный
+command terminal и неизвестные tokens внутри команды. Build receipt дополнен
+runtime/requested model/effort и observed model/provider. Панель и CLI дают один
+обзор; общий total остаётся неопределённым для несопоставимых scopes.
+Полный self-test проходит: **646/646** тестов и семь quality checks. После
+уточнения exact Trial plan binding повторно проходят 27 профильных тестов.
+Staged production build и typecheck проходят; prerender не содержит private
+страниц, 1198 traced dependencies не содержат state/private файлов. Actual
+Task Chat page/CSS проверены в Chromium на 1280 и 390 px, без model/Goal RPC.
+Strict live health относится к предыдущему deployed release. Publication audit
+и пересборка памяти завершают локальный пакет; main/push/fleet ещё впереди.
+Подробности и границы: `07_workflows/delivery-usage-accounting.md`.

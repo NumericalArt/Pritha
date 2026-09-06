@@ -1,4 +1,5 @@
 import type { CatalogOptions } from "./identity.mjs";
+import type { DeliveryUsageView } from "./phase-usage.mjs";
 export type DeliveryTask = { chatId: string; nativeThreadId: string; providerId: "desktop_bundled" | "standalone_cli"; stateIdentityHash: string | null };
 export type DeliveryBudgetChange = { mode: "add" | "set"; tokens: number; resume: boolean; addIterations?: number; addElapsedMs?: number };
 export type TaskDeliveryRequest = { runId: string; requestId: string; expectedRevision: string; action: "bind" | "verify" | "prepare_handoff" | "budget"; budget?: DeliveryBudgetChange; sourceTextHash?: string };
@@ -15,6 +16,7 @@ export type TaskDeliveryView = {
     result: { status?: string; code?: string; handoff?: string | null; retry?: string; resume?: string; tokensUsed?: number; maxTokens?: number } | null }>;
   acceptance: "accepted_by_user" | "not_accepted";
   preparation: { preparedAt: string; demo: string[]; head: string | null; verification: string; acceptance: string } | null;
+  usage: DeliveryUsageView;
 };
 export class TaskDeliveryError extends Error { code: string; status: number }
 export function normalizeTaskDeliveryBudgetRequest(input: TaskDeliveryRequest): TaskDeliveryRequest;

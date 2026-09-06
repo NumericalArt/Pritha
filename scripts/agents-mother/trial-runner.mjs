@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { atomicWriteFile } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { createExecutionBackend, ExecutionBackendError } from "./execution-backends.mjs";
+import { recordTrialUsage } from "./phase-usage.mjs";
 import {
   outcomeDocumentLock,
   outcomeSemanticLock,
@@ -226,6 +227,16 @@ async function runAutomatedTrial(trial, context) {
     };
   }
 
+  let dispatched = false;
+  const recordUsage = (status, execution = null) => {
+    if (!context.usage?.runRoot) return;
+    try {
+      recordTrialUsage(context.usage.runRoot, { ...context.usage, trialId: trial.id, status,
+        backend: context.backend.name, runtimeVersion: execution?.runtimeVersion || context.probe?.runtimeVersion,
+        commandHash: sha256(JSON.stringify([trial.argv, trial.cwd || ".", trial.timeoutMs, trial.isolation])),
+        terminalObserved: execution != null && Number.isInteger(execution.exitCode) }, context.usage.options);
+    } catch { /* Missing accounting evidence stays unknown; it never rewrites Trial truth. */ }
+  };
   try {
     if (trial.isolation === "sandbox" && (
       context.probe?.available !== true
@@ -234,6 +245,8 @@ async function runAutomatedTrial(trial, context) {
     )) {
       throw new ExecutionBackendError("isolation_unavailable", "Backend probe did not confirm required sandbox isolation");
     }
+    recordUsage("dispatching");
+    dispatched = true;
     const execution = await context.backend.execute({
       argv: trial.argv,
       cwd,
@@ -243,6 +256,7 @@ async function runAutomatedTrial(trial, context) {
         ? { required: true, type: "workspaceWrite", writableRoots: [context.projectRoot], networkAccess: false }
         : { required: false, type: "none", writableRoots: [], networkAccess: false },
     });
+    recordUsage("completed", execution);
     if (trial.isolation === "sandbox" && execution.isolation !== "sandboxed") {
       throw new ExecutionBackendError("isolation_unavailable", "Backend did not prove the required sandbox isolation");
     }
@@ -263,6 +277,7 @@ async function runAutomatedTrial(trial, context) {
       error: null,
     };
   } catch (error) {
+    recordUsage(dispatched ? "unknown" : "not-started");
     return {
       id: trial.id,
       kind: trial.kind,
@@ -290,6 +305,9 @@ export async function runTrialPlan(planOrPath, options = {}) {
     : createExecutionBackend(options.backend || "local", { cwd: projectRoot, codexBin: options.codexBin });
   const before = workspaceRevision(projectRoot, options.workspaceRevisionOptions);
   const startedAt = new Date().toISOString();
+  const usage = { runRoot: options.runRoot || (loaded.planPath ? path.dirname(loaded.planPath) : null),
+    runId: options.runId || path.basename(options.runRoot || (loaded.planPath ? path.dirname(loaded.planPath) : "unbound")),
+    attemptId: randomUUID(), planLock: sha256(JSON.stringify(plan)), options: { root: options.root, stateRoot: options.stateRoot } };
   const trials = [];
   const redaction = { projectRoot, stateRoot: options.stateRoot, root: options.root };
   let runtimeProbe;
@@ -324,6 +342,7 @@ export async function runTrialPlan(planOrPath, options = {}) {
           outputBytesCap: options.outputBytesCap || 1_048_576,
           maxArtifactBytes: options.maxArtifactBytes || MAX_ARTIFACT_BYTES,
           redaction,
+          usage,
         }));
       }
     }

@@ -81,8 +81,11 @@ Marina и latency warnings MacBook записаны в
 теперь реализованы локально: add/set total, дополнительные итерации/время,
 private replay receipts и explicit continuation того же run. Профильные проверки
 54/54 и полный self-test 637/637 проходят; actual page проверена на desktop/mobile.
-Следующий вход: полный accounting 1.5, затем readiness/scaffold и остальные требования
-полного roadmap. Общая цель не закрывается по результатам этого пакета.
+Scoped accounting 1.5 также реализован локально: parent counter, build receipts
+и Trial invocations представлены раздельно, unknown остаётся unknown. Self-test
+646/646, staged build и typecheck проходят. Следующий вход: readiness/scaffold,
+orphan recovery и остальные требования полного roadmap. Общая цель не
+закрывается по результатам этого пакета.
 
 ## 1. Граница экземпляра
 
@@ -321,7 +324,7 @@ mother не требует изменения accepted contracts или approval
 Найденный конфликт document-lock алгоритмов CLI и UI устранён общим модулем
 с сохранением canonical v1. Task Chat/run binding и host control 1.4 также
 реализованы локально: exact native ownership, полный approved plan, request
-replay/recovery и reviewable demo без изменения Goal/acceptance. Следующий
-вход — build intent 1.3, полный accounting 1.5, затем независимые readiness и
+replay/recovery и reviewable demo без изменения Goal/acceptance. Build intent
+1.3 и scoped accounting 1.5 реализованы и проверены локально. Следующий вход — независимые readiness и
 handoff по типу результата. Финальный main/push,
 managed rollout и синхронизация ND выполняются после завершения полного пакета.

@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 11; released base cf11419; completion work in codex/roadmap-completion
+source_version: pilot roadmap revision 12; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -396,11 +396,15 @@ approved plan, cwd/argv, timeout, output, concurrency и isolation; не вво�
 
 ### 1.5 Честный учёт расхода — M, до 1.1/1.6
 
-Статус: build accounting реализован локально. Receipts v2 сохраняются до/после
+Статус: build accounting выпущен, локально добавлен scoped overview. Receipts v2 сохраняются до/после
 dispatch и на ошибках; ledger v2 дополнен явными unknown/legacy-unknown.
 Восстановление не повторяет turn и не переписывает старые Trial results.
-CLI/report показывают область build executor; фактические расходы parent
-Task Chat и Trials остаются неизмеренными. UI reader v2 относится к 1.2.
+CLI/report показывают область build executor. `delivery usage` и Task Chat
+показывают также parent thread counter с partial coverage и отдельные Trial
+invocation receipts с неизвестными токенами. Actual billing parent/команд не
+выводится из этих snapshots. Версия соединения и storage приходят от host,
+а не из JSON модели; repeated events/Goal updates не увеличивают сумму.
+Workflow: `07_workflows/delivery-usage-accounting.md`. UI reader v2 относится к 1.2.
 
 Дополнить имеющиеся account records. Разделить parent Task Chat, build executor,
 Trials и прочие phases, сохранить thread/turn/run binding приватно. Total Goal

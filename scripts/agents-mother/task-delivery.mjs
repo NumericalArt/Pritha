@@ -8,6 +8,7 @@ import { DELIVERY_ACTIVE_STATUSES, deliveryUsageStatus, grantDeliveryBudget, rea
 import { defaultDeliveryTrialBackend, withDeliveryBudgetControl, withDeliveryHostControl } from "./delivery-loop.mjs";
 import { approvalEvidencePath, verifyCompiledTrialPlan } from "./outcome-spec.mjs";
 import { verifyTrialResultFreshness } from "./trial-runner.mjs";
+import { readDeliveryUsage } from "./phase-usage.mjs";
 
 const SCHEMA = "pritha-task-delivery-control-v1";
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -151,6 +152,7 @@ function view(target) {
     receipts: Object.entries(control?.requests || {}).slice(-10).map(([requestId, receipt]) => ({ requestId, action: receipt.action, status: receipt.status, request: receipt.request || null, result: receipt.result || null })),
     acceptance: state.accepted_by === "user" ? "accepted_by_user" : "not_accepted",
     preparation,
+    usage: readDeliveryUsage(target.runRoot, state, target.bindingStatus === "bound" ? control.binding.task : null, target.options),
   };
 }
 export function readTaskDelivery(runId, taskInput, options = {}) {

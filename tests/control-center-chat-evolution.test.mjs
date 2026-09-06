@@ -21,6 +21,7 @@ export async function fixtureModules() {
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
       .replaceAll('"@/lib/private-json"', '"./private-json.mjs"')
       .replaceAll('"../../../../../scripts/agents-mother/task-delivery.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/task-delivery.mjs")).href))
+      .replaceAll('"../../../../../scripts/agents-mother/phase-usage.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/phase-usage.mjs")).href))
       .replace(/from "\.\/(.*?)"/g, (_, file) => `from "./${file.endsWith('.mjs') ? file : file + '.mjs'}"`);
     writeFileSync(path.join(tmp, `${path.basename(name)}.mjs`), output);
   }

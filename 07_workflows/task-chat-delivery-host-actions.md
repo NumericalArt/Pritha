@@ -144,5 +144,7 @@ Browser fixture использует настоящий Task Chat source и CSS 
 HTTP на desktop/mobile. Он не заменяет проверку deployed release или платный
 provider pilot. Проверяются также add/set, continuation, потерянный ответ,
 несколько run, смена выбора между отправкой и retry, reload и CLI set-tokens.
-Полный accounting parent/Trials, readiness по типам агента и окончательный
-handoff/reconcile продолжаются в следующих пунктах mother roadmap.
+Scoped accounting parent/build/Trials описан в
+`07_workflows/delivery-usage-accounting.md` и проверен локально. Readiness по типам
+агента, orphan recovery и окончательный handoff/reconcile продолжаются в следующих
+пунктах mother roadmap.

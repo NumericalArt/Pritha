@@ -455,7 +455,9 @@ confidence: ${["verified", "awaiting_acceptance", "accepted"].includes(state.sta
 - Iterations: ${state.iteration}/${state.budget.max_iterations}
 - Build tokens observed: ${state.budget.tokens_used}/${state.budget.max_tokens} (${state.budget.token_budget_source}; Goal ${state.budget.goal_enforcement}; accounting ${deliveryUsageStatus(state.budget)})
 - Budget authorizations: ${state.budget.amendments.length}; reserved tokens: ${deliveryTokenPreflight(state.budget).reserved ?? "unknown"}
-- Usage scope: build executor only; parent Task Chat, Trials and other phases are not measured here
+- Usage scope: build executor only; parent Task Chat counters and Trial command receipts are separate
+- Phase accounting: node scripts/pritha.mjs delivery usage ${state.run_id}
+- Shared native counters and unknown command usage do not define a combined run total
 - Branch: ${worktree?.branch || "not-created"}
 - Base revision: ${worktree?.base_revision || "not-created"}
 - Verified checkpoint: ${worktree?.verified_checkpoint || "pending"}

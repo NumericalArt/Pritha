@@ -29,7 +29,7 @@ class FakeConnection {
     if (method === "thread/start") {
       const thread = { id: `thread-${this.threads.size + 1}`, cwd: params.cwd, ephemeral: params.ephemeral, turns: [], goal: null };
       this.threads.set(thread.id, thread);
-      return { thread };
+      return { thread, model: params.model || "fixture-default", modelProvider: "fixture-provider" };
     }
     if (method === "thread/list") return { data: [...this.threads.values()].filter(thread => thread.archived && thread.cwd === params.cwd) };
     const thread = this.threads.get(params.threadId);
@@ -101,6 +101,10 @@ test("App Server build executor constrains a persisted attempt and saves intent 
   assert.equal(result.usage_source, "goal");
   assert.equal(result.thread_cleanup, "archived");
   assert.equal(result.run_id, request.runId);
+  assert.equal(result.runtime_version, "codex-fixture/2");
+  assert.equal(result.model_observed, "fixture-default");
+  assert.equal(result.provider_observed, "fixture-provider");
+  assert.equal(result.effort_requested, "high");
 });
 
 test("App Server build probe verifies persisted Goal capability and archives its empty thread", async () => {

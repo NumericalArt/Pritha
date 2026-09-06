@@ -584,6 +584,11 @@ export function accountDeliveryExecutorResult(runRoot, result, executorPath) {
           tokens_used: nextCount, executor_result: previous?.executor_result || executorPath,
           phase: "build-executor", usage_source: previous?.usage_source || result.usage_source || "legacy-goal",
           turn_status: result.turn_status || result.status,
+          runtime_version: result.runtime_version || previous?.runtime_version || null,
+          model_requested: result.model_requested || previous?.model_requested || null,
+          effort_requested: result.effort_requested || previous?.effort_requested || null,
+          model_observed: result.model_observed || previous?.model_observed || null,
+          provider_observed: result.provider_observed || previous?.provider_observed || null,
         };
         budget.accounted_turns = [...budget.accounted_turns.filter((item) => item.key !== key), entry];
         budget.tokens_used = nextTotal;

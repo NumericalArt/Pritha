@@ -95,6 +95,12 @@ export function DeliveryPanel({ chatId, active, editable, refreshKey = 0, onSele
         <p>Проверка: {statusLabel[run.status] || run.status}. Приёмка: {run.acceptance === "accepted_by_user" ? "подтверждена пользователем" : "ещё не подтверждена"}.</p>
         <p>Подтверждённый расход сборочного исполнителя: {run.budget.tokensUsed.toLocaleString("ru-RU")} / {run.budget.maxTokens.toLocaleString("ru-RU")} токенов. {run.budget.usageStatus !== "complete" ? "Часть расхода ещё не установлена. " : ""}Goal задачи и расход внутри проверок учитываются отдельно.</p>
         <p>Сборочные итерации: {run.budget.iterations} / {run.budget.maxIterations}. Время с начала сборки: {Math.floor(run.budget.elapsedMs / 60000)} / {Math.ceil(run.budget.maxElapsedMs / 60000)} мин. При продлении времени новый запас отсчитывается от текущего момента, если прежний срок уже прошёл.</p>
+        {run.usage ? <details><summary>Расход по этапам</summary>
+          <p>Переписка: {run.usage.parent.observedTokens === null ? "расход ещё не установлен" : `наблюдалось ${run.usage.parent.observedTokens.toLocaleString("ru-RU")} токенов`}. Это накопительный счётчик всей native задачи; он не распределён между её сборками и может содержать неполные наблюдения.</p>
+          <p>Сборочный исполнитель: {run.usage.build.tokensUsed.toLocaleString("ru-RU")} подтверждённых токенов; {run.usage.build.measuredTurns} учтённых шагов. {run.usage.build.coverage !== "complete" ? "Учёт неполный." : ""}</p>
+          <p>Проверки: {run.usage.trials.attempts} сохранённых запусков; расход моделей внутри команд не измерен. {run.usage.trials.unconfirmedTerminals ? `Завершение ${run.usage.trials.unconfirmedTerminals} запусков ещё не подтверждено.` : ""}</p>
+          <p>Итог по всем этапам пока не определён. Неизвестный расход и счётчик общей задачи не прибавляются к бюджету сборки.</p>
+        </details> : null}
         {run.bindingStatus === "bound" && run.actions.budget ? <form onSubmit={event => {
           event.preventDefault();
           const number = (value: string) => { const raw = value.replace(/\s/g, ""); return raw === "" ? 0 : /^\d+$/.test(raw) ? Number(raw) : NaN; };

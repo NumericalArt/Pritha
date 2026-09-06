@@ -27,6 +27,7 @@ const normalize = load("codex-chat/normalize");
 const noop = {};
 const { CodexChatGateway } = load("codex-chat/gateway", {
   "../../../../../scripts/agents-mother/task-delivery.mjs": noop,
+  "../../../../../scripts/agents-mother/phase-usage.mjs": noop,
   "@/lib/pritha-paths": noop, "./app-server": noop, "./storage-identity": noop,
   "./attachment-store": noop, "./attachment-policy": noop, "./native-thread-errors": noop,
   "./private-store": { logicalChatKey: row => `${row.stateIdentityHash}:${row.nativeThreadId}` },
