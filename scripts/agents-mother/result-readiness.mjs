@@ -91,6 +91,9 @@ export function readAgentResultReadiness(target, input = {}) {
     verification: { status: "unverified", scope: "canonical-project", reason: "no-current-evidence", counts: null, head: null },
     candidate: { status: "unverified", reason: "no-current-evidence", head: null },
     acceptance: { status: "not_accepted", at: null }, run: null, evidenceIssues: 0, truncated: false };
+  if (input.runId !== undefined && !id(input.runId)) {
+    view.verification.reason = "run-identity-invalid"; return view;
+  }
   if (!agent?.projectPath || agent.identityStatus === "conflict") {
     view.verification.reason = "project-identity-unavailable"; return view;
   }
@@ -115,6 +118,7 @@ export function readAgentResultReadiness(target, input = {}) {
       try { state = normalizeDeliveryLedger(json(path.join(runRoot, "build-state.json"), stateRoot)); } catch { continue; }
       if (state?.source_project !== agent.projectPath || state?.target_key !== targetKey(agent.projectPath)) continue;
       if (!validateDeliveryLedger(state).ok || state.run_id !== path.basename(runRoot)) { view.evidenceIssues++; continue; }
+      if (input.runId !== undefined && state.run_id !== input.runId) continue;
       const spec = state.spec;
       if (spec?.id !== currentPlan.spec_id || spec.contract_fingerprint !== currentPlan.contract_fingerprint
         || spec.document_lock !== currentPlan.document_lock || spec.semantic_lock !== currentPlan.semantic_lock || spec.approval_id !== currentPlan.approval_id) continue;

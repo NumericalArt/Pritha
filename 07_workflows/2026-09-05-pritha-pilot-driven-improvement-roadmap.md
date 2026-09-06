@@ -59,7 +59,7 @@ refines: [07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: pilot roadmap revision 14; released base cf11419; completion work in codex/roadmap-completion
+source_version: pilot roadmap revision 15; released base cf11419; completion work in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: next improvement cycle beginning on primary Mac mini
@@ -511,6 +511,15 @@ acceptance receipt не позволяет выставить accepted/handed-of
 Markdown, чужой run/instance, stale lock, dirty tree и повтор reconcile
 отвергаются или дают точный pending state. Никакого автоматического merge,
 cleanup или acceptance из одного наличия handoff.
+
+**Локальный результат 2026-09-06:** `delivery reconcile` показывает exact plan;
+apply с тем же planLock добавляет проверенное событие и replay receipt.
+Canonical/candidate revision, current Spec/plan/result и matching handoff
+preparation различаются; ни модель, ни Trials, merge/cleanup/acceptance этим
+действием не запускаются. Interrupted receipt и более новый прогресс сохраняются.
+`delivery verify` также умеет заново проверить изменённую candidate в прежнем
+run, сохранив старые Trials и protected-input baseline. Существующая приёмка
+не открывается заново. Подробности: `07_workflows/delivery-facts-reconciliation.md`.
 
 ### 2.6 Профиль и operations metadata при handoff — S/M
 

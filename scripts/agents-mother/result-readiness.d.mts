@@ -10,4 +10,4 @@ export type ResultReadiness = {
   evidenceIssues: number; truncated: boolean;
 };
 export const RESULT_READINESS_SCHEMA: "pritha-result-readiness-v1";
-export function readAgentResultReadiness(target: string, options?: CatalogOptions): ResultReadiness;
+export function readAgentResultReadiness(target: string, options?: CatalogOptions & { runId?: string }): ResultReadiness;

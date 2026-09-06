@@ -5,7 +5,7 @@ import { atomicWriteFile } from "../lib/atomic-file.mjs";
 import { resolvePrithaStateRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, readCatalogArtifact, readIdentityEvidence } from "./identity.mjs";
 import { DELIVERY_ACTIVE_STATUSES, deliveryUsageStatus, grantDeliveryBudget, readDeliveryLedger, targetKey } from "./delivery-ledger.mjs";
-import { defaultDeliveryTrialBackend, withDeliveryBudgetControl, withDeliveryHostControl } from "./delivery-loop.mjs";
+import { canHostVerifyDelivery, defaultDeliveryTrialBackend, withDeliveryBudgetControl, withDeliveryHostControl } from "./delivery-loop.mjs";
 import { approvalEvidencePath, verifyCompiledTrialPlan } from "./outcome-spec.mjs";
 import { verifyTrialResultFreshness } from "./trial-runner.mjs";
 import { readDeliveryUsage } from "./phase-usage.mjs";
@@ -15,7 +15,6 @@ const hash = value => createHash("sha256").update(JSON.stringify(value)).digest(
 const id = value => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
 const canonical = value => realpathSync(path.resolve(value));
 const finished = new Set(["verified", "awaiting_acceptance", "accepted"]);
-const budgetPauses = new Set(["token_budget_exhausted", "iteration_budget_exhausted", "elapsed_budget_exhausted", "goal_usage_unavailable"]);
 export class TaskDeliveryError extends Error {
   constructor(code, message, status = 409) { super(message); this.code = code; this.status = status; }
 }
@@ -133,7 +132,6 @@ function actionPlan(target) {
 }
 function view(target) {
   const { state, control, plan } = target;
-  const paused = state.status === "blocked" && budgetPauses.has(state.blockers[0]?.code);
   let preparation = null;
   const preparationFile = path.join(target.runRoot, "handoff-preparation.json");
   if (control && existsSync(preparationFile)) {
@@ -147,7 +145,7 @@ function view(target) {
     status: state.status, bindingStatus: target.bindingStatus, revision: target.revision,
     specId: plan.spec_id, budget: { tokensUsed: state.budget.tokens_used, maxTokens: state.budget.max_tokens, scope: "build-executor", usageStatus: deliveryUsageStatus(state.budget),
       iterations: state.iteration, maxIterations: state.budget.max_iterations, elapsedMs: Math.max(0, Date.now() - Date.parse(state.created_at)), maxElapsedMs: state.budget.max_elapsed_ms },
-    actions: { verify: paused || ["created", "paused", "preparing", "building", "correcting", "verifying"].includes(state.status), prepareHandoff: finished.has(state.status), budget: DELIVERY_ACTIVE_STATUSES.has(state.status) },
+    actions: { verify: canHostVerifyDelivery(state), prepareHandoff: finished.has(state.status), budget: DELIVERY_ACTIVE_STATUSES.has(state.status) },
     plan: actionPlan(target),
     receipts: Object.entries(control?.requests || {}).slice(-10).map(([requestId, receipt]) => ({ requestId, action: receipt.action, status: receipt.status, request: receipt.request || null, result: receipt.result || null })),
     acceptance: state.accepted_by === "user" ? "accepted_by_user" : "not_accepted",

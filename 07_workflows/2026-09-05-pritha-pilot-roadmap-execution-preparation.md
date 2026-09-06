@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: preparation v10; full completion work from cf11419 in codex/roadmap-completion
+source_version: preparation v11; full completion work from cf11419 in codex/roadmap-completion
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -88,8 +88,11 @@ v2/agent_kind и базовая operations applicability 2.1/2.3: 656/656, stage
 и typecheck проходят. Revision-bound readiness 2.2 также реализован локально:
 самостоятельные verification/acceptance/runtime, host event и exact revision;
 полный self-test 667/667, staged build/typecheck и browser desktop/mobile проходят.
-Workflow: `07_workflows/agent-result-readiness.md`. Следующий вход: approved CLI probe,
-reconcile, scaffold,
+Workflow: `07_workflows/agent-result-readiness.md`. Fresh verification и exact
+reconcile 2.5 также реализованы и проверены: self-test 675/675, staged build и
+typecheck проходят; CLI plan/apply/replay не создаёт acceptance или новый build.
+Workflow: `07_workflows/delivery-facts-reconciliation.md`. Следующий вход:
+CLI scaffold preflight, approved CLI probe,
 orphan recovery и остальные требования полного roadmap. Общая цель не
 закрывается по результатам этого пакета.
 

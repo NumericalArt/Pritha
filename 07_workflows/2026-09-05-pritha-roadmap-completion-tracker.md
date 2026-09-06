@@ -17,7 +17,7 @@ related:
     - 03_reviews/2026-09-05-pritha-budget-continuation-fleet-release-review.md
 supersedes: []
 superseded_by: []
-source_version: a70bc4d plus result readiness v1 work
+source_version: aacc3b3 plus delivery reconciliation v1 work
 verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -69,7 +69,7 @@ instance isolation, verified managed shutdown и separate acceptance сохра�
 | 2.2 | Read model, карточки и detail page реализованы локально; adoption впереди | Exact approval/plan/result/revision, отдельные canonical/candidate/acceptance, runtime и actions; browser для шести типов; commands и первый сценарий относятся к 2.4/3.3 |
 | 2.3 | Применимость и readiness реализованы локально; adoption впереди | Общий reader/selection для CLI и UI; manifest следует operations contract, CLI без managed runtime не получает ложный blocker; повреждённые metadata остаются диагностикой |
 | 2.4 | Открыт | Явный approved argv probe, cwd/symlink/timeout, GET не исполняет agent-controlled код |
-| 2.5 | Открыт; после 3.1 | Read-only reconcile plan и идемпотентный apply по exact HEAD/spec/approval/Trial/receipt; нет поддельного acceptance |
+| 2.5 | Реализован и проверен локально; adoption впереди | Read-only plan и идемпотентный apply по exact revision/spec/approval/Trial/receipt; fresh host verification прежнего run, история сохраняется; нет поддельного acceptance |
 | 3.1 | Реализован локально; adoption впереди | Общий каталог CLI/UI; 34 targeted tests, legacy и current-state compatibility; exact run/Spec/approval projection |
 | 3.2 | Реализован локально | Own authored profile/contract; bounded parsed cache, immediate selected mission read; fresh host lookup; staged build |
 | 3.3 | Открыт | CLI/service/job/tool/library handoff соответствует реальному первому сценарию и revision evidence |
@@ -292,7 +292,36 @@ Browser actual AgentCard/CSS проверяет шесть типов резул
 
 Strict live health относится к предыдущему deployed release; прежний warning
 launchd-root-drift остаётся отдельным операционным пунктом. Main/push/fleet ещё
-не выполнялись. При подготовке теста выявлен следующий конкретный вход 2.5:
+не выполнялись. При подготовке теста выявлен конкретный вход 2.5:
 повторный `delivery verify` изменённой candidate может сначала отклонить старое
 Trial evidence. Нужен явный fresh verification/reconcile путь с сохранением
-истории и verifier guards, а не автоматическое исправление при GET.
+истории и verifier guards, а не автоматическое исправление при GET. Он реализован
+следующим локальным пакетом; описание — `07_workflows/delivery-facts-reconciliation.md`.
+
+## Fresh verification и сверка фактов
+
+Явная verification повторно проверяет candidate в том же run даже после
+предыдущего verified/awaiting_acceptance или stale evidence. Старые result
+files и protected inputs не переписываются; принятый run не открывается заново.
+Если причина текущей блокировки изменилась, новое событие содержит актуальную
+диагностику и сохраняет предыдущую историю. Task Chat использует ту же
+доступность host verification без Goal capability или build turn.
+
+CLI `delivery reconcile` даёт read-only plan с exact instance/agent/run,
+canonical/candidate revision, Spec/approval/Trial binding и handoff preparation.
+Apply перечитывает план под execution lease; добавляет host event/receipt и
+освобождает только собственный claim завершённого run. Receipt replay и recovery
+не создают повторных событий и не перезаписывают более новый progress/claim.
+Ни отсутствие acceptance, ни один handoff report не дают права выставить accepted.
+
+49 профильных verification/Task Chat тестов проходят. Семь reconcile tests
+проверяют также публичный CLI от plan до apply/replay; первая CLI проверка
+выявила неверное место dispatch, оно исправлено до итоговых проверок.
+Staged production build и финальный typecheck проходят; private/state файлы
+отсутствуют в 1199 dependency traces, prerender содержит только global error.
+Полный self-test после исправлений проходит **675/675**, все семь quality checks
+— pass. Старый warning launchd-root-drift сохранён. Managed runtime и fleet
+остаются на предыдущем release до завершения полного объёма.
+
+Следующий вход: 4.0 preflight и минимальный CLI scaffold, затем approved command
+probe 2.4, protected verifier 4.1 и authored handoff/profile 0.5/2.6/3.3.

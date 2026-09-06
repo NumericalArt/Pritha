@@ -37,6 +37,7 @@ import { handoffProject } from "./handoff.mjs";
 import { deployProject, operationsProject } from "./operations.mjs";
 import { evolveProject, listContracts, rebuildRegistry } from "./registry.mjs";
 import { checkCardReadiness, printCardReadiness } from "./card-readiness.mjs";
+import { applyDeliveryReconciliation, planDeliveryReconciliation } from "./delivery-reconcile.mjs";
 import { CONTRACT_SCHEMA_VERSION, proposeAgentKind } from "./agent-kind.mjs";
 import { applyExternalResearchEvidence } from "./external-research.mjs";
 import { newestArtifactPathsFirst, writeUniqueArtifact } from "./artifact-selection.mjs";
@@ -111,6 +112,7 @@ function usage() {
   ${CLI_COMMAND} delivery budget <run-id> --set-tokens <N> --request-id <id> --answered-by user
   ${CLI_COMMAND} delivery resume <run-id> --add-tokens <N> --request-id <id> --answered-by user
   ${CLI_COMMAND} delivery verify <run-id>
+  ${CLI_COMMAND} delivery reconcile <run-id> [--apply --plan-lock <reviewed-plan-lock>]
   ${CLI_COMMAND} delivery accept <run-id> --accepted-by user
   ${CLI_COMMAND} delivery cleanup <run-id> [--apply --yes]
   ${CLI_COMMAND} delivery cleanup --all-stale --older-than-days <N> [--apply --yes]
@@ -1900,6 +1902,13 @@ async function main() {
     if (subcommand === "status") {
       const result = deliveryStatus(runId, { root: ROOT });
       printDeliveryState(result.state, result.worktree);
+      return;
+    }
+    if (subcommand === "reconcile") {
+      const result = options.apply
+        ? applyDeliveryReconciliation(runId, { root: ROOT, planLock: options["plan-lock"] })
+        : planDeliveryReconciliation(runId, { root: ROOT });
+      console.log(JSON.stringify(result, null, 2));
       return;
     }
     if (subcommand === "usage") {

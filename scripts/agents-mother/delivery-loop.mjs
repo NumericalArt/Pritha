@@ -64,6 +64,14 @@ function hostVerificationAllowed(budget) {
     ["completed", "failed", "interrupted"].includes(attempt.turn_status) && attempt.thread_cleanup === "archived");
 }
 
+export function canHostVerifyDelivery(state) {
+  if (["created", "preparing", "building", "verifying", "correcting", "paused", "verified", "awaiting_acceptance"].includes(state?.status)) return true;
+  return state?.status === "blocked" && [
+    "token_budget_exhausted", "iteration_budget_exhausted", "elapsed_budget_exhausted", "goal_usage_unavailable",
+    "verification_stale", "verification_needs_implementation", "checkpoint_commit_failed", "verifier_modified", "trial_input_baseline_changed",
+  ].includes(state.blockers?.[0]?.code);
+}
+
 function bounded(value, maximum = 2_000) {
   const text = String(value || "").trim();
   return text.length <= maximum ? text : `${text.slice(0, maximum - 3)}...`;
@@ -573,7 +581,7 @@ function automaticTerminalCleanup(runRoot, state) {
 
 function blockDelivery(runRoot, plan, worktree, blocker, options = {}) {
   const current = readDeliveryLedger(runRoot);
-  const transitioned = current.status === "blocked"
+  const transitioned = current.status === "blocked" && JSON.stringify(current.blockers) === JSON.stringify([blocker])
     ? { state: current }
     : transitionDelivery(runRoot, "blocked", { blockers: [blocker], phase: blocker.code, eventType: "delivery_blocked" });
   const reportPath = emitDeliveryReport(transitioned.state, plan, worktree, options);
@@ -1044,6 +1052,10 @@ async function resumeDeliveryLocked(runId, options) {
   const hostOnly = options.hostOnly === true || options.answer === "verify-only";
   const bound = policyBoundOptions(plan, { ...options, hostOnly });
   let state = status.state;
+  if (hostOnly && !canHostVerifyDelivery(state)) {
+    if (state.status === "blocked") return { state, worktree: status.worktree, blocked: true, reportPath: null };
+    throw new DeliveryLoopError("delivery_not_verifiable", "This terminal run is preserved. A new result requires a new delivery run.");
+  }
   if (options.addTokens || options.setTokens !== undefined || options.addIterations || options.addElapsedMs) {
     approvedPlanBinding(plan, options);
     state = grantDeliveryBudget(status.runRoot, {
@@ -1052,8 +1064,8 @@ async function resumeDeliveryLocked(runId, options) {
       addElapsedMs: options.addElapsedMs, expectedVersion: options.expectedVersion,
     });
   }
-  if (state.status === "blocked") {
-    const answer = hostOnly ? "verify-only" : options.answer;
+  if (state.status === "blocked" && !hostOnly) {
+    const answer = options.answer;
     if (!answer) return { state, worktree: status.worktree, blocked: true, reportPath: null };
     state = resolveDeliveryBlocker(status.runRoot, answer, options);
     if (state.status === "blocked") return { state, worktree: status.worktree, blocked: true, reportPath: null };
@@ -1071,10 +1083,24 @@ async function resumeDeliveryLocked(runId, options) {
   }
   try {
     approvedPlanBinding(plan, options);
+    if (hostOnly && state.last_trial_result) {
+      // A fresh verification may replace a stale result, never its verifier.
+      // Require the existing baseline before capture can create a new one.
+      readBoundedRegularFile(path.join(status.runRoot, "protected-trial-inputs.json"), { maxBytes: 2_000_000, allowedRoots: [status.runRoot] });
+      if (!worktree?.worktree) throw new DeliveryLoopError("worktree_missing", "The original candidate is unavailable for fresh verification.");
+      captureProtectedTrialInputs(plan, worktree.worktree, status.runRoot);
+    }
   } catch (error) {
+    if (["verified", "awaiting_acceptance"].includes(state.status)) throw error;
     return blockDelivery(status.runRoot, plan, worktree, blockerForError(error), options);
   }
-  if (state.last_trial_result?.path && worktree?.worktree) {
+  if (hostOnly && ["blocked", "verified", "awaiting_acceptance"].includes(state.status)) {
+    state = transitionDelivery(status.runRoot, "correcting", {
+      eventType: "host_verification_requested", phase: "fresh_verification", nextAction: "verify_current_candidate",
+      payload: { previous_status: state.status, previous_trial_result: state.last_trial_result, model_turn: "not_requested" },
+    }).state;
+  }
+  if (!hostOnly && state.last_trial_result?.path && worktree?.worktree) {
     const freshness = verifyTrialResultFreshness(
       path.join(status.runRoot, state.last_trial_result.path),
       worktree.worktree,

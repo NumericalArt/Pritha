@@ -1,39 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import os from "node:os";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { FunctionBuildExecutor } from "../scripts/agents-mother/build-executors.mjs";
-import { acceptDelivery, runDeliveryLoop } from "../scripts/agents-mother/delivery-loop.mjs";
-import { readDeliveryLedger, transitionDelivery } from "../scripts/agents-mother/delivery-ledger.mjs";
-import { approveOutcomeSpec, compileOutcomeSpec, createOutcomeSpec } from "../scripts/agents-mother/outcome-spec.mjs";
-import { readAgentResultReadiness } from "../scripts/agents-mother/result-readiness.mjs";
+import { acceptDelivery, resumeDelivery } from "../scripts/agents-mother/delivery-loop.mjs";
+import { readDeliveryLedger } from "../scripts/agents-mother/delivery-ledger.mjs";
 import { readAgentResultReadinessAsync } from "../scripts/agents-mother/result-readiness-async.mjs";
 
-const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-async function fixture(t) {
-  const parent = realpathSync(mkdtempSync(path.join(os.tmpdir(), "pritha-result-readiness-")));
-  t.after(() => rmSync(parent, { recursive: true, force: true }));
-  const root = path.join(parent, "mother"), stateRoot = path.join(parent, "state"), agentParent = path.join(parent, "children"), project = path.join(agentParent, "product"), contracts = path.join(stateRoot, "agents/contracts");
-  const options = { root, stateRoot, agentParent };
-  for (const directory of [root, contracts, path.join(project, "scripts")]) mkdirSync(directory, { recursive: true });
-  writeFileSync(path.join(project, "AGENTS.md"), "# Synthetic agent\n");
-  writeFileSync(path.join(project, "scripts/smoke-test.mjs"), "console.log('synthetic result');\n");
-  git(project, ["init"]); git(project, ["config", "user.name", "Pritha Tests"]); git(project, ["config", "user.email", "tests@pritha.local"]);
-  git(project, ["add", "."]); git(project, ["commit", "-m", "synthetic fixture"]);
-  const contractPath = path.join(contracts, "contract.md");
-  writeFileSync(contractPath, readFileSync("tests/fixtures/contracts/valid-agent-contract.md", "utf8")
-    .replace("type: agent-contract", "type: agent-contract\ncontract_schema_version: 2\nagent_kind: one-shot-cli\nagent_id: readiness-fixture")
-    .replace(/^- Target folder:.*$/m, `- Target folder: ${project}`));
-  const specPath = createOutcomeSpec(contractPath, options).path;
-  approveOutcomeSpec(specPath, { ...options, approvedBy: "user" });
-  const compiled = compileOutcomeSpec(specPath, { ...options, runId: "readiness-run" });
-  const executor = new FunctionBuildExecutor(async () => { throw new Error("A read-only readiness fixture must never call a build model"); });
-  const result = await runDeliveryLoop({ ...options, ...compiled, projectPath: project, hostOnly: true, buildExecutor: executor, trialBackend: "local" });
-  assert.ok(["verified", "awaiting_acceptance"].includes(result.state.status), JSON.stringify(result.state.blockers));
-  return { ...options, options, ...compiled, project, contractPath, specPath, read: () => readAgentResultReadiness("readiness-fixture", options) };
-}
+import { git, resultReadinessFixture as fixture } from "./helpers/result-readiness-fixture.mjs";
+
 
 test("read model verifies actual approved Trial evidence without mutating the run or executing it again", async t => {
   const f = await fixture(t), state = readDeliveryLedger(f.runRoot);
@@ -70,9 +45,13 @@ test("a verified build branch is distinguished from the unchanged canonical chec
   const f = await fixture(t), worktree = path.join(f.runRoot, "worktree");
   writeFileSync(path.join(worktree, "result.txt"), "New build artifact\n");
   git(worktree, ["add", "."]); git(worktree, ["commit", "-m", "synthetic improvement"]);
-  transitionDelivery(f.runRoot, "correcting", { nextAction: "recheck_changed_result" });
-  await runDeliveryLoop({ ...f.options, runId: f.runId, runRoot: f.runRoot, plan: f.plan, projectPath: f.project, hostOnly: true,
+  const previousReference = readDeliveryLedger(f.runRoot).last_trial_result;
+  const previousEvidence = readFileSync(path.join(f.runRoot, previousReference.path), "utf8");
+  await resumeDelivery(f.runId, { ...f.options, hostOnly: true,
     buildExecutor: new FunctionBuildExecutor(async () => { throw new Error("No build dispatch is allowed"); }), trialBackend: "local" });
+  assert.equal(readFileSync(path.join(f.runRoot, previousReference.path), "utf8"), previousEvidence);
+  assert.notEqual(readDeliveryLedger(f.runRoot).last_trial_result.path, previousReference.path);
+  assert.match(readFileSync(path.join(f.runRoot, "events.jsonl"), "utf8"), /host_verification_requested/);
   const candidate = f.read();
   assert.equal(candidate.verification.status, "stale");
   assert.ok(["verified", "awaiting_operator"].includes(candidate.candidate.status));
@@ -81,6 +60,20 @@ test("a verified build branch is distinguished from the unchanged canonical chec
   git(f.project, ["merge", "--ff-only", `pritha/build-${f.runId}`]);
   assert.ok(["verified", "awaiting_operator"].includes(f.read().verification.status));
   assert.equal(f.read().acceptance.status, "not_accepted");
+});
+
+test("fresh verification preserves the original protected inputs and cannot reopen acceptance", async t => {
+  const f = await fixture(t), worktree = path.join(f.runRoot, "worktree");
+  const before = readFileSync(path.join(f.runRoot, "build-state.json"), "utf8");
+  const snapshot = readFileSync(path.join(f.runRoot, "protected-trial-inputs.json"), "utf8");
+  writeFileSync(path.join(worktree, "scripts/smoke-test.mjs"), "console.log('changed verifier');\n");
+  await assert.rejects(resumeDelivery(f.runId, { ...f.options, hostOnly: true }), error => error.code === "trial_input_baseline_changed");
+  assert.equal(readFileSync(path.join(f.runRoot, "build-state.json"), "utf8"), before);
+  assert.equal(readFileSync(path.join(f.runRoot, "protected-trial-inputs.json"), "utf8"), snapshot);
+  git(worktree, ["restore", "scripts/smoke-test.mjs"]);
+  acceptDelivery(f.runId, { ...f.options, acceptedBy: "user" });
+  await assert.rejects(resumeDelivery(f.runId, { ...f.options, hostOnly: true }), error => error.code === "delivery_not_verifiable");
+  assert.equal(readDeliveryLedger(f.runRoot).status, "accepted");
 });
 
 test("changed commands, result locks and workspace bindings cannot become current verification", async t => {
