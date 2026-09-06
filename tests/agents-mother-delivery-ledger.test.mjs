@@ -4,9 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  accountDeliveryExecutorResult,
+  budgetBlocker,
   claimDeliveryTarget,
   createDeliveryLedger,
   deliveryLedgerPaths,
+  deliveryUsageStatus,
+  deliveryTokenPreflight,
+  grantDeliveryBudget,
   readDeliveryLedger,
   recordDeliveryFailure,
   recoverDeliveryLedger,
@@ -75,6 +80,52 @@ test("typed blockers require one explicit question and bounded answer options", 
   assert.equal(blocker.options.length, 2);
 });
 
+test("invalid explicit usage cannot normalize into a measured zero or an empty account list", () => {
+  const { created: { state } } = fixture();
+  for (const tokens_used of [null, "0", -1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(validateDeliveryLedger({ ...state, budget: { ...state.budget, tokens_used } }).ok, false);
+  }
+  for (const accounted_turns of [null, {}, "invalid"]) {
+    assert.equal(validateDeliveryLedger({ ...state, budget: { ...state.budget, accounted_turns } }).ok, false);
+  }
+});
+
+test("budget amendments are explicit, idempotent, scoped and preserve approval and usage", () => {
+  const { runRoot } = fixture();
+  const before = readDeliveryLedger(runRoot);
+  const input = { requestId: "budget-1", addTokens: 500, approvedBy: "user" };
+  const first = grantDeliveryBudget(runRoot, input);
+  const retry = grantDeliveryBudget(runRoot, input);
+  assert.equal(retry.budget.max_tokens, before.budget.max_tokens + 500);
+  assert.equal(retry.budget.max_iterations, before.budget.max_iterations);
+  assert.equal(retry.budget.max_elapsed_ms, before.budget.max_elapsed_ms);
+  assert.equal(retry.budget.tokens_used, before.budget.tokens_used);
+  assert.deepEqual(retry.spec, before.spec);
+  assert.equal(retry.budget.amendments.length, 1);
+  assert.deepEqual(first.budget.amendments, retry.budget.amendments);
+  assert.throws(() => grantDeliveryBudget(runRoot, { ...input, addTokens: 501 }), /different additions/);
+  assert.throws(() => grantDeliveryBudget(runRoot, { ...input, approvedBy: "agent" }), /user authorization/);
+  assert.throws(() => grantDeliveryBudget(runRoot, { ...input, requestId: "budget-2", expectedVersion: 1 }), /changed/);
+  assert.throws(() => grantDeliveryBudget(runRoot, { ...input, requestId: "budget-3", addTokens: Number.MAX_SAFE_INTEGER }), /supported range/);
+});
+
+test("an explicit time extension grants future time without spending or resetting token accounting", () => {
+  const { runRoot } = fixture();
+  const state = readDeliveryLedger(runRoot);
+  const now = Date.parse(state.created_at) + state.budget.max_elapsed_ms + 90_000;
+  const result = grantDeliveryBudget(runRoot, { requestId: "time-1", approvedBy: "user", addElapsedMs: 60_000, now });
+  assert.equal(result.budget.max_elapsed_ms, now - Date.parse(state.created_at) + 60_000);
+  assert.equal(result.budget.max_tokens, state.budget.max_tokens);
+  assert.equal(result.budget.max_iterations, state.budget.max_iterations);
+});
+
+test("preflight exposes in-flight reservation and unknown availability", () => {
+  const { runRoot } = fixture();
+  const state = accountDeliveryExecutorResult(runRoot, receipt({ status: "dispatching", turn_status: "unknown", turn_id: null, token_budget: 500, tokens_used: null, usage_status: "unknown", thread_cleanup: "pending" }), "executor/iteration-001.json");
+  assert.equal(deliveryTokenPreflight(state.budget).reserved, 500);
+  assert.equal(deliveryTokenPreflight(state.budget).available, null);
+});
+
 test("updates use CAS versions and recover the latest snapshot from append-only events", () => {
   const { runRoot } = fixture();
   const prepared = transitionDelivery(runRoot, "preparing", { nextAction: "prepare_worktree", updatedAt: "2026-08-16T12:01:00.000Z" });
@@ -111,6 +162,8 @@ test("legacy v1 ledgers normalize to the 1000000-token v2 budget", () => {
   delete legacy.budget.token_budget_source;
   delete legacy.budget.goal_enforcement;
   delete legacy.budget.accounted_turns;
+  delete legacy.budget.accounting_version;
+  delete legacy.budget.legacy_usage_unverified;
   writeFileSync(statePath, `${JSON.stringify(legacy, null, 2)}\n`);
   const normalized = readDeliveryLedger(runRoot);
   assert.equal(normalized.schema, "pritha-delivery-ledger-v2");
@@ -118,6 +171,101 @@ test("legacy v1 ledgers normalize to the 1000000-token v2 budget", () => {
   assert.equal(normalized.budget.tokens_used, 0);
   assert.equal(normalized.budget.token_budget_source, "legacy-default");
   assert.deepEqual(normalized.budget.accounted_turns, []);
+  assert.equal(deliveryUsageStatus(normalized.budget), "legacy-unknown");
+  assert.equal(budgetBlocker(normalized).code, "goal_usage_unavailable");
+  assert.deepEqual(normalized.spec, legacy.spec);
+});
+
+function receipt(overrides = {}) {
+  return {
+    schema: "pritha-build-executor-result-v2", executor: "codex-app-server-build", run_id: "run-1",
+    thread_id: "thread-1", turn_id: "turn-1", status: "completed", turn_status: "completed",
+    tokens_used: 120, usage_status: "measured", usage_source: "goal", usage_scope: "build-executor",
+    goal_enforcement: "required", thread_cleanup: "archived", ...overrides,
+  };
+}
+
+test("observed overshoot is durable and blocks further model spending", () => {
+  const { runRoot } = fixture();
+  updateDeliveryLedger(runRoot, state => ({ ...state, budget: { ...state.budget, max_tokens: 100 } }));
+  const state = accountDeliveryExecutorResult(runRoot, receipt(), "executor/iteration-001.json");
+  assert.equal(state.budget.tokens_used, 120);
+  assert.equal(validateDeliveryLedger(state).ok, true);
+  assert.equal(budgetBlocker(state).code, "token_budget_exhausted");
+  assert.equal(readDeliveryLedger(runRoot).budget.tokens_used, 120);
+  assert.equal(recoverDeliveryLedger(runRoot).budget.tokens_used, 120);
+});
+
+test("a long amendment history preserves the same delivery run for another authorized extension", () => {
+  const { runRoot } = fixture();
+  const granted = grantDeliveryBudget(runRoot, { approvedBy: "user", requestId: "first-grant", addTokens: 1 });
+  const amendment = granted.budget.amendments[0];
+  updateDeliveryLedger(runRoot, state => ({ ...state, budget: { ...state.budget, max_tokens: amendment.before.max_tokens + 1_001,
+    amendments: Array.from({ length: 1_001 }, (_, index) => ({ ...amendment, request_id: `historical-grant-${index}`,
+      before: { ...amendment.before, max_tokens: amendment.before.max_tokens + index },
+      after: { ...amendment.after, max_tokens: amendment.after.max_tokens + index },
+    })),
+  } }));
+  const extended = grantDeliveryBudget(runRoot, { approvedBy: "user", requestId: "next-grant", addTokens: 10 });
+  assert.equal(extended.run_id, granted.run_id);
+  assert.equal(extended.budget.max_tokens, amendment.before.max_tokens + 1_011);
+  assert.equal(extended.budget.tokens_used, granted.budget.tokens_used);
+  assert.equal(extended.budget.amendments.length, 1_002);
+});
+
+test("cumulative usage replay and late updates charge the bound turn once", () => {
+  const { runRoot } = fixture();
+  for (const count of [100, 100, 120, 100, 120]) accountDeliveryExecutorResult(runRoot, receipt({ tokens_used: count }), "executor/iteration-001.json");
+  const budget = readDeliveryLedger(runRoot).budget;
+  assert.equal(budget.tokens_used, 120);
+  assert.equal(budget.accounted_turns.length, 1);
+  assert.equal(deliveryUsageStatus(budget), "complete");
+});
+
+test("unknown dispatch becomes measured after recovery without losing other charges", () => {
+  const { runRoot } = fixture();
+  const reference = "executor/iteration-001.json";
+  const pending = receipt({ status: "dispatching", turn_id: null, tokens_used: null, usage_status: "unknown", thread_cleanup: "pending" });
+  accountDeliveryExecutorResult(runRoot, pending, reference);
+  accountDeliveryExecutorResult(runRoot, pending, reference);
+  let state = readDeliveryLedger(runRoot);
+  assert.equal(state.budget.tokens_used, 0);
+  assert.equal(state.budget.unaccounted_attempts.length, 1);
+  assert.equal(budgetBlocker(state).code, "goal_usage_unavailable");
+  state = accountDeliveryExecutorResult(runRoot, receipt(), reference);
+  assert.equal(state.budget.tokens_used, 120);
+  assert.equal(state.budget.unaccounted_attempts.length, 0);
+});
+
+test("waived legacy zero remains unknown and consumes only the authorized waiver", () => {
+  const { runRoot } = fixture();
+  updateDeliveryLedger(runRoot, state => ({ ...state, budget: { ...state.budget, goal_enforcement: "waived-once", goal_waiver: { granted_by: "user" } } }));
+  const legacy = receipt({ schema: "pritha-build-executor-result-v1", tokens_used: 0, goal_enforcement: "waived-once" });
+  delete legacy.usage_status;
+  delete legacy.usage_source;
+  const state = accountDeliveryExecutorResult(runRoot, legacy, "executor/iteration-001.json");
+  assert.equal(state.budget.accounted_turns.length, 0);
+  assert.equal(deliveryUsageStatus(state.budget), "unknown");
+  assert.equal(state.budget.goal_enforcement, "required");
+  assert.ok(state.budget.goal_waiver.used_at);
+});
+
+test("invalid totals and conflicting measurement sources preserve a blocker", () => {
+  const { runRoot } = fixture();
+  accountDeliveryExecutorResult(runRoot, receipt({ tokens_used: Number.MAX_SAFE_INTEGER }), "executor/iteration-001.json");
+  let state = accountDeliveryExecutorResult(runRoot, receipt({ thread_id: "thread-2", tokens_used: 1 }), "executor/iteration-002.json");
+  assert.equal(state.budget.tokens_used, Number.MAX_SAFE_INTEGER);
+  assert.equal(state.budget.unaccounted_attempts[0].reason, "token_total_out_of_range");
+  state = accountDeliveryExecutorResult(runRoot, receipt({ tokens_used: 5, usage_source: "thread-token-usage" }), "executor/iteration-001.json");
+  assert.equal(state.budget.tokens_used, Number.MAX_SAFE_INTEGER);
+  assert.ok(state.budget.unaccounted_attempts.some(entry => entry.reason === "conflicting_usage_sources"));
+});
+
+test("another run or accounting phase cannot enter the build budget", () => {
+  const { runRoot } = fixture();
+  assert.throws(() => accountDeliveryExecutorResult(runRoot, receipt({ run_id: "other-run" }), "executor/iteration-001.json"), /another delivery run/);
+  assert.throws(() => accountDeliveryExecutorResult(runRoot, receipt({ usage_scope: "parent-task-chat" }), "executor/iteration-001.json"), /different usage scope/);
+  assert.equal(readDeliveryLedger(runRoot).budget.tokens_used, 0);
 });
 
 test("one active run may own a delivery target", () => {

@@ -231,6 +231,7 @@ export class CodexAppServerConnection {
     this.notificationWaiters = new Set();
     this.recentNotifications = [];
     this.agentText = new Map();
+    this.tokenUsage = new Map();
   }
 
   start(timeoutMs = 10_000) {
@@ -315,6 +316,15 @@ export class CodexAppServerConnection {
   }
 
   dispatchNotification(message) {
+    if (message.method === "thread/tokenUsage/updated") {
+      const { threadId, turnId, tokenUsage } = message.params || {};
+      const total = tokenUsage?.total?.totalTokens;
+      if (typeof threadId === "string" && typeof turnId === "string" && Number.isSafeInteger(total) && total >= 0) {
+        const key = `${threadId}:${turnId}`;
+        this.tokenUsage.set(key, Math.max(this.tokenUsage.get(key) ?? 0, total));
+        if (this.tokenUsage.size > 1_000) this.tokenUsage.delete(this.tokenUsage.keys().next().value);
+      }
+    }
     this.recentNotifications.push(message);
     if (this.recentNotifications.length > 200) this.recentNotifications.shift();
     for (const waiter of [...this.notificationWaiters]) {
@@ -364,6 +374,16 @@ export class CodexAppServerConnection {
     });
   }
 
+  notify(method, params = {}) {
+    const stdin = this.child?.stdin;
+    if (!stdin?.writable) throw new ExecutionBackendError("app_server_unavailable", "Codex App Server is not running");
+    stdin.write(`${JSON.stringify({ method, params })}\n`);
+  }
+
+  tokenUsageForTurn(threadId, turnId) {
+    return this.tokenUsage.get(`${threadId}:${turnId}`) ?? null;
+  }
+
   waitForNotification(predicate, timeoutMs = 10_000) {
     const priorIndex = this.recentNotifications.findIndex((message) => predicate(message));
     if (priorIndex !== -1) {
@@ -387,6 +407,7 @@ export class CodexAppServerConnection {
     this.rejectPending(error);
     this.rejectNotificationWaiters(error);
     this.agentText.clear();
+    this.tokenUsage.clear();
     if (!child) return;
     try {
       child.stdin?.end();

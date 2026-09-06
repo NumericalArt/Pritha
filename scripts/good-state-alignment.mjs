@@ -3,10 +3,12 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
 import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
+loadPrithaRuntimeEnv({ root: ROOT });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
 

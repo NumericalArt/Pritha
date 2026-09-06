@@ -157,3 +157,17 @@ test("App Server connection preserves streamed agent text for completed build tu
   }));
   assert.equal(connection.agentTextForTurn("turn-1"), '{"summary":"done","changed_files":[]}');
 });
+
+test("token usage survives notification eviction and ignores duplicate, stale and foreign updates", () => {
+  const connection = new CodexAppServerConnection({ cwd: process.cwd() });
+  for (const total of [50, 120, 120, 70, -1, null, 1.5]) {
+    connection.handleLine(JSON.stringify({ method: "thread/tokenUsage/updated", params: { threadId: "thread-1", turnId: "turn-1", tokenUsage: { total: { totalTokens: total }, last: { totalTokens: 2 } } } }));
+  }
+  connection.handleLine(JSON.stringify({ method: "thread/tokenUsage/updated", params: { threadId: "thread-2", turnId: "turn-1", tokenUsage: { total: { totalTokens: 900 } } } }));
+  for (let i = 0; i < 250; i++) connection.dispatchNotification({ method: "item/started", params: {} });
+  assert.equal(connection.tokenUsageForTurn("thread-1", "turn-1"), 120);
+  assert.equal(connection.tokenUsageForTurn("thread-1", "missing"), null);
+  assert.equal(connection.tokenUsageForTurn("thread-2", "turn-1"), 900);
+  connection.stop();
+  assert.equal(connection.tokenUsageForTurn("thread-1", "turn-1"), null);
+});

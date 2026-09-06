@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { controlCenterStatusForClient, getControlCenterStatus } from "@/lib/control-center/server";
+import { deliveryBudgetText } from "@/lib/control-center/delivery-state";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
     ["Folder", agent.folder.status, agent.folder.relativePath || agent.folder.name || "not available"],
     ["Outcome Spec", agent.lifecycle.outcome.status, agent.lifecycle.outcome.path || agent.lifecycle.outcome.reason || "not available"],
     ["Outcome delivery", agent.lifecycle.delivery.status, deliveryDetail],
+    ...(agent.lifecycle.delivery.budget ? [["Build budget", agent.lifecycle.delivery.budget.usageStatus, deliveryBudgetText(agent.lifecycle.delivery.budget)]] : []),
     ["Health", agent.health.status, agent.health.checkedUrl || agent.health.detail || "not checked"],
     ["Readiness", agent.readiness.status, agent.readiness.summary],
     ["Runtime service", agent.readiness.runtime.status, agent.readiness.runtime.detail],

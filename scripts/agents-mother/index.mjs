@@ -64,6 +64,7 @@ import {
 } from "./outcome-spec.mjs";
 import {
   acceptDelivery,
+  amendDeliveryBudget,
   cleanupDeliveryRun,
   cleanupStaleDeliveryRuns,
   deliverOutcome,
@@ -71,6 +72,7 @@ import {
   resumeDelivery,
 } from "./delivery-loop.mjs";
 import { runTrialPlan } from "./trial-runner.mjs";
+import { deliveryUsageStatus, deliveryTokenPreflight } from "./delivery-ledger.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -100,6 +102,9 @@ function usage() {
   ${CLI_COMMAND} deliver <outcome-spec-path> --project <path> [--executor codex-app-server] [--trial-backend local|app-server] [--run-id <id>]
   ${CLI_COMMAND} delivery status <run-id>
   ${CLI_COMMAND} delivery resume <run-id> [--answer <option-id>] [--answered-by user] [--guidance <text>] [--project <path>]
+  ${CLI_COMMAND} delivery budget <run-id> --add-tokens <N> --request-id <id> --answered-by user
+  ${CLI_COMMAND} delivery resume <run-id> --add-tokens <N> --request-id <id> --answered-by user
+  ${CLI_COMMAND} delivery verify <run-id>
   ${CLI_COMMAND} delivery accept <run-id> --accepted-by user
   ${CLI_COMMAND} delivery cleanup <run-id> [--apply --yes]
   ${CLI_COMMAND} delivery cleanup --all-stale --older-than-days <N> [--apply --yes]
@@ -1717,8 +1722,12 @@ function deliveryCliOptions(options) {
     answer: options.answer,
     answeredBy: options["answered-by"],
     guidance: options.guidance,
-    extendIterations: positiveCliInteger(options["extend-iterations"]),
-    extendElapsedMs: positiveCliInteger(options["extend-elapsed-ms"]),
+    addTokens: positiveCliInteger(options["add-tokens"]),
+    addIterations: positiveCliInteger(options["add-iterations"] ?? options["extend-iterations"]),
+    addElapsedMs: positiveCliInteger(options["add-elapsed-ms"] ?? options["extend-elapsed-ms"]),
+    budgetRequestId: options["request-id"],
+    expectedVersion: positiveCliInteger(options["expected-version"]),
+    hostOnly: Boolean(options["host-only"]),
     projectPath: options.project ? path.resolve(ROOT, options.project) : undefined,
     budget: {
       maxIterations,
@@ -1733,7 +1742,10 @@ function printDeliveryState(state, worktree = null) {
   console.log(`Status: ${state.status}`);
   console.log(`Phase: ${state.phase}`);
   console.log(`Iterations: ${state.iteration}/${state.budget.max_iterations}`);
-  console.log(`Build tokens: ${state.budget.tokens_used}/${state.budget.max_tokens} (${state.budget.token_budget_source}; Goal ${state.budget.goal_enforcement})`);
+  console.log(`Build tokens observed: ${state.budget.tokens_used}/${state.budget.max_tokens} (${state.budget.token_budget_source}; Goal ${state.budget.goal_enforcement}; accounting ${deliveryUsageStatus(state.budget)})`);
+  console.log("Usage scope: build executor; parent Task Chat and Trials are not included.");
+  const preflight = deliveryTokenPreflight(state.budget);
+  console.log(`Available build tokens: ${preflight.available ?? "unknown"}; reserved: ${preflight.reserved ?? "unknown"}; budget authorizations: ${state.budget.amendments.length}`);
   if (worktree?.branch) console.log(`Branch: ${worktree.branch}`);
   if (worktree?.cleanup_status) console.log(`Worktree cleanup: ${worktree.cleanup_status}${worktree.cleanup_reason ? ` (${worktree.cleanup_reason})` : ""}`);
   if (state.last_trial_result) console.log(`Verification evidence: ${state.last_trial_result.status} (${state.last_trial_result.evidence_lock})`);
@@ -1879,6 +1891,18 @@ async function main() {
     }
     if (subcommand === "resume") {
       const result = await resumeDelivery(runId, deliveryCliOptions(options));
+      printDeliveryState(result.state, result.worktree);
+      if (result.reportPath) console.log(`Delivery report: ${path.relative(ROOT, result.reportPath)}`);
+      if (result.state.status === "blocked") process.exitCode = 2;
+      return;
+    }
+    if (subcommand === "budget") {
+      const result = await amendDeliveryBudget(runId, deliveryCliOptions(options));
+      printDeliveryState(result.state, result.worktree);
+      return;
+    }
+    if (subcommand === "verify") {
+      const result = await resumeDelivery(runId, { ...deliveryCliOptions(options), hostOnly: true });
       printDeliveryState(result.state, result.worktree);
       if (result.reportPath) console.log(`Delivery report: ${path.relative(ROOT, result.reportPath)}`);
       if (result.state.status === "blocked") process.exitCode = 2;

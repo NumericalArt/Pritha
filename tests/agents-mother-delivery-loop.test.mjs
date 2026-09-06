@@ -5,10 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { FunctionBuildExecutor } from "../scripts/agents-mother/build-executors.mjs";
+import { ExecutionBackendError } from "../scripts/agents-mother/execution-backends.mjs";
 import { readDeliveryLedger, transitionDelivery } from "../scripts/agents-mother/delivery-ledger.mjs";
 import {
   cleanupDeliveryRun,
   cleanupStaleDeliveryRuns,
+  amendDeliveryBudget,
   resumeDelivery,
   runDeliveryLoop,
 } from "../scripts/agents-mother/delivery-loop.mjs";
@@ -388,8 +390,10 @@ test("Goal absence requires an explicit user-only one-turn waiver", async () => 
     answer: "continue-without-goal", answeredBy: "user",
     buildExecutor: executor, trialBackend: "local", reportDir: false,
   });
-  assert.equal(resumed.state.status, "verified");
+  assert.equal(resumed.state.status, "blocked");
+  assert.equal(resumed.state.blockers[0].code, "goal_usage_unavailable");
   assert.equal(executions, 1);
+  assert.equal(resumed.state.budget.accounted_turns.length, 0, "legacy waived zero is not a measurement");
   const budget = readDeliveryLedger(runRoot).budget;
   assert.equal(budget.goal_enforcement, "required");
   assert.equal(budget.goal_waiver.granted_by, "user");
@@ -441,4 +445,207 @@ test("resume reconciles a crash-saved executor result into token usage exactly o
   budget = readDeliveryLedger(runRoot).budget;
   assert.equal(budget.tokens_used, 321);
   assert.equal(budget.accounted_turns.filter((entry) => entry.key === "crash-thread:crash-turn").length, 1);
+});
+
+function chargedResult(overrides = {}) {
+  return { schema: "pritha-build-executor-result-v2", executor: "codex-app-server-build", status: "completed", turn_status: "completed", thread_id: "charged-thread", turn_id: "charged-turn", tokens_used: 120, usage_status: "measured", usage_source: "goal", usage_scope: "build-executor", goal_enforcement: "required", thread_cleanup: "archived", ...overrides };
+}
+
+for (const status of ["completed", "failed", "interrupted"]) {
+  test(`${status} attempt overshoot is saved while approved verification finishes ready work`, async () => {
+    const project = repository();
+    const runRoot = path.join(mkdtempSync(path.join(os.tmpdir(), "pritha-loop-overshoot-")), "builds", "fixture-agent", `run-${status}`);
+    let executions = 0;
+    const executor = {
+      name: "fixture-charged-build",
+      async execute({ worktree }) {
+        executions++;
+        writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+        const result = chargedResult({ status, turn_status: status });
+        if (status !== "completed") throw new ExecutionBackendError("app_server_turn_failed", "fixture turn stopped", { executorResult: result });
+        return result;
+      },
+      close() {},
+    };
+    const result = await runDeliveryLoop({ plan: plan(), projectPath: project, runRoot, runId: `run-${status}`, buildExecutor: executor, trialBackend: "local", reportDir: false, budget: { maxTokens: 100 } });
+    assert.equal(result.state.status, "verified");
+    assert.equal(result.state.budget.tokens_used, 120);
+    assert.equal(result.state.budget.accounted_turns.length, 1);
+    assert.equal(executions, 1);
+    assert.equal(JSON.parse(readFileSync(path.join(runRoot, "executor/iteration-001.json"), "utf8")).turn_status, status);
+    assert.equal(readFileSync(path.join(project, "implementation.txt"), "utf8"), "not-ready\n");
+  });
+}
+
+test("unknown charged attempt blocks and resumes by recovering its receipt without dispatch", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-unknown-recover-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-unknown");
+  let executions = 0;
+  let recoveries = 0;
+  const executor = {
+    name: "codex-app-server-build",
+    async probe() { return { backend: this.name, available: true, capabilities: { goal: true } }; },
+    async execute({ worktree, runId }) {
+      executions++;
+      writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+      throw new ExecutionBackendError("goal_usage_unavailable", "fixture usage missing", { executorResult: chargedResult({ run_id: runId, tokens_used: null, usage_status: "unknown" }) });
+    },
+    async recover(input, saved) {
+      recoveries++;
+      assert.equal(input.runId, saved.run_id);
+      return { ...saved, tokens_used: 211, usage_status: "measured" };
+    },
+    close() {},
+  };
+  const request = { plan: plan(), projectPath: project, runRoot, runId: "run-unknown", buildExecutor: executor, trialBackend: "local", reportDir: false };
+  const blocked = await runDeliveryLoop(request);
+  assert.equal(blocked.state.blockers[0].code, "goal_usage_unavailable");
+  assert.equal(blocked.state.budget.tokens_used, 0);
+  assert.equal(blocked.state.budget.unaccounted_attempts.length, 1);
+  const initialTrials = readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8");
+  const recovered = await resumeDelivery("run-unknown", { root: project, stateRoot, allowDraft: true, answer: "retry-accounting", buildExecutor: executor, trialBackend: "local", reportDir: false });
+  assert.equal(recovered.state.status, "verified");
+  assert.equal(recovered.state.budget.tokens_used, 211);
+  assert.equal(recovered.state.budget.unaccounted_attempts.length, 0);
+  assert.equal(executions, 1);
+  assert.equal(recoveries, 1);
+  assert.equal(readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8"), initialTrials, "recovery must not overwrite earlier Trial evidence");
+  assert.equal(JSON.parse(readFileSync(path.join(runRoot, "executor/iteration-001.json"), "utf8")).usage_status, "measured");
+  await runDeliveryLoop(request);
+  assert.equal(readDeliveryLedger(runRoot).budget.tokens_used, 211);
+  assert.equal(executions, 1);
+});
+
+test("failed receipt recovery keeps unknown usage blocked without another build", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-recovery-failure-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-pending");
+  let executions = 0;
+  const executor = {
+    name: "fixture-charged-build",
+    async execute({ runId }) { executions++; return chargedResult({ executor: this.name, run_id: runId, tokens_used: null, usage_status: "unknown" }); },
+    async recover() { throw new Error("disconnected fixture"); },
+    close() {},
+  };
+  await runDeliveryLoop({ plan: plan(), projectPath: project, runRoot, runId: "run-pending", buildExecutor: executor, trialBackend: "local", reportDir: false });
+  const result = await resumeDelivery("run-pending", { root: project, stateRoot, allowDraft: true, answer: "retry-accounting", buildExecutor: executor, trialBackend: "local", reportDir: false });
+  assert.equal(result.state.blockers[0].code, "goal_usage_unavailable");
+  assert.equal(executions, 1);
+  assert.equal(result.state.budget.unaccounted_attempts.length, 1);
+});
+
+for (const scenario of ["overshoot", "modified-verifier"]) {
+  test(`usage recovery preserves the ${scenario} gate`, async () => {
+    const project = repository();
+    const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-recovery-gate-"));
+    const runId = `run-${scenario}`;
+    const runRoot = path.join(stateRoot, "builds", "fixture-agent", runId);
+    let executions = 0;
+    const executor = {
+      name: "fixture-charged-build",
+      async execute({ worktree, runId }) {
+        executions++;
+        if (scenario === "modified-verifier") writeFileSync(path.join(worktree, "eval.mjs"), "process.stdout.write('READY');\n");
+        return chargedResult({ executor: this.name, run_id: runId, tokens_used: null, usage_status: "unknown" });
+      },
+      async recover(input, saved) { return { ...saved, tokens_used: 211, usage_status: "measured" }; },
+      close() {},
+    };
+    const initial = await runDeliveryLoop({ plan: plan(), projectPath: project, runRoot, runId, buildExecutor: executor, trialBackend: "local", reportDir: false, budget: { maxTokens: 100 } });
+    assert.equal(initial.state.blockers[0].code, "goal_usage_unavailable");
+    const frozenInputs = readFileSync(path.join(runRoot, "protected-trial-inputs.json"), "utf8");
+    const result = await resumeDelivery(runId, { root: project, stateRoot, allowDraft: true, answer: "retry-accounting", buildExecutor: executor, trialBackend: "local", reportDir: false });
+    assert.equal(result.state.status, "blocked");
+    assert.equal(result.state.blockers[0].code, scenario === "overshoot" ? "token_budget_exhausted" : "trial_input_baseline_changed");
+    if (scenario === "overshoot") assert.equal(result.state.budget.tokens_used, 211);
+    assert.equal(executions, 1);
+    assert.equal(readFileSync(path.join(runRoot, "protected-trial-inputs.json"), "utf8"), frozenInputs);
+    assert.equal(readFileSync(path.join(project, "implementation.txt"), "utf8"), "not-ready\n");
+  });
+}
+
+test("a user budget extension finishes the same run without changing the approved plan or replaying charges", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-budget-continue-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-extend");
+  let executions = 0;
+  const executor = {
+    name: "fixture-charged-build",
+    async execute({ worktree, runId, tokenBudget }) {
+      executions++;
+      assert.equal(runId, "run-extend");
+      if (executions === 2) {
+        assert.equal(tokenBudget, 200);
+        writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+      }
+      return chargedResult({ executor: this.name, run_id: runId, thread_id: `thread-${executions}`, tokens_used: executions === 1 ? 100 : 80 });
+    },
+    close() {},
+  };
+  const paused = await runDeliveryLoop({ plan: plan(), projectPath: project, runRoot, runId: "run-extend", buildExecutor: executor, trialBackend: "local", reportDir: false, budget: { maxTokens: 100 } });
+  assert.equal(paused.state.blockers[0].code, "token_budget_exhausted");
+  assert.ok(paused.state.blockers[0].options.some(option => option.id === "extend-budget"));
+  const frozenPlan = readFileSync(path.join(runRoot, "trial-plan.json"), "utf8");
+  const initialTrials = readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8");
+  const amendment = { root: project, stateRoot, allowDraft: true, answeredBy: "user", budgetRequestId: "extend-200", addTokens: 200, buildExecutor: executor, trialBackend: "local", reportDir: false };
+  const finished = await resumeDelivery("run-extend", amendment);
+  assert.equal(finished.state.status, "verified");
+  assert.equal(finished.worktree.worktree, paused.worktree.worktree);
+  assert.deepEqual(finished.state.spec, paused.state.spec);
+  assert.equal(finished.state.budget.tokens_used, 180);
+  assert.equal(finished.state.budget.max_tokens, 300);
+  assert.equal(finished.state.budget.amendments.length, 1);
+  await amendDeliveryBudget("run-extend", amendment);
+  assert.equal(readDeliveryLedger(runRoot).budget.max_tokens, 300);
+  assert.equal(executions, 2);
+  assert.equal(readFileSync(path.join(runRoot, "trial-plan.json"), "utf8"), frozenPlan);
+  assert.equal(readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8"), initialTrials);
+});
+
+for (const turnStatus of ["completed", "unknown"]) {
+  test(`host-only verification respects the ${turnStatus} execution state without a new model turn`, async () => {
+    const project = repository();
+    const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-host-only-"));
+    const runId = `run-host-${turnStatus}`;
+    const runRoot = path.join(stateRoot, "builds", "fixture-agent", runId);
+    let executions = 0;
+    const executor = {
+      name: "fixture-charged-build",
+      async execute({ worktree, runId }) {
+        executions++;
+        writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+        return chargedResult({ executor: this.name, run_id: runId, tokens_used: null, usage_status: "unknown", turn_status: turnStatus });
+      },
+      close() {},
+    };
+    await runDeliveryLoop({ plan: plan(), projectPath: project, runRoot, runId, buildExecutor: executor, trialBackend: "local", reportDir: false });
+    const result = await resumeDelivery(runId, { root: project, stateRoot, allowDraft: true, hostOnly: true, buildExecutor: executor, trialBackend: "local", reportDir: false });
+    assert.equal(result.state.status, turnStatus === "completed" ? "verified" : "blocked");
+    assert.equal(result.state.budget.unaccounted_attempts.length, 1, "verification cannot invent missing usage");
+    assert.equal(executions, 1);
+  });
+}
+
+test("concurrent delivery orchestration cannot dispatch a second attempt for the same run", async () => {
+  const project = repository();
+  const runRoot = path.join(mkdtempSync(path.join(os.tmpdir(), "pritha-loop-exclusive-")), "builds", "fixture-agent", "run-exclusive");
+  let started;
+  const running = new Promise(resolve => { started = resolve; });
+  let finish;
+  const held = new Promise(resolve => { finish = resolve; });
+  let executions = 0;
+  const executor = new FunctionBuildExecutor(async ({ worktree }) => {
+    executions++; started(); await held;
+    writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+    return { summary: "implemented" };
+  });
+  const request = { plan: plan(), projectPath: project, runRoot, runId: "run-exclusive", buildExecutor: executor, trialBackend: "local", reportDir: false };
+  const first = runDeliveryLoop(request);
+  try {
+    await running;
+    await assert.rejects(runDeliveryLoop(request), error => error.code === "delivery_running");
+  } finally { finish(); }
+  assert.equal((await first).state.status, "verified");
+  assert.equal(executions, 1);
 });

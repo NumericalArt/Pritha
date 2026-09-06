@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { atomicWriteFile } from "../lib/atomic-file.mjs";
+import { acquireFileLock, atomicWriteFile } from "../lib/atomic-file.mjs";
 import { today } from "../lib/date.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
@@ -8,7 +8,11 @@ import { slug } from "../lib/slug.mjs";
 import { writeLifecycleReport } from "./lifecycle-report.mjs";
 import { createBuildExecutor } from "./build-executors.mjs";
 import {
+  accountDeliveryExecutorResult as accountExecutorResult,
   budgetBlocker,
+  deliveryUsageStatus,
+  deliveryTokenPreflight,
+  grantDeliveryBudget,
   claimDeliveryTarget,
   createDeliveryLedger,
   deliveryTargetClaimPath,
@@ -41,6 +45,19 @@ export class DeliveryLoopError extends Error {
     this.code = code;
     this.details = details;
   }
+}
+
+async function withDeliveryExecution(runRoot, work) {
+  let lock;
+  try { lock = acquireFileLock(path.join(runRoot, "delivery-execution")); }
+  catch { throw new DeliveryLoopError("delivery_running", "This run is already being handled. Reconnect to its existing progress; no second execution was started."); }
+  try { return await work(); } finally { lock.release(); }
+}
+
+function hostVerificationAllowed(budget) {
+  if (deliveryUsageStatus(budget) === "complete") return true;
+  return !budget.legacy_usage_unverified && budget.unaccounted_attempts.every(attempt =>
+    ["completed", "failed", "interrupted"].includes(attempt.turn_status) && attempt.thread_cleanup === "archived");
 }
 
 function bounded(value, maximum = 2_000) {
@@ -97,70 +114,46 @@ function goalObjective(state, plan) {
   );
 }
 
-function accountExecutorResult(runRoot, result, executorPath) {
-  return updateDeliveryLedger(runRoot, (current) => {
-    const budget = { ...current.budget };
-    const threadId = String(result?.thread_id || "");
-    const turnId = String(result?.turn_id || "");
-    const tokensUsed = result?.tokens_used;
-    const key = threadId && turnId ? `${threadId}:${turnId}` : "";
-    if (key && Number.isSafeInteger(tokensUsed) && tokensUsed >= 0) {
-      const accounted = (budget.accounted_turns || []).some((entry) => entry.key === key);
-      if (!accounted) {
-        const nextTokensUsed = budget.tokens_used + tokensUsed;
-        if (!Number.isSafeInteger(nextTokensUsed) || nextTokensUsed > budget.max_tokens) {
-          throw new DeliveryLoopError("token_usage_invalid", "Recorded Goal usage exceeds the confirmed delivery token budget");
-        }
-        budget.tokens_used = nextTokensUsed;
-        budget.accounted_turns = [...(budget.accounted_turns || []), {
-          key,
-          thread_id: threadId,
-          turn_id: turnId,
-          tokens_used: tokensUsed,
-          executor_result: executorPath,
-        }];
-      }
-    }
-    if (result?.goal_enforcement === "waived-once" && budget.goal_enforcement === "waived-once") {
-      budget.goal_enforcement = "required";
-      budget.goal_waiver = { ...(budget.goal_waiver || {}), used_at: new Date().toISOString() };
-    }
-    return {
-      ...current,
-      budget,
-      executor_last_result: executorPath,
-      next_action: current.status === "building" ? "verify_executor_changes" : current.next_action,
-    };
-  }, {
-    eventType: "build_iteration_completed",
-    payload: {
-      iteration: readDeliveryLedger(runRoot).iteration,
-      executor_result: executorPath,
-      thread_id: result?.thread_id || null,
-      turn_id: result?.turn_id || null,
-      tokens_used: Number.isSafeInteger(result?.tokens_used) ? result.tokens_used : null,
-    },
-  }).state;
-}
-
 function reconcileExecutorAccounting(runRoot) {
   const directory = path.join(runRoot, "executor");
   if (!existsSync(directory)) return readDeliveryLedger(runRoot);
   for (const name of readdirSync(directory).filter((entry) => /^iteration-\d+\.json$/.test(entry)).sort()) {
     const relative = path.join("executor", name).replaceAll(path.sep, "/");
     let result;
-    try {
-      result = JSON.parse(readFileSync(path.join(directory, name), "utf8"));
-    } catch {
-      continue;
-    }
+    try { result = JSON.parse(readFileSync(path.join(directory, name), "utf8")); }
+    catch { result = { schema: "pritha-build-executor-result-v2", status: "receipt-unreadable", usage_status: "unknown", tokens_used: null }; }
     const key = result?.thread_id && result?.turn_id ? `${result.thread_id}:${result.turn_id}` : "";
     const state = readDeliveryLedger(runRoot);
-    if (!key || (state.budget.accounted_turns || []).some((entry) => entry.key === key)) continue;
-    if (!Number.isSafeInteger(result.tokens_used) || result.tokens_used < 0) continue;
+    const previous = state.budget.accounted_turns.find((entry) => entry.key === key);
+    if (previous && result.thread_cleanup !== "pending" && result.usage_status !== "unknown"
+      && previous.tokens_used === result.tokens_used
+      && !state.budget.unaccounted_attempts.some((entry) => entry.executor_result === relative)) continue;
     accountExecutorResult(runRoot, result, relative);
   }
   return readDeliveryLedger(runRoot);
+}
+
+async function recoverExecutorAttempts(runRoot, worktree, executor, input) {
+  if (typeof executor.recover !== "function") return;
+  const state = readDeliveryLedger(runRoot);
+  for (const attempt of state.budget.unaccounted_attempts) {
+    if (!/^executor\/iteration-\d+\.json$/.test(attempt.executor_result)) continue;
+    const file = path.join(runRoot, attempt.executor_result);
+    let saved;
+    try { saved = JSON.parse(readFileSync(file, "utf8")); } catch { continue; }
+    if (saved.executor !== executor.name || saved.run_id !== state.run_id) continue;
+    try {
+      const result = await executor.recover({
+        ...input, runId: state.run_id, worktree: worktree.worktree,
+        onCheckpoint: async (receipt) => {
+          atomicWriteFile(file, `${JSON.stringify(receipt, null, 2)}\n`);
+          accountExecutorResult(runRoot, receipt, attempt.executor_result);
+        },
+      }, saved);
+      atomicWriteFile(file, `${JSON.stringify(result, null, 2)}\n`);
+      accountExecutorResult(runRoot, result, attempt.executor_result);
+    } catch { /* Keep the original unresolved receipt and fail closed. */ }
+  }
 }
 
 function assertPlan(plan) {
@@ -326,16 +319,26 @@ function blockerForError(error) {
       ],
     },
     goal_usage_unavailable: {
-      question: "How should Pritha preserve the completed turn now that its Goal usage cannot be accounted safely?",
+      question: "How should Pritha reconcile the build attempt before another model turn?",
       options: [
+        { id: "retry-accounting", label: "Reconcile usage", effect: "Read the bound native attempt and recover usage without resending turn/start." },
+        { id: "verify-only", label: "Verify existing work", effect: "Run approved Trials once the bound attempt is confirmed terminal and archived; preserve unknown usage." },
         { id: "inspect-worktree", label: "Inspect worktree", effect: "Keep the run blocked and inspect the saved executor result and worktree without starting another iteration." },
         { id: "abandon", label: "Abandon", effect: "Abandon the run while preserving its worktree, branch and saved executor result." },
+      ],
+    },
+    verification_needs_implementation: {
+      question: "How should Pritha finish the remaining implementation in this same run?",
+      options: [
+        { id: "resume-build", label: "Continue build", effect: "Resume bounded implementation using the saved failures and remaining authorized budget." },
+        { id: "inspect-worktree", label: "Review failures", effect: "Inspect the saved Trial evidence and implementation before continuing." },
       ],
     },
     token_budget_exhausted: {
       question: "How should Pritha proceed after the confirmed token budget was exhausted?",
       options: [
-        { id: "revise-contract", label: "Revise budget", effect: "Approve a revised contract budget and begin a new bound delivery run." },
+        { id: "extend-budget", label: "Continue this run", effect: "Authorize an explicit additional build budget and continue with the same worktree, approvals and usage." },
+        { id: "verify-only", label: "Verify existing work", effect: "Run approved Trials without another model turn." },
         { id: "review-failures", label: "Review evidence", effect: "Keep the run blocked and inspect the existing evidence." },
         { id: "stop-run", label: "Stop run", effect: "Abandon the run without merge or deployment." },
       ],
@@ -430,7 +433,9 @@ confidence: ${["verified", "awaiting_acceptance", "accepted"].includes(state.sta
 - Status: ${state.status}
 - Phase: ${state.phase}
 - Iterations: ${state.iteration}/${state.budget.max_iterations}
-- Build tokens: ${state.budget.tokens_used}/${state.budget.max_tokens} (${state.budget.token_budget_source}; Goal ${state.budget.goal_enforcement})
+- Build tokens observed: ${state.budget.tokens_used}/${state.budget.max_tokens} (${state.budget.token_budget_source}; Goal ${state.budget.goal_enforcement}; accounting ${deliveryUsageStatus(state.budget)})
+- Budget authorizations: ${state.budget.amendments.length}; reserved tokens: ${deliveryTokenPreflight(state.budget).reserved ?? "unknown"}
+- Usage scope: build executor only; parent Task Chat, Trials and other phases are not measured here
 - Branch: ${worktree?.branch || "not-created"}
 - Base revision: ${worktree?.base_revision || "not-created"}
 - Verified checkpoint: ${worktree?.verified_checkpoint || "pending"}
@@ -625,6 +630,10 @@ async function finalizePassingResult(plan, runRoot, worktree, protectedInputs, t
 }
 
 export async function runDeliveryLoop(input = {}) {
+  return withDeliveryExecution(path.resolve(input.runRoot), () => runDeliveryLoopLocked(input));
+}
+
+async function runDeliveryLoopLocked(input = {}) {
   const plan = assertPlan(input.plan);
   const runRoot = path.resolve(input.runRoot);
   const projectPath = path.resolve(input.projectPath);
@@ -676,8 +685,16 @@ export async function runDeliveryLoop(input = {}) {
   const trialBackend = input.trialBackend || "local";
   let buildProbeCompleted = false;
   let failures = [];
-  let verificationSequence = 0;
+  const trialDirectory = path.join(runRoot, "trial-results");
+  let verificationSequence = existsSync(trialDirectory)
+    ? Math.max(0, ...readdirSync(trialDirectory).map(name => Number(/^verification-(\d+)\.json$/.exec(name)?.[1] || 0)).filter(Number.isSafeInteger))
+    : 0;
   try {
+    await recoverExecutorAttempts(runRoot, worktree, buildExecutor, input);
+    state = readDeliveryLedger(runRoot);
+    if (deliveryUsageStatus(state.budget) !== "complete" && !(input.hostOnly && hostVerificationAllowed(state.budget))) {
+      return blockDelivery(runRoot, plan, worktree, budgetBlocker(state), input);
+    }
     if (state.status !== "verifying") {
       state = transitionDelivery(runRoot, "verifying", { nextAction: "run_initial_trials", phase: "initial_verification" }).state;
     }
@@ -718,6 +735,12 @@ export async function runDeliveryLoop(input = {}) {
         failures = result.trials.filter((trial) => trial.kind === "automated" && trial.status !== "passed");
       }
 
+      // A model budget limits the next model turn. Already-approved, bounded
+      // Trials can finish the existing result before requesting more budget.
+      state = readDeliveryLedger(runRoot);
+      const beforeBuild = budgetBlocker(state);
+      if (beforeBuild) return blockDelivery(runRoot, plan, worktree, beforeBuild, input);
+      if (input.hostOnly) return blockDelivery(runRoot, plan, worktree, blockerForError(new DeliveryLoopError("verification_needs_implementation", "The approved checks found remaining work; the result and evidence are preserved.")), input);
       const failureUpdate = recordDeliveryFailure(runRoot, failures, { eventType: "verification_failed" });
       state = failureUpdate.state;
       if (state.status === "blocked") {
@@ -733,6 +756,10 @@ export async function runDeliveryLoop(input = {}) {
         phase: "implementation",
         iteration: current.iteration + 1,
         next_action: "execute_build_iteration",
+        executor_preceding_trial_result: current.last_trial_result,
+        // A build may change the revision. Retain the old receipt in history,
+        // but require a new verification instead of reusing its former lock.
+        last_trial_result: null,
         blockers: [],
       }), { eventType: "build_iteration_started" }).state;
 
@@ -767,8 +794,9 @@ export async function runDeliveryLoop(input = {}) {
           }
         }
         const executionState = readDeliveryLedger(runRoot);
-        const remainingTokens = executionState.budget.max_tokens - executionState.budget.tokens_used;
-        if (remainingTokens <= 0) {
+        const preflight = deliveryTokenPreflight(executionState.budget);
+        const remainingTokens = preflight.available;
+        if (remainingTokens === null || remainingTokens <= 0) {
           return blockDelivery(runRoot, plan, worktree, blockerForError(new DeliveryLoopError("token_budget_exhausted", "The confirmed build token budget is exhausted")), input);
         }
         const goalRequired = executionState.budget.goal_enforcement !== "waived-once";
@@ -786,17 +814,21 @@ export async function runDeliveryLoop(input = {}) {
           tokenBudget: remainingTokens,
           goalRequired,
           goalObjective: goalObjective(executionState, plan),
+          onCheckpoint: async (receipt) => {
+            const reference = storeExecutorResult(runRoot, receipt, state.iteration);
+            accountExecutorResult(runRoot, receipt, reference);
+          },
         });
         const executorPath = storeExecutorResult(runRoot, executorResult, state.iteration);
         accountExecutorResult(runRoot, executorResult, executorPath);
       } catch (error) {
-        if (error?.code === "goal_usage_unavailable" && error?.details?.executorResult) {
+        if (error?.details?.executorResult) {
           const executorPath = storeExecutorResult(runRoot, error.details.executorResult, state.iteration);
-          updateDeliveryLedger(runRoot, (current) => ({ ...current, executor_last_result: executorPath }), {
-            eventType: "goal_usage_unavailable",
-            payload: { iteration: state.iteration, executor_result: executorPath },
-          });
+          accountExecutorResult(runRoot, error.details.executorResult, executorPath);
         }
+        const unresolved = readDeliveryLedger(runRoot);
+        const postFailureBudget = budgetBlocker(unresolved);
+        if (postFailureBudget?.code === "goal_usage_unavailable") return blockDelivery(runRoot, plan, worktree, postFailureBudget, input);
         if ([
           "manual_build_required",
           "no_git_in_place_not_implemented",
@@ -804,6 +836,9 @@ export async function runDeliveryLoop(input = {}) {
           "goal_api_unavailable",
           "goal_usage_unavailable",
           "token_budget_exhausted",
+          "goal_state_mismatch",
+          "executor_cleanup_pending",
+          "executor_checkpoint_failed",
         ].includes(error?.code)) {
           return blockDelivery(runRoot, plan, worktree, blockerForError(error), input);
         }
@@ -816,6 +851,9 @@ export async function runDeliveryLoop(input = {}) {
         continue;
       }
 
+      const accountedState = readDeliveryLedger(runRoot);
+      const postTurnBudget = budgetBlocker(accountedState);
+      if (postTurnBudget?.code === "goal_usage_unavailable") return blockDelivery(runRoot, plan, worktree, postTurnBudget, input);
       const protectedStatus = verifyProtectedTrialInputs(protectedInputs, worktree.worktree);
       if (!protectedStatus.ok) {
         return blockDelivery(
@@ -877,8 +915,17 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
   const state = readDeliveryLedger(runRoot);
   if (state.status !== "blocked" || state.blockers.length === 0) throw new DeliveryLoopError("run_not_blocked", "Delivery run has no active blocker");
   const selected = String(answer || "").trim();
-  const option = state.blockers[0].options.find((entry) => entry.id === selected);
+  const budgetPause = ["token_budget_exhausted", "iteration_budget_exhausted", "elapsed_budget_exhausted", "goal_usage_unavailable"].includes(state.blockers[0].code);
+  const option = state.blockers[0].options.find((entry) => entry.id === selected)
+    || (budgetPause && ["verify-only", "extend-budget"].includes(selected));
   if (!option) throw new DeliveryLoopError("blocker_answer_invalid", "Answer must match one of the blocker option ids");
+  if (["extend-budget", "extend-once"].includes(selected)) {
+    return grantDeliveryBudget(runRoot, {
+      approvedBy: options.answeredBy, requestId: options.budgetRequestId,
+      addTokens: options.addTokens, addIterations: options.addIterations,
+      addElapsedMs: options.addElapsedMs, expectedVersion: options.expectedVersion,
+    });
+  }
   if (["stop-run", "stop-new-run", "resume-existing", "use-clean-clone", "revise-contract", "abandon"].includes(selected)) {
     return transitionDelivery(runRoot, "abandoned", { eventType: "delivery_abandoned_by_user" }).state;
   }
@@ -919,10 +966,6 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
   if (selected === "discard-iteration") discardDeliveryIteration(runRoot);
   return updateDeliveryLedger(runRoot, (current) => {
     const budget = { ...current.budget };
-    if (selected === "extend-once") {
-      budget.max_iterations += Number.isSafeInteger(options.extendIterations) ? Math.min(Math.max(options.extendIterations, 1), 10) : 2;
-      budget.max_elapsed_ms += Number.isSafeInteger(options.extendElapsedMs) ? Math.min(Math.max(options.extendElapsedMs, 60_000), 3_600_000) : 30 * 60 * 1_000;
-    }
     return {
       ...current,
       status: "correcting",
@@ -937,13 +980,42 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
 
 export async function resumeDelivery(runId, options = {}) {
   const status = deliveryStatus(runId, options);
+  return withDeliveryExecution(status.runRoot, () => resumeDeliveryLocked(runId, options));
+}
+
+export async function amendDeliveryBudget(runId, options = {}) {
+  const { runRoot } = deliveryStatus(runId, options);
+  return withDeliveryExecution(runRoot, () => {
+    const plan = JSON.parse(readFileSync(path.join(runRoot, "trial-plan.json"), "utf8"));
+    approvedPlanBinding(plan, options);
+    const state = grantDeliveryBudget(runRoot, {
+      approvedBy: options.answeredBy, requestId: options.budgetRequestId,
+      addTokens: options.addTokens, addIterations: options.addIterations,
+      addElapsedMs: options.addElapsedMs, expectedVersion: options.expectedVersion,
+    });
+    return { state, worktree: readDeliveryWorktree(runRoot) };
+  });
+}
+
+async function resumeDeliveryLocked(runId, options) {
+  const status = deliveryStatus(runId, options);
   const planPath = path.join(status.runRoot, "trial-plan.json");
   const plan = JSON.parse(readFileSync(planPath, "utf8"));
-  const bound = policyBoundOptions(plan, options);
+  const hostOnly = options.hostOnly === true || options.answer === "verify-only";
+  const bound = policyBoundOptions(plan, { ...options, hostOnly });
   let state = status.state;
+  if (options.addTokens || options.addIterations || options.addElapsedMs) {
+    approvedPlanBinding(plan, options);
+    state = grantDeliveryBudget(status.runRoot, {
+      approvedBy: options.answeredBy, requestId: options.budgetRequestId,
+      addTokens: options.addTokens, addIterations: options.addIterations,
+      addElapsedMs: options.addElapsedMs, expectedVersion: options.expectedVersion,
+    });
+  }
   if (state.status === "blocked") {
-    if (!options.answer) return { state, worktree: status.worktree, blocked: true, reportPath: null };
-    state = resolveDeliveryBlocker(status.runRoot, options.answer, options);
+    const answer = hostOnly ? "verify-only" : options.answer;
+    if (!answer) return { state, worktree: status.worktree, blocked: true, reportPath: null };
+    state = resolveDeliveryBlocker(status.runRoot, answer, options);
     if (state.status === "blocked") return { state, worktree: status.worktree, blocked: true, reportPath: null };
     if (state.status === "abandoned") {
       releaseTarget(status.runRoot, state, options);
@@ -985,7 +1057,7 @@ export async function resumeDelivery(runId, options = {}) {
       );
     }
   }
-  return runDeliveryLoop({
+  return runDeliveryLoopLocked({
     ...bound,
     runId,
     runRoot: status.runRoot,

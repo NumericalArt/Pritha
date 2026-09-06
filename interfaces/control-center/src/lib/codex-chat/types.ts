@@ -3,6 +3,7 @@ export type RuntimeProtocol = "app_server" | "exec_resume" | "queue";
 export type Availability = "ready" | "degraded" | "unavailable";
 
 export type RuntimeCapabilityMap = {
+  goalControl?: boolean;
   imageInput?: boolean;
   fileMetadata?: boolean;
   fullChat: boolean;
@@ -199,6 +200,24 @@ export type ThreadDetail = {
   streamUrl: string;
   continuationState: ThreadContinuationState;
   history?: { state: "available" | "recovery_available" | "blocked"; code: string | null; recoverable: boolean };
+};
+
+export type GoalBudgetRequest = {
+  requestId: string;
+  expectedRevision: string;
+  mode: "add" | "set";
+  tokens: number;
+  resume: boolean;
+};
+
+export type ThreadGoalView = {
+  availability: "available" | "none" | "unsupported" | "unavailable";
+  objective: string | null;
+  status: string | null;
+  tokensUsed: number | null;
+  tokenBudget: number | null;
+  revision: string | null;
+  pendingRequest: GoalBudgetRequest | null;
 };
 
 export type CreateTaskLinkRequest = {

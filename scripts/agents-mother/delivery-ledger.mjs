@@ -105,12 +105,17 @@ export function normalizeDeliveryLedger(value) {
     runtime_probes: Array.isArray(value.runtime_probes) ? value.runtime_probes : [],
     budget: {
       ...budget,
-      max_tokens: Number.isSafeInteger(budget.max_tokens) ? budget.max_tokens : 1_000_000,
-      tokens_used: Number.isSafeInteger(budget.tokens_used) ? budget.tokens_used : 0,
+      max_tokens: budget.max_tokens === undefined ? 1_000_000 : budget.max_tokens,
+      tokens_used: budget.tokens_used === undefined ? 0 : budget.tokens_used,
       token_budget_source: String(budget.token_budget_source || "legacy-default"),
       goal_enforcement: String(budget.goal_enforcement || "required"),
-      accounted_turns: Array.isArray(budget.accounted_turns) ? budget.accounted_turns : [],
+      accounted_turns: budget.accounted_turns === undefined ? [] : budget.accounted_turns,
       goal_waiver: budget.goal_waiver || null,
+      accounting_version: budget.accounting_version ?? 1,
+      usage_scope: budget.usage_scope ?? "build-executor",
+      legacy_usage_unverified: budget.legacy_usage_unverified ?? (budget.accounting_version === undefined),
+      unaccounted_attempts: budget.unaccounted_attempts ?? [],
+      amendments: budget.amendments ?? [],
     },
   };
 }
@@ -147,12 +152,13 @@ export function validateDeliveryLedger(input) {
   if (!Number.isSafeInteger(value?.budget?.repeated_failure_threshold) || value.budget.repeated_failure_threshold < 2) issues.push("budget.repeated_failure_threshold must be at least 2");
   if (!Number.isSafeInteger(value?.budget?.max_tokens) || value.budget.max_tokens < 1) issues.push("budget.max_tokens must be a positive safe integer");
   if (!Number.isSafeInteger(value?.budget?.tokens_used) || value.budget.tokens_used < 0) issues.push("budget.tokens_used must be a non-negative safe integer");
-  if (value?.budget?.tokens_used > value?.budget?.max_tokens) issues.push("budget.tokens_used must not exceed budget.max_tokens");
+  // A budget bounds future dispatch, not the observations the ledger may retain.
   if (!new Set(["required", "waived-once", "not-applicable"]).has(value?.budget?.goal_enforcement)) issues.push("budget.goal_enforcement is invalid");
   if (!Array.isArray(value?.budget?.accounted_turns)) issues.push("budget.accounted_turns must be an array");
-  const turnKeys = (value?.budget?.accounted_turns || []).map((entry) => entry?.key).filter(Boolean);
+  const accountedTurns = Array.isArray(value?.budget?.accounted_turns) ? value.budget.accounted_turns : [];
+  const turnKeys = accountedTurns.map((entry) => entry?.key).filter(Boolean);
   if (new Set(turnKeys).size !== turnKeys.length) issues.push("budget.accounted_turns keys must be unique");
-  const accountedTokenTotal = (value?.budget?.accounted_turns || []).reduce((total, entry) => {
+  const accountedTokenTotal = accountedTurns.reduce((total, entry) => {
     if (
       typeof entry?.key !== "string"
       || !entry.key
@@ -168,9 +174,22 @@ export function validateDeliveryLedger(input) {
     }
     return total + entry.tokens_used;
   }, 0);
-  if (Number.isSafeInteger(accountedTokenTotal) && accountedTokenTotal !== value?.budget?.tokens_used) {
+  if (!Number.isSafeInteger(accountedTokenTotal)) issues.push("accounted token total exceeds safe integer range");
+  if (accountedTokenTotal !== value?.budget?.tokens_used) {
     issues.push("budget.tokens_used must equal the sum of accounted turns");
   }
+  if (value?.budget?.accounting_version !== 1 || value?.budget?.usage_scope !== "build-executor") issues.push("unsupported build accounting contract");
+  if (typeof value?.budget?.legacy_usage_unverified !== "boolean") issues.push("legacy usage marker must be boolean");
+  const unresolved = value?.budget?.unaccounted_attempts;
+  if (!Array.isArray(unresolved) || unresolved.some((entry) => typeof entry?.executor_result !== "string" || !entry.executor_result || typeof entry?.reason !== "string" || !entry.reason)) {
+    issues.push("unaccounted attempts must identify their executor receipt and reason");
+  } else if (new Set(unresolved.map((entry) => entry.executor_result)).size !== unresolved.length) {
+    issues.push("unaccounted attempt receipts must be unique");
+  }
+  const amendments = value?.budget?.amendments;
+  if (!Array.isArray(amendments) || amendments.some(entry => !entry?.request_id || entry.approved_by !== "user" || !entry.request_hash)) {
+    issues.push("budget amendments must contain user authorization and a request identity");
+  } else if (new Set(amendments.map(entry => entry.request_id)).size !== amendments.length) issues.push("budget amendment request ids must be unique");
   return { ok: issues.length === 0, issues };
 }
 
@@ -246,6 +265,11 @@ export function createDeliveryLedger(runRoot, input = {}) {
       goal_enforcement: input.budget?.goalEnforcement || "required",
       accounted_turns: [],
       goal_waiver: null,
+      accounting_version: 1,
+      usage_scope: "build-executor",
+      legacy_usage_unverified: false,
+      unaccounted_attempts: [],
+      amendments: [],
     },
     iteration: 0,
     consecutive_failure_signature: null,
@@ -412,13 +436,28 @@ export function recordDeliveryFailure(runRoot, failures, options = {}) {
 
 export function budgetBlocker(state, now = Date.now()) {
   const elapsed = now - Date.parse(state.created_at);
+  if (deliveryUsageStatus(state.budget) !== "complete") {
+    return typedBlocker({
+      code: "goal_usage_unavailable",
+      summary: "Build usage or the end of a prior attempt is unresolved; another model turn is not allowed.",
+      question: "How should Pritha reconcile the saved build attempt before another model turn?",
+      options: [
+        { id: "retry-accounting", label: "Reconcile usage", effect: "Inspect the bound native thread and saved receipt without resending a model turn." },
+        { id: "verify-only", label: "Verify existing work", effect: "Run the approved Trials without a model turn, once the saved attempt is confirmed stopped." },
+        { id: "inspect-worktree", label: "Inspect evidence", effect: "Keep the run blocked and inspect its saved receipts and worktree." },
+        { id: "abandon", label: "Abandon", effect: "Abandon delivery while preserving its evidence." },
+      ],
+      evidence_refs: ["ledger:budget.unaccounted_attempts", "ledger:budget.legacy_usage_unverified"],
+    });
+  }
   if (state.budget.tokens_used >= state.budget.max_tokens) {
     return typedBlocker({
       code: "token_budget_exhausted",
       summary: `The build used its ${state.budget.max_tokens}-token budget.`,
       question: "How should Pritha proceed after the confirmed build token budget was exhausted?",
       options: [
-        { id: "revise-contract", label: "Revise budget", effect: "Revise and approve the contract with a new token budget, then start a new delivery run." },
+        { id: "extend-budget", label: "Continue this run", effect: "Authorize an explicit additional build budget; preserve this run, its worktree, approvals and observed usage." },
+        { id: "verify-only", label: "Verify existing work", effect: "Run the approved Trials and prepare the verified result without starting another model turn." },
         { id: "review-failures", label: "Review evidence", effect: "Keep the run blocked and inspect the current worktree and Trial evidence." },
         { id: "stop-run", label: "Stop run", effect: "Abandon this run without merging or deploying changes." },
       ],
@@ -431,7 +470,8 @@ export function budgetBlocker(state, now = Date.now()) {
       summary: `The build used its ${state.budget.max_iterations}-iteration budget.`,
       question: "Should Pritha extend the build budget for this approved outcome?",
       options: [
-        { id: "extend-once", label: "Extend once", effect: "Add a bounded number of iterations and continue from the latest evidence." },
+        { id: "extend-budget", label: "Continue this run", effect: "Authorize an explicit number of additional iterations and continue from the latest evidence." },
+        { id: "verify-only", label: "Verify existing work", effect: "Run only the approved Trials without another model turn." },
         { id: "review-failures", label: "Review failures", effect: "Keep the run blocked and inspect the latest Trial evidence." },
         { id: "stop-run", label: "Stop run", effect: "Abandon this run without merging or deploying changes." },
       ],
@@ -444,7 +484,8 @@ export function budgetBlocker(state, now = Date.now()) {
       summary: "The delivery run reached its elapsed-time budget.",
       question: "Should Pritha extend the elapsed-time budget for this run?",
       options: [
-        { id: "extend-once", label: "Extend once", effect: "Grant one bounded time extension and resume." },
+        { id: "extend-budget", label: "Continue this run", effect: "Authorize an explicit time extension from now and resume this run." },
+        { id: "verify-only", label: "Verify existing work", effect: "Run only the approved Trials without another model turn." },
         { id: "review-failures", label: "Review failures", effect: "Keep the run blocked and inspect current evidence." },
         { id: "stop-run", label: "Stop run", effect: "Abandon this run without merging or deployment." },
       ],
@@ -452,6 +493,114 @@ export function budgetBlocker(state, now = Date.now()) {
     });
   }
   return null;
+}
+
+export function deliveryUsageStatus(budget) {
+  if (budget.legacy_usage_unverified) return "legacy-unknown";
+  return budget.unaccounted_attempts?.length ? "unknown" : "complete";
+}
+
+export function deliveryTokenPreflight(budget) {
+  const reserved = (budget.unaccounted_attempts || []).reduce((total, entry) => total + (Number.isSafeInteger(entry.reserved_tokens) ? entry.reserved_tokens : 0), 0);
+  return {
+    usage_status: deliveryUsageStatus(budget),
+    used: budget.tokens_used,
+    cap: budget.max_tokens,
+    reserved: Number.isSafeInteger(reserved) ? reserved : null,
+    available: deliveryUsageStatus(budget) === "complete" && Number.isSafeInteger(reserved)
+      ? Math.max(0, budget.max_tokens - budget.tokens_used - reserved) : null,
+  };
+}
+
+export function grantDeliveryBudget(runRoot, input = {}) {
+  if (input.approvedBy !== "user") throw new Error("A budget extension requires explicit user authorization");
+  const requestId = safeIdentifier(input.requestId, "budget request id");
+  const additions = { tokens: input.addTokens ?? 0, iterations: input.addIterations ?? 0, elapsed_ms: input.addElapsedMs ?? 0 };
+  if (Object.values(additions).some(value => !Number.isSafeInteger(value) || value < 0) || !Object.values(additions).some(value => value > 0)) {
+    throw new Error("Specify positive safe integer budget additions");
+  }
+  const requestHash = sha256(JSON.stringify(additions));
+  return updateDeliveryLedger(runRoot, current => {
+    const prior = current.budget.amendments.find(entry => entry.request_id === requestId);
+    if (prior) {
+      if (prior.request_hash !== requestHash) throw new Error("The budget request id was already used with different additions");
+      return current;
+    }
+    if (!DELIVERY_ACTIVE_STATUSES.has(current.status)) throw new Error("This delivery run no longer needs a build budget");
+    if (input.expectedVersion !== undefined && input.expectedVersion !== current.version) throw new Error("The delivery budget changed; refresh its state before extending it");
+    const now = input.now ?? Date.now();
+    const elapsed = Math.max(0, now - Date.parse(current.created_at));
+    const before = { max_tokens: current.budget.max_tokens, max_iterations: current.budget.max_iterations, max_elapsed_ms: current.budget.max_elapsed_ms };
+    const after = {
+      max_tokens: before.max_tokens + additions.tokens,
+      max_iterations: before.max_iterations + additions.iterations,
+      max_elapsed_ms: additions.elapsed_ms ? Math.max(before.max_elapsed_ms, elapsed) + additions.elapsed_ms : before.max_elapsed_ms,
+    };
+    if (Object.values(after).some(value => !Number.isSafeInteger(value))) throw new Error("The extended budget exceeds the supported range");
+    if (additions.tokens && after.max_tokens <= current.budget.tokens_used) throw new Error("The extended token cap must exceed the observed usage");
+    const budget = {
+      ...current.budget, ...after,
+      amendments: [...current.budget.amendments, { request_id: requestId, request_hash: requestHash, approved_by: "user", approved_at: new Date(now).toISOString(), additions, before, after }],
+    };
+    const recoverable = current.status === "blocked" && ["token_budget_exhausted", "iteration_budget_exhausted", "elapsed_budget_exhausted"].includes(current.blockers[0]?.code);
+    const remaining = budgetBlocker({ ...current, budget }, now);
+    return {
+      ...current, budget,
+      ...(recoverable ? remaining
+        ? { blockers: [remaining], phase: remaining.code }
+        : { status: "correcting", phase: "budget_extended", next_action: "resume_delivery", blockers: [] }
+        : {}),
+    };
+  }, { eventType: "delivery_budget_authorized", payload: { request_id: requestId, additions } }).state;
+}
+
+export function accountDeliveryExecutorResult(runRoot, result, executorPath) {
+  if (!["pritha-build-executor-result-v1", "pritha-build-executor-result-v2"].includes(result?.schema)) throw new Error("Unsupported executor receipt");
+  if (result.usage_scope && result.usage_scope !== "build-executor") throw new Error("Executor receipt has a different usage scope");
+  return updateDeliveryLedger(runRoot, (current) => {
+    if (result.run_id && result.run_id !== current.run_id) throw new Error("Executor receipt belongs to another delivery run");
+    const budget = { ...current.budget };
+    let unresolved = budget.unaccounted_attempts.filter((entry) => entry.executor_result !== executorPath);
+    const threadId = String(result.thread_id || "");
+    const turnId = String(result.turn_id || "");
+    const key = threadId && turnId ? `${threadId}:${turnId}` : "";
+    const count = result.tokens_used;
+    const status = result.usage_status ?? (result.goal_enforcement !== "waived-once" && key && Number.isSafeInteger(count) && count >= 0 ? "measured" : "unknown");
+    let reason = "";
+    if (status === "measured" && key && Number.isSafeInteger(count) && count >= 0) {
+      const previous = budget.accounted_turns.find((entry) => entry.key === key);
+      const nextCount = Math.max(previous?.tokens_used ?? 0, count);
+      const nextTotal = budget.tokens_used - (previous?.tokens_used ?? 0) + nextCount;
+      if (!Number.isSafeInteger(nextTotal)) reason = "token_total_out_of_range";
+      else if (previous?.usage_source && result.usage_source && previous.usage_source !== result.usage_source && previous.tokens_used !== count) reason = "conflicting_usage_sources";
+      else {
+        const entry = {
+          ...previous, key, thread_id: threadId, turn_id: turnId,
+          tokens_used: nextCount, executor_result: previous?.executor_result || executorPath,
+          phase: "build-executor", usage_source: previous?.usage_source || result.usage_source || "legacy-goal",
+          turn_status: result.turn_status || result.status,
+        };
+        budget.accounted_turns = [...budget.accounted_turns.filter((item) => item.key !== key), entry];
+        budget.tokens_used = nextTotal;
+      }
+    } else if (!["not-started", "not-applicable"].includes(status)) reason = "usage_unavailable";
+    if (result.thread_cleanup === "pending") reason ||= "thread_cleanup_pending";
+    if (reason) unresolved.push({ executor_result: executorPath, thread_id: threadId || null, turn_id: turnId || null, phase: "build-executor", reason,
+      turn_status: result.turn_status || result.status, thread_cleanup: result.thread_cleanup || "unknown",
+      reserved_tokens: ["dispatching", "running", "uncertain"].includes(result.status) && Number.isSafeInteger(result.token_budget) ? result.token_budget : 0 });
+    budget.unaccounted_attempts = unresolved;
+    if (result.goal_enforcement === "waived-once" && status !== "not-started" && budget.goal_enforcement === "waived-once") {
+      budget.goal_enforcement = "required";
+      budget.goal_waiver = { ...budget.goal_waiver, used_at: new Date().toISOString() };
+    }
+    return {
+      ...current, budget, executor_last_result: executorPath,
+      next_action: current.status === "building" ? "verify_executor_changes" : current.next_action,
+    };
+  }, {
+    eventType: "build_usage_recorded",
+    payload: { executor_result: executorPath, thread_id: result.thread_id || null, turn_id: result.turn_id || null, usage_status: result.usage_status || "legacy" },
+  }).state;
 }
 
 export function deliveryTargetClaimPath(buildsRoot, key) {

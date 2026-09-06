@@ -6562,6 +6562,27 @@ button:active,
   padding: 0 18px;
 }
 
+.codex-goal-panel {
+  flex: 0 0 auto;
+  max-height: 42vh;
+  overflow: auto;
+  margin: 0 16px 8px;
+  border: 1px solid var(--border-medium);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.codex-goal-panel summary { padding: 10px 12px; cursor: pointer; overflow-wrap: anywhere; }
+.codex-goal-panel summary span { margin-left: 12px; color: var(--text-secondary); }
+.codex-goal-body { padding: 0 12px 12px; color: var(--text-secondary); }
+.codex-goal-body p { margin: 6px 0 10px; }
+.codex-goal-objective { color: var(--text-primary); overflow-wrap: anywhere; }
+.codex-goal-fields { display: flex; flex-wrap: wrap; gap: 10px; }
+.codex-goal-fields label { display: flex; flex: 1 1 160px; min-width: 0; flex-direction: column; gap: 4px; }
+.codex-goal-fields input, .codex-goal-fields select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--border-medium); border-radius: 6px; background: var(--surface-panel-raised); color: var(--text-primary); }
+.codex-goal-resume { display: flex; gap: 8px; align-items: start; margin: 10px 0; }
+.codex-goal-resume input { margin-top: 3px; }
+.codex-goal-body > button { margin-top: 8px; }
+
 .codex-turn {
   min-width: 0;
   max-width: 100%;

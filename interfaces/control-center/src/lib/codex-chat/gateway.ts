@@ -8,6 +8,7 @@ import { classifyNativeThreadReadFailure } from "./native-thread-errors";
 import { CodexChatPrivateStore, logicalChatKey, type ChatBinding } from "./private-store";
 import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
+import { changeThreadGoalBudget, emptyGoalView, GoalControlError, readThreadGoal, type GoalBudgetReceipt } from "./goal-control";
 import {
   asObject,
   itemIdFor,
@@ -31,6 +32,8 @@ import type {
   TurnPage,
   TurnView,
   CreateTaskLinkRequest,
+  GoalBudgetRequest,
+  ThreadGoalView,
 } from "./types";
 
 type CreateThreadInput = {
@@ -426,6 +429,56 @@ export class CodexChatGateway {
       continuationState: summary.continuationState,
       history,
     };
+  }
+
+  private async goalContext(chatId: string, writable: boolean) {
+    const binding = await this.requireBinding(chatId);
+    const provider = (await this.runtime.provider(binding.providerId)).view;
+    if (provider.availability !== "ready") throw new CodexChatGatewayError("runtime_unavailable", "The task runtime is unavailable. Its saved progress is preserved.", 503, true);
+    if (!provider.capabilities.goalControl) throw new CodexChatGatewayError("goal_unsupported", "This runtime does not expose Goal controls.", 422);
+    if (!binding.stateIdentityHash || provider.stateIdentityHash !== binding.stateIdentityHash) throw new CodexChatGatewayError("runtime_identity_mismatch", "Restore access to the original task before changing its Goal.", 409);
+    const native = await this.readNativeThread(binding, false);
+    if (native.id !== binding.nativeThreadId || native.ephemeral === true) throw new CodexChatGatewayError("goal_thread_mismatch", "The Goal could not be bound to this saved task.", 409);
+    if (writable) {
+      if (binding.archived) throw new CodexChatGatewayError("chat_archived", "Restore this chat before changing its budget.", 409);
+      if (binding.origin === "voice" && !binding.continuationEnabled) throw new CodexChatGatewayError("continuation_confirmation_required", "Choose Continue in Task Chat before changing this task.", 409);
+      if (this.activeTurns.has(chatId) || threadStatusFromNative(native.status) === "active") throw new CodexChatGatewayError("turn_active", "Wait for the current turn or pending approval before changing its budget.", 409, true);
+    }
+    const connection = await this.runtime.connection(binding.providerId);
+    return {
+      threadId: binding.nativeThreadId,
+      read: () => connection.request("thread/goal/get", { threadId: binding.nativeThreadId }, 5_000),
+      set: (params: { threadId: string; tokenBudget: number; status?: "active" }) => connection.request("thread/goal/set", params, 10_000),
+      receipts: async () => (await this.requireBinding(chatId)).goalBudgetRequests || {},
+      save: async (requestId: string, receipt: GoalBudgetReceipt) => {
+        const current = await this.requireBinding(chatId);
+        if (!await this.store.patch(chatId, { goalBudgetRequests: { ...current.goalBudgetRequests, [requestId]: receipt } })) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
+      },
+    };
+  }
+
+  async threadGoal(chatId: string): Promise<ThreadGoalView> {
+    try { return await readThreadGoal(await this.goalContext(chatId, false)); }
+    catch (error) {
+      if (error instanceof CodexChatGatewayError && error.code === "goal_unsupported") return emptyGoalView("unsupported");
+      if (error instanceof CodexChatGatewayError) throw error;
+      throw new CodexChatGatewayError("goal_unavailable", "The Goal could not be read. Task history and progress are preserved.", 503, true);
+    }
+  }
+
+  async updateGoalBudget(chatId: string, input: GoalBudgetRequest) {
+    const binding = await this.requireBinding(chatId);
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `goal-budget:${chatId}`);
+    if (!release) throw new CodexChatGatewayError("turn_active", "This task already has an active operation. Reconcile it before changing its budget.", 409, true);
+    try {
+      const result = await changeThreadGoalBudget(await this.goalContext(chatId, true), input);
+      this.emit(chatId, "goal.updated", { goal: result.goal });
+      return result;
+    } catch (error) {
+      if (error instanceof CodexChatGatewayError) throw error;
+      if (error instanceof GoalControlError) throw new CodexChatGatewayError(error.code, error.message, error.status, error.retryable);
+      throw new CodexChatGatewayError("goal_update_unconfirmed", "The runtime did not confirm the budget change. Retry the same request to reconcile it.", 503, true);
+    } finally { release(); }
   }
 
   async archiveThread(chatId: string, archived: boolean) {
@@ -860,7 +913,8 @@ export class CodexChatGateway {
     if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     const aliases = await this.store.all();
     const matching = aliases.filter(row => logicalChatKey(row) === logicalChatKey(binding));
-    return { ...binding, archived: matching.some(row => row.archived), attachmentMessages: Object.assign({}, ...matching.map(row => row.attachmentMessages || {}), binding.attachmentMessages || {}) };
+    return { ...binding, archived: matching.some(row => row.archived), attachmentMessages: Object.assign({}, ...matching.map(row => row.attachmentMessages || {}), binding.attachmentMessages || {}),
+      goalBudgetRequests: Object.assign({}, ...matching.map(row => row.goalBudgetRequests || {}), binding.goalBudgetRequests || {}) };
   }
 
   private releaseActiveTurn(chatId: string) {
@@ -923,6 +977,11 @@ export class CodexChatGateway {
       const nativeTurn = asObject(params.turn);
       const nativeTurnId = String(params.turnId || nativeTurn?.id || "");
       const active = this.activeTurns.get(binding.chatId) || null;
+
+      if (method === "thread/goal/updated" || method === "thread/goal/cleared") {
+        this.emit(binding.chatId, "goal.updated", {});
+        return;
+      }
 
       if (method === "turn/started" && active && nativeTurnId) {
         active.nativeTurnId = nativeTurnId;

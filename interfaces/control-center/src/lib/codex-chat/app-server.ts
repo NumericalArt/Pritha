@@ -134,6 +134,7 @@ function has(files: Set<string>, name: string) {
 
 function capabilitiesFromSchema(files: Set<string>) {
   const capabilities = emptyCapabilities();
+  capabilities.goalControl = has(files, "ThreadGoalGetParams") && has(files, "ThreadGoalSetParams");
   capabilities.listThreads = has(files, "ThreadListParams") && has(files, "ThreadListResponse");
   capabilities.readThread = has(files, "ThreadReadParams") && has(files, "ThreadReadResponse");
   capabilities.nativeHistory = capabilities.readThread;
@@ -642,6 +643,9 @@ export class CodexRuntimeManager {
         }
         const saved = JSON.parse(readFileSync(markerPath, "utf8")) as { capabilities?: RuntimeCapabilityMap };
         capabilities = saved.capabilities || capabilitiesFromSchema(fileNamesRecursively(schemaRoot));
+        // Older cache markers predate Goal controls; derive this capability from
+        // the installed runtime's existing schema instead of a missing field.
+        capabilities.goalControl = capabilitiesFromSchema(fileNamesRecursively(schemaRoot)).goalControl;
         capabilities.fileMetadata = has(fileNamesRecursively(schemaRoot), "FsGetMetadataParams");
         try {
           const schema = JSON.parse(readFileSync(path.join(schemaRoot, "v2", "TurnStartParams.json"), "utf8"));

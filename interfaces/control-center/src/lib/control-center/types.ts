@@ -255,6 +255,7 @@ export type ControlCenterAgent = {
       runId?: string;
       phase?: string;
       blockerCount?: number;
+      budget?: import("./delivery-state").DeliveryBudgetView;
       updatedAt?: string;
       source?: "live-ledger" | "delivery-report";
       reason?: string;

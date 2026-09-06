@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction 
 import { useChatAttachments } from "./useChatAttachments";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { CopyResponse } from "./CopyResponse";
+import { GoalBudgetPanel } from "./GoalBudgetPanel";
 import { CodexMarkdown } from "./CodexMarkdown";
 import {
   checkControlCenterHealth,
@@ -305,6 +306,7 @@ export function CodexChatPage() {
   const [error, setError] = useState<ChatFailure | null>(null);
   const [recovering, setRecovering] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [goalRevision, setGoalRevision] = useState(0);
   const [historyState, setHistoryState] = useState<HistoryState>("idle");
   const [historyHasImages, setHistoryHasImages] = useState(false);
   const [olderCursor, setOlderCursor] = useState<string | null>(null);
@@ -769,6 +771,7 @@ export function CodexChatPage() {
         setConnection("ready");
       }
       if (message.type === "stream.reset") void reload();
+      if (message.type === "goal.updated" || message.type === "connection.ready") setGoalRevision(value => value + 1);
       if (message.type === "message.delta") setTurns((rows) => appendDelta(rows, payload));
       if (message.type === "turn.started" || message.type === "turn.completed" || message.type === "turn.interrupted" || message.type === "turn.failed") {
         const turn = payload.payload.turn as TurnView | undefined;
@@ -803,7 +806,7 @@ export function CodexChatPage() {
       };
       for (const name of [
         "connection.ready", "stream.reset", "thread.updated", "thread.archived", "thread.unarchived", "turn.started", "turn.completed", "turn.interrupted", "turn.failed",
-        "message.delta", "message.completed", "item.started", "item.completed",
+        "message.delta", "message.completed", "item.started", "item.completed", "goal.updated",
       ]) source.addEventListener(name, event as EventListener);
       source.onerror = () => {
         if (cancelled) return;
@@ -1351,6 +1354,9 @@ export function CodexChatPage() {
           </div>
         ) : null}
 
+        {displayedDetail ? <GoalBudgetPanel key={displayedDetail.thread.chatId} chatId={displayedDetail.thread.chatId} refreshKey={goalRevision}
+          active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
+          editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} /> : null}
         <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
           {loading && !selectedChatId ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Task Chat</h2></div> : null}
           {!loading && !selectedChatId ? (

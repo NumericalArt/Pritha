@@ -58,12 +58,17 @@ const CHILD_AGENT_TYPES = new Set([
 
 function publicationBase() {
   const mergeBase = git(["merge-base", "HEAD", "origin/main"]);
-  return mergeBase.ok ? mergeBase.stdout.trim() : "";
+  const base = mergeBase.stdout.trim();
+  // An unknown base cannot establish that child-agent publication is safe.
+  // Keep this audit offline; the operator must resolve local refs/history first.
+  if (!mergeBase.ok || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(base)) {
+    throw new Error("Cannot determine publication changes: git merge-base HEAD origin/main did not return a valid commit. Check local origin/main and repository history, then rerun the audit. No fetch was attempted.");
+  }
+  return base;
 }
 
 function changedAgentArtifacts() {
   const base = publicationBase();
-  if (!base) return [];
   const diff = git(["diff", "--name-only", "--diff-filter=ACDMRTUXB", "-z", base, "--", "11_agents"]);
   if (!diff.ok) throw new Error(diff.stderr || "git diff publication guard failed");
   const untracked = git(["ls-files", "--others", "--exclude-standard", "-z", "--", "11_agents"]);
@@ -83,6 +88,23 @@ function prohibitedChildAgentChanges() {
       return true;
     }
   });
+}
+
+function childAgentPublicationCheck() {
+  const id = "instance-local-child-agent-publication";
+  try {
+    const changes = prohibitedChildAgentChanges();
+    return {
+      id,
+      status: changes.length ? "fail" : "pass",
+      detail: changes.length
+        ? changes.join("\n")
+        : "no new, modified, renamed, or deleted child-agent lifecycle artifacts under tracked 11_agents",
+    };
+  } catch (error) {
+    // Report the failure without skipping the remaining privacy checks.
+    return { id, status: "fail", detail: error instanceof Error ? error.message : "Child-agent publication inspection failed." };
+  }
 }
 
 function textFilesWithMatches(files, pattern) {
@@ -116,7 +138,7 @@ function compact(matches, limit = 80) {
 }
 
 const files = trackedFiles();
-const childAgentPublicationChanges = prohibitedChildAgentChanges();
+const childAgentPublication = childAgentPublicationCheck();
 const rawMediaPattern = /^01_sources\/raw\/.*\.(mp4|wav|mov|mkv|webm|mp3|m4a|avi|flac)$/i;
 const maxRegularFileBytes = 95 * 1024 * 1024;
 const requiredMemorySnapshotFiles = [
@@ -188,13 +210,7 @@ const optionalScanners = {
 };
 
 const checks = [
-  {
-    id: "instance-local-child-agent-publication",
-    status: childAgentPublicationChanges.length ? "fail" : "pass",
-    detail: childAgentPublicationChanges.length
-      ? childAgentPublicationChanges.join("\n")
-      : "no new, modified, renamed, or deleted child-agent lifecycle artifacts under tracked 11_agents",
-  },
+  childAgentPublication,
   {
     id: "secret-history",
     status: secretHistory.stdout.trim() ? "fail" : "pass",

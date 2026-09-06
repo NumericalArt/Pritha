@@ -51,6 +51,8 @@ import type {
   ControlCenterStatus,
 } from "./types";
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
+import { runSyncProbe } from "./sync-probe";
+import { deliveryStateView } from "./delivery-state";
 
 type RegistryRecord = {
   name: string;
@@ -310,9 +312,7 @@ function firstLanIPv4() {
 }
 
 function tailscaleSelfDnsName() {
-  const result = spawnSync("tailscale", ["status", "--json"], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
+  const result = runSyncProbe("tailscale", ["status", "--json"], {
     timeout: TAILSCALE_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0 || !result.stdout.trim()) return undefined;
@@ -325,9 +325,7 @@ function tailscaleSelfDnsName() {
 }
 
 function tailscaleServeStatusOutput() {
-  const result = spawnSync("tailscale", ["serve", "status"], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
+  const result = runSyncProbe("tailscale", ["serve", "status"], {
     timeout: TAILSCALE_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0) return "";
@@ -335,9 +333,7 @@ function tailscaleServeStatusOutput() {
 }
 
 function tailscaleServeStatusJson() {
-  const result = spawnSync("tailscale", ["serve", "status", "--json"], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
+  const result = runSyncProbe("tailscale", ["serve", "status", "--json"], {
     timeout: TAILSCALE_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0 || !result.stdout.trim()) return null;
@@ -453,7 +449,7 @@ function emptyMemoryStats(): MemoryStats {
 function sqliteMemoryStats(root: string): MemoryStats | null {
   const databasePath = resolvePrithaStatePath("memory", "techscope.sqlite");
   if (!existsSync(databasePath)) return null;
-  const result = spawnSync(
+  const result = runSyncProbe(
     "sqlite3",
     [
       "-json",
@@ -467,8 +463,6 @@ UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
 `,
     ],
     {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
       timeout: 5_000,
     },
   );
@@ -530,13 +524,15 @@ function selfTestStatus(root: string): ControlCenterStatus["selfTest"] {
 
 function launchdRootWarnings(root: string) {
   const auditScript = path.join(/* turbopackIgnore: true */ root, "scripts", "launchd-root-audit.mjs");
-  const result = spawnSync(process.execPath, [auditScript, "status", "--json"], {
+  const result = runSyncProbe(process.execPath, [auditScript, "status", "--json"], {
     cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
     timeout: 30_000,
     env: { ...process.env, TECHSCOPE_ROOT: root },
   });
+  if (result.error) {
+    const timedOut = "code" in result.error && result.error.code === "ETIMEDOUT";
+    return [`Launchd root audit unavailable: ${timedOut ? "probe timed out" : "probe failed"}`];
+  }
   const text = String(result.stdout || "").trim();
   if (!text) return result.status === 0 ? [] : [`Launchd root audit unavailable: ${String(result.stderr || "no output").trim()}`];
   try {
@@ -761,42 +757,16 @@ function findLiveDeliveryState(root: string, agent: RegistryRecord) {
   const buildsRoot = resolvePrithaStatePath("builds");
   if (!existsSync(buildsRoot)) return null;
   const agentKey = compactKey(agent.name);
-  const candidates: Array<{
-    status: ControlCenterAgent["lifecycle"]["delivery"]["status"];
-    runId: string;
-    phase?: string;
-    blockerCount: number;
-    updatedAt?: string;
-    statePath: string;
-  }> = [];
-  const activeStatuses = new Set(["created", "preparing", "building", "verifying", "correcting", "paused"]);
-  const knownStatuses = new Set([
-    ...activeStatuses,
-    "blocked",
-    "verified",
-    "awaiting_acceptance",
-    "accepted",
-    "failed",
-    "abandoned",
-    "cancelled",
-  ]);
+  const candidates: Array<NonNullable<ReturnType<typeof deliveryStateView>>> = [];
   for (const agentDir of readdirSync(buildsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== ".targets").slice(0, 1_000)) {
     const directory = path.join(buildsRoot, agentDir.name);
     for (const runDir of readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isDirectory()).slice(0, 1_000)) {
       const statePath = path.join(directory, runDir.name, "build-state.json");
       const state = readJson<Record<string, unknown>>(statePath);
-      if (state?.schema !== "pritha-delivery-ledger-v1") continue;
+      const view = deliveryStateView(state);
+      if (!state || !view) continue;
       if (![state.agent_slug, state.target_label, agentDir.name].some((value) => compactKey(String(value || "")) === agentKey)) continue;
-      const rawStatus = String(state.status || "unknown");
-      const status = (knownStatuses.has(rawStatus) ? rawStatus : "unknown") as ControlCenterAgent["lifecycle"]["delivery"]["status"];
-      candidates.push({
-        status,
-        runId: String(state.run_id || runDir.name),
-        phase: String(state.phase || "") || undefined,
-        blockerCount: Array.isArray(state.blockers) ? state.blockers.length : 0,
-        updatedAt: String(state.updated_at || "") || undefined,
-        statePath,
-      });
+      candidates.push({ ...view, runId: view.runId || runDir.name });
     }
   }
   return candidates.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))[0] || null;
@@ -1080,6 +1050,7 @@ function lifecycleForAgent(root: string, agent: RegistryRecord, manifest: Operat
           runId: liveDelivery.runId,
           phase: liveDelivery.phase,
           blockerCount: liveDelivery.blockerCount,
+          budget: liveDelivery.budget,
           updatedAt: liveDelivery.updatedAt,
           source: "live-ledger" as const,
         }
@@ -1930,10 +1901,8 @@ function launchdRuntimeState(manifest: OperationsManifest | null) {
   const target = label && uid !== undefined ? `gui/${uid}/${label}` : label;
   const loaded =
     Boolean(target) &&
-    spawnSync("launchctl", ["print", target], {
-      encoding: "utf8",
+    runSyncProbe("launchctl", ["print", target], {
       timeout: 2500,
-      stdio: ["ignore", "pipe", "pipe"],
     }).status === 0;
 
   return {
@@ -1946,11 +1915,10 @@ function launchdRuntimeState(manifest: OperationsManifest | null) {
 
 function screenSessionRunning(session: string | undefined) {
   if (!session) return false;
-  const result = spawnSync("screen", ["-ls"], {
-    encoding: "utf8",
+  const result = runSyncProbe("screen", ["-ls"], {
     timeout: 2500,
-    stdio: ["ignore", "pipe", "pipe"],
   });
+  if (result.error) return false;
   const output = `${result.stdout || ""}\n${result.stderr || ""}`;
   return output.split(/\r?\n/).some((line) => line.includes(`.${session}`) || line.trim() === session);
 }

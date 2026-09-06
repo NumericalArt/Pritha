@@ -1,9 +1,10 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { CodexAppServerConnection, ExecutionBackendError } from "./execution-backends.mjs";
 
-export const BUILD_EXECUTOR_RESULT_SCHEMA = "pritha-build-executor-result-v1";
+export const BUILD_EXECUTOR_RESULT_SCHEMA = "pritha-build-executor-result-v2";
 
 function bounded(value, maximum = 20_000) {
   const text = String(value || "").trim();
@@ -107,7 +108,7 @@ function extractAgentText(turn) {
 
 function parseSummary(text) {
   const source = String(text || "").trim();
-  if (!source) return { summary: "Codex completed without a textual summary.", changed_files: [], remaining_risks: [] };
+  if (!source) return { summary: "The build attempt has no textual summary.", changed_files: [], remaining_risks: [] };
   try {
     const parsed = JSON.parse(source);
     if (parsed && typeof parsed === "object") {
@@ -149,7 +150,10 @@ export class FunctionBuildExecutor {
       runtime_version: value?.runtime_version || "fixture",
       thread_id: value?.thread_id || null,
       turn_id: value?.turn_id || null,
-      tokens_used: Number.isSafeInteger(value?.tokens_used) ? value.tokens_used : 0,
+      tokens_used: Number.isSafeInteger(value?.tokens_used) ? value.tokens_used : null,
+      usage_scope: "build-executor",
+      usage_status: value?.usage_status || (Number.isSafeInteger(value?.tokens_used) ? "measured" : "not-applicable"),
+      usage_source: value?.usage_source || "fixture",
       goal_enforcement: value?.goal_enforcement || "not-applicable",
     };
   }
@@ -193,6 +197,19 @@ export class ManualBuildExecutor {
   close() {}
 }
 
+function worktreeIdentity(cwd) {
+  return `sha256:${createHash("sha256").update(cwd).digest("hex")}`;
+}
+
+function validGoal(goal, receipt) {
+  return goal?.threadId === receipt.thread_id
+    && goal?.objective === receipt.goal_objective
+    && goal?.tokenBudget === receipt.token_budget
+    && Number.isSafeInteger(goal?.tokensUsed) && goal.tokensUsed >= 0;
+}
+
+const TERMINAL_TURN_STATUSES = new Set(["completed", "failed", "interrupted"]);
+
 export class CodexAppServerBuildExecutor {
   constructor(options = {}) {
     this.name = "codex-app-server-build";
@@ -202,188 +219,275 @@ export class CodexAppServerBuildExecutor {
   }
 
   async ensureReady(cwd, timeoutMs) {
-    if (this.initializeResponse) return this.initializeResponse;
+    if (this.initializeResponse && this.connection && (!("child" in this.connection) || this.connection.child)) return this.initializeResponse;
     if (!this.connection) {
       const factory = this.options.connectionFactory || ((value) => new CodexAppServerConnection(value));
       this.connection = factory({ codexBin: this.options.codexBin, cwd });
     }
     await this.connection.start(Math.min(timeoutMs, 10_000));
     this.initializeResponse = await this.connection.request("initialize", {
-      clientInfo: { name: "pritha-build-executor", title: "Pritha Build Executor", version: "1.0" },
+      clientInfo: { name: "pritha-build-executor", title: "Pritha Build Executor", version: "2.0" },
       capabilities: {
         experimentalApi: true,
         requestAttestation: false,
-        optOutNotificationMethods: ["thread/tokenUsage/updated", "item/reasoning/textDelta", "item/reasoning/summaryTextDelta"],
+        optOutNotificationMethods: ["item/reasoning/textDelta", "item/reasoning/summaryTextDelta"],
       },
     }, Math.min(timeoutMs, 10_000));
+    this.connection.notify?.("initialized");
     return this.initializeResponse;
   }
 
   async probe(options = {}) {
     const cwd = worktreeRoot(options.cwd || options.worktree);
-    const timeoutMs = Number.isSafeInteger(options.timeoutMs) ? Math.min(Math.max(options.timeoutMs, 10_000), 30_000) : 30_000;
+    const timeoutMs = 10_000;
+    let threadId;
+    let result;
     try {
       const initialized = await this.ensureReady(cwd, timeoutMs);
       const response = await this.connection.request("thread/start", {
-        cwd,
-        ephemeral: true,
-        approvalPolicy: "never",
-        sandbox: "workspace-write",
-        runtimeWorkspaceRoots: [cwd],
-        personality: "pragmatic",
-        threadSource: "user",
-        developerInstructions: "Capability probe only. Do not start a turn or modify files.",
+        cwd, ephemeral: false, approvalPolicy: "never", sandbox: "read-only",
+        threadSource: "user", developerInstructions: "Capability probe only. No model turn is authorized.",
       }, timeoutMs);
-      const threadId = String(response?.thread?.id || "");
-      const threadStart = Boolean(threadId);
+      threadId = String(response?.thread?.id || "");
+      if (!threadId || response.thread.ephemeral === true) throw new ExecutionBackendError("app_server_thread_missing", "A persisted probe thread is required");
       let goal = false;
-      let goalError = null;
-      if (threadStart) {
-        try {
-          await this.connection.request("thread/goal/get", { threadId }, timeoutMs);
-          goal = true;
-        } catch (error) {
-          goal = false;
-          goalError = bounded(error instanceof Error ? error.message : String(error), 2_000);
-        }
-      }
-      return {
-        backend: this.name,
-        available: threadStart,
-        isolation: "sandboxed",
+      let error = null;
+      try {
+        const objective = "Pritha capability probe; no model turn is authorized.";
+        await this.connection.request("thread/goal/set", { threadId, objective, status: "paused", tokenBudget: 1_000 }, timeoutMs);
+        const readback = (await this.connection.request("thread/goal/get", { threadId }, timeoutMs))?.goal;
+        goal = validGoal(readback, { thread_id: threadId, goal_objective: objective, token_budget: 1_000 })
+          && readback.tokensUsed === 0 && readback.status === "paused";
+        if (!goal) error = "The paused probe Goal failed its readback check.";
+      } catch (failure) { error = bounded(failure?.message || failure, 2_000); }
+      result = {
+        backend: this.name, available: true, isolation: "sandboxed",
         runtimeVersion: String(initialized?.userAgent || "codex-app-server/unknown"),
-        capabilities: { commandExec: false, threadStart, goal },
-        error: threadStart ? goalError : "App Server did not return a probe thread id.",
+        capabilities: { commandExec: false, threadStart: true, goal, threadLifetime: "persisted-per-attempt" }, error,
       };
     } catch (error) {
-      return {
-        backend: this.name,
-        available: false,
-        isolation: "unavailable",
+      result = {
+        backend: this.name, available: false, isolation: "unavailable",
         runtimeVersion: String(this.initializeResponse?.userAgent || "unknown"),
         capabilities: { commandExec: false, threadStart: false, goal: "unprobed" },
-        error: bounded(error instanceof Error ? error.message : String(error), 2_000),
+        error: bounded(error?.message || error, 2_000),
       };
+    } finally {
+      if (threadId) {
+        try { await this.connection.request("thread/goal/clear", { threadId }, timeoutMs); }
+        catch { /* Goal may be unsupported; no model turn was sent. */ }
+        try { await this.archiveAttempt({ thread_id: threadId, usage_status: "not-started" }, cwd, timeoutMs); }
+        catch { result.available = false; result.error = "The capability probe thread could not be archived."; }
+      }
     }
+    return result;
+  }
+
+  async archiveAttempt(receipt, cwd, timeoutMs) {
+    try {
+      await this.connection.request("thread/archive", { threadId: receipt.thread_id }, timeoutMs);
+      return "archived";
+    } catch (error) {
+      // Installed runtimes reject a repeated archive. Confirm its native state
+      // instead of treating a lost archive acknowledgement as pending forever.
+      if (!/no rollout found for thread id/i.test(error?.message || "")) throw error;
+      let cursor;
+      for (let page = 0; page < 5; page++) {
+        const listed = await this.connection.request("thread/list", { cwd, archived: true, limit: 100, ...(cursor ? { cursor } : {}) }, timeoutMs);
+        if (listed.data?.some(thread => thread.id === receipt.thread_id && path.resolve(thread.cwd || "") === cwd)) return "archived";
+        cursor = listed.nextCursor;
+        if (!cursor) break;
+      }
+      if (receipt.usage_status === "not-started") {
+        // Before the first Goal/turn, thread/start may have no rollout at all.
+        // This exception is limited to an attempt for which no RPC was sent.
+        await this.connection.request("thread/unsubscribe", { threadId: receipt.thread_id }, timeoutMs);
+        return "not-materialized";
+      }
+      throw error;
+    }
+  }
+
+  async checkpoint(input, receipt) {
+    const context = { projectRoot: input.worktree, stateRoot: input.stateRoot, root: input.root };
+    const safe = sanitized(receipt, context);
+    try { await input.onCheckpoint?.(safe); }
+    catch {
+      throw new ExecutionBackendError("executor_checkpoint_failed", "The host could not persist the build attempt checkpoint", { executorResult: safe });
+    }
+    return safe;
+  }
+
+  async waitForTurn(receipt, timeoutMs) {
+    return this.connection.waitForNotification((message) => {
+      const thread = message?.params?.threadId;
+      const turn = message?.params?.turn?.id || message?.params?.turnId;
+      return thread === receipt.thread_id && turn === receipt.turn_id
+        && (message.method === "turn/completed" || (message.method === "error" && message.params?.willRetry !== true));
+    }, timeoutMs);
+  }
+
+  async settle(input, receipt, turn, timeoutMs) {
+    const rpcTimeout = Math.min(timeoutMs, 10_000);
+    // A timeout/error is not proof that execution stopped. Interrupt only the
+    // bound turn and wait for its terminal notification before trusting usage.
+    if (!TERMINAL_TURN_STATUSES.has(turn?.status) && receipt.turn_id) {
+      try {
+        await this.connection.request("turn/interrupt", { threadId: receipt.thread_id, turnId: receipt.turn_id }, rpcTimeout);
+        const notification = await this.waitForTurn(receipt, rpcTimeout);
+        turn = notification.params?.turn;
+      } catch { /* Unknown remains unknown; no dispatch retry. */ }
+    }
+    const terminal = TERMINAL_TURN_STATUSES.has(turn?.status);
+    receipt.turn_status = terminal ? turn.status : "unknown";
+    receipt.status = terminal ? turn.status : "uncertain";
+    const summary = parseSummary(this.connection.agentTextForTurn?.(receipt.turn_id) || extractAgentText(turn));
+    Object.assign(receipt, summary);
+    let goal;
+    if (receipt.goal_enforcement === "required") {
+      try { goal = (await this.connection.request("thread/goal/get", { threadId: receipt.thread_id }, rpcTimeout))?.goal; }
+      catch { /* A matching final token update can still supply usage. */ }
+    }
+    receipt.goal_status = goal?.status || (receipt.goal_enforcement === "required" ? "unavailable" : "waived");
+    const goalValid = validGoal(goal, receipt);
+    const fallback = this.connection.tokenUsageForTurn?.(receipt.thread_id, receipt.turn_id);
+    const count = goalValid ? goal.tokensUsed : fallback;
+    receipt.usage_status = terminal && Number.isSafeInteger(count) && count >= 0 ? "measured" : "unknown";
+    receipt.tokens_used = receipt.usage_status === "measured" ? count : null;
+    receipt.usage_source = receipt.usage_status === "measured" ? (goalValid ? "goal" : "thread-token-usage") : "unavailable";
+    if (goal && !goalValid) receipt.error_code = "goal_state_mismatch";
+    // Persist evidence before cleanup: a crash never hides a charged attempt.
+    receipt.thread_cleanup = "pending";
+    try { await this.checkpoint(input, receipt); }
+    catch { /* Still quiesce the native thread; the final checkpoint must succeed. */ }
+    try {
+      if (receipt.goal_enforcement === "required" && goal?.status === "active") {
+        await this.connection.request("thread/goal/set", { threadId: receipt.thread_id, status: "paused" }, rpcTimeout);
+      }
+      receipt.thread_cleanup = await this.archiveAttempt(receipt, worktreeRoot(input.worktree), rpcTimeout);
+    } catch { receipt.thread_cleanup = "pending"; }
+    return this.checkpoint(input, receipt);
+  }
+
+  async recover(input, saved) {
+    const cwd = worktreeRoot(input.worktree);
+    if (saved.schema !== BUILD_EXECUTOR_RESULT_SCHEMA || saved.run_id !== input.runId
+      || saved.worktree_identity !== worktreeIdentity(cwd) || !saved.thread_id) {
+      throw new ExecutionBackendError("executor_recovery_unavailable", "No compatible bound receipt is available for recovery");
+    }
+    await this.ensureReady(cwd, 10_000);
+    const read = await this.connection.request("thread/read", { threadId: saved.thread_id, includeTurns: true }, 10_000);
+    if (read.thread?.id !== saved.thread_id || path.resolve(read.thread.cwd || "") !== cwd || read.thread.ephemeral === true) {
+      throw new ExecutionBackendError("executor_recovery_mismatch", "Native recovery thread does not match the bound worktree");
+    }
+    const turns = read.thread.turns || [];
+    if (turns.length > 1 || (saved.turn_id && turns.some((turn) => turn.id !== saved.turn_id))) {
+      throw new ExecutionBackendError("executor_recovery_mismatch", "The attempt contains an unexpected native turn");
+    }
+    const receipt = { ...saved };
+    const turn = turns[0];
+    if (saved.usage_status === "not-started" && turns.length === 0) {
+      receipt.thread_cleanup = await this.archiveAttempt(receipt, cwd, 10_000);
+      return this.checkpoint(input, receipt);
+    }
+    receipt.turn_id ||= turn?.id || null;
+    if (turn && !TERMINAL_TURN_STATUSES.has(turn.status)) {
+      await this.connection.request("thread/resume", { threadId: receipt.thread_id, cwd, approvalPolicy: "never", sandbox: "workspace-write" }, 10_000);
+    }
+    // Reading/resuming is recovery only. Never resend turn/start.
+    return this.settle(input, receipt, turn, 10_000);
   }
 
   async execute(input) {
     const cwd = worktreeRoot(input.worktree);
     const timeoutMs = Number.isSafeInteger(input.timeoutMs) ? Math.min(Math.max(input.timeoutMs, 10_000), 3_600_000) : 900_000;
-    const initialized = await this.ensureReady(cwd, timeoutMs);
-    const started = Date.now();
-    const threadResponse = await this.connection.request("thread/start", {
-      cwd,
-      ephemeral: true,
-      approvalPolicy: "never",
-      sandbox: "workspace-write",
-      runtimeWorkspaceRoots: [cwd],
-      personality: "pragmatic",
-      threadSource: "user",
-      developerInstructions: "Implement only the approved delivery payload in the current worktree. Never modify verifier inputs or perform push, merge, deployment, service enablement, secret provisioning, remote changes, or hook bypasses.",
-    }, Math.min(timeoutMs, 30_000));
-    const threadId = String(threadResponse?.thread?.id || "");
-    if (!threadId) throw new ExecutionBackendError("app_server_thread_missing", "Codex App Server did not return a build thread id");
-
     const goalRequired = input.goalRequired !== false;
     const tokenBudget = Number(input.tokenBudget);
-    if (goalRequired) {
-      if (!Number.isSafeInteger(tokenBudget) || tokenBudget < 1) {
-        throw new ExecutionBackendError("token_budget_exhausted", "Build turn has no positive remaining token budget");
-      }
-      const objective = bounded(input.goalObjective, 4_000);
-      if (!objective) throw new ExecutionBackendError("goal_objective_invalid", "Build Goal objective is required");
-      try {
-        await this.connection.request("thread/goal/set", {
-          threadId,
-          objective,
-          status: "active",
-          tokenBudget,
-        }, Math.min(timeoutMs, 30_000));
-      } catch (error) {
-        if (goalMethodUnavailable(error)) {
-          throw new ExecutionBackendError("goal_api_unavailable", "Installed Codex App Server does not expose thread Goal enforcement", { cause: bounded(error?.message || error, 2_000) });
-        }
-        throw error;
-      }
-    }
-
-    const turnResponse = await this.connection.request("turn/start", {
-      threadId,
-      input: [{ type: "text", text: buildPrompt(input), text_elements: [] }],
-      cwd,
-      approvalPolicy: "never",
-      sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: false },
-      runtimeWorkspaceRoots: [cwd],
-      model: this.options.model || undefined,
-      effort: this.options.effort || "high",
-      serviceTier: this.options.serviceTier || undefined,
-      personality: "pragmatic",
-      summary: "none",
-      outputSchema: outputSchema(),
-    }, Math.min(timeoutMs, 30_000));
-    const turnId = String(turnResponse?.turn?.id || "");
-    if (!turnId) throw new ExecutionBackendError("app_server_turn_missing", "Codex App Server did not return a build turn id");
-
-    const notification = await this.connection.waitForNotification((message) => {
-      const notificationThread = String(message?.params?.threadId || "");
-      const notificationTurn = String(message?.params?.turn?.id || message?.params?.turnId || "");
-      if (message.method === "error" && message?.params?.willRetry === true) return false;
-      return notificationThread === threadId && notificationTurn === turnId && ["turn/completed", "error"].includes(message.method);
-    }, timeoutMs);
-    if (notification.method === "error") {
-      const message = notification.params?.error?.message || "Codex build turn failed";
-      throw new ExecutionBackendError("app_server_turn_failed", bounded(message, 2_000));
-    }
-    const turn = notification.params?.turn || {};
-    if (turn.status !== "completed") {
-      throw new ExecutionBackendError("app_server_turn_failed", bounded(turn.error?.message || `Codex build turn ended with status ${turn.status || "unknown"}`, 2_000));
-    }
-    const summary = parseSummary(this.connection.agentTextForTurn?.(turnId) || extractAgentText(turn));
-    const context = { projectRoot: cwd, stateRoot: input.stateRoot, root: input.root };
-    let goal = null;
-    if (goalRequired) {
-      try {
-        const response = await this.connection.request("thread/goal/get", { threadId }, Math.min(timeoutMs, 30_000));
-        goal = response?.goal || null;
-        if (!goal || !Number.isSafeInteger(goal.tokensUsed) || goal.tokensUsed < 0) {
-          throw new ExecutionBackendError("goal_usage_unavailable", "Codex App Server returned no valid Goal token usage");
-        }
-      } catch (error) {
-        const partial = sanitized({
-          schema: BUILD_EXECUTOR_RESULT_SCHEMA,
-          executor: this.name,
-          status: "completed-goal-usage-unavailable",
-          ...summary,
-          duration_ms: Date.now() - started,
-          runtime_version: String(initialized?.userAgent || "codex-app-server/unknown"),
-          thread_id: threadId,
-          turn_id: turnId,
-          token_budget: tokenBudget,
-          tokens_used: null,
-          goal_enforcement: "required",
-          goal_status: "unavailable",
-        }, context);
-        throw new ExecutionBackendError("goal_usage_unavailable", "Build turn completed, but Goal token usage could not be read; no next iteration is allowed", {
-          cause: bounded(error?.message || error, 2_000),
-          executorResult: partial,
-        });
-      }
-    }
-    return sanitized({
-      schema: BUILD_EXECUTOR_RESULT_SCHEMA,
-      executor: this.name,
-      status: "completed",
-      ...summary,
-      duration_ms: Date.now() - started,
+    if (!Number.isSafeInteger(tokenBudget) || tokenBudget < 1) throw new ExecutionBackendError("token_budget_exhausted", "Build turn has no positive remaining token budget");
+    const objective = bounded(input.goalObjective, 4_000);
+    if (goalRequired && !objective) throw new ExecutionBackendError("goal_objective_invalid", "Build Goal objective is required");
+    const initialized = await this.ensureReady(cwd, timeoutMs);
+    const started = Date.now();
+    const receipt = {
+      schema: BUILD_EXECUTOR_RESULT_SCHEMA, executor: this.name, run_id: input.runId, iteration: input.iteration,
+      worktree_identity: worktreeIdentity(cwd), thread_lifetime: "persisted-per-attempt",
       runtime_version: String(initialized?.userAgent || "codex-app-server/unknown"),
-      thread_id: threadId,
-      turn_id: turnId,
-      token_budget: goalRequired ? tokenBudget : null,
-      tokens_used: goalRequired ? goal.tokensUsed : 0,
-      goal_enforcement: goalRequired ? "required" : "waived-once",
-      goal_status: goalRequired ? goal.status : "waived",
-    }, context);
+      status: "prepared", turn_status: "not-started", thread_id: null, turn_id: null,
+      goal_enforcement: goalRequired ? "required" : "waived-once", goal_objective: objective,
+      token_budget: tokenBudget, tokens_used: null, usage_scope: "build-executor", usage_status: "not-started", usage_source: "not-started",
+      thread_cleanup: "not-created", duration_ms: 0,
+    };
+    let failure;
+    let turn;
+    let dispatched = false;
+    try {
+      const response = await this.connection.request("thread/start", {
+        cwd, ephemeral: false, approvalPolicy: "never", sandbox: "workspace-write",
+        runtimeWorkspaceRoots: [cwd], personality: "pragmatic", threadSource: "user",
+        developerInstructions: "Implement only the approved delivery payload in the current worktree. Never modify verifier inputs, budgets or Goal, or perform push, merge, deployment, service enablement, secret provisioning, remote changes, or hook bypasses.",
+      }, Math.min(timeoutMs, 30_000));
+      receipt.thread_id = String(response?.thread?.id || "");
+      if (!receipt.thread_id || response.thread.ephemeral === true) throw new ExecutionBackendError("app_server_thread_missing", "A persisted build thread is required");
+      receipt.thread_cleanup = "pending";
+      await this.checkpoint(input, receipt);
+      if (goalRequired) {
+        try {
+          await this.connection.request("thread/goal/set", { threadId: receipt.thread_id, objective, status: "active", tokenBudget }, Math.min(timeoutMs, 30_000));
+          const goal = (await this.connection.request("thread/goal/get", { threadId: receipt.thread_id }, Math.min(timeoutMs, 30_000)))?.goal;
+          if (!validGoal(goal, receipt) || goal.tokensUsed !== 0 || goal.status !== "active") {
+            throw new ExecutionBackendError("goal_state_mismatch", "Build Goal readback does not match the authorized objective, budget and initial usage");
+          }
+        } catch (error) {
+          if (goalMethodUnavailable(error)) throw new ExecutionBackendError("goal_api_unavailable", "Installed Codex runtime cannot enforce this persisted build Goal");
+          throw error;
+        }
+      }
+      receipt.status = "dispatching";
+      receipt.turn_status = "unknown";
+      receipt.usage_status = "unknown";
+      // This durable intent must precede the potentially charged RPC.
+      await this.checkpoint(input, receipt);
+      dispatched = true;
+      const turnResponse = await this.connection.request("turn/start", {
+        threadId: receipt.thread_id, input: [{ type: "text", text: buildPrompt(input), text_elements: [] }],
+        cwd, approvalPolicy: "never", sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: false },
+        runtimeWorkspaceRoots: [cwd], model: this.options.model || undefined, effort: this.options.effort || "high",
+        serviceTier: this.options.serviceTier || undefined, personality: "pragmatic", summary: "none", outputSchema: outputSchema(),
+      }, Math.min(timeoutMs, 30_000));
+      receipt.turn_id = String(turnResponse?.turn?.id || "");
+      if (!receipt.turn_id) throw new ExecutionBackendError("app_server_turn_missing", "Codex App Server did not return a build turn id");
+      receipt.status = "running";
+      await this.checkpoint(input, receipt);
+      const notification = await this.waitForTurn(receipt, timeoutMs);
+      turn = notification.params?.turn;
+      if (notification.method === "error" || turn?.status !== "completed") {
+        failure = new ExecutionBackendError("app_server_turn_failed", "The bound Codex build turn did not complete successfully");
+      }
+    } catch (error) {
+      failure = error;
+      if (!dispatched) {
+        receipt.usage_status = "not-started";
+        receipt.turn_status = "not-started";
+      }
+    }
+    receipt.duration_ms = Date.now() - started;
+    if (receipt.usage_status === "not-started") {
+      receipt.status = "not-started";
+      if (receipt.thread_id) {
+        try { receipt.thread_cleanup = await this.archiveAttempt(receipt, cwd, 10_000); }
+        catch { receipt.thread_cleanup = "pending"; }
+      }
+      await this.checkpoint(input, receipt);
+    } else {
+      // Unknown delivery is preserved for reconnect recovery; no automatic resend.
+      Object.assign(receipt, await this.settle(input, receipt, turn, timeoutMs));
+    }
+    const result = await this.checkpoint(input, receipt);
+    if (receipt.usage_status === "unknown") failure = new ExecutionBackendError("goal_usage_unavailable", "Build usage could not be settled; no next model turn is allowed");
+    else if (receipt.thread_cleanup === "pending") failure = new ExecutionBackendError("executor_cleanup_pending", "The bound build thread could not be archived");
+    else if (receipt.error_code) failure = new ExecutionBackendError(receipt.error_code, "The native Goal no longer matches the authorized build projection");
+    if (failure) throw new ExecutionBackendError(failure.code || "app_server_turn_failed", bounded(failure.message, 2_000), { executorResult: result });
+    return result;
   }
 
   close() {

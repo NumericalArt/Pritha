@@ -8,7 +8,7 @@ topics: [task-chat, neuraldeep, attachments, model-capabilities]
 tools: [Pritha, Codex, Git]
 sources: [operator-approved-task-chat-roadmap-2026-09-04]
 related:
-  workflows: [07_workflows/task-chat-evolution-roadmap.md, 07_workflows/control-center-staged-release.md]
+  workflows: [07_workflows/task-chat-evolution-roadmap.md, 07_workflows/control-center-staged-release.md, 07_workflows/2026-09-05-pritha-neuraldeep-improvement-roadmap.md]
   standards: [04_standards/control-center-codex-chat-api-contract.md]
 supersedes: []
 superseded_by: []
@@ -27,6 +27,12 @@ confidence: high
 This guide transfers behavior, contracts and tests from the implemented and
 deployed mother release. See the integrated fleet release report for actual
 per-instance outcomes. These changes have not been installed in NeuralDeep.
+
+For the next agent-delivery and budget cycle, use the
+[specialized NeuralDeep roadmap](../07_workflows/2026-09-05-pritha-neuraldeep-improvement-roadmap.md).
+It was checked against consolidated ND main `31b438e`, accounts for its
+CLI-only execution and provider ledger, and distinguishes already completed
+local release tooling from the remaining A/B/C and delivery work.
 
 ## Source commits and order
 

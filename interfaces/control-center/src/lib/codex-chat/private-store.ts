@@ -4,6 +4,7 @@ import path from "node:path";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { appendPrivateAuditEvent, atomicWritePrivateJson } from "@/lib/private-json";
 import type { AttachmentMessage, RuntimeProviderId, TaskLinkView, ThreadGroup, ThreadOrigin, ThreadStatus } from "./types";
+import type { GoalBudgetReceipt } from "./goal-control";
 
 export type MessageReceipt = {
   clientMessageId: string;
@@ -33,6 +34,7 @@ export type ChatBinding = {
   lastStatus: ThreadStatus;
   messageReceipts: Record<string, MessageReceipt>;
   attachmentMessages?: Record<string, AttachmentMessage>;
+  goalBudgetRequests?: Record<string, GoalBudgetReceipt>;
   taskLinks: TaskLinkView[];
 };
 
@@ -66,6 +68,7 @@ function normalizeBinding(value: unknown): ChatBinding | null {
   if (!String(row.chatId || "").startsWith("chat_")) return null;
   if (!String(row.nativeThreadId || "")) return null;
   if (row.providerId !== "desktop_bundled" && row.providerId !== "standalone_cli") return null;
+  if (row.goalBudgetRequests !== undefined && (!row.goalBudgetRequests || typeof row.goalBudgetRequests !== "object" || Array.isArray(row.goalBudgetRequests))) return null;
   const createdAt = String(row.createdAt || new Date(0).toISOString());
   return {
     chatId: String(row.chatId),
@@ -89,6 +92,7 @@ function normalizeBinding(value: unknown): ChatBinding | null {
       : "not_loaded",
     messageReceipts: row.messageReceipts && typeof row.messageReceipts === "object" ? row.messageReceipts : {},
     ...(row.attachmentMessages && typeof row.attachmentMessages === "object" ? { attachmentMessages: row.attachmentMessages } : {}),
+    ...(row.goalBudgetRequests ? { goalBudgetRequests: row.goalBudgetRequests } : {}),
     taskLinks: Array.isArray(row.taskLinks) ? row.taskLinks : [],
   };
 }
