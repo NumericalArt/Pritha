@@ -19,7 +19,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-06
 source_updated: 2026-09-06
-source_version: roadmap completion candidate based on 8a26775
+source_version: roadmap preparation and runtime release 66274b4
 retrieved: 2026-09-06
 verified: 2026-09-06
 valid_for: preparation for manual mother CLI pilots
@@ -41,7 +41,8 @@ recommendation: experiment
 Этот отчёт закрывает подготовку mother roadmap к ручному созданию агентов.
 Он не объявляет завершёнными ещё не проведённые пользовательские пилоты,
 калибровку default или реализацию ND. Managed adoption фиксируется отдельным
-финальным release report после проверки всех пяти экземпляров.
+отчётом `03_reviews/2026-09-06-pritha-canonical-fleet-readiness-report.md`,
+который содержит версии и проверки каждого экземпляра.
 
 ## Реализованные пакеты
 
@@ -161,6 +162,16 @@ queue deadline; отдельный процессный тест проверя�
 Материнский сервис восстановлен штатным менеджером на прежней сборке;
 окончательное применение исправления и версии фиксирует release report.
 
-После исправления: **705/705 unit tests**, семь quality checks pass,
+После первого исправления: **705/705 unit tests**, семь quality checks pass,
 regressions пусты; staged build, последующий typecheck и Markdown validation
 проходят. Tracing по-прежнему содержит 1199 файлов без private/state inputs.
+
+Последующие изменения объединяют независимые metadata/readiness deadlines,
+прогревают cold status перед strict gate и разделяют незавершённый status read
+между API и SSR bundles через bounded instance-scoped cache. Fresh identity
+для операций изменения сохраняется. Эти регрессии расширили набор до
+708 тестов; результаты применения и ограничения приведены в итоговом отчёте.
+Ответ диагностики теперь ограничен deadline независимо от задержки OS cleanup;
+занятый worker slot освобождается только после завершения cleanup. Page read
+использует runtimeRead budget для launchd audit, полный ручной audit сохраняет
+свой бюджет. Unknown diagnostics не становятся положительным readiness evidence.

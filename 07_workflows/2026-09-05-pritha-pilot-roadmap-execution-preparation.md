@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-06
-source_version: preparation revision 13; completion candidate based on 8a26775
+source_version: preparation revision 14; canonical runtime release 66274b4
 retrieved: 2026-09-05
 verified: 2026-09-06
 valid_for: first implementation sessions on the primary Mac mini instance
@@ -57,8 +57,10 @@ confidence: high
 `03_reviews/2026-09-06-pritha-pre-pilot-readiness-review.md`, поштучные статусы —
 `07_workflows/2026-09-05-pritha-roadmap-completion-tracker.md`.
 Русский CLI guide, чистый synthetic delivery, private authored handoff,
-protected verifier/waiver, async diagnostics и redaction готовы к финальному
-release gate. Ручные пилоты, сопоставимая калибровка и empirical promotion
+protected verifier/waiver, async diagnostics и redaction прошли канонический
+release gate на пяти экземплярах. Версии, проверки и оставшиеся ограничения:
+`03_reviews/2026-09-06-pritha-canonical-fleet-readiness-report.md`.
+Ручные пилоты, сопоставимая калибровка и empirical promotion
 идут после объявления готовности по отдельному manual-pilot protocol.
 История ниже сохраняет результаты прежних пакетов; финальный installed pin
 и self-test приводятся в release report, а не выводятся из старых чисел.

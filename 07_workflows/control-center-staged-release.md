@@ -3,7 +3,7 @@ id: control-center-staged-release
 type: workflow
 status: active
 created: 2026-08-27
-updated: 2026-09-05
+updated: 2026-09-06
 topics:
   - control-center
   - staged-release
@@ -25,10 +25,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-08-27
-source_updated: 2026-09-05
+source_updated: 2026-09-06
 source_version: control-center-staged-release-v2; required page/chunk and build-identity gate
 retrieved: 2026-08-27
-verified: 2026-09-05
+verified: 2026-09-06
 valid_for: Pritha Control Center production and fleet releases
 temporal_status: current
 memory_domain: pritha-self
@@ -113,6 +113,14 @@ Readiness requests and poll delays are capped by the remaining readiness
 deadline. Once ready, strict verification has its separate total deadline and
 is terminated with SIGKILL on expiry. A failed strict check causes rollback;
 there is no continuous watchdog, automatic restart loop or unlimited retry.
+
+Before strict page checks, the updater makes one bounded `/api/status` warmup
+request and records its timing. Warmup does not replace exact identity, page or
+chunk checks. API and SSR share pending status reads and a short instance-scoped
+cache; mutation flows still request fresh identity. A slower host may select a
+larger bounded invocation profile, which must be recorded in its release receipt
+and followed by a warm-page latency check. Do not change global defaults merely
+to make one cold release pass.
 
 ## Apply approval boundary
 
