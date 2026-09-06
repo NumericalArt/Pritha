@@ -23,7 +23,9 @@ verified: 2026-09-06
 temporal_status: version-bound
 memory_domain: pritha-self
 memory_domains: [pritha-self, agent-building-knowledge]
-subject: { kind: pritha, id: pritha }
+subject:
+  kind: pritha
+  id: pritha
 privacy: public
 retention: durable
 review_status: reviewed
