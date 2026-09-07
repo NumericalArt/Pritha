@@ -9,6 +9,7 @@ The format follows Keep a Changelog, and this project uses semantic versioning f
 - Contract-selected child modules now agree across generated files, commands, documentation and smoke checks.
 - Child projects include engineering tests; handoff records revision-bound results as advisory evidence. API process lifecycle tests cover owned process safety.
 - Bounded JS probes use SIGKILL; identical helpers are shared and unused exports are removed after checking all consumers.
+- Staged releases retry temporary HTTP/network failures once within bounded request and overall deadlines, retaining strict build, page and JavaScript checks and verified rollback.
 - Task Chat renders local paths safely, normalizes file-operation labels, filters placeholder agent identity and offers explicit Start/Serve decision cards.
 - Updated Russian guidance, commit-subject warnings, archived UI specifications under docs/ui-design and the separate NeuralDeep roadmap revision 9.
 

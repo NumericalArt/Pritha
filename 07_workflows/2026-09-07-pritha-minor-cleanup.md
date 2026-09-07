@@ -1,7 +1,7 @@
 ---
 id: 2026-09-07-pritha-minor-cleanup
 type: workflow
-status: active
+status: completed
 created: 2026-09-07
 updated: 2026-09-07
 topics: [agent-engineering, cleanup, release]
@@ -10,6 +10,8 @@ sources:
   - 07_workflows/2026-09-05-pritha-pilot-driven-improvement-roadmap.md
   - 03_reviews/2026-09-06-api-process-delivery-factory-review.md
 related:
+  reviews:
+    - 03_reviews/2026-09-07-pritha-minor-cleanup-release-review.md
   workflows:
     - 07_workflows/control-center-staged-release.md
     - 07_workflows/2026-09-05-pritha-neuraldeep-improvement-roadmap.md
@@ -78,3 +80,16 @@ Mother code and native Goal/App Server RPC are not bulk-merged into NeuralDeep.
 The 41-template extraction, broad declaration coverage, server.ts split and Techscope
 rename remain outside this cycle. Outcome approvals, protected Trials, publication
 guards and persistent-service consent remain intact.
+
+## Completion — 2026-09-07
+
+A–F and the API/Goal prerequisites are implemented and published. Full self-test
+on `4208882` passed 728/728, with no regressions; golden checks passed 10/10.
+Five canonical runtimes passed staged identity, page, chunk and isolation checks.
+The release-only retry follow-up is fast-forwarded without rebuilding the four
+unchanged UI bundles; MacBook compiled `4208882`. The report records both kinds
+of version and the bounded retry profile, verified rollbacks and browser QA limits.
+
+NeuralDeep has the same revision 9 roadmap in its own documentation history;
+its engine and provider implementation remain independent. See the linked release
+review for completed groups, evidence, remaining optional work and final sync policy.

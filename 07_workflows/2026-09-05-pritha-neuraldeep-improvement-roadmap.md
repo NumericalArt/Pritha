@@ -33,7 +33,7 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-07
-source_version: ND roadmap revision 9; ND docs base 45be624 and engine a3820b5; mother cleanup code c4b1791
+source_version: ND roadmap revision 9; ND docs base 45be624 and engine a3820b5; mother cleanup and release checks 4208882
 retrieved: 2026-09-05
 verified: 2026-09-07
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -506,13 +506,13 @@ remote, `origin` не создаётся. Shared revision и локальная 
 
 ## 14. Минорные улучшения после пилота — revision 9
 
-Проверено 2026-09-07: ND остаётся на собственном `main` `45be624`
+Исходная сверка 2026-09-07: ND находилась на собственном `main` `45be624`
 (документация revision 8), последняя функциональная точка — `a3820b5`.
 Незавершённое исследование voice transport сохраняется. Описание чистого
 checkout в разделе 1 относится к исторической исходной точке, а не к этой
 повторной сверке. Mother cleanup реализован поверх восьми API/Goal follow-up
 commits до `31e862c`; группы A–F заканчиваются кодом `20defc1`, с исправлением повторного
-запуска lifecycle fixture в `c4b1791`.
+запуска lifecycle fixture в `c4b1791` и release health retries в `4208882`.
 Это версия источника требований, а не заявление об обновлении ND engine.
 
 Фактический ND scaffold пока допускает только `codex-native`; его workspace
@@ -567,3 +567,12 @@ commit поверх собственной истории. `pritha-upstream` о�
 pin, ND engine pin, ND documentation pin, пройденные tests и ещё не выполненный
 provider pilot. Тема интерфейса и локальное исследование voice transport
 сохраняются. Обновление этого документа не означает реализации пакетов ND.
+
+При переносе staged release учитывать наблюдение с MacBook: доступный health
+endpoint ещё не доказывает готовность холодных SSR-страниц. Для временной
+сетевой ошибки или HTTP 502/503/504 допустим один повтор с тем же ограниченным
+request timeout; весь strict процесс также имеет конечный deadline. HTTP 500,
+неверная identity, отсутствующий chunk и HTML вместо JavaScript остаются
+ошибками выпуска. Не заменять проверку BUILD_ID текущим checkout SHA: после
+rollback исходники могут быть новее фактически запущенной сборки. Эти проверки
+относятся к host release и не разрешают повторять оплачиваемый provider request.
