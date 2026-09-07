@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { parseLongArgs as parseArgs } from "../lib/cli-args.mjs";
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -177,25 +178,7 @@ Layer 10 status:
   evolve captures lessons learned; registry rebuilds the ${CLI_PRODUCT} lineage registry`);
 }
 
-function parseArgs(argv) {
-  const out = { _: [] };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (!next || next.startsWith("--")) {
-        out[key] = true;
-      } else {
-        out[key] = next;
-        i += 1;
-      }
-    } else {
-      out._.push(arg);
-    }
-  }
-  return out;
-}
+
 
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 

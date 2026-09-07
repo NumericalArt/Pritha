@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
+import { sha256Text as sha256 } from "../lib/hash.mjs";
+import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { atomicCompareAndSwapFile, atomicWriteFile, withFileLock } from "../lib/atomic-file.mjs";
@@ -252,9 +253,7 @@ export function outcomeSemanticProjection(value) {
   };
 }
 
-function sha256(value) {
-  return `sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
-}
+
 
 export function outcomeSemanticLock(value) {
   return sha256(JSON.stringify(outcomeSemanticProjection(value)));

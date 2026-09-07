@@ -32,7 +32,7 @@ async function collectTsFiles(dir) {
 function rewriteTsImports(source) {
   return source
     .replace(/(from\s+["']\.[^"']*)\.ts(["'])/g, "$1.mjs$2")
-    .replace(/(from\s+["']\.\.\/pritha-paths)(["'])/g, "$1.mjs$2");
+    .replace(/(from\s+["'](?:\.\.\/)+(?:pritha-paths|time))(["'])/g, "$1.mjs$2");
 }
 
 async function transpileMusicModules() {
@@ -57,7 +57,9 @@ async function transpileMusicModules() {
     });
     await writeFile(outPath, rewriteTsImports(compiled.outputText), "utf8");
   }
-  const pathSource = await readFile(prithaPathsSource, "utf8");
+  for (const stem of ["pritha-paths", "time"]) {
+  const sourcePath = path.join(path.dirname(prithaPathsSource), `${stem}.ts`);
+  const pathSource = await readFile(sourcePath, "utf8");
   const pathCompiled = ts.transpileModule(pathSource, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,
@@ -65,9 +67,10 @@ async function transpileMusicModules() {
       moduleResolution: ts.ModuleResolutionKind.Bundler,
       verbatimModuleSyntax: false,
     },
-    fileName: prithaPathsSource,
+    fileName: sourcePath,
   });
-  await writeFile(path.join(fixtureRoot, "pritha-paths.mjs"), pathCompiled.outputText, "utf8");
+  await writeFile(path.join(fixtureRoot, `${stem}.mjs`), pathCompiled.outputText, "utf8");
+  }
   return outRoot;
 }
 

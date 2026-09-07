@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
+import { sha256Text as sha256 } from "../lib/hash.mjs";
+import { randomUUID } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
@@ -51,9 +52,7 @@ const ALLOWED_TRANSITIONS = new Map([
   ["cancelled", new Set()],
 ]);
 
-function sha256(value) {
-  return `sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
-}
+
 
 function boundedText(value, name, maximum = 2_000) {
   const text = String(value || "").trim();

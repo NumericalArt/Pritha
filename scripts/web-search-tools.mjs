@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { parseLongArgsWithEquals as parseArgs } from "./lib/cli-args.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { spawn } from "node:child_process";
@@ -27,30 +28,7 @@ const DEFAULT_SEARCH_QUERY = "SearXNG search API";
 const DEFAULT_HTTP_TIMEOUT_MS = 6_000;
 const DEFAULT_START_TIMEOUT_MS = 45_000;
 
-function parseArgs(argv) {
-  const out = { _: [] };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      const eq = arg.indexOf("=");
-      if (eq > 0) {
-        out[arg.slice(2, eq)] = arg.slice(eq + 1);
-        continue;
-      }
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (!next || next.startsWith("--")) {
-        out[key] = true;
-      } else {
-        out[key] = next;
-        i += 1;
-      }
-    } else {
-      out._.push(arg);
-    }
-  }
-  return out;
-}
+
 
 function run(command, args, options = {}) {
   return runSyncProbe(command, args, {

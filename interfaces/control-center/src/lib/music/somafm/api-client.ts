@@ -1,3 +1,5 @@
+
+import { nowIso } from "../../time";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -23,9 +25,7 @@ export type SomaFmApiClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
-function nowIso() {
-  return new Date().toISOString();
-}
+
 
 function cacheIsFresh(cache: SomaFmCacheFile, ttlMs: number) {
   const updated = Date.parse(cache.updatedAt);

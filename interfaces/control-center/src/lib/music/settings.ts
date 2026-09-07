@@ -1,3 +1,5 @@
+
+import { nowIso } from "../time";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -6,9 +8,7 @@ import type { MusicSource, MusicSourceSettings } from "./types";
 
 const MUSIC_SOURCE_OPTIONS: MusicSource[] = ["somafm", "library", "ace-step"];
 
-function nowIso() {
-  return new Date().toISOString();
-}
+
 
 export function isMusicSource(value: unknown): value is MusicSource {
   return MUSIC_SOURCE_OPTIONS.includes(value as MusicSource);

@@ -1,5 +1,7 @@
 "use client";
 
+import { nowIso } from "@/lib/time";
+
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { readStickyContextSetting, STICKY_CONTEXT_CHANGED_EVENT, STICKY_CONTEXT_STORAGE_KEY } from "./voicePreferences";
 import { useVoiceMusicController } from "./useVoiceMusic";
@@ -561,9 +563,7 @@ function itemId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function nowIso() {
-  return new Date().toISOString();
-}
+
 
 function loadSessionEvents() {
   if (typeof window === "undefined") return [];

@@ -1,3 +1,5 @@
+
+import { nowIso } from "../time";
 import { randomUUID } from "node:crypto";
 import { clampMusicDuration, getMusicRuntimeConfig } from "./config";
 import { normalizeMusicStyleKey } from "./prompt-builder";
@@ -16,9 +18,7 @@ function hasPromptSpecifics(request: AceStepGenerateRequest) {
   );
 }
 
-function nowIso() {
-  return new Date().toISOString();
-}
+
 
 function cloneJob(job: MusicGenerationJob): MusicGenerationJob {
   return {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { parseLongArgs as parseArgs } from "./lib/cli-args.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -40,25 +41,7 @@ const SECRET_ENV_PATTERNS = [
   /^TRUTHSOCIAL_TOKEN$/i,
 ];
 
-function parseArgs(argv) {
-  const out = { _: [] };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (!next || next.startsWith("--")) {
-        out[key] = true;
-      } else {
-        out[key] = next;
-        i += 1;
-      }
-    } else {
-      out._.push(arg);
-    }
-  }
-  return out;
-}
+
 
 function run(command, args, options = {}) {
   return runSyncProbe(command, args, {

@@ -1,3 +1,5 @@
+
+import { nowIso } from "../time";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -12,9 +14,7 @@ type CacheIndex = {
   tracks: CachedGeneratedTrack[];
 };
 
-function nowIso() {
-  return new Date().toISOString();
-}
+
 
 function extensionForContentType(contentType: string, fallback: string) {
   if (/wav/i.test(contentType)) return "wav";

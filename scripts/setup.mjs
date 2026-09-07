@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { parseLongArgs as parseArgs } from "./lib/cli-args.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -52,25 +53,7 @@ export function routeTriggerPhrase(text) {
   return null;
 }
 
-function parseArgs(argv) {
-  const out = { _: [] };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (!next || next.startsWith("--")) {
-        out[key] = true;
-      } else {
-        out[key] = next;
-        i += 1;
-      }
-    } else {
-      out._.push(arg);
-    }
-  }
-  return out;
-}
+
 
 function readJsonIfExists(filePath) {
   if (!existsSync(filePath)) return null;
