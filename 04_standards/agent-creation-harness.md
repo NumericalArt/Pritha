@@ -3,7 +3,7 @@ id: agent-creation-harness
 type: standard
 status: draft
 created: 2026-05-18
-updated: 2026-09-06
+updated: 2026-09-07
 last_reviewed: 2026-09-06
 owner: Techscope/user
 topics:
@@ -119,7 +119,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-05-18
 source_updated: 2026-08-22
-source_version: Pritha draft standard v18; local scaffold capability and headless CLI revision; previous external evidence unchanged
+source_version: Pritha draft standard v19; contract-selected modules and advisory child tests; previous external evidence unchanged
 retrieved: 2026-05-18
 verified: 2026-08-22
 valid_for: TechScope agent creation workflow from 2026-05-18 onward
@@ -134,6 +134,8 @@ Last reviewed: 2026-08-22
 
 Local scaffold capability and CLI amendment reviewed: 2026-09-06. This amendment
 does not revalidate the dates or versions of earlier external sources.
+Local module-selection and child-test amendment reviewed: 2026-09-07, against
+cleanup code 20defc1 and isolated API process lifecycle evidence.
 
 ## Rule
 
@@ -157,6 +159,22 @@ workspace revision; `accepted` remains a separate user decision.
 TechScope may use its own architecture as a reference, but it must not clone itself blindly. The new agent's runtime, interface, memory, tools and security model must follow the contract.
 
 Pritha descendants are assembled from contract-selected modules, not from one universal bundle. Every future agent should receive the harness, memory, data, skills, MCP servers, interface adapters, tools, evals and operations modules that its contract actually needs, and no more. A pattern marked `adopt-in-scaffold` means "available for Pritha to select and compose", not "automatically copied into every descendant".
+
+One selection controls generated files, commands, documentation and smoke
+requirements. Explicit none/ephemeral choices take precedence over text
+heuristics; absent legacy choices preserve their existing defaults. Child
+redaction may be omitted only when no selected skill, Telegram adapter or
+untrusted intake requires it and the contract explicitly opts out. Pritha's
+host redaction remains mandatory. New external input requires reviewing this
+choice before activation.
+
+Each child receives its own engineering `npm test`; API process lifecycle
+checks run in a disposable copy with locally owned PID state. At handoff,
+record passed, failed, missing or not-run against the current revision. An
+approved execution must bind the exact npm command and scripts/hooks, workspace,
+instance and reviewed plan; reading a report never runs child code. Missing or
+failed engineering tests produce a warning and leave preparation of the handoff
+available. They do not replace protected Outcome Trials or user acceptance.
 
 The initial scaffold is a starting point, not completion. After scaffold, Pritha
 runs the compiled Trials, gives failures to the selected build executor, applies

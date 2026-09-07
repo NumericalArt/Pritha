@@ -3,7 +3,7 @@ id: 2026-09-05-pritha-neuraldeep-improvement-roadmap
 type: workflow
 status: ready-for-implementation
 created: 2026-09-05
-updated: 2026-09-06
+updated: 2026-09-07
 topics: [neuraldeep, agents-mother, codex-cli, delivery-budget, usage-accounting, recovery, task-chat]
 tools: [Pritha, NeuralDeep, Codex CLI, Node.js, SQLite, Next.js]
 agent_platforms: [Pritha NeuralDeep, Codex]
@@ -32,10 +32,10 @@ superseded_by: []
 refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
-source_updated: 2026-09-06
-source_version: ND roadmap revision 8; own baseline a3820b5; mother final pre-pilot preparation
+source_updated: 2026-09-07
+source_version: ND roadmap revision 9; ND docs base 45be624 and engine a3820b5; mother cleanup code 20defc1
 retrieved: 2026-09-05
-verified: 2026-09-06
+verified: 2026-09-07
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
 temporal_status: version-bound
 memory_domain: agent-building-knowledge
@@ -502,3 +502,67 @@ remote, `origin` не создаётся. Shared revision и локальная 
 На финальной сверке 2026-09-06 обнаружен более новый независимый ND commit
 `a3820b5` (dark/light/classic themes). Он сохраняется; roadmap копируется поверх
 него отдельным документационным commit. Mother rollout не меняет эти темы.
+
+
+## 14. Минорные улучшения после пилота — revision 9
+
+Проверено 2026-09-07: ND остаётся на собственном `main` `45be624`
+(документация revision 8), последняя функциональная точка — `a3820b5`.
+Незавершённое исследование voice transport сохраняется. Описание чистого
+checkout в разделе 1 относится к исторической исходной точке, а не к этой
+повторной сверке. Mother cleanup реализован поверх восьми API/Goal follow-up
+commits до `31e862c`; группы A–F заканчиваются кодом `20defc1`.
+Это версия источника требований, а не заявление об обновлении ND engine.
+
+Фактический ND scaffold пока допускает только `codex-native`; его workspace
+исполняется собственным Codex CLI с NeuralDeep. Поддержка CLI/API child
+адаптеров матери не появляется от копирования этого документа. Выбор
+архитектуры создаваемого child и executor самой Pritha — разные решения.
+
+| Пакет | Применение к ND | Условие завершения |
+| --- | --- | --- |
+| A1: выбранные модули | Единый selected для memory/skills/tools/redaction в существующем ND scaffold. Явные none/ephemeral приоритетнее текстовых эвристик; отсутствующее legacy поле сохраняет прежний default. Redaction остаётся при skills, Telegram и untrusted intake; host redaction обязателен. | Минимальный и полный ND контракты дают согласованные файлы, npm-команды, AGENTS/README и smoke; запуск через собственный CLI сохранён. |
+| A2: child tests | `npm test` = smoke + `node --test tests/*.test.mjs`; структурные проверки выбранных файлов и JSON manifests. API lifecycle добавляется только вместе с отдельным ND API adapter. | Существующий ND child проверен в disposable copy. Passed/failed/missing/not-run и ревизия записаны приватно; handoff остаётся доступен с предупреждением. |
+| C: bounded probes | Перенести JS sync helper с положительным timeout, shell:false и SIGKILL только для синхронных проб. Сохранить отдельные длительные бюджеты test/build/media. | SIGTERM-resistant fixture завершается; собственный CLI process/group и чужие PID различаются. Helper не заменяет ND async executor. |
+| B/D: helpers и exports | Повторить поиск по ND, включая provider adapters, dynamic imports, tests и Markdown. Переносить только побайтно/семантически одинаковое. | Сохраняются разные JSON failure policies, Unicode slug и byte/text hashes; provider-only exports не удалены по mother inventory. |
+| E: инструкции | Собственные launcher/auth/model/accounting команды в README, dated changelog, warning по новым conventional commit subjects; узкие operator-visible ошибки. | Никакие реальные provider credentials, billing snapshots или endpoints не попадают в Git; новая история не переписывается. |
+| F: Task Chat | Локальные пути как code или через существующий ограниченный viewer; native file-change variants нормализованы; placeholder identity не становится агентом. Start/Serve используют карточки поверх собственного ND host controller. | Desktop/mobile: preview и cancel не запускают процесс, approve действует один раз; потерянный ответ восстанавливается по тому же request ID. Текст модели не авторизует действие. |
+
+### Порядок и границы переноса
+
+1. До кодинга снять Good State и точные ND CLI/provider/admission/ledger pins.
+   Выполнить ND-0 и prerequisites из разделов 12–13: accounting probe/build/
+   summary/retry, durable attempts, сохранение task/run после лимита.
+2. A1 → A2 → C → B → D → E → F; группы с отличающейся семантикой получают
+   собственную реализацию и focused tests. Не переносить mother native Goal
+   activation, App Server RPC, desktop authentication или OpenAI тарифы.
+3. `npm test` в child — выполнение кода проекта: host связывает план с
+   exact argv/cwd, package scripts/hooks, manifest, whole workspace revision,
+   instance и согласованным execution policy. GET только читает состояние.
+   При отсутствии выполнения handoff показывает not-run/warning, без скрытого
+   provider call и без объявления verified/accepted. Это не новый hard blocker
+   создания агента; budgets/account limits также сохраняют путь продолжения.
+4. Карточки Start/Serve связываются с canonical agent, исходной ND task/session,
+   run/revision и свежими machine Trials. Operator Trials могут ждать запуска;
+   operational approval не подменяет их и приёмку. Сохранить receipt до dispatch,
+   explicit cancel и проверку stale/foreign/duplicate/unknown operation. После
+   timeout/restart сначала reconcile собственного process/provider состояния,
+   затем разрешённое продолжение. Network Serve остаётся отдельным решением.
+5. Один полный ND self-test после групп, затем typecheck, staged build и
+   desktop/mobile; не повторять ту же unit suite через отдельный npm test.
+   Обязательно выполнить provider/CLI failure matrix раздела 12, strict pages
+   с chunks и identity; реальные paid calls только в согласованном pilot.
+
+A1 сохраняет legacy auto skills без выбранного pack, если прежний ND scaffold
+создавал каталог и status-команду; явный none удаляет модуль. Решение о таком
+legacy default фиксируется тестом. У матери readJson и slug не объединены из-за
+различий, а не потому, что работа пропущена. Эти выводы требуют собственной
+проверки на ND. Полный перенос inline templates, широкие declarations, split
+server.ts и переименование Techscope остаются за пределами этого цикла.
+
+Deliverable revision 9 — одинаковый roadmap в матери и ND, отдельный ND docs
+commit поверх собственной истории. `pritha-upstream` остаётся read-only;
+`origin` не создаётся. В отчёте раздельно фиксировать mother checkout/compiled
+pin, ND engine pin, ND documentation pin, пройденные tests и ещё не выполненный
+provider pilot. Тема интерфейса и локальное исследование voice transport
+сохраняются. Обновление этого документа не означает реализации пакетов ND.

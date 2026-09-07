@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format follows Keep a Changelog, and this project uses semantic versioning for public releases.
 
+## 2026-09-07 — Scoped cleanup
+
+- Contract-selected child modules now agree across generated files, commands, documentation and smoke checks.
+- Child projects include engineering tests; handoff records revision-bound results as advisory evidence. API process lifecycle tests cover owned process safety.
+- Bounded JS probes use SIGKILL; identical helpers are shared and unused exports are removed after checking all consumers.
+- Task Chat renders local paths safely, normalizes file-operation labels, filters placeholder agent identity and offers explicit Start/Serve decision cards.
+- Updated Russian guidance, commit-subject warnings, archived UI specifications under docs/ui-design and the separate NeuralDeep roadmap revision 9.
+
 ## 2026-09-06 — Pilot preparation
 
 - Follow-up API process adapter preserves explicit ephemeral memory and keeps server/lifecycle implementation pending until delivery.
