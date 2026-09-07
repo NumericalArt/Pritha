@@ -580,7 +580,9 @@ async function runService() {
       if (stopping) return;
       stopping = true;
       appendLifecycle("operator-stop", { signal });
-      try { process.kill(-child.pid, "SIGTERM"); } catch { /* child already stopped */ }
+      try { process.kill(-child.pid, "SIGTERM"); } catch (error) {
+        if (error.code !== "ESRCH") appendLifecycle("operator-stop-signal-failed", { phase: "graceful-stop", code: /^[A-Z_]+$/.test(error.code || "") ? error.code : "UNKNOWN" });
+      }
       forceTimer = setTimeout(() => {
         if (!processExists(child.pid)) return;
         const current = processInfo(child.pid);
@@ -591,7 +593,9 @@ async function runService() {
         try {
           process.kill(-child.pid, "SIGKILL");
           appendLifecycle("forced-stop", { childPid: child.pid });
-        } catch { /* child exited during verification */ }
+        } catch (error) {
+          if (error.code !== "ESRCH") appendLifecycle("operator-stop-signal-failed", { phase: "forced-stop", code: /^[A-Z_]+$/.test(error.code || "") ? error.code : "UNKNOWN" });
+        }
       }, STOP_GRACE_MS);
       forceTimer.unref?.();
     };

@@ -51,7 +51,7 @@ related:
     - 03_reviews/2026-06-23-pritha-voice-codex-app-thread-routing-review.md
   briefs: []
   workflows:
-    - UI-design/2026-08-26-control-center-codex-chat-wireframe.md
+    - docs/ui-design/2026-08-26-control-center-codex-chat-wireframe.md
 supersedes: []
 superseded_by: []
 freshness_status: current

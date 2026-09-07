@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { commitMessageWarnings } from "../scripts/lib/commit-hygiene.mjs";
+test("commit hygiene warns only on the new range and does not disclose subjects", t => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-commit-hygiene-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = args => execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  git(["init"]); git(["commit", "--allow-empty", "-m", "Historical title"]);
+  const base = git(["rev-parse", "HEAD"]).trim();
+  git(["commit", "--allow-empty", "-m", "fix(cli): preserve argument grammar"]);
+  assert.deepEqual(commitMessageWarnings(root, base), []);
+  git(["commit", "--allow-empty", "-m", "Operator private wording"]);
+  const warnings = commitMessageWarnings(root, base);
+  assert.equal(warnings.length, 1); assert.match(warnings[0], /prefix missing/); assert.doesNotMatch(warnings[0], /private wording/);
+  assert.deepEqual(commitMessageWarnings(root, "HEAD"), []);
+});

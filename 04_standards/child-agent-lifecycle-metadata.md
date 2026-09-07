@@ -29,8 +29,8 @@ config_surfaces:
   - interfaces/control-center/
 portability: codex-native
 sources:
-  - UI-design/2026-06-04-pritha-control-center-contract-v0.4-full.txt
-  - UI-design/2026-06-04-control-center-appendix-a-unimplemented-surfaces.txt
+  - docs/ui-design/2026-06-04-pritha-control-center-contract-v0.4-full.txt
+  - docs/ui-design/2026-06-04-control-center-appendix-a-unimplemented-surfaces.txt
   - 04_standards/memory-domains.md
   - 08_templates/child-agent-profile.md
 related:

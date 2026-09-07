@@ -17,17 +17,17 @@ tools:
   - CSS
   - lucide-react
 sources:
-  - UI-design/2026-06-04-pritha-control-center-spec-v0.4.txt
-  - UI-design/2026-06-04-agents-page-implementation-guide.txt
-  - UI-design/2026-06-04-voice-page-implementation-guide.txt
-  - UI-design/2026-06-04-settings-page-implementation-guide.txt
-  - UI-design/2026-06-04-dev-page-implementation-guide.txt
-  - UI-design/2026-06-04-mobile-ui-implementation-guide.txt
-  - UI-design/image_1P.png
-  - UI-design/image_2P.png
-  - UI-design/image_3P.png
-  - UI-design/image_4P.png
-  - UI-design/image_1PM.png
+  - docs/ui-design/2026-06-04-pritha-control-center-spec-v0.4.txt
+  - docs/ui-design/2026-06-04-agents-page-implementation-guide.txt
+  - docs/ui-design/2026-06-04-voice-page-implementation-guide.txt
+  - docs/ui-design/2026-06-04-settings-page-implementation-guide.txt
+  - docs/ui-design/2026-06-04-dev-page-implementation-guide.txt
+  - docs/ui-design/2026-06-04-mobile-ui-implementation-guide.txt
+  - docs/ui-design/image_1P.png
+  - docs/ui-design/image_2P.png
+  - docs/ui-design/image_3P.png
+  - docs/ui-design/image_4P.png
+  - docs/ui-design/image_1PM.png
 related:
   interfaces:
     - interfaces/manifest.json
@@ -68,7 +68,7 @@ manifest/scripts instead of rewriting the legacy web UI.
 
 ## 1. Design Inputs
 
-Use the TXT files copied into `UI-design/` as normative implementation text:
+Use the TXT files copied into `docs/ui-design/` as normative implementation text:
 
 - `2026-06-04-pritha-control-center-spec-v0.4.txt`: product scope, state model,
   safety policy and MVP acceptance criteria.

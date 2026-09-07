@@ -21,8 +21,8 @@ tools:
   - Codex App
   - Codex CLI
 sources:
-  - UI-design/2026-06-04-settings-page-implementation-guide.txt
-  - UI-design/2026-06-04-pritha-control-center-coding-plan.md
+  - docs/ui-design/2026-06-04-settings-page-implementation-guide.txt
+  - docs/ui-design/2026-06-04-pritha-control-center-coding-plan.md
   - interfaces/control-center/src/components/settings/SettingsControlPage.tsx
   - interfaces/control-center/src/components/settings/VoiceSettingsSection.tsx
   - interfaces/control-center/src/lib/realtime/pritha-runtime.ts

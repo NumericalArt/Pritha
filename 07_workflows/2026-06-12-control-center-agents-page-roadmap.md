@@ -25,8 +25,8 @@ sources:
   - interfaces/control-center/src/components/shell/Sidebar.tsx
   - interfaces/control-center/src/components/settings/SettingsControlPage.tsx
   - interfaces/control-center/src/lib/control-center/server.ts
-  - UI-design/2026-06-04-agents-page-implementation-guide.txt
-  - UI-design/2026-06-04-control-center-appendix-a-unimplemented-surfaces.txt
+  - docs/ui-design/2026-06-04-agents-page-implementation-guide.txt
+  - docs/ui-design/2026-06-04-control-center-appendix-a-unimplemented-surfaces.txt
 related:
   workflows:
     - 07_workflows/agents-mother.md

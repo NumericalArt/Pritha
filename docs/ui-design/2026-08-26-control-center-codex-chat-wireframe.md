@@ -18,8 +18,8 @@ tools:
   - Codex App Server
   - Server-Sent Events
 sources:
-  - UI-design/2026-06-04-pritha-control-center-spec-v0.4.txt
-  - UI-design/2026-06-04-mobile-ui-implementation-guide.txt
+  - docs/ui-design/2026-06-04-pritha-control-center-spec-v0.4.txt
+  - docs/ui-design/2026-06-04-mobile-ui-implementation-guide.txt
   - interfaces/control-center/src/components/shell/Sidebar.tsx
   - interfaces/control-center/src/components/shell/MobileShell.tsx
   - interfaces/control-center/src/lib/routes.ts
@@ -35,7 +35,7 @@ related:
   interfaces:
     - interfaces/control-center/
 supersedes:
-  - UI-design/2026-06-04-pritha-control-center-spec-v0.4.txt#section-7-rule-7-no-full-chat
+  - docs/ui-design/2026-06-04-pritha-control-center-spec-v0.4.txt#section-7-rule-7-no-full-chat
 superseded_by: []
 freshness_status: current
 source_published: unknown

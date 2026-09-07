@@ -24,7 +24,7 @@ sources:
   - interfaces/control-center/src/lib/realtime/codex-task/codex-app-server-client.ts
   - interfaces/control-center/src/lib/realtime/pritha-runtime.ts
   - interfaces/control-center/src/lib/routes.ts
-  - UI-design/2026-06-04-pritha-control-center-spec-v0.4.txt
+  - docs/ui-design/2026-06-04-pritha-control-center-spec-v0.4.txt
   - 03_reviews/2026-06-23-pritha-voice-codex-app-thread-routing-review.md
 related:
   intakes: []
@@ -36,7 +36,7 @@ related:
     - 04_standards/realtime-voice-control-for-codex-agents.md
     - 04_standards/realtime-voice-control-ui.md
 supersedes:
-  - UI-design/2026-06-04-pritha-control-center-spec-v0.4.txt#section-7-rule-7-no-full-chat
+  - docs/ui-design/2026-06-04-pritha-control-center-spec-v0.4.txt#section-7-rule-7-no-full-chat
 superseded_by: []
 freshness_status: current
 source_published: unknown

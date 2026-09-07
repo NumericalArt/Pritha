@@ -181,7 +181,7 @@ Control Center переопределяет резолв ещё раз в TS (`p
 
 ### 2.2 Q2 (Низкий) — нет линтера/форматтера
 
-Ни в корне, ни в `interfaces/control-center` нет eslint/prettier/biome и `devDependencies` для них. Качество держится на `golden-checks.mjs` + `node --test` (+ ручной `tsc --noEmit` в control-center). ESLint упомянут только в дизайн-доке `UI-design/...coding-plan.md`, но не внедрён.
+Ни в корне, ни в `interfaces/control-center` нет eslint/prettier/biome и `devDependencies` для них. Качество держится на `golden-checks.mjs` + `node --test` (+ ручной `tsc --noEmit` в control-center). ESLint упомянут только в дизайн-доке `docs/ui-design/...coding-plan.md`, но не внедрён.
 
 ### 2.3 Q3 (Низкий) — naming drift
 

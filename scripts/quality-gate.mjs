@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { runSyncProbe } from "./lib/sync-probe.mjs";
+import { commitMessageWarnings } from "./lib/commit-hygiene.mjs";
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -150,6 +151,7 @@ const payload = {
   dryRun,
   failed: failed.length,
   checks,
+  warnings: dryRun ? [] : commitMessageWarnings(ROOT, process.env.PRITHA_COMMIT_BASE || "origin/main"),
 };
 
 function compact(text, max = 360) {
@@ -217,6 +219,7 @@ function failureText(check) {
 
 function printGitHubAnnotations() {
   if (!githubAnnotations) return;
+  for (const warning of payload.warnings) console.error(`::warning title=Commit hygiene::${githubEscape(warning)}`);
   for (const check of failed) {
     const title = githubEscape(`Quality gate failed: ${check.name}`, true);
     const message = githubEscape(failureText(check));
@@ -230,6 +233,7 @@ function printMarkdown() {
   console.log(`- Root: \`${payload.root}\``);
   console.log(`- Created: \`${payload.createdAt}\``);
   console.log(`- Failed checks: \`${payload.failed}\``);
+  for (const warning of payload.warnings) console.log(`- Warning: ${warning}`);
   console.log();
   console.log("| Status | Check | Command | Duration |");
   console.log("| --- | --- | --- | --- |");
@@ -253,6 +257,7 @@ function printMarkdown() {
 function printHuman() {
   console.log(`Techscope quality gate: ${payload.status}`);
   console.log(`Root: ${payload.root}`);
+  for (const warning of payload.warnings) console.log(`- WARNING ${warning}`);
   for (const check of checks) {
     const suffix = check.status === "planned" ? ` (${check.notes})` : ` (${check.durationMs}ms)`;
     console.log(`- ${check.status.toUpperCase()} ${check.name}${suffix}`);
