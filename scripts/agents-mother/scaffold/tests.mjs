@@ -39,7 +39,7 @@ export function serviceLifecycleTest(manifest) {
   const healthPath = new URL(manifest.health_url).pathname;
   return `import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import test from "node:test";
 const portVariable = ${JSON.stringify(variable)};
@@ -79,6 +79,8 @@ test("managed process starts, serves health and stops without touching foreign P
     writeFileSync(pidFile, ownedRecord);
     command("stop"); // A stale record cannot authorize killing a different process.
     assert.doesNotThrow(() => process.kill(process.pid, 0));
+    // Remove only the stale record restored by this test, leaving a reusable copy.
+    if (existsSync(pidFile) && readFileSync(pidFile, "utf8") === ownedRecord) rmSync(pidFile);
   }
 });
 `;
