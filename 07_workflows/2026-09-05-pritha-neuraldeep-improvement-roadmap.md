@@ -33,7 +33,7 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-07
-source_version: ND roadmap revision 9; ND docs base 45be624 and engine a3820b5; mother cleanup code 20defc1
+source_version: ND roadmap revision 9; ND docs base 45be624 and engine a3820b5; mother cleanup code c4b1791
 retrieved: 2026-09-05
 verified: 2026-09-07
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -511,7 +511,8 @@ remote, `origin` не создаётся. Shared revision и локальная 
 Незавершённое исследование voice transport сохраняется. Описание чистого
 checkout в разделе 1 относится к исторической исходной точке, а не к этой
 повторной сверке. Mother cleanup реализован поверх восьми API/Goal follow-up
-commits до `31e862c`; группы A–F заканчиваются кодом `20defc1`.
+commits до `31e862c`; группы A–F заканчиваются кодом `20defc1`, с исправлением повторного
+запуска lifecycle fixture в `c4b1791`.
 Это версия источника требований, а не заявление об обновлении ND engine.
 
 Фактический ND scaffold пока допускает только `codex-native`; его workspace
