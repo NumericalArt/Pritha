@@ -189,3 +189,44 @@ test("earlier history remains readable after a failed page and a refresh", async
   await expect(page.getByText("old answer", { exact: true })).toBeVisible();
   await expect(page.getByText("recent answer", { exact: true })).toBeVisible();
 });
+
+for (const width of [1280, 390]) {
+  test(`cleanup links and operation cards preserve explicit decisions at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 850 });
+    await mockChat(page, true);
+    const run = { runId: "run_fixture", agentId: "agent_fixture", agentName: "Fixture service", specId: "spec_fixture", status: "verified", acceptance: "pending", bindingStatus: "bound", revision: "fixture", receipts: [], actions: { verify: false, prepareHandoff: false, budget: false }, budget: { tokensUsed: 2, maxTokens: 100, usageStatus: "complete", iterations: 1, maxIterations: 3, elapsedMs: 1000, maxElapsedMs: 60000 }, plan: { maxVerificationPasses: 1, outputBytesCap: 1000, backend: "fixture", commands: [] } };
+    const requests: Array<Record<string, string>> = [];
+    let loseResponse = true;
+    await page.route("**/api/codex-chat/v1/threads/chat_fixture/delivery**", route => route.fulfill({ json: { apiVersion: "1", data: new URL(route.request().url()).searchParams.has("runId") ? { run } : { runs: [{ runId: run.runId, status: run.status }] } } }));
+    await page.route("**/api/codex-chat/v1/threads/chat_fixture/turns?**", route => route.fulfill({ json: { apiVersion: "1", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/example/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
+    await page.route("**/api/codex-chat/v1/threads/chat_fixture/operations**", async route => {
+      if (route.request().method() === "GET") {
+        const action = new URL(route.request().url()).searchParams.get("action");
+        return route.fulfill({ json: { apiVersion: "1", data: { agentId: run.agentId, runId: run.runId, action, planLock: "a".repeat(64), enabled: true, label: action === "start" ? "Start" : "Tailscale Serve", summary: "Operation on the selected fixture service.", reason: null, pendingRequest: null } } });
+      }
+      const body = route.request().postDataJSON(); requests.push(body);
+      expect(route.request().headers()["idempotency-key"]).toBe(body.requestId);
+      if (body.decision === "approve" && loseResponse) { loseResponse = false; return route.abort("failed"); }
+      return route.fulfill({ json: { apiVersion: "1", data: { requestId: body.requestId, status: body.decision === "cancel" ? "cancelled" : "completed" } } });
+    });
+    await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+    await expect(page.locator(".codex-markdown code[title='Handoff']")).toBeVisible();
+    await expect(page.locator('a[href*="/Users/"]')).toHaveCount(0);
+    await page.locator("summary").filter({ hasText: "Сборка агента" }).click();
+    await page.getByRole("button", { name: "План Start", exact: true }).click();
+    expect(requests).toHaveLength(0);
+    await page.getByRole("button", { name: "Отмена", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Операция отменена" })).toBeVisible();
+    expect(requests[0].decision).toBe("cancel");
+    await page.getByRole("button", { name: "План Start", exact: true }).click();
+    await page.getByRole("button", { name: "Подтвердить Start", exact: true }).click();
+    await page.getByRole("button", { name: "Проверить сохранённое действие", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Операция выполнена" })).toBeVisible();
+    expect(requests[1]).toEqual(requests[2]);
+    await page.getByRole("button", { name: "План Tailscale Serve", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Подтвердить Tailscale Serve", exact: true })).toBeVisible();
+    expect(requests).toHaveLength(3);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBeTruthy();
+    await page.locator(".codex-operation-decisions").screenshot({ path: `/tmp/pritha-cleanup-operation-${width}.png` });
+  });
+}

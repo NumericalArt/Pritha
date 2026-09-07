@@ -51,6 +51,16 @@ async function loadNormalizeModule() {
   };
 }
 
+test("file change kinds accept native tagged objects and preserve relative labels", async () => {
+  const loaded = await loadNormalizeModule();
+  try {
+    for (const [kind, expected] of [[{ type: "add" }, "add"], [{ type: "update" }, "modify"], [{ type: "delete" }, "delete"], [{ type: "update", move_path: "new.mjs" }, "rename"], ["modify", "modify"]]) {
+      const item = loaded.module.normalizeNativeItem("chat_test", { id: "files", type: "fileChange", changes: [{ path: "/project/src/agent.mjs", kind }] }, "/project", "2026-09-07T00:00:00Z");
+      assert.deepEqual(item.changes, [{ path: "src/agent.mjs", operation: expected }]);
+    }
+  } finally { loaded.cleanup(); }
+});
+
 async function transpileModule(source, prefix) {
   const output = ts.transpileModule(source, {
     compilerOptions: {

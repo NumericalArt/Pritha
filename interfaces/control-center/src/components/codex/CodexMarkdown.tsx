@@ -1,4 +1,5 @@
 import { Fragment, type JSX, type ReactNode } from "react";
+import { markdownLink } from "./link-policy";
 
 type Block =
   | { type: "paragraph"; lines: string[] }
@@ -7,16 +8,6 @@ type Block =
   | { type: "list"; ordered: boolean; items: string[] }
   | { type: "quote"; lines: string[] }
   | { type: "table"; rows: string[][] };
-
-function safeHref(value: string) {
-  if (value.startsWith("/") || value.startsWith("#")) return value;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? value : null;
-  } catch {
-    return null;
-  }
-}
 
 function inline(text: string): ReactNode[] {
   const pattern = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*)/g;
@@ -32,8 +23,10 @@ function inline(text: string): ReactNode[] {
       nodes.push(<strong key={`${index}-strong`}>{token.slice(2, -2)}</strong>);
     } else {
       const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-      const href = link ? safeHref(link[2]) : null;
-      nodes.push(href ? <a key={`${index}-link`} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{link?.[1]}</a> : token);
+      const policy = markdownLink(link?.[2] || "");
+      const href = policy.href;
+      nodes.push(href ? <a key={`${index}-link`} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{link?.[1]}</a>
+        : policy.local ? <code key={`${index}-path`} title={link?.[1]}>{link?.[2].replace(/^<|>$/g, "")}</code> : token);
     }
     cursor = index + token.length;
   }

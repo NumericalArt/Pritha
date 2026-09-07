@@ -7257,3 +7257,5 @@ button:active,
 .codex-attachment-limits { color: #94a3b8; font-size: 11px; }
 
 .settings-fields { min-width: 0; border: 0; padding: 0; margin: 0; }
+
+.codex-operation-card { border: 1px solid var(--border-color, #727782); border-radius: 8px; padding: 12px; margin: 10px 0; }

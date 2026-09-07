@@ -1,3 +1,5 @@
+import { planOperationDecision, resolveOperationDecision, type OperationAction, type OperationRequest } from "../../../../../scripts/agents-mother/operation-decisions.mjs";
+import { operationRuntime } from "./operation-runtime";
 import { createHash, randomUUID } from "node:crypto";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage, type RuntimeNotificationOrigin } from "./app-server";
@@ -483,6 +485,21 @@ export class CodexChatGateway {
     // Goal availability and budget status do not authorize or block a host job.
     // Native history is read for ownership only; there is no Goal RPC or turn.
     return binding;
+  }
+
+  async operationDecision(chatId: string, runId: string, action: OperationAction, request?: OperationRequest) {
+    const binding = await this.deliveryContext(chatId, Boolean(request));
+    const release = request ? tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `operation:${chatId}`) : null;
+    if (request && !release) throw new CodexChatGatewayError("turn_active", "Дождитесь завершения текущего действия.", 409);
+    const options = { root: this.root, stateRoot: this.store.stateRoot, runtime: operationRuntime(this.root, this.store.stateRoot) };
+    try {
+      if (request) return await resolveOperationDecision(binding, request, options);
+      const { agentId, planLock, enabled, label, summary, reason, pendingRequest } = await planOperationDecision(binding, runId, action, options);
+      return { agentId, runId, action, planLock, enabled, label, summary, reason, pendingRequest };
+    } catch (error) {
+      if (error instanceof TaskDeliveryError) throw new CodexChatGatewayError(error.code, error.message, error.status);
+      throw new CodexChatGatewayError("operation_unavailable", "Операция пока недоступна. Проверьте Operations и сохранённое состояние.", 409);
+    } finally { release?.(); }
   }
 
   async taskDeliveries(chatId: string, runId?: string) {

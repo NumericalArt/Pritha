@@ -1525,7 +1525,7 @@ ${markdownValue(data.primaryMission, "TBD")}
 - Information boundaries: keep project instructions concise; put detailed procedures in \`07_workflows/\`.
 - Tool system: use local scripts first; add external APIs only when documented in the contract.
 - Execution orchestration: follow \`07_workflows/agent-operating-workflow.md\`.
-- Memory and state: ${markdownValue(data.memoryModel, "Markdown-first")} (\`${memoryProfile}\`)
+- Memory and state: ${markdownValue(data.memoryModel, "Markdown-first")} (\`${selected.memory ? memoryProfile : "no persistent module"}\`)
 - Tool profiles: ${toolProfiles.join(", ")}
 - Evaluation and observability: run \`node scripts/smoke-test.mjs\`; inspect logs before declaring done.
 - Constraints and recovery: stop on missing secrets, failed tests or unclear permissions.
@@ -1637,7 +1637,7 @@ ${selected.skills ? `- \`skills/manifest.json\`: reviewed installed skills, cand
 - Interface adapters: ${interfaces.join(", ")}
 - Telegram mode: ${markdownValue(data.telegramMode, "none")}
 - Memory model: ${markdownValue(data.memoryModel, "Markdown-first")}
-- Memory profile: ${memoryProfile}
+- Memory profile: ${selected.memory ? memoryProfile : "none"}
 - Tool profiles: ${toolProfiles.join(", ")}
 - Skill policy: needs=${skillPolicy.skillNeeds}; sources=${skillPolicy.allowedSkillSources}; install=${skillPolicy.skillInstallMode}; mutation=${skillPolicy.skillMutationPolicy}
 - Deployment target: ${markdownValue(operationProfile.deploymentTarget, "local Mac")}

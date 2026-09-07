@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { OperationDecisions } from "./OperationDecisions";
 import { controlCenterRequest, ControlCenterRequestError } from "@/lib/control-center-request";
 import type { DeliveryBudgetChange, TaskDeliveryRequest, TaskDeliveryView } from "@/lib/codex-chat/delivery-types";
 
@@ -130,6 +131,7 @@ export function DeliveryPanel({ chatId, active, editable, refreshKey = 0, onSele
           </div>}
         {pending ? <button className="outline-button compact" disabled={disabled} onClick={() => void act(pending.action)}>Проверить сохранённое действие</button> : null}
         {latest && latest.action !== "bind" ? <p role="status">{latest.status === "started" ? "Проверяем ход действия…" : latest.status === "interrupted" ? "Предыдущее действие прервалось. Проверьте состояние сборки перед новым запуском." : latest.status === "failed" ? "Действие требует разбора; прежние результаты сохранены." : latest.action === "budget" ? `Бюджет сборки сверён.${latest.request?.budget?.resume ? " Продолжение запрошено; текущее состояние показано выше." : " Продолжение доступно отдельным действием."}` : latest.result?.handoff === "prepared_for_review" ? "Материалы передачи подготовлены для проверки. Приёмка, merge и deployment выполняются отдельно." : "Проверки завершились. Текущее состояние сборки показано выше."}</p> : null}
+        {run.bindingStatus === "bound" ? <OperationDecisions key={`${chatId}:${run.runId}`} chatId={chatId} runId={run.runId} disabled={disabled || Boolean(pending)} /> : null}
         {run.preparation ? <details><summary>Подготовленный сценарий демонстрации</summary><p>Подготовлено: {run.preparation.preparedAt}{run.preparation.head ? `; ревизия ${run.preparation.head.slice(0, 12)}` : ""}. Текущая ревизия повторно сверяется при подготовке передачи.</p><ol>{run.preparation.demo.map((step, index) => <li key={index}>{step}</li>)}</ol></details> : null}
         <button className="codex-text-action" onClick={() => void refresh(run.runId)}>Обновить состояние сборки</button>
       </> : null}

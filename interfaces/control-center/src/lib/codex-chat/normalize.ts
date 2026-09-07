@@ -144,7 +144,9 @@ function userText(item: Record<string, unknown> | undefined) {
 }
 
 function fileOperation(value: unknown): "add" | "modify" | "delete" | "rename" | "unknown" {
-  const kind = String(value || "").toLowerCase();
+  const structured = asObject(value);
+  if (structured?.type === "update" && (typeof structured.move_path === "string" || typeof structured.movePath === "string")) return "rename";
+  const kind = String(structured?.type || value || "").toLowerCase();
   if (kind.includes("add") || kind.includes("create")) return "add";
   if (kind.includes("delete") || kind.includes("remove")) return "delete";
   if (kind.includes("rename") || kind.includes("move")) return "rename";

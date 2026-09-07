@@ -27,6 +27,13 @@ function fixture(t) {
   return { ...options, options, write, folder, contract, catalog: () => readAgentCatalog({ ...options, fresh: true }) };
 }
 
+test("placeholder-only lifecycle reports are diagnostics and do not synthesize agents", t => {
+  const f = fixture(t);
+  f.write("reports/placeholder.md", "agent-post-creation-review", null, "# Agent Post-Creation Review: pilot\n\n- Project path: <PROJECT_ROOT>");
+  assert.equal(f.catalog().agents.length, 0);
+  assert.ok(f.catalog().diagnostics.some(row => row.code === "unbound-legacy-report"));
+});
+
 test("frontmatter-only reports use exact stable ID; display and artifact renames preserve identity", (t) => {
   const f = fixture(t);
   const folder = f.folder("alpha");

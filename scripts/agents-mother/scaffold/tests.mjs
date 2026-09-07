@@ -20,6 +20,10 @@ test("selected scaffold files remain regular project files", () => {
   }
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal(typeof pkg.scripts.test, "string");
+  for (const file of required.filter(name => name.endsWith("/manifest.json"))) {
+    const manifest = JSON.parse(readFileSync(new URL("../" + file, import.meta.url), "utf8"));
+    assert.ok(manifest && typeof manifest === "object" && !Array.isArray(manifest), file);
+  }
 });
 `;
   const result = [...files, { path: "tests/structure.test.mjs", content: structure }];
@@ -48,6 +52,9 @@ test("managed process starts, serves health and stops without touching foreign P
   const port = reservation.address().port;
   await new Promise(resolve => reservation.close(resolve));
   const env = { ...process.env, [portVariable]: String(port) };
+  // The disposable copy owns its local PID record, even when invoked by Pritha.
+  delete env.PRITHA_STATE_ROOT;
+  delete env.NODE_TEST_CONTEXT;
   const command = action => spawnSync(process.execPath, ["scripts/service-control.mjs", action], { env, encoding: "utf8", timeout: 5000, killSignal: "SIGKILL" });
   let ownedRecord;
   try {

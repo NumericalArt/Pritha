@@ -84,7 +84,7 @@ function artifact(file, text, context) {
   return {
     path: file, type: fm.type, fm, name, agentId: identity.id, issue,
     contractPath, projectRef, legacyContractPath,
-    standalone: Boolean(identity.id || projectRef || bodyValue(text, "Agent name") || ["agent-contract", "child-agent-profile"].includes(fm.type)),
+    standalone: Boolean(identity.id || concreteProjectRef(projectRef) || bodyValue(text, "Agent name") || ["agent-contract", "child-agent-profile"].includes(fm.type)),
     aliases: [...new Set([name, bodyValue(text, "Technical slug"), value(fm.agent_slug), identity.id].map(agentAlias).filter(Boolean))],
     mission: missionText(text, fm),
     agentKind: fm.type === "agent-contract" ? readAgentKind(text) : null,

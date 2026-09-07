@@ -326,10 +326,12 @@ export function evolveProject(projectPath, options = {}) {
   const detection = detectProject(projectRoot);
   const reports = relatedReportsForProject(projectRoot, projectName);
   const lessons = inferLessonsFromProject(projectRoot, detection, reports);
+  const identity = findCatalogAgent(readAgentCatalog({ root: ROOT, stateRoot: process.env.PRITHA_STATE_ROOT, fresh: true }), projectRoot);
+  const authoredIdentity = identity?.agentId && identity.identityStatus !== "conflict" ? identity : null;
   const reportPath = writeLifecycleReport(
     path.join(REPORT_DIR, `${today()}-${slug(projectName)}-agent-post-creation-review.md`),
-    ({ artifactId }) => agentPostCreationReviewMarkdown(projectRoot, projectName, detection, reports, lessons, { ...options, artifactId }),
-    { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT },
+    ({ artifactId }) => agentPostCreationReviewMarkdown(projectRoot, projectName, detection, reports, lessons, { ...options, artifactId, identity: authoredIdentity }),
+    { projectRoot, stateRoot: process.env.PRITHA_STATE_ROOT, root: ROOT, ...(authoredIdentity ? { instanceKey: authoredIdentity.instanceKey } : {}) },
   ).path;
   rebuildRegistry();
   console.log(`Post-creation review: ${path.relative(ROOT, reportPath)}`);
@@ -343,7 +345,7 @@ function agentPostCreationReviewMarkdown(projectRoot, projectName, detection, re
   return `---
 id: ${options.artifactId || `${date}-${slug(projectName)}-agent-post-creation-review`}
 type: agent-post-creation-review
-status: draft
+${options.identity ? `agent_id: ${options.identity.agentId}\ninstance_key: ${options.identity.instanceKey}\ncontract_path: ${path.relative(ROOT, options.identity.contractSource)}\nproject_path: ${path.relative(ROOT, projectRoot)}\n` : ""}status: draft
 created: ${date}
 updated: ${date}
 topics:
