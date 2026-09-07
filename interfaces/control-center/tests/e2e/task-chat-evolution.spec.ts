@@ -198,7 +198,7 @@ for (const width of [1280, 390]) {
     const requests: Array<Record<string, string>> = [];
     let loseResponse = true;
     await page.route("**/api/codex-chat/v1/threads/chat_fixture/delivery**", route => route.fulfill({ json: { apiVersion: "1", data: new URL(route.request().url()).searchParams.has("runId") ? { run } : { runs: [{ runId: run.runId, status: run.status }] } } }));
-    await page.route("**/api/codex-chat/v1/threads/chat_fixture/turns?**", route => route.fulfill({ json: { apiVersion: "1", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/example/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
+    await page.route("**/api/codex-chat/v1/threads/chat_fixture/turns?**", route => route.fulfill({ json: { apiVersion: "1", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/<user>/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
     await page.route("**/api/codex-chat/v1/threads/chat_fixture/operations**", async route => {
       if (route.request().method() === "GET") {
         const action = new URL(route.request().url()).searchParams.get("action");

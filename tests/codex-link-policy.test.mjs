@@ -10,7 +10,7 @@ test("local Markdown links cannot become HTTP filesystem routes", async t => {
   const file = path.join(dir, "policy.mjs");
   writeFileSync(file, ts.transpileModule(readFileSync("interfaces/control-center/src/components/codex/link-policy.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText);
   const { markdownLink } = await import(pathToFileURL(file).href);
-  for (const input of ["/Users/operator/child/README.md", "</private/state/Outcome Spec.md>", "../state/handoff.md", "file:///etc/passwd", "//external.invalid/path", "/agents/../../etc/passwd"]) assert.deepEqual(markdownLink(input), { href: null, local: true });
+  for (const input of ["/Users/<user>/child/README.md", "</private/state/Outcome Spec.md>", "../state/handoff.md", "file:///etc/passwd", "//external.invalid/path", "/agents/../../etc/passwd"]) assert.deepEqual(markdownLink(input), { href: null, local: true });
   for (const input of ["/agents?id=fixture", "#checks", "https://example.org/docs"]) assert.equal(markdownLink(input).href, input);
   for (const input of ["javascript:alert(1)", "data:text/html,unsafe", "https://name:password@example.org"]) assert.equal(markdownLink(input).href, null);
 });
