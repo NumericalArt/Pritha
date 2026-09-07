@@ -1,6 +1,6 @@
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-export function boundedJsonReason(value, options = {}) {
+function boundedJsonReason(value, options = {}) {
   const maxDepth = Math.max(1, Math.min(Number(options.maxDepth || 24), 64));
   const maxNodes = Math.max(1, Math.min(Number(options.maxNodes || 20_000), 100_000));
   const maxArrayLength = Math.max(1, Math.min(Number(options.maxArrayLength || 2_000), 20_000));

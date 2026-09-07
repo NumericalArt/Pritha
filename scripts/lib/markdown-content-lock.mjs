@@ -7,9 +7,7 @@ export function markdownBodyText(value) {
   return end === -1 ? text : text.slice(end + 5);
 }
 
-export function markdownBodyLock(value) {
-  return `sha256:${createHash("sha256").update(markdownBodyText(value)).digest("hex")}`;
-}
+
 
 export function markdownDocumentLock(value, field = "research_content_lock") {
   const text = String(value || "").replace(/\r\n?/g, "\n");

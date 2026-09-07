@@ -96,9 +96,7 @@ export function resolvePrithaStatePath(kind, ...segments) {
   return resolvePrithaStatePathFrom({}, kind, ...segments);
 }
 
-export function prithaStatePath(kind, ...segments) {
-  return resolvePrithaStatePath(kind, ...segments);
-}
+
 
 export function prithaInstanceConfig(options = {}) {
   const codeRoot = options.root ? path.resolve(options.root) : resolveTechscopeRoot(options);

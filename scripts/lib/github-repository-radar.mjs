@@ -2,13 +2,13 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { readBoundedRegularFile } from "./safe-file-read.mjs";
 
-export const GITHUB_REPOSITORY_REGISTRY_RELATIVE_PATH = path.join(
+const GITHUB_REPOSITORY_REGISTRY_RELATIVE_PATH = path.join(
   "01_sources",
   "registries",
   "github-agent-building-repos.md",
 );
 
-export const GITHUB_REPOSITORY_TOPIC_QUERIES = Object.freeze({
+const GITHUB_REPOSITORY_TOPIC_QUERIES = Object.freeze({
   "agent-harness": [
     "agent framework harness tool calling stars:>25",
     "AI agent framework TypeScript MCP stars:>25",
@@ -71,7 +71,7 @@ export function normalizeGitHubRepositoryUrl(value) {
   };
 }
 
-export function splitMarkdownTableRow(line) {
+function splitMarkdownTableRow(line) {
   const source = String(line || "").trim();
   if (!source.startsWith("|") || !source.endsWith("|")) return [];
 
@@ -99,7 +99,7 @@ function parseIntegerCell(value) {
   return Number.parseInt(normalized, 10) || 0;
 }
 
-export function parseGitHubRepositoryRegistry(markdown) {
+function parseGitHubRepositoryRegistry(markdown) {
   return String(markdown || "")
     .split(/\r?\n/)
     .map((line) => {
@@ -255,7 +255,7 @@ export function normalizeGitHubApiRepository(item) {
   };
 }
 
-export function isExplicitlyPublicGitHubApiRepository(item) {
+function isExplicitlyPublicGitHubApiRepository(item) {
   return item?.private === false && String(item?.visibility || "").toLowerCase() === "public";
 }
 
@@ -340,7 +340,7 @@ export async function fetchGitHubRepositorySearch(query, limit, options = {}) {
   return fetchJson(url, options);
 }
 
-export async function fetchGitHubRepository(repositoryValue, options = {}) {
+async function fetchGitHubRepository(repositoryValue, options = {}) {
   const repository = normalizeGitHubRepositoryUrl(repositoryValue);
   if (!repository) throw new Error(`Invalid GitHub repository: ${repositoryValue}`);
   const url = new URL(`https://api.github.com/repos/${repository.owner}/${repository.repo}`);
@@ -351,7 +351,7 @@ export async function fetchGitHubRepository(repositoryValue, options = {}) {
   return normalizeGitHubApiRepository(payload);
 }
 
-export async function fetchGitHubRepositoryHead(repositoryValue, branch, options = {}) {
+async function fetchGitHubRepositoryHead(repositoryValue, branch, options = {}) {
   const repository = normalizeGitHubRepositoryUrl(repositoryValue);
   if (!repository) throw new Error(`Invalid GitHub repository: ${repositoryValue}`);
   const ref = String(branch || "HEAD").trim() || "HEAD";
@@ -365,7 +365,7 @@ export async function fetchGitHubRepositoryHead(repositoryValue, branch, options
   };
 }
 
-export async function fetchGitHubRepositoryTree(repositoryValue, treeSha, options = {}) {
+async function fetchGitHubRepositoryTree(repositoryValue, treeSha, options = {}) {
   const repository = normalizeGitHubRepositoryUrl(repositoryValue);
   if (!repository) throw new Error(`Invalid GitHub repository: ${repositoryValue}`);
   const sha = String(treeSha || "").trim();
@@ -503,7 +503,7 @@ export function detectRepositoryLicenseSpdx(contentValue, filenameValue = "") {
   return signals.size === 1 ? [...signals][0] : "";
 }
 
-export async function fetchGitHubRepositoryBlob(repositoryValue, blobShaValue, options = {}) {
+async function fetchGitHubRepositoryBlob(repositoryValue, blobShaValue, options = {}) {
   const repository = normalizeGitHubRepositoryUrl(repositoryValue);
   if (!repository) throw new Error(`Invalid GitHub repository: ${repositoryValue}`);
   const blobSha = String(blobShaValue || "").trim().toLowerCase();
@@ -526,7 +526,7 @@ export async function fetchGitHubRepositoryBlob(repositoryValue, blobShaValue, o
   };
 }
 
-export async function fetchGitHubRepositoryModuleLicenseAtTree(repositoryValue, moduleValue, verifiedModule, pinShaValue, options = {}) {
+async function fetchGitHubRepositoryModuleLicenseAtTree(repositoryValue, moduleValue, verifiedModule, pinShaValue, options = {}) {
   const repository = normalizeGitHubRepositoryUrl(repositoryValue);
   const modulePath = normalizeRepositoryModulePath(moduleValue);
   const pinSha = String(pinShaValue || "").trim().toLowerCase();
@@ -572,7 +572,7 @@ export async function fetchGitHubRepositoryModuleLicenseAtTree(repositoryValue, 
   };
 }
 
-export async function fetchGitHubLatestRelease(repositoryValue, options = {}) {
+async function fetchGitHubLatestRelease(repositoryValue, options = {}) {
   const repository = normalizeGitHubRepositoryUrl(repositoryValue);
   if (!repository) throw new Error(`Invalid GitHub repository: ${repositoryValue}`);
   const url = new URL(`https://api.github.com/repos/${repository.owner}/${repository.repo}/releases/latest`);

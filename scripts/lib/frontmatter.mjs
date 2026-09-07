@@ -1,4 +1,4 @@
-export function parseScalar(value) {
+function parseScalar(value) {
   const trimmed = String(value ?? "").trim();
   if (trimmed === "") return "";
   if (trimmed === "[]") return [];

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-export const RAW_SOURCE_PREFIX = "01_sources/raw/";
+const RAW_SOURCE_PREFIX = "01_sources/raw/";
 
 export const FORBIDDEN_RAW_PATHS = [
   "01_sources/raw/media/",
@@ -14,13 +14,13 @@ export const FORBIDDEN_RAW_GLOBS = [
   "01_sources/raw/youtube-*",
 ];
 
-export const PRIVACY_TEXT_TARGETS = [
+const PRIVACY_TEXT_TARGETS = [
   "00_inbox/",
   "01_sources/notes/",
   "01_sources/signals/",
 ];
 
-export const FORBIDDEN_TEXT_PATTERNS = [
+const FORBIDDEN_TEXT_PATTERNS = [
   {
     id: "raw-source-path",
     pattern: /01_sources\/raw\//i,
@@ -58,9 +58,9 @@ export const FORBIDDEN_TEXT_PATTERNS = [
   },
 ];
 
-export const INCOMING_URL_PATTERN = /https?:\/\/[^\s<>)\]]+/i;
+const INCOMING_URL_PATTERN = /https?:\/\/[^\s<>)\]]+/i;
 
-export function normalizeRelPath(filePath) {
+function normalizeRelPath(filePath) {
   return String(filePath || "").split(path.sep).join("/");
 }
 

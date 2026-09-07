@@ -1,6 +1,6 @@
-export const MAINTENANCE_SCHEMA_VERSION = "pritha-maintenance-contract-v1";
+const MAINTENANCE_SCHEMA_VERSION = "pritha-maintenance-contract-v1";
 
-export const MAINTENANCE_ACTIONS = [
+const MAINTENANCE_ACTIONS = [
   {
     id: "github-check",
     label: "Check GitHub updates",
@@ -83,8 +83,4 @@ export function maintenanceContracts() {
     },
     actions: MAINTENANCE_ACTIONS.map((action) => ({ ...action })),
   };
-}
-
-export function findMaintenanceAction(id) {
-  return MAINTENANCE_ACTIONS.find((action) => action.id === id) || null;
 }
