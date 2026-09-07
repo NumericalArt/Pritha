@@ -917,7 +917,7 @@ test("generated skills status rejects traversal and symlinked installed skills",
       runtimeFamily: "codex-native",
       primaryInterface: "Codex project",
       telegramMode: "none",
-      skillNeeds: "none",
+      skillNeeds: "auto", skillInstallMode: "recommend",
     })) {
       const destination = path.join(root, file.path);
       mkdirSync(path.dirname(destination), { recursive: true });
@@ -992,7 +992,7 @@ test("generated skills status uses shared secret scanning and locks the full sec
       runtimeFamily: "codex-native",
       primaryInterface: "Codex project",
       telegramMode: "none",
-      skillNeeds: "none",
+      skillNeeds: "auto", skillInstallMode: "recommend",
     })) {
       const destination = path.join(root, file.path);
       mkdirSync(path.dirname(destination), { recursive: true });

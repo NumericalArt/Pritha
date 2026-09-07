@@ -17,6 +17,7 @@ import { newestArtifactPathsFirst } from "../artifact-selection.mjs";
 import { writeLifecycleReport } from "../lifecycle-report.mjs";
 import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "../outcome-spec.mjs";
 import { assertScaffoldCapability, scaffoldCapability } from "./capabilities.mjs";
+import { selectedScaffoldModules } from "./modules.mjs";
 import { headlessCliFiles } from "./headless-cli.mjs";
 import { apiProcessFiles, apiProcessManifest } from "./api-process.mjs";
 
@@ -191,6 +192,7 @@ function memoryProfileDetails(profile) {
 }
 
 function toolProfilesFor(data) {
+  if (/^(none|нет|без инструментов)$/i.test(String(data.toolSystem || "").trim())) return [];
   const text = `${data.toolSystem || ""} ${data.primaryInterface || ""} ${data.telegramMode || ""}`.toLowerCase();
   const profiles = new Set(["cli-script", "workflow"]);
   const skillPolicy = skillPolicyFor(data);
@@ -1288,6 +1290,7 @@ if (existsSync(repositoryManifestPath)) {
   const jsControlCenterLocalUrl = javascriptLiteral(controlCenterLocalUrl);
   const jsServiceLabel = javascriptLiteral(operationProfile.serviceLabel);
   const skillSelection = selectSkillsForContract(data);
+  const selected = selectedScaffoldModules(data, { toolProfiles, skills: skillSelection, telegram: telegramEnabled });
   const skillPolicy = skillSelection.policy;
   const installedSkillRows = skillSelection.installed.map((row) => skillRowForManifest(row, "installed"));
   const candidateSkillRows = [
@@ -1547,8 +1550,8 @@ ${telegramEnabled ? "Telegram is enabled by contract. Use the adapter only with 
 
 ## Memory and Tools
 
-- Memory profile is documented in \`memory/manifest.json\`.
-- Tool boundaries are documented in \`tools/manifest.json\`.
+${selected.memory ? `- Memory profile is documented in \`memory/manifest.json\`.` : ""}
+${selected.tools ? `- Tool boundaries are documented in \`tools/manifest.json\`.` : ""}
 - Add heavier memory or external tools only after updating the contract.
 
 ## Harness Evolution Protocol
@@ -1565,7 +1568,7 @@ Required order:
 4. Only then design and implement the harness change.
 5. Record the decision or result in this agent's local memory/report, and send reusable lessons back to Pritha when they may improve future agents.
 
-## Skills
+${selected.skills ? `## Skills
 
 - Skill policy and provenance live in \`skills/manifest.json\`.
 - Before reading or using an installed skill, run \`node scripts/skills-status.mjs\` and require a successful deterministic audit.
@@ -1573,7 +1576,7 @@ Required order:
 - Fail closed on hash, provenance or security-metadata drift; do not read the changed skill as instructions.
 - Do not use entries from \`skills/candidates.json\` as active instructions.
 - Do not modify skills unless the contract allows skill mutation.
-- External skills remain inactive candidates until Pritha implements a dedicated pinned-bundle verification and approval workflow; approval text alone is insufficient.
+- External skills remain inactive candidates until Pritha implements a dedicated pinned-bundle verification and approval workflow; approval text alone is insufficient.` : ""}
 `,
   });
 
@@ -1595,9 +1598,9 @@ chmod 600 .env
 node scripts/smoke-test.mjs
 node scripts/agent-cli.mjs help
 node scripts/interface-status.mjs
-node scripts/memory-status.mjs
-node scripts/tools-status.mjs
-node scripts/skills-status.mjs
+${selected.memory ? `node scripts/memory-status.mjs` : ""}
+${selected.tools ? `node scripts/tools-status.mjs` : ""}
+${selected.skills ? `node scripts/skills-status.mjs` : ""}
 node scripts/operations-status.mjs
 \`\`\`
 
@@ -1615,9 +1618,9 @@ node scripts/telegram-bot.mjs healthcheck
 - \`07_workflows/agent-operating-workflow.md\`: normal work cycle.
 - \`interfaces/manifest.json\`: selected interface adapters.
 - \`interfaces/README.md\`: interface contract and adapter notes.
-- \`memory/manifest.json\`: memory profile and boundaries.
-- \`tools/manifest.json\`: tool profiles and boundaries.
-- \`skills/manifest.json\`: reviewed installed skills, candidate skills, hashes and mutation policy.
+${selected.memory ? `- \`memory/manifest.json\`: memory profile and boundaries.` : ""}
+${selected.tools ? `- \`tools/manifest.json\`: tool profiles and boundaries.` : ""}
+${selected.skills ? `- \`skills/manifest.json\`: reviewed installed skills, candidate skills, hashes and mutation policy.` : ""}
 - \`operations/manifest.json\`: deployment target, service profile, proactivity, autostart policy, healthcheck and log path.
 - \`docs/user-training-guide.md\`: first user exercise and handoff notes.
 - \`scripts/smoke-test.mjs\`: structure and configuration smoke test.
@@ -1664,9 +1667,9 @@ LOG_LEVEL=info
     "help": "node scripts/agent-cli.mjs help",
     "status": "node scripts/agent-cli.mjs status",
     "interfaces": "node scripts/interface-status.mjs",
-    "memory": "node scripts/memory-status.mjs",
-    "tools": "node scripts/tools-status.mjs",
-    "skills": "node scripts/skills-status.mjs",
+${selected.memory ? '    "memory": "node scripts/memory-status.mjs",' : ""}
+${selected.tools ? '    "tools": "node scripts/tools-status.mjs",' : ""}
+${selected.skills ? '    "skills": "node scripts/skills-status.mjs",' : ""}
     "operations": "node scripts/operations-status.mjs",
     "control-center:status": "node scripts/control-center-runtime.mjs status",
     "control-center:start": "node scripts/control-center-runtime.mjs start",
@@ -1791,6 +1794,7 @@ ${voiceCopyCommand}
     });
   }
 
+  if (selected.memory) {
   files.push({
     path: "memory/manifest.json",
     content: `${JSON.stringify(memoryManifest, null, 2)}
@@ -1819,7 +1823,7 @@ ${memoryDetails.directories.map((dir) => `- \`${dir}\``).join("\n")}
 ## Commands
 
 \`\`\`sh
-node scripts/memory-status.mjs
+${selected.memory ? `node scripts/memory-status.mjs` : ""}
 \`\`\`
 `,
   });
@@ -1854,6 +1858,9 @@ Document external memory/vector/graph services here before connecting them. Incl
     }
   }
 
+  }
+
+  if (selected.tools) {
   files.push({
     path: "tools/manifest.json",
     content: `${JSON.stringify(toolsManifest, null, 2)}
@@ -1901,6 +1908,9 @@ Status: scaffolded profile. Add concrete commands or integrations only after the
     });
   }
 
+  }
+
+  if (selected.skills) {
   files.push({
     path: "skills/manifest.json",
     content: `${JSON.stringify(skillsManifest, null, 2)}
@@ -1949,7 +1959,7 @@ Skills are reviewed procedural knowledge for this agent. Use \`skills/manifest.j
 ## Commands
 
 \`\`\`sh
-node scripts/skills-status.mjs
+${selected.skills ? `node scripts/skills-status.mjs` : ""}
 \`\`\`
 `,
   });
@@ -1959,6 +1969,8 @@ node scripts/skills-status.mjs
       path: `skills/${row.skill.name}/SKILL.md`,
       content: row.skill.text,
     });
+  }
+
   }
 
   files.push({
@@ -2289,6 +2301,7 @@ for (const adapter of manifest.adapters || []) {
 `,
   });
 
+  if (selected.memory) {
   files.push({
     path: "scripts/memory-status.mjs",
     content: `#!/usr/bin/env node
@@ -2310,7 +2323,9 @@ console.log("Directories:");
 for (const dir of manifest.directories || []) console.log(\`- \${dir}\`);
 `,
   });
+  }
 
+  if (selected.tools) {
   files.push({
     path: "scripts/tools-status.mjs",
     content: `#!/usr/bin/env node
@@ -2332,16 +2347,21 @@ for (const profile of manifest.profiles || []) {
 }
 `,
   });
+  }
 
+  if (selected.skills) {
   files.push({
     path: "scripts/skills-status.mjs",
     content: SKILLS_STATUS_SCRIPT,
   });
+  }
 
+  if (selected.redaction) {
   files.push({
     path: "scripts/redaction.mjs",
     content: SHARED_REDACTION_SCRIPT,
   });
+  }
 
   files.push({
     path: "scripts/control-center-runtime.mjs",
@@ -2623,11 +2643,11 @@ const requiredPaths = [
   "package.json",
   "operations/manifest.json",
   "interfaces/manifest.json",
-  "memory/manifest.json",
-  "tools/manifest.json",
-  "skills/manifest.json",
-  "scripts/skills-status.mjs",
-  "scripts/redaction.mjs",
+${selected.memory ? '  "memory/manifest.json",' : ""}
+${selected.tools ? '  "tools/manifest.json",' : ""}
+${selected.skills ? '  "skills/manifest.json",' : ""}
+${selected.skills ? '  "scripts/skills-status.mjs",' : ""}
+${selected.redaction ? '  "scripts/redaction.mjs",' : ""}
   "scripts/control-center-agent-service.mjs",
   "scripts/control-center-runtime.mjs",
   "scripts/smoke-test.mjs"
@@ -2704,14 +2724,14 @@ const required = [
   "package.json",
   "interfaces/manifest.json",
   "interfaces/README.md",
-  "memory/manifest.json",
-  "memory/README.md",
-  "tools/manifest.json",
-  "tools/README.md",
-  "skills/manifest.json",
-  "skills/candidates.json",
-  "skills/lock.json",
-  "skills/README.md",
+${selected.memory ? '  "memory/manifest.json",' : ""}
+${selected.memory ? '  "memory/README.md",' : ""}
+${selected.tools ? '  "tools/manifest.json",' : ""}
+${selected.tools ? '  "tools/README.md",' : ""}
+${selected.skills ? '  "skills/manifest.json",' : ""}
+${selected.skills ? '  "skills/candidates.json",' : ""}
+${selected.skills ? '  "skills/lock.json",' : ""}
+${selected.skills ? '  "skills/README.md",' : ""}
   "operations/manifest.json",
   "operations/README.md",
   "07_workflows/agent-operating-workflow.md",
@@ -2722,10 +2742,10 @@ const required = [
   "scripts/interface-status.mjs",
   "scripts/healthcheck.mjs",
   "scripts/control-center-agent-service.mjs",
-  "scripts/memory-status.mjs",
-  "scripts/tools-status.mjs",
-  "scripts/skills-status.mjs",
-  "scripts/redaction.mjs",
+${selected.memory ? '  "scripts/memory-status.mjs",' : ""}
+${selected.tools ? '  "scripts/tools-status.mjs",' : ""}
+${selected.skills ? '  "scripts/skills-status.mjs",' : ""}
+${selected.redaction ? '  "scripts/redaction.mjs",' : ""}
   "scripts/operations-status.mjs",
   "scripts/deploy-service.mjs"
 ];
@@ -3012,8 +3032,8 @@ data/telegram-state.json
   });
   files.push({ path: "logs/.gitkeep", content: "" });
   const capability = scaffoldCapability(data);
-  if (capability.adapter === "headless-cli-v1") return headlessCliFiles(files, data, capability);
-  if (capability.adapter === "api-process-v1") return apiProcessFiles(files, data, capability);
+  if (capability.adapter === "headless-cli-v1") return headlessCliFiles(files, data, capability, selected);
+  if (capability.adapter === "api-process-v1") return apiProcessFiles(files, data, capability, selected);
   return files;
 }
 

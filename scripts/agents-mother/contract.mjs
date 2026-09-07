@@ -512,6 +512,7 @@ export function contractData(contractPath, options = {}) {
     indexingSearchNeeds: bodyValue(text, "Indexing/search needs"),
     toolSystem: bodyValue(text, "Tool system"),
     inputDataTypes: bodyValue(text, "Input data types"),
+    untrustedInputPolicy: bodyValue(text, "Untrusted input policy") || bodyValue(text, "untrusted_input_policy"),
     storedData: bodyValue(text, "Stored data"),
     sensitiveData: bodyValue(text, "Sensitive data"),
     targetFolder: bodyValue(text, "Target folder"),
