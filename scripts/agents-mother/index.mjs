@@ -125,7 +125,7 @@ function usage() {
   ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days] [--input evidence.json]
   ${CLI_COMMAND} scaffold <contract-path> [--output <folder>] [--allow-draft-scaffold] [--allow-missing-research] [--allow-pending-external-verification]
   ${CLI_COMMAND} scaffold-plan <contract-path>
-  ${CLI_COMMAND} probe-plan <agent-id-or-project> [--timeout-ms 5000]
+  ${CLI_COMMAND} probe-plan <agent-id-or-project> [--purpose health|test] [--timeout-ms 5000]
   ${CLI_COMMAND} probe <agent-id-or-project> --approved-by user --plan-lock <sha256> [--timeout-ms 5000]
   ${CLI_COMMAND} test <project-path>
   ${CLI_COMMAND} handoff <project-path>
@@ -1795,7 +1795,7 @@ async function main() {
   if (command === "probe-plan" || command === "probe") {
     const target = options._[0];
     if (!target) throw new Error("Missing agent identity or project path");
-    const input = { root: ROOT, timeoutMs: options["timeout-ms"], approvedBy: options["approved-by"], planLock: options["plan-lock"] };
+    const input = { root: ROOT, purpose: options.purpose, timeoutMs: options["timeout-ms"], approvedBy: options["approved-by"], planLock: options["plan-lock"] };
     const result = command === "probe-plan" ? planAgentCommandProbe(target, input) : await runAgentCommandProbe(target, input);
     console.log(JSON.stringify(result, null, 2));
     if (result.status && result.status !== "runnable") process.exitCode = 1;
@@ -2059,7 +2059,7 @@ async function main() {
   if (command === "handoff") {
     const target = options._[0];
     if (!target) throw new Error("Missing project path.");
-    handoffProject(target, options);
+    await handoffProject(target, options);
     return;
   }
   if (command === "operations") {

@@ -17,6 +17,7 @@ import { newestArtifactPathsFirst } from "../artifact-selection.mjs";
 import { writeLifecycleReport } from "../lifecycle-report.mjs";
 import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "../outcome-spec.mjs";
 import { assertScaffoldCapability, scaffoldCapability } from "./capabilities.mjs";
+import { withChildTests } from "./tests.mjs";
 import { selectedScaffoldModules } from "./modules.mjs";
 import { headlessCliFiles } from "./headless-cli.mjs";
 import { apiProcessFiles, apiProcessManifest } from "./api-process.mjs";
@@ -3032,9 +3033,9 @@ data/telegram-state.json
   });
   files.push({ path: "logs/.gitkeep", content: "" });
   const capability = scaffoldCapability(data);
-  if (capability.adapter === "headless-cli-v1") return headlessCliFiles(files, data, capability, selected);
-  if (capability.adapter === "api-process-v1") return apiProcessFiles(files, data, capability, selected);
-  return files;
+  if (capability.adapter === "headless-cli-v1") return withChildTests(headlessCliFiles(files, data, capability, selected), capability);
+  if (capability.adapter === "api-process-v1") return withChildTests(apiProcessFiles(files, data, capability, selected), capability);
+  return withChildTests(files, capability);
 }
 
 export function runSmoke(projectRoot) {

@@ -1,5 +1,6 @@
 // Shared host policies. Callers may select a class, never an unbounded timeout.
 export const TIMEOUT_POLICIES = Object.freeze({
+  childTest: Object.freeze({ defaultMs: 120_000, minMs: 50, maxMs: 900_000, env: "PRITHA_CHILD_TEST_TIMEOUT_MS" }),
   releaseReady: Object.freeze({ defaultMs: 45_000, minMs: 100, maxMs: 300_000, env: "PRITHA_UPDATE_HEALTH_TIMEOUT_MS" }),
   releaseRollback: Object.freeze({ defaultMs: 30_000, minMs: 100, maxMs: 300_000, env: "PRITHA_UPDATE_ROLLBACK_HEALTH_TIMEOUT_MS" }),
   releaseRequest: Object.freeze({ defaultMs: 8_000, minMs: 50, maxMs: 60_000, env: "PRITHA_UPDATE_HEALTH_REQUEST_TIMEOUT_MS" }),

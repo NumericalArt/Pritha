@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { resultReadinessFixture, git } from "./helpers/result-readiness-fixture.mjs";
 import { prepareAuthoredHandoff, firstScenarioForHandoff } from "../scripts/agents-mother/authored-handoff.mjs";
-import { planAgentCommandProbe, runAgentCommandProbe } from "../scripts/agents-mother/command-probe.mjs";
+import { planAgentCommandProbe, runAgentCommandProbe, readAgentTestResult } from "../scripts/agents-mother/command-probe.mjs";
 import { LocalExecBackend } from "../scripts/agents-mother/execution-backends.mjs";
 
 test("handoff preserves authored project and profile, replays its guide and separates acceptance", async t => {
@@ -64,4 +64,27 @@ test("bounded local execution terminates only its own stubborn process descendan
   const descendant = Number(readFileSync(pidFile, "utf8"));
   const listing = (() => { try { return execFileSync("ps", ["-o", "stat=", "-p", String(descendant)], { encoding: "utf8" }).trim(); } catch { return ""; } })();
   assert.ok(!listing || listing.startsWith("Z"), listing);
+});
+
+test("child npm test is approved, revision-bound and advisory at handoff", async t => {
+  const f = await resultReadinessFixture(t);
+  const packagePath = path.join(f.project, "package.json");
+  writeFileSync(packagePath, JSON.stringify({ scripts: { test: "node -e \"process.exit(1)\"" } }));
+  const input = { ...f.options, purpose: "test" };
+  const plan = planAgentCommandProbe(f.project, input);
+  assert.deepEqual(plan.argv, ["npm", "test"]);
+  assert.equal(readAgentTestResult(f.project, input).status, "not-run");
+  await assert.rejects(runAgentCommandProbe(f.project, input), /approval_required/);
+  const result = await runAgentCommandProbe(f.project, { ...input, approvedBy: "user", planLock: plan.planLock });
+  assert.equal(result.status, "failed");
+  assert.equal(readAgentTestResult(f.project, input).status, "failed");
+  const report = prepareAuthoredHandoff(f.project, f.options);
+  assert.equal(report.status, "guide-prepared");
+  assert.match(readFileSync(report.reportPath, "utf8"), /npm test: failed.*warning/);
+  writeFileSync(packagePath, JSON.stringify({ scripts: { test: "node --version" } }));
+  assert.equal(readAgentTestResult(f.project, input).status, "not-run");
+  await assert.rejects(runAgentCommandProbe(f.project, { ...input, approvedBy: "user", planLock: plan.planLock }), /plan_changed/);
+  const fresh = planAgentCommandProbe(f.project, input);
+  await runAgentCommandProbe(f.project, { ...input, approvedBy: "user", planLock: fresh.planLock });
+  assert.equal(readAgentTestResult(f.project, input).status, "pass");
 });

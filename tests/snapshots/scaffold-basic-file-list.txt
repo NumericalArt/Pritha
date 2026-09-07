@@ -34,6 +34,7 @@ skills/README.md
 skills/candidates.json
 skills/lock.json
 skills/manifest.json
+tests/structure.test.mjs
 tools/README.md
 tools/cli-script/README.md
 tools/manifest.json

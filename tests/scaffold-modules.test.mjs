@@ -21,6 +21,12 @@ for (const adapter of [{ runtimeFamily: "cli", primaryInterface: "CLI" }, { runt
       const result = spawnSync(process.execPath, [`scripts/${command}.mjs`], { cwd: root, encoding: "utf8", timeout: 10000, killSignal: "SIGKILL" });
       assert.equal(result.status, 0, result.stdout + result.stderr);
     }
+    const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+    const tests = spawnSync("npm", ["test"], { cwd: root, env, encoding: "utf8", timeout: 30000, killSignal: "SIGKILL" });
+    if (adapter.runtimeFamily === "api") {
+      assert.notEqual(tests.status, 0);
+      assert.match(tests.stdout + tests.stderr, /implementation-required/);
+    } else assert.equal(tests.status, 0, tests.stdout + tests.stderr);
     assert.equal(generatedAgentFiles({ ...minimal, ...adapter, memoryModel: "ephemeral", indexingSearchNeeds: "no SQLite/embeddings" }).some(file => file.path.startsWith("memory/")), false);
   });
 }

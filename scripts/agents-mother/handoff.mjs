@@ -6,6 +6,7 @@ import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { checkResult, detectProject, fileExists, recommendationForProject } from "./test.mjs";
 import { writeLifecycleReport } from "./lifecycle-report.mjs";
+import { readAgentTestResult, runAgentCommandProbe } from "./command-probe.mjs";
 import { prepareAuthoredHandoff } from "./authored-handoff.mjs";
 
 const ROOT = resolveTechscopeRoot();
@@ -20,7 +21,15 @@ function scalar(value, fallback = "TBD") {
   const text = String(value || "").trim();
   return text || fallback;
 }
-export function handoffProject(projectPath, options = {}) {
+export async function handoffProject(projectPath, options = {}) {
+  if (options["run-tests"]) {
+    const input = { ...options, root: ROOT, purpose: "test", timeoutMs: options["timeout-ms"], approvedBy: options["approved-by"], planLock: options["plan-lock"] };
+    const prior = readAgentTestResult(path.resolve(ROOT, projectPath), input);
+    if (prior.planLock !== input.planLock || !prior.at) {
+      try { await runAgentCommandProbe(path.resolve(ROOT, projectPath), input); }
+      catch { console.warn("Child test warning: the reviewed command could not run; handoff continues without verification credit."); }
+    }
+  }
   const authored = prepareAuthoredHandoff(path.resolve(ROOT, projectPath), { ...options, root: ROOT });
   if (authored) {
     console.log(`Handoff: ${authored.status}\nProfile: ${authored.profilePath}\nReport: ${authored.reportPath}\nUnchanged: ${authored.unchanged}`);
@@ -33,7 +42,7 @@ export function handoffProject(projectPath, options = {}) {
   }
 
   const detection = detectProject(projectRoot);
-  const checks = [];
+  const checks = [checkResult("npm test", readAgentTestResult(projectRoot, { ...options, root: ROOT }).status, "Child engineering tests are separate from Outcome verification.")];
   const scripts = detection.scripts;
 
   if (fileExists(projectRoot, "scripts/smoke-test.mjs")) {
