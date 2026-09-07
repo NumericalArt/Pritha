@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -64,7 +64,7 @@ function run(command, commandArgs, options = {}) {
   if (simulatedMissing.has(command) || simulatedMissing.has(options.id)) {
     return { status: 127, stdout: "", stderr: "simulated missing dependency" };
   }
-  return spawnSync(command, commandArgs, {
+  return runSyncProbe(command, commandArgs, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs || 20000,

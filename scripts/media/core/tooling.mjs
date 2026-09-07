@@ -1,3 +1,4 @@
+import { runSyncProbe } from "../../lib/sync-probe.mjs";
 import { mkdirSync, existsSync } from "node:fs";
 import { execFileSync as execFileSyncChild, spawnSync } from "node:child_process";
 import path from "node:path";
@@ -5,12 +6,12 @@ import path from "node:path";
 const PYTHON = "python3";
 
 export function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const result = runSyncProbe(command, args, {
     cwd: options.cwd,
     encoding: "utf8",
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
     env: options.env || process.env,
-    timeout: options.timeout || 0,
+    timeout: options.timeout || 1_800_000,
   });
   if (result.status !== 0) {
     const detail = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();

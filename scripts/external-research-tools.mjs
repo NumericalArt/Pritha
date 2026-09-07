@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -61,7 +61,7 @@ function parseArgs(argv) {
 }
 
 function run(command, args, options = {}) {
-  return spawnSync(command, args, {
+  return runSyncProbe(command, args, {
     cwd: options.cwd,
     env: options.env || process.env,
     encoding: "utf8",

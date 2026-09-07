@@ -1,6 +1,6 @@
+import { runSyncProbe } from "../lib/sync-probe.mjs";
 import { appendFileSync, chmodSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { quarantineUntrustedInstructionText, redactSensitiveText, redactStructuredText } from "../lib/redaction.mjs";
 import { today } from "../lib/date.mjs";
@@ -244,7 +244,7 @@ export function runSemanticPatternSearch(root, query, options = {}) {
 
   const limit = Math.max(1, Math.min(Number(options.semanticLimit || options["semantic-limit"] || options.limit || 8) || 8, 20));
   const timeoutMs = Math.max(5_000, Math.min(Number(options.semanticTimeoutMs || options["semantic-timeout-ms"] || 60_000) || 60_000, 180_000));
-  const result = spawnSync("python3", ["scripts/semantic-search.py", query, "--limit", String(limit)], {
+  const result = runSyncProbe("python3", ["scripts/semantic-search.py", query, "--limit", String(limit)], {
     cwd: root,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

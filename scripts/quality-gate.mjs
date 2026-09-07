@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -80,7 +80,7 @@ function run(id, name, command, commandArgs, options = {}) {
 
   const childEnv = { ...process.env, TECHSCOPE_ROOT: ROOT, ...(options.env || {}) };
   for (const key of options.unsetEnv || []) delete childEnv[key];
-  const result = spawnSync(command, commandArgs, {
+  const result = runSyncProbe(command, commandArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

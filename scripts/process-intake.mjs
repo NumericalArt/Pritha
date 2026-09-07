@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -180,11 +180,11 @@ async function downloadTelegramMedia(data, body, intakeRel) {
 }
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const result = runSyncProbe(command, args, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "pipe"],
-    timeout: options.timeout || 0,
+    timeout: options.timeout || 1_800_000,
   });
   const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
   if (result.status !== 0) {

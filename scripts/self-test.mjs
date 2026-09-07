@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -21,7 +21,7 @@ const noWrite = args.has("--no-write") || dryRun;
 const baselinePath = resolvePrithaStatePath("memory", "last-self-test.json");
 
 function runJson(command, commandArgs, options = {}) {
-  const result = spawnSync(command, commandArgs, {
+  const result = runSyncProbe(command, commandArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -68,7 +68,7 @@ function runJson(command, commandArgs, options = {}) {
 }
 
 function runCommand(command, commandArgs, options = {}) {
-  const result = spawnSync(command, commandArgs, {
+  const result = runSyncProbe(command, commandArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -88,7 +88,7 @@ function stats() {
   if (dryRun) {
     return { documents: 0, chunks: 0, entities: 0, relations: 0, embeddings: 0 };
   }
-  const result = spawnSync("node", ["scripts/query-memory.mjs", "stats"], {
+  const result = runSyncProbe("node", ["scripts/query-memory.mjs", "stats"], {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

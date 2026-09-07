@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { randomUUID } from "node:crypto";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   appendFileSync,
   chmodSync,
@@ -164,7 +165,7 @@ function appendLifecycle(event, detail = {}) {
 }
 
 function run(command, args, runOptions = {}) {
-  const result = spawnSync(command, args, {
+  const result = runSyncProbe(command, args, {
     cwd: runOptions.cwd || config.codeRoot,
     env: { ...process.env, ...(runOptions.env || {}) },
     encoding: "utf8",

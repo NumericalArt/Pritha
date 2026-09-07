@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -52,7 +52,7 @@ function tailscaleBin() {
 }
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const result = runSyncProbe(command, args, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
   closeSync,
@@ -52,7 +53,7 @@ function parseArgs(argv) {
 }
 
 function run(command, args, options = {}) {
-  return spawnSync(command, args, {
+  return runSyncProbe(command, args, {
     cwd: options.cwd || ROOT,
     env: options.env || process.env,
     encoding: "utf8",

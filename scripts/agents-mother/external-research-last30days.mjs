@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { runSyncProbe } from "../lib/sync-probe.mjs";
 import path from "node:path";
 import { redactSensitiveText } from "./external-research.mjs";
 import {
@@ -177,7 +177,7 @@ export function runLast30DaysBackend(contractData, topics, options = {}) {
 
   for (const topic of requiredTopics) {
     const args = buildLast30DaysArgs(cfg.enginePath, topic, options);
-    const result = spawnSync(python, args, {
+    const result = runSyncProbe(python, args, {
       cwd,
       env,
       encoding: "utf8",

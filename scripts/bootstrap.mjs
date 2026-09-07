@@ -335,6 +335,7 @@ function runStep(item, options) {
   }
   const startsForegroundProcess = item.startsForegroundProcess;
   const result = spawnSync(item.command, item.args, {
+    killSignal: "SIGKILL",
     cwd: ROOT,
     encoding: startsForegroundProcess ? undefined : "utf8",
     stdio: startsForegroundProcess ? "inherit" : ["ignore", "pipe", "pipe"],

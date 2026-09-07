@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -32,7 +32,7 @@ function run(name, command, commandArgs, options = {}) {
     };
   }
 
-  const result = spawnSync(command, commandArgs, {
+  const result = runSyncProbe(command, commandArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

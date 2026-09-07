@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
@@ -26,7 +26,7 @@ const labels = (process.env.PRITHA_LAUNCHD_LABELS || DEFAULT_LABELS.join(","))
   .filter(Boolean);
 
 function runLaunchctl(commandArgs) {
-  const result = spawnSync("launchctl", commandArgs, {
+  const result = runSyncProbe("launchctl", commandArgs, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 30_000,

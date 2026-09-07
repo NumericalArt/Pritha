@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -19,7 +19,7 @@ const yesMode = argv.includes("--yes");
 const noFetchMode = argv.includes("--no-fetch");
 
 function run(commandName, commandArgs = [], options = {}) {
-  const result = spawnSync(commandName, commandArgs, {
+  const result = runSyncProbe(commandName, commandArgs, {
     cwd: options.cwd || ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

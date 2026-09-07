@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -57,7 +57,7 @@ function invoke(instance, commandArgs) {
     PRITHA_CONTROL_CENTER_PORT: String(instance.port),
     PRITHA_CONTROL_CENTER_ENV_FILE: path.join(path.resolve(instance.state_root), "config", "runtime.env"),
   };
-  const result = spawnSync("node", [instanceScript, ...commandArgs, "--root", checkout, "--json"], {
+  const result = runSyncProbe("node", [instanceScript, ...commandArgs, "--root", checkout, "--json"], {
     cwd: checkout,
     env,
     encoding: "utf8",
@@ -80,7 +80,7 @@ function releaseCommit() {
   const requested = options["target-sha"] ? String(options["target-sha"]).trim().toLowerCase() : "";
   if (requested && !/^[a-f0-9]{40}$/.test(requested)) throw new Error("--target-sha must be a full 40-character Git commit SHA");
   if (requested) return requested;
-  const result = spawnSync("git", ["ls-remote", "origin", "refs/heads/main"], {
+  const result = runSyncProbe("git", ["ls-remote", "origin", "refs/heads/main"], {
     cwd: root,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

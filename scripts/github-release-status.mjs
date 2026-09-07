@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { resolveTechscopeRoot } from "./lib/paths.mjs";
@@ -14,7 +14,7 @@ const skipPrePushAudit = args.has("--skip-pre-push-audit");
 const skipWorkingTreeCheck = args.has("--skip-working-tree-check");
 
 function run(command, commandArgs = [], options = {}) {
-  const result = spawnSync(command, commandArgs, {
+  const result = runSyncProbe(command, commandArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

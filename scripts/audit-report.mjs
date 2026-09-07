@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -39,7 +39,7 @@ if (!phase || !output) {
 }
 
 function runGate() {
-  const result = spawnSync("node", ["scripts/quality-gate.mjs", "--json"], {
+  const result = runSyncProbe("node", ["scripts/quality-gate.mjs", "--json"], {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
