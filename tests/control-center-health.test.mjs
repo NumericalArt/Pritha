@@ -144,6 +144,9 @@ test("control-center health retries one transient page response when requested",
       response.end("temporarily unavailable");
       return;
     }
+    if (request.url === "/voice" && voiceAttempts === 2) {
+      return setTimeout(() => htmlResponse(response, "/_next/static/chunks/current.js"), 2100);
+    }
     if (["/voice", "/agents", "/task-chat", "/codex", "/settings"].includes(request.url)) {
       return htmlResponse(response, "/_next/static/chunks/current.js");
     }
@@ -155,11 +158,12 @@ test("control-center health retries one transient page response when requested",
     response.writeHead(404, { "content-type": "text/plain" });
     response.end("not found");
   }, async (baseUrl) => {
-    const result = await runHealth(baseUrl, ["--retries", "1"]);
+    const result = await runHealth(baseUrl, ["--retries", "1", "--timeout-ms", "3000"]);
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.status, "pass");
     assert.equal(voiceAttempts, 2);
+    assert.equal(payload.pages.find(page => page.path === "/voice").attempts, 2);
   });
 });
 

@@ -536,6 +536,7 @@ async function verifyReleaseHealth({ buildId, commit = null, timeouts, rollback 
   }
   const result = run(process.execPath, [
     "scripts/control-center-health.mjs", "--strict", "--json",
+    "--retries", "1",
     "--timeout-ms", String(timeouts.releaseRequest),
     "--page", "/voice,/agents,/task-chat,/codex,/settings",
   ], { timeoutMs: timeouts.releaseStrict, killSignal: "SIGKILL" });

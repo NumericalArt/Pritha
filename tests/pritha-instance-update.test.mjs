@@ -146,6 +146,7 @@ if (command.includes("run start")) {
   const fault = buildId === "candidate-build" ? process.env.PRITHA_TEST_HEALTH_FAULT : "";
   const commit = require("node:child_process").execFileSync("git", ["rev-parse", "--short=12", "HEAD"], { encoding: "utf8" }).trim();
   let warmed = false;
+  let transientVoice = false;
   http.createServer((request, response) => {
     if (request.url === "/api/status") {
       warmed = true;
@@ -155,6 +156,7 @@ if (command.includes("run start")) {
     }
     if (["/voice", "/agents", "/task-chat", "/codex", "/settings"].includes(request.url)) {
       if (!warmed) { response.writeHead(503); response.end("cold dynamic status"); return; }
+      if (request.url === "/voice" && !transientVoice) { transientVoice = true; response.writeHead(503); response.end("cold page"); return; }
       if (fault === "timeout" && request.url === "/codex") return;
       response.writeHead(fault === "page" && request.url === "/codex" ? 500 : 200, { "content-type": "text/html" });
       response.end(fault === "no-chunks" ? "<html>Loading</html>" : '<html><script src="/_next/static/chunks/fixture.js"></script></html>');
@@ -318,6 +320,7 @@ test("instance update pins the target and preserves agent fingerprints through a
     assert.equal(payload.health.strict.ok, true);
     assert.equal(payload.health.strict.releaseMatch, true);
     assert.equal(payload.health.strict.payload.pages.length, 5);
+    assert.equal(payload.health.strict.payload.pages.find(page => page.path === "/voice").attempts, 2);
     assert.equal(payload.health.strict.payload.chunks.length, 1);
     assert.equal(payload.health.strict.payload.checks.find((item) => item.id === "health-contract").release.buildId, "candidate-build");
     assert.equal(payload.isolationMatch, true);

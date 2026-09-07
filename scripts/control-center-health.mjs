@@ -64,10 +64,12 @@ function isTransientFailure(result) {
 
 async function fetchText(url, timeoutMs, retries = 0) {
   let result = await fetchTextOnce(url, timeoutMs);
+  let attempts = 1;
   for (let attempt = 0; attempt < retries && isTransientFailure(result); attempt += 1) {
-    result = await fetchTextOnce(url, Math.min(timeoutMs, 2000));
+    result = await fetchTextOnce(url, timeoutMs);
+    attempts += 1;
   }
-  return result;
+  return { ...result, attempts };
 }
 
 function extractScriptUrls(html, pageUrl, baseOrigin) {
@@ -182,6 +184,7 @@ async function runHealthcheck(options) {
     const pageResult = {
       path: page,
       url: pageUrl,
+      attempts: response.attempts,
       httpStatus: response.status,
       contentType: response.contentType,
       scripts: [],
