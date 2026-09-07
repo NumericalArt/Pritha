@@ -15,13 +15,15 @@ export async function fixtureModules() {
   writeFileSync(path.join(tmp, "paths.mjs"), `export const resolveTechscopeRoot=()=>${JSON.stringify(root)}; export const resolvePrithaStateRoot=()=>${JSON.stringify(state)};`);
   writeFileSync(path.join(tmp, "app-server.mjs"), "export class AppServerConnection {} export class CodexRuntimeManager {}");
   writeFileSync(path.join(tmp, "voice-links.mjs"), "export const queueVoiceTaskChatIndexRefresh=()=>{}; export const reconcileVoiceTaskChatLink=async()=>{}; export const voiceTaskChatIndexStatus=()=>({state:'ready'});");
-  for (const name of ["attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "private-store", "goal-control", "budget-intent", "gateway", "../private-json"]) {
+  for (const name of ["attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "private-store", "goal-control", "budget-intent", "operation-runtime", "gateway", "../private-json"]) {
     const source = readFileSync(`interfaces/control-center/src/lib/codex-chat/${name}.ts`, "utf8");
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
       .replaceAll('"@/lib/private-json"', '"./private-json.mjs"')
       .replaceAll('"../../../../../scripts/agents-mother/task-delivery.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/task-delivery.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/phase-usage.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/phase-usage.mjs")).href))
+      .replaceAll('"../../../../../scripts/agents-mother/operation-decisions.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/operation-decisions.mjs")).href))
+      .replaceAll('"../../../../../scripts/agents-mother/execution-backends.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/execution-backends.mjs")).href))
       .replace(/from "\.\/(.*?)"/g, (_, file) => `from "./${file.endsWith('.mjs') ? file : file + '.mjs'}"`);
     writeFileSync(path.join(tmp, `${path.basename(name)}.mjs`), output);
   }

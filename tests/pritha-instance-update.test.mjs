@@ -94,6 +94,7 @@ if (action === "start") {
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "env.mjs"), path.join(lib, "env.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "timeout-policy.mjs"), path.join(lib, "timeout-policy.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "cli-args.mjs"), path.join(lib, "cli-args.mjs"));
   writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "version"), "good\n");
   writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "BUILD_ID"), "previous-build\n");
   writeFileSync(path.join(checkout, "interfaces", "control-center", "next-env.d.ts"), "stable next env\n");
