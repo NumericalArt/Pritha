@@ -85,7 +85,16 @@ RSS/CPU относятся к Node harness с TypeScript loader, не к сум�
 - Полный итоговый unit suite: **821/821 pass**; браузерные проверки: **67/67 pass**.
 - TypeScript: pass; focused workspace selection integration: pass.
 - Golden checks: pass, включая Markdown integrity, memory rebuild, environment,
-  factory inspection, Telegram dry-run/status. Embeddings — отдельный final gate.
+  factory inspection, Telegram dry-run/status.
+- Итоговый self-test: **pass**, без warnings/regressions в его результате;
+  memory и 6892 embeddings пересобраны в изолированном state-root. Python вывел
+  существующий LibreSSL compatibility warning; embedding завершился успешно.
+- Production candidate build и strict health: **pass**, 5 страниц, включая `/codex`,
+  и все 13 JavaScript chunks. Отдельный protocol-1 recovery build также прошёл
+  strict pages/chunks; оба временных preview process groups подтверждённо завершены.
+- CI полной платформы переведён на Node 22/24, setup smoke — на Node 22:
+  новый Control Center требует ≥22.13 и встроенный SQLite. Отдельный memory-only
+  workflow остаётся на Node 20. Результаты remote CI фиксируются в release manifest.
 - Privacy retention audit: pass. Protocol-1 recovery production build: pass.
 - Strict pre-push audit: **pass**, без предупреждений. Публичный large-history
   report перенесён из child-agent reports в `03_reviews/`, synthetic Tailscale
@@ -106,7 +115,9 @@ RSS/CPU относятся к Node harness с TypeScript loader, не к сум�
   новые темы не должны его увеличивать. Исправление общей геометрии в T1 не входит.
 - Сборка сообщает NFT tracing warnings для динамических путей существующей runtime
   архитектуры. Аудит recovery build: 4115 уникальных traced entries, **0** найденных
-  auth/runtime.env/private-state entries; standalone bundle не публикуется.
+  auth/runtime.env/private-state entries. Итоговый candidate: 15 warnings,
+  1366 уникальных traced entries, **0** private/runtime entries; standalone bundle
+  не публикуется. Gitleaks 8.30.1: история кандидата проверена, **0** найденных secrets.
 
 ## Read-only preflight флота
 

@@ -29,7 +29,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-09-08
 source_updated: 2026-09-08
-source_version: "Canonical concurrency/theme coding plan revision 2; implementation and release pins pending"
+source_version: "Canonical concurrency/theme implementation; exact candidate pin and verification in release manifest"
 retrieved: 2026-09-08
 verified: 2026-09-08
 valid_for: "Preparation; executable release handoff requires the verified final release receipt"
@@ -43,7 +43,7 @@ privacy: public
 retention: durable
 review_status: draft
 confidence: medium
-release_package_status: release-pin-pending
+release_package_status: awaiting-fleet-acceptance
 ---
 
 # MacBook: подготовка обновления Task Chat, Voice и трёх тем

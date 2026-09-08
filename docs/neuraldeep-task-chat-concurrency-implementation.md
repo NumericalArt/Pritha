@@ -148,7 +148,7 @@ ND служит источником палитр и не входит в это
    recovery state и active processes. Не выводить Keychain token, environment dump,
    account identifiers и private endpoints в shared report.
 3. Сохранить чужую незавершённую работу. Для исполнения создать отдельный worktree
-   и отдельные state/home/test projects; production state туда не копировать.
+и отдельные state-root, native home и test projects; production state туда не копировать.
 4. Получить точные mother commits P1–P7 из delivery report, прочитать каждый diff.
    Переносить поведение, schemas и tests небольшими пакетами. Не делать wholesale
    checkout файлов, blanket cherry-pick или downgrade lockfile/runtime modules.
@@ -302,7 +302,7 @@ Grant не расширяет исходные permissions, и CLI не полу
 
 Адаптировать материнский P5 к launcher `--cwd`, resume и ND sandbox policy.
 Новый mutating task получает проверенный worktree, собственные output/temp files
-и минимальные `--add-dir`. Existing session не меняет cwd/home/profile молча.
+и минимальные `--add-dir`. Existing session не меняет cwd, native home или profile молча.
 Для общего checkout или non-Git — одна разрешённая запись за раз до готовности
 другого безопасного isolation mode. Worktree lifecycle не копирует secrets,
 runtime state, native history, queue, Voice topics или provider credentials.

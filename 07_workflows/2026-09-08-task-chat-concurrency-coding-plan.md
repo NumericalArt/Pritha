@@ -907,7 +907,9 @@ source требует отдельного review. ND получает отде�
 ## 10. Фактическое выполнение
 
 См. [implementation review](../03_reviews/2026-09-08-task-chat-concurrency-implementation-review.md).
-P0–P5 реализованы; T1 и P6 проходят финальную проверку. Новый selector workspace
+P0–P5 и T1 реализованы; unit 821/821, browser 67/67, Classic before/after,
+production build, strict health, self-test и embeddings проверены. P6 production
+и P8 требуют отдельных release receipts. Новый selector workspace
 позволяет изолировать новый чат при глобальном full access, сохраняя существующие
 треды и явно выбранный configured mode. P8 production требует release receipts;
 наличие commit и документации не переводит fleet/MacBook/ND в installed.
