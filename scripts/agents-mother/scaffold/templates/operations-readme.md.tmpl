@@ -1,0 +1,48 @@
+# Operations Profile
+
+Deployment target: {{pritha:operationProfile_deploymentTarget}}
+Deployment profile: {{pritha:operationProfile_deploymentProfile}}
+Service mode: `{{pritha:operationProfile_serviceMode}}`
+Autostart: `{{pritha:operationProfile_autostart}}`
+Proactive mode: `{{pritha:operationProfile_proactiveMode}}`
+
+## Commands
+
+```sh
+node scripts/operations-status.mjs
+{{pritha:operationProfile_healthcheckArgv}}
+```
+
+## Policy
+
+- Scaffold never starts long-running processes.
+- Scaffold never installs autostart.
+- Autostart is configurable through the contract, but enabling it requires an explicit user-approved deployment step.
+- Control Center start/stop use structured argv only. Legacy command strings are planning evidence, not executable input.
+- Healthcheck execution uses `healthcheck_argv` only. Legacy `healthcheck_command` is planning/display metadata.
+- Keep healthcheck argv, runtime manager, start argv, stop behavior and log paths documented before treating this as a service.
+- Deployment automation is available through `node scripts/deploy-service.mjs plan|status|install|uninstall`.
+- `install` and `uninstall` require `--yes` and refuse incompatible service/autostart modes.
+
+## Current Profile
+
+- Control Center managed: `false`
+- Runtime manager: `none`
+- Planned start command: {{pritha:operationProfile_startCommand}}
+- Planned stop command: {{pritha:operationProfile_stopCommand}}
+- Healthcheck argv: `{{pritha:operationProfile_healthcheckArgv_2}}`
+- Legacy healthcheck command: `{{pritha:operationProfile_healthcheckCommand}}`
+- Log path: {{pritha:operationProfile_logPath}}
+- Restart policy: {{pritha:operationProfile_restartPolicy}}
+- Service label: `{{pritha:operationProfile_serviceLabel}}`
+
+## Proactivity
+
+- Mode: `{{pritha:operationProfile_proactiveMode_2}}`
+- Trigger sources: {{pritha:operationProfile_triggerSources}}
+- Schedule: {{pritha:operationProfile_schedule}}
+- Heartbeat interval: {{pritha:operationProfile_heartbeatInterval}}
+- Idle behavior: {{pritha:operationProfile_idleBehavior}}
+- User interruption policy: {{pritha:data_userInterruptionPolicy}}
+
+{{pritha:operationsManifest_launchd_template}}

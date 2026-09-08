@@ -1,0 +1,239 @@
+---
+id: {{pritha:options_artifactId}}
+type: scaffold-report
+agent_id: {{pritha:data_agentId}}
+project_path: {{pritha:path_relative}}
+scaffold_adapter: {{pritha:capability_adapter}}
+readiness_scope: scaffold-only
+status: {{pritha:reportStatus}}
+created: {{pritha:date}}
+updated: {{pritha:date_2}}
+topics:
+  - agent-engineering
+  - scaffold
+  - {{pritha:agentSlug}}
+tools:
+  - Codex
+  - AGENTS.md
+  - {{pritha:telegramApplicable_Telegram}}
+  - {{pritha:controlCenterServiceMode_launchd}}
+agent_platforms:
+  - Codex
+model_context:
+  - unknown
+runtime_environment:
+  - {{pritha:data_runtimeFamily}}
+config_surfaces:
+  - AGENTS.md
+  - .env.example
+  - scripts
+portability: {{pritha:headless_adapter}}
+sources:
+  - {{pritha:data_relPath}}
+{{pritha:research_path}}  - 07_workflows/agents-mother.md
+  - 04_standards/agent-creation-harness.md
+related:
+  agent_contracts:
+    - {{pritha:data_relPath_2}}
+  workflows:
+    - 07_workflows/agents-mother.md
+  standards:
+    - 04_standards/agent-creation-harness.md
+supersedes: []
+superseded_by: []
+freshness_status: current
+source_published: {{pritha:date_3}}
+source_updated: {{pritha:date_4}}
+source_version: scaffold v1
+retrieved: {{pritha:date_5}}
+verified: {{pritha:productionReady_date}}
+valid_for: {{pritha:productionReady_initial}}
+temporal_status: {{pritha:productionReady_current}}
+contract_fingerprint: {{pritha:data_fingerprint}}
+research_gate_status: {{pritha:effectiveGateStatus}}
+research_gate_source_status: {{pritha:gateFields_researchGate}}
+memory_research_status: {{pritha:gateFields_memoryResearch}}
+external_research_status: {{pritha:gateFields_externalResearch}}
+synthesis_status: {{pritha:gateFields_synthesis}}
+pattern_pack: {{pritha:researchFrontmatter_pattern_pack}}
+pattern_pack_lock: {{pritha:researchFrontmatter_pattern_pack_lock}}
+pattern_pack_contract_fingerprint: {{pritha:researchFrontmatter_pattern_pack_contract_fingerprint}}
+repository_research_required: {{pritha:String_researchFrontmatter}}
+repository_research_policy: {{pritha:repositoryPolicy}}
+repository_research_mode: {{pritha:repositoryMode}}
+repository_research_status: {{pritha:repositoryStatus}}
+repository_research_completed_at: {{pritha:researchFrontmatter_repository_research_completed_at}}
+repository_research_online_status: {{pritha:repositoryOnlineStatus}}
+repository_research_lock: {{pritha:researchFrontmatter_repository_research_lock}}
+repository_candidate_count: {{pritha:Number_researchFrontmatter}}
+repository_adoption_status: {{pritha:repositoryAdoptionStatus}}
+repository_research_scopes:
+{{pritha:repositoryScopes_length}}
+external_evidence_count: {{pritha:researchFrontmatter_external_evidence_count}}
+external_evidence_topics: {{pritha:JSON_stringify}}
+external_research_lock: {{pritha:researchFrontmatter_external_research_lock}}
+synthesis_lock: {{pritha:researchFrontmatter_synthesis_lock}}
+research_content_lock: {{pritha:researchFrontmatter_research_content_lock}}
+experimental_scaffold: {{pritha:experimental_true}}
+experimental_overrides:{{pritha:experimentalOverrides_length}}
+outcome_spec_status: {{pritha:outcome_status}}
+outcome_spec_id: {{pritha:outcome_id}}
+outcome_semantic_lock: {{pritha:outcome_semanticLock}}
+outcome_document_lock: {{pritha:outcome_documentLock}}
+outcome_approval_evidence: {{pritha:outcome_approvalValid}}
+delivery_git_status: {{pritha:deliveryGit_status}}
+delivery_git_revision: {{pritha:deliveryGit_revision}}
+control_center_card_status: {{pritha:headless_pending}}
+card_refs:
+{{pritha:headless_interfaces}}
+card_blockers:{{pritha:headless_n}}
+next_card_actions:
+{{pritha:headless_Inspect}}
+  - node scripts/pritha.mjs card-readiness {{pritha:agentSlug_2}}
+---
+
+# Agent Scaffold Report: {{pritha:data_agentName}}
+
+Date: {{pritha:date_6}}
+Status: {{pritha:reportStatus_2}}
+
+## Summary
+
+- Agent name: {{pritha:data_agentName_2}}
+- Target folder: {{pritha:targetFolder}}
+- Contract: {{pritha:data_relPath_3}}
+- Outcome Spec: {{pritha:outcome_outcome}}
+- Outcome approval evidence: {{pritha:outcome_approvalValid_2}}
+- Delivery Git baseline: {{pritha:deliveryGit_status_2}}{{pritha:deliveryGit_revision_2}}
+- Runtime family: {{pritha:data_runtimeFamily_2}}
+- Scaffold adapter: {{pritha:capability_adapter_2}}; readiness scope: scaffold-only
+- Interfaces: {{pritha:data_primaryInterface}}
+- Telegram mode: {{pritha:data_telegramMode}}
+- Deployment target: {{pritha:operationProfile_deploymentTarget}}
+- Deployment profile: {{pritha:operationProfile_deploymentProfile}}
+- Memory profile: {{pritha:memoryProfileFor_data}}
+- Tool profiles: {{pritha:toolProfilesFor_data}}
+- Skill policy: needs={{pritha:skillPolicyFor_data}}; sources={{pritha:skillPolicyFor_data_2}}; install={{pritha:skillPolicyFor_data_3}}; mutation={{pritha:skillPolicyFor_data_4}}
+- Research report: {{pritha:research_status}}
+- Research gate: {{pritha:researchGateStatusLabel_research}}
+- External verification: {{pritha:externalVerification}}
+- Repository research: {{pritha:research_gate}}
+- Repository adoption mode: {{pritha:data_repositoryAdoptionMode}}
+- Repository module installation: {{pritha:data_repositoryAdoptionMode_2}}
+- Service mode: {{pritha:controlCenterServiceMode}}
+- Autostart: {{pritha:operationProfile_autostart}}
+- Local upstream URL: {{pritha:controlCenterLocalUrl}}
+- Health URL: {{pritha:controlCenterHealthUrl}}
+- Proactive mode: {{pritha:operationProfile_proactiveMode}}
+- Result: {{pritha:productionReady_scaffold}}
+- Experimental scaffold: {{pritha:experimental_yes}}
+- Experimental overrides: {{pritha:experimentalOverrides_join}}
+
+{{pritha:experimental_Experimental}}
+
+## Generated structure
+
+{{pritha:createdFiles_map}}
+
+## Environment setup
+
+- Required secrets: {{pritha:data_secretsRequired}}
+- `.env.example` created: yes
+- Dependencies installed: no external dependencies installed
+- Services configured: {{pritha:controlCenterServiceMode_2}}; project-local runtime contract generated, but no service was started or installed
+- Autostart configured: {{pritha:operationProfile_autostart_2}}; installation requires explicit approval
+
+## Verification
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Structure validation | {{pritha:smokeResult_ok}} | `node scripts/smoke-test.mjs` |
+| Smoke test | {{pritha:smokeResult_ok_2}} | {{pritha:smokeResult_output}} |
+| Healthcheck | {{pritha:healthResult_ok}} | {{pritha:healthResult_output}} |
+| Telegram adapter test | {{pritha:telegramApplicable_pending}} | {{pritha:telegramApplicable_Fill}} |
+| Operations status | pending | `{{pritha:apiProcess_node}}` |
+| Skills status | pending | `node scripts/skills-status.mjs` |
+| Pritha memory research | {{pritha:research_status_2}} | {{pritha:research_path_2}} |
+| Research gate | {{pritha:researchGateResultLabel_research}} | {{pritha:researchGateReasons_research}} |
+| Memory research gate | {{pritha:gateFields_memoryResearch_2}} | Machine-readable research report status |
+| External verification | {{pritha:externalVerification_2}} | Machine-readable external research status |
+| Synthesis gate | {{pritha:gateFields_synthesis_2}} | Memory vs external comparison status |
+| Repository research | {{pritha:research_gate_2}} | Discovery is advisory; selected-module readiness is recomputed from contract and evidence |
+| Repository discovery safety | pass | Scaffold did not clone, install, execute, vendor, link or activate repository code |
+| Reference-only exact evidence | {{pritha:data_repositoryAdoptionMode_3}} | Every selected canonical repository requires current matching `github-repository-review` evidence |
+| Selected repository exact pin | {{pritha:data_repositoryAdoptionMode_4}} | {{pritha:data_repositoryPin}} |
+| Selected repository module tree | {{pritha:data_repositoryAdoptionMode_5}} | {{pritha:repositoryResearchCandidate_verified_module_path}} |
+| Selected repository license | {{pritha:data_repositoryAdoptionMode_6}} | {{pritha:data_repositoryLicenseDecision}} |
+| Selected repository pin-bound license source | {{pritha:data_repositoryAdoptionMode_7}} | {{pritha:repositoryLicenseEvidence_license_source_url}} |
+| Selected repository license content identity | {{pritha:data_repositoryAdoptionMode_8}} | blob {{pritha:repositoryLicenseEvidence_license_source_blob_sha}}; sha256 {{pritha:repositoryLicenseEvidence_license_source_content_sha256}}; SPDX {{pritha:repositoryLicenseEvidence_license_source_spdx}}; scope {{pritha:repositoryLicenseEvidence_license_scope}} |
+| Selected repository security/permissions | {{pritha:data_repositoryAdoptionMode_9}} | {{pritha:data_repositorySecurityReview}} |
+| Selected repository eval/user approval | {{pritha:data_repositoryAdoptionMode_10}} | {{pritha:data_repositoryEvalStatus}} |
+| Selected repository evidence/synthesis | {{pritha:data_repositoryAdoptionMode_11}} | github-repository-review={{pritha:evidenceTopics_includes}}; synthesis={{pritha:gateFields_synthesis_3}} |
+| Control Center runtime contract | {{pritha:headless_not}} | {{pritha:headless_No}} |
+| Control Center card readiness | {{pritha:headless_pending_2}} | {{pritha:headless_Own}}; `node scripts/pritha.mjs card-readiness {{pritha:agentSlug_3}}` |
+| Documentation review | pass | README and training guide generated |
+| Outcome Spec lineage | {{pritha:outcome_recorded}} | Scaffold readiness is separate from outcome verification and acceptance |
+
+## Research and repository gate
+
+- Research report: {{pritha:research_path_3}}
+- Contract fingerprint: {{pritha:data_fingerprint_2}}
+- Memory research status: {{pritha:gateFields_memoryResearch_3}}
+- External research status: {{pritha:gateFields_externalResearch_2}}
+- External evidence count/topics: {{pritha:Number_researchFrontmatter_2}} / {{pritha:evidenceTopics_join}}
+- External research lock: {{pritha:researchFrontmatter_external_research_lock_2}}
+- Synthesis status/lock: {{pritha:gateFields_synthesis_4}} / {{pritha:researchFrontmatter_synthesis_lock_2}}
+- Repository research required: {{pritha:researchFrontmatter_repository_research_required}}
+- Repository policy/mode/scopes: {{pritha:researchFrontmatter_repository_research_policy}}
+- Repository research/online status: {{pritha:researchFrontmatter_repository_research_status}}
+- Repository research lock: {{pritha:researchFrontmatter_repository_research_lock_2}}
+- Candidate count: {{pritha:Number_researchFrontmatter_3}}
+- Repository adoption mode/status: {{pritha:data_repositoryAdoptionMode_12}}
+- Selected repository/module: {{pritha:data_selectedGitHubRepositories}}
+- Exact immutable pin: {{pritha:data_repositoryPin_2}}
+- License decision: {{pritha:data_repositoryLicenseDecision_2}}
+- Pin-bound license source: {{pritha:repositoryLicenseEvidence_license_source_url_2}}
+- License blob/content identity: {{pritha:repositoryLicenseEvidence_license_source_blob_sha_2}} / {{pritha:repositoryLicenseEvidence_license_source_content_sha256_2}}
+- Verified SPDX/scope: {{pritha:repositoryLicenseEvidence_license_source_spdx_2}} / {{pritha:repositoryLicenseEvidence_license_scope_2}}
+- Security and permissions decision: {{pritha:data_repositorySecurityReview_2}}
+- Eval result: {{pritha:data_repositoryEvalStatus_2}}
+- github-repository-review evidence: {{pritha:evidenceTopics_includes_2}}
+- Evidence-to-memory synthesis: {{pritha:gateFields_synthesis_5}}
+- User approval: {{pritha:data_repositoryUserApproval}}
+- Installation status: {{pritha:data_repositoryAdoptionMode_13}}
+
+## Control Center Card Readiness
+
+- Status: {{pritha:headless_pending_3}}.
+- Card refs: {{pritha:headless_CLI}}.
+- Expected first card state: {{pritha:headless_discoverable}}.
+- Card blockers:
+  - {{pritha:headless_Check}}
+- Next card actions:
+  - {{pritha:headless_Use}}
+  - From Pritha root, run `node scripts/pritha.mjs card-readiness {{pritha:agentSlug_4}}`.
+
+## Handoff
+
+- How to run: `{{pritha:apiProcess_node_2}}`
+- How to test: `node scripts/smoke-test.mjs`
+- How to healthcheck: `node scripts/healthcheck.mjs`
+- How to start local runtime: {{pritha:headless_not_2}}
+- How to stop local runtime: {{pritha:headless_not_3}}
+- How to inspect operations: {{pritha:headless_no}}
+- How to inspect skills: `node scripts/skills-status.mjs`
+- How to stop: {{pritha:headless_Ctrl}}
+- How to inspect logs: {{pritha:headless_read}}
+- First user exercise: follow `{{pritha:apiProcess_workflows}}`
+
+## Open issues
+
+- Complete external verification checklist before adding dependencies or deployment.
+- Review generated instructions before using this agent for production work.
+
+## Next steps
+
+- Review and explicitly approve the separate Outcome Spec if it is still a proposal.
+- From Pritha, run `node scripts/pritha.mjs deliver <outcome-spec> --project {{pritha:targetFolder_2}}` to enter the build/fix/verify loop.
+- Treat `verified`, `awaiting_acceptance`, `accepted`, merge and deployment as distinct states.
+- If Telegram is selected, run `chmod 600 .env`, configure it, and run Telegram healthcheck.
