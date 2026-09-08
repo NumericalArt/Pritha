@@ -93,3 +93,28 @@ of version and the bounded retry profile, verified rollbacks and browser QA limi
 NeuralDeep has the same revision 9 roadmap in its own documentation history;
 its engine and provider implementation remain independent. See the linked release
 review for completed groups, evidence, remaining optional work and final sync policy.
+
+
+## Follow-up approved and implemented — 2026-09-07
+
+The operator approved closing all three reported limitations. The follow-up
+implements launchd applicability diagnostics, restores the entire configured
+isolated Playwright suite, fixes malformed delivery discovery and mobile path
+wrapping, and completes G: all 41 inline templates extracted with byte equality.
+The earlier Deferred paragraph describes the original A–F scope; G is now done.
+Broad declarations, server.ts split and Techscope rename retain their original
+non-goal status. NeuralDeep requirements advance to revision 10.
+
+See `03_reviews/2026-09-07-pritha-cleanup-followup-release-review.md` for final
+validation, publication and all five canonical release receipts.
+
+Run browser regression checks with:
+
+```sh
+npm --prefix interfaces/control-center run test:e2e
+```
+
+The runner creates isolated state and fixtures, uses a separate build, restores
+Next build metadata and rejects skipped or flaky tests. It never reuses a live
+Control Center. A complete run is required for UI release evidence; targeted
+specs are useful during implementation but are not a full-suite receipt.

@@ -33,7 +33,7 @@ refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
 source_updated: 2026-09-07
-source_version: ND roadmap revision 9; ND docs base 45be624 and engine a3820b5; mother cleanup and release checks 4208882
+source_version: ND roadmap revision 10; ND docs base 320e56e and engine a3820b5; mother follow-up aa9c775
 retrieved: 2026-09-05
 verified: 2026-09-07
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
@@ -576,3 +576,68 @@ request timeout; весь strict процесс также имеет конеч
 ошибками выпуска. Не заменять проверку BUILD_ID текущим checkout SHA: после
 rollback исходники могут быть новее фактически запущенной сборки. Эти проверки
 относятся к host release и не разрешают повторять оплачиваемый provider request.
+
+
+## 15. Закрытие ограничений cleanup — revision 10
+
+Повторная сверка 2026-09-07: ND docs `320e56e`, engine `a3820b5`;
+mother follow-up `aa9c775`, включая diagnostics `e1b0f69` и templates
+`cc97d06`. Раздел 14 остаётся историей revision 9; этот раздел обновляет
+требования к проверкам и отменяет перенос группы G на неопределённый срок.
+Сам ND engine этим документационным выпуском не изменяется.
+
+### Автоматические UI-проверки
+
+У матери восстановлен полный настроенный Chromium suite: 33/33, без skipped,
+flaky и неожиданных ошибок; desktop 1280 px и mobile 390 px. Причина прежнего
+падения — устаревший test mock, который отдавал chat payload вместо delivery
+списка; невалидное значение обрушало React-страницу. Теперь ошибочный список
+сборок локализован в панели, а чат остаётся доступен. Длинные локальные пути
+переносятся в компактных списках и не расширяют мобильную страницу.
+
+Для ND создать свой disposable runner: отдельные source/state/agent-parent,
+loopback port и build directory, без копирования private data, provider keys
+или пользовательского Codex home. Build и запуск ограничены по времени;
+cleanup завершает только собственную process group. Build metadata исходного
+checkout восстанавливается. Не использовать работающий экземпляр для E2E
+мутаций. При переносе fixtures сохранить форму ответов собственного ND host,
+CLI session IDs, ledger и admission. Общий mock не должен перехватывать новый
+endpoint с чужой схемой ответа. Malformed discovery проверять на обоих размерах.
+
+Условия pass: весь настроенный suite завершается с нулём failed/skipped/flaky;
+есть machine-readable report, browser assertions и серверные negative tests.
+Отдельные browser clicks или открытый health endpoint не заменяют этот pass.
+Синтетический Start/Serve проверяет интерфейс и receipt, но не доказывает live
+provider или сетевой запуск. Реальные uploads/settings допускаются только в
+изолированном state. Текущую подтверждающую кнопку/dialog ND проверять по его
+accepted поведению, не возвращать устаревшие поля ради старого теста.
+
+### Launchd и группа G
+
+Отсутствующий необязательный legacy job — `not-installed`, только если plist
+отсутствует и launchctl однозначно сообщает, что job не загружен. Явно требуемая
+служба, сломанный installed job, чужой root, оставшаяся загруженная job без
+plist и ошибка чтения launchctl остаются диагностическими ошибками. Проверять
+собственные ND labels и runtime manager; не включать лишние службы, чтобы
+погасить warning. Mother diagnostics подтверждены 11 тестами.
+
+У матери G завершена: 41 шаблон вынесен в authored files, однопроходная
+подстановка не исполняет содержимое контракта. 11 вариантов / 456 файлов и
+11 scaffold reports побайтно совпали с исходником; 43 scaffold tests прошли.
+В ND выполнять G после A1/A2 и стабилизации собственного output: сначала снять
+его эталон, затем вынести только его шаблоны. Не копировать mother snapshots
+или несуществующие ND CLI/API adapters. Сохранить escaping, newline, executable
+content, private lineage и собственный provider bootstrap; проверять minimal,
+full, memory, tools, skills и специальные символы на поддерживаемом codex-native.
+
+Готовность этого блока ND: самостоятельные template regression fixtures,
+launchd applicability tests, полный isolated E2E и strict staged pages/chunks
+с точной build identity. Это добавляется к accounting/provider failure matrix,
+а не заменяет её. Лимит сохраняет task/run и путь продолжения; diagnostics и
+отсутствующий native Goal не создают жёсткого блока создания агента.
+
+Revision 10 зеркалируется побайтно в mother и ND отдельным docs commit.
+История, engine/provider, темы и незавершённое voice-исследование ND сохраняются.
+Live ND pilot и реализация пакетов ND остаются отдельным будущим coding cycle;
+их pass не следует из успешных тестов матери. Split server.ts, переименование
+Techscope и широкое расширение declarations не добавляются в этот cleanup.

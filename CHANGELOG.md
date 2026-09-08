@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format follows Keep a Changelog, and this project uses semantic versioning for public releases.
 
+## 2026-09-07 — Cleanup completion
+
+- Restored all 33 configured Playwright cases in an isolated instance, with no skipped tests; retained live services and private settings.
+- Invalid delivery discovery now leaves chat usable; long paths wrap within mobile status cards.
+- Optional absent legacy launchd jobs no longer report root drift; required, broken and foreign-root jobs remain visible.
+- Extracted all 41 scaffold templates with byte-equal output across 11 scenarios and 456 files; documented NeuralDeep transfer requirements in roadmap revision 10.
+
 ## 2026-09-07 — Scoped cleanup
 
 - Contract-selected child modules now agree across generated files, commands, documentation and smoke checks.

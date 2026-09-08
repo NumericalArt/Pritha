@@ -28,6 +28,11 @@ confidence: high
 
 # Pritha: результат минорного cleanup
 
+Это исторический отчёт выпуска A–F. Все три ограничения ниже закрываются
+последующим выпуском: [проверки, G и fleet](2026-09-07-pritha-cleanup-followup-release-review.md).
+Повторная диагностика уточнила причину Playwright: устаревший mock delivery
+обрушал React-страницу; соединение с локальным сервером работало.
+
 Восемь исходных API/Goal follow-up commits опубликованы до начала cleanup.
 Реализация A–F опубликована на GitHub в `main`, UI candidate `ed3c395`, follow-up release checks `4208882`.
 Версия runtime определяется commit и BUILD_ID; package version остаётся 0.1.0.
