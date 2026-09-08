@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       clientThreadId: string;
       title?: string;
       source: "chat";
+      workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only"};
       settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
       initialTurn?: {
         clientMessageId: string;

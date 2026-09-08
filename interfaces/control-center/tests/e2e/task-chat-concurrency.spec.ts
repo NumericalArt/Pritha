@@ -47,6 +47,8 @@ test('two new chats send independently and late creation never changes the selec
   await expect.poll(()=>f.requests.length).toBe(1);
   await page.getByLabel('Task Chat history').getByRole('button',{name:'New chat',exact:true}).click();await composer.fill('New draft two');await page.getByRole('button',{name:'Send',exact:true}).click();
   await expect.poll(()=>f.requests.length).toBe(2);
+  expect(f.requests[0].body.workspace.mode).toBe('isolated');
+  expect(f.requests[1].body.workspace.mode).toBe('isolated');
   expect(f.requests[0].body.clientThreadId).not.toBe(f.requests[1].body.clientThreadId);
   await page.getByRole('button',{name:/Chat B/}).click();await expect(composer).toBeEnabled();await composer.fill('Keep B');
   await f.finish(1,'chat_newtwo');await f.finish(0,'chat_newone');

@@ -6,6 +6,7 @@ export type DraftSession = {
   revisions:Record<string,number>;
   creationIds:Record<string,string>;
   newDraftId:string;
+  workspaceModes?:Record<string,"isolated"|"configured"|"read-only">;
   pending:Record<string,unknown>;
   pendingNew:Record<string,unknown>;
 };
@@ -24,6 +25,7 @@ export function readDraftSession():DraftSession|null {
       if(delivery.chatId!==key && delivery.draftId!==key)return null;
       delivery.status="delivery_unknown";
     }
+    if(value.workspaceModes && (typeof value.workspaceModes!=="object" || Array.isArray(value.workspaceModes) || Object.keys(value.workspaceModes).length>100 || Object.values(value.workspaceModes).some(mode=>!["isolated","configured","read-only"].includes(String(mode)))))return null;
     return value;
   } catch {return null;}
 }

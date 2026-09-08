@@ -7269,3 +7269,16 @@ button:active,
 .codex-task-controls pre { max-width: 100%; max-height: 160px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .codex-task-controls .codex-composer-actions { flex-wrap: wrap; }
 .codex-runtime-warning code { overflow-wrap: anywhere; }
+
+.codex-workspace-choice { flex-wrap: wrap; }
+.codex-workspace-choice select {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 220px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--bg-1);
+  color: var(--text-primary);
+  font: inherit;
+}

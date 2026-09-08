@@ -51,7 +51,7 @@ type CreateThreadInput = {
   clientThreadId: string;
   title?: string;
   source: "chat";
-  workspace?: {baseRevision?:string};
+  workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only"};
   settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
 };
 
@@ -408,6 +408,7 @@ export class CodexChatGateway {
     if (!validClientId(input.clientThreadId) || input.source !== "chat") {
       throw new CodexChatGatewayError("invalid_request", "A valid clientThreadId and source=chat are required.", 400);
     }
+    if(input.workspace?.mode!==undefined && !["isolated","configured","read-only"].includes(input.workspace.mode))throw new CodexChatGatewayError("invalid_request","Unknown workspace mode.",400);
     const createHash = hash({ clientThreadId: input.clientThreadId, source: input.source, title: input.title, settings: input.settings, ...(input.workspace ? {workspace:input.workspace} : {}) });
     const existing = await this.store.findByClientThreadId(input.clientThreadId);
     if (existing) {
@@ -435,7 +436,9 @@ export class CodexChatGateway {
       const connection = await this.runtime.connection(provider.providerId);
       const requestedTitle = titleText(input.title);
       const defaults = this.runtime.threadDefaults();
-      const sandbox = defaults.sandbox || "read-only";
+      const mode=input.workspace?.mode || "configured";
+      const configured=defaults.sandbox || "read-only";
+      const sandbox=mode === "read-only" ? "read-only" : mode === "isolated" && configured !== "read-only" ? "workspace-write" : configured;
       const workspace = await prepareTaskWorkspace({coordinator:this.store.execution,source:this.root,directory:path.join(this.store.root,"workspaces"),id:input.clientThreadId,
         mode:sandbox === "read-only" ? "read-only" : sandbox === "workspace-write" ? "worktree" : "serialized",baseRevision:input.workspace?.baseRevision});
       creationLease.assertOwned();
@@ -444,6 +447,7 @@ export class CodexChatGateway {
       const response = asObject(await connection.request("thread/start", {
         ...defaults,
         cwd: workspace.cwd,
+        sandbox,
         model: input.settings?.modelId || defaults.model,
         ephemeral: false,
       }));

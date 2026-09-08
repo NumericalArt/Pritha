@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
 
@@ -643,4 +643,24 @@ test('native secret answers reach the original callback across HTTP workers exac
     if(child && child.exitCode===null){const done=once(child,'exit');child.kill('SIGTERM');await done;}
     if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();
   }
+});
+
+test('new isolated chats narrow configured full access into independent workspaces while configured mode is preserved',async()=>{
+  const f=await fixtureModules();
+  try {
+    const git=(...args)=>execFileSync('git',args,{cwd:f.root,stdio:'ignore'});
+    git('init');git('config','user.name','Workspace fixture');git('config','user.email','fixture@example.invalid');
+    writeFileSync(path.join(f.root,'file.txt'),'base');git('add','.');git('commit','-m','base');
+    let native={id:'initial',cwd:f.root,status:'idle',turns:[]},count=0;const requests=[];
+    const connection={markThreadLoaded:()=>{},request:async(method,params)=>{if(method==='thread/start'){requests.push(params);Object.assign(native,{id:'native-'+(++count),cwd:params.cwd});return {thread:native};}return {};}};
+    const gateway=await coordinatedGateway(f,connection,native);
+    gateway.runtime.threadDefaults=()=>({cwd:f.root,sandbox:'danger-full-access'});
+    const first=await gateway.createThread({clientThreadId:randomUUID(),source:'chat',workspace:{mode:'isolated'}});
+    const second=await gateway.createThread({clientThreadId:randomUUID(),source:'chat',workspace:{mode:'isolated'}});
+    const a=await gateway.store.get(first.detail.thread.chatId),b=await gateway.store.get(second.detail.thread.chatId);
+    assert.equal(a.sandbox,'workspace-write');assert.equal(b.sandbox,'workspace-write');assert.notEqual(a.workspace.cwd,b.workspace.cwd);
+    assert.ok(requests.slice(0,2).every(request=>request.sandbox==='workspace-write' && request.cwd!==f.root));
+    const configured=await gateway.createThread({clientThreadId:randomUUID(),source:'chat',workspace:{mode:'configured'}});
+    assert.equal((await gateway.store.get(configured.detail.thread.chatId)).sandbox,'danger-full-access');assert.equal(requests.at(-1).cwd,a.workspace.source);
+  }finally{f.cleanup();}
 });

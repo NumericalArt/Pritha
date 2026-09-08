@@ -102,7 +102,7 @@ type PendingNewChatDelivery = {
   effortId?: string;
   serviceTierId?: string;
   clientThreadId: string;
-  workspace?: {baseRevision:string};
+  workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only"};
   clientMessageId: string;
   text: string;
   status: "sending" | "delivery_unknown";
@@ -326,6 +326,8 @@ export function CodexChatPage() {
   const navigationEpochRef = useRef(0);
   const draftRevisionsRef = useRef<Record<string, number>>({});
   const creationIdsRef = useRef<Record<string,string>>({});
+  const [workspaceModes,setWorkspaceModes]=useState<Record<string,"isolated"|"configured"|"read-only">>({});
+  const workspaceMode=workspaceModes[newDraftId] || "isolated";
   newDraftIdRef.current = newDraftId;
   const [error, setError] = useState<ChatFailure | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -439,11 +441,12 @@ export function CodexChatPage() {
 
   saveSessionRef.current = () => {
     if(!sessionLoadedRef.current)return;
-    writeDraftSession({version:1,drafts:draftsByChatRef.current,revisions:draftRevisionsRef.current,creationIds:creationIdsRef.current,newDraftId:newDraftIdRef.current,pending:pendingDeliveriesRef.current,pendingNew:pendingNewChatDeliveriesRef.current});
+    writeDraftSession({version:1,workspaceModes,drafts:draftsByChatRef.current,revisions:draftRevisionsRef.current,creationIds:creationIdsRef.current,newDraftId:newDraftIdRef.current,pending:pendingDeliveriesRef.current,pendingNew:pendingNewChatDeliveriesRef.current});
   };
   useEffect(() => {
     const saved=readDraftSession();
     if(saved) {
+      setWorkspaceModes(saved.workspaceModes || {});
       draftsByChatRef.current=saved.drafts;setDraftsByChat(saved.drafts);
       draftRevisionsRef.current=saved.revisions;creationIdsRef.current=saved.creationIds;
       pendingDeliveriesRef.current=saved.pending as Record<string,PendingDelivery>;setPendingDeliveries(pendingDeliveriesRef.current);
@@ -458,7 +461,7 @@ export function CodexChatPage() {
     const save=()=>saveSessionRef.current();window.addEventListener("pagehide",save);
     return ()=>{save();window.removeEventListener("pagehide",save);};
   },[]);
-  useEffect(()=>saveSessionRef.current(),[draftsByChat,newDraftId,pendingDeliveries,pendingNewChatDeliveries]);
+  useEffect(()=>saveSessionRef.current(),[draftsByChat,newDraftId,pendingDeliveries,pendingNewChatDeliveries,workspaceModes]);
 
   const selectedSummary = useMemo(
     () => threads.find((thread) => thread.chatId === selectedChatId) || null,
@@ -1313,7 +1316,7 @@ export function CodexChatPage() {
       const draftId = newDraftIdRef.current;
       if (workspacePreflights.current.has(draftId)) return;
       const snapshot = {draftId,draftRevision:draftRevisionsRef.current[draftId] || 0,navigationEpoch:navigationEpochRef.current};
-      if (runtime?.selected.sandboxMode === "workspace_write" && !workspaceBase) {
+      if (workspaceMode !== "read-only" && runtime?.selected.sandboxMode !== "read_only" && (workspaceMode === "isolated" || runtime?.selected.sandboxMode === "workspace_write") && !workspaceBase) {
         workspacePreflights.current.add(draftId);
         try {
           const preview=(await api<{git:boolean;dirty:boolean;baseRevision:string|null}>("/api/codex-chat/v1/workspace")).data;
@@ -1328,7 +1331,7 @@ export function CodexChatPage() {
       }
       await deliverNewChatMessage({
         ...snapshot,
-        ...(workspaceBase ? {workspace:{baseRevision:workspaceBase}} : {}),
+        workspace:{mode:workspaceMode,...(workspaceBase ? {baseRevision:workspaceBase} : {})},
         clientThreadId: creationIdsRef.current[draftId] ||= crypto.randomUUID(),
         clientMessageId: crypto.randomUUID(),
         text,
@@ -1556,6 +1559,13 @@ export function CodexChatPage() {
         {connection === "reconnecting" && !backendOffline ? (
           <div className="codex-runtime-warning"><LoaderCircle className="spin" size={17} /><span>Event stream is reconnecting. The last synchronized history remains visible and read-only.</span></div>
         ) : null}
+        {!selectedChatId ? <label className="codex-runtime-warning codex-workspace-choice">Workspace
+          <select aria-label="New chat workspace" value={workspaceMode} disabled={Boolean(pendingNewChatDelivery)} onChange={event=>setWorkspaceModes(current=>({...current,[newDraftId]:event.target.value as "isolated"|"configured"|"read-only"}))}>
+            <option value="isolated">Isolated workspace · parallel tasks</option>
+            <option value="read-only">Read only</option>
+            <option value="configured">Configured access · shared resources may wait</option>
+          </select>
+        </label> : null}
         {!selectedChatId && workspaceChoices[newDraftId] ? <div className="codex-runtime-warning" role="status">
           <span>В исходном проекте есть несохранённые в Git изменения. Отдельная рабочая копия будет создана из коммита <code>{workspaceChoices[newDraftId].slice(0,12)}</code>; эти изменения в неё не войдут.</span>
           <button type="button" className="codex-button" onClick={()=>void sendMessage(workspaceChoices[newDraftId])}>Использовать этот коммит</button>
