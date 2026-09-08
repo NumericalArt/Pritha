@@ -23,6 +23,8 @@ import {
   X,
 } from "lucide-react";
 import QRCode from "qrcode";
+import { selectTheme, type ControlCenterTheme } from "@/lib/theme";
+import { useControlCenterTheme } from "@/components/shell/ThemeSync";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { CodexAuthSection } from "@/components/settings/CodexAuthSection";
@@ -61,53 +63,11 @@ function capabilityTone(status: CapabilityStatus | "pass" | "fail" | "unknown") 
   return "";
 }
 
-type ThemePreference = "dark" | "system" | "light";
-type ResolvedTheme = "dark" | "light";
-
-const THEME_STORAGE_KEY = "pritha-control-center-theme";
-const ENABLE_EXPERIMENTAL_LIGHT_THEME = false;
-const THEME_OPTIONS: Array<{
-  id: ThemePreference;
-  label: string;
-  detail: string;
-  icon: typeof Moon;
-}> = [
-  { id: "dark", label: "Dark", detail: "Deep control room", icon: Moon },
-  { id: "system", label: "System", detail: "Follow this device", icon: Monitor },
-  { id: "light", label: "Light", detail: "Bright operations", icon: Sun },
+const THEME_OPTIONS: Array<{id:ControlCenterTheme;label:string;appliedLabel:string;detail:string;icon:typeof Moon}> = [
+  {id:"classic",label:"Классическая",appliedLabel:"Classic",detail:"Deep control room",icon:Monitor},
+  {id:"dark",label:"Тёмная",appliedLabel:"Dark",detail:"Graphite and pastel accents",icon:Moon},
+  {id:"light",label:"Светлая",appliedLabel:"Light",detail:"Mineral green and blue",icon:Sun},
 ];
-const VISIBLE_THEME_OPTIONS = ENABLE_EXPERIMENTAL_LIGHT_THEME ? THEME_OPTIONS : THEME_OPTIONS.filter((option) => option.id === "dark");
-
-function isThemePreference(value: string | null): value is ThemePreference {
-  return value === "dark" || value === "system" || value === "light";
-}
-
-function resolveTheme(preference: ThemePreference): ResolvedTheme {
-  if (!ENABLE_EXPERIMENTAL_LIGHT_THEME) return "dark";
-  if (preference !== "system") return preference;
-  if (typeof window === "undefined") return "dark";
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-}
-
-function applyThemePreference(preference: ThemePreference) {
-  const resolved = resolveTheme(preference);
-  if (typeof document !== "undefined") {
-    document.documentElement.dataset.themePreference = preference;
-    document.documentElement.dataset.theme = resolved;
-  }
-  return resolved;
-}
-
-function readStoredThemePreference(): ThemePreference {
-  if (typeof window === "undefined") return "dark";
-  try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (!ENABLE_EXPERIMENTAL_LIGHT_THEME) return "dark";
-    return isThemePreference(stored) ? stored : "dark";
-  } catch {
-    return "dark";
-  }
-}
 
 function memoryIndexLabel(status?: ControlCenterStatus) {
   const stats = status?.selfTest.memoryStats;
@@ -480,27 +440,10 @@ function AccessSection({ access }: AccessProps) {
 }
 
 function AppearanceSection() {
-  const [themePreference, setThemePreference] = useState<ThemePreference>(() => readStoredThemePreference());
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(themePreference));
-
-  useEffect(() => {
-    setResolvedTheme(applyThemePreference(themePreference));
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
-    } catch {
-      // Theme selection is still applied for this session.
-    }
-
-    const media = window.matchMedia("(prefers-color-scheme: light)");
-    const syncSystemTheme = () => {
-      if (themePreference === "system") setResolvedTheme(applyThemePreference(themePreference));
-    };
-    media.addEventListener("change", syncSystemTheme);
-    return () => media.removeEventListener("change", syncSystemTheme);
-  }, [themePreference]);
-
-  const activeOption = THEME_OPTIONS.find((option) => option.id === themePreference) || THEME_OPTIONS[0];
-  const appliedLabel = themePreference === "system" ? `System: ${resolvedTheme}` : activeOption.label;
+  const themePreference = useControlCenterTheme();
+  const resolvedTheme = themePreference;
+  const activeOption = THEME_OPTIONS.find(option=>option.id===themePreference)!;
+  const appliedLabel = activeOption.appliedLabel;
 
   return (
     <section className="settings-section appearance-section">
@@ -511,7 +454,7 @@ function AppearanceSection() {
         </span>
       </div>
       <div className="theme-toggle" role="radiogroup" aria-label="Theme">
-        {VISIBLE_THEME_OPTIONS.map((option) => {
+        {THEME_OPTIONS.map((option,index) => {
           const Icon = option.icon;
           const selected = option.id === themePreference;
           return (
@@ -520,7 +463,16 @@ function AppearanceSection() {
               type="button"
               role="radio"
               aria-checked={selected}
-              onClick={() => setThemePreference(option.id)}
+              tabIndex={selected ? 0 : -1}
+              title={option.label}
+              onClick={() => selectTheme(option.id)}
+              onKeyDown={event=>{
+                if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End"].includes(event.key))return;
+                event.preventDefault();
+                const next=event.key === "Home" ? 0 : event.key === "End" ? 2 : (index+(["ArrowLeft","ArrowUp"].includes(event.key)?2:1))%3;
+                selectTheme(THEME_OPTIONS[next].id);
+                event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
+              }}
               key={option.id}
             >
               <Icon size={16} />
@@ -541,7 +493,7 @@ function AppearanceSection() {
         </div>
         <div>
           <strong>{activeOption.detail}</strong>
-          <span>{themePreference === "system" ? `Pritha is following the current ${resolvedTheme} system appearance.` : `${activeOption.label} theme is active across the control surface.`}</span>
+          <span>{`${appliedLabel} theme is active across the control surface.`}</span>
         </div>
         <Check size={18} />
       </div>

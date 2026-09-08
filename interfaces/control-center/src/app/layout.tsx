@@ -2,37 +2,12 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { AppShell } from "@/components/shell/AppShell";
 import "@/styles/globals.css";
+import { themeInitScript } from "@/lib/theme";
+import { ThemeSync } from "@/components/shell/ThemeSync";
 
 // AppShell reads the current instance's private status. Never bake that state
 // into a release artifact or require a live memory database during compilation.
 export const dynamic = "force-dynamic";
-
-const themeInitScript = `
-(() => {
-  const storageKey = "pritha-control-center-theme";
-  const lightThemeEnabled = false;
-  const allowed = new Set(lightThemeEnabled ? ["dark", "system", "light"] : ["dark"]);
-  const root = document.documentElement;
-
-  function storedPreference() {
-    try {
-      const value = window.localStorage.getItem(storageKey);
-      return allowed.has(value || "") ? value : "dark";
-    } catch {
-      return "dark";
-    }
-  }
-
-  function systemTheme() {
-    if (!lightThemeEnabled) return "dark";
-    return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  }
-
-  const preference = storedPreference();
-  root.dataset.themePreference = preference;
-  root.dataset.theme = preference === "system" ? systemTheme() : preference;
-})();
-`;
 
 export const metadata: Metadata = {
   title: "Pritha Control Center",
@@ -51,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Script id="pritha-theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
+        <ThemeSync />
         <AppShell>{children}</AppShell>
       </body>
     </html>

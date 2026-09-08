@@ -48,7 +48,7 @@ export function StatusStrip({
         const Icon = segment.icon;
         return (
           <div className="status-segment" key={`${segment.title}-${segment.value}`}>
-            <span className="status-icon">
+            <span className="status-icon" data-color-role={segment.title.toLowerCase()}>
               <Icon size={18} />
             </span>
             <span>

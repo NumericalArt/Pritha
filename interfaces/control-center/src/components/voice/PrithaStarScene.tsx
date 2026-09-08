@@ -1,19 +1,31 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useControlCenterTheme } from "@/components/shell/ThemeSync";
+import type { ControlCenterTheme } from "@/lib/theme";
 import * as THREE from "three";
 import type { RealtimePhase } from "./usePrithaRealtime";
 
 // Port of the no-spider Three.js web from pritha_spiderweb_three_v5_no_spider.html.
 // Keep this component as the canonical UI implementation; do not replace it with
 // CSS/SVG asterisk fallbacks.
-const COLORS = {
+const CLASSIC_COLORS = {
   violet: new THREE.Color("#a45cff"),
   purple: new THREE.Color("#7048ff"),
   blue: new THREE.Color("#2f7dff"),
   cyan: new THREE.Color("#22d7ff"),
   white: new THREE.Color("#f7f8ff"),
 };
+
+const DARK_COLORS = {
+  violet: new THREE.Color("#f15380"), purple: new THREE.Color("#eb94ac"),
+  blue: new THREE.Color("#67a9ea"), cyan: new THREE.Color("#3fcbd7"), white: new THREE.Color("#e9ecf3"),
+};
+const LIGHT_COLORS = {
+  violet: new THREE.Color("#f7c0d6"), purple: new THREE.Color("#f8d9e9"),
+  blue: new THREE.Color("#d1e4ff"), cyan: new THREE.Color("#bcebf0"), white: new THREE.Color("#fffafb"),
+};
+function themeColors(theme:ControlCenterTheme) { return theme === "light" ? LIGHT_COLORS : theme === "dark" ? DARK_COLORS : CLASSIC_COLORS; }
 
 const WEB_STRAND_WIDTH = 0.018;
 const CALM_SWAY_MULTIPLIER = 4.0;
@@ -141,9 +153,16 @@ function updateDynamicNodes(
   }
 }
 
-function makeRadialColor(x: number) {
+function makeRadialColor(x: number, COLORS = CLASSIC_COLORS) {
   const t = THREE.MathUtils.clamp((x / LONG_RADIUS + 1) * 0.5, 0, 1);
   const c = new THREE.Color();
+  if(COLORS !== CLASSIC_COLORS) {
+    if(t<0.3)c.lerpColors(COLORS.violet,COLORS.purple,t/0.3);
+    else if(t<0.5)c.lerpColors(COLORS.purple,COLORS.white,(t-0.3)/0.2);
+    else if(t<0.72)c.lerpColors(COLORS.white,COLORS.blue,(t-0.5)/0.22);
+    else c.lerpColors(COLORS.blue,COLORS.cyan,(t-0.72)/0.28);
+    return c;
+  }
   if (t < 0.5) {
     c.lerpColors(COLORS.violet, COLORS.purple, t * 2);
   } else {
@@ -152,7 +171,7 @@ function makeRadialColor(x: number) {
   return c;
 }
 
-function makeNodeTexture() {
+function makeNodeTexture(theme:ControlCenterTheme) {
   const size = 128;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -163,9 +182,9 @@ function makeNodeTexture() {
   const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   g.addColorStop(0.0, "rgba(255,255,255,1)");
   g.addColorStop(0.18, "rgba(255,255,255,0.94)");
-  g.addColorStop(0.42, "rgba(130,100,255,0.48)");
-  g.addColorStop(0.7, "rgba(70,70,255,0.20)");
-  g.addColorStop(1.0, "rgba(0,0,0,0)");
+  g.addColorStop(0.42, theme === "classic" ? "rgba(130,100,255,0.48)" : theme === "light" ? "rgba(255,255,255,0.48)" : "rgba(233,236,243,0.48)");
+  g.addColorStop(0.7, theme === "classic" ? "rgba(70,70,255,0.20)" : theme === "light" ? "rgba(255,255,255,0.20)" : "rgba(233,236,243,0.20)");
+  g.addColorStop(1.0, theme === "light" ? "rgba(255,255,255,0)" : "rgba(0,0,0,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
 
@@ -179,11 +198,12 @@ function markGeometryDirty(geometry: THREE.BufferGeometry) {
   (geometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
 }
 
-function colorCss(color: THREE.Color, alpha = 1) {
+function colorCss(color: THREE.Color, alpha = 1, classic = true) {
+  if(!classic)return color.getStyle(THREE.SRGBColorSpace).replace("rgb(","rgba(").replace(")",`, ${alpha})`);
   return `rgba(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)}, ${alpha})`;
 }
 
-function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: RealtimePhase }, mobile: boolean) {
+function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: RealtimePhase }, mobile: boolean, COLORS = CLASSIC_COLORS, clock: {current:number|null} = {current:null}) {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (!ctx) {
@@ -242,13 +262,13 @@ function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: Realti
     for (const [a, b] of segments) {
       const pa = dynamicNodes[a];
       const pb = dynamicNodes[b];
-      const ca = makeRadialColor(pa.x);
-      const cb = makeRadialColor(pb.x);
+      const ca = makeRadialColor(pa.x, COLORS);
+      const cb = makeRadialColor(pb.x, COLORS);
       const sa = project(pa, rootScale);
       const sb = project(pb, rootScale);
       const gradient = context.createLinearGradient(sa.x, sa.y, sb.x, sb.y);
-      gradient.addColorStop(0, colorCss(ca, alpha));
-      gradient.addColorStop(1, colorCss(cb, alpha));
+      gradient.addColorStop(0, colorCss(ca, alpha, COLORS === CLASSIC_COLORS));
+      gradient.addColorStop(1, colorCss(cb, alpha, COLORS === CLASSIC_COLORS));
       context.strokeStyle = gradient;
       context.beginPath();
       context.moveTo(sa.x, sa.y);
@@ -266,12 +286,12 @@ function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: Realti
       const pulse = meta.ring === RINGS.length - 1 ? 1 + 0.035 * Math.sin(t * 1.9 + i) : 1;
       const centerPulse = meta.isCenter ? 1 + 0.06 * Math.sin(t * 1.4) : 1;
       const radius = Math.max(1.3, baseSize * pulse * centerPulse * p.scale * 0.5);
-      const color = meta.isCenter ? COLORS.white : makeRadialColor(point.x);
+      const color = meta.isCenter ? COLORS.white : makeRadialColor(point.x, COLORS);
       const gradient = context.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
-      gradient.addColorStop(0, colorCss(COLORS.white, meta.isCenter ? 1 : 0.92));
-      gradient.addColorStop(0.22, colorCss(color, 0.72));
-      gradient.addColorStop(0.62, colorCss(color, 0.22));
-      gradient.addColorStop(1, colorCss(color, 0));
+      gradient.addColorStop(0, colorCss(COLORS.white, meta.isCenter ? 1 : 0.92, COLORS === CLASSIC_COLORS));
+      gradient.addColorStop(0.22, colorCss(color, 0.72, COLORS === CLASSIC_COLORS));
+      gradient.addColorStop(0.62, colorCss(color, 0.22, COLORS === CLASSIC_COLORS));
+      gradient.addColorStop(1, colorCss(color, 0, COLORS === CLASSIC_COLORS));
       context.fillStyle = gradient;
       context.beginPath();
       context.arc(p.x, p.y, radius, 0, Math.PI * 2);
@@ -285,7 +305,7 @@ function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: Realti
   window.addEventListener("resize", resize);
   const resizeFrame = requestAnimationFrame(resize);
 
-  const startTime = performance.now();
+  const startTime = clock.current ?? (clock.current = performance.now());
   let frame = 0;
   function animate() {
     frame = requestAnimationFrame(animate);
@@ -295,7 +315,7 @@ function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: Realti
     updateDynamicNodes(baseNodes, dynamicNodes, nodeMeta, t, state);
     context.clearRect(0, 0, width, height);
     context.save();
-    context.globalCompositeOperation = "lighter";
+    context.globalCompositeOperation = COLORS === LIGHT_COLORS ? "source-over" : "lighter";
     strokeSegments(rootScale * 1.003, 4.4, 0.12);
     strokeSegments(rootScale, 2.0, 0.42);
     strokeSegments(rootScale, 1.0, 0.92);
@@ -318,6 +338,8 @@ function startCanvasFallback(hostEl: HTMLDivElement, phaseRef: { current: Realti
 export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhase; mobile?: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const phaseRef = useRef(phase);
+  const clockRef = useRef<number|null>(null);
+  const theme = useControlCenterTheme();
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -327,6 +349,8 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
     const host = hostRef.current;
     if (!host) return;
     const hostEl = host;
+    const COLORS = themeColors(theme);
+    const blending = theme === "light" ? THREE.NormalBlending : THREE.AdditiveBlending;
 
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
@@ -342,7 +366,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
         powerPreference: "high-performance",
       });
     } catch {
-      return startCanvasFallback(hostEl, phaseRef, mobile);
+      return startCanvasFallback(hostEl, phaseRef, mobile, COLORS, clockRef);
     }
     hostEl.dataset.rendered = "true";
     hostEl.dataset.renderer = "webgl";
@@ -376,7 +400,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
       vertexColors: true,
       transparent: true,
       opacity: 0.58,
-      blending: THREE.AdditiveBlending,
+      blending,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
@@ -388,7 +412,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
       vertexColors: true,
       transparent: true,
       opacity: 0.86,
-      blending: THREE.AdditiveBlending,
+      blending,
       depthWrite: false,
     });
     const webLines = new THREE.LineSegments(lineGeometry, lineMaterial);
@@ -400,7 +424,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
       vertexColors: true,
       transparent: true,
       opacity: 0.24,
-      blending: THREE.AdditiveBlending,
+      blending,
       depthWrite: false,
     });
     const glowLines = new THREE.LineSegments(glowGeometry, glowMaterial);
@@ -408,7 +432,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
     glowLines.renderOrder = 0;
     root.add(glowLines);
 
-    const nodeTexture = makeNodeTexture();
+    const nodeTexture = makeNodeTexture(theme);
     const nodeSprites: THREE.Sprite[] = [];
     if (nodeTexture) {
       for (let i = 0; i < dynamicNodes.length; i += 1) {
@@ -416,10 +440,10 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
         const sprite = new THREE.Sprite(
           new THREE.SpriteMaterial({
             map: nodeTexture,
-            color: meta.isCenter ? COLORS.white : makeRadialColor(baseNodes[i].x),
+            color: meta.isCenter ? COLORS.white : makeRadialColor(baseNodes[i].x, COLORS),
             transparent: true,
             opacity: meta.isCenter ? 1 : 0.92,
-            blending: THREE.AdditiveBlending,
+            blending,
             depthWrite: false,
           }),
         );
@@ -463,8 +487,8 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
         linePositions[p++] = pb.y;
         linePositions[p++] = pb.z;
 
-        const ca = makeRadialColor(pa.x);
-        const cb = makeRadialColor(pb.x);
+        const ca = makeRadialColor(pa.x, COLORS);
+        const cb = makeRadialColor(pb.x, COLORS);
         const colorOffset = s * 2 * 3;
         lineColors[colorOffset] = ca.r;
         lineColors[colorOffset + 1] = ca.g;
@@ -480,8 +504,8 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
         const [a, b] = segments[s];
         const pa = dynamicNodes[a];
         const pb = dynamicNodes[b];
-        const ca = makeRadialColor(pa.x);
-        const cb = makeRadialColor(pb.x);
+        const ca = makeRadialColor(pa.x, COLORS);
+        const cb = makeRadialColor(pb.x, COLORS);
         const dx = pb.x - pa.x;
         const dy = pb.y - pa.y;
         const len = Math.hypot(dx, dy) || 1;
@@ -527,7 +551,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
     resize();
     const resizeFrame = requestAnimationFrame(resize);
 
-    const startTime = performance.now();
+    const startTime = clockRef.current ?? (clockRef.current = performance.now());
     let frame = 0;
     function animate() {
       frame = requestAnimationFrame(animate);
@@ -564,7 +588,7 @@ export function PrithaStarScene({ phase, mobile = false }: { phase: RealtimePhas
       }
       renderer.dispose();
     };
-  }, [mobile]);
+  }, [mobile, theme]);
 
   return (
     <div className={mobile ? "mobile-pritha-star-scene" : "pritha-star-scene"} ref={hostRef} data-testid="pritha-star-scene" data-state={phase} aria-hidden="true" />

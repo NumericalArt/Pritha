@@ -35,6 +35,7 @@ await new Promise((resolve, reject) => { server.once("error", reject); server.li
 const port = server.address().port;
 await new Promise(resolve => server.close(resolve));
 const env = Object.fromEntries(["PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "SHELL"].filter(key => process.env[key]).map(key => [key, process.env[key]]));
+for(const key of ["PRITHA_THEME_BASELINE_DIR","PRITHA_THEME_EVIDENCE_MODE"]) if(process.env[key])env[key]=process.env[key];
 Object.assign(env, {
   TECHSCOPE_ROOT: root, PRITHA_STATE_ROOT: state, PRITHA_AGENT_PARENT: path.join(temporary, "children"),
   PRITHA_INSTANCE_ID: "chat-evolution-test", PRITHA_INSTANCE_ROLE: "developer",
