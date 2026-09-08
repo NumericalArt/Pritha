@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { drainExecutions, executionBuildCompatible } from "./lib/execution-lifecycle.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { randomUUID } from "node:crypto";
@@ -359,8 +360,9 @@ function releaseIdentity() {
   };
 }
 
-function validateProduction() {
+function validateProduction({checkExecutionBuild=true}={}) {
   const errors = [];
+  try {if(checkExecutionBuild && !executionBuildCompatible(config.codeRoot,config.stateRoot))errors.push("execution_rollback_incompatible");}catch{errors.push("execution_store_unreadable");}
   if (!isPrithaCodeCheckout(config.codeRoot)) errors.push("invalid_checkout");
   if (config.stateRoot === config.codeRoot) errors.push("external_state_root_required");
   if (!existsSync(runtimeEnvPath)) errors.push("runtime_env_missing");
@@ -452,7 +454,7 @@ function requireApply() {
   if (process.platform !== "darwin" && !process.env.PRITHA_RUNTIME_ALLOW_NON_DARWIN_TEST) {
     throw new Error("launchd lifecycle commands are available only on macOS");
   }
-  const productionErrors = validateProduction();
+  const productionErrors = validateProduction({checkExecutionBuild: !["stop","uninstall"].includes(options._[0])});
   if (productionErrors.length) throw new Error(`runtime_preflight_failed:${productionErrors.join(",")}`);
 }
 
@@ -633,6 +635,8 @@ async function assertSafeStop() {
     throw new Error("owner_mismatch:refusing_to_stop_foreign_listener");
   }
   if (state && !identityMatches(state)) throw new Error("owner_mismatch:runtime_state_identity");
+  const execution=drainExecutions(config.codeRoot,config.stateRoot);
+  if(execution.active>0)throw new Error("execution_drain_required:active_or_unknown_owners");
   return { state, ownership };
 }
 
@@ -701,6 +705,7 @@ function installService() {
 }
 
 async function startService() {
+  const errors=validateProduction();if(errors.length)throw new Error(errors.join(","));
   if (!existsSync(installedPlistPath)) throw new Error("service_not_installed");
   const listener = listenerPids();
   if (listener.pids.length) {

@@ -1,5 +1,6 @@
+import { runtimeProbe } from "../../../../../../scripts/lib/runtime-probe.mjs";
 import { spawn, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,7 +8,11 @@ import readline from "node:readline";
 import type { CodexAppThreadRoutingMode, CodexReasoningEffort, CodexServiceTier } from "../pritha-runtime";
 import { isDesktopCodexBinary, resolveCodexAppBinary } from "../../settings/codex-binaries";
 import { codexAppTurnSettings } from "../../settings/codex-model-catalog";
-import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "../../codex-chat/native-turn-coordinator";
+import { nativeExecutionCoordinator, nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "../../codex-chat/native-turn-coordinator";
+import { captureNativeRequest, expireNativeRequests } from "../../codex-chat/native-requests";
+import { effectiveCodexHome, storageIdentity } from "../../codex-chat/storage-identity";
+import { registerNativeControl } from "../../codex-chat/native-control";
+import { assertVoiceOwner, voiceWorkflow } from "./voice-execution";
 import type { PrithaCodexTaskClient, PrithaCodexTaskPayload, PrithaCodexTaskRunOptions, PrithaCodexThreadScope, PrithaCodexThreadScopeKind } from "./types";
 
 type RpcMessage = {
@@ -25,6 +30,7 @@ type PendingRequest = {
 };
 
 type CodexAppServerClientOptions = {
+  logicalTaskId?: string;
   codexBin?: string;
   cwd: string;
   branch?: string;
@@ -50,6 +56,14 @@ type CodexAppThreadTarget = {
 };
 
 const CODEX_APP_RECONNECT_FINAL_ATTEMPT = 5;
+
+export class CodexDispatchError extends Error {
+  constructor(readonly code: string, message: string, readonly deliveryState: "not_dispatched" | "unknown" | "completed", readonly fallbackEligible = false) { super(message); }
+}
+
+export function safeCodexCliFallback(error: unknown, anyTurnDispatched: boolean) {
+  return !anyTurnDispatched && error instanceof CodexDispatchError && error.deliveryState === "not_dispatched" && error.fallbackEligible;
+}
 
 const RESULT_SCHEMA = {
   type: "object",
@@ -84,6 +98,7 @@ function throwIfAborted(signal?: AbortSignal) {
 }
 
 export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
+  private readonly logicalTaskId?: string;
   private readonly codexBin: string;
   private readonly cwd: string;
   private readonly branch: string;
@@ -93,6 +108,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
   private readonly getRuntimeSettings?: CodexAppServerClientOptions["getRuntimeSettings"];
 
   constructor(options: CodexAppServerClientOptions) {
+    this.logicalTaskId = options.logicalTaskId;
     this.codexBin = resolveCodexAppBinary(options.codexBin);
     this.cwd = path.resolve(options.cwd);
     this.branch = options.branch || currentBranch(this.cwd);
@@ -104,14 +120,47 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
 
   async runTask(payload: PrithaCodexTaskPayload, options: PrithaCodexTaskRunOptions) {
     if (looksLikePath(this.codexBin) && !fs.existsSync(this.codexBin)) {
-      throw new Error(`Codex binary not found: ${this.codexBin}`);
+      throw new CodexDispatchError("runtime_unavailable", "Codex binary is unavailable.", "not_dispatched", true);
     }
 
     const connection = new AppServerConnection(this.codexBin, this.cwd);
+    const coordinator = nativeExecutionCoordinator();
+    const workflow = this.logicalTaskId ? voiceWorkflow(this.logicalTaskId) : null;
+    const phase = options.executionPhase || "execution";
+    const intentKey = `voice-turn:${this.logicalTaskId || payload.requestId}:${workflow?.round || 1}:${phase}`;
+    const requestHash = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+    const clientUserMessageId=`voice_${createHash("sha256").update(intentKey).digest("hex").slice(0,40)}`;
+    const prompt=buildPrompt(payload);
+    const {intent} = coordinator.reserveIntent(intentKey, requestHash, {kind:"voice-turn",key:intentKey,taskId:this.logicalTaskId || payload.requestId,phase,round:workflow?.round || 1,storage:storageIdentity(effectiveCodexHome()),clientMessageId:clientUserMessageId,promptHash:createHash("sha256").update(prompt).digest("hex")});
+    if (intent.state === "completed" && intent.result) return intent.result;
+    if (!["reserved","not_dispatched"].includes(intent.state)) throw new CodexDispatchError("voice_delivery_unknown", "The original Voice turn must be reconciled before continuing.", "unknown");
     const startedAt = Date.now();
     let target: CodexAppThreadTarget | null = null;
     let turnId = "";
-    let releaseTurnLease: (() => void) | null = null;
+    let controlCleanup: (()=>void) | undefined;
+    const ownership: {lease: ReturnType<typeof tryAcquireNativeThreadTurn>} = {lease:null};
+    let ownedThreadId = "";
+    let stage: "initializing" | "routing" | "dispatching" | "completed" = "initializing";
+    let routingLease: ReturnType<ReturnType<typeof nativeExecutionCoordinator>["claim"]> = null;
+    let capacityLease: ReturnType<ReturnType<typeof nativeExecutionCoordinator>["claim"]> = null;
+    connection.beforeThreadMutation = async (threadId) => {
+      if (ownedThreadId === threadId) { ownership.lease?.assertOwned(); return; }
+      if (ownedThreadId) throw new CodexDispatchError("thread_identity_changed", "Voice routing cannot switch an owned native thread.", "unknown");
+      const nativeKey = nativeThreadLeaseKey("voice", threadId);
+      let lease;
+      if (this.logicalTaskId) {
+        const owner = assertVoiceOwner(this.logicalTaskId, nativeKey);
+        lease = Object.assign(() => {}, {owner:owner.owner as string,generation:owner.generation as string,assertOwned:()=>{assertVoiceOwner(this.logicalTaskId!,nativeKey);}});
+      } else lease = tryAcquireNativeThreadTurn(nativeKey, `voice:${payload.requestId}`, { detail: { taskId: payload.requestId, nativeThreadId: threadId } });
+      if (!lease) throw new CodexDispatchError("turn_active", "This task thread is already owned by another execution.", "not_dispatched");
+      ownership.lease = lease;
+      ownedThreadId = threadId;
+      if (!connection.newThreads.has(threadId)) {
+        const response = asObject(await connection.request("thread/read", {threadId, includeTurns:false}, remainingMs(startedAt, options.timeoutMs)));
+        const status = asObject(response?.thread)?.status;
+        if (status === "active" || asObject(status)?.type === "active") throw new CodexDispatchError("turn_active", "The native runtime reports an active turn.", "not_dispatched");
+      }
+    };
     const emitProgress = async (phase: string, message: string, extra: Record<string, unknown> = {}) => {
       await options.onProgress?.({
         timestamp: new Date().toISOString(),
@@ -125,13 +174,17 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       });
     };
 
-    const abortHandler = () => connection.close(codexAppAbortError());
+    const abortHandler = () => {
+      if (ownedThreadId && turnId) void connection.request("turn/interrupt", {threadId:ownedThreadId, turnId}, 5_000).catch(() => undefined);
+    };
     if (options.signal) {
       throwIfAborted(options.signal);
       options.signal.addEventListener("abort", abortHandler, { once: true });
     }
 
     try {
+      capacityLease = coordinator.claim([intentKey], intentKey, {kind:"turn",capacity:coordinator.admission().capacity,detail:{taskId:payload.requestId,intentKey}});
+      if (!capacityLease) throw new CodexDispatchError("capacity_busy", "The execution limit is reached; this turn has not been sent.", "not_dispatched");
       await connection.start(options.timeoutMs);
       throwIfAborted(options.signal);
       await emitProgress("codex_app_started", "Codex App sidecar process started.");
@@ -154,6 +207,14 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       throwIfAborted(options.signal);
       await emitProgress("codex_app_initialized", "Codex App sidecar initialized.");
 
+      const scope = payload.threadScope;
+      const routingMode = this.getRuntimeSettings?.().codexAppThreadRoutingMode || "subject_scoped";
+      const routingKey = `voice-routing:${this.cwd}:${routingMode === "control" ? "control" : routingMode === "per_task" ? payload.requestId : `${scope?.kind}:${scope?.id}`}`;
+      if (!this.logicalTaskId) {
+        routingLease = coordinator.claim([routingKey], `voice-routing:${payload.requestId}`, {kind:"voice-routing", detail:{taskId:payload.requestId}});
+        if (!routingLease) throw new CodexDispatchError("voice_scope_busy", "Another Voice task owns this conversation scope.", "not_dispatched");
+      }
+      stage = "routing";
       target = await this.resolveTaskThread(connection, payload, remainingMs(startedAt, options.timeoutMs));
       throwIfAborted(options.signal);
       await emitProgress("thread_resolved", "Codex App task thread resolved.", {
@@ -164,9 +225,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         thread_scope: target.scope,
         routing_mode: target.routingMode,
       });
-      const providerId = isDesktopCodexBinary(this.codexBin) ? "desktop_bundled" : "standalone_cli";
-      releaseTurnLease = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(providerId, target.threadId), `voice:${payload.requestId}`);
-      if (!releaseTurnLease) throw new Error("The task thread already has an active turn. Retry this Voice task after it finishes.");
+      await connection.beforeThreadMutation(target.threadId);
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("started", payload, target.threadName), remainingMs(startedAt, options.timeoutMs));
       throwIfAborted(options.signal);
       const runtimeSettings = this.getRuntimeSettings?.();
@@ -176,11 +235,15 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         serviceTier: runtimeSettings?.codexServiceTier || "standard",
       });
 
+      coordinator.updateIntent(intentKey, {state:"dispatching",nativeThreadId:target.threadId,owner:capacityLease.owner,generation:capacityLease.generation}, intent.revision);
+      await emitProgress("turn_dispatching", "Sending the reserved Voice turn.");
+      stage = "dispatching";
       const turnResponse = (await connection.request(
         "turn/start",
         {
           threadId: target.threadId,
-          input: [{ type: "text", text: buildPrompt(payload), text_elements: [] }],
+          clientUserMessageId,
+          input: [{ type: "text", text: prompt, text_elements: [] }],
           cwd: this.cwd,
           model: turnSettings.model || undefined,
           approvalPolicy: "never",
@@ -193,20 +256,26 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         },
         remainingMs(startedAt, options.timeoutMs),
       )) as { turn?: { id?: string; items?: unknown[] } };
-      throwIfAborted(options.signal);
-
       turnId = String(turnResponse.turn?.id || "");
       if (!turnId) throw new Error("Codex app-server did not return a turn id");
+      coordinator.updateIntent(intentKey, {state:"running",nativeTurnId:turnId});
+      const controlOwner = ownership.lease!;
+      controlCleanup = registerNativeControl({coordinator:coordinator,key:nativeThreadLeaseKey("voice",target.threadId),owner:controlOwner.owner,generation:controlOwner.generation,turnId:()=>turnId,steer:phase !== "planning",request:(method,params)=>connection.request(method,params,5_000)});
       await emitProgress("turn_started", "Codex App turn started; waiting for completion.", { turn_id: turnId });
 
+      if(options.signal?.aborted)abortHandler();
       const completed = await connection.waitForTurnCompleted(target.threadId, turnId, remainingMs(startedAt, options.timeoutMs));
+      stage = "completed";
+      coordinator.updateIntent(intentKey, {state:"completed",nativeTurnId:turnId,terminalStatus:asObject(completed)?.status});
       throwIfAborted(options.signal);
       await emitProgress("turn_completed", "Codex App turn completed.", { turn_id: turnId, level: "complete", status: "complete" });
       const text = extractAssistantText(completed) || connection.agentTextForTurn(turnId);
       const result = parseCodexJson(text);
+      coordinator.updateIntent(intentKey, {state:"completed",result:{...result,transport:"codex-app"}});
       await this.injectThreadReport(connection, target.threadId, buildTaskReport("completed", payload, target.threadName, result, Date.now() - startedAt), remainingMs(startedAt, options.timeoutMs));
       return { ...result, transport: "codex-app" };
     } catch (error) {
+      if (stage !== "completed") coordinator.updateIntent(intentKey, {state: stage === "dispatching" ? "unknown" : "not_dispatched"});
       await options.onProgress?.({
         timestamp: new Date().toISOString(),
         phase: "failed",
@@ -216,12 +285,16 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         transport: "codex-app",
         elapsed_ms: Date.now() - startedAt,
       });
-      if (target) {
+      if (target && ownership.lease && stage === "completed") {
         await this.injectThreadReport(connection, target.threadId, buildTaskReport("failed", payload, target.threadName, error, Date.now() - startedAt), Math.min(5_000, remainingMs(startedAt, options.timeoutMs)));
       }
-      throw error;
+      if (error instanceof CodexDispatchError) throw error;
+      const code=String((error as {code?:string}).code || (error instanceof Error ? error.message : ""));
+      if (stage !== "dispatching" && ["turn_active","workspace_busy","capacity_busy"].includes(code)) throw new CodexDispatchError(code,"The requested execution resource is busy.","not_dispatched");
+      throw new CodexDispatchError("voice_dispatch_failed", error instanceof Error ? error.message : "Voice task failed.", stage === "initializing" ? "not_dispatched" : stage === "completed" ? "completed" : "unknown", stage === "initializing");
     } finally {
-      releaseTurnLease?.();
+      controlCleanup?.();
+      if (stage !== "dispatching") { ownership.lease?.(); routingLease?.release(); capacityLease?.release(); }
       options.signal?.removeEventListener("abort", abortHandler);
       connection.close();
     }
@@ -244,7 +317,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
 
     if (overrideThreadId) {
       const thread = await this.resumeThread(connection, overrideThreadId, timeoutMs);
-      this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+      await this.saveThread({ threadName, thread, role: "control", scope, routingMode });
       return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
     }
 
@@ -252,10 +325,10 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
     if (registered?.threadId) {
       try {
         const thread = await this.resumeThread(connection, registered.threadId, timeoutMs);
-        this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+        await this.saveThread({ threadName, thread, role: "control", scope, routingMode });
         return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
-      } catch {
-        // Stale registry entries are local hints only.
+      } catch (error) {
+        throw error; // A busy or unavailable original thread never authorizes a replacement.
       }
     }
 
@@ -265,12 +338,12 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
     if (exact?.id) {
       const thread = await this.resumeThread(connection, String(exact.id), timeoutMs);
-      this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+      await this.saveThread({ threadName, thread, role: "control", scope, routingMode });
       return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
     }
 
     const thread = await this.startNamedThread(connection, threadName, timeoutMs);
-    this.saveThread({ threadName, thread, role: "control", scope, routingMode });
+    await this.saveThread({ threadName, thread, role: "control", scope, routingMode });
     return { threadId: String(thread.id), threadName, role: "control", scope, routingMode };
   }
 
@@ -341,7 +414,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       {
         cwd: this.cwd,
         approvalPolicy: "never",
-        sandbox: "workspace-write",
+        sandbox: "read-only",
         personality: "pragmatic",
         threadSource: "user",
       },
@@ -358,10 +431,6 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       "thread/resume",
       {
         threadId,
-        cwd: this.cwd,
-        approvalPolicy: "never",
-        sandbox: "workspace-write",
-        personality: "pragmatic",
       },
       timeoutMs,
     )) as { thread?: Record<string, unknown> };
@@ -394,10 +463,10 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
       if (registered?.threadId) {
         try {
           const thread = await this.resumeThread(connection, registered.threadId, options.timeoutMs);
-          this.saveThread({ threadName: registered.threadName || options.threadName, thread, role: options.role, scope: { ...options.scope, generation: Number(registered.generation || options.scope.generation || 1) }, routingMode: options.routingMode });
+          await this.saveThread({ threadName: registered.threadName || options.threadName, thread, role: options.role, scope: { ...options.scope, generation: Number(registered.generation || options.scope.generation || 1) }, routingMode: options.routingMode });
           return thread;
-        } catch {
-          // Stale scoped registry entries are local hints only.
+        } catch (error) {
+          throw error;
         }
       }
 
@@ -407,18 +476,18 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
       if (exact?.id) {
         const thread = await this.resumeThread(connection, String(exact.id), options.timeoutMs);
-        this.saveThread({ threadName: options.threadName, thread, role: options.role, scope: options.scope, routingMode: options.routingMode });
+        await this.saveThread({ threadName: options.threadName, thread, role: options.role, scope: options.scope, routingMode: options.routingMode });
         return thread;
       }
     }
 
     const thread = await this.startNamedThread(connection, options.threadName, options.timeoutMs);
-    this.saveThread({ threadName: options.threadName, thread, role: options.role, scope: options.scope, routingMode: options.routingMode });
+    await this.saveThread({ threadName: options.threadName, thread, role: options.role, scope: options.scope, routingMode: options.routingMode });
     return thread;
   }
 
-  private saveThread(options: { threadName: string; thread: Record<string, unknown>; role: VoiceCodexThreadRole; scope: PrithaCodexThreadScope; routingMode: CodexAppThreadRoutingMode }) {
-    saveVoiceCodexThread(
+  private async saveThread(options: { threadName: string; thread: Record<string, unknown>; role: VoiceCodexThreadRole; scope: PrithaCodexThreadScope; routingMode: CodexAppThreadRoutingMode }) {
+    await nativeExecutionCoordinator().withMutation(`voice-registry:${this.registryPath || defaultVoiceCodexRegistryPath()}`, async()=>saveVoiceCodexThread(
       {
         projectRoot: this.cwd,
         projectSlug: projectSlug(this.cwd),
@@ -435,7 +504,7 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
         updatedAt: new Date().toISOString(),
       },
       this.registryPath,
-    );
+    ));
   }
 
   private async injectThreadReport(connection: AppServerConnection, threadId: string, report: string, timeoutMs: number) {
@@ -456,11 +525,16 @@ export class PrithaCodexAppServerClient implements PrithaCodexTaskClient {
 }
 
 class AppServerConnection {
+  readonly generation = randomUUID();
+  readonly storage = storageIdentity(effectiveCodexHome());
+  beforeThreadMutation?: (threadId: string) => Promise<void>;
+  readonly newThreads = new Set<string>();
   private child: ReturnType<typeof spawn> | null = null;
   private nextId = 1;
   private pending = new Map<string | number, PendingRequest>();
   private turnWaiters = new Map<string, PendingRequest>();
   private turnErrors = new Map<string, string>();
+  private completedTurns = new Map<string, unknown>();
   private agentText = new Map<string, string>();
 
   constructor(private readonly codexBin: string, private readonly cwd: string) {}
@@ -496,11 +570,13 @@ class AppServerConnection {
     });
   }
 
-  request(method: string, params: unknown, timeoutMs: number) {
+  async request(method: string, params: unknown, timeoutMs: number): Promise<unknown> {
+    const threadId = String(asObject(params)?.threadId || "");
+    if (threadId && ["thread/resume", "thread/name/set", "thread/inject_items", "turn/start"].includes(method)) await this.beforeThreadMutation?.(threadId);
     const stdin = this.child?.stdin;
     if (!stdin?.writable) return Promise.reject(new Error("Codex app-server is not running"));
     const id = this.nextId++;
-    return new Promise<unknown>((resolve, reject) => {
+    const result = await new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Codex app-server request timed out: ${method}`));
@@ -508,10 +584,16 @@ class AppServerConnection {
       this.pending.set(id, { resolve, reject, timer });
       stdin.write(`${JSON.stringify({ id, method, params })}\n`);
     });
+    if (method === "thread/start") {
+      const id = asObject(asObject(result)?.thread)?.id;
+      if (id) this.newThreads.add(String(id));
+    }
+    return result;
   }
 
   waitForTurnCompleted(threadId: string, turnId: string, timeoutMs: number) {
     const key = `${threadId}:${turnId}`;
+    if (this.completedTurns.has(key)) { const turn = this.completedTurns.get(key); this.completedTurns.delete(key); return Promise.resolve(turn); }
     const priorError = this.turnErrors.get(key);
     if (priorError) {
       this.turnErrors.delete(key);
@@ -531,6 +613,7 @@ class AppServerConnection {
   }
 
   close(reason?: Error) {
+    try { expireNativeRequests(this.generation); } catch { /* Closing still expires live callbacks. */ }
     const closeError = reason || new Error("Codex app-server connection closed");
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -554,6 +637,20 @@ class AppServerConnection {
     try {
       message = JSON.parse(trimmed) as RpcMessage;
     } catch {
+      return;
+    }
+    if (message.id !== undefined && message.method) {
+      try {
+      if (captureNativeRequest(message,this.storage,this.generation,result=>{
+        const stdin=this.child?.stdin;
+        if (!stdin?.writable) throw new Error("native_request_connection_expired");
+        return new Promise<void>((resolve,reject)=>stdin.write(`${JSON.stringify({id:message.id,result})}\n`,error=>error?reject(error):resolve()));
+      })) return;
+      } catch {
+        this.child?.stdin?.write(`${JSON.stringify({id:message.id,error:{code:-32603,message:"Request coordination is unavailable."}})}\n`);
+        return;
+      }
+      this.child?.stdin?.write(`${JSON.stringify({id:message.id,error:{code:-32601,message:"Unsupported request"}})}\n`);
       return;
     }
     if (message.id !== undefined) {
@@ -594,6 +691,7 @@ class AppServerConnection {
       const turn = asObject(message.params?.turn);
       const turnId = String(turn?.id || "");
       const waiter = this.turnWaiters.get(`${threadId}:${turnId}`);
+      if (!waiter && threadId && turnId) this.completedTurns.set(`${threadId}:${turnId}`, turn);
       if (waiter) {
         this.turnWaiters.delete(`${threadId}:${turnId}`);
         clearTimeout(waiter.timer);
@@ -618,17 +716,12 @@ function codexReconnectProgress(message: string) {
   return { current, total };
 }
 
-export function checkCodexAppServerAvailable(codexBin: string, cwd: string) {
-  const result = spawnSync(codexBin, ["app-server", "--help"], {
-    cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: 5_000,
-  });
+export async function checkCodexAppServerAvailable(codexBin: string, cwd: string) {
+  const result = await runtimeProbe(codexBin,["app-server","--help"],cwd);
   const detail = `${result.stdout || ""}${result.stderr || ""}`.trim();
   const hasAppServerHelp = /Usage:\s+codex app-server\b/.test(detail) && /--listen\s+<URL>/.test(detail);
   return {
-    available: result.status === 0 && hasAppServerHelp && !/unknown|unrecognized|invalid/i.test(detail),
+    available: result.ok && hasAppServerHelp && !/unknown|unrecognized|invalid/i.test(detail),
     detail,
   };
 }
@@ -785,6 +878,25 @@ function extractAssistantText(turn: unknown) {
   return messages.at(-1) || "";
 }
 
+/** Native receipt recovery never launches or resumes a model turn. */
+export function recoverVoiceNativeTurns(storage:string,nativeThreadId:string,turns:unknown[]) {
+  const coordinator=nativeExecutionCoordinator();
+  for(const intent of coordinator.listIntents({kind:"voice-turn",states:["dispatching","running","unknown"],limit:1000})) {
+    if(intent.storage!==storage || intent.nativeThreadId!==nativeThreadId || !intent.key)continue;
+    const candidate=turns.map(asObject).find(turn=>turn && (intent.nativeTurnId ? turn.id===intent.nativeTurnId : (Array.isArray(turn.items)?turn.items:[]).some(raw=>{
+      const item=asObject(raw);
+      if(item?.type!=="userMessage" || item.clientId!==intent.clientMessageId)return false;
+      const content=(Array.isArray(item.content)?item.content:[]).map(asObject).filter(part=>part?.type==="text").map(part=>String(part?.text || "")).join("\n");
+      return createHash("sha256").update(content).digest("hex")===intent.promptHash;
+    })));
+    if(!candidate || !["completed","interrupted","failed"].includes(String(candidate.status)))continue;
+    try {
+      coordinator.updateIntent(intent.key,{state:"completed",nativeTurnId:candidate.id,terminalStatus:candidate.status,result:{...parseCodexJson(extractAssistantText(candidate)),transport:"codex-app"},recoveredFromNative:true},intent.revision);
+      if(intent.owner && intent.generation)coordinator.reconcileRelease(intent.owner,intent.generation);
+    } catch(error){if((error as {code?:string}).code!=="execution_revision_conflict")throw error;}
+  }
+}
+
 function currentBranch(cwd: string) {
   const result = spawnSync("git", ["branch", "--show-current"], { cwd, encoding: "utf8" });
   return result.stdout?.trim() || "main";
@@ -860,9 +972,10 @@ function readVoiceCodexRegistry(registryPath = defaultVoiceCodexRegistryPath()) 
   if (!fs.existsSync(registryPath)) return { version: 1, threads: {} as Record<string, VoiceCodexThreadEntry> };
   try {
     const parsed = JSON.parse(fs.readFileSync(registryPath, "utf8")) as { threads?: Record<string, VoiceCodexThreadEntry> };
-    return { version: 1, threads: parsed.threads && typeof parsed.threads === "object" ? parsed.threads : {} };
+    if (!parsed.threads || typeof parsed.threads!=="object" || Array.isArray(parsed.threads))throw new Error("voice_registry_invalid");
+    return { version: 1, threads: parsed.threads };
   } catch {
-    return { version: 1, threads: {} as Record<string, VoiceCodexThreadEntry> };
+    throw new Error("Voice thread registry needs recovery; the original history has been preserved.");
   }
 }
 
@@ -904,8 +1017,12 @@ function saveVoiceCodexThread(entry: VoiceCodexThreadEntry, registryPath = defau
     turnCount: Number(previous?.turnCount || 0) + 1,
     updatedAt: new Date().toISOString(),
   };
-  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
-  fs.writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+  fs.mkdirSync(path.dirname(registryPath), { recursive: true, mode:0o700 });
+  if (fs.existsSync(registryPath) && fs.lstatSync(registryPath).isSymbolicLink()) throw new Error("voice_registry_symlink");
+  const temporary=`${registryPath}.${randomUUID()}.tmp`;
+  const fd=fs.openSync(temporary,"wx",0o600);
+  try {fs.writeFileSync(fd,`${JSON.stringify(registry,null,2)}\n`);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+  fs.renameSync(temporary,registryPath);
   return entry;
 }
 

@@ -149,6 +149,7 @@ export type BaseItemView = {
 };
 
 export type ChatItemView =
+  | (BaseItemView & { kind: "user_message"; message: MessageView })
   | (BaseItemView & { kind: "assistant_message"; message: MessageView })
   | (BaseItemView & { kind: "reasoning_summary"; markdown: string })
   | (BaseItemView & {
@@ -197,6 +198,9 @@ export type PendingRequestView = {
 };
 
 export type ThreadDetail = {
+  voiceWorkflow?: {taskId:string;state:string;revision:number;question:string|null;questionId:string|null} | null;
+  queued?: Array<{id:string;revision:number;state:string;text:string;clientMessageId:string;createdAt:string;reason:string|null}>;
+  controls?: {turnId:string;steer:boolean;interrupt:boolean} | null;
   thread: ThreadSummary;
   activeTurnId: string | null;
   pendingRequests: PendingRequestView[];

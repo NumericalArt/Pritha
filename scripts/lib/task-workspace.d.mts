@@ -1,0 +1,11 @@
+import type { ExecutionCoordinator } from './execution-coordinator.mjs';
+export function scopedAgentWorkspace(parent:string,name:unknown):string;
+export function prepareAgentWorkspaceTarget(coordinator:ExecutionCoordinator,target:string,workflow:Record<string,any>|null):void;
+export type TaskWorkspace = {id:string;mode:'worktree'|'serialized'|'read-only';source:string;cwd:string;baseRevision:string|null;branch:string|null};
+export function inspectTaskWorkspace(source:string):Promise<{source:string;git:boolean;baseRevision:string|null;dirty:boolean}>;
+export function prepareTaskWorkspace(options:{coordinator:ExecutionCoordinator;source:string;directory:string;id:string;mode?:'worktree'|'serialized'|'read-only';baseRevision?:string}):Promise<TaskWorkspace>;
+export function verifyTaskWorkspace(workspace:TaskWorkspace):Promise<TaskWorkspace>;
+export function taskWorkspaceResources(workspace:Pick<TaskWorkspace,'cwd'>,sandbox:string):{resources:string[];mode:'write'|'read'};
+export function reviewTaskWorkspace(workspace:TaskWorkspace):Promise<Record<string,unknown>>;
+export function applyTaskWorkspace(options:{coordinator:ExecutionCoordinator;workspace:TaskWorkspace;expectedSource:string;expectedHead:string;requestId:string;verify:(source:string,head:string)=>Promise<{passed:boolean;[key:string]:unknown}>}):Promise<Record<string,any>>;
+export function cleanupTaskWorkspace(options:{coordinator:ExecutionCoordinator;workspace:TaskWorkspace;expectedHead:string}):Promise<Record<string,any>>;

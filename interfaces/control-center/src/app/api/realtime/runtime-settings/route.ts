@@ -50,8 +50,8 @@ type RuntimeSettingsPayload = {
   prithaVoice?: string;
 };
 
-function transportStatus() {
-  return getPrithaRealtimeStatus().codex.transports;
+async function transportStatus() {
+  return (await getPrithaRealtimeStatus()).codex.transports;
 }
 
 function isCodexPlanningMode(value: unknown) {
@@ -74,7 +74,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     settings: getPrithaRuntimeSettings(),
-    transports: transportStatus(),
+    transports: await transportStatus(),
     behaviorProfiles: VOICE_BEHAVIOR_PROFILE_OPTIONS,
     voiceOptions: PRITHA_FEMININE_VOICE_OPTIONS,
   });
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     settings,
-    transports: transportStatus(),
+    transports: await transportStatus(),
     behaviorProfiles: VOICE_BEHAVIOR_PROFILE_OPTIONS,
     voiceOptions: PRITHA_FEMININE_VOICE_OPTIONS,
   });

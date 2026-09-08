@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/host-policy.mjs && next dev --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
-    "build": "node scripts/build-preflight.mjs && next build",
+    "build": "node scripts/build-preflight.mjs && next build && node scripts/write-execution-protocol.mjs",
     "serve": "npm run build && npm run start",
     "start": "node scripts/host-policy.mjs && next start --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
     "test:e2e": "node scripts/e2e.mjs",
@@ -34,5 +34,8 @@
     "@types/react-dom": "19.2.3",
     "@types/three": "0.184.1",
     "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

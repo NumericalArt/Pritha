@@ -206,9 +206,9 @@ async function reconcileTask(store: CodexChatPrivateStore, runtime: CodexRuntime
       messageReceipts: {},
       taskLinks: links,
     };
-    await store.put(binding);
+    const merged = await store.mergeVoiceBinding(binding, link);
     ledger.push({
-      chat_id: binding.chatId,
+      chat_id: merged.chatId,
       native_thread_id: row.threadId,
       provider_id: resolved.providerId,
       state_identity_hash: resolved.stateIdentityHash,

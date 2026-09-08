@@ -134,7 +134,8 @@ export class HistoryReader {
     const originals = rows(raw.items);
     const userItem = originals.find(item => item.type === "userMessage");
     const lastAnswer = [...originals].reverse().find(item => item.type === "agentMessage");
-    const turn = normalizeNativeTurn(c.binding, { ...raw, items: [userItem, lastAnswer].filter(Boolean) }, c.root);
+    const visibleUsers = new Set(originals.filter(item=>item.type === "userMessage").slice(-10));
+    const turn = normalizeNativeTurn(c.binding, { ...raw, items: originals.filter(item=>item === userItem || item === lastAnswer || visibleUsers.has(item)) }, c.root);
     if (!turn) throw new HistoryError("history_format_unsupported", "A history turn has no identity.", 422);
     const rawItems = rows(raw.items), nativeTurn = String(raw.id);
     const user = rawItems.find(x => x.type === "userMessage");
@@ -144,7 +145,11 @@ export class HistoryReader {
     // Summary items can themselves be incomplete: always offer the verified original body.
     if (user) turn.userMessage.contentRef = this.contentRef(c, mode, nativeTurn, String(user.id), "user", { sort: "asc" });
     if (!user) turn.userMessage.markdown = "Request details are available in Activity.";
-    turn.items = assistant ? [assistant] : [];
+    turn.items = turn.items.filter(item=>item.kind === "assistant_message" || item.kind === "user_message");
+    for (const item of turn.items) if (item.kind === "user_message") {
+      const source = originals.find(row=>itemIdFor(c.binding.chatId,String(row.id)) === item.id);
+      if (source) item.message = {...item.message,markdown:utf8Prefix(item.message.markdown,PREVIEW_BYTES),contentRef:this.contentRef(c,mode,nativeTurn,String(source.id),"user",{sort:"asc"})};
+    }
     if (assistant?.kind === "assistant_message" && sourceAssistant) {
       assistant.message = { ...assistant.message, markdown: utf8Prefix(assistant.message.markdown, PREVIEW_BYTES),
         contentRef: this.contentRef(c, mode, nativeTurn, String(sourceAssistant.id), "message", { sort: "desc" }) };
@@ -242,14 +247,13 @@ export class HistoryReader {
     for (let i = 0; i < 40; i++) {
       const batch = await this.itemBatch(c, t, deadline, 1);
       for (const raw of batch.data) {
-        const item: ChatItemView | null = raw.type === "userMessage"
-          ? { id: itemIdFor(c.binding.chatId, String(raw.id)), kind: "notice", tone: "info", text: "Original user request", status: "completed", startedAt: null, completedAt: null }
-          : normalizeNativeItem(c.binding.chatId, raw, c.root, new Date(0).toISOString());
+        const item = normalizeNativeItem(c.binding.chatId, raw, c.root, new Date(0).toISOString());
         if (!item) continue;
         const field = item.kind === "assistant_message" ? "message" : item.kind === "command" ? "output" : item.kind === "file_change" ? "diff" : item.kind === "reasoning_summary" ? "reasoning" : raw.type === "userMessage" ? "user" : item.kind === "tool" ? "tool" : item.kind === "plan" ? "plan" : item.kind === "web_search" ? "search" : null;
         if (field) {
           const contentRef = this.contentRef(c, batch.mode, String(t.turn), String(raw.id), field, { cursor: batch.mode === "native" ? t.cursor : undefined, offset: batch.mode === "compatibility" ? t.offset : undefined, snapshot: t.snapshot, sort: t.sort });
           if (item.kind === "assistant_message") item.message = { ...item.message, markdown: utf8Prefix(String(raw.text || ""), 2048), contentRef };
+          else if (item.kind === "user_message") item.message = {...item.message, markdown:utf8Prefix(item.message.markdown,2048),contentRef};
           else item.contentRef = contentRef;
         }
         if (item.kind === "command") { item.commandPreview = utf8Prefix(item.commandPreview, 256); item.cwdLabel = item.cwdLabel ? utf8Prefix(item.cwdLabel, 512) : null; item.outputPreview = null; }

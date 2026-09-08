@@ -302,7 +302,7 @@ test.describe("Control Center UI regression", () => {
             : { data: [voice()], nextCursor: "voice-page-2" }
           : { data: [direct], nextCursor: null };
       }
-      else if (url.pathname.endsWith("/turns")) {
+      else if (url.pathname.endsWith("/history")) {
         if (url.pathname.includes("/chat-new/")) {
           data = { data: [newTurn], olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
           return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId: "task-chat-new-history", data }) });
@@ -540,7 +540,7 @@ test.describe("Control Center UI regression", () => {
       let data: unknown;
       if (url.pathname.endsWith("/runtime")) data = runtime;
       else if (url.pathname.endsWith("/threads")) data = { data: [thread], nextCursor: null };
-      else if (url.pathname.endsWith("/turns")) data = { data: turns, olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
+      else if (url.pathname.endsWith("/history")) data = { data: turns, olderCursor: null, newerCursor: null, hasOlder: false, hasNewer: false, snapshotAt: now };
       else if (url.pathname.endsWith("/chat-long")) data = { thread, activeTurnId: null, pendingRequests: [], streamUrl: "/api/codex-chat/v1/threads/chat-long/events" };
       else {
         await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", error: { code: "not_found", message: "Not found", retryable: false, requestId } }) });

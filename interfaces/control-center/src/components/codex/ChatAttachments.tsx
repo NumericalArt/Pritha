@@ -14,7 +14,7 @@ export function DraftAttachments({ items, locked, remove, retry }: { items: Draf
   return <div className="codex-attachments codex-draft-attachments" aria-label="Draft attachments">{items.map(item => <div key={item.id} className="codex-attachment">
     {item.view?.kind === "image" ? <img src={item.view.href} alt={item.view.name} /> : item.state === "uploading" ? <LoaderCircle size={20} className="spin" /> : <File size={20} />}
     <span>{item.file.name}<small>{item.state === "uploading" ? "Uploading…" : item.state === "error" ? item.error : "Ready"}</small></span>
-    {item.state === "error" ? <button type="button" className="codex-text-action" disabled={locked} onClick={() => retry(item)}>Retry upload</button> : null}
+    {item.state === "error" && !item.localFileMissing ? <button type="button" className="codex-text-action" disabled={locked} onClick={() => retry(item)}>Retry upload</button> : null}
     <button type="button" className="codex-text-action" aria-label={`Remove ${item.file.name}`} disabled={locked} onClick={() => remove(item.id)}><X size={16} /></button>
   </div>)}</div>;
 }

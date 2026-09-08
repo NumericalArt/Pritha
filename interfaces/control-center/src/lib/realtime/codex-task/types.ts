@@ -48,6 +48,7 @@ export type PrithaCodexTaskResult = {
 };
 
 export type PrithaCodexTaskRunOptions = {
+  executionPhase?: string;
   timeoutMs: number;
   userId: string;
   signal?: AbortSignal;

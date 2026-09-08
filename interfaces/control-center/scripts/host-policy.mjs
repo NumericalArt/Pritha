@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./node-runtime.mjs";
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const value = String(process.env.PRITHA_CONTROL_CENTER_HOST || "").trim();

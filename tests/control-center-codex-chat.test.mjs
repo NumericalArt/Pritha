@@ -121,7 +121,7 @@ test("Codex Chat core keeps native history, stable browser ids and safe turn rep
   assert.doesNotMatch(startTurnSource, /input\.settings\?\.modelId \|\| defaults\.model/);
   assert.match(startTurnSource, /input\.settings\?\.modelId \? \{ model: input\.settings\.modelId \} : \{\}/);
   assert.match(gatewaySource, /active\?\.acknowledged && !turns\.some/);
-  assert.match(gatewaySource, /UNCERTAIN_TURN_LEASE_MS = 30_000/);
+  assert.doesNotMatch(gatewaySource, /UNCERTAIN_TURN_LEASE_MS|deferUncertainTurnRelease/);
   assert.match(gatewaySource, /event\("turn-start-failed"|recordRuntimeEvent\("turn-start-failed"/);
   assert.doesNotMatch(gatewaySource, /recordRuntimeEvent\("turn-start-failed"[\s\S]{0,500}(?:userText|nativeThreadId|clientMessageId|\btext\b)/);
 });
@@ -262,7 +262,10 @@ test("corrupt Codex Chat registry restores a valid backup and otherwise stays re
   const helperOutput = ts.transpileModule(privateJsonSource, { compilerOptions }).outputText;
   const storeOutput = ts.transpileModule(privateStoreSource, { compilerOptions }).outputText
     .replace('"@/lib/pritha-paths"', '"./pritha-paths.mjs"')
-    .replace('"@/lib/private-json"', '"./private-json.mjs"');
+    .replace('"@/lib/private-json"', '"./private-json.mjs"')
+    .replaceAll('"../../../../../scripts/lib/task-workspace.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/task-workspace.mjs")).href))
+    .replaceAll('"../../../../../scripts/lib/execution-channel.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-channel.mjs")).href))
+      .replaceAll('"../../../../../scripts/lib/execution-coordinator.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-coordinator.mjs")).href));
   writeFileSync(path.join(tmp, "private-json.mjs"), helperOutput);
   writeFileSync(path.join(tmp, "pritha-paths.mjs"), `
 export const resolveTechscopeRoot = () => ${JSON.stringify(checkout)};
@@ -349,7 +352,7 @@ test("Codex Chat navigation, editable dictation and 320px-safe layout are presen
   assert.match(routesSource, /href: "\/task-chat"/);
   assert.match(routesSource, /label: "Task Chat"/);
   assert.match(chatPageSource, /SpeechRecognition/);
-  assert.match(chatPageSource, /setDraft\(\(current\) =>/);
+  assert.match(chatPageSource, /updateDraftForChat\(dictationDraftKey/);
   assert.doesNotMatch(chatPageSource, /recognition\.onresult[\s\S]{0,700}sendMessage\(/);
   assert.doesNotMatch(chatPageSource, /navigator\.language/);
   assert.match(chatPageSource, /if \(languageTag\) recognition\.lang = languageTag/);
@@ -374,7 +377,7 @@ test("Voice task threads are privately reconciled and require explicit continuat
   assert.match(chatPageSource, /Direct Chats/);
   assert.match(chatPageSource, /Voice Tasks/);
   assert.match(chatPageSource, /Continue in Task Chat/);
-  assert.match(nativeTurnCoordinatorSource, /if \(leases\.has\(key\)\) return null/);
+  assert.match(nativeTurnCoordinatorSource, /coordinator\.claim\(\[key, \.\.\.resources\]/);
   assert.match(gatewaySource, /tryAcquireNativeThreadTurn/);
   assert.match(appServerSource + readFileSync(`${root}/lib/realtime/codex-task/codex-app-server-client.ts`, "utf8"), /nativeThreadLeaseKey/);
 });
@@ -425,11 +428,11 @@ test("a new Direct Chat sends its first turn through one idempotent request", ()
   assert.match(chatPageSource, /newChatDraftActiveRef\.current \|\| pendingNewChatDeliveryRef\.current/);
   assert.match(chatPageSource, /newChatDraftActiveRef\.current = true/);
   assert.match(chatPageSource, /First-message delivery is unknown/);
-  assert.match(chatPageSource, /await deliverNewChatMessage\(delivery\)/);
+  assert.match(chatPageSource, /await deliverNewChatMessage\(\{\.\.\.delivery,navigationEpoch:navigationEpochRef\.current\}\)/);
   assert.doesNotMatch(chatPageSource, /if \(!chatId\) \{[\s\S]{0,300}createChat/);
   assert.match(gatewaySource, /for \(let attempt = 0; attempt < 2; attempt \+= 1\)/);
   assert.match(gatewaySource, /replaceEmptyDirectThread/);
-  assert.match(gatewaySource, /firstTurnDeliveryIsUncertain/);
+  assert.doesNotMatch(gatewaySource, /await this\.store\.removeEmptyDirectChat/);
 });
 
 test("mobile navigation reuses one status snapshot and exposes immediate progress", () => {
@@ -514,6 +517,8 @@ test("Task Chat interaction telemetry is private, bounded and content-free", asy
     compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022, isolatedModules: true },
   }).outputText
     .replace('"@/lib/private-json"', '"./private-json.mjs"')
+    .replaceAll('"../../../../../scripts/lib/task-workspace.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/task-workspace.mjs")).href))
+    .replaceAll('"../../../../../scripts/lib/execution-coordinator.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-coordinator.mjs")).href))
     .replace('"@/lib/pritha-paths"', '"./pritha-paths.mjs"')
     .replace('"./gateway"', '"./gateway.mjs"')
     .replace('"./private-store"', '"./private-store.mjs"');

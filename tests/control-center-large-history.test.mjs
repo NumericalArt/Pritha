@@ -133,8 +133,8 @@ test("full user requests and plans remain accessible when summaries omit them", 
   };
   const reader = new HistoryReader(), page = await reader.page(c), turnView = page.data[0];
   const items = await reader.items(c, turnView.turnId, turnView.history.itemsRef);
-  const user = items.data.find(x => x.kind === "notice");
-  assert.equal((await reader.content(c, user.id, user.contentRef)).text, "Question 1");
+  const user = items.data.find(x => x.kind === "user_message");
+  assert.equal((await reader.content(c, user.id, user.message.contentRef)).text, "Question 1");
   const plan = items.data.find(x => x.kind === "plan");
   let text = "", cursor = plan.contentRef;
   while (cursor) { const part = await reader.content(c, plan.id, cursor); text += part.text; cursor = part.nextCursor; }

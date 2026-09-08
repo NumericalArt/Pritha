@@ -2343,7 +2343,7 @@ function snapshotsStatus(root: string): CapabilityStatus {
   return existsSync(resolvePrithaStatePath("snapshots", "child-agents")) ? "ready" : "unavailable";
 }
 
-type VoiceRuntimeStatus = ReturnType<typeof getPrithaRealtimeStatus>;
+type VoiceRuntimeStatus = Awaited<ReturnType<typeof getPrithaRealtimeStatus>>;
 
 function voiceRealtimeCapability(voiceRuntime: VoiceRuntimeStatus): CapabilityStatus {
   return voiceRuntime.openai_key_configured ? "ready" : "pending_auth";
@@ -2426,7 +2426,7 @@ async function readControlCenterStatus(options: { freshIdentity?: boolean } = {}
     accessPromise.then(access => Promise.all(records.map(record => buildAgent(root, record, access)))),
   ]);
   const childAgents = allAgents.filter((agent) => agent.name !== "Techscope" && agent.name !== "Pritha");
-  const voiceRuntime = getPrithaRealtimeStatus();
+  const voiceRuntime = await getPrithaRealtimeStatus();
   const caps = capabilities(root, records.length > 0, childAgents, voiceRuntime);
   const warnings = [
     ...childAgents.flatMap((agent) => (agent.ui.issueText ? [`${agent.name}: ${agent.ui.issueText}`] : [])),
@@ -4295,7 +4295,7 @@ function agentToFolderRow(agent: ControlCenterAgent): ControlCenterDiagnostics["
 export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagnostics> {
   const status = await getControlCenterStatus();
   const stateRoot = resolvePrithaStateRoot(status.root);
-  const voiceRuntime = getPrithaRealtimeStatus();
+  const voiceRuntime = await getPrithaRealtimeStatus();
   const reports = status.latestReports.map((report) => ({
     path: report.path,
     title: report.title,

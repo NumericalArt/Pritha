@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
 
+import * as executionCoordinator from "../scripts/lib/execution-coordinator.mjs";
 const require = createRequire(import.meta.url);
 const sourceRoot = "interfaces/control-center/src/lib";
 function load(name, dependencies = {}) {
@@ -15,6 +16,7 @@ function load(name, dependencies = {}) {
   const module = { exports: {} };
   new Function("require", "module", "exports", output)(id => {
     if (Object.hasOwn(dependencies, id)) return dependencies[id];
+    if (id === "../../../../../scripts/lib/execution-coordinator.mjs") return executionCoordinator;
     if (id.startsWith("node:")) return require(id);
     throw new Error(`Unexpected test dependency: ${id}`);
   }, module, module.exports);
@@ -22,19 +24,25 @@ function load(name, dependencies = {}) {
 }
 const control = load("codex-chat/goal-control");
 const budgetIntent = load("codex-chat/budget-intent");
-const coordinator = load("codex-chat/native-turn-coordinator");
+const coordinationRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-goal-coordination-"));
+test.after(() => rmSync(coordinationRoot, { recursive: true, force: true }));
+const coordinator = load("codex-chat/native-turn-coordinator", {
+  "@/lib/pritha-paths": {resolveTechscopeRoot:()=>coordinationRoot, resolvePrithaStateRoot:()=>coordinationRoot},
+  "./storage-identity": { effectiveCodexHome:()=>coordinationRoot, storageIdentity:()=>"storage-v2:fixture" },
+});
 const normalize = load("codex-chat/normalize");
 const noop = {};
 const { CodexChatGateway } = load("codex-chat/gateway", {
   "./history-reader": load("codex-chat/history-reader", { "./normalize": normalize }),
   "../../../../../scripts/agents-mother/operation-decisions.mjs": noop,
   "./operation-runtime": noop,
+  "../../../../../scripts/lib/task-workspace.mjs": noop,
   "../../../../../scripts/agents-mother/task-delivery.mjs": noop,
   "../../../../../scripts/agents-mother/phase-usage.mjs": noop,
   "@/lib/pritha-paths": noop, "./app-server": noop, "./storage-identity": noop,
   "./attachment-store": noop, "./attachment-policy": noop, "./native-thread-errors": noop,
   "./private-store": { logicalChatKey: row => `${row.stateIdentityHash}:${row.nativeThreadId}` },
-  "./voice-links": noop, "./native-turn-coordinator": coordinator, "./goal-control": control, "./budget-intent": budgetIntent, "./normalize": normalize,
+  "./native-requests": noop, "./native-control": noop, "./voice-links": noop, "./native-turn-coordinator": coordinator, "./goal-control": control, "./budget-intent": budgetIntent, "./normalize": normalize,
 });
 
 test("direct Russian and English budget commands select add versus total and require explicit continuation", () => {
@@ -300,7 +308,7 @@ test("Goal gateway guards original storage, exact thread, live turns, voice cont
 test("Goal gateway shares the native turn lease and safely reconciles an unconfirmed change", async () => {
   const f = gatewayFixture();
   const request = await f.request();
-  const release = coordinator.tryAcquireNativeThreadTurn("desktop_bundled:native-fixture", "test-turn");
+  const release = coordinator.tryAcquireNativeThreadTurn(coordinator.nativeThreadLeaseKey(f.binding.stateIdentityHash, "native-fixture"), "test-turn");
   try { await assert.rejects(f.gateway.updateGoalBudget("chat_fixture", request), { code: "turn_active" }); }
   finally { release(); }
   f.mode = "lost-ack";

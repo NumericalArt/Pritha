@@ -1,0 +1,11 @@
+import { CodexChatGatewayError, getCodexChatGateway } from "@/lib/codex-chat/gateway";
+import { apiError, apiSuccess, readJsonBody, requireIdempotencyKey } from "@/lib/codex-chat/http";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export async function POST(request:Request,context:{params:Promise<{chatId:string}>}) {
+  try {
+    const body=await readJsonBody<{action:"steer"|"interrupt";expectedTurnId:string;clientMessageId:string;text?:string}>(request);
+    if (requireIdempotencyKey(request)!==body.clientMessageId) throw new CodexChatGatewayError("idempotency_conflict","The control identifier must match its idempotency key.",409);
+    return apiSuccess(await getCodexChatGateway().controlTurn((await context.params).chatId,body));
+  } catch(error) {return apiError(error);}
+}

@@ -543,16 +543,19 @@ function inputLevelToGain(inputLevel: number) {
 
 function loadSavedMicInputLevel() {
   if (typeof window === "undefined") return DEFAULT_MIC_INPUT_LEVEL;
+  try {
   const raw = window.localStorage.getItem(MIC_INPUT_LEVEL_STORAGE_KEY);
   if (raw !== null) return clampMicInputLevel(Number(raw));
   const legacyRaw = window.localStorage.getItem(LEGACY_MIC_GAIN_STORAGE_KEY);
   if (legacyRaw !== null) return clampMicInputLevel(Number(legacyRaw) * 100);
+  } catch { /* Use the default when browser storage is unavailable. */ }
   return DEFAULT_MIC_INPUT_LEVEL;
 }
 
 function saveMicInputLevel(value: number) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(MIC_INPUT_LEVEL_STORAGE_KEY, String(clampMicInputLevel(value)));
+  try { window.localStorage.setItem(MIC_INPUT_LEVEL_STORAGE_KEY, String(clampMicInputLevel(value))); }
+  catch { /* The in-memory microphone setting remains available. */ }
 }
 
 function nowTime() {

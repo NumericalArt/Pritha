@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
 
 export async function fixtureModules() {
@@ -15,11 +17,14 @@ export async function fixtureModules() {
   writeFileSync(path.join(tmp, "paths.mjs"), `export const resolveTechscopeRoot=()=>${JSON.stringify(root)}; export const resolvePrithaStateRoot=()=>${JSON.stringify(state)};`);
   writeFileSync(path.join(tmp, "app-server.mjs"), "export class AppServerConnection {} export class CodexRuntimeManager {}");
   writeFileSync(path.join(tmp, "voice-links.mjs"), "export const queueVoiceTaskChatIndexRefresh=()=>{}; export const reconcileVoiceTaskChatLink=async()=>{}; export const voiceTaskChatIndexStatus=()=>({state:'ready'});");
-  for (const name of ["history-reader", "attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "private-store", "goal-control", "budget-intent", "operation-runtime", "gateway", "../private-json"]) {
+  for (const name of ["history-reader", "attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "native-control", "native-requests", "private-store", "goal-control", "budget-intent", "operation-runtime", "gateway", "../private-json"]) {
     const source = readFileSync(`interfaces/control-center/src/lib/codex-chat/${name}.ts`, "utf8");
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
       .replaceAll('"@/lib/private-json"', '"./private-json.mjs"')
+      .replaceAll('"../../../../../scripts/lib/task-workspace.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/task-workspace.mjs")).href))
+    .replaceAll('"../../../../../scripts/lib/execution-channel.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-channel.mjs")).href))
+      .replaceAll('"../../../../../scripts/lib/execution-coordinator.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-coordinator.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/task-delivery.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/task-delivery.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/phase-usage.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/phase-usage.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/operation-decisions.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/operation-decisions.mjs")).href))
@@ -267,4 +272,375 @@ test("attachment-only first messages reconcile unknown delivery without a second
     await assert.rejects(gateway.startTurn(firstBinding.chatId, { clientMessageId: randomUUID(), input: [{ type: "text", text: "Follow up" }], settings: { modelId: "text-only" } }), e => e.code === "model_image_unsupported");
     assert.equal(starts, 1, "an incompatible follow-up cannot discard previous images");
   } finally { f.cleanup(); }
+});
+
+async function coordinatedGateway(f, connection, native) {
+  const { CodexChatPrivateStore } = await f.load('private-store');
+  const { CodexChatGateway } = await f.load('gateway');
+  const store = new CodexChatPrivateStore();
+  const gateway = Object.create(CodexChatGateway.prototype);
+  const view = { stateIdentityHash:'storage-v2:fixture', availability:'ready', capabilities:{fullChat:true} };
+  Object.assign(gateway, {store, root:f.root, activeTurns:new Map(), activeTurnLeases:new Map(), emit:()=>{}, runtime:{
+    provider:async()=>({providerId:'desktop_bundled',view}),effectiveProvider:async()=>({providerId:'desktop_bundled',view}),
+    connection:async()=>connection,threadDefaults:()=>({cwd:f.root}), readThread:async()=>({thread:native}),
+  }});
+  return gateway;
+}
+
+test('two gateway instances create exactly one native chat for a shared client key', async () => {
+  const f=await fixtureModules();
+  try {
+    let starts=0, release, dispatched;
+    const barrier=new Promise(r=>release=r), signal=new Promise(r=>dispatched=r);
+    const native={id:'native-one',cwd:f.root,turns:[],status:'idle'};
+    const connection={markThreadLoaded:()=>{},request:async(method)=>{
+      if(method==='thread/start'){starts++;dispatched();await barrier;return {thread:native};} return {};
+    }};
+    const a=await coordinatedGateway(f,connection,native), b=await coordinatedGateway(f,connection,native);
+    const input={clientThreadId:randomUUID(),source:'chat'};
+    const first=a.createThread(input);await signal;
+    await assert.rejects(b.createThread(input),e=>['create_pending','create_delivery_unknown'].includes(e.code));
+    release();const result=await first;
+    const replay=await b.createThread(input);
+    assert.equal(starts,1);assert.equal(replay.detail.thread.chatId,result.detail.thread.chatId);
+    assert.equal(replay.replayed,true);assert.equal((await b.store.all()).length,1);
+    await assert.rejects(b.createThread({...input,title:'changed'}),{code:'idempotency_conflict'});
+  } finally {f.cleanup();}
+});
+
+test('unknown turn delivery survives gateway replacement and releases only after exact terminal history', async () => {
+  const f=await fixtureModules();
+  try {
+    let turns=0;
+    const native={id:'native-one',cwd:f.root,turns:[],status:'idle'};
+    const connection={markThreadLoaded:()=>{},ensureThreadLoaded:async()=>{},request:async(method,params)=>{
+      if(method==='thread/start')return {thread:native};
+      if(method==='turn/start'){turns++;throw new Error('request timed out: turn/start');}return {};
+    }};
+    const a=await coordinatedGateway(f,connection,native);
+    const input={clientThreadId:randomUUID(),source:'chat',initialTurn:{clientMessageId:randomUUID(),input:[{type:'text',text:'Run once'}]}};
+    await assert.rejects(a.createThreadWithFirstTurn(input),{code:'fallback_confirmation_required'});
+    const b=await coordinatedGateway(f,connection,native);
+    await assert.rejects(b.createThreadWithFirstTurn(input),{code:'turn_active'});
+    assert.equal(turns,1,'empty history cannot authorize replay');
+    native.turns.push({id:'native-turn',status:'completed',items:[{id:'u',type:'userMessage',clientId:input.initialTurn.clientMessageId,content:[{type:'text',text:'Run once'}]}]});
+    const replay=await b.createThreadWithFirstTurn(input);
+    assert.equal(replay.replayed,true);assert.equal(turns,1);
+    assert.equal(b.store.execution.claims().filter(r=>r.kind==='turn').length,0);
+    assert.equal((await b.store.all())[0].messageReceipts[input.initialTurn.clientMessageId].nativeTurnId,'native-turn');
+  } finally {f.cleanup();}
+});
+
+test('voice reconciliation preserves concurrent receipts and operator choices', async () => {
+  const f=await fixtureModules();
+  try {
+    const {CodexChatPrivateStore}=await f.load('private-store');
+    const a=new CodexChatPrivateStore(),b=new CodexChatPrivateStore();
+    const initial=await a.put({chatId:'chat_shared',nativeThreadId:'native',providerId:'desktop_bundled',messageReceipts:{},taskLinks:[],origin:'voice',continuationEnabled:false});
+    await a.patch(initial.chatId,{continuationEnabled:true,title:'Operator title',messageReceipts:{newer:{clientMessageId:'newer',requestHash:'h',turnId:'t',nativeTurnId:'n',startedAt:'2026-01-01'}}});
+    await b.mergeVoiceBinding({...initial,title:'Stale title'}, {taskId:'voice-1',label:'Voice task',mode:'observe'});
+    const fresh=await a.get(initial.chatId);
+    assert.equal(fresh.continuationEnabled,true);assert.equal(fresh.title,'Operator title');assert.ok(fresh.messageReceipts.newer);
+    await Promise.all([a.patch(initial.chatId,{messageReceipts:{a:{turnId:'a'}}}),b.patch(initial.chatId,{messageReceipts:{b:{turnId:'b'}}})]);
+    assert.deepEqual(Object.keys((await a.get(initial.chatId)).messageReceipts).sort(),['a','b','newer']);
+  } finally {f.cleanup();}
+});
+
+async function voiceClientFixture(f, mode='complete') {
+  const compilerOptions={module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022};
+  writeFileSync(path.join(f.tmp,'voice-settings.mjs'), `export const resolveCodexAppBinary=x=>x;export const isDesktopCodexBinary=()=>true;export const codexAppTurnSettings=x=>x;`);
+  for (const name of ['voice-execution','codex-app-server-client']) {
+    const source=readFileSync(`interfaces/control-center/src/lib/realtime/codex-task/${name}.ts`,'utf8');
+    const output=ts.transpileModule(source,{compilerOptions}).outputText
+      .replaceAll('"../../../../../../scripts/lib/runtime-probe.mjs"',JSON.stringify(pathToFileURL(path.resolve("scripts/lib/runtime-probe.mjs")).href))
+      .replaceAll('"../../codex-chat/native-turn-coordinator"','"./native-turn-coordinator.mjs"')
+      .replaceAll('"../../codex-chat/storage-identity"','"./storage-identity.mjs"')
+      .replaceAll('"../../codex-chat/native-control"','"./native-control.mjs"')
+      .replaceAll('"../../codex-chat/native-requests"','"./native-requests.mjs"')
+      .replaceAll('"./voice-execution"','"./voice-execution.mjs"')
+      .replaceAll('"../../settings/codex-binaries"','"./voice-settings.mjs"')
+      .replaceAll('"../../settings/codex-model-catalog"','"./voice-settings.mjs"');
+    writeFileSync(path.join(f.tmp,`${name}.mjs`),output);
+  }
+  const trace=path.join(f.tmp,'rpc.jsonl');
+  const bin=path.join(f.tmp,'fake-codex');
+  writeFileSync(bin,`#!${process.execPath}
+import readline from 'node:readline';import {appendFileSync} from 'node:fs';
+const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');
+readline.createInterface({input:process.stdin}).on('line',line=>{
+ const m=JSON.parse(line);appendFileSync(${JSON.stringify(trace)},JSON.stringify({method:m.method,params:m.params})+'\\n');
+ let result={};
+ if(m.method==='thread/list')result={data:[{id:'native-voice',name:'VC · '+${JSON.stringify(path.basename(f.root))}+' · task · voice-task · main',cwd:${JSON.stringify(f.root)}}]};
+ if(m.method==='thread/start'||m.method==='thread/resume'||m.method==='thread/read')result={thread:{id:'native-voice',cwd:${JSON.stringify(f.root)},status:'idle',turns:[]}};
+ if(m.method==='turn/start'){
+   if(${JSON.stringify(mode)}==='disconnect'){process.exit(1);return;}
+   result={turn:{id:'voice-turn',status:'inProgress',items:[]}};
+ }
+ send({id:m.id,result});
+ if(m.method==='turn/start')send({method:'turn/completed',params:{threadId:'native-voice',turn:{id:'voice-turn',status:'completed',items:[{type:'agentMessage',text:JSON.stringify({status:'ok',text:'done',data:{},errors:[],warnings:[]})}]}}});
+});
+`,{mode:0o700});
+  const m=await f.load('codex-app-server-client');
+  return {m,trace,client:new m.PrithaCodexAppServerClient({codexBin:bin,cwd:f.root,branch:'main',registryPath:path.join(f.tmp,'registry.json'),buildSandboxPolicy:()=>({type:'readOnly'}),getRuntimeSettings:()=>({codexAppThreadRoutingMode:'per_task'})})};
+}
+const voicePayload=f=>({requestId:'voice-task',userId:'test',taskType:'review',userIntent:'Inspect',projectContext:{project:'Pritha',cwd:f.root,interface:'realtime',focus:[]},constraints:[],expectedResponse:{format:'json',schema:{}}});
+
+test('Voice denies a busy native thread before resume, reports or turn dispatch', async()=>{
+ const f=await fixtureModules(); const previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+ try {
+   const {client,m,trace}=await voiceClientFixture(f);
+   const coordinator=await f.load('native-turn-coordinator');
+   const release=coordinator.tryAcquireNativeThreadTurn(coordinator.nativeThreadLeaseKey('desktop_bundled','native-voice'),'direct-task');
+   try {
+     await assert.rejects(client.runTask(voicePayload(f),{timeoutMs:3000,userId:'test'}),e=>e instanceof m.CodexDispatchError && !m.safeCodexCliFallback(e,false));
+     const methods=readFileSync(trace,'utf8').trim().split('\n').map(x=>JSON.parse(x).method);
+     assert.ok(methods.includes('thread/list'));
+     assert.ok(!methods.some(x=>['thread/resume','thread/inject_items','turn/start'].includes(x)),JSON.stringify(methods));
+   } finally {release();}
+ } finally {if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('Voice catches fast completion and replays its saved result without another turn', async()=>{
+ const f=await fixtureModules();const previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+ try {
+   const {client,trace}=await voiceClientFixture(f);
+   const payload=voicePayload(f);
+   assert.equal((await client.runTask(payload,{timeoutMs:3000,userId:'test'})).status,'ok');
+   assert.equal((await client.runTask(payload,{timeoutMs:3000,userId:'test'})).status,'ok');
+   const methods=readFileSync(trace,'utf8').trim().split('\n').map(x=>JSON.parse(x).method);
+   assert.equal(methods.filter(x=>x==='turn/start').length,1);
+ } finally {if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('Voice transport loss after dispatch preserves ownership and forbids fallback or replay', async()=>{
+ const f=await fixtureModules();const previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+ try {
+   const {client,m,trace}=await voiceClientFixture(f,'disconnect');
+   const payload=voicePayload(f);
+   await assert.rejects(client.runTask(payload,{timeoutMs:3000,userId:'test'}),e=>e.deliveryState==='unknown'&&!m.safeCodexCliFallback(e,false));
+   await assert.rejects(client.runTask(payload,{timeoutMs:3000,userId:'test'}),e=>e.deliveryState==='unknown');
+   const methods=readFileSync(trace,'utf8').trim().split('\n').map(x=>JSON.parse(x).method);
+   assert.equal(methods.filter(x=>x==='turn/start').length,1);
+   const coordinator=await f.load('native-turn-coordinator');
+   assert.equal(coordinator.tryAcquireNativeThreadTurn(coordinator.nativeThreadLeaseKey('standalone_cli','native-voice'),'next'),null);
+ } finally {if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('native answers require the exact request and generation and never grant session permissions',async()=>{
+ const f=await fixtureModules(),previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+ try {
+  const coordinator=await f.load('native-turn-coordinator'),control=await f.load('native-control'),requests=await f.load('native-requests');
+  const key=coordinator.nativeThreadLeaseKey('desktop_bundled','native-request'),db=coordinator.nativeExecutionCoordinator();
+  const lease=coordinator.tryAcquireNativeThreadTurn(key,'request-owner');
+  const storage=(await f.load('storage-identity')).storageIdentity(f.state);
+  const cleanup=control.registerNativeControl({coordinator:coordinator.nativeExecutionCoordinator(),key,owner:lease.owner,generation:lease.generation,turnId:()=> 'turn-request',steer:true,request:async()=>({})});
+  const sent=[];
+  try {
+    const message={id:7,method:'item/permissions/requestApproval',params:{threadId:'native-request',turnId:'turn-request',permissions:{network:{enabled:true}}}};
+    assert.equal(requests.captureNativeRequest(message,storage,'connection-one',result=>sent.push(result)),true);
+    const row=requests.pendingNativeRequests(storage,'native-request')[0];
+    const input={requestId:row.id,revision:row.revision,clientMessageId:randomUUID(),decision:'accept'};
+    await assert.rejects(requests.answerNativeRequest(storage,'different-thread',input),{code:'native_request_not_found'});
+    const results=await Promise.all([requests.answerNativeRequest(storage,'native-request',input),requests.answerNativeRequest(storage,'native-request',{...input,clientMessageId:randomUUID()})]);
+    assert.equal(results.filter(r=>r.replayed).length,1);assert.equal(sent.length,1);
+    assert.deepEqual(sent[0],{permissions:{network:{enabled:true}},scope:'turn',strictAutoReview:true});
+    await assert.rejects(requests.answerNativeRequest(storage,'native-request',{...input,decision:'decline'}),{code:'native_request_changed'});
+    requests.captureNativeRequest({...message,id:8},storage,'connection-old',result=>sent.push(result));
+    const old=requests.pendingNativeRequests(storage,'native-request')[0];requests.expireNativeRequests('connection-old');
+    await assert.rejects(requests.answerNativeRequest(storage,'native-request',{...input,requestId:old.id,revision:old.revision}),{code:'native_request_changed'});
+    assert.equal(sent.length,1);
+  } finally {cleanup();lease();}
+ } finally {if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('native input answers are submitted once and secret values are not retained in the coordinator',async()=>{
+ const f=await fixtureModules(),previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+ try {
+  const coordinator=await f.load('native-turn-coordinator'),control=await f.load('native-control'),requests=await f.load('native-requests');
+  const storage=(await f.load('storage-identity')).storageIdentity(f.state),key=coordinator.nativeThreadLeaseKey(storage,'native-input');
+  const lease=coordinator.tryAcquireNativeThreadTurn(key,'input-owner');
+  const cleanup=control.registerNativeControl({coordinator:coordinator.nativeExecutionCoordinator(),key,owner:lease.owner,generation:lease.generation,turnId:()=> 'turn-input',steer:true,request:async()=>({})});
+  let calls=0;
+  try {
+    requests.captureNativeRequest({id:1,method:'item/tool/requestUserInput',params:{threadId:'native-input',turnId:'turn-input',questions:[{id:'secret',question:'Credential',isSecret:true}]}},storage,'input-connection',()=>{calls++;throw new Error('write failed');});
+    const row=requests.pendingNativeRequests(storage,'native-input')[0];
+    const input={requestId:row.id,revision:row.revision,clientMessageId:randomUUID(),answers:{secret:['synthetic-sensitive-answer']}};
+    await assert.rejects(requests.answerNativeRequest(storage,'native-input',input),/write failed/);
+    await assert.rejects(requests.answerNativeRequest(storage,'native-input',input),{code:'native_request_changed'});
+    assert.equal(calls,1);assert.ok(!JSON.stringify(coordinator.nativeExecutionCoordinator().getIntentById(row.id)).includes('synthetic-sensitive-answer'));
+  } finally {cleanup();lease();}
+ } finally {if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('queue waits for the exact predecessor and cancellation preserves following message order',async()=>{
+ const f=await fixtureModules();let gateway;
+ try {
+  const native={id:'queue-native',cwd:f.root,status:'idle',turns:[]};let starts=0;
+  const connection={generation:'fixture',isRunning:()=>true,markThreadLoaded:()=>{},ensureThreadLoaded:async()=>{},request:async(method,params)=>{
+    if(method==='thread/start')return {thread:native};
+    if(method==='turn/start'){starts++;const turn={id:`turn-${starts}`,status:'inProgress',items:[{id:`u-${starts}`,type:'userMessage',clientId:params.clientUserMessageId,content:params.input}]};native.turns.push(turn);native.status='active';return {turn};}return {};
+  }};
+  gateway=await coordinatedGateway(f,connection,native);
+  const first={clientMessageId:randomUUID(),input:[{type:'text',text:'first'}]};
+  const created=await gateway.createThreadWithFirstTurn({clientThreadId:randomUUID(),source:'chat',initialTurn:first});const chatId=created.data.detail.thread.chatId;
+  const second={clientMessageId:randomUUID(),input:[{type:'text',text:'second'}]},third={clientMessageId:randomUUID(),input:[{type:'text',text:'third'}]};
+  await gateway.enqueueMessage(chatId,second);await gateway.enqueueMessage(chatId,third);await gateway.drainQueue(chatId);assert.equal(starts,1);
+  const queued=await gateway.queuedMessages(chatId);await gateway.cancelQueued(chatId,queued[0].id,queued[0].revision);
+  native.turns[0].status='completed';native.status='idle';await gateway.reconcileExecutions(await gateway.store.get(chatId),native);
+  await gateway.drainQueue(chatId);assert.equal(starts,2);assert.equal(native.turns[1].items[0].content[0].text,'third');
+  await gateway.drainQueue(chatId);assert.equal(starts,2);
+ } finally {if(gateway){gateway.queueStopped=true;clearTimeout(gateway.queueTimer);for(const id of gateway.activeTurns.keys())gateway.releaseActiveTurn(id);}f.cleanup();}
+});
+
+test('Voice logical ownership spans operator waits, preserves completed rounds, and blocks Direct until release',async()=>{
+  const f=await fixtureModules();const previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+  try {
+    await voiceClientFixture(f);
+    const voice=await f.load('voice-execution'),native=await f.load('native-turn-coordinator');
+    const task={id:'workflow-A',thread_scope:{kind:'task',id:'shared'}};
+    const first=voice.beginVoiceWorkflow(task,f.root,'subject_scoped','read-only');
+    const key=native.nativeThreadLeaseKey('desktop_bundled','native-shared');
+    voice.assertVoiceOwner(task.id,key);
+    voice.finishVoiceWorkflow(task.id,'waiting_for_operator',{question:'Which target?'});
+    assert.equal(native.tryAcquireNativeThreadTurn(key,'direct'),null);
+    assert.throws(()=>voice.beginVoiceWorkflow({...task,id:'workflow-B'},f.root,'subject_scoped','read-only'),/voice_scope_busy/);
+    const next=voice.beginVoiceWorkflow({...task,operator_question_answered_at:'answer-1'},f.root,'subject_scoped','read-only');
+    assert.equal(next.round,first.round+1);assert.equal(next.generation,first.generation);
+    voice.finishVoiceWorkflow(task.id,'waiting_admission');
+    const resumed=voice.beginVoiceWorkflow(task,f.root,'subject_scoped','read-only');
+    assert.equal(resumed.round,next.round,'capacity wait does not rerun successful phase identities');
+    voice.finishVoiceWorkflow(task.id,'completed');
+    const direct=native.tryAcquireNativeThreadTurn(key,'direct');assert.ok(direct);direct();
+  } finally {if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('stop and steer target only their exact native turn and expire with their owner',async()=>{
+  const f=await fixtureModules();const previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+  try {
+    const native=await f.load('native-turn-coordinator'),controls=await f.load('native-control');
+    const db=native.nativeExecutionCoordinator(),aKey=native.nativeThreadLeaseKey('desktop_bundled','A'),bKey=native.nativeThreadLeaseKey('desktop_bundled','B');
+    const a=native.tryAcquireNativeThreadTurn(aKey,'a'),b=native.tryAcquireNativeThreadTurn(bKey,'b');
+    const calls=[];let aTurn='turn-A';
+    const removeA=controls.registerNativeControl({coordinator:db,key:aKey,owner:a.owner,generation:a.generation,turnId:()=>aTurn,steer:true,request:async(method,params)=>calls.push({method,params})});
+    const removeB=controls.registerNativeControl({coordinator:db,key:bKey,owner:b.owner,generation:b.generation,turnId:()=> 'turn-B',steer:true,request:async()=>{throw new Error('B must not be controlled');}});
+    try {
+      await controls.controlNativeTurn(db,aKey,'turn-A','interrupt',{threadId:'A',turnId:'turn-A'});
+      assert.equal(calls.length,1);b.assertOwned();
+      aTurn='turn-A-next';
+      await assert.rejects(controls.controlNativeTurn(db,aKey,'turn-A','steer',{threadId:'A',expectedTurnId:'turn-A'}),{code:'control_turn_changed'});
+      assert.equal(calls.length,1);a();
+      await assert.rejects(controls.controlNativeTurn(db,aKey,'turn-A-next','interrupt',{threadId:'A',turnId:'turn-A-next'}),{code:'control_connection_expired'});
+    } finally {removeA();removeB();a();b();}
+  } finally {if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('Voice recovery needs original storage and exact delivery evidence, and releases only the phase capacity',async()=>{
+  const f=await fixtureModules(),previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+  try {
+    const {m}=await voiceClientFixture(f),native=await f.load('native-turn-coordinator'),db=native.nativeExecutionCoordinator();
+    const storage=(await f.load('storage-identity')).storageIdentity(f.state),key='voice-turn:recovery:1:execution';
+    const logical=db.claim(['workflow:recovery'],'logical',{kind:'voice-workflow'}),phase=db.claim(['capacity:recovery'],'phase',{kind:'turn'});
+    const prompt='Original task',clientMessageId='original-delivery';
+    db.reserveIntent(key,'hash',{kind:'voice-turn',key,taskId:'recovery',round:1,storage,nativeThreadId:'native-recovery',clientMessageId,promptHash:createHash('sha256').update(prompt).digest('hex')});
+    db.updateIntent(key,{state:'unknown',owner:phase.owner,generation:phase.generation});
+    const turn={id:'actual-turn',status:'completed',items:[{type:'userMessage',clientId:clientMessageId,content:[{type:'text',text:prompt}]},{type:'agentMessage',text:JSON.stringify({status:'ok',text:'Recovered',data:{}})}]};
+    m.recoverVoiceNativeTurns('wrong-home','native-recovery',[turn]);assert.equal(db.getIntent(key).state,'unknown');
+    m.recoverVoiceNativeTurns(storage,'native-recovery',[{...turn,items:[{...turn.items[0],clientId:'other'},turn.items[1]]}]);assert.equal(db.getIntent(key).state,'unknown');
+    m.recoverVoiceNativeTurns(storage,'native-recovery',[]);assert.equal(db.getIntent(key).state,'unknown');
+    m.recoverVoiceNativeTurns(storage,'native-recovery',[turn]);
+    assert.equal(db.getIntent(key).state,'completed');assert.equal(db.getIntent(key).result.text,'Recovered');
+    assert.throws(()=>phase.assertOwned(),{code:'execution_owner_changed'});logical.assertOwned();logical.release();
+    assert.equal(readFileSync(path.join(f.tmp,'fake-codex'),'utf8').includes('readline'),true);
+    assert.throws(()=>readFileSync(path.join(f.tmp,'rpc.jsonl')),{code:'ENOENT'});
+  }finally{if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();}
+});
+
+test('legacy registry migration imports permanent delivery guards once and retains the original receipt',async()=>{
+  const f=await fixtureModules();
+  try {
+    const {CodexChatPrivateStore}=await f.load('private-store');
+    let store=new CodexChatPrivateStore();
+    const receipt={clientMessageId:'old-message',requestHash:'original-hash',turnId:'public-turn',nativeTurnId:'native-turn',startedAt:'2026-09-01T00:00:00Z'};
+    mkdirSync(store.root,{recursive:true});
+    writeFileSync(store.registryPath,JSON.stringify({version:1,chats:{chat_legacy:{chatId:'chat_legacy',nativeThreadId:'native',providerId:'desktop_bundled',messageReceipts:{'old-message':receipt}}}}));
+    await store.patch('chat_legacy',{title:'Updated title'});
+    const guard=store.execution.getIntent('turn:chat_legacy:old-message');
+    assert.equal(guard.state,'legacy_receipt');assert.deepEqual(guard.receipt,receipt);
+    assert.equal(store.execution.getIntent('migration:registry-execution-v1').importedReceipts,1);
+    store=new CodexChatPrivateStore();
+    await store.patch('chat_legacy',{pinned:true});
+    assert.equal(store.execution.getIntent('turn:chat_legacy:old-message').revision,guard.revision);
+    assert.deepEqual((await store.get('chat_legacy')).messageReceipts['old-message'],receipt);
+    assert.throws(()=>store.execution.reserveIntent('turn:chat_legacy:old-message','changed',{kind:'turn'}),{code:'idempotency_conflict'});
+  }finally{f.cleanup();}
+});
+
+test('legacy migration rejects conflicting guards before changing registry bytes',async()=>{
+  const f=await fixtureModules();
+  try {
+    const {CodexChatPrivateStore}=await f.load('private-store'),store=new CodexChatPrivateStore();
+    const receipt={clientMessageId:'old-message',requestHash:'original-hash',turnId:'public-turn',nativeTurnId:'native-turn',startedAt:'2026-09-01T00:00:00Z'};
+    mkdirSync(store.root,{recursive:true});
+    const original=JSON.stringify({version:1,chats:{chat_legacy:{chatId:'chat_legacy',nativeThreadId:'native',providerId:'desktop_bundled',messageReceipts:{'old-message':receipt}}}});
+    writeFileSync(store.registryPath,original);
+    store.execution.reserveIntent('turn:chat_legacy:old-message','conflict',{kind:'turn'});
+    await assert.rejects(store.patch('chat_legacy',{title:'Must not persist'}),{code:'codex_chat_registry_corrupt'});
+    assert.equal(readFileSync(store.registryPath,'utf8'),original);
+    assert.equal(store.execution.getIntent('migration:registry-execution-v1').state,'reserved');
+  }finally{f.cleanup();}
+});
+
+test('queued delivery keeps its immutable payload through temporary resource and drain conflicts',async()=>{
+  const f=await fixtureModules();let gateway;
+  try {
+    const {CodexChatGateway}=await f.load('gateway'),{CodexChatPrivateStore}=await f.load('private-store');
+    gateway=Object.create(CodexChatGateway.prototype);gateway.store=new CodexChatPrivateStore();
+    const binding=await gateway.store.put({chatId:'chat_wait',nativeThreadId:'native',stateIdentityHash:'storage-v2:fixture',providerId:'desktop_bundled'});
+    gateway.requireBinding=async()=>binding;
+    const db=gateway.store.execution,predecessorKey='turn:chat_wait:previous';
+    db.reserveIntent(predecessorKey,'previous',{kind:'turn'});db.updateIntent(predecessorKey,{state:'completed'});
+    const input={clientMessageId:'next',input:[{type:'text',text:'Captured once'}]},key='queued:chat_wait:next';
+    db.reserveIntent(key,'hash',{kind:'queued-message',chatId:binding.chatId,nativeThreadId:binding.nativeThreadId,stateIdentityHash:binding.stateIdentityHash,predecessorKey,input},{initialState:'queued'});
+    for(const code of ['workspace_busy','execution_draining','execution_metadata_busy']) {
+      gateway.startTurn=async()=>{throw Object.assign(new Error(code),{code});};
+      await gateway.drainQueue(binding.chatId);assert.equal(db.getIntent(key).state,'queued');assert.deepEqual(db.getIntent(key).input,input);
+    }
+    let deliveries=0;gateway.startTurn=async()=>{deliveries++;};
+    await gateway.drainQueue(binding.chatId);await gateway.drainQueue(binding.chatId);
+    assert.equal(deliveries,1);assert.equal(db.getIntent(key).state,'delivered');
+  }finally{f.cleanup();}
+});
+
+test('native secret answers reach the original callback across HTTP workers exactly once',async()=>{
+  const f=await fixtureModules(),previous=process.env.CODEX_HOME;process.env.CODEX_HOME=f.state;
+  let child;
+  try {
+    const file=name=>pathToFileURL(path.join(f.tmp,`${name}.mjs`)).href;
+    const source=`import {nativeExecutionCoordinator,nativeThreadLeaseKey} from ${JSON.stringify(file('native-turn-coordinator'))};
+      import {captureNativeRequest,pendingNativeRequests,expireNativeRequests} from ${JSON.stringify(file('native-requests'))};
+      import {registerNativeControl} from ${JSON.stringify(file('native-control'))};
+      import {storageIdentity} from ${JSON.stringify(file('storage-identity'))};
+      import {executionChannelView} from ${JSON.stringify(pathToFileURL(path.resolve('scripts/lib/execution-channel.mjs')).href)};
+      const db=nativeExecutionCoordinator(),storage=storageIdentity(process.env.CODEX_HOME),key=nativeThreadLeaseKey(storage,'remote-thread');
+      const lease=db.claim([key],'remote-owner');let calls=0;
+      const close=registerNativeControl({coordinator:db,key,owner:lease.owner,generation:lease.generation,turnId:()=> 'remote-turn',steer:true,request:async()=>({})});
+      captureNativeRequest({id:1,method:'item/tool/requestUserInput',params:{threadId:'remote-thread',turnId:'remote-turn',questions:[{id:'secret',question:'Synthetic secret',isSecret:true}]}},storage,'remote-generation',async response=>{calls++;if(!response.answers.secret.answers[0])throw new Error('missing answer');});
+      const row=pendingNativeRequests(storage,'remote-thread')[0];
+      const timer=setInterval(()=>{if(executionChannelView(db,'native-answer:'+row.id)){clearInterval(timer);process.send({row,storage});}},10);
+      process.on('message',()=>{process.send({calls});expireNativeRequests('remote-generation');close();lease.release();db.close();process.disconnect();});`;
+    child=spawn(process.execPath,['--input-type=module','-e',source],{stdio:['ignore','ignore','pipe','ipc']});
+    let error='';child.stderr.on('data',chunk=>error+=chunk);
+    const [{row,storage}]=await Promise.race([once(child,'message'),once(child,'exit').then(()=>{throw new Error(error);})]);
+    const {answerNativeRequest}=await f.load('native-requests');
+    const input={requestId:row.id,revision:row.revision,clientMessageId:'remote-response',answers:{secret:['Синтетический секрет 🪷 73159']}};
+    assert.equal((await answerNativeRequest(storage,'remote-thread',input)).submitted,true);
+    assert.equal((await answerNativeRequest(storage,'remote-thread',input)).replayed,true);
+    const done=once(child,'exit'),reply=once(child,'message');child.send('finish');
+    assert.equal((await reply)[0].calls,1);await done;
+    const db=(await f.load('native-turn-coordinator')).nativeExecutionCoordinator();
+    for(const name of [db.file,`${db.file}-wal`])assert.equal(readFileSync(name).includes(Buffer.from(input.answers.secret[0])),false);
+  }finally{
+    if(child && child.exitCode===null){const done=once(child,'exit');child.kill('SIGTERM');await done;}
+    if(previous===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previous;f.cleanup();
+  }
 });

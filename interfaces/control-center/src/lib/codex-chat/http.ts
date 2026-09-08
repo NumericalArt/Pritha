@@ -1,3 +1,4 @@
+import { ExecutionConflict } from "../../../../../scripts/lib/execution-coordinator.mjs";
 import { HistoryError } from "./history-reader";
 import { randomUUID } from "node:crypto";
 import { CodexChatGatewayError } from "./gateway";
@@ -23,14 +24,17 @@ export function apiError(error: unknown) {
   const requestId = randomUUID();
   const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError || error instanceof HistoryError;
   const registryCorrupt = !known && (error as { code?: unknown } | null)?.code === "codex_chat_registry_corrupt";
-  const status = known ? error.status : registryCorrupt ? 503 : 500;
+  const executionConflict = error instanceof ExecutionConflict;
+  const status = known ? error.status : executionConflict ? 409 : registryCorrupt ? 503 : 500;
   const payload: ApiErrorEnvelope = {
     apiVersion: "1",
     error: {
-      code: known ? error.code : registryCorrupt ? "codex_chat_registry_corrupt" : "internal_error",
+      code: known || executionConflict ? error.code : registryCorrupt ? "codex_chat_registry_corrupt" : "internal_error",
       message: known
         ? error.message
-        : registryCorrupt
+        : executionConflict
+          ? ({execution_draining:"New task starts are paused for a managed update. Drafts and existing task controls remain available.",execution_queue_full:"The queue is full. Cancel an unneeded queued message or wait for a slot.",approval_resources_busy:"Another task owns shared resources. Wait for it to finish before granting this request."} as Record<string,string>)[error.code] || "This operation cannot proceed with the current execution or request state. Refresh the task and try the appropriate action."
+          : registryCorrupt
           ? "Task Chat history bindings are read-only until the private registry is recovered."
           : "Task Chat encountered an internal error.",
       retryable: known ? error.retryable : registryCorrupt,

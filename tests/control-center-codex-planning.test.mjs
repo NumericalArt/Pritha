@@ -78,7 +78,7 @@ test("Planner operator questions leave actionable wait cards that can resume", (
   assert.match(runtimeSource, /operator_question_terminal: false/);
   assert.match(runtimeSource, /export async function answerPrithaCodexTask/);
   assert.match(runtimeSource, /operator_question_answered: true/);
-  assert.match(runtimeSource, /startCodexAppTask\(nextRequest/);
+  assert.match(runtimeSource, /startAdmittedVoiceTask\("codex-app", nextRequest/);
   assert.match(runtimeSource, /name: "answer_codex_task"/);
   assert.match(runtimeSource, /Do not start a new run_codex_task just to answer that clarification/);
 });

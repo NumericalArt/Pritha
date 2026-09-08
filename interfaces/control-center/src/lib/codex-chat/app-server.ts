@@ -1,5 +1,6 @@
-import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createHash } from "node:crypto";
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { promisify } from "node:util";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,6 +9,7 @@ import { getPrithaRuntimeSettings } from "@/lib/realtime/pritha-runtime";
 import { DESKTOP_CODEX_BIN_CANDIDATES } from "@/lib/settings/codex-binaries";
 import { codexAppTurnSettings } from "@/lib/settings/codex-model-catalog";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { captureNativeRequest, expireNativeRequests } from "./native-requests";
 import { CodexChatPrivateStore } from "./private-store";
 import { effectiveCodexHome, legacyIdentityMatches, storageIdentity } from "./storage-identity";
 import type { RuntimeCapabilityMap, RuntimeProviderId, RuntimeProviderView, RuntimeStatus } from "./types";
@@ -39,6 +41,7 @@ type ExitHandler = (providerId: RuntimeProviderId, exitCode: number | null, sign
 
 const PROBE_TTL_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 20_000;
+const runCommand = promisify(execFile);
 
 function asText(value: unknown, max = 500) {
   return String(value || "").trim().slice(0, max);
@@ -87,8 +90,10 @@ function childEnvironment(home = effectiveCodexHome()) {
 
 function commandPath(command: string) {
   if (path.isAbsolute(command)) return existsSync(command) ? command : null;
-  const result = spawnSync("which", [command], { encoding: "utf8", timeout: 3_000 });
-  return result.status === 0 ? asText(result.stdout, 2_000) : null;
+  return String(process.env.PATH || "").split(path.delimiter).filter(Boolean)
+    .map(directory => path.resolve(directory, command)).find(candidate => {
+      try { const stat = statSync(candidate); return stat.isFile() && Boolean(stat.mode & 0o111); } catch { return false; }
+    }) || null;
 }
 
 function firstExisting(candidates: Array<string | undefined | null>) {
@@ -178,6 +183,7 @@ function sandboxModeForView(value: string): RuntimeStatus["selected"]["sandboxMo
 
 export class AppServerConnection {
   runtimeVersion: string | null = null;
+  generation = randomUUID();
   readonly codexHome = effectiveCodexHome();
   readonly stateIdentityHash = storageIdentity(this.codexHome);
   private child: ChildProcessWithoutNullStreams | null = null;
@@ -261,6 +267,7 @@ export class AppServerConnection {
   }
 
   close(reason = new Error("Codex App Server connection closed.")) {
+    try { if (!this.historyOnly) expireNativeRequests(this.generation); } catch { /* Pending requests remain unconfirmed; live callbacks have expired. */ }
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
       pending.reject(reason);
@@ -292,6 +299,7 @@ export class AppServerConnection {
   }
 
   private async startConnection() {
+    this.generation = randomUUID();
     const child = spawn(this.binary, ["app-server", "--listen", "stdio://"], {
       cwd: this.cwd,
       env: childEnvironment(this.codexHome),
@@ -384,6 +392,16 @@ export class AppServerConnection {
     }
 
     if (message.id !== undefined && message.method) {
+      const generation=this.generation;
+      try {
+      if (!this.historyOnly && captureNativeRequest(message,this.stateIdentityHash,generation,result=>{
+        if (this.generation!==generation || !this.child?.stdin.writable) throw new Error("native_request_connection_expired");
+        return new Promise<void>((resolve,reject)=>this.child!.stdin!.write(`${JSON.stringify({id:message.id,result})}\n`,error=>error?reject(error):resolve()));
+      })) return;
+      } catch {
+        this.child?.stdin?.write(`${JSON.stringify({id:message.id,error:{code:-32603,message:"Request coordination is unavailable."}})}\n`);
+        return;
+      }
       void this.notificationHandler(this.providerId, message, this.notificationOrigin());
       this.child?.stdin.write(`${JSON.stringify({ id: message.id, error: { code: -32601, message: "Unsupported in Codex Chat core v1" } })}\n`);
       return;
@@ -680,13 +698,13 @@ export class CodexRuntimeManager {
       return missing;
     }
 
-    const versionResult = spawnSync(binary, ["--version"], {
+    const versionResult = await runCommand(binary, ["--version"], {
       cwd: this.root,
       env: childEnvironment(),
       encoding: "utf8",
       timeout: 5_000,
-    });
-    const version = versionResult.status === 0 ? asText(versionResult.stdout || versionResult.stderr, 120) : null;
+    }).catch(() => null);
+    const version = versionResult ? asText(versionResult.stdout || versionResult.stderr, 120) : null;
     let capabilities = emptyCapabilities();
     let warning: string | null = null;
     if (version) {
@@ -696,13 +714,12 @@ export class CodexRuntimeManager {
       try {
         mkdirSync(schemaRoot, { recursive: true, mode: 0o700 });
         if (!existsSync(markerPath)) {
-          const generated = spawnSync(binary, ["app-server", "generate-json-schema", "--out", schemaRoot], {
+          await runCommand(binary, ["app-server", "generate-json-schema", "--out", schemaRoot], {
             cwd: this.root,
             env: childEnvironment(),
             encoding: "utf8",
             timeout: 30_000,
           });
-          if (generated.status !== 0) throw new Error("schema_generation_failed");
           const probedCapabilities = capabilitiesFromSchema(fileNamesRecursively(schemaRoot));
           writeFileSync(markerPath, `${JSON.stringify({ version, capabilities: probedCapabilities }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
         }

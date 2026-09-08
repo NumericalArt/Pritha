@@ -166,7 +166,13 @@ async function gatewayFixture(t, createdAt) {
     new Function("require", "module", "exports", output)(id => id.startsWith("node:") ? require(id) : dependencies[id] || {}, module, module.exports);
     return module.exports;
   }
-  const nativeCoordinator = load("native-turn-coordinator");
+  const nativeCoordinator = load("native-turn-coordinator", {
+    "@/lib/pritha-paths": {resolveTechscopeRoot:()=>f.root,resolvePrithaStateRoot:()=>f.stateRoot},
+    "./storage-identity": {effectiveCodexHome:()=>f.root,storageIdentity:()=>task.stateIdentityHash},
+    "../../../../../scripts/lib/execution-coordinator.mjs": await import("../scripts/lib/execution-coordinator.mjs"),
+  });
+  const execution=nativeCoordinator.nativeExecutionCoordinator();
+  t.after(()=>execution.close());
   const { CodexChatGateway } = load("gateway", {
     "../../../../../scripts/agents-mother/task-delivery.mjs": await import("../scripts/agents-mother/task-delivery.mjs"),
     "../../../../../scripts/agents-mother/phase-usage.mjs": await import("../scripts/agents-mother/phase-usage.mjs"),
@@ -177,7 +183,7 @@ async function gatewayFixture(t, createdAt) {
   const provider = { availability: "ready", stateIdentityHash: task.stateIdentityHash, capabilities: { goalControl: false } };
   const native = { id: task.nativeThreadId, cwd: f.root, status: { type: "idle" }, ephemeral: false };
   const gateway = Object.create(CodexChatGateway.prototype);
-  Object.assign(gateway, { root: f.root, activeTurns: new Map(), activeTurnLeases: new Map(), uncertainTurnTimers: new Map(), emit: () => {}, store: { stateRoot: f.stateRoot, get: async () => binding, all: async () => [binding], patch: async (_id, patch) => Object.assign(binding, patch), findByNative: async (providerId, threadId) => providerId === task.providerId && threadId === task.nativeThreadId ? binding : null }, runtime: {
+  Object.assign(gateway, { root: f.root, activeTurns: new Map(), activeTurnLeases: new Map(), uncertainTurnTimers: new Map(), emit: () => {}, store: { execution, stateRoot: f.stateRoot, get: async () => binding, all: async () => [binding], patch: async (_id, patch) => Object.assign(binding, patch), findByNative: async (providerId, threadId) => providerId === task.providerId && threadId === task.nativeThreadId ? binding : null }, runtime: {
     provider: async () => ({ view: provider }), readThread: async () => ({ thread: native }),
     liveRuntimeOrigin: () => ({ stateIdentityHash: task.stateIdentityHash, runtimeVersion: "codex/fixture-native-version" }),
     connection: async () => assert.fail("Host actions must not request a model turn or Goal RPC"),

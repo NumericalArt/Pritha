@@ -181,7 +181,11 @@ export function normalizeNativeItem(
   };
   const type = String(item.type || "");
 
-  if (type === "userMessage" || type === "hookPrompt") return null;
+  if (type === "hookPrompt") return null;
+  if (type === "userMessage") {
+    const markdown=userText(item);
+    return markdown ? { ...base, kind:"user_message", message:{id,role:"user",markdown,status:"completed",createdAt} } : null;
+  }
   if (type === "agentMessage") {
     const message: MessageView = {
       id,
@@ -277,6 +281,7 @@ export function normalizeNativeTurn(
   if (!active && attachmentMessage?.manifest && text.endsWith(attachmentMessage.manifest)) text = text.slice(0, -attachmentMessage.manifest.length).trimEnd();
   if (!text && !attachmentMessage?.attachments.length) text = "Codex request";
   const items = nativeItems
+    .filter((item) => item !== userItem)
     .map((item) => normalizeNativeItem(binding.chatId, item, root, startedAt))
     .filter((item): item is ChatItemView => Boolean(item));
 

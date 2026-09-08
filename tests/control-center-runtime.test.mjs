@@ -4,10 +4,23 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
+import { ExecutionCoordinator } from "../scripts/lib/execution-coordinator.mjs";
+import { executionDirectory } from "../scripts/lib/execution-lifecycle.mjs";
 
 const sourceRoot = path.resolve(import.meta.dirname, "..");
 const runtimeScript = path.join(sourceRoot, "scripts", "control-center-runtime.mjs");
 const trackedTemplate = path.join(sourceRoot, "launchd", "com.numericalart.pritha.control-center.instance.plist.template");
+
+test('managed stop drains admission and refuses active or uncertain task owners before launchctl',()=>{
+  const item=fixture(),db=new ExecutionCoordinator({stateRoot:item.stateRoot,directory:executionDirectory(item.checkout,item.stateRoot)});
+  try {
+    const lease=db.claim(['native:uncertain'],'task-owner');
+    const result=invoke(item,'stop',['--yes']);
+    assert.notEqual(result.status,0);assert.match(result.stdout,/execution_drain_required/);
+    assert.equal(existsSync(item.launchctlLog),false);assert.equal(db.admission().enabled,false);
+    lease.assertOwned();lease.release();
+  }finally{db.close();rmSync(item.directory,{recursive:true,force:true});}
+});
 
 function executable(filePath, source) {
   writeFileSync(filePath, source, "utf8");

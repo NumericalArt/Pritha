@@ -1,10 +1,14 @@
+import { runtimeProbe } from "../../../../../scripts/lib/runtime-probe.mjs";
+import { registerExecutionChannel, callExecutionChannel, executionChannelView } from "../../../../../scripts/lib/execution-channel.mjs";
+import { prepareAgentWorkspaceTarget, scopedAgentWorkspace, inspectTaskWorkspace, prepareTaskWorkspace, verifyTaskWorkspace, type TaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
+import { ownChildProcess, signalOwnedProcess, ownedGroupExited, type OwnedProcess } from "../../../../../scripts/lib/owned-process.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
 import { atomicWritePrivateJson } from "../private-json";
 import {
   codexCliConfigEntries,
@@ -15,7 +19,9 @@ import {
 } from "../settings/codex-model-catalog";
 import { resolveCodexAppBinary, resolveCodexCliBinary } from "../settings/codex-binaries";
 import { codexLegacyWriteEnabledFromFlag, codexWorkspaceWriteAllowedFromFlag, codexWriteFlagFromValues } from "./codex-safety";
-import { checkCodexAppServerAvailable, PrithaCodexAppServerClient } from "./codex-task/codex-app-server-client";
+import { nativeExecutionCoordinator } from "../codex-chat/native-turn-coordinator";
+import { beginVoiceWorkflow, finishVoiceWorkflow, settleAbortedVoiceWorkflow, voiceWorkflow } from "./codex-task/voice-execution";
+import { checkCodexAppServerAvailable, PrithaCodexAppServerClient, CodexDispatchError, safeCodexCliFallback } from "./codex-task/codex-app-server-client";
 import {
   isActiveCodexTaskStatus,
   resolveCodexTaskContinuation,
@@ -178,6 +184,8 @@ type InspectCodexTaskArgs = {
 };
 
 type AnswerCodexTaskArgs = {
+  expected_question_id?: string;
+  expected_revision?: number;
   task_id?: unknown;
   answer?: unknown;
   operator_confirmation?: unknown;
@@ -4278,17 +4286,9 @@ function codexMode() {
   return mode === "queue" ? "queue" : "exec";
 }
 
-function codexAvailable() {
-  const result = spawnSync(codexCliBin(), ["--version"], {
-    cwd: resolveTechscopeRoot(),
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: 5_000,
-  });
-  return {
-    available: result.status === 0,
-    detail: compactText(result.stdout || result.stderr || "", 1_200),
-  };
+async function codexAvailable() {
+  const result=await runtimeProbe(codexCliBin(),["--version"],resolveTechscopeRoot());
+  return {available:result.ok,detail:compactText(result.stdout || result.stderr || "",1_200)};
 }
 
 function codexCliBin() {
@@ -4299,21 +4299,12 @@ function codexAppBin() {
   return resolveCodexAppBinary();
 }
 
-function codexExecHelp() {
-  const result = spawnSync(codexCliBin(), ["exec", "--help"], {
-    cwd: resolveTechscopeRoot(),
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: 5_000,
-  });
-  return `${result.stdout || ""}${result.stderr || ""}`;
+async function codexExecSupportsEphemeral() {
+  const result=await runtimeProbe(codexCliBin(),["exec","--help"],resolveTechscopeRoot());
+  return /\s--ephemeral\b/.test(`${result.stdout}${result.stderr}`);
 }
 
-function codexExecSupportsEphemeral() {
-  return /\s--ephemeral\b/.test(codexExecHelp());
-}
-
-function codexAppAvailable() {
+async function codexAppAvailable() {
   const root = resolveTechscopeRoot();
   const binary = codexAppBin();
   if (!binary) {
@@ -4323,7 +4314,7 @@ function codexAppAvailable() {
     };
   }
   try {
-    const result = checkCodexAppServerAvailable(binary, root);
+    const result = await checkCodexAppServerAvailable(binary, root);
     return {
       available: result.available,
       detail: compactText(result.detail, 1_200),
@@ -5092,7 +5083,17 @@ function codexAdditionalWritableDirs(root: string, task: Record<string, unknown>
   if (sandbox !== "workspace-write") return [];
   const taskType = String(task.task_type || "").toLowerCase();
   if (taskType.toLowerCase() !== "agent_creation") return [];
-  return [resolvePrithaAgentParent(root)];
+  const scope=task.thread_scope as {kind?:string;id?:string}|undefined;
+  const name=task.execution_agent_directory_name || (task.subject_kind==="agent" ? task.subject_id : undefined) || (scope?.kind==="agent" ? scope.id : undefined);
+  return [scopedAgentWorkspace(resolvePrithaAgentParent(root),name)];
+}
+
+function codexFactoryStateWritableDirs(root:string,task:Record<string,unknown>,sandbox:string) {
+  if(task.task_type!=="agent_creation" || sandbox!=="workspace-write")return [];
+  const target=codexAdditionalWritableDirs(root,task,sandbox)[0];
+  // Existing factory contracts, approved ledgers and reports are instance-local.
+  // They need explicit roots once the sibling parent is no longer broadly writable.
+  return [resolvePrithaAgentMemoryRoot(root),resolvePrithaStatePath("builds",path.basename(target)),resolvePrithaStatePath("audit")];
 }
 
 function codexExistingChildAgentWritableDirs(root: string, task: Record<string, unknown>) {
@@ -5122,7 +5123,7 @@ function codexEffectiveTimeoutMs() {
 }
 
 function buildCodexPrompt(task: Record<string, unknown>) {
-  const root = resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
   const childAgentProjects = knownSiblingChildAgentProjects(root);
   const childAgentList = childAgentProjects
     .map((project) => rootRelative(root, project.directory))
@@ -5143,6 +5144,7 @@ function buildCodexPrompt(task: Record<string, unknown>) {
     "For task_type=agent_creation, use outcome-and-card completion: after delivery, rebuild the registry with `node scripts/pritha.mjs registry`, run `node scripts/pritha.mjs card-readiness <agent-slug>`, and do not report the creation task complete if outcome delivery lacks verified evidence or a typed blocker, or if the agent card is missing from the Pritha Agents registry/Control Center surface.",
     "A new child-agent card may show planned or blocked runtime controls; that is acceptable only when the card is visible and its blockers and next actions are explicit for the operator.",
     "For existing child-agent improvement, use `node scripts/pritha.mjs improve <project-path> --task <task>` or create an equivalent agent development task brief before implementation. The brief/pattern-pack must query Pritha memory, attempt semantic/embedding search, log semantic failures, derive external research seeds from selected patterns, and guide the smallest verified change.",
+    ...(task.task_type === "agent_creation" && task.write_mode !== "read_only" ? [`Child-agent directory: ${String(task.execution_agent_directory_name || (task.thread_scope as {kind?:string;id?:string}|undefined)?.id || "resolve the exact target before scaffold")}. Use only the exact authorized child path; the whole sibling parent is not writable.`] : []),
     "Do not modify unrelated sibling projects in the sibling-agent parent. Use that parent only to create or update the child-agent project requested by the operator.",
     childAgentList
       ? `Existing sibling child-agent projects with AGENTS.md: ${childAgentList}. If the task explicitly asks to work on one of them, use that sibling project and keep edits inside it unless the operator separately asks for Pritha or Control Center changes.`
@@ -5282,7 +5284,7 @@ function agentCreationResearchGatePayload() {
 }
 
 function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodexTaskPayload {
-  const root = resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
   const threadScopeValue = typeof task.thread_scope === "object" && task.thread_scope !== null ? (task.thread_scope as PrithaCodexThreadScope) : undefined;
   return {
     requestId: String(task.id || randomUUID()),
@@ -5733,11 +5735,13 @@ function codexAppSandboxPolicyForTask(task: Record<string, unknown>, sandbox: st
 }
 
 function codexAppClientForTask(task: Record<string, unknown>, sandbox: string, writableRoots: Array<{ absolute_path: string }>) {
-  const root = resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
   return new PrithaCodexAppServerClient({
     codexBin: codexAppBin(),
     cwd: root,
     clientName: "pritha-voice-control",
+    logicalTaskId: String(task.id),
+    registryPath: path.join(privateRoot(), "voice-native-threads.json"),
     buildSandboxPolicy: () => codexAppSandboxPolicyForTask(task, sandbox, writableRoots),
     getRuntimeSettings: () => getPrithaRuntimeSettings(),
   });
@@ -5803,6 +5807,7 @@ async function planCodexAppTask(
     const planningPayload = buildPrithaCodexTaskPayload(planningTask);
     const planningTimeoutMs = Math.min(Math.max(60_000, Math.round(codexEffectiveTimeoutMs() / 4)), 180_000);
     const raw = await client.runTask(planningPayload, {
+      executionPhase: "planning",
       timeoutMs: planningTimeoutMs,
       userId: "pritha-voice-operator",
       signal,
@@ -5827,6 +5832,7 @@ async function planCodexAppTask(
     return plan;
   } catch (error) {
     if (isCodexAbortError(error) || signal?.aborted) throw error;
+    if (error instanceof CodexDispatchError && !safeCodexCliFallback(error, false)) throw error;
     const plan = syntheticCodexTaskPlan(task, "fallback");
     await writeCodexTaskPlan(taskId, paths.planPath, plan);
     await progress({
@@ -5857,7 +5863,7 @@ async function runCodexAppPayload(
   throwIfCodexTaskAborted(signal);
   const client = codexAppClientForTask(task, sandbox, writableRoots);
   const payload = buildPrithaCodexTaskPayload(task);
-  const raw = await client.runTask(payload, { timeoutMs, userId: "pritha-voice-operator", signal, onProgress: progress });
+  const raw = await client.runTask(payload, { executionPhase: String(task.execution_phase || "execution"), timeoutMs, userId: "pritha-voice-operator", signal, onProgress: progress });
   throwIfCodexTaskAborted(signal);
   return normalizeCodexTaskResult(raw, payload.requestId, new Date().toISOString(), "codex-app");
 }
@@ -5888,6 +5894,7 @@ async function runCodexStepOrchestrator(
     });
     const stepTask = {
       ...task,
+      execution_phase: `step:${step.id}`,
       task: [
         `Execute only step ${index + 1} of ${plan.steps.length} for the current Pritha Voice Control Codex task.`,
         `Step title: ${step.title}`,
@@ -5975,15 +5982,118 @@ async function runCodexStepOrchestrator(
   };
 }
 
+let voiceAdmissionTimer: ReturnType<typeof setTimeout> | undefined;
+let voiceAdmissionDraining = false;
+let voiceAdmissionOffset = 0;
+const admissionKey = (task:Record<string,unknown>) => `voice-admission:${task.id}:${task.operator_question_answered_at || "initial"}`;
+
+async function enqueueVoiceAdmission(transport:"codex-app"|"codex-cli",task:Record<string,unknown>,paths:CodexTaskRuntimePaths,reason:string) {
+  const coordinator=nativeExecutionCoordinator(), key=admissionKey(task);
+  if(!coordinator.getIntent(key) && coordinator.listIntents({kind:"voice-admission",states:["queued","dispatching"],limit:65}).length>=64) throw new Error("voice_queue_full");
+  coordinator.reserveIntent(key,createHash("sha256").update(JSON.stringify([task.id,transport,task.operator_question_answered_at || "initial"])).digest("hex"),{kind:"voice-admission",taskId:String(task.id),task,paths,transport},{initialState:"queued",limit:{max:64,states:["queued","dispatching","blocked"]}});
+  coordinator.updateIntent(key,{state:"queued",task,reason});
+  const status=await readJsonFile(paths.statusPath);
+  await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:paths.statusPath,value:{...status,status:"queued",phase:"waiting_admission",admission_reason:reason,updated_at:new Date().toISOString()}});
+  wakeVoiceAdmissions();
+  return {transport,status:"queued",reason};
+}
+
+/** Runs only in the existing application process. Restart never replays dispatching entries. */
+export function wakeVoiceAdmissions() {
+  if(voiceAdmissionTimer || voiceAdmissionDraining)return;
+  voiceAdmissionTimer=setTimeout(async()=>{
+    voiceAdmissionTimer=undefined;voiceAdmissionDraining=true;
+    let remaining=false;
+    try {
+      const coordinator=nativeExecutionCoordinator();
+      const rows=coordinator.listIntents({kind:"voice-admission",states:["queued"],limit:64});
+      const start=rows.length ? voiceAdmissionOffset%rows.length : 0;
+      voiceAdmissionOffset=start+8;
+      for(const row of [...rows.slice(start),...rows.slice(0,start)].slice(0,8)) await coordinator.withMutation(`voice-control:${row.taskId}`,async()=>{
+        const key=admissionKey(row.task),current=coordinator.getIntent(key);
+        if(current?.state!=="queued")return;
+        const status=await readJsonFile(row.paths.statusPath);
+        if(["aborted","stopping","complete","rejected"].includes(String(status?.status))) {coordinator.updateIntent(key,{state:"cancelled"},current.revision);return;}
+        coordinator.updateIntent(key,{state:"dispatching"},current.revision);
+        try {
+          const result=await startAdmittedVoiceTask(row.transport,row.task,row.paths);
+          if(!(result && "status" in result && result.status === "queued"))coordinator.updateIntent(key,{state:"delivered"});
+        } catch(error) {
+          coordinator.updateIntent(key,{state:"blocked",reason:String((error as {code?:string}).code || "admission_failed")});
+          await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:row.paths.statusPath,value:{...status,status:"decision_required",phase:"admission_blocked",recovery_required:true}});
+        }
+      });
+      remaining=coordinator.listIntents({kind:"voice-admission",states:["queued"],limit:1}).length>0;
+    } catch { /* A unavailable coordinator never authorizes another launch. */ }
+    finally {voiceAdmissionDraining=false;if(remaining)wakeVoiceAdmissions();}
+  },2_000);
+  voiceAdmissionTimer.unref?.();
+}
+
+async function startAdmittedVoiceTask(transport:"codex-app"|"codex-cli",task:Record<string,unknown>,paths:CodexTaskRuntimePaths) {
+  const source=resolveTechscopeRoot();
+  const sandbox=codexSandboxForTask(String(task.task_type),String(task.write_mode));
+  try {
+    const agentRoots=codexAdditionalWritableDirs(source,task,sandbox);
+    for(const target of agentRoots) {
+      prepareAgentWorkspaceTarget(nativeExecutionCoordinator(),target,voiceWorkflow(String(task.id)));
+      codexAdditionalWritableDirs(source,task,sandbox);
+    }
+    for(const directory of codexFactoryStateWritableDirs(source,task,sandbox)) {
+      const state=realpathSync(resolvePrithaStateRoot(source));
+      let ancestor=directory;
+      while(!existsSync(ancestor))ancestor=path.dirname(ancestor);
+      if(!isPathInsideOrSame(state,realpathSync(ancestor)))throw new Error("factory_state_root_invalid");
+      mkdirSync(directory,{recursive:true,mode:0o700});
+      if(!isPathInsideOrSame(state,realpathSync(directory)))throw new Error("factory_state_root_invalid");
+    }
+    if(!task.execution_workspace) {
+      // Existing subject-scoped conversations keep their original cwd. An explicit
+      // independent coding task receives a new native thread and its own worktree.
+      const isolated=task.independent_execution === true && sandbox === "workspace-write" && task.task_type !== "agent_creation" && task.task_type !== "system_change";
+      task.execution_workspace=await prepareTaskWorkspace({coordinator:nativeExecutionCoordinator(),source,directory:path.join(privateRoot(),"task-workspaces"),id:`voice:${task.id}`,mode:isolated?"worktree":sandbox === "read-only"?"read-only":"serialized",baseRevision:typeof task.workspace_base_revision === "string"?task.workspace_base_revision:undefined});
+      const requestPath=path.join(path.dirname(paths.statusPath),"request.json");
+      const request=await readJsonFile(requestPath);
+      await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:requestPath,value:{...request,execution_workspace:task.execution_workspace}});
+    }
+    await verifyTaskWorkspace(task.execution_workspace as TaskWorkspace);
+    return transport === "codex-app" ? await startCodexAppTask(task,paths) : await startCodexExec(task,paths);
+  } catch(error) {
+    const code=String((error as {code?:string}).code || (error instanceof Error?error.message:""));
+    if(["voice_scope_busy","workspace_busy","capacity_busy","workspace_management_busy","execution_draining"].includes(code)) {
+      const workflow=voiceWorkflow(String(task.id));
+      if(workflow?.state === "running")finishVoiceWorkflow(String(task.id),"waiting_admission");
+      return enqueueVoiceAdmission(transport,task,paths,code);
+    }
+    if(code === "agent_workspace_target_required") {
+      const question="Как назвать папку создаваемого агента? Укажите одно имя латиницей (буквы, цифры, дефис). Задача получит доступ только к этой папке, а не ко всем соседним агентам.";
+      const requestPath=path.join(path.dirname(paths.statusPath),"request.json"),request=await readJsonFile(requestPath);
+      await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:requestPath,value:{...request,workspace_question_agent:true}});
+      await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:paths.statusPath,value:{status:"waiting_for_operator",phase:"agent_workspace_target_required",question,requires_operator_response:true,short_id:task.short_id}});
+      return {transport,status:"waiting_for_operator",question};
+    }
+    if(code === "workspace_dirty") {
+      const view=await inspectTaskWorkspace(source);
+      const question=`В проекте есть незакоммиченные изменения. Для независимой рабочей копии можно использовать коммит ${view.baseRevision}. Ответьте полным hash этого коммита, чтобы продолжить; локальные изменения в копию не войдут.`;
+      const requestPath=path.join(path.dirname(paths.statusPath),"request.json"),request=await readJsonFile(requestPath);
+      await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:requestPath,value:{...request,workspace_question_base:view.baseRevision}});
+      await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:paths.statusPath,value:{status:"waiting_for_operator",phase:"workspace_base_required",question,requires_operator_response:true,short_id:task.short_id}});
+      return {transport,status:"waiting_for_operator",question};
+    }
+    throw error;
+  }
+}
+
 async function startCodexAppTask(
   task: Record<string, unknown>,
   paths: CodexTaskRuntimePaths,
 ) {
-  const root = resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
   const taskType = String(task.task_type || "analysis");
   const sandbox = codexSandboxForTask(taskType, String(task.write_mode || "read_only"));
   const additionalWritableDirs = [
     ...codexAdditionalWritableDirs(root, task, sandbox),
+    ...codexFactoryStateWritableDirs(root,task,sandbox),
     ...(sandbox === "workspace-write" ? codexExistingChildAgentWritableDirs(root, task) : []),
   ];
   const writableRoots = codexWritableRootEntries(root, additionalWritableDirs);
@@ -5991,7 +6101,13 @@ async function startCodexAppTask(
   const startedAt = new Date().toISOString();
   const payload = buildPrithaCodexTaskPayload(task);
   const taskId = String(task.id || payload.requestId);
-  const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, paths.progressPath, event);
+  task.execution_writable_roots = additionalWritableDirs;
+  beginVoiceWorkflow(task, root, getPrithaRuntimeSettings().codexAppThreadRoutingMode, sandbox);
+  let anyTurnDispatched = false;
+  const progress = (event: PrithaCodexTaskProgressEvent) => {
+    if (/(?:^|_)turn_(?:dispatching|started|completed)$/.test(event.phase)) anyTurnDispatched = true;
+    return appendCodexTaskProgress(taskId, paths.progressPath, event);
+  };
   const abortController = new AbortController();
   activeCodexAppAbortHandles.set(taskId, {
     controller: abortController,
@@ -5999,6 +6115,10 @@ async function startCodexAppTask(
     progressPath: paths.progressPath,
     voiceFeedbackPath: paths.voiceFeedbackPath,
     startedAt,
+  });
+  const closeControl=registerExecutionChannel(nativeExecutionCoordinator(),`voice-workflow-control:${taskId}`,{
+    view:()=>activeCodexAppAbortHandles.get(taskId)?.controller===abortController ? {taskId} : null,
+    call:input=>abortPrithaCodexTask(taskId,input.reason,input.expectedRevision),
   });
   const taskWasAborted = async () => abortController.signal.aborted || (await codexTaskIsAborted(paths.statusPath));
 
@@ -6077,6 +6197,7 @@ async function startCodexAppTask(
       voice_text: selectedMode === "step_orchestrator" ? "Для этой задачи включен step orchestrator: Codex будет выполнять план по шагам." : "Для этой задачи Codex пойдет одним выполнением с сохраненным планом.",
     });
     if (plan.requiresOperatorInput && plan.operatorQuestions.length && settings.codexAskBeforeOrchestration && !boolValue(task.operator_question_answered)) {
+      await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async()=>{
       const question = plan.operatorQuestions[0];
       const updatedAt = new Date().toISOString();
       await writeFile(
@@ -6137,7 +6258,9 @@ async function startCodexAppTask(
         message: "Codex task is waiting for the operator answer before continuing.",
         elapsed_ms: elapsedMsSince(startedAt),
       });
+      finishVoiceWorkflow(taskId, "waiting_for_operator", {question});
       clearInterval(heartbeat);
+      });
       return;
     }
 
@@ -6146,8 +6269,12 @@ async function startCodexAppTask(
       : await runCodexAppPayload(task, sandbox, writableRoots, timeoutMs, progress, abortController.signal);
     clearInterval(heartbeat);
     if (await taskWasAborted()) return;
+    await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
+      if (await taskWasAborted()) return;
     const finishedAt = new Date().toISOString();
-    const status = result.status === "ok" || result.status === "decision_required" ? "complete" : "failed";
+    const operatorQuestion=result.status === "decision_required" ? String(result.text || result.data?.summary || "Please confirm how to continue this task.") : undefined;
+    finishVoiceWorkflow(taskId, operatorQuestion ? "waiting_for_operator" : "completed", {question:operatorQuestion});
+    const status = operatorQuestion ? "waiting_for_operator" : result.status === "ok" ? "complete" : "failed";
     await writeFile(paths.resultPath, codexAppResultText(result), "utf8").catch(() => undefined);
     await writeFile(
       paths.statusPath,
@@ -6155,9 +6282,10 @@ async function startCodexAppTask(
         {
 	          status,
 	          short_id: task.short_id,
-	          phase: status === "complete" ? "completed" : "failed",
+	          phase: operatorQuestion ? "waiting_for_operator" : status === "complete" ? "completed" : "failed",
           transport: "codex-app",
           codex_app_status: result.status,
+          ...(operatorQuestion ? {question:operatorQuestion,requires_operator_response:true,operator_question_terminal:false} : {}),
           execution_mode: selectedMode,
           plan,
           sandbox,
@@ -6168,7 +6296,7 @@ async function startCodexAppTask(
           codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
           timeout_ms: timeoutMs,
           started_at: startedAt,
-          completed_at: finishedAt,
+          ...(operatorQuestion ? {} : {completed_at: finishedAt}),
           result_path: rootRelative(root, paths.resultPath),
           stdout_path: rootRelative(root, paths.stdoutPath),
           stderr_path: rootRelative(root, paths.stderrPath),
@@ -6183,18 +6311,19 @@ async function startCodexAppTask(
       "utf8",
     ).catch(() => undefined);
     await progress({
-      phase: status === "complete" ? "completed" : "failed",
-      level: status === "complete" ? "complete" : "error",
+      phase: operatorQuestion ? "waiting_for_operator" : status === "complete" ? "completed" : "failed",
+      level: operatorQuestion ? "warning" : status === "complete" ? "complete" : "error",
       status,
       transport: "codex-app",
-      message: status === "complete" ? "Codex App task completed." : "Codex App task failed.",
+      message: operatorQuestion ? "Codex task is waiting for an operator answer." : status === "complete" ? "Codex App task completed." : "Codex App task failed.",
       elapsed_ms: elapsedMsSince(startedAt, Date.parse(finishedAt)),
     });
     await emitCodexVoiceProgress(taskId, paths.voiceFeedbackPath, paths.progressPath, {
-      phase: status === "complete" ? "completed" : "failed",
+      phase: operatorQuestion ? "waiting_for_operator" : status === "complete" ? "completed" : "failed",
       speakable: true,
       priority: status === "complete" ? "normal" : "high",
-      voice_text: status === "complete" ? "Codex завершил задачу, результат готов." : "Codex завершил задачу с ошибкой. Подробности доступны в карточке задачи.",
+      voice_text: operatorQuestion ? operatorQuestion : status === "complete" ? "Codex завершил задачу, результат готов." : "Codex завершил задачу с ошибкой. Подробности доступны в карточке задачи.",
+    });
     });
   })().catch(async (error) => {
     clearInterval(heartbeat);
@@ -6202,6 +6331,14 @@ async function startCodexAppTask(
     const finishedAt = new Date().toISOString();
     const status = statusForCodexAppError(error);
     const message = error instanceof Error ? error.message : "Codex App task failed";
+    if (error instanceof CodexDispatchError && error.deliveryState === "not_dispatched" && ["capacity_busy","turn_active"].includes(error.code)) {
+      await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
+        if (await taskWasAborted()) return;
+        finishVoiceWorkflow(taskId,"waiting_admission");
+        await enqueueVoiceAdmission("codex-app",task,paths,error.code);
+      });
+      return;
+    }
     const fallbackTask = {
       ...task,
       effective_transport: "codex-cli",
@@ -6209,7 +6346,7 @@ async function startCodexAppTask(
       fallback_reason: message,
     };
 
-    if (String(task.fallback_transport || "") === "codex-cli" && codexAvailable().available) {
+    if (safeCodexCliFallback(error, anyTurnDispatched) && String(task.fallback_transport || "") === "codex-cli" && (await codexAvailable()).available) {
       await progress({
         phase: "fallback_started",
         level: "warning",
@@ -6225,10 +6362,14 @@ async function startCodexAppTask(
         voice_text: `Codex App остановился, поэтому я переключаю эту же задачу на Codex CLI и продолжаю работу. Причина: ${compactText(message, 360)}`,
       });
       await appendFile(paths.stderrPath, `${finishedAt} Codex App transport failed: ${message}\n${finishedAt} Starting Codex CLI fallback for the same task.\n`, "utf8").catch(() => undefined);
-      await startCodexExec(fallbackTask, paths);
+      await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
+        if (await taskWasAborted()) return;
+        await startCodexExec(fallbackTask, paths, true);
+      });
       return;
     }
 
+    finishVoiceWorkflow(taskId, error instanceof CodexDispatchError && error.deliveryState === "not_dispatched" && !anyTurnDispatched ? "not_dispatched" : "unknown");
     await writeFile(paths.resultPath, `Codex App transport failed.\n\n${compactText(message, 4_000)}\n`, "utf8").catch(() => undefined);
     await appendFile(paths.stderrPath, `${finishedAt} ${message}\n`, "utf8").catch(() => undefined);
     await writeFile(
@@ -6272,8 +6413,19 @@ async function startCodexAppTask(
       priority: "high",
       voice_text: `Codex App завершился с ошибкой и fallback недоступен. Подробности доступны в карточке задачи. Причина: ${compactText(message, 360)}`,
     });
-  }).finally(() => {
-    activeCodexAppAbortHandles.delete(taskId);
+  }).finally(() => nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
+    if (activeCodexAppAbortHandles.get(taskId)?.controller === abortController) {
+      if (abortController.signal.aborted) {
+        settleAbortedVoiceWorkflow(taskId);
+        const confirmed=voiceWorkflow(taskId)?.state==="completed";
+        const current=await readJsonFile(paths.statusPath);
+        await writeFile(paths.statusPath,JSON.stringify({...current,status:confirmed?"aborted":"stopping",phase:confirmed?"aborted":"stop_unconfirmed",recovery_required:!confirmed,updated_at:new Date().toISOString()},null,2)+"\n").catch(()=>undefined);
+      }
+      activeCodexAppAbortHandles.delete(taskId);
+      closeControl();
+    }
+  })).catch(async error => {
+    await appendFile(paths.stderrPath, `Execution reconciliation failed: ${String(error)}\n`, "utf8").catch(() => undefined);
   });
 
   return {
@@ -6309,16 +6461,20 @@ function normalizeCodexTaskResult(raw: unknown, requestId: string, startedAt: st
 async function startCodexExec(
   task: Record<string, unknown>,
   paths: { resultPath: string; statusPath: string; stdoutPath: string; stderrPath: string; progressPath: string },
+  existingWorkflow = false,
 ) {
-  const root = resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
   const settings = getPrithaRuntimeSettings();
   const taskType = String(task.task_type || "analysis");
   const sandbox = codexSandboxForTask(taskType, String(task.write_mode || "read_only"));
   const additionalWritableDirs = [
     ...codexAdditionalWritableDirs(root, task, sandbox),
+    ...codexFactoryStateWritableDirs(root,task,sandbox),
     ...(sandbox === "workspace-write" ? codexExistingChildAgentWritableDirs(root, task) : []),
   ];
   const writableRoots = codexWritableRootEntries(root, additionalWritableDirs);
+  task.execution_writable_roots = additionalWritableDirs;
+  if (!existingWorkflow) beginVoiceWorkflow(task, root, settings.codexAppThreadRoutingMode, sandbox);
   const config = ['approval_policy="never"'];
   config.push(...codexCliConfigEntries({
     model: settings.codexModel,
@@ -6343,26 +6499,68 @@ async function startCodexExec(
     paths.resultPath,
     "-",
   ];
-  if (codexExecSupportsEphemeral()) args.splice(1, 0, "--ephemeral");
+  if (await codexExecSupportsEphemeral()) args.splice(1, 0, "--ephemeral");
   const model = settings.codexModel || env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", ""));
   if (model) args.splice(1, 0, "-m", model);
 
-  const stdoutFd = openSync(paths.stdoutPath, "a");
-  const stderrFd = openSync(paths.stderrPath, "a");
   const timeoutMs = codexEffectiveTimeoutMs();
   const startedAt = new Date().toISOString();
   const taskId = String(task.id || "");
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, paths.progressPath, event);
   let killedByTimeout = false;
-  const child = spawn(codexCliBin(), args, {
+  const coordinator = nativeExecutionCoordinator();
+  const workflow = voiceWorkflow(taskId);
+  if (!workflow || workflow.state !== "running" || !coordinator.claims().some(row => row.owner === workflow.owner && row.generation === workflow.generation)) throw new Error("voice_owner_not_running");
+  const attemptKey = `voice-cli:${taskId}:${workflow.round}`;
+  const {intent} = coordinator.reserveIntent(attemptKey, createHash("sha256").update(buildCodexPrompt(task)).digest("hex"), {kind:"voice-cli",taskId,round:workflow.round});
+  if (!["reserved","not_dispatched"].includes(intent.state)) throw new Error("cli_delivery_unconfirmed");
+  const capacityLease = coordinator.claim([attemptKey], attemptKey, {kind:"turn",capacity:coordinator.admission().capacity,detail:{taskId,intentKey:attemptKey}});
+  if (!capacityLease) throw new CodexDispatchError("capacity_busy","The execution limit is reached; CLI has not started.","not_dispatched");
+  coordinator.updateIntent(attemptKey,{state:"dispatching",owner:capacityLease.owner,generation:capacityLease.generation},intent.revision);
+  let stdoutFd:number|undefined,stderrFd:number|undefined;
+  let child:ReturnType<typeof spawn>;
+  try {
+    stdoutFd = openSync(paths.stdoutPath, "a");
+    stderrFd = openSync(paths.stderrPath, "a");
+    child = spawn(codexCliBin(), args, {
     cwd: root,
     env:
       env("PRITHA_REALTIME_CODEX_USE_PROXY", env("TECHSCOPE_VOICE_CODEX_USE_PROXY", "0")) === "1"
         ? { ...process.env, TECHSCOPE_ROOT: root }
         : envWithoutProxy({ TECHSCOPE_ROOT: root }),
     stdio: ["pipe", stdoutFd, stderrFd],
+    detached: true,
   });
 
+  } catch(error) {
+    coordinator.updateIntent(attemptKey,{state:"not_dispatched"});
+    capacityLease.release();finishVoiceWorkflow(taskId,"not_dispatched");
+    throw new CodexDispatchError("cli_start_failed","CLI could not start; no process was dispatched.","not_dispatched");
+  } finally {
+    if(stdoutFd!==undefined)closeSync(stdoutFd);
+    if(stderrFd!==undefined)closeSync(stderrFd);
+  }
+  child.stdin?.on("error",()=>{ /* Completion/owned process reconciliation remains authoritative. */ });
+
+  // Subscribe before the first await so a fast CLI exit cannot disappear.
+  const completion=new Promise<{code:number|null;signal:NodeJS.Signals|null}>(resolve=>{
+    child.once("close",(code,signal)=>resolve({code,signal}));
+    child.once("error",()=>resolve({code:-1,signal:null}));
+  });
+  let owned:OwnedProcess|undefined;
+  try {owned=ownChildProcess(child,root);activeCodexCliProcesses.set(taskId,owned);}
+  catch {
+    child.kill("SIGTERM");
+    coordinator.updateIntent(attemptKey,{state:child.pid ? "unknown" : "not_dispatched"});
+    if(!child.pid)capacityLease.release();
+    finishVoiceWorkflow(taskId,child.pid ? "unknown" : "not_dispatched");
+    throw new Error("CLI process ownership could not be verified.");
+  }
+  const closeControl=registerExecutionChannel(coordinator,`voice-workflow-control:${taskId}`,{
+    view:()=>activeCodexCliProcesses.get(taskId)===owned ? {taskId} : null,
+    call:input=>abortPrithaCodexTask(taskId,input.reason,input.expectedRevision),
+  });
+  coordinator.updateIntent(attemptKey,{state:"running",pid:owned.pid,processBirth:owned.birth,processGroup:owned.group,processGeneration:owned.generation});
   child.stdin?.end(buildCodexPrompt(task));
   await writeFile(
     paths.statusPath,
@@ -6373,6 +6571,9 @@ async function startCodexExec(
 	          phase: "runner_started",
           transport: "codex-cli",
           pid: child.pid,
+          process_generation: owned.generation,
+          process_birth: owned.birth,
+          process_group: owned.group,
         sandbox,
         writable_roots: writableRoots,
         thread_scope: task.thread_scope,
@@ -6420,14 +6621,26 @@ async function startCodexExec(
       message: "Codex CLI task reached its timeout; sending termination signal.",
       elapsed_ms: elapsedMsSince(startedAt),
     });
-    child.kill("SIGTERM");
-    setTimeout(() => child.kill("SIGKILL"), 5_000).unref();
+    signalOwnedProcess(owned);
+    setTimeout(() => { if (activeCodexCliProcesses.get(taskId) === owned) signalOwnedProcess(owned,"SIGKILL"); }, 5_000).unref();
   }, timeoutMs);
   timer.unref();
 
-  child.on("close", async (code, signal) => {
+  void completion.then(({code,signal}) => coordinator.withMutation(`voice-control:${taskId}`, async () => {
+    const ownsCurrent=activeCodexCliProcesses.get(taskId)===owned;
+    if (!ownsCurrent) return;
+    activeCodexCliProcesses.delete(taskId);closeControl();
+    const groupExited=ownedGroupExited(owned);
+    coordinator.updateIntent(attemptKey,{state:groupExited ? "completed" : "unknown",code,signal});
+    if (groupExited) capacityLease.release();
+    finishVoiceWorkflow(String(task.id), groupExited ? "completed" : "unknown");
     clearTimeout(timer);
     clearInterval(heartbeat);
+    if (owned?.stopRequested) {
+      const current=await readJsonFile(paths.statusPath);
+      await writeFile(paths.statusPath,JSON.stringify({...current,status:groupExited?"aborted":"stopping",phase:groupExited?"aborted":"stop_unconfirmed",recovery_required:!groupExited,updated_at:new Date().toISOString()},null,2)+"\n").catch(()=>undefined);
+      return;
+    }
     if (await codexTaskIsAborted(paths.statusPath)) return;
     const resultText = await readFile(paths.resultPath, "utf8").catch(() => "");
     const hasResult = Boolean(resultText.trim());
@@ -6486,6 +6699,8 @@ async function startCodexExec(
       signal: signal ?? undefined,
       elapsed_ms: elapsedMsSince(startedAt),
     });
+  })).catch(async error => {
+    await appendFile(paths.stderrPath, `CLI completion reconciliation failed: ${String(error)}\n`, "utf8").catch(() => undefined);
   });
 
   child.unref();
@@ -6510,8 +6725,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
   const settings = getPrithaRuntimeSettings();
   const requestedMode = codexMode();
   const requestedTransport = settings.deepTaskPrimaryTransport;
-  const cli = codexAvailable();
-  const app = requestedMode === "queue" ? { available: false, detail: "disabled by queue mode" } : codexAppAvailable();
+  const cli = await codexAvailable();
+  const app = requestedMode === "queue" ? { available: false, detail: "disabled by queue mode" } : await codexAppAvailable();
   const fallbackTransport = requestedTransport === "codex-app" ? "codex-cli" : "codex-app";
   const effectiveTransport: DeepTaskPrimaryTransport | "queue" =
     requestedMode === "queue"
@@ -6542,7 +6757,8 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
     subject_kind: normalizeThreadScopeKind(args.subject_kind) || undefined,
     subject_id: normalizeThreadScopeId(args.subject_id) || undefined,
     subject_label: args.subject_label ? normalizeThreadScopeLabel(args.subject_label, String(args.subject_id || "subject")) : undefined,
-    thread_reset: boolValue(args.thread_reset),
+    thread_reset: boolValue(args.thread_reset) || args.continuation_mode === "force_new",
+    independent_execution: args.continuation_mode === "force_new",
     root: rootRelative(root, root),
     sibling_agent_parent: rootRelative(root, resolvePrithaAgentParent(root)),
     sibling_agent_parent_absolute: resolvePrithaAgentParent(root),
@@ -6578,6 +6794,9 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
       continue_task_id: normalizeCodexTaskRef(args.continue_task_id) || undefined,
     });
     return continuation.response;
+  }
+  if (task.independent_execution) {
+    task.thread_scope = {kind:"task",id:taskId,label:String(task.task).slice(0,80),source:"independent",generation:1};
   }
   if (continuation.action === "selected") {
     applyContinuationToTask(task, continuation.selected, continuation.historyContext, args);
@@ -6650,20 +6869,23 @@ async function runCodexTask(args: CodexTaskArgs = {}) {
           : "Codex task created and ready for sidecar execution.",
   });
 
-  let exec: Awaited<ReturnType<typeof startCodexExec>> | Awaited<ReturnType<typeof startCodexAppTask>> | null = null;
-  if (task.status === "decision_required") {
-    await logPrivateEvent("codex_task_decision_required", { task_id: taskId, approval });
-  } else if (effectiveTransport === "codex-app") {
-    exec = await startCodexAppTask(task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
-  } else if (effectiveTransport === "codex-cli") {
-    exec = await startCodexExec(task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
-  }
+  let exec: Awaited<ReturnType<typeof startAdmittedVoiceTask>> | null = null;
+  await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
+    if (await codexTaskIsAborted(statusPath)) return;
+    if (task.status === "decision_required") {
+      await logPrivateEvent("codex_task_decision_required", { task_id: taskId, approval });
+    } else if (effectiveTransport === "codex-app") {
+      exec = await startAdmittedVoiceTask("codex-app", task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
+    } else if (effectiveTransport === "codex-cli") {
+      exec = await startAdmittedVoiceTask("codex-cli", task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
+    }
+  });
 
   return {
     ok: true,
     task_id: taskId,
     short_id: shortId,
-    status: task.status,
+    status: (exec as {status?:string}|null)?.status || task.status,
     mode: task.status === "decision_required" ? "approval" : effectiveMode,
     requested_mode: requestedMode,
     requested_transport: requestedTransport,
@@ -6808,6 +7030,7 @@ async function resolveCodexTaskIdRef(taskRef: unknown) {
 }
 
 const activeCodexAppAbortHandles = new Map<string, CodexAppAbortHandle>();
+const activeCodexCliProcesses = new Map<string, OwnedProcess>();
 
 function taskTelemetryFromEvents(taskId?: string) {
   const eventsPath = path.join(privateRoot(), "events.jsonl");
@@ -7154,6 +7377,7 @@ async function codexTaskSummary(id: string) {
 }
 
 export async function listPrithaCodexTasks(limit = 5) {
+  wakeVoiceAdmissions();
   const root = privateRoot();
   const tasksRoot = path.join(root, "codex-tasks");
   if (!existsSync(tasksRoot)) return { ok: true, tasks: [] };
@@ -7506,42 +7730,6 @@ function codexTaskPidCommand(pid: unknown) {
   return String(result.stdout || "").trim();
 }
 
-function codexTaskPidLooksAbortable(pid: unknown) {
-  const command = codexTaskPidCommand(pid);
-  if (!command) return { ok: false, command, reason: "process_command_unavailable" };
-  if (/(^|[/\s])codex(\s|$)|Codex\.app|app-server/i.test(command)) return { ok: true, command, reason: "codex_process_match" };
-  return { ok: false, command, reason: "process_not_codex" };
-}
-
-function signalCodexTaskPid(pid: unknown) {
-  const numericPid = Number(pid);
-  if (!Number.isFinite(numericPid) || numericPid <= 0) return { attempted: false, signaled: false, reason: "invalid_pid" };
-  if (!processIsAlive(numericPid)) return { attempted: false, signaled: false, reason: "pid_not_alive", pid: numericPid };
-  const check = codexTaskPidLooksAbortable(numericPid);
-  if (!check.ok) return { attempted: false, signaled: false, pid: numericPid, command: check.command, reason: check.reason };
-  try {
-    process.kill(numericPid, "SIGTERM");
-    setTimeout(() => {
-      if (processIsAlive(numericPid)) {
-        try {
-          process.kill(numericPid, "SIGKILL");
-        } catch {
-          // The process may have already exited after SIGTERM.
-        }
-      }
-    }, 5_000).unref();
-    return { attempted: true, signaled: true, pid: numericPid, command: check.command, reason: "sigterm_sent" };
-  } catch (error) {
-    return {
-      attempted: true,
-      signaled: false,
-      pid: numericPid,
-      command: check.command,
-      reason: error instanceof Error ? error.message : "signal_failed",
-    };
-  }
-}
-
 async function codexTaskStatusValue(statusPath: string) {
   const status = await readJsonFile(statusPath);
   return String(status?.status || "");
@@ -7551,7 +7739,18 @@ async function codexTaskIsAborted(statusPath: string) {
   return (await codexTaskStatusValue(statusPath)) === "aborted";
 }
 
-export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
+export async function abortPrithaCodexTask(taskRef: string, reason?: unknown, expectedRevision?:number):Promise<Record<string,any>> {
+  const id = await resolveCodexTaskIdRef(taskRef);
+  if (!id) return abortPrithaCodexTaskOwned(taskRef,reason);
+  const coordinator=nativeExecutionCoordinator();
+  if(!activeCodexAppAbortHandles.has(id) && !activeCodexCliProcesses.has(id) && executionChannelView(coordinator,`voice-workflow-control:${id}`))return callExecutionChannel(coordinator,`voice-workflow-control:${id}`,{reason,expectedRevision});
+  return coordinator.withMutation(`voice-control:${id}`, () => {
+    if(expectedRevision!==undefined && voiceWorkflow(id)?.revision!==expectedRevision)return Promise.resolve({ok:false,error:"voice_task_changed"});
+    return abortPrithaCodexTaskOwned(id,reason);
+  });
+}
+
+async function abortPrithaCodexTaskOwned(taskRef: string, reason?: unknown) {
   const id = await resolveCodexTaskIdRef(taskRef);
   if (!id) {
     await logPrivateEvent("codex_task_abort", { ok: false, error: "invalid_task_id" });
@@ -7578,7 +7777,7 @@ export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
   const shortId = await ensureCodexTaskShortId(id);
   const abortReason = compactText(reason || "operator_requested", 300) || "operator_requested";
 
-  if (TERMINAL_CODEX_TASK_STATUSES.has(statusValue)) {
+  if (TERMINAL_CODEX_TASK_STATUSES.has(statusValue) && (!voiceWorkflow(id) || voiceWorkflow(id)?.state==="completed")) {
     await logPrivateEvent("codex_task_abort", { ok: true, task_id: id, short_id: shortId, status: statusValue, already_terminal: true });
     return {
       ...(await getPrithaCodexTask(id)),
@@ -7590,10 +7789,20 @@ export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
   const now = new Date().toISOString();
   const handle = activeCodexAppAbortHandles.get(id);
   if (handle) handle.controller.abort();
-  const pidSignal = signalCodexTaskPid(status?.pid);
+  const cliOwner=activeCodexCliProcesses.get(id);
+  const pidSignal=cliOwner?signalOwnedProcess(cliOwner):{attempted:false,signaled:false,reason:"process_owner_unavailable"};
+  if (cliOwner && pidSignal.signaled) cliOwner.stopRequested=true;
+  if (cliOwner && pidSignal.signaled) setTimeout(()=>{if(activeCodexCliProcesses.get(id)===cliOwner)signalOwnedProcess(cliOwner,"SIGKILL");},5_000).unref();
+  const idleOwnedWorkflow=voiceWorkflow(id);
+  const phases=[...nativeExecutionCoordinator().listIntents({kind:"voice-turn",limit:1000}),...nativeExecutionCoordinator().listIntents({kind:"voice-cli",limit:1000})].filter(row=>row.taskId===id && row.round===idleOwnedWorkflow?.round);
+  const recoveredTerminal=idleOwnedWorkflow?.state==="unknown" && phases.length>0 && phases.every(row=>["completed","not_dispatched"].includes(row.state));
+  const canCancelWithoutProcess=recoveredTerminal || ["queued","awaiting_operator_confirmation","waiting_for_approval"].includes(statusValue) || ["waiting_for_operator","waiting_admission"].includes(String(idleOwnedWorkflow?.state));
+  if (!handle && !pidSignal.signaled && !canCancelWithoutProcess) return { ...(await getPrithaCodexTask(id)), abort_applied:false,recovery_required:true,operator_note:"The original execution owner is unavailable. No process was signaled; reconcile this task before controlling it." };
+  if (!handle && (recoveredTerminal || ["waiting_for_operator","waiting_admission"].includes(String(idleOwnedWorkflow?.state)))) settleAbortedVoiceWorkflow(id);
+  const stopStatus=handle || pidSignal.signaled ? "stopping" : "aborted";
   const resultText = await readFile(resultPath, "utf8").catch(() => "");
   const abortNote = [
-    "Codex task aborted by the operator.",
+    "Codex task stop requested by the operator.",
     "",
     `Task id: ${id}`,
     shortId ? `Short id: ${shortId}` : "",
@@ -7611,7 +7820,7 @@ export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
       `${JSON.stringify(
         {
           ...request,
-          status: "aborted",
+          status: stopStatus,
           short_id: shortId,
           previous_status: statusValue,
           abort_reason: abortReason,
@@ -7630,14 +7839,14 @@ export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
     `${JSON.stringify(
       {
         ...(status || {}),
-        status: "aborted",
+        status: stopStatus,
         short_id: shortId,
-        phase: "aborted",
+        phase: stopStatus,
         previous_status: statusValue,
         abort_reason: abortReason,
         aborted_at: now,
         aborted_by: "pritha-control-center-ui",
-        completed_at: now,
+        ...(stopStatus === "aborted" ? {completed_at: now} : {}),
         updated_at: now,
         transport: status?.transport || request?.effective_transport || request?.requested_transport || "unknown",
         pid: status?.pid,
@@ -7658,19 +7867,19 @@ export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
   ).catch(() => undefined);
 
   await appendCodexTaskProgress(id, progressPath, {
-    phase: "aborted",
+    phase: stopStatus,
     level: "warning",
-    status: "aborted",
+    status: stopStatus,
     transport: String(status?.transport || request?.effective_transport || "unknown"),
-    message: "Codex task aborted by the operator from the task card.",
+    message: stopStatus === "aborted" ? "Queued or waiting task cancelled by the operator." : "Stop requested; waiting for the execution owner to confirm completion.",
     reason: abortReason,
     pid_signal_reason: String(pidSignal.reason || ""),
   });
   await appendCodexVoiceFeedback(id, voiceFeedbackPath, {
-    phase: "aborted",
+    phase: stopStatus,
     priority: "high",
     speakable: true,
-    voice_text: `Codex-задача #${shortId || id.slice(0, 8)} остановлена оператором.`,
+    voice_text: stopStatus === "aborted" ? `Codex-задача #${shortId || id.slice(0, 8)} отменена.` : `Остановка Codex-задачи #${shortId || id.slice(0, 8)} запрошена. Жду подтверждения завершения.`,
     requires_response: false,
   });
   await logPrivateEvent("codex_task_abort", {
@@ -7687,11 +7896,17 @@ export async function abortPrithaCodexTask(taskRef: string, reason?: unknown) {
     abort_applied: true,
     pid_signal: pidSignal,
     app_abort_signal_sent: Boolean(handle),
-    operator_note: "Codex task aborted from the task card.",
+    operator_note: stopStatus === "aborted" ? "Task cancelled." : "Stop requested; completion has not yet been confirmed.",
   };
 }
 
 export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
+  const id = await resolveCodexTaskIdRef(args.task_id) || await latestWaitingCodexTaskId();
+  if (!id) return answerPrithaCodexTaskOwned(args);
+  return nativeExecutionCoordinator().withMutation(`voice-control:${id}`, () => answerPrithaCodexTaskOwned({...args,task_id:id}));
+}
+
+async function answerPrithaCodexTaskOwned(args: AnswerCodexTaskArgs) {
   const spokenAnswer = compactText(args.answer, 4_000);
   if (!spokenAnswer) {
     await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "missing_answer" });
@@ -7705,6 +7920,9 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
     await logPrivateEvent("codex_task_operator_answer", { ok: false, error: "no_waiting_codex_task" });
     return { ok: false, error: "no_waiting_codex_task" };
   }
+
+  const workflow=voiceWorkflow(id);
+  if (args.expected_revision !== undefined && (!workflow || workflow.revision!==args.expected_revision || workflow.questionId!==args.expected_question_id || workflow.state!=="waiting_for_operator")) return {ok:false,error:"voice_question_changed",task_id:id};
 
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
   if (!isPathInsideOrSame(privateRoot(), taskDir) || !existsSync(taskDir)) {
@@ -7736,6 +7954,10 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
   const operatorConfirmation = compactText(args.operator_confirmation, 700);
   const synthesizedAnswer = synthesizeCodexOperatorAnswer(question, spokenAnswer);
   const answer = synthesizedAnswer.answer;
+  if(request.workspace_question_agent) {
+    try {scopedAgentWorkspace(resolvePrithaAgentParent(root),spokenAnswer.trim());}
+    catch{return {ok:false,error:"agent_workspace_target_required",task_id:id};}
+  }
   const operatorAnswer = {
     question,
     answer,
@@ -7750,8 +7972,11 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
       "Operator answered the Codex clarification by voice and asked Codex to continue the same task.",
   };
   const existingAnswers = Array.isArray(request.operator_answers) ? request.operator_answers : [];
+  if (request.workspace_question_base && spokenAnswer.trim() !== request.workspace_question_base) return {ok:false,error:"workspace_base_confirmation_required",task_id:id};
   const nextRequest: Record<string, unknown> = {
     ...request,
+    ...(request.workspace_question_agent ? {execution_agent_directory_name:spokenAnswer.trim(),workspace_question_agent:undefined} : {}),
+    ...(request.workspace_question_base ? {workspace_base_revision:request.workspace_question_base,workspace_question_base:undefined} : {}),
     short_id: shortId,
     status: "running",
     operator_question_answered: true,
@@ -7821,11 +8046,11 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
   });
 
   const effectiveTransport = String(nextRequest.effective_transport || status?.transport || "codex-app");
-  let exec: Awaited<ReturnType<typeof startCodexExec>> | Awaited<ReturnType<typeof startCodexAppTask>> | null = null;
+  let exec: Awaited<ReturnType<typeof startAdmittedVoiceTask>> | null = null;
   if (effectiveTransport === "codex-app") {
-    exec = await startCodexAppTask(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
+    exec = await startAdmittedVoiceTask("codex-app", nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
   } else if (effectiveTransport === "codex-cli") {
-    exec = await startCodexExec(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
+    exec = await startAdmittedVoiceTask("codex-cli", nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
   } else {
     await progress({
       phase: "queued",
@@ -7847,6 +8072,12 @@ export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
 }
 
 export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApprovalAction) {
+  const id = await resolveCodexTaskIdRef(taskId);
+  if (!id) return decidePrithaCodexTaskOwned(taskId,action);
+  return nativeExecutionCoordinator().withMutation(`voice-control:${id}`, () => decidePrithaCodexTaskOwned(id,action));
+}
+
+async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskApprovalAction) {
   const id = await resolveCodexTaskIdRef(taskId);
   if (!id) {
     await logPrivateEvent("codex_task_approval_decision", { ok: false, error: "invalid_task_id" });
@@ -7945,7 +8176,7 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
   await writeFile(requestPath, `${JSON.stringify(nextRequest, null, 2)}\n`, "utf8");
   await writeFile(promptPath, `${buildCodexPrompt(nextRequest)}\n`, "utf8");
 
-  let exec: Awaited<ReturnType<typeof startCodexExec>> | Awaited<ReturnType<typeof startCodexAppTask>> | null = null;
+  let exec: Awaited<ReturnType<typeof startAdmittedVoiceTask>> | null = null;
   await progress({
     phase: "approval_approved",
     level: "info",
@@ -7962,9 +8193,9 @@ export async function decidePrithaCodexTask(taskId: string, action: CodexTaskApp
     requires_response: false,
   });
   if (effectiveTransport === "codex-app") {
-    exec = await startCodexAppTask(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
+    exec = await startAdmittedVoiceTask("codex-app", nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
   } else if (effectiveTransport === "codex-cli") {
-    exec = await startCodexExec(nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
+    exec = await startAdmittedVoiceTask("codex-cli", nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
   } else {
     await writeFile(
       statusPath,
@@ -8047,11 +8278,10 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
   return output;
 }
 
-export function getPrithaRealtimeStatus() {
+export async function getPrithaRealtimeStatus() {
   const config = buildRealtimeSessionConfig();
   const root = resolveTechscopeRoot();
-  const codex = codexAvailable();
-  const codexApp = codexAppAvailable();
+  const [codex,codexApp] = await Promise.all([codexAvailable(),codexAppAvailable()]);
   const runtimeSettings = getPrithaRuntimeSettings();
   const last30days = realtimeLast30DaysStatus(root);
   return {

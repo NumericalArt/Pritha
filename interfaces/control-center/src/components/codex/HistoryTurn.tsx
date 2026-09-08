@@ -45,7 +45,7 @@ function HistoryText({ chatId, id, preview, contentRef, code = false }: { chatId
 }
 function HistoryItem({ chatId, item }: { chatId: string; item: ChatItemView }) {
   const [open, setOpen] = useState(false);
-  if (item.kind === "assistant_message") return <HistoryText chatId={chatId} id={item.id} preview={item.message.markdown} contentRef={item.message.contentRef} />;
+  if (item.kind === "assistant_message" || item.kind === "user_message") return <HistoryText chatId={chatId} id={item.id} preview={item.message.markdown} contentRef={item.message.contentRef} />;
   const label = item.kind === "command" ? `Command · ${item.status}` : item.kind === "file_change" ? "Files changed" : item.kind === "reasoning_summary" ? "Reasoning summary" : item.kind.replaceAll("_", " ");
   const preview = item.kind === "command" ? item.commandPreview : item.kind === "reasoning_summary" ? item.markdown : item.kind === "notice" ? item.text : item.kind === "tool" ? item.displayName : item.kind === "web_search" ? item.query : item.kind === "plan" ? item.steps.map(x => `${x.status}: ${x.label}`).join("\n") : item.kind === "file_change" ? item.changes.map(x => `${x.operation}: ${x.path}`).join("\n") : "";
   return <details className="codex-activity" onToggle={event => setOpen(event.currentTarget.open)}>
@@ -105,7 +105,7 @@ export function HistoryTurn({ chatId, turn }: { chatId: string; turn: TurnView }
   </article>;
   return <section className="codex-turn" aria-label={`Turn ${turn.status}`}>
     {message(turn.userMessage, "user", "You")}
-    {turn.items.filter(item => item.kind === "assistant_message").map(item => item.kind === "assistant_message" ? <div key={item.id}>{message(item.message, item.id, "Pritha")}</div> : null)}
+    {turn.items.map(item => item.kind === "assistant_message" || item.kind === "user_message" ? <div key={item.id}>{message(item.message, item.id, item.kind === "user_message" ? "You" : "Pritha")}</div> : null)}
     <details className="codex-activity" open={open} onToggle={event => { const next = event.currentTarget.open; setOpen(next); if (next && !items.length) void more(); }}>
       <summary>Activity · {turn.status.replaceAll("_", " ")}</summary>
       {open ? <div>

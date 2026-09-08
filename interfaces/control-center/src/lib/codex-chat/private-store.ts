@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { appendPrivateAuditEvent, atomicWritePrivateJson } from "@/lib/private-json";
+import { ExecutionCoordinator } from "../../../../../scripts/lib/execution-coordinator.mjs";
+import type { TaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
 import type { AttachmentMessage, RuntimeProviderId, TaskLinkView, ThreadGroup, ThreadOrigin, ThreadStatus } from "./types";
 import type { GoalBudgetReceipt } from "./goal-control";
 import type { DeliveryBudgetReceipt } from "./delivery-types";
@@ -21,6 +23,8 @@ export type ChatBinding = {
   createHash: string;
   nativeThreadId: string;
   providerId: RuntimeProviderId;
+  workspace?: TaskWorkspace;
+  sandbox?: string;
   stateIdentityHash: string | null;
   group: ThreadGroup;
   origin: ThreadOrigin;
@@ -80,6 +84,8 @@ function normalizeBinding(value: unknown): ChatBinding | null {
     createHash: String(row.createHash || ""),
     nativeThreadId: String(row.nativeThreadId),
     providerId: row.providerId,
+    ...(row.workspace && typeof row.workspace === "object" ? {workspace:row.workspace} : {}),
+    ...(typeof row.sandbox === "string" ? {sandbox:row.sandbox} : {}),
     stateIdentityHash: typeof row.stateIdentityHash === "string" ? row.stateIdentityHash : null,
     group: row.group === "voice_work" || row.group === "other_sessions" ? row.group : "my_chats",
     origin: row.origin === "voice" || row.origin === "external" || row.origin === "exec_fallback" ? row.origin : "chat",
@@ -139,9 +145,15 @@ export class CodexChatPrivateStore {
   readonly backupPath = path.join(this.root, "registry.last-known-good.json");
   readonly auditPath = path.join(this.root, "registry.audit.jsonl");
   readonly capabilitiesRoot = path.join(this.root, "runtime-capabilities");
-  private registry: RegistryFile | null = null;
   private readOnlyError: CodexChatRegistryError | null = null;
   private mutationQueue: Promise<void> = Promise.resolve();
+  private coordinator: ExecutionCoordinator | null = null;
+
+  get execution() {
+    return this.coordinator ||= new ExecutionCoordinator({ stateRoot: this.stateRoot, directory: path.join(this.root, "execution") });
+  }
+
+  close() { this.coordinator?.close(); this.coordinator = null; }
 
   async all() {
     const registry = await this.load();
@@ -175,9 +187,23 @@ export class CodexChatPrivateStore {
   async put(binding: ChatBinding) {
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;
-      const registry = await this.load();
+      const registry = await this.load(true);
       registry.chats[binding.chatId] = normalizeBinding(binding) || binding;
-      await this.persist();
+      await this.persist(registry);
+      return registry.chats[binding.chatId];
+    });
+  }
+
+  async putCreatedBinding(binding: ChatBinding) {
+    return this.enqueueMutation(async () => {
+      const registry = await this.load(true);
+      const current = Object.values(registry.chats).find(row => row.clientThreadId === binding.clientThreadId);
+      if (current) {
+        if (current.createHash !== binding.createHash) throw new Error("idempotency_conflict");
+        return current;
+      }
+      registry.chats[binding.chatId] = normalizeBinding(binding) || binding;
+      await this.persist(registry);
       return registry.chats[binding.chatId];
     });
   }
@@ -185,12 +211,36 @@ export class CodexChatPrivateStore {
   async patch(chatId: string, patch: Partial<ChatBinding>) {
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;
-      const registry = await this.load();
+      const registry = await this.load(true);
       const current = registry.chats[chatId];
       if (!current) return null;
-      const next = normalizeBinding({ ...current, ...patch, chatId }) || current;
+      const next = normalizeBinding({ ...current, ...patch, chatId,
+        messageReceipts: { ...current.messageReceipts, ...patch.messageReceipts },
+        attachmentMessages: { ...current.attachmentMessages, ...patch.attachmentMessages },
+        goalBudgetRequests: { ...current.goalBudgetRequests, ...patch.goalBudgetRequests },
+        deliveryBudgetRequests: { ...current.deliveryBudgetRequests, ...patch.deliveryBudgetRequests },
+      }) || current;
       registry.chats[chatId] = next;
-      await this.persist();
+      await this.persist(registry);
+      return next;
+    });
+  }
+
+  async mergeVoiceBinding(proposed: ChatBinding, link: TaskLinkView) {
+    return this.enqueueMutation(async () => {
+      const registry = await this.load(true);
+      const current = Object.values(registry.chats).find(row => row.providerId === proposed.providerId && row.nativeThreadId === proposed.nativeThreadId);
+      const priorLink = current?.taskLinks.find(row => row.taskId === link.taskId);
+      const nextLink = { ...link, mode: priorLink?.mode || link.mode };
+      const next = current ? {
+        ...current,
+        stateIdentityHash: current.stateIdentityHash || proposed.stateIdentityHash,
+        updatedAt: Date.parse(current.updatedAt) > Date.parse(proposed.updatedAt) ? current.updatedAt : proposed.updatedAt,
+        lastStatus: proposed.lastStatus === "active" ? "active" as const : current.lastStatus,
+        taskLinks: [...current.taskLinks.filter(row => row.taskId !== link.taskId), nextLink],
+      } : { ...proposed, taskLinks: [nextLink] };
+      registry.chats[next.chatId] = next;
+      await this.persist(registry);
       return next;
     });
   }
@@ -198,7 +248,7 @@ export class CodexChatPrivateStore {
   async migrateIdentity(chatId: string, expected: string | null, replacement: string) {
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;
-      const registry = await this.load();
+      const registry = await this.load(true);
       const current = registry.chats[chatId];
       if (!current) throw new Error("chat_not_found");
       if (current.stateIdentityHash === replacement) return current;
@@ -208,7 +258,7 @@ export class CodexChatPrivateStore {
       if (await readOptional(backup) == null) await this.writeRegistry(backup, registry);
       const next = { ...current, stateIdentityHash: replacement };
       registry.chats[chatId] = next;
-      try { await this.persist(); } catch (error) { registry.chats[chatId] = current; throw error; }
+      try { await this.persist(registry); } catch (error) { registry.chats[chatId] = current; throw error; }
       await this.audit("identity-converted-v2", { chatRef: key.slice(0, 16), sourcePreserved: true });
       return next;
     });
@@ -217,14 +267,14 @@ export class CodexChatPrivateStore {
   async setArchived(chatId: string, archived: boolean) {
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;
-      const registry = await this.load();
+      const registry = await this.load(true);
       const selected = registry.chats[chatId];
       if (!selected) return null;
       const key = logicalChatKey(selected);
       const original = registry.chats;
       registry.chats = Object.fromEntries(Object.entries(original).map(([id, row]) =>
         [id, logicalChatKey(row) === key ? { ...row, archived } : row]));
-      try { await this.persist(); } catch (error) { registry.chats = original; throw error; }
+      try { await this.persist(registry); } catch (error) { registry.chats = original; throw error; }
       return registry.chats[chatId];
     });
   }
@@ -232,13 +282,13 @@ export class CodexChatPrivateStore {
   async prepareAttachmentMessage(chatId: string, messageId: string, message: AttachmentMessage) {
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;
-      const registry = await this.load();
+      const registry = await this.load(true);
       const current = registry.chats[chatId];
       if (!current) throw new Error("chat_not_found");
       const prior = current.attachmentMessages?.[messageId];
       if (prior) return prior.requestHash === message.requestHash;
       registry.chats[chatId] = { ...current, attachmentMessages: { ...current.attachmentMessages, [messageId]: message } };
-      try { await this.persist(); } catch (error) { registry.chats[chatId] = current; throw error; }
+      try { await this.persist(registry); } catch (error) { registry.chats[chatId] = current; throw error; }
       return true;
     });
   }
@@ -246,7 +296,7 @@ export class CodexChatPrivateStore {
   async removeEmptyDirectChat(chatId: string, nativeThreadId: string) {
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;
-      const registry = await this.load();
+      const registry = await this.load(true);
       const current = registry.chats[chatId];
       const removable = current
         && current.nativeThreadId === nativeThreadId
@@ -257,7 +307,7 @@ export class CodexChatPrivateStore {
         && current.taskLinks.length === 0;
       if (!removable) return false;
       delete registry.chats[chatId];
-      await this.persist();
+      await this.persist(registry);
       await this.audit("empty-direct-chat-removed", {
         chatRef: createHash("sha256").update(chatId).digest("hex").slice(0, 16),
       });
@@ -266,41 +316,68 @@ export class CodexChatPrivateStore {
   }
 
   private enqueueMutation<T>(operation: () => Promise<T>) {
-    const result = this.mutationQueue.catch(() => undefined).then(operation);
+    const result = this.mutationQueue.catch(() => undefined).then(() =>
+      this.execution.withMutation("codex-chat-registry", async () => {
+        const registry=await this.load(true);
+        this.migrateLegacyReceiptGuards(registry);
+        return operation();
+      }));
     this.mutationQueue = result.then(() => undefined, () => undefined);
     return result;
   }
 
-  private async load() {
-    if (this.registry) return this.registry;
+  private migrateLegacyReceiptGuards(registry:RegistryFile) {
+    const key="migration:registry-execution-v1",current=this.execution.getIntent(key);
+    if(current?.state==="completed")return;
+    const sourceHash=createHash("sha256").update(JSON.stringify(registry)).digest("hex");
+    const {intent}=this.execution.reserveIntent(key,sourceHash,{kind:"migration",sourceSchema:1,targetExecutionSchema:1,sourceHash});
+    let imported=0;
+    for(const binding of Object.values(registry.chats))for(const [clientMessageId,receipt] of Object.entries(binding.messageReceipts)) {
+      if(!receipt.requestHash || !receipt.nativeTurnId || !receipt.turnId)throw new CodexChatRegistryError();
+      const turnKey=`turn:${binding.chatId}:${clientMessageId}`;
+      const prior=this.execution.getIntent(turnKey);
+      if(prior && prior.hash!==receipt.requestHash)throw new CodexChatRegistryError();
+      if(!prior) {
+        const {intent:guard}=this.execution.reserveIntent(turnKey,receipt.requestHash,{kind:"turn",chatId:binding.chatId,clientMessageId,nativeThreadId:binding.nativeThreadId,stateIdentityHash:binding.stateIdentityHash,receipt});
+        this.execution.updateIntent(turnKey,{state:"legacy_receipt"},guard.revision);
+      }
+      imported++;
+    }
+    this.execution.updateIntent(key,{state:"completed",importedReceipts:imported,registryRetained:true},intent.revision);
+  }
+
+  private async load(locked = false): Promise<RegistryFile> {
     const primaryText = await readOptional(this.registryPath);
     if (primaryText == null) {
       const backupText = await readOptional(this.backupPath);
       if (backupText == null) {
-        this.registry = emptyRegistry();
-        return this.registry;
+        return emptyRegistry();
       }
       try {
-        this.registry = parseRegistry(backupText);
-        await this.writeRegistry(this.registryPath, this.registry);
+        if (!locked) return this.execution.withMutation("codex-chat-registry", () => this.load(true));
+        const registry = parseRegistry(backupText);
+        await this.writeRegistry(this.registryPath, registry);
         await this.audit("registry-restored", { reason: "primary_missing" });
-        return this.registry;
+        return registry;
       } catch {
         this.readOnlyError = new CodexChatRegistryError();
         throw this.readOnlyError;
       }
     }
     try {
-      this.registry = parseRegistry(primaryText);
-      return this.registry;
+      return parseRegistry(primaryText);
     } catch {
       const backupText = await readOptional(this.backupPath);
       try {
         if (backupText == null) throw new Error("backup_missing");
-        this.registry = parseRegistry(backupText);
-        await this.writeRegistry(this.registryPath, this.registry);
+        if (!locked) return this.execution.withMutation("codex-chat-registry", () => this.load(true));
+        const registry = parseRegistry(backupText);
+        const raw = await readFile(this.registryPath);
+        const sha256 = createHash("sha256").update(raw).digest("hex");
+        await atomicWritePrivateJson({stateRoot:this.stateRoot,filePath:path.join(this.root,"quarantine",`${sha256}.json`),value:{schema:"pritha-corrupt-registry-v1",sha256,encoding:"base64",bytes:raw.toString("base64")}});
+        await this.writeRegistry(this.registryPath, registry);
         await this.audit("registry-restored", { reason: "primary_corrupt" });
-        return this.registry;
+        return registry;
       } catch {
         this.readOnlyError = new CodexChatRegistryError();
         await this.audit("registry-read-only", { reason: "primary_and_backup_invalid" });
@@ -337,9 +414,8 @@ export class CodexChatPrivateStore {
     try { return parseRegistry(primary); } catch { return null; }
   }
 
-  private async persist() {
+  private async persist(registry: RegistryFile) {
     if (this.readOnlyError) throw this.readOnlyError;
-    const registry = this.registry || emptyRegistry();
     const previous = await this.validPrimarySnapshot();
     if (previous) await this.writeRegistry(this.backupPath, previous);
     await this.writeRegistry(this.registryPath, registry);

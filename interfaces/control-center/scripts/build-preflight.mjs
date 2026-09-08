@@ -1,3 +1,4 @@
+import "./node-runtime.mjs";
 const host = process.env.PRITHA_CONTROL_CENTER_HOST && process.env.PRITHA_CONTROL_CENTER_HOST !== "0.0.0.0" ? process.env.PRITHA_CONTROL_CENTER_HOST : "127.0.0.1";
 const allowLiveBuild = process.env.PRITHA_CONTROL_CENTER_ALLOW_LIVE_BUILD === "1";
 const distDir = String(process.env.PRITHA_CONTROL_CENTER_DIST_DIR || ".next").trim();

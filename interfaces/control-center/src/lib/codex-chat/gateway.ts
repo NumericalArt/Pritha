@@ -2,6 +2,8 @@ import { HistoryReader, HistoryError, HISTORY_READ_MS, type HistoryContext } fro
 import { planOperationDecision, resolveOperationDecision, type OperationAction, type OperationRequest } from "../../../../../scripts/agents-mother/operation-decisions.mjs";
 import { operationRuntime } from "./operation-runtime";
 import { createHash, randomUUID } from "node:crypto";
+import path from "node:path";
+import { prepareTaskWorkspace, inspectTaskWorkspace, taskWorkspaceResources, verifyTaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage, type RuntimeNotificationOrigin } from "./app-server";
 import { verifyNativeThreadIdentity } from "./storage-identity";
@@ -10,6 +12,8 @@ import { assertAttachmentCapabilities } from "./attachment-policy";
 import { classifyNativeThreadReadFailure } from "./native-thread-errors";
 import { CodexChatPrivateStore, logicalChatKey, type ChatBinding } from "./private-store";
 import { queueVoiceTaskChatIndexRefresh, reconcileVoiceTaskChatLink, voiceTaskChatIndexStatus } from "./voice-links";
+import { pendingNativeRequests, answerNativeRequest, expireCompletedNativeRequests } from "./native-requests";
+import { registerNativeControl, nativeControlView, controlNativeTurn } from "./native-control";
 import { nativeThreadLeaseKey, tryAcquireNativeThreadTurn } from "./native-turn-coordinator";
 import { changeThreadGoalBudget, emptyGoalView, GoalControlError, readThreadGoal, type GoalBudgetReceipt } from "./goal-control";
 import { parseBudgetIntent } from "./budget-intent";
@@ -47,6 +51,7 @@ type CreateThreadInput = {
   clientThreadId: string;
   title?: string;
   source: "chat";
+  workspace?: {baseRevision?:string};
   settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
 };
 
@@ -65,12 +70,13 @@ type ActiveAttempt = ActiveAttemptSnapshot & {
   clientMessageId: string;
   requestHash: string;
   acknowledged: boolean;
+  intentKey?: string;
+  controlCleanup?: () => void;
 };
 
 type EventSubscriber = { send: (event: ChatEventRecord) => void; close: (() => void) | null };
 
 const MAX_EVENTS_PER_CHAT = 10_000;
-const UNCERTAIN_TURN_LEASE_MS = 30_000;
 
 function hash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -139,11 +145,6 @@ function replaceableEmptyDirectChat(binding: ChatBinding) {
     && binding.taskLinks.length === 0;
 }
 
-function firstTurnDeliveryIsUncertain(error: unknown) {
-  return error instanceof CodexChatGatewayError
-    && (error.code === "fallback_confirmation_required" || error.code === "turn_active");
-}
-
 function validatedTurnText(input: StartTurnInput) {
   if (!validClientId(input?.clientMessageId)) {
     throw new CodexChatGatewayError("invalid_request", "A valid clientMessageId is required.", 400);
@@ -191,10 +192,136 @@ export class CodexChatGateway {
   private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message, origin) => this.handleNotification(providerId, message, origin), this.root);
   private readonly activeTurns = new Map<string, ActiveAttempt>();
   private readonly activeTurnLeases = new Map<string, () => void>();
-  private readonly uncertainTurnTimers = new Map<string, NodeJS.Timeout>();
   private readonly events = new Map<string, ChatEventRecord[]>();
   private readonly subscribers = new Map<string, Set<EventSubscriber>>();
   private eventSequence = 0;
+  private activityRefresh: Promise<unknown> | null = null;
+  private activityRefreshAt = 0;
+  private queueTimer?: ReturnType<typeof setTimeout>;
+  private queueStopped = false;
+  private refreshOffset = 0;
+  private queueOffset = 0;
+
+  private scheduleQueues() {
+    if (this.queueTimer || this.queueStopped) return;
+    this.queueTimer = setTimeout(async () => {
+      this.queueTimer = undefined;
+      try {
+        const rows=this.store.execution.listIntents({kind:"queued-message",states:["queued"],limit:200});
+        const chats=[...new Set(rows.map(row=>String(row.chatId)))];
+        const start=chats.length ? this.queueOffset%chats.length : 0;
+        for (const chatId of [...chats.slice(start),...chats.slice(0,start)].slice(0,8)) await this.drainQueue(chatId);
+        this.queueOffset=start+8;
+        if (rows.length) this.scheduleQueues();
+      } catch { this.scheduleQueues(); }
+    },2_000);
+    this.queueTimer.unref?.();
+  }
+
+  async activity(after = 0) {
+    this.scheduleQueues();
+    void import("../realtime/pritha-runtime").then(runtime=>runtime.wakeVoiceAdmissions()).catch(()=>undefined);
+    const active = this.store.execution.listIntents({kind:"turn",states:["dispatching","running","unknown"],limit:1000});
+    if (!this.activityRefresh && Date.now() - this.activityRefreshAt > 5_000) {
+      this.activityRefreshAt = Date.now();
+      const pendingVoice=this.store.execution.listIntents({kind:"voice-turn",states:["dispatching","running","unknown"],limit:1000});
+      const bindings=await this.store.all();
+      const all=[...new Set([...active.map(row=>String(row.chatId)),...bindings.filter(binding=>pendingVoice.some(row=>row.nativeThreadId===binding.nativeThreadId && row.storage===binding.stateIdentityHash)).map(binding=>binding.chatId)])];
+      const start=all.length ? this.refreshOffset%all.length : 0;
+      const chats=[...all.slice(start),...all.slice(0,start)].slice(0,4);
+      this.refreshOffset=start+4;
+      this.activityRefresh = Promise.allSettled(chats.map(chatId => this.historyPage(chatId, undefined, 1))).finally(() => { this.activityRefresh = null; });
+    }
+    const window=this.store.execution.eventWindow();
+    const reset=after===0 || after>window.newest || (window.oldest>0 && after<window.oldest-1);
+    const events = this.store.execution.events(reset ? 0 : after);
+    const bindings = await this.store.all();
+    const changed = bindings.filter(binding=>reset || events.some(event=>event.chatId===binding.chatId || (event.nativeThreadId===binding.nativeThreadId && event.storage===binding.stateIdentityHash) || (event.taskId && binding.taskLinks.some(link=>link.taskId===event.taskId)))).map(binding=>binding.chatId);
+    return {
+      cursor: reset ? window.newest : events.at(-1)?.sequence || after,
+      reset,
+      admissionEnabled:this.store.execution.admission().enabled,
+      changed,
+      active: active.map(row=>({chatId:row.chatId,state:row.state,revision:row.revision})),
+      capacity: this.store.execution.admission().capacity,
+      counts:{
+        active:new Set(this.store.execution.claims().filter(row=>row.kind==="turn").map(row=>row.owner)).size,
+        queued:this.store.execution.listIntents({kind:"queued-message",states:["queued"],limit:1000}).length+this.store.execution.listIntents({kind:"voice-admission",states:["queued"],limit:1000}).length,
+        waitingForOperator:this.store.execution.listIntents({kind:"voice-workflow",states:["waiting_for_operator"],limit:1000}).length,
+        unknown:this.store.execution.listIntents({states:["unknown"],limit:1000}).length,
+      },
+    };
+  }
+
+  async queuedMessages(chatId: string) {
+    await this.requireBinding(chatId);
+    return this.store.execution.listIntents({kind:"queued-message",states:["queued","dispatching","unknown","blocked"],limit:1000})
+      .filter(row=>row.chatId===chatId).map(row=>({id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || null}));
+  }
+
+  async enqueueMessage(chatId: string, input: StartTurnInput) {
+    return this.store.execution.withMutation(`queue-admission:${chatId}`,()=>this.enqueueMessageOwned(chatId,input));
+  }
+  private async enqueueMessageOwned(chatId: string, input: StartTurnInput) {
+    const binding=await this.requireBinding(chatId), text=validatedTurnText(input);
+    if (binding.archived) throw new CodexChatGatewayError("chat_archived","Restore this chat before queuing a message.",409);
+    if (parseBudgetIntent(text).kind !== "none") throw new CodexChatGatewayError("budget_control_required","Use the task budget control for budget changes.",422);
+    const provider=(await this.runtime.provider(binding.providerId)).view;
+    if (provider.stateIdentityHash !== binding.stateIdentityHash) throw new CodexChatGatewayError("runtime_identity_mismatch","The original execution storage is unavailable.",409);
+    const priorQueue=this.store.execution.listIntents({kind:"queued-message",states:["queued","dispatching","unknown","blocked"],limit:1000}).filter(row=>row.chatId===chatId && row.input.clientMessageId !== input.clientMessageId).at(-1);
+    const nativeKey=nativeThreadLeaseKey(binding.stateIdentityHash!,binding.nativeThreadId);
+    const resource=createHash("sha256").update(nativeKey).digest("hex");
+    const voiceOwner=this.store.execution.claims().find(row=>row.resource===resource && row.kind === "voice-workflow");
+    const direct=this.store.execution.listIntents({kind:"turn",states:["running","dispatching","unknown"],limit:1000}).find(row=>row.chatId===chatId);
+    const predecessorKey=priorQueue ? `turn:${chatId}:${priorQueue.input.clientMessageId}` : voiceOwner ? `voice-workflow:${voiceOwner.detail.taskId}` : direct ? `turn:${chatId}:${direct.clientMessageId}` : null;
+    const key=`queued:${chatId}:${input.clientMessageId}`;
+    const existing=this.store.execution.getIntent(key);
+    if (!existing && !predecessorKey) throw new CodexChatGatewayError("queue_target_ended","The preceding task ended. Send this draft as a new turn when ready.",409);
+    const prepared=await this.prepareAttachmentInput(input,binding.providerId);
+    if (prepared.files.length) await this.attachments.retain(input.attachments || []);
+    const {intent,created}=this.store.execution.reserveIntent(key,hash(input),{kind:"queued-message",chatId,input,predecessorKey,nativeThreadId:binding.nativeThreadId,stateIdentityHash:binding.stateIdentityHash,continueVoice:Boolean(voiceOwner)},{initialState:"queued",limit:{max:128,scopeField:"chatId",scopeMax:16,states:["queued","dispatching","unknown","blocked"]}});
+    if (created) this.store.execution.updateIntent(key,{state:"queued"},intent.revision);
+    this.scheduleQueues();
+    return this.queuedMessages(chatId);
+  }
+
+  async cancelQueued(chatId: string, id: string, revision: number) {
+    await this.requireBinding(chatId);
+    const row=this.store.execution.getIntentById(id);
+    if (!row || row.kind!=="queued-message" || row.chatId!==chatId) throw new CodexChatGatewayError("queue_not_found","Queued message not found.",404);
+    if (row.state === "cancelled") return this.queuedMessages(chatId);
+    if (!["queued","blocked"].includes(row.state)) throw new CodexChatGatewayError("queue_already_dispatching","This message has reached dispatch. Stop its exact turn instead.",409);
+    this.store.execution.updateIntent(`queued:${chatId}:${row.input.clientMessageId}`,{state:"cancelled"},revision);
+    return this.queuedMessages(chatId);
+  }
+
+  private async drainQueue(chatId: string) {
+    await this.store.execution.withMutation(`queue-drain:${chatId}`,async()=>{
+      const queued=this.store.execution.listIntents({kind:"queued-message",states:["queued"],limit:1000}).find(row=>row.chatId===chatId);
+      if (!queued) return;
+      let predecessorKey=queued.predecessorKey;
+      let predecessor=this.store.execution.getIntent(predecessorKey);
+      for(let depth=0;!predecessor && predecessorKey.startsWith("turn:") && depth<32;depth++) {
+        const cancelled=this.store.execution.getIntent(`queued:${predecessorKey.slice(5)}`);
+        if(cancelled?.state!=="cancelled")break;
+        predecessorKey=cancelled.predecessorKey;
+        predecessor=this.store.execution.getIntent(predecessorKey);
+      }
+      if (!predecessor || predecessor.state !== "completed") return;
+      const binding=await this.requireBinding(chatId);
+      if (binding.archived || binding.nativeThreadId !== queued.nativeThreadId || binding.stateIdentityHash !== queued.stateIdentityHash) return;
+      const key=`queued:${chatId}:${queued.input.clientMessageId}`;
+      this.store.execution.updateIntent(key,{state:"dispatching"},queued.revision);
+      try {
+        if (queued.continueVoice) await this.store.patch(chatId,{continuationEnabled:true,continuationEnabledAt:new Date().toISOString()});
+        await this.startTurn(chatId,queued.input,{fromQueue:key});
+        this.store.execution.updateIntent(key,{state:"delivered"});
+      } catch(error) {
+        const code=(error as {code?:string}).code;
+        this.store.execution.updateIntent(key,{state:["turn_active","workspace_busy","execution_draining","execution_metadata_busy"].includes(code || "") ? "queued" : code === "fallback_confirmation_required" ? "unknown" : "blocked",reason:code || "execution_unavailable"});
+      }
+    });
+  }
 
   async runtimeStatus() {
     return this.runtime.status();
@@ -281,21 +408,42 @@ export class CodexChatGateway {
     if (!validClientId(input.clientThreadId) || input.source !== "chat") {
       throw new CodexChatGatewayError("invalid_request", "A valid clientThreadId and source=chat are required.", 400);
     }
-    const createHash = hash(input);
+    const createHash = hash({ clientThreadId: input.clientThreadId, source: input.source, title: input.title, settings: input.settings, ...(input.workspace ? {workspace:input.workspace} : {}) });
     const existing = await this.store.findByClientThreadId(input.clientThreadId);
     if (existing) {
-      if (existing.createHash !== createHash) throw new CodexChatGatewayError("idempotency_conflict", "This clientThreadId was already used with different values.", 409);
+      if (existing.createHash !== createHash && existing.createHash !== hash(input)) throw new CodexChatGatewayError("idempotency_conflict", "This clientThreadId was already used with different values.", 409);
       return { detail: await this.threadDetail(existing.chatId), replayed: true };
     }
 
-    const provider = await this.runtime.effectiveProvider();
-    if (!provider) throw new CodexChatGatewayError("runtime_unavailable", "No compatible Codex runtime is available.", 503, true);
+    const intentKey = `create:${input.clientThreadId}`;
+    let intent;
+    try { intent = this.store.execution.reserveIntent(intentKey, createHash, { kind: "create" }).intent; }
+    catch (error) { throw new CodexChatGatewayError((error as {code?: string}).code || "execution_unavailable", "The chat request could not be reserved safely.", 409); }
+    if (intent.state === "bound" && intent.binding) {
+      await this.store.putCreatedBinding(intent.binding as ChatBinding);
+      return { detail: await this.threadDetail(String(intent.chatId)), replayed: true };
+    }
+    if (["dispatching", "unknown"].includes(intent.state)) {
+      throw new CodexChatGatewayError("create_delivery_unknown", "The original chat creation is being reconciled. Keep this draft; it will not be sent twice.", 409, true);
+    }
+    const creationLease = this.store.execution.claim([intentKey], intentKey, { kind: "create" });
+    if (!creationLease) throw new CodexChatGatewayError("create_pending", "This chat creation is already in progress.", 409, true);
+    let dispatched = false;
     try {
+      const provider = await this.runtime.effectiveProvider();
+      if (!provider) throw new CodexChatGatewayError("runtime_unavailable", "No compatible Codex runtime is available.", 503, true);
       const connection = await this.runtime.connection(provider.providerId);
       const requestedTitle = titleText(input.title);
       const defaults = this.runtime.threadDefaults();
+      const sandbox = defaults.sandbox || "read-only";
+      const workspace = await prepareTaskWorkspace({coordinator:this.store.execution,source:this.root,directory:path.join(this.store.root,"workspaces"),id:input.clientThreadId,
+        mode:sandbox === "read-only" ? "read-only" : sandbox === "workspace-write" ? "worktree" : "serialized",baseRevision:input.workspace?.baseRevision});
+      creationLease.assertOwned();
+      this.store.execution.updateIntent(intentKey, { state: "dispatching", providerId: provider.providerId, stateIdentityHash: provider.view.stateIdentityHash });
+      dispatched = true;
       const response = asObject(await connection.request("thread/start", {
         ...defaults,
+        cwd: workspace.cwd,
         model: input.settings?.modelId || defaults.model,
         ephemeral: false,
       }));
@@ -310,6 +458,8 @@ export class CodexChatGateway {
         createHash,
         nativeThreadId,
         providerId: provider.providerId,
+        workspace,
+        sandbox,
         stateIdentityHash: provider.view.stateIdentityHash,
         group: "my_chats",
         origin: "chat",
@@ -325,13 +475,20 @@ export class CodexChatGateway {
         messageReceipts: {},
         taskLinks: [],
       };
-      await this.store.put(binding);
+      this.store.execution.updateIntent(intentKey, { state: "bound", chatId: binding.chatId, binding });
+      await this.store.putCreatedBinding(binding);
       if (input.title) void connection.request("thread/name/set", { threadId: nativeThreadId, name: requestedTitle }, 5_000).catch(() => undefined);
       const detail = await this.threadDetail(binding.chatId);
       this.emit(binding.chatId, "thread.updated", { thread: detail.thread });
       return { detail, replayed: false };
     } catch (error) {
+      const current = this.store.execution.getIntent(intentKey);
+      if (current?.state !== "bound") this.store.execution.updateIntent(intentKey, { state: dispatched ? "unknown" : "reserved" });
+      if (error instanceof CodexChatGatewayError) throw error;
+      if (String((error as {code?:string}).code || "").startsWith("workspace_")) throw error;
       throw new CodexChatGatewayError("runtime_incompatible", publicMessage(error), 503, true);
+    } finally {
+      creationLease.release();
     }
   }
 
@@ -345,7 +502,6 @@ export class CodexChatGateway {
     }
     const created = await this.createThread(input);
     let binding = await this.requireBinding(created.detail.thread.chatId);
-    let ownsFreshEmptyBinding = !created.replayed;
     let freshlyCreatedNativeThread = !created.replayed;
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -368,13 +524,11 @@ export class CodexChatGateway {
           if (active && (active.clientMessageId !== input.initialTurn.clientMessageId || active.acknowledged)) throw error;
           if (active) this.releaseActiveTurn(binding.chatId);
           binding = await this.replaceEmptyDirectThread(binding, input);
-          ownsFreshEmptyBinding = true;
           freshlyCreatedNativeThread = true;
           continue;
         }
-        if (ownsFreshEmptyBinding && !firstTurnDeliveryIsUncertain(error)) {
-          await this.store.removeEmptyDirectChat(binding.chatId, binding.nativeThreadId).catch(() => false);
-        }
+        // Preserve the binding and idempotency key even when the first turn fails.
+        // A retry resumes this same chat; deleting it could start a second native thread.
         throw error;
       }
     }
@@ -382,42 +536,50 @@ export class CodexChatGateway {
   }
 
   private async replaceEmptyDirectThread(binding: ChatBinding, input: CreateThreadInput) {
-    if (!replaceableEmptyDirectChat(binding)) {
-      throw new CodexChatGatewayError("native_thread_missing", "This task thread is no longer available in the selected runtime.", 410);
-    }
-    const provider = await this.runtime.effectiveProvider();
-    if (!provider) throw new CodexChatGatewayError("runtime_unavailable", "No compatible task runtime is available.", 503, true);
-    try {
-      const connection = await this.runtime.connection(provider.providerId);
-      const defaults = this.runtime.threadDefaults();
-      const response = asObject(await connection.request("thread/start", {
-        ...defaults,
-        model: input.settings?.modelId || defaults.model,
-        ephemeral: false,
-      }));
-      const nativeThreadId = String(asObject(response?.thread)?.id || "");
-      if (!nativeThreadId) throw new Error("missing_thread_id");
-      connection.markThreadLoaded(nativeThreadId);
-      const next = await this.store.patch(binding.chatId, {
-        nativeThreadId,
-        providerId: provider.providerId,
-        stateIdentityHash: provider.view.stateIdentityHash,
-        updatedAt: new Date().toISOString(),
-        lastStatus: "idle",
-      });
-      if (!next) throw new Error("missing_binding");
-      await this.store.recordRuntimeEvent("empty-direct-chat-replaced", {
-        chatRef: hash({ chatId: binding.chatId }).slice(0, 16),
-        providerId: provider.providerId,
-      }).catch(() => undefined);
-      if (!['New task chat', 'New Codex chat'].includes(next.title)) {
-        void connection.request("thread/name/set", { threadId: nativeThreadId, name: next.title }, 5_000).catch(() => undefined);
+    return this.store.execution.withMutation(`replace-empty:${binding.chatId}`, async () => {
+      const current=await this.requireBinding(binding.chatId);
+      if(current.nativeThreadId!==binding.nativeThreadId)return current;
+      if(!replaceableEmptyDirectChat(current))throw new CodexChatGatewayError("native_thread_missing","This task thread is no longer available.",410);
+      const key=`replace-empty:${current.chatId}:${current.nativeThreadId}`;
+      const {intent}=this.store.execution.reserveIntent(key,hash({clientThreadId:input.clientThreadId}),{kind:"replace-empty",chatId:current.chatId});
+      if(intent.state === "bound" && intent.binding) {
+        const restored=await this.store.patch(current.chatId,intent.binding);
+        if(intent.owner && intent.generation)this.store.execution.reconcileRelease(intent.owner,intent.generation);
+        return restored!;
       }
-      return next;
-    } catch (error) {
-      if (error instanceof CodexChatGatewayError) throw error;
-      throw new CodexChatGatewayError("runtime_incompatible", publicMessage(error), 503, true);
-    }
+      if(!["reserved","not_dispatched"].includes(intent.state))throw new CodexChatGatewayError("create_delivery_unknown","Replacement of the empty native thread must be reconciled first.",409,true);
+      const lease=tryAcquireNativeThreadTurn(nativeThreadLeaseKey(current.stateIdentityHash || current.providerId,current.nativeThreadId),key,{coordinator:this.store.execution,kind:"create",resources:[`chat-binding:${current.chatId}`]});
+      if(!lease)throw new CodexChatGatewayError("turn_active","This conversation is already owned by another operation.",409,true);
+      let dispatched=false;
+      try {
+        const provider=await this.runtime.provider(current.providerId);
+        if(provider.view.stateIdentityHash!==current.stateIdentityHash)throw new CodexChatGatewayError("runtime_identity_mismatch","The original runtime storage is unavailable.",409);
+        const uncertain=this.store.execution.listIntents({kind:"turn",states:["dispatching","running","unknown"],limit:1000}).some(row=>row.chatId===current.chatId);
+        if(uncertain)throw new CodexChatGatewayError("fallback_confirmation_required","An earlier first message is unconfirmed; this thread cannot be replaced.",409);
+        const connection=await this.runtime.connection(current.providerId),defaults=this.runtime.threadDefaults();
+        if(current.workspace)await verifyTaskWorkspace(current.workspace);
+        this.store.execution.updateIntent(key,{state:"dispatching",owner:lease.owner,generation:lease.generation},intent.revision);
+        dispatched=true;
+        const response=asObject(await connection.request("thread/start",{...defaults,cwd:current.workspace?.cwd || defaults.cwd,sandbox:current.sandbox || defaults.sandbox,model:input.settings?.modelId || defaults.model,ephemeral:false}));
+        const nativeThreadId=String(asObject(response?.thread)?.id || "");
+        if(!nativeThreadId)throw new Error("missing_thread_id");
+        connection.markThreadLoaded(nativeThreadId);
+        const next={...current,nativeThreadId,updatedAt:new Date().toISOString(),lastStatus:"idle" as const};
+        this.store.execution.updateIntent(key,{state:"bound",binding:next});
+        await this.store.patch(current.chatId,next);
+        const creation=this.store.execution.getIntent(`create:${current.clientThreadId}`);
+        if(creation?.state === "bound")this.store.execution.updateIntent(`create:${current.clientThreadId}`,{binding:next});
+        for(const turn of this.store.execution.listIntents({kind:"turn",states:["reserved","not_dispatched"],limit:1000})) {
+          if(turn.chatId===current.chatId)this.store.execution.updateIntent(`turn:${current.chatId}:${turn.clientMessageId}`,{nativeThreadId});
+        }
+        lease();
+        return next;
+      } catch(error) {
+        if(!dispatched)lease();
+        else if(this.store.execution.getIntent(key)?.state!=="bound")this.store.execution.updateIntent(key,{state:"unknown"});
+        throw error;
+      }
+    });
   }
 
   async threadDetail(chatId: string): Promise<ThreadDetail> {
@@ -432,15 +594,104 @@ export class CodexChatGateway {
       const code = error instanceof CodexChatGatewayError ? error.code : "history_unavailable";
       history = { state: code === "history_recovery_available" ? "recovery_available" : "blocked", code, recoverable: code === "history_recovery_available" };
     }
-    const summary = summarizeThread(current, provider, nativeThread);
+    const nativeResource=createHash("sha256").update(nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId,binding.nativeThreadId)).digest("hex");
+    const voiceOwner=this.store.execution.claims().find(row=>row.resource===nativeResource && row.kind==="voice-workflow");
+    const voice=voiceOwner ? this.store.execution.getIntent(`voice-workflow:${voiceOwner.detail.taskId}`) : null;
+    const summary = summarizeThread(voice ? {...current,lastStatus:"active"} : current, provider, voice ? undefined : nativeThread);
+    const control = nativeControlView(this.store.execution, nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId,binding.nativeThreadId));
+    const controlTurnId = control ? this.activeTurns.get(chatId)?.turnId || turnIdFor(chatId,control.nativeTurnId) : null;
     return {
       thread: summary,
+      voiceWorkflow:voice ? {taskId:voice.taskId,state:voice.state,revision:voice.revision,question:voice.question || null,questionId:voice.questionId || null} : null,
+      queued: await this.queuedMessages(chatId),
+      controls: control && controlTurnId ? {turnId:controlTurnId,steer:control.steer && provider.capabilities.steerTurn,interrupt:provider.capabilities.interruptTurn} : null,
       activeTurnId: this.activeTurns.get(chatId)?.turnId || null,
-      pendingRequests: [],
+      pendingRequests: pendingNativeRequests(binding.stateIdentityHash!,binding.nativeThreadId).map(request=>({
+        requestId:request.id,chatId,turnId:controlTurnId || "",itemId:null,kind:request.kind,title:request.kind === "user_input" ? "Input needed" : "Approval needed",reason:typeof request.params.reason === "string" ? request.params.reason : null,expiresAt:null,resolved:false,
+        presentation:{...Object.fromEntries(Object.entries(request.params).filter(([key])=>!["threadId","turnId","itemId"].includes(key))),revision:request.revision,state:request.state},
+      })),
       streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events`,
       continuationState: summary.continuationState,
       history,
     };
+  }
+
+  async voiceControl(chatId:string,input:{action:"answer"|"stop";taskId:string;questionId?:string;revision:number;answer?:string;clientMessageId:string}) {
+    const binding=await this.requireBinding(chatId);
+    const workflow=this.store.execution.getIntent(`voice-workflow:${input.taskId}`);
+    if(!validClientId(input.clientMessageId) || !binding.taskLinks.some(link=>link.taskId===input.taskId) || !workflow) throw new CodexChatGatewayError("voice_task_not_linked","This Voice task is not linked to the selected conversation.",409);
+    if(input.action==="answer") {
+      const text=String(input.answer || "").trim();
+      if(!text || Buffer.byteLength(text)>4_000)throw new CodexChatGatewayError("invalid_request","Enter an answer of at most 4,000 UTF-8 bytes.",400);
+      const key=`voice-answer:${input.taskId}:${input.clientMessageId}`;
+      const {intent}=this.store.execution.reserveIntent(key,hash(input),{kind:"voice-answer",chatId,taskId:input.taskId});
+      if(intent.state==="answered")return {submitted:true,replayed:true};
+      if(!["reserved","not_dispatched"].includes(intent.state))throw new CodexChatGatewayError("voice_answer_unconfirmed","The original answer must be reconciled before another continuation.",409);
+      this.store.execution.updateIntent(key,{state:"dispatching"},intent.revision);
+      const {answerPrithaCodexTask}=await import("../realtime/pritha-runtime");
+      const result=await answerPrithaCodexTask({task_id:input.taskId,answer:text,expected_question_id:input.questionId,expected_revision:input.revision});
+      if(result.ok===false){this.store.execution.updateIntent(key,{state:"not_dispatched"});throw new CodexChatGatewayError("voice_question_changed","This question was already answered or changed.",409);}
+      this.store.execution.updateIntent(key,{state:"answered"});
+      return {submitted:true,replayed:false};
+    }
+    if(input.action!=="stop" || workflow.revision!==input.revision)throw new CodexChatGatewayError("voice_task_changed","Refresh the Voice task before controlling it.",409);
+    const {abortPrithaCodexTask}=await import("../realtime/pritha-runtime");
+    const result = await abortPrithaCodexTask(input.taskId,"Operator requested stop from Task Chat.",input.revision);
+    if (result.ok === false || ("recovery_required" in result && result.recovery_required)) {
+      throw new CodexChatGatewayError("voice_stop_unconfirmed", "The original execution owner is unavailable. No new stop signal was sent; reconcile this task first.", 409);
+    }
+    return {submitted:"abort_applied" in result && result.abort_applied === true, alreadyTerminal:"abort_applied" in result && result.abort_applied === false};
+  }
+
+  async workspacePreview() {
+    const workspace=await inspectTaskWorkspace(this.root);
+    return {git:workspace.git,dirty:workspace.dirty,baseRevision:workspace.baseRevision};
+  }
+
+  async answerRequest(chatId:string,input:Parameters<typeof answerNativeRequest>[2]) {
+    if(!validClientId(input.clientMessageId))throw new CodexChatGatewayError("invalid_request","A stable answer identifier is required.",400);
+    const binding=await this.requireBinding(chatId);
+    const provider=(await this.runtime.provider(binding.providerId)).view;
+    if(provider.stateIdentityHash!==binding.stateIdentityHash)throw new CodexChatGatewayError("runtime_identity_mismatch","The original request storage is unavailable.",409);
+    return answerNativeRequest(binding.stateIdentityHash!,binding.nativeThreadId,input);
+  }
+
+  async controlTurn(chatId: string, input: {action:"steer"|"interrupt";expectedTurnId:string;clientMessageId:string;text?:string}) {
+    if (!validClientId(input.clientMessageId) || !["steer","interrupt"].includes(input.action) || !input.expectedTurnId) throw new CodexChatGatewayError("invalid_request","A valid action, request identifier and exact turn are required.",400);
+    const binding = await this.requireBinding(chatId);
+    const provider = (await this.runtime.provider(binding.providerId)).view;
+    if (provider.stateIdentityHash !== binding.stateIdentityHash) throw new CodexChatGatewayError("runtime_identity_mismatch","The original execution storage is unavailable.",409);
+    if (!provider.capabilities[input.action === "steer" ? "steerTurn" : "interruptTurn"]) throw new CodexChatGatewayError("control_unsupported","This runtime does not support the requested control.",422);
+    const text = String(input.text || "").trim();
+    if (input.action === "steer" && (!text || Buffer.byteLength(text,"utf8") > 64_000)) throw new CodexChatGatewayError("invalid_request","A clarification must contain at most 64,000 UTF-8 bytes.",400);
+    const intentKey=`control:${chatId}:${input.clientMessageId}`;
+    const {intent}=this.store.execution.reserveIntent(intentKey,hash(input),{kind:input.action,chatId,clientMessageId:input.clientMessageId,text,expectedTurnId:input.expectedTurnId});
+    if (intent.state === "confirmed") return {status:"requested",action:input.action,replayed:true};
+    if (!["reserved","not_dispatched"].includes(intent.state)) throw new CodexChatGatewayError("control_delivery_unknown","Delivery of this control is being reconciled. It will not be repeated automatically.",409);
+    const key=nativeThreadLeaseKey(binding.stateIdentityHash!,binding.nativeThreadId);
+    return this.store.execution.withMutation(`native-control:${key}`,async()=>{
+      const current=this.store.execution.getIntent(intentKey)!;
+      if (current.state === "confirmed") return {status:"requested",action:input.action,replayed:true};
+      if (!["reserved","not_dispatched"].includes(current.state)) throw new CodexChatGatewayError("control_delivery_unknown","The original control is unconfirmed.",409);
+      const control=nativeControlView(this.store.execution,key);
+      const turnId=control ? this.activeTurns.get(chatId)?.turnId || turnIdFor(chatId,control.nativeTurnId) : null;
+      if (!control || turnId !== input.expectedTurnId) throw new CodexChatGatewayError("control_turn_changed","The selected turn ended or its connection changed. Your draft has been kept.",409);
+      if (input.action === "steer" && this.store.execution.listIntents({kind:"steer",states:["dispatching","unknown"],limit:1000}).some(row=>row.chatId===chatId && row.nativeTurnId===control.nativeTurnId)) throw new CodexChatGatewayError("control_delivery_unknown","An earlier clarification is still unconfirmed. Check this turn before sending another clarification.",409);
+      this.store.execution.updateIntent(intentKey,{state:"dispatching",nativeTurnId:control.nativeTurnId},current.revision);
+      try {
+        await controlNativeTurn(this.store.execution,key,control.nativeTurnId,input.action,input.action === "steer" ? {
+          threadId:binding.nativeThreadId,expectedTurnId:control.nativeTurnId,clientUserMessageId:input.clientMessageId,input:[{type:"text",text}],
+        } : {threadId:binding.nativeThreadId,turnId:control.nativeTurnId});
+        this.store.execution.updateIntent(intentKey,{state:"confirmed"});
+        this.historyReader?.invalidateChat(chatId);
+        return {status:"requested",action:input.action,replayed:false};
+      } catch(error) {
+        const rejected=typeof (error as {rpcCode?:number}).rpcCode === "number";
+        this.store.execution.updateIntent(intentKey,{state:rejected ? "not_dispatched" : "unknown"});
+        if(rejected)throw new CodexChatGatewayError("control_rejected","The runtime rejected this control. Your draft has been kept; refresh the turn before trying again.",409);
+        throw new CodexChatGatewayError("control_delivery_unknown","The runtime did not confirm this control. Check the task before repeating it.",409);
+      }
+    });
   }
 
   private async goalContext(chatId: string, writable: boolean) {
@@ -476,7 +727,7 @@ export class CodexChatGateway {
       throw new CodexChatGatewayError("delivery_task_unverified", "Restore access to the original native task before using delivery actions.", 409);
     }
     const native = await this.readNativeThread(binding, false);
-    if (!verifyNativeThreadIdentity(native, binding.nativeThreadId, this.root) || native.ephemeral === true) {
+    if (!verifyNativeThreadIdentity(native, binding.nativeThreadId, binding.workspace?.cwd || this.root) || native.ephemeral === true) {
       throw new CodexChatGatewayError("delivery_task_unverified", "The delivery action could not be bound to this saved task.", 409);
     }
     if (writable) {
@@ -491,7 +742,7 @@ export class CodexChatGateway {
 
   async operationDecision(chatId: string, runId: string, action: OperationAction, request?: OperationRequest) {
     const binding = await this.deliveryContext(chatId, Boolean(request));
-    const release = request ? tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `operation:${chatId}`) : null;
+    const release = request ? tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId, binding.nativeThreadId), `operation:${chatId}`) : null;
     if (request && !release) throw new CodexChatGatewayError("turn_active", "Дождитесь завершения текущего действия.", 409);
     const options = { root: this.root, stateRoot: this.store.stateRoot, runtime: operationRuntime(this.root, this.store.stateRoot) };
     try {
@@ -520,7 +771,7 @@ export class CodexChatGateway {
     if (input?.action === "budget" && (binding.goalBudgetRequests?.[input.requestId] || binding.messageReceipts[input.requestId] || binding.attachmentMessages?.[input.requestId])) {
       throw new CodexChatGatewayError("idempotency_conflict", "This request identifier already belongs to another task operation.", 409);
     }
-    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `delivery:${chatId}`);
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId, binding.nativeThreadId), `delivery:${chatId}`);
     if (!release) throw new CodexChatGatewayError("turn_active", "This task has an active operation. Read its progress before trying another action.", 409, true);
     try {
       const current = await this.deliveryContext(chatId, true);
@@ -554,7 +805,7 @@ export class CodexChatGateway {
     if (binding.goalBudgetRequests?.[input.clientMessageId] || binding.messageReceipts[input.clientMessageId] || binding.attachmentMessages?.[input.clientMessageId]) {
       throw new CodexChatGatewayError("idempotency_conflict", "This message identifier already belongs to another task operation.", 409);
     }
-    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `delivery-budget:${chatId}`);
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId, binding.nativeThreadId), `delivery-budget:${chatId}`);
     if (!release) throw new CodexChatGatewayError("turn_active", "This task has an active operation. Read its saved progress before retrying the budget command.", 409, true);
     try {
       const current = await this.deliveryContext(chatId, true);
@@ -616,7 +867,7 @@ export class CodexChatGateway {
   async updateGoalBudget(chatId: string, input: GoalBudgetRequest) {
     const binding = await this.requireBinding(chatId);
     if (binding.deliveryBudgetRequests?.[input?.requestId]) throw new CodexChatGatewayError("idempotency_conflict", "This request identifier was used for a build budget.", 409);
-    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `goal-budget:${chatId}`);
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId, binding.nativeThreadId), `goal-budget:${chatId}`);
     if (!release) throw new CodexChatGatewayError("turn_active", "This task already has an active operation. Reconcile it before changing its budget.", 409, true);
     try {
       const result = await changeThreadGoalBudget(await this.goalContext(chatId, true), input);
@@ -636,7 +887,7 @@ export class CodexChatGateway {
     const binding = await this.requireBinding(chatId);
     if (binding.deliveryBudgetRequests?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was used for a build budget.", 409);
     if (binding.messageReceipts[input.clientMessageId] || binding.attachmentMessages?.[input.clientMessageId]) throw new CodexChatGatewayError("idempotency_conflict", "This message identifier was already used for a model turn.", 409);
-    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId), `budget-intent:${chatId}`);
+    const release = tryAcquireNativeThreadTurn(nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId, binding.nativeThreadId), `budget-intent:${chatId}`);
     if (!release) throw new CodexChatGatewayError("turn_active", "This task already has an active operation. Reconcile it before changing its budget.", 409, true);
     try {
       const context = await this.goalContext(chatId, true);
@@ -715,6 +966,8 @@ export class CodexChatGateway {
     const existing = binding.taskLinks.find((link) => link.taskId === input.taskId);
     if (!existing) throw new CodexChatGatewayError("task_not_linked", "This task is not linked to the selected chat.", 404);
     if (input.mode === "shared_thread") {
+      const workflow=this.store.execution.getIntent(`voice-workflow:${input.taskId}`);
+      if ((workflow && !["completed","not_dispatched"].includes(workflow.state)) || (!workflow && !["complete","failed","failed_timeout","failed_empty_result","aborted","rejected"].includes(existing.status))) throw new CodexChatGatewayError("voice_task_owned","This Voice task still owns the conversation. Answer its question or stop the task before taking over.",409);
       const provider = (await this.runtime.provider(binding.providerId)).view;
       if (!binding.stateIdentityHash || provider.stateIdentityHash !== binding.stateIdentityHash) {
         throw new CodexChatGatewayError("runtime_identity_mismatch", "The task runtime does not match this chat binding.", 409);
@@ -756,11 +1009,16 @@ export class CodexChatGateway {
             let runtimeReadMs = 0;
             const read: HistoryContext["read"] = async (method, params, until) => {
               const before = Date.now();
-              try { return await this.runtime.historyRequest(binding.providerId, method, params, until); }
+              try {
+                const response = await this.runtime.historyRequest(binding.providerId, method, params, until);
+                if (method === "thread/turns/list" && Array.isArray(asObject(response)?.data)) await this.reconcileExecutions(binding, {turns:asObject(response)!.data});
+                if (method === "thread/read" && Array.isArray(asObject(asObject(response)?.thread)?.turns)) await this.reconcileExecutions(binding, asObject(asObject(response)?.thread)!);
+                return response;
+              }
               finally { runtimeReadMs += Date.now() - before; }
             };
             const metadata = asObject(await read("thread/read", { threadId: binding.nativeThreadId, includeTurns: false }, deadline));
-            if (!verifyNativeThreadIdentity(asObject(metadata?.thread) || {}, binding.nativeThreadId, this.root)) throw new HistoryError("runtime_identity_mismatch", "The original conversation could not be verified in this workspace.", 409);
+            if (!verifyNativeThreadIdentity(asObject(metadata?.thread) || {}, binding.nativeThreadId, binding.workspace?.cwd || this.root)) throw new HistoryError("runtime_identity_mismatch", "The original conversation could not be verified in this workspace.", 409);
             phase = "history";
             const readStarted = Date.now();
             const result = await operation({ binding, root: this.root, version: provider.version || "unknown", pagination: provider.capabilities.historyPagination, read }, deadline);
@@ -850,7 +1108,7 @@ export class CodexChatGateway {
     };
   }
 
-  async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean } = {}) {
+  async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean; fromQueue?: string } = {}): Promise<{ accepted: AcceptedTurn; replayed: boolean }> {
     const binding = await this.requireBinding(chatId);
     if (binding.archived) throw new CodexChatGatewayError("chat_archived", "Restore this chat from archive before sending a message.", 409);
     if (binding.origin === "voice" && !binding.continuationEnabled) {
@@ -886,6 +1144,16 @@ export class CodexChatGateway {
       if (!replayTurn) throw new CodexChatGatewayError("turn_not_found", "The existing turn could not be restored.", 404);
       return { accepted: { turn: replayTurn, streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events` }, replayed: true };
     }
+    if (!options.fromQueue && this.store.execution.listIntents({kind:"queued-message",states:["queued","dispatching","unknown","blocked"],limit:1000}).some(row=>row.chatId===chatId && row.input.clientMessageId !== input.clientMessageId)) throw new CodexChatGatewayError("queue_waiting","This chat has queued messages. Add this draft to the queue or cancel those messages first.",409);
+
+    const intentKey = `turn:${chatId}:${input.clientMessageId}`;
+    let intent;
+    try { intent = this.store.execution.reserveIntent(intentKey, requestHash, { kind: "turn", chatId, clientMessageId: input.clientMessageId, userText: text, nativeThreadId: binding.nativeThreadId, stateIdentityHash: binding.stateIdentityHash }).intent; }
+    catch (error) { throw new CodexChatGatewayError((error as {code?: string}).code || "execution_unavailable", "The message could not be reserved safely.", 409); }
+    if (intent.receipt) {
+      await this.store.patch(chatId, { messageReceipts: { [input.clientMessageId]: intent.receipt } });
+      return this.startTurn(chatId, input, options);
+    }
 
     const native = options.freshlyCreatedNativeThread
       ? { turns: [], status: "idle" }
@@ -914,6 +1182,7 @@ export class CodexChatGateway {
           },
         },
       });
+      this.store.execution.updateIntent(intentKey, { state: recoveredNativeTurn.status === "in_progress" ? "running" : "completed", nativeTurnId });
       return {
         accepted: { turn: recoveredNativeTurn, streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events` },
         replayed: true,
@@ -935,10 +1204,25 @@ export class CodexChatGateway {
 
     const startedAt = new Date().toISOString();
     const releaseLease = tryAcquireNativeThreadTurn(
-      nativeThreadLeaseKey(binding.providerId, binding.nativeThreadId),
+      nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId, binding.nativeThreadId),
       `task-chat:${chatId}:${input.clientMessageId}`,
+      { coordinator: this.store.execution, kind: "turn", capacity: this.store.execution.admission().capacity, resources:[`chat-binding:${chatId}`], detail: { chatId, intentKey } },
     );
     if (!releaseLease) throw new CodexChatGatewayError("turn_active", "This task thread already has an active turn.", 409, true);
+    try {
+      if(binding.workspace)await verifyTaskWorkspace(binding.workspace);
+      const workspace = binding.workspace || {cwd:typeof native.cwd === "string" ? native.cwd : this.root};
+      const policy=taskWorkspaceResources(workspace,binding.sandbox || "workspace-write");
+      if(!this.store.execution.extend(releaseLease.owner,releaseLease.generation,policy.resources,{mode:policy.mode}) ||
+        !this.store.execution.extend(releaseLease.owner,releaseLease.generation,["execution-ambient-effects"],{mode:binding.sandbox === "danger-full-access" || !binding.sandbox ? "write" : "read"})) {
+        throw new CodexChatGatewayError("workspace_busy","Another task owns this workspace or shared resources. Keep this draft or add it to the queue.",409,true);
+      }
+    } catch(error) { releaseLease(); throw error; }
+    const dispatchIntent = this.store.execution.getIntent(intentKey);
+    if (!dispatchIntent || !["reserved", "not_dispatched"].includes(dispatchIntent.state)) {
+      releaseLease();
+      throw new CodexChatGatewayError("fallback_confirmation_required", "Delivery of this message is being reconciled; it will not be dispatched twice.", 409, true);
+    }
     const active: ActiveAttempt = {
       turnId: newId("turn"),
       nativeTurnId: "",
@@ -948,6 +1232,7 @@ export class CodexChatGateway {
       clientMessageId: input.clientMessageId,
       requestHash,
       acknowledged: false,
+      intentKey,
       attachmentMessage,
     };
     this.activeTurns.set(chatId, active);
@@ -957,12 +1242,22 @@ export class CodexChatGateway {
       const connection = await this.runtime.connection(binding.providerId);
       failureStage = "resume";
       await connection.ensureThreadLoaded(binding.nativeThreadId);
+      releaseLease.assertOwned();
+      const connectionGeneration = connection.generation;
+      active.controlCleanup = registerNativeControl({coordinator:this.store.execution,key:nativeThreadLeaseKey(binding.stateIdentityHash!,binding.nativeThreadId),owner:releaseLease.owner,generation:releaseLease.generation,turnId:()=>active.nativeTurnId,steer:providerView.capabilities.steerTurn,
+        request:async (method,params)=>{
+          if (!connection.isRunning() || connection.generation !== connectionGeneration) throw new CodexChatGatewayError("control_connection_expired","The original execution connection is no longer available. Reconcile this task before controlling it.",409);
+          return connection.request(method,params);
+        }});
+      this.store.execution.updateIntent(intentKey, { state: "dispatching", owner: releaseLease.owner, generation: releaseLease.generation }, dispatchIntent.revision);
       failureStage = "turn_start";
       this.recordUsage(binding, { attemptId: input.clientMessageId, turnStatus: "dispatching", modelRequested: input.settings?.modelId, effortRequested: input.settings?.effortId });
       const response = asObject(await connection.request("turn/start", {
         threadId: binding.nativeThreadId,
         clientUserMessageId: input.clientMessageId,
         input: attachmentInput.nativeInput,
+        ...(binding.workspace ? {cwd:binding.workspace.cwd} : {}),
+        ...(binding.sandbox ? {sandboxPolicy:binding.sandbox === "read-only" ? {type:"readOnly"} : binding.sandbox === "danger-full-access" ? {type:"dangerFullAccess"} : {type:"workspaceWrite",writableRoots:[binding.workspace?.cwd || this.root],networkAccess:false,excludeTmpdirEnvVar:true,excludeSlashTmp:true}} : {}),
         ...(input.settings?.modelId ? { model: input.settings.modelId } : {}),
         ...(input.settings?.effortId ? { effort: input.settings.effortId } : {}),
         ...(input.settings?.serviceTierId ? { serviceTier: input.settings.serviceTierId } : {}),
@@ -972,6 +1267,8 @@ export class CodexChatGateway {
       const nativeTurnId = String(nativeTurn?.id || "");
       if (!nativeTurnId) throw new Error("missing_turn_id");
       active.nativeTurnId = nativeTurnId;
+      const receipt = { clientMessageId: input.clientMessageId, requestHash, turnId: active.turnId, nativeTurnId, startedAt };
+      this.store.execution.updateIntent(intentKey, { state: this.store.execution.getIntent(intentKey)?.state === "completed" ? "completed" : "running", nativeTurnId, receipt });
       this.recordUsage(binding, { attemptId: input.clientMessageId, turnId: nativeTurnId, turnStatus: "running" });
       const firstMessage = Object.keys(binding.messageReceipts).length === 0;
       const nextTitle = firstMessage && ["New Codex chat", "New task chat"].includes(binding.title) ? titleText(previewText(text || attachmentMessage?.attachments[0]?.name).slice(0, 72)) : binding.title;
@@ -979,7 +1276,7 @@ export class CodexChatGateway {
         title: nextTitle,
         preview: previewText(text || attachmentMessage?.attachments.map(file => file.name).join(", ")),
         updatedAt: startedAt,
-        lastStatus: "active",
+        lastStatus: this.store.execution.getIntent(intentKey)?.state === "completed" ? "idle" : "active",
         messageReceipts: {
           ...binding.messageReceipts,
           [input.clientMessageId]: {
@@ -1002,8 +1299,8 @@ export class CodexChatGateway {
     } catch (error) {
       const deliveryUnknown = active.acknowledged || (failureStage === "turn_start" && uncertainTurnStartFailure(error));
       const failureReason = turnStartFailureReason(error, failureStage, active.acknowledged);
-      if (deliveryUnknown) this.deferUncertainTurnRelease(chatId, active);
-      else this.releaseActiveTurn(chatId);
+      this.store.execution.updateIntent(intentKey, { state: deliveryUnknown ? "unknown" : "not_dispatched" });
+      if (!deliveryUnknown) this.releaseActiveTurn(chatId);
       await this.store.patch(chatId, {
         lastStatus: deliveryUnknown ? "active" : "system_error",
         updatedAt: new Date().toISOString(),
@@ -1076,12 +1373,18 @@ export class CodexChatGateway {
   }
 
   async dispose() {
+    this.queueStopped = true;
+    if (this.queueTimer) clearTimeout(this.queueTimer);
     this.historyReader.clear();
     for (const subscribers of this.subscribers.values()) {
       for (const subscriber of subscribers) subscriber.close?.();
     }
     this.subscribers.clear();
-    for (const chatId of [...this.activeTurns.keys()]) this.releaseActiveTurn(chatId);
+    // Disconnecting the dispatcher is not proof that its native turns stopped.
+    for (const active of this.activeTurns.values()) if (active.intentKey) this.store.execution.updateIntent(active.intentKey, { state: "unknown" });
+    for (const active of this.activeTurns.values()) active.controlCleanup?.();
+    this.activeTurns.clear();
+    this.activeTurnLeases.clear();
     this.events.clear();
     await this.runtime.dispose();
   }
@@ -1118,11 +1421,12 @@ export class CodexChatGateway {
       const result = asObject(await this.runtime.readThread(binding.providerId, binding.nativeThreadId, includeTurns));
       const thread = asObject(result?.thread);
       if (!thread) throw new Error("missing_thread");
-      if (mismatch && !verifyNativeThreadIdentity(thread, binding.nativeThreadId, this.root)) {
+      if (mismatch && !verifyNativeThreadIdentity(thread, binding.nativeThreadId, binding.workspace?.cwd || this.root)) {
         throw new CodexChatGatewayError("runtime_identity_mismatch", "The original chat could not be verified in this workspace. Its history has been preserved.", 409);
       }
       if (includeTurns && !Array.isArray(thread.turns)) throw new Error("history_format_unsupported");
       if (mismatch && !allowRecovery) throw new CodexChatGatewayError("history_recovery_available", "This chat uses an older storage binding. Restore access to open the verified original conversation.", 409, false, { recoverable: true });
+      if (includeTurns && !mismatch) await this.reconcileExecutions(binding, thread);
       return thread;
     } catch (error) {
       if (error instanceof CodexChatGatewayError) throw error;
@@ -1150,37 +1454,63 @@ export class CodexChatGateway {
     }
   }
 
+  private async reconcileExecutions(binding: ChatBinding, thread: Record<string, unknown>) {
+    if (!this.store.execution || !Array.isArray(thread.turns)) return;
+    if(this.store.execution.listIntents({kind:"native-request",states:["pending","unknown"],limit:1}).length)expireCompletedNativeRequests(binding.stateIdentityHash!,binding.nativeThreadId,new Set(thread.turns.map(asObject).filter(turn=>turn && ["completed","interrupted","failed"].includes(String(turn.status))).map(turn=>String(turn?.id))));
+    if(this.store.execution.listIntents({kind:"voice-turn",states:["dispatching","running","unknown"],limit:1000}).some(row=>row.storage===binding.stateIdentityHash && row.nativeThreadId===binding.nativeThreadId)) {
+      const {recoverVoiceNativeTurns}=await import("../realtime/codex-task/codex-app-server-client");
+      recoverVoiceNativeTurns(binding.stateIdentityHash!,binding.nativeThreadId,thread.turns);
+    }
+    for (const intent of this.store.execution.listIntents({ kind: "turn", states: ["dispatching", "running", "unknown"], limit: 1000 })) {
+      if (intent.chatId !== binding.chatId || intent.nativeThreadId !== binding.nativeThreadId || intent.stateIdentityHash !== binding.stateIdentityHash) continue;
+      const candidate = thread.turns.map(asObject).find(row => row && (
+        (intent.nativeTurnId && row.id === intent.nativeTurnId) ||
+        (!intent.nativeTurnId && normalizeNativeTurn(binding, row, this.root, null)?.clientMessageId === intent.clientMessageId)
+      ));
+      if (!candidate) continue; // An idle snapshot or elapsed time cannot prove non-delivery.
+      const turn = normalizeNativeTurn(binding, candidate, this.root, null);
+      if (!turn || (!intent.nativeTurnId && turn.userMessage.markdown.trim() !== intent.userText)) continue;
+      const key = `turn:${binding.chatId}:${intent.clientMessageId}`;
+      const terminal = ["completed", "interrupted", "failed"].includes(turn.status);
+      const receipt = intent.receipt || { clientMessageId: intent.clientMessageId, requestHash: intent.hash, turnId: turn.turnId, nativeTurnId: String(candidate.id), startedAt: turn.startedAt };
+      await this.store.patch(binding.chatId, { messageReceipts: { [intent.clientMessageId]: receipt } });
+      try { this.store.execution.updateIntent(key, { state: terminal ? "completed" : "running", nativeTurnId: candidate.id, receipt }, intent.revision); }
+      catch (error) { if ((error as {code?:string}).code === "execution_revision_conflict") continue; throw error; }
+      const queuedKey=`queued:${binding.chatId}:${intent.clientMessageId}`;
+      const queued=this.store.execution.getIntent(queuedKey);
+      if(queued && ["dispatching","unknown"].includes(queued.state))this.store.execution.updateIntent(queuedKey,{state:"delivered"});
+      if (terminal && intent.owner && intent.generation) {
+        this.store.execution.reconcileRelease(intent.owner, intent.generation);
+        if (this.activeTurns.get(binding.chatId)?.clientMessageId === intent.clientMessageId) this.releaseActiveTurn(binding.chatId);
+        await this.store.patch(binding.chatId, {lastStatus:turn.status === "failed" ? "system_error" : "idle",updatedAt:new Date().toISOString()});
+      }
+    }
+    for(const intent of this.store.execution.listIntents({kind:"steer",states:["dispatching","unknown"],limit:1000})) {
+      if(intent.chatId!==binding.chatId)continue;
+      const turn=thread.turns.map(asObject).find(row=>row?.id===intent.nativeTurnId);
+      const items=Array.isArray(turn?.items)?turn.items:[];
+      const item=items.map(asObject).find(row=>row?.type==="userMessage" && row.clientId===intent.clientMessageId);
+      const normalized=item && normalizeNativeItem(binding.chatId,item,this.root,intent.createdAt);
+      if(normalized?.kind==="user_message" && normalized.message.markdown.trim()===intent.text)this.store.execution.updateIntent(`control:${binding.chatId}:${intent.clientMessageId}`,{state:"confirmed"});
+    }
+  }
+
   private async requireBinding(chatId: string): Promise<ChatBinding> {
     if (!/^chat_[A-Za-z0-9]+$/.test(chatId)) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     const binding = await this.store.get(chatId);
     if (!binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
     const aliases = await this.store.all();
     const matching = aliases.filter(row => logicalChatKey(row) === logicalChatKey(binding));
-    return { ...binding, archived: matching.some(row => row.archived), hasDeliveryBinding: matching.some(row => row.hasDeliveryBinding), attachmentMessages: Object.assign({}, ...matching.map(row => row.attachmentMessages || {}), binding.attachmentMessages || {}),
+    return { ...binding, archived: matching.some(row => row.archived), hasDeliveryBinding: matching.some(row => row.hasDeliveryBinding), messageReceipts:Object.assign({}, ...matching.map(row => row.messageReceipts),binding.messageReceipts), attachmentMessages: Object.assign({}, ...matching.map(row => row.attachmentMessages || {}), binding.attachmentMessages || {}),
       goalBudgetRequests: Object.assign({}, ...matching.map(row => row.goalBudgetRequests || {}), binding.goalBudgetRequests || {}),
       deliveryBudgetRequests: Object.assign({}, ...matching.map(row => row.deliveryBudgetRequests || {}), binding.deliveryBudgetRequests || {}) };
   }
 
   private releaseActiveTurn(chatId: string) {
-    const uncertainTimer = this.uncertainTurnTimers.get(chatId);
-    if (uncertainTimer) clearTimeout(uncertainTimer);
-    this.uncertainTurnTimers.delete(chatId);
+    this.activeTurns.get(chatId)?.controlCleanup?.();
     this.activeTurns.delete(chatId);
     this.activeTurnLeases.get(chatId)?.();
     this.activeTurnLeases.delete(chatId);
-  }
-
-  private deferUncertainTurnRelease(chatId: string, active: ActiveAttempt) {
-    const previous = this.uncertainTurnTimers.get(chatId);
-    if (previous) clearTimeout(previous);
-    const timer = setTimeout(() => {
-      this.uncertainTurnTimers.delete(chatId);
-      if (this.activeTurns.get(chatId) === active && !(active.acknowledged && active.nativeTurnId)) {
-        this.releaseActiveTurn(chatId);
-      }
-    }, UNCERTAIN_TURN_LEASE_MS);
-    timer.unref?.();
-    this.uncertainTurnTimers.set(chatId, timer);
   }
 
   private emit(
@@ -1237,6 +1567,7 @@ export class CodexChatGateway {
       }
 
       if (method === "turn/started" && active && nativeTurnId) {
+        if(active.nativeTurnId && active.nativeTurnId!==nativeTurnId)return;
         active.nativeTurnId = nativeTurnId;
         active.acknowledged = true;
         this.recordUsage(binding, { attemptId: active.clientMessageId, turnId: nativeTurnId, turnStatus: "running" }, origin || null);
@@ -1272,7 +1603,9 @@ export class CodexChatGateway {
 
       if (method === "item/started" || method === "item/completed") {
         const item = normalizeNativeItem(binding.chatId, params.item, this.root, active?.startedAt || binding.updatedAt);
-        if (!item) return;
+        if (!item || (active?.nativeTurnId && nativeTurnId && active.nativeTurnId!==nativeTurnId)) return;
+        const rawItem=asObject(params.item);
+        if(item.kind==="user_message" && rawItem?.clientId===active?.clientMessageId)return;
         const turnId = active?.turnId || (nativeTurnId ? turnIdFor(binding.chatId, nativeTurnId) : null);
         if (method === "item/completed" && item.kind === "assistant_message") {
           this.emit(binding.chatId, "message.completed", { message: item.message }, { turnId, itemId: item.id });
@@ -1282,6 +1615,8 @@ export class CodexChatGateway {
       }
 
       if (method === "turn/completed" && nativeTurn) {
+        if (active && (!active.nativeTurnId || active.nativeTurnId !== nativeTurnId)) return;
+        if (active?.intentKey) this.store.execution.updateIntent(active.intentKey, { state: "completed", nativeTurnId });
         if (usageAttempt) this.recordUsage(binding, { attemptId: usageAttempt, turnId: nativeTurnId, turnStatus: String(nativeTurn.status || "unknown") }, origin || null);
         const turn = normalizeNativeTurn(binding, nativeTurn, this.root, active);
         if (!turn) return;
@@ -1318,7 +1653,7 @@ export class CodexChatGateway {
           error: { code: "codex_turn_failed", message: "Codex could not complete this turn." },
         };
         this.emit(binding.chatId, "turn.failed", { turn: failed, retryMode: "resume" }, { turnId: active.turnId });
-        this.releaseActiveTurn(binding.chatId);
+        if (active.intentKey) this.store.execution.updateIntent(active.intentKey, { state: "unknown" });
         await this.store.patch(binding.chatId, { lastStatus: "system_error", updatedAt: new Date().toISOString() });
       }
     } catch {

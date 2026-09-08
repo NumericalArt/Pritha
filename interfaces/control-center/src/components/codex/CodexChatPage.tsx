@@ -21,7 +21,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useChatAttachments } from "./useChatAttachments";
+import { readDraftSession, writeDraftSession } from "@/lib/codex-chat/draft-session";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
+import { TaskChatControls } from "./TaskChatControls";
 import { HistoryTurn } from "./HistoryTurn";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
@@ -83,6 +85,8 @@ type PendingDelivery = {
   runId?: string;
   attachments?: string[];
   modelId?: string;
+  effortId?: string;
+  serviceTierId?: string;
   chatId: string;
   clientMessageId: string;
   text: string;
@@ -90,9 +94,15 @@ type PendingDelivery = {
 };
 
 type PendingNewChatDelivery = {
+  draftId: string;
+  draftRevision: number;
+  navigationEpoch: number;
   attachments?: string[];
   modelId?: string;
+  effortId?: string;
+  serviceTierId?: string;
   clientThreadId: string;
+  workspace?: {baseRevision:string};
   clientMessageId: string;
   text: string;
   status: "sending" | "delivery_unknown";
@@ -229,6 +239,7 @@ function appendDelta(rows: TurnView[], event: ChatEvent): TurnView[] {
 }
 
 function ActivityItem({ item }: { item: ChatItemView }) {
+  if (item.kind === "user_message") return <article className="codex-message codex-user-message"><div className="codex-message-label">You · clarification</div><CodexMarkdown markdown={item.message.markdown} /></article>;
   if (item.kind === "assistant_message") {
     return (
       <article className={`codex-message codex-assistant-message ${item.message.status === "streaming" ? "streaming" : ""}`}>
@@ -305,10 +316,17 @@ export function CodexChatPage() {
   const [nextCursorByGroup, setNextCursorByGroup] = useState<Record<ChatGroup, string | null>>({ my_chats: null, voice_work: null });
   const [listLoading, setListLoading] = useState(true);
   const [listPageLoading, setListPageLoading] = useState(false);
+  const [admissionPaused,setAdmissionPaused]=useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [voiceSync, setVoiceSync] = useState<ThreadPage["sync"]>(undefined);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [newDraftId, setNewDraftId] = useState(NEW_CHAT_DRAFT_KEY);
+  const [newDraftIds, setNewDraftIds] = useState<string[]>([]);
+  const newDraftIdRef = useRef(newDraftId);
+  const navigationEpochRef = useRef(0);
+  const draftRevisionsRef = useRef<Record<string, number>>({});
+  const creationIdsRef = useRef<Record<string,string>>({});
+  newDraftIdRef.current = newDraftId;
   const [error, setError] = useState<ChatFailure | null>(null);
   const [recovering, setRecovering] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -340,7 +358,20 @@ export function CodexChatPage() {
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [streamRevision, setStreamRevision] = useState(0);
   const [pendingDeliveries, setPendingDeliveries] = useState<Record<string, PendingDelivery>>({});
-  const [pendingNewChatDelivery, setPendingNewChatDelivery] = useState<PendingNewChatDelivery | null>(null);
+  const [pendingNewChatDeliveries, setPendingNewChatDeliveries] = useState<Record<string,PendingNewChatDelivery>>({});
+  const pendingNewChatDeliveriesRef = useRef<Record<string,PendingNewChatDelivery>>({});
+  const pendingNewChatDelivery = pendingNewChatDeliveries[newDraftId] || null;
+  const [workspaceChoices,setWorkspaceChoices] = useState<Record<string,string>>({});
+  const workspacePreflights = useRef(new Set<string>());
+  const saveSessionRef = useRef(()=>{});
+  const sessionLoadedRef = useRef(false);
+  const setPendingNewChatDelivery = useCallback((draftId: string, value: PendingNewChatDelivery | null) => {
+    const next = {...pendingNewChatDeliveriesRef.current};
+    if (value) next[draftId] = value; else delete next[draftId];
+    pendingNewChatDeliveriesRef.current = next;
+    setPendingNewChatDeliveries(next);
+    saveSessionRef.current();
+  }, []);
   const [dictation, setDictation] = useState<DictationState>("idle");
   const [dictationSupported, setDictationSupported] = useState(false);
   const [dictationLanguage, setDictationLanguage] = useState<DictationLanguage>("browser");
@@ -363,9 +394,9 @@ export function CodexChatPage() {
   selectedChatIdRef.current = selectedChatId;
   activeGroupRef.current = activeGroup;
   connectionRef.current = connection;
-  pendingNewChatDeliveryRef.current = pendingNewChatDelivery;
+  pendingNewChatDeliveryRef.current = selectedChatId ? null : pendingNewChatDelivery;
 
-  const draftKey = selectedChatId || NEW_CHAT_DRAFT_KEY;
+  const draftKey = selectedChatId || newDraftId;
   const draft = draftsByChat[draftKey] || "";
   const attachmentDraft = useChatAttachments(draftKey);
   const filePickerRef = useRef<HTMLInputElement | null>(null);
@@ -374,9 +405,11 @@ export function CodexChatPage() {
   const selectedModalities = runtime?.models.find(model => model.id === runtime.selected.modelId)?.inputModalities;
   const imageCapabilityMissing = attachmentDraft.items.some(file => file.view?.kind === "image") && !selectedModalities?.includes("image");
   const pendingDelivery = selectedChatId ? pendingDeliveries[selectedChatId] || null : pendingNewChatDelivery;
+  const sending = pendingDelivery?.status === "sending";
 
   const updateDraftForChat = useCallback((chatId: string | null, value: SetStateAction<string>) => {
-    const key = chatId || NEW_CHAT_DRAFT_KEY;
+    const key = chatId || newDraftIdRef.current;
+    draftRevisionsRef.current[key] = (draftRevisionsRef.current[key] || 0) + 1;
     const current = draftsByChatRef.current[key] || "";
     const nextValue = typeof value === "function" ? value(current) : value;
     const next = { ...draftsByChatRef.current };
@@ -387,6 +420,11 @@ export function CodexChatPage() {
   }, []);
 
   const setDraft = useCallback((value: SetStateAction<string>) => {
+    if (!selectedChatIdRef.current) {
+      newChatDraftActiveRef.current = true;
+      const id = newDraftIdRef.current;
+      setNewDraftIds(ids => ids.includes(id) ? ids : [...ids,id]);
+    }
     updateDraftForChat(selectedChatIdRef.current, value);
   }, [updateDraftForChat]);
 
@@ -396,7 +434,31 @@ export function CodexChatPage() {
     else delete next[chatId];
     pendingDeliveriesRef.current = next;
     setPendingDeliveries(next);
+    saveSessionRef.current();
   }, []);
+
+  saveSessionRef.current = () => {
+    if(!sessionLoadedRef.current)return;
+    writeDraftSession({version:1,drafts:draftsByChatRef.current,revisions:draftRevisionsRef.current,creationIds:creationIdsRef.current,newDraftId:newDraftIdRef.current,pending:pendingDeliveriesRef.current,pendingNew:pendingNewChatDeliveriesRef.current});
+  };
+  useEffect(() => {
+    const saved=readDraftSession();
+    if(saved) {
+      draftsByChatRef.current=saved.drafts;setDraftsByChat(saved.drafts);
+      draftRevisionsRef.current=saved.revisions;creationIdsRef.current=saved.creationIds;
+      pendingDeliveriesRef.current=saved.pending as Record<string,PendingDelivery>;setPendingDeliveries(pendingDeliveriesRef.current);
+      pendingNewChatDeliveriesRef.current=saved.pendingNew as Record<string,PendingNewChatDelivery>;setPendingNewChatDeliveries(pendingNewChatDeliveriesRef.current);
+      const ids=[...new Set([...Object.keys(saved.drafts).filter(id=>!id.startsWith("chat_") && saved.drafts[id]),...Object.keys(saved.pendingNew)])];
+      setNewDraftIds(ids);
+      if(!new URLSearchParams(window.location.search).has("chat") && ids.includes(saved.newDraftId)) {
+        newDraftIdRef.current=saved.newDraftId;setNewDraftId(saved.newDraftId);newChatDraftActiveRef.current=true;
+      }
+    }
+    sessionLoadedRef.current=true;
+    const save=()=>saveSessionRef.current();window.addEventListener("pagehide",save);
+    return ()=>{save();window.removeEventListener("pagehide",save);};
+  },[]);
+  useEffect(()=>saveSessionRef.current(),[draftsByChat,newDraftId,pendingDeliveries,pendingNewChatDeliveries]);
 
   const selectedSummary = useMemo(
     () => threads.find((thread) => thread.chatId === selectedChatId) || null,
@@ -445,6 +507,53 @@ export function CodexChatPage() {
     }
   }, [activeGroup, debouncedSearch, showArchived]);
 
+  const activityDetailRefreshRef = useRef<(chatId:string)=>Promise<unknown>>(async()=>{});
+  const activityRefreshRef = useRef(refreshThreads);
+  activityRefreshRef.current = refreshThreads;
+  useEffect(() => {
+    let stopped=false,cursor=0,refreshing=false;
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    let stream:EventSource|null=null;
+    const controller=new AbortController();
+    const pending=new Set<string>();let pendingCursor=0;
+    const update=async(data:{cursor:number;changed:string[];admissionEnabled?:boolean})=>{
+      if(stopped)return;
+      if(typeof data.admissionEnabled==="boolean")setAdmissionPaused(!data.admissionEnabled);
+      if(Array.isArray(data.changed))for(const chatId of data.changed)if(typeof chatId==='string')pending.add(chatId);
+      if(Number.isSafeInteger(data.cursor))pendingCursor=data.cursor;
+      if(refreshing)return;
+      refreshing=true;
+      try {
+        do {
+          const changed=[...pending],nextCursor=pendingCursor;pending.clear();
+          try {
+            if(changed.length) {
+              await activityRefreshRef.current();
+              const selected=selectedChatIdRef.current;
+              if(selected && changed.includes(selected))await activityDetailRefreshRef.current(selected);
+            }
+            cursor=nextCursor;
+          } catch(error){for(const id of changed)pending.add(id);throw error;}
+        } while(!stopped && pending.size);
+      } finally {refreshing=false;}
+    };
+    const poll=async()=>{
+      try {const response=await api<{cursor:number;changed:string[]}>(`/api/codex-chat/v1/activity?after=${cursor}`,{signal:controller.signal});await update(response.data);}
+      catch {/* Selected history keeps its independent reconnect controls. */}
+      finally {if(!stopped && !stream)timer=setTimeout(poll,document.hidden?15_000:3_000);}
+    };
+    const connect=()=>{
+      clearTimeout(timer);stream?.close();stream=null;
+      if(stopped)return;
+      if(document.hidden || typeof EventSource==='undefined'){timer=setTimeout(poll,1_000);return;}
+      const source=new EventSource(`/api/codex-chat/v1/activity/stream?after=${cursor}`);stream=source;
+      source.addEventListener('activity',event=>{try{void update(JSON.parse((event as MessageEvent).data)).catch(()=>{});}catch{}});
+      source.onerror=()=>{source.close();if(stream===source){stream=null;timer=setTimeout(poll,1_000);}};
+    };
+    connect();document.addEventListener('visibilitychange',connect);window.addEventListener('online',connect);
+    return ()=>{stopped=true;clearTimeout(timer);controller.abort();stream?.close();document.removeEventListener('visibilitychange',connect);window.removeEventListener('online',connect);};
+  }, []);
+
   const loadMoreThreads = useCallback(async () => {
     const group = activeGroupRef.current;
     const cursor = nextCursorByGroup[group];
@@ -484,6 +593,7 @@ export function CodexChatPage() {
     source: TaskChatUiActivitySource,
     options: { selected?: boolean; context?: TaskChatNavigationContext | null } = {},
   ) => {
+    navigationEpochRef.current += 1;
     const context = options.context || createTaskChatNavigation(chatId, source);
     const previous = navigationRef.current;
     if (previous && previous.interactionId !== context.interactionId) {
@@ -573,6 +683,7 @@ export function CodexChatPage() {
       }
     }
   }, []);
+  activityDetailRefreshRef.current = loadThreadDetail;
 
   const loadThreadHistory = useCallback((
     chatId: string,
@@ -990,11 +1101,16 @@ export function CodexChatPage() {
     }
   }, [beginNavigation, connection, loadThreadDetail, loadThreadHistory, refreshRuntime, refreshThreads]);
 
-  const startNewDraft = useCallback(() => {
+  const openNewDraft = useCallback((id: string) => {
+    navigationEpochRef.current += 1;
+    newDraftIdRef.current = id;
+    setNewDraftId(id);
+    setNewDraftIds(ids => ids.includes(id) ? ids : [...ids,id]);
     newChatDraftActiveRef.current = true;
     selectedChatIdRef.current = null;
     selectedByGroupRef.current.my_chats = null;
     setActiveGroup("my_chats");
+    navigationEpochRef.current += 1;
     setSelectedChatId(null);
     setDetail(null);
     setTurns([]);
@@ -1003,6 +1119,7 @@ export function CodexChatPage() {
     setDrawerOpen(false);
     window.history.replaceState(null, "", "/task-chat?group=my_chats");
   }, []);
+  const startNewDraft = useCallback(() => openNewDraft(`draft_${crypto.randomUUID()}`), [openNewDraft]);
 
   const startReplacementDraft = useCallback(() => {
     const chatId = selectedChatIdRef.current;
@@ -1012,12 +1129,13 @@ export function CodexChatPage() {
       updateDraftForChat(chatId, "");
       setPendingForChat(chatId, null);
     }
-    updateDraftForChat(null, replacementText);
     startNewDraft();
+    updateDraftForChat(null, replacementText);
   }, [setPendingForChat, startNewDraft, updateDraftForChat]);
 
   const backToThreadList = useCallback(() => {
     selectedByGroupRef.current[activeGroupRef.current] = null;
+    navigationEpochRef.current += 1;
     setSelectedChatId(null);
     setDetail(null);
     setTurns([]);
@@ -1053,6 +1171,7 @@ export function CodexChatPage() {
 
   function switchGroup(group: ChatGroup) {
     if (group === activeGroup) return;
+    navigationEpochRef.current += 1;
     selectedByGroupRef.current[activeGroup] = selectedChatId;
     setActiveGroup(group);
     const next = group === "my_chats" && (newChatDraftActiveRef.current || pendingNewChatDeliveryRef.current)
@@ -1070,7 +1189,6 @@ export function CodexChatPage() {
   }
 
   async function deliverMessage(delivery: PendingDelivery) {
-    setSending(true);
     setError(null);
     const intent = parseBudgetIntent(delivery.text);
     const budgetCommand = (intent.kind === "goal_budget" || intent.kind === "delivery_budget") && !delivery.attachments?.length;
@@ -1103,7 +1221,7 @@ export function CodexChatPage() {
       const response = await api<AcceptedTurn>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/turns`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": delivery.clientMessageId },
-        body: JSON.stringify({ clientMessageId: delivery.clientMessageId, input: [{ type: "text", text: delivery.text }], ...(delivery.attachments?.length || delivery.modelId ? { attachments: delivery.attachments, settings: { modelId: delivery.modelId } } : {}) }),
+        body: JSON.stringify({ clientMessageId: delivery.clientMessageId, input: [{ type: "text", text: delivery.text }], ...(delivery.attachments?.length || delivery.modelId ? { attachments: delivery.attachments, settings: { modelId: delivery.modelId, effortId: delivery.effortId, serviceTierId: delivery.serviceTierId } } : {}) }),
       }, { timeoutMs: TURN_START_TIMEOUT_MS });
       setPendingForChat(delivery.chatId, null);
       attachmentDraft.clear(delivery.chatId, delivery.attachments);
@@ -1124,15 +1242,12 @@ export function CodexChatPage() {
         setPendingForChat(delivery.chatId, null);
         setError(failure(cause, "Message could not be sent.", "turn", delivery.chatId));
       }
-    } finally {
-      setSending(false);
     }
   }
 
   async function deliverNewChatMessage(delivery: PendingNewChatDelivery) {
-    setSending(true);
     setError(null);
-    setPendingNewChatDelivery({ ...delivery, status: "sending" });
+    setPendingNewChatDelivery(delivery.draftId, { ...delivery, status: "sending" });
     try {
       const response = await api<CreatedThreadTurn>("/api/codex-chat/v1/threads", {
         method: "POST",
@@ -1140,47 +1255,53 @@ export function CodexChatPage() {
         body: JSON.stringify({
           clientThreadId: delivery.clientThreadId,
           source: "chat",
+          ...(delivery.workspace ? {workspace:delivery.workspace} : {}),
           initialTurn: {
             clientMessageId: delivery.clientMessageId,
             input: [{ type: "text", text: delivery.text }],
-            ...(delivery.attachments?.length || delivery.modelId ? { attachments: delivery.attachments, settings: { modelId: delivery.modelId } } : {}),
+            ...(delivery.attachments?.length || delivery.modelId ? { attachments: delivery.attachments, settings: { modelId: delivery.modelId, effortId: delivery.effortId, serviceTierId: delivery.serviceTierId } } : {}),
           },
         }),
       }, { timeoutMs: TURN_START_TIMEOUT_MS });
       const { detail: nextDetail, accepted } = response.data;
-      newChatDraftActiveRef.current = false;
-      setPendingNewChatDelivery(null);
-      updateDraftForChat(null, "");
-      attachmentDraft.clear(NEW_CHAT_DRAFT_KEY, delivery.attachments);
+      setPendingNewChatDelivery(delivery.draftId, null);
+      const unchanged = draftRevisionsRef.current[delivery.draftId] === delivery.draftRevision;
+      const remainingDraft = unchanged ? "" : draftsByChatRef.current[delivery.draftId] || "";
+      if (remainingDraft) updateDraftForChat(nextDetail.thread.chatId, remainingDraft);
+      updateDraftForChat(delivery.draftId, "");
+      attachmentDraft.clear(delivery.draftId, delivery.attachments);
+      attachmentDraft.move(delivery.draftId,nextDetail.thread.chatId);
+      setNewDraftIds(ids => ids.filter(id => id !== delivery.draftId));
       setThreads((rows) => [nextDetail.thread, ...rows.filter((thread) => thread.chatId !== nextDetail.thread.chatId)]);
-      setActiveGroup("my_chats");
-      selectedByGroupRef.current.my_chats = nextDetail.thread.chatId;
-      setSelectedChatId(nextDetail.thread.chatId);
-      setDetail(nextDetail);
-      setTurns((rows) => upsertTurn(rows, accepted.turn));
-      setDrawerOpen(false);
-      window.history.replaceState(null, "", `/task-chat?group=my_chats&chat=${encodeURIComponent(nextDetail.thread.chatId)}`);
+      if (selectedChatIdRef.current === null && newDraftIdRef.current === delivery.draftId && activeGroupRef.current === "my_chats" && navigationEpochRef.current === delivery.navigationEpoch) {
+        newChatDraftActiveRef.current = false;
+        selectedChatIdRef.current = nextDetail.thread.chatId;
+        selectedByGroupRef.current.my_chats = nextDetail.thread.chatId;
+        setSelectedChatId(nextDetail.thread.chatId);
+        setDetail(nextDetail);
+        setTurns([accepted.turn]);
+        setDrawerOpen(false);
+        window.history.replaceState(null, "", `/task-chat?group=my_chats&chat=${encodeURIComponent(nextDetail.thread.chatId)}`);
+      }
     } catch (cause) {
-      if (deliveryMayBeUnknown(cause)) {
-        setPendingNewChatDelivery({ ...delivery, status: "delivery_unknown" });
-        setError({
+      if (deliveryMayBeUnknown(cause) || (cause instanceof ControlCenterRequestError && ["create_pending", "create_delivery_unknown", "fallback_confirmation_required", "turn_active"].includes(cause.code))) {
+        setPendingNewChatDelivery(delivery.draftId, { ...delivery, status: "delivery_unknown" });
+        if (!selectedChatIdRef.current && newDraftIdRef.current === delivery.draftId) setError({
           message: "The connection ended before the first message could be confirmed. Check and retry the same request safely.",
           source: "turn",
           kind: cause instanceof ControlCenterRequestError && cause.kind !== "api" ? "backend_offline" : "turn_failed",
           chatId: null,
         });
       } else {
-        setPendingNewChatDelivery(null);
-        setError(failure(cause, "The new chat was not created because its first message was not accepted.", "turn"));
+        setPendingNewChatDelivery(delivery.draftId, null);
+        if (!selectedChatIdRef.current && newDraftIdRef.current === delivery.draftId) setError(failure(cause, "The new chat was not created because its first message was not accepted.", "turn"));
       }
-    } finally {
-      setSending(false);
     }
   }
 
-  async function sendMessage() {
+  async function sendMessage(workspaceBase?: string) {
     const text = draft.trim();
-    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || pendingNewChatDelivery || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
+    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || (!selectedChatId && pendingNewChatDelivery) || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
     const chatId = selectedChatId;
     const intent = parseBudgetIntent(text);
     if (intent.kind === "clarification" || ((intent.kind === "goal_budget" || intent.kind === "delivery_budget") && (!chatId || attachmentIds.length > 0))) {
@@ -1189,12 +1310,32 @@ export function CodexChatPage() {
     }
     setBudgetNotice(null);
     if (!chatId) {
+      const draftId = newDraftIdRef.current;
+      if (workspacePreflights.current.has(draftId)) return;
+      const snapshot = {draftId,draftRevision:draftRevisionsRef.current[draftId] || 0,navigationEpoch:navigationEpochRef.current};
+      if (runtime?.selected.sandboxMode === "workspace_write" && !workspaceBase) {
+        workspacePreflights.current.add(draftId);
+        try {
+          const preview=(await api<{git:boolean;dirty:boolean;baseRevision:string|null}>("/api/codex-chat/v1/workspace")).data;
+          if(preview.git && preview.dirty && preview.baseRevision) {
+            setWorkspaceChoices(current=>({...current,[draftId]:preview.baseRevision!}));
+            return;
+          }
+        } catch(cause) {
+          if(newDraftIdRef.current === draftId)setError(failure(cause,"The project base could not be checked.","mutation"));
+          return;
+        } finally { workspacePreflights.current.delete(draftId); }
+      }
       await deliverNewChatMessage({
-        clientThreadId: crypto.randomUUID(),
+        ...snapshot,
+        ...(workspaceBase ? {workspace:{baseRevision:workspaceBase}} : {}),
+        clientThreadId: creationIdsRef.current[draftId] ||= crypto.randomUUID(),
         clientMessageId: crypto.randomUUID(),
         text,
         attachments: attachmentIds,
-        modelId: attachmentIds.length || historyHasImages ? runtime?.selected.modelId || undefined : undefined,
+        modelId: runtime?.selected.modelId || undefined,
+      effortId: runtime?.selected.effortId || undefined,
+      serviceTierId: runtime?.selected.serviceTierId || undefined,
         status: "sending",
       });
       return;
@@ -1205,7 +1346,9 @@ export function CodexChatPage() {
       clientMessageId: crypto.randomUUID(),
       text,
       attachments: attachmentIds,
-      modelId: attachmentIds.length || historyHasImages ? runtime?.selected.modelId || undefined : undefined,
+      modelId: runtime?.selected.modelId || undefined,
+      effortId: runtime?.selected.effortId || undefined,
+      serviceTierId: runtime?.selected.serviceTierId || undefined,
       status: "sending",
     };
     setPendingForChat(chatId, delivery);
@@ -1217,20 +1360,11 @@ export function CodexChatPage() {
     if (!chatId) {
       const delivery = pendingNewChatDelivery;
       if (!delivery || delivery.status !== "delivery_unknown" || sending) return;
-      if ((draftsByChatRef.current[NEW_CHAT_DRAFT_KEY] || "").trim() !== delivery.text) {
-        setError({
-          message: "The draft changed. Restore the original message before retrying its delivery.",
-          source: "turn",
-          kind: "turn_failed",
-          chatId: null,
-        });
-        return;
-      }
       setRecovering(true);
       try {
         await checkControlCenterHealth();
         await refreshRuntime();
-        await deliverNewChatMessage(delivery);
+        await deliverNewChatMessage({...delivery,navigationEpoch:navigationEpochRef.current});
       } catch (cause) {
         setError(failure(cause, "First-message delivery could not be reconciled.", "turn"));
       } finally {
@@ -1252,15 +1386,6 @@ export function CodexChatPage() {
       await loadThreadHistory(delivery.chatId, nextDetail);
       const unresolved = pendingDeliveriesRef.current[delivery.chatId];
       if (!unresolved || unresolved.clientMessageId !== delivery.clientMessageId) return;
-      if ((draftsByChatRef.current[delivery.chatId] || "").trim() !== delivery.text) {
-        setError({
-          message: "The draft changed. Restore the original message before retrying its delivery.",
-          source: "turn",
-          kind: "turn_failed",
-          chatId: delivery.chatId,
-        });
-        return;
-      }
       await deliverMessage(delivery);
     } catch (cause) {
       setError(failure(cause, "Delivery could not be reconciled.", "turn", delivery.chatId));
@@ -1279,6 +1404,7 @@ export function CodexChatPage() {
       setDictation("error");
       return;
     }
+    const dictationDraftKey = selectedChatIdRef.current || newDraftIdRef.current;
     const recognition = new SpeechRecognition();
     const languageTag = recognitionLanguageTag(dictationLanguage);
     if (languageTag) recognition.lang = languageTag;
@@ -1290,7 +1416,7 @@ export function CodexChatPage() {
         if (event.results[index].isFinal) recognized.push(event.results[index][0].transcript);
       }
       const text = recognized.join(" ").trim();
-      if (text) setDraft((current) => `${current}${current.trim() ? " " : ""}${text}`);
+      if (text) updateDraftForChat(dictationDraftKey, (current) => `${current}${current.trim() ? " " : ""}${text}`);
     };
     recognition.onend = () => {
       recognitionRef.current = null;
@@ -1332,6 +1458,7 @@ export function CodexChatPage() {
     setNextCursorByGroup({ my_chats: null, voice_work: null });
     selectedByGroupRef.current = { my_chats: null, voice_work: null };
     selectedChatIdRef.current = null;
+    navigationEpochRef.current += 1;
     setSelectedChatId(null);
     window.history.replaceState(null, "", `/task-chat?group=${activeGroup}`);
   };
@@ -1344,7 +1471,8 @@ export function CodexChatPage() {
       if (selectedChatIdRef.current === thread.chatId) {
         selectedChatIdRef.current = null;
         selectedByGroupRef.current[activeGroup] = null;
-        setSelectedChatId(null);
+        navigationEpochRef.current += 1;
+    setSelectedChatId(null);
         window.history.replaceState(null, "", `/task-chat?group=${activeGroup}`);
       }
       setThreads(rows => rows.filter(row => row.chatId !== thread.chatId));
@@ -1363,7 +1491,7 @@ export function CodexChatPage() {
         <button type="button" role="tab" aria-selected={activeGroup === "my_chats"} className={activeGroup === "my_chats" ? "active" : ""} onClick={() => switchGroup("my_chats")}>Direct Chats</button>
         <button type="button" role="tab" aria-selected={activeGroup === "voice_work"} className={activeGroup === "voice_work" ? "active" : ""} onClick={() => switchGroup("voice_work")}>Voice Tasks</button>
       </div>
-      {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={startNewDraft} disabled={Boolean(pendingNewChatDelivery) || runtime?.availability === "unavailable"}>
+      {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={startNewDraft} disabled={runtime?.availability === "unavailable"}>
         <Plus size={17} /> New chat
       </button> : null}
       <button type="button" className="codex-text-action" onClick={changeArchiveView}>{showArchived ? "Show active" : "Show archived"}</button>
@@ -1371,6 +1499,11 @@ export function CodexChatPage() {
         <Search size={16} />
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={activeGroup === "voice_work" ? "Search Voice tasks…" : "Search chats…"} aria-label="Search Task Chat" />
       </label>
+      {activeGroup === "my_chats" && newDraftIds.length > 0 ? <section className="codex-thread-group" aria-label="Draft chats">
+        {newDraftIds.map(id => <button key={id} type="button" className="codex-text-action" aria-current={!selectedChatId && newDraftId === id ? "true" : undefined} onClick={() => openNewDraft(id)}>
+          {pendingNewChatDeliveries[id]?.status === "sending" ? "Sending · " : pendingNewChatDeliveries[id] ? "Check delivery · " : "Draft · "}{(draftsByChat[id] || "New chat").slice(0,48)}
+        </button>)}
+      </section> : null}
       <section className="codex-thread-group">
         {listLoading && visibleThreads.length === 0 ? <div className="codex-list-loading"><LoaderCircle className="spin" size={20} /><span>Loading {activeGroup === "voice_work" ? "Voice tasks" : "chats"}…</span></div> : null}
         {visibleThreads.length ? visibleThreads.map((thread) => (
@@ -1416,12 +1549,17 @@ export function CodexChatPage() {
           <span className={`codex-connection ${connection}`} title={`Event stream: ${connection}`}><span /></span>
         </header>
 
+      {admissionPaused&&<div className="codex-inline-notice info" role="status">New task starts are paused for an update. Drafts and existing task controls remain available.</div>}
         {runtime?.availability !== "ready" ? (
           <div className="codex-runtime-warning"><AlertTriangle size={17} /><span>{runtime?.availability === "degraded" ? "The task runtime is installed but the full chat capability probe did not pass." : "No compatible task runtime is available."}</span></div>
         ) : null}
         {connection === "reconnecting" && !backendOffline ? (
           <div className="codex-runtime-warning"><LoaderCircle className="spin" size={17} /><span>Event stream is reconnecting. The last synchronized history remains visible and read-only.</span></div>
         ) : null}
+        {!selectedChatId && workspaceChoices[newDraftId] ? <div className="codex-runtime-warning" role="status">
+          <span>В исходном проекте есть несохранённые в Git изменения. Отдельная рабочая копия будет создана из коммита <code>{workspaceChoices[newDraftId].slice(0,12)}</code>; эти изменения в неё не войдут.</span>
+          <button type="button" className="codex-button" onClick={()=>void sendMessage(workspaceChoices[newDraftId])}>Использовать этот коммит</button>
+        </div> : null}
         {visibleError ? (
           <div className="codex-error-banner">
             <AlertTriangle size={17} />
@@ -1449,7 +1587,7 @@ export function CodexChatPage() {
               <Bot size={34} />
               <h2>{activeGroup === "voice_work" ? "Voice task threads" : "Work directly with Pritha"}</h2>
               <p>Start a persistent conversation with the runtime selected in Settings.</p>
-              {activeGroup === "my_chats" ? <button className="codex-new-chat codex-empty-action" type="button" onClick={startNewDraft} disabled={Boolean(pendingNewChatDelivery) || runtime?.availability !== "ready"}><Plus size={17} /> New chat</button> : null}
+              {activeGroup === "my_chats" ? <button className="codex-new-chat codex-empty-action" type="button" onClick={startNewDraft} disabled={runtime?.availability !== "ready"}><Plus size={17} /> New chat</button> : null}
             </div>
           ) : null}
           {selectedChatId && displayedTurns.length === 0 && historyBusy ? (
@@ -1507,14 +1645,18 @@ export function CodexChatPage() {
         </div>
 
         <div className="codex-composer-wrap">
+          <TaskChatControls canSend={!attachmentsIncomplete && !imageCapabilityMissing} chatId={selectedChatId} detail={displayedDetail} draft={draft} attachments={attachmentsIncomplete?[]:attachmentIds} settings={runtime?.selected} refresh={loadThreadDetail} onSent={(chatId,text,files)=>{
+            updateDraftForChat(chatId,current=>current.trim()===text?"":current);
+            attachmentDraft.clear(chatId,files);
+          }} />
           {pendingDelivery?.status === "delivery_unknown" ? (
             <div className="codex-inline-notice warning codex-delivery-unknown">
-              {pendingNewChatDelivery
+              {!selectedChatId && pendingNewChatDelivery
                 ? "First-message delivery is unknown. The same idempotent create request will be reconciled before anything new is sent."
                 : ["goal_budget", "delivery_budget"].includes(parseBudgetIntent(pendingDelivery.text).kind)
                   ? "Budget confirmation is pending. Check the saved request to avoid adding tokens twice."
                   : "Delivery is unknown. History will be checked first; Task Chat will never replay this turn automatically."}
-              <button type="button" onClick={() => void retryUnknownDelivery()} disabled={recovering || sending || draft.trim() !== pendingDelivery.text}>
+              <button type="button" onClick={() => void retryUnknownDelivery()} disabled={recovering || sending}>
                 {recovering ? "Checking…" : "Check and retry same message"}
               </button>
             </div>
@@ -1523,7 +1665,7 @@ export function CodexChatPage() {
             <div className="codex-composer-status"><LoaderCircle className="spin" size={17} /><span>Opening thread controls…</span></div>
           ) : displayedDetail?.thread.archived ? (
             <div className="codex-continuation-gate"><p>This chat is archived. Restore it to continue.</p><button type="button" className="codex-text-action" onClick={() => void archiveChat(displayedDetail.thread)} disabled={archiveBusy}>Restore from archive</button></div>
-          ) : displayedDetail?.thread.origin === "voice" && displayedDetail.continuationState !== "continuation_enabled" ? (
+          ) : displayedDetail?.thread.origin === "voice" && displayedDetail.continuationState !== "continuation_enabled" && !displayedDetail.voiceWorkflow ? (
             <div className="codex-continuation-gate">
               <div><strong>{displayedDetail.continuationState === "blocked_active_turn" ? "Voice task is running" : "Voice task history is read-only"}</strong><p>{displayedDetail.continuationState === "blocked_active_turn" ? "Wait for the active Voice turn to finish before continuing here." : "Enable continuation only when you want to add a typed turn to this same task thread."}</p></div>
               <button className="codex-new-chat" type="button" onClick={() => void continueInTaskChat()} disabled={recovering || historyState !== "ready" || displayedDetail.continuationState !== "read_only"}>{recovering ? "Checking…" : historyBusy ? "Loading history…" : "Continue in Task Chat"}</button>
@@ -1558,7 +1700,7 @@ export function CodexChatPage() {
                     : hasActiveTurn ? "Pritha is working…" : "Ask Pritha…"}
               rows={3}
               maxLength={64_000}
-              disabled={Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready")}
+              disabled={Boolean(selectedChatId && historyState !== "ready")}
             />
             <div className="codex-composer-actions">
               <small>
@@ -1597,7 +1739,7 @@ export function CodexChatPage() {
                 >
                   <Mic size={16} /> {!dictationSupported ? "Unavailable" : dictation === "listening" ? "Listening" : dictation === "error" ? "Try again" : "Dictate"}
                 </button>
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(pendingNewChatDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} Send
                 </button>
               </div>
