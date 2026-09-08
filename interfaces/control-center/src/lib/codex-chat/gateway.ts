@@ -1,3 +1,4 @@
+import { HistoryReader, HistoryError, HISTORY_READ_MS, type HistoryContext } from "./history-reader";
 import { planOperationDecision, resolveOperationDecision, type OperationAction, type OperationRequest } from "../../../../../scripts/agents-mother/operation-decisions.mjs";
 import { operationRuntime } from "./operation-runtime";
 import { createHash, randomUUID } from "node:crypto";
@@ -183,6 +184,7 @@ export class CodexChatGatewayError extends Error {
 }
 
 export class CodexChatGateway {
+  private readonly historyReader = new HistoryReader();
   private readonly store = new CodexChatPrivateStore();
   readonly attachments = new ChatAttachmentStore(this.store.stateRoot, this.store.root);
   private readonly root = resolveTechscopeRoot();
@@ -736,6 +738,62 @@ export class CodexChatGateway {
     return detail;
   }
 
+  private async historyOperation<T>(chatId: string, key: string, operation: (context: HistoryContext, deadline: number) => Promise<T>): Promise<T> {
+    return this.historyReader.singleFlight(`${chatId}:${key}`, async () => {
+      const started = Date.now(), deadline = started + HISTORY_READ_MS;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let phase = "metadata";
+      try {
+        return await Promise.race([
+          (async () => {
+            const binding = await this.requireBinding(chatId);
+            const provider = (await this.runtime.provider(binding.providerId)).view;
+            if (provider.availability !== "ready") throw new HistoryError("runtime_unavailable", "The selected history runtime is unavailable.", 503, true);
+            if (provider.stateIdentityHash !== binding.stateIdentityHash) {
+              await this.readNativeThread(binding, false);
+              throw new HistoryError("history_recovery_available", "Restore access to this original conversation before loading history.", 409, true);
+            }
+            let runtimeReadMs = 0;
+            const read: HistoryContext["read"] = async (method, params, until) => {
+              const before = Date.now();
+              try { return await this.runtime.historyRequest(binding.providerId, method, params, until); }
+              finally { runtimeReadMs += Date.now() - before; }
+            };
+            const metadata = asObject(await read("thread/read", { threadId: binding.nativeThreadId, includeTurns: false }, deadline));
+            if (!verifyNativeThreadIdentity(asObject(metadata?.thread) || {}, binding.nativeThreadId, this.root)) throw new HistoryError("runtime_identity_mismatch", "The original conversation could not be verified in this workspace.", 409);
+            phase = "history";
+            const readStarted = Date.now();
+            const result = await operation({ binding, root: this.root, version: provider.version || "unknown", pagination: provider.capabilities.historyPagination, read }, deadline);
+            if (Date.now() >= deadline) throw new HistoryError("history_timeout", "History preparation timed out. Retry without restarting the task.", 504, true);
+            void this.store.recordRuntimeEvent("history-page-read", { chatRef: hash({ chatId }).slice(0, 16), providerId: binding.providerId,
+              metadataMs: readStarted - started, historyMs: Date.now() - readStarted, runtimeReadMs, preparationMs: Math.max(0, Date.now() - started - runtimeReadMs), bytes: Buffer.byteLength(JSON.stringify(result)) }).catch(() => undefined);
+            return result;
+          })(),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new HistoryError("history_timeout", "Reading history took too long. Retry without restarting the task.", 504, true)), HISTORY_READ_MS); }),
+        ]);
+      } catch (error) {
+        const code = error instanceof HistoryError || error instanceof CodexChatGatewayError ? error.code
+          : (error as { code?: string }).code === "history_response_too_large" ? "history_response_too_large" : classifyNativeThreadReadFailure(error);
+        void this.store.recordRuntimeEvent("history-read-failed", { chatRef: hash({ chatId }).slice(0, 16), phase, code, durationMs: Date.now() - started }).catch(() => undefined);
+        if (error instanceof HistoryError || error instanceof CodexChatGatewayError) throw error;
+        if (code === "history_response_too_large") throw new HistoryError(code, "This history needs a Codex runtime with pagination. Update the selected runtime.", 413);
+        if (code === "history_timeout") throw new HistoryError(code, "Reading history took too long. Retry without restarting the task.", 504, true);
+        if (code === "native_thread_missing") throw new HistoryError(code, "The original history was not found. Its binding has been preserved.", 410);
+        throw new HistoryError("history_unavailable", "History could not be read from the selected runtime.", 503, true);
+      } finally { if (timer) clearTimeout(timer); }
+    });
+  }
+
+  historyPage(chatId: string, cursor?: string, limit = 20) {
+    return this.historyOperation(chatId, `page:${cursor || "latest"}:${limit}`, (context, deadline) => this.historyReader.page(context, cursor, limit, deadline));
+  }
+  historyItems(chatId: string, turnId: string, ref: string) {
+    return this.historyOperation(chatId, `items:${turnId}:${ref}`, (context, deadline) => this.historyReader.items(context, turnId, ref, deadline));
+  }
+  historyContent(chatId: string, itemId: string, ref: string) {
+    return this.historyOperation(chatId, `content:${itemId}:${ref}`, (context, deadline) => this.historyReader.content(context, itemId, ref, deadline));
+  }
+
   async listTurns(chatId: string, input: { cursor?: string; direction?: "older" | "newer"; limit?: number } = {}): Promise<TurnPage> {
     const binding = await this.requireBinding(chatId);
     const nativeThread = await this.readNativeThread(binding, true);
@@ -1018,6 +1076,7 @@ export class CodexChatGateway {
   }
 
   async dispose() {
+    this.historyReader.clear();
     for (const subscribers of this.subscribers.values()) {
       for (const subscriber of subscribers) subscriber.close?.();
     }
@@ -1130,6 +1189,7 @@ export class CodexChatGateway {
     payload: Record<string, unknown>,
     refs: { turnId?: string | null; itemId?: string | null; requestId?: string | null } = {},
   ) {
+    if (["turn.started", "turn.completed", "turn.failed", "turn.interrupted"].includes(event)) this.historyReader?.invalidateChat(chatId);
     const eventId = `event_${Date.now().toString(36)}_${(++this.eventSequence).toString(36)}`;
     const data: ChatEvent = {
       apiVersion: "1",

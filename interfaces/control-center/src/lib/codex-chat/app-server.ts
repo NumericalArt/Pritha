@@ -150,7 +150,7 @@ function capabilitiesFromSchema(files: Set<string>) {
   capabilities.fileChangeApprovals = [...files].some((name) => /(FileChange|ApplyPatch).*Approval.*Params\.json/i.test(name));
   capabilities.permissionApprovals = [...files].some((name) => /Permission.*Request.*Params\.json/i.test(name));
   capabilities.requestUserInput = has(files, "ToolRequestUserInputParams");
-  capabilities.historyPagination = has(files, "ThreadTurnsListParams");
+  capabilities.historyPagination = has(files, "ThreadTurnsListParams") && has(files, "ThreadItemsListParams");
   capabilities.audioInput = false;
   capabilities.fullChat = [
     "ThreadStartParams",
@@ -194,6 +194,7 @@ export class AppServerConnection {
     private readonly cwd: string,
     notificationHandler: NotificationHandler,
     private readonly exitHandler?: ExitHandler,
+    private readonly historyOnly = false,
   ) {
     this.notificationHandler = notificationHandler;
   }
@@ -226,6 +227,9 @@ export class AppServerConnection {
   }
 
   async request(method: string, params: unknown, timeoutMs = REQUEST_TIMEOUT_MS) {
+    if (this.historyOnly && !["thread/read", "thread/turns/list", "thread/items/list"].includes(method)) {
+      throw new Error("History connection permits read methods only.");
+    }
     await this.start();
     const stdin = this.child?.stdin;
     if (!stdin?.writable) throw new Error("Codex App Server is unavailable.");
@@ -294,7 +298,25 @@ export class AppServerConnection {
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.child = child;
-    readline.createInterface({ input: child.stdout }).on("line", (line) => this.handleLine(line));
+    if (this.historyOnly) {
+      let chunks: Buffer[] = [], bytes = 0;
+      child.stdout.on("data", (chunk: Buffer) => {
+        let start = 0;
+        for (let end = chunk.indexOf(10); ; end = chunk.indexOf(10, start)) {
+          const part = chunk.subarray(start, end < 0 ? chunk.length : end);
+          bytes += part.length;
+          if (bytes > 64 * 1024 * 1024) {
+            chunks = []; bytes = 0;
+            this.close(Object.assign(new Error("History exceeds the compatible reader limit. Update this Codex runtime."), { code: "history_response_too_large" }));
+            return;
+          }
+          chunks.push(part);
+          if (end < 0) break;
+          this.handleLine(Buffer.concat(chunks, bytes).toString("utf8"));
+          chunks = []; bytes = 0; start = end + 1;
+        }
+      });
+    } else readline.createInterface({ input: child.stdout }).on("line", (line) => this.handleLine(line));
     child.stderr.on("data", () => undefined);
     child.once("close", (exitCode, signal) => {
       void this.exitHandler?.(this.providerId, exitCode, signal);
@@ -316,7 +338,7 @@ export class AppServerConnection {
       {
         clientInfo: { name: "pritha_control_center", title: "Pritha Control Center", version: "0.1.0" },
         capabilities: {
-          experimentalApi: false,
+          experimentalApi: this.historyOnly,
           requestAttestation: false,
           optOutNotificationMethods: ["item/reasoning/textDelta", "item/reasoning/summaryTextDelta"],
         },
@@ -356,7 +378,7 @@ export class AppServerConnection {
       if (!pending) return;
       this.pending.delete(message.id);
       clearTimeout(pending.timer);
-      if (message.error) pending.reject(new Error(message.error.message || "Codex App Server rejected the request."));
+      if (message.error) pending.reject(Object.assign(new Error(message.error.message || "Codex App Server rejected the request."), { rpcCode: message.error.code }));
       else pending.resolve(message.result);
       return;
     }
@@ -376,6 +398,7 @@ export class CodexRuntimeManager {
   private probes = new Map<RuntimeProviderId, ProviderProbe>();
   private probePromises = new Map<RuntimeProviderId, Promise<ProviderProbe>>();
   private connections = new Map<RuntimeProviderId, AppServerConnection>();
+  private historyConnections = new Map<RuntimeProviderId, AppServerConnection>();
 
   constructor(
     private readonly store: CodexChatPrivateStore,
@@ -528,6 +551,34 @@ export class CodexRuntimeManager {
     }
   }
 
+  async historyRequest(providerId: RuntimeProviderId, method: string, params: unknown, deadline: number) {
+    const probe = await this.probe(providerId);
+    if (probe.view.availability !== "ready") throw new Error("Selected Codex runtime is unavailable.");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (Date.now() >= deadline) throw new Error("History request timed out.");
+      let connection = this.historyConnections.get(providerId);
+      if (connection && (connection.binary !== probe.binary || connection.codexHome !== effectiveCodexHome())) {
+        connection.close(); this.historyConnections.delete(providerId); connection = undefined;
+      }
+      if (!connection) {
+        connection = new AppServerConnection(providerId, probe.binary, this.root, () => {}, undefined, true);
+        this.historyConnections.set(providerId, connection);
+      }
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          connection.request(method, params, Math.min(12_000, Math.max(1, deadline - Date.now()))),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("History request timed out.")), Math.max(1, deadline - Date.now())); }),
+        ]);
+      } catch (error) {
+        if (!retryableReadFailure(error) && !/timed out/i.test(String(error))) throw error;
+        connection.close(); this.historyConnections.delete(providerId);
+        if (attempt || Date.now() >= deadline) throw error;
+      } finally { if (timer) clearTimeout(timer); }
+    }
+    throw new Error("History request timed out.");
+  }
+
   async readThread(providerId: RuntimeProviderId, threadId: string, includeTurns: boolean) {
     let lastError: Error = new Error("Codex App Server thread read failed.");
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -581,6 +632,8 @@ export class CodexRuntimeManager {
   }
 
   async dispose() {
+    for (const connection of this.historyConnections.values()) await connection.dispose();
+    this.historyConnections.clear();
     const connections = [...this.connections.values()];
     this.connections.clear();
     await Promise.allSettled(connections.map((connection) => connection.dispose()));

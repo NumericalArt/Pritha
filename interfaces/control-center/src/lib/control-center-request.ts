@@ -17,7 +17,9 @@ export class ControlCenterRequestError extends Error {
   }
 }
 
+export type RequestMetrics = { networkMs: number; bodyMs: number; decodeMs: number; responseBytes: number };
 type RequestOptions = {
+  onMetrics?: (metrics: RequestMetrics) => void;
   timeoutMs?: number;
   maxBodyBytes?: number;
   fetchImpl?: typeof fetch;
@@ -96,9 +98,13 @@ export async function controlCenterRequest<T>(url: string, init: RequestInit = {
   const externalSignal = init.signal;
   const abortFromExternal = () => controller.abort();
   externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+  if (externalSignal?.aborted) controller.abort();
+  const started = performance.now();
   try {
     const response = await (options.fetchImpl || fetch)(url, { cache: "no-store", ...init, signal: controller.signal });
+    const headersAt = performance.now();
     const text = await readBoundedText(response, options.maxBodyBytes || DEFAULT_MAX_BODY_BYTES);
+    const bodyAt = performance.now();
     const contentType = response.headers.get("content-type") || "";
     if (!JSON_CONTENT_TYPE.test(contentType)) throw gatewayError(response.status);
 
@@ -114,6 +120,7 @@ export async function controlCenterRequest<T>(url: string, init: RequestInit = {
       throw requestError("api", payload.error.code, payload.error.message, payload.error.retryable, response.status, payload.error.requestId, payload.error.details);
     }
     if (!response.ok || !validApiSuccess<T>(payload)) throw gatewayError(response.status);
+    try { options.onMetrics?.({ networkMs: headersAt - started, bodyMs: bodyAt - headersAt, decodeMs: performance.now() - bodyAt, responseBytes: new TextEncoder().encode(text).byteLength }); } catch { /* Telemetry never changes request outcome. */ }
     return payload;
   } catch (cause) {
     if (cause instanceof ControlCenterRequestError) throw cause;

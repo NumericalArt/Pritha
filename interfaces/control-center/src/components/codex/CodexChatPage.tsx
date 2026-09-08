@@ -22,6 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useChatAttachments } from "./useChatAttachments";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
+import { HistoryTurn } from "./HistoryTurn";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
 import { DeliveryPanel } from "./DeliveryPanel";
@@ -124,7 +125,7 @@ type SpeechWindow = Window & {
 };
 
 const HISTORY_SLOW_MS = 2_500;
-const HISTORY_TIMEOUT_MS = 12_000;
+const HISTORY_TIMEOUT_MS = 35_000;
 const TURN_START_TIMEOUT_MS = 30_000;
 const VOICE_LIST_REFRESH_MS = 30_000;
 const NEW_CHAT_DRAFT_KEY = "__new_chat__";
@@ -326,6 +327,7 @@ export function CodexChatPage() {
   const [olderError, setOlderError] = useState<string | null>(null);
   const expandedHistoryRef = useRef(false);
   const olderRequestRef = useRef<AbortController | null>(null);
+  const followTranscriptRef = useRef(true);
   const olderScrollRef = useRef<{ element: HTMLElement; height: number; top: number } | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyIssue, setHistoryIssue] = useState<{ code: string; retryable: boolean; replacementAllowed: boolean } | null>(null);
@@ -343,6 +345,7 @@ export function CodexChatPage() {
   const [dictationSupported, setDictationSupported] = useState(false);
   const [dictationLanguage, setDictationLanguage] = useState<DictationLanguage>("browser");
   const recognitionRef = useRef<RecognitionLike | null>(null);
+  const historyLoadPromises = useRef(new Map<string, Promise<boolean>>());
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const listSentinelRef = useRef<HTMLDivElement | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
@@ -468,7 +471,7 @@ export function CodexChatPage() {
   const completeNavigation = useCallback((
     context: TaskChatNavigationContext | null,
     event: "history_loaded" | "history_failed",
-    options: { stage: "navigation" | "metadata" | "history"; durationMs: number; errorCode?: string },
+    options: { stage: "navigation" | "metadata" | "history"; durationMs: number; errorCode?: string; metrics?: Record<string, number> },
   ) => {
     if (!context || completedInteractionsRef.current.has(context.interactionId)) return;
     if (completedInteractionsRef.current.size >= 500) completedInteractionsRef.current.clear();
@@ -571,11 +574,14 @@ export function CodexChatPage() {
     }
   }, []);
 
-  const loadThreadHistory = useCallback(async (
+  const loadThreadHistory = useCallback((
     chatId: string,
     threadDetail: ThreadDetail,
     context: TaskChatNavigationContext | null = null,
   ) => {
+    const existing = historyLoadPromises.current.get(chatId);
+    if (existing) return existing;
+    const operation = (async () => {
     historyRequestRef.current?.controller.abort();
     const token = Symbol(chatId);
     const controller = new AbortController();
@@ -585,21 +591,22 @@ export function CodexChatPage() {
       setHistoryError(null);
       setHistoryIssue(null);
     }
+    let metrics: Record<string, number> = {};
     const slowTimer = window.setTimeout(() => {
       if (historyRequestRef.current?.token === token && selectedChatIdRef.current === chatId) setHistoryState("slow");
     }, HISTORY_SLOW_MS);
     try {
       const historyPage = (await api<TurnPage>(
-        `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50`,
+        `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/history?limit=20`,
         { signal: controller.signal },
-        { timeoutMs: HISTORY_TIMEOUT_MS, maxBodyBytes: 16 * 1024 * 1024 },
+        { timeoutMs: HISTORY_TIMEOUT_MS, maxBodyBytes: 256 * 1024, onMetrics: value => { metrics = value; } },
       )).data;
       const rows = historyPage.data;
       if (historyRequestRef.current?.token !== token) return false;
       if (selectedChatIdRef.current === chatId) {
-        setTurns(current => expandedHistoryRef.current ? rows.reduce(upsertTurn, current) : rows);
+        setTurns(current => rows.reduce(upsertTurn, current));
         if (!expandedHistoryRef.current) setOlderCursor(historyPage.olderCursor || null);
-        setHistoryHasImages(historyPage.hasImageInputs === true);
+        setHistoryHasImages(current => current || historyPage.hasImageInputs === true || historyPage.imageInputsState === "present");
         setHistoryState("ready");
         setHistoryError(null);
         setHistoryIssue(null);
@@ -612,9 +619,12 @@ export function CodexChatPage() {
         updateDraftForChat(chatId, (current) => current.trim() === pending.text ? "" : current);
         setError((current) => current?.source === "turn" && current.chatId === chatId ? null : current);
       }
-      completeNavigation(context, "history_loaded", {
-        stage: "history",
-        durationMs: context ? Math.max(0, Date.now() - context.startedAt) : 0,
+      const renderStarted = performance.now();
+      requestAnimationFrame(() => {
+        if (selectedChatIdRef.current === chatId) completeNavigation(context, "history_loaded", {
+          stage: "history", durationMs: context ? Math.max(0, Date.now() - context.startedAt) : 0,
+          metrics: { ...metrics, renderMs: performance.now() - renderStarted },
+        });
       });
       return true;
     } catch (cause) {
@@ -641,6 +651,10 @@ export function CodexChatPage() {
       window.clearTimeout(slowTimer);
       if (historyRequestRef.current?.token === token) historyRequestRef.current = null;
     }
+    })();
+    historyLoadPromises.current.set(chatId, operation);
+    void operation.finally(() => { if (historyLoadPromises.current.get(chatId) === operation) historyLoadPromises.current.delete(chatId); }).catch(() => undefined);
+    return operation;
   }, [completeNavigation, setPendingForChat, updateDraftForChat]);
 
   const loadOlderHistory = async () => {
@@ -651,7 +665,7 @@ export function CodexChatPage() {
     setOlderLoading(true);
     setOlderError(null);
     try {
-      const page = (await api<TurnPage>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/turns?limit=50&cursor=${encodeURIComponent(olderCursor)}`, { signal: controller.signal }, { timeoutMs: HISTORY_TIMEOUT_MS, maxBodyBytes: 16 * 1024 * 1024 })).data;
+      const page = (await api<TurnPage>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/history?limit=20&cursor=${encodeURIComponent(olderCursor)}`, { signal: controller.signal }, { timeoutMs: HISTORY_TIMEOUT_MS, maxBodyBytes: 256 * 1024 })).data;
       if (controller.signal.aborted || selectedChatIdRef.current !== chatId) return;
       const element = transcriptEndRef.current?.parentElement;
       if (element) olderScrollRef.current = { element, height: element.scrollHeight, top: element.scrollTop };
@@ -729,10 +743,12 @@ export function CodexChatPage() {
     displayedChatIdRef.current = selectedChatId;
     detailRequestRef.current?.controller.abort();
     historyRequestRef.current?.controller.abort();
+    historyLoadPromises.current.clear();
     olderRequestRef.current?.abort();
     olderRequestRef.current = null;
     olderScrollRef.current = null;
     expandedHistoryRef.current = false;
+    followTranscriptRef.current = true;
     setOlderCursor(null);
     setOlderLoading(false);
     setOlderError(null);
@@ -764,7 +780,16 @@ export function CodexChatPage() {
 
     setConnection("connecting");
 
+    let reloadPending = false, reloadAgain = false;
+    let reloadTimer: number | null = null;
     const reload = async () => {
+      if (cancelled) return;
+      if (reloadPending) { reloadAgain = true; return; }
+      if (historyRequestRef.current?.chatId === selectedChatId || detailRequestRef.current?.chatId === selectedChatId) {
+        if (reloadTimer == null) reloadTimer = window.setTimeout(() => { reloadTimer = null; void reload(); }, 250);
+        return;
+      }
+      reloadPending = true;
       try {
         const nextDetail = await loadThreadDetail(selectedChatId);
         if (!cancelled) await loadThreadHistory(selectedChatId, nextDetail);
@@ -772,6 +797,9 @@ export function CodexChatPage() {
         if (!cancelled) {
           setError(failure(cause, "Chat history could not be synchronized.", "history"));
         }
+      } finally {
+        reloadPending = false;
+        if (reloadAgain && !cancelled) { reloadAgain = false; window.setTimeout(() => void reload(), 250); }
       }
     };
 
@@ -782,13 +810,13 @@ export function CodexChatPage() {
         retryAttempt = 0;
         setConnection("ready");
       }
-      if (message.type === "stream.reset") void reload();
+      if (message.type === "stream.reset" || message.type === "history.changed") void reload();
       if (message.type === "goal.updated" || message.type === "connection.ready") setGoalRevision(value => value + 1);
       if (message.type === "message.delta") setTurns((rows) => appendDelta(rows, payload));
       if (message.type === "turn.started" || message.type === "turn.completed" || message.type === "turn.interrupted" || message.type === "turn.failed") {
         const turn = payload.payload.turn as TurnView | undefined;
         if (turn) setTurns((rows) => upsertTurn(rows, turn));
-        if (message.type !== "turn.started") {
+        if (!turn || message.type !== "turn.started") {
           void refreshThreads();
           window.setTimeout(() => void reload(), 150);
         }
@@ -812,12 +840,12 @@ export function CodexChatPage() {
 
     const attachStream = (streamUrl: string) => {
       source?.close();
-      source = new EventSource(streamUrl);
+      source = new EventSource(`${streamUrl}${streamUrl.includes("?") ? "&" : "?"}view=compact`);
       source.onopen = () => {
         if (!cancelled) setConnection("connecting");
       };
       for (const name of [
-        "connection.ready", "stream.reset", "thread.updated", "thread.archived", "thread.unarchived", "turn.started", "turn.completed", "turn.interrupted", "turn.failed",
+        "connection.ready", "stream.reset", "history.changed", "thread.updated", "thread.archived", "thread.unarchived", "turn.started", "turn.completed", "turn.interrupted", "turn.failed",
         "message.delta", "message.completed", "item.started", "item.completed", "goal.updated",
       ]) source.addEventListener(name, event as EventListener);
       source.onerror = () => {
@@ -872,6 +900,7 @@ export function CodexChatPage() {
     return () => {
       cancelled = true;
       if (retryTimer != null) window.clearTimeout(retryTimer);
+      if (reloadTimer != null) window.clearTimeout(reloadTimer);
       source?.close();
     };
   }, [beginNavigation, completeNavigation, loadThreadDetail, loadThreadHistory, refreshThreads, selectedChatId, streamRevision]);
@@ -886,7 +915,7 @@ export function CodexChatPage() {
       olderScrollRef.current = null;
       return;
     }
-    transcriptEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    if (followTranscriptRef.current) transcriptEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [displayedTurns.length, lastTranscriptText]);
 
   const visibleThreads = useMemo(() => threads.filter((thread) => thread.group === activeGroup && thread.archived === showArchived), [activeGroup, threads, showArchived]);
@@ -1413,7 +1442,7 @@ export function CodexChatPage() {
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} /></div> : null}
         {budgetNotice?.chatId === selectedChatId ? <div className="codex-attachment-notice" role="status">{budgetNotice.text}</div> : null}
-        <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
+        <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} onScroll={event => { const el = event.currentTarget; followTranscriptRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; }} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
           {loading && !selectedChatId ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Task Chat</h2></div> : null}
           {!loading && !selectedChatId ? (
             <div className="codex-empty-state">
@@ -1454,10 +1483,10 @@ export function CodexChatPage() {
             </div>
           ) : null}
           {selectedChatId && olderCursor ? <div className="codex-inline-notice">
-            {olderError ? <span role="status">{olderError}</span> : null}
+            {olderError ? <span role="status"><span>{olderError}</span> <button type="button" onClick={() => { expandedHistoryRef.current = false; setOlderError(null); void retryNow(); }}>Refresh history position</button></span> : null}
             <button type="button" className="codex-text-action" onClick={() => void loadOlderHistory()} disabled={olderLoading}>{olderLoading ? "Loading earlier messages…" : "Load earlier messages"}</button>
           </div> : null}
-          {displayedTurns.map((turn) => (
+          {displayedTurns.map((turn) => turn.history && selectedChatId ? <HistoryTurn key={turn.turnId} chatId={selectedChatId} turn={turn} /> : (
             <section className="codex-turn" key={turn.turnId} aria-label={`Turn ${turn.status}`}>
               <article className="codex-message codex-user-message">
                 <div className="codex-message-label">You</div>

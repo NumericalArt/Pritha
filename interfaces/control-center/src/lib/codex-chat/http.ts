@@ -1,3 +1,4 @@
+import { HistoryError } from "./history-reader";
 import { randomUUID } from "node:crypto";
 import { CodexChatGatewayError } from "./gateway";
 import { AttachmentError } from "./attachment-store";
@@ -20,7 +21,7 @@ export function apiSuccess<T>(data: T, options: { status?: number; replayed?: bo
 
 export function apiError(error: unknown) {
   const requestId = randomUUID();
-  const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError;
+  const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError || error instanceof HistoryError;
   const registryCorrupt = !known && (error as { code?: unknown } | null)?.code === "codex_chat_registry_corrupt";
   const status = known ? error.status : registryCorrupt ? 503 : 500;
   const payload: ApiErrorEnvelope = {

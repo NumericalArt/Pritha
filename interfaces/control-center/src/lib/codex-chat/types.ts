@@ -131,6 +131,7 @@ export type AttachmentView = { id: string; name: string; size: number; kind: "im
 export type AttachmentMessage = { requestHash: string; attachments: AttachmentView[]; manifest: string };
 
 export type MessageView = {
+  contentRef?: string;
   attachments?: AttachmentView[];
   id: string;
   role: "user" | "assistant";
@@ -140,6 +141,7 @@ export type MessageView = {
 };
 
 export type BaseItemView = {
+  contentRef?: string;
   id: string;
   status: "pending" | "in_progress" | "completed" | "failed" | "declined";
   startedAt: string | null;
@@ -169,6 +171,7 @@ export type ChatItemView =
   | (BaseItemView & { kind: "unsupported"; label: string });
 
 export type TurnView = {
+  history?: { itemsRef: string; itemsState: "not_loaded" | "partial" | "complete"; sourceMode: "native" | "compatibility" };
   turnId: string;
   clientMessageId?: string | null;
   status: TurnStatus;
@@ -235,6 +238,8 @@ export type ThreadPage = {
 };
 
 export type TurnPage = {
+  sourceMode?: "native" | "compatibility";
+  imageInputsState?: "present" | "unknown";
   hasImageInputs?: boolean;
   data: TurnView[];
   olderCursor: string | null;
@@ -243,6 +248,9 @@ export type TurnPage = {
   hasNewer: boolean;
   snapshotAt: string;
 };
+
+export type HistoryItemsPage = { data: ChatItemView[]; nextCursor: string | null };
+export type HistoryContentPage = { text: string; nextCursor: string | null; complete: boolean };
 
 export type AcceptedTurn = {
   turn: TurnView;

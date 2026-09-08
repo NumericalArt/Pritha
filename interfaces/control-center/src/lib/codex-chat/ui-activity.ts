@@ -28,6 +28,7 @@ export type TaskChatUiActivityInput = {
   group?: string;
   view?: string;
   count?: number;
+  metrics?: Record<string, number>;
 };
 
 function boundedDuration(value: unknown) {
@@ -61,6 +62,11 @@ export async function recordTaskChatUiActivity(input: TaskChatUiActivityInput) {
   const count = input.count == null ? null : Number(input.count);
   if (count != null && (!Number.isInteger(count) || count < 0 || count > 50)) throw new CodexChatGatewayError("invalid_request", "Telemetry item count is invalid.", 400);
 
+  const metrics: Record<string, number> = {};
+  for (const name of ["networkMs", "bodyMs", "decodeMs", "renderMs", "responseBytes"]) {
+    const value = input.metrics?.[name];
+    if (value != null && Number.isFinite(value) && value >= 0 && value <= (name === "responseBytes" ? 262144 : 120000)) metrics[name] = Math.round(value);
+  }
   const store = new CodexChatPrivateStore();
   const binding = input.chatId ? await store.get(input.chatId) : null;
   if (input.chatId && !binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
@@ -87,6 +93,7 @@ export async function recordTaskChatUiActivity(input: TaskChatUiActivityInput) {
       to_route: input.toRoute || null,
       view: input.view || null,
       item_count: count,
+      metrics,
     },
   });
   return { recorded: true };

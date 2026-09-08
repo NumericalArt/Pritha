@@ -40,11 +40,11 @@ async function mockChat(page: Page, initiallyRestored = false) {
     if (url.pathname.endsWith("/restore-access")) restored = true;
     if (url.pathname.endsWith("/archive")) archived = true;
     if (url.pathname.endsWith("/unarchive")) archived = false;
-    if (url.pathname.endsWith("/turns") && !restored) return route.fulfill({ status: 409, json: { apiVersion: "1", error: { requestId: "fixture-error", code: "history_recovery_available", message: "The original conversation was verified. Restore access to open it.", retryable: false } } });
+    if (url.pathname.endsWith("/history") && !restored) return route.fulfill({ status: 409, json: { apiVersion: "1", error: { requestId: "fixture-error", code: "history_recovery_available", message: "The original conversation was verified. Restore access to open it.", retryable: false } } });
     const data = url.pathname.endsWith("/runtime") ? runtime
       : url.pathname.endsWith("/threads") ? { data: (url.searchParams.get("archived") === "true") === archived ? [thread()] : [], nextCursor: null }
-      : url.pathname.endsWith("/turns") ? { data: sentTurn ? [sentTurn] : [{ turnId: "turn_fixture", status: "completed", userMessage: { id: "user", markdown: "Original question" }, items: [{ id: "answer", kind: "assistant_message", status: "completed", message: { id: "answer", markdown: "Original answer", status: "completed" } }], startedAt: now, pendingRequestIds: [] }], olderCursor: null }
-      : { thread: thread(), continuationState: thread().continuationState, pendingRequests: [], history: { state: restored ? "available" : "recovery_available", recoverable: !restored } };
+      : url.pathname.endsWith("/history") ? { data: sentTurn ? [sentTurn] : [{ turnId: "turn_fixture", status: "completed", userMessage: { id: "user", markdown: "Original question" }, items: [{ id: "answer", kind: "assistant_message", status: "completed", message: { id: "answer", markdown: "Original answer", status: "completed" } }], startedAt: now, pendingRequestIds: [] }], olderCursor: null }
+      : { thread: thread(), streamUrl: "/api/codex-chat/v1/threads/chat_fixture/events", continuationState: thread().continuationState, pendingRequests: [], history: { state: restored ? "available" : "recovery_available", recoverable: !restored } };
     return route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data } });
   });
   return control;
@@ -187,7 +187,7 @@ test("earlier history remains readable after a failed page and a refresh", async
   const now = "2026-09-05T00:00:00Z";
   let failOlder = true;
   const turn = (id: string) => ({ turnId: id, status: "completed", startedAt: id === "old" ? "2026-09-01T00:00:00Z" : now, userMessage: { markdown: `${id} question` }, items: [{ id, kind: "assistant_message", status: "completed", message: { markdown: `${id} answer`, status: "completed" } }] });
-  await page.route("**/api/codex-chat/v1/threads/chat_fixture/turns?**", async route => {
+  await page.route("**/api/codex-chat/v1/threads/chat_fixture/history?**", async route => {
     const earlier = new URL(route.request().url()).searchParams.has("cursor");
     if (earlier && failOlder) { failOlder = false; return route.fulfill({ status: 503, json: { apiVersion: "1", error: { code: "history_unavailable", requestId: "earlier", message: "Earlier history is temporarily unavailable.", retryable: true } } }); }
     await route.fulfill({ json: { apiVersion: "1", requestId: "page", data: { data: [turn(earlier ? "old" : "recent")], olderCursor: earlier ? null : "older-fixture" } } });
@@ -213,7 +213,7 @@ for (const width of [1280, 390]) {
     const requests: Array<Record<string, string>> = [];
     let loseResponse = true;
     await page.route("**/api/codex-chat/v1/threads/chat_fixture/delivery**", route => route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: new URL(route.request().url()).searchParams.has("runId") ? { run } : { runs: [{ runId: run.runId, status: run.status }] } } }));
-    await page.route("**/api/codex-chat/v1/threads/chat_fixture/turns?**", route => route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/<user>/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
+    await page.route("**/api/codex-chat/v1/threads/chat_fixture/history?**", route => route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/<user>/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
     await page.route("**/api/codex-chat/v1/threads/chat_fixture/operations**", async route => {
       if (route.request().method() === "GET") {
         const action = new URL(route.request().url()).searchParams.get("action");
@@ -245,3 +245,88 @@ for (const width of [1280, 390]) {
     await page.locator(".codex-operation-decisions").screenshot({ path: `/tmp/pritha-cleanup-operation-${width}.png` });
   });
 }
+
+for (const width of [390, 1280]) test(`bounded history reveals details and copies complete Unicode at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 850 });
+  await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => { (window as unknown as { copiedText: string }).copiedText = text; } } }));
+  await mockChat(page, true);
+  const original = "Complete 🙂 answer\n".repeat(4000), chunks = [original.slice(0, 12000), original.slice(12000)];
+  let itemReads = 0, failContent = true;
+  const row = { turnId: "bounded", status: "completed", userMessage: { id: "u", markdown: "Question" }, items: [{ id: "a", kind: "assistant_message", message: { id: "a", markdown: "Short preview", contentRef: "part0" } }], history: { itemsRef: "items", itemsState: "not_loaded", sourceMode: "native" }, pendingRequestIds: [] };
+  await page.route("**/api/codex-chat/v1/threads/chat_fixture/history**", async route => {
+    const url = new URL(route.request().url());
+    let data: unknown;
+    if (url.pathname.endsWith("/content")) {
+      if (failContent) { failContent = false; return route.fulfill({ status: 503, json: { apiVersion: "1", error: { requestId: "failed", code: "history_unavailable", message: "Details temporarily unavailable.", retryable: true } } }); }
+      const second = url.searchParams.get("cursor") === "part1";
+      data = { text: chunks[second ? 1 : 0], nextCursor: second ? null : "part1", complete: second };
+    } else if (url.pathname.endsWith("/items")) { itemReads++; data = { data: row.items, nextCursor: null }; }
+    else data = { data: [row], olderCursor: null };
+    return route.fulfill({ json: { apiVersion: "1", requestId: "bounded", data } });
+  });
+  await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+  await expect(page.getByText("Short preview", { exact: true })).toBeVisible();
+  expect(itemReads).toBe(0);
+  await page.getByRole("button", { name: "Read original text", exact: true }).click();
+  await expect(page.getByText("Details temporarily unavailable.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Short preview", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Copy response", exact: true }).click();
+  await expect(page.getByText("Copied", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { copiedText: string }).copiedText)).toBe(original);
+  expect(itemReads).toBe(1);
+  await page.locator('.codex-activity > summary').filter({ hasText: "Activity" }).click();
+  expect(itemReads).toBeGreaterThanOrEqual(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("history arriving after the former 12 second timeout remains usable", async ({ page }) => {
+  test.setTimeout(25000);
+  const control = await mockChat(page, true);
+  await page.route("**/api/codex-chat/v1/threads/chat_fixture/history?**", async route => {
+    await new Promise(resolve => setTimeout(resolve, 13000));
+    await route.fulfill({ json: { apiVersion: "1", requestId: "slow", data: { data: [{ turnId: "slow", status: "completed", userMessage: { markdown: "Slow question" }, items: [{ id: "a", kind: "assistant_message", message: { markdown: "Arrived safely" } }], pendingRequestIds: [] }], olderCursor: null } } });
+  });
+  await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+  await expect(page.getByText("Still loading history…", { exact: false })).toBeVisible({ timeout: 6000 });
+  await expect(page.getByText("Arrived safely", { exact: true })).toBeVisible({ timeout: 16000 });
+  expect(control.sent).toHaveLength(0);
+});
+
+test("mobile recent page fits five seconds with modeled 1 Mbps and 300 ms latency", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 850 });
+  await mockChat(page, true);
+  const rows = Array.from({ length: 20 }, (_, i) => ({ turnId: `mobile${i}`, status: "completed", userMessage: { markdown: `Question ${i} ${"text ".repeat(750)}` }, items: [{ id: `a${i}`, kind: "assistant_message", message: { markdown: `Answer ${i} ${"text ".repeat(750)}` } }], history: { itemsRef: `items${i}`, itemsState: "not_loaded", sourceMode: "native" }, pendingRequestIds: [] }));
+  const body = JSON.stringify({ apiVersion: "1", requestId: "mobile", data: { data: rows, olderCursor: "older" } });
+  expect(Buffer.byteLength(body)).toBeLessThan(256 * 1024);
+  let started = 0;
+  await page.route("**/api/codex-chat/v1/threads/chat_fixture/history?**", async route => {
+    started = Date.now();
+    await new Promise(resolve => setTimeout(resolve, 300 + Math.ceil(Buffer.byteLength(body) * 8 / 1000)));
+    await route.fulfill({ contentType: "application/json", body });
+  });
+  await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+  await expect(page.getByText(/^Answer 19 /)).toBeVisible();
+  expect(started).toBeGreaterThan(0);
+  expect(Date.now() - started).toBeLessThan(5000);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("isolated candidate serves health, Task Chat, Codex alias and every referenced JS chunk", async ({ request }) => {
+  const health = await request.get("/api/health");
+  expect(health.ok()).toBe(true);
+  expect(await health.json()).toMatchObject({ schema: "pritha-control-center-health-v2", service: "pritha-control-center", status: "ready", ok: true });
+  const chunks = new Set<string>();
+  for (const route of ["/task-chat", "/codex"]) {
+    const response = await request.get(route);
+    expect(response.ok()).toBe(true);
+    const html = await response.text();
+    for (const match of html.matchAll(/src="([^" ]*\/_next\/static\/[^" ]+\.js[^" ]*)"/g)) chunks.add(match[1].replaceAll("&amp;", "&"));
+  }
+  expect(chunks.size).toBeGreaterThan(0);
+  for (const chunk of chunks) {
+    const response = await request.get(chunk);
+    expect(response.ok()).toBe(true);
+    expect(response.headers()["content-type"]).toMatch(/javascript/);
+    expect((await response.body()).length).toBeGreaterThan(20);
+  }
+});

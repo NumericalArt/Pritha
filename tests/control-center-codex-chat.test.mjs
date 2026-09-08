@@ -354,7 +354,7 @@ test("Codex Chat navigation, editable dictation and 320px-safe layout are presen
   assert.doesNotMatch(chatPageSource, /navigator\.language/);
   assert.match(chatPageSource, /if \(languageTag\) recognition\.lang = languageTag/);
   assert.match(chatPageSource, /aria-label="Dictation language"/);
-  assert.match(chatPageSource, /new EventSource\(streamUrl\)/);
+  assert.match(chatPageSource, /new EventSource\(`/);
   assert.match(stylesSource, /grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(stylesSource, /\.codex-conversation \{[\s\S]{0,180}display: flex;[\s\S]{0,80}flex-direction: column;/);
   assert.match(stylesSource, /\.codex-transcript \{[\s\S]{0,80}flex: 1 1 auto;[\s\S]{0,120}overflow-y: auto;/);
@@ -477,7 +477,7 @@ test("Codex Chat loads selected history independently and exposes explicit bound
   assert.match(chatPageSource, /const loadThreadHistory = useCallback/);
   assert.match(chatPageSource, /Promise\.allSettled\(\[refreshRuntime\(\), refreshThreads\(\)\]\)/);
   assert.match(chatPageSource, /HISTORY_SLOW_MS = 2_500/);
-  assert.match(chatPageSource, /HISTORY_TIMEOUT_MS = 12_000/);
+  assert.match(chatPageSource, /HISTORY_TIMEOUT_MS = 35_000/);
   assert.match(chatPageSource, /VOICE_LIST_REFRESH_MS = 30_000/);
   assert.match(chatPageSource, /TURN_START_TIMEOUT_MS = 30_000/);
   assert.match(chatPageSource, /draftsByChat/);

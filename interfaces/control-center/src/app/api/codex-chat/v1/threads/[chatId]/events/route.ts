@@ -1,3 +1,4 @@
+import { compactHistoryEvent } from "@/lib/codex-chat/history-stream";
 import { apiError } from "@/lib/codex-chat/http";
 import { getCodexChatGateway } from "@/lib/codex-chat/gateway";
 import type { ChatEventRecord } from "@/lib/codex-chat/types";
@@ -23,7 +24,7 @@ export async function GET(request: Request, context: { params: Promise<{ chatId:
       start(controller) {
         let closed = false;
         const send = (record: ChatEventRecord) => {
-          if (!closed) controller.enqueue(encoder.encode(frame(record)));
+          if (!closed) controller.enqueue(encoder.encode(frame(url.searchParams.get("view") === "compact" ? compactHistoryEvent(record) : record)));
         };
         const close = () => {
           if (closed) return;

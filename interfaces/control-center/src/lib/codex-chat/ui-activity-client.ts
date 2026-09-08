@@ -26,7 +26,7 @@ export function createTaskChatNavigation(chatId: string, source: TaskChatUiActiv
 export function reportTaskChatUiActivity(
   context: TaskChatNavigationContext,
   event: TaskChatUiActivityEvent,
-  options: { stage?: TaskChatUiActivityStage; durationMs?: number; errorCode?: string } = {},
+  options: { stage?: TaskChatUiActivityStage; durationMs?: number; errorCode?: string; metrics?: Record<string, number> } = {},
 ) {
   if (typeof window === "undefined") return;
   void fetch("/api/codex-chat/v1/ui-activity", {
@@ -40,6 +40,7 @@ export function reportTaskChatUiActivity(
       stage: options.stage || "navigation",
       durationMs: options.durationMs,
       errorCode: options.errorCode,
+      metrics: options.metrics,
       clientClass: clientClass(),
     }),
     keepalive: true,

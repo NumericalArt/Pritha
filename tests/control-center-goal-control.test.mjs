@@ -26,6 +26,7 @@ const coordinator = load("codex-chat/native-turn-coordinator");
 const normalize = load("codex-chat/normalize");
 const noop = {};
 const { CodexChatGateway } = load("codex-chat/gateway", {
+  "./history-reader": load("codex-chat/history-reader", { "./normalize": normalize }),
   "../../../../../scripts/agents-mother/operation-decisions.mjs": noop,
   "./operation-runtime": noop,
   "../../../../../scripts/agents-mother/task-delivery.mjs": noop,
