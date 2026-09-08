@@ -93,10 +93,12 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
   const autostart = String(data.autostart || "disabled").trim();
   const proactiveMode = String(data.proactiveMode || "none").trim();
   const repositoryAdoptionMode = String(data.repositoryAdoptionMode || "none").trim();
+  const kind = typeof data.agentKind === "string" ? data.agentKind : data.agentKind?.kind;
+  const toolServer = kind === "tool-server" && runtime === "cli" && /^(mcp(?:\s+stdio)?|stdio|tool-server|tool server)$/i.test(String(data.primaryInterface || "").trim());
 
-  if (runtime === "api" && serviceMode === "process") {
+  if ((runtime === "api" || toolServer) && serviceMode === "process") {
     pushTopic(topics, "node-http-runtime", "Node.js HTTP process service and host APIs",
-      "Node.js current HTTP server lifecycle os fs statfs child_process execFile documentation",
+      toolServer ? "Node.js LTS HTTP DNS filesystem locking child_process lifecycle Windows macOS Linux documentation" : "Node.js current HTTP server lifecycle os fs statfs child_process execFile documentation",
       "Explicit API process service requires HTTP/runtime evidence, without implying a model SDK.",
       { preferredSources: ["official-docs", "changelog"] });
   }
@@ -153,7 +155,12 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  if (/\b(mcp|model context protocol|connector|apps sdk|mcp app)\b/.test(text)) {
+  if (toolServer) {
+    pushTopic(topics, "mcp-provider", "MCP stdio provider protocol and schemas",
+      "Model Context Protocol current specification stdio server discovery backward compatibility tools JSON Schema errors",
+      "Explicit deterministic MCP provider; no client connector installation, authentication or model SDK is implied.",
+      { preferredSources: ["official-docs", "specification", "security-docs"] });
+  } else if (/\b(mcp|model context protocol|connector|apps sdk|mcp app)\b/.test(text)) {
     pushTopic(
       topics,
       "mcp-connectors",
@@ -195,7 +202,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
       topics,
       "operations-deployment",
       "Operations, deployment and proactive execution constraints",
-      "current macOS launchd cron service deployment agent safety background scheduler best practices",
+      toolServer ? "Node.js cross platform process lifecycle graceful shutdown Windows signal documentation no autostart" : "current macOS launchd cron service deployment agent safety background scheduler best practices",
       "Service, autostart, deployment or proactive execution selected.",
       { preferredSources: ["official-docs", "security-docs", "trusted-secondary"] },
     );

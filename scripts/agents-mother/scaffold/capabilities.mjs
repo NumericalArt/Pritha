@@ -2,6 +2,7 @@ const runtimeFamilies = new Set(["codex-native", "cli", "api", "local-model", "h
 function interfaceName(value) {
   const name = String(value || "").trim().toLowerCase();
   if (!name || ["none", "not-applicable"].includes(name)) return null;
+  if (/^(?:mcp(?:\s+stdio)?|stdio|tool-server|tool server)$/.test(name)) return "mcp-stdio";
   if (/\bcli\b|headless|command[- ]line/.test(name)) return "cli";
   if (/codex/.test(name)) return "codex-project";
   if (/telegram/.test(name)) return "telegram";
@@ -29,6 +30,19 @@ export function scaffoldCapability(data = {}) {
     primaryInterface: primary, interfaces, operationsSelected: !noManagedOperations, readinessScope: "scaffold-only" };
   const unsupported = (reason, nextAction) => ({ ...base, supported: false, adapter: null, reason, nextAction });
   if (!runtimeFamilies.has(runtime)) return unsupported("runtime-unknown", "Choose a supported runtime in a reviewed contract revision.");
+  if (primary === "mcp-stdio") {
+    const kind = typeof data.agentKind === "string" ? data.agentKind : data.agentKind?.kind;
+    const web = interfaces.includes("web");
+    if (kind !== "tool-server" || runtime !== "cli"
+      || interfaces.some(name => !["mcp-stdio", "web", "cli"].includes(name))
+      || (web ? data.serviceMode !== "process" : ![undefined, "none"].includes(data.serviceMode))
+      || (data.autostart && !["disabled", "optional"].includes(data.autostart))
+      || (data.proactiveMode && data.proactiveMode !== "none")
+      || (data.repositoryAdoptionMode && data.repositoryAdoptionMode !== "none")) {
+      return unsupported("tool-server-combination-adapter-missing", "The stdio tool-server adapter requires cli runtime, explicit tool-server kind, optional web/CLI, process operations only for the web surface, no proactivity or repository adoption, and disabled/optional autostart.");
+    }
+    return { ...base, supported: true, adapter: "tool-server-stdio-v1", reason: "stdio-provider-with-optional-owner-ui", nextAction: "Implement the approved MCP tools and optional owner UI; independent Outcome Trials must verify each surface. Scaffold starts no process." };
+  }
   if (runtime === "api" && data.serviceMode === "process") {
     if (!interfaces.length || interfaces.some(name => !["web", "api"].includes(name))
       || (data.autostart && !["disabled", "optional"].includes(data.autostart))

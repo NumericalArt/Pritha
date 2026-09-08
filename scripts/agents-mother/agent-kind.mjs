@@ -52,7 +52,7 @@ export function operationsApplicability(text = "", manifest = null) {
   const fm = parseFrontmatterData(text.replaceAll("\r\n", "\n")) || {};
   const service = field(text, "Service mode"), autostart = field(text, "Autostart"), proactive = field(text, "Proactive mode");
   const declarations = [];
-  if (["manual", "launchd", "external"].includes(service)) declarations.push("contract-service");
+  if (["manual", "process", "launchd", "external"].includes(service)) declarations.push("contract-service");
   if (["launchd-on-approval", "external"].includes(autostart)) declarations.push("contract-autostart");
   if (scheduled.has(proactive)) declarations.push("contract-proactivity");
   if (manifest && (manifest.control_center_managed === true || (manifest.service_mode && manifest.service_mode !== "none")

@@ -22,6 +22,7 @@ import { withChildTests } from "./tests.mjs";
 import { selectedScaffoldModules } from "./modules.mjs";
 import { headlessCliFiles } from "./headless-cli.mjs";
 import { apiProcessFiles, apiProcessManifest } from "./api-process.mjs";
+import { toolServerFiles, toolServerManifest } from "./tool-server.mjs";
 
 const ROOT = resolveTechscopeRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -1192,6 +1193,7 @@ LOG_LEVEL=info
   const capability = scaffoldCapability(data);
   if (capability.adapter === "headless-cli-v1") return withChildTests(headlessCliFiles(files, data, capability, selected), capability);
   if (capability.adapter === "api-process-v1") return withChildTests(apiProcessFiles(files, data, capability, selected), capability);
+  if (capability.adapter === "tool-server-stdio-v1") return withChildTests(toolServerFiles(files, data, capability, selected), capability);
   return withChildTests(files, capability);
 }
 
@@ -1282,9 +1284,11 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   const telegramApplicable = data.telegramMode && data.telegramMode !== "none";
   const operationProfile = operationProfileFor(data);
   const capability = options.capability || scaffoldCapability(data);
-  const headless = capability.adapter === "headless-cli-v1";
-  const apiProcess = capability.adapter === "api-process-v1";
-  const apiManifest = apiProcess ? apiProcessManifest(data) : null;
+  const toolServer = capability.adapter === "tool-server-stdio-v1";
+  const headless = capability.adapter === "headless-cli-v1" || (toolServer && !capability.interfaces.includes("web"));
+  const toolEntry = toolServer ? toolServerManifest(data, capability).mcp.argv[1] : null;
+  const apiProcess = capability.adapter === "api-process-v1" || toolServer;
+  const apiManifest = toolServer ? toolServerManifest(data, capability) : apiProcess ? apiProcessManifest(data) : null;
   const controlCenterServiceMode = headless ? "none" : operationProfile.serviceMode === "none" ? "manual" : operationProfile.serviceMode;
   const controlCenterPort = stableLocalPort(agentSlug);
   const controlCenterLocalUrl = headless ? "not-applicable" : apiProcess ? apiManifest.local_upstream_url : `http://127.0.0.1:${controlCenterPort}`;
@@ -1331,7 +1335,7 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
     telegramApplicable_Telegram: `${telegramApplicable ? "Telegram" : "CLI"}`,
     controlCenterServiceMode_launchd: `${controlCenterServiceMode === "launchd" ? "launchd" : "operations"}`,
     data_runtimeFamily: `${yamlScalar(data.runtimeFamily || "codex-native")}`,
-    headless_adapter: `${headless ? "adapter-needed" : "codex-native"}`,
+    headless_adapter: `${toolServer ? "portable" : headless ? "adapter-needed" : "codex-native"}`,
     data_relPath: `${yamlScalar(data.relPath)}`,
     research_path: `${research.path ? `  - ${yamlScalar(research.path)}\n` : ""}`,
     data_relPath_2: `${yamlScalar(data.relPath)}`,
@@ -1375,7 +1379,7 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
     deliveryGit_status: `${deliveryGit.status}`,
     deliveryGit_revision: `${deliveryGit.revision || "pending"}`,
     headless_pending: `${headless ? "pending-live-check" : "pending-registry"}`,
-    headless_interfaces: `${headless ? "  - interfaces/manifest.json\n  - scripts/agent-cli.mjs\n  - scripts/healthcheck.mjs" : apiProcess ? "  - operations/manifest.json\n  - scripts/service-control.mjs\n  - scripts/server.mjs\n  - scripts/healthcheck.mjs" : "  - operations/manifest.json\n  - scripts/control-center-runtime.mjs\n  - scripts/control-center-agent-service.mjs\n  - scripts/healthcheck.mjs"}`,
+    headless_interfaces: `${toolServer ? `  - interfaces/manifest.json\n  - operations/manifest.json\n  - ${toolEntry}\n  - scripts/healthcheck.mjs` : headless ? "  - interfaces/manifest.json\n  - scripts/agent-cli.mjs\n  - scripts/healthcheck.mjs" : apiProcess ? "  - operations/manifest.json\n  - scripts/service-control.mjs\n  - scripts/server.mjs\n  - scripts/healthcheck.mjs" : "  - operations/manifest.json\n  - scripts/control-center-runtime.mjs\n  - scripts/control-center-agent-service.mjs\n  - scripts/healthcheck.mjs"}`,
     headless_n: `${headless ? " []" : "\n  - Registry must be rebuilt after scaffold before the card appears in Agents."}`,
     headless_Inspect: `${headless ? "  - Inspect the own-instance identity catalog and current result readiness." : "  - node scripts/pritha.mjs registry"}`,
     agentSlug_2: `${agentSlug}`,
@@ -1431,7 +1435,7 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
     healthResult_output: `${markdownValue(healthResult.output, "no output", 1200)}`,
     telegramApplicable_pending: `${telegramApplicable ? "pending" : "not-applicable"}`,
     telegramApplicable_Fill: `${telegramApplicable ? "Fill .env and run npm run telegram:healthcheck" : "Telegram not selected"}`,
-    apiProcess_node: `${apiProcess ? "node scripts/deploy-service.mjs status (scaffold-only)" : "node scripts/operations-status.mjs"}`,
+    apiProcess_node: `${toolServer ? `node ${toolEntry} status (implementation-required)` : apiProcess ? "node scripts/deploy-service.mjs status (scaffold-only)" : "node scripts/operations-status.mjs"}`,
     research_status_2: `${research.status}`,
     research_path_2: `${research.path || "Run `node scripts/pritha.mjs research <contract>` before production scaffold decisions"}`,
     researchGateResultLabel_research: `${markdownValue(researchGateResultLabel(research), "pending", 80)}`,
@@ -1502,10 +1506,10 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
     headless_Check: `${headless ? "Check live card availability separately; scaffold alone does not establish Outcome readiness." : "Registry must be rebuilt after scaffold."}`,
     headless_Use: `${headless ? "Use the shared own-instance identity catalog." : "From Pritha root, rebuild the registry."}`,
     agentSlug_4: `${agentSlug}`,
-    apiProcess_node_2: `${apiProcess ? "node scripts/server.mjs (exits 78 until implemented)" : "node scripts/agent-cli.mjs status"}`,
-    headless_not_2: `${headless ? "not-applicable; use the on-demand CLI" : apiProcess ? "node scripts/service-control.mjs start (implementation-required)" : "node scripts/control-center-runtime.mjs start"}`,
-    headless_not_3: `${headless ? "not-applicable; a command exits after its result" : apiProcess ? "node scripts/service-control.mjs stop (implementation-required)" : "node scripts/control-center-runtime.mjs stop"}`,
-    headless_no: `${headless ? "no service or schedule selected" : apiProcess ? "read operations/manifest.json; plan/status via scripts/deploy-service.mjs" : "node scripts/operations-status.mjs"}`,
+    apiProcess_node_2: `${toolServer ? `node ${toolEntry} serve (implementation-required)` : apiProcess ? "node scripts/server.mjs (exits 78 until implemented)" : "node scripts/agent-cli.mjs status"}`,
+    headless_not_2: `${toolServer && !headless ? `node ${toolEntry} ui start (implementation-required)` : headless ? "not-applicable; use the on-demand CLI" : apiProcess ? "node scripts/service-control.mjs start (implementation-required)" : "node scripts/control-center-runtime.mjs start"}`,
+    headless_not_3: `${toolServer && !headless ? `node ${toolEntry} ui stop (implementation-required)` : headless ? "not-applicable; a command exits after its result" : apiProcess ? "node scripts/service-control.mjs stop (implementation-required)" : "node scripts/control-center-runtime.mjs stop"}`,
+    headless_no: `${toolServer ? "read operations/manifest.json; no installation or autostart selected" : headless ? "no service or schedule selected" : apiProcess ? "read operations/manifest.json; plan/status via scripts/deploy-service.mjs" : "node scripts/operations-status.mjs"}`,
     headless_Ctrl: `${headless ? "Ctrl+C interrupts an explicitly running foreground command" : "no long-running process is started during scaffold; use the Control Center stop action after starting it"}`,
     headless_read: `${headless ? "read command stdout/stderr and the private host Trial receipts" : "see logs/"}`,
     apiProcess_workflows: `${apiProcess ? "workflows/user-training.md" : "docs/user-training-guide.md"}`,

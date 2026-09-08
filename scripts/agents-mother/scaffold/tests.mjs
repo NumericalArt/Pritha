@@ -1,13 +1,15 @@
 // These are child-owned engineering tests, never host-owned Outcome Trials.
 export function withChildTests(files, capability) {
+  const portable = capability.adapter === "tool-server-stdio-v1";
   const required = files.map(file => file.path).sort();
+  if (portable) required.push("scripts/run-tests.mjs");
   const testFiles = ["tests/structure.test.mjs", ...(capability.adapter === "api-process-v1" ? ["tests/service-lifecycle.test.mjs"] : [])];
   required.push(...testFiles);
   files.find(file => file.path === "scripts/smoke-test.mjs").content += `\nimport { lstatSync as childTestFileStat } from "node:fs";\nfor (const file of ${JSON.stringify(testFiles)}) {\n  const info = childTestFileStat(new URL("../" + file, import.meta.url));\n  if (!info.isFile() || info.isSymbolicLink()) throw new Error("Invalid child test file");\n}\n`;
   files.find(file => file.path === "README.md").content += "\n## Engineering tests\n\nRun `npm test` for structural and child-owned engineering checks. API lifecycle tests initially fail with implementation-required until the approved service is built. Run lifecycle tests in a disposable copy. These checks do not replace independent Outcome Trials or user acceptance.\n";
   const packageFile = files.find(file => file.path === "package.json");
   const pkg = JSON.parse(packageFile.content);
-  pkg.scripts.test = "node scripts/smoke-test.mjs && node --test tests/*.test.mjs";
+  pkg.scripts.test = portable ? "node scripts/run-tests.mjs" : "node scripts/smoke-test.mjs && node --test tests/*.test.mjs";
   packageFile.content = `${JSON.stringify(pkg, null, 2)}\n`;
   const structure = `import assert from "node:assert/strict";
 import { lstatSync, readFileSync } from "node:fs";
@@ -27,6 +29,22 @@ test("selected scaffold files remain regular project files", () => {
 });
 `;
   const result = [...files, { path: "tests/structure.test.mjs", content: structure }];
+  if (portable) {
+    // No shell chaining/glob expansion: the same argv works on Windows and POSIX.
+    result.push({ path: "scripts/run-tests.mjs", content: `import { spawnSync } from "node:child_process";
+import { readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
+const files=readdirSync(path.join(root,"tests")).filter(name=>name.endsWith(".test.mjs")).sort().map(name=>path.join("tests",name));
+if(!files.length) throw new Error("No engineering tests found");
+const env={...process.env};delete env.NODE_TEST_CONTEXT;delete env.NODE_OPTIONS;
+for(const argv of [[path.join("scripts","smoke-test.mjs")],["--test",...files]]) {
+ const result=spawnSync(process.execPath,argv,{cwd:root,env,stdio:"inherit",shell:false});
+ if(result.error||result.status!==0){process.exitCode=result.status||1;break;}
+}
+` });
+  }
   if (capability.adapter === "api-process-v1") {
     const manifest = JSON.parse(files.find(file => file.path === "operations/manifest.json").content);
     result.push({ path: "tests/service-lifecycle.test.mjs", content: serviceLifecycleTest(manifest) });

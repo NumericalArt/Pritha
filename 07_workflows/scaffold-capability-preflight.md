@@ -3,7 +3,7 @@ id: scaffold-capability-preflight
 type: workflow
 status: active
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-08
 topics: [agents-mother, scaffold, runtime-capability, headless-cli, operations]
 tools: [Pritha, Node.js, Git]
 sources:
@@ -52,6 +52,7 @@ Scaffold повторяет capability preflight до создания ката�
 | Runtime cli или codex-native, только CLI/headless, service none, autostart disabled/optional, proactivity none/manual | headless-cli-v1 |
 | Codex-native с поддерживаемыми workspace/interface слоями | Существующий codex-workspace-v1; placeholders не становятся готовым интерфейсом |
 | API, service process, только web/API, proactivity none, autostart disabled/optional, adoption none | api-process-v1: HTTP/operations заготовки без запуска; независимые Outcome Trials обязательны |
+| Явный tool-server, runtime cli, primary MCP stdio, optional web/CLI, UI service process (без UI service none), proactivity none, autostart disabled/optional, adoption none | tool-server-stdio-v1: provider и вспомогательный UI с отдельной readiness; Node-only test runner, no runtime start |
 | CLI с сервером, расписанием или вторым интерфейсом | Конкретный дополнительный adapter требуется до записи файлов |
 | Остальные API/local-model/hybrid/environment-specific сочетания, неизвестный custom interface | Runtime/interface adapter требуется до записи файлов |
 | Headless CLI с selected-module adoption | Отдельный проверенный module-install adapter требуется до записи файлов |
