@@ -20,7 +20,8 @@ const platform = process.env.PRITHA_LAUNCHD_AUDIT_PLATFORM || process.platform;
 const isDarwin = platform === "darwin";
 const uid = typeof process.getuid === "function" ? process.getuid() : Number(process.env.UID || 0);
 const agentDir = process.env.PRITHA_LAUNCHD_AGENT_DIR || path.join(os.homedir(), "Library", "LaunchAgents");
-const labels = (process.env.PRITHA_LAUNCHD_LABELS || DEFAULT_LABELS.join(","))
+const explicitlyRequired = Boolean(process.env.PRITHA_LAUNCHD_LABELS?.trim());
+const labels = (process.env.PRITHA_LAUNCHD_LABELS?.trim() || DEFAULT_LABELS.join(","))
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
@@ -76,7 +77,7 @@ function diskState(label) {
   const containsOldRoot = OLD_ROOT_PATTERN.test(text);
   OLD_ROOT_PATTERN.lastIndex = 0;
   return {
-    status: containsOldRoot ? "disk-stale" : "ok",
+    status: containsOldRoot ? "disk-stale" : text.includes(root) ? "ok" : "disk-root-mismatch",
     path: plistPath,
     contains_expected_root: text.includes(root),
     contains_old_root: containsOldRoot,
@@ -86,17 +87,19 @@ function diskState(label) {
 function loadedState(label) {
   const result = runLaunchctl(["print", `gui/${uid}/${label}`]);
   if (!result.ok) {
+    const detail = (result.stderr || result.stdout || "launchctl query failed").trim();
+    const absent = result.status === 113 && /could not find (?:specified )?service|not loaded|no such process/i.test(detail);
     return {
-      status: "not-loaded",
+      status: absent ? "not-loaded" : "query-failed",
       contains_expected_root: false,
       contains_old_root: false,
-      detail: (result.stderr || result.stdout || "not loaded").trim(),
+      detail,
     };
   }
   const text = result.stdout;
   const containsOldRoot = text.includes(oldRoot);
   return {
-    status: containsOldRoot ? "loaded-stale" : "ok",
+    status: containsOldRoot ? "loaded-stale" : text.includes(root) ? "ok" : "loaded-root-mismatch",
     contains_expected_root: text.includes(root),
     contains_old_root: containsOldRoot,
     excerpt: text
@@ -122,20 +125,26 @@ export function auditLaunchdRoot() {
   const jobs = labels.map((label) => {
     const disk = diskState(label);
     const loaded = loadedState(label);
+    const applicable = explicitlyRequired || disk.status !== "missing" || loaded.status !== "not-loaded";
     let status = "ok";
-    if (disk.status === "missing") status = "disk-missing";
+    if (!applicable) status = "not-installed";
+    else if (loaded.status === "query-failed") status = "query-failed";
+    else if (disk.status === "missing") status = "disk-missing";
     else if (disk.status === "disk-stale") status = "disk-stale";
+    else if (disk.status === "disk-root-mismatch") status = "disk-root-mismatch";
     else if (loaded.status === "loaded-stale") status = "disk-fixed-loaded-stale";
+    else if (loaded.status === "loaded-root-mismatch") status = "loaded-root-mismatch";
     else if (loaded.status === "not-loaded") status = "not-loaded";
-    return { label, status, disk, loaded };
+    return { label, status, applicable, required: explicitlyRequired, disk, loaded };
   });
   return {
-    ok: jobs.every((job) => job.status === "ok"),
+    ok: jobs.every((job) => !job.applicable || job.status === "ok"),
+    applicable: jobs.some((job) => job.applicable),
     root,
     domain: `gui/${uid}`,
     agent_dir: agentDir,
     jobs,
-    stale_jobs: jobs.filter((job) => job.status !== "ok").map((job) => job.label),
+    stale_jobs: jobs.filter((job) => job.applicable && job.status !== "ok").map((job) => job.label),
   };
 }
 
@@ -153,7 +162,7 @@ function reloadLaunchdJobs() {
       errors: [`launchd reload is only available on macOS; current platform is ${platform}`],
     };
   }
-  const blockers = before.jobs.filter((job) => job.disk.status !== "ok");
+  const blockers = before.jobs.filter((job) => job.applicable && (job.disk.status !== "ok" || job.loaded.status === "query-failed" || job.loaded.status === "loaded-root-mismatch"));
   if (blockers.length) {
     return {
       ok: false,
@@ -161,7 +170,7 @@ function reloadLaunchdJobs() {
       before,
       after: null,
       actions: [],
-      errors: blockers.map((job) => `${job.label}: disk state is ${job.disk.status}; fix plist before reload`),
+      errors: blockers.map((job) => `${job.label}: ${job.status}; resolve the audit finding before reload`),
     };
   }
 
@@ -201,7 +210,7 @@ function reloadLaunchdJobs() {
   }
 
   const after = auditLaunchdRoot();
-  if (!after.ok) errors.push(...after.jobs.filter((job) => job.status !== "ok").map((job) => `${job.label}: still ${job.status}`));
+  if (!after.ok) errors.push(...after.jobs.filter((job) => job.applicable && job.status !== "ok").map((job) => `${job.label}: still ${job.status}`));
   return { ok: errors.length === 0, root, before, after, actions, errors };
 }
 
