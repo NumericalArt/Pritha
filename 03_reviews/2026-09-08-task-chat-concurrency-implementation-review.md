@@ -150,3 +150,21 @@ ND получает отдельную CLI-only инструкцию, без п�
 или reset usage ledger. MacBook получает source package и инструкцию; actual install,
 provider smoke и peer access на другом устройстве остаются непроверенными до их
 собственного выполнения.
+
+## Проверка установленного сервера и усиление release gate
+
+Первое поэтапное обновление выявило ошибку именно production bundle: Turbopack
+преобразовал `createRequire(import.meta.url)("node:sqlite")` в unsupported URL
+external. Исходные Node-тесты проходили, страницы/chunks отвечали, но activity API
+возвращал `execution_runtime_unsupported`. Допуск матери закрыт с нулём execution
+owners; клоны до исправления не обновлялись. Данные и прежние WIP сохранены.
+
+Загрузка переведена на штатный `process.getBuiltinModule`, доступный в проверенной
+ветке Node 24 и минимальной ветке Node 22.13. Источник:
+[Node.js process.getBuiltinModule](https://nodejs.org/api/process.html#processgetbuiltinmoduleid),
+проверено 2026-09-08. Health использует тот же loader и выполняет SQL-запрос в
+отдельной in-memory DB; пользовательское execution-state этот probe не открывает.
+Strict health отклоняет отрицательный результат до активации. Добавлены regression
+checks успешной/неуспешной загрузки и отказа strict checker. Итоговый release pin,
+проверка compiled activity/native-turn API и per-instance результаты фиксируются
+в окончательном deployment receipt; предыдущий rc2 не является готовым release.

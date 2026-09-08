@@ -173,3 +173,22 @@ test("control-center health skips cleanly when the server is not running", async
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.status, "skipped");
 });
+
+for (const runtimeReady of [true, false]) test(`health checks compiled SQLite readiness before admission: ${runtimeReady}`, async () => {
+  await withServer((request, response) => {
+    if (request.url === '/api/health') return jsonResponse(response, 200, {
+      schema: 'pritha-control-center-health-v2', ok: true, service: 'pritha-control-center', status: 'ready',
+      instance: {id:'fixture',role:'developer',port:Number(request.headers.host?.split(':').at(-1))},
+      release: {commit:'abcdef123456',buildId:'fixture-build'}, execution:{protocol:1,runtimeReady},
+    });
+    if (request.url === '/_next/static/chunks/current.js') {
+      response.writeHead(200, {'content-type':'application/javascript'});return response.end('window.ready=true;');
+    }
+    return htmlResponse(response, '/_next/static/chunks/current.js');
+  }, async baseUrl => {
+    const result=await runHealth(baseUrl,['--strict']);
+    assert.equal(result.status,runtimeReady?0:1);
+    const payload=JSON.parse(result.stdout);
+    assert.equal(payload.checks.find(check=>check.id==='execution-runtime').status,runtimeReady?'pass':'fail');
+  });
+});

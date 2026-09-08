@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { executionRuntimeReady } from "../../../../../../scripts/lib/execution-coordinator.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export function GET() {
     ok: true,
     service: "pritha-control-center",
     status: "ready",
+    execution: { protocol: 1, runtimeReady: executionRuntimeReady() },
     instance: {
       id: instanceId,
       role,

@@ -1,4 +1,5 @@
 export class ExecutionConflict extends Error { code: string; constructor(code: string, message?: string); }
+export function executionRuntimeReady(): boolean;
 export type ExecutionIntent = Record<string, any> & { id: string; hash: string; kind: string; state: string; revision: number; createdAt: string; updatedAt: string };
 export type ExecutionLease = { owner: string; generation: string; assertOwned(): void; release(): void };
 export class ExecutionCoordinator {

@@ -2,8 +2,25 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
+import process from "node:process";
+
+function executionDatabase() {
+  // Keep native loading at runtime: Turbopack rewrites createRequire(node:sqlite)
+  // into an unsupported URL external in the production server bundle.
+  const DatabaseSync = process.getBuiltinModule?.("node:sqlite")?.DatabaseSync;
+  if (!DatabaseSync) throw new ExecutionConflict("execution_runtime_unsupported", "Task execution requires Node.js 22.13 or newer.");
+  return DatabaseSync;
+}
+
+export function executionRuntimeReady() {
+  let db;
+  try {
+    const DatabaseSync = executionDatabase();
+    db = new DatabaseSync(":memory:");
+    return db.prepare("SELECT 1 AS ready").get().ready === 1;
+  } catch { return false; }
+  finally { db?.close(); }
+}
 
 const processGeneration = randomUUID();
 const digest = value => createHash("sha256").update(String(value)).digest("hex");
@@ -68,9 +85,7 @@ function decoded(row) { return row ? JSON.parse(row.value) : null; }
 /** Instance-local coordination, never a generated memory database. No RPC runs inside a transaction. */
 export class ExecutionCoordinator {
   constructor({ stateRoot, directory = path.join(stateRoot, "execution") }) {
-    let DatabaseSync;
-    try { ({ DatabaseSync } = require("node:sqlite")); }
-    catch { throw new ExecutionConflict("execution_runtime_unsupported", "Task execution requires Node.js 22.13 or newer."); }
+    const DatabaseSync = executionDatabase();
     this.file = privateDatabase(stateRoot, directory);
     this.db = new DatabaseSync(this.file);
     chmodSync(this.file, 0o600);

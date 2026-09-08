@@ -177,6 +177,13 @@ async function runHealthcheck(options) {
     }));
   }
 
+  if (healthPayload?.execution?.protocol === 1) {
+    const ready = healthPayload.execution.runtimeReady === true;
+    checks.push(check(ready ? "pass" : "fail", "execution-runtime", ready
+      ? "Compiled execution runtime can open and query native SQLite"
+      : "Compiled execution runtime cannot use native SQLite"));
+  }
+
   const scripts = new Map();
   for (const page of pages) {
     const pageUrl = new URL(page, base).href;
