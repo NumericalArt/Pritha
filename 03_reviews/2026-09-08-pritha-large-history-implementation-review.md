@@ -1,6 +1,6 @@
 ---
 id: pritha-large-history-agent-test-report-2026-09-08
-type: agent-test-report
+type: review
 status: passed
 created: 2026-09-08
 updated: 2026-09-08

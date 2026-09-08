@@ -62,7 +62,7 @@ test("actual managed executor uses the validated environment and rejects a stale
   writeFileSync(path.join(folder,"record-env.mjs"),'console.log(JSON.stringify({keys:Object.keys(process.env),state:process.env.LINK_VAULT_STATE,origin:process.env.LINK_VAULT_UI_ORIGIN}));\n',"utf8");
   const port=await fixtureServer(t,(_,res)=>res.end(JSON.stringify({agent_id:"fixture-tool"})));
   const keys=["LINK_VAULT_PORT","LINK_VAULT_STATE","LINK_VAULT_UI_ORIGIN","PRITHA_TEST_SECRET_CANARY"],saved=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
-  Object.assign(process.env,{LINK_VAULT_UI_ORIGIN:"https://fixture.tailtest.ts.net:3432",LINK_VAULT_PORT:String(port),LINK_VAULT_STATE:path.join(folder,"state"),PRITHA_TEST_SECRET_CANARY:"synthetic-do-not-inherit"});
+  Object.assign(process.env,{LINK_VAULT_UI_ORIGIN:"https://fixture.example.ts.net:3432",LINK_VAULT_PORT:String(port),LINK_VAULT_STATE:path.join(folder,"state"),PRITHA_TEST_SECRET_CANARY:"synthetic-do-not-inherit"});
   t.after(()=>{for(const k of keys){if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];}});
   const m=manifest();m.start_command.argv=["node","record-env.mjs"];for(const field of ["start_command","stop_command"])m[field].env_allowlist.push("LINK_VAULT_UI_ORIGIN");
   const resolved=resolveToolServerManifest(m),agent={id:"fixture-tool",control:{ownership:"managed",runtimeBinding:toolServerRuntimeBinding(resolved)}};
@@ -78,14 +78,14 @@ test("actual managed executor uses the validated environment and rejects a stale
 });
 
 test("only declared canonical HTTPS UI origins pass and changing one invalidates an operation plan",()=>{
-  const m=manifest(),origin="https://fixture.tailtest.ts.net:3432";
+  const m=manifest(),origin="https://fixture.example.ts.net:3432";
   const parent={LINK_VAULT_UI_ORIGIN:origin,OTHER_UI_ORIGIN:origin,NODE_OPTIONS:"--inspect"};
   assert.equal(toolServerLaunchEnvironment(m,m.start_command,parent).LINK_VAULT_UI_ORIGIN,undefined);
   for(const field of ["start_command","stop_command"])m[field].env_allowlist.push("LINK_VAULT_UI_ORIGIN");
   assert.deepEqual(toolServerLaunchEnvironment(m,m.start_command,parent),{LINK_VAULT_UI_ORIGIN:origin});
   assert.notEqual(toolServerRuntimeBinding(m,{}),toolServerRuntimeBinding(m,parent));
-  assert.notEqual(toolServerRuntimeBinding(m,parent),toolServerRuntimeBinding(m,{LINK_VAULT_UI_ORIGIN:"https://second.tailtest.ts.net:3432"}));
-  for(const value of ["*","https://*.ts.net","https://example.com","http://fixture.tailtest.ts.net:3432",origin+"/",origin+"?x",origin+"\n","https://user:pass@fixture.tailtest.ts.net"]){
+  assert.notEqual(toolServerRuntimeBinding(m,parent),toolServerRuntimeBinding(m,{LINK_VAULT_UI_ORIGIN:"https://second.example.ts.net:3432"}));
+  for(const value of ["*","https://*.ts.net","https://example.com","http://fixture.example.ts.net:3432",origin+"/",origin+"?x",origin+"\n","https://user:pass@fixture.example.ts.net"]){
     assert.throws(()=>toolServerLaunchEnvironment(m,m.start_command,{LINK_VAULT_UI_ORIGIN:value}),{code:"tool_server_runtime_invalid"});
   }
   assert.equal(toolServerLaunchEnvironment(m,m.start_command,{LINK_VAULT_UI_ORIGIN:""}).LINK_VAULT_UI_ORIGIN,"");
