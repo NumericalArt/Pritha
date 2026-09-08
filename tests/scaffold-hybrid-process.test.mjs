@@ -42,10 +42,10 @@ test("hybrid editor capability accepts only the explicitly reviewed service comb
 });
 
 test("hybrid research covers editor isolation and Node/Telegram without excluded SDK, MCP, memory or macOS choices", () => {
-  const topics = deriveExternalResearchTopics({...selected, dependencies: "Node.js built-ins; Codex CLI", inputDataTypes: "untrusted HTML and Telegram", memoryModel: "bounded atomic JSON state; no SQLite/embeddings/vector DB"});
+  const topics = deriveExternalResearchTopics({...selected, dependencies: "Node.js built-ins; Codex CLI", inputDataTypes: "untrusted HTML and Telegram; no voice or Realtime", memoryModel: "bounded atomic JSON state; no SQLite/embeddings/vector DB"}, {patternPack: {externalResearchSeeds: ["openai", "openai realtime webrtc", "voice speech", "semantic embeddings rag", "telegram bot api", "codex cli", "tailscale"]}});
   const ids = topics.map(topic => topic.id);
   for (const id of ["node-http-runtime", "codex-editor-isolation", "telegram-bot-api", "interface-runtime-security", "operations-deployment", "untrusted-input-security"]) assert(ids.includes(id), id);
-  for (const id of ["openai-agents-sdk", "mcp-connectors", "memory-rag-storage"]) assert(!ids.includes(id), id);
+  for (const id of ["openai-agents-sdk", "mcp-connectors", "memory-rag-storage", "openai-realtime", "pattern-openai", "pattern-openai-realtime-webrtc", "pattern-voice-speech", "pattern-semantic-embeddings-rag"]) assert(!ids.includes(id), id);
   assert.doesNotMatch(topics.find(topic => topic.id === "operations-deployment").query, /macOS launchd cron/);
   assert(deriveExternalResearchTopics({runtimeFamily: "api"}).some(topic => topic.id === "openai-agents-sdk"));
 });

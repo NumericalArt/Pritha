@@ -66,10 +66,13 @@ function pushTopic(topics, id, topic, query, reason, extra = {}) {
   });
 }
 
-function addPatternDerivedTopics(topics, patternPack) {
+function addPatternDerivedTopics(topics, patternPack, { hybridEditor = false } = {}) {
   const seeds = parsePatternPackSeeds(patternPack)
     .map((seed) => canonicalPatternResearchSeed(compact(seed)))
     .filter(Boolean)
+    // Retrieval matches are advisory. The narrow editor adapter cannot acquire
+    // technologies that its reviewed capability boundary explicitly excludes.
+    .filter((seed) => !hybridEditor || (/\b(codex cli|telegram|bot api|tailscale|sandbox|browser|node|eval|evaluation)\b/i.test(seed) && !/\b(realtime|webrtc|voice|speech|mcp|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron)\b/i.test(seed)))
     .filter((seed) => /\b(openai|realtime|webrtc|voice|speech|telegram|bot api|mcp|connector|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron|tailscale|oauth|webhook|browser|sandbox|codex app|codex cli|agents sdk|github|repository|skill|eval|evaluation|open-source|api)\b/i.test(seed))
     .slice(0, 5);
 
@@ -152,7 +155,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  if (/\b(realtime|voice|speech|microphone|audio|webrtc|transcription|gpt-realtime)\b/.test(text)) {
+  if (!hybridEditor && /\b(realtime|voice|speech|microphone|audio|webrtc|transcription|gpt-realtime)\b/.test(text)) {
     pushTopic(
       topics,
       "openai-realtime",
@@ -251,7 +254,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  addPatternDerivedTopics(topics, options.patternPack || options.patternPackText);
+  addPatternDerivedTopics(topics, options.patternPack || options.patternPackText, { hybridEditor });
 
   return topics;
 }
