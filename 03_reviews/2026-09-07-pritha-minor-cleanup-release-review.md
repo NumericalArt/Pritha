@@ -120,5 +120,6 @@ commit `320e56e` сохраняет самостоятельную истори�
 read-only; новый origin не создавался.
 
 Пакеты ND ждут отдельной реализации по специализированному roadmap.
-G (перенос 41 inline template и широкие declarations), split server.ts и
-переименование Techscope остаются за пределами согласованного цикла.
+На момент этого A–F отчёта G (41 inline template) оставалась опциональной;
+она завершена в связанном follow-up. Широкие declarations, split server.ts и
+переименование Techscope сохраняют статус non-goals.

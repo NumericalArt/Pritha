@@ -75,10 +75,10 @@ NeuralDeep receives a matching revision 9 roadmap as a separate documentation co
 preserving its Codex CLI executor, provider, accounting, themes and unrelated research.
 Mother code and native Goal/App Server RPC are not bulk-merged into NeuralDeep.
 
-## Deferred
+## Non-goals
 
-The 41-template extraction, broad declaration coverage, server.ts split and Techscope
-rename remain outside this cycle. Outcome approvals, protected Trials, publication
+G, the 41-template extraction, is completed by the approved follow-up below.
+Broad declaration coverage, server.ts split and Techscope rename remain non-goals. Outcome approvals, protected Trials, publication
 guards and persistent-service consent remain intact.
 
 ## Completion — 2026-09-07
@@ -118,3 +118,9 @@ The runner creates isolated state and fixtures, uses a separate build, restores
 Next build metadata and rejects skipped or flaky tests. It never reuses a live
 Control Center. A complete run is required for UI release evidence; targeted
 specs are useful during implementation but are not a full-suite receipt.
+
+
+Follow-up release status: mother, Dasha, Sasha and Marina are deployed and each
+passed 748/748 self-test. MacBook went offline during its update attempt; its
+release receipt and actual runtime must be checked after reconnection. The
+five-instance release remains open until that verification and final sync pass.
