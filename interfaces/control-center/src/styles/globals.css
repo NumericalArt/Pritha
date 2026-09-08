@@ -2272,7 +2272,7 @@ button[aria-disabled="true"] {
 
 .compact-dl div {
   display: grid;
-  grid-template-columns: minmax(100px, 1fr) auto;
+  grid-template-columns: minmax(100px, 1fr) minmax(0, auto);
   align-items: baseline;
   gap: 12px;
 }
@@ -2283,6 +2283,7 @@ button[aria-disabled="true"] {
 
 .compact-dl dd {
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--text-primary);
   text-align: right;
 }

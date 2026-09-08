@@ -39,6 +39,8 @@ node_modules/
 .next/
 .next-pritha-staging/
 .next-pritha-previous/
+.next-pritha-e2e/
+.next-pritha-e2e.lock
 *.tsbuildinfo
 __pycache__/
 *.py[cod]

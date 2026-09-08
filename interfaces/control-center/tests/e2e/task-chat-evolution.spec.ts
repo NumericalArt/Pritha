@@ -6,13 +6,14 @@ async function mockChat(page: Page, initiallyRestored = false) {
   const now = new Date().toISOString();
   let restored = initiallyRestored;
   let archived = false;
-  const control = { rejectSend: false, failUpload: false, inputModalities: ["text", "image"], sent: [] as Array<Record<string, unknown>> };
+  const control = { rejectSend: false, failUpload: false, deliveryResponse: { runs: [] } as unknown, inputModalities: ["text", "image"], sent: [] as Array<Record<string, unknown>> };
   const uploads = new Map<string, AttachmentView>();
   let sentTurn: TurnView | null = null;
   const runtime = { preferredProvider: "auto", effectiveProvider: "desktop_bundled", availability: "ready", providers: [{ providerId: "desktop_bundled", label: "Test runtime", locationLabel: "Desktop bundled", protocol: "app_server", availability: "ready", capabilities: { fullChat: true, imageInput: true, fileMetadata: true }, stateIdentityHash: "new" }], models: [{ id: "test", inputModalities: control.inputModalities }], selected: { modelId: "test", sandboxMode: "read_only" } };
   const thread = () => ({ chatId: "chat_fixture", title: "Preserved conversation", preview: "An existing message", group: "my_chats", origin: "chat", status: "idle", activeFlags: [], taskLinks: [], archived, historyKind: "native", createdAt: now, updatedAt: now, runtime: { providerId: "desktop_bundled", compatibility: restored ? "bound" : "mismatch" }, continuationState: restored ? "continuation_enabled" : "blocked_runtime_mismatch" });
   await page.route("**/api/codex-chat/v1/**", async route => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/delivery")) return route.fulfill({ json: { apiVersion: "1", requestId: "delivery-fixture", data: control.deliveryResponse } });
     if (url.pathname.includes("/attachments/")) {
       const id = url.pathname.split("/").at(-1)!;
       if (route.request().method() === "PUT") {
@@ -50,6 +51,20 @@ async function mockChat(page: Page, initiallyRestored = false) {
 }
 
 for (const width of [1280, 390]) {
+  test(`invalid delivery discovery preserves the conversation at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 850 });
+    const control = await mockChat(page, true);
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    for (const invalid of [null, {}, { runs: null }, { runs: [null] }, { runs: [{ runId: 1, status: "verified" }] }]) {
+      control.deliveryResponse = invalid;
+      await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+      await expect(page.getByText("Original answer", { exact: true })).toBeVisible();
+      await page.locator(".codex-delivery-panel summary").click();
+      await expect(page.getByText("Список сборок пока недоступен. Чат остаётся доступен.", { exact: true })).toBeVisible();
+    }
+    expect(errors).toEqual([]);
+  });
   test(`history recovery explains a blocked chat and opens its original at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 850 });
     await mockChat(page);
@@ -197,17 +212,17 @@ for (const width of [1280, 390]) {
     const run = { runId: "run_fixture", agentId: "agent_fixture", agentName: "Fixture service", specId: "spec_fixture", status: "verified", acceptance: "pending", bindingStatus: "bound", revision: "fixture", receipts: [], actions: { verify: false, prepareHandoff: false, budget: false }, budget: { tokensUsed: 2, maxTokens: 100, usageStatus: "complete", iterations: 1, maxIterations: 3, elapsedMs: 1000, maxElapsedMs: 60000 }, plan: { maxVerificationPasses: 1, outputBytesCap: 1000, backend: "fixture", commands: [] } };
     const requests: Array<Record<string, string>> = [];
     let loseResponse = true;
-    await page.route("**/api/codex-chat/v1/threads/chat_fixture/delivery**", route => route.fulfill({ json: { apiVersion: "1", data: new URL(route.request().url()).searchParams.has("runId") ? { run } : { runs: [{ runId: run.runId, status: run.status }] } } }));
-    await page.route("**/api/codex-chat/v1/threads/chat_fixture/turns?**", route => route.fulfill({ json: { apiVersion: "1", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/<user>/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
+    await page.route("**/api/codex-chat/v1/threads/chat_fixture/delivery**", route => route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: new URL(route.request().url()).searchParams.has("runId") ? { run } : { runs: [{ runId: run.runId, status: run.status }] } } }));
+    await page.route("**/api/codex-chat/v1/threads/chat_fixture/turns?**", route => route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/<user>/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
     await page.route("**/api/codex-chat/v1/threads/chat_fixture/operations**", async route => {
       if (route.request().method() === "GET") {
         const action = new URL(route.request().url()).searchParams.get("action");
-        return route.fulfill({ json: { apiVersion: "1", data: { agentId: run.agentId, runId: run.runId, action, planLock: "a".repeat(64), enabled: true, label: action === "start" ? "Start" : "Tailscale Serve", summary: "Operation on the selected fixture service.", reason: null, pendingRequest: null } } });
+        return route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { agentId: run.agentId, runId: run.runId, action, planLock: "a".repeat(64), enabled: true, label: action === "start" ? "Start" : "Tailscale Serve", summary: "Operation on the selected fixture service.", reason: null, pendingRequest: null } } });
       }
       const body = route.request().postDataJSON(); requests.push(body);
       expect(route.request().headers()["idempotency-key"]).toBe(body.requestId);
       if (body.decision === "approve" && loseResponse) { loseResponse = false; return route.abort("failed"); }
-      return route.fulfill({ json: { apiVersion: "1", data: { requestId: body.requestId, status: body.decision === "cancel" ? "cancelled" : "completed" } } });
+      return route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { requestId: body.requestId, status: body.decision === "cancel" ? "cancelled" : "completed" } } });
     });
     await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
     await expect(page.locator(".codex-markdown code[title='Handoff']")).toBeVisible();

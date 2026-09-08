@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 test.beforeEach(async ({ request }) => {
-  test.skip(process.env.PRITHA_E2E_ISOLATED_STATE !== "1" || !process.env.PRITHA_STATE_ROOT || process.env.PRITHA_CONTROL_CENTER_PORT !== "7342", "Requires the isolated settings test instance.");
+  expect(process.env.PRITHA_E2E_ISOLATED_STATE).toBe("1");
+  expect(process.env.PRITHA_STATE_ROOT).toBeTruthy();
   const health = await (await request.get("/api/health")).json();
   expect(health.instance.id).toBe("chat-evolution-test");
 });

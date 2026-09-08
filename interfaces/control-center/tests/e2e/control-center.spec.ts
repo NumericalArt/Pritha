@@ -1,41 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { agentFixtures, installAgentFixture, openAgents } from "./agent-fixture";
+import type { ControlCenterStatus } from "../../src/lib/control-center/types";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-type ControlCenterStatus = {
-  app: {
-    version: string;
-  };
-  selfTest: {
-    ageLabel: string;
-  };
-  counts: {
-    childAgents: number;
-  };
-  access: {
-    localhost: string;
-    tailscale: string;
-    tailscaleUrl?: string;
-  };
-  childAgents: Array<{
-    id: string;
-    name: string;
-    url?: {
-      status: "available" | "unavailable";
-      local?: string;
-      tailscale?: string;
-    };
-    ui?: {
-      state?: string;
-    };
-    control?: {
-      planAction?: "start" | "stop" | "check" | "restore";
-    };
-    credentials?: {
-      definitions: unknown[];
-    };
-  }>;
-};
 
 type OperatorActionPlan = {
   actionEnabled: boolean;
@@ -59,13 +27,21 @@ type ChildAgent = ControlCenterStatus["childAgents"][number];
 async function getStatus(page: Page) {
   const response = await page.request.get("/api/status");
   expect(response.ok()).toBeTruthy();
-  return (await response.json()) as ControlCenterStatus;
+  return installAgentFixture(page, (await response.json()) as ControlCenterStatus);
 }
 
 async function expectNoPageOverflow(page: Page) {
-  await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2))
-    .toBeTruthy();
+  await expect.poll(() => page.evaluate(() => {
+    if (document.documentElement.scrollWidth <= window.innerWidth + 2) return [];
+    const elements = [...document.querySelectorAll<HTMLElement>("body *")].filter(element => {
+      if (!element.offsetParent || element.getBoundingClientRect().right <= innerWidth + 2) return false;
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        if (["auto", "scroll", "hidden", "clip"].includes(getComputedStyle(parent).overflowX) && parent.getBoundingClientRect().right <= innerWidth + 2) return false;
+      }
+      return true;
+    }).slice(0, 12).map(element => ({ element: element.tagName + "." + element.className, right: Math.round(element.getBoundingClientRect().right) }));
+    return [{ viewport: innerWidth, documentWidth: document.documentElement.scrollWidth, route: location.pathname, elements }];
+  })).toEqual([]);
   await expect
     .poll(() => page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".codex-transcript")]
       .filter((element) => element.offsetParent !== null)
@@ -80,6 +56,7 @@ async function expectNoRawSecret(page: Page) {
 }
 
 function findRepoRoot() {
+  if (process.env.PRITHA_E2E_ISOLATED_STATE === "1" && process.env.TECHSCOPE_ROOT) return process.env.TECHSCOPE_ROOT;
   let cursor = process.cwd();
   for (let i = 0; i < 8; i += 1) {
     if (existsSync(path.join(cursor, "AGENTS.md")) && existsSync(path.join(cursor, "interfaces", "control-center"))) return cursor;
@@ -93,7 +70,7 @@ function findRepoRoot() {
 function writeFakeCodexTask(status: string) {
   const root = findRepoRoot();
   const taskId = `test-${status}-${Date.now()}`;
-  const taskDir = path.join(root, ".private", "interface-lab", "pritha-control-center", "realtime", "codex-tasks", taskId);
+  const taskDir = path.join(realtimePrivateRoot(), "codex-tasks", taskId);
   const startedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const completedAt = new Date().toISOString();
   mkdirSync(taskDir, { recursive: true });
@@ -137,7 +114,7 @@ function writeFakeCodexTask(status: string) {
 function writeStaleCodexTask() {
   const root = findRepoRoot();
   const taskId = `test-stale-running-${Date.now()}`;
-  const taskDir = path.join(root, ".private", "interface-lab", "pritha-control-center", "realtime", "codex-tasks", taskId);
+  const taskDir = path.join(realtimePrivateRoot(), "codex-tasks", taskId);
   const startedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   mkdirSync(taskDir, { recursive: true });
   writeFileSync(
@@ -266,6 +243,7 @@ test.describe("Control Center UI regression", () => {
     const secondVoice = { ...voice(), chatId: "chat-voice-second", title: "Voice pagination example", taskLinks: [{ ...voice().taskLinks[0], taskId: "task-two", shortId: "TWO" }] };
     await page.route("**/api/codex-chat/v1/**", async (route) => {
       const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/delivery")) return route.fulfill({ json: { apiVersion: "1", requestId: "delivery-fixture", data: { runs: [] } } });
       if (route.request().method() === "POST" && url.pathname.endsWith("/ui-activity")) {
         uiActivity.push(route.request().postDataJSON() as Record<string, unknown>);
         return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ apiVersion: "1", requestId: "task-chat-telemetry", data: { recorded: true } }) });
@@ -553,6 +531,7 @@ test.describe("Control Center UI regression", () => {
 
     await page.route("**/api/codex-chat/v1/**", async (route) => {
       const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/delivery")) return route.fulfill({ json: { apiVersion: "1", requestId: "delivery-fixture", data: { runs: [] } } });
       const requestId = `e2e-${url.pathname}`;
       if (url.pathname.endsWith("/events")) {
         await route.fulfill({ status: 200, contentType: "text/event-stream", body: ": ready\n\n" });
@@ -606,7 +585,7 @@ test.describe("Control Center UI regression", () => {
 
   test("keeps agents filters, credentials drawer, create-plan drawer, and voice-link modal interactive", async ({ page }) => {
     const status = await getStatus(page);
-    await page.goto("/agents");
+    await openAgents(page);
 
     await page.getByRole("button", { name: "All" }).click();
     await expect(page.getByTestId("agent-filter-toolbar")).toContainText(/\d+ shown/);
@@ -643,7 +622,7 @@ test.describe("Control Center UI regression", () => {
     }
 
     await setAccessMode(page, "localhost");
-    await page.goto("/agents");
+    await openAgents(page);
     const allButton = page.getByRole("button", { name: "All" });
     if (await allButton.isEnabled().catch(() => false)) await allButton.click();
     const localLink = page.locator(`[data-testid="agent-url-link"][data-agent-id="${agent.id}"]`).first();
@@ -664,7 +643,7 @@ test.describe("Control Center UI regression", () => {
     }
 
     await setAccessMode(page, "tailscale");
-    await page.goto("/agents");
+    await openAgents(page);
     const allButton = page.getByRole("button", { name: "All" });
     if (await allButton.isEnabled().catch(() => false)) await allButton.click();
     const localLink = page.locator(`[data-testid="agent-url-link"][data-agent-id="${agent.id}"]`).first();
@@ -672,7 +651,8 @@ test.describe("Control Center UI regression", () => {
 
     const unservedAgent = status.childAgents.find((item) => item.url?.local && !item.url?.tailscale && item.ui?.state === "alive");
     if (unservedAgent) {
-      await expect(page.locator(`[data-testid="agent-url-link"][data-agent-id="${unservedAgent.id}"]`)).toHaveCount(0);
+      await expect(page.locator(`[data-testid="agent-url-link"][data-agent-id="${unservedAgent.id}"]`).first())
+        .toHaveAttribute("data-url", new URL(`/agents/${unservedAgent.id}`, status.access.tailscaleUrl).href);
     }
   });
 
@@ -686,7 +666,7 @@ test.describe("Control Center UI regression", () => {
 
     await setAccessMode(page, "localhost");
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/agents");
+    await openAgents(page);
 
     const card = page.locator(".mobile-agent-card", { hasText: agent.name }).first();
     await expect(card.locator("button.mobile-agent-action")).toContainText("Stop Plan");
@@ -694,51 +674,27 @@ test.describe("Control Center UI regression", () => {
     await expect(card.locator(`[data-testid="agent-url-link"][data-agent-id="${agent.id}"]`)).toHaveAttribute("data-url", agent.url.local);
   });
 
-  test("keeps manual confirmation phrase input editable even when start execution is blocked", async ({ page }) => {
+  test("runtime plans require a deliberate confirmation and preserve blocked actions", async ({ page }) => {
     const status = await getStatus(page);
-    const pictureBoom = status.childAgents.find((item) => item.id === "picture-boom");
-    const stupidJoke = status.childAgents.find((item) => item.id === "stupid-joke");
-    if (!pictureBoom || !stupidJoke) {
-      test.skip(true, "PictureBoom and StupidJoke must both be registered for this comparison.");
-      return;
-    }
-
-    async function openStartPlan(agent: ChildAgent) {
-      await page.goto("/agents");
-      await page.getByRole("button", { name: "All" }).click();
-      const card = page.locator(".agents-desktop-content .agent-card", { hasText: agent.name }).first();
-      await expect(card).toBeVisible();
-
-      const planResponse = page.waitForResponse((response) =>
-        response.url().includes(`/api/agents/${agent.id}/actions/start/plan`) && response.ok(),
-      );
-      await card.locator("button.agent-action").click();
-      const plan = (await (await planResponse).json()) as OperatorActionPlan;
-      const requiredPhrase = plan.confirmation?.requiredPhrase || "";
-      expect(requiredPhrase).toBeTruthy();
-
-      const panel = page.locator(".operator-action-panel", { hasText: agent.name });
+    async function openPlan(name: string) {
+      const agent = status.childAgents.find(item => item.name === name)!;
+      await openAgents(page);
+      await page.locator(".agents-desktop-content .agent-card", { hasText: name }).first().locator("button.agent-action").click();
+      const panel = page.locator(".operator-action-panel", { hasText: name });
       await expect(panel).toBeVisible();
-      await expect(panel.locator(".operator-confirmation-copy strong")).toHaveText(requiredPhrase);
-
-      const input = panel.locator(".operator-confirmation-input input");
-      await expect(input).toBeEditable();
-      await input.fill(requiredPhrase);
-      await expect(input).toHaveValue(requiredPhrase);
-
-      return {
-        actionEnabled: plan.actionEnabled,
-        startButton: panel.getByRole("button", { name: "Start" }),
-      };
+      return { agent, start: panel.getByRole("button", { name: "Start", exact: true }) };
     }
-
-    const blockedPlan = await openStartPlan(pictureBoom);
-    expect(blockedPlan.actionEnabled).toBe(false);
-    await expect(blockedPlan.startButton).toBeDisabled();
-
-    const executablePlan = await openStartPlan(stupidJoke);
-    expect(executablePlan.actionEnabled).toBe(true);
-    await expect(executablePlan.startButton).toBeEnabled();
+    await expect((await openPlan("PictureBoom")).start).toBeDisabled();
+    const ready = await openPlan("StupidJoke");
+    await expect(ready.start).toBeEnabled();
+    const fixture = agentFixtures.get(page)!;
+    expect(fixture.requests).toHaveLength(0);
+    page.once("dialog", dialog => dialog.dismiss());
+    await ready.start.click();
+    expect(fixture.requests).toHaveLength(0);
+    page.once("dialog", dialog => dialog.accept());
+    await ready.start.click();
+    await expect.poll(() => fixture.requests).toEqual([{ action: "start", confirmation: `start ${ready.agent.id}` }]);
   });
 
   test("guards start and stop actions behind blockers or exact confirmation", async ({ page }) => {
@@ -772,12 +728,12 @@ test.describe("Control Center UI regression", () => {
     const runtimeAgent = status.childAgents.find((item) => item.control?.planAction === "start" || item.control?.planAction === "stop");
     if (!runtimeAgent) return;
 
-    await page.goto("/agents");
+    await openAgents(page);
     await page.getByRole("button", { name: "All" }).click();
     await page.locator(".agents-desktop-content .agent-card", { hasText: runtimeAgent.name }).first().locator("button.agent-action").click();
     await expect(page.locator('[aria-label*="for"]').filter({ hasText: runtimeAgent.name })).toBeVisible();
-    await expect(page.getByText("Manual Confirmation")).toBeVisible();
-    await expect(page.getByText("Required phrase")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Preflight", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Safety", exact: true })).toBeVisible();
     await expectNoPageOverflow(page);
   });
 
@@ -922,19 +878,19 @@ test.describe("Control Center UI regression", () => {
   test("guards voice context reset behind an explicit confirmation", async ({ page }) => {
     await page.goto("/voice");
 
-    await expect(page.getByLabel("Voice input level")).toBeVisible();
-    await expect(page.getByText("Voice input level").first()).toBeVisible();
+    await expect(page.getByRole("slider", { name: "Voice input level" })).toBeVisible();
+    await expect(page.getByText("Voice input level", { exact: true }).filter({ visible: true })).toBeVisible();
     const resetButton = page.locator('button:visible').filter({ hasText: "Reset Voice Context" }).first();
     await expect(resetButton).toBeVisible();
     await expect(resetButton).toBeEnabled();
     await resetButton.click();
 
     await expect(page.getByText("Reset current voice context for this session?")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Confirm" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Confirm", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
     await expectNoPageOverflow(page);
 
-    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(page.getByText("Reset current voice context for this session?")).toHaveCount(0);
   });
 
@@ -975,8 +931,8 @@ test.describe("Control Center UI regression", () => {
       expect(diagnosis.diagnosis).toBe("timeout");
 
       await page.goto("/voice");
-      await expect(page.getByText("failed_timeout").first()).toBeVisible();
-      await expect(page.getByText(/timed out/i).first()).toBeVisible();
+      await expect(page.getByText("failed_timeout", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+      await expect(page.getByText(/timed out/i).filter({ visible: true }).first()).toBeVisible();
     } finally {
       rmSync(taskDir, { recursive: true, force: true });
     }

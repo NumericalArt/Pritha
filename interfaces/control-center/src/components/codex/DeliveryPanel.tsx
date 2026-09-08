@@ -45,9 +45,14 @@ export function DeliveryPanel({ chatId, active, editable, refreshKey = 0, onSele
     const controller = new AbortController();
     void controlCenterRequest<{ runs: Array<{ runId: string; status: string }> }>(url, { signal: controller.signal }).then(({ data }) => {
       if (controller.signal.aborted || !mounted.current) return;
+      if (!data || !Array.isArray(data.runs) || data.runs.some(row => !row || typeof row.runId !== "string" || typeof row.status !== "string")) {
+        throw new Error("invalid_delivery_discovery");
+      }
       setLinks(data.runs);
       if (data.runs.length === 1) void refresh(data.runs[0].runId, controller.signal);
-    }).catch(() => { /* Opening a chat must never depend on delivery discovery. */ });
+    }).catch(() => {
+      if (!controller.signal.aborted && mounted.current) setError("Список сборок пока недоступен. Чат остаётся доступен.");
+    });
     return () => controller.abort();
   }, [refresh, url]);
   const loadedRunId = run?.runId;
