@@ -3,8 +3,8 @@ id: control-center-codex-chat-api-contract
 type: standard
 status: active
 created: 2026-08-26
-updated: 2026-09-05
-last_reviewed: 2026-09-05
+updated: 2026-09-08
+last_reviewed: 2026-09-08
 owner: Pritha/user
 topics:
   - pritha-control-center
@@ -59,7 +59,7 @@ source_published: unknown
 source_updated: unknown
 source_version: "Pritha Codex Chat API v1; attachment input and filesystem metadata verified against installed Codex 0.153.4 schemas; earlier core verification covered bundled 0.149.0-alpha.4.1 and standalone 0.135.0"
 retrieved: 2026-08-26
-verified: 2026-09-05
+verified: 2026-09-08
 valid_for: Pritha Control Center Codex Chat API v1
 temporal_status: version-bound
 memory_domain: governance
@@ -522,10 +522,9 @@ does not lose an approval or question.
 | `POST` | `/threads/{chatId}/archive` | archive | `200` |
 | `POST` | `/threads/{chatId}/unarchive` | unarchive | `200` |
 | `POST` | `/threads/{chatId}/turns` | start one new turn | `202` |
-| `POST` | `/threads/{chatId}/turns/{turnId}/steer` | add input to active turn | `202` |
-| `POST` | `/threads/{chatId}/turns/{turnId}/interrupt` | interrupt active turn | `202` |
+| `POST` | `/threads/{chatId}/control` | exact-turn steer / interrupt | `200` |
 | `GET` | `/threads/{chatId}/events` | thread SSE stream | streaming `200` |
-| `POST` | `/threads/{chatId}/requests/{requestId}/resolve` | resolve approval/input | `200` |
+| `POST` | `/threads/{chatId}/requests` | revision-bound approval/input | `200` |
 | `POST` | `/threads/{chatId}/task-links` | explicit Voice/task linkage | `201` or idempotent `200` |
 
 There is no `DELETE` route in v1.
@@ -736,84 +735,81 @@ type AcceptedTurn = {
 Only one active turn is allowed per chat. Starting another returns
 `409 turn_active`; the client may call steer or interrupt explicitly.
 
-The gateway records an attempt before invoking Codex. It may try the next
-provider only before the upstream emits/acknowledges `turn.started`. It must not
-auto-replay after that boundary.
+The gateway records an attempt before invoking Codex. Fallback is permitted only when non-delivery is proven before any upstream turn
+may have started. Missing acknowledgement is not proof of non-delivery. Voice may
+not fall back to CLI by replaying planning or steps that already executed.
 
-### `POST /threads/{chatId}/turns/{turnId}/steer`
+### `POST /threads/{chatId}/control`
 
-Body:
+Implemented control endpoint (the earlier per-turn URL shapes were design-only).
+`Idempotency-Key` must equal `clientMessageId`. Return data is
+`{ submitted: true, replayed: boolean }` with HTTP 200.
 
 ```ts
-type SteerTurnRequest = {
+type ControlTurnRequest = {
+  action: "steer" | "interrupt";
+  expectedTurnId: string; // public turn ID from ThreadDetail.controls
   clientMessageId: string;
-  input: [{ type: "text"; text: string }];
+  text?: string; // nonempty for steer, no attachments or settings overrides
 };
 ```
 
-The turn must be active and the capability must be available. Response data is
-`{ turnId, accepted: true }` with `202`.
-
-### `POST /threads/{chatId}/turns/{turnId}/interrupt`
-
-Body is `{}`. Response data is `{ turnId, accepted: true }` with `202`.
-Completion is authoritative only when SSE emits `turn.interrupted` or
-`turn.completed` with an interrupted status.
+The runtime capability, original storage/thread and exact current native turn must
+match. Only the original live owner may execute the RPC, including across HTTP
+workers through private Unix IPC. A lost acknowledgement stays unknown; the control
+is not resent automatically. Stop acknowledgement does not prove process/turn exit.
 
 ## 10. Resolve approval or user input
 
-`POST /threads/{chatId}/requests/{requestId}/resolve` requires an
-`Idempotency-Key` and one of these bodies:
+`POST /threads/{chatId}/requests` requires an `Idempotency-Key` matching
+`clientMessageId` and this revision-bound body:
 
 ```ts
-type ResolveRequestBody =
-  | {
-      kind: "command_approval";
-      turnId: TurnId;
-      decision: "accept" | "acceptForSession" | "decline" | "cancel";
-      execpolicyAmendment?: string[];
-    }
-  | {
-      kind: "file_change_approval";
-      turnId: TurnId;
-      decision: "accept" | "acceptForSession" | "decline" | "cancel";
-    }
-  | {
-      kind: "permission_approval";
-      turnId: TurnId;
-      scope: "turn" | "session";
-      granted: {
-        network: string[];
-        filesystem: string[];
-      };
-    }
-  | {
-      kind: "user_input";
-      turnId: TurnId;
-      answers: Array<{
-        questionId: string;
-        optionId?: string;
-        text?: string;
-      }>;
-    }
-  | {
-      kind: "mcp_elicitation";
-      turnId: TurnId;
-      action: "accept" | "decline" | "cancel";
-      content: Record<string, unknown> | null;
-    };
+type ResolveRequestBody = {
+  requestId: string;
+  revision: number;
+  clientMessageId: string;
+  decision?: "accept" | "decline" | "cancel";
+  answers?: Record<string, string[]>;
+};
 ```
 
-Rules:
+Native command, file-change, permission and structured user-input requests are
+supported. A grant contains exactly the requested permissions with scope `turn`
+and `strictAutoReview: true`. Session-wide grants, policy amendments and arbitrary
+extra roots are not accepted. Widening approval requires exclusive ownership of
+shared effects; if another task is using them, the request remains pending.
+MCP elicitation is not advertised by this implementation.
 
-- `chatId`, `turnId`, `requestId` and pending native request must match.
-- A grant must be a subset of the requested permissions.
-- `execpolicyAmendment` is accepted only when it exactly matches an amendment
-  proposed by the pending request.
-- An identical repeated resolution returns `200` with
-  `{ requestId, resolved: true, alreadyResolved: true }`.
-- A different resolution after completion returns `409 request_conflict`.
-- An expired or upstream-cleared request returns `410 request_expired`.
+The request, chat, storage, turn, revision and live connection generation must match.
+Only the answer hash is persisted for secret input. An identical answered request
+returns `{submitted:true,replayed:true}`; a changed request is a 409 conflict.
+Disconnection never creates a new runtime solely to answer an old request. Proven
+terminal native turns expire their outstanding requests.
+
+### Activity, explicit queue and Voice controls
+
+| Endpoint below `/api/codex-chat/v1` | Body / result |
+| --- | --- |
+| `GET /activity?after=<sequence>` | `{cursor,reset,changed,active,counts,capacity,admissionEnabled}`; bounded metadata, no transcript |
+| `GET /activity/stream?after=<sequence>` | Summary SSE event `activity`, same payload; full snapshot on initial/replay gap |
+| `GET /workspace` | `{git,dirty,baseRevision}` preflight without private paths |
+| `GET /threads/{chatId}/queue` | Pending queue rows with immutable text, revision, delivery state and reason |
+| `POST /threads/{chatId}/queue` | Existing StartTurnInput; explicit queue admission only |
+| `POST /threads/{chatId}/queue` with `action:"cancel"` | `{action,id,revision}`; only queued/blocked rows, required idempotency header |
+| `POST /threads/{chatId}/voice-control` | `{action:"answer"|"stop",taskId,questionId?,revision,answer?,clientMessageId}` |
+
+Queue edit means cancel plus a new intent. Per-instance limits are 128 typed queued
+messages (16/chat), 64 Voice admissions and 128 outstanding native requests. Queue
+admission is transactional. A queued receipt does not mean runtime dispatch.
+A Voice predecessor is the logical workflow, not just its current native phase.
+
+ThreadDetail adds optional `controls`, `queued` and `voiceWorkflow` fields. Controls
+use the current public turn ID. Voice questions carry their own question ID/revision;
+answers continue that task. Stop addresses its workflow owner and is confirmed only
+by terminal evidence. A runtime restart never erases ownership or replays queued
+entries already in dispatching/unknown state. Admission is initially paused for new
+primary/replica stores until strict, BUILD_ID-bound activation.
 
 ## 11. Voice task linking
 
@@ -1230,3 +1226,12 @@ Contract tests must cover:
 ## Related decisions
 
 - `05_decisions/2026-08-26-control-center-codex-chat-architecture.md`
+
+### Workspace mode нового чата
+
+POST /threads принимает workspace.mode: isolated | read-only | configured
+и необязательный полный workspace.baseRevision. Browser default — isolated;
+raw API без mode сохраняет configured defaults. Isolated переводит полный доступ
+в workspace-write собственной Git worktree, но не расширяет глобальный read-only.
+Выбор входит в create hash, binding и retry payload. Configured full access и
+legacy threads могут ждать общие ресурсы; capacity не обходит этот guard.
