@@ -37,6 +37,9 @@ test('clean headless path passes its research gate, separate Outcome approval, i
  writeFileSync(path.join(researchDir,'synthetic-research.md'),report);
  const env={...process.env,TECHSCOPE_ROOT:root,PRITHA_STATE_ROOT:stateRoot,PRITHA_AGENT_PARENT:agentParent};
  const scaffold=execFileSync(process.execPath,['scripts/pritha.mjs','scaffold',contract],{encoding:'utf8',env,timeout:30000});assert.doesNotMatch(scaffold,/experimental scaffold overrides/);
+ // The fixture owns its Git identity; a clean runner has no operator profile.
+ git(project,['config','user.name','Pritha Test']);
+ git(project,['config','user.email','pritha-test@example.invalid']);
  assert.equal(existsSync(path.join(project,'operations/manifest.json')),false);
  mkdirSync(path.join(project,'verification'));
  const verifier=`import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';\nfor(const [a,b,expected] of [['2','3',5],['-3','1',-2],['0','0',0]]){const r=spawnSync(process.execPath,['scripts/agent-cli.mjs',a,b],{encoding:'utf8',timeout:2000});assert.equal(r.status,0);assert.deepEqual(JSON.parse(r.stdout),{sum:expected});}\nconst bad=spawnSync(process.execPath,['scripts/agent-cli.mjs','bad','1'],{encoding:'utf8',timeout:2000});assert.equal(bad.status,64);console.log('sum verified');\n`;
