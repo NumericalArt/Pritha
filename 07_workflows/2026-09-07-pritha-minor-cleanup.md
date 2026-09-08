@@ -101,7 +101,7 @@ The operator approved closing all three reported limitations. The follow-up
 implements launchd applicability diagnostics, restores the entire configured
 isolated Playwright suite, fixes malformed delivery discovery and mobile path
 wrapping, and completes G: all 41 inline templates extracted with byte equality.
-The earlier Deferred paragraph describes the original A–F scope; G is now done.
+G is now complete within the approved follow-up scope.
 Broad declarations, server.ts split and Techscope rename retain their original
 non-goal status. NeuralDeep requirements advance to revision 10.
 
@@ -120,7 +120,9 @@ Control Center. A complete run is required for UI release evidence; targeted
 specs are useful during implementation but are not a full-suite receipt.
 
 
-Follow-up release status: mother, Dasha, Sasha and Marina are deployed and each
-passed 748/748 self-test. MacBook went offline during its update attempt; its
-release receipt and actual runtime must be checked after reconnection. The
-five-instance release remains open until that verification and final sync pass.
+Follow-up release completed: mother, Dasha, Sasha, Marina and canonical MacBook
+are deployed and each passed 748/748 self-test. MacBook recovery verified the
+previous rollback before a successful pinned release. All five passed exact
+build identity, pages, chunks and isolation; final documentation and memory
+are synchronized without rebuilding unchanged UI code. NeuralDeep revision 10
+remains byte-identical in its own documentation history and in mother.
