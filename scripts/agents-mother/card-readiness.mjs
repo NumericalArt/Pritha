@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { latestOutcomeSpecForContract } from "./outcome-spec.mjs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { resolveTechscopeRoot } from "../lib/paths.mjs";
@@ -48,10 +49,12 @@ function latestArtifact(artifacts, type) {
     .sort((left, right) => `${right.updated}:${right.path}`.localeCompare(`${left.updated}:${left.path}`))[0] || null;
 }
 
-function deliveryLifecycle(root, evidence) {
+function deliveryLifecycle(root, evidence, contractPath, options = {}) {
   const contracts = evidence.contracts.map((filePath) => artifactSummary(root, filePath)).filter(Boolean);
   const reports = evidence.reports.map((filePath) => artifactSummary(root, filePath)).filter(Boolean);
-  const outcome = latestArtifact(contracts, "agent-outcome-spec");
+  const selected = contractPath ? latestOutcomeSpecForContract(contractPath, { ...options, root }) : null;
+  const outcome = selected ? contracts.find(item => path.resolve(root, item.path) === path.resolve(root, selected.path))
+    : latestArtifact(contracts, "agent-outcome-spec");
   const delivery = latestArtifact(reports, "agent-delivery-report");
   return {
     outcome: outcome
@@ -177,7 +180,11 @@ export async function checkCardReadiness(target, options = {}) {
   const manifest = manifestRead.manifest;
   const applicability = agentOperationsApplicability(record, manifest, { ...options, root });
   const evidence = evidencePaths(root, record);
-  const lifecycle = deliveryLifecycle(root, evidence);
+  const lifecycle = deliveryLifecycle(root, evidence, record?.contractSource, options);
+  const { timeoutMs: _httpTimeout, ...readinessOptions } = options;
+  const resultReadiness = record ? await readAgentResultReadinessAsync(record.id, { ...readinessOptions, root }) : unavailableResultReadiness("agent-identity-unavailable");
+  if (resultReadiness.run) lifecycle.delivery = { present: true, id: resultReadiness.run.id,
+    status: resultReadiness.run.status, source: "delivery-ledger" };
   const blockers = [];
   const nextActions = [];
   if (record?.identityStatus === "conflict") blockers.push(`Agent identity needs reconciliation: ${record.diagnostics.join(", ")}`);
@@ -259,8 +266,6 @@ export async function checkCardReadiness(target, options = {}) {
 
   const localCardReady = Boolean(record && folder && (manifest || applicability.manifestRequired === false) && blockers.length === 0);
   const status = !record || live.visible === false ? "missing" : localCardReady ? "ready" : "blocked";
-  const { timeoutMs: _httpTimeout, ...readinessOptions } = options;
-  const resultReadiness = record ? await readAgentResultReadinessAsync(record.id, { ...readinessOptions, root }) : unavailableResultReadiness("agent-identity-unavailable");
 
   return {
     ok: status !== "missing",

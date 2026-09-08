@@ -4,7 +4,7 @@ import path from "node:path";
 import { resolvePrithaStatePathFrom, resolvePrithaStateRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { findCatalogAgent, readAgentCatalog, readCatalogArtifact, readIdentityEvidence } from "./identity.mjs";
 import { normalizeDeliveryLedger, targetKey, validateDeliveryLedger } from "./delivery-ledger.mjs";
-import { approvedTrialPlan, verifyCompiledTrialPlan } from "./outcome-spec.mjs";
+import { approvedTrialPlan, verifyCompiledTrialPlan, latestOutcomeSpecForContract } from "./outcome-spec.mjs";
 import { verifyTrialResultFreshness, verifyTrialResultIntegrity } from "./trial-runner.mjs";
 
 export const RESULT_READINESS_SCHEMA = "pritha-result-readiness-v1";
@@ -101,7 +101,9 @@ export function readAgentResultReadiness(target, input = {}) {
   if (!contract || !readCatalogArtifact(agent, contract.path, options)) {
     view.verification.reason = "contract-unavailable"; return view;
   }
-  const outcome = agent.artifacts.find(item => item.type === "agent-outcome-spec" && item.contractPath === contract.path);
+  const selected = latestOutcomeSpecForContract(contract.path, options);
+  const outcome = selected && agent.artifacts.find(item => item.type === "agent-outcome-spec"
+    && item.contractPath === contract.path && item.path === path.resolve(root, selected.path));
   if (!outcome || !readCatalogArtifact(agent, outcome.path, options)) {
     view.verification.reason = "outcome-unavailable"; return view;
   }
