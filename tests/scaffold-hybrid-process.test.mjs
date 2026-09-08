@@ -8,6 +8,7 @@ import { contractData, validateContract } from "../scripts/agents-mother/contrac
 import { scaffoldCapability } from "../scripts/agents-mother/scaffold/capabilities.mjs";
 import { generatedAgentFiles } from "../scripts/agents-mother/scaffold/index.mjs";
 import { deriveExternalResearchTopics } from "../scripts/agents-mother/external-research-topics.mjs";
+import { runRepositoryResearch, repositoryResearchFrontmatter, repositoryResearchMarkdown, verifyRepositoryResearchIntegrity } from "../scripts/agents-mother/github-research.mjs";
 
 const selected = {agentKind: "service", runtimeFamily: "hybrid", primaryInterface: "web", secondaryInterfaces: "Telegram", telegramMode: "operator-control", serviceMode: "process", autostart: "optional", proactiveMode: "manual", runtimePlacementProfile: "deterministic-first", repositoryAdoptionMode: "none", skillNeeds: "none", mcpNeeds: "none", memoryModel: "structured-json", untrustedInputPolicy: "high; bounded hostile input and human approval"};
 function fixture(t) {
@@ -48,6 +49,23 @@ test("hybrid research covers editor isolation and Node/Telegram without excluded
   for (const id of ["openai-agents-sdk", "mcp-connectors", "memory-rag-storage", "openai-realtime", "pattern-openai", "pattern-openai-realtime-webrtc", "pattern-voice-speech", "pattern-semantic-embeddings-rag"]) assert(!ids.includes(id), id);
   assert.doesNotMatch(topics.find(topic => topic.id === "operations-deployment").query, /macOS launchd cron/);
   assert(deriveExternalResearchTopics({runtimeFamily: "api"}).some(topic => topic.id === "openai-agents-sdk"));
+});
+
+test("hybrid no-adoption registry lookup keeps stale advisory rows visible without authorizing code", async t => {
+  const f = fixture(t), directory = path.join(f.root, "01_sources/registries");
+  mkdirSync(directory, {recursive: true});
+  writeFileSync(path.join(directory, "github-agent-building-repos.md"), "# Registry\n\n| Repo | Topics | Status | Added | Last checked | Stars | Why | Notes |\n| --- | --- | --- | --- | --- | ---: | --- | --- |\n| `https://github.com/example/reference` | agent-harness | candidate | 2020-01-01 | 2020-01-01 | 5 | Historical reference | MIT |\n");
+  const data = {...selected, repositoryResearchPolicy: "registry-only", repositoryResearchTopics: "agent-harness", selectedGitHubRepositories: "none"};
+  const result = await runRepositoryResearch(f.root, data, [], {githubMode: "registry-only"});
+  assert.equal(result.status, "complete"); assert.equal(result.onlineStatus, "registry-only");
+  assert.equal(result.candidates.length, 1); assert.equal(result.candidates[0].decision, "candidate");
+  assert.deepEqual(result.queries, []); assert(result.errors.some(row => row.startsWith("warning: stale registry")));
+  const report = `---\n${repositoryResearchFrontmatter(result)}\n---\n\n${repositoryResearchMarkdown(result)}`;
+  const integrity = verifyRepositoryResearchIntegrity(report); assert.equal(integrity.ok, true, integrity.reasons.join(", "));
+  const legacy = await runRepositoryResearch(f.root, {...data, runtimeFamily: "api"}, [], {githubMode: "registry-only"});
+  assert.equal(legacy.status, "pending");
+  const missing = await runRepositoryResearch(f.root, {...data, selectedGitHubRepositories: "https://github.com/example/missing"}, [], {githubMode: "registry-only"});
+  assert.equal(missing.status, "pending");
 });
 
 test("hybrid scaffold preserves runtime and credential boundaries without starting integrations or copying heavy layers", t => {

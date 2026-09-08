@@ -9,6 +9,7 @@ import {
   redactStructuredText,
 } from "../lib/redaction.mjs";
 import { contentSha256 } from "../lib/markdown-content-lock.mjs";
+import { scaffoldCapability } from "./scaffold/capabilities.mjs";
 import {
   fetchGitHubRepositorySnapshot,
   githubRepositoryContentUrlMatches,
@@ -997,12 +998,18 @@ export async function runRepositoryResearch(root, data, externalTopics, options 
   });
   const staleRegistryOnly = plan.mode === "registry-only"
     && shortlist.some((candidate) => (candidate.discoverySource || candidate.source) === "registry" && !recentDate(candidate.updatedAt));
+  // This reviewed adapter adopts no repository code or repository references.
+  // Keep stale discovery visible without making it authorize any dependency.
+  const advisoryHybridRegistry = scaffoldCapability(data).adapter === "hybrid-editor-process-v1"
+    && plan.adoptionMode === "none" && plan.selectedRepositories.length === 0;
   if (staleRegistryOnly) {
-    errors.push(plan.adoptionMode === "reference-only"
+    errors.push(advisoryHybridRegistry
+      ? "warning: stale registry metadata is advisory; hybrid editor adopts no repositories"
+      : plan.adoptionMode === "reference-only"
       ? "warning: registry-only shortlist contains metadata older than 30 days; exact fresh external review remains required"
       : "registry-only shortlist contains metadata older than 30 days");
   }
-  const staleRegistryBlocking = staleRegistryOnly && plan.adoptionMode !== "reference-only";
+  const staleRegistryBlocking = staleRegistryOnly && plan.adoptionMode !== "reference-only" && !advisoryHybridRegistry;
   const incomplete = onlineStatus === "failed" || !registry.ok && !plan.online || requiredSelectedMissing || staleRegistryBlocking;
   const status = incomplete ? "pending" : "complete";
 
