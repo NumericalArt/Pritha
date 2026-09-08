@@ -205,7 +205,6 @@ function githubEscape(value, property = false) {
 function failureText(check) {
   const lines = [
     `${check.name} failed with exit code ${check.exitCode}.`,
-    `Command: ${check.command}`,
   ];
   const stderrContext = failureContext(check.stderr);
   const stdoutContext = failureContext(check.stdout);
@@ -214,6 +213,9 @@ function failureText(check) {
   if (stdoutContext) lines.push(`stdout failure context: ${compactTail(stdoutContext, 2600)}`);
   else if (check.stdout) lines.push(`stdout tail: ${compactTail(check.stdout)}`);
   if (check.error) lines.push(`error: ${check.error}`);
+  // A full unit-test command can exceed the GitHub annotation limit by itself.
+  // Keep the actual failure first and bound diagnostic command text.
+  lines.push(`Command: ${compact(check.command, 800)}`);
   return lines.join("\n");
 }
 

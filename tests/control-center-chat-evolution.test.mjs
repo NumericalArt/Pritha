@@ -37,6 +37,8 @@ export async function fixtureModules() {
 
 test("storage identity survives version/provider changes and canonicalizes symlinks", async () => {
   const f = await fixtureModules();
+  const previousHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = f.root;
   try {
     const m = await f.load("storage-identity");
     const alias = path.join(f.tmp, "alias"); symlinkSync(f.root, alias);
@@ -49,11 +51,13 @@ test("storage identity survives version/provider changes and canonicalizes symli
     assert.equal(m.legacyIdentityMatches(null, "desktop_bundled", ["old-version"], f.root), false);
     assert.equal(m.verifyNativeThreadIdentity({ id: "one", cwd: alias }, "one", f.root), true);
     assert.equal(m.verifyNativeThreadIdentity({ id: "two", cwd: alias }, "one", f.root), false);
-  } finally { f.cleanup(); }
+  } finally { if (previousHome === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = previousHome; f.cleanup(); }
 });
 
 test("recovery verifies native history and preserves original registry, receipts and task links", async () => {
   const f = await fixtureModules();
+  const previousHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = f.state;
   try {
     const { CodexChatPrivateStore } = await f.load("private-store");
     const { CodexChatGateway } = await f.load("gateway");
@@ -89,7 +93,7 @@ test("recovery verifies native history and preserves original registry, receipts
     const original = JSON.parse(readFileSync(path.join(store.root, "identity-migrations", backups[0]), "utf8"));
     assert.deepEqual(original.chats.chat_one, binding);
     assert.deepEqual((await gateway.listTurns("chat_one")).data, []);
-  } finally { f.cleanup(); }
+  } finally { if (previousHome === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = previousHome; f.cleanup(); }
 });
 
 test("local archive preserves active work and deduplicates only verified storage aliases", async () => {
