@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 const systemNames = ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR"];
-const configName = name => name === "PRITHA_STATE_ROOT" || /^[A-Z][A-Z0-9_]*_(?:STATE|PORT)$/.test(name);
+const configName = name => name === "PRITHA_STATE_ROOT" || /^[A-Z][A-Z0-9_]*_(?:STATE|PORT|UI_ORIGIN)$/.test(name);
 function invalid() {
   const error = new Error("Tool-server runtime configuration is invalid; review its declared state, port and environment.");
   error.code = "tool_server_runtime_invalid";
@@ -21,6 +21,14 @@ export function toolServerLaunchEnvironment(manifest, command, parent = process.
     const value = parent[name];
     if (value === undefined) continue;
     if (typeof value !== "string" || value.length > 4096 || /[\0\r\n]/.test(value)) invalid();
+    if (name.endsWith("_UI_ORIGIN") && value !== "") {
+      try {
+        const origin = new URL(value);
+        if (origin.protocol !== "https:" || origin.origin !== value || origin.username || origin.password
+          || origin.pathname !== "/" || origin.search || origin.hash
+          || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.ts\.net$/.test(origin.hostname)) invalid();
+      } catch { invalid(); }
+    }
     env[name] = value;
   }
   return env;
