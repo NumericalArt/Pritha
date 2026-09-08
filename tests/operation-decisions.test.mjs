@@ -4,10 +4,23 @@ import path from "node:path";
 import test from "node:test";
 import { resultReadinessFixture } from "./helpers/result-readiness-fixture.mjs";
 import { apiProcessManifest } from "../scripts/agents-mother/scaffold/api-process.mjs";
+import { toolServerManifest } from "../scripts/agents-mother/scaffold/tool-server.mjs";
 import { readTaskDelivery, performTaskDeliveryAction } from "../scripts/agents-mother/task-delivery.mjs";
 import { planOperationDecision, resolveOperationDecision } from "../scripts/agents-mother/operation-decisions.mjs";
 
 const task = { chatId: "chat_operations", nativeThreadId: "native-operations", providerId: "desktop_bundled", stateIdentityHash: "storage-v2:operations" };
+test("tool-server operation decisions bind the resolved port and declared environment",async t=>{
+  const f=await resultReadinessFixture(t,{project(project){mkdirSync(path.join(project,"operations"));writeFileSync(path.join(project,"operations","manifest.json"),JSON.stringify(toolServerManifest({agentId:"readiness-fixture",agentName:"link-vault",autostart:"disabled",envExampleVariables:"LINK_VAULT_PORT=3432"})));},contract:source=>source.replace("agent_kind: one-shot-cli","agent_kind: tool-server")});
+  const saved=process.env.LINK_VAULT_PORT;process.env.LINK_VAULT_PORT="4567";t.after(()=>{if(saved===undefined)delete process.env.LINK_VAULT_PORT;else process.env.LINK_VAULT_PORT=saved;});
+  let calls=0;const options={...f.options,runtime:{startPlan:async()=>({enabled:true,confirmation:"reviewed"}),accessPlan:async target=>({enabled:target.port===4567}),start:async()=>{calls++;return{ok:true};},serve:async()=>{calls++;return{ok:true};}}};
+  const runId=path.basename(f.runRoot),run=readTaskDelivery(runId,task,f.options);
+  await performTaskDeliveryAction(task,{runId,requestId:"bind-tool",action:"bind",expectedRevision:run.revision},f.options);
+  const plan=await planOperationDecision(task,runId,"start",options);assert.equal(plan.enabled,true);assert.equal(plan.port,4567);assert.match(plan.runtimeBinding,/^[a-f0-9]{64}$/);
+  const access=await planOperationDecision(task,runId,"tailscale-serve",options);assert.equal(access.port,4567);assert.equal(access.enabled,true);
+  process.env.LINK_VAULT_PORT="4568";
+  await assert.rejects(resolveOperationDecision(task,{runId,requestId:"old-port",action:"start",decision:"approve",planLock:plan.planLock},options),/plan changed/i);
+  assert.equal(calls,0);
+});
 test("operation cards bind the canonical revision, cancellation and idempotent execution", async t => {
   const f = await resultReadinessFixture(t, {
     project(project) {

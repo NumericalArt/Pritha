@@ -7,6 +7,7 @@ import { readAgentCatalog, findCatalogAgent, readAgentOperationsManifest, readId
 import { readAgentResultReadiness } from "./result-readiness.mjs";
 import { readTaskDelivery, TaskDeliveryError } from "./task-delivery.mjs";
 import { workspaceRevision } from "./workspace-revision.mjs";
+import { resolveToolServerManifest, toolServerRuntimeBinding } from "./tool-server-runtime.mjs";
 
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const valid = value => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
@@ -22,7 +23,8 @@ export async function planOperationDecision(task, runId, action, options) {
   if (!agent?.projectPath || agent.identityStatus === "conflict") fail("operation_identity_unavailable", "Restore the canonical agent identity first.");
   const operation = readAgentOperationsManifest(agent);
   if (!operation.manifest || operation.issue) fail("operation_manifest_unavailable", "Review the agent's operations manifest first.");
-  const manifest = operation.manifest;
+  const manifest = resolveToolServerManifest(operation.manifest);
+  const runtimeBinding = toolServerRuntimeBinding(manifest);
   const revision = workspaceRevision(agent.projectPath, { requireComplete: true });
   const readiness = readAgentResultReadiness(agent.agentId, input);
   // Operator-judged Trials may require starting the service. Fresh machine
@@ -45,7 +47,8 @@ export async function planOperationDecision(task, runId, action, options) {
   const bound = { task: { chatId: task.chatId, nativeThreadId: task.nativeThreadId, providerId: task.providerId, stateIdentityHash: task.stateIdentityHash },
     instanceKey: agent.instanceKey, runId, runRevision: run.revision, agentId: agent.agentId,
     projectRevision: revision, manifestHash: hash(manifest), action, port, healthPath,
-    enabled, confirmation: preview?.confirmation || "", runtimeLock: preview?.lock || null };
+    enabled, confirmation: preview?.confirmation || "", runtimeLock: preview?.lock || null,
+    ...(runtimeBinding ? { runtimeBinding } : {}) };
   let pendingRequest = null;
   const pendingFile = resolvePrithaStatePathFrom(input, "audit", "operation-decisions", `${hash([task.stateIdentityHash, runId])}-pending.json`);
   if (existsSync(pendingFile)) {

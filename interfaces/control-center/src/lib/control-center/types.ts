@@ -112,6 +112,7 @@ export type ControlCenterAgentCredentials = {
 };
 
 export type ControlCenterAgentControl = {
+  runtimeBinding?: string;
   runtimeKind: ControlCenterAgentRuntimeKind;
   ownership: "managed" | "adoptable" | "unmanaged" | "external" | "none";
   primaryCardAction: ControlCenterCardAction;

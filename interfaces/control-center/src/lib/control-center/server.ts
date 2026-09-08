@@ -53,6 +53,7 @@ import type {
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
 import { runAsyncProbe, createProbeCache, sharedProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
 import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
+import { resolveToolServerManifest, toolServerLaunchEnvironment, toolServerRuntimeBinding } from "../../../../../scripts/agents-mother/tool-server-runtime.mjs";
 import { deliveryStateView } from "./delivery-state";
 import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
 
@@ -94,6 +95,10 @@ type OperationsCredentialDefinition = {
 };
 
 type OperationsManifest = {
+  agent_kind?: string;
+  agent_id?: string;
+  ui_port?: number;
+  ui_port_env?: string;
   agent?: string;
   display_name?: string;
   version?: string | number;
@@ -1542,6 +1547,10 @@ function findSiblingFolder(root: string, agentId: string) {
 }
 
 function localHealthUrls(manifest: OperationsManifest | null) {
+  if (manifest?.agent_kind === "tool-server") {
+    try { const resolved = resolveToolServerManifest(manifest); return resolved.health_url ? [resolved.health_url] : []; }
+    catch { return []; }
+  }
   const urls = new Set<string>();
   if (manifest?.health_url) urls.add(manifest.health_url);
   if (manifest?.local_upstream_url) {
@@ -1563,7 +1572,22 @@ async function probeHealth(manifest: OperationsManifest | null) {
         method: "GET",
         cache: "no-store",
         signal: AbortSignal.timeout(650),
+        ...(manifest?.agent_kind === "tool-server" ? { redirect: "error" as const } : {}),
       });
+      if (response.ok && manifest?.agent_kind === "tool-server") {
+        const reader = response.body?.getReader();
+        if (!reader || !manifest.agent_id) { await reader?.cancel(); continue; }
+        const chunks: Uint8Array[] = []; let size = 0, tooLarge = false;
+        while (true) {
+          const item = await reader.read(); if (item.done) break;
+          size += item.value.byteLength;
+          if (size > 16_384) { tooLarge = true; await reader.cancel(); break; }
+          chunks.push(item.value);
+        }
+        if (tooLarge) continue;
+        const identity = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        if (identity.agent_id !== manifest.agent_id) continue;
+      }
       if (response.ok) return { status: "ok" as const, checkedUrl: url, detail: `HTTP ${response.status}` };
     } catch {
       // Try the next health candidate.
@@ -1689,6 +1713,14 @@ function validateStructuredOperationsCommand(params: {
       continue;
     }
     if (process.env[name] !== undefined) env[name] = process.env[name];
+  }
+
+  if (params.manifest?.agent_kind === "tool-server") {
+    try {
+      if (toolServerRuntimeBinding(params.manifest) !== params.agent.control.runtimeBinding) errors.push("Tool-server operation plan changed; review a fresh plan.");
+      for (const name of Object.keys(env)) delete env[name];
+      Object.assign(env, toolServerLaunchEnvironment(params.manifest, command));
+    } catch { errors.push("Tool-server runtime configuration is invalid."); }
   }
 
   if (params.action === "start" && command.background) {
@@ -2114,7 +2146,8 @@ function buildAgentControl(
     runtimeKind,
     ownership,
     executionMode: "plan_only" as const,
-    confirmationRequired: manifest?.control_center_contract?.confirmation_required !== false,
+    confirmationRequired: manifest?.agent_kind === "tool-server" || manifest?.control_center_contract?.confirmation_required !== false,
+    ...(manifest?.agent_kind === "tool-server" ? { runtimeBinding: toolServerRuntimeBinding(manifest) } : {}),
     commandReadiness,
   };
   const canExecuteStart = ownership === "managed" && commandReadiness.start === "structured_executable";
@@ -2234,7 +2267,9 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
     }),
   ]);
   const manifestRead = projectMetadata.manifest;
-  const manifest = manifestRead.manifest as OperationsManifest | null;
+  let manifest = manifestRead.manifest as OperationsManifest | null;
+  try { manifest = resolveToolServerManifest(manifest); toolServerRuntimeBinding(manifest); }
+  catch { manifest = null; manifestRead.issue = "tool-server-runtime-invalid"; }
   const applicability = agentOperationsApplicability(record, manifest, { root });
   const noRuntimeRequired = Boolean(folder && !manifest && applicability.manifestRequired === false && !manifestRead.issue);
   const health = folder ? await probeHealth(manifest) : { status: "not_checked" as const, detail: "Missing folder" };
@@ -2731,7 +2766,7 @@ function baseOperatorChecks(agent: ControlCenterAgent): ControlCenterOperatorAct
 }
 
 function operatorActionPhrase(agent: ControlCenterAgent, action: ControlCenterOperatorAction) {
-  return `${action.toUpperCase()} ${agent.id}`;
+  return `${action.toUpperCase()} ${agent.id}${agent.control.runtimeBinding ? ` ${agent.control.runtimeBinding}` : ""}`;
 }
 
 function controlForAction(agent: ControlCenterAgent, action: ControlCenterOperatorAction): ControlCenterAgentControl {
@@ -3048,9 +3083,12 @@ function blockedOperatorActionResult(params: {
 function operationManifestForAgent(root: string, agent: ControlCenterAgent) {
   const folder = findSiblingFolder(root, agent.id);
   if (!folder) return { folder: null, manifest: null };
+  let manifest: OperationsManifest | null;
+  try { manifest = resolveToolServerManifest(readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json"))); }
+  catch { manifest = null; }
   return {
     folder,
-    manifest: readJson<OperationsManifest>(path.join(folder.absolutePath, "operations", "manifest.json")),
+    manifest,
   };
 }
 
@@ -3106,7 +3144,8 @@ async function executeStructuredAgentCommand(params: {
   if (params.command.background && params.action === "start") {
     const child = spawn(argv[0], argv.slice(1), {
       cwd: params.cwd,
-      env: { ...process.env, ...params.env },
+      // Next augments ProcessEnv with NODE_ENV; a restricted child environment need not inherit it.
+      env: (params.manifest?.agent_kind === "tool-server" ? params.env : { ...process.env, ...params.env }) as NodeJS.ProcessEnv,
       detached: true,
       stdio: "ignore",
       shell: false,
@@ -3153,7 +3192,7 @@ async function executeStructuredAgentCommand(params: {
 
   const result = spawnSync(argv[0], argv.slice(1), {
     cwd: params.cwd,
-    env: { ...process.env, ...params.env },
+    env: (params.manifest?.agent_kind === "tool-server" ? params.env : { ...process.env, ...params.env }) as NodeJS.ProcessEnv,
     encoding: "utf8",
     timeout: params.timeoutMs,
     shell: false,
@@ -3219,7 +3258,7 @@ export async function runAgentRuntimeAction(
       plan,
       generatedAt,
       resultStatus: "pending_confirmation",
-      errors: [`Confirmation phrase mismatch. Required phrase: ${requiredPhrase}`],
+      errors: [agent.control.runtimeBinding ? "Tool-server operation plan changed; review a fresh plan." : `Confirmation phrase mismatch. Required phrase: ${requiredPhrase}`],
       warnings: ["No runtime command was executed."],
     });
     appendManualCheckAudit(status, result);

@@ -42,6 +42,7 @@ async function fixture(t) {
     import { createHash } from 'node:crypto';
     import { readAgentCatalog as catalog, readCatalogArtifact as artifact, findCatalogAgent, readIdentityEvidence } from ${JSON.stringify(identityUrl)};
     import { deliveryStateView } from ${JSON.stringify(deliveryUrl)};
+    import { resolveToolServerManifest } from ${JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/tool-server-runtime.mjs")).href)};
     const context = ${JSON.stringify({ root, stateRoot, agentParent, memoryRoot })};
     const readAgentCatalog = (options) => catalog({ ...options, ...context });
     const readCatalogArtifact = (agent, file) => artifact(agent, file, context);

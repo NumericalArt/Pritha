@@ -7,6 +7,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { isPrithaCodeCheckout, resolvePrithaAgentParent, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolveToolServerManifest } from "./agents-mother/tool-server-runtime.mjs";
 
 const ROOT = resolveTechscopeRoot({ cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
@@ -201,7 +202,7 @@ function siblingAgentApps() {
   for (const folder of folders) {
     if (path.resolve(folder.absolutePath) === path.resolve(ROOT)) continue;
     const manifestPath = path.join(folder.absolutePath, "operations", "manifest.json");
-    const manifest = readJsonIfExists(manifestPath);
+    const manifest = resolveToolServerManifest(readJsonIfExists(manifestPath));
     const local = localHttpUrl(manifest?.local_upstream_url);
     if (!local) continue;
     items.push({
