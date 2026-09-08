@@ -668,3 +668,31 @@ test('new isolated chats narrow configured full access into independent workspac
     assert.equal((await gateway.store.get(configured.detail.thread.chatId)).sandbox,'danger-full-access');assert.equal(requests.at(-1).cwd,a.workspace.source);
   }finally{f.cleanup();}
 });
+
+test('separate paginated history cannot interrupt a live turn or release its resource claims',async()=>{
+ const f=await fixtureModules();let gateway;
+ try {
+  const native={id:'history-live-native',cwd:f.root,status:'idle',turns:[]};
+  const connection={generation:'fixture',isRunning:()=>true,markThreadLoaded:()=>{},ensureThreadLoaded:async()=>{},request:async(method,params)=>{
+   if(method==='thread/start')return {thread:native};
+   if(method==='turn/start'){const turn={id:'history-live-turn',status:'inProgress',items:[{id:'user',type:'userMessage',clientId:params.clientUserMessageId,content:params.input}]};native.turns=[turn];native.status='active';return {turn};}return {};
+  }};
+  gateway=await coordinatedGateway(f,connection,native);
+  const created=await gateway.createThreadWithFirstTurn({clientThreadId:randomUUID(),source:'chat',initialTurn:{clientMessageId:randomUUID(),input:[{type:'text',text:'still running'}]}});
+  const chatId=created.data.detail.thread.chatId,binding=await gateway.store.get(chatId);
+  const {HistoryReader}=await f.load('history-reader');gateway.historyReader=new HistoryReader();
+  gateway.runtime.provider=async()=>({view:{stateIdentityHash:'storage-v2:fixture',availability:'ready',version:'test',capabilities:{fullChat:true,historyPagination:true}}});
+  const interrupted={...native.turns[0],status:'interrupted'};
+  native.cwd=binding.workspace.cwd;
+  gateway.runtime.historyRequest=async (_provider,method)=>method==='thread/read'?{thread:{...native,status:{type:'notLoaded'},turns:undefined}}:{data:[interrupted],nextCursor:null};
+  const owners=gateway.store.execution.claims().filter(row=>row.kind!=='metadata').length;
+  assert.ok(owners>0);
+  const page=await gateway.historyPage(chatId,undefined,1);
+  assert.equal(page.data[0].status,'in_progress');
+  assert.equal(gateway.store.execution.claims().filter(row=>row.kind!=='metadata').length,owners);
+  await gateway.reconcileExecutions(binding,{...native,status:{type:'notLoaded'},turns:[interrupted]});
+  assert.equal(gateway.store.execution.claims().filter(row=>row.kind!=='metadata').length,owners);
+  native.turns[0].status='completed';native.status='idle';await gateway.reconcileExecutions(binding,native);
+  assert.equal(gateway.store.execution.claims().filter(row=>row.kind!=='metadata').length,0);
+ }finally{if(gateway){gateway.queueStopped=true;clearTimeout(gateway.queueTimer);for(const id of gateway.activeTurns.keys())gateway.releaseActiveTurn(id);}f.cleanup();}
+});

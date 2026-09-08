@@ -1015,9 +1015,9 @@ export class CodexChatGateway {
               const before = Date.now();
               try {
                 const response = await this.runtime.historyRequest(binding.providerId, method, params, until);
-                if (method === "thread/turns/list" && Array.isArray(asObject(response)?.data)) await this.reconcileExecutions(binding, {turns:asObject(response)!.data});
-                if (method === "thread/read" && Array.isArray(asObject(asObject(response)?.thread)?.turns)) await this.reconcileExecutions(binding, asObject(asObject(response)?.thread)!);
-                return response;
+                // A separate history connection reconstructs open rollouts as
+                // interrupted. Its snapshots must never release execution owners.
+                return this.executionAwareHistory(binding, method, response);
               }
               finally { runtimeReadMs += Date.now() - before; }
             };
@@ -1044,6 +1044,23 @@ export class CodexChatGateway {
         throw new HistoryError("history_unavailable", "History could not be read from the selected runtime.", 503, true);
       } finally { if (timer) clearTimeout(timer); }
     });
+  }
+
+  private executionAwareHistory(binding: ChatBinding, method: string, response: unknown) {
+    const live = this.store.execution.listIntents({states:["dispatching","running"],limit:1000})
+      .filter(row => (row.kind === "turn" || row.kind === "voice-turn")
+        && row.nativeThreadId === binding.nativeThreadId
+        && (row.stateIdentityHash || row.storage) === binding.stateIdentityHash);
+    const pending = new Set(live.map(row=>String(row.nativeTurnId || "")).filter(Boolean));
+    const overlay = (value: unknown) => {
+      const turn = asObject(value);
+      return turn && pending.has(String(turn.id)) ? {...turn,status:"inProgress",completedAt:null} : value;
+    };
+    const data = asObject(response);
+    if (method === "thread/turns/list" && Array.isArray(data?.data)) return {...data,data:data.data.map(overlay)};
+    const thread = asObject(data?.thread);
+    if (method === "thread/read" && Array.isArray(thread?.turns)) return {...data,thread:{...thread,turns:thread.turns.map(overlay)}};
+    return response;
   }
 
   historyPage(chatId: string, cursor?: string, limit = 20) {
@@ -1460,6 +1477,9 @@ export class CodexChatGateway {
 
   private async reconcileExecutions(binding: ChatBinding, thread: Record<string, unknown>) {
     if (!this.store.execution || !Array.isArray(thread.turns)) return;
+    // A newly opened runtime can read persisted history without owning the live
+    // thread. In particular its synthesized interruption is not terminal proof.
+    if (threadStatusFromNative(thread.status) === "not_loaded") return;
     if(this.store.execution.listIntents({kind:"native-request",states:["pending","unknown"],limit:1}).length)expireCompletedNativeRequests(binding.stateIdentityHash!,binding.nativeThreadId,new Set(thread.turns.map(asObject).filter(turn=>turn && ["completed","interrupted","failed"].includes(String(turn.status))).map(turn=>String(turn?.id))));
     if(this.store.execution.listIntents({kind:"voice-turn",states:["dispatching","running","unknown"],limit:1000}).some(row=>row.storage===binding.stateIdentityHash && row.nativeThreadId===binding.nativeThreadId)) {
       const {recoverVoiceNativeTurns}=await import("../realtime/codex-task/codex-app-server-client");

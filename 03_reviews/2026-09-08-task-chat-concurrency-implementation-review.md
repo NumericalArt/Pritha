@@ -168,3 +168,12 @@ Strict health отклоняет отрицательный результат �
 checks успешной/неуспешной загрузки и отказа strict checker. Итоговый release pin,
 проверка compiled activity/native-turn API и per-instance результаты фиксируются
 в окончательном deployment receipt; предыдущий rc2 не является готовым release.
+
+Compiled native-turn smoke дополнительно воспроизвёл конфликт отдельного
+history transport: open rollout возвращался как `interrupted`, хотя исходный
+App Server продолжал turn. History responses теперь только отображаются с
+учётом durable running intents и не освобождают Direct/Voice leases. Native
+`notLoaded` read также не считается подтверждением завершения. Освобождение
+остаётся за исходным execution owner и проверенным loaded-thread reconciliation.
+Регрессионный тест проверяет одновременно статус, сохранение claims при чтении
+истории и освобождение после подтверждённого завершения владельцем.
