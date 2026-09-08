@@ -1,5 +1,6 @@
 import { canonicalPatternResearchSeed, parsePatternPackSeeds } from "./pattern-research.mjs";
 import { normalizeGitHubRepositoryUrl } from "../lib/github-repository-radar.mjs";
+import { scaffoldCapability } from "./scaffold/capabilities.mjs";
 
 function compact(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -95,12 +96,19 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
   const repositoryAdoptionMode = String(data.repositoryAdoptionMode || "none").trim();
   const kind = typeof data.agentKind === "string" ? data.agentKind : data.agentKind?.kind;
   const toolServer = kind === "tool-server" && runtime === "cli" && /^(mcp(?:\s+stdio)?|stdio|tool-server|tool server)$/i.test(String(data.primaryInterface || "").trim());
+  const hybridEditor = scaffoldCapability(data).adapter === "hybrid-editor-process-v1";
 
-  if ((runtime === "api" || toolServer) && serviceMode === "process") {
+  if ((runtime === "api" || toolServer || hybridEditor) && serviceMode === "process") {
     pushTopic(topics, "node-http-runtime", "Node.js HTTP process service and host APIs",
-      toolServer ? "Node.js LTS HTTP DNS filesystem locking child_process lifecycle Windows macOS Linux documentation" : "Node.js current HTTP server lifecycle os fs statfs child_process execFile documentation",
+      toolServer || hybridEditor ? "Node.js LTS HTTP DNS filesystem locking child_process lifecycle Windows macOS Linux documentation" : "Node.js current HTTP server lifecycle os fs statfs child_process execFile documentation",
       "Explicit API process service requires HTTP/runtime evidence, without implying a model SDK.",
       { preferredSources: ["official-docs", "changelog"] });
+  }
+  if (hybridEditor) {
+    pushTopic(topics, "codex-editor-isolation", "Codex CLI tool-free editorial subprocess",
+      "Codex CLI current configuration disable tools shell network isolated credentials output schema",
+      "Hybrid editor receives only bounded sanitized evidence; verify tool, filesystem and credential isolation plus unavailable fallback.",
+      { preferredSources: ["official-docs", "official-repository", "security-docs"] });
   }
   if ((runtime === "api" && serviceMode !== "process") || /\bopenai agents sdk\b|\bagents sdk\b/.test(text)) {
     pushTopic(
@@ -160,7 +168,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
       "Model Context Protocol current specification stdio server discovery backward compatibility tools JSON Schema errors",
       "Explicit deterministic MCP provider; no client connector installation, authentication or model SDK is implied.",
       { preferredSources: ["official-docs", "specification", "security-docs"] });
-  } else if (/\b(mcp|model context protocol|connector|apps sdk|mcp app)\b/.test(text)) {
+  } else if (!hybridEditor && /\b(mcp|model context protocol|connector|apps sdk|mcp app)\b/.test(text)) {
     pushTopic(
       topics,
       "mcp-connectors",
@@ -171,7 +179,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  if (/\b(embeddings|semantic search|vector|qdrant|lancedb|neo4j|kuzu|rag)\b/.test(text)) {
+  if (!hybridEditor && /\b(embeddings|semantic search|vector|qdrant|lancedb|neo4j|kuzu|rag)\b/.test(text)) {
     pushTopic(
       topics,
       "memory-rag-storage",
@@ -181,7 +189,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  if (/\b(web ui|next\.js|react|browser|api|webhook|public endpoint|external service)\b/.test(text)) {
+  if (hybridEditor || /\b(web ui|next\.js|react|browser|api|webhook|public endpoint|external service)\b/.test(text)) {
     pushTopic(
       topics,
       "interface-runtime-security",
@@ -202,13 +210,13 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
       topics,
       "operations-deployment",
       "Operations, deployment and proactive execution constraints",
-      toolServer ? "Node.js cross platform process lifecycle graceful shutdown Windows signal documentation no autostart" : "current macOS launchd cron service deployment agent safety background scheduler best practices",
+      toolServer || hybridEditor ? "Node.js POSIX process lifecycle graceful shutdown ownership manual start stop Tailscale Serve private HTTPS documentation no autostart" : "current macOS launchd cron service deployment agent safety background scheduler best practices",
       "Service, autostart, deployment or proactive execution selected.",
       { preferredSources: ["official-docs", "security-docs", "trusted-secondary"] },
     );
   }
 
-  if (/\b(untrusted|external messages|email|telegram posts|links|uploads|files|screenshots|media|transcripts)\b/.test(text)) {
+  if (hybridEditor || /\b(untrusted|external messages|email|telegram posts|links|uploads|files|screenshots|media|transcripts)\b/.test(text)) {
     pushTopic(
       topics,
       "untrusted-input-security",

@@ -22,6 +22,7 @@ import { withChildTests } from "./tests.mjs";
 import { selectedScaffoldModules } from "./modules.mjs";
 import { headlessCliFiles } from "./headless-cli.mjs";
 import { apiProcessFiles, apiProcessManifest } from "./api-process.mjs";
+import { hybridProcessFiles, hybridProcessManifest } from "./hybrid-process.mjs";
 import { toolServerFiles, toolServerManifest } from "./tool-server.mjs";
 
 const ROOT = resolveTechscopeRoot();
@@ -147,6 +148,7 @@ function usesRealtimeVoice(data) {
 }
 
 function memoryProfileFor(data) {
+  if (scaffoldCapability(data).adapter === "hybrid-editor-process-v1") return "structured-json";
   const memoryText = String(data.memoryModel || "").toLowerCase();
   if (data.runtimeFamily === "api" && data.serviceMode === "process" && memoryText.trim() === "ephemeral") return "ephemeral";
   const indexText = String(data.indexingSearchNeeds || "").toLowerCase();
@@ -160,6 +162,11 @@ function memoryProfileFor(data) {
 
 function memoryProfileDetails(profile) {
   const profiles = {
+    "structured-json": {
+      directories: [],
+      description: "Child-owned bounded JSON application state; no Pritha memory, indexes, embeddings or external store.",
+      generated_files: ["memory/README.md", "memory/manifest.json"],
+    },
     ephemeral: {
       directories: [],
       description: "Bounded process-memory state only; no persistent memory, database, indexes or embeddings.",
@@ -1193,6 +1200,7 @@ LOG_LEVEL=info
   const capability = scaffoldCapability(data);
   if (capability.adapter === "headless-cli-v1") return withChildTests(headlessCliFiles(files, data, capability, selected), capability);
   if (capability.adapter === "api-process-v1") return withChildTests(apiProcessFiles(files, data, capability, selected), capability);
+  if (capability.adapter === "hybrid-editor-process-v1") return withChildTests(hybridProcessFiles(files, data, capability), capability);
   if (capability.adapter === "tool-server-stdio-v1") return withChildTests(toolServerFiles(files, data, capability, selected), capability);
   return withChildTests(files, capability);
 }
@@ -1287,8 +1295,9 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   const toolServer = capability.adapter === "tool-server-stdio-v1";
   const headless = capability.adapter === "headless-cli-v1" || (toolServer && !capability.interfaces.includes("web"));
   const toolEntry = toolServer ? toolServerManifest(data, capability).mcp.argv[1] : null;
-  const apiProcess = capability.adapter === "api-process-v1" || toolServer;
-  const apiManifest = toolServer ? toolServerManifest(data, capability) : apiProcess ? apiProcessManifest(data) : null;
+  const hybridProcess = capability.adapter === "hybrid-editor-process-v1";
+  const apiProcess = capability.adapter === "api-process-v1" || toolServer || hybridProcess;
+  const apiManifest = hybridProcess ? hybridProcessManifest(data) : toolServer ? toolServerManifest(data, capability) : apiProcess ? apiProcessManifest(data) : null;
   const controlCenterServiceMode = headless ? "none" : operationProfile.serviceMode === "none" ? "manual" : operationProfile.serviceMode;
   const controlCenterPort = stableLocalPort(agentSlug);
   const controlCenterLocalUrl = headless ? "not-applicable" : apiProcess ? apiManifest.local_upstream_url : `http://127.0.0.1:${controlCenterPort}`;
@@ -1335,7 +1344,7 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
     telegramApplicable_Telegram: `${telegramApplicable ? "Telegram" : "CLI"}`,
     controlCenterServiceMode_launchd: `${controlCenterServiceMode === "launchd" ? "launchd" : "operations"}`,
     data_runtimeFamily: `${yamlScalar(data.runtimeFamily || "codex-native")}`,
-    headless_adapter: `${toolServer ? "portable" : headless ? "adapter-needed" : "codex-native"}`,
+    headless_adapter: `${toolServer || hybridProcess ? "portable" : headless ? "adapter-needed" : "codex-native"}`,
     data_relPath: `${yamlScalar(data.relPath)}`,
     research_path: `${research.path ? `  - ${yamlScalar(research.path)}\n` : ""}`,
     data_relPath_2: `${yamlScalar(data.relPath)}`,

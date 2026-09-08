@@ -30,6 +30,20 @@ export function scaffoldCapability(data = {}) {
     primaryInterface: primary, interfaces, operationsSelected: !noManagedOperations, readinessScope: "scaffold-only" };
   const unsupported = (reason, nextAction) => ({ ...base, supported: false, adapter: null, reason, nextAction });
   if (!runtimeFamilies.has(runtime)) return unsupported("runtime-unknown", "Choose a supported runtime in a reviewed contract revision.");
+  if (runtime === "hybrid" && data.serviceMode === "process") {
+    const kind = typeof data.agentKind === "string" ? data.agentKind : data.agentKind?.kind;
+    if (kind !== "service" || primary !== "web"
+      || !interfaces.includes("telegram") || interfaces.some(name => !["web", "telegram"].includes(name))
+      || data.telegramMode !== "operator-control" || data.runtimePlacementProfile !== "deterministic-first"
+      || !["none", "manual"].includes(data.proactiveMode)
+      || !["disabled", "optional"].includes(data.autostart)
+      || data.repositoryAdoptionMode !== "none" || data.skillNeeds !== "none" || data.mcpNeeds !== "none"
+      || !/^(?:structured-json|bounded atomic json state)(?:$|[;,])/i.test(String(data.memoryModel || ""))
+      || !/^high\b/i.test(String(data.untrustedInputPolicy || ""))) {
+      return unsupported("hybrid-process-combination-adapter-missing", "The editor-only hybrid adapter requires an explicit service, web plus Telegram operator-control, deterministic-first placement, bounded atomic JSON state, high untrusted-input policy, no skills/MCP/repository adoption, manual/no proactivity and disabled/optional autostart.");
+    }
+    return { ...base, supported: true, adapter: "hybrid-editor-process-v1", reason: "editor-only-process-service-scaffold", nextAction: "Implement the approved deterministic service and tool-free editor; independently verify input, approval and fallback boundaries. Scaffold starts no process or integration." };
+  }
   if (primary === "mcp-stdio") {
     const kind = typeof data.agentKind === "string" ? data.agentKind : data.agentKind?.kind;
     const web = interfaces.includes("web");

@@ -1,6 +1,6 @@
 // These are child-owned engineering tests, never host-owned Outcome Trials.
 export function withChildTests(files, capability) {
-  const portable = capability.adapter === "tool-server-stdio-v1";
+  const portable = ["tool-server-stdio-v1", "hybrid-editor-process-v1"].includes(capability.adapter);
   const required = files.map(file => file.path).sort();
   if (portable) required.push("scripts/run-tests.mjs");
   const testFiles = ["tests/structure.test.mjs", ...(capability.adapter === "api-process-v1" ? ["tests/service-lifecycle.test.mjs"] : [])];
