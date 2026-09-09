@@ -28,11 +28,12 @@ type CodexAuthStatus = {
 
 function availabilityLabel(status?: AvailabilityStatus) {
   if (!status) return "Loading";
+  if (typeof status.available !== "boolean") return "Unknown";
   return status.available ? "Ready" : "Unavailable";
 }
 
 function availabilityClass(status?: AvailabilityStatus) {
-  if (!status) return "unknown";
+  if (typeof status?.available !== "boolean") return "unknown";
   return status.available ? "alive" : "missing";
 }
 

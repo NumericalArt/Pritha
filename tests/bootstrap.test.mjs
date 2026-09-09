@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { isolatedProject } from "./helpers/isolated-project.mjs";
 
 function runBootstrap(args) {
   return spawnSync("node", ["scripts/bootstrap.mjs", ...args], {
@@ -58,14 +59,26 @@ test("bootstrap start target pulls in Control Center install and foreground star
   assert.equal(payload.steps.some((step) => /launchd|cron/i.test(step.commandText || step.detail || "")), false);
 });
 
-test("bootstrap verify minimal performs read-only prerequisite checks", () => {
-  const result = runBootstrap(["verify", "--profile", "minimal", "--json"]);
+test("bootstrap verify minimal performs read-only prerequisite checks", t => {
+  const fixture = isolatedProject(t, { bootstrap: true });
+  const result = fixture.run("scripts/bootstrap.mjs", ["verify", "--profile", "minimal", "--json"]);
   assert.equal(result.status, 0, result.stderr || result.stdout);
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.status, "pass");
   assert.deepEqual(payload.phases, ["verify"]);
   assert.ok(payload.steps.every((step) => step.writes === false));
   assert.ok(payload.steps.some((step) => step.id === "validate-memory" && step.status === "pass"));
+  assert.equal(payload.root, fixture.root);
+});
+
+test("bootstrap verify rejects invalid fixture memory", t => {
+  const fixture = isolatedProject(t, { bootstrap: true });
+  fixture.write("02_briefs/fixture.md", "# Missing required frontmatter\n");
+  const result = fixture.run("scripts/bootstrap.mjs", ["verify", "--profile", "minimal", "--json"]);
+  assert.equal(result.status, 1, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.status, "fail");
+  assert.ok(payload.steps.some(step => step.id === "validate-memory" && step.status === "fail" && /missing YAML frontmatter/.test(step.stderr)));
 });
 
 test("query-memory stats tolerates minimal memory index without embeddings", () => {
@@ -90,7 +103,7 @@ test("query-memory stats tolerates minimal memory index without embeddings", () 
 
     const result = spawnSync("node", ["scripts/query-memory.mjs", "stats"], {
       encoding: "utf8",
-      env: { ...process.env, TECHSCOPE_ROOT: root },
+      env: { ...process.env, TECHSCOPE_ROOT: root, PRITHA_STATE_ROOT: root },
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /embeddings\s+0/);

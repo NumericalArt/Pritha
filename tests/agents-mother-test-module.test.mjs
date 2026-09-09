@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { isolatedProject } from "./helpers/isolated-project.mjs";
 import {
   detectProject,
   fileExists,
@@ -84,11 +84,13 @@ test("project metadata reads reject traversal, symlinks and oversized files", ()
   }
 });
 
-test("Agents Mother test command still supports no-report mode through wrapper and direct entrypoint", () => {
+test("Agents Mother test command still supports no-report mode through wrapper and direct entrypoint", t => {
+  const fixture = isolatedProject(t);
   for (const entrypoint of ["scripts/agents-mother.mjs", "scripts/agents-mother/index.mjs"]) {
-    const result = spawnSync("node", [entrypoint, "test", ".", "--no-report"], { encoding: "utf8" });
+    const result = fixture.run(entrypoint, ["test", ".", "--no-report"]);
     assert.equal(result.status, 0, `${entrypoint}\n${result.stdout}\n${result.stderr}`);
     assert.match(result.stdout, /Classification: agent-project/);
     assert.match(result.stdout, /Report: skipped \(--no-report\)/);
   }
+  fixture.assertNoReports();
 });

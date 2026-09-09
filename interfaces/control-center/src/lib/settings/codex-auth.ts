@@ -15,12 +15,12 @@ function runCodexVersion() {
   };
 }
 
-export function getCodexAuthStatus() {
+export async function getCodexAuthStatus() {
   const root = resolveTechscopeRoot();
   const cli = runCodexVersion();
   const codexAppBin = resolveCodexAppBinary();
   const appServer = codexAppBin
-    ? checkCodexAppServerAvailable(codexAppBin, root)
+    ? await checkCodexAppServerAvailable(codexAppBin, root)
     : { available: false, detail: "Codex desktop bundled binary is unavailable." };
   return {
     codexBin: resolveCodexCliBinary(),

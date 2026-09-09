@@ -5,5 +5,5 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ ok: true, codex: getCodexAuthStatus() });
+  return NextResponse.json({ ok: true, codex: await getCodexAuthStatus() });
 }
