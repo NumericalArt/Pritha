@@ -3,7 +3,7 @@ id: control-center-staged-release
 type: workflow
 status: active
 created: 2026-08-27
-updated: 2026-09-06
+updated: 2026-09-09
 topics:
   - control-center
   - staged-release
@@ -25,10 +25,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-08-27
-source_updated: 2026-09-06
-source_version: control-center-staged-release-v2; required page/chunk and build-identity gate
+source_updated: 2026-09-09
+source_version: control-center-staged-release-v3; admission and operational verification
 retrieved: 2026-08-27
-verified: 2026-09-06
+verified: 2026-09-09
 valid_for: Pritha Control Center production and fleet releases
 temporal_status: current
 memory_domain: pritha-self
@@ -81,6 +81,35 @@ transaction after the separate lifecycle approval exists:
    same-origin JavaScript chunk; HTML without chunks is a failure;
 9. re-check Git and instance isolation;
 10. remove the displaced build only after all checks pass.
+
+The updater's process/build checks do not finish the operator's release check:
+complete admission activation and operational verification below before
+reporting success. For a manual staged transaction retain the previous build
+until these additional checks pass.
+
+Managed stop pauses task admission. Starting a process does not clear that
+pause. After a release, rollback or an approved restart of an instance that
+was accepting tasks, complete the transaction explicitly:
+
+```sh
+node scripts/execution-control.mjs activate --yes --expected-build <verified-BUILD_ID>
+node scripts/control-center-health.mjs --port <instance-port> --strict --operational --json
+```
+
+Activation verifies the live build and its page/chunk health before admitting
+tasks. Do not call a release complete while admission remains paused. Preserve
+an intentional pre-existing operator pause. The operational checker is for
+instances with the execution-coordinator and Codex Chat v1 activity API; older
+or different runtime families need their own equivalent checks.
+
+Operational verification reads task admission, runtime availability, agent
+identities and project metadata, the chat list and one existing history page.
+It does not create a task or send a message. HTTP 200 and valid JavaScript alone
+do not establish that these features work. Check desktop/mobile navigation as
+well. When correcting authored metadata, compare the agent catalog before and
+after the edit: a syntactically valid `subject.id` can still introduce a second
+identity for an existing project. Preserve the identifier from its accepted
+contract and verify that its project binding remains unique.
 
 If any check fails, boot out the current service, restore the displaced build
 and previous private service state, restart that instance, verify rollback

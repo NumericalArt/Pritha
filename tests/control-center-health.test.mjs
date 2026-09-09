@@ -192,3 +192,39 @@ for (const runtimeReady of [true, false]) test(`health checks compiled SQLite re
     assert.equal(payload.checks.find(check=>check.id==='execution-runtime').status,runtimeReady?'pass':'fail');
   });
 });
+
+for (const failure of [null, "task-admission", "task-runtime", "agent-catalog", "agent-metadata", "chat-list", "chat-history"]) {
+  test(`operational health checks application behavior without sending a message: ${failure || "ready"}`, async () => {
+    const requests = [];
+    await withServer((request, response) => {
+      requests.push({ method: request.method, url: request.url });
+      if (request.url === "/api/health") return jsonResponse(response, 200, {
+        schema: "pritha-control-center-health-v2", ok: true, service: "pritha-control-center", status: "ready",
+        instance: { id: "fixture", role: "developer", port: Number(request.headers.host.split(":").at(-1)) },
+        release: { commit: "abcdef123456", buildId: "fixture-build" }, execution: { protocol: 1, runtimeReady: true },
+      });
+      if (request.url === "/api/codex-chat/v1/activity") return jsonResponse(response, 200, { data: { admissionEnabled: failure !== "task-admission" } });
+      if (request.url === "/api/codex-chat/v1/runtime") return jsonResponse(response, 200, { data: { availability: failure === "task-runtime" ? "unavailable" : "ready" } });
+      if (request.url === "/api/agents") return jsonResponse(response, 200, { ok: true, agents: [
+        { identity: { status: failure === "agent-catalog" ? "conflict" : "identified" },
+          operations: { status: failure === "agent-metadata" ? "not_installed" : "disabled" },
+          credentials: { warnings: failure === "agent-metadata" ? ["Child-project credential metadata could not be read within the host policy."] : [] } },
+      ] });
+      if (request.url.startsWith("/api/codex-chat/v1/threads?")) return jsonResponse(response, 200,
+        failure === "chat-list" ? {} : { data: { data: [{ chatId: "chat_private_fixture", preview: "PRIVATE_CONTENT" }] } });
+      if (request.url === "/api/codex-chat/v1/threads/chat_private_fixture/history?limit=1") return jsonResponse(response,
+        failure === "chat-history" ? 503 : 200, { data: { data: [{ text: "PRIVATE_CONTENT" }] } });
+      if (request.url === "/_next/static/chunks/current.js") {
+        response.writeHead(200, { "content-type": "application/javascript" }); return response.end("window.ready=true;");
+      }
+      return htmlResponse(response, "/_next/static/chunks/current.js");
+    }, async baseUrl => {
+      const result = await runHealth(baseUrl, ["--strict", "--operational"]);
+      assert.equal(result.status, failure ? 1 : 0, result.stderr || result.stdout);
+      const payload = JSON.parse(result.stdout);
+      assert.deepEqual(payload.checks.filter(item => item.status === "fail").map(item => item.id), failure ? [failure === "agent-metadata" ? "agent-catalog" : failure] : []);
+      assert.ok(requests.every(request => request.method === "GET"));
+      assert.doesNotMatch(result.stdout, /PRIVATE_CONTENT|chat_private_fixture/);
+    });
+  });
+}

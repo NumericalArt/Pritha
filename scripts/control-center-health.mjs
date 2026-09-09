@@ -265,6 +265,42 @@ async function runHealthcheck(options) {
     checks.push(check(strict ? "fail" : "warn", "chunks-present", "No JavaScript chunks were discovered across checked pages"));
   }
 
+  // Run after managed activation. The pre-activation page/chunk gate must still
+  // work while admission is deliberately paused. Never include private API
+  // bodies, chat identifiers, transcripts or agent paths in health reports.
+  if (options.operational && instanceMatch) {
+    async function readApi(endpoint) {
+      const response = await fetchText(new URL(endpoint, base).href, timeoutMs, retries);
+      if (!response.ok) return null;
+      try { return JSON.parse(response.text); } catch { return null; }
+    }
+    const activity = await readApi("/api/codex-chat/v1/activity");
+    checks.push(check(activity?.data?.admissionEnabled === true ? "pass" : "fail",
+      "task-admission", "New task admission must be enabled after the update"));
+    const runtime = await readApi("/api/codex-chat/v1/runtime");
+    checks.push(check(runtime?.data?.availability === "ready" ? "pass" : "fail",
+      "task-runtime", "Task runtime must be available"));
+    const agents = await readApi("/api/agents");
+    const cards = agents?.agents;
+    checks.push(check(agents?.ok === true && Array.isArray(cards)
+      && cards.every(agent => agent.identity?.status !== "conflict"
+        && !/^project-metadata-(?:timeout|unavailable)$/.test(agent.operations?.issue || "")
+        && !agent.credentials?.warnings?.includes("Child-project credential metadata could not be read within the host policy.")) ? "pass" : "fail",
+      "agent-catalog", "Agent identities and project metadata must be readable"));
+    const threads = await readApi("/api/codex-chat/v1/threads?group=my_chats&limit=20");
+    const chats = threads?.data?.data;
+    checks.push(check(Array.isArray(chats) ? "pass" : "fail", "chat-list", "Existing chats must be readable"));
+    if (Array.isArray(chats) && chats.length) {
+      const chat = chats.find(item => item.preview) || chats[0];
+      const history = typeof chat?.chatId === "string" && /^chat_[a-zA-Z0-9_-]{1,100}$/.test(chat.chatId)
+        ? await readApi(`/api/codex-chat/v1/threads/${encodeURIComponent(chat.chatId)}/history?limit=1`) : null;
+      checks.push(check(Array.isArray(history?.data?.data) ? "pass" : "fail",
+        "chat-history", "A current chat history page must be readable"));
+    } else if (Array.isArray(chats)) {
+      checks.push(check("skip", "chat-history", "No existing chat is available for a read-only history check"));
+    }
+  }
+
   return {
     schema: "pritha-control-center-health-v1",
     baseUrl,
@@ -296,13 +332,16 @@ if (options.help) {
   node scripts/control-center-health.mjs
   node scripts/control-center-health.mjs --json
   node scripts/control-center-health.mjs --strict --port 3420
+  node scripts/control-center-health.mjs --strict --operational --port 3420
   node scripts/control-center-health.mjs --strict --retries 1
   node scripts/control-center-health.mjs --base-url http://127.0.0.1:3420
 
 Read-only check. If Control Center is running, verifies that key UI pages and
 their referenced Next.js JavaScript chunks load from the same live build. If the
 server is not running, the default mode reports skipped and exits successfully;
-use --strict when an active server is required.`);
+use --strict when an active server is required. After execution activation,
+--operational also checks admission, runtime, agent metadata and existing chat
+history without starting tasks. Use it only on the execution-coordinator API.`);
   process.exit(0);
 }
 

@@ -128,6 +128,22 @@ test("one project cannot silently become two explicit agents", (t) => {
   }
 });
 
+test("a repaired report subject must use the accepted contract ID to preserve its project binding", t => {
+  const f = fixture(t), project = f.folder("brief-fixture");
+  f.contract("brief-fixture", "stable-fixture-id", project);
+  const report = f.write("reports/adapter.md", "agent-operations-report", null, "",
+    "subject:\n  kind: child-agent\n  id: brief-fixture\n");
+  const conflicted = f.catalog().agents;
+  assert.equal(conflicted.length, 2);
+  assert.ok(conflicted.every(agent => agent.identityStatus === "conflict" && agent.projectPath === null));
+  writeFileSync(report, readFileSync(report, "utf8").replace("  id: brief-fixture\n", "  id: stable-fixture-id\n"));
+  const repaired = f.catalog().agents;
+  assert.equal(repaired.length, 1);
+  assert.equal(repaired[0].projectPath, project);
+  assert.equal(repaired[0].identityStatus, "identified");
+  assert.equal(repaired[0].artifacts.length, 2);
+});
+
 test("external state excludes tracked historical child files and symlinked memory/folders", (t) => {
   const f = fixture(t), g = fixture(t);
   const tracked = path.join(f.root, "11_agents/contracts");
