@@ -43,7 +43,7 @@ export function HistoryTurn({ chatId, turn }: { chatId: string; turn: TurnView }
   </article>;
   return <section className="codex-turn" aria-label={`Turn ${turn.status}`}>
     {message(turn.userMessage, "user", "You")}
-    {turn.items.map(item => item.kind === "assistant_message" || item.kind === "user_message" ? <div key={item.id}>{message(item.message, item.id, item.kind === "user_message" ? "You" : "Pritha")}</div> : null)}
+    {turn.items.map(item => (item.kind === "assistant_message" && item.message.phase !== "commentary") || item.kind === "user_message" ? <div key={item.id}>{message(item.message, item.id, item.kind === "user_message" ? "You" : "Pritha")}</div> : null)}
     <HistoryActivity chatId={chatId} turn={turn} reference={turn.history?.itemsRef || null} />
     <CopyResponse turn={turn} loadText={copy} />
     {turn.error ? <p role="status">{turn.error.message}</p> : null}

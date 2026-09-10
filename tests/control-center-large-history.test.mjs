@@ -35,6 +35,18 @@ function context(turns, pagination = true, providerId = "desktop_bundled") {
     } };
   return { c, calls };
 }
+for (const pagination of [true, false]) test(`only explicit commentary joins activity; final and legacy answers remain messages (${pagination})`, async () => {
+  const row = turn(1);
+  row.items.splice(1, 0, { id: 'progress', type: 'agentMessage', phase: 'commentary', text: 'Checking the result for you.' });
+  row.items.at(-1).phase = 'final_answer';
+  const { c } = context([row], pagination), reader = new HistoryReader();
+  const summary = (await reader.page(c)).data[0];
+  assert.deepEqual(summary.items.filter(x => x.kind === 'assistant_message').map(x => x.message.markdown), ['Answer 1']);
+  const activity = await reader.items(c, summary.turnId, summary.history.itemsRef, undefined, true);
+  assert.equal(activity.data.length, 1);
+  assert.equal(activity.data[0].message.phase, 'commentary');
+  assert.equal(activity.data[0].message.markdown, 'Checking the result for you.');
+});
 for (const pagination of [true, false]) test(`recent activity is bounded, newest first and keeps earlier cursors (${pagination ? "native" : "compatibility"})`, async () => {
   const row = turn(1);
   row.items.splice(1, 0, ...Array.from({ length: 73 }, (_, i) => ({ id: `cmd${i}`, type: "commandExecution", command: `echo ${i}`, aggregatedOutput: `output ${i}`, status: "completed", exitCode: 0 })));

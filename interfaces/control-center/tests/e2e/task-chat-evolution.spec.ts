@@ -318,7 +318,8 @@ for (const width of [1280, 390]) for (const history of [false, true]) test(`resp
   await page.setViewportSize({width,height:850});
   await page.addInitScript(() => Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async(text:string)=>{(window as any).copiedText=text;}}}));
   await mockChat(page,true);
-  const actions=Array.from({length:12},(_,i)=>({id:`action_${i+1}`,kind:"command",status:"completed",commandPreview:`Action ${i+1}`,outputPreview:null,exitCode:0}));
+  const actions:any[]=Array.from({length:12},(_,i)=>({id:`action_${i+1}`,kind:"command",status:"completed",commandPreview:`Action ${i+1}`,outputPreview:null,exitCode:0}));
+  actions[10]={id:"action_11",kind:"assistant_message",status:"completed",message:{id:"action_11",phase:"commentary",markdown:"I am checking the result for you.",status:"completed",role:"assistant"}};
   const answer={id:"answer_complete",kind:"assistant_message",status:"completed",message:{id:"answer_complete",markdown:"Answer complete",status:"completed",role:"assistant",createdAt:new Date().toISOString()}};
   const row:any={turnId:"turn_activity",status:"completed",userMessage:{id:"user",markdown:"Run the activity fixture",role:"user",status:"completed"},items:history?[answer]:[...actions,answer],pendingRequestIds:[],startedAt:new Date().toISOString(),...(history?{history:{itemsRef:"recent_actions",itemsState:"not_loaded",sourceMode:"native"}}:{})};
   const reads:string[]=[];
@@ -329,31 +330,40 @@ for (const width of [1280, 390]) for (const history of [false, true]) test(`resp
         const cursor=url.searchParams.get("cursor")!;reads.push(cursor);
         const end=cursor==="recent_actions"?12:Number(cursor.slice(6));const start=Math.max(0,end-5);
         data={data:actions.slice(start,end).reverse(),nextCursor:start?`older_${start}`:null};
-      }else data={data:[answer],nextCursor:null};
+      }else data={data:[actions[10],answer],nextCursor:null};
     }else data={data:[row],olderCursor:null,newerCursor:null,hasOlder:false,hasNewer:false,completeness:"captured-from-creation"};
     return route.fulfill({json:{apiVersion:"1",requestId:"activity-fixture",data}});
   });
   await page.goto("/task-chat?group=my_chats&chat=chat_fixture");
   const feed=page.getByRole("region",{name:"Activity",exact:true});
-  await expect(feed.getByText("Action 12",{exact:true})).toBeVisible();
-  await expect(feed.getByText("Action 7",{exact:true})).toHaveCount(0);
+  await expect(feed.locator('[data-activity-id="action_12"]')).toBeVisible();
+  await expect(feed.locator('[data-activity-id="action_7"]')).toHaveCount(0);
   await expect.poll(async()=>{
-    const latestBounds=await feed.getByText("Action 12",{exact:true}).boundingBox();
+    const latestBounds=await feed.locator('[data-activity-id="action_12"]').boundingBox();
     const transcriptBounds=await page.locator(".codex-transcript").boundingBox();
     return latestBounds!.y+latestBounds!.height <= transcriptBounds!.y+transcriptBounds!.height+1;
   }).toBe(true);
+  await expect(feed.getByText("Action 12",{exact:true})).toHaveCount(0);
+  await expect(feed.getByText("I am checking the result for you.",{exact:true})).toBeVisible();
+  await expect(page.locator('.codex-assistant-message').getByText("I am checking the result for you.",{exact:true})).toHaveCount(0);
+  const latestAction=feed.locator('[data-activity-id="action_12"]');
+  await expect(latestAction.getByText("Command · completed",{exact:true})).toBeVisible();
+  await latestAction.getByText("Details",{exact:true}).click();
+  await expect(latestAction.getByText("Action 12",{exact:true})).toBeVisible();
+  await latestAction.getByText("Details",{exact:true}).click();
+  await expect(latestAction.getByText("Action 12",{exact:true})).toHaveCount(0);
   await page.screenshot({path:testInfo.outputPath("latest-activity.png"),fullPage:true});
   const copy=page.getByRole("button",{name:"Copy response",exact:true});
   await expect(copy).toBeVisible();await expect(copy).toHaveText("");await expect(copy.locator("svg")).toHaveCount(1);
-  await copy.click();await expect.poll(()=>page.evaluate(()=>(window as any).copiedText)).toBe("Answer complete");
+  await copy.click();await expect.poll(()=>page.evaluate(()=>(window as any).copiedText)).toBe("I am checking the result for you.\n\nAnswer complete");
   await expect(page.getByText("Copied",{exact:true})).toHaveCount(0);
   if(history) { expect(reads.length).toBeGreaterThan(0); expect(reads.every(cursor=>cursor==="recent_actions")).toBe(true); }
   await feed.getByRole("button",{name:/Show earlier actions/}).click();
-  await expect(feed.getByText("Action 3",{exact:true})).toBeVisible();
-  const early=await feed.getByText("Action 3",{exact:true}).boundingBox(),latest=await feed.getByText("Action 12",{exact:true}).boundingBox();
+  await expect(feed.locator('[data-activity-id="action_3"]')).toBeVisible();
+  const early=await feed.locator('[data-activity-id="action_3"]').boundingBox(),latest=await feed.locator('[data-activity-id="action_12"]').boundingBox();
   expect(early!.y).toBeLessThan(latest!.y);
   await feed.getByRole("button",{name:/Show earlier actions/}).click();
-  await expect(feed.getByText("Action 1",{exact:true})).toBeAttached();
+  await expect(feed.locator('[data-activity-id="action_1"]')).toBeAttached();
   await expect(feed.getByRole("button",{name:/Show earlier actions/})).toHaveCount(0);
   await page.screenshot({path:testInfo.outputPath("response-activity.png"),fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
@@ -412,4 +422,48 @@ test("background activity cannot cancel the initial chat history load", async ({
   } finally { releaseDetail(); }
   await expect(page.getByText("Original answer", { exact: true })).toBeVisible();
   await expect(page.getByText("History did not load", { exact: true })).toHaveCount(0);
+});
+
+test("Activity renews expired positions, preserves messages and keeps technical text inside Details",async({page})=>{
+  await mockChat(page,true);
+  let readExpired=false, unavailable=false, contentReads=0;
+  const requests:string[]=[];
+  const answer:any={id:"answer",kind:"assistant_message",status:"completed",message:{id:"answer",role:"assistant",markdown:"Final answer remains here.",status:"completed"}};
+  const progress:any={id:"progress",kind:"assistant_message",status:"completed",message:{id:"progress",role:"assistant",phase:"commentary",markdown:"Progress stays visible.",status:"completed"}};
+  const command:any={id:"command",kind:"command",status:"failed",commandPreview:"node hidden_command",outputPreview:null,contentRef:"command_body"};
+  const row:any={turnId:"turn_recovery",status:"completed",userMessage:{id:"user",role:"user",markdown:"Keep this request.",status:"completed"},items:[answer],pendingRequestIds:[],startedAt:new Date().toISOString(),history:{itemsRef:"expired_tail",itemsState:"not_loaded"}};
+  await page.route("**/threads/chat_fixture/history**",route=>{
+    const url=new URL(route.request().url());
+    if(url.pathname.endsWith('/content')){contentReads++;return route.fulfill({json:{apiVersion:"1",requestId:"body",data:{text:"node hidden_command\n\nComplete command output.",nextCursor:null,complete:true}}});}
+    if(url.pathname.endsWith('/items')){
+      const ref=url.searchParams.get('cursor')!;requests.push(ref);
+      if(ref!=="fresh_tail" || unavailable){readExpired=true;return route.fulfill({status:409,json:{apiVersion:"1",error:{code:"history_cursor_expired",message:"This history position has expired. Reload recent messages; displayed text is preserved.",retryable:true,requestId:"expired"}}});}
+      return route.fulfill({json:{apiVersion:"1",requestId:"activity",data:{data:[command,progress],nextCursor:"expired_earlier"}}});
+    }
+    return route.fulfill({json:{apiVersion:"1",requestId:"history",data:{data:[{...row,history:{...row.history,itemsRef:readExpired?"fresh_tail":"expired_tail"}}],olderCursor:null}}});
+  });
+  await page.goto('/task-chat?group=my_chats&chat=chat_fixture');
+  const feed=page.getByRole('region',{name:'Activity',exact:true}),draft=page.getByRole('textbox',{name:'Message Pritha',exact:true});
+  await expect(feed.getByText('Progress stays visible.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Final answer remains here.',{exact:true})).toBeVisible();
+  await expect(feed.getByText('Command · failed',{exact:true})).toBeVisible();
+  expect(contentReads).toBe(0);
+  await expect(feed.getByText('node hidden_command',{exact:true})).toHaveCount(0);
+  const entry=feed.locator('[data-activity-id="command"]');
+  await entry.getByText('Details',{exact:true}).click();
+  await expect(entry).toContainText('Complete command output.');expect(contentReads).toBe(1);
+  await entry.getByText('Details',{exact:true}).click();
+  await expect(entry.getByText('Complete command output.',{exact:false})).toHaveCount(0);
+  await draft.fill('Preserve my next message.');
+  unavailable=true;const before=requests.length;
+  await feed.getByRole('button',{name:/Show earlier actions/}).click();
+  await expect(feed.getByText('Activity could not be refreshed. Your messages are still available.',{exact:false})).toBeVisible();
+  expect(requests.length-before).toBeLessThanOrEqual(3);
+  await expect(feed.getByText('Progress stays visible.',{exact:true})).toBeVisible();
+  await expect(page.getByText('This history position has expired.',{exact:false})).toHaveCount(0);
+  await expect(draft).toHaveValue('Preserve my next message.');
+  unavailable=false;await feed.getByRole('button',{name:'Retry activity',exact:true}).click();
+  await expect(feed.getByRole('button',{name:'Retry activity',exact:true})).toHaveCount(0);
+  await expect(feed.locator('.codex-activity-entry')).toHaveCount(2);
+  await expect(draft).toHaveValue('Preserve my next message.');
 });

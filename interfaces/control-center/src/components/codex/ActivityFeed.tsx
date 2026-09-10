@@ -18,6 +18,6 @@ export function ActivityFeed({ status, items, renderItem, hasEarlier = false, on
     }}>Show earlier actions{hidden ? ` (${hidden})` : ""}</button> : null}
     {error ? <div role="status">{error} <button type="button" className="codex-text-action" onClick={onRetry}>Retry activity</button></div> : null}
     {busy ? <span className="codex-activity-loading" role="status">Loading activity…</span> : null}
-    <div className="codex-activity-items">{items.slice(-visibleCount).map(item => <div key={item.id} className="codex-activity-entry">{renderItem(item)}</div>)}</div>
+    <div className="codex-activity-items">{items.slice(-visibleCount).map(item => <div key={item.id} className="codex-activity-entry" data-activity-id={item.id}>{renderItem(item)}</div>)}</div>
   </section>;
 }

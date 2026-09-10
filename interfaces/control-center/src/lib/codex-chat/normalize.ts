@@ -190,6 +190,7 @@ export function normalizeNativeItem(
     const message: MessageView = {
       id,
       role: "assistant",
+      ...(item.phase === "commentary" || item.phase === "final_answer" ? { phase: item.phase } : {}),
       markdown: String(item.text || ""),
       status: item.status === "failed" ? "failed" : item.status === "inProgress" ? "streaming" : "completed",
       createdAt,

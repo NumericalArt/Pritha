@@ -131,6 +131,7 @@ export type AttachmentView = { id: string; name: string; size: number; kind: "im
 export type AttachmentMessage = { requestHash: string; attachments: AttachmentView[]; manifest: string };
 
 export type MessageView = {
+  phase?: "commentary" | "final_answer";
   contentRef?: string;
   attachments?: AttachmentView[];
   id: string;

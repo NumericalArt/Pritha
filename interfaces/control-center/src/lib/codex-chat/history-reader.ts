@@ -133,7 +133,7 @@ export class HistoryReader {
   private compact(c: HistoryContext, raw: Row, mode: Mode): TurnView {
     const originals = rows(raw.items);
     const userItem = originals.find(item => item.type === "userMessage");
-    const lastAnswer = [...originals].reverse().find(item => item.type === "agentMessage");
+    const lastAnswer = [...originals].reverse().find(item => item.type === "agentMessage" && item.phase !== "commentary");
     const visibleUsers = new Set(originals.filter(item=>item.type === "userMessage").slice(-10));
     const turn = normalizeNativeTurn(c.binding, { ...raw, items: originals.filter(item=>item === userItem || item === lastAnswer || visibleUsers.has(item)) }, c.root);
     if (!turn) throw new HistoryError("history_format_unsupported", "A history turn has no identity.", 422);
@@ -252,7 +252,7 @@ export class HistoryReader {
       const batch = await this.itemBatch(c, t, deadline, 1);
       for (const raw of batch.data) {
         const item = normalizeNativeItem(c.binding.chatId, raw, c.root, new Date(0).toISOString());
-        if (!item || (t.activity && (item.kind === "assistant_message" || item.kind === "user_message" || raw.type === "userMessage"))) continue;
+        if (!item || (t.activity && ((item.kind === "assistant_message" && item.message.phase !== "commentary") || item.kind === "user_message" || raw.type === "userMessage"))) continue;
         const field = item.kind === "assistant_message" ? "message" : item.kind === "command" ? "output" : item.kind === "file_change" ? "diff" : item.kind === "reasoning_summary" ? "reasoning" : raw.type === "userMessage" ? "user" : item.kind === "tool" ? "tool" : item.kind === "plan" ? "plan" : item.kind === "web_search" ? "search" : null;
         if (field) {
           const contentRef = this.contentRef(c, batch.mode, String(t.turn), String(raw.id), field, { cursor: batch.mode === "native" ? t.cursor : undefined, offset: batch.mode === "compatibility" ? t.offset : undefined, snapshot: t.snapshot, sort: t.sort });
