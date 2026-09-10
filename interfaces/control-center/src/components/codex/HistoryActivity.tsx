@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChatItemView, TurnView } from "@/lib/codex-chat/types";
 import { ActivityFeed } from "./ActivityFeed";
 import { ActivityAction } from "./ActivityAction";
@@ -9,30 +9,20 @@ import { readActivityPage } from "./activity-request";
 
 export function HistoryActivity({ chatId, turn, reference }: { chatId: string; turn: TurnView; reference: string | null }) {
   const anchor = useRef<HTMLDivElement>(null), controller = useRef<AbortController | null>(null), expanded = useRef(false);
-  const followBottom = useRef<Element | null>(null);
   const [visible, setVisible] = useState(false), [items, setItems] = useState<ChatItemView[]>([]);
   const [cursor, setCursor] = useState<string | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const read = async (ref: string, earlier = false) => {
-    const transcript = anchor.current?.closest(".codex-transcript");
-    const initialTop = transcript?.scrollTop || 0;
-    const wasAtBottom = Boolean(transcript && transcript.scrollHeight - initialTop - transcript.clientHeight < 80);
     controller.current?.abort();
     const request = new AbortController(); controller.current = request; setBusy(true); setError(null);
     try {
       const { page, recovered } = await inReadPool(request.signal, () => readActivityPage(chatId, turn.turnId, ref, reference, request.signal));
       if (request.signal.aborted) return;
-      if (!earlier && !expanded.current && transcript && transcript.scrollTop >= initialTop &&
-        (wasAtBottom || transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 80)) followBottom.current = transcript;
       const chronological = page.data.filter(item => item.kind === "assistant_message" ? item.message.phase === "commentary" : String(item.kind) !== "user_message").reverse();
       setItems(old => [...new Map((recovered ? [...old, ...chronological] : earlier ? [...chronological, ...old] : expanded.current ? [...old, ...chronological] : chronological).map(item => [item.id, item])).values()]);
       setCursor(page.nextCursor);
     } catch { if (!request.signal.aborted) setError("Activity could not be refreshed. Your messages are still available."); }
     finally { if (!request.signal.aborted) setBusy(false); }
   };
-  useLayoutEffect(() => {
-    const transcript = followBottom.current;
-    if (transcript) { transcript.scrollTop = transcript.scrollHeight; followBottom.current = null; }
-  }, [items]);
   useEffect(() => {
     const observer = new IntersectionObserver(entries => setVisible(entries.some(entry => entry.isIntersecting)), { rootMargin: "100px" });
     if (anchor.current) observer.observe(anchor.current);

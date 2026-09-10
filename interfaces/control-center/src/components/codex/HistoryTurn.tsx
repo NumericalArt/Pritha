@@ -36,7 +36,7 @@ export function HistoryTurn({ chatId, turn }: { chatId: string; turn: TurnView }
     if (!messages.length) throw new Error("No assistant response is available for this turn.");
     return messages.join("\n\n");
   }
-  const message = (value: MessageView, id: string, label: string) => <article className={`codex-message ${label === "You" ? "codex-user-message" : "codex-assistant-message"}`}>
+  const message = (value: MessageView, id: string, label: string) => <article data-scroll-anchor={`${turn.turnId}:${id}`} className={`codex-message ${label === "You" ? "codex-user-message" : "codex-assistant-message"}`}>
     <div className="codex-message-label">{label}</div>
     <HistoryText chatId={chatId} id={id} preview={value.markdown} contentRef={value.contentRef} />
     {value.attachments?.length ? <AttachmentLinks files={value.attachments} /> : null}

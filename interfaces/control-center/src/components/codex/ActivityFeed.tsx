@@ -12,12 +12,13 @@ export function ActivityFeed({ status, items, renderItem, hasEarlier = false, on
   const hidden = Math.max(0, items.length - visibleCount);
   return <section className="codex-activity-feed" aria-label="Activity">
     <div className="codex-activity-heading">Activity · {status.replaceAll("_", " ")}</div>
-    {hidden || hasEarlier ? <button type="button" className="codex-text-action" disabled={busy} onClick={() => {
+    {hidden || hasEarlier ? <button type="button" className="codex-text-action" disabled={busy} onClick={event => {
+      event.currentTarget.dispatchEvent(new CustomEvent("codex-history-expand", { bubbles: true }));
       setVisibleCount(count => count + 5);
       if (!hidden) onEarlier?.();
     }}>Show earlier actions{hidden ? ` (${hidden})` : ""}</button> : null}
     {error ? <div role="status">{error} <button type="button" className="codex-text-action" onClick={onRetry}>Retry activity</button></div> : null}
-    {busy ? <span className="codex-activity-loading" role="status">Loading activity…</span> : null}
-    <div className="codex-activity-items">{items.slice(-visibleCount).map(item => <div key={item.id} className="codex-activity-entry" data-activity-id={item.id}>{renderItem(item)}</div>)}</div>
+    {busy && !items.length ? <span className="codex-activity-loading" role="status">Loading activity…</span> : null}
+    <div className="codex-activity-items">{items.slice(-visibleCount).map(item => <div key={item.id} className="codex-activity-entry" data-activity-id={item.id} data-scroll-anchor={`activity:${item.id}`}>{renderItem(item)}</div>)}</div>
   </section>;
 }

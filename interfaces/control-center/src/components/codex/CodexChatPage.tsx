@@ -22,6 +22,7 @@ import { TaskChatControls } from "./TaskChatControls";
 import { ActivityFeed } from "./ActivityFeed";
 import { ActivityAction } from "./ActivityAction";
 import { HistoryTurn } from "./HistoryTurn";
+import { useTranscriptScroll } from "./useTranscriptScroll";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
@@ -304,8 +305,6 @@ export function CodexChatPage() {
   const [olderError, setOlderError] = useState<string | null>(null);
   const expandedHistoryRef = useRef(false);
   const olderRequestRef = useRef<AbortController | null>(null);
-  const followTranscriptRef = useRef(true);
-  const olderScrollRef = useRef<{ element: HTMLElement; height: number; top: number } | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyIssue, setHistoryIssue] = useState<{ code: string; retryable: boolean; replacementAllowed: boolean } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -336,7 +335,7 @@ export function CodexChatPage() {
   const [dictationLanguage, setDictationLanguage] = useState<DictationLanguage>("browser");
   const recognitionRef = useRef<RecognitionLike | null>(null);
   const historyLoadPromises = useRef(new Map<string, Promise<boolean>>());
-  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const { transcriptRef, contentRef: transcriptContentRef, preservePosition } = useTranscriptScroll(selectedChatId);
   const listSentinelRef = useRef<HTMLDivElement | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const displayedChatIdRef = useRef<string | null>(null);
@@ -742,8 +741,7 @@ export function CodexChatPage() {
     try {
       const page = (await api<TurnPage>(`/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/history?limit=20&cursor=${encodeURIComponent(olderCursor)}`, { signal: controller.signal }, { timeoutMs: HISTORY_TIMEOUT_MS, maxBodyBytes: 256 * 1024 })).data;
       if (controller.signal.aborted || selectedChatIdRef.current !== chatId) return;
-      const element = transcriptEndRef.current?.parentElement;
-      if (element) olderScrollRef.current = { element, height: element.scrollHeight, top: element.scrollTop };
+      preservePosition();
       expandedHistoryRef.current = true;
       setTurns(current => current.reduce(upsertTurn, page.data));
       setOlderCursor(page.olderCursor || null);
@@ -821,9 +819,7 @@ export function CodexChatPage() {
     historyLoadPromises.current.clear();
     olderRequestRef.current?.abort();
     olderRequestRef.current = null;
-    olderScrollRef.current = null;
     expandedHistoryRef.current = false;
-    followTranscriptRef.current = true;
     setOlderCursor(null);
     setOlderLoading(false);
     setOlderError(null);
@@ -982,17 +978,6 @@ export function CodexChatPage() {
 
   const selectionChanging = displayedChatIdRef.current !== selectedChatId;
   const displayedTurns = selectionChanging ? [] : turns;
-  const lastTranscriptText = displayedTurns.at(-1)?.items.at(-1);
-  useEffect(() => {
-    const position = olderScrollRef.current;
-    if (position) {
-      position.element.scrollTop = position.top + position.element.scrollHeight - position.height;
-      olderScrollRef.current = null;
-      return;
-    }
-    if (followTranscriptRef.current) transcriptEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [displayedTurns.length, lastTranscriptText]);
-
   const visibleThreads = useMemo(() => threads.filter((thread) => thread.group === activeGroup && thread.archived === showArchived), [activeGroup, threads, showArchived]);
 
   const hasActiveTurn = displayedTurns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
@@ -1547,7 +1532,8 @@ export function CodexChatPage() {
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} />
         </div> : null}
         {budgetNotice?.chatId === selectedChatId ? <div className="codex-attachment-notice" role="status">{budgetNotice.text}</div> : null}
-        <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} onScroll={event => { const el = event.currentTarget; followTranscriptRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; }} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
+        <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} ref={transcriptRef} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
+          <div ref={transcriptContentRef} className="codex-transcript-content">
           {loading && !selectedChatId ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Task Chat</h2></div> : null}
           {!loading && !selectedChatId ? (
             <div className="codex-empty-state">
@@ -1593,20 +1579,20 @@ export function CodexChatPage() {
           </div> : null}
           {displayedTurns.map((turn) => turn.history && selectedChatId ? <HistoryTurn key={turn.turnId} chatId={selectedChatId} turn={turn} /> : (
             <section className="codex-turn" key={turn.turnId} aria-label={`Turn ${turn.status}`}>
-              <article className="codex-message codex-user-message">
+              <article className="codex-message codex-user-message" data-scroll-anchor={`${turn.turnId}:user`}>
                 <div className="codex-message-label">You</div>
                 <CodexMarkdown markdown={turn.userMessage.markdown} />
                 {turn.userMessage.attachments?.length ? <AttachmentLinks files={turn.userMessage.attachments} /> : null}
               </article>
               <div className="codex-turn-items">
-                {turn.items.filter(item => (item.kind === "assistant_message" && item.message.phase !== "commentary") || item.kind === "user_message").map(item => <ActivityItem item={item} key={item.id} />)}
+                {turn.items.filter(item => (item.kind === "assistant_message" && item.message.phase !== "commentary") || item.kind === "user_message").map(item => <div key={item.id} data-scroll-anchor={`${turn.turnId}:${item.id}`}><ActivityItem item={item} /></div>)}
                 <ActivityFeed status={turn.status} items={turn.items.filter(item => item.kind === "assistant_message" ? item.message.phase === "commentary" : item.kind !== "user_message")} renderItem={item => <ActivityAction item={item} />} />
                 <CopyResponse turn={turn} />
                 {turn.error ? <div className="codex-inline-notice error">{turn.error.message}</div> : null}
               </div>
             </section>
           ))}
-          <div ref={transcriptEndRef} />
+          </div>
         </div>
 
         <div className="codex-composer-wrap">

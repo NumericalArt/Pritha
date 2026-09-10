@@ -6517,7 +6517,26 @@ button:active,
   padding: 26px clamp(18px, 4vw, 48px) 22px;
   overflow-y: auto;
   overflow-x: hidden;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
+  overflow-anchor: none;
+}
+
+.codex-transcript-content {
+  display: flow-root;
+  min-height: 100%;
+}
+
+.codex-transcript-content:has(> .codex-empty-state:only-child) { height: 100%; }
+
+.codex-history-loading-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .codex-empty-state {
