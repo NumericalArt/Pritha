@@ -1678,36 +1678,39 @@ export function CodexChatPage() {
           }}>
             <div className="codex-composer-heading">
               <span id="codex-message-label">Message Pritha</span>
-              <WorkingIndicator label={workingLabel} />
             </div>
             <DraftAttachments items={attachmentDraft.items} locked={Boolean(pendingDelivery) || sending} remove={attachmentDraft.remove} retry={attachmentDraft.retry} />
             {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
             {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
-            <textarea
-              aria-labelledby="codex-message-label"
-              onPaste={event => {
-                const images = Array.from(event.clipboardData.files).filter(file => file.type.startsWith("image/"));
-                if (images.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(images); }
-              }}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  void sendMessage();
-                }
-              }}
-              placeholder={pendingDelivery?.status === "delivery_unknown"
-                ? "Delivery confirmation is pending…"
-                : selectedChatId && historyState === "error"
-                  ? "Retry history before sending…"
-                  : selectedChatId && historyState !== "ready"
-                    ? "Loading history…"
-                    : "Ask Pritha…"}
-              rows={3}
-              maxLength={64_000}
-              disabled={Boolean(selectedChatId && historyState !== "ready")}
-            />
+            <div className="codex-composer-input">
+              <textarea
+                aria-describedby="codex-working-status"
+                aria-labelledby="codex-message-label"
+                onPaste={event => {
+                  const images = Array.from(event.clipboardData.files).filter(file => file.type.startsWith("image/"));
+                  if (images.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(images); }
+                }}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+                placeholder={workingLabel ? "" : pendingDelivery?.status === "delivery_unknown"
+                  ? "Delivery confirmation is pending…"
+                  : selectedChatId && historyState === "error"
+                    ? "Retry history before sending…"
+                    : selectedChatId && historyState !== "ready"
+                      ? "Loading history…"
+                      : "Ask Pritha…"}
+                rows={3}
+                maxLength={64_000}
+                disabled={Boolean(selectedChatId && historyState !== "ready")}
+              />
+              <WorkingIndicator label={workingLabel} concealed={Boolean(draft)} />
+            </div>
             <div className="codex-composer-actions">
               <small>
                 {dictationSupported

@@ -6984,11 +6984,27 @@ button:active,
   line-height: 18px;
 }
 
+.codex-composer-input {
+  position: relative;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.codex-composer-input textarea { display: block; }
+
 .codex-working-indicator {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  pointer-events: none;
+  color: var(--text-faint);
+  font: inherit;
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
+
+.codex-working-indicator[data-concealed="true"] { opacity: 0; }
 
 .codex-working-dots {
   display: inline-flex;
