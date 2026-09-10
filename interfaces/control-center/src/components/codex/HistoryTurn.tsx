@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { controlCenterRequest } from "@/lib/control-center-request";
 import type { ChatItemView, HistoryContentPage, HistoryItemsPage, MessageView, TurnView } from "@/lib/codex-chat/types";
-import { CodexMarkdown } from "./CodexMarkdown";
+import { HistoryText } from "./HistoryText";
 import { AttachmentLinks } from "./ChatAttachments";
 
 const requestOptions = { timeoutMs: 35_000, maxBodyBytes: 256 * 1024 };
@@ -20,28 +20,6 @@ async function fullContent(chatId: string, id: string, cursor: string, signal: A
     if (text.length > 64 * 1024 * 1024) throw new Error("This response is too large to copy in the browser.");
   }
   return text;
-}
-function HistoryText({ chatId, id, preview, contentRef, code = false }: { chatId: string; id: string; preview: string; contentRef?: string; code?: boolean }) {
-  const [text, setText] = useState<string | null>(null), [cursor, setCursor] = useState<string | null>(contentRef || null);
-  const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
-  const controller = useRef<AbortController | null>(null);
-  useEffect(() => () => controller.current?.abort(), []);
-  useEffect(() => { controller.current?.abort(); setText(null); setCursor(contentRef || null); setError(null); setBusy(false); }, [contentRef]);
-  async function more() {
-    if (!cursor || busy) return;
-    const request = new AbortController(); controller.current = request; setBusy(true); setError(null);
-    try {
-      const page = await content(chatId, id, cursor, request.signal);
-      if (!request.signal.aborted) { setText(old => (old || "") + page.text); setCursor(page.nextCursor); }
-    } catch (cause) { if (!request.signal.aborted) setError(cause instanceof Error ? cause.message : "Details could not load."); }
-    finally { if (!request.signal.aborted) setBusy(false); }
-  }
-  const shown = text ?? preview;
-  return <div className="codex-history-text">
-    {code ? <pre>{shown}</pre> : <CodexMarkdown markdown={shown} />}
-    {cursor ? <button type="button" className="codex-text-action" disabled={busy} onClick={() => void more()}>{busy ? "Loading text…" : text == null ? "Read original text" : "Read more text"}</button> : null}
-    {error ? <span role="status">{error} <button type="button" onClick={() => { setCursor(contentRef || null); setText(null); setError(null); }}>Reset detail position</button></span> : null}
-  </div>;
 }
 function HistoryItem({ chatId, item }: { chatId: string; item: ChatItemView }) {
   const [open, setOpen] = useState(false);

@@ -51,18 +51,19 @@ async function mockChat(page: Page, initiallyRestored = false) {
 }
 
 for (const width of [1280, 390]) {
-  test(`invalid delivery discovery preserves the conversation at ${width}px`, async ({ page }) => {
+  test(`Task Chat omits agent build controls and discovery at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 850 });
-    const control = await mockChat(page, true);
-    const errors: string[] = [];
+    await mockChat(page, true);
+    const requests: string[] = [], errors: string[] = [];
+    page.on("request", request => { if (/\/(delivery|operations)(?:[/?]|$)/.test(new URL(request.url()).pathname)) requests.push(request.url()); });
     page.on("pageerror", error => errors.push(error.message));
-    for (const invalid of [null, {}, { runs: null }, { runs: [null] }, { runs: [{ runId: 1, status: "verified" }] }]) {
-      control.deliveryResponse = invalid;
-      await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
-      await expect(page.getByText("Original answer", { exact: true })).toBeVisible();
-      await page.locator(".codex-delivery-panel summary").click();
-      await expect(page.getByText("Список сборок пока недоступен. Чат остаётся доступен.", { exact: true })).toBeVisible();
-    }
+    await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+    await expect(page.getByText("Original answer", { exact: true })).toBeVisible();
+    await expect(page.locator(".codex-delivery-panel")).toHaveCount(0);
+    await expect(page.getByText("Сборка агента", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Read original text|Read more text/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Read original text|Read more text/i })).toHaveCount(0);
+    expect(requests).toEqual([]);
     expect(errors).toEqual([]);
   });
   test(`history recovery explains a blocked chat and opens its original at ${width}px`, async ({ page }) => {
@@ -206,43 +207,15 @@ test("earlier history remains readable after a failed page and a refresh", async
 });
 
 for (const width of [1280, 390]) {
-  test(`cleanup links and operation cards preserve explicit decisions at ${width}px`, async ({ page }) => {
+  test(`local report links stay safe without agent controls at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 850 });
     await mockChat(page, true);
-    const run = { runId: "run_fixture", agentId: "agent_fixture", agentName: "Fixture service", specId: "spec_fixture", status: "verified", acceptance: "pending", bindingStatus: "bound", revision: "fixture", receipts: [], actions: { verify: false, prepareHandoff: false, budget: false }, budget: { tokensUsed: 2, maxTokens: 100, usageStatus: "complete", iterations: 1, maxIterations: 3, elapsedMs: 1000, maxElapsedMs: 60000 }, plan: { maxVerificationPasses: 1, outputBytesCap: 1000, backend: "fixture", commands: [] } };
-    const requests: Array<Record<string, string>> = [];
-    let loseResponse = true;
-    await page.route("**/api/codex-chat/v1/threads/chat_fixture/delivery**", route => route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: new URL(route.request().url()).searchParams.has("runId") ? { run } : { runs: [{ runId: run.runId, status: run.status }] } } }));
     await page.route("**/api/codex-chat/v1/threads/chat_fixture/history?**", route => route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { data: [{ turnId: "links", status: "completed", userMessage: { markdown: "Show the report" }, items: [{ id: "links", kind: "assistant_message", status: "completed", message: { markdown: "[Handoff](/Users/<user>/Pritha-state/agents/reports/handoff.md) and [README](./README.md)", status: "completed" } }], pendingRequestIds: [] }], olderCursor: null } } }));
-    await page.route("**/api/codex-chat/v1/threads/chat_fixture/operations**", async route => {
-      if (route.request().method() === "GET") {
-        const action = new URL(route.request().url()).searchParams.get("action");
-        return route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { agentId: run.agentId, runId: run.runId, action, planLock: "a".repeat(64), enabled: true, label: action === "start" ? "Start" : "Tailscale Serve", summary: "Operation on the selected fixture service.", reason: null, pendingRequest: null } } });
-      }
-      const body = route.request().postDataJSON(); requests.push(body);
-      expect(route.request().headers()["idempotency-key"]).toBe(body.requestId);
-      if (body.decision === "approve" && loseResponse) { loseResponse = false; return route.abort("failed"); }
-      return route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data: { requestId: body.requestId, status: body.decision === "cancel" ? "cancelled" : "completed" } } });
-    });
     await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
     await expect(page.locator(".codex-markdown code[title='Handoff']")).toBeVisible();
     await expect(page.locator('a[href*="/Users/"]')).toHaveCount(0);
-    await page.locator("summary").filter({ hasText: "Сборка агента" }).click();
-    await page.getByRole("button", { name: "План Start", exact: true }).click();
-    expect(requests).toHaveLength(0);
-    await page.getByRole("button", { name: "Отмена", exact: true }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Операция отменена" })).toBeVisible();
-    expect(requests[0].decision).toBe("cancel");
-    await page.getByRole("button", { name: "План Start", exact: true }).click();
-    await page.getByRole("button", { name: "Подтвердить Start", exact: true }).click();
-    await page.getByRole("button", { name: "Проверить сохранённое действие", exact: true }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Операция выполнена" })).toBeVisible();
-    expect(requests[1]).toEqual(requests[2]);
-    await page.getByRole("button", { name: "План Tailscale Serve", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Подтвердить Tailscale Serve", exact: true })).toBeVisible();
-    expect(requests).toHaveLength(3);
+    await expect(page.locator(".codex-delivery-panel, .codex-operation-decisions")).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBeTruthy();
-    await page.locator(".codex-operation-decisions").screenshot({ path: `/tmp/pritha-cleanup-operation-${width}.png` });
   });
 }
 
@@ -250,7 +223,7 @@ for (const width of [390, 1280]) test(`bounded history reveals details and copie
   await page.setViewportSize({ width, height: 850 });
   await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => { (window as unknown as { copiedText: string }).copiedText = text; } } }));
   await mockChat(page, true);
-  const original = "Complete 🙂 answer\n".repeat(4000), chunks = [original.slice(0, 12000), original.slice(12000)];
+  const chunks = Array.from({ length: 4 }, (_, i) => `Part ${i}\n\n${"Complete 🙂 answer\n\n".repeat(500)}`), original = chunks.join("");
   let itemReads = 0, failContent = true;
   const row = { turnId: "bounded", status: "completed", userMessage: { id: "u", markdown: "Question" }, items: [{ id: "a", kind: "assistant_message", message: { id: "a", markdown: "Short preview", contentRef: "part0" } }], history: { itemsRef: "items", itemsState: "not_loaded", sourceMode: "native" }, pendingRequestIds: [] };
   await page.route("**/api/codex-chat/v1/threads/chat_fixture/history**", async route => {
@@ -258,8 +231,9 @@ for (const width of [390, 1280]) test(`bounded history reveals details and copie
     let data: unknown;
     if (url.pathname.endsWith("/content")) {
       if (failContent) { failContent = false; return route.fulfill({ status: 503, json: { apiVersion: "1", error: { requestId: "failed", code: "history_unavailable", message: "Details temporarily unavailable.", retryable: true } } }); }
-      const second = url.searchParams.get("cursor") === "part1";
-      data = { text: chunks[second ? 1 : 0], nextCursor: second ? null : "part1", complete: second };
+      const index = Number(url.searchParams.get("cursor")!.slice(4));
+      const complete = index === chunks.length - 1;
+      data = { text: chunks[index], nextCursor: complete ? null : `part${index + 1}`, complete };
     } else if (url.pathname.endsWith("/items")) { itemReads++; data = { data: row.items, nextCursor: null }; }
     else data = { data: [row], olderCursor: null };
     return route.fulfill({ json: { apiVersion: "1", requestId: "bounded", data } });
@@ -267,13 +241,20 @@ for (const width of [390, 1280]) test(`bounded history reveals details and copie
   await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
   await expect(page.getByText("Short preview", { exact: true })).toBeVisible();
   expect(itemReads).toBe(0);
-  await page.getByRole("button", { name: "Read original text", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Read original text|Read more text/i })).toHaveCount(0);
   await expect(page.getByText("Details temporarily unavailable.", { exact: false })).toBeVisible();
   await expect(page.getByText("Short preview", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Copy response", exact: true }).click();
   await expect(page.getByText("Copied", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { copiedText: string }).copiedText)).toBe(original);
   expect(itemReads).toBe(1);
+  await page.getByRole("button", { name: "Retry loading text", exact: true }).click();
+  await expect(page.getByText("Short preview", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".codex-history-text").filter({ hasText: "Part 0" })).toBeVisible();
+  // Newly appended text must not pull the composer outside the viewport.
+  const composer = await page.locator(".codex-composer").boundingBox();
+  expect(composer).not.toBeNull();
+  expect(composer!.y + composer!.height).toBeLessThanOrEqual(852);
   await page.locator('.codex-activity > summary').filter({ hasText: "Activity" }).click();
   expect(itemReads).toBeGreaterThanOrEqual(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

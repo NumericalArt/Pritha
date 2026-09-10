@@ -3,7 +3,7 @@ id: task-chat-large-history
 type: workflow
 status: implemented
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-10
 topics: [task-chat, history-pagination, runtime-compatibility]
 tools: [Pritha, Codex, Next.js]
 sources: [https://learn.chatgpt.com/docs/app-server]
@@ -88,6 +88,14 @@ Older turns and Activity load explicitly. Reconnects coalesce refresh requests,
 retain loaded older text and drafts, and avoid pulling the viewport to the
 bottom when the user is reading earlier messages. Switching chat aborts obsolete
 requests. Partial read errors preserve the text already displayed.
+
+Long message bodies load automatically as their displayed end enters the viewport,
+with at most two concurrent background text reads and the same 64 KiB response
+limit. There are no “Read original text” or “Read more text” controls. A failed
+part retains visible text and offers a retry. This applies to user and assistant
+messages and expanded Activity; collapsed Activity remains unloaded. The agent
+build panel is no longer mounted in Task Chat; its backend contracts remain
+available, and navigation from Agents is deferred.
 
 Compact SSE retains bounded live deltas and sends invalidation notifications
 instead of complete turns and command output. The browser then uses the bounded

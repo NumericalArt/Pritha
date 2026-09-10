@@ -27,7 +27,6 @@ import { TaskChatControls } from "./TaskChatControls";
 import { HistoryTurn } from "./HistoryTurn";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
-import { DeliveryPanel } from "./DeliveryPanel";
 import type { TaskDeliveryView } from "@/lib/codex-chat/delivery-types";
 import { parseBudgetIntent } from "@/lib/codex-chat/budget-intent";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -333,12 +332,6 @@ export function CodexChatPage() {
   const [recovering, setRecovering] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [goalRevision, setGoalRevision] = useState(0);
-  const [deliveryRevision, setDeliveryRevision] = useState(0);
-  const [deliveryBudgetResult, setDeliveryBudgetResult] = useState<{ chatId: string; run: TaskDeliveryView } | null>(null);
-  const [deliverySelections, setDeliverySelections] = useState<Record<string, string | null>>({});
-  const selectDeliveryRun = useCallback((chatId: string, runId: string | null) => {
-    setDeliverySelections(current => current[chatId] === runId ? current : { ...current, [chatId]: runId });
-  }, []);
   const [budgetNotice, setBudgetNotice] = useState<{ chatId: string; text: string } | null>(null);
   const [historyState, setHistoryState] = useState<HistoryState>("idle");
   const [historyHasImages, setHistoryHasImages] = useState(false);
@@ -1216,9 +1209,7 @@ export function CodexChatPage() {
         setPendingForChat(delivery.chatId, null);
         updateDraftForChat(delivery.chatId, current => current.trim() === delivery.text ? "" : current);
         const result = response.data.receipts.find(receipt => receipt.requestId === delivery.clientMessageId);
-        setDeliveryBudgetResult({ chatId: delivery.chatId, run: response.data });
-        setBudgetNotice({ chatId: delivery.chatId, text: `Сборка ${response.data.agentName}: подтверждённый расход ${response.data.budget.tokensUsed.toLocaleString("ru-RU")} / ${response.data.budget.maxTokens.toLocaleString("ru-RU")} токенов. ${result?.status === "failed" || result?.status === "interrupted" ? "Сохранённое действие требует сверки в панели сборки." : intent.resume ? "Продолжение этой сборки запрошено; текущее состояние показано в панели." : "Бюджет сверён; продолжение отдельно."}` });
-        setDeliveryRevision(value => value + 1);
+        setBudgetNotice({ chatId: delivery.chatId, text: `Сборка ${response.data.agentName}: подтверждённый расход ${response.data.budget.tokensUsed.toLocaleString("ru-RU")} / ${response.data.budget.maxTokens.toLocaleString("ru-RU")} токенов. ${result?.status === "failed" || result?.status === "interrupted" ? "Сохранённое действие требует сверки перед продолжением." : intent.resume ? "Продолжение этой сборки запрошено." : "Бюджет сверён; продолжение отдельно."}` });
         return;
       }
       const response = await api<AcceptedTurn>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/turns`, {
@@ -1345,7 +1336,6 @@ export function CodexChatPage() {
     }
     const delivery: PendingDelivery = {
       chatId,
-      ...(intent.kind === "delivery_budget" && deliverySelections[chatId] ? { runId: deliverySelections[chatId]! } : {}),
       clientMessageId: crypto.randomUUID(),
       text,
       attachments: attachmentIds,
@@ -1584,11 +1574,7 @@ export function CodexChatPage() {
         {displayedDetail ? <div className="codex-task-controls"><GoalBudgetPanel key={displayedDetail.thread.chatId} chatId={displayedDetail.thread.chatId} refreshKey={goalRevision}
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} />
-        <DeliveryPanel key={`delivery-${displayedDetail.thread.chatId}`} chatId={displayedDetail.thread.chatId}
-          refreshKey={deliveryRevision} onSelectedRun={selectDeliveryRun}
-          budgetResult={deliveryBudgetResult?.chatId === displayedDetail.thread.chatId ? deliveryBudgetResult.run : null}
-          active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
-          editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} /></div> : null}
+        </div> : null}
         {budgetNotice?.chatId === selectedChatId ? <div className="codex-attachment-notice" role="status">{budgetNotice.text}</div> : null}
         <div className={`codex-transcript ${transcriptStale ? "stale" : ""}`} onScroll={event => { const el = event.currentTarget; followTranscriptRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; }} role="log" aria-live="polite" aria-label="Task Chat messages" aria-busy={historyBusy || connection === "connecting"}>
           {loading && !selectedChatId ? <div className="codex-empty-state"><LoaderCircle className="spin" size={28} /><h2>Loading Task Chat</h2></div> : null}
