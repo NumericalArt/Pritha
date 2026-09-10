@@ -387,3 +387,29 @@ test("task budget stays hidden until exhausted and collapses into a warning",asy
   await expect(panel).toHaveCount(0);
   expect(changes).toHaveLength(1);expect(changes[0]).toMatchObject({mode:"add",tokens:100,expectedRevision:"goal-1"});
 });
+
+test("background activity cannot cancel the initial chat history load", async ({ page }) => {
+  await mockChat(page, true);
+  let releaseDetail!: () => void, metadataStarted!: () => void;
+  const detailPending = new Promise<void>(resolve => { releaseDetail = resolve; });
+  const started = new Promise<void>(resolve => { metadataStarted = resolve; });
+  let detailReads = 0, listReads = 0;
+  await page.route("**/threads?**", async route => { listReads += 1; await route.fallback(); });
+  await page.route("**/threads/chat_fixture", async route => {
+    detailReads += 1;
+    if (detailReads === 1) { metadataStarted(); await detailPending; }
+    await route.fallback();
+  });
+  await page.route("**/activity/stream?**", async route => {
+    await started;
+    await route.fulfill({ contentType: "text/event-stream", body: 'event: activity\ndata: {"cursor":1,"changed":["chat_fixture"],"admissionEnabled":true}\n\n' });
+  });
+  await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+  try {
+    await expect.poll(() => listReads).toBeGreaterThanOrEqual(2);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    expect(detailReads).toBe(1);
+  } finally { releaseDetail(); }
+  await expect(page.getByText("Original answer", { exact: true })).toBeVisible();
+  await expect(page.getByText("History did not load", { exact: true })).toHaveCount(0);
+});

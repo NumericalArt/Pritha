@@ -528,7 +528,11 @@ export function CodexChatPage() {
             if(changed.length) {
               await activityRefreshRef.current();
               const selected=selectedChatIdRef.current;
-              if(selected && changed.includes(selected))await activityDetailRefreshRef.current(selected);
+              // Let the initial open finish: a background refresh must not abort
+              // the metadata request that is about to load history and its stream.
+              if(selected && changed.includes(selected)
+                && detailRequestRef.current?.chatId !== selected
+                && historyRequestRef.current?.chatId !== selected) await activityDetailRefreshRef.current(selected);
             }
             cursor=nextCursor;
           } catch(error){for(const id of changed)pending.add(id);throw error;}
