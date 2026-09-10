@@ -87,7 +87,8 @@ for (const width of [1280, 390]) {
     await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
     await page.getByRole("button", { name: "Restore access", exact: true }).click();
     await page.getByRole("button", { name: "Copy response", exact: true }).click();
-    await expect(page.getByText("Copied", { exact: true })).toBeVisible();
+    await expect(page.getByText("Copied", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy response", exact: true })).toHaveAttribute("aria-busy", "false");
     expect(await page.evaluate(() => (window as unknown as { copiedText: string }).copiedText)).toBe("Original answer");
     if (width < 700) await page.getByRole("button", { name: "Open chat history", exact: true }).click();
     const history = page.locator('.codex-history:visible, .codex-history-drawer:visible');
@@ -234,7 +235,7 @@ for (const width of [390, 1280]) test(`bounded history reveals details and copie
       const index = Number(url.searchParams.get("cursor")!.slice(4));
       const complete = index === chunks.length - 1;
       data = { text: chunks[index], nextCursor: complete ? null : `part${index + 1}`, complete };
-    } else if (url.pathname.endsWith("/items")) { itemReads++; data = { data: row.items, nextCursor: null }; }
+    } else if (url.pathname.endsWith("/items")) { if (url.searchParams.get("view") !== "activity") itemReads++; data = { data: url.searchParams.get("view") === "activity" ? [] : row.items, nextCursor: null }; }
     else data = { data: [row], olderCursor: null };
     return route.fulfill({ json: { apiVersion: "1", requestId: "bounded", data } });
   });
@@ -245,7 +246,8 @@ for (const width of [390, 1280]) test(`bounded history reveals details and copie
   await expect(page.getByText("Details temporarily unavailable.", { exact: false })).toBeVisible();
   await expect(page.getByText("Short preview", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Copy response", exact: true }).click();
-  await expect(page.getByText("Copied", { exact: true })).toBeVisible();
+  await expect(page.getByText("Copied", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy response", exact: true })).toHaveAttribute("aria-busy", "false");
   expect(await page.evaluate(() => (window as unknown as { copiedText: string }).copiedText)).toBe(original);
   expect(itemReads).toBe(1);
   await page.getByRole("button", { name: "Retry loading text", exact: true }).click();
@@ -255,7 +257,7 @@ for (const width of [390, 1280]) test(`bounded history reveals details and copie
   const composer = await page.locator(".codex-composer").boundingBox();
   expect(composer).not.toBeNull();
   expect(composer!.y + composer!.height).toBeLessThanOrEqual(852);
-  await page.locator('.codex-activity > summary').filter({ hasText: "Activity" }).click();
+  await expect(page.getByRole("region", { name: "Activity", exact: true })).toHaveCount(0);
   expect(itemReads).toBeGreaterThanOrEqual(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -310,4 +312,78 @@ test("isolated candidate serves health, Task Chat, Codex alias and every referen
     expect(response.headers()["content-type"]).toMatch(/javascript/);
     expect((await response.body()).length).toBeGreaterThan(20);
   }
+});
+
+for (const width of [1280, 390]) for (const history of [false, true]) test(`response icons and latest activity at ${width}px (${history ? "history" : "live"})`, async ({ page }, testInfo) => {
+  await page.setViewportSize({width,height:850});
+  await page.addInitScript(() => Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async(text:string)=>{(window as any).copiedText=text;}}}));
+  await mockChat(page,true);
+  const actions=Array.from({length:12},(_,i)=>({id:`action_${i+1}`,kind:"command",status:"completed",commandPreview:`Action ${i+1}`,outputPreview:null,exitCode:0}));
+  const answer={id:"answer_complete",kind:"assistant_message",status:"completed",message:{id:"answer_complete",markdown:"Answer complete",status:"completed",role:"assistant",createdAt:new Date().toISOString()}};
+  const row:any={turnId:"turn_activity",status:"completed",userMessage:{id:"user",markdown:"Run the activity fixture",role:"user",status:"completed"},items:history?[answer]:[...actions,answer],pendingRequestIds:[],startedAt:new Date().toISOString(),...(history?{history:{itemsRef:"recent_actions",itemsState:"not_loaded",sourceMode:"native"}}:{})};
+  const reads:string[]=[];
+  await page.route("**/threads/chat_fixture/history**",route=>{
+    const url=new URL(route.request().url());let data:any;
+    if(url.pathname.endsWith("/items")){
+      if(url.searchParams.get("view")==="activity"){
+        const cursor=url.searchParams.get("cursor")!;reads.push(cursor);
+        const end=cursor==="recent_actions"?12:Number(cursor.slice(6));const start=Math.max(0,end-5);
+        data={data:actions.slice(start,end).reverse(),nextCursor:start?`older_${start}`:null};
+      }else data={data:[answer],nextCursor:null};
+    }else data={data:[row],olderCursor:null,newerCursor:null,hasOlder:false,hasNewer:false,completeness:"captured-from-creation"};
+    return route.fulfill({json:{apiVersion:"1",requestId:"activity-fixture",data}});
+  });
+  await page.goto("/task-chat?group=my_chats&chat=chat_fixture");
+  const feed=page.getByRole("region",{name:"Activity",exact:true});
+  await expect(feed.getByText("Action 12",{exact:true})).toBeVisible();
+  await expect(feed.getByText("Action 7",{exact:true})).toHaveCount(0);
+  await expect.poll(async()=>{
+    const latestBounds=await feed.getByText("Action 12",{exact:true}).boundingBox();
+    const transcriptBounds=await page.locator(".codex-transcript").boundingBox();
+    return latestBounds!.y+latestBounds!.height <= transcriptBounds!.y+transcriptBounds!.height+1;
+  }).toBe(true);
+  await page.screenshot({path:testInfo.outputPath("latest-activity.png"),fullPage:true});
+  const copy=page.getByRole("button",{name:"Copy response",exact:true});
+  await expect(copy).toBeVisible();await expect(copy).toHaveText("");await expect(copy.locator("svg")).toHaveCount(1);
+  await copy.click();await expect.poll(()=>page.evaluate(()=>(window as any).copiedText)).toBe("Answer complete");
+  await expect(page.getByText("Copied",{exact:true})).toHaveCount(0);
+  if(history) { expect(reads.length).toBeGreaterThan(0); expect(reads.every(cursor=>cursor==="recent_actions")).toBe(true); }
+  await feed.getByRole("button",{name:/Show earlier actions/}).click();
+  await expect(feed.getByText("Action 3",{exact:true})).toBeVisible();
+  const early=await feed.getByText("Action 3",{exact:true}).boundingBox(),latest=await feed.getByText("Action 12",{exact:true}).boundingBox();
+  expect(early!.y).toBeLessThan(latest!.y);
+  await feed.getByRole("button",{name:/Show earlier actions/}).click();
+  await expect(feed.getByText("Action 1",{exact:true})).toBeAttached();
+  await expect(feed.getByRole("button",{name:/Show earlier actions/})).toHaveCount(0);
+  await page.screenshot({path:testInfo.outputPath("response-activity.png"),fullPage:true});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  row.status="in_progress";await page.reload();
+  await expect(page.getByText("Answer complete",{exact:true})).toBeVisible();
+  await expect(copy).toHaveCount(0);
+});
+
+
+test("task budget stays hidden until exhausted and collapses into a warning",async({page})=>{
+  await mockChat(page,true);
+  let goal:any={availability:"available",status:"active",objective:"Finish the fixture",tokensUsed:30,tokenBudget:50,revision:"goal-1",pendingRequest:null};
+  const changes:any[]=[];
+  await page.route("**/threads/chat_fixture/goal",route=>{
+    if(route.request().method()==="POST") {changes.push(route.request().postDataJSON());goal={...goal,status:"active",tokenBudget:150,revision:"goal-2"};}
+    return route.fulfill({json:{apiVersion:"1",requestId:"goal-fixture",data:goal}});
+  });
+  for(const state of [{availability:"none"},{availability:"unsupported"},{status:"active"},{status:"paused"},{status:"blocked"},{status:"usageLimited"},{status:"complete",tokensUsed:70}]){
+    goal={...goal,availability:"available",tokensUsed:30,status:"active",...state};
+    const read=page.waitForResponse(response=>response.url().endsWith("/goal"));
+    await page.goto("/task-chat?group=my_chats&chat=chat_fixture");await read;
+    await expect(page.getByText("Бюджет этой задачи",{exact:true})).toHaveCount(0);
+  }
+  goal={...goal,status:"budgetLimited",tokensUsed:70};
+  await page.reload();
+  const panel=page.locator(".codex-goal-panel");await expect(panel).toContainText("Бюджет закончился");
+  await expect(panel).not.toHaveAttribute("open","");
+  await panel.locator("summary").click();
+  await panel.getByLabel("Токены",{exact:true}).fill("100");
+  await panel.getByRole("button",{name:"Применить бюджет",exact:true}).click();
+  await expect(panel).toHaveCount(0);
+  expect(changes).toHaveLength(1);expect(changes[0]).toMatchObject({mode:"add",tokens:100,expectedRevision:"goal-1"});
 });

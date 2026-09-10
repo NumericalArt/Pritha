@@ -6,7 +6,7 @@ const MAX_READS = 2;
 let active = 0;
 const waiting: Array<() => void> = [];
 function cancelled() { return new DOMException("Text loading cancelled.", "AbortError"); }
-async function inReadPool<T>(signal: AbortSignal, read: () => Promise<T>): Promise<T> {
+export async function inReadPool<T>(signal: AbortSignal, read: () => Promise<T>): Promise<T> {
   await new Promise<void>((resolve, reject) => {
     if (signal.aborted) { reject(cancelled()); return; }
     const start = () => { signal.removeEventListener("abort", abort); active++; resolve(); };

@@ -1066,8 +1066,8 @@ export class CodexChatGateway {
   historyPage(chatId: string, cursor?: string, limit = 20) {
     return this.historyOperation(chatId, `page:${cursor || "latest"}:${limit}`, (context, deadline) => this.historyReader.page(context, cursor, limit, deadline));
   }
-  historyItems(chatId: string, turnId: string, ref: string) {
-    return this.historyOperation(chatId, `items:${turnId}:${ref}`, (context, deadline) => this.historyReader.items(context, turnId, ref, deadline));
+  historyItems(chatId: string, turnId: string, ref: string, activity = false) {
+    return this.historyOperation(chatId, `items:${activity}:${turnId}:${ref}`, (context, deadline) => this.historyReader.items(context, turnId, ref, deadline, activity));
   }
   historyContent(chatId: string, itemId: string, ref: string) {
     return this.historyOperation(chatId, `content:${itemId}:${ref}`, (context, deadline) => this.historyReader.content(context, itemId, ref, deadline));

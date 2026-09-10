@@ -35,6 +35,22 @@ function context(turns, pagination = true, providerId = "desktop_bundled") {
     } };
   return { c, calls };
 }
+for (const pagination of [true, false]) test(`recent activity is bounded, newest first and keeps earlier cursors (${pagination ? "native" : "compatibility"})`, async () => {
+  const row = turn(1);
+  row.items.splice(1, 0, ...Array.from({ length: 73 }, (_, i) => ({ id: `cmd${i}`, type: "commandExecution", command: `echo ${i}`, aggregatedOutput: `output ${i}`, status: "completed", exitCode: 0 })));
+  const { c, calls } = context([row], pagination), reader = new HistoryReader();
+  const summary = (await reader.page(c)).data[0];
+  const first = await reader.items(c, summary.turnId, summary.history.itemsRef, undefined, true);
+  assert.deepEqual(first.data.map(item => item.commandPreview), [72,71,70,69,68].map(i => `echo ${i}`));
+  if (pagination) assert.equal(calls.filter(call => call.method === "thread/items/list").length, 6);
+  assert.ok((await reader.content(c, first.data[0].id, first.data[0].contentRef)).text.startsWith("echo 72"));
+  const all = [...first.data]; let cursor = first.nextCursor;
+  while (cursor) { const page = await reader.items(c, summary.turnId, cursor, undefined, true); assert.ok(page.data.length <= 5); all.push(...page.data); cursor = page.nextCursor; }
+  assert.deepEqual(all.map(item => item.commandPreview), Array.from({length:73},(_,i)=>`echo ${72-i}`));
+  const copyPage = await reader.items(c, summary.turnId, summary.history.itemsRef);
+  assert.ok(copyPage.data.some(item => item.kind === "user_message"));
+  assert.equal(copyPage.data.find(item=>item.kind === "command").commandPreview, "echo 0");
+});
 for (const provider of ["desktop_bundled", "standalone_cli"]) test(`${provider}: native first page stays small for 10,000 turns and survives appends`, async () => {
   const turns = Array.from({ length: 10000 }, (_, i) => turn(i));
   const { c, calls } = context(turns, true, provider); const reader = new HistoryReader();

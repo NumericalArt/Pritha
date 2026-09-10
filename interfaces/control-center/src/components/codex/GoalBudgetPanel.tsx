@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { controlCenterRequest, ControlCenterRequestError } from "@/lib/control-center-request";
 import type { GoalBudgetRequest, ThreadGoalView } from "@/lib/codex-chat/types";
@@ -72,12 +73,14 @@ export function GoalBudgetPanel({ chatId, active, editable, refreshKey }: { chat
     } finally { busyRef.current = false; if (mounted.current) setBusy(false); }
   };
 
-  if (goal?.availability === "none") return null;
+  const exhausted = goal?.availability === "available" && goal.status !== "complete" &&
+    (goal.status === "budgetLimited" || (goal.tokenBudget !== null && goal.tokensUsed !== null && goal.tokensUsed >= goal.tokenBudget));
+  // Keep an unconfirmed budget change reachable until its receipt is reconciled.
+  if (!exhausted && !pending) return null;
   const visible = goal?.availability === "available";
   const disabled = !visible || !editable || active || busy || goal.status === "complete";
-  const needsControl = ["budgetLimited", "paused", "blocked", "usageLimited"].includes(goal?.status || "");
-  return <details className="codex-goal-panel" open={needsControl || Boolean(pending) || undefined}>
-    <summary><strong>Бюджет этой задачи</strong><span>{visible ? `${number(goal.tokensUsed)} / ${number(goal.tokenBudget)} · ${labels[goal.status || ""] || goal.status}` : goal?.availability === "unsupported" ? "Goal недоступен в этом runtime" : "Проверяем Goal…"}</span></summary>
+  return <details className="codex-goal-panel codex-goal-warning">
+    <summary><AlertTriangle size={16} aria-hidden="true" /><strong>Бюджет этой задачи</strong><span>{pending ? "Проверяем изменение бюджета · " : "Бюджет закончился · "}</span><span>{visible ? `${number(goal.tokensUsed)} / ${number(goal.tokenBudget)} · ${labels[goal.status || ""] || goal.status}` : goal?.availability === "unsupported" ? "Goal недоступен в этом runtime" : "Проверяем Goal…"}</span></summary>
     <div className="codex-goal-body">
       {visible ? <>
         <p className="codex-goal-objective">{goal.objective}</p>

@@ -24,6 +24,7 @@ import { useChatAttachments } from "./useChatAttachments";
 import { readDraftSession, writeDraftSession } from "@/lib/codex-chat/draft-session";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { TaskChatControls } from "./TaskChatControls";
+import { ActivityFeed } from "./ActivityFeed";
 import { HistoryTurn } from "./HistoryTurn";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { CopyResponse } from "./CopyResponse";
@@ -249,11 +250,11 @@ function ActivityItem({ item }: { item: ChatItemView }) {
     );
   }
   if (item.kind === "reasoning_summary") {
-    return <details className="codex-activity"><summary><ChevronRight size={15} /> Reasoning summary</summary><CodexMarkdown markdown={item.markdown} /></details>;
+    return <details className="codex-activity" open><summary><ChevronRight size={15} /> Reasoning summary</summary><CodexMarkdown markdown={item.markdown} /></details>;
   }
   if (item.kind === "command") {
     return (
-      <details className="codex-activity">
+      <details className="codex-activity" open>
         <summary><Terminal size={15} /> Command <span>{item.status.replace("_", " ")}</span></summary>
         <code>{item.commandPreview}</code>
         {item.cwdLabel ? <small>in {item.cwdLabel}</small> : null}
@@ -263,7 +264,7 @@ function ActivityItem({ item }: { item: ChatItemView }) {
   }
   if (item.kind === "file_change") {
     return (
-      <details className="codex-activity">
+      <details className="codex-activity" open>
         <summary><FileCode2 size={15} /> Files changed <span>{item.changes.length}</span></summary>
         <ul>{item.changes.map((change, index) => <li key={`${change.path}-${index}`}><strong>{change.operation}</strong> {change.path}</li>)}</ul>
         {item.diffPreview ? <pre>{item.diffPreview}</pre> : null}
@@ -274,7 +275,7 @@ function ActivityItem({ item }: { item: ChatItemView }) {
   if (item.kind === "web_search") return <div className="codex-activity-row"><Globe2 size={15} /><span>Web search</span><small>{item.query}</small></div>;
   if (item.kind === "plan") {
     return (
-      <details className="codex-activity">
+      <details className="codex-activity" open>
         <summary><ListChecks size={15} /> Plan <span>{item.steps.length} steps</span></summary>
         <ol>{item.steps.map((step, index) => <li key={index}>{step.label}</li>)}</ol>
       </details>
@@ -1632,7 +1633,8 @@ export function CodexChatPage() {
                 {turn.userMessage.attachments?.length ? <AttachmentLinks files={turn.userMessage.attachments} /> : null}
               </article>
               <div className="codex-turn-items">
-                {turn.items.map((item) => <ActivityItem item={item} key={item.id} />)}
+                {turn.items.filter(item => item.kind === "assistant_message" || item.kind === "user_message").map(item => <ActivityItem item={item} key={item.id} />)}
+                <ActivityFeed status={turn.status} items={turn.items.filter(item => item.kind !== "assistant_message" && item.kind !== "user_message")} renderItem={item => <ActivityItem item={item} />} />
                 <CopyResponse turn={turn} />
                 {turn.error ? <div className="codex-inline-notice error">{turn.error.message}</div> : null}
               </div>

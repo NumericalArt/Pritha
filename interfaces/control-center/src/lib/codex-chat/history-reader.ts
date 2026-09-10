@@ -23,7 +23,7 @@ export type HistoryContext = {
 type Row = Record<string, unknown>;
 type Mode = "native" | "compatibility";
 type Token = { scope: string; kind: "page" | "items" | "content"; mode: Mode; turn?: string; item?: string;
-  cursor?: string | null; offset?: number; contentOffset?: number; snapshot?: string; field?: string; hash?: string; sort?: "asc" | "desc" };
+  cursor?: string | null; offset?: number; contentOffset?: number; snapshot?: string; field?: string; hash?: string; sort?: "asc" | "desc"; activity?: boolean };
 type Snapshot = { scope: string; chatId: string; id: string; at: number; bytes: number; turns: Row[] };
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 const rows = (value: unknown): Row[] => Array.isArray(value) ? value.map(asObject).filter((x): x is Row => Boolean(x)) : [];
@@ -223,7 +223,7 @@ export class HistoryReader {
     const all = rows(turn.items); if (t.sort === "desc") all.reverse();
     const offset = t.offset || 0;
     const data = all.slice(offset, offset + limit);
-    const next = offset + data.length < all.length ? this.token(c, "compatibility", { kind: "items", turn: t.turn, offset: offset + data.length, snapshot: snapshot.id, sort: t.sort }) : null;
+    const next = offset + data.length < all.length ? this.token(c, "compatibility", { kind: "items", turn: t.turn, offset: offset + data.length, snapshot: snapshot.id, sort: t.sort, activity: t.activity }) : null;
     return { data, next, mode: "compatibility" };
   }
   private itemText(c: HistoryContext, t: Token, item: Row): string {
@@ -237,8 +237,12 @@ export class HistoryReader {
     if (t.field === "reasoning") return Array.isArray(item.summary) ? item.summary.map(String).join("\n\n") : "";
     return "";
   }
-  async items(c: HistoryContext, turnId: string, ref: string, deadline = Date.now() + HISTORY_READ_MS): Promise<HistoryItemsPage> {
+  async items(c: HistoryContext, turnId: string, ref: string, deadline = Date.now() + HISTORY_READ_MS, activity = false): Promise<HistoryItemsPage> {
     let t = this.parse(c, ref, "items");
+    if (activity && !t.activity) {
+      if (t.cursor || t.offset) throw expired();
+      t = { ...t, sort: "desc", activity: true };
+    }
     const identity = normalizeNativeTurn(c.binding, { id: t.turn, items: [] }, c.root)?.turnId;
     if (identity !== turnId) throw expired();
     const data: ChatItemView[] = [];
@@ -248,7 +252,7 @@ export class HistoryReader {
       const batch = await this.itemBatch(c, t, deadline, 1);
       for (const raw of batch.data) {
         const item = normalizeNativeItem(c.binding.chatId, raw, c.root, new Date(0).toISOString());
-        if (!item) continue;
+        if (!item || (t.activity && (item.kind === "assistant_message" || item.kind === "user_message" || raw.type === "userMessage"))) continue;
         const field = item.kind === "assistant_message" ? "message" : item.kind === "command" ? "output" : item.kind === "file_change" ? "diff" : item.kind === "reasoning_summary" ? "reasoning" : raw.type === "userMessage" ? "user" : item.kind === "tool" ? "tool" : item.kind === "plan" ? "plan" : item.kind === "web_search" ? "search" : null;
         if (field) {
           const contentRef = this.contentRef(c, batch.mode, String(t.turn), String(raw.id), field, { cursor: batch.mode === "native" ? t.cursor : undefined, offset: batch.mode === "compatibility" ? t.offset : undefined, snapshot: t.snapshot, sort: t.sort });
@@ -262,8 +266,8 @@ export class HistoryReader {
         if (data.length && Buffer.byteLength(JSON.stringify([...data, item])) > HISTORY_PAGE_BYTES - 10_240) return boundedPage({ data, nextCursor: this.sign(t) });
         data.push(item);
       }
-      next = batch.next ? batch.mode === "native" ? this.token(c, "native", { kind: "items", turn: t.turn, cursor: batch.next }) : batch.next : null;
-      if (!next) break;
+      next = batch.next ? batch.mode === "native" ? this.token(c, "native", { kind: "items", turn: t.turn, cursor: batch.next, sort: t.sort, activity: t.activity }) : batch.next : null;
+      if (!next || (t.activity && data.length >= 5)) break;
       t = this.parse(c, next, "items");
       if (Buffer.byteLength(JSON.stringify(data)) > HISTORY_PAGE_BYTES - 16_384) break;
     }

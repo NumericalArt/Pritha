@@ -5,6 +5,6 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: { params: Promise<{ chatId: string; turnId: string }> }) {
   try {
     const p = await context.params, url = new URL(request.url), gateway = getCodexChatGateway();
-    return apiSuccess(await gateway.historyItems(p.chatId, p.turnId, url.searchParams.get("cursor") || ""));
+    return apiSuccess(await gateway.historyItems(p.chatId, p.turnId, url.searchParams.get("cursor") || "", url.searchParams.get("view") === "activity"));
   } catch (error) { return apiError(error); }
 }

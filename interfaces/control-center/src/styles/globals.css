@@ -7322,3 +7322,21 @@ button:active,
   color: var(--text-primary);
   font: inherit;
 }
+
+/* Response tools stay quiet; activity retains its latest actions at the bottom. */
+.codex-copy-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted, #94a3b8); cursor: pointer; }
+.codex-copy-button:hover { color: var(--text-primary, #e2e8f0); background: rgba(148, 163, 184, .1); }
+.codex-copy-button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.codex-copy-button:disabled { opacity: .5; cursor: default; }
+.codex-history-activity { min-height: 1px; }
+.codex-activity-feed { min-width: 0; margin: 12px 0; padding: 12px 14px; border: 1px solid var(--border, #253041); border-radius: 12px; }
+.codex-activity-heading, .codex-history-action-label { color: var(--text-muted, #94a3b8); font-size: 12px; }
+.codex-activity-items { display: grid; gap: 10px; margin-top: 8px; min-width: 0; }
+.codex-activity-entry { min-width: 0; }
+.codex-activity-preview { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; max-height: 4.5em; overflow: hidden; }
+.codex-history-action details { margin-top: 4px; min-width: 0; }
+.codex-history-action details > summary { cursor: pointer; color: var(--text-muted, #94a3b8); font-size: 12px; }
+.codex-activity-loading { display: block; color: var(--text-muted, #94a3b8); font-size: 12px; }
+.codex-task-controls:empty { display: none; }
+.codex-goal-panel.codex-goal-warning { border-color: #b9944b; }
+.codex-goal-warning > summary { color: #dfbb70; }
