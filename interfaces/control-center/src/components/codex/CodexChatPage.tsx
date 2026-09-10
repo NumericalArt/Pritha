@@ -25,6 +25,7 @@ import { readDraftSession, writeDraftSession } from "@/lib/codex-chat/draft-sess
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { TaskChatControls } from "./TaskChatControls";
 import { HistoryTurn } from "./HistoryTurn";
+import { WorkingIndicator } from "./WorkingIndicator";
 import { CopyResponse } from "./CopyResponse";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
 import type { TaskDeliveryView } from "@/lib/codex-chat/delivery-types";
@@ -1028,6 +1029,9 @@ export function CodexChatPage() {
   const visibleThreads = useMemo(() => threads.filter((thread) => thread.group === activeGroup && thread.archived === showArchived), [activeGroup, threads, showArchived]);
 
   const hasActiveTurn = displayedTurns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
+  const workingLabel = displayedTurns.some(turn => turn.status === "waiting_for_approval" || turn.status === "waiting_for_input") ? null
+    : displayedTurns.some(turn => turn.status === "in_progress") ? "Pritha is working"
+    : displayedTurns.some(turn => turn.status === "queued") ? "In queue" : null;
   const displayedDetail = selectionChanging ? null : detail;
   const displayedThread = displayedDetail?.thread || selectedSummary;
   const effectiveProvider = runtime?.providers.find((provider) => provider.providerId === (displayedThread?.runtime.providerId || runtime.effectiveProvider));
@@ -1629,9 +1633,6 @@ export function CodexChatPage() {
               </article>
               <div className="codex-turn-items">
                 {turn.items.map((item) => <ActivityItem item={item} key={item.id} />)}
-                {turn.status === "in_progress" && !turn.items.some((item) => item.kind === "assistant_message") ? (
-                  <div className="codex-thinking"><LoaderCircle className="spin" size={16} /> Pritha is working…</div>
-                ) : null}
                 <CopyResponse turn={turn} />
                 {turn.error ? <div className="codex-inline-notice error">{turn.error.message}</div> : null}
               </div>
@@ -1669,7 +1670,10 @@ export function CodexChatPage() {
           ) : <div className="codex-composer" role="group" aria-label="Message composer" onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={event => {
             if (event.dataTransfer.files.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(Array.from(event.dataTransfer.files)); }
           }}>
-            <span id="codex-message-label">Message Pritha</span>
+            <div className="codex-composer-heading">
+              <span id="codex-message-label">Message Pritha</span>
+              <WorkingIndicator label={workingLabel} />
+            </div>
             <DraftAttachments items={attachmentDraft.items} locked={Boolean(pendingDelivery) || sending} remove={attachmentDraft.remove} retry={attachmentDraft.retry} />
             {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
             {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
@@ -1693,7 +1697,7 @@ export function CodexChatPage() {
                   ? "Retry history before sending…"
                   : selectedChatId && historyState !== "ready"
                     ? "Loading history…"
-                    : hasActiveTurn ? "Pritha is working…" : "Ask Pritha…"}
+                    : "Ask Pritha…"}
               rows={3}
               maxLength={64_000}
               disabled={Boolean(selectedChatId && historyState !== "ready")}

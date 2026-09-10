@@ -96,3 +96,44 @@ test('mobile native input stays within the page and answers only its exact reque
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await f.controls[0].route.fulfill({json:{apiVersion:'1',data:{submitted:true}}});
 });
+
+for (const width of [1440, 390]) test(`composer working indicator preserves typing and follows the selected task at ${width}px`,async({page},testInfo)=>{
+  await page.setViewportSize({width,height:900});
+  const f=await fixture(page);
+  let status='in_progress';
+  await page.route('**/api/codex-chat/v1/threads/chat_A/history?**',route=>route.fulfill({json:{apiVersion:'1',requestId:'working',data:{data:[{
+    turnId:'turn_working',status,userMessage:{id:'working_user',markdown:'Prepare the report'},
+    items:[],pendingRequestIds:[],startedAt:new Date().toISOString(),error:null,
+  }],olderCursor:null}}}));
+  await page.goto('/task-chat?group=my_chats&chat=chat_A');
+  const composer=page.locator('.codex-composer'), input=composer.locator('textarea'), indicator=composer.locator('.codex-working-indicator');
+  await expect(indicator).toHaveText('Pritha is working');
+  await expect(page.locator('.codex-transcript').getByText('Pritha is working',{exact:false})).toHaveCount(0);
+  await expect(input).toBeEnabled(); await input.fill('Keep this next task draft');
+  await expect(indicator).toBeVisible();
+  await expect(input).toHaveValue('Keep this next task draft');
+  const dots=indicator.locator('.codex-working-dots > span');
+  await expect(dots).toHaveCount(3);
+  expect(await dots.evaluateAll(elements=>elements.map(el=>getComputedStyle(el).animationDelay))).toEqual(['0s','0.16s','0.32s']);
+  await expect.poll(()=>dots.first().evaluate(el=>getComputedStyle(el).animationName)).toBe('codex-working-dot');
+  const opacity=await dots.first().evaluate(el=>getComputedStyle(el).opacity);
+  await expect.poll(()=>dots.first().evaluate(el=>getComputedStyle(el).opacity)).not.toBe(opacity);
+  const heading=await composer.locator('.codex-composer-heading').boundingBox(), field=await input.boundingBox();
+  expect(heading!.y+heading!.height).toBeLessThanOrEqual(field!.y);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:testInfo.outputPath('working-composer.png'),fullPage:true});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  expect(await dots.evaluateAll(elements=>elements.map(el=>getComputedStyle(el).animationName))).toEqual(['none','none','none']);
+  async function select(name:string) {
+    if(width<700)await page.getByRole('button',{name:'Open chat history',exact:true}).click();
+    await page.getByRole('button',{name:new RegExp(`Chat ${name}`)}).click();
+  }
+  await select('B'); await expect(indicator).toBeEmpty();
+  await select('A'); await expect(indicator).toHaveText('Pritha is working');
+  await expect(input).toHaveValue('Keep this next task draft');
+  for(const paused of ['waiting_for_approval','waiting_for_input','completed']) {
+    status=paused; await page.reload(); await expect(input).toBeEnabled();
+    await expect(indicator).toBeEmpty(); await expect(input).toHaveValue('Keep this next task draft');
+  }
+  expect(f.requests).toHaveLength(0);
+});

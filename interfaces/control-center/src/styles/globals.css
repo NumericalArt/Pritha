@@ -6666,13 +6666,7 @@ button:active,
   }
 }
 
-.codex-thinking {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
+
 
 .codex-activity,
 .codex-activity-row,
@@ -6976,6 +6970,51 @@ button:active,
 .codex-composer > span {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.codex-composer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.codex-working-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.codex-working-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.codex-working-dots > span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  animation: codex-working-dot 1.4s ease-in-out infinite;
+}
+
+.codex-working-dots > span:nth-child(2) { animation-delay: 0.16s; }
+.codex-working-dots > span:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes codex-working-dot {
+  0%, 60%, 100% { opacity: 0.3; }
+  25% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codex-working-dots > span { animation: none; opacity: 0.65; }
 }
 
 .codex-composer textarea {
