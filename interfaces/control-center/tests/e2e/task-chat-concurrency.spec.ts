@@ -129,8 +129,7 @@ for (const width of [1440, 390]) test(`composer working indicator preserves typi
   await expect.poll(()=>dots.first().evaluate(el=>getComputedStyle(el).animationName)).toBe('codex-working-dot');
   const opacity=await dots.first().evaluate(el=>getComputedStyle(el).opacity);
   await expect.poll(()=>dots.first().evaluate(el=>getComputedStyle(el).opacity)).not.toBe(opacity);
-  const heading=await composer.locator('.codex-composer-heading').boundingBox(), field=await input.boundingBox();
-  expect(heading!.y+heading!.height).toBeLessThanOrEqual(field!.y);
+  await expect(composer.getByText('Message Pritha', { exact: true })).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:testInfo.outputPath('working-composer.png'),fullPage:true});
   await page.emulateMedia({reducedMotion:'reduce'});

@@ -1676,16 +1676,13 @@ export function CodexChatPage() {
           ) : <div className="codex-composer" role="group" aria-label="Message composer" onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={event => {
             if (event.dataTransfer.files.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(Array.from(event.dataTransfer.files)); }
           }}>
-            <div className="codex-composer-heading">
-              <span id="codex-message-label">Message Pritha</span>
-            </div>
             <DraftAttachments items={attachmentDraft.items} locked={Boolean(pendingDelivery) || sending} remove={attachmentDraft.remove} retry={attachmentDraft.retry} />
             {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
             {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
             <div className="codex-composer-input">
               <textarea
                 aria-describedby="codex-working-status"
-                aria-labelledby="codex-message-label"
+                aria-label="Message Pritha"
                 onPaste={event => {
                   const images = Array.from(event.clipboardData.files).filter(file => file.type.startsWith("image/"));
                   if (images.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(images); }

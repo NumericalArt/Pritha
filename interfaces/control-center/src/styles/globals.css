@@ -6972,18 +6972,6 @@ button:active,
   font-size: 12px;
 }
 
-.codex-composer-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  min-width: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 18px;
-}
-
 .codex-composer-input {
   position: relative;
   min-width: 0;
@@ -7151,9 +7139,13 @@ button:active,
     overflow: hidden;
   }
 
+  .content-shell:has(.codex-page) .mobile-header {
+    display: none;
+  }
+
   .app-main:has(.codex-page) {
     min-height: 0;
-    padding: 0 0 calc(92px + env(safe-area-inset-bottom));
+    padding: env(safe-area-inset-top) 0 calc(92px + env(safe-area-inset-bottom));
     gap: 0;
     overflow: hidden;
   }
@@ -7222,8 +7214,9 @@ button:active,
     flex-direction: column;
   }
 
-  .codex-composer-actions > small {
-    max-width: none;
+  .codex-composer-actions > small,
+  .codex-attachment-limits {
+    display: none;
   }
 
   .codex-composer-controls {
@@ -7282,10 +7275,6 @@ button:active,
   }
 
   .codex-runtime-pill {
-    display: none;
-  }
-
-  .codex-composer-actions > small {
     display: none;
   }
 

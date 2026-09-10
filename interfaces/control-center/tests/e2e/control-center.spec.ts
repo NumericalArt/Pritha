@@ -353,7 +353,7 @@ test.describe("Control Center UI regression", () => {
     await page.locator('[aria-label="Task Chat history drawer"]').getByRole("button", { name: /^Voice example/ }).click();
     await expect(page.getByRole("button", { name: "Continue in Task Chat" })).toBeVisible();
     await page.getByRole("button", { name: "Continue in Task Chat" }).click();
-    await expect(page.getByText("Message Pritha")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Message Pritha", exact: true })).toBeVisible();
 
     const voiceDraft = "Keep this retry attached only to the Voice thread";
     await page.locator(".codex-composer textarea").fill(voiceDraft);
