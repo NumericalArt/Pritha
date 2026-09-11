@@ -4,6 +4,32 @@ export const LIVE_MODEL = "gpt-live-1";
 export const DEFAULT_LIVE_BACKEND = "gpt-5.6-terra";
 export const isLiveModel = (model: string) => model === LIVE_MODEL;
 
+// Live's per-session appended-input limit is 128 items / 32768 UTF-8 bytes.
+// Leave space for provider accounting and keep individual tool results small.
+const INPUT_BYTE_BUDGET = 30000;
+const INPUT_ITEM_BUDGET = 120;
+const byteLength = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
+export function boundedLiveToolOutput(value: unknown, budget: number): string {
+  const full = JSON.stringify(value) ?? "null";
+  if (byteLength(full) <= budget) return full;
+  const compact = {
+    truncated: true,
+    original_bytes: new TextEncoder().encode(full).length,
+    note: "Partial tool result. Request a narrower read if needed. Do not repeat a completed action to retrieve its result.",
+    output_preview: "",
+  };
+  const chars = Array.from(full);
+  let low = 0, high = chars.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    compact.output_preview = chars.slice(0, middle).join("");
+    if (byteLength(JSON.stringify(compact)) <= budget) low = middle;
+    else high = middle - 1;
+  }
+  compact.output_preview = chars.slice(0, low).join("");
+  return JSON.stringify(compact);
+}
+
 type FunctionItem = { type?: string; name?: string; call_id?: string; arguments?: string };
 type Event = {
   type?: string; event_id?: string; delegation_id?: string; target?: string; response_id?: string;
@@ -20,6 +46,7 @@ type Callbacks = {
   closed: (event: Event) => void;
   error: (message: string) => void;
   usage?: (seconds: number | undefined, backend: unknown) => void;
+  diagnostic?: (event: Record<string, unknown>) => void;
 };
 
 export function liveSessionConfig(options: {
@@ -55,12 +82,37 @@ export class LiveSession {
   private queue: Promise<void> = Promise.resolve();
   private responseActive = false;
   private queuedResponse = false;
+  private inputBytes = 0;
+  private inputItems = 0;
+  private backendBlocked = false;
   private pending = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   constructor(private callbacks: Callbacks) {}
 
+  private blockBackend(code: string) {
+    if (this.backendBlocked) return;
+    this.backendBlocked = true;
+    this.responseActive = false;
+    this.queuedResponse = false;
+    this.callbacks.diagnostic?.({ code, input_bytes: this.inputBytes, input_items: this.inputItems });
+    this.callbacks.error("Voice tool workflow paused. Reconnect to continue; check completed actions before retrying.");
+    this.context("The tool workflow is paused because its result could not be safely delivered. Ask the user to reconnect. Do not claim the operation failed or repeat completed actions.", "commentary");
+  }
+
   private send(event: Record<string, unknown>) {
     if (this.disposed || !this.ready || this.closing) return false;
-    this.callbacks.send({ event_id: crypto.randomUUID(), ...event });
+    const isInput = event.type === "response.item.create";
+    if ((isInput || event.type === "response.create") && this.backendBlocked) return false;
+    const size = isInput ? byteLength(event.item) : 0;
+    if (isInput && (this.inputItems >= INPUT_ITEM_BUDGET || this.inputBytes + size > INPUT_BYTE_BUDGET)) {
+      this.blockBackend("input_budget_exhausted");
+      return false;
+    }
+    try { this.callbacks.send({ event_id: crypto.randomUUID(), ...event }); }
+    catch {
+      if (isInput || event.type === "response.create") this.blockBackend("transport_send_failed");
+      return false;
+    }
+    if (isInput) { this.inputBytes += size; this.inputItems++; }
     return true;
   }
   context(text: string, kind: "thinking" | "commentary" | "instructions" = "thinking") {
@@ -130,6 +182,12 @@ export class LiveSession {
       const pending = this.pending.get(id);
       const error = new Error(message.error?.message || message.error?.code || "GPT-Live error");
       if (pending) { clearTimeout(pending.timer); this.pending.delete(id); pending.reject(error); }
+      this.callbacks.diagnostic?.({ code: message.error?.code || "provider_error", client_event_id: id });
+      if (["response_input_buffer_full", "function_call_outputs_required"].includes(message.error?.code || "")) {
+        this.blockBackend(message.error!.code!);
+        return;
+      }
+      this.responseActive = this.responses.size > 0;
       this.callbacks.error(error.message);
       return;
     }
@@ -172,19 +230,26 @@ export class LiveSession {
         return;
       }
       for (const item of calls) {
-        if (this.disposed || this.closing) return;
+        if (this.disposed || this.closing || this.backendBlocked) return;
+        const envelopeBytes = byteLength({ type: "function_call_output", call_id: item.call_id, output: "" });
+        const outputBudget = Math.min(6000, INPUT_BYTE_BUDGET - this.inputBytes - envelopeBytes);
+        if (this.inputItems >= INPUT_ITEM_BUDGET || outputBudget < 512) {
+          this.blockBackend("input_budget_exhausted_before_tool");
+          return;
+        }
         let output = this.toolResults.get(item.call_id!);
         if (output === undefined) {
-          try { output = JSON.stringify(await this.callbacks.runTool(item)) ?? "null"; }
+          try { output = boundedLiveToolOutput(await this.callbacks.runTool(item), outputBudget); }
           catch { output = JSON.stringify({ ok: false, error: "Tool execution failed; verify operation state before retrying." }); }
           this.toolResults.set(item.call_id!, output);
         }
         if (this.disposed || this.closing) return;
-        this.send({ type: "response.item.create", item: { type: "function_call_output", call_id: item.call_id, output } });
+        if (!this.send({ type: "response.item.create", item: { type: "function_call_output", call_id: item.call_id, output } })) return;
+        this.callbacks.diagnostic?.({ code: "tool_result_sent", input_bytes: this.inputBytes, input_items: this.inputItems });
       }
       this.responses.delete(id!);
       this.responseActive = this.responses.size > 0;
       if (calls.length || this.queuedResponse) { this.queuedResponse = false; this.requestResponse(); }
-    }).catch(() => this.callbacks.error("Voice backend result could not be delivered; check operation state before retrying."));
+    }).catch(() => this.blockBackend("tool_result_delivery_failed"));
   }
 }

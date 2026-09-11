@@ -73,3 +73,48 @@ test('Live context preserves Unicode within append limits and closes without a v
   f.live.context('late'); assert.equal(f.sent.length,n);
   f.event({ type:'session.closed', usage: { seconds: 23 } }); assert.equal(f.counts().closed,1);
 });
+test('Live bounds a large Unicode tool result and continues a multi-function workflow', async () => {
+  let runs = 0;
+  const f = fixture(async () => { runs++; return { entries: Array.from({length:300}, (_,i)=>({path:`музыка/🎵/${i}`,text:'x'.repeat(200)})) }; });
+  f.event({type:'session.started'});
+  for(let i=0;i<4;i++) { f.startResponse(`r${i}`); f.call(`r${i}`,`c${i}`); f.complete(`r${i}`); await tick(); }
+  const items=f.sent.filter(x=>x.type==='response.item.create');
+  assert.equal(runs,4); assert.equal(items.length,4);
+  assert.ok(items.every(x=>JSON.parse(x.item.output).truncated));
+  assert.ok(items.every(x=>Buffer.byteLength(JSON.stringify(x.item))<6200));
+  assert.equal(f.sent.filter(x=>x.type==='response.create').length,4);
+  assert.equal(f.errors.length,0);
+});
+test('Live stops before executing another tool when cumulative input budget is exhausted', async () => {
+  let runs=0; const f=fixture(async()=>{runs++;return{data:'x'.repeat(50000)}});
+  f.event({type:'session.started'});
+  for(let i=0;i<10;i++){f.startResponse(`r${i}`);f.call(`r${i}`,`c${i}`);f.complete(`r${i}`);await tick();}
+  const items=f.sent.filter(x=>x.type==='response.item.create');
+  assert.ok(runs<10);assert.equal(runs,items.length);
+  assert.ok(items.reduce((n,x)=>n+Buffer.byteLength(JSON.stringify(x.item)),0)<=30000);
+  assert.equal(f.errors.length,1);assert.match(f.errors[0],/Reconnect/);
+  assert.equal(f.live.userText('retry'),false);
+});
+test('Live counts typed messages toward the shared input item limit',()=>{
+  const f=fixture();f.event({type:'session.started'});
+  for(let i=0;i<130;i++)f.live.userText('hello');
+  assert.equal(f.sent.filter(x=>x.type==='response.item.create').length,120);
+  assert.equal(f.errors.length,1);
+});
+test('Live provider input rejection pauses rather than leaving a queued retry or rerunning tools',async()=>{
+  let runs=0;const f=fixture(async()=>{runs++;return{ok:true}});f.event({type:'session.started'});
+  f.startResponse('r');f.call('r','c');f.complete('r');await tick();
+  f.event({type:'error',error:{code:'response_input_buffer_full'}});
+  f.event({type:'error',error:{code:'function_call_outputs_required'}});
+  const creates=f.sent.filter(x=>x.type==='response.create').length;
+  f.live.requestResponse();f.startResponse('r2');f.call('r2','c2');f.complete('r2');await tick();
+  assert.equal(runs,1);assert.equal(f.sent.filter(x=>x.type==='response.create').length,creates);
+  assert.equal(f.errors.length,1);
+});
+test('Live send failure cannot continue with an undelivered function result',async()=>{
+  const errors=[];let creates=0,runs=0;
+  const live=new LiveSession({send:e=>{if(e.type==='response.item.create')throw Error('closed');if(e.type==='response.create')creates++;},runTool:async()=>{runs++;return{ok:true}},ready:()=>{},closed:()=>{},transcript:()=>{},error:e=>errors.push(e)});
+  const receive=e=>live.receive(JSON.stringify(e));receive({type:'session.started'});
+  for(const event of [{type:'response.created',response:{id:'r'}},{type:'response.output_item.done',response_id:'r',item:{type:'function_call',call_id:'c',name:'inspect'}},{type:'response.completed',response:{id:'r'}}])receive({type:'response.event',delegation_id:'d',event});
+  await tick();assert.equal(runs,1);assert.equal(creates,0);assert.equal(errors.length,1);
+});

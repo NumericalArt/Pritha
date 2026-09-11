@@ -2323,7 +2323,11 @@ function usePrithaRealtimeController() {
       channel.onopen = () => { if (!liveSessionRef.current) onVoiceReady(); };
       if (sessionData.voice_api === "live") {
         const live = new LiveSession({
-          send: (event) => { if (channel.readyState === "open") channel.send(JSON.stringify(event)); },
+          send: (event) => {
+            if (channel.readyState !== "open") throw new Error("Voice data channel is closed.");
+            channel.send(JSON.stringify(event));
+          },
+          diagnostic: (event) => logClientEvent("live_tool_protocol", event),
           runTool: async (item) => {
             if (liveSessionRef.current !== live || live.closing) return { ok: false, error: "Voice session ended." };
             return runToolCall(item);
