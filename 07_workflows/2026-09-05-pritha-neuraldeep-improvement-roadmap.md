@@ -3,8 +3,8 @@ id: 2026-09-05-pritha-neuraldeep-improvement-roadmap
 type: workflow
 status: ready-for-implementation
 created: 2026-09-05
-updated: 2026-09-07
-topics: [neuraldeep, agents-mother, codex-cli, delivery-budget, usage-accounting, recovery, task-chat]
+updated: 2026-09-08
+topics: [neuraldeep, agents-mother, codex-cli, delivery-budget, usage-accounting, recovery, task-chat, concurrency, voice-control, worktree, large-history, audit]
 tools: [Pritha, NeuralDeep, Codex CLI, Node.js, SQLite, Next.js]
 agent_platforms: [Pritha NeuralDeep, Codex]
 runtime_environment: [local-mac, cli, control-center]
@@ -14,13 +14,20 @@ sources:
   - neuraldeep-local-main-31b438e9d51ee0982f0ee4a3c18d6e6210117562
   - 07_workflows/2026-09-05-pritha-pilot-driven-improvement-roadmap.md
   - 03_reviews/2026-09-05-pritha-budget-continuation-implementation-review.md
+  - docs/neuraldeep-task-chat-concurrency-implementation.md
+  - docs/neuraldeep-large-history-adaptation.md
+  - docs/task-chat-large-history.md
   - https://learn.chatgpt.com/docs/config-file/config-advanced
   - https://neuraldeep.ru/docs
 related:
   workflows:
     - 07_workflows/2026-09-05-pritha-pilot-driven-improvement-roadmap.md
     - docs/neuraldeep-task-chat-adaptation.md
+    - docs/neuraldeep-task-chat-concurrency-implementation.md
+    - docs/task-chat-large-history.md
     - 07_workflows/control-center-staged-release.md
+  briefs:
+    - docs/neuraldeep-large-history-adaptation.md
   decisions:
     - 05_decisions/2026-09-05-delivery-budget-continuation.md
     - 05_decisions/2026-09-05-delivery-goal-lifecycle-and-accounting.md
@@ -32,10 +39,10 @@ superseded_by: []
 refines: [docs/neuraldeep-task-chat-adaptation.md]
 freshness_status: current
 source_published: 2026-09-05
-source_updated: 2026-09-07
-source_version: ND roadmap revision 10; ND docs base 320e56e and engine a3820b5; mother follow-up aa9c775
+source_updated: 2026-09-08
+source_version: ND roadmap revision 12; adaptation instructions based on ND source 8307bec; mother large-history contract 774b2d1; prior engine a3820b5 and mother cleanup aa9c775
 retrieved: 2026-09-05
-verified: 2026-09-07
+verified: 2026-09-08
 valid_for: next NeuralDeep implementation cycle; recheck runtime and provider before live pilot
 temporal_status: version-bound
 memory_domain: agent-building-knowledge
@@ -50,6 +57,13 @@ confidence: medium
 ---
 
 # Pritha ND: завершение агентов через Codex CLI и NeuralDeep
+
+Текущая редакция — **revision 12**: [раздел 17](#17-большая-история-и-cli-аудит--revision-12)
+добавляет большую историю и CLI-аудит к плану параллельного Task Chat/Voice
+из [раздела 16](#16-task-chat-и-voice-concurrency--revision-11).
+Исходные pins и evidence ниже относятся к указанным историческим сверкам;
+добавление инструкций не означает повторной проверки runtime или реализации
+этих пакетов в ND.
 
 План подготовлен по фактическому NeuralDeep `main`
 `31b438e9d51ee0982f0ee4a3c18d6e6210117562`. Он переносит цели улучшений
@@ -294,10 +308,21 @@ C — оригиналы вложений и весь CLI → Responses → Neur
 adapter payload и model capabilities проверяются отдельно. Хранение оригинала
 не доказывает его интерпретацию. Attachment receipt использует ND-1/ND-2.
 
+Для A/B и полного Copy выполнить ND-H0…ND-H3 из раздела 17 по
+[инструкции большой истории](../docs/neuraldeep-large-history-adaptation.md).
+Сначала проверить полный долговременный источник, затем pagination и bounded
+read API: ограниченный private mirror не заменяет полную историю. Этот же
+источник используется CLI-аудитом с отдельными правилами чтения и исполнения.
+
 M/S переносятся по оставшемуся diff: effective home, собственная память,
 числовые Settings и provider fields. Уже исправленный canonical CLI Usage
 не чинить повторно без регрессии. Streaming — отдельная измеренная работа
 после стабилизации receipts, payload limits и backpressure.
+
+Параллельный Task Chat/Voice включён отдельным пакетом ND-C0…ND-C5
+в разделе 16 по [детальной инструкции](../docs/neuraldeep-task-chat-concurrency-implementation.md).
+Он использует общие receipts/admission из ND-1/ND-2 и сохраняет A/B/C,
+модельные настройки и Voice associations этого раздела.
 
 Готовность: read/download оригинала, сохранение draft при несовместимой модели,
 история/Voice associations после миграции, проверки поддержанных MIME/моделей,
@@ -332,12 +357,24 @@ artifacts; origin/main матери не назначается upstream ND. Tru
 | Третья реализация | ND-3 | UI/intent/provider recovery с общим admission |
 | Следующий блок | ND-4 | Identity/readiness/scaffold для повторного CLI |
 | Отдельные UI пакеты | ND-5: A → B → C; M/S по diff | История, файлы и Settings |
+| Большая история и CLI-аудит | ND-H0 → ND-H1/ND-H2 → ND-H3; раздел 17 | Полный durable source, bounded browser/audit reads и проверенная полнота Copy |
+| Параллельный Task Chat/Voice | ND-C0 → ND-C1 → ND-C2 → ND-C3 → ND-C4 → ND-C5; раздел 16 | Независимые чаты, durable очередь, точный Stop, workspaces и локальные concurrency tests |
 | Проверка результата | ND-6 | Измеренный CLI outcome, проверенный release и handoff |
 
 ND-5 A/B может предшествовать ND-4 по пользовательскому приоритету; C зависит
 от ND-1/2. Server refactor, timeout policies, cleanup/redaction, Sensors docs
 и CLI getting-started соответствуют mother 0.3/0.4, 5.1–5.5 и 7.1–7.3, но
 внедряются по конкретному ND diff. Techscope rename остаётся отложенным.
+
+ND-C0 совмещается с ND-0; общий фундамент ND-C1 выполняется вместе с ND-1/2.
+ND-C2/3 согласуются с ND-3/5. Повышать число одновременных mutating executions
+можно после resource isolation ND-C4 и проверок ND-C5. Финальная приёмка
+concurrency входит в ND-6; одинаковые migrations, ledger и тесты не дублируются.
+
+ND-H0 согласуется с ND-5 A и ND-C1: единые source identity, generation и migration
+map. После него ND-H1 развивает browser history/Copy, ND-H2 — headless audit;
+эти потребители используют один источник. ND-H3 входит в ND-6 вместе с ND-C5.
+Summary stream ND-C2 не должен перечитывать полную историю каждого чата.
 
 Mother contract schema v2 теперь отдельно задаёт `agent_kind`, включая
 `interactive-agent` для диалога через Codex CLI. Для ND-4 перенести совместимый
@@ -641,3 +678,114 @@ Revision 10 зеркалируется побайтно в mother и ND отде
 Live ND pilot и реализация пакетов ND остаются отдельным будущим coding cycle;
 их pass не следует из успешных тестов матери. Split server.ts, переименование
 Techscope и широкое расширение declarations не добавляются в этот cleanup.
+
+## 16. Task Chat и Voice concurrency — revision 11
+
+В roadmap включена [отдельная инструкция реализации параллельного Task Chat
+для NeuralDeep](../docs/neuraldeep-task-chat-concurrency-implementation.md).
+Её статус — `draft`, исходная сверка ND — `8307bec20fb3b6a312d4478eafb50157c1603786`.
+Это план будущей реализации: mother P1–P7 pins, локальные ND changes и evidence
+заполняются по факту. Старые результаты cleanup не являются concurrency pass.
+
+Для однозначной трассировки этапы инструкции `ND0…ND5` здесь обозначаются
+**ND-C0…ND-C5**. Они отличаются от существующих бюджетных пакетов `ND-0…ND-6`.
+
+| Пакет | Этап инструкции | Работа и связь с основным roadmap | Критерий готовности |
+| --- | --- | --- | --- |
+| ND-C0 | ND0 | Вместе с ND-0 сверить target, source/compiled pins, capabilities, baselines, оставшиеся A/B/C и переносимые mother diffs | Migration map, явные prerequisites и test matrix для фактической ND версии |
+| ND-C1 | ND1 | Вместе с ND-1/2 развить существующий admission: транзакционные receipts до spawn, logical owner, generations, session aliases и crash recovery | Два процесса coordinator и duplicate create дают один spawn; corrupt state сохраняется; stale callback не освобождает нового владельца |
+| ND-C2 | ND2 | В ND-3/5 добавить независимые drafts/sending, navigation guard и фоновые summary events | Медленная задача A не блокирует ввод в B/C; drafts и поздние ACK не меняют чужой чат; history/model/billing UI сохранён |
+| ND-C3 | ND3 | Связать same-run continuation с очередью, Voice answers/handoff и адресным Stop wrapper/CLI/tools/adapter | Resume по точной session после безопасной границы; duplicate answer идемпотентен; Stop A сохраняет B и usage/partial result |
+| ND-C4 | ND4 | Общие worktree/resource claims, provider capacity, attachments и accounting поверх ND-1/2/4 | Нет конфликтов writable resources и двойного расхода; unknown сохранён; original attachments проходят поддержанный initial/resume путь |
+| ND-C5 | ND5 | Включить concurrency/crash/provider/browser matrix в ND-6 и отдельный pinned ND release | Собственный полный applicable suite, isolated desktop/mobile E2E, staged build, strict pages/chunks/identity и согласованный live smoke |
+
+### Обязательные границы
+
+- Единственный inference path остаётся launcher → stock Codex CLI `exec` /
+  `exec resume <точный session ID>` → Responses adapter → выбранная модель ND.
+  При `steerTurn=false` уточнение сохраняется в очереди; чужой App Server,
+  `--last`, запись в закрытый stdin и второй resume живой session не подменяют steer.
+- Task Chat, Voice и delivery используют общий admission/ownership. Compute slot,
+  logical owner и session lock различаются; пауза Voice между шагами не передаёт
+  тему соседнему чату. Usage ledger остаётся единственным источником расхода;
+  при разных stores требуется идемпотентный accounting event/outbox и reconciliation.
+- Capacity выбирается по проверенным local/provider ограничениям. Доступный ввод
+  в несколько чатов не обещает одновременное выполнение всех запросов. Очередь,
+  лимит и неизвестный расход сохраняют task/run, работу и явный путь продолжения.
+- Stop проверяет принадлежность всего дерева процессов; disconnect/reload не
+  отменяет выполнение. Recovery не replay'ит возможно принятый provider request.
+  Миграции сохраняют историю, receipts, Voice links, originals и свежие usage записи.
+
+До старта ND-C0 сверить фактический прогресс матери и ND: инструкция содержит
+плановые зависимости, а не уже опубликованные mother concurrency commits.
+Существующие ND admission/Voice guarantees сохраняются и повторно не реализуются.
+Детальные cases, regression commands, migration и release contract находятся
+в разделах 4–10 инструкции. При несовпадении с текущим ND кодом сначала обновить
+локальную migration map и evidence; название одинакового файла у матери не
+доказывает совместимость transport, provider или accounting.
+
+Revision 11 и файл инструкции передаются вместе в mother и ND. Публикация
+документов означает готовность плана; статус реализации ND-C0…ND-C5 и live pilot
+остаётся незавершённым до собственного проверенного результата NeuralDeep.
+
+## 17. Большая история и CLI-аудит — revision 12
+
+Включена [инструкция адаптации большой истории для ND](../docs/neuraldeep-large-history-adaptation.md)
+(`proposed`, source ND `8307bec`) и её обязательный
+[контракт чтения Task Chat](../docs/task-chat-large-history.md) из mother commit
+`774b2d1d39fb47e966a5e7f4f5f344986fc5a26c`. Статус `implemented` у материнского
+контракта относится к матери; реализация ND-H0…ND-H3 ещё предстоит.
+При переносе сохраняются `neuraldeep_cli`, выбранный provider и instance state.
+
+| Пакет | Работа и зависимости | Критерий готовности |
+| --- | --- | --- |
+| ND-H0 — полный источник | Проверить native rollout выбранного CLI либо внедрить private append-only event store; согласовать с ND-5 A и ND-C1 | Доказана полнота источника либо явно отмечены невосстановимые legacy gaps; IDs, receipts, archive/resume bindings сохранены; projection пересоздаётся |
+| ND-H1 — browser history | После ND-H0 перенести read contract, pagination, lazy Activity, original text chunks и полный Copy в собственный ND backend | Стабильные scoped cursors при append; ограниченные page bytes/cache; ошибки сохраняют текст/draft; Copy успешен только после всех original parts |
+| ND-H2 — CLI-аудит | После ND-H0 использовать streaming/bounded reads и checkpoints отдельно от model context и audit execution | Измерен ограниченный рост памяти; source count/digest и completeness проверяемы; retry чтения не запускает новый audit или CLI resume |
+| ND-H3 — приёмка и выпуск | Объединить history/crash/isolation fixtures с ND-C5/ND-6; проверить migration/rebuild и rollback на собственном ND | Большие fixtures, archive/restore, append, restart, полный Copy и CLI resume подтверждены; staged release имеет exact compiled identity |
+
+В исходной сверке `safeTurns`/upsert ограничивает нормализованный private binding
+200 ходами. До UI pagination проверить, где сохранились более ранние события.
+Пагинация усечённой коллекции не восстанавливает потерянные ходы; migration
+не создаёт выдуманную историю. Native JSONL активной session не переписывается.
+Индексируемая projection со стабильными sequence/offset и item records строится
+из полного источника под своим `PRITHA_STATE_ROOT`, вне tracked knowledge.
+
+### Контракт чтения и сохранения результата
+
+- Начальная страница — до 20 ходов, Activity — до 40 items. Page envelope
+  ограничен 256 KiB, original text responses — 64 KiB с корректными границами
+  Unicode; byte budget может уменьшить число записей на странице.
+- Cursor привязан к instance, provider, source generation и chat; append
+  сохраняет допустимую позицию, истечение cursor явно диагностируется.
+  Original parts относятся к одной версии содержимого; preview, unloaded
+  activity и unknown image state не выдаются за полный результат.
+- Полный Copy собирает все сообщения ответа и original parts до подтверждения
+  успеха. Ошибки чтения/clipboard сохраняются как ошибки; уже показанный текст
+  и draft остаются. Поддержанные Activity данные не раскрывают private reasoning.
+- Read path использует streaming/indexed reads, coalescing и bounded cache;
+  чтение страницы не загружает весь registry. Timeout/retry чтения не вызывает
+  `exec`, `resume`, повторный audit или переключение runtime/provider.
+- CLI-аудит хранит completeness, count/digest, gaps и cursor/checkpoint отдельно
+  от выбранного evidence для модели. Ограничение context не стирает исходную
+  историю; скорость native `exec resume` проверяется на конкретном CLI/profile,
+  а не выводится из ускорения браузера. Accounting/idempotency ND-1/2 сохраняются.
+
+Обязательные fixtures: более 10 000 ходов, тысячи команд в одном ходе,
+Unicode-сообщение более 10 MiB, archive/restore, append во время pagination,
+ошибка чтения, restart, полный Copy, legacy gaps и повтор audit request.
+Проверить bounded memory, instance/profile isolation и отсутствие лишнего spawn.
+CLI resume проверяется в disposable audit fixture; платные вызовы остаются
+частью согласованного live pilot, а не обычной read-only проверки.
+
+Материнский App Server reader/fallback не переносится как ND transport.
+Отсутствие data migration у mother patch не доказывает безопасность ND rollback:
+для выбранного полного источника нужен собственный reviewed migration/rebuild
+plan с сохранением новых данных. Выпуск выполняется через ND manager после
+готовности кандидата и предусмотренного lifecycle approval. Для phone access
+проверяется реальное trusted device; simulated mobile не доказывает сетевой путь.
+
+Пакет передачи revision 12: roadmap, concurrency instruction из раздела 16,
+`docs/neuraldeep-large-history-adaptation.md` и `docs/task-chat-large-history.md`.
+Копии документов в mother и ND синхронизируются; это обновление плана, а не
+свидетельство уже выполненного ND history migration, тестов или выпуска.
