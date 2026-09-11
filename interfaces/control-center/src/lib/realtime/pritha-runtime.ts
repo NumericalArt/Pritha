@@ -1,3 +1,5 @@
+import { normalizeVoiceModel, type VoiceModel } from "./voice-settings";
+import { LIVE_MODEL, isLiveModel, liveSessionConfig, DEFAULT_LIVE_BACKEND } from "./live-session";
 import { runtimeProbe } from "../../../../../scripts/lib/runtime-probe.mjs";
 import { registerExecutionChannel, callExecutionChannel, executionChannelView } from "../../../../../scripts/lib/execution-channel.mjs";
 import { prepareAgentWorkspaceTarget, scopedAgentWorkspace, inspectTaskWorkspace, prepareTaskWorkspace, verifyTaskWorkspace, type TaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
@@ -282,6 +284,7 @@ export type PrithaRuntimeSettings = {
   codexAppThreadMaxAgeHours: number;
   voiceBehaviorProfile: VoiceBehaviorProfile;
   prithaVoice: PrithaVoiceId;
+  voiceModel: VoiceModel;
   updatedAt: string;
 };
 
@@ -432,7 +435,7 @@ type ExternalResearchToolModule = {
   runRecentLast30DaysResearch: (options: Record<string, unknown>) => unknown;
 };
 
-const DEFAULT_MODEL = "gpt-realtime-2";
+const DEFAULT_MODEL = LIVE_MODEL;
 const DEFAULT_VOICE = DEFAULT_PRITHA_VOICE;
 const DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe";
 const DEFAULT_CODEX_TIMEOUT_MS = 300_000;
@@ -3111,7 +3114,7 @@ export function buildRealtimeSessionConfig(options: RealtimeSessionBuildOptions 
   const runtimeSettings = getPrithaRuntimeSettings();
   return {
     type: "realtime",
-    model: env("TECHSCOPE_VOICE_MODEL", env("OPENAI_REALTIME_MODEL", DEFAULT_MODEL)),
+    model: runtimeSettings.voiceModel,
     instructions: buildRealtimeInstructions(options),
     tool_choice: "auto",
     tools: buildPrithaRealtimeTools(options),
@@ -3129,6 +3132,43 @@ export function buildRealtimeSessionConfig(options: RealtimeSessionBuildOptions 
       },
     },
   };
+}
+
+export function usesLiveVoice() {
+  return isLiveModel(buildRealtimeSessionConfig().model);
+}
+
+export function buildLiveSessionConfig(options: RealtimeSessionBuildOptions = {}) {
+  const config = buildRealtimeSessionConfig(options);
+  return liveSessionConfig({
+    voice: config.audio.output.voice,
+    instructions: config.instructions,
+    tools: config.tools,
+    backend: env("TECHSCOPE_VOICE_BACKEND_MODEL", DEFAULT_LIVE_BACKEND),
+    conversationInstructions: [
+      "You are Pritha, the operator's voice assistant. Speak Russian by default and use feminine grammatical self-reference. Keep replies natural and concise.",
+      "Delegate all requests for current facts, memory, tools, music, task execution or status to the backend. Never claim an action completed without a verified backend result. Ask clarifying questions when needed and respect corrections.",
+      "Before starting a substantial Codex task, briefly summarize the usable brief and ask whether the operator has finished and wants it sent to Codex. Await that confirmation. Service changes and other approval-gated actions still require the existing UI approval.",
+      "The backend knows Pritha's detailed workflows and permissions. Do not invent tools, task results, or approvals. A speech interruption does not mean backend work was cancelled. Never request secrets or read private paths or raw technical output aloud.",
+      buildVoiceBehaviorPromptSections(getPrithaRuntimeSettings().voiceBehaviorProfile),
+    ].join("\n\n"),
+  });
+}
+
+export async function createLiveCall(offerSdp: string, options: RealtimeSessionBuildOptions = {}) {
+  const apiKey = env("OPENAI_API_KEY");
+  if (!apiKey) throw new RealtimeProviderError({ status: 503, providerCode: "missing_openai_api_key", message: "OpenAI API key is not configured." });
+  if (!offerSdp.trim() || offerSdp.length > 65536) throw new RealtimeProviderError({ status: 400, providerCode: "invalid_offer_sdp", message: "A valid SDP offer is required." });
+  const response = await fetch(`${realtimeBaseUrl()}/live/sessions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ session: buildLiveSessionConfig(options), transport: { type: "webrtc", sdp: offerSdp } }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new RealtimeProviderError({ status: response.status, providerCode: result.error?.code, message: "Could not create GPT-Live session. Check model access and server configuration." });
+  if (typeof result.transport?.sdp !== "string" || typeof result.session?.id !== "string") throw new RealtimeProviderError({ status: 502, providerCode: "invalid_provider_payload", message: "GPT-Live returned an invalid session answer." });
+  return { answerSdp: result.transport.sdp, sessionId: result.session.id };
 }
 
 function normalizeClientSecret(result: RawSessionResponse) {
@@ -3892,6 +3932,7 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
     voiceBehaviorProfile: normalizeVoiceBehaviorProfile(
       env("PRITHA_REALTIME_BEHAVIOR_PROFILE", env("TECHSCOPE_VOICE_BEHAVIOR_PROFILE", DEFAULT_VOICE_BEHAVIOR_PROFILE)),
     ),
+    voiceModel: normalizeVoiceModel(env("TECHSCOPE_VOICE_MODEL", env("OPENAI_REALTIME_MODEL", DEFAULT_MODEL))),
     prithaVoice: normalizePrithaVoice(
       env("PRITHA_REALTIME_VOICE", env("TECHSCOPE_VOICE_REALTIME_VOICE", env("OPENAI_REALTIME_VOICE", DEFAULT_VOICE))),
     ),
@@ -3964,6 +4005,7 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
     codexAppThreadMaxAgeHours: Number.isFinite(maxThreadAgeHours) ? Math.max(1, Math.min(Math.round(maxThreadAgeHours), 720)) : defaults.codexAppThreadMaxAgeHours,
     voiceBehaviorProfile: normalizeVoiceBehaviorProfile(value.voiceBehaviorProfile, defaults.voiceBehaviorProfile),
     prithaVoice: normalizePrithaVoice(value.prithaVoice, defaults.prithaVoice),
+    voiceModel: normalizeVoiceModel(value.voiceModel, defaults.voiceModel),
     updatedAt: String(value.updatedAt || defaults.updatedAt),
   };
 }
@@ -4002,6 +4044,7 @@ export async function updatePrithaRuntimeSettings(patch: Partial<PrithaRuntimeSe
     codexAppThreadMaxAgeHours: next.codexAppThreadMaxAgeHours,
     voiceBehaviorProfile: next.voiceBehaviorProfile,
     prithaVoice: next.prithaVoice,
+    voiceModel: next.voiceModel,
   });
   return next;
 }
@@ -8292,7 +8335,9 @@ export async function getPrithaRealtimeStatus() {
     voice_behavior_profile: runtimeSettings.voiceBehaviorProfile,
     voice_options: PRITHA_FEMININE_VOICE_OPTIONS,
     behavior_profile_options: VOICE_BEHAVIOR_PROFILE_OPTIONS,
-    transcription_model: config.audio.input.transcription.model,
+    transcription_model: usesLiveVoice() ? "gpt-live-1 (built-in)" : config.audio.input.transcription.model,
+    voice_api: usesLiveVoice() ? "live" : "realtime",
+    backend_model: usesLiveVoice() ? env("TECHSCOPE_VOICE_BACKEND_MODEL", DEFAULT_LIVE_BACKEND) : null,
     tools: config.tools.map((tool) => tool.name),
     openai_key_configured: Boolean(env("OPENAI_API_KEY")),
     realtime_base_url: realtimeBaseUrl(),

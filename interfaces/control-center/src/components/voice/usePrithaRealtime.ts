@@ -1,10 +1,25 @@
 "use client";
 
+import { LiveSession } from "@/lib/realtime/live-session";
+
 import { nowIso } from "@/lib/time";
 
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { readStickyContextSetting, STICKY_CONTEXT_CHANGED_EVENT, STICKY_CONTEXT_STORAGE_KEY } from "./voicePreferences";
 import { useVoiceMusicController } from "./useVoiceMusic";
+
+
+function sendVoiceEvent(channel: RTCDataChannel, live: LiveSession | null, event: Record<string, any>, context?: "thinking" | "commentary" | "instructions") {
+  if (!live) { channel.send(JSON.stringify(event)); return true; }
+  if (!live.ready || live.closing) return false;
+  if (context) return live.context(String(event.item?.content?.[0]?.text || ""), context);
+  if (event.type === "conversation.item.create") {
+    channel.send(JSON.stringify({ ...event, event_id: crypto.randomUUID(), type: "response.item.create" }));
+    return true;
+  }
+  if (event.type === "response.create") { live.requestResponse(); return true; }
+  return false;
+}
 
 export type RealtimePhase = "idle" | "connecting" | "listening" | "speaking" | "working" | "error";
 
@@ -166,7 +181,8 @@ type SessionErrorPayload = {
 };
 
 type RealtimeSessionPayload = {
-  client_secret: { value: string };
+  client_secret?: { value: string };
+  voice_api?: "live" | "realtime";
   model: string;
   voice: string;
   tools: string[];
@@ -926,11 +942,27 @@ function usePrithaRealtimeController() {
     });
   }, [loadStatus]);
 
+  const liveSessionRef = useRef<LiveSession | null>(null);
+  const liveCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveAudioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectionGenerationRef = useRef(0);
+  const callAbortRef = useRef<AbortController | null>(null);
+  const liveCaptionGroupsRef = useRef<Array<{ id: string; role: "user" | "assistant"; start: number; end: number; text: string }>>([]);
+
   const bindRemoteAudioElement = useCallback((element: HTMLAudioElement | null) => {
     remoteAudioRef.current = element;
   }, []);
 
   const closeConnection = useCallback(() => {
+    connectionGenerationRef.current++;
+    callAbortRef.current?.abort();
+    callAbortRef.current = null;
+    liveSessionRef.current?.close();
+    liveSessionRef.current?.dispose();
+    liveSessionRef.current = null;
+    if (liveCloseTimerRef.current) clearTimeout(liveCloseTimerRef.current);
+    if (liveAudioTimerRef.current) clearInterval(liveAudioTimerRef.current);
+    liveCaptionGroupsRef.current = [];
     if (localTrackRef.current) {
       localTrackRef.current.stop();
       localTrackRef.current = null;
@@ -981,6 +1013,10 @@ function usePrithaRealtimeController() {
   }, [music]);
 
   const requestResponse = useCallback((reason = "") => {
+    if (liveSessionRef.current) {
+      if (["text_message", "voice_intake_clarification", "tool_outputs", "queued"].includes(reason)) liveSessionRef.current.requestResponse();
+      return;
+    }
     const channel = eventsChannelRef.current;
     if (!channel || channel.readyState !== "open") return;
     if (responseInProgressRef.current || processingToolBatchRef.current) {
@@ -989,7 +1025,7 @@ function usePrithaRealtimeController() {
       return;
     }
     responseInProgressRef.current = true;
-    channel.send(JSON.stringify({ type: "response.create" }));
+    sendVoiceEvent(channel, liveSessionRef.current, { type: "response.create" });
   }, []);
 
   const applyRealtimeMusicControlGate = useCallback(
@@ -1003,6 +1039,7 @@ function usePrithaRealtimeController() {
       });
       const payload = (await response.json().catch(() => ({ ok: false, error: "session config returned non-json" }))) as {
         ok?: boolean;
+        live_responses?: Record<string, unknown>;
         type?: string;
         instructions?: string;
         tools?: Array<{ name?: string }>;
@@ -1012,8 +1049,10 @@ function usePrithaRealtimeController() {
       if (!response.ok || !payload.ok || !payload.instructions || !Array.isArray(payload.tools)) {
         throw new Error(payload.error || `Realtime session config failed with status ${response.status}`);
       }
-      channel.send(
-        JSON.stringify({
+      if (liveSessionRef.current) {
+        if (!payload.live_responses) throw new Error("Live session configuration is missing.");
+        await liveSessionRef.current.update(payload.live_responses);
+      } else sendVoiceEvent(channel, liveSessionRef.current, {
           type: "session.update",
           session: {
             type: payload.type || "realtime",
@@ -1021,8 +1060,7 @@ function usePrithaRealtimeController() {
             tools: payload.tools,
             tool_choice: payload.tool_choice || "auto",
           },
-        }),
-      );
+        });
       setStatus((current) =>
         current
           ? {
@@ -1065,19 +1103,17 @@ function usePrithaRealtimeController() {
     (reason: string) => {
       const pending = pendingVoiceIntakeRef.current;
       const channel = eventsChannelRef.current;
-      if (!pending || pending.promptSent || !channel || channel.readyState !== "open") return false;
+      if (!pending || pending.promptSent || !channel || channel.readyState !== "open" || (liveSessionRef.current && !liveSessionRef.current.ready)) return false;
 
       const prompt = formatVoiceIntakeClarificationPrompt(pending.metadata);
-      channel.send(
-        JSON.stringify({
+      sendVoiceEvent(channel, liveSessionRef.current, {
           type: "conversation.item.create",
           item: {
             type: "message",
             role: "user",
             content: [{ type: "input_text", text: prompt }],
           },
-        }),
-      );
+        });
       pending.promptSent = true;
       pending.handlers.status?.("awaiting_instruction");
       appendSessionEvent(
@@ -1593,16 +1629,14 @@ function usePrithaRealtimeController() {
       const text = buildStickyContext(reason);
       if (!text.trim() || lastStickyContextSentRef.current === text) return false;
       lastStickyContextSentRef.current = text;
-      channel.send(
-        JSON.stringify({
+      sendVoiceEvent(channel, liveSessionRef.current, {
           type: "conversation.item.create",
           item: {
             type: "message",
             role: "user",
             content: [{ type: "input_text", text: `Sticky Context Update:\n${text}` }],
           },
-        }),
-      );
+        }, "thinking");
       logClientEvent("sticky_context_sent", {
         session_id: sessionIdRef.current,
         reason,
@@ -1623,16 +1657,14 @@ function usePrithaRealtimeController() {
     queueRollingSummaryCheckpoint("sticky_context_reset", { force: true });
 
     if (!channel || channel.readyState !== "open") return false;
-    channel.send(
-      JSON.stringify({
+    sendVoiceEvent(channel, liveSessionRef.current, {
         type: "conversation.item.create",
         item: {
           type: "message",
           role: "user",
           content: [{ type: "input_text", text }],
         },
-      }),
-    );
+      }, "instructions");
     requestResponse("sticky_context_reset");
     return true;
   }, [appendSessionEvent, logClientEvent, queueRollingSummaryCheckpoint, requestResponse]);
@@ -1663,16 +1695,14 @@ function usePrithaRealtimeController() {
       const channel = eventsChannelRef.current;
       const channelState = channel?.readyState || "missing";
       if (channel?.readyState === "open") {
-        channel.send(
-          JSON.stringify({
+        sendVoiceEvent(channel, liveSessionRef.current, {
             type: "conversation.item.create",
             item: {
               type: "message",
               role: "user",
               content: [{ type: "input_text", text: message }],
             },
-          }),
-        );
+          }, "commentary");
         if (approvalStatus === "approved") requestResponse("codex_task_approval_received");
         else requestResponse("codex_task_rejected");
         logClientEvent("codex_task_approval_handoff_sent", {
@@ -1742,8 +1772,7 @@ function usePrithaRealtimeController() {
             response_busy: responseBusy,
           });
           if (channel?.readyState === "open" && handoffText) {
-            channel.send(
-              JSON.stringify({
+            sendVoiceEvent(channel, liveSessionRef.current, {
                 type: "conversation.item.create",
                 item: {
                   type: "message",
@@ -1755,8 +1784,7 @@ function usePrithaRealtimeController() {
                     },
                   ],
                 },
-              }),
-            );
+              }, "commentary");
             requestResponse("codex_task_complete");
             logClientEvent("codex_task_result_handoff_sent", {
               task_id: snapshot.task_id,
@@ -1794,8 +1822,7 @@ function usePrithaRealtimeController() {
             const responseBusy = responseInProgressRef.current || processingToolBatchRef.current;
             if (channel?.readyState === "open" && !responseBusy && now - lastBriefAt >= 180_000) {
               lastCodexTaskProgressBriefRef.current.set(snapshot.task_id, now);
-              channel.send(
-                JSON.stringify({
+              sendVoiceEvent(channel, liveSessionRef.current, {
                   type: "conversation.item.create",
                   item: {
                     type: "message",
@@ -1807,8 +1834,7 @@ function usePrithaRealtimeController() {
                       },
                     ],
                   },
-                }),
-              );
+                }, "commentary");
               requestResponse("codex_task_progress");
               logClientEvent("codex_task_progress_handoff_sent", {
                 task_id: snapshot.task_id,
@@ -2037,16 +2063,14 @@ function usePrithaRealtimeController() {
         handledToolCallsRef.current.add(callKey);
         const output = await runToolCall(item);
         if (channel.readyState === "open") {
-          channel.send(
-            JSON.stringify({
+          sendVoiceEvent(channel, liveSessionRef.current, {
               type: "conversation.item.create",
               item: {
                 type: "function_call_output",
                 call_id: item.call_id,
                 output: JSON.stringify(output),
               },
-            }),
-          );
+            });
           sentOutput = true;
         }
       }
@@ -2077,6 +2101,7 @@ function usePrithaRealtimeController() {
 
   const handleRealtimeEvent = useCallback(
     (raw: string) => {
+      if (liveSessionRef.current) { liveSessionRef.current.receive(raw); return; }
       let event: RealtimeEvent;
       try {
         event = JSON.parse(raw) as RealtimeEvent;
@@ -2141,10 +2166,14 @@ function usePrithaRealtimeController() {
   );
 
   const start = useCallback(async () => {
-    if (phase === "connecting") return;
+    if (phase !== "idle" && phase !== "error") return;
+    if (peerConnectionRef.current) closeConnection();
     setError(null);
     setPhase("connecting");
     const t0 = performance.now();
+    const generation = ++connectionGenerationRef.current;
+    const attempt = new AbortController();
+    callAbortRef.current = attempt;
 
     try {
       const runtimeStatus = await loadStatus();
@@ -2152,7 +2181,9 @@ function usePrithaRealtimeController() {
         throw new Error("OPENAI_API_KEY is not configured for the control-center server.");
       }
 
+      if (generation !== connectionGenerationRef.current) return;
       const sessionResponse = await fetch("/api/realtime/session", {
+        signal: attempt.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ musicControlEnabled: musicControlEnabledRef.current }),
@@ -2162,6 +2193,7 @@ function usePrithaRealtimeController() {
         throw new Error(payload.error || `Realtime session failed with status ${sessionResponse.status}`);
       }
       const sessionData = (await sessionResponse.json()) as RealtimeSessionPayload;
+      if (generation !== connectionGenerationRef.current) return;
       const nextSessionId = `voice-${itemId()}`;
       sessionIdRef.current = nextSessionId;
       sessionEventsRef.current = [];
@@ -2191,6 +2223,7 @@ function usePrithaRealtimeController() {
       };
       (audioConstraints as MediaTrackConstraints & { autoGainControl?: boolean }).autoGainControl = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      if (generation !== connectionGenerationRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
       localStreamRef.current = stream;
       const inputTrack = stream.getAudioTracks()[0];
       if (!inputTrack) throw new Error("No local audio track available.");
@@ -2248,11 +2281,12 @@ function usePrithaRealtimeController() {
       }
       localTrackRef.current = track;
 
+      if (generation !== connectionGenerationRef.current) return;
       const peerConnection = new RTCPeerConnection();
       peerConnectionRef.current = peerConnection;
       peerConnection.addTrack(track, streamForPeer);
       peerConnection.onconnectionstatechange = () => {
-        if (peerConnection.connectionState === "connected") setPhase("listening");
+        if (peerConnection.connectionState === "connected" && !liveSessionRef.current) setPhase("listening");
         if (peerConnection.connectionState === "failed" || peerConnection.connectionState === "disconnected") {
           setPhase("error");
           setError("Realtime connection lost. Reconnect to continue.");
@@ -2273,7 +2307,7 @@ function usePrithaRealtimeController() {
 
       const channel = peerConnection.createDataChannel("oai-events");
       eventsChannelRef.current = channel;
-      channel.onopen = () => {
+      const onVoiceReady = () => {
         rollingSummarySessionActiveRef.current = true;
         setPhase("listening");
         setToolStatus(`Realtime data channel connected. Tools: ${sessionData.tools.join(", ")}.`);
@@ -2286,6 +2320,78 @@ function usePrithaRealtimeController() {
         });
         sendPendingVoiceIntakeClarification("data_channel_open");
       };
+      channel.onopen = () => { if (!liveSessionRef.current) onVoiceReady(); };
+      if (sessionData.voice_api === "live") {
+        const live = new LiveSession({
+          send: (event) => { if (channel.readyState === "open") channel.send(JSON.stringify(event)); },
+          runTool: async (item) => {
+            if (liveSessionRef.current !== live || live.closing) return { ok: false, error: "Voice session ended." };
+            return runToolCall(item);
+          },
+          ready: () => { if (liveSessionRef.current === live) { clearTimeout(liveCloseTimerRef.current!); onVoiceReady(); } },
+          closed: () => { if (liveSessionRef.current === live) { closeConnection(); setPhase("idle"); } },
+          error: (message) => { if (liveSessionRef.current === live) { setError(message); setToolStatus(message); } },
+          usage: (seconds, backend) => {
+            // Duration updates are cumulative snapshots; never add them together.
+            if (seconds !== undefined) logClientEvent("live_duration_snapshot", { seconds });
+            if (backend) logClientEvent("live_backend_usage", { usage: backend });
+          },
+          transcript: (role, delta, startMs, endMs) => {
+            if (liveSessionRef.current !== live) return;
+            const groups = liveCaptionGroupsRef.current;
+            let group = [...groups].reverse().find(row => row.text.length < 8000 && row.role === role && startMs <= row.end + 1200 && endMs >= row.start - 1200);
+            if (!group) { group = { id: itemId(), role, start: startMs, end: endMs, text: "" }; groups.push(group); }
+            group.text += delta;
+            group.start = Math.min(group.start, startMs); group.end = Math.max(group.end, endMs);
+            const entry = { id: group.id, role, text: group.text, timestamp: nowTime() };
+            const memoryEvent: VoiceSessionEvent = { id: group.id, kind: role, text: group.text.slice(-3000), timestamp: nowTime() };
+            // Update the existing private session recap in place; fragments are not turns.
+            setSessionEvents(current => {
+              const next = (current.some(row => row.id === memoryEvent.id)
+                ? current.map(row => row.id === memoryEvent.id ? memoryEvent : row)
+                : [...current, memoryEvent]).slice(-MAX_SESSION_EVENTS);
+              sessionEventsRef.current = next;
+              window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ session_id: sessionIdRef.current, updated_at: nowIso(), events: next }));
+              return next;
+            });
+            queueRollingSummaryCheckpoint("session_turn");
+            setTranscript(current => {
+              const found = current.findIndex(row => row.id === entry.id);
+              return found < 0 ? [...current, entry].slice(-200) : current.map(row => row.id === entry.id ? entry : row);
+            });
+            if (groups.length > 200) groups.splice(0, groups.length - 200);
+          },
+        });
+        liveSessionRef.current = live;
+        liveCloseTimerRef.current = setTimeout(() => {
+          if (liveSessionRef.current === live && !live.ready) { closeConnection(); setPhase("error"); setError("GPT-Live startup timed out. Reconnect to continue."); }
+        }, 25000);
+        // Playback and microphone activity remain independent from backend completion.
+        const context = audioContextRef.current;
+        if (context) {
+          const mic = context.createAnalyser(); mic.fftSize = 512;
+          context.createMediaStreamSource(streamForPeer).connect(mic);
+          let remote: AnalyserNode | null = null;
+          let userSpeaking = false;
+          let assistantLastActive = 0;
+          let userLastActive = 0;
+          const samples = new Float32Array(512);
+          const active = (analyser: AnalyserNode) => {
+            analyser.getFloatTimeDomainData(samples);
+            return Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length) > 0.015;
+          };
+          liveAudioTimerRef.current = setInterval(() => {
+            if (liveSessionRef.current !== live || !live.ready || live.closing) return;
+            if (!remote && remoteStreamRef.current) { remote = context.createAnalyser(); remote.fftSize = 512; context.createMediaStreamSource(remoteStreamRef.current).connect(remote); }
+            const now = Date.now();
+            if (localTrackRef.current?.enabled && active(mic)) userLastActive = now;
+            const userActive = now - userLastActive < 600;
+            if (userActive !== userSpeaking) { userSpeaking = userActive; if (userActive) music.onUserSpeechStart(); else music.onUserSpeechStop(); }
+            if (remote && active(remote) && !remoteAudioRef.current?.paused && !remoteAudioRef.current?.muted) assistantLastActive = now;
+            setPhase(now - assistantLastActive < 500 ? "speaking" : "listening");
+          }, 100);
+        }
+      }
       channel.onmessage = (event) => handleRealtimeEvent(String(event.data));
       channel.onclose = () => {
         if (phase !== "idle") setToolStatus("Realtime data channel closed.");
@@ -2294,12 +2400,23 @@ function usePrithaRealtimeController() {
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
 
+      if (sessionData.voice_api === "live" && peerConnection.iceGatheringState !== "complete") {
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => { peerConnection.removeEventListener("icegatheringstatechange", check); reject(new Error("ICE gathering timed out.")); }, 10000);
+          function check() { if (peerConnection.iceGatheringState === "complete") { clearTimeout(timer); peerConnection.removeEventListener("icegatheringstatechange", check); resolve(); } }
+          peerConnection.addEventListener("icegatheringstatechange", check); check();
+        });
+      }
+      if (generation !== connectionGenerationRef.current) return;
       const callResponse = await fetch("/api/realtime/call", {
+        signal: attempt.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          offerSdp: offer.sdp || "",
-          ephemeralKey: sessionData.client_secret.value,
+          offerSdp: peerConnection.localDescription?.sdp || offer.sdp || "",
+          ephemeralKey: sessionData.client_secret?.value,
+          voiceApi: sessionData.voice_api,
+          musicControlEnabled: musicControlEnabledRef.current,
         }),
       });
       if (!callResponse.ok) {
@@ -2307,15 +2424,17 @@ function usePrithaRealtimeController() {
         throw new Error(payload.error || `Realtime call failed with status ${callResponse.status}`);
       }
       const callPayload = (await callResponse.json()) as RealtimeCallResponse;
+      if (generation !== connectionGenerationRef.current) return;
       await peerConnection.setRemoteDescription({ type: "answer", sdp: callPayload.answerSdp });
     } catch (err) {
+      if (generation !== connectionGenerationRef.current) return;
       closeConnection();
       setPhase("error");
       const message = err instanceof Error ? err.message : "Unknown realtime call error";
       setError(message);
       addTranscript("tool", message);
     }
-  }, [addTranscript, checkpointRollingSummaryNow, closeConnection, codexTasks.length, handleRealtimeEvent, loadStatus, logClientEvent, music, phase, queueRollingSummaryCheckpoint, sendPendingVoiceIntakeClarification, sessionEvents.length, stickyContextEnabled]);
+  }, [addTranscript, checkpointRollingSummaryNow, closeConnection, codexTasks.length, handleRealtimeEvent, loadStatus, logClientEvent, music, phase, queueRollingSummaryCheckpoint, runToolCall, sendPendingVoiceIntakeClarification, sessionEvents.length, stickyContextEnabled]);
 
   const beginVoiceIntakeClarification = useCallback(
     (metadata: VoiceIntakeClarificationMetadata, handlers: VoiceIntakePendingHandlers) => {
@@ -2352,8 +2471,15 @@ function usePrithaRealtimeController() {
   const stop = useCallback(() => {
     checkpointRollingSummaryNow("session_stopping", { keepalive: true });
     rollingSummarySessionActiveRef.current = false;
-    closeConnection();
-    setPhase("idle");
+    const live = liveSessionRef.current;
+    if (live?.ready) {
+      live.close();
+      if (localTrackRef.current) localTrackRef.current.enabled = false;
+      setToolStatus("Closing GPT-Live session…");
+      liveCloseTimerRef.current = setTimeout(() => {
+        if (liveSessionRef.current === live) { closeConnection(); setPhase("idle"); setToolStatus("Voice disconnected; final usage was not confirmed."); }
+      }, 4000);
+    } else { closeConnection(); setPhase("idle"); }
   }, [checkpointRollingSummaryNow, closeConnection]);
 
   const toggleMute = useCallback(() => {
@@ -2376,18 +2502,16 @@ function usePrithaRealtimeController() {
     (text: string) => {
       const compact = text.trim();
       const channel = eventsChannelRef.current;
-      if (!compact || !channel || channel.readyState !== "open") return false;
+      if (!compact || !channel || channel.readyState !== "open" || (liveSessionRef.current && (!liveSessionRef.current.ready || liveSessionRef.current.closing))) return false;
 
-      channel.send(
-        JSON.stringify({
+      sendVoiceEvent(channel, liveSessionRef.current, {
           type: "conversation.item.create",
           item: {
             type: "message",
             role: "user",
             content: [{ type: "input_text", text: compact }],
           },
-        }),
-      );
+        });
       addTranscript("user", compact);
       requestResponse("text_message");
       return true;

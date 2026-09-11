@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   buildRealtimeSessionConfig,
+  usesLiveVoice,
   createEphemeralRealtimeSession,
   RealtimeProviderError,
 } from "@/lib/realtime/pritha-runtime";
@@ -16,10 +17,12 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => ({}))) as RealtimeSessionRequest;
     const options = { musicControlEnabled: body.musicControlEnabled === true };
-    const session = await createEphemeralRealtimeSession(options);
+    const live = usesLiveVoice();
+    const session = live ? null : await createEphemeralRealtimeSession(options);
     const config = buildRealtimeSessionConfig(options);
     return NextResponse.json({
-      client_secret: session.client_secret,
+      client_secret: session?.client_secret,
+      voice_api: live ? "live" : "realtime",
       model: config.model,
       voice: config.audio.output.voice,
       tools: config.tools.map((tool) => tool.name),

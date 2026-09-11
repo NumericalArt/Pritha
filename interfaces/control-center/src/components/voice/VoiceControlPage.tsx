@@ -1382,7 +1382,7 @@ function VoiceSessionPanel({
   onMicInputLevelChange: (value: number) => void;
   mobile?: boolean;
 }) {
-  const model = status?.model || "gpt-realtime-2";
+  const model = status?.model || "gpt-live-1";
   const active = phaseIsActive(phase);
   const keyMissing = keyIsMissing(status);
   const primaryDisabled = phase === "connecting" || (phase === "idle" && keyMissing);

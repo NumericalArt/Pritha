@@ -13,6 +13,8 @@ import {
 } from "@/lib/realtime/pritha-runtime";
 import {
   isPrithaVoiceId,
+  isVoiceModel,
+  VOICE_MODEL_OPTIONS,
   isVoiceBehaviorProfile,
   PRITHA_FEMININE_VOICE_OPTIONS,
   VOICE_BEHAVIOR_PROFILE_OPTIONS,
@@ -48,6 +50,7 @@ type RuntimeSettingsPayload = {
   codexAppThreadMaxAgeHours?: number;
   voiceBehaviorProfile?: string;
   prithaVoice?: string;
+  voiceModel?: string;
 };
 
 async function transportStatus() {
@@ -77,6 +80,7 @@ export async function GET() {
     transports: await transportStatus(),
     behaviorProfiles: VOICE_BEHAVIOR_PROFILE_OPTIONS,
     voiceOptions: PRITHA_FEMININE_VOICE_OPTIONS,
+    voiceModels: VOICE_MODEL_OPTIONS,
   });
 }
 
@@ -182,6 +186,10 @@ export async function POST(request: Request) {
     }
     patch.voiceBehaviorProfile = payload.voiceBehaviorProfile;
   }
+  if ("voiceModel" in payload) {
+    if (!isVoiceModel(payload.voiceModel)) return NextResponse.json({ ok: false, error: "invalid_voice_model" }, { status: 400 });
+    patch.voiceModel = payload.voiceModel;
+  }
   if ("prithaVoice" in payload) {
     if (!isPrithaVoiceId(payload.prithaVoice)) {
       return NextResponse.json({ ok: false, error: "invalid_pritha_voice" }, { status: 400 });
@@ -196,5 +204,6 @@ export async function POST(request: Request) {
     transports: await transportStatus(),
     behaviorProfiles: VOICE_BEHAVIOR_PROFILE_OPTIONS,
     voiceOptions: PRITHA_FEMININE_VOICE_OPTIONS,
+    voiceModels: VOICE_MODEL_OPTIONS,
   });
 }

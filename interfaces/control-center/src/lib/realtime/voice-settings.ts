@@ -1,3 +1,15 @@
+export const VOICE_MODEL_OPTIONS = [
+  { id: "gpt-realtime-2", label: "GPT Realtime 2" },
+  { id: "gpt-live-1", label: "GPT Live 1" },
+] as const;
+export type VoiceModel = (typeof VOICE_MODEL_OPTIONS)[number]["id"];
+export function isVoiceModel(value: unknown): value is VoiceModel {
+  return VOICE_MODEL_OPTIONS.some(option => option.id === value);
+}
+export function normalizeVoiceModel(value: unknown, fallback: VoiceModel = "gpt-live-1"): VoiceModel {
+  return isVoiceModel(value) ? value : fallback;
+}
+
 export const VOICE_BEHAVIOR_PROFILE_OPTIONS = [
   {
     id: "beginner",

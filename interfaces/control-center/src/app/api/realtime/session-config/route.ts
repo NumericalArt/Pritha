@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildRealtimeSessionConfig } from "@/lib/realtime/pritha-runtime";
+import { buildRealtimeSessionConfig, buildLiveSessionConfig } from "@/lib/realtime/pritha-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   });
   return NextResponse.json({
     ok: true,
+    live_responses: buildLiveSessionConfig({ musicControlEnabled: body.musicControlEnabled === true }).delegation.responses,
     type: config.type,
     instructions: config.instructions,
     tools: config.tools,

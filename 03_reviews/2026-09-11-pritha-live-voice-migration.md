@@ -1,0 +1,106 @@
+---
+id: 2026-09-11-pritha-live-voice-migration
+type: review
+status: implemented-pending-deployment
+created: 2026-09-11
+updated: 2026-09-11
+topics: [pritha, voice-control, model-migration, live-api, realtime, settings]
+tools: [OpenAI Live API, OpenAI Realtime API, GPT-Live 1, GPT-Realtime-2, GPT-5.6 Terra, WebRTC]
+sources:
+  - https://developers.openai.com/api/docs/models/gpt-live-1
+  - https://developers.openai.com/api/docs/guides/live-migration
+  - https://developers.openai.com/api/docs/guides/voice-webrtc?api=live
+  - https://developers.openai.com/api/docs/guides/live-delegation
+  - https://developers.openai.com/api/docs/guides/live-conversations
+related:
+  standards:
+    - 04_standards/realtime-voice-control-for-codex-agents.md
+    - 04_standards/pritha-good-state-alignment.md
+  workflows:
+    - 07_workflows/control-center-staged-release.md
+supersedes: []
+superseded_by: []
+source_published: unknown
+source_updated: unknown
+source_version: gpt-live-1; Live sessions API contract retrieved 2026-09-11
+retrieved: 2026-09-11
+verified: 2026-09-11
+temporal_status: version-bound
+memory_domain: pritha-self
+memory_domains: [pritha-self, agent-building-knowledge]
+subject:
+  kind: pritha
+  id: pritha
+privacy: public
+retention: durable
+review_status: reviewed
+confidence: medium
+---
+
+# GPT Live 1 и переключение голосовой модели
+
+Запрос: перевести голос канонической Pritha на GPT Live 1 и сохранить выбор
+между GPT Realtime 2 и GPT Live 1 в Settings. Другие экземпляры не обновляются.
+
+## Проверенные отличия API
+
+`gpt-live-1` использует Live API; его нельзя подставлять в прежний
+`/realtime/client_secrets` / `/realtime/calls` transport. Browser handshake
+требует серверного JSON POST `/live/sessions`, SDP offer в `transport.sdp`,
+ответа из `transport.sdp` и ожидания `session.started` на data channel.
+
+Речь и reasoning разделены. Для текущего набора локально исполняемых tools
+используется Responses delegation с `gpt-5.6-terra` — рекомендованным в
+документации вариантом. Backend можно изменить через
+`TECHSCOPE_VOICE_BACKEND_MODEL`. Его расход оплачивается отдельно от времени
+Live-сессии. Возможности самой Codex-модели и deep-task transport не заменяются.
+
+## Реализация
+
+- Settings → Voice → Voice Model сохраняет `voiceModel` в instance-local
+  runtime settings. Допустимы только `gpt-realtime-2` и `gpt-live-1`.
+- Сохранённый выбор имеет приоритет над env-default. Новые конфигурации получают
+  Live 1; существующий явный env-default сохраняется до выбора в Settings.
+- Выбор применяется к следующему подключению. Смена настройки посреди handshake
+  завершает попытку понятной ошибкой, а не соединяет разные протоколы.
+- Realtime сохраняет прежние handshake и события. Live получает отдельную
+  конфигурацию, короткую разговорную инструкцию и прежние tool/workflow rules
+  в backend instructions. Выбранный голос, включая Marin, сохраняется.
+- Вложенные `response.event` связываются с delegation и response ID. Calls
+  собираются из `response.output_item.done`; пустой terminal `output` не теряет
+  pending calls. Результаты отправляются до continuation. Повторный call ID
+  использует сохранённый результат, не повторяет локальное действие.
+- Permission checks, UI approvals, memory tools, Codex task state и opt-in
+  управления музыкой остаются в приложении. Live не получает новые полномочия.
+- Субтитры пользователя и ассистента группируются отдельно по времени;
+  фрагмент не считается подтверждением полного пользовательского хода.
+  UI речи и music ducking опираются на аудиопотоки, а не backend completion.
+- Прогресс Codex и sticky context передаются через Live context appends;
+  приватное содержимое остаётся в существующем instance-local контуре.
+- `store: false` сохраняет отсутствие записи сессии у провайдера. Duration
+  учитывается как cumulative snapshots. Graceful close ожидает `session.closed`
+  с ограниченным timeout и сообщает о неподтверждённой финализации при сбое.
+
+## Проверки и границы результата
+
+Реальный API-проект подтвердил доступ к `gpt-live-1`. Проверены запуск с Marin
+и Terra и корректное закрытие. Отдельный bounded API probe проверил один
+безопасный тестовый function call: получение вызова, возврат результата,
+второй завершённый backend response и `session.closed`. Ни один production
+инструмент в этих probes не исполнялся; микрофон пользователя не использовался.
+
+Unit tests покрывают protocol gates, дубликаты, late results, неуспешный backend,
+пустой terminal output, подтверждение session update, Unicode и graceful close.
+Browser tests проверяют оба transport paths с synthetic WebRTC, сохранение
+выбора и отклонение неизвестной модели на desktop/mobile. Эти тесты не доказывают
+качество русского голоса или фактически услышанную речь.
+
+Good State Alignment: aligned при сохранении legacy path, music controls,
+приватности, permissions и отдельного deployment gate. Tracked история старых
+моделей не переписывается; шаблоны других агентов и экспериментальный voice
+server остаются самостоятельными поверхностями.
+
+Включение новой сборки основной Pritha требует staged release с отдельным
+непосредственным approval перед service actions. После активации: strict
+pages/chunks, operational admission, выбор Live 1, затем живой smoke речи,
+перебиваний, памяти, музыки и Codex handoff. До этого статус deployment — pending.

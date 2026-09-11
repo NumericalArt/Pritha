@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { MemoryStick, Save } from "lucide-react";
 import {
   PRITHA_FEMININE_VOICE_OPTIONS,
+  VOICE_MODEL_OPTIONS,
+  type VoiceModel,
   VOICE_BEHAVIOR_PROFILE_OPTIONS,
   type PrithaVoiceId,
   type VoiceBehaviorProfile,
@@ -13,12 +15,14 @@ import { readStickyContextSetting, writeStickyContextSetting } from "@/component
 type RuntimeSettings = {
   voiceBehaviorProfile: VoiceBehaviorProfile;
   prithaVoice: PrithaVoiceId;
+  voiceModel: VoiceModel;
   updatedAt: string;
 };
 
 const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   voiceBehaviorProfile: "advanced",
   prithaVoice: "marin",
+  voiceModel: "gpt-live-1",
   updatedAt: "",
 };
 
@@ -67,6 +71,7 @@ export function VoiceSettingsSection() {
       body: JSON.stringify({
         voiceBehaviorProfile: runtimeSettings.voiceBehaviorProfile,
         prithaVoice: runtimeSettings.prithaVoice,
+        voiceModel: runtimeSettings.voiceModel,
       }),
     }).catch(() => null);
     setSaving(false);
@@ -116,6 +121,16 @@ export function VoiceSettingsSection() {
         </div>
       ) : (
         <>
+          <div className="settings-rowline">
+            <div>
+              <strong>Voice Model</strong>
+              <span>Choose the model for your next voice session. Live 1 uses a separately billed backend for tools.</span>
+            </div>
+            <select value={runtimeSettings.voiceModel} aria-label="Voice model"
+              onChange={(event) => updateRuntimeSetting("voiceModel", event.currentTarget.value as VoiceModel)}>
+              {VOICE_MODEL_OPTIONS.map(option => <option value={option.id} key={option.id}>{option.label}</option>)}
+            </select>
+          </div>
           <div className="settings-rowline">
             <div>
               <strong>Behavior Detail</strong>
