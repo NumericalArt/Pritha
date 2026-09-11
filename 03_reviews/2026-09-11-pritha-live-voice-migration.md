@@ -1,7 +1,7 @@
 ---
 id: 2026-09-11-pritha-live-voice-migration
 type: review
-status: implemented-pending-deployment
+status: deployed-awaiting-voice-feedback
 created: 2026-09-11
 updated: 2026-09-11
 topics: [pritha, voice-control, model-migration, live-api, realtime, settings]
@@ -100,7 +100,33 @@ Good State Alignment: aligned при сохранении legacy path, music con
 моделей не переписывается; шаблоны других агентов и экспериментальный voice
 server остаются самостоятельными поверхностями.
 
-Включение новой сборки основной Pritha требует staged release с отдельным
-непосредственным approval перед service actions. После активации: strict
-pages/chunks, operational admission, выбор Live 1, затем живой smoke речи,
-перебиваний, памяти, музыки и Codex handoff. До этого статус deployment — pending.
+Staged release выполнен после отдельного разрешения пользователя. Живой
+пользовательский smoke речи, перебиваний, памяти, музыки и Codex handoff остаётся
+проверкой качества взаимодействия, отдельной от автоматических release gates.
+
+## Deployment основной Pritha — 2026-09-11
+
+- Runtime commit: `a9b6095fe92be59e3572909ebbeed2f7d035375b`.
+- Обновлён только instance `main` через pinned `pritha-instance update`;
+  остальные экземпляры и устройства не обновлялись.
+- Перед update: admission enabled, active tasks 0. После managed restart
+  admission повторно активирован для проверенного BUILD_ID, capacity 3.
+- В instance-local Settings сохранён `voiceModel: gpt-live-1`; выбранный ранее
+  голос Shimmer сохранён, backend — `gpt-5.6-terra`.
+- Strict health: 5 страниц и 13 JavaScript chunks проходят проверку.
+  Operational admission, runtime, agent catalog, chat list и history — pass.
+  Первая operational проверка не подтвердила agent catalog; последующее прямое
+  чтение вернуло 12 карточек без конфликтов/ошибок метаданных, повторный gate
+  прошёл. Дополнительных рестартов или изменений каталога не выполнялось.
+- На живой сборке desktop/mobile Settings показывают выбранный Live 1 и
+  доступный Realtime 2; Voice page показывает `gpt-live-1`.
+- Дополнительный реальный WebSocket probe подтвердил Shimmer + Live 1.
+  Production WebRTC broker проверен с полным настроенным набором tools:
+  `session.started` и `session.closed` получены, final usage — 15 секунд
+  (WebRTC initialization). Пользовательский микрофон и production tools в
+  проверке не использовались; звучание этим тестом не оценивается.
+- Послерелизный self-test — pass; failed/stale queue items 0, live UI pass.
+- Полный private release receipt хранится в instance-local `releases/`;
+  идентификаторы устройств, endpoints, SDP и приватные runtime values в Git
+  не публикуются. Этот отчёт фиксирует runtime pin отдельно от documentation
+  commit; обновление отчёта не требует пересборки сервиса.
