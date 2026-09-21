@@ -49,7 +49,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => stop(acti
 try {
   for (const directory of [root, state, env.PRITHA_AGENT_PARENT]) mkdirSync(directory, { recursive: true });
   writeFileSync(env.PRITHA_CONTROL_CENTER_ENV_FILE, "# Disposable E2E instance\n");
-  const files = execFileSync("git", ["ls-files", "-z"], { cwd: source, encoding: "utf8" }).split("\0").filter(Boolean);
+  const files = execFileSync("git", ["ls-files", "-cz", "--others", "--exclude-standard"], { cwd: source, encoding: "utf8" }).split("\0").filter(Boolean);
   for (const file of files) {
     if (file.startsWith("interfaces/") || file.startsWith("tests/")) continue;
     if (!lstatSync(path.join(source, file)).isFile()) throw new Error("E2E source must contain regular files only");

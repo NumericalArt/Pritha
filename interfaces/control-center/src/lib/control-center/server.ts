@@ -52,6 +52,7 @@ import type {
 } from "./types";
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
 import { runAsyncProbe, createProbeCache, sharedProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
+import { credentialFilePath, normalizeCredentialTarget, readCredentialFile, updateCredentialFile } from "../../../../../scripts/lib/credential-store.mjs";
 import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
 import { resolveToolServerManifest, toolServerLaunchEnvironment, toolServerRuntimeBinding } from "../../../../../scripts/agents-mother/tool-server-runtime.mjs";
 import { deliveryStateView } from "./delivery-state";
@@ -1219,71 +1220,26 @@ function removeEnvValue(text: string, name: string) {
     .replace(/\n+$/, "")}\n`;
 }
 
-function envLocalPath(folderPath: string) {
-  return path.join(folderPath, ".env.local");
-}
-
-function envBackupDir(folderPath: string) {
-  return path.join(folderPath, ".env.local.backups");
-}
-
-function ensurePrivateGitExclude(folderPath: string) {
-  const excludePath = path.join(folderPath, ".git", "info", "exclude");
-  if (!existsSync(path.dirname(excludePath))) return;
-  const entry = ".env.local.backups/";
-  const current = readText(excludePath);
-  if (current.split(/\r?\n/).includes(entry)) return;
-  appendFileSync(excludePath, `${current.endsWith("\n") || !current ? "" : "\n"}${entry}\n`, "utf8");
-}
-
-function writePrivateFileAtomic(filePath: string, text: string) {
-  const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.tmp-${process.pid}-${Date.now()}`);
-  writeFileSync(temporaryPath, text, { encoding: "utf8", mode: 0o600 });
-  chmodSync(temporaryPath, 0o600);
-  renameSync(temporaryPath, filePath);
-  chmodSync(filePath, 0o600);
-}
-
-function writeEnvBackup(folderPath: string) {
-  const filePath = envLocalPath(folderPath);
-  if (!existsSync(filePath)) return undefined;
-  ensurePrivateGitExclude(folderPath);
-  const backupDir = envBackupDir(folderPath);
-  mkdirSync(backupDir, { recursive: true, mode: 0o700 });
-  chmodSync(backupDir, 0o700);
-  const backupName = `.env.local.${new Date().toISOString().replace(/[:.]/g, "-")}.bak`;
-  const backupPath = path.join(backupDir, backupName);
-  writeFileSync(backupPath, readFileSync(filePath, "utf8"), { encoding: "utf8", mode: 0o600 });
-  chmodSync(backupPath, 0o600);
-
-  const backups = readdirSync(backupDir)
-    .filter((entry) => entry.startsWith(".env.local.") && entry.endsWith(".bak"))
-    .sort()
-    .reverse();
-  for (const oldBackup of backups.slice(5)) rmSync(path.join(backupDir, oldBackup), { force: true });
-  return backupPath;
-}
-
 function maskSecretValue(value: string | undefined) {
   if (!value) return undefined;
   const suffix = value.slice(-4);
   return suffix ? `••••${suffix}` : "••••";
 }
 
-function credentialStorage(root: string, folderPath: string, file: ProjectMetadataFile): ControlCenterAgentCredentials["storage"] {
-  const filePath = envLocalPath(folderPath);
-  const backupPath = envBackupDir(folderPath);
+function credentialStorage(root: string, folderPath: string, file: ProjectMetadataFile, target = ".env.local"): ControlCenterAgentCredentials["storage"] {
+  const filePath = path.join(folderPath, target);
+  const backupPath = `${filePath}.backups`;
   if (file.status !== "read") {
     return {
       status: file.status === "missing" ? "manual_only" : "unavailable",
-      target: ".env.local",
+      target,
       relativePath: relativePath(root, filePath),
       backupRelativePath: relativePath(root, backupPath),
     };
   }
   return {
     status: "ready",
-    target: ".env.local",
+    target,
     relativePath: relativePath(root, filePath),
     mode: file.mode || undefined,
     backupRelativePath: relativePath(root, backupPath),
@@ -1309,12 +1265,17 @@ function credentialsForAgent(root: string, folder: { absolutePath: string } | nu
   }
 
   const definitionBases = mergeSecretDefinitions(manifest, metadata.envExample.text);
-  const envValues = parseEnvValues(metadata.envLocal.text);
-  const lastUpdated = metadata.envLocal.mtime || undefined;
-  const storage = credentialStorage(root, folder.absolutePath, metadata.envLocal);
-  const unavailable = metadata.envExample.status === "unavailable" || metadata.envLocal.status === "unavailable";
+  const missingFile: ProjectMetadataFile = { status: "unavailable", text: "", mtime: null, mode: null };
+  const fileFor = (target: string) => normalizeCredentialTarget(target)
+    ? metadata.credentialStores?.[target] || (target === ".env.local" ? metadata.envLocal : missingFile) : missingFile;
+  const storageTargets = [...new Set(definitionBases.map(definition => definition.storageTarget))];
+  const storageTarget = storageTargets.length === 1 && normalizeCredentialTarget(storageTargets[0]) ? storageTargets[0] : ".env.local";
+  const storage = credentialStorage(root, folder.absolutePath, fileFor(storageTarget), storageTarget);
+  const unavailable = metadata.envExample.status === "unavailable" || definitionBases.some(definition => fileFor(definition.storageTarget).status === "unavailable");
   const definitions: ControlCenterSecretDefinition[] = definitionBases.map((definition) => {
-    const value = envValues.get(definition.name);
+    const file = fileFor(definition.storageTarget);
+    const value = parseEnvValues(file.text).get(definition.name);
+    const lastUpdated = file.mtime || undefined;
     const configured = Boolean(value);
     const status: ControlCenterSecretReadiness = configured ? "configured" : definition.required ? "missing" : "optional";
     return {
@@ -1323,8 +1284,8 @@ function credentialsForAgent(root: string, folder: { absolutePath: string } | nu
       configured,
       maskedValue: maskSecretValue(value),
       lastUpdated: configured ? lastUpdated : undefined,
-      canWrite: !unavailable && definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
-      canRemove: !unavailable && configured && definition.storageTarget === ".env.local" && definition.provider !== "codex_external",
+      canWrite: file.status !== "unavailable" && Boolean(normalizeCredentialTarget(definition.storageTarget)) && definition.provider !== "codex_external",
+      canRemove: file.status !== "unavailable" && configured && Boolean(normalizeCredentialTarget(definition.storageTarget)) && definition.provider !== "codex_external",
       note:
         definition.note ||
         (definition.provider === "codex_external"
@@ -2538,11 +2499,9 @@ export async function setAgentCredentialSecret(
   const folderPath = resolveAgentFolderPath(status, agent);
   if (!folderPath) throw new Error("agent_folder_unavailable");
 
-  const filePath = envLocalPath(folderPath);
+  credentialFilePath(folderPath, definition.storageTarget);
   if (!options.dryRun) {
-    const current = existsSync(filePath) ? readText(filePath) : "";
-    writeEnvBackup(folderPath);
-    writePrivateFileAtomic(filePath, upsertEnvValue(current, definition.name, secretValue));
+    updateCredentialFile(folderPath, definition.storageTarget, current => upsertEnvValue(current, definition.name, secretValue));
   }
 
   const refreshed = options.dryRun ? agent : (await getControlCenterAgent(agentId)).agent;
@@ -2565,7 +2524,7 @@ export async function setAgentCredentialSecret(
     storage: options.dryRun ? agent.credentials.storage : refreshed?.credentials.storage || agent.credentials.storage,
     warnings: options.dryRun
       ? ["Dry run completed; no .env.local file was written."]
-      : ["Secret was written to the child agent private .env.local store. The value is not returned by this API."],
+      : ["Secret saved in the declared private store. Restart the child service to load it; saving alone does not enable the provider or verify its billing. The value is not returned by this API."],
   };
 }
 
@@ -2579,15 +2538,13 @@ export async function removeAgentCredentialSecret(
   if (!agent) return null;
   const definition = findCredential(agent, name);
   if (!definition) throw new Error("unknown_secret");
-  if (!definition.storageTarget || definition.storageTarget !== ".env.local") throw new Error("secret_not_removable");
+  if (!definition.canRemove || !normalizeCredentialTarget(definition.storageTarget)) throw new Error("secret_not_removable");
   const folderPath = resolveAgentFolderPath(status, agent);
   if (!folderPath) throw new Error("agent_folder_unavailable");
 
-  const filePath = envLocalPath(folderPath);
-  if (!options.dryRun && existsSync(filePath)) {
-    const current = readText(filePath);
-    writeEnvBackup(folderPath);
-    writePrivateFileAtomic(filePath, removeEnvValue(current, definition.name));
+  credentialFilePath(folderPath, definition.storageTarget);
+  if (!options.dryRun) {
+    updateCredentialFile(folderPath, definition.storageTarget, current => removeEnvValue(current, definition.name));
   }
 
   const refreshed = options.dryRun ? agent : (await getControlCenterAgent(agentId)).agent;
@@ -2623,8 +2580,7 @@ export async function validateAgentCredentialSecret(agentId: string, name: strin
   const folderPath = resolveAgentFolderPath(status, agent);
   if (!folderPath) throw new Error("agent_folder_unavailable");
 
-  const filePath = envLocalPath(folderPath);
-  const values = existsSync(filePath) ? parseEnvValues(readText(filePath)) : new Map<string, string>();
+  const values = parseEnvValues(readCredentialFile(folderPath, definition.storageTarget));
   const value = values.get(definition.name);
   const checks = validateSecretFormat(definition, value);
   const failed = checks.some((check) => check.status === "fail");
