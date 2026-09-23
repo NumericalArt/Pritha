@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AttachmentView, TurnView } from "../../src/lib/codex-chat/types";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 async function mockChat(page: Page, initiallyRestored = false) {
   const now = new Date().toISOString();
@@ -466,4 +466,63 @@ test("Activity renews expired positions, preserves messages and keeps technical 
   await expect(feed.getByRole('button',{name:'Retry activity',exact:true})).toHaveCount(0);
   await expect(feed.locator('.codex-activity-entry')).toHaveCount(2);
   await expect(draft).toHaveValue('Preserve my next message.');
+});
+
+
+for (const width of [390, 1280]) test(`activity pagination survives background refresh at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 850 });
+  await mockChat(page, true);
+  const actions = Array.from({ length: 12 }, (_, i) => ({ id: `action_${i + 1}`, kind: "command", status: "completed", commandPreview: `Action ${i + 1}`, outputPreview: null, exitCode: 0 }));
+  const row = { turnId: "turn_priority", status: "completed", userMessage: { id: "user", markdown: "Read the earlier actions", role: "user", status: "completed" }, items: [], pendingRequestIds: [], startedAt: new Date().toISOString(), history: { itemsRef: "recent_actions", itemsState: "not_loaded", sourceMode: "native" } };
+  let holdTail = false, holdOlder = true, historyReads = 0;
+  const tailRoutes: Route[] = [], olderRoutes: Route[] = [], reads: string[] = [];
+  const reply = (route: Route, cursor: string) => {
+    const end = cursor === "recent_actions" ? 12 : Number(cursor.slice(6)), start = Math.max(0, end - 5);
+    return route.fulfill({ json: { apiVersion: "1", requestId: "activity-priority", data: { data: actions.slice(start, end).reverse(), nextCursor: start ? `older_${start}` : null } } });
+  };
+  await page.route("**/threads/chat_fixture/history**", route => {
+    const url = new URL(route.request().url());
+    if (!url.pathname.endsWith("/items")) {
+      historyReads++;
+      return route.fulfill({ json: { apiVersion: "1", requestId: "activity-history", data: { data: [row], olderCursor: null } } });
+    }
+    const cursor = url.searchParams.get("cursor")!;
+    reads.push(cursor);
+    if (cursor === "recent_actions" && holdTail) { tailRoutes.push(route); return; }
+    if (cursor === "older_7" && holdOlder) { olderRoutes.push(route); return; }
+    return reply(route, cursor);
+  });
+  const refresh = () => page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.goto("/task-chat?group=my_chats&chat=chat_fixture");
+  const feed = page.getByRole("region", { name: "Activity", exact: true });
+  const earlier = feed.getByRole("button", { name: /Show earlier actions/ });
+  await expect(feed.locator('[data-activity-id="action_12"]')).toBeVisible();
+  holdTail = true;
+  await refresh();
+  await expect.poll(() => tailRoutes.length).toBe(1);
+  await expect(earlier).toBeEnabled();
+  await earlier.click();
+  await expect.poll(() => olderRoutes.length).toBe(1);
+  const tailReads = reads.filter(cursor => cursor === "recent_actions").length;
+  const beforeRefresh = historyReads;
+  await refresh();
+  await expect.poll(() => historyReads).toBeGreaterThan(beforeRefresh);
+  // Finishing a superseded tail and refreshing the turn must preserve the selected page.
+  await reply(tailRoutes.shift()!, "recent_actions");
+  holdTail = false;
+  holdOlder = false;
+  await reply(olderRoutes.shift()!, "older_7");
+  await expect(feed.locator('[data-activity-id="action_3"]')).toBeAttached();
+  await expect.poll(() => reads.filter(cursor => cursor === "recent_actions").length).toBeGreaterThan(tailReads);
+  await expect(earlier).toBeEnabled();
+  await earlier.click();
+  await expect(feed.locator('[data-activity-id="action_1"]')).toBeAttached();
+  await expect(earlier).toHaveCount(0);
+  const completedTailReads = reads.filter(cursor => cursor === "recent_actions").length;
+  await refresh();
+  await expect.poll(() => reads.filter(cursor => cursor === "recent_actions").length).toBeGreaterThan(completedTailReads);
+  await expect(feed.locator('[data-activity-id="action_1"]')).toBeAttached();
+  await expect(earlier).toHaveCount(0);
+  expect(reads.filter(cursor => cursor === "older_7")).toHaveLength(1);
+  expect(reads.filter(cursor => cursor === "older_2")).toHaveLength(1);
 });

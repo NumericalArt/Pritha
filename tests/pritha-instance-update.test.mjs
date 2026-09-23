@@ -91,6 +91,7 @@ if (action === "start") {
   process.exitCode = 1;
 }
 `);
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "atomic-file.mjs"), path.join(lib, "atomic-file.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "env.mjs"), path.join(lib, "env.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "timeout-policy.mjs"), path.join(lib, "timeout-policy.mjs"));
@@ -224,6 +225,7 @@ function invoke(fixture, port, releaseVersion = "bad", expectedCommit = null, mu
   if (!existsSync(path.join(agentParent, ".codex", "AGENTS.md"))) writeFileSync(path.join(agentParent, ".codex", "AGENTS.md"), "# Runtime metadata, not a child agent\n");
   writeFileSync(path.join(agentParent, ".codex", "runtime-state"), `${Date.now()}\n`);
   return run(process.execPath, [
+    ...(extraEnv.PRITHA_INSTANCE_TEST_PRELOAD ? ["--import", extraEnv.PRITHA_INSTANCE_TEST_PRELOAD] : []),
     path.join(fixture.checkout, "scripts", "pritha-instance.mjs"),
     "update", "--apply", "--yes", ...(expectedCommit ? ["--expected-commit", expectedCommit] : []), "--json",
   ], {
@@ -493,3 +495,97 @@ for (const mode of ["delay-always", "owner", "malformed", "missing-ok"]) {
     }
   });
 }
+
+test("verified deployment is recorded before a failed retired-build cleanup", async () => {
+  const fixture = makeFixture(), port = await freePort(); let pid;
+  try {
+    const target = git(fixture.remoteWork, "rev-parse", "HEAD");
+    const preload = path.join(fixture.fixture, "cleanup-fault.mjs");
+    const evidencePath = path.join(fixture.fixture, "cleanup-evidence.json");
+    writeFileSync(preload, `
+import fs from "node:fs";
+import path from "node:path";
+import { syncBuiltinESMExports } from "node:module";
+const original = fs.rmSync; let retiredCalls = 0;
+fs.rmSync = (file, options) => {
+  if (String(file).endsWith("/.next-pritha-previous") && ++retiredCalls === 2) {
+    const releases = path.join(process.env.PRITHA_STATE_ROOT, "releases");
+    const manifests = fs.readdirSync(releases).map(name => path.join(releases, name, "release.json")).filter(file => fs.existsSync(file));
+    fs.writeFileSync(${JSON.stringify(evidencePath)}, JSON.stringify({ options, receipt: manifests.length ? JSON.parse(fs.readFileSync(manifests[0], "utf8")) : null }));
+    const error = new Error("retired Finder metadata remains"); error.code = "ENOTEMPTY"; throw error;
+  }
+  return original(file, options);
+};
+syncBuiltinESMExports();
+`);
+    const deployed = invoke(fixture, port, "good", target, false, false, "", { PRITHA_INSTANCE_TEST_PRELOAD: preload });
+    const payload = JSON.parse(deployed.stdout);
+    const runtimePid = path.join(fixture.fixture, "state/setup/fixture-runtime.pid");
+    pid = existsSync(runtimePid) ? Number(readFileSync(runtimePid, "utf8")) : payload.pid;
+    assert.equal(deployed.status, 0, deployed.stderr || deployed.stdout);
+    assert.equal(payload.status, "deployed");
+    assert.equal(payload.health.ok, true);
+    assert.equal(payload.isolationMatch, true);
+    assert.equal(payload.finalHead, target);
+    assert.equal(payload.finalGitClean, true);
+    const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
+    assert.equal(evidence.receipt.status, "deployed");
+    assert.equal(evidence.receipt.cleanup.status, "pending");
+    assert.equal(evidence.receipt.final_head, target);
+    assert.equal(evidence.receipt.health.ok, true);
+    assert.equal(evidence.options.maxRetries, 5);
+    assert.equal(evidence.options.retryDelay, 100);
+    const manifest = JSON.parse(readFileSync(payload.manifest, "utf8"));
+    assert.equal(manifest.status, "deployed");
+    assert.equal(manifest.cleanup.status, "pending");
+    assert.equal(manifest.cleanup.code, "ENOTEMPTY");
+    assert.deepEqual(payload.cleanup, manifest.cleanup);
+    assert.equal(existsSync(manifest.cleanup.path), true);
+    assert.equal(readFileSync(path.join(fixture.checkout, "interfaces/control-center/.next/BUILD_ID"), "utf8").trim(), "candidate-build");
+    assert.equal(statSync(payload.manifest).mode & 0o777, 0o600);
+  } finally {
+    if (pid) { try { process.kill(pid, "SIGTERM"); } catch {} }
+    rmSync(fixture.fixture, { recursive: true, force: true });
+  }
+});
+
+
+test("cleanup receipt update failure retains the earlier verified deployment atomically", async () => {
+  const fixture = makeFixture(), port = await freePort(); let pid;
+  try {
+    const target = git(fixture.remoteWork, "rev-parse", "HEAD");
+    const preload = path.join(fixture.fixture, "receipt-fault.mjs");
+    writeFileSync(preload, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+const original = fs.renameSync; let receiptWrites = 0;
+fs.renameSync = (from, to) => {
+  if (String(to).endsWith("/release.json") && ++receiptWrites === 2) {
+    const error = new Error("fixture cannot replace cleanup receipt"); error.code = "ENOSPC"; throw error;
+  }
+  return original(from, to);
+};
+syncBuiltinESMExports();
+`);
+    const deployed = invoke(fixture, port, "good", target, false, false, "", { PRITHA_INSTANCE_TEST_PRELOAD: preload });
+    const payload = JSON.parse(deployed.stdout);
+    const runtimePid = path.join(fixture.fixture, "state/setup/fixture-runtime.pid");
+    pid = existsSync(runtimePid) ? Number(readFileSync(runtimePid, "utf8")) : payload.pid;
+    assert.equal(deployed.status, 0, deployed.stderr || deployed.stdout);
+    assert.equal(payload.status, "deployed");
+    assert.equal(payload.health.ok, true);
+    assert.equal(payload.isolationMatch, true);
+    assert.equal(payload.cleanup.status, "complete");
+    assert.equal(payload.cleanupReceiptError.code, "ENOSPC");
+    assert.equal(existsSync(payload.cleanup.path), false);
+    const manifest = JSON.parse(readFileSync(payload.manifest, "utf8"));
+    assert.equal(manifest.status, "deployed");
+    assert.equal(manifest.final_head, target);
+    assert.equal(manifest.health.ok, true);
+    assert.equal(manifest.cleanup.status, "pending");
+    assert.equal(statSync(payload.manifest).mode & 0o777, 0o600);
+  } finally {
+    if (pid) { try { process.kill(pid, "SIGTERM"); } catch {} }
+    rmSync(fixture.fixture, { recursive: true, force: true });
+  }
+});

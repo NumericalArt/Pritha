@@ -3,7 +3,7 @@ id: control-center-staged-release
 type: workflow
 status: active
 created: 2026-08-27
-updated: 2026-09-09
+updated: 2026-09-23
 topics:
   - control-center
   - staged-release
@@ -25,10 +25,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-08-27
-source_updated: 2026-09-09
-source_version: control-center-staged-release-v3; admission and operational verification
+source_updated: 2026-09-23
+source_version: control-center-staged-release-v4; durable receipt before retired-build cleanup
 retrieved: 2026-08-27
-verified: 2026-09-09
+verified: 2026-09-23
 valid_for: Pritha Control Center production and fleet releases
 temporal_status: current
 memory_domain: pritha-self
@@ -80,7 +80,13 @@ transaction after the separate lifecycle approval exists:
    `/voice`, `/agents`, `/task-chat`, `/codex`, `/settings` and every referenced
    same-origin JavaScript chunk; HTML without chunks is a failure;
 9. re-check Git and instance isolation;
-10. remove the displaced build only after all checks pass.
+10. atomically record the verified deployment with cleanup marked pending;
+11. attempt retired-build cleanup and atomically record its separate result.
+
+A cleanup failure leaves the verified deployment recorded and the retired build
+available for later cleanup. If updating the cleanup receipt fails, retain the
+first atomic receipt and report `cleanupReceiptError` separately. Neither case
+authorizes repeating the whole release or weakening any health/rollback gate.
 
 The updater's process/build checks do not finish the operator's release check:
 complete admission activation and operational verification below before
