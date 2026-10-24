@@ -382,7 +382,11 @@ export class CodexAppServerBuildExecutor {
     if (read.thread.status?.type === "notLoaded" || (turn && !TERMINAL_TURN_STATUSES.has(turn.status))) {
       // Persisted Goal reads require a loaded thread in Codex 0.153. A terminal
       // archived attempt may therefore need loading too; this never sends input.
-      const params = { threadId: receipt.thread_id, cwd, approvalPolicy: "never", sandbox: "workspace-write" };
+      // Cold resume may otherwise resolve a new account default rather than
+      // the model that actually ran this bound attempt. Recovery sends no new
+      // turn, but must preserve the model projection before reading its Goal.
+      const params = { threadId: receipt.thread_id, cwd, approvalPolicy: "never", sandbox: "workspace-write",
+        model: saved.model_observed || saved.model_requested || undefined };
       try {
         await this.connection.request("thread/resume", params, 10_000);
       } catch (error) {

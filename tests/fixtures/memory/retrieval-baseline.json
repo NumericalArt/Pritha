@@ -1,0 +1,552 @@
+{
+  "phase": "baseline",
+  "fixture_sha256": "ae86a7a8846ecf6b37e99ada07a4f2fea2e9e2201ca0f3ff3738573efd87f2f2",
+  "model": "paraphrase-multilingual-MiniLM-L12-v2",
+  "chunks": 10171,
+  "model_load_ms": 513.333292,
+  "vector_load_ms": 615.8281250000002,
+  "peak_rss_bytes": 1039941632,
+  "method": "Legacy AND FTS and unfiltered chunk semantic ranking on consistent initial instance index; vectorized float32 dot for batch evaluation, not original CLI latency.",
+  "results": [
+    {
+      "id": "a1",
+      "group": "exact",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 9.716
+    },
+    {
+      "id": "a1",
+      "group": "exact",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 102.857
+    },
+    {
+      "id": "a2",
+      "group": "exact",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 5.83
+    },
+    {
+      "id": "a2",
+      "group": "exact",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 25.352
+    },
+    {
+      "id": "a3",
+      "group": "exact",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 3.132
+    },
+    {
+      "id": "a3",
+      "group": "exact",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 24.959
+    },
+    {
+      "id": "a4",
+      "group": "exact",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 5.2
+    },
+    {
+      "id": "a4",
+      "group": "exact",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 11.172
+    },
+    {
+      "id": "a5",
+      "group": "exact",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 4.817
+    },
+    {
+      "id": "a5",
+      "group": "exact",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 25.757
+    },
+    {
+      "id": "a6",
+      "group": "exact",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 6.078
+    },
+    {
+      "id": "a6",
+      "group": "exact",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 10.866
+    },
+    {
+      "id": "a7",
+      "group": "exact",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 4.471
+    },
+    {
+      "id": "a7",
+      "group": "exact",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 10.138
+    },
+    {
+      "id": "a8",
+      "group": "exact",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 2.551
+    },
+    {
+      "id": "a8",
+      "group": "exact",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 9.396
+    },
+    {
+      "id": "s1",
+      "group": "semantic",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 3.346
+    },
+    {
+      "id": "s1",
+      "group": "semantic",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 24.853
+    },
+    {
+      "id": "s2",
+      "group": "semantic",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 5.418
+    },
+    {
+      "id": "s2",
+      "group": "semantic",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 23.967
+    },
+    {
+      "id": "s3",
+      "group": "semantic",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 2.328
+    },
+    {
+      "id": "s3",
+      "group": "semantic",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 23.148
+    },
+    {
+      "id": "s4",
+      "group": "semantic",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 1.661
+    },
+    {
+      "id": "s4",
+      "group": "semantic",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 11.216
+    },
+    {
+      "id": "s5",
+      "group": "semantic",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 1.643
+    },
+    {
+      "id": "s5",
+      "group": "semantic",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 20.917
+    },
+    {
+      "id": "s6",
+      "group": "semantic",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 1.262
+    },
+    {
+      "id": "s6",
+      "group": "semantic",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 25.96
+    },
+    {
+      "id": "s7",
+      "group": "semantic",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 0.832
+    },
+    {
+      "id": "s7",
+      "group": "semantic",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 10.374
+    },
+    {
+      "id": "s8",
+      "group": "semantic",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 2.559
+    },
+    {
+      "id": "s8",
+      "group": "semantic",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 11.616
+    },
+    {
+      "id": "s9",
+      "group": "semantic",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 0.319
+    },
+    {
+      "id": "s9",
+      "group": "semantic",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 7.349
+    },
+    {
+      "id": "s10",
+      "group": "semantic",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 7.303
+    },
+    {
+      "id": "s10",
+      "group": "semantic",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 6.921
+    },
+    {
+      "id": "v1",
+      "group": "version",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 0.52
+    },
+    {
+      "id": "v1",
+      "group": "version",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 9.768
+    },
+    {
+      "id": "v2",
+      "group": "version",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 1.013
+    },
+    {
+      "id": "v2",
+      "group": "version",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 32.665
+    },
+    {
+      "id": "v3",
+      "group": "version",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 1.108
+    },
+    {
+      "id": "v3",
+      "group": "version",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 10.299
+    },
+    {
+      "id": "v4",
+      "group": "version",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 2.076
+    },
+    {
+      "id": "v4",
+      "group": "version",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 24.882
+    },
+    {
+      "id": "v5",
+      "group": "version",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 0.504
+    },
+    {
+      "id": "v5",
+      "group": "version",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "latency_ms": 10.372
+    },
+    {
+      "id": "v6",
+      "group": "version",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 4.537
+    },
+    {
+      "id": "v6",
+      "group": "version",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "latency_ms": 28.52
+    },
+    {
+      "id": "n1",
+      "group": "negative",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 0.185
+    },
+    {
+      "id": "n1",
+      "group": "negative",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 12.324
+    },
+    {
+      "id": "n2",
+      "group": "negative",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 1.727
+    },
+    {
+      "id": "n2",
+      "group": "negative",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 9.548
+    },
+    {
+      "id": "n3",
+      "group": "negative",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 2.157
+    },
+    {
+      "id": "n3",
+      "group": "negative",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 18.316
+    },
+    {
+      "id": "n4",
+      "group": "negative",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 0.821
+    },
+    {
+      "id": "n4",
+      "group": "negative",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 9.984
+    },
+    {
+      "id": "n5",
+      "group": "negative",
+      "split": "holdout",
+      "mode": "fts",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 0.912
+    },
+    {
+      "id": "n5",
+      "group": "negative",
+      "split": "holdout",
+      "mode": "semantic",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 23.386
+    },
+    {
+      "id": "n6",
+      "group": "negative",
+      "split": "development",
+      "mode": "fts",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 0.953
+    },
+    {
+      "id": "n6",
+      "group": "negative",
+      "split": "development",
+      "mode": "semantic",
+      "hit_at_5": null,
+      "hit_at_10": null,
+      "latency_ms": 9.868
+    }
+  ]
+}

@@ -286,6 +286,8 @@ test("recovery reconnects and interrupts the existing running turn without anoth
   assert.equal(result.turn_status, "interrupted");
   assert.equal(result.tokens_used, 123);
   assert.equal(resumed.calls.filter(call => call.method === "thread/resume").length, 1);
+  assert.equal(resumed.calls.find(call => call.method === "thread/resume").params.model, saved.model_observed,
+    "Recovery must retain the observed model even when the new process has another default");
   assert.equal(resumed.calls.filter(call => call.method === "turn/interrupt").length, 1);
   assert.equal(resumed.calls.some(call => call.method === "turn/start"), false);
 });

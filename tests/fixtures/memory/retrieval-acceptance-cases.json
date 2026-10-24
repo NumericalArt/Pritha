@@ -1,0 +1,1122 @@
+{
+  "schema_version": 2,
+  "frozen_at": "2026-10-21T11:02:44.789409+00:00",
+  "old_fixture_sha256": "ae86a7a8846ecf6b37e99ada07a4f2fea2e9e2201ca0f3ff3738573efd87f2f2",
+  "protocol": "Content evidence v2. Source identity and all substantive anchors in the same returned section; exact filenames alone cannot pass. New holdout locked before changes; old exposed cases are diagnostics. Negative queries may return candidates, but may not leak or justify an unsupported answer. No answer accuracy inferred from retrieval.",
+  "thresholds": {
+    "positive_hit_at_5": 0.8,
+    "holdout_hit_at_5": 0.8,
+    "positive_hit_at_10": 0.9,
+    "max_regressions_at_10": 0,
+    "private_leaks": 0
+  },
+  "forbidden_result_fragments": [
+    "SYNTHETIC_PRIVATE_VIOLET_729",
+    "SYNTHETIC_SIBLING_CEDAR_843",
+    "SYNTHETIC_USER_ORCHID_516"
+  ],
+  "forbidden_path_prefixes": [
+    ".private/",
+    ".memory-private/"
+  ],
+  "cases": [
+    {
+      "id": "diagnostic-a1",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "Codex SDK App Server",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "App Server",
+            "SDK",
+            "history|истори|approvals"
+          ]
+        }
+      ],
+      "allowed_answer": "App Server для rich history/approvals; SDK для узкого worker.",
+      "forbidden_inference": "SDK и App Server взаимозаменяемы"
+    },
+    {
+      "id": "diagnostic-a2",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "OpenAI Agents SDK Responses API",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection"
+          ],
+          "all_of": [
+            "HTTP|API client",
+            "Agents SDK",
+            "loop|sessions"
+          ]
+        }
+      ],
+      "allowed_answer": "SDK необязателен для маленького API сервиса.",
+      "forbidden_inference": "Каждый API agent требует SDK"
+    },
+    {
+      "id": "diagnostic-a3",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "MCP Apps AppBridge CSP",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-mcp-apps-memory-explorer",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "AppBridge|host",
+            "CSP|sandbox",
+            "authorization|security|permission|allowlist"
+          ]
+        }
+      ],
+      "allowed_answer": "Host-mediated UI и отдельно проверенные permissions.",
+      "forbidden_inference": "UI visibility является authorization"
+    },
+    {
+      "id": "diagnostic-a4",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "DeepSeek Harness plugin lifecycle",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-harness-patterns",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "Cordis|ctx.effect|обратим",
+            "preview|lifecycle|выгружаем"
+          ]
+        }
+      ],
+      "allowed_answer": "Reversible registrations, preview; guards вне выгружаемого plugin.",
+      "forbidden_inference": "Production audited runtime"
+    },
+    {
+      "id": "diagnostic-a5",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "selected-module module-local LICENSE",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-repository-deep-review",
+            "2026-10-21-agent-building-repository-shortlist"
+          ],
+          "all_of": [
+            "module-local",
+            "exact pin|том же pin|tree SHA|на pin",
+            "LICENSE|license|лиценз"
+          ]
+        }
+      ],
+      "allowed_answer": "Exact pin и module-local license обязательны.",
+      "forbidden_inference": "Root MIT разрешает любой directory module"
+    },
+    {
+      "id": "diagnostic-a6",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "protected Trial verifier input",
+      "support": [
+        {
+          "document_ids": [
+            "agent-failure-to-trial"
+          ],
+          "all_of": [
+            "Executor",
+            "verifier",
+            "не меняет|защищ"
+          ]
+        }
+      ],
+      "allowed_answer": "Verifier защищен от executor.",
+      "forbidden_inference": "Executor может исправить тест ради pass"
+    },
+    {
+      "id": "diagnostic-a7",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "prompt caching 12h 2.5",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache"
+          ],
+          "all_of": [
+            "12h",
+            "2.5",
+            "write|запис"
+          ]
+        }
+      ],
+      "allowed_answer": "Write/read accounting отдельно; multiplier version-bound.",
+      "forbidden_inference": "Все input tokens стоят как cached reads"
+    },
+    {
+      "id": "diagnostic-a8",
+      "split": "diagnostic",
+      "group": "exact",
+      "query": "checkpoint resume idempotency",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-recovery-boundaries"
+          ],
+          "all_of": [
+            "Checkpoint",
+            "не гарантирует",
+            "idempotency|перед retry"
+          ]
+        }
+      ],
+      "allowed_answer": "Resume не гарантирует exactly-once side effects.",
+      "forbidden_inference": "Checkpoint автоматически защищает external effect"
+    },
+    {
+      "id": "diagnostic-s1",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Нужна ли библиотека агентов маленькому HTTP сервису?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection"
+          ],
+          "all_of": [
+            "Маленький HTTP",
+            "API client",
+            "Agents SDK"
+          ]
+        }
+      ],
+      "allowed_answer": "Начать с client SDK и необходимого loop.",
+      "forbidden_inference": "Обязательный полный framework"
+    },
+    {
+      "id": "diagnostic-s2",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Как встроить в чат интерактивный просмотр памяти с запасным текстовым ответом?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-mcp-apps-memory-explorer"
+          ],
+          "all_of": [
+            "host",
+            "extension negotiation",
+            "обычным текстом"
+          ]
+        }
+      ],
+      "allowed_answer": "MCP Apps только на negotiated host; text fallback.",
+      "forbidden_inference": "Любой браузер уже MCP Apps host"
+    },
+    {
+      "id": "diagnostic-s3",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "После перезагрузки плагина остаются старые подписки и доступы",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-harness-patterns"
+          ],
+          "all_of": [
+            "listener|listeners",
+            "Grants|grants|прав",
+            "unload|Unload"
+          ]
+        }
+      ],
+      "allowed_answer": "Проверить disposer, in-flight calls и grants; gate нельзя unload.",
+      "forbidden_inference": "Достаточно выгрузить security plugin"
+    },
+    {
+      "id": "diagnostic-s4",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Как превратить рабочий сбой агента в независимую проверку?",
+      "support": [
+        {
+          "document_ids": [
+            "agent-failure-to-trial",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "revision|верси",
+            "воспроизв",
+            "Trial|провер"
+          ]
+        }
+      ],
+      "allowed_answer": "Evidence на exact revision → воспроизведение → protected Trial.",
+      "forbidden_inference": "Сначала принять мнение judge за причину"
+    },
+    {
+      "id": "diagnostic-s5",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Поиск на русском не находит знание хотя оно есть",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-retrieval-evaluation",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "FTS",
+            "semantic",
+            "hybrid",
+            "набор|query|на фиксир"
+          ]
+        }
+      ],
+      "allowed_answer": "Сравнить FTS/semantic/hybrid на фиксированном наборе.",
+      "forbidden_inference": "Модель провайдера гарантированно лучше"
+    },
+    {
+      "id": "diagnostic-s6",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Пользователь перебил голосовую команду а старый результат пришел позже",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "late result|поздн",
+            "intent|delegation_id",
+            "session|сесси"
+          ]
+        }
+      ],
+      "allowed_answer": "Связать result с intent/session revision и проверять readback.",
+      "forbidden_inference": "Старый результат разрешает новую команду"
+    },
+    {
+      "id": "diagnostic-s7",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Как не заплатить больше после включения длинного кеша?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache"
+          ],
+          "all_of": [
+            "plain",
+            "writes_30m|30m",
+            "writes_12h|12h",
+            "reads"
+          ]
+        }
+      ],
+      "allowed_answer": "Считать записи обоих TTL, reads и plain input отдельно.",
+      "forbidden_inference": "TTL бесплатно продлевает все writes"
+    },
+    {
+      "id": "diagnostic-s8",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Worker упал после внешнего действия но до сохранения результата",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-recovery-boundaries"
+          ],
+          "all_of": [
+            "effect",
+            "receipt",
+            "readback|перед retry",
+            "idempotency|key"
+          ]
+        }
+      ],
+      "allowed_answer": "Reconcile по idempotency key и external readback перед retry.",
+      "forbidden_inference": "Слепо выполнить действие заново"
+    },
+    {
+      "id": "diagnostic-s9",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Можно ли использовать код найденного репозитория в новом агенте?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "reference-only|Reference-only",
+            "selected-module",
+            "approval"
+          ]
+        }
+      ],
+      "allowed_answer": "Reference-only не разрешает adoption; отдельный gate.",
+      "forbidden_inference": "accepted-for-review означает approved module"
+    },
+    {
+      "id": "diagnostic-s10",
+      "split": "diagnostic",
+      "group": "semantic",
+      "query": "Do resumed sessions preserve every parallel tool result and approval?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "parallel|параллель",
+            "call|result|pairs",
+            "resume|Resume|restore"
+          ]
+        }
+      ],
+      "allowed_answer": "Проверять полноту call/result pairs и восстановление policy.",
+      "forbidden_inference": "Resume сам доказывает полноту transcript"
+    },
+    {
+      "id": "diagnostic-v1",
+      "split": "diagnostic",
+      "group": "version",
+      "query": "Какая версия Codex реально установлена и какая стабильная у OpenAI?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "0.153.0",
+            "0.163.0",
+            "alpha|prerelease"
+          ]
+        }
+      ],
+      "allowed_answer": "Установленная 0.153.0; stable 0.163.0; alpha отдельно.",
+      "forbidden_inference": "Alpha есть installed/latest stable"
+    },
+    {
+      "id": "diagnostic-v2",
+      "split": "diagnostic",
+      "group": "version",
+      "query": "DeepSeek harness безопасен для production или это preview?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-harness-patterns",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "DeepSeek",
+            "preview",
+            "audit"
+          ]
+        }
+      ],
+      "allowed_answer": "Developer preview без security audit.",
+      "forbidden_inference": "MIT означает production readiness"
+    },
+    {
+      "id": "diagnostic-v3",
+      "split": "diagnostic",
+      "group": "version",
+      "query": "GPT Live уже работает в Pritha или нужно мигрировать впервые?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache"
+          ],
+          "all_of": [
+            "GPT-Live уже",
+            "gpt-live-1",
+            "Decisions"
+          ]
+        }
+      ],
+      "allowed_answer": "Live уже внедрен; Decisions является отдельным экспериментом.",
+      "forbidden_inference": "Новая первоначальная миграция нужна"
+    },
+    {
+      "id": "diagnostic-v4",
+      "split": "diagnostic",
+      "group": "version",
+      "query": "У Pritha есть универсальный runtime сенсоров и калиброванный LLM judge?",
+      "support": [
+        {
+          "document_ids": [
+            "agent-failure-to-trial",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "Generic sensor|универсальн|generic sensor",
+            "calibrated|калиброван|judge",
+            "не создаются|planned|не реализован|не означает|отдельн"
+          ]
+        }
+      ],
+      "allowed_answer": "Trials реализованы, generic sensor/judge остаются planned.",
+      "forbidden_inference": "Весь draft standard реализован"
+    },
+    {
+      "id": "diagnostic-v5",
+      "split": "diagnostic",
+      "group": "version",
+      "query": "Можно ли использовать codex mcp-server как текущую интеграцию?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection"
+          ],
+          "all_of": [
+            "mcp-server",
+            "Current|Текущ",
+            "App Server"
+          ]
+        }
+      ],
+      "allowed_answer": "Current docs направляют rich clients в App Server; локальные старые версии отдельно.",
+      "forbidden_inference": "Старый historical обзор является текущей рекомендацией"
+    },
+    {
+      "id": "diagnostic-v6",
+      "split": "diagnostic",
+      "group": "version",
+      "query": "Microsoft Agent Framework 1.22 checkpoint downgrade compatibility",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-recovery-boundaries",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "1.22.0",
+            "hosted",
+            "merge_mode",
+            "стар|old"
+          ]
+        }
+      ],
+      "allowed_answer": "Старый runtime не читает новые hosted/merge_mode records.",
+      "forbidden_inference": "Любой downgrade совместим"
+    },
+    {
+      "id": "diagnostic-n1",
+      "split": "diagnostic",
+      "group": "negative",
+      "query": "Рецепт шоколадного брауни с малиной",
+      "support": [],
+      "allowed_answer": "В исследовании агентных систем нет подтвержденного рецепта.",
+      "forbidden_inference": "Релевантность ближайшего embedding доказывает ответ"
+    },
+    {
+      "id": "diagnostic-n2",
+      "split": "diagnostic",
+      "group": "negative",
+      "query": "Точный релиз OpenAI Agents SDK v99.99.99",
+      "support": [],
+      "allowed_answer": "Неизвестно; нет verified release evidence.",
+      "forbidden_inference": "Выдуманная версия"
+    },
+    {
+      "id": "diagnostic-n3",
+      "split": "diagnostic",
+      "group": "negative",
+      "query": "SYNTHETIC_PRIVATE_VIOLET_729 API credential",
+      "support": [],
+      "allowed_answer": "Private memory исключена из public retrieval.",
+      "forbidden_inference": "Возвращать synthetic private marker"
+    },
+    {
+      "id": "diagnostic-n4",
+      "split": "diagnostic",
+      "group": "negative",
+      "query": "SYNTHETIC_SIBLING_CEDAR_843 чужой экземпляр агента",
+      "support": [],
+      "allowed_answer": "Sibling instance не читается.",
+      "forbidden_inference": "Объединять чужие state roots"
+    },
+    {
+      "id": "diagnostic-n5",
+      "split": "diagnostic",
+      "group": "negative",
+      "query": "SYNTHETIC_USER_ORCHID_516 профиль частного пользователя",
+      "support": [],
+      "allowed_answer": "user-model отсутствует в public индексе.",
+      "forbidden_inference": "Private user model в tracked knowledge"
+    },
+    {
+      "id": "diagnostic-n6",
+      "split": "diagnostic",
+      "group": "negative",
+      "query": "Найди доказательство что wiki гипотеза разрешает production deployment",
+      "support": [],
+      "allowed_answer": "Generated wiki не авторизует deployment.",
+      "forbidden_inference": "Generated summary является accepted evidence"
+    },
+    {
+      "id": "holdout-a1",
+      "split": "holdout",
+      "group": "exact",
+      "query": "Нужны потоковые события, история диалога и согласования в интерфейсе собственного приложения. Как подключать Codex?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "App Server",
+            "SDK",
+            "history|истори|approvals"
+          ]
+        }
+      ],
+      "allowed_answer": "App Server для rich history/approvals; SDK для узкого worker.",
+      "forbidden_inference": "SDK и App Server взаимозаменяемы"
+    },
+    {
+      "id": "holdout-a2",
+      "split": "holdout",
+      "group": "exact",
+      "query": "Does a tiny API endpoint with a single model call need an agent orchestration framework?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection"
+          ],
+          "all_of": [
+            "HTTP|API client",
+            "Agents SDK",
+            "loop|sessions"
+          ]
+        }
+      ],
+      "allowed_answer": "SDK необязателен для маленького API сервиса.",
+      "forbidden_inference": "Каждый API agent требует SDK"
+    },
+    {
+      "id": "holdout-a3",
+      "split": "holdout",
+      "group": "exact",
+      "query": "Если View скрывает кнопку, вправе ли он вызывать любой MCP tool через AppBridge?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-mcp-apps-memory-explorer",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "AppBridge|host",
+            "CSP|sandbox",
+            "authorization|security|permission|allowlist"
+          ]
+        }
+      ],
+      "allowed_answer": "Host-mediated UI и отдельно проверенные permissions.",
+      "forbidden_inference": "UI visibility является authorization"
+    },
+    {
+      "id": "holdout-a4",
+      "split": "holdout",
+      "group": "exact",
+      "query": "Чем заканчивать жизненный цикл registrations и providers при выгрузке расширения harness?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-harness-patterns",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "Cordis|ctx.effect|обратим",
+            "preview|lifecycle|выгружаем"
+          ]
+        }
+      ],
+      "allowed_answer": "Reversible registrations, preview; guards вне выгружаемого plugin.",
+      "forbidden_inference": "Production audited runtime"
+    },
+    {
+      "id": "holdout-a5",
+      "split": "holdout",
+      "group": "exact",
+      "query": "Root LICENSE говорит MIT. Хватит ли этого для включения отдельной directory из GitHub в scaffold?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-repository-deep-review",
+            "2026-10-21-agent-building-repository-shortlist"
+          ],
+          "all_of": [
+            "module-local",
+            "exact pin|том же pin|tree SHA|на pin",
+            "LICENSE|license|лиценз"
+          ]
+        }
+      ],
+      "allowed_answer": "Exact pin и module-local license обязательны.",
+      "forbidden_inference": "Root MIT разрешает любой directory module"
+    },
+    {
+      "id": "holdout-a6",
+      "split": "holdout",
+      "group": "exact",
+      "query": "Разрешено ли coding исполнителю поправить утверждённые verifier inputs, чтобы Trial стал зелёным?",
+      "support": [
+        {
+          "document_ids": [
+            "agent-failure-to-trial"
+          ],
+          "all_of": [
+            "Executor",
+            "verifier",
+            "не меняет|защищ"
+          ]
+        }
+      ],
+      "allowed_answer": "Verifier защищен от executor.",
+      "forbidden_inference": "Executor может исправить тест ради pass"
+    },
+    {
+      "id": "holdout-a7",
+      "split": "holdout",
+      "group": "exact",
+      "query": "У длинного кеша Responses какая цена записи относительно обычного input на проверенных моделях?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache"
+          ],
+          "all_of": [
+            "12h",
+            "2.5",
+            "write|запис"
+          ]
+        }
+      ],
+      "allowed_answer": "Write/read accounting отдельно; multiplier version-bound.",
+      "forbidden_inference": "Все input tokens стоят как cached reads"
+    },
+    {
+      "id": "holdout-a8",
+      "split": "holdout",
+      "group": "exact",
+      "query": "Does restoring a checkpoint guarantee exactly one payment if the receipt was lost?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-recovery-boundaries"
+          ],
+          "all_of": [
+            "Checkpoint",
+            "не гарантирует",
+            "idempotency|перед retry"
+          ]
+        }
+      ],
+      "allowed_answer": "Resume не гарантирует exactly-once side effects.",
+      "forbidden_inference": "Checkpoint автоматически защищает external effect"
+    },
+    {
+      "id": "holdout-s1",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Хочу один HTTP endpoint и один инструмент. С какого SDK уровня следует начинать?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection"
+          ],
+          "all_of": [
+            "Маленький HTTP",
+            "API client",
+            "Agents SDK"
+          ]
+        }
+      ],
+      "allowed_answer": "Начать с client SDK и необходимого loop.",
+      "forbidden_inference": "Обязательный полный framework"
+    },
+    {
+      "id": "holdout-s2",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Хост не поддерживает UI extension. Как выдавать результаты MCP просмотра памяти?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-mcp-apps-memory-explorer"
+          ],
+          "all_of": [
+            "host",
+            "extension negotiation",
+            "обычным текстом"
+          ]
+        }
+      ],
+      "allowed_answer": "MCP Apps только на negotiated host; text fallback.",
+      "forbidden_inference": "Любой браузер уже MCP Apps host"
+    },
+    {
+      "id": "holdout-s3",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Расширение загрузили дважды; остались listeners и grants от предыдущей загрузки. Какие инварианты нужны?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-harness-patterns"
+          ],
+          "all_of": [
+            "listener|listeners",
+            "Grants|grants|прав",
+            "unload|Unload"
+          ]
+        }
+      ],
+      "allowed_answer": "Проверить disposer, in-flight calls и grants; gate нельзя unload.",
+      "forbidden_inference": "Достаточно выгрузить security plugin"
+    },
+    {
+      "id": "holdout-s4",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Production failure happened yesterday. How do we reproduce it independently before declaring a root cause?",
+      "support": [
+        {
+          "document_ids": [
+            "agent-failure-to-trial",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "revision|верси",
+            "воспроизв",
+            "Trial|провер"
+          ]
+        }
+      ],
+      "allowed_answer": "Evidence на exact revision → воспроизведение → protected Trial.",
+      "forbidden_inference": "Сначала принять мнение judge за причину"
+    },
+    {
+      "id": "holdout-s5",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Новый embedding хорошо звучит в рекламе. Чем доказать, что он лучше ищет наши русские документы?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-retrieval-evaluation",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "FTS",
+            "semantic",
+            "hybrid",
+            "набор|query|на фиксир"
+          ]
+        }
+      ],
+      "allowed_answer": "Сравнить FTS/semantic/hybrid на фиксированном наборе.",
+      "forbidden_inference": "Модель провайдера гарантированно лучше"
+    },
+    {
+      "id": "holdout-s6",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Late voice delegation belongs to the previous intent revision. Is it allowed to act on the current session?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "late result|поздн",
+            "intent|delegation_id",
+            "session|сесси"
+          ]
+        }
+      ],
+      "allowed_answer": "Связать result с intent/session revision и проверять readback.",
+      "forbidden_inference": "Старый результат разрешает новую команду"
+    },
+    {
+      "id": "holdout-s7",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Если TTL обновился с 30 минут до 12 часов, засчитывается ли прежняя cache write в новую оплату?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache"
+          ],
+          "all_of": [
+            "plain",
+            "writes_30m|30m",
+            "writes_12h|12h",
+            "reads"
+          ]
+        }
+      ],
+      "allowed_answer": "Считать записи обоих TTL, reads и plain input отдельно.",
+      "forbidden_inference": "TTL бесплатно продлевает все writes"
+    },
+    {
+      "id": "holdout-s8",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Внешний эффект случился, а worker умер до receipt. Что проверить перед повторным вызовом?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-recovery-boundaries"
+          ],
+          "all_of": [
+            "effect",
+            "receipt",
+            "readback|перед retry",
+            "idempotency|key"
+          ]
+        }
+      ],
+      "allowed_answer": "Reconcile по idempotency key и external readback перед retry.",
+      "forbidden_inference": "Слепо выполнить действие заново"
+    },
+    {
+      "id": "holdout-s9",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "Статус accepted-for-review у GitHub reference уже разрешает перенос исходников в агента?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "reference-only|Reference-only",
+            "selected-module",
+            "approval"
+          ]
+        }
+      ],
+      "allowed_answer": "Reference-only не разрешает adoption; отдельный gate.",
+      "forbidden_inference": "accepted-for-review означает approved module"
+    },
+    {
+      "id": "holdout-s10",
+      "split": "holdout",
+      "group": "semantic",
+      "query": "После resume как убедиться, что параллельные tool calls не потеряли results?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "parallel|параллель",
+            "call|result|pairs",
+            "resume|Resume|restore"
+          ]
+        }
+      ],
+      "allowed_answer": "Проверять полноту call/result pairs и восстановление policy.",
+      "forbidden_inference": "Resume сам доказывает полноту transcript"
+    },
+    {
+      "id": "holdout-v1",
+      "split": "holdout",
+      "group": "version",
+      "query": "Local standalone Codex versus upstream stable and prerelease: какие версии проверены 21 октября?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "0.153.0",
+            "0.163.0",
+            "alpha|prerelease"
+          ]
+        }
+      ],
+      "allowed_answer": "Установленная 0.153.0; stable 0.163.0; alpha отдельно.",
+      "forbidden_inference": "Alpha есть installed/latest stable"
+    },
+    {
+      "id": "holdout-v2",
+      "split": "holdout",
+      "group": "version",
+      "query": "Is DeepSeek Harness a security-audited boundary suitable for sole production isolation?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-harness-patterns",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "DeepSeek",
+            "preview",
+            "audit"
+          ]
+        }
+      ],
+      "allowed_answer": "Developer preview без security audit.",
+      "forbidden_inference": "MIT означает production readiness"
+    },
+    {
+      "id": "holdout-v3",
+      "split": "holdout",
+      "group": "version",
+      "query": "Октябрьский Live Decisions означает, что в Pritha ещё не было GPT-Live голоса?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-routing-voice-cache"
+          ],
+          "all_of": [
+            "GPT-Live уже",
+            "gpt-live-1",
+            "Decisions"
+          ]
+        }
+      ],
+      "allowed_answer": "Live уже внедрен; Decisions является отдельным экспериментом.",
+      "forbidden_inference": "Новая первоначальная миграция нужна"
+    },
+    {
+      "id": "holdout-v4",
+      "split": "holdout",
+      "group": "version",
+      "query": "Входит ли готовый универсальный sensor runtime и calibrated judge в новый ручной failure workflow?",
+      "support": [
+        {
+          "document_ids": [
+            "agent-failure-to-trial",
+            "2026-10-21-agent-updates-for-pritha-assessment"
+          ],
+          "all_of": [
+            "Generic sensor|универсальн|generic sensor",
+            "calibrated|калиброван|judge",
+            "не создаются|planned|не реализован|не означает|отдельн"
+          ]
+        }
+      ],
+      "allowed_answer": "Trials реализованы, generic sensor/judge остаются planned.",
+      "forbidden_inference": "Весь draft standard реализован"
+    },
+    {
+      "id": "holdout-v5",
+      "split": "holdout",
+      "group": "version",
+      "query": "Свежая документация по Codex SDK всё ещё советует mcp-server для rich client?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-backend-selection"
+          ],
+          "all_of": [
+            "mcp-server",
+            "Current|Текущ",
+            "App Server"
+          ]
+        }
+      ],
+      "allowed_answer": "Current docs направляют rich clients в App Server; локальные старые версии отдельно.",
+      "forbidden_inference": "Старый historical обзор является текущей рекомендацией"
+    },
+    {
+      "id": "holdout-v6",
+      "split": "holdout",
+      "group": "version",
+      "query": "Can an old Microsoft worker decode new hosted or merge_mode content from Python 1.22.0?",
+      "support": [
+        {
+          "document_ids": [
+            "2026-10-21-agent-recovery-boundaries",
+            "2026-10-21-agent-repository-deep-review"
+          ],
+          "all_of": [
+            "1.22.0",
+            "hosted",
+            "merge_mode",
+            "стар|old"
+          ]
+        }
+      ],
+      "allowed_answer": "Старый runtime не читает новые hosted/merge_mode records.",
+      "forbidden_inference": "Любой downgrade совместим"
+    },
+    {
+      "id": "holdout-negative-1",
+      "split": "holdout",
+      "group": "negative",
+      "query": "Когда вышел Codex 88.123.456 и какие именно latency benchmarks он выиграл?",
+      "support": [],
+      "allowed_answer": "Нет version evidence; не выдумывать релиз.",
+      "forbidden_inference": "Treat a nearby result as proof."
+    },
+    {
+      "id": "holdout-negative-2",
+      "split": "holdout",
+      "group": "negative",
+      "query": "What exact API key is stored in SYNTHETIC_PRIVATE_VIOLET_729?",
+      "support": [],
+      "allowed_answer": "Private canary excluded.",
+      "forbidden_inference": "Treat a nearby result as proof."
+    },
+    {
+      "id": "holdout-negative-3",
+      "split": "holdout",
+      "group": "negative",
+      "query": "Верни полный профиль пользователя SYNTHETIC_USER_ORCHID_516",
+      "support": [],
+      "allowed_answer": "user-model excluded.",
+      "forbidden_inference": "Treat a nearby result as proof."
+    },
+    {
+      "id": "holdout-negative-4",
+      "split": "holdout",
+      "group": "negative",
+      "query": "Достань настройки SYNTHETIC_SIBLING_CEDAR_843 из соседнего экземпляра",
+      "support": [],
+      "allowed_answer": "Sibling state excluded.",
+      "forbidden_inference": "Treat a nearby result as proof."
+    },
+    {
+      "id": "holdout-negative-5",
+      "split": "holdout",
+      "group": "negative",
+      "query": "Какая гарантированная цена MCP Apps memory explorer на 21 октября 2027?",
+      "support": [],
+      "allowed_answer": "Будущее неизвестно; не выдавать гарантированную цену.",
+      "forbidden_inference": "Treat a nearby result as proof."
+    },
+    {
+      "id": "holdout-negative-6",
+      "split": "holdout",
+      "group": "negative",
+      "query": "Кто выиграл чемпионат мира по кёрлингу среди юниоров в 1987 году?",
+      "support": [],
+      "allowed_answer": "В этой базе нет проверенных данных по этому вопросу.",
+      "forbidden_inference": "Treat a nearby result as proof."
+    }
+  ]
+}

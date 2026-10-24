@@ -4,7 +4,9 @@ import path from "node:path";
 
 export const DESKTOP_CODEX_BIN_CANDIDATES = [
   "/Applications/ChatGPT.app/Contents/Resources/codex",
+  "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
   "/Applications/Codex.app/Contents/Resources/codex",
+  "/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex",
 ] as const;
 
 type CodexBinaryResolverOptions = {
@@ -18,14 +20,16 @@ function clean(value: unknown) {
 }
 
 export function isDesktopCodexBinary(candidate: string) {
-  return /\/(?:ChatGPT|Codex)\.app\/Contents\/Resources\/codex$/.test(candidate);
+  return /\/(?:ChatGPT|Codex)\.app\/Contents\/Resources\/(?:codex|codex-cli\/bin\/codex)$/.test(candidate);
 }
 
 export function desktopCodexBinaryCandidates(homeDir = os.homedir()) {
   return [
     ...DESKTOP_CODEX_BIN_CANDIDATES,
     path.join(homeDir, "Applications", "ChatGPT.app", "Contents", "Resources", "codex"),
+    path.join(homeDir, "Applications", "ChatGPT.app", "Contents", "Resources", "codex-cli", "bin", "codex"),
     path.join(homeDir, "Applications", "Codex.app", "Contents", "Resources", "codex"),
+    path.join(homeDir, "Applications", "Codex.app", "Contents", "Resources", "codex-cli", "bin", "codex"),
   ];
 }
 

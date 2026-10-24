@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { searchCuratedMemory } from "./lib/curated-memory.mjs";
 
 const ROOT = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
@@ -58,6 +59,7 @@ if (command === "help") {
   console.log(`Usage:
   node scripts/query-memory.mjs stats
   node scripts/query-memory.mjs search <text>
+  node scripts/query-memory.mjs curated <text>
   node scripts/query-memory.mjs documents
   node scripts/query-memory.mjs entities
   node scripts/query-memory.mjs relations <document-id>`);
@@ -73,6 +75,16 @@ Filters:
   node scripts/query-memory.mjs recent
   node scripts/query-memory.mjs open`);
   process.exit(0);
+}
+
+if (command === "curated") {
+  try {
+    console.log(JSON.stringify(searchCuratedMemory(arg, { root: ROOT }), null, 2));
+  } catch {
+    console.error("Curated memory unavailable; check the query and instance index.");
+    process.exitCode = 2;
+  }
+  process.exit(process.exitCode || 0);
 }
 
 if (command === "stats") {

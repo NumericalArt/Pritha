@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "verified": "2026-10-21",
+  "claim_scope": "reference retrieval and machine checks; not generated-answer accuracy, provider performance or user acceptance",
+  "fixture_sha256": "ae86a7a8846ecf6b37e99ada07a4f2fea2e9e2201ca0f3ff3738573efd87f2f2",
+  "fixture_thresholds": {
+    "positive_hit_at_5": 0.8,
+    "holdout_hit_at_5": 0.75,
+    "max_regressions_at_10": 0,
+    "private_leaks": 0
+  },
+  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "sentence_transformers_version": "5.1.2",
+  "initial_baseline": {
+    "fts": {
+      "hit_at_5": 6,
+      "hit_at_10": 6,
+      "cases": 24,
+      "holdout_hit_at_5": 1,
+      "holdout_cases": 8
+    },
+    "semantic": {
+      "hit_at_5": 12,
+      "hit_at_10": 12,
+      "cases": 24,
+      "holdout_hit_at_5": 4,
+      "holdout_cases": 8
+    }
+  },
+  "knowledge_only_legacy": {
+    "fts": {
+      "hit_at_5": 7,
+      "hit_at_10": 7,
+      "cases": 24,
+      "holdout_hit_at_5": 2,
+      "holdout_cases": 8
+    },
+    "semantic": {
+      "hit_at_5": 15,
+      "hit_at_10": 15,
+      "cases": 24,
+      "holdout_hit_at_5": 4,
+      "holdout_cases": 8
+    }
+  },
+  "intermediate_scoped": {
+    "gate": "pass",
+    "summaries": {
+      "fts": {
+        "positive_cases": 24,
+        "hit_at_5": 20,
+        "hit_at_10": 22,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 6,
+        "warm_p95_ms": 11.976,
+        "leaks": 0
+      },
+      "semantic": {
+        "positive_cases": 24,
+        "hit_at_5": 18,
+        "hit_at_10": 19,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 4,
+        "warm_p95_ms": 28.168,
+        "leaks": 0
+      },
+      "hybrid": {
+        "positive_cases": 24,
+        "hit_at_5": 19,
+        "hit_at_10": 21,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 4,
+        "warm_p95_ms": 23.218,
+        "leaks": 0
+      }
+    }
+  },
+  "repeat_after_authored_updates": {
+    "gate": "fail",
+    "summaries": {
+      "fts": {
+        "positive_cases": 24,
+        "hit_at_5": 19,
+        "hit_at_10": 22,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 5,
+        "warm_p95_ms": 13.498,
+        "leaks": 0
+      },
+      "semantic": {
+        "positive_cases": 24,
+        "hit_at_5": 18,
+        "hit_at_10": 19,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 4,
+        "warm_p95_ms": 31.182,
+        "leaks": 0
+      },
+      "hybrid": {
+        "positive_cases": 24,
+        "hit_at_5": 19,
+        "hit_at_10": 20,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 4,
+        "warm_p95_ms": 24.772,
+        "leaks": 0
+      }
+    },
+    "regressions_at_10": [],
+    "eligible_chunks": 1753,
+    "cold_load_ms": 2597.218,
+    "peak_rss_bytes": 903790592
+  },
+  "fts_operator_ablation": {
+    "factor": "AND versus OR; same snapshot, domain/status/path filters, document dedup, cases and limit",
+    "positive_cases": 24,
+    "hit_at_5": {
+      "scoped-and": 6,
+      "scoped-or": 20
+    }
+  },
+  "fts_command_footprint": {
+    "mode": "fts",
+    "elapsed_ms": 35.47,
+    "peak_rss_bytes": 29229056,
+    "model_libraries_loaded": false,
+    "results": 8
+  },
+  "codex_schema": {
+    "installed_version": "0.153.0",
+    "schema_exit_code": 0,
+    "json_files": 304,
+    "schema_methods": {
+      "thread/start": true,
+      "thread/read": true,
+      "thread/resume": true,
+      "thread/goal/set": true,
+      "thread/goal/get": true,
+      "thread/goal/clear": true,
+      "turn/start": true,
+      "turn/steer": true,
+      "turn/interrupt": true,
+      "command/exec": true,
+      "item/commandExecution/requestApproval": true,
+      "item/fileChange/requestApproval": true,
+      "thread/tokenUsage/updated": true
+    },
+    "method_count": 182
+  },
+  "codex_no_turn_probe": {
+    "scope": "isolated local installed runtime; no model turn",
+    "calls": [
+      {
+        "method": "initialize",
+        "ok": true,
+        "error_code": null
+      },
+      {
+        "method": "thread/start",
+        "ok": true,
+        "error_code": null
+      },
+      {
+        "method": "thread/goal/set",
+        "ok": true,
+        "error_code": null
+      },
+      {
+        "method": "thread/goal/get",
+        "ok": true,
+        "error_code": null
+      },
+      {
+        "method": "thread/goal/clear",
+        "ok": true,
+        "error_code": null
+      },
+      {
+        "method": "thread/read",
+        "ok": true,
+        "error_code": null
+      },
+      {
+        "method": "thread/unsubscribe",
+        "ok": true,
+        "error_code": null
+      }
+    ],
+    "model_turns": 0,
+    "goal_paused_zero_usage": true,
+    "goal_budget": 1000,
+    "unmaterialized_history_read_supported": true
+  },
+  "code_validation": {
+    "full_self_test": "pass",
+    "unit_tests": 875,
+    "passed": 875,
+    "failed": 0,
+    "skipped": 0,
+    "strict_health": "pass",
+    "pages": 5,
+    "javascript_chunks": 13,
+    "privacy": "pass",
+    "metadata": "pass"
+  },
+  "factory_cases": {
+    "scenarios": [
+      "small-api",
+      "codex-worker",
+      "read-only-research-view",
+      "voice-agent"
+    ],
+    "reference_selection": "pass",
+    "shortlist_limit": 5,
+    "registry_unique_repositories": 24,
+    "adoption_still_requires_contract_evidence": true
+  },
+  "research": {
+    "pinned_repositories": 10,
+    "verified_source_blobs": 28,
+    "external_source_payloads": "purged",
+    "external_model_turns": 0,
+    "provider_pilots_executed": false
+  },
+  "promotion_decision": {
+    "knowledge_workflows_and_eval_tooling": "adopt",
+    "new_retriever": "hold-experimental-final-gate-failed",
+    "hybrid_default": "rejected",
+    "new_embedding_model": "watch",
+    "core_runtime_replacement": "skip"
+  },
+  "closure_index_validation": {
+    "status": "pass",
+    "counts": {
+      "documents": 958,
+      "chunks": 10449,
+      "embeddings": 10228
+    },
+    "missing_non_template_embeddings": 0,
+    "orphan_embeddings": 0,
+    "wrong_dimensions": 0
+  },
+  "closure_retrieval": {
+    "gate": "fail",
+    "summaries": {
+      "fts": {
+        "positive_cases": 24,
+        "hit_at_5": 19,
+        "hit_at_10": 22,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 5,
+        "warm_p95_ms": 14.175,
+        "leaks": 0
+      },
+      "semantic": {
+        "positive_cases": 24,
+        "hit_at_5": 18,
+        "hit_at_10": 19,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 4,
+        "warm_p95_ms": 29.024,
+        "leaks": 0
+      },
+      "hybrid": {
+        "positive_cases": 24,
+        "hit_at_5": 19,
+        "hit_at_10": 20,
+        "holdout_cases": 8,
+        "holdout_hit_at_5": 4,
+        "warm_p95_ms": 24.918,
+        "leaks": 0
+      }
+    },
+    "regressions_at_10": [],
+    "eligible_chunks": 1749,
+    "embedded_chunks": 1749,
+    "corpus_sha256": "9f5ee47ab75660cc54b6af50beda6abfee8fb269da3de6c7a3ffa607149bb3e4",
+    "fingerprint_scope": "eligible paths, chunk IDs, status and full text; no source text retained in report"
+  }
+}

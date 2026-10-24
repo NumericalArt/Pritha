@@ -1,0 +1,409 @@
+{
+  "schema_version": 1,
+  "frozen_at": "2026-10-21T10:24:00Z",
+  "thresholds": {
+    "positive_hit_at_5": 0.8,
+    "holdout_hit_at_5": 0.75,
+    "max_regressions_at_10": 0,
+    "private_leaks": 0
+  },
+  "notes": "Frozen before ranker changes. Retrieval relevance is checked automatically; allowed answers require source reading, not string matching. No model answer accuracy is inferred.",
+  "cases": [
+    {
+      "id": "a1",
+      "group": "exact",
+      "split": "development",
+      "query": "Codex SDK App Server",
+      "expected_path_contains": [
+        "backend-selection",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "App Server для rich history/approvals; SDK для узкого worker.",
+      "forbidden_inference": "SDK и App Server взаимозаменяемы"
+    },
+    {
+      "id": "a2",
+      "group": "exact",
+      "split": "holdout",
+      "query": "OpenAI Agents SDK Responses API",
+      "expected_path_contains": [
+        "backend-selection",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "SDK необязателен для маленького API сервиса.",
+      "forbidden_inference": "Каждый API agent требует SDK"
+    },
+    {
+      "id": "a3",
+      "group": "exact",
+      "split": "development",
+      "query": "MCP Apps AppBridge CSP",
+      "expected_path_contains": [
+        "mcp-apps",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Host-mediated UI и отдельно проверенные permissions.",
+      "forbidden_inference": "UI visibility является authorization"
+    },
+    {
+      "id": "a4",
+      "group": "exact",
+      "split": "development",
+      "query": "DeepSeek Harness plugin lifecycle",
+      "expected_path_contains": [
+        "harness-patterns",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Reversible registrations, preview; guards вне выгружаемого plugin.",
+      "forbidden_inference": "Production audited runtime"
+    },
+    {
+      "id": "a5",
+      "group": "exact",
+      "split": "holdout",
+      "query": "selected-module module-local LICENSE",
+      "expected_path_contains": [
+        "github-repository",
+        "agent-contract-research",
+        "agents-mother"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Exact pin и module-local license обязательны.",
+      "forbidden_inference": "Root MIT разрешает любой directory module"
+    },
+    {
+      "id": "a6",
+      "group": "exact",
+      "split": "development",
+      "query": "protected Trial verifier input",
+      "expected_path_contains": [
+        "agent-sensor",
+        "failure-to-trial",
+        "agent-feedback",
+        "agent-outcome"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Verifier защищен от executor.",
+      "forbidden_inference": "Executor может исправить тест ради pass"
+    },
+    {
+      "id": "a7",
+      "group": "exact",
+      "split": "development",
+      "query": "prompt caching 12h 2.5",
+      "expected_path_contains": [
+        "routing-voice-cache",
+        "agent-updates-for-pritha"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Write/read accounting отдельно; multiplier version-bound.",
+      "forbidden_inference": "Все input tokens стоят как cached reads"
+    },
+    {
+      "id": "a8",
+      "group": "exact",
+      "split": "holdout",
+      "query": "checkpoint resume idempotency",
+      "expected_path_contains": [
+        "recovery",
+        "agent-updates-for-pritha",
+        "agent-trajectory"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Resume не гарантирует exactly-once side effects.",
+      "forbidden_inference": "Checkpoint автоматически защищает external effect"
+    },
+    {
+      "id": "s1",
+      "group": "semantic",
+      "split": "development",
+      "query": "Нужна ли библиотека агентов маленькому HTTP сервису?",
+      "expected_path_contains": [
+        "backend-selection",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Начать с client SDK и необходимого loop.",
+      "forbidden_inference": "Обязательный полный framework"
+    },
+    {
+      "id": "s2",
+      "group": "semantic",
+      "split": "development",
+      "query": "Как встроить в чат интерактивный просмотр памяти с запасным текстовым ответом?",
+      "expected_path_contains": [
+        "mcp-apps",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "MCP Apps только на negotiated host; text fallback.",
+      "forbidden_inference": "Любой браузер уже MCP Apps host"
+    },
+    {
+      "id": "s3",
+      "group": "semantic",
+      "split": "holdout",
+      "query": "После перезагрузки плагина остаются старые подписки и доступы",
+      "expected_path_contains": [
+        "harness-patterns",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Проверить disposer, in-flight calls и grants; gate нельзя unload.",
+      "forbidden_inference": "Достаточно выгрузить security plugin"
+    },
+    {
+      "id": "s4",
+      "group": "semantic",
+      "split": "development",
+      "query": "Как превратить рабочий сбой агента в независимую проверку?",
+      "expected_path_contains": [
+        "failure-to-trial",
+        "agent-sensor-and-eval-design",
+        "agent-feedback"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Evidence на exact revision → воспроизведение → protected Trial.",
+      "forbidden_inference": "Сначала принять мнение judge за причину"
+    },
+    {
+      "id": "s5",
+      "group": "semantic",
+      "split": "development",
+      "query": "Поиск на русском не находит знание хотя оно есть",
+      "expected_path_contains": [
+        "retrieval",
+        "agent-updates-for-pritha",
+        "memory-indexing"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Сравнить FTS/semantic/hybrid на фиксированном наборе.",
+      "forbidden_inference": "Модель провайдера гарантированно лучше"
+    },
+    {
+      "id": "s6",
+      "group": "semantic",
+      "split": "holdout",
+      "query": "Пользователь перебил голосовую команду а старый результат пришел позже",
+      "expected_path_contains": [
+        "routing-voice-cache",
+        "agent-updates-for-pritha",
+        "realtime"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Связать result с intent/session revision и проверять readback.",
+      "forbidden_inference": "Старый результат разрешает новую команду"
+    },
+    {
+      "id": "s7",
+      "group": "semantic",
+      "split": "development",
+      "query": "Как не заплатить больше после включения длинного кеша?",
+      "expected_path_contains": [
+        "routing-voice-cache",
+        "agent-updates-for-pritha"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Считать записи обоих TTL, reads и plain input отдельно.",
+      "forbidden_inference": "TTL бесплатно продлевает все writes"
+    },
+    {
+      "id": "s8",
+      "group": "semantic",
+      "split": "development",
+      "query": "Worker упал после внешнего действия но до сохранения результата",
+      "expected_path_contains": [
+        "recovery",
+        "agent-trajectory-control",
+        "agent-updates-for-pritha"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Reconcile по idempotency key и external readback перед retry.",
+      "forbidden_inference": "Слепо выполнить действие заново"
+    },
+    {
+      "id": "s9",
+      "group": "semantic",
+      "split": "holdout",
+      "query": "Можно ли использовать код найденного репозитория в новом агенте?",
+      "expected_path_contains": [
+        "github-repository",
+        "agent-contract-research",
+        "agents-mother",
+        "agent-building-repository"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Reference-only не разрешает adoption; отдельный gate.",
+      "forbidden_inference": "accepted-for-review означает approved module"
+    },
+    {
+      "id": "s10",
+      "group": "semantic",
+      "split": "development",
+      "query": "Do resumed sessions preserve every parallel tool result and approval?",
+      "expected_path_contains": [
+        "backend-selection",
+        "agent-stack-repository",
+        "repository-deep-review"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Проверять полноту call/result pairs и восстановление policy.",
+      "forbidden_inference": "Resume сам доказывает полноту transcript"
+    },
+    {
+      "id": "v1",
+      "group": "version",
+      "split": "development",
+      "query": "Какая версия Codex реально установлена и какая стабильная у OpenAI?",
+      "expected_path_contains": [
+        "backend-selection",
+        "repository-deep-review",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Установленная 0.153.0; stable 0.163.0; alpha отдельно.",
+      "forbidden_inference": "Alpha есть installed/latest stable"
+    },
+    {
+      "id": "v2",
+      "group": "version",
+      "split": "holdout",
+      "query": "DeepSeek harness безопасен для production или это preview?",
+      "expected_path_contains": [
+        "harness-patterns",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Developer preview без security audit.",
+      "forbidden_inference": "MIT означает production readiness"
+    },
+    {
+      "id": "v3",
+      "group": "version",
+      "split": "development",
+      "query": "GPT Live уже работает в Pritha или нужно мигрировать впервые?",
+      "expected_path_contains": [
+        "routing-voice-cache",
+        "2026-09-11-pritha-live-voice-migration",
+        "agent-updates-for-pritha"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Live уже внедрен; Decisions является отдельным экспериментом.",
+      "forbidden_inference": "Новая первоначальная миграция нужна"
+    },
+    {
+      "id": "v4",
+      "group": "version",
+      "split": "development",
+      "query": "У Pritha есть универсальный runtime сенсоров и калиброванный LLM judge?",
+      "expected_path_contains": [
+        "failure-to-trial",
+        "agent-feedback-sensors",
+        "agent-sensor-and-eval-design",
+        "agent-updates-for-pritha"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Trials реализованы, generic sensor/judge остаются planned.",
+      "forbidden_inference": "Весь draft standard реализован"
+    },
+    {
+      "id": "v5",
+      "group": "version",
+      "split": "holdout",
+      "query": "Можно ли использовать codex mcp-server как текущую интеграцию?",
+      "expected_path_contains": [
+        "backend-selection",
+        "agent-stack-repository-assessment"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Current docs направляют rich clients в App Server; локальные старые версии отдельно.",
+      "forbidden_inference": "Старый historical обзор является текущей рекомендацией"
+    },
+    {
+      "id": "v6",
+      "group": "version",
+      "split": "development",
+      "query": "Microsoft Agent Framework 1.22 checkpoint downgrade compatibility",
+      "expected_path_contains": [
+        "recovery",
+        "repository-deep-review"
+      ],
+      "expected_domain": "agent-building-knowledge",
+      "allowed_answer": "Старый runtime не читает новые hosted/merge_mode records.",
+      "forbidden_inference": "Любой downgrade совместим"
+    },
+    {
+      "id": "n1",
+      "group": "negative",
+      "split": "development",
+      "query": "Рецепт шоколадного брауни с малиной",
+      "expected_path_contains": [],
+      "expected_domain": null,
+      "allowed_answer": "В исследовании агентных систем нет подтвержденного рецепта.",
+      "forbidden_inference": "Релевантность ближайшего embedding доказывает ответ"
+    },
+    {
+      "id": "n2",
+      "group": "negative",
+      "split": "holdout",
+      "query": "Точный релиз OpenAI Agents SDK v99.99.99",
+      "expected_path_contains": [],
+      "expected_domain": null,
+      "allowed_answer": "Неизвестно; нет verified release evidence.",
+      "forbidden_inference": "Выдуманная версия"
+    },
+    {
+      "id": "n3",
+      "group": "negative",
+      "split": "development",
+      "query": "SYNTHETIC_PRIVATE_VIOLET_729 API credential",
+      "expected_path_contains": [],
+      "expected_domain": null,
+      "allowed_answer": "Private memory исключена из public retrieval.",
+      "forbidden_inference": "Возвращать synthetic private marker"
+    },
+    {
+      "id": "n4",
+      "group": "negative",
+      "split": "development",
+      "query": "SYNTHETIC_SIBLING_CEDAR_843 чужой экземпляр агента",
+      "expected_path_contains": [],
+      "expected_domain": null,
+      "allowed_answer": "Sibling instance не читается.",
+      "forbidden_inference": "Объединять чужие state roots"
+    },
+    {
+      "id": "n5",
+      "group": "negative",
+      "split": "holdout",
+      "query": "SYNTHETIC_USER_ORCHID_516 профиль частного пользователя",
+      "expected_path_contains": [],
+      "expected_domain": null,
+      "allowed_answer": "user-model отсутствует в public индексе.",
+      "forbidden_inference": "Private user model в tracked knowledge"
+    },
+    {
+      "id": "n6",
+      "group": "negative",
+      "split": "development",
+      "query": "Найди доказательство что wiki гипотеза разрешает production deployment",
+      "expected_path_contains": [],
+      "expected_domain": null,
+      "allowed_answer": "Generated wiki не авторизует deployment.",
+      "forbidden_inference": "Generated summary является accepted evidence"
+    }
+  ],
+  "forbidden_result_fragments": [
+    "SYNTHETIC_PRIVATE_VIOLET_729",
+    "SYNTHETIC_SIBLING_CEDAR_843",
+    "SYNTHETIC_USER_ORCHID_516"
+  ],
+  "forbidden_path_prefixes": [
+    ".private/",
+    ".memory-private/"
+  ]
+}

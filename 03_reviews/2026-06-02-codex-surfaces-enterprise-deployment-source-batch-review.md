@@ -1,9 +1,9 @@
 ---
 id: 2026-06-02-codex-surfaces-enterprise-deployment-source-batch-review
 type: review
-status: draft
+status: outdated
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-10-21
 topics:
   - codex
   - codex-cli
@@ -45,7 +45,8 @@ related:
     - 04_standards/agent-mcp-connector-lifecycle.md
     - 04_standards/agent-tool-integration-selection.md
 supersedes: []
-superseded_by: []
+superseded_by:
+  - 03_reviews/2026-10-21-agent-stack-repository-assessment.md
 source_type: article
 source_class: mixed
 ingested_at: 2026-06-02
@@ -55,27 +56,38 @@ usefulness: high
 evidence_quality: high
 anonymous_source_id: source-codex-surfaces-batch-2026-06-02
 recommendation: standard
-freshness_status: current
+freshness_status: outdated
 source_published: 2025-04-16 to 2026-06-01
 source_updated: mixed
 source_version: official source batch verified 2026-06-02
 retrieved: 2026-06-02
 verified: 2026-06-02
-valid_for: Pritha Codex surface, MCP and enterprise deployment choices
-temporal_status: current
+valid_for: historical June 2026 source batch; current worker transport is covered by the October 2026 assessment
+temporal_status: stale
 ---
 
 # Review: Codex Surfaces And Enterprise Deployment Source Batch
 
 Date: 2026-06-02
-Status: draft
+Status: outdated for current worker-transport selection
 Recommendation: standard
+
+## Freshness correction — 2026-10-21
+
+The source batch remains historical evidence. Its Codex-as-MCP-server
+adoption recommendation is superseded by
+`03_reviews/2026-10-21-agent-stack-repository-assessment.md`.
+Current [Codex SDK documentation](https://learn.chatgpt.com/docs/codex-sdk)
+states that `codex mcp-server` and `codex-mcp-server` have been removed and
+directs existing integrations to App Server. This does not claim that the
+command is absent from every older installed CLI. Recheck current versions
+before using any deployment guidance from this historical review.
 
 ## One-Paragraph Read
 
 This batch is highly useful, but it should refine Pritha's selection logic
 rather than expand the default scaffold. Codex is now best understood as a
-multi-surface agent platform: CLI, app, IDE, cloud, MCP server, MCP client,
+multi-surface agent platform: CLI, app, IDE, cloud, historical MCP server, MCP client,
 SDK-orchestrated worker, workspace agent and AWS Bedrock-backed provider path.
 The portable lesson is contract-first surface selection: choose the narrowest
 Codex surface, MCP boundary and deployment provider that match the child
@@ -87,7 +99,7 @@ agent's mission, operator model, security posture and governance needs.
 | --- | --- | --- | --- |
 | 2025-04-16 | OpenAI: Introducing o3 and o4-mini | baseline | Codex CLI starts as local lightweight coding agent with local code access and multimodal context. Useful historical anchor, not a current architecture rule. |
 | 2025-05-16 | OpenAI: Introducing Codex | baseline/adopt | Cloud Codex pattern: per-task sandbox, repository work, logs, tests, AGENTS.md and verifiable execution traces. |
-| 2025-10-01 | OpenAI Cookbook: Codex CLI & Agents SDK | adopt | Codex-as-MCP-worker pattern with scoped tasks, handoffs, artifact gates and traces. Useful for Pritha when a parent orchestrator needs a coding worker. |
+| 2025-10-01 | OpenAI Cookbook: Codex CLI & Agents SDK | outdated transport | Historical Codex-as-MCP-worker example. Current integrations should use App Server or the appropriate SDK; preserve scoped tasks, artifact gates and traces. |
 | 2025-10-17 | Docker: Codex + Docker MCP Toolkit | adopt with caveat | Useful MCP gateway/catalog and credential pattern. Do not treat catalog size as permission; Pritha must still select narrow tools and approval policy. |
 | 2026-01-23 | OpenAI: Unrolling Codex agent loop | already adopted, reinforce | Confirms model vs harness split, context construction, tool loop and AGENTS.md/skills/config surfaces. |
 | 2026-02-02 | OpenAI: Introducing Codex app | adopt | Codex app as command center for supervising multiple agents, worktrees, diffs and long-running work. Useful as operator surface, not mandatory runtime. |
@@ -107,17 +119,18 @@ Pritha should decide which Codex surface, if any, a child agent uses:
   worktrees.
 - `cloud-task`: hosted parallel software tasks with logs and sandboxing.
 - `ide-attached`: editor-native code review and implementation.
-- `sdk-orchestrated`: Codex CLI exposed as an MCP server to another agent
-  runtime.
+- `sdk-orchestrated`: programmatic coding worker; use current App Server or
+  SDK guidance rather than the removed MCP server entry point.
 - `workspace-agent`: shared team workflow agent with permissions and approvals.
 - `bedrock-backed`: Codex/OpenAI models through AWS governance.
 - `none`: child agent does not need Codex as a runtime surface.
 
-### Codex As MCP Worker
+### Codex Worker Transport — updated 2026-10-21
 
-Codex can be made available as an MCP server to an orchestrating agent. This is
-useful when the parent agent owns planning, role routing and handoffs, while
-Codex owns repo changes. The safe pattern requires:
+The historical example exposed Codex as an MCP server. Current rich clients
+should use App Server; SDKs cover the documented job-automation use cases.
+An orchestrator can still own planning while Codex handles repository work.
+The portable pattern requires:
 
 - scoped working directory;
 - explicit sandbox/approval policy;
@@ -187,7 +200,7 @@ Promote as principles:
 
 - Codex surface/provider selection belongs in the contract.
 - MCP gateway/catalog use requires narrow allowlists and approval gates.
-- Codex-as-MCP-worker needs thread continuity, traces and artifact gates.
+- Coding-worker integrations need thread continuity, traces and artifact gates.
 - Enterprise provider placement must record region, identity, capability gaps
   and audit ownership.
 - Shared/team agents need governance beyond personal agent defaults.

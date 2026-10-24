@@ -58,6 +58,39 @@ test("generic CODEX_BIN cannot silently turn the primary App route into CLI", as
   }
 });
 
+test("packaged desktop CLI remains the App provider for system and user installations", async () => {
+  const loaded = await loadBinaryModule();
+  try {
+    for (const appName of ["ChatGPT", "Codex"]) {
+      for (const base of ["/Applications", path.join(fixtureHome, "Applications")]) {
+        const desktop = `${base}/${appName}.app/Contents/Resources/codex-cli/bin/codex`;
+        const cli = path.join(fixtureHome, ".local", "bin", "codex");
+        const options = { env: {}, homeDir: fixtureHome, existsSync: (candidate) => candidate === desktop || candidate === cli };
+        assert.equal(loaded.module.resolveCodexAppBinary(undefined, options), desktop);
+        assert.equal(loaded.module.isDesktopCodexBinary(desktop), true);
+        assert.equal(loaded.module.resolveCodexCliBinary(undefined, { ...options, env: { CODEX_BIN: desktop } }), cli);
+        if (base === "/Applications") assert.ok(loaded.module.DESKTOP_CODEX_BIN_CANDIDATES.includes(desktop));
+      }
+    }
+    assert.equal(loaded.module.isDesktopCodexBinary("/custom/codex-cli/bin/codex"), false);
+  } finally {
+    loaded.cleanup();
+  }
+});
+
+test("desktop discovery preserves the legacy binary when both layouts exist", async () => {
+  const loaded = await loadBinaryModule();
+  try {
+    const legacy = "/Applications/ChatGPT.app/Contents/Resources/codex";
+    const packaged = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex";
+    assert.equal(loaded.module.resolveCodexAppBinary(undefined, {
+      env: {}, homeDir: fixtureHome, existsSync: (candidate) => candidate === legacy || candidate === packaged,
+    }), legacy);
+  } finally {
+    loaded.cleanup();
+  }
+});
+
 test("missing desktop App leaves the App route unavailable and preserves CLI fallback", async () => {
   const loaded = await loadBinaryModule();
   try {

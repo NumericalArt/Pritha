@@ -1,0 +1,724 @@
+{
+  "schema_version": 2,
+  "verified": "2026-10-21",
+  "fixture_sha256": "b6e60c6559288cce982770c64e4065f0645a54b4a45b6b724b9fe4d2dce89118",
+  "old_fixture_sha256": "ae86a7a8846ecf6b37e99ada07a4f2fea2e9e2201ca0f3ff3738573efd87f2f2",
+  "retrieval": {
+    "first_content_acceptance": "pass",
+    "before": {
+      "fts": {
+        "positive": 48,
+        "hit_at_5": 27,
+        "hit_at_10": 30,
+        "holdout": 24,
+        "holdout_hit_at_5": 15,
+        "leaks": 0,
+        "warm_p95_ms": 16.679
+      },
+      "semantic": {
+        "positive": 48,
+        "hit_at_5": 21,
+        "hit_at_10": 25,
+        "holdout": 24,
+        "holdout_hit_at_5": 9,
+        "leaks": 0,
+        "warm_p95_ms": 27.645
+      },
+      "hybrid": {
+        "positive": 48,
+        "hit_at_5": 31,
+        "hit_at_10": 31,
+        "holdout": 24,
+        "holdout_hit_at_5": 16,
+        "leaks": 0,
+        "warm_p95_ms": 27.469
+      }
+    },
+    "after": {
+      "fts": {
+        "positive": 48,
+        "hit_at_5": 45,
+        "hit_at_10": 46,
+        "holdout": 24,
+        "holdout_hit_at_5": 23,
+        "leaks": 0,
+        "warm_p95_ms": 2.666
+      },
+      "semantic": {
+        "positive": 48,
+        "hit_at_5": 32,
+        "hit_at_10": 36,
+        "holdout": 24,
+        "holdout_hit_at_5": 16,
+        "leaks": 0,
+        "warm_p95_ms": 30.492
+      },
+      "hybrid": {
+        "positive": 48,
+        "hit_at_5": 42,
+        "hit_at_10": 44,
+        "holdout": 24,
+        "holdout_hit_at_5": 22,
+        "leaks": 0,
+        "warm_p95_ms": 12.43
+      }
+    },
+    "regressions_at_10": [],
+    "remaining_fts_misses_at_5": [
+      "diagnostic-s6",
+      "diagnostic-s9",
+      "holdout-s9"
+    ],
+    "stability_after_self_test": {
+      "fts": {
+        "positive": 48,
+        "hit_at_5": 45,
+        "hit_at_10": 46,
+        "holdout": 24,
+        "holdout_hit_at_5": 23,
+        "leaks": 0,
+        "warm_p95_ms": 2.727
+      },
+      "semantic": {
+        "positive": 48,
+        "hit_at_5": 32,
+        "hit_at_10": 36,
+        "holdout": 24,
+        "holdout_hit_at_5": 16,
+        "leaks": 0,
+        "warm_p95_ms": 29.458
+      },
+      "hybrid": {
+        "positive": 48,
+        "hit_at_5": 41,
+        "hit_at_10": 44,
+        "holdout": 24,
+        "holdout_hit_at_5": 21,
+        "leaks": 0,
+        "warm_p95_ms": 12.595
+      }
+    },
+    "closure": {
+      "fts": {
+        "positive": 48,
+        "hit_at_5": 45,
+        "hit_at_10": 46,
+        "holdout": 24,
+        "holdout_hit_at_5": 23,
+        "leaks": 0,
+        "warm_p95_ms": 2.798
+      },
+      "semantic": {
+        "positive": 48,
+        "hit_at_5": 32,
+        "hit_at_10": 35,
+        "holdout": 24,
+        "holdout_hit_at_5": 16,
+        "leaks": 0,
+        "warm_p95_ms": 27.47
+      },
+      "hybrid": {
+        "positive": 48,
+        "hit_at_5": 41,
+        "hit_at_10": 45,
+        "holdout": 24,
+        "holdout_hit_at_5": 21,
+        "leaks": 0,
+        "warm_p95_ms": 12.776
+      }
+    },
+    "closure_status": "pass",
+    "selected_implementation_unchanged_after_holdout": {
+      "scripts/pritha_memory_retrieval.py": true,
+      "scripts/memory-retrieval-acceptance.py": true,
+      "tests/fixtures/memory/retrieval-acceptance-cases.json": true
+    },
+    "whole_cli": {
+      "samples_ms": [
+        413.18,
+        422.31,
+        418.33
+      ],
+      "median_ms": 418.33,
+      "scope": "Whole FTS process startup, scoped index construction and JSON output; no ML model"
+    }
+  },
+  "ablations": [
+    {
+      "name": "ablation-1-scoped",
+      "summaries": {
+        "fts": {
+          "positive": 24,
+          "hit_at_5": 12,
+          "hit_at_10": 12,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 1.091
+        }
+      }
+    },
+    {
+      "name": "ablation-2-language",
+      "summaries": {
+        "fts": {
+          "positive": 24,
+          "hit_at_5": 15,
+          "hit_at_10": 16,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 0.94
+        }
+      }
+    },
+    {
+      "name": "ablation-3-sections",
+      "summaries": {
+        "fts": {
+          "positive": 24,
+          "hit_at_5": 18,
+          "hit_at_10": 19,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 1.319
+        }
+      }
+    },
+    {
+      "name": "ablation-4-context",
+      "summaries": {
+        "fts": {
+          "positive": 24,
+          "hit_at_5": 20,
+          "hit_at_10": 21,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 1.658
+        }
+      }
+    },
+    {
+      "name": "ablation-5-title",
+      "summaries": {
+        "fts": {
+          "positive": 24,
+          "hit_at_5": 20,
+          "hit_at_10": 21,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 1.835
+        },
+        "semantic": {
+          "positive": 24,
+          "hit_at_5": 16,
+          "hit_at_10": 18,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 25.707
+        },
+        "hybrid": {
+          "positive": 24,
+          "hit_at_5": 19,
+          "hit_at_10": 20,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 12.646
+        }
+      }
+    },
+    {
+      "name": "ablation-6-authority",
+      "summaries": {
+        "fts": {
+          "positive": 24,
+          "hit_at_5": 21,
+          "hit_at_10": 21,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 2.255
+        }
+      }
+    },
+    {
+      "name": "ablation-7-inflections",
+      "summaries": {
+        "fts": {
+          "positive": 24,
+          "hit_at_5": 22,
+          "hit_at_10": 22,
+          "holdout": 0,
+          "holdout_hit_at_5": 0,
+          "leaks": 0,
+          "warm_p95_ms": 2.367
+        }
+      }
+    }
+  ],
+  "codex": [
+    {
+      "version": "0.153.0",
+      "model": "gpt-6-astra",
+      "status": "pass",
+      "receipt": {
+        "effect_count": 1,
+        "requests": 2,
+        "key": "synthetic-recovery-01",
+        "value": 7
+      },
+      "interrupted_status": "interrupted",
+      "finished_status": "completed",
+      "resume_policy": "on-request",
+      "resume_sandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "duration_seconds": 17.59,
+      "usage": {
+        "totalTokens": 38052,
+        "inputTokens": 37944,
+        "cachedInputTokens": 37120,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 108,
+        "reasoningOutputTokens": 0
+      },
+      "persisted_successful_tool_pairs": 2,
+      "cancelled_wait_completed_item_present": false,
+      "test_thread_archived": true
+    },
+    {
+      "version": "0.163.0",
+      "model": "gpt-6.1-sol",
+      "status": "pass",
+      "receipt": {
+        "effect_count": 1,
+        "requests": 2,
+        "key": "synthetic-recovery-01",
+        "value": 7
+      },
+      "interrupted_status": "interrupted",
+      "finished_status": "completed",
+      "resume_policy": "on-request",
+      "resume_sandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "duration_seconds": 15.63,
+      "usage": {
+        "totalTokens": 95551,
+        "inputTokens": 95326,
+        "cachedInputTokens": 83200,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 225,
+        "reasoningOutputTokens": 18
+      },
+      "persisted_successful_tool_pairs": 2,
+      "cancelled_wait_completed_item_present": false,
+      "test_thread_archived": true
+    }
+  ],
+  "sdk": {
+    "openai-sdk": {
+      "status": "pass",
+      "sdk": "@openai/agents@0.21.0",
+      "mode": "offline-scripted-model",
+      "checks": [
+        "parallel call/result pairs",
+        "pause before effect",
+        "serialize and restore",
+        "narrow approval",
+        "rejection prevents effect",
+        "no duplicate results",
+        "usage totals",
+        "no tracing export"
+      ],
+      "executions": 1,
+      "usage": {
+        "requests": 2,
+        "inputTokens": 30,
+        "outputTokens": 5,
+        "totalTokens": 35,
+        "inputTokensDetails": [],
+        "outputTokensDetails": [],
+        "requestUsageEntries": [
+          {
+            "inputTokens": 11,
+            "outputTokens": 3,
+            "totalTokens": 14,
+            "inputTokensDetails": {},
+            "outputTokensDetails": {}
+          },
+          {
+            "inputTokens": 19,
+            "outputTokens": 2,
+            "totalTokens": 21,
+            "inputTokensDetails": {},
+            "outputTokensDetails": {}
+          }
+        ]
+      },
+      "baseline": {
+        "pausedBeforeEffect": true,
+        "effect_count": 1,
+        "calls": [
+          "lookup-01",
+          "receipt-01"
+        ],
+        "results": [
+          "lookup-01",
+          "receipt-01"
+        ],
+        "output": "7; receipt sdk-pilot-01",
+        "syntheticUsage": {
+          "input": 30,
+          "output": 5,
+          "total": 35
+        }
+      },
+      "providerBenchmark": "Live controlled task passed; not a general provider benchmark",
+      "recommendation": "Keep current Codex backend; use SDK for an API loop with sessions and approval state when contract needs it"
+    },
+    "claude-sdk": {
+      "status": "pass",
+      "sdk": "@anthropic-ai/claude-agent-sdk@0.3.306",
+      "mode": "offline-custom-tool-conformance",
+      "checks": [
+        "SDK tool registration",
+        "MCP initialize and tools/list",
+        "typed public-domain call",
+        "invalid private domain rejected before execution"
+      ],
+      "calls": 1,
+      "agentLoop": "pending-auth",
+      "apiKeyAvailable": false,
+      "providerQualityAndCost": "not measured",
+      "terms": "Commercial Terms; no third-party claude.ai login offered"
+    },
+    "openai-live": {
+      "sdk": "@openai/agents@0.21.0",
+      "mode": "live-API-controlled-task",
+      "status": "pass",
+      "model": "gpt-5.6-terra",
+      "providerQualityBenchmark": false,
+      "baseline": {
+        "status": "pass",
+        "calls": 1,
+        "output": {
+          "value": 7,
+          "source": "fixture-alpha"
+        },
+        "usage": [
+          {
+            "input_tokens": 207,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 18,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 225
+          },
+          {
+            "input_tokens": 246,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 18,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 264
+          }
+        ],
+        "elapsedMs": 3575
+      },
+      "agentsSdk": {
+        "status": "pass",
+        "calls": 1,
+        "output": {
+          "value": 7,
+          "source": "fixture-alpha"
+        },
+        "usage": {
+          "requests": 2,
+          "inputTokens": 451,
+          "outputTokens": 35,
+          "totalTokens": 486,
+          "inputTokensDetails": [
+            {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            }
+          ],
+          "outputTokensDetails": [
+            {
+              "reasoning_tokens": 0
+            },
+            {
+              "reasoning_tokens": 0
+            }
+          ],
+          "requestUsageEntries": [
+            {
+              "inputTokens": 206,
+              "outputTokens": 18,
+              "totalTokens": 224,
+              "inputTokensDetails": {
+                "cache_write_tokens": 0,
+                "cached_tokens": 0
+              },
+              "outputTokensDetails": {
+                "reasoning_tokens": 0
+              },
+              "endpoint": "responses.create"
+            },
+            {
+              "inputTokens": 245,
+              "outputTokens": 17,
+              "totalTokens": 262,
+              "inputTokensDetails": {
+                "cache_write_tokens": 0,
+                "cached_tokens": 0
+              },
+              "outputTokensDetails": {
+                "reasoning_tokens": 0
+              },
+              "endpoint": "responses.create"
+            }
+          ]
+        },
+        "pauseBeforeCall": true,
+        "stateRestored": true,
+        "callResultPairsComplete": true,
+        "elapsedMs": 2353
+      },
+      "credentialSerialized": false,
+      "costScope": "Measured tokens and one latency sample per implementation, no general quality or pricing claim",
+      "reference_pricing": {
+        "verified": "2026-10-21",
+        "source": "https://developers.openai.com/api/docs/pricing",
+        "model": "gpt-5.6-terra",
+        "rate_scope": "Standard, short context, USD per 1M tokens; reference estimate, not billing statement",
+        "input_rate": 2.0,
+        "output_rate": 12.0,
+        "cache_writes": 0,
+        "cached_reads": 0,
+        "baseline_estimate_usd": 0.001338,
+        "sdk_estimate_usd": 0.001322
+      },
+      "api_requests": 4,
+      "known_total_tokens": 975
+    }
+  },
+  "mcp": {
+    "dependency_audit_before": {
+      "high_packages": 2,
+      "advisory_causes": 5
+    },
+    "dependency_audit_after": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "browser_status": "pass",
+    "checks": [
+      "App/AppBridge handshake",
+      "public search 5 sources",
+      "source section drill-down",
+      "governance domain filter",
+      "old source cleared on new result",
+      "teardown/reload reconnect",
+      "one backend request per post-reload search",
+      "rebuild denied",
+      "user-model denied",
+      "network denied by CSP",
+      "plain text fallback visible"
+    ],
+    "allowed_requests": 3,
+    "denied_controls": 7,
+    "plain_tool_has_no_ui_metadata": true,
+    "text_fallback_equal": true,
+    "temporary_server_stopped": true
+  },
+  "answer_audit": {
+    "schema_version": 1,
+    "status": "pass",
+    "cases": 10,
+    "supported": 6,
+    "appropriate_insufficient": 4,
+    "citations_within_packet": true,
+    "private_marker_echoes": 0,
+    "untrusted_wiki_ignored": true,
+    "reviewer": "Codex current research thread, substantive comparison with primary curated sections; no calibrated model judge",
+    "limits": "A selected 10-case answer audit, not full generated-answer accuracy or user acceptance",
+    "checks": [
+      {
+        "id": "diagnostic-n1",
+        "status": "insufficient",
+        "review": "pass"
+      },
+      {
+        "id": "diagnostic-n2",
+        "status": "insufficient",
+        "review": "pass"
+      },
+      {
+        "id": "diagnostic-n6",
+        "status": "insufficient",
+        "review": "pass"
+      },
+      {
+        "id": "holdout-a5",
+        "status": "supported",
+        "review": "pass"
+      },
+      {
+        "id": "holdout-s3",
+        "status": "supported",
+        "review": "pass"
+      },
+      {
+        "id": "holdout-s10",
+        "status": "supported",
+        "review": "pass"
+      },
+      {
+        "id": "holdout-v2",
+        "status": "supported",
+        "review": "pass"
+      },
+      {
+        "id": "holdout-v3",
+        "status": "supported",
+        "review": "pass"
+      },
+      {
+        "id": "holdout-v6",
+        "status": "supported",
+        "review": "pass"
+      },
+      {
+        "id": "holdout-negative-2",
+        "status": "insufficient",
+        "review": "pass"
+      }
+    ]
+  },
+  "final_verification": {
+    "self_test": "pass",
+    "unit_tests": 879,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "regressions": [],
+    "warnings": [],
+    "quality_checks": [
+      {
+        "id": "env-doctor",
+        "status": "pass",
+        "durationMs": 268
+      },
+      {
+        "id": "privacy-audit",
+        "status": "pass",
+        "durationMs": 155
+      },
+      {
+        "id": "validate-memory",
+        "status": "pass",
+        "durationMs": 157
+      },
+      {
+        "id": "rebuild-memory",
+        "status": "pass",
+        "durationMs": 5548
+      },
+      {
+        "id": "smoke-test",
+        "status": "pass",
+        "durationMs": 131
+      },
+      {
+        "id": "unit-tests",
+        "status": "pass",
+        "durationMs": 189677
+      },
+      {
+        "id": "telegram-dry-run",
+        "status": "pass",
+        "durationMs": 25
+      }
+    ],
+    "embeddings_restored": true,
+    "memory_stats": {
+      "documents": 960,
+      "chunks": 10460,
+      "entities": 3094,
+      "relations": 21506,
+      "embeddings": 10239
+    },
+    "strict_health": "pass",
+    "pages": 5,
+    "chunks": 13,
+    "queue": "pass",
+    "final_corpus_check": "pass",
+    "missing_non_template_embeddings": 0,
+    "orphan_embeddings": 0
+  },
+  "usage_accounting": {
+    "native_cumulative_per_thread": [
+      {
+        "scenario": "codex-stable-0163",
+        "status": "pass",
+        "tokens": 95551
+      },
+      {
+        "scenario": "codex-live-pinned-model",
+        "status": "pass",
+        "tokens": 38052
+      },
+      {
+        "scenario": "codex-live-elicitation",
+        "status": "fail",
+        "tokens": 22627
+      }
+    ],
+    "unknown_attempts": [
+      "codex-live",
+      "codex-live-approved-fixture"
+    ],
+    "known_total_tokens_sum": 156230,
+    "first_attempt_usage": "unknown; not zero",
+    "usd_cost": "not inferred from ChatGPT subscription counters",
+    "answers_total": {
+      "totalTokens": 44644,
+      "inputTokens": 43684,
+      "cachedInputTokens": 0,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 960,
+      "reasoningOutputTokens": 0
+    }
+  },
+  "credential_readiness": {
+    "probe_method": "Existing Node runtime/env-store loader; only configured booleans exposed",
+    "openai": true,
+    "anthropic": false,
+    "earlier_python_probe": "path-only loader intentionally does not load API credentials"
+  }
+}

@@ -12,6 +12,7 @@ import { parseFrontmatterData, yamlList } from "../lib/frontmatter.mjs";
 import { atomicCompareAndSwapFile } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
+import { searchCuratedMemory } from "../lib/curated-memory.mjs";
 import { redactSensitiveText, redactStructuredText } from "../lib/redaction.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolveTechscopeRoot } from "../lib/paths.mjs";
@@ -874,6 +875,13 @@ LIMIT ${Number(limit) || 12};
 }
 
 function searchMemoryByDomain(query, domain, limit) {
+  if (domain === "agent-building-knowledge") {
+    const boundedQuery = Array.from(String(query)).slice(0, 2000).join("");
+    return searchCuratedMemory(boundedQuery, { domain, limit: Math.min(20, Math.max(1, Number(limit) || 8)), root: ROOT }).results.map(row => ({
+      type: row.type, status: row.status, path: row.path, title: row.title, heading: row.heading,
+      snippet: row.text.replace(/\s+/gu, " ").slice(0, 420), retrieval_method: "curated-fts-v2", retrieval_query_truncated: boundedQuery !== query,
+    }));
+  }
   const match = ftsQuery(query);
   if (!match || !domain) return [];
   return runSqlJson(`

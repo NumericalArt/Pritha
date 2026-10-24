@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-08-22
+updated: 2026-10-21
 topics:
   - agent-engineering
   - agent-factory
@@ -47,7 +47,11 @@ sources:
   - 07_workflows/2026-08-16-outcome-driven-agent-delivery-roadmap.md
   - 04_standards/agent-feedback-sensors-and-evaluation-loops.md
   - 07_workflows/agent-sensor-and-eval-design.md
+  - 05_decisions/2026-10-21-curated-retrieval-promotion.md
+  - 03_reviews/2026-10-21-pritha-retrieval-and-runtime-verification.md
 related:
+  decisions:
+    - 05_decisions/2026-10-21-curated-retrieval-promotion.md
   standards:
     - 04_standards/agent-creation-harness.md
     - 04_standards/agent-environment-compatibility.md
@@ -157,7 +161,10 @@ runtime blockers, but creation is not complete while the agent is missing from
     coverage, approve it independently from the contract, record host-side
     approval evidence, lock its content and compile it to `trial-plan.json` in
     `PRITHA_STATE_ROOT`.
-4. Create a reusable `agent-pattern-pack` artifact in `11_agents/research/`.
+4. Create a reusable `agent-pattern-pack` in instance-local
+   `<PRITHA_STATE_ROOT>/agents/research/`, or gitignored
+   `.private/agents/research/` when no external state root is configured.
+   Tracked `11_agents/` remains shared reference history.
    The pack must combine FTS search, domain-routed memory search and an
    attempted semantic/embedding search:
    - first, `agent-building-knowledge` for standards, workflows and reusable
@@ -167,9 +174,30 @@ runtime blockers, but creation is not complete while the agent is missing from
      patterns, not templates to copy;
    - optionally, `user-model` local-private preferences only when available and
      permitted.
+   The `agent-building-knowledge` factory branch uses accepted curated FTS v2,
+   as recorded in
+   [the current retrieval decision](../05_decisions/2026-10-21-curated-retrieval-promotion.md).
+   The manual read-only entry point is
+   `node scripts/query-memory.mjs curated "<query>"`. A scoped manual query for
+   Pritha capabilities is
+   `python3 scripts/memory-retrieve.py "<query>" --domain pritha-self --json`.
+   This decision does not migrate generic memory or the other factory domain
+   branches. Curated queries exclude child/private/sibling paths and historical
+   statuses by default; permitted child evidence is researched separately.
+   Semantic/hybrid remain explicitly selected alternatives with the cached
+   model, not the default for the curated agent-building branch. The pattern
+   pack still records the attempted semantic search. Report missing/stale
+   capability rather than downloading a model or declaring success.
+   Search hits are candidates: read the source section, status, version and
+   applicable decision before drawing a conclusion. Generated wiki is a
+   navigation layer, not evidence or approval for adoption.
+   Select SDK/runtime using
+   `02_briefs/2026-10-21-agent-backend-selection.md` and verify volatile pins.
    If semantic/embedding search is unavailable, stale or fails, continue with a
    warning, record the status in the pattern pack, and append the failure to
-   `.private/agents-mother/semantic-memory-failures.jsonl` for later repair.
+   `<PRITHA_STATE_ROOT>/private/agents-mother/semantic-memory-failures.jsonl`
+   for later repair; the legacy fallback without an external state root is
+   `.private/agents-mother/semantic-memory-failures.jsonl`.
 5. Derive external research topics from both the contract and the selected
    pattern-pack seeds. Verify volatile architecture choices through current
    primary sources and trusted secondary sources.

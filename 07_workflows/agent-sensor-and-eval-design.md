@@ -3,7 +3,7 @@ id: agent-sensor-and-eval-design
 type: workflow
 status: experimental
 created: 2026-08-22
-updated: 2026-09-06
+updated: 2026-10-21
 topics:
   - agent-engineering
   - feedback-sensors
@@ -63,6 +63,8 @@ they are not enabled or required merely because this document describes them.
 No background sensor service is installed by this roadmap preparation.
 
 ## Goal
+
+Manual incident intake is now specified in `07_workflows/agent-failure-to-trial.md`, with the reusable `08_templates/agent-failure-evidence.md`. It binds observations to the deployed revision and requires negative/positive controls before promotion to a protected Trial. This does not implement a universal sensor runtime or scheduled collection.
 
 Turn an accepted agent outcome and risk model into executable constraints,
 fast feedback sensors, representative evals, production metrics and a durable
