@@ -134,14 +134,22 @@ agent, provider registration, credentials or Claude configuration was created.
 
 ## Remaining operational boundaries
 
-Native Safari and physical iPhone checks have not been performed. Installed
+At the end of implementation, native Safari and physical iPhone checks had not
+been performed. Installed
 WebKit covers the automated Safari-engine scenarios, including touch input,
 without claiming a native-device manual trial.
 
-Production deployment, service restart and fleet rollout were not performed.
+At that point, production deployment, service restart and fleet rollout had
+not been performed.
 Any release must follow the staged-release workflow with its separate immediate
 lifecycle authorization, verified candidate/instance identity, operational health
 and rollback. Git commit/tag/push was not requested or performed.
+
+The operator subsequently authorized a separate production update on 2026-10-29.
+The main instance was released from implementation commit `3a3c36d`; native
+Safari quote, annotation and original-restore checks passed. Replicas were not
+updated. See `03_reviews/2026-10-29-task-chat-composer-tools-release-review.md`
+for deployment evidence and remaining physical-device/peer limitations.
 
 Rollback needs no server migration: revert the UI additions or restore the prior
 compiled release through the runtime manager, preserving private attachment
