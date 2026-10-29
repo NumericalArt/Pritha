@@ -1,0 +1,17 @@
+{
+  "status": "not-verified",
+  "runtimeEnabled": false,
+  "reviewedAt": "2026-10-29",
+  "sources": {
+    "paste-preview": { "version": "0.2.0", "commit": "d1550099cb69eeb92c7c70b5b86d1ca3a0a3074c" },
+    "quote-reply": { "version": "0.1.0", "commit": "e99bc062fe19ed6fb66cbafcb95f8f5ef51ed5fc" }
+  },
+  "required": {
+    "quote": ["ui.selection", "prompt.fill:append", "ui.render:AbovePrompt"],
+    "annotation": ["image-preview", "edited-image-delivery", "original-preservation", "terminal-capability-detection"]
+  },
+  "quote": { "selection": "Первая строка\nВторая строка", "autoSend": false },
+  "annotation": { "outputType": "image/png", "overwriteOriginal": false, "autoSend": false },
+  "missingCapabilityBehavior": "disable-feature-preserve-draft-and-original",
+  "recheckOn": ["claude-code-version", "plugin-version", "ui-hooks", "attachment-layout", "terminal-graphics"]
+}

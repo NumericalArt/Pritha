@@ -10,11 +10,14 @@ export function AttachmentLinks({ files }: { files: AttachmentView[] }) {
   </a>)}</div>;
 }
 
-export function DraftAttachments({ items, locked, remove, retry }: { items: DraftAttachment[]; locked: boolean; remove: (id: string) => void; retry: (file: DraftAttachment) => void }) {
-  return <div className="codex-attachments codex-draft-attachments" aria-label="Draft attachments">{items.map(item => <div key={item.id} className="codex-attachment">
+export function DraftAttachments({ items, locked, remove, retry, annotate, restore }: { items: DraftAttachment[]; locked: boolean; remove: (id: string) => void; retry: (file: DraftAttachment) => void; annotate?: (item: DraftAttachment, opener: HTMLButtonElement) => void; restore?: (id: string) => void }) {
+  return <div className="codex-attachments codex-draft-attachments" aria-label="Draft attachments">{items.map(item => <div key={item.id} className="codex-attachment" data-draft-attachment={item.id}>
     {item.view?.kind === "image" ? <img src={item.view.href} alt={item.view.name} /> : item.state === "uploading" ? <LoaderCircle size={20} className="spin" /> : <File size={20} />}
     <span>{item.file.name}<small>{item.state === "uploading" ? "Uploading…" : item.state === "error" ? item.error : "Ready"}</small></span>
     {item.state === "error" && !item.localFileMissing ? <button type="button" className="codex-text-action" disabled={locked} onClick={() => retry(item)}>Retry upload</button> : null}
+    {item.state === "ready" && item.view?.kind === "image" && ["image/png", "image/jpeg", "image/webp"].includes(item.view.mediaType) && annotate ? <button type="button" data-annotation-open className="codex-text-action" disabled={locked || Boolean(item.restoring)} onClick={event => annotate(item, event.currentTarget)}>Разметить</button> : null}
+    {item.original && restore ? <button type="button" className="codex-text-action" disabled={locked || Boolean(item.restoring)} onClick={() => restore(item.id)}>{item.restoring ? "Проверка оригинала…" : "Вернуть оригинал"}</button> : null}
+    {item.original ? <small>Размеченная копия</small> : null}
     <button type="button" className="codex-text-action" aria-label={`Remove ${item.file.name}`} disabled={locked} onClick={() => remove(item.id)}><X size={16} /></button>
   </div>)}</div>;
 }

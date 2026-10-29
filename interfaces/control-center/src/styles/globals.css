@@ -7313,6 +7313,26 @@ button:active,
 .codex-attachments { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .codex-draft-attachments { max-height: 160px; overflow: auto; }
 .codex-attachments:empty { display: none; }
+.codex-draft-attachments .codex-attachment { flex-wrap: wrap; }
+.codex-quote-button { margin-top: 6px; }
+.codex-quote-error { position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 100; background: var(--surface-overlay); color: var(--text-primary); padding: 12px; border: 1px solid var(--border-medium); border-radius: 8px; }
+.codex-image-editor { width: min(1000px, calc(100vw - 24px)); max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow: auto; border: 1px solid var(--border-medium); border-radius: 12px; padding: 16px; background: var(--panel-0, #141b23); color: var(--text-primary); }
+.codex-image-editor::backdrop { background: rgba(0, 0, 0, .65); }
+.codex-editor-header, .codex-editor-footer, .codex-editor-toolbar, .codex-editor-discard { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.codex-editor-header, .codex-editor-footer { justify-content: space-between; }
+.codex-editor-header strong { min-width: 0; overflow-wrap: anywhere; }
+.codex-editor-toolbar { border: 0; padding: 12px 0; min-width: 0; }
+.codex-editor-toolbar legend { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.codex-image-editor button, .codex-image-editor select { border: 1px solid var(--border-medium); border-radius: 6px; padding: 8px; color: var(--text-primary); background: var(--surface-control, var(--panel-1)); font: inherit; cursor: pointer; }
+.codex-image-editor button[aria-pressed="true"] { outline: 2px solid var(--theme-link); outline-offset: -2px; }
+.codex-image-editor button:disabled { opacity: .45; cursor: default; }
+.codex-editor-toolbar label { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 12px; }
+.codex-editor-workspace { max-height: 55dvh; overflow: auto; min-height: 40px; background: repeating-conic-gradient(#ccc 0% 25%, #eee 0% 50%) 0 0 / 16px 16px; }
+.codex-editor-workspace canvas { display: block; max-width: 100%; max-height: 55dvh; width: auto; height: auto; margin: 0 auto; touch-action: none; cursor: crosshair; }
+.codex-editor-text textarea { display: block; width: 100%; min-height: 64px; background: var(--surface-control); color: var(--text-primary); }
+.codex-editor-text, .codex-editor-discard, .codex-editor-footer { margin-top: 12px; }
+.codex-image-editor small { color: var(--text-secondary); }
+@media (max-width: 600px) { .codex-image-editor { padding: 10px; font-size: 12px; } .codex-image-editor button { min-height: 40px; } }
 .codex-attachment { display: flex; align-items: center; gap: 8px; border: 1px solid #334155; border-radius: 8px; padding: 8px; max-width: 100%; min-width: 0; color: inherit; font-size: 12px; text-decoration: none; }
 .codex-attachment > span { min-width: 0; overflow-wrap: anywhere; }
 .codex-attachment img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; border-radius: 4px; }

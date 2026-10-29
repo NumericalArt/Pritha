@@ -5,6 +5,7 @@ import { HistoryActivity } from "./HistoryActivity";
 import { CopyResponse } from "./CopyResponse";
 import { HistoryText } from "./HistoryText";
 import { AttachmentLinks } from "./ChatAttachments";
+import { QuoteAnswer } from "./QuoteReply";
 
 const requestOptions = { timeoutMs: 35_000, maxBodyBytes: 256 * 1024 };
 function base(chatId: string) { return `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/history`; }
@@ -38,7 +39,9 @@ export function HistoryTurn({ chatId, turn }: { chatId: string; turn: TurnView }
   }
   const message = (value: MessageView, id: string, label: string) => <article data-scroll-anchor={`${turn.turnId}:${id}`} className={`codex-message ${label === "You" ? "codex-user-message" : "codex-assistant-message"}`}>
     <div className="codex-message-label">{label}</div>
-    <HistoryText chatId={chatId} id={id} preview={value.markdown} contentRef={value.contentRef} />
+    <QuoteAnswer chatId={chatId} eligible={label !== "You" && turn.status === "completed" && value.status !== "streaming"}>
+      <HistoryText chatId={chatId} id={id} preview={value.markdown} contentRef={value.contentRef} />
+    </QuoteAnswer>
     {value.attachments?.length ? <AttachmentLinks files={value.attachments} /> : null}
   </article>;
   return <section className="codex-turn" aria-label={`Turn ${turn.status}`}>

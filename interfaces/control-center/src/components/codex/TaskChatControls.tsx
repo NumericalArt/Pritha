@@ -3,12 +3,12 @@ import { useRef, useState } from "react";
 import { controlCenterRequest as api, ControlCenterRequestError } from "@/lib/control-center-request";
 import type { PendingRequestView, RuntimeStatus, ThreadDetail } from "@/lib/codex-chat/types";
 
-type Props={canSend:boolean;chatId:string|null;detail:ThreadDetail|null;draft:string;attachments:string[];settings?:RuntimeStatus["selected"];onSent:(chatId:string,text:string,attachments:string[])=>void;refresh:(chatId:string)=>Promise<unknown>};
+type Props={canSend:boolean;chatId:string|null;detail:ThreadDetail|null;draft:string;attachments:string[];settings?:RuntimeStatus["selected"];onSent:(chatId:string,text:string,attachments:string[])=>void;onDraftLockChange?:(chatId:string,locked:boolean)=>void;refresh:(chatId:string)=>Promise<unknown>};
 type Snapshot={id:string;body:Record<string,unknown>;text:string;attachments:string[]};
 function rejectedBeforeDelivery(error:unknown) {
   return error instanceof ControlCenterRequestError && ["control_turn_changed","control_rejected","control_unsupported","invalid_request","queue_target_ended","chat_archived","model_image_unsupported","attachment_inaccessible","runtime_identity_mismatch","native_answer_invalid","native_request_changed","voice_question_changed"].includes(error.code);
 }
-export function TaskChatControls({canSend,chatId,detail,draft,attachments,settings,onSent,refresh}:Props) {
+export function TaskChatControls({canSend,chatId,detail,draft,attachments,settings,onSent,onDraftLockChange,refresh}:Props) {
   const [busy,setBusy]=useState<Record<string,boolean>>({});
   const [notices,setNotices]=useState<Record<string,string>>({});
   const pending=useRef<Record<string,Snapshot>>({});
@@ -17,11 +17,13 @@ export function TaskChatControls({canSend,chatId,detail,draft,attachments,settin
   const locked=busy[id]===true;
   const running=detail.thread.status === "active" || Boolean(detail.activeTurnId) || Boolean(detail.controls);
   const send=async(action:"steer"|"interrupt"|"queue")=>{
+    if(action!=="interrupt" && !canSend)return;
     const key=`${id}:${action}`, previous=pending.current[key];
     const text=draft.trim();
     if(previous && action!=="interrupt" && previous.text!==text){setNotices(rows=>({...rows,[id]:"Check the earlier request before changing its contents. Your new draft has been kept."}));return;}
     const snapshot=previous || {id:crypto.randomUUID(),text,attachments:[...attachments],body:action==="queue" ? {input:[{type:"text",text}],attachments:[...attachments],settings:{modelId:settings?.modelId,effortId:settings?.effortId,serviceTierId:settings?.serviceTierId}} : {action,text,expectedTurnId:detail.controls?.turnId}};
     pending.current[key]=snapshot;
+    if(action!=="interrupt")onDraftLockChange?.(id,true);
     setBusy(rows=>({...rows,[id]:true}));
     try {
       await api(`/api/codex-chat/v1/threads/${encodeURIComponent(id)}/${action==="queue"?"queue":"control"}`,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":snapshot.id},body:JSON.stringify({...snapshot.body,clientMessageId:snapshot.id})});
@@ -30,7 +32,7 @@ export function TaskChatControls({canSend,chatId,detail,draft,attachments,settin
       setNotices(rows=>({...rows,[id]:action==="queue"?"Message queued. It will run after the preceding task finishes.":action==="interrupt"?"Stop requested. Waiting for the exact turn to finish.":"Clarification submitted to this turn."}));
       await refresh(id);
     } catch(error){if(rejectedBeforeDelivery(error))delete pending.current[key];setNotices(rows=>({...rows,[id]:error instanceof Error?error.message:"Check this request before repeating it."}));}
-    finally{setBusy(rows=>({...rows,[id]:false}));}
+    finally{setBusy(rows=>({...rows,[id]:false}));onDraftLockChange?.(id,Object.keys(pending.current).some(key=>key.startsWith(`${id}:`)&&!key.endsWith(":interrupt")));}
   };
   const cancel=async(request:{id:string;revision:number})=>{
     setBusy(rows=>({...rows,[id]:true}));

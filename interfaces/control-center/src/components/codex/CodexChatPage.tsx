@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import dynamic from "next/dynamic";
 import { useChatAttachments } from "./useChatAttachments";
 import { readDraftSession, writeDraftSession } from "@/lib/codex-chat/draft-session";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
@@ -25,6 +26,8 @@ import { HistoryTurn } from "./HistoryTurn";
 import { useTranscriptScroll } from "./useTranscriptScroll";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { CopyResponse } from "./CopyResponse";
+import { QuoteAnswer, QuoteReplyProvider } from "./QuoteReply";
+import { appendQuote } from "@/lib/codex-chat/quote-reply";
 import { GoalBudgetPanel } from "./GoalBudgetPanel";
 import type { TaskDeliveryView } from "@/lib/codex-chat/delivery-types";
 import { parseBudgetIntent } from "@/lib/codex-chat/budget-intent";
@@ -66,6 +69,7 @@ import type {
 } from "@/lib/codex-chat/types";
 
 type ConnectionState = "idle" | "connecting" | "ready" | "reconnecting";
+const ImageAnnotationEditor = dynamic(() => import("./ImageAnnotationEditor"), { ssr: false });
 type DictationState = "idle" | "listening" | "error";
 type HistoryState = "idle" | "loading" | "slow" | "ready" | "error";
 type ChatGroup = "my_chats" | "voice_work";
@@ -236,13 +240,13 @@ function appendDelta(rows: TurnView[], event: ChatEvent): TurnView[] {
   });
 }
 
-function ActivityItem({ item }: { item: ChatItemView }) {
+function ActivityItem({ item, chatId, completed }: { item: ChatItemView; chatId: string; completed: boolean }) {
   if (item.kind === "user_message") return <article className="codex-message codex-user-message"><div className="codex-message-label">You · clarification</div><CodexMarkdown markdown={item.message.markdown} /></article>;
   if (item.kind === "assistant_message") {
     return (
       <article className={`codex-message codex-assistant-message ${item.message.status === "streaming" ? "streaming" : ""}`}>
         <div className="codex-message-label"><Bot size={15} /> Pritha</div>
-        <CodexMarkdown markdown={item.message.markdown || "…"} />
+        <QuoteAnswer chatId={chatId} eligible={completed && item.message.status !== "streaming" && item.message.phase !== "commentary"}><CodexMarkdown markdown={item.message.markdown || "…"} /></QuoteAnswer>
       </article>
     );
   }
@@ -357,7 +361,23 @@ export function CodexChatPage() {
   const draftKey = selectedChatId || newDraftId;
   const draft = draftsByChat[draftKey] || "";
   const attachmentDraft = useChatAttachments(draftKey);
+  const [imageEditor, setImageEditor] = useState<{ owner: string; id: string; href: string; name: string } | null>(null);
+  const imageEditorRef = useRef(imageEditor); imageEditorRef.current = imageEditor;
+  const imageEditorOpener = useRef<HTMLElement | null>(null);
+  const [draftSubmissionLocks, setDraftSubmissionLocks] = useState<Record<string, boolean>>({});
+  const draftSubmissionLocksRef = useRef(draftSubmissionLocks); draftSubmissionLocksRef.current = draftSubmissionLocks;
+  const onDraftLockChange = useCallback((chatId: string, locked: boolean) => {
+    draftSubmissionLocksRef.current = { ...draftSubmissionLocksRef.current, [chatId]: locked };
+    setDraftSubmissionLocks(draftSubmissionLocksRef.current);
+  }, []);
+  const annotationBusy = Boolean(imageEditor?.owner === draftKey || attachmentDraft.items.some(file => file.edit?.state === "uploading" || file.restoring));
+  useEffect(() => {
+    if (imageEditor && imageEditor.owner !== draftKey) {
+      attachmentDraft.cancelEdit(imageEditor.owner, imageEditor.id); setImageEditor(null);
+    }
+  }, [draftKey, imageEditor, attachmentDraft.cancelEdit]);
   const filePickerRef = useRef<HTMLInputElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentIds = attachmentDraft.items.flatMap(file => file.state === "ready" ? [file.id] : []);
   const attachmentsIncomplete = attachmentDraft.items.some(file => file.state !== "ready");
   const selectedModalities = runtime?.models.find(model => model.id === runtime.selected.modelId)?.inputModalities;
@@ -1251,7 +1271,7 @@ export function CodexChatPage() {
 
   async function sendMessage(workspaceBase?: string) {
     const text = draft.trim();
-    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || (!selectedChatId && pendingNewChatDelivery) || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
+    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || imageEditorRef.current?.owner === draftKey || attachmentDraft.isBusy(draftKey) || draftSubmissionLocksRef.current[draftKey] || sending || hasActiveTurn || (!selectedChatId && pendingNewChatDelivery) || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
     const chatId = selectedChatId;
     const intent = parseBudgetIntent(text);
     if (intent.kind === "clarification" || ((intent.kind === "goal_budget" || intent.kind === "delivery_budget") && (!chatId || attachmentIds.length > 0))) {
@@ -1477,7 +1497,11 @@ export function CodexChatPage() {
   );
 
   return (
-    <div className="codex-page">
+    <QuoteReplyProvider chatId={selectedChatId} enabled={Boolean(selectedChatId && historyState === "ready" && !displayedDetail?.thread.archived && (displayedDetail?.thread.origin !== "voice" || displayedDetail.continuationState === "continuation_enabled" || displayedDetail.voiceWorkflow))} onQuote={text => {
+      const next = appendQuote(draftsByChatRef.current[selectedChatIdRef.current || newDraftIdRef.current] || "", text);
+      setDraft(next);
+      requestAnimationFrame(() => { composerRef.current?.focus(); composerRef.current?.setSelectionRange(next.length, next.length); });
+    }}><div className="codex-page">
       <aside className="codex-history" aria-label="Task Chat history">{history}</aside>
       {drawerOpen ? <div className="codex-history-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setDrawerOpen(false)}><aside className="codex-history-drawer" aria-label="Task Chat history drawer">{history}</aside></div> : null}
 
@@ -1585,7 +1609,7 @@ export function CodexChatPage() {
                 {turn.userMessage.attachments?.length ? <AttachmentLinks files={turn.userMessage.attachments} /> : null}
               </article>
               <div className="codex-turn-items">
-                {turn.items.filter(item => (item.kind === "assistant_message" && item.message.phase !== "commentary") || item.kind === "user_message").map(item => <div key={item.id} data-scroll-anchor={`${turn.turnId}:${item.id}`}><ActivityItem item={item} /></div>)}
+                {turn.items.filter(item => (item.kind === "assistant_message" && item.message.phase !== "commentary") || item.kind === "user_message").map(item => <div key={item.id} data-scroll-anchor={`${turn.turnId}:${item.id}`}><ActivityItem item={item} chatId={selectedChatId || ""} completed={turn.status === "completed"} /></div>)}
                 <ActivityFeed status={turn.status} items={turn.items.filter(item => item.kind === "assistant_message" ? item.message.phase === "commentary" : item.kind !== "user_message")} renderItem={item => <ActivityAction item={item} />} />
                 <CopyResponse turn={turn} />
                 {turn.error ? <div className="codex-inline-notice error">{turn.error.message}</div> : null}
@@ -1596,7 +1620,7 @@ export function CodexChatPage() {
         </div>
 
         <div className="codex-composer-wrap">
-          <TaskChatControls canSend={!attachmentsIncomplete && !imageCapabilityMissing} chatId={selectedChatId} detail={displayedDetail} draft={draft} attachments={attachmentsIncomplete?[]:attachmentIds} settings={runtime?.selected} refresh={loadThreadDetail} onSent={(chatId,text,files)=>{
+          <TaskChatControls canSend={!attachmentsIncomplete && !imageCapabilityMissing && !annotationBusy} onDraftLockChange={onDraftLockChange} chatId={selectedChatId} detail={displayedDetail} draft={draft} attachments={attachmentsIncomplete?[]:attachmentIds} settings={runtime?.selected} refresh={loadThreadDetail} onSent={(chatId,text,files)=>{
             updateDraftForChat(chatId,current=>current.trim()===text?"":current);
             attachmentDraft.clear(chatId,files);
           }} />
@@ -1622,18 +1646,24 @@ export function CodexChatPage() {
               <button className="codex-new-chat" type="button" onClick={() => void continueInTaskChat()} disabled={recovering || historyState !== "ready" || displayedDetail.continuationState !== "read_only"}>{recovering ? "Checking…" : historyBusy ? "Loading history…" : "Continue in Task Chat"}</button>
             </div>
           ) : <div className="codex-composer" role="group" aria-label="Message composer" onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={event => {
-            if (event.dataTransfer.files.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(Array.from(event.dataTransfer.files)); }
+            if (event.dataTransfer.files.length) { event.preventDefault(); if (!pendingDelivery && !sending && !annotationBusy && !draftSubmissionLocks[draftKey]) attachmentDraft.add(Array.from(event.dataTransfer.files)); }
           }}>
-            <DraftAttachments items={attachmentDraft.items} locked={Boolean(pendingDelivery) || sending} remove={attachmentDraft.remove} retry={attachmentDraft.retry} />
+            <DraftAttachments items={attachmentDraft.items} locked={Boolean(pendingDelivery) || sending || annotationBusy || Boolean(draftSubmissionLocks[draftKey])} remove={attachmentDraft.remove} retry={attachmentDraft.retry} annotate={(item, opener) => {
+              if (!item.view || pendingDelivery || sending || draftSubmissionLocksRef.current[draftKey] || attachmentDraft.isBusy(draftKey)) return;
+              const target = { owner: draftKey, id: item.id, href: item.view.href, name: item.view.name };
+              imageEditorOpener.current = opener;
+              imageEditorRef.current = target; setImageEditor(target);
+            }} restore={id => void attachmentDraft.restoreOriginal(draftKey, id)} />
             {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
             {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
             <div className="codex-composer-input">
               <textarea
+                ref={composerRef}
                 aria-describedby="codex-working-status"
                 aria-label="Message Pritha"
                 onPaste={event => {
                   const images = Array.from(event.clipboardData.files).filter(file => file.type.startsWith("image/"));
-                  if (images.length) { event.preventDefault(); if (!pendingDelivery && !sending) attachmentDraft.add(images); }
+                  if (images.length) { event.preventDefault(); if (!pendingDelivery && !sending && !annotationBusy && !draftSubmissionLocks[draftKey]) attachmentDraft.add(images); }
                 }}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -1663,8 +1693,8 @@ export function CodexChatPage() {
                   : "Enter to send · Browser dictation unavailable; use system dictation"}
               </small>
               <div className="codex-composer-controls">
-                <input ref={filePickerRef} type="file" multiple hidden aria-label="Attach files" onChange={event => { attachmentDraft.add(Array.from(event.target.files || [])); event.target.value = ""; }} />
-                <button type="button" className="codex-text-action" title="Up to 10 files; 100 MiB each, 250 MiB per message. Originals are processed on request." disabled={Boolean(pendingDelivery) || sending} onClick={() => filePickerRef.current?.click()}><Paperclip size={16} /> Attach files</button>
+                <input ref={filePickerRef} type="file" multiple hidden aria-label="Attach files" onChange={event => { if (!pendingDelivery && !sending && !annotationBusy && !draftSubmissionLocksRef.current[draftKey] && !attachmentDraft.isBusy(draftKey)) attachmentDraft.add(Array.from(event.target.files || [])); event.target.value = ""; }} />
+                <button type="button" className="codex-text-action" title="Up to 10 files; 100 MiB each, 250 MiB per message. Originals are processed on request." disabled={Boolean(pendingDelivery) || sending || annotationBusy || Boolean(draftSubmissionLocks[draftKey])} onClick={() => filePickerRef.current?.click()}><Paperclip size={16} /> Attach files</button>
                 <label
                   className="codex-dictation-language"
                   title="Auto uses the browser default. Choose one language when recognition guesses incorrectly."
@@ -1693,7 +1723,7 @@ export function CodexChatPage() {
                 >
                   <Mic size={16} /> {!dictationSupported ? "Unavailable" : dictation === "listening" ? "Listening" : dictation === "error" ? "Try again" : "Dictate"}
                 </button>
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} Send
                 </button>
               </div>
@@ -1702,6 +1732,18 @@ export function CodexChatPage() {
           </div>}
         </div>
       </section>
-    </div>
+      {imageEditor && imageEditor.owner === draftKey ? <ImageAnnotationEditor key={`${imageEditor.owner}:${imageEditor.id}`} href={imageEditor.href} name={imageEditor.name} opener={imageEditorOpener.current} onClose={() => {
+        attachmentDraft.cancelEdit(imageEditor.owner, imageEditor.id); imageEditorRef.current = null; setImageEditor(null);
+      }} onApply={async blob => {
+        const target = imageEditor;
+        const copy = await attachmentDraft.applyEdit(target.owner, target.id, blob);
+        if (imageEditorRef.current === target) {
+          imageEditorRef.current = null; setImageEditor(null);
+          requestAnimationFrame(() => {
+            if ((selectedChatIdRef.current || newDraftIdRef.current) === target.owner) document.querySelector<HTMLButtonElement>(`[data-draft-attachment="${copy.id}"] [data-annotation-open]`)?.focus();
+          });
+        }
+      }} /> : null}
+    </div></QuoteReplyProvider>
   );
 }

@@ -814,7 +814,9 @@ test.describe("Control Center UI regression", () => {
       expect(afterRejected.settings.codexReasoningEffort).toBe(customSettings.codexReasoningEffort);
 
       const legacy = await page.request.post("/api/realtime/runtime-settings", {
-        data: { codexModel: "gpt-5.5", codexReasoningEffort: "very_high", codexServiceTier: "standard" },
+        // Exercise the legacy effort alias on the same available model used below.
+        // A retired gpt-5.5 is correctly rejected by the current runtime catalog.
+        data: { codexModel: "gpt-5.6-sol", codexReasoningEffort: "very_high", codexServiceTier: "standard" },
       });
       expect(legacy.ok()).toBeTruthy();
       expect((await legacy.json()).settings.codexReasoningEffort).toBe("xhigh");
