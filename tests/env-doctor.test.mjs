@@ -37,3 +37,12 @@ test("env-doctor fails with an actionable message when a critical dependency is 
   assert.match(result.stdout, /FAIL sqlite3 CLI/);
   assert.match(result.stdout, /Install sqlite3 CLI/);
 });
+
+test("env-doctor Local model profile checks memory and UI dependencies without requiring cloud voice transcription", () => {
+  const result = spawnSync("node", ["scripts/env-doctor.mjs", "--profile", "local-model", "--simulate-missing=mlx-whisper,mlx-whisper-bin", "--json"], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.ok(payload.checks.some(check => check.id === "sentence-transformers" && check.ok));
+  assert.ok(payload.checks.some(check => check.id === "control-center-pinned-deps" && check.ok));
+  assert.equal(payload.checks.some(check => check.id.startsWith("mlx-whisper")), false);
+});

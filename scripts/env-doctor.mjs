@@ -35,6 +35,12 @@ const profileConfig = {
     controlCenter: true,
     tailscale: false,
   },
+  "local-model": {
+    pythonPackages: true,
+    macosTranscription: false,
+    controlCenter: true,
+    tailscale: false,
+  },
   "control-center-tailscale": {
     pythonPackages: true,
     macosTranscription: true,

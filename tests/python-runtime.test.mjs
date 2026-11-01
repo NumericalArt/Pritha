@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { instancePythonPath, resolvePrithaPython } from "../scripts/lib/python-runtime.mjs";
+import { instancePythonPath, resolvePrithaPython,resolveBootstrapPython } from "../scripts/lib/python-runtime.mjs";
 
 test("Python resolution preserves overrides and selects only this instance's venv", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-python-"));
@@ -25,4 +25,11 @@ test("Python resolution preserves overrides and selects only this instance's ven
     assert.equal(resolvePrithaPython({ root, env: { PRITHA_STATE_ROOT: path.join(root, "other") } }), "python3");
     assert.equal(instancePythonPath({ root, env: {}, platform: "win32" }), path.join(root, ".private/venv/Scripts/python.exe"));
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('fresh bootstrap selects an installed modern interpreter and never overrides an explicit incompatible choice',()=>{
+  const calls=[];const probe=(command,args,options)=>{calls.push(command);assert.equal(args[0],'-I');assert.equal(options.shell,false);return command==='python3.11'?{status:0,stdout:'3.11\n'}:{status:command==='python3'?0:1,stdout:command==='python3'?'3.9\n':''};};
+  assert.equal(resolveBootstrapPython({env:{},probe}),'python3.11');assert.deepEqual(calls,['python3.12','python3.11']);
+  calls.length=0;assert.throws(()=>resolveBootstrapPython({env:{PRITHA_PYTHON:'python3'},probe}),{code:'python_bootstrap_unavailable'});assert.deepEqual(calls,['python3']);
+  assert.throws(()=>resolveBootstrapPython({env:{},probe:()=>({status:0,stdout:'3.9'})}),{code:'python_bootstrap_unavailable'});
 });

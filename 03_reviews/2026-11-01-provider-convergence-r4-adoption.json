@@ -401,7 +401,7 @@
       "path": "scripts/bootstrap.mjs",
       "source_sha256": "38f94f8360d6521a02a370af03d7a67e3a9f4f68233171d13a3843efc7fef887",
       "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
-      "target_sha256": "b2b9939d7884530854cf6e12d17c93eafacebc529d97767e0967e30ee58c62fc"
+      "target_sha256": "1c7bca2018ae780fbb65dc68394fc3219715cf09e7eb329bb726aa2674a5fe55"
     },
     {
       "path": "START_HERE.md",

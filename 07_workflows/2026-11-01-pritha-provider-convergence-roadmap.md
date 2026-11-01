@@ -601,12 +601,12 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: pending.** Зависимости все выше.
+**Статус: in-progress; self-test 1408/1408, security/semantic gates и isolated staging health passed. Production activation, operator acceptance и перечисленные feature gaps ещё открыты.** Зависимости все выше.
 
 - [ ] Full `node scripts/quality-gate.mjs`, self-test, privacy strict,
   validate/rebuild memory, Curated acceptance frozen fixture, ND security/network
   audits, all provider suites, factory suites, typecheck, production staging build.
-- [ ] Dependency audit от 2026-11-01: обновить проверяемые patches Next/Sharp/
+- [x] Dependency audit от 2026-11-01: обновить проверяемые patches Next/Sharp/
   Undici и транзитивных browser-mapping/source-map-js, затем production E2E.
   Для sandbox-runtime 0.0.81 upstream использует Zod 3; отдельно проверить
   advisory GHSA-mrhx-c7xc-m3w5 и достижимость oversized collection path:
@@ -2120,6 +2120,36 @@ unit child environment отдельно и изолировать оба aliases
   Optional Claude session auth / external voice factory scope ожидают решения
   пользователя; пока не исключены из исходного объёма. Live/manual acceptance
   по-прежнему не подменяется synthetic tests.
+
+### Checkpoint 37 — Полный self-test, recovery и чистая установка
+
+- Реальный self-test canonical instance: **1408/1408**, warnings **0**, regressions
+  **0**. Память: 992 documents, 10998 chunks, 10777 embeddings. Это результат до
+  следующего bootstrap repair; новые тесты проверены отдельно, финальный gate
+  будет привязан к итоговому commit.
+- Production staging для `f9749a55918c2a410237869a76d6325ca801f4b7` собран успешно.
+  Exact staging скопирован как `.next` в disposable source/state/HOME: strict
+  health **5 pages / 12 JS chunks**, process-tree exit подтверждён. Live build
+  не менялся. Private recovery содержит прежние source/build/locked dependencies,
+  успешный `npm ci --ignore-scripts` и hashes девяти посторонних untracked files.
+- Actual fresh `local-model` preparation выявила два дефекта, не видимых в dry-run:
+  системный Python 3.9 выбирался вместо установленного 3.11; env-doctor требовал
+  macOS Whisper, который этот профиль намеренно не устанавливает. Новый seed
+  resolver проверяет только version (`-I`, timeout, shell:false), соблюдает
+  `PRITHA_PYTHON` без тихой подмены и сохраняет существующую venv. Диагностика
+  Local продолжает проверять memory/UI dependencies, исключая только Whisper.
+- Повтор actual preparation в той же fresh fixture полностью прошёл: instance,
+  setup, Python 3.11.15 venv, pip core, SQLite, embeddings, npm ci, env-doctor,
+  Markdown, stats, semantic search, typecheck, production build. Provider
+  connection честно остаётся `planned` без модели/ключей. Model cache offline;
+  ни cloud inference, ни autostart, ни Git init не выполнялись.
+- Targeted bootstrap/Python/env-doctor: **13/13**, без skips. Reviewed source
+  inventory: **72 source hashes / 34 explicit target hashes**, включая обновлённый
+  bootstrap. Entries reference-only не выдаются за дословно перенесённые файлы.
+- Ручная приёмка и план controlled activation описаны в
+  `11_agents/reports/2026-11-01-pritha-provider-convergence-deployment-report.md`.
+  Сервисные действия ещё не разрешены и не выполнялись. Два ранее обсуждённых
+  режима остаются открытыми, пока пользователь не изменил их scope.
 
 ## 7. Полные исходные материалы
 

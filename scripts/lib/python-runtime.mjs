@@ -1,5 +1,6 @@
 import { accessSync, constants, existsSync, statSync } from "node:fs";
 import path from "node:path";
+import {spawnSync} from 'node:child_process';
 import {resolvePrithaStateRoot} from './paths.mjs';
 
 /** Shared with bootstrap: computing this path does not create a venv. */
@@ -34,4 +35,16 @@ export function resolvePrithaPython({ root = process.cwd(), env = process.env, p
     throw Object.assign(new Error("The instance Python environment needs repair."), { code: "python_environment_incomplete" });
   }
   return "python3";
+}
+
+/** Fresh environments need a supported Python; legacy venvs are preserved by
+ * bootstrap before this probe. -I avoids user startup modules and PYTHONPATH. */
+export function resolveBootstrapPython({root=process.cwd(),env=process.env,probe=spawnSync}={}){
+  const candidates=env.PRITHA_PYTHON!==undefined?[resolvePrithaPython({root,env})]:['python3.12','python3.11','python3.10','python3.13','python3'];
+  for(const command of candidates){
+    const result=probe(command,['-I','-c','import sys; print("%d.%d" % sys.version_info[:2])'],{env,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:5000,maxBuffer:4096,shell:false});
+    const match=String(result.stdout||'').trim().match(/^3\.(\d+)$/);
+    if(result.status===0&&match&&Number(match[1])>=10)return command;
+  }
+  throw Object.assign(new Error('A fresh instance needs Python 3.10 or newer. Install it or select an available interpreter with PRITHA_PYTHON.'),{code:'python_bootstrap_unavailable'});
 }

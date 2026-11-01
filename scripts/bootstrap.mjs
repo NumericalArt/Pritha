@@ -9,7 +9,7 @@ import {existsSync} from 'node:fs';
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaRoot } from "./lib/paths.mjs";
 import {instanceConfig,applyInstanceEnvironment,prepareDistributionInstance} from './lib/distribution-instance.mjs';
-import {instancePythonPath,resolvePrithaPython} from './lib/python-runtime.mjs';
+import {instancePythonPath,resolvePrithaPython,resolveBootstrapPython} from './lib/python-runtime.mjs';
 import {connectorForBootstrapProfile,normalizeProviderConnectorId} from './lib/provider-profile.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -114,6 +114,7 @@ function setupArgs(options) {
 
 function envProfile(profile, config) {
   if (config.tailscale) return "control-center-tailscale";
+  if (profile === "local-model") return "local-model";
   if (config.controlCenter) return "control-center";
   return profile === "minimal" ? "minimal" : "local";
 }
@@ -150,7 +151,8 @@ function installSteps(profile, config, options) {
   if(profile==='neuraldeep')steps.push(step('brief-desk-import','install','Import the reviewed Brief Desk example without credentials or startup','node',['scripts/install-brief-desk.mjs','--install'],{writes:true,timeoutMs:30000}));
   if (config.pythonCore) {
     const python=instancePythonPath({root:ROOT});
-    steps.push(step('python-venv','install','Create this instance’s isolated Python environment','python3',['-m','venv',path.dirname(path.dirname(python))],{writes:true,timeoutMs:240000}));
+    const venv=path.dirname(path.dirname(python));
+    steps.push(step('python-venv','install','Create this instance’s isolated Python environment',existsSync(venv)?python:resolveBootstrapPython({root:ROOT}),['-m','venv',venv],{writes:true,timeoutMs:240000}));
     steps.push(step("python-core", "install", "Install portable Python dependencies", python, [
       "-m",
       "pip",

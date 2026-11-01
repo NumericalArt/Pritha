@@ -28,7 +28,9 @@ history or change the provider/model of an existing conversation.
 ## Prepare an instance
 
 Use Node.js 24+, Git, SQLite CLI and Python 3.10+ for new installations (3.9 is a
-transitional compatibility floor). The reviewed external CLI isolation currently
+transitional compatibility floor). Bootstrap selects an installed supported
+interpreter for a fresh venv; `PRITHA_PYTHON` selects one explicitly. An existing
+instance venv is preserved. The reviewed external CLI isolation currently
 requires macOS. NeuralDeep/OpenRouter/Local need the compatible installed Codex
 CLI; Claude requires the compatible Claude Code CLI. Readiness reports an
 unsupported version instead of executing with weaker isolation.
