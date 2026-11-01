@@ -89,9 +89,9 @@ for(const legacy of [false,true])test(`approved commands read only verified copi
   assert.equal(result.status,'completed',JSON.stringify(result));const output=JSON.parse(result.text);assert.deepEqual(output,{hash:hash(body),write:'denied',rename:'denied',original:'denied',secret:'denied'});assert.equal(approvals,1);assert.deepEqual(readFileSync(file.file.filePath),body);
 });
 
-test('capability admission checks exact CLI evidence and preserves image and Local blockers',async()=>{
-  assert.equal(hostFileAttachmentVerified('claude','2.1.296'),true);assert.equal(hostFileAttachmentVerified('openrouter','0.153.0'),true);assert.equal(hostFileAttachmentVerified('neuraldeep','0.153.0'),true);
-  for(const [provider,version] of [['claude','2.1.297'],['openrouter','0.154.0'],['neuraldeep','0.154.0'],['local','0.153.0']])assert.equal(hostFileAttachmentVerified(provider,version),false);
+test('capability admission checks exact CLI evidence and preserves image and unsupported-version blockers',async()=>{
+  assert.equal(hostFileAttachmentVerified('claude','2.1.296'),true);assert.equal(hostFileAttachmentVerified('openrouter','0.153.0'),true);assert.equal(hostFileAttachmentVerified('neuraldeep','0.153.0'),true);assert.equal(hostFileAttachmentVerified('local','0.153.0'),true);
+  for(const [provider,version] of [['claude','2.1.297'],['openrouter','0.154.0'],['neuraldeep','0.154.0'],['local','0.154.0']])assert.equal(hostFileAttachmentVerified(provider,version),false);
   let version='2.1.296';const transport=hostFileAttachmentTransport({stateRoot:'/unused',privateRoot:'/unused',snapshot:async()=>({status:'ready',version,capabilities:{attachments:{files:true}}})}),base={binding:{connectorId:'claude'},files:[{view:{kind:'file'}}],historicalImages:false};
   await transport.validate(base);version='2.1.297';await assert.rejects(transport.validate(base),{code:'provider_attachments_unverified'});
   await assert.rejects(transport.validate({...base,files:[],historicalAttachments:true}),{code:'provider_attachments_unverified'});

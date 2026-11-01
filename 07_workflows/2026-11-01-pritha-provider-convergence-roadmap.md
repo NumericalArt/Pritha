@@ -2060,6 +2060,19 @@ unit child environment отдельно и изолировать оба aliases
   Privacy/names/Markdown passed; actual provider/Telegram send не выполнялись.
 - Локальная установка примера для ручной приёмки и весь R12 ещё впереди.
 
+### Checkpoint 34 — Local file transport
+
+- Local присоединён к общему verified file transport для Codex 0.153.0.
+  Images остаются отдельной unsupported capability; offline process guard не менялся.
+- Installed-CLI acceptance **1/1**: initial/resume, 8 synthetic requests, 2 exact
+  command approvals; UTF-8/hash, exact binary bytes, snapshot readonly, original
+  inaccessible to command, full process-tree exit и cleanup подтверждены.
+  Responses замоканы; owned inference process реально запускался/проверялся.
+  Предыдущий Local stock fixture отдельно проверил реальные HTTP responses от
+  собственного изолированного model server. Оба вида evidence нужны вместе.
+- Targeted file/admission/provider-service tests **19/19**. Parent credentials
+  для Local не читались; платных вызовов/моделей/сервисных изменений нет.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

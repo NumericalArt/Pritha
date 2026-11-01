@@ -102,6 +102,14 @@ Responses support; LM Studio documents its separate daemon and on-demand model
 loading. Those protocol statements do not prove network isolation. The tested
 runtime boundary is macOS Seatbelt, sandbox-runtime **0.0.81**, Codex **0.153.0**.
 
+## File attachments
+
+Local supports the shared file attachment transport with verified Codex 0.153.0:
+UTF-8 reads, immutable originals and read-only binary snapshots for an approved
+sandboxed command. Images remain unavailable. Initial and resumed turns were
+checked against the installed CLI; no attachment or key went to a remote API.
+This capability does not relax the owned model process or offline requirement.
+
 ## Recovery and checks
 
 Stop/timeout closes inference, CLI and host-command trees. Unknown exit keeps the
@@ -113,6 +121,7 @@ provider runtime and original model/session binding.
 ```sh
 node --test tests/owned-local-server.test.mjs tests/compatible-owned-runner.test.mjs tests/compatible-provider-service.test.mjs tests/provider-connector-presets.test.mjs
 node --test tests/acceptance/local-stock-cli.fixture.mjs
+node --test --test-name-pattern="^local:" tests/acceptance/provider-file-attachments.fixture.mjs
 ```
 
 The synthetic acceptance uses the installed CLI and real OS isolation. It checks

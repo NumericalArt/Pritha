@@ -16,7 +16,7 @@ export const HOST_FILE_ATTACHMENT_PROTOCOL='pritha-host-files-v1';
 export const HOST_IMAGE_ATTACHMENT_PROTOCOL='pritha-host-images-v1';
 // These exact CLI versions are exercised with initial/resume MCP calls, real
 // Seatbelt and synthetic upstreams. A new CLI does not inherit file readiness.
-export const HOST_FILE_ATTACHMENT_CLI=Object.freeze({neuraldeep:'0.153.0',claude:'2.1.296',openrouter:'0.153.0'});
+export const HOST_FILE_ATTACHMENT_CLI=Object.freeze({neuraldeep:'0.153.0',claude:'2.1.296',openrouter:'0.153.0',local:'0.153.0'});
 export function hostFileAttachmentVerified(connectorId,version){return Object.hasOwn(HOST_FILE_ATTACHMENT_CLI,connectorId) && HOST_FILE_ATTACHMENT_CLI[connectorId]===version;}
 
 function location(options,receipt){

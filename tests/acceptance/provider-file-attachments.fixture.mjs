@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
-import {mkdtempSync,mkdirSync,readFileSync,rmSync,existsSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync,existsSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -15,6 +15,8 @@ import {startClaudeCodeRun,resolveClaudeBinary} from '../../scripts/claude-code-
 import {probeClaudeCli} from '../../scripts/claude/cli-probe.mjs';
 import {startCompatibleRun} from '../../scripts/openai-compatible-codex.mjs';
 import {probeCompatibleCli} from '../../scripts/openai-compatible/cli-probe.mjs';
+import {saveLocalServerConfiguration} from '../../scripts/openai-compatible/owned-local-server.mjs';
+import {providerProcessTreesExited} from '../../scripts/lib/provider-process-proof.mjs';
 import {startNeuralDeepRun} from '../../scripts/neuraldeep-codex.mjs';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
@@ -32,11 +34,16 @@ function responsesReply(model,id,tool){
   const response={id:'response_'+id,model,status:'completed',output,usage:{input_tokens:4,output_tokens:2,total_tokens:6}};
   return new Response('data: '+JSON.stringify({type:'response.completed',response})+'\n\ndata: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});
 }
-for(const connectorId of ['neuraldeep','claude','openrouter'])test(`${connectorId}: installed CLI reads chat files and exact binary copies on initial and resumed turns`,{timeout:120000},async t=>{
+for(const connectorId of ['neuraldeep','claude','openrouter','local'])test(`${connectorId}: installed CLI reads chat files and exact binary copies on initial and resumed turns`,{timeout:120000},async t=>{
   const directory=mkdtempSync(path.join(os.tmpdir(),'pritha-attachment-cli-')),cwd=path.join(directory,'workspace'),stateRoot=path.join(directory,'state');mkdirSync(cwd);mkdirSync(stateRoot);
-  const privateRoot=path.join(stateRoot,'task-chat'),providerRoot=path.join(privateRoot,connectorId),model=connectorId==='claude'?'claude-sonnet-5-5':connectorId==='neuraldeep'?'qwen3.8-27b':'vendor/model';
+  const privateRoot=path.join(stateRoot,'task-chat'),providerRoot=path.join(privateRoot,connectorId),model=connectorId==='claude'?'claude-sonnet-5-5':connectorId==='neuraldeep'?'qwen3.8-27b':connectorId==='local'?'fixture-local':'vendor/model';
+  if(connectorId==='local'){
+    const assets=path.join(directory,'model');mkdirSync(assets);const script=path.join(assets,'server.mjs');
+    writeFileSync(script,"import {createServer} from 'node:http';createServer((req,res)=>{res.setHeader('content-type','application/json');res.end(JSON.stringify({data:[{id:'fixture-local'}]}));}).listen(Number(process.argv[2]),'127.0.0.1');");
+    saveLocalServerConfiguration({root,stateRoot},{schema:1,endpoint:'http://127.0.0.1:1234/v1',command:process.execPath,args:[script,'{port}'],readRoots:[assets],model:{id:model,tools:true,responses:true,contextTokens:32768,outputTokens:4096,efforts:['default']}});
+  }
   const store=new ImmutableAttachmentStore({stateRoot,privateRoot:path.join(privateRoot,'originals')}),coordinator=new ExecutionCoordinator({stateRoot});
-  let registry=new ProviderChatRegistry({stateRoot,privateRoot,connectorId}),exited=true,session,scope;
+  let registry=new ProviderChatRegistry({stateRoot,privateRoot,connectorId}),exited=true,session,scope,proof;
   t.after(async()=>{await scope?.close();registry.close();coordinator.close();await store.close();if(exited)rmSync(directory,{recursive:true,force:true});});
   const cli=connectorId==='claude'?await probeClaudeCli({root,stateRoot,binary:resolveClaudeBinary()}):await probeCompatibleCli({root,stateRoot,connectorId});
   assert.equal(cli.available,true);assert.equal(hostFileAttachmentVerified(connectorId,cli.version),true,'This CLI version needs a new explicit transport verification.');
@@ -53,7 +60,7 @@ for(const connectorId of ['neuraldeep','claude','openrouter'])test(`${connectorI
     let step=0,fixtureError=null;const events=[];
     const fetchImpl=async(url,init)=>{
       try{
-        assert.equal(String(url).startsWith(connectorId==='claude'?'https://api.anthropic.com/v1/messages':connectorId==='neuraldeep'?'https://api.neuraldeep.ru/v1/responses':'https://openrouter.ai/api/v1/responses'),true);
+        if(connectorId==='local')assert.match(String(url),/^http:\/\/127\.0\.0\.1:\d+\/v1\/responses$/);else assert.equal(String(url).startsWith(connectorId==='claude'?'https://api.anthropic.com/v1/messages':connectorId==='neuraldeep'?'https://api.neuraldeep.ru/v1/responses':'https://openrouter.ai/api/v1/responses'),true);
         if(String(url).includes('/count_tokens'))return Response.json({input_tokens:10});
         requests++;step++;const payload=JSON.parse(init.body),encoded=JSON.stringify(payload);assert.equal(payload.model,model);assert.equal(payload.tools.length,connectorId==='neuraldeep'?9:7);
         if(step===2){assert.match(encoded,/ATTACHMENT_UTF8_Привет/);assert.ok(encoded.includes(hash(text)));}
@@ -68,13 +75,14 @@ for(const connectorId of ['neuraldeep','claude','openrouter'])test(`${connectorI
         return connectorId==='claude'?anthropicReply(model,id,tool):responsesReply(model,id,tool);
       }catch(error){fixtureError=error.message;throw error;}
     };
-    const options={root,cwd,stateRoot,privateRoot:providerRoot,connectorId,model,effort:connectorId==='claude'?'medium':'none',authMode:'api-key',sandbox:'workspace-write',timeoutMs:45000,resume:session,maxTurns:6,
+    const options={root,cwd,stateRoot,privateRoot:providerRoot,connectorId,model,effort:connectorId==='claude'?'medium':connectorId==='local'?'default':'none',authMode:'api-key',sandbox:'workspace-write',timeoutMs:45000,resume:session,maxTurns:6,
+      ...(connectorId==='local'?{baseUrl:'http://127.0.0.1:1234/v1',modelContextTokens:32768}:{}),onEvidence:value=>{proof=value;},
       prompt:'Read attachment:'+ids[0]+' and attachment:'+ids[1]+' with the Pritha tools. Run the supplied approved binary check, then report FILE_FIXTURE_OK.',hostAttachments:scope,
       hostExecutionContext:{coordinator,lease,chatId:binding.chatId,turnId:turn.turnId},approve:async request=>{assert.equal(request.kind,'command_approval');approvals++;return {decision:'accept'};},onEvent:event=>events.push(event)};
     try{
       const launch=connectorId==='claude'?startClaudeCodeRun:connectorId==='neuraldeep'?startNeuralDeepRun:startCompatibleRun;
-      const run=await launch(options,{readCredential:()=> 'SYNTHETIC_ATTACHMENT_KEY',fetchImpl}),result=await run.completion;exited=result.processTreeExited;
-      assert.equal(result.ok,true,JSON.stringify({errorCode:result.errorCode,providerCode:result.providerError?.code,fixtureError,step}));assert.equal(exited,true);assert.equal(step,4);
+      const run=await launch(options,{readCredential:()=>{assert.notEqual(connectorId,'local');return 'SYNTHETIC_ATTACHMENT_KEY';},fetchImpl}),result=await run.completion;exited=result.processTreeExited;
+      assert.equal(result.ok,true,JSON.stringify({errorCode:result.errorCode,providerCode:result.providerError?.code,fixtureError,step}));assert.equal(exited,true);assert.equal(step,4);if(connectorId==='local'){assert.equal(providerProcessTreesExited(proof),true);assert(proof.trees.some(tree=>tree.id==='inference'));}
       if(session)assert.equal(result.sessionId,session);session=result.sessionId;
       assert.ok(events.some(event=>event.type==='item.completed' && event.item?.text==='FILE_FIXTURE_OK'));
       const snapshot=scope.files.get(ids[1]).filePath;assert.deepEqual(readFileSync(snapshot),body);
