@@ -1,0 +1,195 @@
+{
+  "schema": "pritha-provider-source-adoption-v1",
+  "repository": "https://github.com/NumericalArt/Pritha-NeuralDeep",
+  "commit": "2ab22aeff5f1c167c86e925ec30311942b76023b",
+  "source_version": "0.2.0",
+  "verified": "2026-11-01",
+  "phase": "R4 transport foundation",
+  "files": [
+    {
+      "path": "scripts/neuraldeep/responses-adapter.mjs",
+      "source_sha256": "391a5c359246dfbf767e85763d2202b7c221b9c72ce6047411d12ea552866a35",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-normalizer.mjs",
+      "source_sha256": "5bfcc51aa1445ad3e459deb7e264575a317b63da0bd158b036ab19e221bf9c4f",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-stream.mjs",
+      "source_sha256": "faef9c2ead26ebe99c9b51c67ab778803290b4e2645ed956da478e8208bede1a",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/usage-ledger.mjs",
+      "source_sha256": "ebc9095f2e3799c832eb5e4af918ef2178e22073a45654dfbde0d04b7632d091",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/runtime-identity.mjs",
+      "source_sha256": "b373391b4fd8f6797281b4a69f56a9320ad01026198372d3203c151beca31942",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/runtime-identity.d.mts",
+      "source_sha256": "360fe5b1732a1867438fac841b7c6cb59b0e5be7c9d14e403282156c5b6143b2",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/provider-error.mjs",
+      "source_sha256": "5ea58e5b93ff0d633d242d2f42b525eacc10c9adde54b9bb531cc03e57263c72",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/jsonl-reader.mjs",
+      "source_sha256": "a1c7a176d8dbf8e87d3a41230ea75a2e42c1425ce2ddcde5d1911fa067386914",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/jsonl-reader.d.mts",
+      "source_sha256": "d79470bf551913044f46e2b0a8f00cfbaa8cfb30bf8524d5744300098b646f10",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-policy.mjs",
+      "source_sha256": "dbfbacde2512effd8a0692a06ad63d0b1e4dd3eedfea88e9e5b1767f349b77bc",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-policy.d.mts",
+      "source_sha256": "ec168e6080796148ecbbcad076256e9fadc24ff6aa89cb264395a9c06438d2c1",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-store.mjs",
+      "source_sha256": "519a15cc7aeb9833dd8561d23c61e76984775828e802bb2733332679665f2004",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-store.d.mts",
+      "source_sha256": "38628ff03a8cc3c059701abc93b31fce4dbe56ef02e5d2394a119d3c9043c25b",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/creation-execution-policy.mjs",
+      "source_sha256": "7c0e0e118c8fadfac4a8fcf5e030595e176a98f33457d86ea8747d069d54183a",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/creation-execution-policy.d.mts",
+      "source_sha256": "255b82b08c7708d039a31e026c31c1d44cfaae17d04fa66b907756dc3adb10ca",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/model-execution-profile.mjs",
+      "source_sha256": "529d1a1013d99be8060c575b0630f4957c020b207d14ddaef7929ed9a0c11b19",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/model-execution-profile.d.mts",
+      "source_sha256": "998e61c9e97a391d763a2ce1deb8ec0470eb14b96860070b1cc1e16653149a88",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/model-input-capabilities.mjs",
+      "source_sha256": "14bd7642cd14aa5468c972906258958cc15ee4c4e788ee6ce2d7b3d4ea8890bf",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/model-input-capabilities.d.mts",
+      "source_sha256": "f05cec3edef2166bfdb65ecca6e36b0b39f017c22f4a0b07e6b754ba0645f059",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-input-policy.mjs",
+      "source_sha256": "fa4bd36ba4a985e5b94d0ccc23b35a8a6056a841b62632aaf90d95f255780596",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-input-policy.d.mts",
+      "source_sha256": "85dd93a4824a95ddb21dbaf089c723e822a732e29ad6057a65b8b90f064ca401",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "tests/neuraldeep-responses-adapter.test.mjs",
+      "source_sha256": "f2a1ed56ea8c8e905642184353bd9a537b38b4b87d07d3378901739ed4c4968f",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "tests/neuraldeep-provider-errors.test.mjs",
+      "source_sha256": "cc39e23652f16bca5fa7bb2713eb3726fe63dc3afcba518441885879378ec05d",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "tests/neuraldeep-jsonl-reader.test.mjs",
+      "source_sha256": "6315d4be4fcf4bc852591fe1fdeacb429a89b3ec57c6fac6ec5c5021542cb61b",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/process-supervisor.mjs",
+      "source_sha256": "96e42ff6875e54feb395b916a6e1db43fa933732222f77ace976cce15847952c",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/process-supervisor.d.mts",
+      "source_sha256": "817c019e67a78c2b7d999f7adae22cb7077e6ff8b24ea9b3bf5b24a30d4e05e4",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/process-snapshot.mjs",
+      "source_sha256": "1591fe75ef9d50de93dc699141a71f1049d87d32c1d44b89c1422324c8373a3d",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "scripts/neuraldeep/process-snapshot.d.mts",
+      "source_sha256": "18a3794a1cc6343f6cf536155ba8af9b329ccaed44c6403e61a2c0859b8013ad",
+      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+    },
+    {
+      "path": "tests/neuraldeep-process-supervisor.test.mjs",
+      "source_sha256": "9df90c99fae7a627af199c35e502f3a8224ed2ed860a83824314afcb81fe4166",
+      "adoption": "process ownership tests; coordination-store integration deferred to shared host coordinator tests"
+    },
+    {
+      "path": "scripts/neuraldeep/chat-history-store.mjs",
+      "source_sha256": "4785bdbde6bae4c82e59e28f0a8c03bf2959e4b398775d41c05f3a248a182977",
+      "adoption": "reviewed source base; isolated history and summary projection for external drivers"
+    },
+    {
+      "path": "scripts/neuraldeep/chat-summary-projection.mjs",
+      "source_sha256": "01646ab578f5ddec26348ec43bbb3e773c7b4b7c19cbb0dd621ffe6c99062214",
+      "adoption": "reviewed source base; isolated history and summary projection for external drivers"
+    },
+    {
+      "path": "scripts/neuraldeep/creation-dialogue.mjs",
+      "source_sha256": "7de42fff5cb91eb5f64b1d56689a392f5c2b64a4e15d4b1fd466d5bcfcdea299",
+      "adoption": "reviewed source base; isolated history and summary projection for external drivers"
+    },
+    {
+      "path": "scripts/neuraldeep/file-preview.mjs",
+      "source_sha256": "e32336939a53b5ab856b21d6405044f0258aebc4cee75e8737f43776bfe9a2e1",
+      "adoption": "reviewed source base; isolated history and summary projection for external drivers"
+    },
+    {
+      "path": "scripts/neuraldeep/history-audit.mjs",
+      "source_sha256": "0a1cb4323a1500de3e79d1405ee9afae73e34ed09b5f30b53dbef5341b95d828",
+      "adoption": "reviewed source base; isolated history and summary projection for external drivers"
+    },
+    {
+      "path": "tests/neuraldeep-chat-history-store.test.mjs",
+      "source_sha256": "5fe9c87c488801045a2a74516ca7882109074565b6e1b4f048b44d8bae11dfb0",
+      "adoption": "reviewed source base; isolated history and summary projection for external drivers"
+    },
+    {
+      "path": "tests/neuraldeep-chat-summary.test.mjs",
+      "source_sha256": "a3be5abf74482948350f7d6cc707760365d02b8a6f9d34702923d89a445fab2b",
+      "adoption": "reviewed source base; isolated history and summary projection for external drivers"
+    },
+    {
+      "path": "scripts/neuraldeep-codex.mjs",
+      "source_sha256": "5ba3bae9c83e0392ae89ec05de166f6108d0bc0d1afde0c1f8f8c9d7d7343dba",
+      "adoption": "function-level adaptation into owned runner; canonical state roots, minimal environment, server-only credential, protected loopback adapter, no automatic replay"
+    }
+  ]
+}

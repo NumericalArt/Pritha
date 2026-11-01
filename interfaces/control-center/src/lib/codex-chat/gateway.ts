@@ -6,6 +6,8 @@ import { PROVIDER_CONNECTOR_IDS, ProviderConfigurationError, isProviderConnector
 import { getProviderSettings } from "../settings/provider-settings-server";
 import { providerThreadPage } from "./provider-thread-pages";
 import { ProviderActivity } from "./provider-activity";
+import { ProviderThreadRouting, ProviderRouteError } from "../../../../../scripts/lib/provider-thread-routing.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot } from "../pritha-paths";
 export { CodexChatGatewayError } from "./native-gateway";
 export type { CreateThreadInput, StartTurnInput, CreateThreadWithFirstTurnInput } from "./native-gateway";
 
@@ -16,14 +18,16 @@ type CreateWithTurn = CreateThreadWithFirstTurnInput & { connectorId?: ProviderC
 export class CodexChatGateway {
   private readonly drivers = new Map<ProviderConnectorId, TaskChatBackendDriver>();
   private readonly activityMux: ProviderActivity;
+  private readonly routes: ProviderThreadRouting;
   readonly attachments: TaskChatBackend["attachments"];
-  constructor(drivers: TaskChatBackendDriver[] = [new CodexAppServerDriver()], private readonly selection: () => ProviderConnectorId = () => getProviderSettings().activeConnectorId) {
+  constructor(drivers: TaskChatBackendDriver[] = [new CodexAppServerDriver()], private readonly selection: () => ProviderConnectorId = () => getProviderSettings().activeConnectorId, routes?: ProviderThreadRouting) {
     for (const driver of drivers) {
       if (!isProviderConnectorId(driver.connectorId) || this.drivers.has(driver.connectorId)) throw new CodexChatGatewayError("provider_registry_invalid", "The task provider registry needs repair.", 503);
       this.drivers.set(driver.connectorId, driver);
     }
     this.attachments = this.driver("codex").backend.attachments;
     this.activityMux = new ProviderActivity(drivers);
+    this.routes = routes || new ProviderThreadRouting({ stateRoot: resolvePrithaStateRoot(), directory: resolvePrithaStatePath("private", "task-chat", "routing") });
   }
   private driver(connectorId: ProviderConnectorId) {
     const driver = this.drivers.get(connectorId);
@@ -58,15 +62,33 @@ export class CodexChatGateway {
     if (this.drivers.size === 1) return this.driver("codex").listThreads(input);
     return providerThreadPage([...this.drivers.values()], input);
   }
-  createThread(input: Create) { const { connectorId, ...request } = input; return this.selected(connectorId).backend.createThread(request); }
-  createThreadWithFirstTurn(input: CreateWithTurn) { const { connectorId, ...request } = input; return this.selected(connectorId).backend.createThreadWithFirstTurn(request); }
+  private creationRoute(input: Create) {
+    try {
+      return this.routes.resolve({ clientThreadId: input.clientThreadId, connectorId: input.connectorId, modelId: input.settings?.modelId }, () => {
+        const connectorId = this.selected(input.connectorId).connectorId;
+        return { connectorId, modelId: getProviderSettings().providerPresets[connectorId].modelId || null };
+      });
+    } catch (error) {
+      if (error instanceof ProviderRouteError) throw new CodexChatGatewayError(error.code, error.message, error.status);
+      throw error;
+    }
+  }
+  createThread(input: Create) {
+    const route = this.creationRoute(input), { connectorId: _connectorId, ...request } = input;
+    return this.driver(route.connectorId).backend.createThread({ ...request, settings: { ...request.settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
+  }
+  createThreadWithFirstTurn(input: CreateWithTurn) {
+    if (input.settings?.modelId && input.initialTurn.settings?.modelId && input.settings.modelId !== input.initialTurn.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "The first turn must use the chat's model.", 409);
+    const route = this.creationRoute({ ...input, settings: { ...input.settings, modelId: input.settings?.modelId ?? input.initialTurn.settings?.modelId } }), { connectorId: _connectorId, ...request } = input;
+    return this.driver(route.connectorId).backend.createThreadWithFirstTurn({ ...request, settings: { ...request.settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
+  }
   activity(after = 0) { return this.drivers.size === 1 ? this.driver("codex").backend.activity(after) : this.activityMux.read(after); }
   workspacePreview() { return this.selected().backend.workspacePreview(); }
   async taskChatLinkForTask(taskId: string) {
     for (const driver of this.drivers.values()) { const found = await driver.backend.taskChatLinkForTask(taskId); if (found) return found; }
     return null;
   }
-  async dispose() { await Promise.all([...this.drivers.values()].map(driver => driver.backend.dispose())); }
+  async dispose() { try { await Promise.all([...this.drivers.values()].map(driver => driver.backend.dispose())); } finally { this.routes.close(); } }
   queuedMessages(...args: Parameters<TaskChatBackend["queuedMessages"]>) { return this.thread(args[0]).queuedMessages(...args); }
   enqueueMessage(...args: Parameters<TaskChatBackend["enqueueMessage"]>) { return this.thread(args[0]).enqueueMessage(...args); }
   cancelQueued(...args: Parameters<TaskChatBackend["cancelQueued"]>) { return this.thread(args[0]).cancelQueued(...args); }

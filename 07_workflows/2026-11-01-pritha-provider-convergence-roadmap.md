@@ -278,7 +278,7 @@ typecheck; history pagination/quotes/image annotation/scroll не дегради
 
 ### R4 — NeuralDeep как полноценный adapter
 
-**Статус: pending.** Зависимости R2–R3, подтверждённый ND pin.
+**Статус: in-progress; transport/owned-runner/history foundations verified.** Зависимости R2–R3, подтверждённый ND pin.
 
 - [ ] Перенести reviewed `scripts/neuraldeep-codex.mjs`, `scripts/neuraldeep/*`,
   loopback Responses SSE adapter, credential boundary и model capability data.
@@ -743,6 +743,53 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
 - Добавлено пользовательское дополнение D и R11b: завершить ребрендинг с
   primary Pritha names, compatibility aliases и проверяемой migration/rollback.
   Ни один этап A/B/C не удалён; реальные state paths пока не переименовывались.
+
+### Checkpoint реализации 4
+
+- R2/R3: durable creation route закрепляет provider/model до dispatch. Потеря
+  HTTP-ответа, другой worker и новый default не перенаправляют retry. Explicit
+  conflicting provider/model отвергаются; промпты в routing receipt не пишутся.
+  Driver/routing tests 6/6; isolated browser concurrency/settings tests 8/8.
+- R4: первые reviewed модули перенесены только из GitHub commit
+  `2ab22aeff5f1c167c86e925ec30311942b76023b` (NeuralDeep 0.2.0). Per-file source
+  SHA и характер адаптации — в
+  [R4 adoption inventory](../03_reviews/2026-11-01-provider-convergence-r4-adoption.json).
+  Этот inventory фиксирует происхождение; он не объявляет весь fork интегрированным.
+- Responses adapter сохраняет normalization, tool completion, UTF-8, backpressure,
+  deadlines и usage semantics. Реальный transport дополнительно требует ephemeral
+  loopback capability, держит provider key на хосте, разрешает только Responses/
+  catalog endpoints и exact upstream origin, не передаёт чужие headers. Raw
+  upstream errors/unknown codes/retry headers не возвращаются клиенту. Default
+  uncertain request не повторяется автоматически. Source+boundary tests 33/33.
+- ND CLI runner работает через принадлежащий попытке supervisor. Clean environment
+  содержит только необходимое окружение и локальную capability; HOME/CODEX_HOME
+  не смешивают native session store с ND. ASCII scratch/UTF-8, pinned model,
+  exact resume, output/time bounds и сохранение scratch при unconfirmed process
+  exit покрыты tests. Qwen preset сохраняет requested xhigh, но игнорируемый
+  provider effort не выдаётся за действующий параметр исполнения.
+- Credential boundary раздельный для NeuralDeep/Anthropic/OpenRouter: env или
+  instance-scoped Keychain, metadata-only status, stdin-only bounded write.
+  OAuth extraction отсутствует. Реальные credentials при разработке не читались
+  и не менялись. Process/env/credential suite 14/14; owned runner suite 4/4.
+- Explicit stock-CLI acceptance: Codex CLI 0.153.0 реально запущен на synthetic
+  upstream без аккаунтного ключа и paid inference. New session + exact resume
+  вернули `FIXTURE_OK`, 2 fixture requests, process trees exited. Команда:
+  `node --test tests/acceptance/neuraldeep-stock-cli.fixture.mjs` (1/1).
+  Это protocol acceptance; live NeuralDeep quality/billing/limits ещё не проверены.
+- Imported history regression suite 18/18: 10 001 turns, >10 MiB Unicode,
+  immutable originals, scoped cursors, concurrent receipts, restart и read-only
+  audit. Generic provider registry добавляет namespaces/model/session immutability
+  для четырёх внешних connectors; 3/3 tests. Native history не переносилась.
+- Dependency addition: exact `undici@7.29.1` из verified fork pin и npm metadata
+  (Node >=20.18.1, MIT, locked integrity). Install выполнялся с `--ignore-scripts`.
+  [Official Undici source](https://github.com/nodejs/undici) проверен 2026-11-01;
+  Agent необходим для явных header/body timeouts длинных provider responses.
+- Объединённая provider/NeuralDeep foundation suite: 88/88, failures=0;
+  после усиления registry immutability отдельный повтор 3/3. Validation в
+  disposable state: 774 authored Markdown, pass. Typecheck и strict privacy pass.
+  Готовность ND connector в UI пока не объявлена:
+  впереди shared admission/queue/events facade, account/model gates и Settings.
+  R5–R9/R11/R11b/R12 остаются незавершёнными; MacBook/GitHub/services не менялись.
 
 ## 7. Полные исходные материалы
 

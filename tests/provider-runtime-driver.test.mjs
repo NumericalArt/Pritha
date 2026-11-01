@@ -22,10 +22,17 @@ function load(name, dependencies = {}) {
   return module.exports;
 }
 const pages=load("provider-thread-pages"),activity=load("provider-activity");
+class FakeRoutes {
+  constructor(){this.rows=new Map();}
+  resolve(input,choose){if(!this.rows.has(input.clientThreadId))this.rows.set(input.clientThreadId,choose());return this.rows.get(input.clientThreadId);}
+  close(){}
+}
 const {CodexChatGateway}=load("gateway",{
   "./drivers/codex-app-server-driver":{},"../settings/provider-profile":profile,
-  "../settings/provider-settings-server":{getProviderSettings:()=>({activeConnectorId:"codex"})},
+  "../settings/provider-settings-server":{getProviderSettings:()=>({activeConnectorId:"codex",providerPresets:Object.fromEntries(profile.PROVIDER_CONNECTOR_IDS.map(id=>[id,{modelId:`${id}-model`}] ))})},
   "./provider-thread-pages":pages,"./provider-activity":activity,
+  "../../../../../scripts/lib/provider-thread-routing.mjs":{ProviderThreadRouting:FakeRoutes,ProviderRouteError:class extends Error{}},
+  "../pritha-paths":{resolvePrithaStateRoot:()=>"fixture",resolvePrithaStatePath:()=>"fixture"},
 });
 function driver(connectorId) {
   const calls=[];
