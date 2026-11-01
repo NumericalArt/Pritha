@@ -94,6 +94,7 @@ export function summarizeThread(binding: ChatBinding, provider: RuntimeProviderV
         : "mismatch";
   return {
     chatId: binding.chatId,
+    ...(binding.subject?{subject:binding.subject}:{}),
     title: binding.title,
     preview: binding.preview || boundedText(native?.preview, 500),
     group: binding.group,

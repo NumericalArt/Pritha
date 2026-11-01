@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import {normalizeChatSubject,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
@@ -18,6 +19,7 @@ export type MessageReceipt = {
 };
 
 export type ChatBinding = {
+  subject?:ChatSubject;
   chatId: string;
   clientThreadId: string;
   createHash: string;
@@ -74,6 +76,7 @@ function emptyRegistry(): RegistryFile {
 function normalizeBinding(value: unknown): ChatBinding | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Partial<ChatBinding>;
+  let subject:ChatSubject|null;try{subject=normalizeChatSubject(row.subject);}catch{return null;}
   if (!String(row.chatId || "").startsWith("chat_")) return null;
   if (!String(row.nativeThreadId || "")) return null;
   if (row.providerId !== "desktop_bundled" && row.providerId !== "standalone_cli") return null;
@@ -84,6 +87,7 @@ function normalizeBinding(value: unknown): ChatBinding | null {
   const createdAt = String(row.createdAt || new Date(0).toISOString());
   return {
     chatId: String(row.chatId),
+    ...(subject?{subject}:{}),
     clientThreadId: String(row.clientThreadId || ""),
     createHash: String(row.createHash || ""),
     nativeThreadId: String(row.nativeThreadId),
@@ -191,6 +195,7 @@ export class CodexChatPrivateStore {
   }
 
   async put(binding: ChatBinding) {
+    normalizeChatSubject(binding.subject);
     return this.enqueueMutation(async () => {
       if (this.readOnlyError) throw this.readOnlyError;
       const registry = await this.load(true);
@@ -201,6 +206,7 @@ export class CodexChatPrivateStore {
   }
 
   async putCreatedBinding(binding: ChatBinding) {
+    normalizeChatSubject(binding.subject);
     return this.enqueueMutation(async () => {
       const registry = await this.load(true);
       const current = Object.values(registry.chats).find(row => row.clientThreadId === binding.clientThreadId);
@@ -220,6 +226,7 @@ export class CodexChatPrivateStore {
       const registry = await this.load(true);
       const current = registry.chats[chatId];
       if (!current) return null;
+      if(Object.hasOwn(patch,'subject') && JSON.stringify(normalizeChatSubject(patch.subject))!==JSON.stringify(normalizeChatSubject(current.subject)))throw Object.assign(new Error('This chat retains its original subject and factory phase.'),{code:'runtime_identity_mismatch'});
       if (current.modelId && patch.modelId !== undefined && current.modelId !== patch.modelId) throw Object.assign(new Error("This thread's model binding cannot be changed."), { code: "runtime_identity_mismatch" });
       const next = normalizeBinding({ ...current, ...patch, chatId,
         messageReceipts: { ...current.messageReceipts, ...patch.messageReceipts },

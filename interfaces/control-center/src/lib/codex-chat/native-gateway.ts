@@ -2,6 +2,7 @@ import { HistoryReader, HistoryError, HISTORY_READ_MS, type HistoryContext } fro
 import { planOperationDecision, resolveOperationDecision, type OperationAction, type OperationRequest } from "../../../../../scripts/agents-mother/operation-decisions.mjs";
 import { operationRuntime } from "./operation-runtime";
 import { createHash, randomUUID } from "node:crypto";
+import {normalizeChatSubject,factorySubjectInstructions,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
 import path from "node:path";
 import { prepareTaskWorkspace, inspectTaskWorkspace, taskWorkspaceResources, verifyTaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
 import { resolveTechscopeRoot } from "@/lib/pritha-paths";
@@ -49,6 +50,7 @@ import type {
 } from "./types";
 
 export type CreateThreadInput = {
+  subject?:ChatSubject|null;
   clientThreadId: string;
   title?: string;
   source: "chat";
@@ -420,11 +422,12 @@ export class CodexChatGateway {
   }
 
   async createThread(input: CreateThreadInput) {
+    const subject=normalizeChatSubject(input.subject);
     if (!validClientId(input.clientThreadId) || input.source !== "chat") {
       throw new CodexChatGatewayError("invalid_request", "A valid clientThreadId and source=chat are required.", 400);
     }
     if(input.workspace?.mode!==undefined && !["isolated","configured","read-only"].includes(input.workspace.mode))throw new CodexChatGatewayError("invalid_request","Unknown workspace mode.",400);
-    const createHash = hash({ clientThreadId: input.clientThreadId, source: input.source, title: input.title, settings: input.settings, ...(input.workspace ? {workspace:input.workspace} : {}) });
+    const createHash = hash({ clientThreadId: input.clientThreadId, source: input.source, title: input.title, settings: input.settings, ...(input.workspace ? {workspace:input.workspace} : {}),...(subject?{subject}:{}) });
     const existing = await this.store.findByClientThreadId(input.clientThreadId);
     if (existing) {
       if (existing.createHash !== createHash && existing.createHash !== hash(input)) throw new CodexChatGatewayError("idempotency_conflict", "This clientThreadId was already used with different values.", 409);
@@ -464,6 +467,7 @@ export class CodexChatGateway {
         cwd: workspace.cwd,
         sandbox,
         model: input.settings?.modelId || defaults.model,
+        ...(subject?{developerInstructions:factorySubjectInstructions(subject)}:{}),
         ephemeral: false,
       }));
       const nativeThread = asObject(response?.thread);
@@ -479,6 +483,7 @@ export class CodexChatGateway {
         nativeThreadId,
         providerId: provider.providerId,
         connectorId: "codex",
+        ...(subject?{subject}:{}),
         ...(modelId ? { modelId } : {}),
         workspace,
         sandbox,
@@ -583,7 +588,7 @@ export class CodexChatGateway {
         if(current.workspace)await verifyTaskWorkspace(current.workspace);
         this.store.execution.updateIntent(key,{state:"dispatching",owner:lease.owner,generation:lease.generation},intent.revision);
         dispatched=true;
-        const response=asObject(await connection.request("thread/start",{...defaults,cwd:current.workspace?.cwd || defaults.cwd,sandbox:current.sandbox || defaults.sandbox,model:current.modelId || input.settings?.modelId || defaults.model,ephemeral:false}));
+        const response=asObject(await connection.request("thread/start",{...defaults,cwd:current.workspace?.cwd || defaults.cwd,sandbox:current.sandbox || defaults.sandbox,model:current.modelId || input.settings?.modelId || defaults.model,...(current.subject?{developerInstructions:factorySubjectInstructions(current.subject)}:{}),ephemeral:false}));
         const nativeThreadId=String(asObject(response?.thread)?.id || "");
         if(!nativeThreadId)throw new Error("missing_thread_id");
         connection.markThreadLoaded(nativeThreadId, current.modelId);
@@ -1149,6 +1154,7 @@ export class CodexChatGateway {
   }
 
   async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean; fromQueue?: string } = {}): Promise<{ accepted: AcceptedTurn; replayed: boolean }> {
+    if(Object.hasOwn(input,'subject'))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
     let binding = await this.requireBinding(chatId);
     if (binding.modelId && input.settings?.modelId && binding.modelId !== input.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "This thread keeps its original model. Create a new chat to use a different model.", 409);
     if (binding.archived) throw new CodexChatGatewayError("chat_archived", "Restore this chat from archive before sending a message.", 409);

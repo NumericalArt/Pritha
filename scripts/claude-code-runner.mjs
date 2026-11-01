@@ -13,6 +13,7 @@ import { listenClaudeApiProxy } from './claude/api-proxy.mjs';
 import { ClaudeStreamState,CLAUDE_SESSION_ID,CLAUDE_MODEL_ID } from './claude/stream-state.mjs';
 import { probeClaudeCli } from './claude/cli-probe.mjs';
 import { ProviderHostTools,PROVIDER_HOST_TOOL_DEFINITIONS } from './lib/provider-host-tools.mjs';
+import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import { listenProviderToolServer } from './lib/provider-tool-server.mjs';
 import { ClaudeRequestBudget } from './claude/request-budget.mjs';
 
@@ -24,7 +25,8 @@ export function resolveClaudeBinary(value='claude',env=process.env){
   for(const candidate of candidates)try{accessSync(candidate,constants.X_OK);return realpathSync(candidate);}catch{/* Try only the explicit PATH. */}
   throw fail('provider_runtime_unavailable');
 }
-export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxTurns=32,mcpConfigPath,allowedTools=[]}){
+export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxTurns=32,mcpConfigPath,allowedTools=[],factorySubject}){
+  const factoryInstructions=factorySubjectInstructions(factorySubject);
   if(!CLAUDE_MODEL_ID.test(model || '') || !CLAUDE_SESSION_ID.test(sessionId || '') || !['low','medium','high','xhigh','max'].includes(effort)
       || !Number.isSafeInteger(maxTurns) || maxTurns<1 || maxTurns>128 || allowedTools.length>64 || allowedTools.some(name=>!/^mcp__pritha__[a-z_]{1,60}$/.test(name)))throw fail('provider_input_invalid');
   const args=['--print','--bare','--restricted','--output-format','stream-json','--verbose','--model',model,'--effort',effort,'--max-turns',String(maxTurns),
@@ -33,7 +35,7 @@ export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxT
   args.push(resume?'--resume':'--session-id',sessionId);
   if(mcpConfigPath)args.push('--mcp-config',mcpConfigPath);
   if(allowedTools.length)args.push('--allowedTools',...allowedTools);
-  args.push('--append-system-prompt','This task is hosted by Pritha. Read the workspace AGENTS.md and applicable nested instructions before editing. Use only the supplied Pritha tools. Preserve operation_id when retrying an identical tool request; never retry an ambiguous effect under a new ID. Host approval authorizes only the displayed action. Do not bypass protected paths, network restrictions, tests or the host verifier. Report unavailable tools and incomplete verification honestly.');
+  args.push('--append-system-prompt','This task is hosted by Pritha. Read the workspace AGENTS.md and applicable nested instructions before editing. Use only the supplied Pritha tools. Preserve operation_id when retrying an identical tool request; never retry an ambiguous effect under a new ID. Host approval authorizes only the displayed action. Do not bypass protected paths, network restrictions, tests or the host verifier. Report unavailable tools and incomplete verification honestly.'+(factoryInstructions?'\n\n'+factoryInstructions:''));
   return args;
 }
 

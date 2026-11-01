@@ -7415,3 +7415,12 @@ button:active,
 .new-chat-provider-selector select { width:100%; min-width:0; max-width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-soft); background:var(--surface-input); color:var(--text-primary); text-overflow:ellipsis; }
 .new-chat-provider-selector a { padding:8px 0; color:var(--text-secondary); font-size:12px; text-decoration:underline; text-underline-offset:3px; }
 @media(max-width:700px) { .new-chat-provider-selector { padding:10px 12px; } .new-chat-provider-selector label,.new-chat-provider-selector label:first-child { flex:1 1 140px; } }
+.factory-chat-selector { padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-soft); }
+.factory-chat-fields { display: flex; align-items: end; gap: 0.65rem; flex-wrap: wrap; }
+.factory-chat-fields label { display: grid; gap: 0.2rem; font-size: 0.75rem; color: var(--text-muted); min-width: 0; }
+.factory-chat-fields input, .factory-chat-fields select { max-width: 100%; min-width: 0; border: 1px solid var(--border-soft); border-radius: 8px; padding: 0.4rem 0.55rem; color: var(--text-primary); background: var(--surface-input); font: inherit; }
+.factory-chat-selector p, .codex-factory-context { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+.factory-chat-selector p { margin: 0.55rem 0 0; }
+.codex-factory-context { display: grid; gap: 0.3rem; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-soft); overflow-wrap: anywhere; }
+.codex-admission-status { display:flex; flex-wrap:wrap; gap:0.3rem 1rem; padding:0.4rem 1rem; color:var(--text-muted); font-size:0.7rem; }
+.provider-parallel-limit { flex-basis:100%; color:var(--text-muted); font-size:0.7rem; }

@@ -261,6 +261,7 @@ test("corrupt Codex Chat registry restores a valid backup and otherwise stays re
   const compilerOptions = { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022, isolatedModules: true };
   const helperOutput = ts.transpileModule(privateJsonSource, { compilerOptions }).outputText;
   const storeOutput = ts.transpileModule(privateStoreSource, { compilerOptions }).outputText
+    .replace(/(['"])\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/scripts\/lib\/chat-subject\.mjs\1/g,JSON.stringify(pathToFileURL(path.resolve('scripts/lib/chat-subject.mjs')).href))
     .replace('"@/lib/pritha-paths"', '"./pritha-paths.mjs"')
     .replace('"@/lib/private-json"', '"./private-json.mjs"')
     .replaceAll('"../../../../../scripts/lib/task-workspace.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/task-workspace.mjs")).href))
@@ -318,6 +319,11 @@ export const resolvePrithaStateRoot = () => ${JSON.stringify(stateRoot)};
     const removalAudit = readFileSync(path.join(chatRoot, "registry.audit.jsonl"), "utf8");
     assert.match(removalAudit, /empty-direct-chat-removed/);
     assert.doesNotMatch(removalAudit, /chat_empty_direct|native-empty-direct/);
+    const child={...emptyBinding,subject:{kind:'child',slug:'paper-radar',phase:'contract'}};
+    await recovered.put(child);assert.deepEqual((await recovered.get(child.chatId)).subject,child.subject);
+    await assert.rejects(recovered.patch(child.chatId,{subject:{...child.subject,phase:'scaffold'}}),{code:'runtime_identity_mismatch'});
+    await assert.rejects(recovered.put({...child,subject:{...child.subject,approved:true}}),{code:'chat_subject_invalid'});
+    assert.deepEqual((await recovered.get(child.chatId)).subject,child.subject);
 
     writeFileSync(path.join(chatRoot, "registry.json"), "{broken-primary", "utf8");
     writeFileSync(path.join(chatRoot, "registry.last-known-good.json"), "{broken-backup", "utf8");

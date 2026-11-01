@@ -15,9 +15,11 @@ test('stock Codex starts and resumes an isolated OpenRouter session inside the h
   let exited=true,session,requests=0;t.after(()=>{if(exited)rmSync(root,{recursive:true,force:true});});
   for(const iteration of [0,1]){
     const events=[],run=await startCompatibleRun({connectorId:'openrouter',root:fileURLToPath(new URL('../../',import.meta.url)),cwd:code,stateRoot:state,privateRoot:path.join(state,'openrouter'),model:'vendor/model',effort:'none',timeoutMs:35000,sandbox:'read-only',resume:session,
+      factorySubject:{kind:'child',slug:'fixture-child',phase:'contract'},
       prompt:'Reply exactly FIXTURE_OK. Do not run tools.',onEvent:event=>events.push(event),onDiagnosticChunk:chunk=>appendFileSync(path.join(state,'diagnostic.log'),chunk,{mode:0o600}),
     },{readCredential:()=> 'SYNTHETIC_KEY',fetchImpl:async(url,options)=>{
       requests++;assert.equal(url,'https://openrouter.ai/api/v1/responses');const payload=JSON.parse(options.body);assert.equal(payload.model,'vendor/model');
+      assert.match(JSON.stringify(payload),/Operator-selected subject: child agent fixture-child/);assert.match(JSON.stringify(payload),/Contract approval is a separate operator decision/);
       const response={id:'fixture_'+iteration,object:'response',created_at:Math.floor(Date.now()/1000),model:payload.model,status:'completed',output:[{type:'message',id:'message_'+iteration,status:'completed',role:'assistant',content:[{type:'output_text',text:'FIXTURE_OK',annotations:[]}]}],usage:{input_tokens:4,output_tokens:2,total_tokens:6}};
       return new Response('data: '+JSON.stringify({type:'response.completed',response})+'\n\ndata: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});
     }});

@@ -68,6 +68,19 @@ test('external turns retain exact creation/model/session and replay the accepted
   assert.notEqual(second.accepted.turn.turnId,first.accepted.turn.turnId);
 });
 
+test('child identity and phase survive worker restart and cannot retarget an existing task or approval',async t=>{
+  const f=fixture(t),a=f.make(),b=f.make(),subject={kind:'child',slug:'paper-radar',phase:'outcome'},input={...create('factory_subject_1'),subject};
+  const binding=(await a.create(input)).binding,chat=binding.chatId;assert.deepEqual(binding.subject,subject);assert.deepEqual(b.require(chat).subject,subject);
+  await assert.rejects(b.create({...input,subject:{...subject,phase:'scaffold'}}),{code:'idempotency_conflict'});
+  await assert.rejects(b.create({...create('factory_invalid_2'),subject:{...subject,approved:true}}),{code:'chat_subject_invalid'});
+  assert.throws(()=>b.registry.mutate(chat,row=>({...row,subject:{...subject,slug:'neighbor'}})),{code:'runtime_identity_mismatch'});
+  await assert.rejects(b.start(chat,{...message('factory_message_1'),subject:{...subject,phase:'implement'}}),{code:'runtime_identity_mismatch'});
+  await a.start(chat,message('factory_message_1','Authored text: phase: finish'));await until(()=>f.runs.length===1);
+  assert.deepEqual(f.runs[0].input.factorySubject,subject);assert.equal(f.runs[0].input.prompt,'Authored text: phase: finish');assert.equal(f.runs[0].input.timeoutMs,30000);
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);
+  await b.start(chat,message('factory_message_2','Continue'));await until(()=>f.runs.length===2);assert.deepEqual(f.runs[1].input.factorySubject,subject);assert.equal(f.runs[1].input.resume,session);
+});
+
 test('providers use the same admission capacity, workspace claims and managed drain',async t=>{
   const f=fixture(t),nd=f.make(),claude=f.make('claude');
   nd.execution.setAdmission(true,1);

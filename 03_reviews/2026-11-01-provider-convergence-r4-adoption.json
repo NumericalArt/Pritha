@@ -208,6 +208,16 @@
       "source_path": "interfaces/control-center/src/lib/codex-chat/normalize.ts",
       "source_sha256": "11cde70389ce5e6f1f2e53dbd44ef37c30902f7582c542cced24db01167f3cd1",
       "adoption": "only normalizeCliItem and cliItemOriginalText adapted; native canonical normalizer preserved"
+    },
+    {
+      "path": "scripts/neuraldeep/task-chat-phases.mjs",
+      "source_sha256": "6d0543d19b75c3be308e2a6a7d28abce1e3d988ad98d952a6b5cad529ae8ba59",
+      "adoption": "Reviewed phase goals and checkpoint semantics; reimplemented as explicit immutable subject metadata in scripts/lib/chat-subject.mjs. Text phase-header inference and restrictive blanket command rules are not adopted."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/chat-subject.ts",
+      "source_sha256": "51c80c225da118905bae27e1e0d7191726783ea289d89e85b4d96347a4720d21",
+      "adoption": "Reviewed child Subject/slug design; canonical implementation uses exact lowercase slug and explicit phase, rejects extra authority fields, and retains native history. Token-budget input deferred to an enforceable shared factory budget contract."
     }
   ]
 }

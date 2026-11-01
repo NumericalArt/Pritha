@@ -1,3 +1,4 @@
+import type {ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
 export type RuntimeProviderId = "desktop_bundled" | "standalone_cli";
 export type ExternalRuntimeProviderId = "neuraldeep_runtime" | "claude_runtime" | "openrouter_runtime" | "local_runtime";
 export type RuntimeProtocol = "app_server" | "exec_resume" | "queue";
@@ -104,6 +105,7 @@ export type TaskLinkView = {
 };
 
 export type ThreadSummary = {
+  subject?:ChatSubject;
   chatId: string;
   title: string;
   preview: string;

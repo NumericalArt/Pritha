@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
 import * as profile from "../scripts/lib/provider-profile.mjs";
+import * as subject from '../scripts/lib/chat-subject.mjs';
 
 const require = createRequire(import.meta.url);
 class GatewayError extends Error {
@@ -28,6 +29,7 @@ class FakeRoutes {
   close(){}
 }
 const {CodexChatGateway}=load("gateway",{
+  '../../../../../scripts/lib/chat-subject.mjs':subject,
   "./drivers/codex-app-server-driver":{},"./drivers/neuraldeep-driver":{},"./drivers/claude-driver":{},"./drivers/compatible-driver":{},"../settings/provider-profile":profile,
   "../settings/provider-settings-server":{getProviderSettings:()=>({activeConnectorId:"codex",providerPresets:Object.fromEntries(profile.PROVIDER_CONNECTOR_IDS.map(id=>[id,{...profile.defaultProviderPreset(id),modelId:`${id}-model`}] ))})},
   "./provider-thread-pages":pages,"./provider-activity":activity,
@@ -95,6 +97,13 @@ test('first-turn model effort and tier are captured by creation instead of falli
   gateway.createThreadWithFirstTurn(input);assert.deepEqual(external.calls[0].args[0].settings,{modelId:'openrouter-model',effortId:'high'});assert.equal(native.calls.length,0);
   assert.throws(()=>gateway.createThreadWithFirstTurn({...input,settings:{effortId:'low'}}),{code:'runtime_identity_mismatch'});
   assert.equal(external.calls.length,1);
+});
+test('subject metadata reaches each explicit driver and malformed approval fields fail before any driver call',()=>{
+  const drivers=profile.PROVIDER_CONNECTOR_IDS.map(driver),gateway=new CodexChatGateway(drivers),subject={kind:'child',slug:'paper-radar',phase:'contract'};
+  for(const connectorId of profile.PROVIDER_CONNECTOR_IDS){gateway.createThread({clientThreadId:'factory_'+connectorId,source:'chat',connectorId,subject});assert.deepEqual(drivers.find(row=>row.connectorId===connectorId).calls.at(-1).args[0].subject,subject);}
+  const before=drivers.reduce((sum,row)=>sum+row.calls.length,0);
+  assert.throws(()=>gateway.createThread({clientThreadId:'factory_invalid',source:'chat',connectorId:'codex',subject:{...subject,approved:true}}),{code:'chat_subject_invalid'});
+  assert.equal(drivers.reduce((sum,row)=>sum+row.calls.length,0),before);
 });
 
 test("merged pagination returns every provider thread once without putting previews in cursors", async () => {

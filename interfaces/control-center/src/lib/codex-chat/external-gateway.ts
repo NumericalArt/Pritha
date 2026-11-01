@@ -14,6 +14,7 @@ export class ExternalChatGateway implements TaskChatBackend {
   private summary(binding:ProviderChatBinding):ThreadSummary {
     const active=this.core.activeIntent(binding.chatId),pending=this.core.pendingRequests(binding.chatId);
     return {chatId:binding.chatId,title:binding.title,preview:binding.preview,group:binding.group,origin:binding.origin,
+      ...(binding.subject?{subject:binding.subject}:{}),
       status:binding.archived?'archived':active?'active':binding.lastStatus,activeFlags:active && active.state!=='unknown'?(pending.length?[pending.some(row=>row.kind==='user_input')?'waiting_on_input':'waiting_on_approval']:['streaming']):[],pinned:binding.pinned,archived:binding.archived,historyKind:'mirrored',createdAt:binding.createdAt,updatedAt:binding.updatedAt,
       runtime:{connectorId:binding.connectorId,modelId:binding.modelId,providerId:binding.providerId,version:null,protocol:'exec_resume',stateIdentityHash:binding.stateIdentityHash,compatibility:'bound'},
       taskLinks:binding.taskLinks,continuationState:active?'blocked_active_turn':binding.continuationEnabled?'continuation_enabled':'read_only'};

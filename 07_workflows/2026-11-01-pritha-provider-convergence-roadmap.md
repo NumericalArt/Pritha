@@ -388,7 +388,7 @@ wrong-project rejection. Live providers readiness только по реальн
 
 ### R8 — Единый пульт Settings и быстрый выбор в Task Chat
 
-**Статус: in-progress; Settings и new-chat selector проверены, factory phase controls впереди.** Зависимости R2–R7.
+**Статус: implemented and locally verified; реальные provider/manual gates входят в R12.** Зависимости R2–R7.
 
 - [x] ProviderConnectorBar ровно из пяти компактных pills: label/status/model.
 - [x] Один выбранный settings panel: native CodexAuth/CodexSettings, ND keys/
@@ -398,7 +398,7 @@ wrong-project rejection. Live providers readiness только по реальн
   перетирает другой panel. Keys не входят в presets/client state persistence.
 - [x] New-chat provider/model selector only `ready`; ссылка Configure providers.
   Existing thread показывает pinned provider; active task не меняется.
-- [ ] Factory phase presets interview/contract/outcome/scaffold/implement,
+- [x] Factory phase presets interview/contract/outcome/scaffold/implement,
   Subject=child + slug, admission queue/limits feedback без hidden prompt headers.
 - [x] Preserve quote replies, image annotation, stream scroll anchoring,
   activity pagination и release receipts.
@@ -1120,6 +1120,36 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
 - Проверки используют isolated state и synthetic provider responses; реальные
   ключи, платная inference, GitHub и работающие экземпляры не менялись.
   Factory phase controls и остальные незавершённые этапы сохраняют pending status.
+
+### Checkpoint реализации 13 — Явный контекст фабрики и доступная ёмкость задач
+
+- Subject=child, slug и phase focus задаются отдельными полями нового draft.
+  Добавлены interview/contract/outcome/scaffold/implement, а также verify/finish
+  из проверенного NeuralDeep source. Фокус описывает текущую задачу; дальнейшая
+  host orchestration и enforceable общий factory budget остаются в R6.
+- Контекст закреплён за native/external binding и передаётся во все harnesses
+  отдельно от authored user text. Native использует developer instructions;
+  внешние harnesses получают тот же проверенный host context. История текста
+  не переписывается, `phase:` внутри текста не переопределяет выбранную фазу.
+  Empty native thread recovery и external resume сохраняют контекст.
+- Поля не разрешают выполнение и не заменяют Contract/Outcome approvals,
+  research gate, locked Trials или workspace sandbox. Дополнительные поля
+  permissions/approved/path отклоняются до driver dispatch; соседний child
+  нельзя подставить в существующий тред. Не добавлен декоративный token budget,
+  который ещё не контролировался бы host ledger для всех backend.
+- UI сохраняет отдельные draft subjects, показывает фазу созданного чата,
+  замораживает первый запрос при неизвестной доставке и сохраняет текст при
+  невалидном slug. Показаны общая ёмкость задач, очередь, ожидания оператора/
+  подтверждения исполнения и известный provider parallel limit; неизвестные
+  лимиты не выдумываются. Activity mux устраняет повторные active entries.
+- Проверки: **56/56** focused tests, **25/25** Chromium E2E без skipped/flaky,
+  TypeScript/Next candidate build pass; **2/2** installed stock Codex + real
+  sandbox fixtures. Последние подтверждают передачу factory context через
+  настоящий CLI при start/resume и сохранение host-tool sandbox/approval.
+  Desktop/mobile screenshots просмотрены, overflow отсутствует.
+- R8 закрыт на уровне реализации/UI. Это не завершение R6 factory orchestration,
+  R7 offline Local/child provisioning, R9 voice, R11 bootstrap, R11b migration
+  или R12 live/manual acceptance. Сервисы, MacBook и GitHub не изменялись.
 
 ## 7. Полные исходные материалы
 

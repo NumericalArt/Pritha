@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash, randomBytes } from 'node:crypto';
+import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import { realpathSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +21,7 @@ const sessionPattern=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{
 const toml=value=>JSON.stringify(value);
 
 export function buildCodexExecArgs(options){
+  const factoryInstructions=factorySubjectInstructions(options.factorySubject);
   if(!modelPattern.test(options.model || ''))throw fail('provider_model_invalid');
   if(!['read-only','workspace-write'].includes(options.sandbox || 'read-only'))throw fail('provider_sandbox_invalid');
   if(options.resume && !sessionPattern.test(options.resume))throw fail('runtime_identity_mismatch');
@@ -46,6 +48,7 @@ export function buildCodexExecArgs(options){
     'sandbox_workspace_write.writable_roots':roots,
   };
   const effort=effectiveNeuralDeepEffort(options.model,options.effort);
+  if(factoryInstructions)config.developer_instructions=factoryInstructions;
   if(effort)config.model_reasoning_effort=effort;
   const context=Number.isSafeInteger(options.modelContextTokens) && options.modelContextTokens>0 ? options.modelContextTokens : neuralDeepExecutionProfile(options.model).declaredContextTokens;
   if(context)config.model_context_window=context;

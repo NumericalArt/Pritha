@@ -1,4 +1,5 @@
 import { CodexAppServerDriver } from "./drivers/codex-app-server-driver";
+import {normalizeChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
 import { NeuralDeepDriver } from "./drivers/neuraldeep-driver";
 import { ClaudeDriver } from "./drivers/claude-driver";
 import { CompatibleDriver } from "./drivers/compatible-driver";
@@ -94,10 +95,12 @@ export class CodexChatGateway {
     }
   }
   createThread(input: Create) {
+    normalizeChatSubject(input.subject);
     const route = this.creationRoute(input), { connectorId: _connectorId, ...request } = input;
     return this.driver(route.connectorId).backend.createThread({ ...request, settings: { ...request.settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
   }
   createThreadWithFirstTurn(input: CreateWithTurn) {
+    normalizeChatSubject(input.subject);
     if (input.settings?.modelId && input.initialTurn.settings?.modelId && input.settings.modelId !== input.initialTurn.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "The first turn must use the chat's model.", 409);
     for(const field of ['effortId','serviceTierId'] as const)if(input.settings?.[field] && input.initialTurn.settings?.[field] && input.settings[field]!==input.initialTurn.settings[field])throw new CodexChatGatewayError('runtime_identity_mismatch','The first turn must use the chat’s execution settings.',409);
     const settings={...input.initialTurn.settings,...input.settings};

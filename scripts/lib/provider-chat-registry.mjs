@@ -4,12 +4,13 @@ import path from 'node:path';
 import { NeuralDeepChatHistoryStore,ChatHistoryError } from '../neuraldeep/chat-history-store.mjs';
 import { privateStateFile } from './private-state-path.mjs';
 import { isProviderConnectorId } from './provider-profile.mjs';
+import {normalizeChatSubject} from './chat-subject.mjs';
 
 const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const now=()=>new Date().toISOString();
 const model=/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/;
 const client=/^[A-Za-z0-9_-]{8,128}$/;
-const immutable=['chatId','connectorId','providerId','modelId','effortId','timeoutMs','workspacePath','workspace','capabilitySnapshot','executionConfig','stateIdentityHash','clientThreadId','createHash'];
+const immutable=['chatId','connectorId','providerId','modelId','effortId','timeoutMs','workspacePath','workspace','capabilitySnapshot','executionConfig','stateIdentityHash','clientThreadId','createHash','subject'];
 const fail=(code,message='The saved task identity does not match this request.')=>new ChatHistoryError(code,message);
 
 /** Provider-owned transcripts share the reviewed bounded history engine, never native Codex history. */
@@ -29,11 +30,13 @@ export class ProviderChatRegistry {
     this.assertId(chatId);const value=this.history.get(chatId,{turnLimit:0});
     if(!value)return null;
     if(value.connectorId!==this.connectorId || value.stateIdentityHash!==this.scope || !model.test(value.modelId || ''))throw fail('runtime_identity_mismatch');
+    normalizeChatSubject(value.subject);
     return value;
   }
   require(chatId){const value=this.get(chatId);if(!value)throw fail('thread_not_found','Task Chat was not found.');return value;}
   findByClient(clientThreadId){const value=this.history.findByClient(clientThreadId);return value?this.require(value.chatId):null;}
   create(input){
+    const subject=normalizeChatSubject(input.subject);
     if(!client.test(input.clientThreadId || '') || !model.test(input.modelId || '') || !Number.isSafeInteger(input.timeoutMs) || input.timeoutMs<1000 || input.timeoutMs>3600000)throw fail('provider_binding_invalid');
     const requestHash=digest(input.request),chatId=`chat_${this.connectorId}_${digest(input.clientThreadId).slice(0,32)}`;
     const stamp=now();
@@ -41,6 +44,7 @@ export class ProviderChatRegistry {
       const prior=this.findByClient(input.clientThreadId);
       if(prior){if(prior.createHash!==requestHash || prior.modelId!==input.modelId)throw fail('idempotency_conflict');return {binding:prior,created:false};}
       const binding={chatId,clientThreadId:input.clientThreadId,createHash:requestHash,connectorId:this.connectorId,
+        ...(subject?{subject}:{}),
         providerId:`${this.connectorId}_runtime`,modelId:input.modelId,effortId:input.effortId || null,timeoutMs:input.timeoutMs,
         workspacePath:realpathSync(input.workspacePath),workspace:input.workspace || null,nativeThreadId:'',profileIdentity:null,stateIdentityHash:this.scope,
         title:String(input.title || 'New task chat').trim().slice(0,120),preview:'',createdAt:stamp,updatedAt:stamp,

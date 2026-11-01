@@ -1,4 +1,5 @@
 import {createHash,randomBytes} from 'node:crypto';
+import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import {realpathSync,rmSync} from 'node:fs';
 import path from 'node:path';
 import {listenCompatibleAdapter} from './openai-compatible/responses-adapter.mjs';
@@ -19,6 +20,7 @@ const failure=code=>Object.assign(new Error('The selected provider task could no
 const sessionPattern=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
 export function buildCompatibleCodexArgs(options){
+  const factoryInstructions=factorySubjectInstructions(options.factorySubject);
   const provider=options.connectorId;
   if(!['openrouter','local'].includes(provider) || !modelId(options.model) || !['default',...COMPATIBLE_EFFORTS].includes(options.effort || 'default'))throw failure('provider_input_invalid');
   if(!['read-only','workspace-write'].includes(options.sandbox || 'read-only'))throw failure('provider_sandbox_invalid');
@@ -33,6 +35,7 @@ export function buildCompatibleCodexArgs(options){
     'analytics.enabled':false,'otel.exporter':'none','otel.log_user_prompt':false,check_for_update_on_startup:false,
     'sandbox_workspace_write.network_access':false,'sandbox_workspace_write.exclude_slash_tmp':true,'sandbox_workspace_write.exclude_tmpdir_env_var':false,'sandbox_workspace_write.writable_roots':roots};
   if(options.effort && !['none','default'].includes(options.effort))config.model_reasoning_effort=options.effort;
+  if(factoryInstructions)config.developer_instructions=factoryInstructions;
   if(options.toolServer){
     config['mcp_servers.pritha.url']=options.toolServer.url;
     config['mcp_servers.pritha.bearer_token_env_var']='PRITHA_TOOL_CAPABILITY';

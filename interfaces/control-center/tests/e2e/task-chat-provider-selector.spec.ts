@@ -14,17 +14,17 @@ async function fixture(page:Page){
   };
   const envelope=(data:any)=>({apiVersion:'1',requestId:'fixture',data});
   await page.route('**/api/task-runtime/settings',route=>{if(route.request().method()==='POST')settingsWrites++;return route.fulfill({json:{ok:true,settings:{version:1,revision:0,activeConnectorId:defaultProvider,providerPresets:presets}}});});
-  await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:Object.keys(presets).map(connectorId=>({connectorId,status:['codex','claude','openrouter'].includes(connectorId)?'ready':'configured'}))}}));
+  await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:Object.keys(presets).map(connectorId=>({connectorId,status:['codex','claude','openrouter'].includes(connectorId)?'ready':'configured',capabilities:connectorId==='openrouter'?{parallelLimit:2}:{}}))}}));
   await page.route('**/api/codex-chat/v1/**',async route=>{
     const request=route.request(),url=new URL(request.url()),parts=url.pathname.split('/'),chatId=parts[5];
     if(request.method()==='POST' && (url.pathname.endsWith('/threads') || url.pathname.endsWith('/turns'))){requests.push({route,body:request.postDataJSON(),chatId});return;}
     if(url.pathname.endsWith('/runtime')){if(holdPreview && url.searchParams.has('connectorId') && !previews.some(entry=>entry.url.searchParams.get('connectorId')===url.searchParams.get('connectorId'))){previews.push({route,url});return;}return route.fulfill({json:envelope(runtime(url))});}
     if(url.pathname.endsWith('/events'))return route.fulfill({contentType:'text/event-stream',body:': ready\n\n'});
-    const data=url.pathname.endsWith('/threads')?{data:rows,nextCursor:null}:url.pathname.endsWith('/activity')?{cursor:0,changed:[],admissionEnabled:true}:url.pathname.endsWith('/history')?{data:[],hasOlder:false,olderCursor:null}:url.pathname.endsWith('/workspace')?{git:false,dirty:false,baseRevision:null}:url.pathname.endsWith('/goal')?{availability:'unsupported'}:url.pathname.endsWith('/delivery')?{runs:[]}:detail(chatId);
+    const data=url.pathname.endsWith('/threads')?{data:rows,nextCursor:null}:url.pathname.endsWith('/activity')?{cursor:0,changed:[],admissionEnabled:true,capacity:3,counts:{active:1,queued:2,waitingForOperator:1,unknown:0}}:url.pathname.endsWith('/history')?{data:[],hasOlder:false,olderCursor:null}:url.pathname.endsWith('/workspace')?{git:false,dirty:false,baseRevision:null}:url.pathname.endsWith('/goal')?{availability:'unsupported'}:url.pathname.endsWith('/delivery')?{runs:[]}:detail(chatId);
     return route.fulfill({json:envelope(data)});
   });
   async function finish(index:number,chatId:string){const pending=requests[index],input=pending.body.initialTurn || pending.body,settings=input.settings || {},connectorId=pending.body.connectorId || 'codex';
-    if(!rows.some(row=>row.chatId===chatId))rows.push(row(chatId,connectorId,settings.modelId,settings.effortId));
+    if(!rows.some(row=>row.chatId===chatId))rows.push(Object.assign(row(chatId,connectorId,settings.modelId,settings.effortId),pending.body.subject?{subject:pending.body.subject}:{}));
     const turn={turnId:'turn_'+index,clientMessageId:input.clientMessageId,status:'completed',userMessage:{id:'message_'+index,role:'user',markdown:input.input[0].text,status:'completed',createdAt:now},items:[],pendingRequestIds:[],startedAt:now,error:null},accepted={turn,streamUrl:`/api/codex-chat/v1/threads/${chatId}/events`};
     await pending.route.fulfill({status:202,json:envelope(pending.body.initialTurn?{detail:detail(chatId),accepted}:accepted)});
   }
@@ -48,11 +48,14 @@ for(const width of [1440,390])test(`new-chat provider/model/effort is explicit a
 test('uncertain first delivery keeps the exact provider across reload and a changed default',async({page})=>{
   const f=await fixture(page);await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page);
   await page.getByLabel('New chat provider',{exact:true}).selectOption('openrouter');await page.getByLabel('New chat model',{exact:true}).selectOption('vendor/beta');await page.getByLabel('New chat reasoning').selectOption('high');
+  await page.getByLabel('Chat subject',{exact:true}).selectOption('child');await page.getByLabel('Child agent slug').fill('paper-radar');await page.getByLabel('Factory phase').selectOption('outcome');
   const composer=page.locator('.codex-composer textarea');await composer.fill('Original exact request');await page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(1);
   const original=f.requests[0].body;await composer.fill('Keep this newer draft');f.changeDefault('claude');await page.reload();
   await expect(composer).toHaveValue('Keep this newer draft');await expect(page.getByLabel('New chat provider',{exact:true})).toHaveValue('openrouter');await expect(page.getByLabel('New chat provider',{exact:true})).toBeDisabled();
+  await expect(page.getByLabel('Child agent slug')).toHaveValue('paper-radar');await expect(page.getByLabel('Factory phase')).toHaveValue('outcome');await expect(page.getByLabel('Factory phase')).toBeDisabled();
   await page.getByRole('button',{name:'Check and retry same message',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(2);expect(f.requests[1].body).toEqual(original);expect(f.writes()).toBe(0);
   await f.finish(1,'chat_openrouter_recovered');await expect(composer).toHaveValue('Keep this newer draft');
+  await expect(page.getByLabel('Factory task context')).toContainText('paper-radar · Outcome');
 });
 test('a late preview cannot switch the chosen provider or retarget an existing native chat',async({page})=>{
   const f=await fixture(page);await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page);f.hold();
@@ -62,4 +65,25 @@ test('a late preview cannot switch the chosen provider or retarget an existing n
   await page.getByLabel('Task Chat history',{exact:true}).getByRole('button',{name:/Native saved/}).click();await expect(page.getByLabel('New chat provider',{exact:true})).toHaveCount(0);
   await composer.fill('Native follow-up');await page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(2);expect(f.requests[1].chatId).toBe('chat_native_saved');expect(f.requests[1].body.settings.modelId).toBe('native-model');
   await f.finish(1,'chat_native_saved');await f.finish(0,'chat_claude_created');await expect(page).toHaveURL(/chat_native_saved/);
+});
+
+for(const width of [1440,390])test(`factory subject and phase are visible, validated and retained as exact metadata at ${width}px`,async({page})=>{
+  const f=await fixture(page);await page.setViewportSize({width,height:960});await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page,width);
+  const composer=page.locator('.codex-composer textarea'),send=page.getByRole('button',{name:'Send',exact:true});
+  await page.getByLabel('New chat provider',{exact:true}).selectOption('openrouter');await expect(page.locator('.provider-parallel-limit')).toHaveText('Provider parallel limit: 2');
+  await expect(page.getByLabel('Task capacity')).toContainText('1/3 task slots in use');await expect(page.getByLabel('Task capacity')).toContainText('2 queued');
+  await page.getByLabel('Chat subject',{exact:true}).selectOption('child');await composer.fill('Original request, no special prompt headers.');await expect(send).toBeDisabled();
+  const slug=page.getByLabel('Child agent slug');await slug.fill('../neighbor');await expect(slug).toHaveAttribute('aria-invalid','true');await composer.press('Enter');expect(f.requests).toHaveLength(0);
+  await slug.fill('paper-radar');await page.getByLabel('Factory phase').selectOption('scaffold');await expect(send).toBeEnabled();
+  await expect(page.getByRole('note').filter({hasText:'Artifact approvals are separate'})).toContainText('separate approvals and a passing gate');
+  await page.locator('.factory-chat-selector').screenshot({path:`test-results/factory-selection-${width}.png`});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await send.click();await expect.poll(()=>f.requests.length).toBe(1);expect(f.requests[0].body.subject).toEqual({kind:'child',slug:'paper-radar',phase:'scaffold'});expect(f.requests[0].body.initialTurn.input[0].text).toBe('Original request, no special prompt headers.');
+  await expect(slug).toBeDisabled();await f.finish(0,'chat_openrouter_child');await expect(page.getByLabel('Factory task context')).toContainText('paper-radar · Scaffold');await expect(page.getByLabel('Chat subject',{exact:true})).toHaveCount(0);
+});
+test('parallel new drafts keep independent factory subjects while a late first creation is settling',async({page})=>{
+  const f=await fixture(page);await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page);
+  const composer=page.locator('.codex-composer textarea');await page.getByLabel('Chat subject',{exact:true}).selectOption('child');await page.getByLabel('Child agent slug').fill('first-child');await page.getByLabel('Factory phase').selectOption('contract');await composer.fill('First child contract');await page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(1);
+  await newDraft(page);await expect(page.getByLabel('Chat subject',{exact:true})).toHaveValue('self');await page.getByLabel('Chat subject',{exact:true}).selectOption('child');await page.getByLabel('Child agent slug').fill('second-child');await page.getByLabel('Factory phase').selectOption('interview');await composer.fill('Second child interview');await page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(2);
+  expect(f.requests.map(entry=>entry.body.subject)).toEqual([{kind:'child',slug:'first-child',phase:'contract'},{kind:'child',slug:'second-child',phase:'interview'}]);
+  await f.finish(1,'chat_codex_second_child');await f.finish(0,'chat_codex_first_child');await expect(page).toHaveURL(/chat_codex_second_child/);await expect(page.getByLabel('Factory task context')).toContainText('second-child · Interview');
 });

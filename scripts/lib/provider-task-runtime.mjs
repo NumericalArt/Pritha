@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, closeSync, constants, openSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { ProviderChatRegistry } from './provider-chat-registry.mjs';
+import {normalizeChatSubject} from './chat-subject.mjs';
 import { ExecutionCoordinator } from './execution-coordinator.mjs';
 import { callExecutionChannel, executionChannelView, registerExecutionChannel } from './execution-channel.mjs';
 import { inspectTaskWorkspace, prepareTaskWorkspace, taskWorkspaceResources, verifyTaskWorkspace } from './task-workspace.mjs';
@@ -51,6 +52,7 @@ export class ProviderTaskRuntime {
   activeIntent(chat){return this.execution.listIntents({kind:'turn',states:activeStates,limit:1000}).find(row=>row.chatId===chat) || null;}
   async workspacePreview(){return inspectTaskWorkspace(this.root);}
   async create(input){
+    const subject=normalizeChatSubject(input?.subject);
     if(!validClient(input?.clientThreadId) || input.source!=='chat' || (input.workspace?.mode!==undefined && !['isolated','configured','read-only'].includes(input.workspace.mode)))throw failure('invalid_request','A valid chat request is required.',400);
     const {initialTurn:ignored,...request}=input;
     const existing=this.registry.findByClient(input.clientThreadId);
@@ -69,11 +71,12 @@ export class ProviderTaskRuntime {
       const workspace=await prepareTaskWorkspace({coordinator:this.execution,source:this.root,directory:path.join(this.privateRoot,'workspaces'),id:this.connectorId+':'+input.clientThreadId,
         mode:sandbox==='read-only'?'read-only':'worktree',baseRevision:input.workspace?.baseRevision});
       const result=this.registry.create({clientThreadId:input.clientThreadId,request,title:input.title,modelId:executionConfig.modelId,effortId:executionConfig.reasoningEffort,timeoutMs:executionConfig.timeoutMs,
-        workspacePath:workspace.cwd,workspace,capabilitySnapshot:capabilities,executionConfig});
+        workspacePath:workspace.cwd,workspace,capabilitySnapshot:capabilities,executionConfig,...(subject?{subject}:{})});
       this.changed(result.binding.chatId);return {binding:result.binding,replayed:!result.created};
     });
   }
   validateTurn(binding,input){
+    if(input && Object.hasOwn(input,'subject'))throw failure('runtime_identity_mismatch','This chat retains its original subject and factory phase.');
     const text=providerTurnText(input);
     if(binding.archived)throw failure('chat_archived','Restore this chat before sending a message.');
     if(input.settings?.modelId && input.settings.modelId!==binding.modelId || input.settings?.effortId && input.settings.effortId!==binding.effortId || input.settings?.serviceTierId)throw failure('runtime_identity_mismatch','This chat retains its original provider, model and execution settings.');
@@ -134,6 +137,7 @@ export class ProviderTaskRuntime {
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
         model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:attachments.prompt?text+'\n\n'+attachments.prompt:text,
+        ...(binding.subject?{factorySubject:binding.subject}:{}),
         images:attachments.images || [],signal:active.controller.signal,
         ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
         beforeStart:async proof=>{

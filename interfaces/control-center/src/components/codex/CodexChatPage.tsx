@@ -17,7 +17,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import dynamic from "next/dynamic";
 import { useChatAttachments } from "./useChatAttachments";
-import { readDraftSession, writeDraftSession,type DraftProviderSelection } from "@/lib/codex-chat/draft-session";
+import { readDraftSession, writeDraftSession,composeDraftSubject,type DraftFactorySelection,type DraftProviderSelection } from "@/lib/codex-chat/draft-session";
+import {FACTORY_PHASES,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
+import {FactoryChatSelector} from './FactoryChatSelector';
 import {PROVIDER_LABELS,type ProviderConnectorId} from '@/lib/settings/provider-profile';
 import {NewChatProviderSelector} from './NewChatProviderSelector';
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
@@ -98,6 +100,7 @@ type PendingDelivery = {
 };
 
 type PendingNewChatDelivery = {
+  subject?:ChatSubject;
   connectorId?:ProviderConnectorId;
   draftId: string;
   draftRevision: number;
@@ -288,6 +291,7 @@ export function CodexChatPage() {
   const [listLoading, setListLoading] = useState(true);
   const [listPageLoading, setListPageLoading] = useState(false);
   const [admissionPaused,setAdmissionPaused]=useState(false);
+  const [admissionCounts,setAdmissionCounts]=useState<{capacity:number;active:number;queued:number;waitingForOperator:number;unknown:number}|null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [voiceSync, setVoiceSync] = useState<ThreadPage["sync"]>(undefined);
   const [loading, setLoading] = useState(true);
@@ -298,6 +302,10 @@ export function CodexChatPage() {
   const draftRevisionsRef = useRef<Record<string, number>>({});
   const creationIdsRef = useRef<Record<string,string>>({});
   const [workspaceModes,setWorkspaceModes]=useState<Record<string,"isolated"|"configured"|"read-only">>({});
+  const workspaceModesRef=useRef(workspaceModes);workspaceModesRef.current=workspaceModes;
+  const [factorySelections,setFactorySelections]=useState<Record<string,DraftFactorySelection>>({});
+  const factorySelectionsRef=useRef(factorySelections);factorySelectionsRef.current=factorySelections;
+  let factoryInvalid=false;try{composeDraftSubject(factorySelections[newDraftId]);}catch{factoryInvalid=true;}
   const [providerSelections,setProviderSelections]=useState<Record<string,DraftProviderSelection>>({});
   const providerSelectionsRef=useRef(providerSelections);providerSelectionsRef.current=providerSelections;
   const runtimeRequest=useRef(0);
@@ -425,13 +433,14 @@ export function CodexChatPage() {
 
   saveSessionRef.current = () => {
     if(!sessionLoadedRef.current)return;
-    writeDraftSession({version:1,workspaceModes,providerSelections:providerSelectionsRef.current,drafts:draftsByChatRef.current,revisions:draftRevisionsRef.current,creationIds:creationIdsRef.current,newDraftId:newDraftIdRef.current,pending:pendingDeliveriesRef.current,pendingNew:pendingNewChatDeliveriesRef.current});
+    writeDraftSession({version:1,workspaceModes:workspaceModesRef.current,factorySelections:factorySelectionsRef.current,providerSelections:providerSelectionsRef.current,drafts:draftsByChatRef.current,revisions:draftRevisionsRef.current,creationIds:creationIdsRef.current,newDraftId:newDraftIdRef.current,pending:pendingDeliveriesRef.current,pendingNew:pendingNewChatDeliveriesRef.current});
   };
   useEffect(() => {
     const saved=readDraftSession();
     if(saved) {
       setWorkspaceModes(saved.workspaceModes || {});
       providerSelectionsRef.current=saved.providerSelections || {};setProviderSelections(providerSelectionsRef.current);
+      factorySelectionsRef.current=saved.factorySelections || {};setFactorySelections(factorySelectionsRef.current);
       draftsByChatRef.current=saved.drafts;setDraftsByChat(saved.drafts);
       draftRevisionsRef.current=saved.revisions;creationIdsRef.current=saved.creationIds;
       pendingDeliveriesRef.current=saved.pending as Record<string,PendingDelivery>;setPendingDeliveries(pendingDeliveriesRef.current);
@@ -446,7 +455,7 @@ export function CodexChatPage() {
     const save=()=>saveSessionRef.current();window.addEventListener("pagehide",save);
     return ()=>{save();window.removeEventListener("pagehide",save);};
   },[]);
-  useEffect(()=>saveSessionRef.current(),[draftsByChat,newDraftId,pendingDeliveries,pendingNewChatDeliveries,workspaceModes,providerSelections]);
+  useEffect(()=>saveSessionRef.current(),[draftsByChat,newDraftId,pendingDeliveries,pendingNewChatDeliveries,workspaceModes,providerSelections,factorySelections]);
 
   const selectedSummary = useMemo(
     () => threads.find((thread) => thread.chatId === selectedChatId) || null,
@@ -511,9 +520,10 @@ export function CodexChatPage() {
     let stream:EventSource|null=null;
     const controller=new AbortController();
     const pending=new Set<string>();let pendingCursor=0;
-    const update=async(data:{cursor:number;changed:string[];admissionEnabled?:boolean})=>{
+    const update=async(data:{cursor:number;changed:string[];admissionEnabled?:boolean;capacity?:number;counts?:{active:number;queued:number;waitingForOperator:number;unknown:number}})=>{
       if(stopped)return;
       if(typeof data.admissionEnabled==="boolean")setAdmissionPaused(!data.admissionEnabled);
+      if(Number.isSafeInteger(data.capacity) && Number(data.capacity)>0 && data.counts && ['active','queued','waitingForOperator','unknown'].every(key=>Number.isSafeInteger(data.counts?.[key as keyof typeof data.counts]) && Number(data.counts?.[key as keyof typeof data.counts])>=0))setAdmissionCounts({capacity:data.capacity!,...data.counts});
       if(Array.isArray(data.changed))for(const chatId of data.changed)if(typeof chatId==='string')pending.add(chatId);
       if(Number.isSafeInteger(data.cursor))pendingCursor=data.cursor;
       if(refreshing)return;
@@ -1243,6 +1253,7 @@ export function CodexChatPage() {
           clientThreadId: delivery.clientThreadId,
           source: "chat",
           ...(delivery.connectorId?{connectorId:delivery.connectorId}:{}),
+          ...(delivery.subject?{subject:delivery.subject}:{}),
           ...(delivery.workspace ? {workspace:delivery.workspace} : {}),
           initialTurn: {
             clientMessageId: delivery.clientMessageId,
@@ -1300,16 +1311,17 @@ export function CodexChatPage() {
     setBudgetNotice(null);
     if (!chatId) {
       const draftId = newDraftIdRef.current;
+      let subject:ChatSubject|null;try{subject=composeDraftSubject(factorySelectionsRef.current[draftId]);}catch{return;}
       const requestedSelection=providerSelectionsRef.current[draftId],connectorId=runtime.connectorId || 'codex';
       if(requestedSelection && requestedSelection.connectorId!==connectorId)return;
-      const selectionFingerprint=JSON.stringify(requestedSelection);
+      const selectionFingerprint=JSON.stringify([requestedSelection,factorySelectionsRef.current[draftId],workspaceModesRef.current[draftId]]);
       if (workspacePreflights.current.has(draftId)) return;
       const snapshot = {draftId,draftRevision:draftRevisionsRef.current[draftId] || 0,navigationEpoch:navigationEpochRef.current};
       if (workspaceMode !== "read-only" && runtime?.selected.sandboxMode !== "read_only" && (workspaceMode === "isolated" || runtime?.selected.sandboxMode === "workspace_write") && !workspaceBase) {
         workspacePreflights.current.add(draftId);
         try {
           const preview=(await api<{git:boolean;dirty:boolean;baseRevision:string|null}>(`/api/codex-chat/v1/workspace?connectorId=${encodeURIComponent(connectorId)}`)).data;
-          if(JSON.stringify(providerSelectionsRef.current[draftId])!==selectionFingerprint)return;
+          if(JSON.stringify([providerSelectionsRef.current[draftId],factorySelectionsRef.current[draftId],workspaceModesRef.current[draftId]])!==selectionFingerprint)return;
           if(preview.git && preview.dirty && preview.baseRevision) {
             setWorkspaceChoices(current=>({...current,[draftId]:preview.baseRevision!}));
             return;
@@ -1322,6 +1334,7 @@ export function CodexChatPage() {
       await deliverNewChatMessage({
         ...snapshot,
         connectorId,
+        ...(subject?{subject}:{}),
         workspace:{mode:workspaceMode,...(workspaceBase ? {baseRevision:workspaceBase} : {})},
         clientThreadId: creationIdsRef.current[draftId] ||= crypto.randomUUID(),
         clientMessageId: crypto.randomUUID(),
@@ -1547,6 +1560,7 @@ export function CodexChatPage() {
         </header>
 
       {admissionPaused&&<div className="codex-inline-notice info" role="status">New task starts are paused for an update. Drafts and existing task controls remain available.</div>}
+      {admissionCounts?<div className="codex-admission-status" aria-label="Task capacity"><span>{admissionCounts.active}/{admissionCounts.capacity} task slots in use</span><span>{admissionCounts.queued} queued</span>{admissionCounts.waitingForOperator?<span>{admissionCounts.waitingForOperator} waiting for operator</span>:null}{admissionCounts.unknown?<span>{admissionCounts.unknown} awaiting execution confirmation</span>:null}</div>:null}
         {runtime?.availability !== "ready" ? (
           <div className="codex-runtime-warning"><AlertTriangle size={17} /><span>{effectiveProvider?.warning || (runtime?.availability === "degraded" ? "The task runtime is installed but the full chat capability probe did not pass." : "No compatible task runtime is available.")}</span></div>
         ) : null}
@@ -1559,6 +1573,11 @@ export function CodexChatPage() {
           const next={...providerSelectionsRef.current,[id]:selection};providerSelectionsRef.current=next;setProviderSelections(next);delete creationIdsRef.current[id];
           setRuntime(current=>current && (current.connectorId || 'codex')===selection.connectorId?{...current,availability:'degraded'}:null);setError(null);setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
         }}/>:null}
+        {!selectedChatId?<FactoryChatSelector value={factorySelections[newDraftId]} disabled={Boolean(pendingNewChatDelivery)} onChange={selection=>{
+          const id=newDraftIdRef.current;if(selectedChatIdRef.current || pendingNewChatDeliveriesRef.current[id])return;
+          const next={...factorySelectionsRef.current,[id]:selection};factorySelectionsRef.current=next;setFactorySelections(next);delete creationIdsRef.current[id];setError(null);
+          setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
+        }}/>:displayedThread?.subject?<div className="codex-factory-context" aria-label="Factory task context"><strong>Child: {displayedThread.subject.slug} · {FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.label}</strong><span>{FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.goal}</span></div>:null}
         {!selectedChatId ? <label className="codex-runtime-warning codex-workspace-choice">Workspace
           <select aria-label="New chat workspace" value={workspaceMode} disabled={Boolean(pendingNewChatDelivery)} onChange={event=>setWorkspaceModes(current=>({...current,[newDraftId]:event.target.value as "isolated"|"configured"|"read-only"}))}>
             <option value="isolated">Isolated workspace · parallel tasks</option>
@@ -1764,7 +1783,7 @@ export function CodexChatPage() {
                 </button>
                 {hasActiveTurn && displayedDetail?.controls?.steer && <button className="codex-text-action" type="button" disabled={!draft.trim() || attachmentDraft.items.length > 0 || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || Boolean(pendingDelivery) || backendOffline || historyState !== "ready"} title={attachmentDraft.items.length ? "Attachments can only be queued for the next turn" : "Inject this instruction immediately into the running reasoning turn (⌘/Ctrl+Enter)"} onClick={() => void composerControlRef.current?.send("steer")}>⚡ Steer now</button>}
                 {hasActiveTurn && displayedDetail?.controls?.interrupt && !displayedDetail.voiceWorkflow && <button className="codex-text-action" type="button" onClick={() => void composerControlRef.current?.send("interrupt")}>■ Stop</button>}
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || fileCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || (!selectedChatId && factoryInvalid) || attachmentsIncomplete || imageCapabilityMissing || fileCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} {hasActiveTurn ? "Queue" : "Send"}
                 </button>
               </div>

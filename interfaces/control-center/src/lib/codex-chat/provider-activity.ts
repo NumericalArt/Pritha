@@ -26,7 +26,7 @@ export class ProviderActivity {
       return {
         cursor: this.cursor, reset, changed,
         admissionEnabled: snapshots.every(snapshot => snapshot.admissionEnabled),
-        active: snapshots.flatMap(snapshot => snapshot.active), capacity: snapshots.reduce((sum, snapshot) => sum + snapshot.capacity, 0),
+        active: [...new Map(snapshots.flatMap(snapshot => snapshot.active).sort((a,b)=>a.revision-b.revision).map(row=>[row.chatId,row])).values()], capacity: snapshots.reduce((sum, snapshot) => sum + snapshot.capacity, 0),
         counts: { active: 0, queued: 0, waitingForOperator: 0, unknown: 0, ...Object.fromEntries(["active", "queued", "waitingForOperator", "unknown"].map(key => [key, snapshots.reduce((sum, snapshot) => sum + snapshot.counts[key as keyof Activity["counts"]], 0)])) },
       };
     });
