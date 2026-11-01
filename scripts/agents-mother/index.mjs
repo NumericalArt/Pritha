@@ -1793,6 +1793,7 @@ function deliveryCliOptions(options) {
     buildExecutorOptions: {
       codexBin: options["codex-bin"],
       claudeBin: options["claude-bin"],
+      baseUrl: options["base-url"],
       model: options.model,
       effort: options.effort,
       serviceTier: options["service-tier"],

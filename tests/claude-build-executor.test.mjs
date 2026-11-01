@@ -27,15 +27,16 @@ function fixture(t,{unknown=false,wait=false,report,connectorId='claude'}={}){
   const launch=async options=>{last=options;calls.push(options);await options.beforeStart({identity,evidence:{fixture:true},sessionId:session,budgetId:options.budgetId});persist(!unknown);await options.onBudgetCheckpoint(accounting(!unknown));await options.onEvent({type:'item.completed',item:{type:'agent_message',text:report ?? JSON.stringify({summary:'implemented',changed_files:['product.txt'],remaining_risks:[]})}});
     const value={ok:!unknown,model,sessionId:session,processTreeExited:!unknown,budget:accounting(!unknown)};const completion=wait?new Promise(resolve=>{finish=()=>resolve(value);}):Promise.resolve(value);return {completion,stop(){finish?.();return true;}};};
   const Executor=connectorId==='claude'?ClaudeCodeBuildExecutor:class extends ResponsesBuildExecutor {constructor(options){super(connectorId,options);}};
-  const executor=new Executor({service,launch,root,stateRoot});
+  const executor=new Executor({service,launch,root,stateRoot,...(connectorId==='local'?{baseUrl:'http://127.0.0.1:1234/v1'}:{})});
   const coordinator=()=>new ExecutionCoordinator({stateRoot,directory:path.join(stateRoot,'codex-chat','execution')});
   t.after(()=>{executor.close();rmSync(directory,{recursive:true,force:true});});return {input,executor,Executor,service,launch,checkpoints,calls,persist,coordinator,finish:()=>finish?.()};
 }
-for(const connectorId of ['claude','neuraldeep','openrouter']){
+for(const connectorId of ['claude','neuraldeep','openrouter','local']){
 test(connectorId+': builds require isolated worktrees, pin model, account every request and replay without another launch',async t=>{
   const f=fixture(t,{connectorId});assert.ok(createBuildExecutor('claude-code') instanceof ClaudeCodeBuildExecutor);assert.equal((await f.executor.probe(f.input)).available,true);
   assert.equal((await f.executor.probe({...f.input,worktree:root})).available,false);
   const result=await f.executor.execute(f.input);assert.equal(result.status,'completed');assert.equal(result.tokens_used,120);assert.equal(result.usage_status,'measured');assert.equal(result.model_observed,model);assert.equal(result.budget_enforcement,'host-reservation-estimate');assert.equal(result.goal_enforcement,'not-applicable');assert.equal(result.summary,'implemented');
+  if(connectorId==='local')assert.equal(f.calls[0].baseUrl,'http://127.0.0.1:1234/v1');
   assert.deepEqual(f.calls[0].hostExecutionContext.protectedPaths,['verify.mjs']);assert.equal((await f.executor.execute(f.input)).attempt_id,result.attempt_id);assert.equal(f.calls.length,1);
   const db=f.coordinator();assert.equal(db.claims().length,0);db.close();await assert.rejects(f.executor.execute({...f.input,tokenBudget:20000}),{code:'executor_recovery_mismatch'});
 });

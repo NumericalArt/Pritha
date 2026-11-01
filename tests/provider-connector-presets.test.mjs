@@ -59,6 +59,7 @@ test("voice defaults follow native/ND while offline and Local auto cannot leak t
   assert.equal(resolveVoiceEngine({connectorId:"codex",configured:{neuraldeep:true}}).engine,null);
   for(const connectorId of ["claude","openrouter"]) assert.equal(resolveVoiceEngine({connectorId,configured:{neuraldeep:true}}).engine,"neuraldeep");
   assert.deepEqual(resolveVoiceEngine({connectorId:"local",configured}),{engine:null,reason:"offline"});
+  for(const engine of ['openai','neuraldeep'])assert.throws(()=>resolveVoiceEngine({connectorId:'local',configured,engine}),{code:'voice_network_disallowed'});
   for(const connectorId of PROVIDER_CONNECTOR_IDS) {
     assert.equal(resolveVoiceEngine({connectorId,configured,offline:true}).engine,null);
     assert.throws(()=>resolveVoiceEngine({connectorId,configured,offline:true,engine:"openai"}),{code:"voice_network_disallowed"});

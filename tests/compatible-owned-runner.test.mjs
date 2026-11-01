@@ -38,6 +38,14 @@ test('unverified Local, missing auth, invalid isolation and mismatched provider 
   assert.throws(()=>buildCompatibleCodexArgs({...options,adapterBaseUrl:'http://127.0.0.1:8765/v1',sandbox:'danger-full-access'}),{code:'provider_sandbox_invalid'});
   assert.throws(()=>buildCompatibleCodexArgs({...options,adapterBaseUrl:'https://remote.invalid/v1'}),{code:'provider_adapter_endpoint_invalid'});
 });
+
+test('Local Stop and unknown model-process exit retain the whole attempt; no credentials are read',async t=>{
+  const options={...fixture(t),connectorId:'local'},capture={},dependencies=deps(capture,{wait:true});let stopped=false,closed=false;
+  dependencies.readCredential=()=>assert.fail('Local credential lookup');dependencies.localConfiguration=()=>({identity:'fixture'});
+  dependencies.startLocalServer=async input=>{await input.beforeStart({version:1,session:43,escaped:[]});return {baseUrl:'http://127.0.0.1:8766/v1',stop:()=>{stopped=true;},verify:async()=>{},close:async()=>{closed=true;return {processTreeExited:false};}};};
+  const run=await startCompatibleRun(options,dependencies);assert.equal(capture.adapter.apiKey,undefined);assert.equal(capture.adapter.baseUrl,'http://127.0.0.1:8766/v1');run.stop();const result=await run.completion;
+  assert(stopped && closed);assert.equal(result.ok,false);assert.equal(result.processTreeExited,false);assert.equal(existsSync(capture.env.TMPDIR),true);
+});
 test('file dispatch rechecks the installed Codex version before starting an OpenRouter adapter',async t=>{
   const options=fixture(t),capture={};
   await assert.rejects(startCompatibleRun({...options,hostAttachments:{},hostExecutionContext:{}},{...deps(capture),probeCli:async()=>({available:true,version:'0.154.0'})}),{code:'provider_attachments_unverified'});

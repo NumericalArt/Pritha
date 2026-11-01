@@ -384,7 +384,7 @@ recover model pin; output large-file/truncation fixture.
 
 ### R7 — OpenRouter и Local
 
-**Статус: in-progress; OpenRouter transport/Task Chat и child provisioning проверены, Local offline execution впереди.** Зависимости R2–R4, R6 contracts.
+**Статус: verified-automated; OpenRouter, child provisioning и owned Local process проверены. Реальная модель/установка — manual gate R12.** Зависимости R2–R4, R6 contracts.
 
 - [x] Выделить reusable OpenAI-compatible loopback bridge без ND billing/auth
   assumptions. OpenRouter uses fixed upstream and HTTP-Referer/X-Title metadata.
@@ -394,11 +394,11 @@ recover model pin; output large-file/truncation fixture.
   исторические пять IDs из C §1.1 сверить, не silently substitute.
 - [x] Child credentials drawer: OpenRouter наравне с ND, API key/base URL/model
   только после операторского выбора и проверки child/.env.local boundary.
-- [ ] Local server discovery Ollama 11434, LM Studio 1234, custom MLX loopback;
+- [x] Local server discovery Ollama 11434, LM Studio 1234, custom MLX loopback;
   /v1/models, selected model validation, endpoint-specific capabilities.
-- [ ] Strict offline policy: no cloud fallback/auth/env leakage/web tools/cloud
+- [x] Strict offline policy: no cloud fallback/auth/env leakage/web tools/cloud
   voice. Проверка egress процесса и tools; Ollama cloud model не offline.
-- [ ] Start/resume/cancel/queue/usage follow common driver; capabilities honest.
+- [x] Start/resume/cancel/queue/usage follow common driver; capabilities honest.
 
 **R7 tests:** fake HTTP/SSE upstream; credentials mask/error sanitization;
 redirect/SSRF/IPv6/invalid URL; unreachable server; no model; cloud model denial;
@@ -1973,6 +1973,33 @@ unit child environment отдельно и изолировать оба aliases
   external provider остаётся отдельным factory route: нельзя выдавать всему
   CLI доступ к sibling parent или private state ради обхода этой границы.
   Local execution пока сохраняет offline gate. Платных calls и service changes 0.
+
+### Checkpoint 32 — Owned Local offline execution
+
+- Общий Responses runner подключает отдельный ephemeral model process только
+  из private operator-authored manifest. Executable SHA-256, exact model,
+  configuration identity и native session закреплены. Model process получает
+  read-only model/runtime roots, private scratch и ровно один собственный порт;
+  ключи и пользовательское окружение не наследуются.
+- Listener проверяется по process-session proof. Durable active receipt не
+  позволяет запустить замену при неизвестном завершении. Stop, timeout и ошибки
+  проверяют inference + CLI + host tool trees; unknown сохраняет scratch/claims.
+  Metadata probe временный, inference не запускает и чужие сервисы не меняет.
+- Local блокирует cloud Voice и Search. Общая Queue и BuildExecutor используют
+  этот же runner. Discovery существующих Ollama/LM Studio/custom endpoints
+  сохранён, но loopback-only сервер не считается offline. Engines с чужим
+  daemon или дополнительными динамическими портами требуют отдельного verified
+  adapter; это явное критическое уточнение исходного предложения.
+- Targeted suite **19/19**. Installed CLI + actual isolated synthetic model
+  server: initial, tool call и resume **1/1**, три Requests, исходный session ID,
+  завершение всего process set. OS test подтвердил remote/foreign-loopback и
+  private-file denial. Реальная модель не скачивалась и не объявлена принятой.
+- Workflow `07_workflows/local-provider-offline.md`, CLI configure/probe,
+  Settings поясняют временную копию. Actual installed-model acceptance — R12.
+- Дополнительный factory gate **46/46** включает Local: budget accounting,
+  recovery, unknown exit, invalid report и provider-slot competition. Source URL
+  передаётся через `--base-url` и закрепляется в attempt. Typecheck, privacy,
+  names **124** и Markdown **990** прошли. Полный unit gate запущен после блока.
 
 ## 7. Полные исходные материалы
 

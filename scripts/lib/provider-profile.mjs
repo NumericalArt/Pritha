@@ -106,7 +106,7 @@ export function assertProviderBinding(binding, requested) {
 
 export function resolveVoiceEngine({ connectorId, engine = "auto", configured = {}, offline = false, preferredEngine = "openai" }) {
   if (!isProviderConnectorId(connectorId) || !VOICE_ENGINES.includes(engine) || !["openai", "neuraldeep"].includes(preferredEngine)) invalid("voice_engine_invalid");
-  if (offline || (connectorId === "local" && engine === "auto")) {
+  if (offline || connectorId === "local") {
     if (engine !== "auto") invalid("voice_network_disallowed");
     return { engine: null, reason: "offline" };
   }

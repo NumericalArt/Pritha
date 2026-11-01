@@ -18,6 +18,7 @@ import {resolvePrithaPython} from './lib/python-runtime.mjs';
 import {ProviderHostTools,PROVIDER_HOST_TOOL_DEFINITIONS} from './lib/provider-host-tools.mjs';
 import {listenProviderToolServer} from './lib/provider-tool-server.mjs';
 import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
+import {readLocalServerConfiguration,startOwnedLocalServer} from './openai-compatible/owned-local-server.mjs';
 const failure=code=>Object.assign(new Error('The selected provider task could not complete safely.'),{code});
 const sessionPattern=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
@@ -62,38 +63,41 @@ export function buildCompatibleCodexArgs(options){
  * model, isolated home, history namespace and owned process proof. */
 export async function startCompatibleRun(options,dependencies={}){
   const provider=options.connectorId;
-  // Local inference needs an owned, egress-isolated server as well as a sandboxed
-  // CLI. An arbitrary localhost listener cannot authorize this offline lane.
-  if(provider==='local')throw failure('provider_offline_unverified');
-  if(provider!=='openrouter' || !modelId(options.model) || !options.model.includes('/') || typeof options.prompt!=='string' || !options.prompt.trim() || Buffer.byteLength(options.prompt)>256000
+  const localConfig=provider==='local'?(dependencies.localConfiguration || readLocalServerConfiguration)(options,{baseUrl:options.baseUrl,modelId:options.model}):null;
+  if(!['openrouter','local'].includes(provider) || !modelId(options.model) || provider==='openrouter' && !options.model.includes('/') || typeof options.prompt!=='string' || !options.prompt.trim() || Buffer.byteLength(options.prompt)>256000
     || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs<1000 || options.timeoutMs>3600000 || options.resume && !sessionPattern.test(options.resume))throw failure('provider_input_invalid');
   if(options.signal?.aborted)throw failure('operator_cancel');
   if(options.hostAttachments && !options.hostExecutionContext)throw failure('provider_attachments_unverified');
   const root=realpathSync(options.root),cwd=realpathSync(options.cwd),stateRoot=path.resolve(options.stateRoot),privateRoot=privateStateDirectory(stateRoot,options.privateRoot);
-  const key=(dependencies.readCredential || readProviderCredential)(provider,{stateRoot,env:options.env || process.env});if(!key)throw failure('provider_pending_auth');
+  const key=provider==='local'?undefined:(dependencies.readCredential || readProviderCredential)(provider,{stateRoot,env:options.env || process.env});if(provider==='openrouter' && !key)throw failure('provider_pending_auth');
   const binary=resolveCodexProviderBinary(options.codexBin,options.env || process.env);
   const cli=await (dependencies.probeCli || probeCompatibleCli)({root,stateRoot,connectorId:provider,codexBin:binary,env:options.env || process.env});if(!cli.available)throw failure(cli.code);
   if(options.hostAttachments && !hostFileAttachmentVerified(provider,cli.version))throw failure('provider_attachments_unverified');
   const codexHome=privateStateDirectory(stateRoot,path.join(privateRoot,'codex-home')),home=privateStateDirectory(stateRoot,path.join(privateRoot,'home'));
   if(options.resume){const proof=(dependencies.inspectSession || inspectProviderCliSession)({stateRoot,codexHome,cwd,provider,sessionId:options.resume,model:options.model});if(!proof.available)throw failure(proof.code);}
   const temporary=createProviderTemporaryDirectory({provider,stateRoot,temporaryRoot:options.temporaryRoot}),localToken=randomBytes(32).toString('base64url');
-  const identity=createHash('sha256').update(JSON.stringify([realpathSync(stateRoot),codexHome,cwd,provider,options.model,options.baseUrl || null])).digest('hex');
-  const controller=new AbortController(),trees=new Map();let budget,adapter,owned,sandboxPlan,timer,closed=false,verifiedExit=false,stopReason=null,providerError=null,hostTools,toolServer;
+  const identity=createHash('sha256').update(JSON.stringify([realpathSync(stateRoot),codexHome,cwd,provider,options.model,options.baseUrl || null,...(localConfig?[localConfig.identity]:[])])).digest('hex');
+  const controller=new AbortController(),trees=new Map();let budget,adapter,owned,sandboxPlan,timer,closed=false,verifiedExit=false,stopReason=null,providerError=null,hostTools,toolServer,localServer;
   const proof=()=>({kind:'provider-process-set',version:1,trees:[...trees].map(([id,evidence])=>({id,evidence}))});
   const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
-  const stop=reason=>{stopReason ||= reason;controller.abort();adapter?.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
-  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
+  const stop=reason=>{stopReason ||= reason;controller.abort();adapter?.abort();localServer?.stop();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
+  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();const inference=await localServer?.close();return result?.processTreeExited!==false && inference?.processTreeExited!==false;};
   try{
+    options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
+    const deadline=Date.now()+options.timeoutMs;timer=setTimeout(()=>stop('provider_timeout'),options.timeoutMs);
     budget=await openResponsesBudget({...options,root,stateRoot,privateRoot,identity,contextTokens:options.modelContextTokens,onCheckpoint:options.onBudgetCheckpoint});
+    if(localConfig)localServer=await (dependencies.startLocalServer || startOwnedLocalServer)({root,stateRoot,signal:controller.signal,timeoutMs:options.timeoutMs,
+      beforeStart:async evidence=>{trees.set('inference',evidence);await options.beforeStart?.({identity,evidence:proof(),codexHome,model:options.model,sessionId:options.resume || null});},
+      onEvidence:evidence=>recordTree('inference',evidence)},localConfig);
     if(options.hostExecutionContext){
       hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:provider,sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments});
       toolServer=await listenProviderToolServer({hostTools});
     }
-    adapter=await (dependencies.listenAdapter || listenCompatibleAdapter)({connectorId:provider,localToken,apiKey:key,model:options.model,effort:options.effort || 'default',reasoningControl:options.reasoningControl,thinkingBudget:options.thinkingBudget,
+    adapter=await (dependencies.listenAdapter || listenCompatibleAdapter)({connectorId:provider,localToken,...(localServer?{baseUrl:localServer.baseUrl}:{apiKey:key}),model:options.model,effort:options.effort || 'default',reasoningControl:options.reasoningControl,thinkingBudget:options.thinkingBudget,
       allowedTools:toolServer?PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name):[],
-      timeoutMs:options.timeoutMs,hardDeadlineAt:Date.now()+options.timeoutMs,maxOutputTokens:options.maxOutputTokens || 16384,fetchImpl:dependencies.fetchImpl,dispatcher:dependencies.dispatcher,
+      timeoutMs:options.timeoutMs,hardDeadlineAt:deadline,maxOutputTokens:options.maxOutputTokens || 16384,fetchImpl:dependencies.fetchImpl,dispatcher:dependencies.dispatcher,
       ...(budget?{prepareRequest:(payload,context)=>budget.begin(payload,context)}:{}),
-      beforeRequest:async request=>{if(controller.signal.aborted)throw failure('operator_cancel');await options.beforeRequest?.(request);},
+      beforeRequest:async request=>{if(controller.signal.aborted)throw failure('operator_cancel');await localServer?.verify();await options.beforeRequest?.(request);},
       onRequest:async event=>{if(event.error)providerError=event.error;await budget?.record(event);await options.onProviderRequest?.(event);}});
     const args=buildCompatibleCodexArgs({...options,cwd,toolServer,adapterBaseUrl:adapter.baseUrl,writableRoots:[temporary]});
     const env=providerProcessEnvironment({provider,root,stateRoot,codexHome,temporary,env:options.env || process.env});
@@ -102,8 +106,7 @@ export async function startCompatibleRun(options,dependencies={}){
     sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[codexHome,home],writeRoots:[codexHome,home],loopbackPorts:[adapter.port,...(toolServer?[toolServer.port]:[])],runtime:'codex'});
     owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(sandboxPlan.command,sandboxPlan.args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),
       beforeStart:async evidence=>{if(options.signal?.aborted)throw failure('operator_cancel');trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),codexHome,model:options.model,sessionId:options.resume || null,budgetId:budget?.budgetId || null,resume:options.resume || null});},onEvidence:evidence=>recordTree('cli',evidence)});
-    options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
-    timer=setTimeout(()=>stop('provider_timeout'),options.timeoutMs);
+    if(controller.signal.aborted)stop(stopReason || 'operator_cancel');
     const state={sessionId:null,usage:null,completed:false,failed:false,errorCode:null};
     const consume=(async()=>{let bytes=0,events=0;
       for await(const line of readJsonlLines(owned.child.stdout,{maximumLineBytes:16*1024*1024,onChunk:async chunk=>{bytes+=chunk.length;if(bytes>128*1024*1024)throw failure('provider_output_limit');await options.onRawChunk?.(chunk);}})){
