@@ -85,7 +85,8 @@ function plan() {
 test("delivery loop repairs a failing fixture, independently verifies, commits and preserves active worktree", async () => {
   const project = repository();
   const runRoot = path.join(mkdtempSync(path.join(os.tmpdir(), "pritha-loop-run-")), "builds", "fixture-agent", "run-success");
-  const executor = new FunctionBuildExecutor(async ({ worktree }) => {
+  const executor = new FunctionBuildExecutor(async ({ worktree, timeoutMs }) => {
+    assert.ok(timeoutMs > 10000 && timeoutMs < 60000, 'build window must fit the remaining total deadline');
     writeFileSync(path.join(worktree, "implementation.txt"), "ready\n", "utf8");
     return { summary: "implemented", changed_files: ["implementation.txt"] };
   });
@@ -94,6 +95,8 @@ test("delivery loop repairs a failing fixture, independently verifies, commits a
     projectPath: project,
     runRoot,
     runId: "run-success",
+    budget: { maxElapsedMs: 60000 },
+    executorTimeoutMs: 900000,
     buildExecutor: executor,
     trialBackend: "local",
     reportDir: false,

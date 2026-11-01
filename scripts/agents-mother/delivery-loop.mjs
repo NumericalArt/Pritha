@@ -847,6 +847,8 @@ async function runDeliveryLoopLocked(input = {}) {
           return blockDelivery(runRoot, plan, worktree, blockerForError(new DeliveryLoopError("token_budget_exhausted", "The confirmed build token budget is exhausted")), input);
         }
         const goalRequired = executionState.budget.goal_enforcement !== "waived-once";
+        const remainingElapsedMs=executionState.budget.max_elapsed_ms-(Date.now()-Date.parse(executionState.created_at));
+        if(!Number.isFinite(remainingElapsedMs) || remainingElapsedMs<10000)throw new DeliveryLoopError('elapsed_budget_exhausted','No complete build window remains in the approved elapsed-time budget.');
         executorResult = await buildExecutor.execute({
           runId: state.run_id,
           iteration: state.iteration,
@@ -855,7 +857,7 @@ async function runDeliveryLoopLocked(input = {}) {
           plan,
           failures: sanitize(failures, { projectRoot: worktree.worktree, stateRoot: input.stateRoot, root: input.root }),
           protectedPaths: protectedInputs.entries,
-          timeoutMs: input.executorTimeoutMs,
+          timeoutMs: Math.min(input.executorTimeoutMs || 900000,remainingElapsedMs),
           stateRoot: input.stateRoot,
           root: input.root,
           tokenBudget: remainingTokens,

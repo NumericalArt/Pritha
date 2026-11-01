@@ -225,7 +225,7 @@ export function createNeuralDeepAdapter(options = {}) {
       timings.firstByteMs ??= elapsedMs;timings.lastByteMs=elapsedMs;timings.responseBytes+=bytes;
       progress('receiving',first);
     };
-    const notifyRequest=event=>{if(!notified){notified=true;try{options.onRequest?.({method:request.method,path:requestUrl.pathname,
+    const notifyRequest=async event=>{if(!notified){notified=true;try{await options.onRequest?.({method:request.method,path:requestUrl.pathname,
       durationMs:Date.now()-startedAt,timings:{...timings},cancellationReason,requestHash:dispatchHash,upstreamAttempted,usage:providerUsage,responseSummary,...event});}
       catch{throw Object.assign(new Error('The host could not record the provider receipt.'),{code:'provider_receipt_failed',statusCode:503});}}};
     try {
@@ -249,7 +249,7 @@ export function createNeuralDeepAdapter(options = {}) {
         // Identity belongs to the caller's request. A shrinking host response
         // cap must not turn an exact retry into a new payable request.
         requestHash = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
-        if (options.prepareResponsesRequest) payload = await options.prepareResponsesRequest(payload);
+        if (options.prepareResponsesRequest) payload = await options.prepareResponsesRequest(payload,{requestHash});
         outputLimit = payload.max_output_tokens;
         body = Buffer.from(JSON.stringify(payload));
         requestDeadlineWindow(options.deadline);
@@ -304,7 +304,7 @@ export function createNeuralDeepAdapter(options = {}) {
         const retryAfter = broken ? null : upstream.headers.get("retry-after");
         const retry = attempt < maxAttempts;
         const delayMs = !retry ? 0 : options.providerRetryDelayMs ? options.providerRetryDelayMs(attempt, status, retryAfter) : providerRetryDelayMs(attempt, status, retryAfter);
-        options.onRequest?.({ method: request.method, path: requestUrl.pathname, status, durationMs: Date.now() - startedAt,
+        await options.onRequest?.({ method: request.method, path: requestUrl.pathname, status, durationMs: Date.now() - startedAt,
           timings: { ...timings }, cancellationReason: null, requestHash: dispatchHash, upstreamAttempted: true, usage: null, responseSummary: null,
           ...(broken ? { streamBroken: true } : { providerRejected: true }), retry: retry ? { attempt, maxAttempts, nextDelayMs: delayMs } : null,
           error: broken ? classifyNeuralDeepProviderError({ status, transportCode: broken.code })
@@ -347,7 +347,7 @@ export function createNeuralDeepAdapter(options = {}) {
         const error=unfinishedResponseError(responseSummary,terminal.type,upstream.status);
         // Close the accounting gap before any complete tool can cause Codex to
         // submit another request. Partial public text never settles the turn.
-        notifyRequest({status:upstream.status,error});
+        await notifyRequest({status:upstream.status,error});
         await normalizer.flush(events);response.end();progress('finished',true);return;
       }
       const upstreamBody = rejectedBody ?? bufferedBody ?? await readWebBody(upstream, responseLimit, received);
@@ -355,7 +355,7 @@ export function createNeuralDeepAdapter(options = {}) {
         const error=classifyNeuralDeepProviderError({status:upstream.status,payload:parseProviderErrorPayload(upstreamBody),retryAfter:upstream.headers.get('retry-after')});
         if(error.retryAfter)response.setHeader('retry-after',error.retryAfter);
         sendJson(response,upstream.status,{error:{code:error.code,message:'The selected task provider could not accept the request.'}});
-        notifyRequest({status:upstream.status,providerRejected:true,error});progress('finished',true);return;
+        await notifyRequest({status:upstream.status,providerRejected:true,error});progress('finished',true);return;
       }
       if (!rejectedBody && !bufferedBody) timings.responseCompletedMs = Date.now() - upstreamStartedAt;
       if(isResponses)providerUsage=responsesUsage(upstreamBody.toString('utf8'),upstream.headers.get('content-type') || '');
@@ -364,7 +364,7 @@ export function createNeuralDeepAdapter(options = {}) {
       const output = isResponses && isEventStream
         ? Buffer.from(normalizeResponsesSse(transformResponseStream(upstreamBody.toString("utf8"))))
         : isResponses && upstream.ok && toolMapping ? Buffer.from(JSON.stringify(projectResponse(JSON.parse(upstreamBody.toString('utf8'))))) : upstreamBody;
-      notifyRequest({
+      await notifyRequest({
         method: request.method,
         path: requestUrl.pathname,
         status: upstream.status,
@@ -403,7 +403,7 @@ export function createNeuralDeepAdapter(options = {}) {
         const code=protectedBoundary ? classifyNeuralDeepProviderError({transportCode:error?.code}).code : typeof error?.code==='string' && /^[a-z_]{1,96}$/.test(error.code)?error.code:'neuraldeep_stream_failed';
         response.end(`data: ${JSON.stringify({type:'response.failed',response:{status:'failed',error:{code,message:'Response stream did not complete.'}}})}\n\ndata: [DONE]\n\n`);
       }
-      notifyRequest({
+      try { await notifyRequest({
         method: request.method,
         path: requestUrl.pathname,
         status: statusCode,
@@ -418,7 +418,7 @@ export function createNeuralDeepAdapter(options = {}) {
           transportCode: cancellationReason || (error?.name === "AbortError" ? "provider_timeout" : error?.code),
         }),
         ...(!protectedBoundary && typeof error?.detail === "string" ? { errorDetail: error.detail } : {}),
-      });
+      }); } catch { /* Failed accounting stays blocked; do not reject the HTTP handler. */ }
       progress('failed',true);
     } finally {
       clearTimeout(timeout);

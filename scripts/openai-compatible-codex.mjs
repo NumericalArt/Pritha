@@ -1,3 +1,4 @@
+import {openResponsesBudget} from './lib/responses-request-budget.mjs';
 import {createHash,randomBytes} from 'node:crypto';
 import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import {realpathSync,rmSync} from 'node:fs';
@@ -77,12 +78,13 @@ export async function startCompatibleRun(options,dependencies={}){
   if(options.resume){const proof=(dependencies.inspectSession || inspectProviderCliSession)({stateRoot,codexHome,cwd,provider,sessionId:options.resume,model:options.model});if(!proof.available)throw failure(proof.code);}
   const temporary=createProviderTemporaryDirectory({provider,stateRoot,temporaryRoot:options.temporaryRoot}),localToken=randomBytes(32).toString('base64url');
   const identity=createHash('sha256').update(JSON.stringify([realpathSync(stateRoot),codexHome,cwd,provider,options.model,options.baseUrl || null])).digest('hex');
-  const controller=new AbortController(),trees=new Map();let adapter,owned,sandboxPlan,timer,closed=false,verifiedExit=false,stopReason=null,providerError=null,hostTools,toolServer;
+  const controller=new AbortController(),trees=new Map();let budget,adapter,owned,sandboxPlan,timer,closed=false,verifiedExit=false,stopReason=null,providerError=null,hostTools,toolServer;
   const proof=()=>({kind:'provider-process-set',version:1,trees:[...trees].map(([id,evidence])=>({id,evidence}))});
   const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
   const stop=reason=>{stopReason ||= reason;controller.abort();adapter?.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
   const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
   try{
+    budget=await openResponsesBudget({...options,root,stateRoot,privateRoot,identity,contextTokens:options.modelContextTokens,onCheckpoint:options.onBudgetCheckpoint});
     if(options.hostExecutionContext){
       hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:provider,sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments});
       toolServer=await listenProviderToolServer({hostTools});
@@ -90,15 +92,16 @@ export async function startCompatibleRun(options,dependencies={}){
     adapter=await (dependencies.listenAdapter || listenCompatibleAdapter)({connectorId:provider,localToken,apiKey:key,model:options.model,effort:options.effort || 'default',reasoningControl:options.reasoningControl,thinkingBudget:options.thinkingBudget,
       allowedTools:toolServer?PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name):[],
       timeoutMs:options.timeoutMs,hardDeadlineAt:Date.now()+options.timeoutMs,maxOutputTokens:options.maxOutputTokens || 16384,fetchImpl:dependencies.fetchImpl,dispatcher:dependencies.dispatcher,
+      ...(budget?{prepareRequest:(payload,context)=>budget.begin(payload,context)}:{}),
       beforeRequest:async request=>{if(controller.signal.aborted)throw failure('operator_cancel');await options.beforeRequest?.(request);},
-      onRequest:async event=>{if(event.error)providerError=event.error;await options.onProviderRequest?.(event);}});
+      onRequest:async event=>{if(event.error)providerError=event.error;await budget?.record(event);await options.onProviderRequest?.(event);}});
     const args=buildCompatibleCodexArgs({...options,cwd,toolServer,adapterBaseUrl:adapter.baseUrl,writableRoots:[temporary]});
     const env=providerProcessEnvironment({provider,root,stateRoot,codexHome,temporary,env:options.env || process.env});
     Object.assign(env,{HOME:home,PRITHA_PROVIDER_CAPABILITY:localToken,PRITHA_PYTHON:resolvePrithaPython({root,env:options.env || process.env})});
     if(toolServer)env.PRITHA_TOOL_CAPABILITY=toolServer.token;
     sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[codexHome,home],writeRoots:[codexHome,home],loopbackPorts:[adapter.port,...(toolServer?[toolServer.port]:[])],runtime:'codex'});
     owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(sandboxPlan.command,sandboxPlan.args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),
-      beforeStart:async evidence=>{if(options.signal?.aborted)throw failure('operator_cancel');trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),codexHome,model:options.model,resume:options.resume || null});},onEvidence:evidence=>recordTree('cli',evidence)});
+      beforeStart:async evidence=>{if(options.signal?.aborted)throw failure('operator_cancel');trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),codexHome,model:options.model,sessionId:options.resume || null,budgetId:budget?.budgetId || null,resume:options.resume || null});},onEvidence:evidence=>recordTree('cli',evidence)});
     options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
     timer=setTimeout(()=>stop('provider_timeout'),options.timeoutMs);
     const state={sessionId:null,usage:null,completed:false,failed:false,errorCode:null};
@@ -106,7 +109,7 @@ export async function startCompatibleRun(options,dependencies={}){
       for await(const line of readJsonlLines(owned.child.stdout,{maximumLineBytes:16*1024*1024,onChunk:async chunk=>{bytes+=chunk.length;if(bytes>128*1024*1024)throw failure('provider_output_limit');await options.onRawChunk?.(chunk);}})){
         if(++events>100000)throw failure('provider_output_limit');let event;try{event=JSON.parse(line);}catch{throw failure('provider_stream_invalid');}
         if(!event || typeof event!=='object' || Array.isArray(event))throw failure('provider_stream_invalid');
-        if(event.type==='thread.started'){if(!sessionPattern.test(event.thread_id || '') || options.resume && event.thread_id!==options.resume || state.sessionId && state.sessionId!==event.thread_id)throw failure('runtime_identity_mismatch');state.sessionId=event.thread_id;}
+        if(event.type==='thread.started'){if(!sessionPattern.test(event.thread_id || '') || options.resume && event.thread_id!==options.resume || state.sessionId && state.sessionId!==event.thread_id)throw failure('runtime_identity_mismatch');state.sessionId=event.thread_id;await budget?.bindSession(event.thread_id);}
         if(event.type==='turn.completed'){state.completed=true;state.usage=neuralDeepUsageKnown(event.usage)?event.usage:null;}
         if(event.type==='turn.failed' || event.type==='error')state.failed=true;
         await options.onEvent?.(event);
@@ -116,8 +119,8 @@ export async function startCompatibleRun(options,dependencies={}){
     owned.child.stdin.on('error',()=>{});owned.child.stdin.end(options.prompt);
     const completion=(async()=>{
       try{const [result]=await Promise.all([owned.completion,consume,diagnostic]);const toolsExited=await closeTools();verifiedExit=result.processTreeExited===true && toolsExited;
-        const errorCode=state.errorCode || stopReason || providerError?.code || (!verifiedExit?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
-        return {ok:!errorCode,errorCode,sessionId:state.sessionId,model:options.model,identity,usage:state.usage,providerError,processTreeExited:verifiedExit};
+        const errorCode=budget?.budget.errorCode || state.errorCode || stopReason || providerError?.code || (!verifiedExit?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
+        return {ok:!errorCode,errorCode,sessionId:state.sessionId,model:options.model,identity,usage:state.usage,providerError,processTreeExited:verifiedExit,...(budget?{budgetId:budget.budgetId,budget:budget.snapshot()}:{})};
       }finally{closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);await adapter?.close();if(verifiedExit){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan.planPath)rmSync(sandboxPlan.planPath,{force:true});}}
     })();return {completion,stop:()=>closed?false:stop('operator_cancel'),identity};
   }catch(error){clearTimeout(timer);options.signal?.removeEventListener('abort',abort);owned?.stop();if(owned)verifiedExit=(await owned.completion).processTreeExited===true;

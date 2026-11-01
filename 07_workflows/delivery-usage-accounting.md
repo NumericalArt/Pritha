@@ -3,7 +3,7 @@ id: delivery-usage-accounting
 type: workflow
 status: active
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-11-01
 topics: [agents-mother, task-chat, delivery, token-usage, accounting, runtime-provenance]
 tools: [Pritha, Codex, Node.js, Control Center]
 sources:
@@ -98,3 +98,40 @@ parent telemetry переписка сохраняет возможность п
 отдельными пунктами 1.6/1.7. Unconfirmed terminal subprocess требует дальнейшей
 проверки владения и recovery; свободный lease родителя не доказывает отсутствие
 оставшегося дочернего процесса.
+
+## Сборка через выбранный connector
+
+Delivery принимает `--executor codex-app-server|claude-code|neuraldeep|openrouter|local`.
+Для внешнего provider явно передаются `--model` и поддерживаемый `--effort`;
+исходный контракт сохраняет отдельный Build executor. Выбор исполнителя не
+меняет принятые Outcome, Trials, права на проект или runtime ребёнка. Local
+зарегистрирован, но reachable endpoint без доказанного offline isolation
+остаётся `provider_offline_unverified` и не запускает сборку.
+
+Claude API, NeuralDeep и OpenRouter используют общий протокол disposable Git
+worktree, неизменяемых verifier paths, семи host tools, exact command approvals
+и instance-private attempt receipts. Build Search выключен: источники заранее
+собираются через host external-research. Provider slot общий с Task Chat;
+одновременная задача не может обойти его отдельным запуском factory.
+
+До HTTP dispatch host сохраняет резерв: размер текстового запроса в UTF-8 +
+8192 framing reserve + разрешённый output. Это консервативная оценка, а не
+точный tokenizer count или гарантия billing. Remote/media input, encrypted
+reasoning, server-side history и hosted tools не допускаются в text-only build
+budget. Output ограничен остатком бюджета и моделью; Gemma 4 thinking build
+имеет cap 8192, Qwen/Kimi thinking — до 32768, остальные — до 16384. Независимый
+thinking budget NeuralDeep Responses не подтверждён и отклоняется до запроса.
+
+Терминальный tool output выдаётся CLI только после durable usage checkpoint.
+При network ambiguity, отсутствующем usage, превышении резерва или ошибке
+записи новые запросы закрыты. Unknown не равен нулю. Receipt привязан к
+instance, worktree, run, iteration, model, session, process tree и budget ID;
+recover не запускает модель и не использует текущий выбранный preset вместо
+сохранённой модели. Повтор завершённой attempt возвращает прежний receipt.
+
+Timeout каждой сборки ограничен оставшимся общим elapsed budget. После
+истечения времени host подтверждает завершение дерева процессов; до этого
+lease и неопределённый расход сохраняются для recovery. Проверки через
+установленный CLI с synthetic upstream подтверждают защиту verifier, запись
+продукта, measured usage и recovery без повторного dispatch. Они не заменяют
+ручную приёмку выбранного реального provider.

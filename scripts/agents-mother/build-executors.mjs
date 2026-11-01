@@ -4,6 +4,12 @@ import { execFileSync } from 'node:child_process';
 import path from "node:path";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { CodexAppServerConnection, ExecutionBackendError } from "./execution-backends.mjs";
+import {NeuralDeepProviderService} from '../neuraldeep/provider-service.mjs';
+import {CompatibleProviderService} from '../openai-compatible/provider-service.mjs';
+import {startNeuralDeepRun} from '../neuraldeep-codex.mjs';
+import {startCompatibleRun} from '../openai-compatible-codex.mjs';
+import {defaultProviderPreset,normalizeProviderPreset} from '../lib/provider-profile.mjs';
+import {neuralDeepExecutionProfile,buildResponseCap,effectiveNeuralDeepEffort} from '../neuraldeep/model-execution-profile.mjs';
 import { ClaudeProviderService } from '../claude/provider-service.mjs';
 import { startClaudeCodeRun } from '../claude-code-runner.mjs';
 import { ExecutionCoordinator } from '../lib/execution-coordinator.mjs';
@@ -534,17 +540,17 @@ export class CodexAppServerBuildExecutor {
  * worktree. Host tools still enforce immutable verifier paths and closed egress;
  * an approval callback cannot widen that boundary. */
 export class ClaudeCodeBuildExecutor {
-  constructor(options={}){this.name='claude-code-build';this.options=options;this.active=new Set();}
+  constructor(options={}){this.name='claude-code-build';this.connectorId='claude';this.providerName='anthropic';this.defaultLaunch=startClaudeCodeRun;this.options=options;this.active=new Set();}
   context(input={}){
     const root=input.root || this.options.root?path.resolve(input.root || this.options.root):resolvePrithaRoot(),stateRoot=resolvePrithaStateRoot({root,stateRoot:input.stateRoot || this.options.stateRoot});
-    const privateRoot=resolvePrithaStatePathFrom({root,stateRoot},'private','agents-mother','claude-build');
+    const privateRoot=resolvePrithaStatePathFrom({root,stateRoot},'private','agents-mother',this.connectorId+'-build');
     const executionDirectory=path.join(stateRoot===root?path.join(root,'.private'):stateRoot,'codex-chat','execution');
     return {root,stateRoot,privateRoot,executionDirectory};
   }
   isolated(input,context){
     const cwd=worktreeRoot(input.worktree || input.cwd),gitFile=path.join(cwd,'.git');
-    if(cwd===realpathSync(context.root) || !existsSync(gitFile) || !lstatSync(gitFile).isFile() || lstatSync(gitFile).isSymbolicLink())throw new ExecutionBackendError('build_isolation_unavailable','Claude builds require a disposable Git worktree.');
-    const env=providerProcessEnvironment({provider:'claude',root:context.root,stateRoot:context.stateRoot});
+    if(cwd===realpathSync(context.root) || !existsSync(gitFile) || !lstatSync(gitFile).isFile() || lstatSync(gitFile).isSymbolicLink())throw new ExecutionBackendError('build_isolation_unavailable','Provider builds require a disposable Git worktree.');
+    const env=providerProcessEnvironment({provider:this.connectorId,root:context.root,stateRoot:context.stateRoot});
     try{const git=(...args)=>execFileSync('git',args,{cwd,env,encoding:'utf8',timeout:5000,maxBuffer:8000,stdio:['ignore','pipe','ignore']}).trim();
       const top=git('rev-parse','--show-toplevel'),directory=realpathSync(git('rev-parse','--absolute-git-dir')),common=realpathSync(path.resolve(cwd,git('rev-parse','--git-common-dir')));
       if(realpathSync(top)!==cwd || directory===common || realpathSync(readFileSync(path.join(directory,'gitdir'),'utf8').trim())!==realpathSync(gitFile))throw new Error();}
@@ -568,7 +574,7 @@ export class ClaudeCodeBuildExecutor {
     const context=this.context(input),cwd=this.isolated(input,context),tokenBudget=Number(input.tokenBudget);
     if(!Number.isSafeInteger(tokenBudget) || tokenBudget<1)throw new ExecutionBackendError('token_budget_exhausted','A positive build token budget is required.');
     if(typeof input.runId!=='string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(input.runId) || !Number.isSafeInteger(input.iteration) || input.iteration<1)throw new ExecutionBackendError('executor_input_invalid','A stable delivery run and iteration are required.');
-    const key='claude-build:'+input.runId+':'+input.iteration,requestHash=createHash('sha256').update(JSON.stringify([cwd,input.plan,input.failures,input.protectedPaths,input.guidance,tokenBudget])).digest('hex');
+    const key=this.connectorId+'-build:'+input.runId+':'+input.iteration,requestHash=createHash('sha256').update(JSON.stringify([cwd,input.plan,input.failures,input.protectedPaths,input.guidance,tokenBudget])).digest('hex');
     const coordinator=new ExecutionCoordinator({stateRoot:context.stateRoot,directory:context.executionDirectory});
     let lease,receipt,started=false,run,exitConfirmed=false,control;
     const checkpoint=async()=>{const safe=sanitized(receipt,{projectRoot:cwd,stateRoot:context.stateRoot,root:context.root});coordinator.updateIntent(key,{receipt:safe});try{await input.onCheckpoint?.(safe);}catch{throw new ExecutionBackendError('executor_checkpoint_failed','The build checkpoint could not be saved.',{executorResult:safe});}return safe;};
@@ -577,13 +583,17 @@ export class ClaudeCodeBuildExecutor {
         const prior=coordinator.getIntent(key);
         if(prior){if(prior.hash!==requestHash)throw new ExecutionBackendError('executor_recovery_mismatch','The saved attempt has different approved inputs.');if(prior.receipt?.process_exited===true)return {replay:prior.receipt};throw new ExecutionBackendError('executor_recovery_required','Recover the original build attempt before starting another.',{executorResult:prior.receipt});}
         const ready=await this.service(context).require(this.preset()),model=ready.model.id,attemptId=randomUUID();
-        lease=coordinator.claim(['delivery-attempt:'+key,'workspace:'+cwd],key,{kind:'turn',capacity:coordinator.admission().capacity,detail:{runId:input.runId,connectorId:'claude'}});
+        lease=coordinator.claim(['delivery-attempt:'+key,'workspace:'+cwd],key,{kind:'turn',capacity:coordinator.admission().capacity,detail:{runId:input.runId,connectorId:this.connectorId}});
         if(!lease)throw new ExecutionBackendError('workspace_busy','Another task owns this build workspace or execution capacity.');
+        const parallel=ready.capabilities?.parallelLimit ?? (this.connectorId==='neuraldeep'?null:1);
+        if(!Number.isSafeInteger(parallel) || parallel<1 || parallel>64)throw new ExecutionBackendError('provider_limits_unknown','The provider concurrency limit is unavailable.');
+        let providerSlot=false;for(let index=0;index<parallel && !providerSlot;index++)providerSlot=coordinator.extend(lease.owner,lease.generation,['provider-slot:'+this.connectorId+':'+index]);
+        if(!providerSlot)throw new ExecutionBackendError('provider_rate_limited','Another task owns the available provider capacity.');
         if(!coordinator.extend(lease.owner,lease.generation,['execution-ambient-effects'],{mode:'read'}))throw new ExecutionBackendError('execution_draining','The host is preparing a managed update.');
-        receipt={schema:BUILD_EXECUTOR_RESULT_SCHEMA,executor:this.name,provider:'claude',run_id:input.runId,iteration:input.iteration,attempt_id:attemptId,budget_id:attemptId,
-          worktree_identity:worktreeIdentity(cwd),runtime_version:ready.version,model_requested:this.options.model || 'sonnet',model_pinned:model,model_observed:null,effort_requested:this.preset().reasoningEffort,provider_observed:null,
-          status:'prepared',turn_status:'not-started',thread_id:null,turn_id:attemptId,process_exited:false,thread_cleanup:'not-created',token_budget:tokenBudget,tokens_used:null,usage_scope:'build-executor',usage_status:'not-started',usage_source:'anthropic-host-response',goal_enforcement:'not-applicable',budget_enforcement:'host-reservation-estimate',duration_ms:0};
-        coordinator.reserveIntent(key,requestHash,{kind:'build-executor',connectorId:'claude',runId:input.runId,iteration:input.iteration,owner:lease.owner,generation:lease.generation,receipt});return {};
+        receipt={schema:BUILD_EXECUTOR_RESULT_SCHEMA,executor:this.name,provider:this.connectorId,run_id:input.runId,iteration:input.iteration,attempt_id:attemptId,budget_id:attemptId,
+          worktree_identity:worktreeIdentity(cwd),runtime_version:ready.version,model_requested:this.preset().modelId,model_pinned:model,model_observed:null,effort_requested:this.preset().reasoningEffort,provider_observed:null,execution_profile:ready.executionProfile || null,effort_effective:this.connectorId==='neuraldeep'?effectiveNeuralDeepEffort(model,this.preset().reasoningEffort):this.preset().reasoningEffort,model_policy:{maxOutputTokens:ready.capabilities?.outputTokens,modelContextTokens:ready.capabilities?.contextTokens,reasoningControl:ready.capabilities?.reasoningControl,thinkingBudget:this.preset().thinkingBudget},
+          status:'prepared',turn_status:'not-started',thread_id:null,turn_id:attemptId,process_exited:false,thread_cleanup:'not-created',token_budget:tokenBudget,tokens_used:null,usage_scope:'build-executor',usage_status:'not-started',usage_source:this.providerName+'-host-response',goal_enforcement:'not-applicable',budget_enforcement:'host-reservation-estimate',duration_ms:0};
+        coordinator.reserveIntent(key,requestHash,{kind:'build-executor',connectorId:this.connectorId,runId:input.runId,iteration:input.iteration,owner:lease.owner,generation:lease.generation,receipt});return {};
       });
       if(prepared.replay)return prepared.replay;
       await checkpoint();const began=Date.now(),controller=new AbortController(),abort=()=>controller.abort();input.signal?.addEventListener('abort',abort,{once:true});if(input.signal?.aborted)abort();
@@ -591,35 +601,35 @@ export class ClaudeCodeBuildExecutor {
       try{
         const prompt=buildPrompt(input)+'\n\nReturn the final report as a JSON object, without code fences, matching this host-validated schema. changed_files must contain only relative workspace paths.\n'+JSON.stringify(CLAUDE_BUILD_REPORT_SCHEMA);
         let finalText='';
-        run=await (this.options.launch || startClaudeCodeRun)({...context,cwd,claudeBin:this.options.claudeBin,model:receipt.model_pinned,effort:receipt.effort_requested,authMode:'api-key',sandbox:'workspace-write',prompt,
+        run=await (this.options.launch || this.defaultLaunch)({...context,cwd,connectorId:this.connectorId,codexBin:this.options.codexBin,claudeBin:this.options.claudeBin,...receipt.model_policy,allowSearch:false,model:receipt.model_pinned,effort:receipt.effort_requested,authMode:'api-key',sandbox:'workspace-write',prompt,
           timeoutMs:Number.isSafeInteger(input.timeoutMs)?Math.max(1000,Math.min(input.timeoutMs,3600000)):900000,maxTurns:Math.min(this.options.maxTurns || 32,128),tokenBudget,budgetId:receipt.budget_id,signal:controller.signal,
           hostExecutionContext:{coordinator,lease,chatId:'build_'+input.runId,turnId:receipt.attempt_id,protectedPaths:(input.protectedPaths || []).map(entry=>entry.path || entry)},
           approve:async request=>{lease.assertOwned();if(controller.signal.aborted)throw new ExecutionBackendError('operator_cancel','Build cancelled.');if(request.kind==='user_input')throw new ExecutionBackendError('build_operator_input_required','The build requires operator guidance.');return {decision:'accept'};},
           beforeStart:async proof=>{lease.assertOwned();started=true;receipt.status='dispatching';receipt.thread_id=proof.sessionId;receipt.profile_identity=proof.identity;receipt.thread_cleanup='pending';coordinator.updateIntent(key,{state:'dispatching',processProof:proof.evidence});await checkpoint();},
           onEvidence:proof=>coordinator.updateIntent(key,{processProof:proof}),
           beforeRequest:()=>{lease.assertOwned();if(controller.signal.aborted)throw new ExecutionBackendError('operator_cancel','Build cancelled.');},
-          onBudgetCheckpoint:async value=>{receipt.tokens_used=value.usageKnown?value.tokensUsed:null;receipt.usage_status=value.requests.length?(value.usageKnown?'measured':'unknown'):'not-started';await checkpoint();},
+          onBudgetCheckpoint:async value=>{if(value.sessionId)receipt.thread_id=value.sessionId;receipt.tokens_used=value.usageKnown?value.tokensUsed:null;receipt.usage_status=value.requests.length?(value.usageKnown?'measured':'unknown'):'not-started';await checkpoint();},
           onEvent:event=>{if(event.type==='item.completed' && event.item?.type==='agent_message')finalText=event.item.text;},
         });
         const result=await run.completion;exitConfirmed=result.processTreeExited===true;
         const accounting=result.budget,measured=accounting?.usageKnown===true && Number.isSafeInteger(accounting.tokensUsed);
         const report=this.report(finalText),ok=result.ok && report!==null,errorCode=result.errorCode || (!report?'build_summary_invalid':null);
         receipt={...receipt,...(report || {summary:'The build returned no valid structured summary.',changed_files:[],remaining_risks:['Review the recorded tool results and independent Trials.']}),status:exitConfirmed?(ok?'completed':'failed'):'uncertain',turn_status:exitConfirmed?(ok?'completed':'interrupted'):'unknown',process_exited:exitConfirmed,
-          model_observed:result.sessionId?result.model || receipt.model_pinned:null,provider_observed:result.sessionId?'anthropic':null,thread_id:result.sessionId || receipt.thread_id,
+          model_observed:result.sessionId?result.model || receipt.model_pinned:null,provider_observed:result.sessionId?this.providerName:null,thread_id:result.sessionId || receipt.thread_id,
           thread_cleanup:exitConfirmed?'closed':'pending',tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':'unknown',duration_ms:Date.now()-began,error_code:errorCode};
         coordinator.updateIntent(key,{state:exitConfirmed?receipt.status:'unknown'});const stored=await checkpoint();
         if(!exitConfirmed || !measured)throw new ExecutionBackendError('goal_usage_unavailable','The previous build execution or its usage remains unconfirmed.',{executorResult:stored});
-        if(!ok)throw new ExecutionBackendError(errorCode==='provider_budget_exhausted'?'token_budget_exhausted':errorCode || 'build_executor_failed','The bounded Claude build stopped before completion.',{executorResult:stored});return stored;
+        if(!ok)throw new ExecutionBackendError(errorCode==='provider_budget_exhausted'?'token_budget_exhausted':errorCode || 'build_executor_failed','The bounded provider build stopped before completion.',{executorResult:stored});return stored;
       }finally{input.signal?.removeEventListener('abort',abort);}
     }catch(error){
       if(receipt && !started){exitConfirmed=true;receipt={...receipt,status:'not-started',turn_status:'not-started',process_exited:true,thread_cleanup:'not-created'};coordinator.updateIntent(key,{state:'not-started',receipt:sanitized(receipt,{projectRoot:cwd,stateRoot:context.stateRoot,root:context.root})});if(error.details?.executorResult)error.details.executorResult=receipt;}
       if(error.processTreeExited===true){exitConfirmed=true;if(receipt){receipt={...receipt,process_exited:true,thread_cleanup:'closed'};try{await checkpoint();}catch{/* Recovery can read the host receipt. */}if(error.details?.executorResult)error.details.executorResult=receipt;}}
       if(receipt && !error.details?.executorResult){exitConfirmed=error.processTreeExited===true || (!started && error.processTreeExited!==false);receipt={...receipt,status:exitConfirmed?'not-started':'uncertain',process_exited:exitConfirmed,thread_cleanup:exitConfirmed?'closed':'pending',error_code:/^[a-z_]+$/.test(error.code || '')?error.code:'build_executor_failed'};try{await checkpoint();}catch{/* The durable intent remains authoritative. */}}
-      if(error instanceof ExecutionBackendError)throw error;throw new ExecutionBackendError('build_executor_failed','The bounded Claude build could not complete.',{executorResult:receipt});
+      if(error instanceof ExecutionBackendError)throw error;throw new ExecutionBackendError('build_executor_failed','The bounded provider build could not complete.',{executorResult:receipt});
     }finally{if(control)this.active.delete(control);if(lease && (exitConfirmed || !started))lease.release();coordinator.close();}
   }
   async recover(input,saved){
-    const context=this.context(input),cwd=this.isolated(input,context),key='claude-build:'+input.runId+':'+saved.iteration,coordinator=new ExecutionCoordinator({stateRoot:context.stateRoot,directory:context.executionDirectory});
+    const context=this.context(input),cwd=this.isolated(input,context),key=this.connectorId+'-build:'+input.runId+':'+saved.iteration,coordinator=new ExecutionCoordinator({stateRoot:context.stateRoot,directory:context.executionDirectory});
     try{
       const intent=coordinator.getIntent(key),receipt=intent?.receipt;
       if(saved.executor!==this.name || saved.run_id!==input.runId || !receipt || receipt.attempt_id!==saved.attempt_id || receipt.worktree_identity!==worktreeIdentity(cwd))throw new ExecutionBackendError('executor_recovery_mismatch','The build recovery identity does not match.');
@@ -643,8 +653,33 @@ export class ClaudeCodeBuildExecutor {
   close(){for(const active of this.active)active.stop();}
 }
 
+export class ResponsesBuildExecutor extends ClaudeCodeBuildExecutor {
+  constructor(connectorId,options={}){
+    super(options);if(!['neuraldeep','openrouter','local'].includes(connectorId))throw new ExecutionBackendError('build_provider_invalid','Choose a registered build provider.');
+    this.connectorId=connectorId;this.providerName=connectorId;this.name=connectorId+'-build';this.defaultLaunch=connectorId==='neuraldeep'?startNeuralDeepRun:startCompatibleRun;
+  }
+  preset(){return normalizeProviderPreset(this.connectorId,{...defaultProviderPreset(this.connectorId),...(this.options.preset || {}),...(this.options.model?{modelId:this.options.model}:{}),...(this.options.effort?{reasoningEffort:this.options.effort}:{}),timeoutMs:900000});}
+  service(context){
+    if(this.options.service)return this.options.service;
+    if(this.connectorId!=='neuraldeep'){
+      const service=new CompatibleProviderService({...context,connectorId:this.connectorId,codexBin:this.options.codexBin});
+      return {require:async preset=>{const status=await service.require(preset);return {...status,model:status.models.find(model=>model.id===preset.modelId)};}};
+    }
+    const service=new NeuralDeepProviderService({...context,codexBin:this.options.codexBin});
+    return {require:async preset=>{
+      const profile=neuralDeepExecutionProfile(preset.modelId);
+      if(preset.thinkingBudget!==undefined)throw new ExecutionBackendError('provider_thinking_budget_unverified','A separate thinking budget has not been verified for this Responses route.');
+      if(profile.effortControl!=='ignored' && !profile.supportedEfforts.includes(preset.reasoningEffort))throw new ExecutionBackendError('provider_effort_invalid','Choose an effort supported by the selected model.');
+      const status=await service.snapshot(preset.modelId);if(status.status!=='ready')throw new ExecutionBackendError(status.error?.code || 'provider_unavailable','The selected NeuralDeep build model is unavailable.');
+      const output=Math.min(status.capabilities.outputTokens || Infinity,buildResponseCap(preset.modelId) || profile.applicationOutputCap);
+      return {...status,executionProfile:{...profile,buildOutputCap:output},capabilities:{...status.capabilities,outputTokens:output},model:status.models.find(model=>model.id===preset.modelId)};
+    }};
+  }
+}
+
 export function createBuildExecutor(name = "codex-app-server", options = {}) {
   if (name === "codex-app-server" || name === "app-server") return new CodexAppServerBuildExecutor(options);
+  if (['neuraldeep','openrouter','local'].includes(name)) return new ResponsesBuildExecutor(name,options);
   if (name === 'claude-code') return new ClaudeCodeBuildExecutor(options);
   if (name === "manual") return new ManualBuildExecutor();
   throw new Error(`Unknown build executor: ${name}`);

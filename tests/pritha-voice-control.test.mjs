@@ -159,17 +159,19 @@ test("Voice intake requires spoken clarification before Codex upload", () => {
   assert.match(voicePageSource, /Voice gate/);
 });
 
-test("Voice Control exposes web search as the active eighth tool and keeps last30days disabled from Realtime", () => {
+test("Voice Control exposes provider-pinned web search and keeps last30days disabled from Realtime", () => {
   assert.match(runtimeSource, /name:\s*"web_search"/);
   assert.doesNotMatch(runtimeSource, /name:\s*"recent_external_research"/);
   assert.match(runtimeSource, /recent_external_research: handleRecentExternalResearch/);
-  assert.match(runtimeSource, /Search the current public web through Pritha's local SearXNG backend/);
+  assert.match(runtimeSource, /Search the current public web through the search backend pinned to this task provider/);
   assert.match(runtimeSource, /PRITHA_SEARXNG_URL/);
   assert.match(runtimeSource, /PRITHA_WEB_SEARCH_AUTO_ENSURE/);
   assert.match(runtimeSource, /ensureLocalSearxngSearchBackend/);
   assert.match(runtimeSource, /local_searxng_auto_ensure_ran/);
   assert.match(runtimeSource, /operation=diagnose/);
-  assert.match(runtimeSource, /web_search: handleWebSearch/);
+  assert.match(runtimeSource, /web_search: async args=>\{/);
+  assert.match(runtimeSource, /return neuralDeepVoiceSearch\(args/);
+  assert.match(runtimeSource, /return handleWebSearch\(args\)/);
   assert.match(webSearchToolsSource, /searxng-lock\.json/);
   assert.match(webSearchToolsSource, /install searxng --yes/);
   assert.match(webSearchToolsSource, /start searxng --yes/);

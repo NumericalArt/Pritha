@@ -9,7 +9,8 @@
     {
       "path": "scripts/neuraldeep/responses-adapter.mjs",
       "source_sha256": "391a5c359246dfbf767e85763d2202b7c221b9c72ce6047411d12ea552866a35",
-      "adoption": "reviewed source base; canonical protected upstream, request-local host tool projection, exact returned model/tool identity; source accounting and deadlines retained"
+      "adoption": "reviewed source base; canonical protected upstream, request-local host tool projection, exact returned model/tool identity; source accounting and deadlines retained",
+      "target_sha256": "be3b7b2a78d34935eccc1ee1dba075d30de62b1525708923ed1e55eac1e3bbef"
     },
     {
       "path": "scripts/neuraldeep/responses-normalizer.mjs",
@@ -191,7 +192,8 @@
     {
       "path": "scripts/neuraldeep-codex.mjs",
       "source_sha256": "5ba3bae9c83e0392ae89ec05de166f6108d0bc0d1afde0c1f8f8c9d7d7343dba",
-      "adoption": "function-level adaptation into owned runner; canonical state roots, isolated HOME and OS sandbox, host MCP tools and exact approvals, composite process evidence, shared immutable files, server-only credential, protected loopback adapter, no automatic replay"
+      "adoption": "function-level adaptation into owned runner; canonical state roots, isolated HOME and OS sandbox, host MCP tools and exact approvals, composite process evidence, shared immutable files, server-only credential, protected loopback adapter, no automatic replay",
+      "target_sha256": "ac187ae1d588ae481f487667073cc4f59adee972ad36362697dfcd7151132602"
     },
     {
       "path": "scripts/neuraldeep/account-snapshot.mjs",
@@ -374,6 +376,20 @@
       "source_sha256": "e1b3df7baacfc92227cc30914bfe8ceacc2ee0d148f17d57b684ac9f9db65334",
       "target_sha256": "a63b4aee588db4c7fe1cfac4d42ed4ba80be928808ec3601cc0f7de5cda2446f",
       "adoption": "Adapted source acquisition/replay/exact-passage/Unicode/freshness cases, plus canonical report CAS recovery, independent gate preservation, cancellation and offline profiles."
+    },
+    {
+      "path": "scripts/lib/responses-request-budget.mjs",
+      "source_path": "scripts/neuraldeep/provider-budget.mjs",
+      "source_sha256": "77a812bab7f2867c62546550b10010651cac32824f11ba3c0ec55bc990a062af",
+      "adoption": "Reviewed text-only reservation and output/context limits adapted to a provider-neutral private journal. No fork creation-storage transaction or automatic retry; exact request hash, async durable settlement and unknown-usage refusal.",
+      "target_sha256": "289cf885ebdcf3db00a289db3398d4ede8c76e677a0cfd13b3ce59b3dd764c50"
+    },
+    {
+      "path": "tests/responses-request-budget.test.mjs",
+      "source_path": "tests/neuraldeep-provider-budget.test.mjs",
+      "source_sha256": "7fa24ebb0f1761fc803137e1505d6f11c53e9cdf5e4efc5bbb990252442e7873",
+      "adoption": "Adapted reservation, unknown usage, opaque input, replay, context and cap boundaries; real loopback adapters prove async tool withholding and no repeat after ambiguous failure for NeuralDeep and OpenRouter.",
+      "target_sha256": "e3324c03f42d8552e55445a6305c43c7e6e66c0937ac206516e518af101d4956"
     }
   ]
 }

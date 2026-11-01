@@ -54,7 +54,7 @@ export async function listenCompatibleAdapter(options){
     let attempted=false,requestHash=null,usage=null,notified=false,terminal=null,errorCode=null,bytes=0;
     const timer=setTimeout(()=>controller.abort(failure('provider_timeout',504)),Math.max(1,Math.min(timeoutMs,hardDeadlineAt-Date.now())));
     const disconnect=()=>{if(!response.writableEnded)controller.abort(failure('provider_client_disconnect',499));};response.on('close',disconnect);
-    const notify=async code=>{if(notified || !attempted)return;notified=true;try{await options.onRequest?.({method:'POST',path:'/v1/responses',requestHash,upstreamAttempted:true,usage,usageKnown:usage!==null,responseBytes:bytes,...(code?{error:{code}}:{})});}catch{throw failure('provider_receipt_failed',503);}};
+    const notify=async code=>{if(notified || (!attempted && !options.prepareRequest))return;notified=true;try{await options.onRequest?.({method:'POST',path:'/v1/responses',requestHash,upstreamAttempted:attempted,usage,usageKnown:usage!==null,responseBytes:bytes,...(code?{error:{code}}:{})});}catch{throw failure('provider_receipt_failed',503);}};
     try{
       if(Date.now()>=hardDeadlineAt)throw failure('provider_timeout',504);
       const chunks=[];let size=0;
@@ -63,7 +63,9 @@ export async function listenCompatibleAdapter(options){
       try{for(;;){if(controller.signal.aborted)throw controller.signal.reason;const {done,value}=await Promise.race([iterator.next(),interrupted]);if(done)break;size+=value.length;if(size>4*1024*1024)throw failure('provider_request_too_large',413);chunks.push(value);}}
       finally{controller.signal.removeEventListener('abort',inputAbort);if(!request.complete)response.once('finish',()=>request.destroy());}
       let input;try{input=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks,size)));}catch{throw failure('provider_input_invalid');}
-      const payload=compatibleRequest(input,options),projection=toolProjection(input.tools,options.allowedTools),body=JSON.stringify(payload);requestHash=digest(body).toString('hex');
+      let payload=compatibleRequest(input,options);const projection=toolProjection(input.tools,options.allowedTools);requestHash=digest(JSON.stringify(payload)).toString('hex');
+      if(options.prepareRequest)payload=await options.prepareRequest(payload,{requestHash});
+      const body=JSON.stringify(payload);
       if(requests.has(requestHash))throw failure('provider_request_uncertain',409);
       if(requests.size>=1024)throw failure('provider_request_limit',409);
       await options.beforeRequest?.({requestHash,model,bytes:Buffer.byteLength(body)});

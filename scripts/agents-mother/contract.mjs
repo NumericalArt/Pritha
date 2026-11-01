@@ -21,7 +21,7 @@ export const STATUS_VALUES = new Set(["draft", "accepted", "superseded"]);
 export const REPOSITORY_RESEARCH_POLICIES = new Set(["auto", "required", "registry-only", "not-applicable"]);
 export const REPOSITORY_ADOPTION_MODES = new Set(["none", "reference-only", "selected-module"]);
 export const BUILD_GIT_MODES = new Set(["disposable-worktree", "no-git-in-place"]);
-export const BUILD_EXECUTORS = new Set(["codex-app-server", "claude-code", "manual"]);
+export const BUILD_EXECUTORS = new Set(["codex-app-server", "neuraldeep", "claude-code", "openrouter", "local", "manual"]);
 export const TRIAL_BACKEND_POLICIES = new Set(["local-or-app-server", "app-server-required", "local-trusted-only"]);
 export const REPOSITORY_RESEARCH_SCOPES = new Set([
   "agent-harness",

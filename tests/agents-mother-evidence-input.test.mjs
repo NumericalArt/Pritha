@@ -12,7 +12,7 @@ test("actual evidence reader admits the instance agent root while preserving bou
   const root=path.join(temp,"checkout"),memory=path.join(temp,"state","agents"),outside=path.join(temp,"outside"),sibling=path.join(temp,"state","agents-other");
   for(const dir of [root,memory,outside,sibling])mkdirSync(dir,{recursive:true});
   const source=readFileSync("scripts/agents-mother/index.mjs","utf8");
-  const start=source.indexOf("function readEvidenceInput(inputPath) {"),end=source.indexOf("\nfunction externalResearchContract",start);
+  const start=source.indexOf("function readEvidenceInput(inputPath) {"),end=source.indexOf("\nasync function externalResearchContract",start);
   assert.ok(start>=0&&end>start);
   const read=vm.runInNewContext(source.slice(start,end)+"\nreadEvidenceInput;",{ROOT:root,AGENT_MEMORY_ROOT:memory,path,readBoundedRegularFile,parseBoundedJson});
   for(const dir of [root,memory,outside,sibling])writeFileSync(path.join(dir,"evidence.json"),'{"items":[]}\n',"utf8");

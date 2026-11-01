@@ -361,13 +361,13 @@ budget exhaustion and crash recovery. Gate does not equate hook with sandbox.
 
 ### R6 — Общая надёжность Agents Mother
 
-**Статус: in-progress; brief/presets, locale и advisory research verified; host source orchestration и все пять backends pending.** Зависимости R1–R5; независимые fixes можно делать раньше.
+**Статус: host research и пять зарегистрированных build backends реализованы; regression gate checkpoint 29 проверен, Local offline execution в R7.** Зависимости R1–R5; независимые fixes можно делать раньше.
 
 - [x] Сравнить изменения ND be82911a/49c4a656, dfe92027/9c508ed1/edcb1f85,
   4e395a37/7cae2809/e89b7d5c, 56ef5205/19a37e01/fcb88077 по verified history.
 - [x] UTF-8 locale и существующий безопасный ASCII TMPDIR, chmod/ownership,
   кириллический cwd и heredoc regression; no user-specific hardcoded paths.
-- [ ] Model capability/effort/thinking/output policy per connector; high/xhigh
+- [x] Model capability/effort/thinking/output policy per connector; high/xhigh
   constraints validate before dispatch. Native recover retains prior model.
 - [x] Host deterministic research с durable checkpoints, total deadline и
   bounded per-source timeouts; exact passages и bounded excerpts сохраняются.
@@ -375,7 +375,7 @@ budget exhaustion and crash recovery. Gate does not equate hook with sandbox.
   не обходить остальные contract-specific evidence/synthesis требования.
 - [x] init --from-brief генерирует валидный runtime/interface/port/operations;
   валидатор перечисляет допустимые enum без секретного input echo.
-- [ ] Общая registration execution backends для пяти connectors; runtime/build
+- [x] Общая registration execution backends для пяти connectors; runtime/build
   capabilities разные, unsupported isolation не маскировать доступностью модели.
 
 **R6 gate:** factory regression suite; UTF-8/TMPDIR; deadline/checkpoint restart;
@@ -1894,6 +1894,35 @@ unit child environment отдельно и изолировать оба aliases
   и не разрешает reference-only adoption без проверки.
 - Targeted host/external/repository/gate suite **87/87**. Полный suite после
   связанного блока execution backends; R6 в целом остаётся in-progress.
+
+### Checkpoint 29 — Shared budgeted build executors
+
+- Registry поддерживает native Codex, Claude Code API, NeuralDeep, OpenRouter и
+  Local. Последний сохраняет явный `offline_unverified` до R7. Existing native
+  delivery и отдельные Trial backends не заменены. Claude host runner стал общей
+  основой для worktree isolation, protected verifier, seven tools, process proof,
+  provider slots и durable recover. Search в build не подключается.
+- Reviewed ND budget policy перенесена в общий Responses request budget;
+  резерв сохраняется до HTTP, измеренный usage — до передачи executable tools.
+  Unknown usage, overshoot, дубликат и ошибка записи блокируют следующий запрос.
+  Чужой concurrent receipt не может завершить активный резерв нулевым расходом.
+- Model/output/context policy pinned в attempt, Gemma build cap 8192, Qwen effort
+  не притворяется действующим; неподдержанный effort/thinking budget отклоняется.
+  Deadline учитывает остаток всего delivery run, а не только одну итерацию.
+- API and real installed-CLI fixtures без платных вызовов: protected Trial
+  write rejected, product write accepted, три запроса / 360 measured tokens,
+  повтор attempt и recovery не делают четвёртый запрос. ND original-PNG fixture
+  повторно прошёл вместе с ними: **3/3**.
+- Дополнительные recovery/concurrency/accounting проверки **27/27**; основной
+  targeted factory gate до них **54/54**; typecheck passed. Полный unit run:
+  **1372/1374**, два устаревших source-text assertions (async evidence handler и
+  provider-pinned voice Search) исправлены; связанный повтор **13/13**. Это
+  исправления test fixtures, не ослабление runtime guard. Повтор полного набора
+  выполняется на следующем крупном/final gate. Privacy, names **124** и Markdown
+  **988** прошли.
+- Инструкция обновлена в `07_workflows/delivery-usage-accounting.md`; provenance
+  inventory содержит 66 source adaptations. R5 local auth/child, R7 offline/child,
+  R9 child voice, R11 и R12 остаются открыты. Runtime/MacBook/GitHub не изменены.
 
 ## 7. Полные исходные материалы
 
