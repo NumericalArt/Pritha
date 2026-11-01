@@ -299,7 +299,7 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
 
 ### R5 — Claude Code: runner, decisions, build и child API
 
-**Статус: pending.** Зависимости R2–R4 (общие contracts, не ND subscription).
+**Статус: in-progress; API lane / parser / host sandbox foundations verified.** Зависимости R2–R4 (общие contracts, не ND subscription).
 
 - [ ] Проверить current CLI flags/stream schema/SDK terms по official docs,
   локально `claude --version` bounded 5s. SDK не обязателен для CLI runner.
@@ -318,6 +318,11 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
 - [ ] Host-owned PreToolUse guard + durable decision state/approval UI; validate
   cwd/roots/symlinks, protected paths, shell/network, git push/remote, services,
   secret writes. Task hooks cannot approve themselves or overwrite guard files.
+  Уточнение по CLI 2.1.296: API lane `--bare` не исполняет hooks. Здесь guard
+  выполняется в host-owned MCP handler перед каждым инструментом; built-in
+  tools отключены. Нельзя включить `--bare` и одновременно полагаться на hook.
+  Shell tool и CLI проходят проверяемую OS sandbox; approvals разрешают только
+  конкретный эффект в прежних границах, не отключение sandbox.
 - [ ] Claude driver supports start/resume/interrupt/queue and honest capabilities.
 - [ ] `ClaudeCodeBuildExecutor`: probe/execute/recover, disposable worktree,
   standard result schema, protected verifier, isolation check, schema output,
@@ -564,6 +569,12 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 - [ ] Full `node scripts/quality-gate.mjs`, self-test, privacy strict,
   validate/rebuild memory, Curated acceptance frozen fixture, ND security/network
   audits, all provider suites, factory suites, typecheck, production staging build.
+- [ ] Dependency audit от 2026-11-01: обновить проверяемые patches Next/Sharp/
+  Undici и транзитивных browser-mapping/source-map-js, затем production E2E.
+  Для sandbox-runtime 0.0.81 upstream использует Zod 3; отдельно проверить
+  advisory GHSA-mrhx-c7xc-m3w5 и достижимость oversized collection path:
+  sandbox получает только bounded host-authored config, model input не подаётся
+  в его schemas. Не подменять несовместимой major-версией без проверки API.
 - [ ] Playwright desktop/mobile: native history, 5 provider settings, ready-only
   selector, queue/steer, phase presets, attachments/annotation/quotes/activity,
   voice settings, agents credentials. Real auth unavailable → pending-live-check.
@@ -837,6 +848,55 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
 - Это промежуточный checkpoint: R4 voice/search/attachments, R5–R9, R11,
   R11b и R12 ещё требуют реализации/проверок. Unsupported capability явно
   возвращает ошибку; фиктивной готовности пяти connectors нет.
+
+### Checkpoint реализации 6 — Claude protocol и проверяемая host sandbox
+
+- Проверены official CLI/headless/env/MCP и Anthropic API docs 2026-11-01:
+  [CLI reference](https://code.claude.com/docs/en/cli-reference),
+  [headless](https://code.claude.com/docs/en/headless),
+  [environment](https://code.claude.com/docs/en/env-vars),
+  [API versions](https://platform.claude.com/docs/en/api/versioning),
+  [model catalog](https://platform.claude.com/docs/en/api/models/list).
+  CLI установлен 2.1.296; разрешён проверенный 2.1.x >=2.1.286 с нужными flags.
+  Новые model aliases разрешаются по account catalog до создания binding;
+  runtime требует exact model ID. API child client pinned `2026-10-21`;
+  удалённые в этой версии sampling parameters не отправляются.
+- `claude-code-runner.mjs`: отдельный private HOME/config/session proof,
+  `--bare --restricted --tools ""`, explicit model/session/max-turns, owned
+  supervisor, timeout/output bounds, clean env и ASCII `CLAUDE_CODE_TMPDIR`.
+  Последняя переменная нужна отдельно от TMPDIR: иначе CLI пишет в общий
+  `/tmp/claude-<uid>`. Account key заменяется ephemeral host capability;
+  upstream фиксирован Anthropic, чужие headers не пересылаются.
+- Proxy ограничивает модель/tools/output, запрещает redirects/CONNECT,
+  повтор одного payload и любые повторные provider dispatch после unconfirmed
+  ошибки. CLI retries также выключены. Private reasoning/signatures исключены
+  из нормализованного journal и UI; наблюдаемые tool starts/results сопоставлены
+  по ID, отсутствующий result становится ambiguous, а не success.
+- Usage считает fresh/cache-write/cache-read/output отдельно, объединяет
+  cumulative snapshots одного message и не складывает aggregate result второй
+  раз. Неизвестные и противоречивые counters остаются unknown. Child Messages
+  client не исполняет tools; signed reasoning для private same-process
+  continuation хранится вне сериализуемого public DTO.
+- Host sandbox: exact `@anthropic-ai/sandbox-runtime@0.0.81`, Apache-2.0,
+  [official source](https://github.com/anthropics/sandbox-runtime), npm integrity
+  зафиксирован в lockfile; install `--ignore-scripts`. Отдельный manager на
+  попытку, deny reads by default / allow workspace-runtime paths, protected
+  files, bounded writes, network allowlist пустой, только exact capability
+  ports. Неподтверждённая платформа или sandbox failure запрещают исполнение.
+  На Mac mini реальные OS probes блокируют outside read/write, `.env`,
+  `.git/config`, symlink escape и чужой loopback; 3/3 pass.
+- Synthetic stock-CLI acceptance: установленный Claude Code 2.1.296 прошёл
+  new + exact resume в OS sandbox; 2 mock upstream requests, `FIXTURE_OK`
+  дважды, оба process trees exited. Команда
+  `node --test tests/acceptance/claude-stock-cli.fixture.mjs` — 1/1.
+  Это проверка протокола; реальная модель/оплата/OAuth здесь не использовались.
+- Durable approval broker проверен через IPC двух coordinators: exact chat/
+  turn/revision, deduped answers, конкурирующие решения, expiry/Stop и ответы
+  на конкретные вопросы; 4/4 pass. Он разрешает один эффект, не ослабление
+  sandbox. Подключение host tools/UI, local-cli-session lane, build executor и
+  Claude driver ещё впереди; этот checkpoint не объявляет R5 завершённым.
+  Объединённый foundation suite 24/24, privacy strict pass; дальнейшая интеграция
+  потребует нового полного gate.
 
 ## 7. Полные исходные материалы
 
