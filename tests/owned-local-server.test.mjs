@@ -57,3 +57,28 @@ test('an unconfirmed supervisor start retains its receipt and never reports a co
   const receipt=JSON.parse(readFileSync(path.join(f.options.stateRoot,'local-runtime','active.json'),'utf8'));assert.equal(receipt.evidence.coverage,'unknown');
   await assert.rejects(startOwnedLocalServer(f.options,config),{code:'provider_local_process_unverified'});
 });
+
+function delayedModel(f,delay){
+  writeFileSync(f.value.args[0],`import {createServer} from 'node:http';
+const readyAt=Date.now()+${delay};
+createServer((req,res)=>{res.setHeader('content-type','application/json');
+if(req.url!=='/v1/models'){res.statusCode=404;res.end('{}');return;}
+if(Date.now()<readyAt){res.statusCode=503;res.end('{"error":"Loading model"}');return;}
+res.end(JSON.stringify({data:[{id:'fixture-local'}]}));}).listen(Number(process.argv[2]),'127.0.0.1');`);
+  f.save();return f.read();
+}
+
+test('a slow owned model can finish loading after ten seconds without losing its isolation lease',{skip:process.platform!=='darwin',timeout:45000},async t=>{
+  const f=fixture(t),config=delayedModel(f,11000);
+  const server=await startOwnedLocalServer({...f.options,timeoutMs:30000},config);t.after(()=>server.close());
+  assert.equal(server.model.id,'fixture-local');
+  assert.equal((await inspectOwnedLocalServer(f.options,config)).id,'fixture-local');
+  assert.equal((await server.close()).processTreeExited,true);
+  assert.equal(await inspectOwnedLocalServer(f.options,config),null);
+});
+
+test('a shorter attempt deadline still stops a loading model and removes only its confirmed lease',{skip:process.platform!=='darwin',timeout:15000},async t=>{
+  const f=fixture(t),config=delayedModel(f,11000);
+  await assert.rejects(startOwnedLocalServer({...f.options,timeoutMs:1000},config),error=>error.code==='provider_local_startup_timeout' && error.processTreeExited===true);
+  assert.equal(await inspectOwnedLocalServer(f.options,config),null);
+});

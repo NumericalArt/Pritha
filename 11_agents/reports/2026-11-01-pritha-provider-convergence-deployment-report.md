@@ -1,9 +1,9 @@
 ---
 id: pritha-provider-convergence-deployment-2026-11-01
 type: agent-deployment-report
-status: prepared-not-activated
+status: activated-awaiting-acceptance
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-02
 topics: [provider-convergence, staged-release, manual-acceptance, recovery]
 tools: [Pritha, Node.js, Next.js, Playwright, SQLite]
 sources: [operator-request-2026-11-01, NumericalArt/Pritha-NeuralDeep@2ab22aeff5f1c167c86e925ec30311942b76023b]
@@ -25,9 +25,73 @@ confidence: medium
 # Canonical Pritha: local activation and acceptance
 
 This report covers only the canonical Mac mini instance. GitHub and both
-MacBook instances remain outside the transaction. No production service action
-has been performed. Exact machine paths, endpoints, build IDs and recovery
+MacBook instances remain outside the transaction. The operator explicitly
+approved activation of `15a17c1`; the managed transaction is complete and
+operational health passes. Final operator acceptance remains pending.
+Exact machine paths, endpoints, build IDs and recovery
 receipts are private under the instance state root.
+
+## Activated evidence — 2026-11-02, Europe/Moscow
+
+- Managed stop confirmed the service and listener were absent before migration
+  and build replacement. The current offline migration plan moved only the
+  memory database name from `techscope.sqlite` to `pritha.sqlite`. SQLite
+  integrity and content checks passed: 993 documents, 11009 chunks, 3196
+  entities, 22182 relations and 10788 embeddings were preserved.
+- The reviewed staging build replaced the retired build atomically. Managed
+  start cleared the circuit breaker. Exact instance, source and build identity,
+  five pages and all twelve referenced JavaScript chunks passed. Admission was
+  restored to its previous enabled state with capacity three. Operational
+  checks confirmed runtime, agent catalog, chat list and existing history.
+- A durable private deployment receipt was written before any cleanup. Previous
+  source, matching dependencies and build are retained; no recovery cleanup or
+  remote publication occurred. Nine unrelated untracked files remain unchanged.
+- Post-activation self-test passed with 1443/1443 unit tests, seven check groups
+  and no warnings. The initial attempt found the instance Python environment
+  lacked `mlx-whisper`; all other groups passed. Installing the repository-pinned
+  macOS requirements in that instance's Python 3.11 environment fixed the
+  dependency gate. The repeated self-test also restored semantic embeddings.
+- Actual Safari checks passed for existing native history, a new isolated
+  native chat, Queue/Edit/Cancel, Steer on the same active turn, Stop, a real
+  synthetic text attachment, and history restoration after reload. Interrupted
+  execution released its slot; the cancelled queued message did not execute.
+  These are Codex-observed technical checks, not operator acceptance.
+- Live voice configuration reports `gpt-realtime-2`, nine core tools and a tenth
+  optional music tool. No microphone session or audio acceptance is inferred
+  from reading this configuration.
+- Local startup from the service exposed sensitivity to macOS background CPU
+  scheduling. The private model configuration now bounds CPU threads to four,
+  disables polling and optional warmup, and uses the engine's medium thread
+  priority for the owned process. A live service readiness probe passed with
+  this configuration. Network/file isolation and process ownership are unchanged;
+  no model service or autostart was installed. Live task checks continue.
+
+### Local follow-up awaiting staged verification
+
+A real Local Task Chat accepted an isolated workspace and started its owned
+model, but did not return a response within the bounded observation period.
+Its queued follow-up was cancelled, then its exact turn was interrupted through
+the supported control API. Active leases returned to zero and the model process
+and ownership receipt exited. No response, queued resume or performance pass is
+claimed for this attempt.
+
+Cold startup also exposed a fixed ten-second readiness limit that could reject
+an otherwise valid CPU model in the macOS service context. The follow-up raises
+the bounded startup window to thirty seconds while retaining a shorter attempt
+deadline, and aligns metadata/CLI probes to a forty-five-second total lease.
+Slow loading gets a dedicated error instead of asking the operator to select a
+different model. Real sandboxed regressions cover loading after ten seconds
+and early deadline cleanup; the targeted suite passes 13/13. This source change
+is not yet active in the running `15a17c1` build. The private model's smaller CPU
+batch profile still needs a completed inference check.
+
+The compact Local model is an integration fixture, not a qualified autonomous
+coding backend. A protected coding pilot failed its Trials and exhausted the
+bounded repair budget after 61641 observed tokens; a separate thinking attempt
+ended with unknown usage and retained its fail-closed receipt. A native Codex
+technical BuildExecutor pilot passed the same six immutable Trials with 19159
+measured tokens and an archived test thread. Neither pilot establishes the
+full voice-to-agent lifecycle or human Contract/Outcome approval.
 
 ## Prepared evidence
 
@@ -119,7 +183,9 @@ build. Never label an old build on mismatched source/dependencies as recovered.
 
 ## Manual acceptance script
 
-Each row is **pending operator execution** until an actual result is recorded.
+Operator acceptance of this matrix remains pending. Native technical checks
+listed above have actual Safari results; the remaining provider/audio/child
+rows still require their own live evidence and relevant user participation.
 Automated fixtures do not establish live authentication, microphone quality,
 provider billing, local model compatibility or user acceptance.
 

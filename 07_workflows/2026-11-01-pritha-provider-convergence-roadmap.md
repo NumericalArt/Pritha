@@ -3,7 +3,7 @@ id: pritha-provider-convergence-roadmap-2026-11-01
 type: workflow
 status: in-progress
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-02
 topics:
   - provider-convergence
   - task-chat
@@ -32,7 +32,7 @@ related:
 supersedes: []
 superseded_by: []
 source_published: 2026-11-01
-source_updated: 2026-11-01
+source_updated: 2026-11-02
 source_version: three-operator-specifications-plus-rebranding-addendum-v2
 retrieved: 2026-11-01
 verified: 2026-11-01
@@ -187,14 +187,19 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
-Текущий срез после checkpoint 40: реализация R0–R11b, включая два обязательных
-дополнительных режима, находится на финальной проверке R12. Далее — повтор
-общего gate, реальные Local проверки, semantic memory после итоговых документов
-и managed activation. Изолированная production-сборка прошла 5 страниц и 12 JS
-chunks. Действующий сервис обнаружен в circuit_open; операторские stop/start
-в этой задаче ещё не выполнялись. Подробности — в deployment report.
+Текущий срез на 2026-11-02 (Europe/Moscow): R0–R11b реализованы, выполняется R12.
+После отдельного непосредственного согласия пользователя кандидат `15a17c1`
+активирован на canonical Mac mini через managed stop/start. Strict и operational
+health прошли: 5 страниц, 12 JS chunks, правильные instance/build, включённый
+приём задач, доступные каталог и история. SQLite перенесён в `pritha.sqlite`
+с проверкой содержимого и сохранённым обратным планом. Полный post-activation
+self-test прошёл: 1443/1443 unit tests, семь групп, warnings отсутствуют.
+В Safari проверены новый/старый native chat, Queue/Edit/Cancel, Steer, Stop,
+настоящее файловое вложение и восстановление после reload. Продолжаются Local
+и оставшиеся provider/voice/child проверки; операторская приёмка ещё открыта.
+Подробности и ограничения — в deployment report.
 
-Последний счётчик цели: около 13 ч 53 мин / 6 071 672 токена. Это общий usage
+Предыдущий счётчик цели до активации: около 13 ч 53 мин / 6 071 672 токена. Это общий usage
 counter задачи, не output-токены или денежный расчёт. Оценка до рабочей локальной
 версии и приёмки: 2–4 активных часа / 0,5–1,2 млн токенов, плюс ожидание
 авторизации и ручных действий пользователя. Реальный Local protocol, живой child
@@ -616,7 +621,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; оба обязательных режима реализованы. Full quality 1443/1443, browser 163/163, secrets 23/23, network 80/80 и isolated candidate health passed. Первый refreshed unit прогон: 1437 pass / 2 устаревших теста; repair suite 24/24, повтор полного gate зелёный. Production activation, реальные Local/provider/voice/child checks и ручная приёмка ещё открыты.** Зависимости все выше.
+**Статус: in-progress; оба обязательных режима реализованы. Кандидат 15a17c1 активирован с явного согласия пользователя; strict/operational health и post-activation self-test прошли. Full quality 1443/1443, browser 163/163, secrets 23/23, network 80/80. Реальные Local/provider/voice/child checks и операторская приёмка ещё открыты.** Зависимости все выше.
 
 - [x] Full `node scripts/quality-gate.mjs`, self-test, privacy strict,
   validate/rebuild memory, Curated acceptance frozen fixture, ND security/network
@@ -630,13 +635,20 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 - [x] Playwright desktop/mobile: native history, 5 provider settings, ready-only
   selector, queue/steer, phase presets, attachments/annotation/quotes/activity,
   voice settings, agents credentials. Real auth unavailable → pending-live-check.
-- [ ] Strict candidate health: /voice, /agents, /task-chat, /codex, /settings,
+- [x] Strict candidate health: /voice, /agents, /task-chat, /codex, /settings,
   same-origin JS chunks, identity/build, admission and operational read-only checks.
-  Candidate test harness — isolated loopback, fixture state, no production swap.
+  Сначала isolated loopback/fixture state; затем approved production activation,
+  exact build/source identity, admission activation и operational read-only gate.
 - [ ] Sanitized review с changed-file/source map, test commands/counts, failures,
   limitations, schema migration/recovery, no-push proof и manual script.
-- [ ] Подготовить staged local activation и rollback; только тогда запросить
+- [x] Подготовить staged local activation и rollback; только тогда запросить
   непосредственный approval на конкретный managed service action, если он нужен.
+- [x] Выполнить разрешённую активацию и offline state migration; сохранить
+  предыдущие source/build/dependencies и durable deployment receipt. Не удалять
+  recovery-материалы до операторской приёмки.
+- [x] Живые проверки Safari/native: старый и новый чат, Queue/Edit/Cancel,
+  Steer активного turn, Stop, реальное файловое вложение и reload истории.
+  Это технические результаты Codex, а не подмена операторской приёмки.
 - [ ] Ручные сценарии на Mac mini: новый/старый Codex chat; Queue/Edit/Cancel/Stop;
   Steer точного turn; переключение presets; ND key/limits/wallet; Claude auth/
   guarded child creation; OpenRouter key/model/child preset; Local без сети;
@@ -2303,6 +2315,34 @@ unit child environment отдельно и изолировать оба aliases
 - R12 остаётся открыт: managed activation, реальные provider auth/model/child
   и microphone checks, операторская ручная приёмка. GitHub/MacBook не изменены;
   private receipts не публикуются. Queue health и launchd-root audit pass.
+
+### Checkpoint 42 — Активация и живые проверки
+
+- Пользователь отдельно разрешил managed switch кандидата `15a17c1` и
+  подготовку компактной Local-модели без фонового сервиса. Выполнены stop,
+  verified SQLite filename migration, atomic staged swap, start, exact health
+  и восстановление admission. Durable receipt и matching rollback сохранены.
+- Post-activation self-test: 1443/1443, семь групп, без warnings. Первый прогон
+  обнаружил отсутствие `mlx-whisper` в instance Python; закреплённые macOS
+  dependencies установлены только в этот venv, повтор прошёл с embeddings.
+- В Safari реально прошли native chat/history, Queue/Edit/Cancel, Steer, Stop,
+  file attachment и reload. Переключение нового draft на Local сохраняет
+  существующий native binding. Voice config: Realtime 2, девять core tools и
+  отдельный optional music tool; физическое аудио ещё не принято.
+- Local readiness выявил слишком короткие 10 секунд для холодного старта из
+  macOS background service. Подготовлен bounded startup fix: до 30 секунд,
+  в пределах более короткого task deadline, и 45-секундный probe lease. Ошибка
+  загрузки имеет отдельный понятный код. Два OS-теста проверяют slow startup
+  после 10 секунд и сохранение короткого deadline с подтверждённым cleanup;
+  targeted gate 13/13. Этот follow-up ещё требует staging/live verification.
+- Большой Pritha context на компактной CPU-модели обрабатывался слишком долго.
+  Тест ограничен штатными queue cancel и exact-turn interrupt; active leases
+  стали нулевыми, model process и ownership receipt исчезли. Это наблюдаемое
+  ограничение, а не успешный ответ или принятая производительность. Проверка
+  уменьшенного CPU batch остаётся открытой.
+- Пользователю переданы конкретные действия для native Claude sign-in,
+  provider credentials через Settings и microphone/interruption acceptance.
+  Ключи не запрашиваются в переписке; OAuth остаётся внутри native CLI.
 
 ## 7. Полные исходные материалы
 

@@ -6,12 +6,13 @@ import {providerSandboxDependency} from '../lib/provider-sandbox.mjs';
 import {ProviderTaskError} from '../lib/provider-task-runtime.mjs';
 import {probeCompatibleCli} from './cli-probe.mjs';
 import {hostFileAttachmentVerified} from '../lib/provider-file-attachments.mjs';
-import {readLocalServerConfiguration,startOwnedLocalServer,inspectOwnedLocalServer} from './owned-local-server.mjs';
+import {readLocalServerConfiguration,startOwnedLocalServer,inspectOwnedLocalServer,LOCAL_SERVER_PROBE_TIMEOUT_MS} from './owned-local-server.mjs';
 import {OPENROUTER_BASE_URL,OPENROUTER_HEADERS,normalizeOpenRouterAccount,normalizeOpenRouterModels,openRouterShortlist,normalizeLocalModels,ollamaModelMetadata,lmStudioModelMetadata} from './catalog.mjs';
 
 export const LOCAL_DISCOVERY_ENDPOINTS=Object.freeze(['http://127.0.0.1:11434/v1','http://127.0.0.1:1234/v1']);
 const messages={provider_pending_auth:'Connect the selected provider in Settings.',provider_model_unavailable:'Select a model from this server’s current catalog.',provider_tools_unverified:'The selected model has not declared tool support.',provider_protocol_unverified:'This model server has not declared the required Responses protocol.',provider_effort_unavailable:'The selected model does not declare this reasoning setting. Choose one of its supported values.',provider_runtime_unavailable:'A compatible installed Codex CLI is required.',provider_sandbox_unavailable:'A verified host sandbox is required.',provider_billing_required:'The current key budget is exhausted.',provider_rate_limited:'The provider currently limits new requests.',provider_local_cloud_model:'This model uses a remote backend and cannot run in Local offline mode.',provider_offline_unverified:'This local server is reachable, but its network isolation has not been verified.',provider_unavailable:'The selected provider is temporarily unavailable.'};
 Object.assign(messages,{provider_local_configuration_invalid:'Review the private Local server manifest before running this model.',provider_local_configuration_mismatch:'The selected Local model or source differs from its private server configuration.',provider_local_binary_changed:'The installed Local server changed. Review and configure it again.',provider_local_process_unverified:'A Local model process needs ownership or exit verification before another task can start.'});
+messages.provider_local_startup_timeout='The local model did not finish loading in time. Try again when this Mac has less CPU work.';
 function capabilities(connectorId){return {steer:false,interrupt:true,approvals:true,tools:false,attachments:{files:false,images:false},usage:'observed',resume:true,sandbox:'host-enforced',offline:false};}
 function result(connectorId,status,code,extra={}){return {connectorId,status,version:null,checkedAt:new Date().toISOString(),capabilities:capabilities(connectorId),models:[],account:null,shortlist:[],endpoint:null,error:code?{code,message:messages[code] || messages.provider_unavailable}:null,...extra};}
 function statusFor(code){return code==='provider_pending_auth'?'pending-auth':code==='provider_rate_limited'?'rate-limited':code==='provider_billing_required'?'billing-required':'error';}
@@ -73,7 +74,7 @@ export class CompatibleProviderService {
     if(config){
       const active=await (this.options.inspectLocalServer || inspectOwnedLocalServer)(this.options,config);
       if(active)return {models:[active],endpoint,account:null,offlineVerified:true};
-      const server=await (this.options.startLocalServer || startOwnedLocalServer)({...this.options,timeoutMs:15000},config);
+      const server=await (this.options.startLocalServer || startOwnedLocalServer)({...this.options,timeoutMs:LOCAL_SERVER_PROBE_TIMEOUT_MS},config);
       const result=await server.close();if(!result.processTreeExited)throw Object.assign(new Error('Local process needs review.'),{code:'provider_local_process_unverified'});
       return {models:[server.model],endpoint,account:null,offlineVerified:true};
     }

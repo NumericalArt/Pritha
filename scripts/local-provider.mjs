@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {resolvePrithaRoot,resolvePrithaStateRoot} from './lib/paths.mjs';
 import {loadPrithaRuntimeEnv} from './lib/env.mjs';
-import {saveLocalServerConfiguration,readLocalServerConfiguration,startOwnedLocalServer} from './openai-compatible/owned-local-server.mjs';
+import {saveLocalServerConfiguration,readLocalServerConfiguration,startOwnedLocalServer,LOCAL_SERVER_PROBE_TIMEOUT_MS} from './openai-compatible/owned-local-server.mjs';
 
 // Configuration is an explicit operator action. No install, model download,
 // launchd entry, arbitrary existing listener or automatic background process.
@@ -17,7 +17,7 @@ try{
     const bytes=readFileSync(flags['--file']);if(bytes.length>64000)throw new Error();
     console.log(JSON.stringify({configured:true,...saveLocalServerConfiguration(options,JSON.parse(bytes))}));
   }else if(action==='probe' && flags['--base-url'] && flags['--model'] && Object.keys(flags).length===2){
-    const config=readLocalServerConfiguration(options,{baseUrl:flags['--base-url'],modelId:flags['--model']}),server=await startOwnedLocalServer({...options,timeoutMs:15000},config);
+    const config=readLocalServerConfiguration(options,{baseUrl:flags['--base-url'],modelId:flags['--model']}),server=await startOwnedLocalServer({...options,timeoutMs:LOCAL_SERVER_PROBE_TIMEOUT_MS},config);
     const result=await server.close();if(!result.processTreeExited)throw Object.assign(new Error(),{code:'provider_local_process_unverified'});
     console.log(JSON.stringify({status:'ready',offline:true,model:server.model,processTreeExited:true}));
   }else throw new Error();

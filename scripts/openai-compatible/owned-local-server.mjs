@@ -14,6 +14,10 @@ import {providerJson} from '../lib/provider-http.mjs';
 import {modelId,normalizeLocalModels,ollamaModelMetadata,lmStudioModelMetadata,COMPATIBLE_EFFORTS} from './catalog.mjs';
 
 const execute=promisify(execFile);
+// A launchd background process can take longer than a foreground CLI to load
+// the same CPU model. Keep startup bounded and below the probe's total lease.
+export const LOCAL_SERVER_STARTUP_TIMEOUT_MS=30_000;
+export const LOCAL_SERVER_PROBE_TIMEOUT_MS=45_000;
 const fail=(code='provider_local_configuration_invalid')=>Object.assign(new Error('The selected Local runtime needs a verified private server configuration.'),{code});
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 function configPath({root,stateRoot}) {return path.join(path.resolve(stateRoot)===path.resolve(root)?path.join(root,'.private'):stateRoot,'local-runtime','server.json');}
@@ -100,12 +104,13 @@ export async function startOwnedLocalServer(options,config,dependencies={}){
     owned.child.stdin.end();options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
     timer=setTimeout(stop,options.timeoutMs || 30000);
     const verify=async()=>{if(options.signal?.aborted)throw fail('operator_cancel');await (dependencies.listenerOwned || listenerOwned)(port,evidence);};
-    const deadline=Date.now()+10000;let models;
+    const deadline=Date.now()+Math.min(LOCAL_SERVER_STARTUP_TIMEOUT_MS,options.timeoutMs || 30000);let models;
     while(Date.now()<deadline && !processFinished){
       if(options.signal?.aborted)throw fail('operator_cancel');
       try{await verify();models=normalizeLocalModels(await providerJson(baseUrl+'/models',{timeoutMs:1000}));break;}
       catch{await new Promise(resolve=>setTimeout(resolve,100));}
     }
+    if(!models && Date.now()>=deadline)throw fail('provider_local_startup_timeout');
     const selected=models?.find(model=>model.id===config.model.id);
     if(!selected || selected.cloud)throw fail('provider_model_unavailable');
     // A declared adapter capability is verified by the first bounded Responses
