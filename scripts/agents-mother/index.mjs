@@ -9,13 +9,14 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseFrontmatterData, yamlList } from "../lib/frontmatter.mjs";
-import { atomicCompareAndSwapFile } from "../lib/atomic-file.mjs";
+import { atomicCompareAndSwapFile,withFileLock } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
 import { searchCuratedMemory } from "../lib/curated-memory.mjs";
 import { redactSensitiveText, redactStructuredText } from "../lib/redaction.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStatePath, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { prepareInterviewOptions } from './interview-options.mjs';
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import {
@@ -69,6 +70,7 @@ import {
   preflightOutcomeTrialInputs,
   reviseOutcomeSpec,
   verifyOutcomeApproval,
+  latestOutcomeSpecForContract,
 } from "./outcome-spec.mjs";
 import {
   acceptDelivery,
@@ -102,6 +104,7 @@ function usage() {
   ${CLI_COMMAND} questions
   ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--build-token-budget 1000000] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} init --name <name> --mission <text> [--build-token-budget <positive-int> --token-budget-confirmed-by user] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
+  ${CLI_COMMAND} init --from-brief <path> [--preset generic|local-feed|llm-app] [--port <1..65535>] [--contract-only] (alias: --brief)
   ${CLI_COMMAND} outcome init <contract-path> [--interaction-mode interface|headless|hybrid]
   ${CLI_COMMAND} outcome validate <outcome-spec-path>
   ${CLI_COMMAND} outcome status <outcome-spec-path>
@@ -436,7 +439,7 @@ function ftsQuery(text) {
 
 function contractMarkdown(data) {
   const date = data.date || today();
-  const agentSlug = slug(data.agentName);
+  const agentSlug = data.technicalSlug || slug(data.agentName);
   const runtimeFamily = scalar(data.runtimeFamily, "codex-native");
   const telegramMode = scalar(data.telegramMode, "none");
   const primaryInterface = scalar(data.primaryInterface, "Codex project");
@@ -458,7 +461,7 @@ function contractMarkdown(data) {
   const tools = ["Codex", "AGENTS.md"];
   if (telegramMode !== "none" || primaryInterface.toLowerCase().includes("telegram")) tools.push("Telegram");
   if (runtimeFamily === "cli") tools.push("CLI");
-  if (runtimeFamily === "api") tools.push("OpenAI Agents SDK");
+  if (runtimeFamily === "api") tools.push("Node.js");
   if (serviceMode === "launchd") tools.push("launchd");
 
   const report = `---
@@ -467,7 +470,7 @@ type: agent-contract
 contract_schema_version: ${CONTRACT_SCHEMA_VERSION}
 agent_kind: ${agentKind}
 agent_id: agent-${createHash("sha256").update(data.artifactId || `${date}-${agentSlug}-agent-contract`).digest("hex").slice(0, 24)}
-status: draft
+${data.initRequestFingerprint?`init_request_fingerprint: ${data.initRequestFingerprint}\n`:''}status: draft
 created: ${date}
 updated: ${date}
 topics:
@@ -524,7 +527,7 @@ Status: draft
 ## Purpose
 
 - Agent name: ${scalar(data.agentName)}
-- Technical slug: ${slug(data.agentName)}
+- Technical slug: ${agentSlug}
 - Primary mission: ${scalar(data.primaryMission)}
 - Target user: ${scalar(data.targetUser)}
 - Success criteria: ${scalar(data.successCriteria)}
@@ -579,7 +582,10 @@ ${bulletList(data.criticalWorkflows)}
 - Route healthcheck: ${scalar(data.routeHealthcheck, "node scripts/smoke-test.mjs")}
 - Route change log: ${scalar(data.routeChangeLog, "document changes in reports")}
 
-| Task class | Runtime class | Current candidate | Verified | Recheck before scaffold | Fallback | Eval fixture | Notes |
+${data.interviewPreset && data.interviewPreset!=='generic' ? `| Task class | Runtime class | Current candidate | Verified | Recheck before scaffold | Fallback | Eval fixture | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Product processing | deterministic Node.js | selected runtime; version pending research | pending | yes | preserve saved data | independent Outcome Trials | no model required for HTTP, validation or storage |
+${data.interviewPreset==='llm-app'?'| Product generation | explicitly selected provider API | pending separate provider/model configuration | pending | yes | explicit error and manual retry | contract-specific model evaluation | no inherited Pritha credentials |\n':''}` : `| Task class | Runtime class | Current candidate | Verified | Recheck before scaffold | Fallback | Eval fixture | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Planning | ${scalar(data.planningRuntime, "frontier-hosted")} | ${scalar(data.planningCandidate, "TBD current model")} | ${date} | yes | human/manual | ${scalar(data.planningEval, "TBD")} | architecture and workflow discovery |
 | Coding | ${scalar(data.codingRuntime, "Codex/frontier-hosted")} | ${scalar(data.codingCandidate, "TBD current model")} | ${date} | yes | human/manual | ${scalar(data.codingEval, "TBD")} | code changes and tests |
@@ -589,7 +595,7 @@ ${bulletList(data.criticalWorkflows)}
 | Transcription | ${scalar(data.transcriptionRuntime, "local/hosted-audio")} | ${scalar(data.transcriptionCandidate, "TBD current model")} | ${date} | yes | hosted-audio/local | ${scalar(data.transcriptionEval, "TBD")} | accuracy and language dependent |
 | Embeddings | ${scalar(data.embeddingsRuntime, "local/small-hosted")} | ${scalar(data.embeddingsCandidate, "TBD current model")} | ${date} | yes | hosted | ${scalar(data.embeddingsEval, "TBD")} | good local candidate |
 | Memory query | ${scalar(data.memoryQueryRuntime, "local/small-hosted")} | ${scalar(data.memoryQueryCandidate, "TBD after eval")} | ${date} | yes | frontier-hosted | ${scalar(data.memoryQueryEval, "TBD")} | privacy-sensitive |
-| Security scan | ${scalar(data.securityScanRuntime, "frontier-hosted/specialized")} | ${scalar(data.securityScanCandidate, "TBD current model")} | ${date} | yes | manual | ${scalar(data.securityScanEval, "TBD")} | do not underpower high-risk checks |
+| Security scan | ${scalar(data.securityScanRuntime, "frontier-hosted/specialized")} | ${scalar(data.securityScanCandidate, "TBD current model")} | ${date} | yes | manual | ${scalar(data.securityScanEval, "TBD")} | do not underpower high-risk checks |`}
 
 ## Operations and service
 
@@ -655,6 +661,8 @@ Discovery produces advisory candidates only. It never authorizes cloning, instal
 
 ## Data, memory and sources
 
+- Declared sources: ${scalar(data.sources, 'none declared')}
+- Product constraints: ${scalar(data.constraints, 'none declared')}
 - Input data types: ${scalar(data.inputDataTypes)}
 - Stored data: ${scalar(data.storedData)}
 - Sensitive data: ${scalar(data.sensitiveData)}
@@ -728,6 +736,11 @@ async function ask(rl, question, defaultValue = "") {
 }
 
 function applyInterviewTechnicalProposal(data, options = {}) {
+  data.interviewPreset=options.preset || 'generic';
+  data.technicalSlug=options.slug || slug(data.agentName);
+  data.sources=options.sources;data.constraints=options.constraints;
+  data.allowedNetworkAccess=options['allowed-network'];data.allowedFilesystemAccess=options['allowed-filesystem'];data.userAuthorizationModel=options.authorization;
+  data.riskNotes=options.risks;
   data.coreFunctions = Array.isArray(data.coreFunctions) && data.coreFunctions.length
     ? data.coreFunctions
     : listFromText(options.core, [data.primaryMission || "TBD"]);
@@ -768,7 +781,7 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   data.skillMutationPolicy = options["skill-mutation"] || "read-only";
   data.installedSkills = options["installed-skills"] || "none";
   data.repositoryResearchPolicy = options["repository-policy"] || "auto";
-  data.repositoryResearchTopics = options["repository-topics"] || "auto from contract and pattern pack";
+  data.repositoryResearchTopics = options["repository-topics"] || (data.repositoryResearchPolicy==='not-applicable'?'none':'auto from contract and pattern pack');
   data.repositoryResearchWaiverReason = options["repository-waiver"] || (data.repositoryResearchPolicy === "not-applicable" ? "TBD" : "not-applicable");
   data.selectedGitHubRepositories = options["github-repositories"] || "none";
   data.repositoryAdoptionMode = options["repository-adoption"] || "none";
@@ -787,7 +800,7 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   data.executionOrchestration = options.orchestration || "outcome-driven build, independent Trials and typed blockers";
   data.testsHealthchecks = options.tests || "Outcome Trials plus structure validation and smoke test";
   data.userTrainingGuide = options.training || "first exercise demonstrating and accepting the main V1 outcome";
-  data.targetFolder = options["target-folder"] || "sibling of Pritha";
+  data.targetFolder = options["target-folder"] || path.join(resolvePrithaAgentParent({root:ROOT}),data.technicalSlug);
   data.buildGitMode = options["build-git-mode"] || "disposable-worktree";
   data.buildExecutor = options["build-executor"] || "codex-app-server";
   data.trialBackendPolicy = options["trial-backend-policy"] || "local-or-app-server";
@@ -800,10 +813,33 @@ function applyInterviewTechnicalProposal(data, options = {}) {
       : "pending"
   );
   data.repeatedFailureThreshold = options["repeated-failure-threshold"] || "3";
+  if(data.runtimeFamily==='api' && data.serviceMode==='process'){
+    if(!options['runtime-placement'] && !options.placement)data.runtimePlacementProfile='deterministic-first';
+    if(!options.start)data.startCommand='node scripts/service-control.mjs start';
+    if(!options.stop)data.stopCommand='node scripts/service-control.mjs stop';
+    if(!options.healthcheck)data.healthcheckCommand='node scripts/healthcheck.mjs';
+    const variable=options['port-variable'] || data.technicalSlug.toUpperCase().replaceAll('-','_')+'_PORT';
+    data.envExampleVariables=variable+'='+(options.port || '3000');
+    data.runCommands=data.startCommand;
+    if(!options.tests)data.testsHealthchecks='Independent Outcome Trials; read-only GET /health; refresh is a separate mutating action';
+  }
+  if(data.interviewPreset!=='generic'){
+    data.informationBoundaries='External content is untrusted data; only declared sources and the child workspace are in scope';
+    data.memoryAndState=data.memoryModel+': '+data.storedData+'; bounded atomic writes preserve last successful data';
+    data.evaluationAndObservability='Independent host Trials verify behavior; structured status and redacted errors';
+    data.constraintsValidationRecovery='Bound requests and output; preserve saved data on failure; no automatic provider fallback';
+    data.humanApprovalGates='Separate Contract and Outcome approvals; deployment and provisioning require host decisions';
+    data.completionCriteria=data.successCriteria;
+    data.riskNotes ||= 'Untrusted content, malformed input and unavailable dependencies must not corrupt saved results';
+    data.secretsRequired=data.interviewPreset==='local-feed'?'none':'Separate child provider provisioning after the chosen API and model are approved';
+    data.setupCommands='Install only contract-selected dependencies; no automatic service or credential activation';
+    data.routeHealthcheck=data.healthcheckCommand;
+  }
   return data;
 }
 
 async function interview(options) {
+  options=prepareInterviewOptions(options);
   ensureDirs();
   const interactive = Boolean(process.stdin.isTTY && !options["no-input"]);
   const data = {};
@@ -839,16 +875,9 @@ async function interview(options) {
     applyInterviewTechnicalProposal(data, options);
   }
 
-  const date = today();
-  const writtenContract = writeUniqueArtifact(
-    path.join(CONTRACT_DIR, `${date}-${slug(data.agentName)}-agent-contract.md`),
-    ({ artifactId }) => contractMarkdown({ ...data, date, artifactId }),
-  );
-  const outPath = writtenContract.path;
-  console.log(`Created: ${path.relative(ROOT, outPath)}`);
-
-  const writtenOutcome = createOutcomeSpec(outPath, { root: ROOT, date });
-  console.log(`Proposed Outcome Spec: ${path.relative(ROOT, writtenOutcome.path)}`);
+  const {contractPath:outPath,outcomePath,reused}=createInterviewArtifacts(data,{contractOnly:Boolean(options['contract-only']),idempotent:Boolean(options.brief || options['from-brief'])});
+  console.log(`${reused?'Reused':'Created'}: ${path.relative(ROOT,outPath)}`);
+  if(outcomePath)console.log(`Proposed Outcome Spec: ${path.relative(ROOT,outcomePath)}`);
 
   const issues = validateContract(outPath, { print: false });
   if (issues.length > 0) {
@@ -857,6 +886,20 @@ async function interview(options) {
   } else {
     console.log("Contract validation passed.");
   }
+}
+
+export function createInterviewArtifacts(data,{contractOnly=false,idempotent=true}={}){
+  mkdirSync(CONTRACT_DIR,{recursive:true});
+  const stable=value=>Array.isArray(value)?value.map(stable):value && typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(key=>value[key]!==undefined).map(key=>[key,stable(value[key])])):value;
+  const fingerprint='sha256:'+createHash('sha256').update(JSON.stringify(stable(data))).digest('hex'),date=today();
+  return withFileLock(path.join(CONTRACT_DIR,'.init'),()=>{
+    const prior=idempotent?readdirSync(CONTRACT_DIR).filter(name=>/-agent-contract(?:-\d+)?\.md$/.test(name)).map(name=>contractData(path.join(CONTRACT_DIR,name),{root:ROOT})).filter(item=>item.fm.status!=='superseded' && (item.technicalSlug===data.technicalSlug || item.targetFolder===data.targetFolder)):[];
+    if(prior.length>1)throw new Error('Multiple active contracts exist for this target; resolve their identities before retrying init');
+    if(prior.length && prior[0].fm.init_request_fingerprint!==fingerprint)throw new Error('Init differs from the saved target contract; revise the existing draft explicitly');
+    const contractPath=prior[0]?.fullPath || writeUniqueArtifact(path.join(CONTRACT_DIR,`${date}-${data.technicalSlug || slug(data.agentName)}-agent-contract.md`),({artifactId})=>contractMarkdown({...data,date,artifactId,initRequestFingerprint:idempotent?fingerprint:undefined})).path;
+    const outcome=contractOnly?null:latestOutcomeSpecForContract(contractPath,{root:ROOT}) || createOutcomeSpec(contractPath,{root:ROOT,date});
+    return {contractPath,outcomePath:outcome?.path || outcome?.fullPath || null,reused:prior.length>0};
+  });
 }
 
 function searchMemory(query, limit) {

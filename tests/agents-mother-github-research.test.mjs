@@ -692,6 +692,14 @@ test("reference-only registry-only research accepts a real selected row while st
   }
 });
 
+test('stale advisory-only discovery stays nonblocking for ordinary API agents without authorizing adoption',async()=>{
+  const {root}=temporaryResearchRoot(['| `https://github.com/example/advisory` | agent-harness | candidate | 2020-01-01 | 2020-01-01 | 5 | Reference only. | Unverified license. |']);
+  try{const research=await runRepositoryResearch(root,{runtimeFamily:'api',repositoryResearchPolicy:'registry-only',repositoryResearchTopics:'agent-harness',repositoryAdoptionMode:'none'},[],{githubMode:'registry-only'});
+    assert.equal(research.status,'complete');assert.equal(research.plan.adoptionMode,'none');assert.ok(research.errors.some(value=>/warning:.*authorizes no adoption/.test(value)));assert.ok(research.candidates.length);
+    const report=`---\n${repositoryResearchFrontmatter(research)}\n---\n\n${repositoryResearchMarkdown(research)}`;assert.equal(verifyRepositoryResearchIntegrity(report).ok,true);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 test("reference-only exact registry selection bypasses unrelated scope scoring", async () => {
   const repository = "https://github.com/example/cross-scope-reference";
   const { root } = temporaryResearchRoot([

@@ -62,8 +62,9 @@ test("hybrid no-adoption registry lookup keeps stale advisory rows visible witho
   assert.deepEqual(result.queries, []); assert(result.errors.some(row => row.startsWith("warning: stale registry")));
   const report = `---\n${repositoryResearchFrontmatter(result)}\n---\n\n${repositoryResearchMarkdown(result)}`;
   const integrity = verifyRepositoryResearchIntegrity(report); assert.equal(integrity.ok, true, integrity.reasons.join(", "));
-  const legacy = await runRepositoryResearch(f.root, {...data, runtimeFamily: "api"}, [], {githubMode: "registry-only"});
-  assert.equal(legacy.status, "pending");
+  const api = await runRepositoryResearch(f.root, {...data, runtimeFamily: "api"}, [], {githubMode: "registry-only"});
+  assert.equal(api.status, "complete");
+  assert(api.errors.some(row => row.startsWith("warning: stale registry")));
   const missing = await runRepositoryResearch(f.root, {...data, selectedGitHubRepositories: "https://github.com/example/missing"}, [], {githubMode: "registry-only"});
   assert.equal(missing.status, "pending");
 });

@@ -3,7 +3,7 @@ id: isolated-agent-pilots
 type: workflow
 status: experimental
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-11-01
 topics: [agent-runtime, mcp-apps, sdk-conformance, recovery]
 tools: [Codex CLI, OpenAI Agents SDK, Claude Agent SDK, MCP Apps]
 sources:
@@ -33,7 +33,7 @@ pilot_run="${PRITHA_STATE_ROOT}/memory/evals/manual-agent-pilots"
 mkdir -p "$pilot_workspace" "$pilot_run"
 chmod 700 "$pilot_workspace" "$pilot_run"
 cp scripts/experiments/agent-pilots/package.json scripts/experiments/agent-pilots/package-lock.json "$pilot_workspace/"
-npm ci --prefix "$pilot_workspace" --ignore-scripts --no-audit --no-fund
+(cd "$pilot_workspace" && npm ci --workspaces=false --ignore-scripts --no-audit --no-fund)
 npm audit --prefix "$pilot_workspace" --omit=dev
 node scripts/experiments/sdk-state-pilot.mjs --workspace "$pilot_workspace" --run-dir "$pilot_run/sdk"
 node scripts/experiments/claude-tools-pilot.mjs --workspace "$pilot_workspace" --run-dir "$pilot_run/sdk"

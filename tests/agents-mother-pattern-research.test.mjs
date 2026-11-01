@@ -6,6 +6,7 @@ import path from "node:path";
 
 import {
   extractKeywords,
+  extractPatternCandidates,
   logSemanticFailure,
   parsePatternPackSeeds,
   parseSemanticSearchOutput,
@@ -13,6 +14,12 @@ import {
   SEMANTIC_FAILURE_LOG_REL,
   verifyPatternPackIntegrity,
 } from "../scripts/agents-mother/pattern-research.mjs";
+
+test('failed attempts remain lessons and one document cannot crowd out the pattern shortlist',()=>{
+  const rows=[];for(const status of ['failed','accepted'])for(let i=0;i<8;i++)rows.push({path:status+'.md',status,title:status,heading:'Section '+i,snippet:'Different evidence '+i});
+  rows.push({path:'another.md',status:'accepted',heading:'Useful alternative',snippet:'Other pattern'});
+  const candidates=extractPatternCandidates({memoryResults:rows});assert.equal(candidates.filter(row=>row.path==='failed.md').length,1);assert.equal(candidates.filter(row=>row.path==='accepted.md').length,2);assert.equal(candidates[0].status,'lesson-only');assert.match(candidates[0].applicability,/never as evidence of a successful implementation/);assert.equal(candidates.at(-1).path,'another.md');
+});
 
 test("pattern pack selects memory/domain/semantic matches and extracts external seeds", () => {
   const pack = patternPackMarkdown(

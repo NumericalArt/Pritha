@@ -139,7 +139,7 @@ test("generated contracts keep sources and related as separate frontmatter field
     ], {
       cwd: path.resolve("."),
       encoding: "utf8",
-      env: { ...process.env, TECHSCOPE_ROOT: root },
+      env: { ...process.env, TECHSCOPE_ROOT: root, PRITHA_AGENT_PARENT:path.join(root,'children') },
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const contractsDir = path.join(root, "11_agents", "contracts");
@@ -150,7 +150,7 @@ test("generated contracts keep sources and related as separate frontmatter field
     assert.ok(frontmatter.sources.includes("07_workflows/agents-mother.md"));
     assert.equal(typeof frontmatter.related, "object");
     assert.ok(Array.isArray(frontmatter.related.standards));
-    assert.match(contractText, /^- Target folder: sibling of Pritha$/m);
+    assert.equal(contractData(contractPath,{root}).targetFolder,path.join(root,'children','frontmatter-agent'));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

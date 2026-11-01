@@ -342,11 +342,11 @@ budget exhaustion and crash recovery. Gate does not equate hook with sandbox.
 
 ### R6 — Общая надёжность Agents Mother
 
-**Статус: pending.** Зависимости R1–R5; независимые fixes можно делать раньше.
+**Статус: in-progress; brief/presets, locale и advisory research verified; host source orchestration и все пять backends pending.** Зависимости R1–R5; независимые fixes можно делать раньше.
 
 - [ ] Сравнить изменения ND be82911a/49c4a656, dfe92027/9c508ed1/edcb1f85,
   4e395a37/7cae2809/e89b7d5c, 56ef5205/19a37e01/fcb88077 по verified history.
-- [ ] UTF-8 locale и существующий безопасный ASCII TMPDIR, chmod/ownership,
+- [x] UTF-8 locale и существующий безопасный ASCII TMPDIR, chmod/ownership,
   кириллический cwd и heredoc regression; no user-specific hardcoded paths.
 - [ ] Model capability/effort/thinking/output policy per connector; high/xhigh
   constraints validate before dispatch. Native recover retains prior model.
@@ -354,7 +354,7 @@ budget exhaustion and crash recovery. Gate does not equate hook with sandbox.
   bounded per-source timeouts; exact passages и bounded excerpts сохраняются.
 - [ ] not-applicable + adoption:none → корректный research gate без allow-pending;
   не обходить остальные contract-specific evidence/synthesis требования.
-- [ ] init --from-brief генерирует валидный runtime/interface/port/operations;
+- [x] init --from-brief генерирует валидный runtime/interface/port/operations;
   валидатор перечисляет допустимые enum без секретного input echo.
 - [ ] Общая registration execution backends для пяти connectors; runtime/build
   capabilities разные, unsupported isolation не маскировать доступностью модели.
@@ -981,6 +981,52 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
 - Остались local-cli-session lane, child Anthropic wiring/pilot, R6–R9,
   bootstrap, ребрендинг и полная staged/manual приёмка. GitHub/MacBook и
   запущенные экземпляры не изменялись.
+
+### Checkpoint реализации 9 — Brief, presets и сохранение исследовательских границ
+
+- GitHub подтвердил полные SHA и file lists всех 11 исторических ND commits
+  из R6; карта сохранена в
+  `03_reviews/2026-11-01-provider-convergence-factory-history.json`. Текущий
+  источник по-прежнему exact pin `2ab22aeff5f1c167c86e925ec30311942b76023b`.
+  Это карта происхождения; сама по себе она не объявляет все изменения перенесёнными.
+- Из ND принят parser Markdown/JSON brief и подход к presets. Каноническая
+  реализация сохраняет native `codex-app-server`, отдельные approvals и чистую
+  provider-neutral конфигурацию. `--from-brief` и `--brief` принимают одинаковые
+  данные; явные CLI fields имеют приоритет. Invalid enums, ports, aliases,
+  symlink и чрезмерный/невалидный JSON отклоняются до записи артефактов, без эха
+  чувствительного входа. Brief не может подтвердить budget/Contract/Outcome.
+- Сохраняются цель, пользователь, критерии, функции, journey, sources,
+  constraints, non-goals, permissions и design. API/process получает согласованные
+  Start/Stop/health, port variable и выбранный sibling target. `local-feed`
+  не навязывает model SDK, аудио или embeddings; `llm-app` требует отдельного
+  выбора и provisioning provider, не наследует ключи. Runtime/API/source research
+  остаётся обязательным при отказе от repository discovery.
+- Brief init получает стабильный fingerprint и file lock. Retry не создаёт
+  второй контракт/Outcome и сохраняет авторские правки; изменённый brief для
+  того же target требует явной ревизии существующего документа. `--contract-only`
+  позволяет затем добавить отдельный Outcome без повторного контракта.
+- Перенесены точечные research corrections: registry-only/adoption:none
+  не блокируется возрастом advisory metadata, при этом stale warning и запрет
+  adoption остаются. Failed/draft/blocked попытки выбираются как lessons;
+  один документ не заполняет весь shortlist. Канонические redaction и content
+  locks сохранены — удаления этих защит из fork не переносились.
+- Focused brief/contract/Outcome run 18/18; research/gates/privacy run 69/69;
+  UTF-8 environment run 3/3. Реальный heredoc в кириллическом cwd и process
+  snapshot под ru_RU.UTF-8 прошли; scratch существует, ASCII-only, mode 0700.
+  `49c4a656` касается fork CLI sandbox с `env -C`; canonical native backend этой
+  команды не использует, поэтому несовместимый wrapper не переносился.
+- Полный root unit suite после обновления старого hybrid-only ожидания:
+  **1052/1052 pass**, 0 skipped. Старый тест теперь также проверяет warning для
+  ordinary API advisory lookup; selected repository/adoption gates сохранены.
+  TypeScript, strict privacy audit и Markdown validation — pass.
+- Октябрьский Claude SDK 0.3.306 custom-tool conformance снова pass (registration,
+  MCP initialize/list, valid tool call, private domain rejection). Установка
+  зависимостей — только временная, по lock, lifecycle scripts выключены; model
+  call/OAuth/key не использовались. Исправлена воспроизводимая команда README:
+  cwd workspace и `--workspaces=false` вместо неоднозначного npm --prefix.
+- R6 не завершён: exact source passages/checkpoints/deadlines в общей factory
+  orchestration и registry всех пяти backends ещё впереди. R5 local auth/child
+  wiring, R7–R9, R11/R11b и финальная R12 также остаются в работе.
 
 ## 7. Полные исходные материалы
 
