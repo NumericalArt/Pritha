@@ -17,6 +17,8 @@ import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import { listenProviderToolServer } from './lib/provider-tool-server.mjs';
 import { ClaudeRequestBudget } from './claude/request-budget.mjs';
 import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
+import {nativeClaudeAuthPaths,probeClaudeNativeAuth,nativeClaudeEnvironment} from './claude/native-auth.mjs';
+import {listenClaudeNativeTunnel} from './claude/native-tunnel.mjs';
 
 const fail=code=>Object.assign(new Error('The configured Claude runtime could not complete this task safely.'),{code});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -26,13 +28,13 @@ export function resolveClaudeBinary(value='claude',env=process.env){
   for(const candidate of candidates)try{accessSync(candidate,constants.X_OK);return realpathSync(candidate);}catch{/* Try only the explicit PATH. */}
   throw fail('provider_runtime_unavailable');
 }
-export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxTurns=32,mcpConfigPath,allowedTools=[],factorySubject}){
+export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxTurns=32,mcpConfigPath,allowedTools=[],factorySubject,authMode='api-key'}){
   const factoryInstructions=factorySubjectInstructions(factorySubject);
   if(!CLAUDE_MODEL_ID.test(model || '') || !CLAUDE_SESSION_ID.test(sessionId || '') || !['low','medium','high','xhigh','max'].includes(effort)
-      || !Number.isSafeInteger(maxTurns) || maxTurns<1 || maxTurns>128 || allowedTools.length>64 || allowedTools.some(name=>!/^mcp__pritha__[a-z_]{1,60}$/.test(name)))throw fail('provider_input_invalid');
-  const args=['--print','--bare','--restricted','--output-format','stream-json','--verbose','--model',model,'--effort',effort,'--max-turns',String(maxTurns),
+      || !['api-key','local-cli-session'].includes(authMode) || !Number.isSafeInteger(maxTurns) || maxTurns<1 || maxTurns>128 || allowedTools.length>64 || allowedTools.some(name=>!/^mcp__pritha__[a-z_]{1,60}$/.test(name)))throw fail('provider_input_invalid');
+  const args=['--print',...(authMode==='api-key'?['--bare']:[]),'--restricted','--output-format','stream-json','--verbose','--model',model,'--effort',effort,'--max-turns',String(maxTurns),
     '--tools','','--strict-mcp-config','--permission-mode','dontAsk','--permission-prompts','none','--setting-sources','',
-    '--settings',JSON.stringify({disableAllHooks:true,autoUpdates:false,permissions:{deny:['Agent','Bash','Read','Write','Edit','WebFetch','WebSearch']}})];
+    '--settings',JSON.stringify({disableAllHooks:true,disableClaudeAiConnectors:true,enableArtifact:false,autoUpdates:false,permissions:{deny:['Agent','Bash','Read','Write','Edit','WebFetch','WebSearch']}})];
   args.push(resume?'--resume':'--session-id',sessionId);
   if(mcpConfigPath)args.push('--mcp-config',mcpConfigPath);
   if(allowedTools.length)args.push('--allowedTools',...allowedTools);
@@ -40,24 +42,32 @@ export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxT
   return args;
 }
 
-/** API-key lane only. local-cli-session is a separate auth contract, never a
- * fallback and never an excuse to copy or extract Claude OAuth credentials. */
+/** API requests use the host-key proxy. A native session uses the unmodified
+ * CLI's own credential store and opaque TLS; these lanes never fall back. */
 export async function startClaudeCodeRun(options,dependencies={}){
-  if(options.authMode && options.authMode!=='api-key')throw fail('provider_auth_mode_unverified');
+  const authMode=options.authMode || 'api-key',native=authMode==='local-cli-session';
+  if(!['api-key','local-cli-session'].includes(authMode))throw fail('provider_auth_mode_unverified');
+  // Host-reserved factory budgets require visible API request accounting.
+  // Native CLI usage is observed, not a request reservation mechanism.
+  if(native && options.tokenBudget!==undefined)throw fail('provider_budget_mode_unavailable');
   if(!CLAUDE_MODEL_ID.test(options.model || '') || typeof options.prompt!=='string' || !options.prompt.trim() || Buffer.byteLength(options.prompt)>256000
       || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs<1000 || options.timeoutMs>3600000 || options.resume && !CLAUDE_SESSION_ID.test(options.resume)
       || options.tokenBudget!==undefined && (!Number.isSafeInteger(options.tokenBudget) || options.tokenBudget<1) || options.budgetId!==undefined && !CLAUDE_SESSION_ID.test(options.budgetId))throw fail('provider_input_invalid');
   if(options.signal?.aborted)throw fail('operator_cancel');
   if(options.images?.length || options.hostAttachments && !options.hostExecutionContext)throw fail('provider_attachments_unverified');
   const root=realpathSync(options.root),cwd=realpathSync(options.cwd),stateRoot=path.resolve(options.stateRoot),privateRoot=privateStateDirectory(stateRoot,options.privateRoot);
-  const key=(dependencies.readCredential || readProviderCredential)('claude',{stateRoot,env:options.env || process.env});if(!key)throw fail('provider_pending_auth');
+  const key=native?null:(dependencies.readCredential || readProviderCredential)('claude',{stateRoot,env:options.env || process.env});if(!native && !key)throw fail('provider_pending_auth');
   const binary=resolveClaudeBinary(options.claudeBin,options.env || process.env);
   const cli=await (dependencies.probeCli || probeClaudeCli)({binary,root,stateRoot,env:options.env || process.env});
   if(!cli.available)throw fail(cli.code);
+  const nativeAuth=native?await (dependencies.probeNativeAuth || probeClaudeNativeAuth)({binary,root,stateRoot,env:options.env || process.env}):null;
+  if(native && (!nativeAuth?.authenticated || !/^[a-f0-9]{64}$/.test(nativeAuth.identity || '')))throw fail(nativeAuth?.code || 'provider_native_login_required');
   if(options.hostAttachments && !hostFileAttachmentVerified('claude',cli.version))throw fail('provider_attachments_unverified');
-  const profile=privateStateDirectory(stateRoot,path.join(privateRoot,'profiles',hash([cwd,options.model,'api-key'])));
-  const home=privateStateDirectory(stateRoot,path.join(profile,'home')),config=privateStateDirectory(stateRoot,path.join(profile,'config'));
-  const sessionId=options.resume || randomUUID(),identity=hash([realpathSync(stateRoot),profile,cwd,options.model,'api-key']);
+  const profile=privateStateDirectory(stateRoot,path.join(privateRoot,'profiles',hash([cwd,options.model,authMode])));
+  const nativePaths=native?nativeClaudeAuthPaths({stateRoot}):null;
+  if(native && !nativePaths.available)throw fail('provider_native_login_required');
+  const home=nativePaths?.home || privateStateDirectory(stateRoot,path.join(profile,'home')),config=nativePaths?.config || privateStateDirectory(stateRoot,path.join(profile,'config'));
+  const sessionId=options.resume || randomUUID(),identity=hash([realpathSync(stateRoot),profile,cwd,options.model,authMode,...(native?[nativeAuth.identity]:[])]);
   const proofFile=privateStateFile(stateRoot,path.join(profile,'sessions',sessionId+'.json'));
   if(options.resume){
     let proof,fd;try{fd=openSync(proofFile,constants.O_RDONLY|constants.O_NOFOLLOW);const stat=fstatSync(fd);if(!stat.isFile() || stat.nlink!==1 || stat.size>8000)throw fail('runtime_identity_mismatch');proof=JSON.parse(readFileSync(fd,'utf8'));}catch{throw fail('runtime_identity_mismatch');}finally{if(fd!==undefined)closeSync(fd);}
@@ -95,11 +105,13 @@ export async function startClaudeCodeRun(options,dependencies={}){
       atomicWriteFile(mcpConfigPath,JSON.stringify({mcpServers:{pritha:{type:'http',url:toolServer.url,headers:{Authorization:'Bearer '+toolServer.token}}}})+'\n');
       allowedTools=PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name);
     }
-    proxy=await (dependencies.listenProxy || listenClaudeApiProxy)({localToken,apiKey:key,model:options.model,timeoutMs:options.timeoutMs,maxOutputTokens:options.maxOutputTokens || 8192,
+    proxy=native?await (dependencies.listenNativeTunnel || listenClaudeNativeTunnel)({signal:controller.signal}):await (dependencies.listenProxy || listenClaudeApiProxy)({localToken,apiKey:key,model:options.model,timeoutMs:options.timeoutMs,maxOutputTokens:options.maxOutputTokens || 8192,
       allowedTools,beforeRequest:options.beforeRequest,budget,fetchImpl:dependencies.fetchImpl});
     const args=buildClaudeExecArgs({...options,sessionId,mcpConfigPath,allowedTools});
-    const env=providerProcessEnvironment({provider:'claude',root,stateRoot,claudeConfigDir:config,temporary,env:options.env || process.env});
-    Object.assign(env,{HOME:home,ANTHROPIC_API_KEY:localToken,ANTHROPIC_BASE_URL:proxy.baseUrl,CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST:'1',CLAUDE_CODE_TMPDIR:temporary,
+    const env=native?nativeClaudeEnvironment({...options,root,stateRoot},nativePaths,temporary):providerProcessEnvironment({provider:'claude',root,stateRoot,claudeConfigDir:config,temporary,env:options.env || process.env});
+    if(!native)Object.assign(env,{ANTHROPIC_API_KEY:localToken,ANTHROPIC_BASE_URL:proxy.baseUrl,CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST:'1'});
+    else env.CLAUDE_CODE_MAX_OUTPUT_TOKENS=String(options.maxOutputTokens || 8192);
+    Object.assign(env,{HOME:home,CLAUDE_CODE_TMPDIR:temporary,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1',DISABLE_AUTOUPDATER:'1',DISABLE_TELEMETRY:'1',DISABLE_ERROR_REPORTING:'1',CLAUDE_CODE_DISABLE_AUTO_MEMORY:'1',PRITHA_PYTHON:resolvePrithaPython({root,env:options.env || process.env})});
     env.CLAUDE_CODE_MAX_RETRIES='0';env.CLAUDE_CODE_NONSTREAMING_TIMEOUT_RETRIES='0';env.CLAUDE_CODE_DISABLE_REFUSAL_RETRY='1';env.MCP_CONNECTION_NONBLOCKING='0';env.ENABLE_TOOL_SEARCH='false';
     sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[home,config],writeRoots:[home,config],loopbackPorts:[proxy.port,...(toolServer?[toolServer.port]:[])]});

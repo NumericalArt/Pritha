@@ -29,7 +29,9 @@ export async function providerSettingsRequest(request,connectorId,{stateRoot,sna
       await save(connectorId,body.value,options);
       stored=true;
     }else if(request.method!=='GET')throw failure('provider_method_invalid',405);
-    const credential=credentials.has(connectorId)?status(connectorId,options):{configured:false,status:'not-applicable',source:null,maskedValue:''};
-    return reply({ok:true,connectorId,stored,credentials:credential,provider:await snapshot(connectorId)});
+    const provider=await snapshot(connectorId);
+    const native=connectorId==='claude' && provider.authMode==='local-cli-session';
+    const credential=credentials.has(connectorId) && !native?status(connectorId,options):{configured:false,status:'not-applicable',source:native?'native-cli':null,maskedValue:''};
+    return reply({ok:true,connectorId,stored,credentials:credential,provider});
   }catch(error){const known=/^provider_[a-z_]{1,80}$/.test(error?.code || '');return reply({ok:false,stored,error:known?error.code:'provider_settings_unavailable',message:stored?'The key was saved, but its status could not be checked. Refresh provider status before sending a task.':'Provider settings could not be updated or checked. Your saved task history is preserved.'},Number.isInteger(error?.status) && error.status>=400 && error.status<=599?error.status:known?400:503);}
 }

@@ -15,9 +15,15 @@ test('provider key saving is exact, instance-scoped and never echoed; status is 
   for(const connectorId of ['neuraldeep','claude','openrouter']){
     const f=fixture(),response=await providerSettingsRequest(post({value:key,confirmation:'save-'+connectorId+'-key'}),connectorId,f.options);
     const body=await response.text();assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.doesNotMatch(body,/PRIVATE_PROVIDER_KEY_CANARY|\/instance\/state/);
-    assert.equal(JSON.parse(body).stored,true);assert.deepEqual(f.calls.map(row=>row[0]),['save','status','snapshot']);
+    assert.equal(JSON.parse(body).stored,true);assert.deepEqual(f.calls.map(row=>row[0]),['save','snapshot','status']);
     assert.deepEqual(f.calls[0],['save',connectorId,key,{stateRoot:'/instance/state',env:{}}]);
   }
+});
+test('native Claude settings never inspect an API key and expose only the sign-in plan',async()=>{
+  const f=fixture();f.options.status=()=>{throw new Error('API key lookup is forbidden');};
+  f.options.snapshot=async()=>({connectorId:'claude',authMode:'local-cli-session',status:'pending-auth',nativeSession:{status:'pending-auth',loginCommand:'native sign-in'}});
+  const response=await providerSettingsRequest(new Request('http://127.0.0.1/status'),'claude',f.options),body=await response.json();
+  assert.equal(response.status,200);assert.equal(body.credentials.source,'native-cli');assert.equal(body.credentials.status,'not-applicable');assert.equal(body.provider.nativeSession.loginCommand,'native sign-in');
 });
 test('invalid provider, foreign confirmation and non-key lanes fail before credential or snapshot access',async()=>{
   for(const [connectorId,body] of [['foreign',{value:key}],['codex',{value:key}],['local',{value:key}],['openrouter',{value:key,confirmation:'save-claude-key'}],['claude',{value:key,confirmation:'save-claude-key',apiKey:key}]]){

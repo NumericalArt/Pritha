@@ -2181,6 +2181,35 @@ unit child environment отдельно и изолировать оба aliases
   controlled local activation и ручная приёмка. MacBook, GitHub и production
   service не изменены.
 
+### Checkpoint 39 — Claude native CLI session
+
+- Реализованы private HOME/config экземпляра, явный terminal login через
+  немодифицированную Claude CLI, bounded status и изолированный Task Chat.
+  Pritha не извлекает OAuth, не подставляет API key и не переключает auth lane
+  при ошибке. Account identity попадает в resume binding только как SHA-256.
+- Native inference проходит через opaque CONNECT TLS tunnel с тремя exact
+  first-party hosts, проверкой всех DNS addresses и pin адреса. TLS и credentials
+  принадлежат CLI. Account MCP connectors, hooks, artifacts и telemetry отключены;
+  рабочие инструменты остаются host-controlled и отдельно подтверждаемыми.
+- Login/status имеют owned-process evidence и exclusive private lease;
+  неподтверждённый выход удерживает evidence. Исправлены canonical `/var` alias
+  paths и достаточный bounded timeout для native startup. Общие filesystem
+  запреты sandbox не ослаблены.
+- Проверки: scoped suite **28/28**; повтор real native auth/fallback file isolation
+  после удаления ненужного sandbox исключения **5/5**. Проверена запись synthetic
+  credential refresh, denial чужого session/workspace secret, смена account при
+  resume, отсутствие API lookup и сохранение unknown-exit fence. Production
+  browser **2/2** (390/1440), typecheck и build pass.
+- Источники проверены 2026-11-01: [native authentication](https://code.claude.com/docs/en/authentication),
+  [network configuration](https://code.claude.com/docs/en/network-config),
+  [CLI hosting rules](https://code.claude.com/docs/en/legal-and-compliance),
+  [model catalog](https://platform.claude.com/docs/en/models/overview).
+  Installed CLI 2.1.296; reviewed native catalog Sonnet/Opus/Haiku 5.5.
+- Native usage — observed; host-reserved factory budget требует отдельного API
+  режима. Не выдавать native usage за hard reservation. Реальный login, account
+  entitlement и paid inference остаются ручными проверками. Good State alignment
+  — aligned; production/MacBook/GitHub не изменены. Далее external voice factory.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

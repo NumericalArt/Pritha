@@ -407,7 +407,7 @@
       "path": "START_HERE.md",
       "source_sha256": "30af3a5441df48ad332fd8a2f3d303eeb6c75d3abc2b77992b5da7252613ae3e",
       "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
-      "target_sha256": "42414ae7f055a7621d40388db86e3498ad1223b3a5fa2616a1695a1ec7c8e89f"
+      "target_sha256": "7354edf891f2d9d7f465bc0787401fe0907a4c006966ab7a96ddd0a0d975cb54"
     },
     {
       "path": "scripts/audit-neuraldeep-secret-leaks.mjs",
@@ -427,7 +427,7 @@
       "path": "scripts/lib/provider-boundary-audit.mjs",
       "source_path": "scripts/audit-neuraldeep-runtime-network.mjs",
       "source_sha256": "efd6f99c067319b8ea6f1e071dbca92b1378cd0a5880c2b98b82229ea050e70f",
-      "target_sha256": "9b86f0a8553b666304363b2a0694bdfb4be48d08e662c55e23406f7841f94912",
+      "target_sha256": "1238ba578666b0d80c25736f3be5effdbd83582894bc4f032a27dc57311042f5",
       "adoption": "Shared reviewed audit entry point, fixed bounded test inventory, clean temporary HOME, sanitized counts and diagnostic hash; native auth remains untouched."
     }
   ]

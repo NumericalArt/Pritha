@@ -32,9 +32,24 @@ test.beforeEach(async({page,request})=>{
   expect(process.env.PRITHA_E2E_ISOLATED_STATE).toBe('1');await fixtures(page);
   let settings=(await(await request.get('/api/task-runtime/settings')).json()).settings;
   for(const connectorId of ['openrouter','claude']){
-    const response=await request.post('/api/task-runtime/settings',{data:{expectedRevision:settings.revision,activeConnectorId:'codex',connectorId,preset:{modelId:connectorId==='claude'?'sonnet':'',reasoningEffort:connectorId==='claude'?'medium':'default',timeoutMs:1800000,thinkingBudget:null}}});
+    const response=await request.post('/api/task-runtime/settings',{data:{expectedRevision:settings.revision,activeConnectorId:'codex',connectorId,preset:{modelId:connectorId==='claude'?'sonnet':'',reasoningEffort:connectorId==='claude'?'medium':'default',timeoutMs:1800000,thinkingBudget:null,...(connectorId==='claude'?{authMode:'api-key'}:{})}}});
     expect(response.ok()).toBe(true);settings=(await response.json()).settings;
   }
+});
+for(const width of [390,1440])test(`Claude native session keeps API keys separate and offers only the explicit terminal sign-in at ${width}px`,async({page,request})=>{
+  let credentialWrites=0;
+  await page.route('**/api/task-runtime/providers/claude',async route=>{
+    if(route.request().method()!=='GET'){credentialWrites++;return route.fulfill({status:400,json:{ok:false}});}
+    const settings=(await(await request.get('/api/task-runtime/settings')).json()).settings;
+    const native=settings.providerPresets.claude.authMode==='local-cli-session';
+    return route.fulfill({json:{ok:true,credentials:{configured:false,status:'not-applicable',source:native?'native-cli':null,maskedValue:''},provider:{...health('claude'),models:[{id:'sonnet',efforts:['medium']}],...(native?{authMode:'local-cli-session',nativeSession:{status:'pending-auth',loginCommand:"'/fixture/node' '/fixture/Pritha/scripts/claude-auth.mjs' login"}}:{})}}});
+  });
+  await page.setViewportSize({width,height:960});await page.goto('/settings');await select(page,'claude');const surface=panel(page);
+  await expect(surface.getByLabel('Claude Code API key',{exact:true})).toBeVisible();await surface.getByLabel('Claude authentication').selectOption('local-cli-session');
+  await expect(surface.getByLabel('Claude Code API key',{exact:true})).toHaveCount(0);await expect(surface).toContainText('Save the local session preset');
+  await surface.getByRole('button',{name:'Save preset',exact:true}).click();await expect(surface.getByRole('button',{name:'Copy sign-in command'})).toBeVisible();
+  await expect(surface).toContainText('claude-auth.mjs');expect(credentialWrites).toBe(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await surface.getByLabel('Claude authentication').selectOption('api-key');await expect(surface.getByLabel('Claude Code API key',{exact:true})).toBeVisible();await expect(surface.getByRole('button',{name:'Copy sign-in command'})).toHaveCount(0);
 });
 for(const width of [1440,390])test(`five provider panels preserve independent drafts and keys stay out of storage at ${width}px`,async({page,request})=>{
   await page.setViewportSize({width,height:960});await page.goto('/settings');const surface=panel(page);

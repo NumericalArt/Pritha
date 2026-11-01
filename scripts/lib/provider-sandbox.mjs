@@ -36,8 +36,8 @@ export function prepareProviderSandbox({root,stateRoot,privateRoot,command,args,
     filesystem:{denyRead:[{path:'/',literal:true},...protectedNames],allowRead:[...[...new Set(read)].map(literal),...(runtime==='codex'?['/etc/codex/requirements.toml','/private/etc/codex/requirements.toml','/etc/codex/config.toml','/private/etc/codex/config.toml'].map(value=>({path:value,literal:true})):[])],allowWrite:[scratch,...writeRoots].map(literal),denyWrite:[...protectedNames,...protectedFiles.map(literal),...immutable]},
     enableWeakerNetworkIsolation:false,enableWeakerNestedSandbox:false,allowAppleEvents:false,allowPty:false};
   // External proxy slots open only these exact loopback ports in Seatbelt.
-  // They point to capability-authenticated protocol endpoints, not forwarding
-  // proxies: CONNECT, SOCKS and foreign paths are rejected by their handlers.
+  // They point to capability endpoints, or the native Claude opaque TLS tunnel
+  // with its fixed first-party destination allowlist. Host commands get neither.
   // With no slots srt supplies a proxy whose empty strict allowlist denies all.
   const plan={version:1,dependency,command:binary,args,cwd:working,config,...(runtime?{runtime,temporary:scratch}:{})};
   const file=privateStateFile(stateRoot,path.join(privateRoot,'sandbox-plans',randomUUID()+'.json'));

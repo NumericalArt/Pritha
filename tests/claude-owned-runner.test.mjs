@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { startClaudeCodeRun,buildClaudeExecArgs } from '../scripts/claude-code-runner.mjs';
 import { probeClaudeCli } from '../scripts/claude/cli-probe.mjs';
+import {nativeClaudeAuthPaths} from '../scripts/claude/native-auth.mjs';
 const model='claude-sonnet-5-5';
 function fixture(t){const root=mkdtempSync(path.join(os.tmpdir(),'pritha-claude-run-'));for(const name of ['code','state'])mkdirSync(path.join(root,name));t.after(()=>rmSync(root,{recursive:true,force:true}));return {root:path.join(root,'code'),cwd:path.join(root,'code'),stateRoot:path.join(root,'state'),privateRoot:path.join(root,'state','private','claude'),model,prompt:'Fixture prompt',timeoutMs:10000,claudeBin:process.execPath};}
 function dependencies(capture,{wait=false,exited=true,wrongModel=false}={}){
@@ -40,10 +41,20 @@ test('unknown exit retains scratch and wrong-model output cannot produce success
   const wrong=await (await startClaudeCodeRun(options,dependencies({},{wrongModel:true}))).completion;assert.equal(wrong.ok,false);assert.equal(wrong.errorCode,'runtime_identity_mismatch');
 });
 test('auth and version failures stop before a CLI task, and no unrestricted permission mode is available',async t=>{
-  const options=fixture(t);await assert.rejects(startClaudeCodeRun({...options,authMode:'local-cli-session'},dependencies({})),{code:'provider_auth_mode_unverified'});
+  const options=fixture(t);await assert.rejects(startClaudeCodeRun({...options,authMode:'invalid'},dependencies({})),{code:'provider_auth_mode_unverified'});
   await assert.rejects(startClaudeCodeRun(options,{...dependencies({}),probeCli:async()=>({available:false,code:'provider_runtime_unverified'})}),{code:'provider_runtime_unverified'});
   const probe=await probeClaudeCli({binary:process.execPath,root:options.root,stateRoot:options.stateRoot,executeImpl:async()=>({stdout:'2.1.200 (Claude Code)'})});assert.equal(probe.available,false);
   assert.throws(()=>buildClaudeExecArgs({model:'sonnet',sessionId:'12345678-1234-1234-1234-123456789012'}),{code:'provider_input_invalid'});
+});
+test('native Claude session never reads API keys, uses opaque transport, pins account/resume and refuses unaccounted build budgets',async t=>{
+  const options={...fixture(t),authMode:'local-cli-session'},capture={};nativeClaudeAuthPaths(options,{prepare:true});let identity='1'.repeat(64),closed=0;
+  const deps={...dependencies(capture),readCredential:()=>assert.fail('Native mode must not read an API key'),listenProxy:()=>assert.fail('Native mode must not use the API proxy'),probeNativeAuth:async()=>({authenticated:true,identity}),listenNativeTunnel:async()=>({port:45678,close:async()=>{closed++;}})};
+  const first=await(await startClaudeCodeRun({...options,env:{...process.env,ANTHROPIC_API_KEY:'API_CANARY',CLAUDE_CODE_OAUTH_TOKEN:'OAUTH_CANARY',ANTHROPIC_BASE_URL:'https://wrong'}},deps)).completion;
+  assert.equal(first.ok,true);assert(!capture.args.includes('--bare'));assert(!capture.args.includes('--dangerously-skip-permissions'));assert.equal(capture.args[capture.args.indexOf('--tools')+1],'');assert.doesNotMatch(JSON.stringify(capture.env),/CANARY|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_BASE_URL|CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST/);assert.deepEqual(capture.sandbox.loopbackPorts,[45678]);assert.equal(closed,1);
+  assert.equal((await(await startClaudeCodeRun({...options,resume:first.sessionId},deps)).completion).ok,true);
+  identity='2'.repeat(64);await assert.rejects(startClaudeCodeRun({...options,resume:first.sessionId},deps),{code:'runtime_identity_mismatch'});
+  await assert.rejects(startClaudeCodeRun({...options,tokenBudget:10000},deps),{code:'provider_budget_mode_unavailable'});
+  await assert.rejects(startClaudeCodeRun(options,{...deps,probeNativeAuth:async()=>({authenticated:false,code:'provider_native_login_required'})}),{code:'provider_native_login_required'});
 });
 test('file dispatch rechecks the installed Claude version after a cached capability decision',async t=>{
   const options=fixture(t),capture={};

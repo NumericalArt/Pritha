@@ -19,9 +19,17 @@ test('a new supported Claude CLI retains text execution but needs file transport
 });
 test('unavailable auth, CLI and sandbox cannot look ready or trigger inference',async()=>{
   const missing=fixture({readCredential:()=>null,listModels:async()=>assert.fail('No key must not invoke a catalog')});assert.equal((await missing.snapshot(preset)).status,'not-configured');
-  assert.equal((await missing.snapshot({...preset,authMode:'local-cli-session'})).error.code,'provider_auth_mode_unverified');
+  assert.equal((await missing.snapshot({...preset,authMode:'unknown'})).error.code,'provider_auth_mode_unverified');
   assert.equal((await fixture({probeCli:async()=>({available:false,code:'provider_runtime_unverified'})}).snapshot(preset)).status,'unavailable');
   assert.equal((await fixture({checkSandbox:()=>{throw Object.assign(new Error('PRIVATE_CANARY'),{code:'provider_sandbox_unavailable'});}}).snapshot(preset)).error.code,'provider_sandbox_unavailable');
+});
+test('native Claude readiness uses CLI session status and the reviewed model catalog without API credential access',async()=>{
+  let authenticated=false;
+  const service=fixture({readCredential:()=>assert.fail('No API credential in native mode'),listModels:()=>assert.fail('No authenticated API catalog in native mode'),probeNativeAuth:async()=>({authenticated,status:authenticated?'ready':'pending-auth',code:authenticated?null:'provider_native_login_required'})});
+  const selected={...preset,authMode:'local-cli-session'};
+  const before=await service.snapshot(selected);assert.equal(before.status,'pending-auth');assert.match(before.nativeSession.loginCommand,/claude-auth/);assert.equal(before.authMode,'local-cli-session');
+  authenticated=true;const ready=await service.snapshot(selected);assert.equal(ready.status,'ready');assert.equal(ready.model.id,'claude-sonnet-5-5');assert.equal(ready.capabilities.steer,false);
+  assert.equal((await service.snapshot({...selected,modelId:'claude-unknown-model'})).error.code,'provider_model_unavailable');
 });
 test('catalog failures are sanitized and credential rotation invalidates metadata cache',async()=>{
   let key='FIRST_CANARY',calls=0;const service=fixture({readCredential:()=>key,listModels:async()=>{calls++;return models;}});

@@ -96,9 +96,15 @@ should review the directory and initialize their own repository explicitly.
 ## Connect the selected provider
 
 Use Settings to save this instance's API key and choose an exact supported model.
-NeuralDeep and OpenRouter use their own credentials; Claude's implemented lane
-uses an Anthropic API key. The optional local Claude session lane remains
-unavailable until separately verified; no OAuth token extraction occurs.
+NeuralDeep and OpenRouter use their own credentials. Claude supports either an
+Anthropic API key or this instance's native Claude Code session. For the latter,
+save **Local CLI session** in Settings and run its displayed terminal sign-in
+command (`node scripts/claude-auth.mjs login`). Only the unmodified Claude CLI
+handles authentication in a dedicated private configuration; Pritha does not
+extract OAuth tokens. `plan` and `status` do not initiate login. The reviewed
+model catalog does not guarantee account entitlement; the first real task is
+part of manual acceptance. Native Task Chat reports observed usage; the factory's
+hard token-reservation lane still uses its separately configured API key.
 Codex keeps its native account/history. A missing key, exhausted budget,
 unverified runtime or model does not fall back to another provider.
 
