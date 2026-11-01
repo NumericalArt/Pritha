@@ -995,6 +995,7 @@ function PasteCommandPanel({
     intakeText: string;
     intakeFiles: File[];
     confirmation: VoiceIntakeConfirmation;
+    host: {contextId:string;sessionId:string};
   }): Promise<VoiceIntakeSubmitResult> {
     if (params.confirmation.intent === "music_local_folder") {
       return await submitConfirmedMusicImport(params);
@@ -1002,7 +1003,7 @@ function PasteCommandPanel({
     setBusy(true);
     try {
       const form = new FormData();
-      const confirmedSessionId = sessionIdRef.current;
+      const confirmedSessionId = params.host.sessionId;
       form.set("text", params.intakeText);
       form.set("session_id", confirmedSessionId);
       form.set("confirmation_intake_id", params.intakeId);
@@ -1015,7 +1016,7 @@ function PasteCommandPanel({
       form.set("persistence", params.confirmation.persistence || "none");
       form.set("confirmation_notes", params.confirmation.notes || "");
       for (const file of params.intakeFiles) form.append("files", file, file.name);
-      const response = await fetch("/api/realtime/intake", { method: "POST", body: form });
+      const response = await fetch("/api/realtime/intake", { method: "POST", headers:{'X-Pritha-Voice-Context':params.host.contextId}, body: form });
       const payload = (await response.json().catch(() => ({ ok: false, error: "intake returned non-json" }))) as VoiceIntakeSubmitResult & {
         max_file_label?: string;
         max_total_label?: string;
@@ -1119,7 +1120,7 @@ function PasteCommandPanel({
         setPendingIntake({ id: intakeId, status: "cancelled" });
         setNote("Intake cancelled. Nothing was sent to the task runtime.");
       },
-      submit: async (confirmation) => submitConfirmedCodexIntake({ intakeId, intakeText, intakeFiles, confirmation }),
+      submit: async (confirmation, host) => submitConfirmedCodexIntake({ intakeId, intakeText, intakeFiles, confirmation, host }),
     });
     if (started.status === "awaiting_instruction") setNote("Pritha is waiting for your voice instruction before upload or import.");
     if (started.status === "waiting_for_realtime_channel") setNote("Waiting for Voice Control data channel before asking for instructions.");

@@ -437,9 +437,9 @@ const DEFAULT_VOICE = DEFAULT_PRITHA_VOICE;
 const DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe";
 const DEFAULT_CODEX_TIMEOUT_MS = 300_000;
 const MAX_TOOL_TEXT = 8_000;
-const VOICE_INTAKE_MAX_FILES = 8;
-const VOICE_INTAKE_MAX_FILE_BYTES = 10 * 1024 * 1024;
-const VOICE_INTAKE_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+export const VOICE_INTAKE_MAX_FILES = 8;
+export const VOICE_INTAKE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+export const VOICE_INTAKE_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const VOICE_INTAKE_STAGING_TTL_MS = 2 * 60 * 60 * 1000;
 const RECENT_RESEARCH_DEFAULT_SOURCES = "reddit,hackernews,polymarket,grounding";
 const RECENT_RESEARCH_ALLOWED_SOURCES = new Set(["reddit", "hackernews", "polymarket", "grounding", "github", "jobs"]);
@@ -4121,8 +4121,7 @@ function fallbackTaskScope(taskId: unknown): PrithaCodexThreadScope {
   return threadScope("task", String(taskId || randomUUID()), "One-off Codex task", "fallback");
 }
 
-export async function createPrithaVoiceIntakeCodexTask(request: VoiceIntakeRequest = {}) {
-  await purgeOldVoiceIntakeStaging();
+export async function createPrithaVoiceIntakeCodexTask(request: VoiceIntakeRequest = {}, host: {taskSelection?:VoiceTaskSelection} = {}) {
   const root = resolvePrithaRoot();
   const text = compactText(request.text, 6_000);
   const files = Array.isArray(request.files) ? request.files : [];
@@ -4142,7 +4141,8 @@ export async function createPrithaVoiceIntakeCodexTask(request: VoiceIntakeReque
 
   let totalBytes = 0;
   for (const file of files) {
-    const size = Number(file.size || file.bytes?.byteLength || 0);
+    const size = file.bytes?.byteLength;
+    if (!Number.isSafeInteger(size) || file.size !== size) return {ok:false,error:'invalid_file_size'};
     if (!Number.isFinite(size) || size <= 0) return { ok: false, error: "empty_file", file: safeOriginalFilename(file.name) };
     if (size > VOICE_INTAKE_MAX_FILE_BYTES) {
       return {
@@ -4164,6 +4164,11 @@ export async function createPrithaVoiceIntakeCodexTask(request: VoiceIntakeReque
       max_total_label: formatBytes(VOICE_INTAKE_MAX_TOTAL_BYTES),
     };
   }
+
+  if (files.length && host.taskSelection && host.taskSelection.connectorId !== 'codex') {
+    return {ok:false,error:'provider_attachments_unverified',connector_id:host.taskSelection.connectorId};
+  }
+  await purgeOldVoiceIntakeStaging();
 
   const createdAt = new Date();
   const createdAtIso = createdAt.toISOString();
@@ -4244,7 +4249,7 @@ export async function createPrithaVoiceIntakeCodexTask(request: VoiceIntakeReque
       confirmation,
       retention: "temporary-private-staging",
     },
-  });
+  }, host);
 
   await logPrivateEvent("voice_intake_codex_task_created", {
     ok: Boolean(result.ok),

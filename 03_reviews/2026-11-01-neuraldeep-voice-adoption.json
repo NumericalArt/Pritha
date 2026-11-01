@@ -79,7 +79,7 @@
       "target": "interfaces/control-center/src/lib/voice/sessions.ts",
       "sourceSha256": "5b476b2b2ce6a94dc332fdfed000ba6e340fd2f5178a48e23110ea7e7ac0d0c6",
       "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "785e32cd1fbc9f08e8a23daf3d2bdb9c9a1217cdd8fbfaffe2f9fe68d36d478b"
+      "targetSha256": "d3b9c103b42ff91df3f546aad467ba0fec65336f35529d221a71b636ce42a980"
     },
     {
       "source": "interfaces/control-center/src/lib/voice/tool-service.ts",
@@ -107,7 +107,7 @@
       "target": "interfaces/control-center/src/app/api/voice/[...path]/route.ts",
       "sourceSha256": "e84e211f88fe614b73dd8cd4e31d19ea6e80e4790583f9e002cd948436698c3d",
       "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "865fffb52902a6259f1ffb77c9f3b6f52d06632e241320a3b056990a2d74f15b"
+      "targetSha256": "162ef62df7bfcf757dfa00d7b049c9f23fe8f8f92201f499c3f6a91994922c4c"
     },
     {
       "source": "scripts/neuraldeep/voice-runtime-config.mjs",
@@ -133,7 +133,7 @@
   ],
   "sourceVersion": "0.2.0",
   "verified": "2026-11-01",
-  "phase": "R9 audio transport, persistent topics, public task routing and immutable host session context in the canonical workspace; child workspace, file intake and manual acceptance pending",
+  "phase": "R9 audio transport, persistent topics, public task routing, immutable host session context and bounded context-pinned intake; child workspace, verified files and manual acceptance pending",
   "referenceAdaptations": [
     {
       "source": "interfaces/control-center/src/lib/codex-chat/voice-topic-store.ts",

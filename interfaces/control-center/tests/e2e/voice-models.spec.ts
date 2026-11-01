@@ -100,6 +100,13 @@ for (const api of ['live','realtime']) {
     let release:()=>void=()=>{};
     const pending=new Promise<void>(resolve=>{release=resolve;}),toolCalls:any[]=[];
     if(api==='realtime'){
+      let intakeContext:string|undefined;
+      await page.route('**/api/realtime/intake',route=>{intakeContext=route.request().headers()['x-pritha-voice-context'];return route.fulfill({json:{ok:true,operator_note:'Fixture intake received'}});});
+      const paste=page.getByPlaceholder('Paste a command, link, screenshot, file, or context.').filter({visible:true});
+      await paste.fill('https://example.test/intake');
+      await page.getByRole('button',{name:'Send command',exact:true}).filter({visible:true}).click();
+      await page.evaluate(()=>{(window as any).__voiceChannel.emit({type:'response.done',response:{output:[{type:'function_call',name:'confirm_voice_intake',call_id:'intake-confirm',arguments:JSON.stringify({action:'submit',operator_instruction:'Summarize fixture',intent:'summarize',contextId:'vctx_forged'})}]}});});
+      await expect.poll(()=>intakeContext).toBe('vctx_fixture_1');await expect(paste).toHaveValue('');
       await page.route('**/api/realtime/tool',async route=>{toolCalls.push(route.request().postDataJSON());await pending;await route.fulfill({json:{ok:true}});});
       await page.evaluate(()=>{
         const channel=(window as any).__voiceChannel;(window as any).__oldVoiceChannel=channel;

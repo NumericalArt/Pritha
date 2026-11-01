@@ -367,7 +367,7 @@ export type VoiceIntakeSubmitResult = {
 };
 
 type VoiceIntakePendingHandlers = {
-  submit: (confirmation: VoiceIntakeConfirmation) => Promise<VoiceIntakeSubmitResult>;
+  submit: (confirmation: VoiceIntakeConfirmation, host: {contextId:string;sessionId:string}) => Promise<VoiceIntakeSubmitResult>;
   cancel: (confirmation: VoiceIntakeConfirmation) => void;
   askMore?: (confirmation: VoiceIntakeConfirmation) => void;
   status?: (status: "starting_voice" | "awaiting_instruction" | "asking_more" | "sending" | "submitted" | "cancelled" | "failed") => void;
@@ -761,6 +761,7 @@ function usePrithaRealtimeController() {
     metadata: VoiceIntakeClarificationMetadata;
     handlers: VoiceIntakePendingHandlers;
     promptSent: boolean;
+    contextId?: string;
   } | null>(null);
   const unmountCleanupRef = useRef<{
     checkpointRollingSummaryNow?: (sourceEvent: string, options?: { keepalive?: boolean }) => unknown;
@@ -965,6 +966,10 @@ function usePrithaRealtimeController() {
 
   const closeConnection = useCallback(() => {
     connectionGenerationRef.current++;
+    if (pendingVoiceIntakeRef.current?.promptSent) {
+      pendingVoiceIntakeRef.current.handlers.status?.('failed');
+      pendingVoiceIntakeRef.current = null;
+    }
     callAbortRef.current?.abort();
     callAbortRef.current = null;
     neuralDeepTransportRef.current?.close();
@@ -1141,6 +1146,7 @@ function usePrithaRealtimeController() {
           },
         });
       pending.promptSent = true;
+      pending.contextId = voiceContextIdRef.current || undefined;
       pending.handlers.status?.("awaiting_instruction");
       appendSessionEvent(
         "system",
@@ -1929,11 +1935,18 @@ function usePrithaRealtimeController() {
         };
       }
 
+      const contextId = pending.contextId;
+      if (!contextId || contextId !== voiceContextIdRef.current) {
+        pending.handlers.status?.('failed');
+        return {ok:false,error:'voice_context_unavailable'};
+      }
+
       pending.handlers.status?.("sending");
-      const output: VoiceIntakeSubmitResult = await pending.handlers.submit(confirmation).catch((error) => ({
+      const output: VoiceIntakeSubmitResult = await pending.handlers.submit(confirmation, {contextId,sessionId:sessionIdRef.current}).catch((error) => ({
         ok: false,
         error: error instanceof Error ? error.message : "voice_intake_submit_failed",
       }));
+      if (pendingVoiceIntakeRef.current !== pending) return output;
       if (!output.ok) {
         pending.handlers.status?.("failed");
         return output;

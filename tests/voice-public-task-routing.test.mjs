@@ -9,7 +9,7 @@ import ts from '../interfaces/control-center/node_modules/typescript/lib/typescr
 import * as profile from '../scripts/lib/provider-profile.mjs';
 
 const file = ts.createSourceFile('runtime.ts', readFileSync('interfaces/control-center/src/lib/realtime/pritha-runtime.ts', 'utf8'), ts.ScriptTarget.Latest, true);
-const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'abortPrithaCodexTask', 'runtimeSettingsForVoiceTask'];
+const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'abortPrithaCodexTask', 'runtimeSettingsForVoiceTask', 'createPrithaVoiceIntakeCodexTask'];
 const source = file.statements.filter(node => ts.isFunctionDeclaration(node) && names.includes(node.name?.text)).map(node => node.getText(file)).join('\n') + '\nexport {runCodexTask,runtimeSettingsForVoiceTask};';
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 
@@ -22,6 +22,10 @@ function fixture(t, options = {}) {
   const json = async file => JSON.parse(await readFile(file, 'utf8').catch(() => 'null'));
   const dependencies = {
     path, randomUUID, existsSync, mkdir, writeFile, readJsonFile: json,
+    VOICE_INTAKE_MAX_FILES:8,VOICE_INTAKE_MAX_FILE_BYTES:10*1024*1024,VOICE_INTAKE_MAX_TOTAL_BYTES:25*1024*1024,VOICE_INTAKE_STAGING_TTL_MS:7200000,
+    purgeOldVoiceIntakeStaging:async()=>{calls.push('purge');},compactText:(value,limit)=>String(value || '').trim().slice(0,limit),extractUrls:()=>[],
+    normalizeVoiceIntakeConfirmation:value=>value || {},voiceIntakeRoot:()=>path.join(privateRoot,'intake'),voiceIntakeTaskText:({text})=>text,
+    safeOriginalFilename:value=>path.basename(value),safeStagedExtension:()=>'.txt',formatBytes:String,
     resolvePrithaRoot: () => root, resolvePrithaStateRoot: () => root, privateRoot: () => privateRoot, resolvePrithaAgentParent: () => root,
     rootRelative: (root, file) => path.relative(root, file),
     getPrithaRuntimeSettings: () => runtimeSettings, codexMode: () => 'exec',
@@ -61,7 +65,7 @@ function fixture(t, options = {}) {
   };
   const exports = {};
   new Function(...Object.keys(dependencies), 'exports', compiled)(...Object.values(dependencies), exports);
-  return { run: exports.runCodexTask, abort: exports.abortPrithaCodexTask, taskSettings:exports.runtimeSettingsForVoiceTask, runtimeSettings, root, privateRoot, calls, reservations, settings, json };
+  return { run: exports.runCodexTask, intake:exports.createPrithaVoiceIntakeCodexTask, abort: exports.abortPrithaCodexTask, taskSettings:exports.runtimeSettingsForVoiceTask, runtimeSettings, root, privateRoot, calls, reservations, settings, json };
 }
 for (const connector of ['neuraldeep', 'claude', 'openrouter', 'local']) {
   test(`${connector}: public voice task preparation selects its provider without native probes or fallback`, async t => {
@@ -130,4 +134,19 @@ test('automatic native continuation inherits its original task preset rather tha
   const saved=await f.json(path.join(f.privateRoot,'codex-tasks',result.task_id,'request.json'));
   assert.equal(saved.parent_task_id,'native-parent');assert.equal(saved.native_task_preset.modelId,'original-model');
   assert.equal(saved.native_task_preset.reasoningEffort,'high');assert.equal(saved.native_task_preset.timeoutMs,180000);assert.equal(saved.native_service_tier,'fast');
+});
+
+test('intake forwards the immutable host task selection through the real public task preparation',async t=>{
+  const f=fixture(t,{connector:'claude'}),taskSelection={contextId:'fixture-context',connectorId:'neuraldeep',preset:{modelId:'intake-pinned',reasoningEffort:'high',timeoutMs:30000},serviceTier:'standard'};
+  const result=await f.intake({text:'Inspect fixture',confirmation:{instruction:'Inspect fixture'}},{taskSelection});
+  assert.equal(result.connector_id,'neuraldeep');assert.equal(f.reservations[0].preset.modelId,'intake-pinned');
+  assert.deepEqual(f.calls,['purge','provider-start']);
+});
+test('unverified provider files and malformed byte counts create no staging or task',async t=>{
+  for(const size of [1,2]){
+    const f=fixture(t),bytes=new Uint8Array([42]);
+    const result=await f.intake({files:[{name:'fixture.txt',size,bytes}],confirmation:{instruction:'Inspect fixture'}},{taskSelection:{connectorId:'neuraldeep'}});
+    assert.equal(result.ok,false);assert.equal(result.error,size===1?'provider_attachments_unverified':'invalid_file_size');
+    assert.deepEqual(f.calls,[]);assert.equal(existsSync(f.privateRoot),false);assert.deepEqual([...bytes],[42]);
+  }
 });

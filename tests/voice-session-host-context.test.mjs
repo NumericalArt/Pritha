@@ -30,6 +30,9 @@ function fixture(t){
     return {...resolved,connectorId:settings.activeConnectorId,revision:settings.revision,chained:{model:'voice-fixture',voice:'serena'}};
   }};
   const provider={getPrithaRuntimeSettings:()=>native,usesLiveVoice:()=>native.voiceModel==='gpt-live-1',
+    VOICE_INTAKE_MAX_FILES:8,VOICE_INTAKE_MAX_FILE_BYTES:10*1024*1024,VOICE_INTAKE_MAX_TOTAL_BYTES:25*1024*1024,
+    buildPrithaRealtimeTools:()=>[],
+    async createPrithaVoiceIntakeCodexTask(input,host){calls.push(['intake',input,host]);return {ok:true,connector:host.taskSelection.connectorId,model:host.taskSelection.preset.modelId};},
     buildRealtimeSessionConfig:options=>({model:options.voiceModel || native.voiceModel,audio:{output:{voice:options.voice || native.prithaVoice}},tools:[]}),
     async createEphemeralRealtimeSession(options){calls.push(['ephemeral',options]);settings.activeConnectorId='claude';native.voiceModel='gpt-live-1';return {client_secret:{value:'synthetic-ephemeral'}};},
     async createRealtimeCall(){calls.push(['call']);return 'fixture-sdp';},
@@ -41,12 +44,20 @@ function fixture(t){
     '../pritha-paths':{resolvePrithaStateRoot:()=>root},'../settings/provider-settings-server':{getProviderSettings:()=>settings},
     '../realtime/pritha-runtime':provider,'../realtime/voice-engine-server':engine,'../realtime/voice-settings':{isVoiceModel:value=>['gpt-realtime-2','gpt-live-1'].includes(value)},
   },environment);
-  const routes=Object.fromEntries(['session','call','tool'].map(name=>[name,load(`interfaces/control-center/src/app/api/realtime/${name}/route.ts`,{
+  const routes=Object.fromEntries(['session','call','tool','intake'].map(name=>[name,load(`interfaces/control-center/src/app/api/realtime/${name}/route.ts`,{
     'next/server':{NextResponse:JsonResponse},'@/lib/voice/session-context':api,'@/lib/realtime/pritha-runtime':provider,
     '@/lib/realtime/voice-engine-server':engine,'../../../../../../../scripts/lib/voice-session-contexts.mjs':contexts,
   },environment)]));
+  routes.neuraldeep=load('interfaces/control-center/src/app/api/voice/[...path]/route.ts',{
+    'next/server':{NextResponse:JsonResponse},'@/lib/voice/session-context':api,'@/lib/realtime/pritha-runtime':provider,
+    '@/lib/realtime/voice-engine-server':engine,'../../../../../../../scripts/lib/voice-session-contexts.mjs':contexts,
+    '../../../../../../../scripts/neuraldeep/voice-runtime-config.mjs':{voiceRuntimeCredentials:()=>({key:'synthetic'})},
+    '@/lib/voice/host':{assertVoiceDispatchAllowed:()=>engine.requireVoiceEngine('neuraldeep'),getVoiceHost:()=>({})},
+    '@/lib/voice/sessions':{voiceOwner:()=> 'b'.repeat(64),createVoiceSession:(owner,musicControlEnabled,contextOwner)=>({id:'nd-fixture',owner,musicControlEnabled,hostContext:api.openVoiceSessionContext(contextOwner,'neuraldeep'),settings:{}})},
+  },environment);
   const request=(data,cookie='',method='POST')=>new Request('http://fixture.invalid/api/realtime/session',{method,headers:{'Content-Type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify(data)});
-  return {api,routes,settings,native,environment,calls,request};
+  const intakeRequest=(contextId,cookie,form=new FormData())=>new Request('http://fixture.invalid/api/realtime/intake',{method:'POST',headers:{cookie,'X-Pritha-Voice-Context':contextId},body:form});
+  return {api,routes,settings,native,environment,calls,request,intakeRequest};
 }
 test('native session captures protocol and task selection before asynchronous provider setup',async t=>{
   const f=fixture(t),response=await f.routes.session.POST(f.request({musicControlEnabled:false})),body=await response.json();
@@ -93,4 +104,63 @@ test('Live startup uses its captured model and rejects a protocol mismatch befor
   assert.equal(mismatch.status,409);assert.equal(f.calls.length,0);
   const valid=await f.routes.call.POST(f.request({contextId:body.voiceContext.id,voiceApi:'live',offerSdp:'fixture'},cookie));
   assert.equal(valid.status,200);assert.equal(f.calls[0][0],'live');assert.equal(f.calls[0][1].voiceModel,'gpt-live-1');
+});
+
+for(const voice of ['openai','neuraldeep'])test(`${voice} intake uses its host context across all task connectors and default changes`,async t=>{
+  const f=fixture(t);
+  for(const connector of policy.PROVIDER_CONNECTOR_IDS){
+    f.settings.activeConnectorId=connector;f.settings.voiceEngine=voice;
+    const response=voice==='openai'?await f.routes.session.POST(f.request({})):await f.routes.neuraldeep.POST(f.request({}),{params:Promise.resolve({path:['sessions']})});
+    assert.equal(response.status,200);
+    const body=await response.json(),cookie=response.headers.getSetCookie().find(value=>value.startsWith('pritha-voice-owner=')).split(';')[0];
+    f.settings.activeConnectorId='openrouter';f.settings.voiceEngine='openai';
+    const form=new FormData();form.set('text','https://example.test/source');form.set('confirmed_instruction','Summarize source');form.set('connectorId','untrusted-form-value');
+    const output=await f.routes.intake.POST(f.intakeRequest(body.voiceContext.id,cookie,form));
+    assert.equal(output.status,200);assert.deepEqual(await output.json(),{ok:true,connector,model:connector+'-fixture'});
+    const call=f.calls.at(-1);assert.equal(call[0],'intake');assert.equal(call[1].files.length,0);assert.equal(call[2].taskSelection.contextId,body.voiceContext.id);
+  }
+});
+
+test('intake rejects missing or foreign context before consuming multipart bytes',async t=>{
+  const f=fixture(t),created=await f.routes.session.POST(f.request({})),body=await created.json();
+  for(const id of [body.voiceContext.id,'vctx_'+'c'.repeat(32)]){
+    let reads=0;
+    const stream=new ReadableStream({pull(controller){reads++;controller.close();}},{highWaterMark:0});
+    const request=new Request('http://fixture.invalid/api/realtime/intake',{method:'POST',duplex:'half',headers:{'Content-Type':'multipart/form-data; boundary=fixture','X-Pritha-Voice-Context':id},body:stream});
+    const response=await f.routes.intake.POST(request);assert.equal(response.status,409);assert.equal(reads,0);
+  }
+  assert.equal(f.calls.some(row=>row[0]==='intake'),false);
+});
+
+test('intake limits file count, per-file bytes and the total streamed body before dispatch',async t=>{
+  const f=fixture(t),created=await f.routes.session.POST(f.request({})),body=await created.json(),cookie=created.headers.getSetCookie()[0].split(';')[0];
+  for(const sizes of [Array(9).fill(1),[10*1024*1024+1],[9*1024*1024,9*1024*1024,8*1024*1024]]){
+    const form=new FormData();for(const size of sizes)form.append('files',new Blob([new Uint8Array(size)]),'fixture.bin');
+    const encoded=f.intakeRequest(body.voiceContext.id,cookie,form);
+    const wire=new Request(encoded.url,{method:'POST',headers:encoded.headers,body:await encoded.arrayBuffer()});
+    const result=await f.routes.intake.POST(wire);assert.equal(result.status,413);
+  }
+  const malformed=new Request('http://fixture.invalid/api/realtime/intake',{method:'POST',headers:{cookie,'Content-Type':'multipart/form-data; boundary=fixture','X-Pritha-Voice-Context':body.voiceContext.id},body:'invalid multipart'});
+  assert.equal((await f.routes.intake.POST(malformed)).status,400);
+  assert.equal(f.calls.some(row=>row[0]==='intake'),false);
+});
+
+test('an oversized streaming upload is cancelled and hard offline rejects before body consumption',async t=>{
+  const f=fixture(t),created=await f.routes.session.POST(f.request({})),body=await created.json(),cookie=created.headers.getSetCookie()[0].split(';')[0];
+  for(const offline of [false,true]){
+    let reads=0,cancelled=false;
+    const stream=new ReadableStream({pull(controller){reads++;controller.enqueue(new Uint8Array(1024*1024));},cancel(){cancelled=true;}},{highWaterMark:0});
+    f.environment.env.PRITHA_VOICE_OFFLINE=offline?'1':'0';
+    const request=new Request('http://fixture.invalid/api/realtime/intake',{method:'POST',duplex:'half',headers:{cookie,'Content-Type':'multipart/form-data; boundary=fixture','X-Pritha-Voice-Context':body.voiceContext.id},body:stream});
+    const response=await f.routes.intake.POST(request);
+    assert.equal(response.status,offline?409:413);assert.equal(reads,offline?0:27);assert.equal(cancelled,!offline);
+  }
+  assert.equal(f.calls.some(row=>row[0]==='intake'),false);
+});
+
+test('closing a context during upload prevents the pending intake from starting a task',async t=>{
+  const f=fixture(t),created=await f.routes.session.POST(f.request({})),body=await created.json(),cookie=created.headers.getSetCookie()[0].split(';')[0];
+  const form=new FormData();form.set('text','Fixture');const encoded=f.intakeRequest(body.voiceContext.id,cookie,form),bytes=new Uint8Array(await encoded.arrayBuffer());
+  const request=new Request(encoded.url,{method:'POST',duplex:'half',headers:encoded.headers,body:new ReadableStream({pull(controller){f.api.closeRequestVoiceSessionContext(encoded,body.voiceContext.id);controller.enqueue(bytes);controller.close();}},{highWaterMark:0})});
+  assert.equal((await f.routes.intake.POST(request)).status,409);assert.equal(f.calls.some(row=>row[0]==='intake'),false);
 });

@@ -1548,7 +1548,7 @@ endpoints и общему tool dispatcher. Порядок реализации �
   на прежний `11_agents` layout полный unit gate прошёл **1223/1223**, без skipped.
   Этот прогон также закрывает cumulative gate checkpoint 22.
 
-### Следующий checkpoint 24 — Voice intake context (planned)
+### Checkpoint реализации 24 — Voice intake context (verified-automated)
 
 1. Передавать opaque host context из callback активного разговора при spoken
    confirmation. Не брать provider/model из model arguments или изменившихся
@@ -1565,6 +1565,50 @@ endpoints и общему tool dispatcher. Порядок реализации �
    отклонении. Browser test подтверждает передачу host context вне model args.
    Durable intake replay и проверенная доставка originals входят в последующий
    общий attachment этап; этот checkpoint сам по себе их не объявляет готовыми.
+
+- Реализовано для OpenAI и ND: оба транспорта используют общий private owner
+  для host context; отдельная ND audio identity сохранена. Context ID приходит
+  из browser callback в HTTP header, поддельный model argument его не заменяет.
+  Смена defaults не меняет provider/preset при подтверждении материала.
+- Закрытие разговора отменяет ожидающее подтверждение и оставляет draft/files
+  в композере. Context проверяется до чтения body и повторно после upload.
+  Bounded streaming multipart: 25 MiB originals + 1 MiB framing, 30 s deadline,
+  8 файлов, 10 MiB на файл, declared/actual length, count и bytes согласованы.
+  Отказ не создаёт задачу/staging и не удаляет originals. External file transport
+  пока возвращает `provider_attachments_unverified` до отдельной проверки.
+- Targeted host/public/session/native tests **43/43**, TypeScript passed;
+  isolated Chromium **10/10**, без skipped/flaky. Проверены forged context,
+  оба audio transports × пять task connectors, закрытие во время upload,
+  oversized streamed body/cancellation, позднее подтверждение после disconnect.
+- Полный unit gate **1231/1231**, без skipped. Strict privacy, name guard
+  (124 compatibility references) и Markdown validation (987 files) прошли.
+
+### Следующий checkpoint 25 — Общие originals и подготовка attachment delivery (planned)
+
+1. Адаптировать reviewed ND immutable store из pinned GitHub в общий модуль;
+   native API и прежние IDs/hrefs сохраняются. Прежняя canonical metadata без
+   version читается после строгой валидации; новые записи versioned. Не выполнять
+   массовый перенос или перезапись существующих private файлов.
+2. Один cross-process quota/reference mutex для обоих callers, bounded streaming,
+   pending publication receipt, hash и descriptor identity, symlink/hardlink
+   rejection, recovery только после доказанного завершения owner. Corrupt
+   metadata сохраняется для восстановления; referenced originals не истекают.
+3. Подготовить проверенные private dispatch snapshots отдельно от originals;
+   native metadata/path check и неизвестный dispatch receipt остаются обязательны.
+   Readback/queue Edit возвращают публичные metadata, без private paths.
+4. Проверить старую metadata, fresh store, два процесса/два instance, quota,
+   partial publication/retry, modified bytes, links, expired drafts, retained
+   originals, snapshot isolation, native image/file/history/replay regression.
+   Переносимые source tests фиксируются в adoption inventory с исходным hash.
+5. После store gate: общий provider queue attachment preparation/retention и
+   readback, затем отдельные verified delivery paths ND/Claude/compatible.
+   Проверка транспорта привязана к точным model/CLI/adapter capabilities;
+   недоступные capabilities остаются явными. Голосовой file intake и durable
+   replay используют тот же store/receipts, без второй очереди и скрытого fallback.
+
+Good State Alignment для этого этапа: aligned. Сохраняются canonical native
+history, отсутствие повторного turn после unknown receipt, instance privacy,
+точные files и сохранность draft; production lifecycle не меняется.
 
 R12 дополнительная проверка runner: quality-gate задаёт оба root aliases для
 child commands, а часть legacy test fixtures переопределяет только один. Проверить

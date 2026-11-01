@@ -8,7 +8,7 @@ import { voiceRuntimeCredentials } from '../../../../../../../scripts/neuraldeep
 import { getVoiceHost, assertVoiceDispatchAllowed } from "@/lib/voice/host";
 import { getVoiceEngineStatus, VoiceEngineError } from "@/lib/realtime/voice-engine-server";
 import { VoiceContextError } from '../../../../../../../scripts/lib/voice-session-contexts.mjs';
-import { voiceContextView } from '@/lib/voice/session-context';
+import { voiceContextView, voiceContextOwner, setVoiceContextCookie } from '@/lib/voice/session-context';
 import {
   createVoiceSession,
   getVoiceSession,
@@ -155,9 +155,11 @@ async function handle(request: Request, context: Context) {
         token = /^[a-f0-9-]{36}$/.test(client(request))
           ? client(request)
           : randomUUID();
+      const contextOwner = voiceContextOwner(request, true);
       const s = createVoiceSession(
           voiceOwner(token),
           payload.musicControlEnabled === true,
+          contextOwner.owner,
         ),
         response = NextResponse.json({
           ok: true,
@@ -176,6 +178,7 @@ async function handle(request: Request, context: Context) {
         path: '/api/voice',
         maxAge: 86400,
       });
+      setVoiceContextCookie(response, request, contextOwner.token);
       return response;
     }
     if (!client(request)) throw new Error('voice_session_unavailable');

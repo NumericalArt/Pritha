@@ -67,7 +67,7 @@ export function voiceOwner(client: string) {
     .update(`${voiceRuntimeCredentials().instanceId}:${client}`)
     .digest("hex");
 }
-export function createVoiceSession(owner: string, musicControlEnabled = false) {
+export function createVoiceSession(owner: string, musicControlEnabled = false, contextOwner = owner) {
   assertVoiceDispatchAllowed();
   sweep();
   if (
@@ -75,7 +75,7 @@ export function createVoiceSession(owner: string, musicControlEnabled = false) {
     [...sessions.values()].filter((s) => s.owner === owner).length >= 2
   )
     throw new Error("voice_session_limit");
-  const hostContext = openVoiceSessionContext(owner, 'neuraldeep');
+  const hostContext = openVoiceSessionContext(contextOwner, 'neuraldeep');
   const s: VoiceSession = {
     hostContext,
     id: `voice_${randomUUID()}`,
