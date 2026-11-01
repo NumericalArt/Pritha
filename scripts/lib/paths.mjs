@@ -2,6 +2,7 @@ import { existsSync,realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import {resolvePrithaRoot} from './root-resolution.mjs';
+import {readInstancePointer} from './distribution-instance.mjs';
 export {resolvePrithaRoot,resolveTechscopeRoot,prithaRootEnvironment,PrithaRootError} from './root-resolution.mjs';
 const normalizedPath=value=>path.resolve(value);
 const sameDirectory=(left,right)=>{if(left===right)return true;try{return realpathSync(left)===realpathSync(right);}catch{return false;}};
@@ -38,14 +39,14 @@ const LEGACY_STATE_LAYOUT = Object.freeze({
 
 export function resolvePrithaStateRoot(options = {}) {
   const root = options.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
-  const configured = options.stateRoot || (options.env || process.env).PRITHA_STATE_ROOT;
+  const configured = options.stateRoot || (options.env || process.env).PRITHA_STATE_ROOT || readInstancePointer(root)?.stateRoot;
   const stateRoot=configured ? normalizedPath(configured) : root;
   return sameDirectory(root,stateRoot) ? root : stateRoot;
 }
 
 export function resolvePrithaAgentParent(options = {}) {
   const root = options.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
-  const configured = options.agentParent || (options.env || process.env).PRITHA_AGENT_PARENT;
+  const configured = options.agentParent || (options.env || process.env).PRITHA_AGENT_PARENT || readInstancePointer(root)?.agentParent;
   return configured ? normalizedPath(configured) : path.dirname(root);
 }
 
@@ -83,13 +84,14 @@ export function prithaInstanceConfig(options = {}) {
   const codeRoot = resolvePrithaRoot(options);
   const stateRoot = resolvePrithaStateRoot({ ...options, root: codeRoot });
   const agentParent = resolvePrithaAgentParent({ ...options, root: codeRoot });
+  const instance=readInstancePointer(codeRoot),env=options.env || process.env;
   return {
     codeRoot,
     stateRoot,
     agentParent,
-    instanceId: String(options.instanceId || process.env.PRITHA_INSTANCE_ID || path.basename(codeRoot)).trim(),
-    instanceRole: String(options.instanceRole || process.env.PRITHA_INSTANCE_ROLE || "developer").trim(),
-    controlCenterPort: Number(options.controlCenterPort || process.env.PRITHA_CONTROL_CENTER_PORT || 3420),
+    instanceId: String(options.instanceId || env.PRITHA_INSTANCE_ID || instance?.id || path.basename(codeRoot)).trim(),
+    instanceRole: String(options.instanceRole || env.PRITHA_INSTANCE_ROLE || "developer").trim(),
+    controlCenterPort: Number(options.controlCenterPort || env.PRITHA_CONTROL_CENTER_PORT || instance?.port || 3420),
   };
 }
 

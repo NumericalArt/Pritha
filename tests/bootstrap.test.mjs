@@ -12,6 +12,18 @@ function runBootstrap(args) {
   });
 }
 
+test('external bootstrap profiles isolate Python, persist only a selection and never install global packages or start a server',()=>{
+  for(const [profile,connector] of [['neuraldeep','neuraldeep'],['claude','claude'],['openrouter','openrouter'],['local-model','local']]){
+    const result=runBootstrap(['prepare','--profile',profile,'--dry-run','--json']);assert.equal(result.status,0,result.stderr);const plan=JSON.parse(result.stdout);
+    assert.equal(plan.providerProfile,connector);assert.equal(plan.providerReadiness,'configuration-required');assert.equal(plan.steps[0].id,'instance-prepare');
+    assert(plan.steps.some(item=>item.id==='python-venv'));assert(plan.steps.find(item=>item.id==='python-core').command.includes('/venv/'));
+    assert(!plan.steps.some(item=>item.args?.includes('--user') || item.startsForegroundProcess || item.id.startsWith('web-search')));
+    assert(!JSON.stringify(plan).includes('git add'));assert(plan.steps.some(item=>item.id==='provider-connection'));
+  }
+  const explicit=JSON.parse(runBootstrap(['plan','--profile','minimal','--provider-profile','local','--json']).stdout);assert.equal(explicit.providerProfile,'local');
+  for(const profile of ['__proto__','constructor','invalid'])assert.notEqual(runBootstrap(['plan','--profile',profile,'--json']).status,0);
+});
+
 test("bootstrap plan is machine-readable and non-mutating", () => {
   const result = runBootstrap(["plan", "--profile", "minimal", "--json"]);
   assert.equal(result.status, 0, result.stderr || result.stdout);

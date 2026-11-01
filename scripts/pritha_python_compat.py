@@ -1,6 +1,8 @@
 """Small runtime and environment compatibility shims for Pritha Python scripts."""
 
 import os
+import json
+import stat
 from pathlib import Path
 from pritha_paths import resolve_pritha_root, pritha_root_environment
 
@@ -34,6 +36,26 @@ def load_pritha_runtime_env(root=None):
     _load_path_env_file(code_root / ".env.local")
 
     configured_root = resolve_pritha_root(cwd=code_root)
+    if not os.environ.get("PRITHA_STATE_ROOT"):
+        try:
+            fd = os.open(configured_root / ".pritha-instance.json", os.O_RDONLY | os.O_NOFOLLOW)
+        except FileNotFoundError:
+            fd = None
+        except OSError:
+            raise ValueError("instance_configuration_unreadable") from None
+        if fd is not None:
+            try:
+                info = os.fstat(fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > 16000 or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                    raise ValueError("instance_configuration_unreadable")
+                pointer = json.loads(os.read(fd, 16001))
+                if pointer.get("schema") != "pritha-instance-v1" or not isinstance(pointer.get("codeRoot"), str) or Path(pointer["codeRoot"]).resolve() != configured_root.resolve() or not isinstance(pointer.get("stateRoot"), str) or not Path(pointer["stateRoot"]).is_absolute():
+                    raise ValueError("instance_configuration_invalid")
+                os.environ["PRITHA_STATE_ROOT"] = pointer["stateRoot"]
+            except (KeyError, TypeError, json.JSONDecodeError):
+                raise ValueError("instance_configuration_invalid") from None
+            finally:
+                os.close(fd)
     state_root = Path(os.path.abspath(os.environ.get("PRITHA_STATE_ROOT") or configured_root))
     if state_root.resolve() == configured_root.resolve():
         state_root = configured_root

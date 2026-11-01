@@ -491,15 +491,15 @@ double Enter, lost response, stale revision/turn и mobile composition.
 
 ### R11 — Bootstrap, distribution и инструкции
 
-**Статус: in-progress; private instance roots проверены, unified profiles/examples/upgrade впереди.** Зависимости R1–R10.
+**Статус: in-progress; unified profiles, private roots/venv и fresh preparation проверены. Reviewed demo installer впереди.** Зависимости R1–R10.
 
-- [ ] Unified PROFILES minimal/local/control-center/control-center-tailscale,
+- [x] Unified PROFILES minimal/local/control-center/control-center-tailscale,
   neuraldeep/claude и явные OpenRouter/Local selectors без конфликта имён.
-- [ ] Instance-local venv/state/agent parent; provider profile persisted без keys.
+- [x] Instance-local venv/state/agent parent; provider profile persisted без keys.
   prepareDistributionInstance переносится с isolation regression tests.
 - [ ] Reviewed `examples/brief-desk-nd`, install-brief-desk и START_HERE/docs
   сохраняются; demo setup локально/идемпотентно, без server autostart и secrets.
-- [ ] Native и ND onboarding одной codebase; Claude/API/OpenRouter/Local setup,
+- [x] Native и ND onboarding одной codebase; Claude/API/OpenRouter/Local setup,
   pending-auth/offline statuses, external runtime requirements и recovery guide.
 - [ ] Fresh sandbox install/upgrade from legacy config, no runtime data copied;
   CLI --help, samples, manifests и selected modules coherent.
@@ -2000,6 +2000,41 @@ unit child environment отдельно и изолировать оба aliases
   recovery, unknown exit, invalid report и provider-slot competition. Source URL
   передаётся через `--base-url` и закрепляется в attempt. Typecheck, privacy,
   names **124** и Markdown **990** прошли. Полный unit gate запущен после блока.
+
+### Checkpoint 32b — Full gate и связанные исправления
+
+- Full unit run: **1392/1398**, 295 s. Шесть failures: naming guard заметил уже
+  начатую compatibility detection в bootstrap; voice expectations ещё разрешали
+  cloud audio для Local, а child routing ожидал прежний pending code.
+- Local теперь возвращает нормальный offline status, не читая cloud credentials;
+  сохранённый старый Local voice context также не разрешает сетевой вызов.
+  Public child-route fixture проверяет новые точные причины отказа. Неизвестный
+  результат самого старта inference supervisor сохраняет recovery receipt.
+- Связанный повтор **43/43**, typecheck passed. Полный набор повторяется на
+  следующем общем/final gate; результат 1398/1398 пока не заявляется.
+
+### Checkpoint 33a — Unified bootstrap и private distribution pointer
+
+- Перенесены reviewed идеи ND instance/bootstrap/START_HERE из pinned source.
+  Удалены автоматические Git init/add/commit и credential inheritance. Источник
+  и адаптации зафиксированы в inventory, теперь **69** записей.
+- Профили minimal/local/control-center/control-center-tailscale сохранены;
+  ND/Claude/OpenRouter/local-model добавлены. `--provider-profile` отделяет
+  connector от installation profile. Auth/actual inference остаются отдельными
+  readiness checks; отсутствие ключа не вызывает скрытый fallback.
+- Fresh instance получает gitignored mode-0600 pointer, отдельные state/agent
+  roots и venv. Occupied legacy state не переносится. Env-first precedence
+  сохранён; copied pointer, root overlap, чужой checkout и unsafe file закрыты.
+  Повтор prepare не пересоздаёт готовый venv; required failure останавливает
+  последующие шаги. Системный pip --user больше не используется.
+- JS/Control Center/direct Python entrypoints и env-doctor выбирают один
+  instance state/interpreter. Проверки без импорта ML и без загрузки credentials.
+- Bootstrap/paths/Python/doctor/names gate **32/32**, typecheck passed. Полная
+  minimal preparation из реального локального Git archive прошла три раза,
+  включая index rebuild и verify: **pass**, без Git init и source pointer на
+  канонической машине. Это fixture, не обновление живого runtime.
+- Names **125**, Markdown **991**; обновлены START_HERE и first-run workflow.
+  Reviewed Brief Desk + безопасный installer остаются следующей частью R11.
 
 ## 7. Полные исходные материалы
 

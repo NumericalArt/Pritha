@@ -692,6 +692,18 @@
       "sha256": "3e8469e7a211b905b0b5ef81162f1a6a861926ebc93d85c179df0399a78e7477",
       "count": 1,
       "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/lib/distribution-instance.mjs",
+      "sha256": "6b6cf7c06e33355bb39388ad58cf708c9b4a160d6f0aec771be2d38d9a0762bd",
+      "count": 1,
+      "reason": "Preserve existing legacy setup and memory layout during bootstrap; never silently relocate an occupied instance."
+    },
+    {
+      "path": "scripts/lib/env.mjs",
+      "sha256": "9e23e1c90d1a615e8e84ee02b712e1d47d8482b3ba4116f17fdf585e1dc61648",
+      "count": 1,
+      "reason": "Existing root alias and legacy-state detection remain compatible while provider selection and private instance roots are added."
     }
   ]
 }

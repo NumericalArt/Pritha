@@ -79,9 +79,9 @@ export async function startOwnedLocalServer(options,config,dependencies={}){
   const owner=processSnapshot().find(row=>row.pid===process.pid),record={identity:config.identity,ownerPid:process.pid,ownerStarted:owner?.started};
   const journal=()=>{if(lockFd===undefined)return;const bytes=Buffer.from(JSON.stringify(record));ftruncateSync(lockFd,0);let offset=0;while(offset<bytes.length)offset+=writeSync(lockFd,bytes,offset,bytes.length-offset,offset);fsyncSync(lockFd);};
   journal();
-  let temporary,port,baseUrl,owned,evidence,plan,closed=false,exitResult,outputBytes=0,timer,processFinished=false;
+  let temporary,port,baseUrl,owned,evidence,plan,closed=false,exitResult,outputBytes=0,timer,processFinished=false,unconfirmedStart=false;
   const stop=()=>owned?.stop('SIGTERM'),abort=()=>stop();
-  const close=async()=>{if(closed)return exitResult;closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);stop();exitResult=owned?await owned.completion:{processTreeExited:true};
+  const close=async()=>{if(closed)return exitResult;closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);stop();exitResult=owned?await owned.completion:{processTreeExited:!unconfirmedStart};
     if(lockFd!==undefined){closeSync(lockFd);lockFd=undefined;}
     if(exitResult.processTreeExited){rmSync(lock);if(temporary)rmSync(temporary,{recursive:true,force:true});if(plan?.planPath)rmSync(plan.planPath,{force:true});}return exitResult;};
   try{
@@ -117,5 +117,5 @@ export async function startOwnedLocalServer(options,config,dependencies={}){
     if(!model.tools || !model.responses)throw fail(!model.tools?'provider_tools_unverified':'provider_protocol_unverified');
     record.model=model;journal();
     return {baseUrl,port,model,identity:config.identity,verify,stop,close};
-  }catch(error){const result=await close();error.processTreeExited=result.processTreeExited===true;throw error;}
+  }catch(error){unconfirmedStart=error.processTreeExited===false;const result=await close();error.processTreeExited=result.processTreeExited===true;throw error;}
 }

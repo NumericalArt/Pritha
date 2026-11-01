@@ -390,6 +390,24 @@
       "source_sha256": "7fa24ebb0f1761fc803137e1505d6f11c53e9cdf5e4efc5bbb990252442e7873",
       "adoption": "Adapted reservation, unknown usage, opaque input, replay, context and cap boundaries; real loopback adapters prove async tool withholding and no repeat after ambiguous failure for NeuralDeep and OpenRouter.",
       "target_sha256": "e3324c03f42d8552e55445a6305c43c7e6e66c0937ac206516e518af101d4956"
+    },
+    {
+      "path": "scripts/lib/distribution-instance.mjs",
+      "source_sha256": "8fd823041445f1459158a65cd8fd128a9a8cc8bb87ec251e7a21c86623d9bb34",
+      "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
+      "target_sha256": "9f748ab2922efc346963f4ab98678d4dfadf8786330bd98f7b591dba7a48c3af"
+    },
+    {
+      "path": "scripts/bootstrap.mjs",
+      "source_sha256": "38f94f8360d6521a02a370af03d7a67e3a9f4f68233171d13a3843efc7fef887",
+      "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
+      "target_sha256": "f130936d9a6f807d22c869da3f62be46d26ba85db1e46842a5d358ad460cedaa"
+    },
+    {
+      "path": "START_HERE.md",
+      "source_sha256": "30af3a5441df48ad332fd8a2f3d303eeb6c75d3abc2b77992b5da7252613ae3e",
+      "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
+      "target_sha256": "a286cccaad2340623c4a8e2701a014f85e1840f0e1c92434ccd48858e3b2fc19"
     }
   ]
 }

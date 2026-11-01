@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { resolvePrithaRoot } from "./lib/paths.mjs";
+import {resolvePrithaPython} from './lib/python-runtime.mjs';
 
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
@@ -65,6 +66,7 @@ function run(command, commandArgs, options = {}) {
   if (simulatedMissing.has(command) || simulatedMissing.has(options.id)) {
     return { status: 127, stdout: "", stderr: "simulated missing dependency" };
   }
+  if(command==='python3')try{command=resolvePrithaPython({root:ROOT});}catch{return {status:127,stdout:'',stderr:'This instance Python environment needs repair.'};}
   return runSyncProbe(command, commandArgs, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

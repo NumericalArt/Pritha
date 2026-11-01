@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import {prepareDistributionInstance} from '../scripts/lib/distribution-instance.mjs';
 
 test("direct Python memory entrypoints respect instance roots without loading unrelated secrets or ML", () => {
   const base = realpathSync(mkdtempSync(path.join(os.tmpdir(), "pritha-python-env-")));
@@ -27,4 +28,13 @@ test("direct Python memory entrypoints respect instance roots without loading un
       assert.deepEqual(JSON.parse(result.stdout), { roots: [root, explicit ? override : state], secret: null, ml: false });
     }
   } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('direct Python resolves the private distribution pointer without reading credentials or importing ML',t=>{
+  const base=realpathSync(mkdtempSync(path.join(os.tmpdir(),'pritha-python-pointer-'))),root=path.join(base,'code');mkdirSync(root);t.after(()=>rmSync(base,{recursive:true,force:true}));
+  const config=prepareDistributionInstance(root,{env:{},providerProfile:'neuraldeep'});
+  const script=`import sys,json,os\nsys.path.insert(0,${JSON.stringify(path.resolve('scripts'))})\nfrom pritha_python_compat import load_pritha_runtime_env\nroots=load_pritha_runtime_env(${JSON.stringify(root)})\nprint(json.dumps({'state':str(roots[1]),'ml':'torch' in sys.modules}))`;
+  const env=Object.fromEntries(['PATH','HOME','LANG'].filter(key=>process.env[key]).map(key=>[key,process.env[key]]));
+  const run=spawnSync('python3',['-c',script],{env,encoding:'utf8'});assert.equal(run.status,0,run.stderr);assert.deepEqual(JSON.parse(run.stdout),{state:config.stateRoot,ml:false});
+  writeFileSync(path.join(root,'.pritha-instance.json'),JSON.stringify({...config,codeRoot:base}),{mode:0o600});const rejected=spawnSync('python3',['-c',script],{env,encoding:'utf8'});assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/instance_configuration_invalid/);
 });

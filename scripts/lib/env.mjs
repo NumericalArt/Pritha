@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { resolvePrithaRoot,resolvePrithaStateRoot,prithaRootEnvironment } from "./paths.mjs";
+import {readInstancePointer} from './distribution-instance.mjs';
 
-const PATH_KEYS = new Set(['PRITHA_ROOT','TECHSCOPE_ROOT','PRITHA_STATE_ROOT','PRITHA_AGENT_PARENT','PRITHA_INSTANCE_ID','PRITHA_INSTANCE_ROLE','PRITHA_CONTROL_CENTER_PORT','PRITHA_CONTROL_CENTER_ENV_FILE']);
+const PATH_KEYS = new Set(['PRITHA_ROOT','TECHSCOPE_ROOT','PRITHA_STATE_ROOT','PRITHA_AGENT_PARENT','PRITHA_INSTANCE_ID','PRITHA_INSTANCE_ROLE','PRITHA_CONTROL_CENTER_PORT','PRITHA_CONTROL_CENTER_ENV_FILE','PRITHA_PROVIDER_PROFILE']);
 
 export function loadEnvFile(filePath, target = process.env, allowedKeys = null) {
   if (!existsSync(filePath)) return false;
@@ -34,6 +35,8 @@ export function loadPrithaRuntimeEnv(options = {}) {
   if(options.root!==undefined)Object.assign(target,prithaRootEnvironment(initialRoot));
   loadEnv({ root:initialRoot, target, pathOnly: options.pathOnly });
   const root=resolvePrithaRoot({cwd:initialRoot,env:target});
+  const instance=readInstancePointer(root);
+  if(instance)for(const [name,value] of Object.entries({PRITHA_INSTANCE_ID:instance.id,PRITHA_STATE_ROOT:instance.stateRoot,PRITHA_AGENT_PARENT:instance.agentParent,PRITHA_CONTROL_CENTER_PORT:String(instance.port),PRITHA_PROVIDER_PROFILE:instance.providerProfile}))if(target[name]===undefined)target[name]=value;
   const stateRoot = resolvePrithaStateRoot({root,stateRoot:target.PRITHA_STATE_ROOT,env:target});
   if (stateRoot !== root) {
     loadEnvFile(path.join(stateRoot, "config", "runtime.env"), target, options.pathOnly ? PATH_KEYS : null);

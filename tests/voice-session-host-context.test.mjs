@@ -25,6 +25,7 @@ function fixture(t){
   const environment={env:{}},settings={activeConnectorId:'codex',voiceEngine:'auto',revision:1,providerPresets:Object.fromEntries(policy.PROVIDER_CONNECTOR_IDS.map(id=>[id,{...policy.defaultProviderPreset(id),modelId:id+'-fixture'}]))};
   const native={voiceModel:'gpt-realtime-2',prithaVoice:'marin',codexServiceTier:'standard'},calls=[];
   const engine={VoiceEngineError,requireVoiceEngine:wanted=>{
+    if(settings.activeConnectorId==='local')throw new VoiceEngineError('voice_offline','Cloud voice is disabled.');
     const resolved=policy.resolveVoiceEngine({connectorId:settings.activeConnectorId,engine:settings.voiceEngine,configured:{openai:true,neuraldeep:true}});
     if(resolved.engine!==wanted)throw new VoiceEngineError('voice_engine_changed','Reconnect.');
     return {...resolved,connectorId:settings.activeConnectorId,revision:settings.revision,chained:{model:'voice-fixture',voice:'serena'}};
@@ -86,6 +87,7 @@ test('every task connector retains its session snapshot while hard offline polic
   const cookie='pritha-voice-owner=11111111-2222-4333-8444-555555555555',owner=f.api.voiceContextOwner(f.request({},cookie)).owner;
   for(const connector of policy.PROVIDER_CONNECTOR_IDS){
     f.settings.activeConnectorId=connector;f.settings.voiceEngine='neuraldeep';
+    if(connector==='local'){assert.throws(()=>f.api.openVoiceSessionContext(owner,'neuraldeep'),{code:'voice_offline'});continue;}
     const saved=f.api.openVoiceSessionContext(owner,'neuraldeep');
     f.settings.activeConnectorId='codex';f.settings.voiceEngine='openai';
     const restored=f.api.getVoiceSessionContext(saved.id,owner,'neuraldeep');assert.equal(restored.connectorId,connector);
@@ -93,8 +95,10 @@ test('every task connector retains its session snapshot while hard offline polic
     assert.throws(()=>f.api.getVoiceSessionContext(saved.id,owner,'openai'),{code:'voice_context_engine_mismatch'});
     assert.throws(()=>f.api.assertVoiceContextAllowed({...saved,engine:'openai'},'openai'),{code:'voice_context_engine_mismatch'});
   }
+  f.settings.activeConnectorId='codex';f.settings.voiceEngine='openai';
   const saved=f.api.openVoiceSessionContext(owner,'openai');f.environment.env.PRITHA_VOICE_OFFLINE='1';
   assert.throws(()=>f.api.getVoiceSessionContext(saved.id,owner),{code:'voice_offline'});
+  f.environment.env.PRITHA_VOICE_OFFLINE='0';assert.throws(()=>f.api.assertVoiceContextAllowed({...saved,connectorId:'local'}),{code:'voice_offline'});
 });
 test('Live startup uses its captured model and rejects a protocol mismatch before a provider call',async t=>{
   const f=fixture(t);f.native.voiceModel='gpt-live-1';
@@ -110,7 +114,9 @@ for(const voice of ['openai','neuraldeep'])test(`${voice} intake uses its host c
   const f=fixture(t);
   for(const connector of policy.PROVIDER_CONNECTOR_IDS){
     f.settings.activeConnectorId=connector;f.settings.voiceEngine=voice;
+    const before=f.calls.length;
     const response=voice==='openai'?await f.routes.session.POST(f.request({})):await f.routes.neuraldeep.POST(f.request({}),{params:Promise.resolve({path:['sessions']})});
+    if(connector==='local'){assert.equal(response.status,409);assert.equal(f.calls.length,before);continue;}
     assert.equal(response.status,200);
     const body=await response.json(),cookie=response.headers.getSetCookie().find(value=>value.startsWith('pritha-voice-owner=')).split(';')[0];
     f.settings.activeConnectorId='openrouter';f.settings.voiceEngine='openai';

@@ -53,6 +53,7 @@ function fixture(t, options = {}) {
     startAdmittedVoiceTask: async transport => { calls.push('native-start'); return { status: 'running', transport }; },
     atomicWritePrivateJson: async ({ filePath, value }) => writeFile(filePath, JSON.stringify(value)),
     require: id => {
+      if(id.endsWith('/provider-agent-workspace.mjs'))return {resolveProviderAgentWorkspace:()=>{throw Object.assign(new Error('Missing child'),{code:'provider_agent_workspace_unavailable'});}};
       if (id === '../settings/provider-settings-server') return { getProviderSettings: () => settings };
       if (id === '../settings/provider-profile') return profile;
       if (id === '../codex-chat/gateway') return {getCodexChatGateway:()=>({attachments})};
@@ -98,7 +99,7 @@ test('handoff and preparation failures make no task directory and never start a 
 test('unverified child workspaces and file delivery remain explicit blockers before a provider call', async t => {
   for (const args of [{ subject_kind: 'agent' }, { task_type: 'agent_creation' }, { intake: { files: [{ id: 'file-one' }] } }]) {
     const f = fixture(t), result = await f.run({ task: 'Inspect fixture', ...args });
-    assert.equal(result.ok, false); assert.ok(['provider_voice_agent_workspace_pending', 'provider_attachments_unverified'].includes(result.error));
+    assert.equal(result.ok, false); assert.ok(['provider_agent_workspace_unavailable','provider_voice_agent_creation_pending', 'provider_attachments_unverified'].includes(result.error),result.error);
     assert.deepEqual(f.calls, []); assert.equal(existsSync(path.join(f.privateRoot, 'codex-tasks')), false);
   }
 });

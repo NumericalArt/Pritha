@@ -36,7 +36,7 @@ export function openVoiceSessionContext(owner: string, engine: 'openai' | 'neura
     voice: engine === 'neuraldeep' ? selected.chained.voice : native.prithaVoice, serviceTier: native.codexServiceTier });
 }
 export function assertVoiceContextAllowed(context: VoiceContext, engine?: 'openai' | 'neuraldeep') {
-  if (process.env.PRITHA_VOICE_OFFLINE === '1') throw new VoiceEngineError('voice_offline', 'Cloud voice is disabled.');
+  if (process.env.PRITHA_VOICE_OFFLINE === '1' || context.connectorId==='local') throw new VoiceEngineError('voice_offline', 'Cloud voice is disabled.');
   const saved = store().get(context.id, context.owner);
   if (engine && saved.engine !== engine) throw new VoiceContextError('voice_context_engine_mismatch');
   return saved;

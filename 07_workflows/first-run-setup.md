@@ -3,7 +3,7 @@ id: first-run-setup
 type: workflow
 status: active
 created: 2026-05-28
-updated: 2026-06-25
+updated: 2026-11-01
 topics:
   - pritha
   - setup
@@ -92,9 +92,11 @@ node scripts/bootstrap.mjs --profile local --start control-center
 Use `node scripts/setup.mjs` only as the lower-level setup-state wizard when
 debugging bootstrap or custom setup-state paths.
 
-7. The prepare command must leave `.memory/techscope.sqlite` populated with
-   documents, chunks, relations and embeddings. If `.memory/techscope.sqlite` is
-   absent or stale, rerun:
+7. The prepare command must populate the resolved memory database with
+   documents, chunks, relations and embeddings. Fresh instances use
+   `<PRITHA_STATE_ROOT>/memory/pritha.sqlite`; an occupied legacy layout remains
+   supported until explicit migration. If the selected index is absent or stale,
+   rerun:
 
 ```sh
 node scripts/bootstrap.mjs prepare --profile local
@@ -128,7 +130,20 @@ node scripts/self-test.mjs
   and Funnel/public exposure need a separate explicit user confirmation
   immediately before the action. Peer access remains not tested until the user
   opens the private URL from a phone or other trusted peer device.
-- `claude-code`: out of scope for v0.1; see placeholder contract.
+- Task providers are separate from these interface switches. Use bootstrap
+  profiles `neuraldeep`, `claude`, `openrouter`, `local-model`, or explicit
+  `--provider-profile`. Keys are configured in Settings, never inherited by a
+  new child. Claude supports its API-key lane; Local requires verified owned
+  process isolation. See `START_HERE.md` and `07_workflows/local-provider-offline.md`.
+
+## Instance preparation
+
+Fresh distributions get a private `.pritha-instance.json`, external state/agent
+roots and an instance Python venv. Existing legacy state stays in place.
+Preparation does not create a Git repository or commit files. Plan/dry-run do
+not create pointers or directories; repeated preparation preserves configured
+roots, existing environments and user data. Required-step failures stop later
+steps. Python memory entrypoints and Control Center resolve the same pointer.
 
 ## Tailscale Private Access
 

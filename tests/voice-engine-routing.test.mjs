@@ -24,7 +24,7 @@ function fixture({connectorId='codex',engine='auto',openai=false,neuraldeep=fals
 test('all five connectors and all voice choices resolve deterministically for each credential combination',()=>{
   for(const connectorId of policy.PROVIDER_CONNECTOR_IDS)for(const engine of policy.VOICE_ENGINES)for(const openai of [false,true])for(const neuraldeep of [false,true]){
     const host=fixture({connectorId,engine,openai,neuraldeep}),status=host.getVoiceEngineStatus();
-    const expected=policy.resolveVoiceEngine({connectorId,engine,configured:{openai,neuraldeep}});
+    const expected=policy.resolveVoiceEngine({connectorId,engine:connectorId==='local'?'auto':engine,configured:{openai,neuraldeep}});
     assert.equal(status.engine,expected.engine);assert.equal(status.reason,expected.reason);assert.equal(status.revision,7);
     assert.doesNotMatch(JSON.stringify(status),/fixture-secret|synthetic-state/);
     if(expected.engine)assert.equal(host.requireVoiceEngine(expected.engine).engine,expected.engine);

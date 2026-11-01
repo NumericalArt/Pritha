@@ -5,14 +5,22 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
+import {existsSync} from 'node:fs';
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaRoot } from "./lib/paths.mjs";
+import {instanceConfig,applyInstanceEnvironment,prepareDistributionInstance} from './lib/distribution-instance.mjs';
+import {instancePythonPath,resolvePrithaPython} from './lib/python-runtime.mjs';
+import {connectorForBootstrapProfile,normalizeProviderConnectorId} from './lib/provider-profile.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePrithaRoot({ cwd: path.resolve(SCRIPT_DIR, "..") });
 loadPrithaRuntimeEnv({ root: ROOT });
 const PHASES = new Set(["plan", "prepare", "install", "verify", "start"]);
 const PROFILES = {
+  neuraldeep: {pythonCore:true,pythonMacos:true,controlCenter:true,webSearch:false,tailscale:false},
+  claude: {pythonCore:true,pythonMacos:true,controlCenter:true,webSearch:false,tailscale:false},
+  openrouter: {pythonCore:true,pythonMacos:true,controlCenter:true,webSearch:false,tailscale:false},
+  'local-model': {pythonCore:true,pythonMacos:false,controlCenter:true,webSearch:false,tailscale:false},
   minimal: {
     pythonCore: false,
     pythonMacos: false,
@@ -117,7 +125,7 @@ function memoryBuildSteps(config) {
     ], { writes: true, timeoutMs: 300000 }),
   ];
   if (config.pythonCore) {
-    steps.push(step("memory-embeddings", "install", "Build local semantic embeddings", "python3", [
+    steps.push(step("memory-embeddings", "install", "Build local semantic embeddings", instancePythonPath({root:ROOT}), [
       "scripts/embed-memory.py",
     ], { writes: true, timeoutMs: 900000 }));
   } else {
@@ -133,27 +141,28 @@ function memoryBuildSteps(config) {
 
 function installSteps(profile, config, options) {
   const steps = [
+    {id:'instance-prepare',phase:'install',label:'Persist this instance’s roots and provider selection',kind:'instance',writes:true,required:true},
     step("setup-state", "install", "Create local setup state", "node", setupArgs(options), {
       writes: true,
       timeoutMs: 240000,
     }),
   ];
   if (config.pythonCore) {
-    steps.push(step("python-core", "install", "Install portable Python dependencies", "python3", [
+    const python=instancePythonPath({root:ROOT});
+    steps.push(step('python-venv','install','Create this instance’s isolated Python environment','python3',['-m','venv',path.dirname(path.dirname(python))],{writes:true,timeoutMs:240000}));
+    steps.push(step("python-core", "install", "Install portable Python dependencies", python, [
       "-m",
       "pip",
       "install",
-      "--user",
       "-r",
       "requirements-core.txt",
     ], { writes: true, timeoutMs: 900000 }));
   }
   if (config.pythonMacos && process.platform === "darwin") {
-    steps.push(step("python-macos", "install", "Install macOS transcription dependencies", "python3", [
+    steps.push(step("python-macos", "install", "Install macOS transcription dependencies", instancePythonPath({root:ROOT}), [
       "-m",
       "pip",
       "install",
-      "--user",
       "-r",
       "requirements-macos.txt",
     ], { writes: true, timeoutMs: 900000 }));
@@ -311,6 +320,14 @@ function runStep(item, options) {
   if (options.dryRun || options.planOnly) {
     return { ...item, status: "planned", exitCode: 0 };
   }
+  if(item.kind==='instance'){
+    try{prepareDistributionInstance(ROOT);return {...item,status:'pass',exitCode:0};}
+    catch(error){return {...item,status:'fail',exitCode:1,error:/^instance_[a-z_]+$/.test(error.code || '')?error.code:'instance_prepare_failed'};}
+  }
+  if(item.id==='python-venv' && existsSync(item.args.at(-1))){
+    try{resolvePrithaPython({root:ROOT,env:{...process.env,PRITHA_PYTHON:undefined}});return {...item,status:'pass',exitCode:0,stdout:'Existing instance Python retained.'};}
+    catch{return {...item,status:'fail',exitCode:1,error:'python_environment_incomplete'};}
+  }
   const startsForegroundProcess = item.startsForegroundProcess;
   const result = spawnSync(item.command, item.args, {
     killSignal: "SIGKILL",
@@ -360,7 +377,11 @@ async function main() {
   node scripts/bootstrap.mjs start --profile control-center
   node scripts/bootstrap.mjs --profile local --start control-center
 
-Profiles: minimal, local, control-center, control-center-tailscale
+Profiles: minimal, local, control-center, control-center-tailscale,
+          neuraldeep, claude, openrouter, local-model
+Optional --provider-profile codex|neuraldeep|claude|openrouter|local selects the
+provider independently. Profile local is the existing native local installation;
+local-model is the offline inference connector. Neither provisions credentials.
 
 Safety: bootstrap never installs launchd, cron, durable services, Tailscale, or
 credentials. The local web search backend is installed under ignored .tools and
@@ -374,20 +395,31 @@ command runs in the foreground.`);
     throw new Error(`Unknown bootstrap phase: ${options._[0]}`);
   }
   const profile = options.profile || (options.start ? "local" : "minimal");
-  if (!PROFILES[profile]) throw new Error(`Unknown bootstrap profile: ${profile}`);
+  if (!Object.hasOwn(PROFILES,profile)) throw new Error('Unknown bootstrap profile.');
   const startTarget = phase === "start" && !options.start ? "control-center" : options.start;
   const sequence = phase === "prepare" ? ["install", "verify"] : phase ? [phase] : startTarget ? ["install", "verify", "start"] : ["plan"];
   assertControlCenterHostPolicy(sequence);
+  const selected=options['provider-profile']!==undefined?normalizeProviderConnectorId(options['provider-profile'])
+    :['neuraldeep','claude','openrouter','local-model'].includes(profile)?connectorForBootstrapProfile(profile):undefined;
+  const instance=instanceConfig(ROOT,{providerProfile:selected});applyInstanceEnvironment(ROOT,instance);
   const config = effectiveConfig(profile, startTarget);
+  if(instance.providerProfile!=='codex')config.webSearch=false;
   const steps = plannedSteps(sequence, profile, config, { ...options, start: startTarget });
+  if(instance.providerProfile!=='codex')steps.push(note('provider-connection','verify','Complete provider readiness in Settings',instance.providerProfile==='local'
+    ?'Configure and probe an installed owned Local model process. No model downloads or services start during bootstrap.'
+    :'Connect this instance’s own API credential in Settings and verify the selected model. Bootstrap does not read, copy or provision provider credentials.'));
   const planOnly = sequence.length === 1 && sequence[0] === "plan";
-  const results = steps.map((item) => runStep(item, { dryRun: options["dry-run"], planOnly }));
+  let blocked=false;
+  const results = steps.map(item=>{if(blocked)return {...item,status:'skipped',exitCode:null};const result=runStep(item,{dryRun:options['dry-run'],planOnly});if(result.status==='fail')blocked=true;return result;});
   const failed = results.filter((item) => item.status === "fail");
   const warned = results.filter((item) => item.status === "warn");
   const payload = {
     schema: "pritha-bootstrap-v1",
     root: ROOT,
     profile,
+    providerProfile:instance.providerProfile,
+    providerReadiness:instance.providerProfile==='codex'?'native-not-probed':'configuration-required',
+    instance:{id:instance.id,stateRoot:instance.stateRoot,agentParent:instance.agentParent},
     phases: sequence,
     startTarget: startTarget || null,
     status: failed.length > 0 ? "fail" : warned.length > 0 ? "pass-with-warnings" : planOnly || options["dry-run"] ? "planned" : "pass",

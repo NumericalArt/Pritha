@@ -15,6 +15,7 @@ Untitled*.canvas
 .tools/
 .queue/
 .private/
+.pritha-instance.json
 .memory-private/
 data/logs/
 .techscope-setup.json

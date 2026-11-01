@@ -1,10 +1,11 @@
 import { accessSync, constants, existsSync, statSync } from "node:fs";
 import path from "node:path";
+import {resolvePrithaStateRoot} from './paths.mjs';
 
 /** Shared with bootstrap: computing this path does not create a venv. */
 export function instancePythonPath({ root = process.cwd(), env = process.env, platform = process.platform } = {}) {
-  const state = env.PRITHA_STATE_ROOT?.trim();
-  return path.join(state ? path.resolve(root, state) : path.join(root, ".private"),
+  const state = resolvePrithaStateRoot({root,env});
+  return path.join(state!==path.resolve(root) ? state : path.join(root, ".private"),
     "venv", platform === "win32" ? "Scripts/python.exe" : "bin/python");
 }
 

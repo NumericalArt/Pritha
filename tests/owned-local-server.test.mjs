@@ -38,3 +38,11 @@ const server=createServer((req,res)=>{res.setHeader('content-type','application/
   writeFileSync(path.join(f.options.stateRoot,'local-runtime','active.json'),JSON.stringify({identity:config.identity,ownerPid:999999,evidence:{coverage:'unknown'}}),{mode:0o600});
   await assert.rejects(startOwnedLocalServer(f.options,config),{code:'provider_local_process_unverified'});
 });
+test('an unconfirmed supervisor start retains its receipt and never reports a confirmed exit',async t=>{
+  const f=fixture(t);writeFileSync(f.value.args[0],'// fixture');f.save();const config=f.read();
+  await assert.rejects(startOwnedLocalServer(f.options,config,{prepareSandbox:()=>({command:process.execPath,args:[]}),spawnSupervised:async(_command,_args,options)=>{
+    await options.beforeStart({version:1,session:999999,coverage:'unknown',escaped:[]});throw Object.assign(new Error('fixture'),{processTreeExited:false});
+  }}),error=>error.processTreeExited===false);
+  const receipt=JSON.parse(readFileSync(path.join(f.options.stateRoot,'local-runtime','active.json'),'utf8'));assert.equal(receipt.evidence.coverage,'unknown');
+  await assert.rejects(startOwnedLocalServer(f.options,config),{code:'provider_local_process_unverified'});
+});
