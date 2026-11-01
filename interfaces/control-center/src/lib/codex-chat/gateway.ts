@@ -72,6 +72,11 @@ export class CodexChatGateway {
     return {...status,connectorId,availability:valid?status.availability:'degraded' as const,selected:{...status.selected,modelId:preset.modelId,effortId:preset.reasoningEffort,serviceTierId:tier},providers:status.providers.map(row=>valid?row:{...row,warning:'Choose an available model, reasoning effort and service tier for this new chat.'})};
   }
   providerSettingsSnapshot(connectorId:ProviderConnectorId) {const driver=this.driver(connectorId);return driver.getSettingsSnapshot?.() || driver.getRuntimeHealth();}
+  verifyProviderAttachments(connectorId:ProviderConnectorId,modelId:string,signal?:AbortSignal){
+    const driver=this.driver(connectorId);
+    if(!driver.verifyAttachments)throw new CodexChatGatewayError('provider_capability_unavailable','This provider does not offer local image verification.',422);
+    return driver.verifyAttachments(modelId,{signal});
+  }
   voiceTaskBackend(connectorId:ProviderConnectorId) {
     const backend=this.driver(connectorId).backend.voiceTaskBackend;
     if(!backend)throw new CodexChatGatewayError('provider_capability_unavailable','This provider uses its existing native voice task workflow.',422);

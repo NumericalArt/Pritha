@@ -1,0 +1,1 @@
+export function providerAttachmentVerificationRequest(request:Request,connectorId:string,options:{current:()=>{revision:number;modelId:string};verify:(modelId:string,signal:AbortSignal)=>Promise<Record<string,any>>}):Promise<Response>;

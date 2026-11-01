@@ -13,13 +13,14 @@ const fail=(code='attachment_integrity_failed')=>new AttachmentError(code,'This 
 const reference=file=>({...file.view,sha256:file.sha256});
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export const HOST_FILE_ATTACHMENT_PROTOCOL='pritha-host-files-v1';
+export const HOST_IMAGE_ATTACHMENT_PROTOCOL='pritha-host-images-v1';
 // These exact CLI versions are exercised with initial/resume MCP calls, real
 // Seatbelt and synthetic upstreams. A new CLI does not inherit file readiness.
 export const HOST_FILE_ATTACHMENT_CLI=Object.freeze({neuraldeep:'0.153.0',claude:'2.1.296',openrouter:'0.153.0'});
 export function hostFileAttachmentVerified(connectorId,version){return Object.hasOwn(HOST_FILE_ATTACHMENT_CLI,connectorId) && HOST_FILE_ATTACHMENT_CLI[connectorId]===version;}
 
 function location(options,receipt){
-  if(receipt?.protocol!==HOST_FILE_ATTACHMENT_PROTOCOL || !chat.test(receipt.chatId || '') || !turn.test(receipt.turnId || '') || !uuid.test(receipt.nonce || ''))throw fail();
+  if(![HOST_FILE_ATTACHMENT_PROTOCOL,HOST_IMAGE_ATTACHMENT_PROTOCOL].includes(receipt?.protocol) || !chat.test(receipt.chatId || '') || !turn.test(receipt.turnId || '') || !uuid.test(receipt.nonce || ''))throw fail();
   return path.join(options.privateRoot,'attachment-inputs',receipt.turnId,receipt.nonce);
 }
 async function manifest(options,receipt,{cleanup=false}={}){
@@ -35,7 +36,7 @@ async function manifest(options,receipt,{cleanup=false}={}){
     if(!equal(value.receipt,receipt) || !Array.isArray(value.files) || value.files.length>ATTACHMENT_LIMITS.count)throw fail();
     const names=new Set();let bytes=0;
     for(const row of value.files){
-      if(!uuid.test(row?.view?.id || '') || row.view.kind!=='file' || !/^[a-f0-9]{64}$/.test(row.sha256 || '')
+      if(!uuid.test(row?.view?.id || '') || !(row.view.kind==='file' || receipt.protocol===HOST_IMAGE_ATTACHMENT_PROTOCOL && row.view.kind==='image') || !/^[a-f0-9]{64}$/.test(row.sha256 || '')
         || !Number.isSafeInteger(row.view.size) || row.view.size<0 || row.view.size>ATTACHMENT_LIMITS.fileBytes
         || typeof row.view.name!=='string' || typeof row.name!=='string' || row.name!==row.view.id+path.extname(row.view.name).replace(/[^.a-zA-Z0-9]/g,'').slice(0,17) || names.has(row.name))throw fail();
       names.add(row.name);bytes+=row.view.size;
@@ -62,9 +63,9 @@ export async function cleanupHostFileAttachments(options,receipt){
 /** Opaque host capability. Only attachment IDs recorded in this exact private
  * chat may resolve. Originals are never exposed as writable tool paths. */
 export class ProviderFileAttachments {
-  constructor({store,stateRoot,privateRoot,chatId,turnId,lookup,check=()=>{}}){
-    this.options={store,stateRoot,privateRoot};this.lookup=lookup;this.checkOwner=check;
-    this.receipt=Object.freeze({protocol:HOST_FILE_ATTACHMENT_PROTOCOL,chatId,turnId,nonce:randomUUID()});
+  constructor({store,stateRoot,privateRoot,chatId,turnId,lookup,check=()=>{},allowImages=false}){
+    this.options={store,stateRoot,privateRoot};this.lookup=lookup;this.checkOwner=check;this.allowImages=allowImages===true;
+    this.receipt=Object.freeze({protocol:this.allowImages?HOST_IMAGE_ATTACHMENT_PROTOCOL:HOST_FILE_ATTACHMENT_PROTOCOL,chatId,turnId,nonce:randomUUID()});
     this.directory=privateStateDirectory(stateRoot,location(this.options,this.receipt));
     this.files=new Map();this.serial=Promise.resolve();this.closed=false;this.publish();
   }
@@ -76,7 +77,7 @@ export class ProviderFileAttachments {
   }
   async original(id){
     this.check();if(!uuid.test(id || ''))throw fail('attachment_not_in_chat');
-    const expected=this.lookup(id);if(!expected || expected.kind!=='file')throw fail('attachment_not_in_chat');
+    const expected=this.lookup(id);if(!expected || !(expected.kind==='file' || this.allowImages && expected.kind==='image'))throw fail('attachment_not_in_chat');
     const original=await this.options.store.resolve(id);this.check();
     if(!equal(reference(original),expected))throw fail();return original;
   }

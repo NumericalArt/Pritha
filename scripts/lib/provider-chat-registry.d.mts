@@ -18,6 +18,7 @@ export class ProviderChatRegistry {
   close():void;
   hasAttachments(chatId:string):boolean;
   attachmentReference(chatId:string,id:string):(AttachmentView & {sha256:string})|null;
+  imageReference(chatId:string,sha256:string,mediaType:string,size:number):(AttachmentView & {sha256:string})|null;
   require(chatId:string):ProviderChatBinding;
   get(chatId:string):ProviderChatBinding|null;
   findByClient(clientThreadId:string):ProviderChatBinding|null;

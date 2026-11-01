@@ -104,7 +104,10 @@ export async function POST(request: Request) {
     }
 
     const context = requestVoiceSessionContext(request, contextId);
-    const result = await createPrithaVoiceIntakeCodexTask({ text, files, sessionId, confirmation }, {taskSelection:voiceTaskSelection(context)});
+    const result = await createPrithaVoiceIntakeCodexTask({ text, files, sessionId, confirmation }, {taskSelection:voiceTaskSelection(context),check:()=>{
+      if(request.signal.aborted)throw new IntakePayloadError('intake_interrupted',408);
+      requestVoiceSessionContext(request,contextId);
+    }});
     const error = typeof result.error === "string" ? result.error : "";
     const status = result.ok ? 200 : error === "empty_intake" || error === "voice_confirmation_required" ? 400 : error.includes("large") || error === "too_many_files" ? 413 : 400;
     return NextResponse.json(result, { status });
@@ -112,6 +115,7 @@ export async function POST(request: Request) {
     if (error instanceof VoiceContextError || error instanceof VoiceEngineError || error instanceof IntakePayloadError) {
       return NextResponse.json({ok:false,error:error.code}, {status:error.status});
     }
+    if(error && typeof error==='object' && 'code' in error && /^(?:voice_intake_|attachment_)[a-z_]+$/.test(String(error.code)))return NextResponse.json({ok:false,error:error.code},{status:409});
     return NextResponse.json({ok:false,error:'voice_intake_failed'}, {status:500});
   }
 }

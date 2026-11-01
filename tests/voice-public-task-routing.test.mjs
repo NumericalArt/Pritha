@@ -7,6 +7,9 @@ import os from 'node:os';
 import path from 'node:path';
 import ts from '../interfaces/control-center/node_modules/typescript/lib/typescript.js';
 import * as profile from '../scripts/lib/provider-profile.mjs';
+import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
+import {ImmutableAttachmentStore} from '../scripts/lib/chat-attachment-store.mjs';
+import {VoiceIntakeReceipts,voiceIntakeAttachmentIds} from '../scripts/lib/voice-intake-receipts.mjs';
 
 const file = ts.createSourceFile('runtime.ts', readFileSync('interfaces/control-center/src/lib/realtime/pritha-runtime.ts', 'utf8'), ts.ScriptTarget.Latest, true);
 const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'abortPrithaCodexTask', 'runtimeSettingsForVoiceTask', 'createPrithaVoiceIntakeCodexTask'];
@@ -15,13 +18,14 @@ const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.Scri
 
 function fixture(t, options = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'pritha-voice-entry-')), privateRoot = path.join(root, 'private');
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const coordinator=new ExecutionCoordinator({stateRoot:root}),attachments=new ImmutableAttachmentStore({stateRoot:root,privateRoot:path.join(privateRoot,'chat')});
+  t.after(async() => {coordinator.close();await attachments.close();rmSync(root, { recursive: true, force: true });});
   const calls = [], reservations = [], settings = { activeConnectorId: options.connector || 'neuraldeep', providerPresets: Object.fromEntries(profile.PROVIDER_CONNECTOR_IDS.map(id => [id, { ...profile.defaultProviderPreset(id), modelId: id + '-model' }])) };
   const locks = new Set();
   const runtimeSettings={deepTaskPrimaryTransport:'codex-cli',codexAppThreadRoutingMode:'subject_scoped',codexModel:'default-native',codexReasoningEffort:'medium',codexTimeoutMs:90000,codexServiceTier:'standard',codexNetworkAccess:true,codexExecutionMode:'auto'};
   const json = async file => JSON.parse(await readFile(file, 'utf8').catch(() => 'null'));
   const dependencies = {
-    path, randomUUID, existsSync, mkdir, writeFile, readJsonFile: json,
+    path, randomUUID, existsSync, mkdir, writeFile, readJsonFile: json,VoiceIntakeReceipts,voiceIntakeAttachmentIds,
     VOICE_INTAKE_MAX_FILES:8,VOICE_INTAKE_MAX_FILE_BYTES:10*1024*1024,VOICE_INTAKE_MAX_TOTAL_BYTES:25*1024*1024,VOICE_INTAKE_STAGING_TTL_MS:7200000,
     purgeOldVoiceIntakeStaging:async()=>{calls.push('purge');},compactText:(value,limit)=>String(value || '').trim().slice(0,limit),extractUrls:()=>[],
     normalizeVoiceIntakeConfirmation:value=>value || {},voiceIntakeRoot:()=>path.join(privateRoot,'intake'),voiceIntakeTaskText:({text})=>text,
@@ -44,13 +48,14 @@ function fixture(t, options = {}) {
     codexTaskProgressPath: dir => path.join(dir, 'progress.jsonl'), codexTaskPlanPath: dir => path.join(dir, 'plan.json'), codexTaskVoiceFeedbackPath: dir => path.join(dir, 'voice.jsonl'),
     appendCodexTaskProgress: async () => {}, logPrivateEvent: async () => {},
     buildCodexPrompt: task => 'Operator task: ' + task.task, codexOutboundTransports: () => [], applyCodexOutboundPromptBudget: async () => { calls.push('native-budget'); },
-    nativeExecutionCoordinator: () => ({ withMutation: async (key, action) => { locks.add(key); try { return await action(); } finally { locks.delete(key); } } }), codexTaskIsAborted: async () => false,
+    nativeExecutionCoordinator: () => coordinator, codexTaskIsAborted: async () => false,
     getPrithaCodexTask: async id => ({ok:true,...await json(path.join(privateRoot,'codex-tasks',id,'status.json'))}),
     startAdmittedVoiceTask: async transport => { calls.push('native-start'); return { status: 'running', transport }; },
     atomicWritePrivateJson: async ({ filePath, value }) => writeFile(filePath, JSON.stringify(value)),
     require: id => {
       if (id === '../settings/provider-settings-server') return { getProviderSettings: () => settings };
       if (id === '../settings/provider-profile') return profile;
+      if (id === '../codex-chat/gateway') return {getCodexChatGateway:()=>({attachments})};
       if (id === '../voice/task-router') return {
         reserveProviderVoiceTask: input => {
           if (options.preparationError) throw Object.assign(new Error('preparation failure'), { code: options.preparationError });
@@ -63,9 +68,10 @@ function fixture(t, options = {}) {
       throw new Error('Unexpected runtime dependency: ' + id);
     },
   };
+  const mutate=coordinator.withMutation.bind(coordinator);coordinator.withMutation=(key,action,options)=>mutate(key,async()=>{locks.add(key);try{return await action();}finally{locks.delete(key);}},options);
   const exports = {};
   new Function(...Object.keys(dependencies), 'exports', compiled)(...Object.values(dependencies), exports);
-  return { run: exports.runCodexTask, intake:exports.createPrithaVoiceIntakeCodexTask, abort: exports.abortPrithaCodexTask, taskSettings:exports.runtimeSettingsForVoiceTask, runtimeSettings, root, privateRoot, calls, reservations, settings, json };
+  return { run: exports.runCodexTask, intake:exports.createPrithaVoiceIntakeCodexTask, abort: exports.abortPrithaCodexTask, taskSettings:exports.runtimeSettingsForVoiceTask, runtimeSettings, root, privateRoot, calls, reservations, settings, json,attachments,coordinator };
 }
 for (const connector of ['neuraldeep', 'claude', 'openrouter', 'local']) {
   test(`${connector}: public voice task preparation selects its provider without native probes or fallback`, async t => {
@@ -137,16 +143,46 @@ test('automatic native continuation inherits its original task preset rather tha
 });
 
 test('intake forwards the immutable host task selection through the real public task preparation',async t=>{
-  const f=fixture(t,{connector:'claude'}),taskSelection={contextId:'fixture-context',connectorId:'neuraldeep',preset:{modelId:'intake-pinned',reasoningEffort:'high',timeoutMs:30000},serviceTier:'standard'};
-  const result=await f.intake({text:'Inspect fixture',confirmation:{instruction:'Inspect fixture'}},{taskSelection});
+  const f=fixture(t,{connector:'claude'}),taskSelection={contextId:'vctx_'+'a'.repeat(32),connectorId:'neuraldeep',preset:{modelId:'intake-pinned',reasoningEffort:'high',timeoutMs:30000},serviceTier:'standard'};
+  const input={text:'Inspect fixture',confirmation:{source_intake_id:'voice-intake-fixture',instruction:'Inspect fixture'}};
+  const result=await f.intake(input,{taskSelection});
   assert.equal(result.connector_id,'neuraldeep');assert.equal(f.reservations[0].preset.modelId,'intake-pinned');
-  assert.deepEqual(f.calls,['purge','provider-start']);
+  const replay=await f.intake({...input,confirmation:{...input.confirmation,timestamp:new Date().toISOString()}},{taskSelection});
+  assert.equal(replay.task_id,result.task_id);assert.equal(replay.replayed,true);assert.deepEqual(f.calls,['provider-start']);
 });
-test('unverified provider files and malformed byte counts create no staging or task',async t=>{
-  for(const size of [1,2]){
-    const f=fixture(t),bytes=new Uint8Array([42]);
-    const result=await f.intake({files:[{name:'fixture.txt',size,bytes}],confirmation:{instruction:'Inspect fixture'}},{taskSelection:{connectorId:'neuraldeep'}});
-    assert.equal(result.ok,false);assert.equal(result.error,size===1?'provider_attachments_unverified':'invalid_file_size');
-    assert.deepEqual(f.calls,[]);assert.equal(existsSync(f.privateRoot),false);assert.deepEqual([...bytes],[42]);
-  }
+test('malformed intake byte counts create no originals, staging or task',async t=>{
+  const f=fixture(t),bytes=new Uint8Array([42]);
+  const result=await f.intake({files:[{name:'fixture.txt',size:2,bytes}],confirmation:{instruction:'Inspect fixture'}},{taskSelection:{connectorId:'neuraldeep'}});
+  assert.equal(result.ok,false);assert.equal(result.error,'invalid_file_size');
+  assert.deepEqual(f.calls,[]);assert.equal(existsSync(f.privateRoot),false);assert.deepEqual([...bytes],[42]);
+});
+
+for(const connectorId of ['neuraldeep','claude','openrouter'])test(`${connectorId}: confirmed voice files use shared originals and replay one exact task`,async t=>{
+  const f=fixture(t,{connector:connectorId}),taskSelection={contextId:'vctx_'+'b'.repeat(32),connectorId,preset:{modelId:'file-pinned',reasoningEffort:'high',timeoutMs:30000},serviceTier:'standard'};
+  const bytes=Buffer.from('private voice fixture'),input={text:'Inspect the file',sessionId:'voice-session',files:[{name:'fixture.txt',size:bytes.length,bytes}],confirmation:{source_intake_id:'confirmed-file',instruction:'Read fixture',timestamp:'first'}};
+  const first=await f.intake(input,{taskSelection}),replay=await f.intake({...input,confirmation:{...input.confirmation,timestamp:'retry'}},{taskSelection});
+  assert.equal(first.ok,true);assert.equal(replay.task_id,first.task_id);assert.deepEqual(f.calls,['provider-start']);
+  const saved=await f.json(path.join(f.privateRoot,'codex-tasks',first.task_id,'request.json')),ids=saved.task_chat_request.turn.attachments;
+  assert.equal(ids.length,1);assert.deepEqual(readFileSync((await f.attachments.resolve(ids[0])).filePath),bytes);
+  assert.equal(saved.intake.retention,'private-chat-originals');assert.equal(saved.intake.files[0].relative_path,'attachment:'+ids[0]);assert.equal(existsSync(path.join(f.privateRoot,'intake')),false);
+  await assert.rejects(f.intake({...input,files:[{...input.files[0],bytes:Buffer.alloc(bytes.length,1)}]},{taskSelection}),{code:'voice_intake_idempotency_conflict'});
+  assert.deepEqual(f.calls,['provider-start']);assert.equal(f.reservations[0].preset.modelId,'file-pinned');
+});
+
+test('a lost intake receipt after dispatch recovers the existing card without a second provider task',async t=>{
+  const f=fixture(t),taskSelection={contextId:'vctx_'+'c'.repeat(32),connectorId:'neuraldeep',preset:{modelId:'pinned',reasoningEffort:'high',timeoutMs:30000},serviceTier:'standard'};
+  const input={text:'Inspect the fixture',confirmation:{source_intake_id:'lost-intake',instruction:'Inspect fixture'}};
+  const update=f.coordinator.updateIntent.bind(f.coordinator);let lost=false;
+  f.coordinator.updateIntent=(key,patch,...rest)=>{if(key.startsWith('voice-intake:') && patch.state==='completed' && !lost){lost=true;throw new Error('lost acknowledgement');}return update(key,patch,...rest);};
+  await assert.rejects(f.intake(input,{taskSelection}));
+  const recovered=await f.intake(input,{taskSelection});assert.equal(recovered.ok,true);assert.equal(recovered.recovered,true);assert.equal(recovered.replayed,true);
+  assert.deepEqual(f.calls,['provider-start']);assert.equal(readdirSync(path.join(f.privateRoot,'codex-tasks')).length,1);
+});
+
+test('closing the context after originals are prepared prevents task creation and retains the bytes',async t=>{
+  const f=fixture(t),taskSelection={contextId:'vctx_'+'d'.repeat(32),connectorId:'neuraldeep',preset:{modelId:'pinned',reasoningEffort:'high',timeoutMs:30000},serviceTier:'standard'};
+  const input={text:'Inspect fixture',files:[{name:'fixture.txt',size:1,bytes:Buffer.from('x')}],confirmation:{source_intake_id:'closed-intake',instruction:'Inspect fixture'}};
+  let checks=0;await assert.rejects(f.intake(input,{taskSelection,check:()=>{if(++checks===3)throw Object.assign(new Error('closed'),{code:'voice_context_unavailable'});}}),{code:'voice_context_unavailable'});
+  assert.deepEqual(f.calls,[]);assert.equal(existsSync(path.join(f.privateRoot,'codex-tasks')),false);
+  const receipt=f.coordinator.listIntents({kind:'voice-intake'})[0];assert.equal((await f.attachments.resolve(receipt.attachmentIds[0])).view.size,1);
 });

@@ -9,7 +9,7 @@ import {CodexSettingsSection} from './CodexSettingsSection';
 import type {TaskProviderHealth} from '@/lib/codex-chat/driver-types';
 
 type Settings=ProviderSettings & {revision:number};
-type Model={id:string;efforts?:string[];thinkingBudget?:boolean;reasoningMandatory?:boolean;contextTokens?:number|null;maxInputTokens?:number|null;outputTokens?:number|null;maxOutputTokens?:number|null;tools?:boolean;requiresWallet?:boolean};
+type Model={id:string;efforts?:string[];thinkingBudget?:boolean;reasoningMandatory?:boolean;contextTokens?:number|null;maxInputTokens?:number|null;outputTokens?:number|null;maxOutputTokens?:number|null;tools?:boolean;requiresWallet?:boolean;visionAdvertised?:boolean|null;inputModalities?:string[]|null};
 type Snapshot=TaskProviderHealth & {models?:Model[];model?:Model;account?:{usageUsd?:number|null;limitUsd?:number|null;remainingUsd?:number|null;isFreeTier?:boolean;limits?:{billingMode?:string;parallelLimit?:number;wallet?:{balanceRub?:number|null};session?:{used?:number;limit?:number;remaining?:number}}};shortlist?:Array<{id:string;available:boolean}>;discovery?:Array<{endpoint:string;status:string;models:Model[]}>};
 type Detail={provider:Snapshot;credentials:{configured:boolean;status:string;source:string|null;maskedValue:string}};
 type Draft={modelId:string;reasoningEffort:string;timeout:string;thinkingBudget:string;baseUrl:string;authMode:'api-key'|'local-cli-session'};
@@ -36,8 +36,9 @@ export function ProviderSettingsSection({id}:{id:string}){
   const [drafts,setDrafts]=useState<Partial<Record<ProviderConnectorId,Draft>>>({}),[statuses,setStatuses]=useState<Partial<Record<ProviderConnectorId,TaskProviderHealth>>>({}),[details,setDetails]=useState<Partial<Record<ProviderConnectorId,Detail>>>({});
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[refresh,setRefresh]=useState(0),[loading,setLoading]=useState(true);
   const alive=useRef(true),settingsRequest=useRef(0),initialized=useRef(false),settingsRef=useRef(settings),draftsRef=useRef(drafts);
+  const imageVerification=useRef<AbortController|null>(null);
   settingsRef.current=settings;draftsRef.current=drafts;
-  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;imageVerification.current?.abort();};},[]);
   const loadSettings=useCallback(async(nativeSaved=false)=>{
     const sequence=++settingsRequest.current;setLoading(true);
     try{const response=await fetch('/api/task-runtime/settings',{cache:'no-store'}),payload=await response.json();if(!response.ok || !payload.ok || !payload.settings)throw new Error();
@@ -68,6 +69,17 @@ export function ProviderSettingsSection({id}:{id:string}){
       window.dispatchEvent(new Event('pritha-task-provider-settings-changed'));
     }catch{if(alive.current)setNotice('Saving could not be confirmed. Reload saved presets to check the result.');}finally{if(alive.current)setBusy(false);}
   }
+  async function verifyImages(){
+    if(!settings || !draft || dirty || busy || selected!=='neuraldeep')return;
+    const modelId=draft.modelId,controller=new AbortController();imageVerification.current=controller;setBusy(true);setNotice('Checking image delivery locally…');
+    try{
+      const response=await fetch('/api/task-runtime/providers/neuraldeep/attachments',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({modelId,expectedRevision:settings.revision})}),result=await response.json();
+      if(!alive.current)return;
+      setNotice(response.ok && result.ok && result.verified && result.modelId===modelId?`Original PNG delivery verified for ${modelId}. No paid model request was made.`:response.status===409?'Image delivery was not verified. Refresh status and reload saved presets before retrying.':'Image delivery could not be verified. Your chats and files are preserved.');
+      setRefresh(value=>value+1);
+    }catch{if(alive.current)setNotice('Image verification was interrupted. Refresh status before retrying.');}
+    finally{if(imageVerification.current===controller)imageVerification.current=null;if(alive.current)setBusy(false);}
+  }
   return <div className="settings-section-stack provider-settings" data-testid="provider-settings">
     <section className="settings-section"><div className="section-header"><span className="section-icon"><SlidersHorizontal size={22}/></span><div><h2>Task providers</h2><p>Choose a provider to configure. Each keeps its own saved preset.</p></div></div>
       <ProviderConnectorBar id={id} selected={selected} onSelect={key=>{initialized.current=true;setSelected(key);setNotice('');}} statuses={statuses} presets={settings?.providerPresets} disabled={busy}/>
@@ -93,6 +105,7 @@ export function ProviderSettingsSection({id}:{id:string}){
           </fieldset>:<p>Loading saved preset…</p>}
           {selected==='openrouter' && detail?.provider.account?<div className="provider-account" aria-label="OpenRouter account"><span>Usage: {amount(detail.provider.account.usageUsd,' USD')}</span><span>Key limit: {amount(detail.provider.account.limitUsd,' USD')}</span><span>Remaining: {amount(detail.provider.account.remainingUsd,' USD')}</span><span>{detail.provider.account.isFreeTier?'Free tier':'Paid tier'}</span></div>:null}
           {selected==='neuraldeep' && detail?.provider.account?.limits?<div className="provider-account" aria-label="NeuralDeep account"><span>Billing: {detail.provider.account.limits.billingMode || 'Unknown'}</span><span>Parallel tasks: {amount(detail.provider.account.limits.parallelLimit)}</span><span>Wallet: {amount(detail.provider.account.limits.wallet?.balanceRub,' RUB')}</span></div>:null}
+          {selected==='neuraldeep' && model?.visionAdvertised===true && model.inputModalities?.includes('image')?<div className="settings-rowline"><div><strong>Image attachments</strong><span>{health?.capabilities.attachments.images?'Original PNG delivery verified.':'Run a local check with test images before sending originals. No paid model request is made.'}</span></div><button className="outline-button" type="button" onClick={()=>void verifyImages()} disabled={busy || loading || dirty || health?.status!=='ready'}>Verify image delivery</button></div>:null}
         </>}
       </section>
       {selected==='codex'?<><CodexAuthSection/><CodexSettingsSection onSaved={()=>void loadSettings(true)}/></>:null}

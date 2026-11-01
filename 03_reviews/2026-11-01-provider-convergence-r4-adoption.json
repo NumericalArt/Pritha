@@ -106,7 +106,7 @@
     {
       "path": "scripts/neuraldeep/responses-input-policy.mjs",
       "source_sha256": "fa4bd36ba4a985e5b94d0ccc23b35a8a6056a841b62632aaf90d95f255780596",
-      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+      "adoption": "Reviewed source base; exact original data URI/hash/MIME and exact multiplicity in the latest user message, including historical chat ownership and no silent image loss."
     },
     {
       "path": "scripts/neuraldeep/responses-input-policy.d.mts",
@@ -241,6 +241,41 @@
       "source_sha256": "ea3885bac9ddfe50f4ae84f46980ffaa9561c8c3c8266dafc2b9d7849077bd49",
       "target_sha256": "5ebaf358e37193eaf273942af264b9e64755270e5e769e707f25b4345b4d20d1",
       "adoption": "Nine source behavioral tests retained; hash mismatch uses the shared attachment_corrupt typed error."
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-transport.mjs",
+      "source_path": "scripts/neuraldeep/attachment-transport.mjs",
+      "source_sha256": "45dbe199d4200837f9e0b67bc603a1669bebdd7c01b62f8220eb7f6ee6e8c4cd",
+      "target_sha256": "ae4f4fddcc3081272b7f75c413f4ed8d861ad50d521890a2c26300f79a4518af",
+      "adoption": "Function-level adaptation: private instance/CLI/adapter evidence and exact encoded image validation, shared immutable store and chat registry, host-owned read-only snapshots and cleanup."
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-transport.d.mts",
+      "source_path": "scripts/neuraldeep/attachment-transport.d.mts",
+      "source_sha256": "ac3d91bfed0d7f7476dc09ca2cc166df4edc16418685e81a5fe838bb3de56e97",
+      "target_sha256": "d2ff518d4406419c5b9de5c2fad8e9b454df67c634f34455a92cb28f45612da7",
+      "adoption": "Canonical transport types replace fork-specific runtime and history signatures."
+    },
+    {
+      "path": "scripts/neuraldeep/verify-attachment-transport.mjs",
+      "source_path": "scripts/neuraldeep/stock-cli-acceptance.mjs",
+      "source_sha256": "a98edb68033e4105973dbbf377acd4028333c412f94af359d28ca553bd57d23a",
+      "target_sha256": "e6e7cf42e11c672d06ac5a97c635e963058326bc4faa0231448c88aea5b811fc",
+      "adoption": "Adapted deterministic PNG and installed-CLI synthetic provider proof; isolated canonical host tools, original duplicate IDs and initial/text-resume/image-resume paths; no real key or inference."
+    },
+    {
+      "path": "tests/neuraldeep-image-attachments.test.mjs",
+      "source_path": "tests/neuraldeep-attachment-capabilities.test.mjs",
+      "source_sha256": "d4ec0952ca0bb5fedfc081fd53b5fcb82350b06b8846accff6a9b114469601b3",
+      "target_sha256": "b5c76c888f52ced74a066f273de717a9b42027b25492fba1b44ca63e3350f8cf",
+      "adoption": "Adapted capability metadata, freshness, CLI/hash/path/format cases using canonical catalog; additional shared-store ownership, duplicate count, corruption and Stop tests."
+    },
+    {
+      "path": "tests/acceptance/neuraldeep-image-attachments.fixture.mjs",
+      "source_path": "scripts/neuraldeep/stock-cli-acceptance.mjs",
+      "source_sha256": "a98edb68033e4105973dbbf377acd4028333c412f94af359d28ca553bd57d23a",
+      "target_sha256": "583346dbf9cdc2cd74ddd3a87755f8e7e386464c11bffefdb64feeae88491793",
+      "adoption": "Canonical acceptance wrapper checks private persisted transport evidence after the real installed CLI and sandbox complete all synthetic image turns."
     }
   ]
 }

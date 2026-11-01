@@ -104,3 +104,19 @@ test('voice settings conflicts preserve edits until an explicit reload',async({p
     await page.getByRole('button',{name:'Reload saved voice settings',exact:true}).filter({visible:true}).click();await expect(voice).toHaveValue('neuraldeep');
   }finally{await saveVoice(original.preference);}
 });
+
+for(const width of [1440,390])test(`image verification keeps the saved model and reports only confirmed readiness at ${width}px`,async({page,request})=>{
+  const settings=(await(await request.get('/api/task-runtime/settings')).json()).settings,modelId=settings.providerPresets.neuraldeep.modelId;
+  let verified=false,release:()=>void=()=>{};const gate=new Promise<void>(resolve=>release=resolve),sent:Array<any>=[];
+  const imageHealth=()=>({...health('neuraldeep'),capabilities:{...health('neuraldeep').capabilities,attachments:{files:true,images:verified}}});
+  await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:ids.map(id=>id==='neuraldeep'?imageHealth():health(id))}}));
+  await page.route('**/api/task-runtime/providers/neuraldeep',route=>route.fulfill({json:{ok:true,credentials:{configured:true,status:'configured',source:'macos_keychain',maskedValue:'••••'},provider:{...imageHealth(),models:[{id:modelId,tools:true,visionAdvertised:true,inputModalities:['text','image']}]}}}));
+  await page.route('**/api/task-runtime/providers/neuraldeep/attachments',async route=>{sent.push(route.request().postDataJSON());await gate;verified=true;await route.fulfill({json:{ok:true,verified:true,modelId,imageFormats:['image/png'],paidCalls:0}});});
+  await page.setViewportSize({width,height:960});await page.goto('/settings');await select(page,'neuraldeep');const surface=panel(page),button=surface.getByRole('button',{name:'Verify image delivery',exact:true});
+  await expect(button).toBeEnabled();await button.click();await expect(button).toBeDisabled();await expect(surface.getByRole('tab',{name:/^OpenRouter/})).toBeDisabled();
+  await expect.poll(()=>sent.length).toBe(1);expect(sent[0]).toEqual({modelId,expectedRevision:settings.revision});release();
+  await expect(surface).toContainText(`Original PNG delivery verified for ${modelId}.`);await expect(surface).toContainText('Original PNG delivery verified.');
+  await page.reload();await select(page,'neuraldeep');await expect(panel(page)).toContainText('Original PNG delivery verified.');
+  await panel(page).getByLabel('NeuralDeep timeout seconds').fill('45');await expect(panel(page).getByRole('button',{name:'Verify image delivery',exact:true})).toBeDisabled();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

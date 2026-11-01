@@ -187,6 +187,22 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
+Срез исполнения на 2026-11-01 15:30 UTC: текущая работа — checkpoint 26c,
+NeuralDeep image delivery. Checkpoint 26c.1 (файлы/host tools) сохранён локально
+в `8da09b7`: full unit 1290/1290, targeted 102/102, browser 28/28. Image initial,
+text resume и image resume уже прошли installed-CLI synthetic check; остальная
+проверка image boundary, Settings verification и voice intake ещё выполняются.
+
+Счётчик цели: 9 ч 33 мин, 4 144 314 токенов. Это usage counter задачи, не число
+output-токенов и не денежный расчёт. Прогноз оставшейся работы, **не лимит**:
+8–14 активных часов / 3,5–6,5 млн токенов до кандидата и 1–2 часа ручных тестов
+с возможными исправлениями. Итого ориентировочно 19–26 часов / 7,6–10,6 млн
+токенов. Основа — текущий темп около 434 тыс. токенов/час и открытые R4 Search,
+R5 auth/children, R6 orchestration/backends, R7 Local/children, R9 intake/child
+workspaces и R11–R12. Это оценка с существенной неопределённостью, особенно для
+Local, фабрики и реального аудио. Ожидание операторской приёмки в прогноз
+активных часов не входит. Публикация на GitHub и MacBook rollout не разрешены.
+
 ### R0 — План, входные свидетельства и исходное состояние
 
 **Статус: in-progress.** Зависимости: нет. Результат: этот документ, source hashes,
@@ -243,17 +259,17 @@ generated indexes воспроизводимы, не коммитятся.
 
 ### R2 — Provider schema, presets, identity и migration
 
-**Статус: in-progress.** Зависимости R0–R1.
+**Статус: implemented and automated-verified; live provider acceptance в R12.** Зависимости R0–R1.
 
 - [x] Общий JS provider resolver + typed TS boundary, пять IDs и legacy aliases.
 - [x] Bootstrap names отдельно; precedence и invalid-value fail-closed.
 - [x] Версионированный runtime-settings schema с per-provider presets;
   migrate native model/effort/timeout без destructive rewrite.
-- [ ] Namespaced thread/provider/model/session binding, legacy native migration,
+- [x] Namespaced thread/provider/model/session binding, legacy native migration,
   atomic storage, corruption recovery, optimistic revision и validation.
-- [ ] Capability schema: steer, interrupt, approvals, tools, attachments, usage,
+- [x] Capability schema: steer, interrupt, approvals, tools, attachments, usage,
   resume, sandbox, offline, model constraints. UI использует server capabilities.
-- [ ] Typed provider errors с actionable operator status, без raw upstream body.
+- [x] Typed provider errors с actionable operator status, без raw upstream body.
 
 **R2 tests:** все 5 preset round trips; precedence env/config/setup/default;
 невалидные IDs; corrupt/missing config; два инстанса; switch during active turn;
@@ -261,32 +277,35 @@ native history unchanged; exact model resume; no cross-provider fallback.
 
 ### R3 — Общий Task Chat facade и native driver
 
-**Статус: in-progress; native extraction and contract tests passed.** Зависимость R2.
+**Статус: shared facade/queue/history verified; image delivery и live gates продолжаются.** Зависимость R2.
 
 - [x] Извлечь driver types и native adapter вокруг app-server/native-control/
   native-turn-coordinator/goal-control/history-reader; сохранить canonical source.
-- [ ] Gateway делегирует provider execution и history; общие attachments,
+- [x] Gateway делегирует provider execution и history; общие attachments,
   normalization, idempotency, admission, queue и HTTP errors остаются общими.
-- [ ] Host queue protocol для всех drivers, exact receipt на uncertain start,
+- [x] Host queue protocol для всех drivers, exact receipt на uncertain start,
   restart recovery, cancellation lease cleanup, retry-after и queue limits.
-- [ ] Не смешивать provider sessions в native history; cursor pagination,
+- [x] Не смешивать provider sessions в native history; cursor pagination,
   event replay/dedupe, reconnect, archive/rename и approvals проходят binding.
 - [x] Контрактные tests драйвера на fake backend до подключения новой сети.
+- [ ] Завершить image delivery и voice attachment handoff поверх общего store
+  и queue receipts (checkpoint 26); Local execution остаётся gated до R7.
 
 **R3 gate:** весь native chat suite; concurrency/double-submit/restart tests;
 typecheck; history pagination/quotes/image annotation/scroll не деградировали.
 
 ### R4 — NeuralDeep как полноценный adapter
 
-**Статус: in-progress; transport/owned-runner/history foundations verified.** Зависимости R2–R3, подтверждённый ND pin.
+**Статус: in-progress; transport/history/tools/files/PNG/voice verified; Search и final profile audit впереди.** Зависимости R2–R3, подтверждённый ND pin.
 
-- [ ] Перенести reviewed `scripts/neuraldeep-codex.mjs`, `scripts/neuraldeep/*`,
+- [x] Перенести reviewed transport core `scripts/neuraldeep-codex.mjs`, `scripts/neuraldeep/*`,
   loopback Responses SSE adapter, credential boundary и model capability data.
-- [ ] Интегрировать admission-coordinator, CLI runner/runtime, voice-queued handoff
+- [x] Интегрировать admission-coordinator, CLI runner/runtime, voice-queued handoff
   через общий driver; не заменить native gateway ND-only реализацией.
-- [ ] Сохранить limits/concurrency/Pro/Wallet/requires_wallet gating, bounded
+- [x] Сохранить limits/concurrency/Pro/Wallet/requires_wallet gating, bounded
   retries, output budgets, tool receipts, model pin и cleaned process env.
-- [ ] Search Auto, ND STT/TTS/voice topics подключать через отдельные modules.
+- [x] ND STT/TTS/voice topics подключены через отдельные modules.
+- [ ] Search Auto через отдельный host module с budgets и source evidence.
 - [ ] Перенести все relevant ND тесты с provenance, инвентаризировать реальное
   число файлов и subtests; «93» не hardcoded обещание полноты.
 - [ ] Audit secret leaks и runtime network адаптировать к profiles: разрешённые
@@ -449,21 +468,21 @@ music/duplex/reconnect. Browser mic/audio checks later mark manual evidence.
 
 ### R10 — Умный composer: Queue, Steer, Edit, Cancel, Stop
 
-**Статус: native implemented; cross-provider gate pending.** Зависимость R3; выполнить независимо до всех live providers.
+**Статус: implemented; automated native/shared queue gates passed; live проверка в R12.** Зависимость R3; выполнить независимо до всех live providers.
 
-- [ ] Textarea/attachments доступны во время running turn; send validation
+- [x] Textarea/attachments доступны во время running turn; send validation
   различает empty draft, upload in progress, busy request и active turn.
-- [ ] Enter без Shift и primary button → Queue при active turn, иначе Send.
+- [x] Enter без Shift и primary button → Queue при active turn, иначе Send.
   Queue request несёт текст, attachment IDs, provider binding, Idempotency-Key.
-- [ ] Placeholder объясняет Queue и доступный Cmd/Ctrl+Enter Steer; IME composing
+- [x] Placeholder объясняет Queue и доступный Cmd/Ctrl+Enter Steer; IME composing
   и Shift+Enter не отправляют сообщение; повтор keydown не дублирует dispatch.
-- [ ] Steer capability + exact expectedTurnId/clientMessageId. С вложениями
+- [x] Steer capability + exact expectedTurnId/clientMessageId. С вложениями
   disabled + tooltip, без capability скрыт. Stale turn не превращается в новый.
-- [ ] Queue cards над composer: status, Edit, Cancel. Revision-checked cancel;
+- [x] Queue cards над composer: status, Edit, Cancel. Revision-checked cancel;
   Edit восстанавливает original text/files только в пустой draft после receipt.
   Проверить draft, изменённый во время await; cancel failure сохраняет всё.
-- [ ] Stop доступен рядом; no destructive queue cancellation без явного действия.
-- [ ] Automatic next turn после completion, FIFO, retries/reload/two tabs,
+- [x] Stop доступен рядом; no destructive queue cancellation без явного действия.
+- [x] Automatic next turn после completion, FIFO, retries/reload/two tabs,
   expired attachments и dispatch-versus-cancel race без потери данных.
 
 **R10 gate:** meaningful behavior tests и Playwright для native steer,
@@ -472,7 +491,7 @@ double Enter, lost response, stale revision/turn и mobile composition.
 
 ### R11 — Bootstrap, distribution и инструкции
 
-**Статус: pending.** Зависимости R1–R10.
+**Статус: in-progress; private instance roots проверены, unified profiles/examples/upgrade впереди.** Зависимости R1–R10.
 
 - [ ] Unified PROFILES minimal/local/control-center/control-center-tailscale,
   neuraldeep/claude и явные OpenRouter/Local selectors без конфликта имён.
@@ -1773,6 +1792,45 @@ history, отсутствие повторного turn после unknown recei
   GitHub не использовались/не изменялись для этих проверок.
 - Изображения остаются gated до выполнения пунктов 3–6 выше. File transport
   verification не считается подтверждением image support или live interpretation.
+
+Промежуточный результат 26c.2 и 26d (verified-targeted, final full gate pending):
+
+- ND PNG delivery использует shared immutable originals, точную private chat
+  history и read-only snapshots. Actual encoded input проверяется на SHA-256,
+  MIME, размер и multiplicity последнего user message; старая картинка в истории
+  не компенсирует потерю новой. Corrupt/foreign/missing inputs блокируются.
+- Settings → NeuralDeep → Verify image delivery выполняет только локальный
+  synthetic probe с установленным CLI и настоящим OS sandbox. Проверены initial,
+  text resume с image history и image resume одной session, включая разные IDs с
+  одинаковыми bytes. Evidence привязано к instance/model metadata/CLI/adapter
+  hash/initial+resume; paid inference отсутствует. Проверен PNG; JPEG/GIF/WebP
+  остаются явно gated. Live interpretation проверяется отдельно в R12.
+- Voice intake использует immutable context и durable confirmation receipt.
+  HTTP timestamp не меняет identity; текст, instruction, preset и SHA originals
+  меняют request hash. Повтор после lost response возвращает ту же карточку.
+  Unknown dispatch допускает только read-only recovery существующей карточки;
+  автоматически повторять задачу нельзя. Закрытие context при upload не запускает
+  задачу. Native staging и Music Local Folder сохраняют прежнее поведение.
+- Для ND/Claude/OpenRouter файлы voice intake загружаются в общий store и
+  передаются через attachment IDs в существующие queue receipts. Native private
+  staging paths не дают external tool права чтения. Файлы в очереди переживают
+  смену default; отменённая queued задача не materialize/dispatch свои copies.
+- Проверки image boundary/CLI/API и shared host paths: **76/76**; отдельный
+  installed CLI proof — **1/1**, paid calls 0. Browser image/settings/upload/
+  approvals — **14/14**, затем voice/settings — **17/17**. TypeScript pass,
+  strict privacy/name guard/Markdown pass, 50 source adoption entries hash-checked.
+  Общий прогон дал 1300 pass и 2 fixture failures во время подключения 26d;
+  эти fixtures обновлены; итоговый targeted input/voice gate **75/75**. Полный итоговый прогон
+  остаётся обязательным и не объявляется завершённым по частичному результату.
+- Следующий блок: Search Auto и host research; далее remaining factory/auth/
+  Local/bootstrap и R12. Live runtime, MacBook и GitHub не менялись.
+
+Уточнение исполнения по просьбе пользователя сократить остаток примерно вдвое:
+целевые tests на каждом изменении, полный suite на крупных checkpoints и перед
+сдачей; связанные изменения объединяются в законченные блоки. Приватность,
+process ownership, originals, recovery и ручная приёмка остаются gates. Новый
+ориентир остатка — **4–7 часов активной работы, 1.8–3.2 млн tokens до кандидата**
+плюс manual tests; это прогноз, не token budget или сокращение требований.
 
 R12 дополнительная проверка runner: quality-gate задаёт оба root aliases для
 child commands, а часть legacy test fixtures переопределяет только один. Проверить

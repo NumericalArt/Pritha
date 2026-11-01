@@ -8,6 +8,9 @@ import { VoiceTopicBindings } from '../scripts/lib/voice-topic-bindings.mjs';
 import { VoiceTaskBridge, voiceTaskRequestHash } from '../scripts/lib/voice-task-bridge.mjs';
 import { providerVoiceTaskBackend } from '../scripts/lib/provider-voice-task-backend.mjs';
 import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
+import {ImmutableAttachmentStore} from '../scripts/lib/chat-attachment-store.mjs';
+import {hostFileAttachmentTransport} from '../scripts/lib/provider-file-attachments.mjs';
+import {randomUUID} from 'node:crypto';
 
 async function until(predicate) { for (let i = 0; i < 200; i++) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 10)); } assert.fail('Fixture did not settle'); }
 const request = text => ({ chat: { title: 'Voice fixture', workspace: { mode: 'read-only' } }, turn: { input: [{ type: 'text', text }] } });
@@ -15,9 +18,12 @@ function fixture(t, connectorId = 'neuraldeep', options = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'pritha-provider-voice-'));
   const root = path.join(directory, 'source'), stateRoot = path.join(directory, 'state'); mkdirSync(root); mkdirSync(stateRoot);
   const settings = { modelId: 'new-default', reasoningEffort: 'high', timeoutMs: 90000, sandbox: 'read-only' }, runs = [], instances = [];
+  const attachments=options.files?new ImmutableAttachmentStore({stateRoot,privateRoot:path.join(stateRoot,'originals')}):null;
+  const snapshot=async()=>({status:'ready',version:connectorId==='claude'?'2.1.296':'0.153.0',capabilities:{attachments:{files:true,images:false}}});
   const make = () => {
     const runtime = new ProviderTaskRuntime({ connectorId, root, stateRoot, privateRoot: path.join(stateRoot, 'task-chat'), executionDirectory: path.join(stateRoot, 'execution'),
       configuration: () => settings, preflight: async () => ({ interrupt: true, steer: false }), ...options,
+      ...(attachments?{attachmentStore:attachments,preflight:async()=>({interrupt:true,steer:false,attachments:{files:true,images:false}}),attachmentTransport:hostFileAttachmentTransport({stateRoot,privateRoot:path.join(stateRoot,'provider-inputs'),snapshot})}:{}),
       launch: async input => {
         await input.beforeStart({ identity: 'a'.repeat(64), evidence: { schema: 1, fixture: true } });
         await input.onRawChunk(Buffer.from('{"type":"fixture"}\n'));
@@ -31,9 +37,26 @@ function fixture(t, connectorId = 'neuraldeep', options = {}) {
   const runtime = make(), bindings = new VoiceTopicBindings({ coordinator: runtime.execution, stateRoot });
   const reserve = (taskId, body) => bindings.reserve({ taskId, scope: { kind: 'pritha', id: 'fixture' }, connectorId,
     preset: { modelId: 'voice-pinned', reasoningEffort: 'low', timeoutMs: 30000 }, requestHash: voiceTaskRequestHash(body) });
-  t.after(async () => { for (const item of instances) await item.dispose(); rmSync(directory, { recursive: true, force: true }); });
-  return { runtime, bindings, bridge: new VoiceTaskBridge({ bindings, backend: providerVoiceTaskBackend(runtime) }), runs, settings, make, reserve };
+  t.after(async () => { for (const item of instances) await item.dispose(); await attachments?.close();rmSync(directory, { recursive: true, force: true }); });
+  return { runtime, bindings, bridge: new VoiceTaskBridge({ bindings, backend: providerVoiceTaskBackend(runtime) }), runs, settings, make, reserve,attachments };
 }
+
+for(const connector of ['neuraldeep','claude','openrouter'])test(`${connector}: voice file queue resumes exact originals and cancellation never dispatches its copies`,async t=>{
+  const f=fixture(t,connector,{files:true}),id=randomUUID(),bytes=Buffer.from('voice queued immutable original');
+  await f.attachments.upload(id,'voice.txt',new Request('http://fixture.invalid',{method:'PUT',body:bytes}));
+  const first=request('First');f.reserve('voice-first',first);const started=await f.bridge.dispatch('voice-first',first);await until(()=>f.runs.length===1);
+  const next={...request('Read the supplied file'),turn:{...request('Read the supplied file').turn,attachments:[id]}};
+  f.reserve('voice-file',next);const queued=await f.bridge.dispatch('voice-file',next);assert.equal(queued.task.state,'queued');
+  const persisted=(await f.runtime.queued(started.topic.chatId))[0];assert.equal(persisted.attachments[0].id,id);
+  f.settings.modelId='changed-default';f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.model,'voice-pinned');assert.equal(f.runs[1].input.resume,f.runtime.require(started.topic.chatId).nativeThreadId);
+  assert.deepEqual((await f.runs[1].input.hostAttachments.read('attachment:'+id)).bytes,bytes);
+  await f.bridge.dispatch('voice-file',next);assert.equal(f.runs.length,2);
+  const cancel={...request('Do not run this file'),turn:{...request('Do not run this file').turn,attachments:[id]}};f.reserve('voice-cancel-file',cancel);
+  const pending=await f.bridge.dispatch('voice-cancel-file',cancel);await f.bridge.stop('voice-cancel-file',{generation:1,revision:pending.task.revision,clientMessageId:'stop_queued_file'});
+  f.runs[1].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+  assert.equal(f.runs.length,2);assert.equal((await f.bridge.reconcile('voice-cancel-file')).task.state,'cancelled');assert.equal((await f.attachments.resolve(id)).view.size,bytes.length);
+});
 for (const connector of ['neuraldeep', 'claude', 'openrouter', 'local']) {
   test(`${connector}: voice and typed tasks share one pinned chat, queue and execution receipt`, async t => {
     const f = fixture(t, connector), body = request('First'), original = f.reserve('task-one', body);

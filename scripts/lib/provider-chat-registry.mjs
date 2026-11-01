@@ -35,6 +35,11 @@ export class ProviderChatRegistry {
     if(!file || file.sha256!==rows[0].sha256 || file.size!==rows[0].size || file.kind!==rows[0].kind || file.mediaType!==rows[0].media_type)throw fail('history_attachment_conflict');
     return file;
   }
+  imageReference(chatId,sha256,mediaType,size){
+    this.require(chatId);
+    const row=this.history.statement("SELECT id FROM attachment_refs WHERE chat=? AND sha256=? AND media_type=? AND size=? AND kind='image' ORDER BY rowid LIMIT 1").get(chatId,sha256,mediaType,size);
+    return row?this.attachmentReference(chatId,row.id):null;
+  }
   assertId(chatId){if(!new RegExp(`^chat_${this.connectorId}_[a-f0-9]{32}$`).test(chatId))throw fail('thread_not_found','Task Chat was not found.');}
   get(chatId){
     this.assertId(chatId);const value=this.history.get(chatId,{turnLimit:0});

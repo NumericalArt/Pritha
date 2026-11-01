@@ -9,6 +9,8 @@ import { loadNeuralDeepAccountSnapshot, billingContextForModel } from './account
 import { declaredModelInputs } from './model-input-capabilities.mjs';
 import {hostFileAttachmentVerified} from '../lib/provider-file-attachments.mjs';
 import {providerSandboxDependency} from '../lib/provider-sandbox.mjs';
+import {readAttachmentTransport} from './attachment-transport.mjs';
+import {attachmentSupport} from './attachment-policy.mjs';
 
 const execute=promisify(execFile),token=value=>typeof value==='string' && /^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(value)?value:null;
 const positive=value=>Number.isSafeInteger(value) && value>0?value:null;
@@ -20,7 +22,7 @@ export function normalizeNeuralDeepModels(payload){
   const ids=new Set();return payload.data.flatMap(row=>{
     const id=token(row?.id);if(!id || ids.has(id) || row.type && row.type!=='chat')return [];ids.add(id);
     const declared=declaredModelInputs(row);
-    return [{id,tools:declared.toolsAdvertised===true,inputModalities:declared.inputModalities,vision:declared.visionAdvertised===true,
+    return [{id,provider:'neuraldeep',capabilitiesKnown:true,tools:declared.toolsAdvertised===true,...declared,vision:declared.visionAdvertised,
       contextTokens:positive(row.limit?.context),outputTokens:positive(row.limit?.output),requiresWallet:row.requires_wallet===true || row.access==='requires_wallet',available:typeof row.available==='boolean'?row.available:null}];
   });
 }
@@ -63,7 +65,8 @@ export class NeuralDeepProviderService {
         providerJson('https://api.neuraldeep.ru/v1/models',{headers:{authorization:'Bearer '+key},fetchImpl:this.options.fetchImpl}),
       ]);
       version=installed;const models=normalizeNeuralDeepModels(payload),model=models.find(row=>row.id===modelId),limits=account.limits;
-      const extra={models,account,billing:billingContextForModel(account,modelId)};
+      const catalog={source:'provider',refreshedAt:new Date().toISOString()};
+      const extra={models,catalog,account,billing:billingContextForModel(account,modelId)};
       if(!version && this.options.requireCli!==false)return this.result('unavailable','provider_runtime_unavailable',null,extra);
       if(this.options.requireCli!==false)try{(this.options.checkSandbox || providerSandboxDependency)(this.options.root);}catch{return this.result('unavailable','provider_sandbox_unavailable',version,extra);}
       if(!limits || account.sections.limits.stale || limits.decision.canRequest===null || !Number.isSafeInteger(limits.parallelLimit) || limits.parallelLimit<1 || limits.parallelLimit>64)return this.result('configured','provider_limits_unknown',version,extra);
@@ -75,8 +78,18 @@ export class NeuralDeepProviderService {
       const allowance=limits.specialAllowances?.some(row=>row.name===modelId && row.active && typeof row.remaining==='number' && row.remaining>0);
       if(walletOnly && !allowance && (limits.billingMode!=='wallet' || !(limits.wallet?.balanceRub>0)))return this.result('billing-required','provider_billing_required',version,extra);
       if(!model.tools)return this.result('configured','provider_tools_unverified',version,extra);
-      return this.result('ready',null,version,{...extra,capabilities:{...capabilities(),tools:true,approvals:this.options.requireCli!==false,sandbox:this.options.requireCli===false?'runtime-enforced':'host-enforced',attachments:{files:hostFileAttachmentVerified('neuraldeep',version),images:false},parallelLimit:limits.parallelLimit,contextTokens:model.contextTokens,outputTokens:model.outputTokens}});
+      let transport=null;
+      if(this.options.requireCli!==false)try{transport=readAttachmentTransport({...this.options,cliVersion:version});}catch{/* A damaged image proof does not disable text tasks. */}
+      const imageSupport=attachmentSupport({model,catalog,transport}),resumeSupport=attachmentSupport({model,catalog,transport,path:'resume'});
+      return this.result('ready',null,version,{...extra,imageSupport,capabilities:{...capabilities(),tools:true,approvals:this.options.requireCli!==false,sandbox:this.options.requireCli===false?'runtime-enforced':'host-enforced',attachments:{files:hostFileAttachmentVerified('neuraldeep',version),images:imageSupport.image==='supported' && resumeSupport.image==='supported'},parallelLimit:limits.parallelLimit,contextTokens:model.contextTokens,outputTokens:model.outputTokens}});
     }catch(error){const code=['provider_pending_auth','provider_billing_required','provider_rate_limited'].includes(error.code)?error.code:'provider_unavailable';return this.result(code==='provider_pending_auth'?'pending-auth':code==='provider_billing_required'?'billing-required':code==='provider_rate_limited'?'rate-limited':'error',code,version);}
   }
   async require(modelId){const snapshot=await this.snapshot(modelId);if(snapshot.status!=='ready')throw new ProviderTaskError(snapshot.error.code,snapshot.error.message,snapshot.status==='rate-limited'?429:snapshot.status==='billing-required'?402:503);return snapshot.capabilities;}
+  async verifyAttachments(modelId,{signal}={}){
+    this.cache.clear();const status=await this.snapshot(modelId);
+    if(status.status!=='ready')throw new ProviderTaskError(status.error.code,status.error.message,409);
+    const {verifyNeuralDeepAttachmentTransport}=await import('./verify-attachment-transport.mjs');
+    const result=await verifyNeuralDeepAttachmentTransport({...this.options,model:status.models.find(row=>row.id===modelId),catalog:status.catalog,signal});
+    this.cache.clear();return result;
+  }
 }

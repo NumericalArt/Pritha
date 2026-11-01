@@ -5,9 +5,11 @@ const fail = (code, statusCode = 409) => { throw Object.assign(new Error(code), 
 export async function validateResponsesInputs(payload, { model, imagesAllowed = false, imageFormats = [], expectedImages = [], requireCurrentImages = false, hasHistoricalImage = () => false } = {}) {
   if (model && payload.model !== model) fail("neuraldeep_model_identity_mismatch");
   const found = [];
+  let current = [];
   if (payload.input != null && typeof payload.input !== "string" && !Array.isArray(payload.input)) fail("invalid_responses_input", 400);
   for (const message of Array.isArray(payload.input) ? payload.input : []) {
     if (!message || typeof message !== "object") fail("invalid_responses_input", 400);
+    const messageImages=[];
     for (const part of Array.isArray(message.content) ? message.content : []) {
       if (part?.type !== "input_image") continue;
       if (!imagesAllowed) fail("model_image_unverified");
@@ -20,8 +22,13 @@ export async function validateResponsesInputs(payload, { model, imagesAllowed = 
       const expected = expectedImages.find(file => file.sha256 === hash && file.size === bytes.length && file.mediaType === match[1]);
       if (!expected && !await hasHistoricalImage(hash, match[1], bytes.length)) fail("attachment_original_not_preserved");
       found.push(hash);
+      messageImages.push(hash);
     }
+    if(message.role==='user')current=messageImages;
   }
-  if (requireCurrentImages && expectedImages.some(image => !found.includes(image.sha256))) fail("attachment_image_missing");
+  if(requireCurrentImages){
+    const counts=values=>{const result=new Map();for(const value of values)result.set(value,(result.get(value) || 0)+1);return [...result].sort(([a],[b])=>a.localeCompare(b));};
+    if(JSON.stringify(counts(expectedImages.map(image=>image.sha256)))!==JSON.stringify(counts(current)))fail('attachment_image_missing');
+  }
   return found;
 }

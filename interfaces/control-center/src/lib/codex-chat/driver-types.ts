@@ -35,5 +35,6 @@ export interface TaskChatBackendDriver {
   getRuntimeHealth(): Promise<TaskProviderHealth>;
   getSettingsSnapshot?(): Promise<TaskProviderHealth & Record<string,unknown>>;
   previewRuntime?(preset:ProviderPreset):Promise<RuntimeStatus>;
+  verifyAttachments?(modelId:string,options?:{signal?:AbortSignal}):Promise<Record<string,unknown>>;
   getRateLimitsAndUsage(): Promise<ProviderUsageView>;
 }

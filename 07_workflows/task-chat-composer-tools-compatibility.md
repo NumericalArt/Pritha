@@ -91,8 +91,32 @@ that exact private chat. It verifies stored hashes and metadata, creates a
 bounded read-only copy and returns UTF-8 text or a processing path for a binary
 or large file. Processing commands retain the existing exact operator approval,
 network restriction and workspace write policy. Archives and executables are
-never opened or run automatically. Images remain unavailable on these paths
-until their separate modality/transport gate passes.
+never opened or run automatically. Image delivery has a separate gate.
+
+For NeuralDeep, select and save a model that explicitly advertises image and
+tool input, then use **Verify image delivery** in its Settings panel. The local
+check uses synthetic PNGs, the installed CLI and the real OS sandbox. It makes
+no paid inference request. It proves original PNG bytes on initial dispatch,
+text-only resume and image resume in the same session, including two distinct
+attachment IDs containing identical bytes. Fresh model metadata, CLI version,
+adapter hash, private instance identity and both paths must match the saved
+evidence before image readiness is enabled. A CLI/adapter/model metadata change
+or expired evidence requires another check. Other image formats remain gated;
+Pritha never converts or drops them to make a request pass.
+
+Every outgoing image is checked against the immutable original in that exact
+chat, including historical images on resume. Current images must all occur in
+the current user message. A missing, changed or foreign image stops dispatch
+while retaining the draft, originals and history. This local check establishes
+delivery only; actual model interpretation remains a manual R12 acceptance test.
+
+Confirmed Voice Intake files for NeuralDeep, Claude and OpenRouter use the same
+originals and queue receipts. The confirmation has a private identity pinned to
+its voice context, instruction, provider preset and file hashes. HTTP retries
+return the existing task; altered content with the same confirmation is rejected.
+An uncertain dispatch may recover an existing task card but never launches a
+replacement automatically. Keep the pending intake when recovery needs attention.
+Native staging and Music Local Folder import retain their existing behavior.
 
 Copies are removed only after all owned processes have exited. Unknown exit
 preserves copies and the execution claim; recovery verifies exit before cleanup.
