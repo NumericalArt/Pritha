@@ -7,6 +7,8 @@ import { requireVoiceEngine } from "../realtime/voice-engine-server";
 import { DEFAULT_CHAINED_VOICE_SETTINGS } from "./settings";
 import { normalizeChainedVoiceSettings } from "./settings";
 import { providerSettingsStore } from "../settings/provider-settings-server";
+import { assertVoiceContextAllowed } from './session-context';
+import type { VoiceContext } from '../../../../../scripts/lib/voice-session-contexts.mjs';
 
 export function getChainedVoiceSettings() { return normalizeChainedVoiceSettings(providerSettingsStore().read().neuraldeepVoice); }
 
@@ -18,14 +20,14 @@ function createHost() {
   process.once("exit", () => store.close());
   return {
     voiceJournal: () => store.journal,
-    assertAllowed() {
-      requireVoiceEngine("neuraldeep");
+    assertAllowed(context?: VoiceContext) {
+      if(context)assertVoiceContextAllowed(context,'neuraldeep');else requireVoiceEngine("neuraldeep");
       if (!store.coordinator.admission().enabled) throw new VoiceProviderError("provider_capacity");
     },
-    async acquire(input: { attemptId: string; signal: AbortSignal; sessionId: string; workloadId: string }) {
-      this.assertAllowed(); input.signal.throwIfAborted();
-      const snapshot = await service.snapshot(DEFAULT_CHAINED_VOICE_SETTINGS.model);
-      input.signal.throwIfAborted(); this.assertAllowed();
+    async acquire(input: { attemptId: string; signal: AbortSignal; sessionId: string; workloadId: string; context?:VoiceContext }) {
+      this.assertAllowed(input.context); input.signal.throwIfAborted();
+      const snapshot = await service.snapshot(input.context?.voiceModel || DEFAULT_CHAINED_VOICE_SETTINGS.model);
+      input.signal.throwIfAborted(); this.assertAllowed(input.context);
       if (snapshot.status !== "ready") throw new VoiceProviderError(snapshot.status === "pending-auth" ? "provider_auth" : snapshot.status === "rate-limited" ? "provider_capacity" : "provider_unavailable");
       const limit = Number((snapshot.capabilities as unknown as Record<string, unknown>).parallelLimit);
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 64) throw new VoiceProviderError("provider_capacity");
@@ -52,4 +54,4 @@ export function getVoiceHost() {
   if (!hosts.has(key)) hosts.set(key, createHost());
   return hosts.get(key)!;
 }
-export function assertVoiceDispatchAllowed() { getVoiceHost().assertAllowed(); }
+export function assertVoiceDispatchAllowed(context?:VoiceContext) { getVoiceHost().assertAllowed(context); }

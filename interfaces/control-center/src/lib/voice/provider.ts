@@ -13,6 +13,7 @@ import {
 } from '../../../../../scripts/neuraldeep/voice-provider.mjs';
 import { voiceRequestHash } from '../../../../../scripts/neuraldeep/voice-journal.mjs';
 import type { ChainedVoiceSettings } from './settings';
+import type { VoiceContext } from '../../../../../scripts/lib/voice-session-contexts.mjs';
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | null;
@@ -24,7 +25,7 @@ export type ToolCall = {
   type: 'function';
   function: { name: string; arguments: string };
 };
-type Identity = { sessionId: string; turnId: string; signal: AbortSignal };
+type Identity = { sessionId: string; turnId: string; signal: AbortSignal; context?:VoiceContext };
 const root = () => resolvePrithaStateRoot();
 function flushAccounting() {
   const journal = getVoiceHost().voiceJournal();
@@ -48,7 +49,7 @@ async function request<T>(
   consume: (r: Response, metadata: Record<string, unknown>) => Promise<T>,
   metadata: Record<string, unknown> = {},
 ) {
-  assertVoiceDispatchAllowed();
+  assertVoiceDispatchAllowed(identity.context);
   const config = voiceRuntimeCredentials();
   if (!config.key) throw new VoiceProviderError('provider_not_configured');
   const coordinator = getVoiceHost(),
@@ -58,12 +59,13 @@ async function request<T>(
   const lease = await coordinator.acquire({
     attemptId: id, workloadId: identity.turnId, sessionId: identity.sessionId,
     signal: identity.signal,
+    context: identity.context,
   });
   let dispatched = false,
     successful = false;
   try {
     identity.signal.throwIfAborted();
-    assertVoiceDispatchAllowed();
+    assertVoiceDispatchAllowed(identity.context);
     const observation = {
       ...metadata,
       workerPid: process.pid,

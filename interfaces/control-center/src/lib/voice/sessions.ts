@@ -24,6 +24,8 @@ import {
   type ToolCall,
 } from "./provider";
 import type { ChainedVoiceSettings } from "./settings";
+import { openVoiceSessionContext, closeVoiceSessionContext, voiceTaskSelection } from './session-context';
+import type { VoiceContext } from '../../../../../scripts/lib/voice-session-contexts.mjs';
 export type VoiceEvent = {
   id: number;
   type: string;
@@ -39,6 +41,7 @@ type BrowserWait = {
   reject: (error: Error) => void;
 };
 export type VoiceSession = {
+  hostContext:VoiceContext;
   id: string;
   owner: string;
   settings: ChainedVoiceSettings;
@@ -72,10 +75,12 @@ export function createVoiceSession(owner: string, musicControlEnabled = false) {
     [...sessions.values()].filter((s) => s.owner === owner).length >= 2
   )
     throw new Error("voice_session_limit");
+  const hostContext = openVoiceSessionContext(owner, 'neuraldeep');
   const s: VoiceSession = {
+    hostContext,
     id: `voice_${randomUUID()}`,
     owner,
-    settings: { ...getChainedVoiceSettings() },
+    settings: { ...getChainedVoiceSettings(), model:hostContext.voiceModel as ChainedVoiceSettings['model'], voice:hostContext.voice as ChainedVoiceSettings['voice'] },
     instructions: buildRealtimeInstructions({ musicControlEnabled }),
     musicControlEnabled,
     updatedAt: Date.now(),
@@ -152,6 +157,7 @@ export function closeVoiceSession(s: VoiceSession) {
   s.context = [];
   s.events = [];
   sessions.delete(s.id);
+  try { closeVoiceSessionContext(s.hostContext); } catch { /* Expired context cleanup is already bounded by its store. */ }
 }
 export function updateVoiceContext(
   s: VoiceSession,
@@ -299,7 +305,7 @@ async function speak(s: VoiceSession, turn: ActiveTurn, text: string) {
     )
       await delay(30, signal);
     const bytes = await voiceSynthesize(
-      { sessionId: s.id, turnId: turn.id, signal },
+      { sessionId: s.id, turnId: turn.id, signal, context:s.hostContext },
       s.settings,
       phrase,
     );
@@ -323,7 +329,7 @@ export function acceptVoiceTurn(
     hostNotification?: boolean;
   },
 ) {
-  assertVoiceDispatchAllowed();
+  assertVoiceDispatchAllowed(s.hostContext);
   if (
     !SAFE_ID.test(input.clientTurnId) ||
     Boolean(input.audio) === Boolean(input.text) ||
@@ -364,7 +370,7 @@ async function runVoiceTurn(
 ) {
   const signal = turn.abort.signal,
     journal = getVoiceHost().voiceJournal();
-  const identity = { sessionId: s.id, turnId: turn.id, signal },
+  const identity = { sessionId: s.id, turnId: turn.id, signal, context:s.hostContext },
     t0 = performance.now();
   try {
     let text = input.text || "";
@@ -463,6 +469,7 @@ async function runVoiceTurn(
                 turnId: turn.id,
                 signal,
                 model: getPrithaRuntimeSettings().codexModel,
+                taskSelection:voiceTaskSelection(s.hostContext),
               });
         // An uncertain effect cannot become a model-driven retry or new approval.
         if (output.ok === false) forceFinal = true;

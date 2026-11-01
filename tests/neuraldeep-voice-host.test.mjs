@@ -20,6 +20,7 @@ function fixture(t){
     '../realtime/voice-engine-server':{requireVoiceEngine:engine=>{assert.equal(engine,'neuraldeep');if(!state.allowed)throw new Error('voice_engine_changed');}},
     '../settings/provider-settings-server':{providerSettingsStore:()=>({read:()=>({})})},
     './settings':{DEFAULT_CHAINED_VOICE_SETTINGS:{model:'fixture-model'},normalizeChainedVoiceSettings:x=>x},
+    './session-context':{assertVoiceContextAllowed:context=>{assert.equal(context.engine,'neuraldeep');if(state.offline)throw new Error('voice_offline');}},
   };
   const module={exports:{}};
   new Function('module','exports','require','process','globalThis',compiled)(module,module.exports,name=>{assert.ok(modules[name],name);return modules[name];},{once:(_event,fn)=>closers.push(fn)},{});
@@ -51,4 +52,10 @@ test('a pause or cancellation during metadata checks is rechecked before admissi
   f.coordinator.setAdmission(true);const abort=new AbortController();
   f.state.gate=new Promise(resolve=>{release=resolve;});const cancelled=f.host.acquire({...f.input('cancel-race'),signal:abort.signal});abort.abort();release();
   await assert.rejects(cancelled);assert.equal(f.coordinator.claims().length,0);
+});
+test('an existing NeuralDeep session keeps its engine after defaults change but obeys a new offline prohibition',async t=>{
+  const f=fixture(t),context={engine:'neuraldeep',voiceModel:'pinned-voice-model'};f.state.allowed=false;
+  const lease=await f.host.acquire({...f.input('pinned-session'),context});await lease.release();
+  f.state.offline=true;await assert.rejects(f.host.acquire({...f.input('offline-session'),context}),/voice_offline/);
+  assert.equal(f.coordinator.claims().length,0);
 });

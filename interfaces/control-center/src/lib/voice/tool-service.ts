@@ -4,6 +4,7 @@ import {
   handlePrithaRealtimeTool,
 } from '@/lib/realtime/pritha-runtime';
 import { getVoiceHost } from "./host";
+import type { VoiceTaskSelection } from './session-context';
 export type VoiceOperationIdentity = {
   id: string;
   sessionId: string;
@@ -12,6 +13,7 @@ export type VoiceOperationIdentity = {
   explicitSearch?: boolean;
   researchExplicit?: boolean;
   model?: string;
+  taskSelection?:VoiceTaskSelection;
 };
 const ajv = new Ajv({
   strict: false,
@@ -62,7 +64,7 @@ export async function executeVoiceTool(
         'append_artifact',
       ].includes(String(args.operation)));
   if (!identity || !mutating)
-    return (await handlePrithaRealtimeTool(name, args)) as Record<
+    return (await handlePrithaRealtimeTool(name, args, identity?.taskSelection ? {taskSelection:identity.taskSelection} : {})) as Record<
       string,
       unknown
     >;
@@ -81,6 +83,7 @@ export async function executeVoiceTool(
   try {
     output = (await handlePrithaRealtimeTool(name, args, {
       reservedTaskId: receipt.task_id || undefined,
+      taskSelection: identity.taskSelection,
     })) as Record<string, unknown>;
   } catch {
     output = {

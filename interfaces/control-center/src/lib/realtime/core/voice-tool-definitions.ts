@@ -1,4 +1,5 @@
 /** Shared host tool contracts. All transports use the same schemas and names. */
+import type { VoiceModel, PrithaVoiceId } from '../voice-settings';
 export type RealtimeToolDefinition = {
   type: "function";
   name: string;
@@ -12,6 +13,8 @@ export type RealtimeToolDefinition = {
 
 export type RealtimeSessionBuildOptions = {
   musicControlEnabled?: boolean;
+  voiceModel?: VoiceModel;
+  voice?: PrithaVoiceId;
 };
 
 function musicControlToolDefinition(): RealtimeToolDefinition {

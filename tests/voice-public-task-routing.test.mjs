@@ -9,8 +9,8 @@ import ts from '../interfaces/control-center/node_modules/typescript/lib/typescr
 import * as profile from '../scripts/lib/provider-profile.mjs';
 
 const file = ts.createSourceFile('runtime.ts', readFileSync('interfaces/control-center/src/lib/realtime/pritha-runtime.ts', 'utf8'), ts.ScriptTarget.Latest, true);
-const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'abortPrithaCodexTask'];
-const source = file.statements.filter(node => ts.isFunctionDeclaration(node) && names.includes(node.name?.text)).map(node => node.getText(file)).join('\n') + '\nexport {runCodexTask};';
+const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'abortPrithaCodexTask', 'runtimeSettingsForVoiceTask'];
+const source = file.statements.filter(node => ts.isFunctionDeclaration(node) && names.includes(node.name?.text)).map(node => node.getText(file)).join('\n') + '\nexport {runCodexTask,runtimeSettingsForVoiceTask};';
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 
 function fixture(t, options = {}) {
@@ -18,12 +18,14 @@ function fixture(t, options = {}) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [], reservations = [], settings = { activeConnectorId: options.connector || 'neuraldeep', providerPresets: Object.fromEntries(profile.PROVIDER_CONNECTOR_IDS.map(id => [id, { ...profile.defaultProviderPreset(id), modelId: id + '-model' }])) };
   const locks = new Set();
+  const runtimeSettings={deepTaskPrimaryTransport:'codex-cli',codexAppThreadRoutingMode:'subject_scoped',codexModel:'default-native',codexReasoningEffort:'medium',codexTimeoutMs:90000,codexServiceTier:'standard',codexNetworkAccess:true,codexExecutionMode:'auto'};
   const json = async file => JSON.parse(await readFile(file, 'utf8').catch(() => 'null'));
   const dependencies = {
     path, randomUUID, existsSync, mkdir, writeFile, readJsonFile: json,
     resolvePrithaRoot: () => root, resolvePrithaStateRoot: () => root, privateRoot: () => privateRoot, resolvePrithaAgentParent: () => root,
     rootRelative: (root, file) => path.relative(root, file),
-    getPrithaRuntimeSettings: () => ({ deepTaskPrimaryTransport: 'codex-cli', codexAppThreadRoutingMode: 'subject_scoped' }), codexMode: () => 'exec',
+    getPrithaRuntimeSettings: () => runtimeSettings, codexMode: () => 'exec',
+    normalizeProviderPreset:profile.normalizeProviderPreset,normalizeCodexReasoningEffort:value=>value,normalizeCodexServiceTier:(value,fallback)=>['standard','fast'].includes(value)?value:fallback,
     codexAvailable: async () => { calls.push('native-probe'); return { available: true }; }, codexAppAvailable: async () => { calls.push('native-app-probe'); return { available: false }; },
     normalizeCodexTaskType: value => value || 'analysis', normalizeCodexWriteMode: value => value || 'read_only',
     normalizeThreadScopeKind: value => value, normalizeThreadScopeId: value => value, normalizeThreadScopeLabel: value => value,
@@ -31,8 +33,8 @@ function fixture(t, options = {}) {
     agentCreationResearchGatePayload: () => ({}), agentDevelopmentResearchGatePayload: () => ({}),
     deriveCodexThreadScope: args => ({ kind: args.subject_kind || 'pritha', id: 'fixture', label: 'Fixture', generation: 1 }),
     continuationThreadScopeFromUnknown: value => value, codexTaskHandoffConfirmationResult: () => options.handoff || null,
-    resolveContinuationForTask: async () => ({ action: 'none' }), normalizeCodexTaskRef: value => String(value || ''),
-    applyContinuationToTask: () => { throw new Error('Unexpected continuation fixture'); },
+    resolveContinuationForTask: async () => options.continuation ? ({action:'selected',selected:{taskId:options.continuation},historyContext:{}}) : ({ action: 'none' }), normalizeCodexTaskRef: value => String(value || ''),
+    applyContinuationToTask: (task,selected) => { task.parent_task_id=selected.taskId; },
     resolveCodexTaskIdRef: async value => value && existsSync(path.join(privateRoot, 'codex-tasks', String(value), 'request.json')) ? String(value) : null,
     ensureCodexTaskShortId: async () => 'ABC', codexTaskApprovalFor: () => options.approval ? { status: 'pending' } : null,
     codexTaskProgressPath: dir => path.join(dir, 'progress.jsonl'), codexTaskPlanPath: dir => path.join(dir, 'plan.json'), codexTaskVoiceFeedbackPath: dir => path.join(dir, 'voice.jsonl'),
@@ -59,7 +61,7 @@ function fixture(t, options = {}) {
   };
   const exports = {};
   new Function(...Object.keys(dependencies), 'exports', compiled)(...Object.values(dependencies), exports);
-  return { run: exports.runCodexTask, abort: exports.abortPrithaCodexTask, root, privateRoot, calls, reservations, settings, json };
+  return { run: exports.runCodexTask, abort: exports.abortPrithaCodexTask, taskSettings:exports.runtimeSettingsForVoiceTask, runtimeSettings, root, privateRoot, calls, reservations, settings, json };
 }
 for (const connector of ['neuraldeep', 'claude', 'openrouter', 'local']) {
   test(`${connector}: public voice task preparation selects its provider without native probes or fallback`, async t => {
@@ -105,4 +107,27 @@ test('stop shares the approval lock and only rejects a pending task after confir
     assert.equal(stopped.ok,!stopError);assert.equal(saved.approval.status,stopError?'pending':'rejected');
     assert.deepEqual(f.calls,['provider-stop']);
   }
+});
+test('a host voice session pins the selected provider and preset after the global default changes',async t=>{
+  const f=fixture(t,{connector:'claude'}),selection={contextId:'fixture-context',connectorId:'neuraldeep',preset:{modelId:'session-pinned',reasoningEffort:'high',timeoutMs:30000},serviceTier:'standard'};
+  const result=await f.run({task:'Inspect fixture'},{taskSelection:selection});
+  assert.equal(result.connector_id,'neuraldeep');assert.equal(f.reservations[0].preset.modelId,'session-pinned');assert.equal(f.calls.includes('native-start'),false);
+});
+test('native tasks persist session model settings across approval while retaining current security policy',async t=>{
+  const f=fixture(t,{approval:true}),selection={contextId:'fixture-context',connectorId:'codex',preset:{modelId:'native-pinned',reasoningEffort:'ultra',timeoutMs:30000},serviceTier:'fast'};
+  const result=await f.run({task:'Implement fixture',write_mode:'workspace_write'},{taskSelection:selection});
+  assert.equal(result.connector_id,'codex');assert.equal(result.status,'decision_required');
+  const saved=await f.json(path.join(f.privateRoot,'codex-tasks',result.task_id,'request.json'));
+  f.runtimeSettings.codexModel='changed-native';f.runtimeSettings.codexNetworkAccess=false;
+  const actual=f.taskSettings(saved);assert.equal(actual.codexModel,'native-pinned');assert.equal(actual.codexReasoningEffort,'ultra');assert.equal(actual.codexTimeoutMs,30000);assert.equal(actual.codexServiceTier,'fast');
+  assert.equal(actual.codexExecutionMode,'inline_only');assert.equal(actual.codexNetworkAccess,false);
+});
+test('automatic native continuation inherits its original task preset rather than a new session default',async t=>{
+  const f=fixture(t,{connector:'codex',approval:true,continuation:'native-parent'}),dir=path.join(f.privateRoot,'codex-tasks','native-parent');
+  await mkdir(dir,{recursive:true});
+  await writeFile(path.join(dir,'request.json'),JSON.stringify({native_task_preset:{modelId:'original-model',reasoningEffort:'high',timeoutMs:180000},native_service_tier:'fast'}));
+  const result=await f.run({task:'Continue fixture',write_mode:'workspace_write'},{taskSelection:{connectorId:'codex',preset:{modelId:'new-session-model',reasoningEffort:'low',timeoutMs:30000},serviceTier:'standard'}});
+  const saved=await f.json(path.join(f.privateRoot,'codex-tasks',result.task_id,'request.json'));
+  assert.equal(saved.parent_task_id,'native-parent');assert.equal(saved.native_task_preset.modelId,'original-model');
+  assert.equal(saved.native_task_preset.reasoningEffort,'high');assert.equal(saved.native_task_preset.timeoutMs,180000);assert.equal(saved.native_service_tier,'fast');
 });

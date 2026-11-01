@@ -79,7 +79,11 @@ test('provider changes refresh Auto voice and retain an unsaved voice draft with
     await surface.getByRole('button',{name:'Use for new chats'}).click();await expect(surface).toContainText('NeuralDeep selected for new chats.');
     await expect(voice).toHaveValue('auto');await expect(timbre).toHaveValue('vivian');
     await expect(page.getByLabel('Voice model',{exact:true}).filter({visible:true})).toHaveCount(0);
-  }finally{await saveVoice(original.preference);}
+  }finally{
+    await saveVoice(original.preference);
+    const current=(await(await request.get('/api/task-runtime/settings')).json()).settings;
+    expect((await request.post('/api/task-runtime/settings',{data:{expectedRevision:current.revision,activeConnectorId:'codex'}})).ok()).toBe(true);
+  }
 });
 
 test('voice settings conflicts preserve edits until an explicit reload',async({page,request})=>{

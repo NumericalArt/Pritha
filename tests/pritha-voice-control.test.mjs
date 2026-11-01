@@ -30,7 +30,7 @@ test("Control Center realtime config exposes filesystem inspection for harness q
 });
 
 test("Control Center /api/realtime/tool routes inspect_pritha_files to the filesystem handler", () => {
-  assert.match(toolRouteSource, /handlePrithaRealtimeTool\(name, payload\.arguments \|\| \{\}\)/);
+  assert.match(toolRouteSource, /handlePrithaRealtimeTool\(name, payload\.arguments \|\| \{\},/);
   assert.match(runtimeSource, /inspect_pritha_files: handlePrithaFiles/);
   assert.match(runtimeSource, /dispatchVoiceTool\(name, args, handlers\)/);
   assert.match(runtimeSource, /async function handlePrithaFiles\(args: PrithaFilesArgs = \{\}\)/);

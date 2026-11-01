@@ -70,13 +70,19 @@ for (const api of ['live','realtime']) {
       Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{const ctx=new AudioContext();const dest=ctx.createMediaStreamDestination();return dest.stream;}});
     },{api});
     await page.route('**/api/realtime/status',route=>route.fulfill({json:{ok:true,model:api==='live'?'gpt-live-1':'gpt-realtime-2',voice:'marin',tools:[],openai_key_configured:true,memory:{sqlite:true,sqlite_cli:true,stats:[]},codex:{available:true,mode:'codex-app',write_enabled:true},transcription_model:'fixture'}}));
-    await page.route('**/api/realtime/session',route=>route.fulfill({json:{voice_api:api,client_secret:api==='realtime'?{value:'fixture-ephemeral'}:undefined,model:api==='live'?'gpt-live-1':'gpt-realtime-2',voice:'marin',tools:[]}}));
+    let closedContext:string|undefined,sessionCount=0;
+    await page.route('**/api/realtime/session',route=>{
+      if(route.request().method()==='DELETE'){closedContext=route.request().postDataJSON().contextId;return route.fulfill({json:{closed:true}});}
+      sessionCount++;
+      return route.fulfill({json:{voice_api:api,client_secret:api==='realtime'?{value:'fixture-ephemeral'}:undefined,model:api==='live'?'gpt-live-1':'gpt-realtime-2',voice:'marin',tools:[],voiceContext:{id:`vctx_fixture_${sessionCount}`,engine:'openai',voiceApi:api,taskConnectorId:'codex',taskModelId:'pinned'}}});
+    });
     let call:any;
     await page.route('**/api/realtime/call',route=>{call=route.request().postDataJSON();return route.fulfill({json:{answerSdp:'v=0\r\nfixture-answer'}});});
     await page.goto('/voice');
     await page.getByRole('button',{name:/start/i}).first().click();
     await expect.poll(()=>call?.voiceApi).toBe(api);
     expect(call.ephemeralKey).toBe(api==='realtime'?'fixture-ephemeral':undefined);
+    expect(call.contextId).toBe('vctx_fixture_1');
     await page.evaluate(({api})=>{
       const channel=(window as any).__voiceChannel;
       if(api==='live'){
@@ -91,7 +97,29 @@ for (const api of ['live','realtime']) {
     await expect.poll(()=>page.evaluate(()=>JSON.stringify(sessionStorage).includes('Проверь память'))).toBe(true);
     const sent=await page.evaluate(()=>(window as any).__voiceSent);
     if(api==='live')expect(sent.some((e:any)=>e.type==='session.start'||e.type==='conversation.item.create')).toBe(false);
+    let release:()=>void=()=>{};
+    const pending=new Promise<void>(resolve=>{release=resolve;}),toolCalls:any[]=[];
+    if(api==='realtime'){
+      await page.route('**/api/realtime/tool',async route=>{toolCalls.push(route.request().postDataJSON());await pending;await route.fulfill({json:{ok:true}});});
+      await page.evaluate(()=>{
+        const channel=(window as any).__voiceChannel;(window as any).__oldVoiceChannel=channel;
+        channel.emit({type:'response.done',response:{output:[{type:'function_call',name:'inspect_pritha_files',call_id:'first',arguments:'{}'},{type:'function_call',name:'inspect_pritha_files',call_id:'second',arguments:'{}'}]}});
+      });
+      await expect.poll(()=>toolCalls.length).toBe(1);expect(toolCalls[0].contextId).toBe('vctx_fixture_1');
+    }
     await page.getByRole('button',{name:/stop|disconnect|end/i}).first().click();
     if(api==='live')await expect.poll(()=>page.evaluate(()=>(window as any).__voiceSent.some((e:any)=>e.type==='session.close'))).toBe(true);
+    await expect.poll(()=>closedContext).toBe('vctx_fixture_1');
+    if(api==='realtime'){
+      await page.getByRole('button',{name:'Start Listening',exact:true}).filter({visible:true}).click();
+      await expect.poll(()=>call.contextId).toBe('vctx_fixture_2');
+      release();
+      await page.evaluate(()=>{(window as any).__oldVoiceChannel.emit({type:'conversation.item.input_audio_transcription.completed',transcript:'STALE_SESSION_EVENT'});});
+      await page.waitForTimeout(250);
+      expect(toolCalls).toHaveLength(1);
+      expect(await page.evaluate(()=>JSON.stringify(sessionStorage).includes('STALE_SESSION_EVENT'))).toBe(false);
+      await page.getByRole('button',{name:'Stop Listening',exact:true}).filter({visible:true}).click();
+      await expect.poll(()=>closedContext).toBe('vctx_fixture_2');
+    }
   });
 }

@@ -77,7 +77,19 @@ test("Control Center Realtime runtime uses behavior settings in instructions and
   const routeSource = readFileSync("interfaces/control-center/src/app/api/realtime/runtime-settings/route.ts", "utf8");
 
   assert.match(runtimeSource, /buildVoiceBehaviorPromptSections\(settings\.voiceBehaviorProfile\)/);
-  assert.match(runtimeSource, /voice:\s*runtimeSettings\.prithaVoice/);
+  const source = ts.createSourceFile('runtime.ts', runtimeSource, ts.ScriptTarget.Latest, true);
+  const declaration = source.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'buildRealtimeSessionConfig');
+  assert.ok(declaration);
+  const compiled = ts.transpileModule(declaration.getText(source), {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const exports = {}, settings = {voiceModel:'gpt-realtime-2',prithaVoice:'marin'};
+  new Function('exports','getPrithaRuntimeSettings','buildRealtimeInstructions','buildPrithaRealtimeTools','env','DEFAULT_TRANSCRIPTION_MODEL',compiled)(
+    exports,()=>settings,()=>'',()=>[],(_key,fallback)=>fallback,'fixture-transcription');
+  const build = exports.buildRealtimeSessionConfig;
+  assert.equal(build().audio.output.voice,'marin');assert.equal(build().model,'gpt-realtime-2');
+  settings.voiceModel='gpt-live-1';settings.prithaVoice='shimmer';
+  const pinned=build({voiceModel:'gpt-realtime-2',voice:'coral'});
+  assert.equal(pinned.model,'gpt-realtime-2');assert.equal(pinned.audio.output.voice,'coral');
+  assert.equal(build().model,'gpt-live-1');assert.equal(build().audio.output.voice,'shimmer');
   assert.match(routeSource, /invalid_voice_behavior_profile/);
   assert.match(routeSource, /invalid_pritha_voice/);
 });

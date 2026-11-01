@@ -1,6 +1,8 @@
 import { dispatchVoiceTool, type VoiceToolHandlers } from "./core/voice-tools-dispatcher";
 import type { VoiceDispatchRequest } from '../../../../../scripts/lib/voice-task-bridge.mjs';
 import type { ProviderConnectorId, ProviderPreset } from '../settings/provider-profile';
+import { normalizeProviderPreset } from '../settings/provider-profile';
+import type { VoiceTaskSelection } from '../voice/session-context';
 import { prithaEnvValue } from "../pritha-env";
 import { resolvePrithaMemoryDatabase } from "../pritha-paths";
 import { DEFAULT_VOICE_MODEL, normalizeVoiceModel, type VoiceModel } from "./voice-settings";
@@ -2706,7 +2708,7 @@ export function buildRealtimeSessionConfig(options: RealtimeSessionBuildOptions 
   const runtimeSettings = getPrithaRuntimeSettings();
   return {
     type: "realtime",
-    model: runtimeSettings.voiceModel,
+    model: options.voiceModel || runtimeSettings.voiceModel,
     instructions: buildRealtimeInstructions(options),
     tool_choice: "auto",
     tools: buildPrithaRealtimeTools(options),
@@ -2720,7 +2722,7 @@ export function buildRealtimeSessionConfig(options: RealtimeSessionBuildOptions 
         },
       },
       output: {
-        voice: runtimeSettings.prithaVoice,
+        voice: options.voice || runtimeSettings.prithaVoice,
       },
     },
   };
@@ -4749,8 +4751,18 @@ function codexTimeoutMs() {
   return Number.isFinite(value) && value > 0 ? Math.max(10_000, Math.min(value, 3_600_000)) : DEFAULT_CODEX_TIMEOUT_MS;
 }
 
-function codexEffectiveTimeoutMs() {
-  return getPrithaRuntimeSettings().codexTimeoutMs || codexTimeoutMs();
+function runtimeSettingsForVoiceTask(task?: Record<string, unknown>) {
+  const current = getPrithaRuntimeSettings();
+  if (!task?.native_task_preset) return current;
+  const preset = normalizeProviderPreset('codex', task.native_task_preset);
+  if (!preset.modelId) throw Object.assign(new Error('The saved native model is unavailable.'),{code:'voice_task_model_missing'});
+  const effort = normalizeCodexReasoningEffort(preset.reasoningEffort);
+  return {...current,codexModel:preset.modelId,codexReasoningEffort:effort,codexTimeoutMs:preset.timeoutMs,
+    codexServiceTier:normalizeCodexServiceTier(task.native_service_tier,current.codexServiceTier),
+    codexExecutionMode:effort==='ultra'?'inline_only' as const:current.codexExecutionMode};
+}
+function codexEffectiveTimeoutMs(task?: Record<string, unknown>) {
+  return runtimeSettingsForVoiceTask(task).codexTimeoutMs || codexTimeoutMs();
 }
 
 function buildCodexPrompt(task: Record<string, unknown>) {
@@ -5374,7 +5386,7 @@ function codexAppClientForTask(task: Record<string, unknown>, sandbox: string, w
     logicalTaskId: String(task.id),
     registryPath: path.join(privateRoot(), "voice-native-threads.json"),
     buildSandboxPolicy: () => codexAppSandboxPolicyForTask(task, sandbox, writableRoots),
-    getRuntimeSettings: () => getPrithaRuntimeSettings(),
+    getRuntimeSettings: () => runtimeSettingsForVoiceTask(task),
   });
 }
 
@@ -5411,7 +5423,7 @@ async function planCodexAppTask(
   progress: (event: PrithaCodexTaskProgressEvent) => Promise<void> | void,
   signal?: AbortSignal,
 ) {
-  const settings = getPrithaRuntimeSettings();
+  const settings = runtimeSettingsForVoiceTask(task);
   const taskId = String(task.id || "");
   throwIfCodexTaskAborted(signal);
   if (settings.codexPlanningMode === "off") {
@@ -5436,7 +5448,7 @@ async function planCodexAppTask(
     const planningSandbox = "read-only";
     const client = codexAppClientForTask(planningTask, planningSandbox, writableRoots);
     const planningPayload = buildPrithaCodexTaskPayload(planningTask);
-    const planningTimeoutMs = Math.min(Math.max(60_000, Math.round(codexEffectiveTimeoutMs() / 4)), 180_000);
+    const planningTimeoutMs = Math.min(Math.max(60_000, Math.round(codexEffectiveTimeoutMs(task) / 4)), 180_000);
     const raw = await client.runTask(planningPayload, {
       executionPhase: "planning",
       timeoutMs: planningTimeoutMs,
@@ -5511,7 +5523,7 @@ async function runCodexStepOrchestrator(
 ): Promise<PrithaCodexTaskResult> {
   const taskId = String(task.id || "");
   const stepResults: Array<{ step_id: string; title: string; status: string; text: string }> = [];
-  const timeoutMs = codexEffectiveTimeoutMs();
+  const timeoutMs = codexEffectiveTimeoutMs(task);
   for (let index = 0; index < plan.steps.length; index += 1) {
     throwIfCodexTaskAborted(signal);
     const step = plan.steps[index];
@@ -5728,7 +5740,7 @@ async function startCodexAppTask(
     ...(sandbox === "workspace-write" ? codexExistingChildAgentWritableDirs(root, task) : []),
   ];
   const writableRoots = codexWritableRootEntries(root, additionalWritableDirs);
-  const timeoutMs = codexEffectiveTimeoutMs();
+  const timeoutMs = codexEffectiveTimeoutMs(task);
   const startedAt = new Date().toISOString();
   const payload = buildPrithaCodexTaskPayload(task);
   const taskId = String(task.id || payload.requestId);
@@ -5801,7 +5813,7 @@ async function startCodexAppTask(
   heartbeat.unref();
 
   void (async () => {
-    const settings = getPrithaRuntimeSettings();
+    const settings = runtimeSettingsForVoiceTask(task);
     if (await taskWasAborted()) {
       clearInterval(heartbeat);
       return;
@@ -6095,7 +6107,7 @@ async function startCodexExec(
   existingWorkflow = false,
 ) {
   const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolvePrithaRoot();
-  const settings = getPrithaRuntimeSettings();
+  const settings = runtimeSettingsForVoiceTask(task);
   const taskType = String(task.task_type || "analysis");
   const sandbox = codexSandboxForTask(taskType, String(task.write_mode || "read_only"));
   const additionalWritableDirs = [
@@ -6134,7 +6146,7 @@ async function startCodexExec(
   const model = settings.codexModel || env("PRITHA_REALTIME_CODEX_MODEL", "");
   if (model) args.splice(1, 0, "-m", model);
 
-  const timeoutMs = codexEffectiveTimeoutMs();
+  const timeoutMs = codexEffectiveTimeoutMs(task);
   const startedAt = new Date().toISOString();
   const taskId = String(task.id || "");
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, paths.progressPath, event);
@@ -6379,7 +6391,7 @@ async function startProviderVoiceTask(task: Record<string, unknown>, paths: Code
   return { transport: 'task-chat', ...status };
 }
 
-async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: string } = {}) {
+async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: string; taskSelection?:VoiceTaskSelection } = {}) {
   const root = resolvePrithaRoot();
   const taskText = String(args.task || "").trim();
   if (!taskText) return { ok: false, error: "missing_task" };
@@ -6396,7 +6408,7 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
   const providerSettings = getProviderSettings();
   const priorId = args.continue_task_id ? await resolveCodexTaskIdRef(args.continue_task_id) : null;
   const priorRequest = priorId ? await readJsonFile(path.join(privateRoot(), 'codex-tasks', priorId, 'request.json')) : null;
-  const connectorId = priorRequest ? priorRequest.task_chat_connector || 'codex' : providerSettings.activeConnectorId;
+  const connectorId = priorRequest ? priorRequest.task_chat_connector || 'codex' : host.taskSelection?.connectorId || providerSettings.activeConnectorId;
   if (!isProviderConnectorId(connectorId)) return { ok: false, error: 'provider_profile_invalid' };
   const external = connectorId !== 'codex';
   const requestedMode = codexMode();
@@ -6442,6 +6454,9 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
     fallback_transport: external ? null : fallbackTransport,
     effective_transport: external ? 'task-chat' : effectiveTransport,
     ...(external ? { task_chat_connector: connectorId } : {}),
+    ...(host.taskSelection ? { voice_context_id: host.taskSelection.contextId } : {}),
+    ...(!external ? { native_task_preset: priorRequest?.native_task_preset || (host.taskSelection?.connectorId === 'codex' ? host.taskSelection.preset : providerSettings.providerPresets.codex),
+      native_service_tier: priorRequest?.native_service_tier || host.taskSelection?.serviceTier || settings.codexServiceTier } : {}),
     codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
     ...(taskType === "agent_creation" ? { agent_creation_research_gate: agentCreationResearchGatePayload() } : {}),
   };
@@ -6477,6 +6492,14 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
   }
   if (continuation.action === "selected") {
     applyContinuationToTask(task, continuation.selected, continuation.historyContext, args);
+    if (!external) {
+      const parent = priorId === continuation.selected.taskId ? priorRequest
+        : await readJsonFile(path.join(privateRoot(), 'codex-tasks', continuation.selected.taskId, 'request.json'));
+      if (parent?.native_task_preset) {
+        task.native_task_preset = normalizeProviderPreset('codex', parent.native_task_preset);
+        task.native_service_tier = normalizeCodexServiceTier(parent.native_service_tier, settings.codexServiceTier);
+      }
+    }
     await logPrivateEvent("codex_task_continuation_linked", {
       task_id: taskId,
       parent_task_id: continuation.selected.taskId,
@@ -6488,7 +6511,7 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
   }
 
   if (external) {
-    try { await prepareProviderVoiceTask(task, providerSettings.providerPresets[connectorId]); }
+    try { await prepareProviderVoiceTask(task, host.taskSelection?.connectorId === connectorId ? host.taskSelection.preset : providerSettings.providerPresets[connectorId]); }
     catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
       return { ok: false, error: /^[a-z][a-z0-9_]{0,79}$/.test(code) ? code : 'voice_task_preparation_failed', connector_id: connectorId };
@@ -7985,13 +8008,13 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
   return { ...(await getPrithaCodexTask(id)), exec };
 }
 
-export async function handlePrithaRealtimeTool(name: string, args: Record<string, unknown> = {}, host: { reservedTaskId?: string } = {}) {
+export async function handlePrithaRealtimeTool(name: string, args: Record<string, unknown> = {}, host: { reservedTaskId?: string; taskSelection?:VoiceTaskSelection } = {}) {
   await logPrivateEvent("tool_call_started", { name, args });
 
   if (["answer_codex_task", "answer_voice_task"].includes(name)) {
     const {getProviderSettings} = await import("../settings/provider-settings-server");
     const explicitTask = args.task_id;
-    if (getProviderSettings().activeConnectorId !== "codex" && !(typeof explicitTask === "string" && explicitTask.trim())) {
+    if ((host.taskSelection?.connectorId || getProviderSettings().activeConnectorId) !== "codex" && !(typeof explicitTask === "string" && explicitTask.trim())) {
       return {ok:false,error:"operator_request_context_required"};
     }
   }

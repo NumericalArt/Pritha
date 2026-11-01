@@ -12,11 +12,17 @@ async function fixture(t) {
     path.join(dir, 'fixture.mjs'),
     `
  import {openVoiceJournal} from ${JSON.stringify(url('scripts/neuraldeep/voice-journal-store.mjs'))};
+ import {VoiceSessionContexts} from ${JSON.stringify(url('scripts/lib/voice-session-contexts.mjs'))};
+ import {createHash} from 'node:crypto';
  const opened=openVoiceJournal({stateRoot:${JSON.stringify(dir)}});
+ const contexts=new VoiceSessionContexts({coordinator:opened.coordinator,stateRoot:${JSON.stringify(dir)}});
  export const store={db:opened.coordinator.db,voiceJournal:opened.journal,close:opened.close};
- export const state={effects:[],requests:[],completions:[],tts:[],gate:null};
+ export const state={effects:[],requests:[],completions:[],tts:[],gate:null,connectorId:'neuraldeep',taskModel:'pinned-task-model'};
  export const getVoiceHost=()=>({voiceJournal:()=>store.voiceJournal});
- export const assertVoiceDispatchAllowed=()=>{};
+ export const assertVoiceDispatchAllowed=context=>{if(context)contexts.get(context.id,context.owner);};
+ export const openVoiceSessionContext=owner=>contexts.create(createHash('sha256').update(owner).digest('hex'),{connectorId:state.connectorId,preset:{modelId:state.taskModel,reasoningEffort:'low',timeoutMs:30000},engine:'neuraldeep',voiceApi:'neuraldeep',voiceModel:'qwen3.6-35b-a3b-noreason',voice:'serena',serviceTier:'standard'});
+ export const closeVoiceSessionContext=context=>contexts.close(context.id,context.owner);
+ export const voiceTaskSelection=context=>({contextId:context.id,connectorId:context.connectorId,preset:context.preset,serviceTier:context.serviceTier});
  export const getChainedVoiceSettings=()=>getPrithaRuntimeSettings().neuraldeepVoice;
  export const getProviderSettings=()=>({activeConnectorId:"codex"});
  export const resolvePrithaStateRoot=()=>${JSON.stringify(dir)};
@@ -49,6 +55,7 @@ async function fixture(t) {
     ).outputText;
     source = source
       .replace(/(['"])\.\/host\1/g, "'./fixture.mjs'")
+      .replace(/(['"])\.\/session-context\1/g, "'./fixture.mjs'")
       .replace(/(['"])\.\.\/settings\/provider-settings-server\1/g, "'./fixture.mjs'")
       .replace(
         /(['"])ajv\1/g,
@@ -126,6 +133,7 @@ test('pure conversation uses one completion, does not invoke tools and preserves
 });
 test('server tools reserve task identity before effects and common result reaches cards once', async (t) => {
   const f = await fixture(t);
+  f.state.connectorId='claude';f.state.taskModel='changed-default';
   f.state.completions.push({ text: 'provisional claim', calls: [call()] });
   const done = terminal(f.s);
   f.acceptVoiceTurn(f.s, {
@@ -135,6 +143,8 @@ test('server tools reserve task identity before effects and common result reache
   await done;
   assert.equal(f.state.effects.length, 1);
   assert.ok(f.state.effects[0].host.reservedTaskId);
+  assert.equal(f.state.effects[0].host.taskSelection.connectorId,'neuraldeep');
+  assert.equal(f.state.effects[0].host.taskSelection.preset.modelId,'pinned-task-model');
   assert.equal(f.s.events.filter((e) => e.type === 'tool.result').length, 1);
   assert.doesNotMatch(f.state.tts.join(' '), /provisional claim/);
   assert.equal(f.state.requests.length, 2);

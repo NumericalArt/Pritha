@@ -72,21 +72,21 @@
       "target": "interfaces/control-center/src/lib/voice/provider.ts",
       "sourceSha256": "a2a8fdb446556e4025571458bda50a213d1b1e113fae270d1693d22c91d1dce7",
       "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "2535daf42934a71347598c00ae759a179593d2dce74f2a04a91c363234c9eacf"
+      "targetSha256": "f9d2aeaa93083feeb853cefda12ba9298c5718e15b3c32e8f586d409295b97b7"
     },
     {
       "source": "interfaces/control-center/src/lib/voice/sessions.ts",
       "target": "interfaces/control-center/src/lib/voice/sessions.ts",
       "sourceSha256": "5b476b2b2ce6a94dc332fdfed000ba6e340fd2f5178a48e23110ea7e7ac0d0c6",
       "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "5c158e5caf5983b17a18a1eaed7df1aaa0b53529ec20ffb470dd6336b3c3eab7"
+      "targetSha256": "785e32cd1fbc9f08e8a23daf3d2bdb9c9a1217cdd8fbfaffe2f9fe68d36d478b"
     },
     {
       "source": "interfaces/control-center/src/lib/voice/tool-service.ts",
       "target": "interfaces/control-center/src/lib/voice/tool-service.ts",
       "sourceSha256": "98f07993cd97fe62fbcf1c6b94d0197381e15345dd7d337fda93bb078e86b6dc",
       "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "146dbcf820f46ae9519c84a5ef33c071d1192f28b6d6d45b451d5e9eb3b650a1"
+      "targetSha256": "f131a7c3deb6ec83ffe8c726a6b3220ece7f99299b77536d21e243ee661559d4"
     },
     {
       "source": "interfaces/control-center/src/components/voice/NeuralDeepVoiceTransport.ts",
@@ -107,7 +107,7 @@
       "target": "interfaces/control-center/src/app/api/voice/[...path]/route.ts",
       "sourceSha256": "e84e211f88fe614b73dd8cd4e31d19ea6e80e4790583f9e002cd948436698c3d",
       "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "e852a5658a3879f6e6dfdcc574beae8ca7fca1701e90c0ee07408f0c67ca61ce"
+      "targetSha256": "865fffb52902a6259f1ffb77c9f3b6f52d06632e241320a3b056990a2d74f15b"
     },
     {
       "source": "scripts/neuraldeep/voice-runtime-config.mjs",
@@ -128,12 +128,12 @@
       "target": "tests/neuraldeep-voice-sessions.test.mjs",
       "sourceSha256": "ca072a8398095f50fc72c0d2b89261d3747ef407de2095ca9e227e31a1f818de",
       "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "e571d8320b431dd1ee69962e9dc6fdab2dd98b497c5d6dea9f000f319532c7a6"
+      "targetSha256": "51174a419989d1531ef88012be1642432defa2d9533e622cff1f5ebd7f9039f8"
     }
   ],
   "sourceVersion": "0.2.0",
   "verified": "2026-11-01",
-  "phase": "R9 audio transport, persistent topics, canonical backend bridge and public task routing in the canonical workspace; child workspace, file intake, session context and manual acceptance pending",
+  "phase": "R9 audio transport, persistent topics, public task routing and immutable host session context in the canonical workspace; child workspace, file intake and manual acceptance pending",
   "referenceAdaptations": [
     {
       "source": "interfaces/control-center/src/lib/codex-chat/voice-topic-store.ts",

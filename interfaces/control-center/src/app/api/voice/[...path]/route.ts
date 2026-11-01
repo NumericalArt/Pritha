@@ -7,6 +7,8 @@ import {
 import { voiceRuntimeCredentials } from '../../../../../../../scripts/neuraldeep/voice-runtime-config.mjs';
 import { getVoiceHost, assertVoiceDispatchAllowed } from "@/lib/voice/host";
 import { getVoiceEngineStatus, VoiceEngineError } from "@/lib/realtime/voice-engine-server";
+import { VoiceContextError } from '../../../../../../../scripts/lib/voice-session-contexts.mjs';
+import { voiceContextView } from '@/lib/voice/session-context';
 import {
   createVoiceSession,
   getVoiceSession,
@@ -160,6 +162,7 @@ async function handle(request: Request, context: Context) {
         response = NextResponse.json({
           ok: true,
           sessionId: s.id,
+          voiceContext:voiceContextView(s.hostContext),
           settings: s.settings,
           tools: buildPrithaRealtimeTools({
             musicControlEnabled: s.musicControlEnabled,
@@ -256,7 +259,7 @@ async function handle(request: Request, context: Context) {
       { status: 404 },
     );
   } catch (error) {
-    if (error instanceof VoiceEngineError) return NextResponse.json({ok:false,error:error.code},{status:error.status});
+    if (error instanceof VoiceEngineError || error instanceof VoiceContextError) return NextResponse.json({ok:false,error:error.code},{status:error.status});
     const raw = error instanceof Error ? error.message : '',
       code = /^(?:voice_[a-z_]+|provider_not_configured)$/.test(raw)
         ? raw

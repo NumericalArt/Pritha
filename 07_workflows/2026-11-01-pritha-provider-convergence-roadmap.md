@@ -410,8 +410,8 @@ active-thread switch, native feature regression и no-secret DOM/storage checks.
 ### R9 — Голос: shared tools и отдельные transports
 
 **Статус: in-progress.** Shared core, настройки и chained transport реализованы
-локально; persistent topics и маршрутизация голосовых задач к пяти коннекторам
-ещё не завершены. Зависимости R2–R8.
+локально; persistent topics, canonical workspace routing и session snapshot
+прошли automated gates. Child workspace/intake и manual checks остаются. Зависимости R2–R8.
 
 - [x] Extract shared voice-tools dispatcher и existing transport boundaries
   небольшими проверяемыми шагами; не переписывать весь runtime одним diff.
@@ -434,7 +434,7 @@ active-thread switch, native feature regression и no-secret DOM/storage checks.
   и file intake пока возвращают явные blockers до проверки своих transports;
   canonical workspace прошёл unit/browser gate checkpoint 20; перечисленные
   исключения и остальная интеграция остаются в работе.
-- [ ] Связать активный task context и engine/session snapshot так, чтобы изменение
+- [x] Связать активный task context и engine/session snapshot так, чтобы изменение
   default connector во время сессии не меняло provider/model существующей темы.
   В Settings обновлять Auto preview после смены task connector без потери edits.
 - [ ] Проверить browser restart/reconnect, восстановление persistent topic,
@@ -1478,10 +1478,10 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   **1206/1206**, без skipped. Strict privacy, name guard (124 разрешённых
   compatibility references) и Markdown validation (987 файлов) прошли.
 
-### Следующий checkpoint 22 — Session snapshot (in-progress)
+### Checkpoint реализации 22 — Session snapshot (verified-targeted; cumulative gate pending)
 
-Private context store реализован отдельно и проверен **5/5** fixture tests;
-подключение к реальным session/tool endpoints ещё не выполнено.
+Private host context подключён к обоим session transports, native call/config
+endpoints и общему tool dispatcher. Порядок реализации и проверки:
 
 1. Immutable host-created session context в существующей private SQLite:
    task connector/preset, voice engine/protocol/model/timbre и native service
@@ -1501,6 +1501,41 @@ Private context store реализован отдельно и проверен 
 5. Tests: restart/owner/expiry/schema/capacity/secret rejection; task preset после
    изменения defaults; OpenAI/ND tool path; no implicit cloud fallback; disconnect
    cleanup, browser reconnect и сохранённая native voice/music regression.
+
+
+- Native и ND сохраняют provider/preset и audio settings до асинхронного startup.
+  Native task request удерживает model/effort/timeout/service tier после Approve,
+  очереди и явного/автоматического продолжения; текущие security настройки
+  по-прежнему применяются. Legacy tasks без snapshot сохраняют совместимость.
+- Context закрывается при disconnect, rejected startup и устаревшем ответе
+  session creation; истечение времени ограничено шестью часами. События и
+  оставшиеся tool calls старой сессии не переходят в новую после reconnect.
+  ND Music переключает собственный context endpoint без OpenAI config request.
+- Targeted store/host/public/config/native regression tests **37/37**; TypeScript passed. Chromium
+  voice/models/settings **14/14** и public provider route **1/1**, без skipped/flaky.
+  Проверены native/Live startup, reconnect с задержанным tool receipt, stale
+  event, ND local VAD/music, независимые drafts и Auto preview. Общий unit gate
+  дал **1217/1219**: оба failures — прежние regex assertions на изменившийся
+  синтаксис вызова/config. Config assertion заменён исполнением реального
+  builder с pinned/default моделью/голосом; route assertion учитывает host
+  argument. После исправления целевой набор **37/37**. Совокупный полный rerun
+  включён в следующий checkpoint. Privacy/name/Markdown gates прошли
+  (124 compatibility references, 987 Markdown files).
+
+### Следующий checkpoint 23 — Live agent memory fallback (planned)
+
+При чтении R11 обнаружен ранее существовавший fallback: checkout без `.git`
+направляет новые live agent artifacts в `11_agents/`. Это нарушает AGENTS и
+делает поведение ZIP distribution отличным от Git checkout. Исправление:
+
+1. Общий resolver всегда выбирает `<state>/agents` при external state, иначе
+   `.private/agents`, включая ZIP/non-Git root. Tracked history остаётся источником
+   authored reference knowledge и не переносится автоматически.
+2. Проверить Git/non-Git/worktree, совпадающий state-root через symlink и два
+   независимых экземпляра; validate/rebuild и factory fixtures используют
+   явно выбранный private layout. Не ослаблять runtime boundary ради fixtures.
+3. Targeted paths/factory/state tests, общий unit gate, name/privacy/Markdown
+   validation. Реальные private contracts, registry и рабочие сервисы не менять.
 
 ## 7. Полные исходные материалы
 

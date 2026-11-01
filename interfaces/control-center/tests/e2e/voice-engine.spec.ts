@@ -56,13 +56,20 @@ test('NeuralDeep voice starts without an OpenAI key, loads local VAD and consume
     Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{const context=new AudioContext();(window as any).__testMicContext=context;return context.createMediaStreamDestination().stream;}});
   });
   let openaiCalls=0,toolDispatches=0,closed=0;
+  const musicUpdates:boolean[]=[];
   await page.route('**/api/realtime/status',route=>route.fulfill({json:{ok:true,model:'qwen3.6-35b-a3b-noreason',voice:'serena',tools:[],openai_key_configured:false,voice_engine:{engine:'neuraldeep',reason:'configured'},memory:{stats:[]},codex:{available:true},transcription_model:'whisper-1'}}));
   await page.route('**/api/realtime/session',route=>{openaiCalls++;return route.fulfill({status:500,json:{error:'wrong engine'}});});
+  await page.route('**/api/realtime/session-config',route=>{openaiCalls++;return route.fulfill({status:500,json:{error:'wrong engine'}});});
   await page.route('**/api/realtime/tool',route=>{toolDispatches++;return route.fulfill({json:{ok:false,error:'receipt must not redispatch'}});});
   await page.route('**/api/voice/sessions',route=>route.fulfill({json:{ok:true,sessionId:'voice-fixture',settings:{model:'qwen3.6-35b-a3b-noreason',voice:'serena'},tools:['inspect_pritha_files']}}));
   await page.route('**/api/voice/sessions/voice-fixture',route=>{if(route.request().method()==='DELETE')closed++;return route.fulfill({json:{ok:true}});});
+  await page.route('**/api/voice/sessions/voice-fixture/context',route=>{musicUpdates.push(route.request().postDataJSON().musicControlEnabled);return route.fulfill({json:{ok:true}});});
   await page.goto('/voice');await page.getByRole('button',{name:'Start Listening',exact:true}).filter({visible:true}).click();
   await expect(page.getByRole('button',{name:'Stop Listening',exact:true}).filter({visible:true})).toBeVisible({timeout:30000});
+  await page.getByRole('button',{name:'Music',exact:true}).filter({visible:true}).click();
+  await expect.poll(()=>musicUpdates).toEqual([true]);
+  await page.getByRole('button',{name:'Music',exact:true}).filter({visible:true}).click();
+  await expect.poll(()=>musicUpdates).toEqual([true,false]);
   await page.evaluate(()=>{
     const emit=(event:any)=>(window as any).__ndEvents.onmessage({data:JSON.stringify(event)});
     emit({id:1,type:'transcript.user',turnId:'fixture-turn',text:'Проверь файлы'});

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import ts from '../interfaces/control-center/node_modules/typescript/lib/typescript.js';
 import * as policy from '../scripts/lib/provider-profile.mjs';
+import {VoiceContextError} from '../scripts/lib/voice-session-contexts.mjs';
 const source=readFileSync('interfaces/control-center/src/lib/realtime/voice-engine-server.ts','utf8');
 const chained={exports:{}};
 new Function('module','exports',ts.transpileModule(readFileSync('interfaces/control-center/src/lib/voice/settings.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(chained,chained.exports);
@@ -48,7 +49,9 @@ test('OpenAI session and call routes reject another engine before any provider I
     let io=0;
     const module={exports:{}},host=fixture({connectorId:'neuraldeep',openai:true,neuraldeep:true});
     const provider={usesLiveVoice:()=>false,buildRealtimeSessionConfig:()=>{io++;},createEphemeralRealtimeSession:()=>{io++;},createRealtimeCall:()=>{io++;},createLiveCall:()=>{io++;},RealtimeProviderError:class extends Error{}};
-    const modules={'next/server':{NextResponse:Response},'@/lib/realtime/voice-engine-server':host,'@/lib/realtime/pritha-runtime':provider};
+    const modules={'next/server':{NextResponse:Response},'@/lib/realtime/voice-engine-server':host,'@/lib/realtime/pritha-runtime':provider,
+      '../../../../../../../scripts/lib/voice-session-contexts.mjs':{VoiceContextError},
+      '@/lib/voice/session-context':{voiceContextOwner:()=>({owner:'fixture'}),openVoiceSessionContext:()=>host.requireVoiceEngine('openai')}};
     new Function('module','exports','require',ts.transpileModule(readFileSync(`interfaces/control-center/src/app/api/realtime/${file}/route.ts`,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(module,module.exports,name=>{assert.ok(modules[name]);return modules[name];});
     const response=await module.exports.POST(new Request('http://fixture.invalid',{method:'POST',body:JSON.stringify({offerSdp:'synthetic',voiceApi:'realtime'})}));
     assert.equal(response.status,409);assert.equal((await response.json()).code,'voice_engine_changed');assert.equal(io,0);
