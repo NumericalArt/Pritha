@@ -5,11 +5,13 @@ import type { TaskChatBackend, TaskProviderHealth } from './driver-types';
 import type { ThreadSummary, RuntimeStatus, ThreadGroup } from './types';
 import { CodexChatGatewayError } from './native-gateway';
 import type {ProviderPreset} from '../settings/provider-profile';
+import { providerVoiceTaskBackend } from '../../../../../scripts/lib/provider-voice-task-backend.mjs';
 type CatalogHealth=TaskProviderHealth & {models?:Array<{id:string;efforts?:string[];tools?:boolean;responses?:boolean;available?:boolean|null}>};
 
 /** UI protocol adapter for private provider history. Native history is never mirrored here. */
 export class ExternalChatGateway implements TaskChatBackend {
   readonly core:ProviderTaskRuntime;
+  voiceTaskBackend=()=>providerVoiceTaskBackend(this.core);
   constructor(readonly attachments:TaskChatBackend['attachments'],private readonly options:ProviderTaskOptions,private readonly health:(modelId?:string,preset?:ProviderChatBinding['executionConfig'])=>Promise<CatalogHealth>){this.core=new ProviderTaskRuntime(options);}
   private summary(binding:ProviderChatBinding):ThreadSummary {
     const active=this.core.activeIntent(binding.chatId),pending=this.core.pendingRequests(binding.chatId);

@@ -9,6 +9,7 @@ import { inspectTaskWorkspace, prepareTaskWorkspace, taskWorkspaceResources, ver
 import { privateStateDirectory, privateStateFile } from './private-state-path.mjs';
 import { providerProcessTreesExited } from './provider-process-proof.mjs';
 import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,expireProviderRequests } from './provider-approvals.mjs';
+import { normalizeProviderPreset } from './provider-profile.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -51,16 +52,20 @@ export class ProviderTaskRuntime {
   require(chat){return this.registry.require(chat);}
   activeIntent(chat){return this.execution.listIntents({kind:'turn',states:activeStates,limit:1000}).find(row=>row.chatId===chat) || null;}
   async workspacePreview(){return inspectTaskWorkspace(this.root);}
-  async create(input){
+  async create(input,{voice}={}){
     const subject=normalizeChatSubject(input?.subject);
     if(!validClient(input?.clientThreadId) || input.source!=='chat' || (input.workspace?.mode!==undefined && !['isolated','configured','read-only'].includes(input.workspace.mode)))throw failure('invalid_request','A valid chat request is required.',400);
-    const {initialTurn:ignored,...request}=input;
+    if(voice && (!/^topic_[a-f0-9]{40}$/.test(voice.topicId) || !Number.isSafeInteger(voice.generation) || voice.generation<1 || voice.generation>999))throw failure('voice_topic_identity_invalid');
+    const voicePreset=voice?normalizeProviderPreset(this.connectorId,voice.preset):null;
+    if(voicePreset && (!voicePreset.modelId || input.settings?.modelId && input.settings.modelId!==voicePreset.modelId || input.settings?.effortId && input.settings.effortId!==voicePreset.reasoningEffort))throw failure('runtime_identity_mismatch');
+    const {initialTurn:ignored,...baseRequest}=input;
+    const request={...baseRequest,...(voice?{hostVoice:{topicId:voice.topicId,generation:voice.generation,preset:voicePreset}}:{})};
     const existing=this.registry.findByClient(input.clientThreadId);
     if(existing){if(existing.createHash!==hash(request))throw failure('idempotency_conflict');return {binding:existing,replayed:true};}
     return this.execution.withMutation('provider-create:'+this.connectorId+':'+input.clientThreadId,async()=>{
       const raced=this.registry.findByClient(input.clientThreadId);
       if(raced){if(raced.createHash!==hash(request))throw failure('idempotency_conflict');return {binding:raced,replayed:true};}
-      const config=this.options.configuration();
+      const current=this.options.configuration(),config=voicePreset?{...voicePreset,sandbox:current.sandbox}:current;
       const modelId=input.settings?.modelId || config.modelId;
       const sandbox=input.workspace?.mode==='read-only' ? 'read-only' : config.sandbox || 'read-only';
       if(!['read-only','workspace-write'].includes(sandbox))throw failure('provider_sandbox_invalid','This provider requires a bounded workspace sandbox.');
@@ -71,9 +76,26 @@ export class ProviderTaskRuntime {
       const workspace=await prepareTaskWorkspace({coordinator:this.execution,source:this.root,directory:path.join(this.privateRoot,'workspaces'),id:this.connectorId+':'+input.clientThreadId,
         mode:sandbox==='read-only'?'read-only':'worktree',baseRevision:input.workspace?.baseRevision});
       const result=this.registry.create({clientThreadId:input.clientThreadId,request,title:input.title,modelId:executionConfig.modelId,effortId:executionConfig.reasoningEffort,timeoutMs:executionConfig.timeoutMs,
-        workspacePath:workspace.cwd,workspace,capabilitySnapshot:capabilities,executionConfig,...(subject?{subject}:{})});
+        workspacePath:workspace.cwd,workspace,capabilitySnapshot:capabilities,executionConfig,...(subject?{subject}:{}),...(voice?{voice:{topicId:voice.topicId,generation:voice.generation}}:{})});
       this.changed(result.binding.chatId);return {binding:result.binding,replayed:!result.created};
     });
+  }
+  voiceReceipt(chat,clientMessageId){
+    const binding=this.require(chat);
+    if(binding.origin!=='voice' || !validClient(clientMessageId))throw failure('voice_topic_chat_mismatch');
+    const common={chatId:chat,clientMessageId,sessionId:binding.nativeThreadId || null};
+    const receipt=this.registry.history.receipt(chat,clientMessageId);
+    if(receipt?.kind==='message'){
+      const turn=this.registry.turn(chat,receipt.value.turnId);
+      if(!turn || turn.clientMessageId!==clientMessageId)throw failure('history_receipt_incomplete');
+      return {...common,kind:'turn',turnId:turn.turnId,turn:providerTurnView(turn)};
+    }
+    const queued=this.execution.getIntent(queueKey(chat,clientMessageId));
+    if(!queued)return null;
+    if(queued.chatId!==chat || queued.input?.clientMessageId!==clientMessageId)throw failure('voice_task_receipt_mismatch');
+    if(queued.state==='cancelled')return {...common,kind:'cancelled',queueId:queued.id};
+    if(!waitingStates.includes(queued.state))throw failure('voice_task_receipt_unconfirmed');
+    return {...common,kind:'queue',queueId:queued.id,revision:queued.revision,status:queued.state};
   }
   validateTurn(binding,input){
     if(input && Object.hasOwn(input,'subject'))throw failure('runtime_identity_mismatch','This chat retains its original subject and factory phase.');

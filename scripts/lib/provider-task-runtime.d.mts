@@ -26,7 +26,8 @@ export class ProviderTaskRuntime {
   readonly registry:ProviderChatRegistry;readonly execution:ExecutionCoordinator;
   require(chatId:string):ProviderChatBinding;
   activeIntent(chatId:string):ExecutionIntent|null;
-  create(input:CreateThreadInput):Promise<{binding:ProviderChatBinding;replayed:boolean}>;
+  create(input:CreateThreadInput,host?:{voice:{topicId:string;generation:number;preset:ProviderPreset}}):Promise<{binding:ProviderChatBinding;replayed:boolean}>;
+  voiceReceipt(chatId:string,clientMessageId:string):import('./voice-task-bridge.mjs').VoiceBackendReceipt|null;
   start(chatId:string,input:StartTurnInput,options?:{fromQueue?:string}):Promise<{accepted:AcceptedTurn;replayed:boolean}>;
   control(chatId:string,input:{action:'steer'|'interrupt';expectedTurnId:string;clientMessageId:string;text?:string}):Promise<{status:string;action:'steer'|'interrupt';replayed:boolean}>;
   pendingRequests(chatId:string):ThreadDetail['pendingRequests'];

@@ -60,6 +60,14 @@ test("all five drivers route existing threads independently of the current defau
   assert.throws(()=>gateway.createThread({source:"chat",connectorId:null}),{code:"provider_profile_invalid"});
 });
 
+test('voice backend dispatch uses the pinned connector and leaves the native workflow explicit', () => {
+  const drivers=profile.PROVIDER_CONNECTOR_IDS.map(driver);
+  for(const item of drivers.slice(1))item.backend.voiceTaskBackend=()=>({connectorId:item.connectorId});
+  const gateway=new CodexChatGateway(drivers,()=>"codex");
+  for(const connectorId of profile.PROVIDER_CONNECTOR_IDS.slice(1))assert.equal(gateway.voiceTaskBackend(connectorId).connectorId,connectorId);
+  assert.throws(()=>gateway.voiceTaskBackend('codex'),{code:'provider_capability_unavailable'});
+});
+
 test("missing and failed providers never dispatch through an available native provider", async () => {
   const native=driver("codex"),claude=driver("claude");
   const gateway=new CodexChatGateway([native,claude],()=>"neuraldeep");

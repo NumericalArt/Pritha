@@ -424,7 +424,10 @@ active-thread switch, native feature regression и no-secret DOM/storage checks.
   no-key/both-keys/offline cases; не переключать engine при error.
 - [x] ND STT → LLM/tool loop → TTS transport: bounded audio/SSE, private receipts,
   локальные VAD assets, прерывание, browser-owned music/intake tools и usage.
-- [ ] Persistent voice topics; common run-task routes to pinned selected task
+- [x] Persistent topic/task registry и внутренний bridge к общей provider queue;
+  restart, idempotency, alias pin и точные operator receipts проверены на fixtures.
+- [ ] Подключить этот registry/bridge к публичным voice task tools, карточкам и
+  intake; common run-task routes to pinned selected task
   connector, exact queue/admission handoff and cancellation. Текущая промежуточная
   защита возвращает `voice_task_binding_required` для нового внешнего task intent;
   она не подменяет выбранный коннектор нативным Codex. Existing native task refs
@@ -1373,6 +1376,46 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   NeuralDeep search integration и ручные microphone/speaker/provider проверки
   ещё впереди. Никаких paid provider calls, установки candidate в live service,
   изменения реальных state filenames, MacBook или GitHub не выполнялось.
+
+### Checkpoint реализации 19 — Persistent topics и общий backend bridge
+
+- `scripts/lib/voice-topic-bindings.mjs` хранит topic/task identity в той же
+  private SQLite database, что canonical ExecutionCoordinator. Topic фиксирует
+  instance, subject, generation, connector, preset, client thread/message IDs,
+  chat и provider session. Opening/reconcile не выполняет inference или restart.
+- Последующая задача той же темы использует закреплённые настройки. Смена
+  коннектора для новой задачи создаёт следующее generation; explicit continuation
+  требует точного старого topic/generation/provider. Reset никогда не затирает
+  историю; после 999 generations возвращается ошибка вместо повторного ключа.
+- `VoiceTaskBridge` передаёт start, queue, stop и operator answer в существующий
+  Task Chat backend. Сохраняет hash исходного запроса, CAS revision и durable
+  dispatch fence до обращения к backend. Потерянный ответ сверяется с canonical
+  history receipt; отсутствие доказательства оставляет unknown без повтора.
+- `provider-voice-task-backend.mjs` использует уже общий ProviderTaskRuntime для
+  NeuralDeep, Claude, OpenRouter и Local. Voice origin задаётся отдельным host
+  argument, не полем HTTP/model payload. Общими остаются admission, sandbox,
+  workspace, FIFO queue, predecessor checks, process proof и broker approvals.
+- Внутренний API Gateway предоставляет этот adapter. Реальные внешний voice
+  entry point, карточки, intake и ручные тесты ещё не переключены: временный
+  guard checkpoint 18 остаётся до завершения их сквозной интеграции. Native
+  voice workflow сохраняется. Это проверенная часть R9, не завершённый R9.
+- Provider alias разрешается при создании chat один раз: topic отдельно хранит
+  requested preset и resolved model. Retry/restart использует сохранённую точную
+  модель; меняющийся default/alias target не влияет на продолжение темы.
+- Переосмыслены механизмы закреплённого NeuralDeep source: topic store/routing,
+  task links, queued handoff и operator service. Source hashes и причины адаптации
+  добавлены в `03_reviews/2026-11-01-neuraldeep-voice-adoption.json`. Отдельный
+  NeuralDeep coordinator, копия execution history и JSON registry не создаются.
+- Проверки включают два конкурирующих процесса, restart, чужой instance/schema,
+  generation exhaustion, смену коннектора/модели, lost acknowledgement, exact
+  queue cancellation, поздний stop, stale question и voice→typed continuation.
+  Все provider calls синтетические, с реальными локальными store/queue/runtime.
+  Targeted backend/topic/bridge regression: **41/41**. Общий прогон: 1184
+  passed, 1 failed — test loader не знал новый module import; он исправлен,
+  весь gateway/driver блок повторно прошёл **10/10**, включая дополнительный
+  pinned voice dispatch test. Не заявляется новый единый all-green full run:
+  следующий общий gate будет выполнен после public voice wiring. TypeScript,
+  Markdown validation (986 файлов), name guard и strict privacy audit прошли.
 
 ## 7. Полные исходные материалы
 

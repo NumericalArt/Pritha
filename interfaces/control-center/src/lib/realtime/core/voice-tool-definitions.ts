@@ -415,4 +415,3 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
   if (options.musicControlEnabled) tools.push(musicControlToolDefinition());
   return tools;
 }
-

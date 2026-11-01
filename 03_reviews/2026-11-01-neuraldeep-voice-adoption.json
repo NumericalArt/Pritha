@@ -133,5 +133,49 @@
   ],
   "sourceVersion": "0.2.0",
   "verified": "2026-11-01",
-  "phase": "R9 audio transport and shared host integration; persistent task binding pending"
+  "phase": "R9 audio transport, persistent topic bindings and canonical backend bridge; public voice task routing and manual acceptance pending",
+  "referenceAdaptations": [
+    {
+      "source": "interfaces/control-center/src/lib/codex-chat/voice-topic-store.ts",
+      "sourceSha256": "ddc4ca9d7a9e97e9001a48cef263b98b4299afe7413ea20a36680c02220d9018",
+      "targets": [
+        "scripts/lib/voice-topic-bindings.mjs"
+      ],
+      "adaptation": "Preserve scoped generation and immutable provider session identity in canonical SQLite, without a second scheduler or JSON registry repair path."
+    },
+    {
+      "source": "interfaces/control-center/src/lib/codex-chat/voice-topic-routing.ts",
+      "sourceSha256": "f24aa1cafef7d91ecd81432cf932cca6465a23975c40d13ece23668f3a6ab213",
+      "targets": [
+        "scripts/lib/voice-topic-bindings.mjs"
+      ],
+      "adaptation": "Reuse same-provider topics, rotate on explicit reset or new connector, reject generation exhaustion instead of clamping to an existing generation."
+    },
+    {
+      "source": "interfaces/control-center/src/lib/codex-chat/voice-task-links.ts",
+      "sourceSha256": "6b9aa0a3f056b68ed20ac177f6ed1ff07ae799605ef5f323f39caac7c3c205da",
+      "targets": [
+        "scripts/lib/voice-task-bridge.mjs",
+        "scripts/lib/provider-voice-task-backend.mjs"
+      ],
+      "adaptation": "Durable task and message identity; use canonical provider history and its receipts, not a duplicated transcript."
+    },
+    {
+      "source": "interfaces/control-center/src/lib/codex-chat/voice-queued-handoff.ts",
+      "sourceSha256": "c7cf79ca81d78dccfb28329e81f47ebaf1af3daf091fd3344ae8386cfb56672a",
+      "targets": [
+        "scripts/lib/voice-task-bridge.mjs",
+        "scripts/lib/provider-voice-task-backend.mjs"
+      ],
+      "adaptation": "Queue and cancellation delegate to the same Task Chat runtime and coordinator, no fork-specific admission or second execution lane."
+    },
+    {
+      "source": "interfaces/control-center/src/lib/codex-chat/voice-operator-service.ts",
+      "sourceSha256": "302f5b1e553228548c675d600e276196d9a09a1fdf9831c8b382fdf7c9efa07a",
+      "targets": [
+        "scripts/lib/voice-task-bridge.mjs"
+      ],
+      "adaptation": "Exact task/topic generation/request revision dispatches to canonical operator broker; no free-form response may target the latest arbitrary request."
+    }
+  ]
 }

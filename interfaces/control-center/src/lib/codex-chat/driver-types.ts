@@ -3,7 +3,9 @@ import type { ProviderConnectorId,ProviderPreset } from "../settings/provider-pr
 import type {RuntimeStatus} from './types';
 
 /** Host protocol stays stable while each backend owns its execution and history. */
-export type TaskChatBackend = Pick<CodexChatGateway, keyof CodexChatGateway>;
+export type TaskChatBackend = Pick<CodexChatGateway, keyof CodexChatGateway> & {
+  voiceTaskBackend?: () => import('../../../../../scripts/lib/voice-task-bridge.mjs').VoiceTaskBackend;
+};
 export type TaskProviderCapabilities = {
   steer: boolean; interrupt: boolean; approvals: boolean; tools: boolean;
   attachments: { files: boolean; images: boolean };

@@ -7,13 +7,14 @@ import os from 'node:os';
 import ts from '../interfaces/control-center/node_modules/typescript/lib/typescript.js';
 import * as core from '../scripts/lib/provider-task-runtime.mjs';
 import * as channel from '../scripts/lib/execution-channel.mjs';
+import * as voiceBackend from '../scripts/lib/provider-voice-task-backend.mjs';
 
 const require=createRequire(import.meta.url);
 class GatewayError extends Error{constructor(code,message,status){super(message);Object.assign(this,{code,status});}}
 const source=readFileSync('interfaces/control-center/src/lib/codex-chat/external-gateway.ts','utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const module={exports:{}};
-new Function('require','module','exports',output)(id=>id.endsWith('/provider-task-runtime.mjs')?core:id.endsWith('/execution-channel.mjs')?channel:id==='./native-gateway'?{CodexChatGatewayError:GatewayError}:require(id),module,module.exports);
+new Function('require','module','exports',output)(id=>id.endsWith('/provider-task-runtime.mjs')?core:id.endsWith('/execution-channel.mjs')?channel:id.endsWith('/provider-voice-task-backend.mjs')?voiceBackend:id==='./native-gateway'?{CodexChatGatewayError:GatewayError}:require(id),module,module.exports);
 const {ExternalChatGateway}=module.exports;
 
 test('external gateway preserves the existing HTTP/SSE envelope and probes the pinned model after defaults change',async t=>{
