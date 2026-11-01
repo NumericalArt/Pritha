@@ -20,7 +20,7 @@ export type ProviderAttachmentTransport = {
   cleanup?:(context:{receipt:ProviderAttachmentDeliveryReceipt;store:ImmutableAttachmentStore})=>Promise<'complete'>;
 };
 export type ProviderTaskOptions = {
-  connectorId:Exclude<ProviderConnectorId,'codex'>;root:string;stateRoot:string;privateRoot:string;executionDirectory:string;
+  connectorId:Exclude<ProviderConnectorId,'codex'>;root:string;stateRoot:string;privateRoot:string;executionDirectory:string;agentParent?:string;
   configuration:()=>ProviderPreset & {sandbox:string};preflight:(binding:Partial<ProviderChatBinding>,context:{phase:'create'|'turn'})=>Promise<Record<string,unknown>>;
   resolveConfiguration?:(configuration:ProviderPreset & {sandbox:string})=>Promise<ProviderPreset & {sandbox:string}>;
   launch:ProviderLaunch;validateText?:(text:string)=>void;

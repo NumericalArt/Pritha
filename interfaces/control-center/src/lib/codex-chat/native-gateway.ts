@@ -54,7 +54,7 @@ export type CreateThreadInput = {
   clientThreadId: string;
   title?: string;
   source: "chat";
-  workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only"};
+  workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only";agentId?:string};
   settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
 };
 
@@ -422,6 +422,7 @@ export class CodexChatGateway {
   }
 
   async createThread(input: CreateThreadInput) {
+    if(input.workspace?.agentId!==undefined)throw new CodexChatGatewayError('native_agent_workspace_route_required','Use the existing native child task route for this workspace.',409);
     const subject=normalizeChatSubject(input.subject);
     if (!validClientId(input.clientThreadId) || input.source !== "chat") {
       throw new CodexChatGatewayError("invalid_request", "A valid clientThreadId and source=chat are required.", 400);

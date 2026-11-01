@@ -384,7 +384,7 @@ recover model pin; output large-file/truncation fixture.
 
 ### R7 — OpenRouter и Local
 
-**Статус: in-progress; OpenRouter transport/Task Chat проверены, Local execution и child provisioning впереди.** Зависимости R2–R4, R6 contracts.
+**Статус: in-progress; OpenRouter transport/Task Chat и child provisioning проверены, Local offline execution впереди.** Зависимости R2–R4, R6 contracts.
 
 - [x] Выделить reusable OpenAI-compatible loopback bridge без ND billing/auth
   assumptions. OpenRouter uses fixed upstream and HTTP-Referer/X-Title metadata.
@@ -1954,6 +1954,25 @@ unit child environment отдельно и изолировать оба aliases
   остаётся pinned GitHub source. Optional Claude local-session lane, Local
   offline execution, child voice, bootstrap и R12 продолжаются. Никакие живые
   child credentials, сервисы, MacBook или GitHub не менялись.
+
+### Checkpoint 31 — Existing child voice workspace
+
+- Голосовая задача ND/Claude/OpenRouter/Local может выбирать существующего
+  child agent по instance-local catalog ID/однозначному alias. Host закрепляет
+  canonical ID и физический project root; произвольный путь не является
+  полномочием. Чужой instance, конфликт идентичности, symlink и другая Pritha
+  отклоняются. Native voice сохраняет свой существующий маршрут.
+- Read-only работает в выбранном child project; запись — в отдельном Git
+  worktree. Для проекта без Git voice write закрывается до создания чата.
+  Queue, restart и typed continuation сохраняют child/provider/model binding;
+  перед новым запуском каталог и physical root проверяются повторно.
+- Targeted voice/topic/router/runtime suite **79/79**, typecheck passed.
+  Проверены четыре внешних connectors, queue/restart, moved child, injection,
+  foreign instance, symlink, worktree isolation и неизменность исходного файла.
+- Это закрывает existing-child routing. Создание нового ребёнка голосом через
+  external provider остаётся отдельным factory route: нельзя выдавать всему
+  CLI доступ к sibling parent или private state ради обхода этой границы.
+  Local execution пока сохраняет offline gate. Платных calls и service changes 0.
 
 ## 7. Полные исходные материалы
 

@@ -1,7 +1,7 @@
 import type { ExecutionCoordinator } from './execution-coordinator.mjs';
 export function scopedAgentWorkspace(parent:string,name:unknown):string;
 export function prepareAgentWorkspaceTarget(coordinator:ExecutionCoordinator,target:string,workflow:Record<string,any>|null):void;
-export type TaskWorkspace = {id:string;mode:'worktree'|'serialized'|'read-only';source:string;cwd:string;baseRevision:string|null;branch:string|null};
+export type TaskWorkspace = {id:string;mode:'worktree'|'serialized'|'read-only';source:string;cwd:string;baseRevision:string|null;branch:string|null;agentId?:string};
 export function inspectTaskWorkspace(source:string):Promise<{source:string;git:boolean;baseRevision:string|null;dirty:boolean}>;
 export function prepareTaskWorkspace(options:{coordinator:ExecutionCoordinator;source:string;directory:string;id:string;mode?:'worktree'|'serialized'|'read-only';baseRevision?:string}):Promise<TaskWorkspace>;
 export function verifyTaskWorkspace(workspace:TaskWorkspace):Promise<TaskWorkspace>;

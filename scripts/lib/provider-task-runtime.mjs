@@ -11,6 +11,7 @@ import { providerProcessTreesExited } from './provider-process-proof.mjs';
 import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,expireProviderRequests } from './provider-approvals.mjs';
 import { normalizeProviderPreset } from './provider-profile.mjs';
 import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
+import {resolveProviderAgentWorkspace} from './provider-agent-workspace.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -84,6 +85,8 @@ export class ProviderTaskRuntime {
   async workspacePreview(){return inspectTaskWorkspace(this.root);}
   async create(input,{voice}={}){
     const subject=normalizeChatSubject(input?.subject);
+    const child=input?.workspace?.agentId===undefined?null:resolveProviderAgentWorkspace({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent},input.workspace.agentId);
+    if(child && child.agentId!==input.workspace.agentId)throw failure('provider_agent_workspace_identity');
     if(!validClient(input?.clientThreadId) || input.source!=='chat' || (input.workspace?.mode!==undefined && !['isolated','configured','read-only'].includes(input.workspace.mode)))throw failure('invalid_request','A valid chat request is required.',400);
     if(voice && (!/^topic_[a-f0-9]{40}$/.test(voice.topicId) || !Number.isSafeInteger(voice.generation) || voice.generation<1 || voice.generation>999))throw failure('voice_topic_identity_invalid');
     const voicePreset=voice?normalizeProviderPreset(this.connectorId,voice.preset):null;
@@ -103,9 +106,12 @@ export class ProviderTaskRuntime {
       let executionConfig={...config,modelId,sandbox,reasoningEffort:input.settings?.effortId || config.reasoningEffort};
       if(this.options.resolveConfiguration)executionConfig=await this.options.resolveConfiguration(executionConfig);
       const capabilities=await this.options.preflight({connectorId:this.connectorId,modelId:executionConfig.modelId,executionConfig},{phase:'create'});
+      if(child && resolveProviderAgentWorkspace({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent},child.agentId).source!==child.source)throw failure('provider_agent_workspace_identity');
+      if(voice && sandbox==='workspace-write' && !(await inspectTaskWorkspace(child?.source || this.root)).git)throw failure('voice_workspace_isolation_required','Voice write tasks require a committed Git project.');
       privateStateDirectory(this.stateRoot,path.join(this.privateRoot,'workspaces'));
-      const workspace=await prepareTaskWorkspace({coordinator:this.execution,source:this.root,directory:path.join(this.privateRoot,'workspaces'),id:this.connectorId+':'+input.clientThreadId,
+      const workspace=await prepareTaskWorkspace({coordinator:this.execution,source:child?.source || this.root,directory:path.join(this.privateRoot,'workspaces'),id:this.connectorId+':'+input.clientThreadId,
         mode:sandbox==='read-only'?'read-only':'worktree',baseRevision:input.workspace?.baseRevision});
+      if(child)workspace.agentId=child.agentId;
       const result=this.registry.create({clientThreadId:input.clientThreadId,request,title:input.title,modelId:executionConfig.modelId,effortId:executionConfig.reasoningEffort,timeoutMs:executionConfig.timeoutMs,
         workspacePath:workspace.cwd,workspace,capabilitySnapshot:capabilities,executionConfig,...(subject?{subject}:{}),...(voice?{voice:{topicId:voice.topicId,generation:voice.generation}}:{})});
       this.changed(result.binding.chatId);return {binding:result.binding,replayed:!result.created};
@@ -173,6 +179,10 @@ export class ProviderTaskRuntime {
       if(!['reserved','not_dispatched'].includes(intent.state))throw failure('fallback_confirmation_required','The original dispatch is unconfirmed and will not be repeated.');
       if(queue?.attachmentReceipt && intent.attachmentReceipt && JSON.stringify(queue.attachmentReceipt)!==JSON.stringify(intent.attachmentReceipt))throw failure('attachment_integrity_failed');
       await verifyTaskWorkspace(binding.workspace);
+      if(binding.workspace.agentId){
+        const child=resolveProviderAgentWorkspace({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent},binding.workspace.agentId);
+        if(child.agentId!==binding.workspace.agentId || child.source!==binding.workspace.source)throw failure('provider_agent_workspace_identity');
+      }
       const capabilities=await this.options.preflight(binding,{phase:'turn'});
       const attachments=await this.attachmentInput(binding,input,{phase:'turn',expected:queue?.attachmentReceipt || intent.attachmentReceipt,retain:true});
       if(attachments.files.length && !intent.attachmentReceipt)intent=this.execution.updateIntent(key,{attachmentReceipt:attachments.receipt},intent.revision);

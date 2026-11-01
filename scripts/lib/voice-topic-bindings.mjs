@@ -26,9 +26,9 @@ function presetOf(connectorId, value) {
   return preset;
 }
 function workspaceOf(value = { mode: 'read-only' }) {
-  if (!value || !['read-only', 'isolated'].includes(value.mode) || Object.keys(value).some(key => !['mode', 'baseRevision'].includes(key))
+  if (!value || !['read-only', 'isolated'].includes(value.mode) || Object.keys(value).some(key => !['mode', 'baseRevision','agentId'].includes(key)) || value.agentId!==undefined && !id(value.agentId)
       || value.baseRevision !== undefined && (typeof value.baseRevision !== 'string' || !/^[a-f0-9]{40,64}$/.test(value.baseRevision))) fail('voice_topic_workspace_invalid');
-  return { mode: value.mode, ...(value.baseRevision ? { baseRevision: value.baseRevision } : {}) };
+  return { mode: value.mode, ...(value.baseRevision ? { baseRevision: value.baseRevision } : {}),...(value.agentId?{agentId:value.agentId}:{}) };
 }
 
 /** Persistent identity only. Admission, FIFO, process proof and history belong to

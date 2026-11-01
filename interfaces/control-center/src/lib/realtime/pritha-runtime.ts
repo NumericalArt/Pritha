@@ -6395,12 +6395,18 @@ async function startCodexExec(
 
 async function prepareProviderVoiceTask(task: Record<string, unknown>, preset: ProviderPreset) {
   const { reserveProviderVoiceTask } = await import('../voice/task-router');
-  const scope = continuationThreadScopeFromUnknown(task.thread_scope);
-  if (scope?.kind === 'agent' || task.task_type === 'agent_creation') throw Object.assign(new Error('This task needs a scoped child-agent workspace.'), { code: 'provider_voice_agent_workspace_pending' });
+  let scope = continuationThreadScopeFromUnknown(task.thread_scope);
+  if (task.task_type === 'agent_creation') throw Object.assign(new Error('This task needs a scoped factory creation workspace.'), { code: 'provider_voice_agent_creation_pending' });
+  let agentId:string|undefined;
+  if(scope?.kind==='agent'){
+    const {resolveProviderAgentWorkspace}=await import('../../../../../scripts/lib/provider-agent-workspace.mjs');
+    const child=resolveProviderAgentWorkspace({root:resolvePrithaRoot(),stateRoot:resolvePrithaStateRoot(),agentParent:resolvePrithaAgentParent()},scope.id);
+    agentId=child.agentId;scope={...scope,id:agentId};
+  }
   const {getCodexChatGateway}=await import('../codex-chat/gateway');
   const attachments=await voiceIntakeAttachmentIds(task.intake,getCodexChatGateway().attachments);
   const workspace = { mode: task.write_mode === 'workspace_write' ? 'isolated' as const : 'read-only' as const,
-    ...(typeof task.workspace_base_revision === 'string' ? { baseRevision: task.workspace_base_revision } : {}) };
+    ...(typeof task.workspace_base_revision === 'string' ? { baseRevision: task.workspace_base_revision } : {}),...(agentId?{agentId}:{}) };
   const promptTask = { ...task, approval: undefined, status: undefined };
   const request: VoiceDispatchRequest = { chat: { workspace }, turn: { input: [{ type: 'text', text: buildCodexPrompt(promptTask) }], ...(attachments.length?{attachments}:{}) } };
   const reservation = reserveProviderVoiceTask({ taskId: String(task.id),

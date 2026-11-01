@@ -16,6 +16,7 @@ export function providerVoiceTaskBackend(runtime) {
         || binding.origin !== 'voice' || binding.group !== 'voice_work' || binding.modelId !== (topic.resolvedModelId || topic.preset.modelId)
         || binding.effortId !== topic.preset.reasoningEffort) throw new VoiceBindingError('voice_topic_chat_mismatch');
     if (topic.sessionId && binding.nativeThreadId !== topic.sessionId) throw new VoiceBindingError('voice_topic_session_mismatch');
+    if(binding.workspace.agentId!==topic.workspace.agentId || topic.workspace.agentId && (topic.scope.kind!=='agent' || topic.scope.id!==topic.workspace.agentId))throw new VoiceBindingError('voice_topic_workspace_mismatch');
     if (topic.workspace.mode === 'read-only' ? binding.executionConfig.sandbox !== 'read-only'
       : binding.executionConfig.sandbox !== 'workspace-write' || binding.workspace.mode !== 'worktree') throw new VoiceBindingError('voice_topic_workspace_mismatch');
     return binding;
@@ -23,11 +24,12 @@ export function providerVoiceTaskBackend(runtime) {
   return {
     async create(topic, request) {
       if (topic.connectorId !== runtime.connectorId) throw new VoiceBindingError('voice_topic_provider_mismatch');
+      if(topic.scope.kind==='agent' && topic.workspace.agentId!==topic.scope.id || topic.workspace.agentId && topic.scope.kind!=='agent')throw new VoiceBindingError('voice_topic_workspace_mismatch');
       // Every task in this topic uses the same creation identity, including when
       // two tasks race before bindChat receives the first creation response.
       if (request.chat.subject) throw new VoiceBindingError('voice_factory_subject_binding_required');
       if (request.chat.workspace && (request.chat.workspace.mode !== topic.workspace.mode
-          || request.chat.workspace.baseRevision !== topic.workspace.baseRevision)) throw new VoiceBindingError('voice_topic_workspace_mismatch');
+          || request.chat.workspace.baseRevision !== topic.workspace.baseRevision || request.chat.workspace.agentId!==topic.workspace.agentId)) throw new VoiceBindingError('voice_topic_workspace_mismatch');
       const result = await runtime.create({ title: 'Voice · ' + (topic.scope.label || topic.scope.id).slice(0, 100), workspace: topic.workspace, clientThreadId: topic.clientThreadId, source: 'chat',
         settings: pinnedSettings(topic, request.chat.settings) },
       { voice: { topicId: topic.topicId, generation: topic.scope.generation, preset: topic.preset } });

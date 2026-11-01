@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, realpathSync, renameSync, symlinkSync } from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { ProviderTaskRuntime } from '../scripts/lib/provider-task-runtime.mjs';
@@ -11,18 +12,19 @@ import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
 import {ImmutableAttachmentStore} from '../scripts/lib/chat-attachment-store.mjs';
 import {hostFileAttachmentTransport} from '../scripts/lib/provider-file-attachments.mjs';
 import {randomUUID} from 'node:crypto';
+import {resolveProviderAgentWorkspace} from '../scripts/lib/provider-agent-workspace.mjs';
 
 async function until(predicate) { for (let i = 0; i < 200; i++) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 10)); } assert.fail('Fixture did not settle'); }
 const request = text => ({ chat: { title: 'Voice fixture', workspace: { mode: 'read-only' } }, turn: { input: [{ type: 'text', text }] } });
 function fixture(t, connectorId = 'neuraldeep', options = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'pritha-provider-voice-'));
-  const root = path.join(directory, 'source'), stateRoot = path.join(directory, 'state'); mkdirSync(root); mkdirSync(stateRoot);
+  const root = path.join(directory, 'source'), stateRoot = path.join(directory, 'state'),agentParent=path.join(directory,'children'); mkdirSync(root); mkdirSync(stateRoot);mkdirSync(agentParent);
   const settings = { modelId: 'new-default', reasoningEffort: 'high', timeoutMs: 90000, sandbox: 'read-only' }, runs = [], instances = [];
   const attachments=options.files?new ImmutableAttachmentStore({stateRoot,privateRoot:path.join(stateRoot,'originals')}):null;
   const snapshot=async()=>({status:'ready',version:connectorId==='claude'?'2.1.296':'0.153.0',capabilities:{attachments:{files:true,images:false}}});
   const make = () => {
     const runtime = new ProviderTaskRuntime({ connectorId, root, stateRoot, privateRoot: path.join(stateRoot, 'task-chat'), executionDirectory: path.join(stateRoot, 'execution'),
-      configuration: () => settings, preflight: async () => ({ interrupt: true, steer: false }), ...options,
+      configuration: () => settings, agentParent, preflight: async () => ({ interrupt: true, steer: false }), ...options,
       ...(attachments?{attachmentStore:attachments,preflight:async()=>({interrupt:true,steer:false,attachments:{files:true,images:false}}),attachmentTransport:hostFileAttachmentTransport({stateRoot,privateRoot:path.join(stateRoot,'provider-inputs'),snapshot})}:{}),
       launch: async input => {
         await input.beforeStart({ identity: 'a'.repeat(64), evidence: { schema: 1, fixture: true } });
@@ -38,8 +40,51 @@ function fixture(t, connectorId = 'neuraldeep', options = {}) {
   const reserve = (taskId, body) => bindings.reserve({ taskId, scope: { kind: 'pritha', id: 'fixture' }, connectorId,
     preset: { modelId: 'voice-pinned', reasoningEffort: 'low', timeoutMs: 30000 }, requestHash: voiceTaskRequestHash(body) });
   t.after(async () => { for (const item of instances) await item.dispose(); await attachments?.close();rmSync(directory, { recursive: true, force: true }); });
-  return { runtime, bindings, bridge: new VoiceTaskBridge({ bindings, backend: providerVoiceTaskBackend(runtime) }), runs, settings, make, reserve,attachments };
+  return { runtime, bindings, bridge: new VoiceTaskBridge({ bindings, backend: providerVoiceTaskBackend(runtime) }), runs, settings, make, reserve,attachments,root,stateRoot,agentParent };
 }
+
+function childFixture(f,{git=false}={}){
+  const project=path.join(f.agentParent,'child-one');mkdirSync(project);writeFileSync(path.join(project,'AGENTS.md'),'# Child fixture\n');
+  writeFileSync(path.join(project,'product.txt'),'original');
+  if(git){for(const args of [['init','-q'],['add','AGENTS.md','product.txt'],['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','initial']])execFileSync('git',args,{cwd:project});}
+  const child=resolveProviderAgentWorkspace(f,'child-one');
+  const reserve=(id,text,mode='read-only')=>{const workspace={mode,agentId:child.agentId},body={...request(text),chat:{workspace}};
+    f.bindings.reserve({taskId:id,scope:{kind:'agent',id:child.agentId},workspace,connectorId:f.runtime.connectorId,preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
+  return {...child,project,reserve};
+}
+for(const connector of ['neuraldeep','claude','openrouter','local'])test(`${connector}: existing child voice stays in its exact instance workspace through queue and restart`,async t=>{
+  const f=fixture(t,connector),child=childFixture(f),body=child.reserve('child-first','Read the child');
+  const first=await f.bridge.dispatch('child-first',body);await until(()=>f.runs.length===1);
+  assert.equal(f.runs[0].input.cwd,realpathSync(child.project));assert.equal(f.runtime.require(first.topic.chatId).workspace.agentId,child.agentId);
+  const second=child.reserve('child-second','Continue');const queued=await f.bridge.dispatch('child-second',second);assert.equal(queued.task.state,'queued');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runs.length===2);assert.equal(f.runs[1].input.cwd,child.source);
+  f.runs[1].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+  const worker=f.make(),next=child.reserve('child-third','After restart');
+  await new VoiceTaskBridge({bindings:f.bindings,backend:providerVoiceTaskBackend(worker)}).dispatch('child-third',next);await until(()=>f.runs.length===3);
+  assert.equal(f.runs[2].input.cwd,child.source);assert.equal(f.runs[2].input.model,'voice-pinned');
+  f.runs[2].resolve({ok:true,processTreeExited:true});await until(()=>worker.active.size===0);
+  renameSync(child.project,child.project+'-moved');
+  await assert.rejects(worker.start(first.topic.chatId,{clientMessageId:'child_after_move',input:[{type:'text',text:'Continue'}]}));assert.equal(f.runs.length,3);
+});
+test('child voice writes use a disposable worktree; non-Git isolation fails before chat creation',async t=>{
+  const f=fixture(t),child=childFixture(f,{git:true});f.settings.sandbox='workspace-write';
+  const body=child.reserve('child-write','Edit child','isolated'),started=await f.bridge.dispatch('child-write',body);await until(()=>f.runs.length===1);
+  const binding=f.runtime.require(started.topic.chatId);assert.equal(binding.workspace.mode,'worktree');assert.equal(binding.workspace.source,child.source);assert.notEqual(f.runs[0].input.cwd,child.source);
+  writeFileSync(path.join(f.runs[0].input.cwd,'product.txt'),'isolated edit');assert.equal(readFileSync(path.join(child.source,'product.txt'),'utf8'),'original');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+  const other=fixture(t),plain=childFixture(other);other.settings.sandbox='workspace-write';const write=plain.reserve('plain-write','Edit','isolated');
+  await assert.rejects(other.bridge.dispatch('plain-write',write),{code:'voice_workspace_isolation_required'});assert.equal(other.runs.length,0);
+});
+test('child catalog resolution rejects path injection, foreign parents, symlinks and another Pritha checkout',async t=>{
+  const f=fixture(t),child=childFixture(f),foreign=fixture(t);childFixture(foreign);
+  for(const target of [child.project,'../child-one',resolveProviderAgentWorkspace(foreign,'child-one').agentId])assert.throws(()=>resolveProviderAgentWorkspace(f,target),{code:'provider_agent_workspace_unavailable'});
+  symlinkSync(child.project,path.join(f.agentParent,'alias-child'));
+  assert.throws(()=>resolveProviderAgentWorkspace(f,'alias-child'),{code:'provider_agent_workspace_unavailable'});
+  const sibling=path.join(f.agentParent,'other-checkout');mkdirSync(sibling);writeFileSync(path.join(sibling,'AGENTS.md'),'# Other');writeFileSync(path.join(sibling,'package.json'),JSON.stringify({name:'pritha'}));
+  assert.throws(()=>resolveProviderAgentWorkspace(f,'other-checkout'),{code:'provider_agent_workspace_unavailable'});
+  const body=child.reserve('child-mismatch','Read');const topic=f.bindings.topic(f.bindings.task('child-mismatch').topicId);
+  await assert.rejects(providerVoiceTaskBackend(f.runtime).create({...topic,workspace:{mode:'read-only'}},body),{code:'voice_topic_workspace_mismatch'});assert.equal(f.runs.length,0);
+});
 
 for(const connector of ['neuraldeep','claude','openrouter'])test(`${connector}: voice file queue resumes exact originals and cancellation never dispatches its copies`,async t=>{
   const f=fixture(t,connector,{files:true}),id=randomUUID(),bytes=Buffer.from('voice queued immutable original');
