@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {installBriefDesk,briefDeskPlan} from '../scripts/install-brief-desk.mjs';
 import {readAgentCatalog} from '../scripts/agents-mother/identity.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -33,4 +34,19 @@ test('interrupted import and changed identity require recovery without modifying
   assert.throws(()=>installBriefDesk(options),/brief_desk_import_recovery_required/);
   fs.writeFileSync(plan.receipt,JSON.stringify(receipt));fs.writeFileSync(path.join(installed.target,'.pritha-bundled-example.json'),JSON.stringify({installId:'other'}));
   assert.throws(()=>installBriefDesk(options),/brief_desk_import_identity_changed/);
+});
+
+test('import CLI reads this checkout’s configured instance paths before planning or writing',t=>{
+  const f=fixture(t),source=path.join(path.dirname(f.stateRoot),'source');fs.mkdirSync(path.join(source,'03_reviews'),{recursive:true});
+  fs.cpSync(path.join(root,'examples/brief-desk-nd'),path.join(source,'examples/brief-desk-nd'),{recursive:true});
+  fs.copyFileSync(path.join(root,'03_reviews/2026-11-01-brief-desk-adoption.json'),path.join(source,'03_reviews/2026-11-01-brief-desk-adoption.json'));
+  fs.writeFileSync(path.join(source,'.env.local'),`PRITHA_STATE_ROOT=${f.stateRoot}\nPRITHA_AGENT_PARENT=${f.agentParent}\n`);
+  const env={PATH:process.env.PATH,HOME:os.tmpdir(),PRITHA_ROOT:source};
+  for(const action of ['--plan','--install']){
+    const result=spawnSync(process.execPath,[path.join(root,'scripts/install-brief-desk.mjs'),action],{cwd:source,env,encoding:'utf8'});
+    assert.equal(result.status,0,result.stderr);const payload=JSON.parse(result.stdout);
+    assert.equal(payload.target,path.join(fs.realpathSync(path.dirname(f.stateRoot)),'children/brief-desk-nd'));
+    if(action==='--plan'){assert.equal(fs.existsSync(f.stateRoot),false);assert.ok(payload.artifacts.every(file=>file.startsWith(path.join(fs.realpathSync(path.dirname(f.stateRoot)),'state/agents')+path.sep)));}
+  }
+  assert.equal(fs.existsSync(path.join(source,'.private')),false);
 });

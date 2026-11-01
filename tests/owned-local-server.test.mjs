@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createServer} from 'node:http';
 import {once} from 'node:events';
+import {spawnSync} from 'node:child_process';
 import {saveLocalServerConfiguration,readLocalServerConfiguration,startOwnedLocalServer,inspectOwnedLocalServer} from '../scripts/openai-compatible/owned-local-server.mjs';
 import {CompatibleProviderService} from '../scripts/openai-compatible/provider-service.mjs';
 
@@ -17,6 +18,16 @@ test('Local configuration pins a private binary/model/endpoint and rejects secre
   assert.throws(()=>readLocalServerConfiguration(f.options,{...f.preset,modelId:'other'}),{code:'provider_local_configuration_mismatch'});
   for(const bad of [{...f.value,environment:{OPENAI_API_KEY:'canary'}},{...f.value,endpoint:'https://example.org/v1'},{...f.value,readRoots:['/']},{...f.value,model:{...f.value.model,id:'model:cloud'}},{...f.value,commandSha256:'0'.repeat(64)}])assert.throws(()=>saveLocalServerConfiguration(f.options,bad));
   const file=path.join(f.options.stateRoot,'local-runtime','server.json');chmodSync(file,0o644);assert.throws(f.read);rmSync(file);symlinkSync(path.join(f.assets,'missing'),file);assert.throws(f.read);
+});
+
+test('Local configure CLI writes only the instance state selected in checkout configuration',t=>{
+  const f=fixture(t),source=path.join(f.directory,'source');mkdirSync(source);
+  writeFileSync(path.join(source,'.env.local'),`PRITHA_STATE_ROOT=${f.options.stateRoot}\n`);
+  const manifest=path.join(f.directory,'manifest.json');writeFileSync(manifest,JSON.stringify(f.value));
+  const result=spawnSync(process.execPath,[path.resolve('scripts/local-provider.mjs'),'configure','--file',manifest],{cwd:source,env:{PATH:process.env.PATH,HOME:os.tmpdir(),PRITHA_ROOT:source},encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).configured,true);
+  assert.equal(readLocalServerConfiguration({...f.options,root:source},f.preset).model.id,'fixture-local');
+  assert.throws(()=>readFileSync(path.join(source,'local-runtime/server.json')),{code:'ENOENT'});
 });
 test('owned model server has one exact port, no remote/foreign-loopback access or parent credentials and dies with its lease',{skip:process.platform!=='darwin'},async t=>{
   const f=fixture(t);let forbiddenHits=0;const forbidden=createServer((_req,res)=>{forbiddenHits++;res.end('ESCAPED');});forbidden.listen(0,'127.0.0.1');await once(forbidden,'listening');t.after(()=>new Promise(resolve=>forbidden.close(resolve)));

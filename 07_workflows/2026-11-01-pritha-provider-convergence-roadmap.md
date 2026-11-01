@@ -296,7 +296,7 @@ typecheck; history pagination/quotes/image annotation/scroll не дегради
 
 ### R4 — NeuralDeep как полноценный adapter
 
-**Статус: in-progress; transport/history/tools/files/PNG/voice/Search verified; final profile audit впереди.** Зависимости R2–R3, подтверждённый ND pin.
+**Статус: verified-automated; transport/history/tools/files/PNG/voice/Search и scoped profile audits passed; реальная авторизация и ручная приёмка остаются R12.** Зависимости R2–R3, подтверждённый ND pin.
 
 - [x] Перенести reviewed transport core `scripts/neuraldeep-codex.mjs`, `scripts/neuraldeep/*`,
   loopback Responses SSE adapter, credential boundary и model capability data.
@@ -601,9 +601,9 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; self-test 1408/1408, security/semantic gates и isolated staging health passed. Production activation, operator acceptance и перечисленные feature gaps ещё открыты.** Зависимости все выше.
+**Статус: in-progress; полный quality gate 1410/1410, browser 161/161, security/semantic и isolated staging health passed. После этого узкий CLI path repair проверен 15/15. Production activation, operator acceptance и перечисленные feature gaps ещё открыты.** Зависимости все выше.
 
-- [ ] Full `node scripts/quality-gate.mjs`, self-test, privacy strict,
+- [x] Full `node scripts/quality-gate.mjs`, self-test, privacy strict,
   validate/rebuild memory, Curated acceptance frozen fixture, ND security/network
   audits, all provider suites, factory suites, typecheck, production staging build.
 - [x] Dependency audit от 2026-11-01: обновить проверяемые patches Next/Sharp/
@@ -612,7 +612,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
   advisory GHSA-mrhx-c7xc-m3w5 и достижимость oversized collection path:
   sandbox получает только bounded host-authored config, model input не подаётся
   в его schemas. Не подменять несовместимой major-версией без проверки API.
-- [ ] Playwright desktop/mobile: native history, 5 provider settings, ready-only
+- [x] Playwright desktop/mobile: native history, 5 provider settings, ready-only
   selector, queue/steer, phase presets, attachments/annotation/quotes/activity,
   voice settings, agents credentials. Real auth unavailable → pending-live-check.
 - [ ] Strict candidate health: /voice, /agents, /task-chat, /codex, /settings,
@@ -2150,6 +2150,36 @@ unit child environment отдельно и изолировать оба aliases
   `11_agents/reports/2026-11-01-pritha-provider-convergence-deployment-report.md`.
   Сервисные действия ещё не разрешены и не выполнялись. Два ранее обсуждённых
   режима остаются открытыми, пока пользователь не изменил их scope.
+
+### Checkpoint 38 — Финальный автоматический gate и CLI instance paths
+
+- Полный quality gate **pass**, все 8 групп: env, privacy strict, Markdown,
+  rebuild, smoke, **1410/1410** unit, Agents Mother inspection, Telegram dry-run.
+  Skips **0**. Полный production browser run **161/161**, без повторной попытки
+  упавших assertion и без ослабления проверок.
+- Staging для `0c10dd0fd9c4dcf97489115887fc9b1023ef5e00`: strict **5 pages /
+  12 JS chunks**, точный build ID и health-contract commit verified, owned process
+  tree exited. Первый probe ошибочно сравнивал full SHA с documented 12-character
+  health SHA; проверочный скрипт исправлен по `api/health` и updater contract.
+  Это не сбой приложения; исходная failed receipt сохранена. Девять чужих
+  untracked файлов подтверждены по исходным hashes.
+- Read-only import preflight обнаружил, что новые CLI installer/Local configure
+  не загружали path-only runtime env. Без экспортированных переменных они могли
+  выбрать checkout fallback вместо canonical external state. Исправлены только
+  CLI entrypoints; library functions по-прежнему принимают явные isolated options.
+  Не загружаются auth keys, не выполняется autostart или импорт чужого runtime.
+- Targeted post-gate repair **15/15**: две новые actual CLI проверки с fixture
+  `.env.local`, importer/idempotence/isolation, owned Local OS boundaries и
+  bootstrap. Actual canonical read-only plan теперь указывает external
+  `agents/contracts`/`profiles`; live demo import не выдаётся за approved scaffold.
+- После этого commit private candidate receipt/build обновляются ещё раз;
+  неизменный UI browser suite не повторяется ради CLI-only правки. Final source
+  identity и staged health проверяются на новой сборке перед approval.
+- Пользователь явно выбрал **доделать оба режима в этой задаче**: Claude native
+  CLI session и external-provider voice factory creation. Они остаются обязательными;
+  экономия достигается организацией исполнения, а не переносом scope. Далее
+  controlled local activation и ручная приёмка. MacBook, GitHub и production
+  service не изменены.
 
 ## 7. Полные исходные материалы
 

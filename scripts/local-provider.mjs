@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {readFileSync} from 'node:fs';
 import {resolvePrithaRoot,resolvePrithaStateRoot} from './lib/paths.mjs';
+import {loadPrithaRuntimeEnv} from './lib/env.mjs';
 import {saveLocalServerConfiguration,readLocalServerConfiguration,startOwnedLocalServer} from './openai-compatible/owned-local-server.mjs';
 
 // Configuration is an explicit operator action. No install, model download,
@@ -9,7 +10,9 @@ try{
   const [action,...args]=process.argv.slice(2),flags={};
   if(args.length%2)throw new Error();
   for(let i=0;i<args.length;i+=2){if(!['--file','--base-url','--model'].includes(args[i]) || flags[args[i]])throw new Error();flags[args[i]]=args[i+1];}
-  const root=resolvePrithaRoot(),stateRoot=resolvePrithaStateRoot({root}),options={root,stateRoot};
+  const root=resolvePrithaRoot();
+  loadPrithaRuntimeEnv({root,pathOnly:true});
+  const stateRoot=resolvePrithaStateRoot({root}),options={root,stateRoot};
   if(action==='configure' && flags['--file'] && Object.keys(flags).length===1){
     const bytes=readFileSync(flags['--file']);if(bytes.length>64000)throw new Error();
     console.log(JSON.stringify({configured:true,...saveLocalServerConfiguration(options,JSON.parse(bytes))}));

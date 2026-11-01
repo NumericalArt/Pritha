@@ -407,7 +407,7 @@
       "path": "START_HERE.md",
       "source_sha256": "30af3a5441df48ad332fd8a2f3d303eeb6c75d3abc2b77992b5da7252613ae3e",
       "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
-      "target_sha256": "07e8c37f41964bb383d040efacb708667d3e0c2ddf1396220150d5ffbfe1f7b7"
+      "target_sha256": "42414ae7f055a7621d40388db86e3498ad1223b3a5fa2616a1695a1ec7c8e89f"
     },
     {
       "path": "scripts/audit-neuraldeep-secret-leaks.mjs",

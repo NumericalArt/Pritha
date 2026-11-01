@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
-import {prithaInstanceConfig,resolvePrithaAgentMemoryRoot} from './lib/paths.mjs';
+import {prithaInstanceConfig,resolvePrithaAgentMemoryRoot,resolvePrithaRoot} from './lib/paths.mjs';
+import {loadPrithaRuntimeEnv} from './lib/env.mjs';
 import {privateStateDirectory,privateStateFile} from './lib/private-state-path.mjs';
 import {atomicWriteFile,withFileLock} from './lib/atomic-file.mjs';
 import {agentInstanceKey} from './agents-mother/identity.mjs';
@@ -102,6 +103,9 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   try{
     const args=process.argv.slice(2);if(args.includes('--help'))console.log('node scripts/install-brief-desk.mjs --plan | --install\nImports a reviewed example with private draft artifacts; no Git, keys or services.');
     else if(args.length!==1||!['--plan','--install'].includes(args[0]))fail('brief_desk_explicit_action_required');
-    else console.log(JSON.stringify(installBriefDesk({plan:args[0]==='--plan'}),null,2));
+    else {
+      loadPrithaRuntimeEnv({root:resolvePrithaRoot(),pathOnly:true});
+      console.log(JSON.stringify(installBriefDesk({plan:args[0]==='--plan'}),null,2));
+    }
   }catch(error){console.error(JSON.stringify({ok:false,error:error.code?.startsWith('brief_desk_')?error.code:'brief_desk_import_failed'}));process.exitCode=1;}
 }

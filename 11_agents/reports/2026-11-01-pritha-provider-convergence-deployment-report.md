@@ -31,15 +31,20 @@ receipts are private under the instance state root.
 
 ## Prepared evidence
 
-- Local candidate baseline: `f9749a55918c2a410237869a76d6325ca801f4b7`.
-  Subsequent bootstrap repair must be committed and the candidate identity
-  refreshed before activation; this hash is not a claim about later changes.
-- Self-test: 1408/1408, no warnings/regressions. Targeted bootstrap repair: 13/13.
-- Full browser run: 159/160; one read-only voice-status ECONNRESET. Unchanged
-  Voice suite then passed 5/5; Voice plus new strict candidate health passed 6/6.
-  The original failure remains recorded. Final browser gate remains required.
+- Tested candidate baseline: `0c10dd0fd9c4dcf97489115887fc9b1023ef5e00`.
+  The subsequent CLI path repair has a separate 15/15 targeted gate. Final exact
+  local commit/build identity is recorded in the private preparation receipt
+  after staging is refreshed; activation must match that receipt.
+- Full quality gate: all eight check groups passed, including 1410/1410 unit
+  tests and zero skips. Self-test: 1408/1408, no warnings/regressions. Targeted
+  bootstrap repair: 13/13; subsequent instance-path CLI repair: 15/15.
+- Final full browser run: **161/161**. The earlier 159/160 run and one read-only
+  voice-status ECONNRESET remain recorded; no assertion or retry policy changed.
 - Real production staging copied into an isolated `.next`: 5 pages and 12
   referenced JS chunks passed; all owned probe processes exited.
+  An initial probe compared the full source SHA to the health contract's
+  12-character SHA; its checker was corrected to the actual contract and the
+  exact expected prefix verified. The original failed probe is retained.
 - Synthetic credential audit 18/18 and real OS/network boundary audit 67/67,
   zero skips. No real credentials or paid provider requests used by these audits.
 - Fresh Local bootstrap passed through real dependency installation, memory,
@@ -82,6 +87,10 @@ Rollback uses the managed lifecycle and retained matching build/source/dependenc
 materials; never kill arbitrary port listeners, run live builds, discard work,
 clear ambiguous receipts or install a watchdog. Verify recovery health before
 reporting recovery. State-name migration has its own verified reverse operation.
+Before any source rollback, require a clean tracked checkout and retained
+candidate commit. Restore the previous Git revision without deleting the nine
+untracked files; match its lockfile to the prepared previous dependencies and
+build. Never label an old build on mismatched source/dependencies as recovered.
 
 ## Manual acceptance script
 
@@ -110,8 +119,13 @@ provider billing, local model compatibility or user acceptance.
 ## Remaining limits
 
 - Claude local CLI session authentication and external-provider voice creation
-  are not yet implemented. They remain in scope unless the operator explicitly
-  agrees to defer them. Claude API and five factory build executors already exist.
+  are not yet implemented. The operator explicitly chose to finish both in this
+  task. Claude API and five factory build executors already exist.
+  Official [authentication](https://code.claude.com/docs/en/authentication) and
+  [credential-use](https://code.claude.com/docs/en/legal-and-compliance) documentation
+  was rechecked on 2026-11-01: a native session must use the unmodified CLI and
+  Anthropic's own sign-in flow; Pritha must not collect or intermediate its OAuth
+  credentials. The API-key proxy is not evidence that this separate lane works.
 - No real local engine/model is installed for this acceptance run; its selection
   and live proof are pending. Synthetic owned-model tests passed.
 - Unsupported image formats/providers remain visibly gated, rather than silently
