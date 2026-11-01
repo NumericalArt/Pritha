@@ -82,6 +82,10 @@ agents/registry.md
 releases/
 ```
 
+Existing `techscope.sqlite` remains readable. The optional, offline filename
+migration and its recovery commands are documented in
+[Pritha state filename migration](pritha-state-filename-migration.md).
+
 Tracked `11_agents/` is historical shared knowledge, not a live registry. A
 local artifact can enter shared knowledge only through explicit review and
 `node scripts/pritha-promote.mjs plan` followed by an approved apply.

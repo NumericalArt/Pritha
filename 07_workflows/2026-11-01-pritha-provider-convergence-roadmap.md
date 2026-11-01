@@ -524,17 +524,17 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
    - [x] При двух разных файлах не выбирать по mtime и не сливать автоматически:
      показать конфликт и остановить запись до явного выбора источника.
      Даже «одинаковые сейчас» копии не должны стать двумя writable truth sources.
-   - [ ] Подготовить read-only migration plan, private manifest, backup и
+   - [x] Подготовить read-only migration plan, private manifest, backup и
      bounded transaction с lock, проверкой source fingerprint и destination
      no-clobber. Повторный запуск идемпотентен; interruption оставляет понятный
      recovery state, а не partly switched paths.
-   - [ ] SQLite переносить согласованным snapshot/backup API с учётом WAL/SHM,
+   - [x] SQLite переносить согласованным snapshot/backup API с учётом WAL/SHM,
      integrity check и отсутствия конкурирующих writers; не делать raw rename
      живой БД. Проверить schema, FTS, relations, embedding dimensions/counts,
      semantic status и authored document identities до/после.
-   - [ ] Setup переносит version/profile/warnings/pointers без secrets в tracked
+   - [x] Setup переносит version/profile/warnings/pointers без secrets в tracked
      report. Проверить permissions, symlinks, path traversal и external state-root.
-   - [ ] Rollback восстанавливает исходные bytes/path selection из manifest;
+   - [x] Rollback восстанавливает исходные bytes/path selection из manifest;
      никакого удаления исходного state до успешной приёмки. Проверить startup
      предыдущего кода на сохранённом состоянии без рассинхронизации записей.
    - **Тесты:** fresh/legacy/external layouts, dual-file conflict, corrupt source,
@@ -1221,6 +1221,42 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   manifest/barrier, fault injection/retry/rollback и current-runtime name guard
   остаются обязательными следующими шагами. На живом экземпляре файлы не
   переносились. Сервисы, MacBook и GitHub не изменялись; исходная цель продолжается.
+
+### Checkpoint реализации 16 — Offline перенос имён и восстановление
+
+- `scripts/pritha-state-migrate.mjs` предоставляет read-only plan/status и
+  explicit apply/rollback. Plan закрепляет source fingerprints и выбор при
+  dual-file конфликте. Применение требует тот же hash и `--yes`; path-only env
+  loading выбирает экземпляр, не загружая provider credentials в migration worker.
+- До записи проверяются execution leases, managed launchd state, port ownership,
+  runtime PIDs и открытые исходные файлы. Неизвестный статус службы блокирует
+  перенос. Никаких автоматических stop/drain/lease cleanup нет. Read-only план
+  реального Mac mini подтвердил `managed_runtime_loaded`, поэтому не готов
+  к применению; реальное состояние не переносилось.
+- OS lock, private manifest/barrier и проверенные backups обеспечивают recovery.
+  SQLite snapshot строится из отдельной рабочей копии всей семьи DB/WAL/SHM;
+  неизменяемые backups и исходные retired files остаются. No-clobber публикация
+  сохраняет данные, а barrier снимается последним. Повтор продолжает закреплённую
+  операцию либо возвращает `already_complete`. Неудачная подготовка также имеет
+  понятный status и допускает rollback.
+- Rollback восстанавливает исходные имена, bytes, inode, permissions и mtime,
+  включая оба исходника dual-file конфликта. Новые записи после миграции блокируют
+  rollback. Проверки при recovery отвергают redirects, чужие hardlinks,
+  повреждённый manifest и иной instance root. Backup cleanup не выполняется.
+- **29/29** Python transaction cases проходят через Node suite: fault injection
+  на retire/publish/commit/rollback, реальная аварийная остановка subprocess после
+  publication link, незавершённая SQLite working copy, WAL committed rows, FTS,
+  relations, binary embeddings, повтор/откат, source changes, locks и layouts.
+  **5/5** CLI tests проверяют план, explicit hash/yes, service/lease refusal,
+  sanitization и recovery. **20/20** existing reader/runtime tests также прошли.
+  Полный unit suite: **1109/1109**, без skipped/failed; Markdown integrity pass.
+- Процедура и ограничения описаны в
+  `docs/pritha-state-filename-migration.md`; SQLite evidence:
+  https://sqlite.org/backup.html и https://sqlite.org/wal.html,
+  проверено 2026-11-01, fixture runtime SQLite 3.51.0. Реальный перенос, semantic
+  gate установленного экземпляра и ручная приёмка остаются частью R12.
+  R11b.4 и исходные незавершённые этапы продолжаются; MacBook/GitHub/services
+  не изменялись.
 
 ## 7. Полные исходные материалы
 

@@ -43,7 +43,7 @@ def _inspect(boundary, file):
     _invalid()
 
 
-def resolve_pritha_state_file(kind, root=None, state_root=None, env=None):
+def inspect_pritha_state_files(kind, root=None, state_root=None, env=None):
     if kind not in ("memory", "setup"):
         raise PrithaStateFileError("pritha_state_kind_invalid", "Choose memory or setup state.")
     environment = os.environ if env is None else env
@@ -58,11 +58,18 @@ def resolve_pritha_state_file(kind, root=None, state_root=None, env=None):
     canonical_exists = _inspect(state, current)
     legacy_exists = _inspect(state, legacy) if legacy else False
     barrier = state / (".private" if local else "private") / "state-migration" / "active.json"
-    if _inspect(state, barrier):
+    return {"kind": kind, "root": code, "state_root": state, "current": current, "legacy": legacy,
+            "canonical_exists": canonical_exists, "legacy_exists": legacy_exists, "barrier": barrier,
+            "migration_pending": _inspect(state, barrier)}
+
+
+def resolve_pritha_state_file(kind, root=None, state_root=None, env=None):
+    value = inspect_pritha_state_files(kind, root, state_root, env)
+    if value["migration_pending"]:
         raise PrithaStateFileError("pritha_state_migration_pending", "A Pritha state migration needs recovery. Complete or roll back that migration before opening state.")
-    if canonical_exists and legacy_exists:
+    if value["canonical_exists"] and value["legacy_exists"]:
         raise PrithaStateFileError("pritha_state_conflict", f"Both Pritha and legacy {kind} files exist. Choose the source in a state migration plan; neither file was changed.")
-    return legacy if legacy_exists else current
+    return value["legacy"] if value["legacy_exists"] else value["current"]
 
 
 def resolve_pritha_memory_database(root=None, state_root=None, env=None):

@@ -38,6 +38,7 @@
     "pre-push-audit": "node scripts/pre-push-audit.mjs",
     "release-status": "node scripts/github-release-status.mjs",
     "instance": "node scripts/pritha-instance.mjs status",
+    "state:migrate": "node scripts/pritha-state-migrate.mjs plan",
     "fleet": "node scripts/pritha-fleet.mjs status",
     "promote-local": "node scripts/pritha-promote.mjs plan"
   }

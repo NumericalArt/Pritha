@@ -261,7 +261,7 @@ function listenerOwnership(record, listener = listenerPids()) {
 }
 
 function launchdStatus() {
-  if (!launchDomain) return { installed: existsSync(installedPlistPath), loaded: false, running: false, pid: null, error: "launchd_unavailable" };
+  if (!launchDomain || process.platform !== "darwin") return { installed: existsSync(installedPlistPath), loaded: false, running: false, pid: null, queryState: "not-applicable", error: "launchd_unavailable" };
   const result = run(launchctlBinary, ["print", serviceTarget]);
   const pidMatch = result.stdout.match(/^\s*pid\s*=\s*(\d+)\s*$/m);
   const stateMatch = result.stdout.match(/^\s*state\s*=\s*([^\n]+)$/m);
@@ -270,6 +270,7 @@ function launchdStatus() {
     loaded: result.ok,
     running: result.ok && (Boolean(pidMatch) || stateMatch?.[1]?.trim() === "running"),
     pid: pidMatch ? Number(pidMatch[1]) : null,
+    queryState: result.ok ? "loaded" : result.status === 113 && /could not find (?:specified )?service|not loaded|no such process/i.test(result.stderr || result.stdout) ? "not-loaded" : "unavailable",
     error: result.ok || !result.stderr ? null : result.stderr.slice(0, 240),
   };
 }
