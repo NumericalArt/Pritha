@@ -10,7 +10,7 @@ const SIGNALS = new Set(["SIGINT","SIGTERM"]);
 
 /** A private live pipe is the only control address. It cannot target a reused PID. */
 export async function spawnSupervisedCli(command, args, options = {}) {
-  const child = spawn(process.execPath,[HERE,"--supervise"],{
+  const child = spawn(process.execPath,[options.supervisorPath || HERE,"--supervise"],{
     cwd: options.cwd, env: options.env, detached: true,
     stdio: options.inherit ? ["inherit","inherit","inherit","pipe","pipe"] : ["pipe","pipe","pipe","pipe","pipe"],
   });
@@ -61,7 +61,7 @@ export async function spawnSupervisedCli(command, args, options = {}) {
     await options.beforeStart?.(initial);
     if(closed || control.destroyed)throw new Error("process_supervisor_control_lost");
     control.write(`${JSON.stringify({type:"start",nonce,command,args,inherit:options.inherit===true})}\n`);
-  } catch(error){control.destroy();await completion;throw error;}
+  } catch(error){control.destroy();const result=await completion;error.processTreeExited=result.processTreeExited;throw error;}
   finally{clearTimeout(timer);}
   return {child,completion,evidence,
     stop(signal="SIGTERM"){

@@ -9,7 +9,7 @@ const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('h
 const now=()=>new Date().toISOString();
 const model=/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/;
 const client=/^[A-Za-z0-9_-]{8,128}$/;
-const immutable=['chatId','connectorId','providerId','modelId','effortId','timeoutMs','workspacePath','workspace','capabilitySnapshot','stateIdentityHash','clientThreadId','createHash'];
+const immutable=['chatId','connectorId','providerId','modelId','effortId','timeoutMs','workspacePath','workspace','capabilitySnapshot','executionConfig','stateIdentityHash','clientThreadId','createHash'];
 const fail=(code,message='The saved task identity does not match this request.')=>new ChatHistoryError(code,message);
 
 /** Provider-owned transcripts share the reviewed bounded history engine, never native Codex history. */
@@ -21,6 +21,7 @@ export class ProviderChatRegistry {
     privateStateFile(stateRoot,`${databasePath}-wal`);privateStateFile(stateRoot,`${databasePath}-shm`);
     this.scope=digest([realpathSync(stateRoot),connectorId]);
     this.history=new NeuralDeepChatHistoryStore({databasePath,instanceScope:this.scope});
+    this.history.db.exec('CREATE TABLE IF NOT EXISTS provider_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,chat TEXT NOT NULL,record TEXT NOT NULL); CREATE INDEX IF NOT EXISTS provider_events_chat ON provider_events(chat,sequence);');
   }
   close(){this.history.close();}
   assertId(chatId){if(!new RegExp(`^chat_${this.connectorId}_[a-f0-9]{32}$`).test(chatId))throw fail('thread_not_found','Task Chat was not found.');}
@@ -44,7 +45,7 @@ export class ProviderChatRegistry {
         workspacePath:realpathSync(input.workspacePath),workspace:input.workspace || null,nativeThreadId:'',profileIdentity:null,stateIdentityHash:this.scope,
         title:String(input.title || 'New task chat').trim().slice(0,120),preview:'',createdAt:stamp,updatedAt:stamp,
         group:'my_chats',origin:'chat',continuationEnabled:true,pinned:false,archived:false,lastStatus:'idle',taskLinks:[],messageReceipts:{},turns:[],
-        capabilitySnapshot:input.capabilitySnapshot || null};
+        capabilitySnapshot:input.capabilitySnapshot || null,executionConfig:input.executionConfig || null};
       this.history.put(binding);return {binding:this.require(chatId),created:true};
     });
   }
@@ -84,4 +85,28 @@ export class ProviderChatRegistry {
   turnsPage(chatId,input={}){this.require(chatId);return this.history.turnsPage(chatId,input);}
   itemsPage(chatId,turnId,cursor,activity=false){this.require(chatId);return this.history.itemsPage(chatId,turnId,cursor,activity);}
   content(chatId,itemId,cursor){this.require(chatId);return this.history.content(chatId,itemId,cursor);}
+  appendEvent(chatId,event,payload={},refs={}){
+    this.require(chatId);
+    return this.history.transaction(()=>{
+      const record={event,data:{apiVersion:'1',eventId:'',occurredAt:now(),chatId,turnId:refs.turnId || null,itemId:refs.itemId || null,requestId:refs.requestId || null,payload}};
+      if(Buffer.byteLength(JSON.stringify(record))>256*1024)throw fail('provider_event_too_large');
+      const result=this.history.db.prepare('INSERT INTO provider_events(chat,record) VALUES(?,?)').run(chatId,JSON.stringify(record));
+      const id=Number(result.lastInsertRowid);record.data.eventId=`event_${this.connectorId}_${id}`;
+      this.history.db.prepare('UPDATE provider_events SET record=? WHERE sequence=?').run(JSON.stringify(record),id);
+      this.history.db.prepare('DELETE FROM provider_events WHERE sequence<=?').run(id-10000);
+      return record;
+    });
+  }
+  eventsAfter(chatId,eventId){
+    this.require(chatId);
+    if(!eventId)return {events:[],reset:false};
+    const match=new RegExp(`^event_${this.connectorId}_([0-9]+)$`).exec(eventId);
+    const id=Number(match?.[1]);
+    const found=Number.isSafeInteger(id) && this.history.db.prepare('SELECT chat FROM provider_events WHERE sequence=?').get(id);
+    if(!found || found.chat!==chatId)return {events:[],reset:true};
+    const rows=this.history.db.prepare('SELECT record FROM provider_events WHERE chat=? AND sequence>? ORDER BY sequence LIMIT 257').all(chatId,id);
+    if(rows.length>256)return {events:[],reset:true};
+    return {events:rows.map(row=>JSON.parse(row.record)),reset:false};
+  }
+  latestEventId(chatId){this.require(chatId);const row=this.history.db.prepare('SELECT record FROM provider_events WHERE chat=? ORDER BY sequence DESC LIMIT 1').get(chatId);return row ? JSON.parse(row.record).data.eventId : '';}
 }

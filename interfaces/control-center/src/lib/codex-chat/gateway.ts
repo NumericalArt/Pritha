@@ -1,4 +1,5 @@
 import { CodexAppServerDriver } from "./drivers/codex-app-server-driver";
+import { NeuralDeepDriver } from "./drivers/neuraldeep-driver";
 import { CodexChatGatewayError } from "./native-gateway";
 import type { CreateThreadInput, CreateThreadWithFirstTurnInput } from "./native-gateway";
 import type { TaskChatBackendDriver, TaskChatBackend, TaskProviderHealth } from "./driver-types";
@@ -13,6 +14,7 @@ export type { CreateThreadInput, StartTurnInput, CreateThreadWithFirstTurnInput 
 
 type Create = CreateThreadInput & { connectorId?: ProviderConnectorId };
 type CreateWithTurn = CreateThreadWithFirstTurnInput & { connectorId?: ProviderConnectorId };
+function defaultDrivers():TaskChatBackendDriver[] {const native=new CodexAppServerDriver();return [native,new NeuralDeepDriver(native.backend.attachments)];}
 
 /** HTTP/UI facade. Execution, native history and provider credentials live in drivers. */
 export class CodexChatGateway {
@@ -20,7 +22,7 @@ export class CodexChatGateway {
   private readonly activityMux: ProviderActivity;
   private readonly routes: ProviderThreadRouting;
   readonly attachments: TaskChatBackend["attachments"];
-  constructor(drivers: TaskChatBackendDriver[] = [new CodexAppServerDriver()], private readonly selection: () => ProviderConnectorId = () => getProviderSettings().activeConnectorId, routes?: ProviderThreadRouting) {
+  constructor(drivers: TaskChatBackendDriver[] = defaultDrivers(), private readonly selection: () => ProviderConnectorId = () => getProviderSettings().activeConnectorId, routes?: ProviderThreadRouting) {
     for (const driver of drivers) {
       if (!isProviderConnectorId(driver.connectorId) || this.drivers.has(driver.connectorId)) throw new CodexChatGatewayError("provider_registry_invalid", "The task provider registry needs repair.", 503);
       this.drivers.set(driver.connectorId, driver);

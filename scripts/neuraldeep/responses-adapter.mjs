@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { createRequire } from "node:module";
+import process from 'node:process';
 import { RESPONSES_REQUEST_LIMIT } from "./attachment-policy.mjs";
 import { classifyNeuralDeepProviderError, parseProviderErrorPayload, safeProviderRetryAfter } from "./provider-error.mjs";
 import { normalizeResponsesSse, responsesUsage, responsesSummary, responsesTerminalSummary, parseSseData } from "./responses-normalizer.mjs";
@@ -9,7 +9,11 @@ export { normalizeResponsesSse, responsesUsage } from "./responses-normalizer.mj
 import { requestDeadlineWindow } from './creation-execution-policy.mjs';
 import {normalizeModelExecutionRequest} from './model-execution-profile.mjs';
 
-const { Agent } = createRequire(new URL("../../interfaces/control-center/package.json", import.meta.url))("undici");
+function createDispatcher(options,timeout){
+  if(options.createDispatcher)return options.createDispatcher(timeout);
+  const {Agent}=process.getBuiltinModule('node:module').createRequire(new URL('../../interfaces/control-center/package.json',import.meta.url))('undici');
+  return new Agent({headersTimeout:timeout,bodyTimeout:timeout});
+}
 const DEFAULT_UPSTREAM = "https://api.neuraldeep.ru";
 const DEFAULT_REQUEST_LIMIT = RESPONSES_REQUEST_LIMIT;
 const DEFAULT_RESPONSE_LIMIT = 32 * 1024 * 1024;
@@ -150,7 +154,7 @@ export function createNeuralDeepAdapter(options = {}) {
     return `data: ${JSON.stringify(event)}\n\n`;
   }).join('') : options.transformResponsesStream;
   // Node fetch has separate 300-second header/body timers unless its dispatcher overrides them.
-  const dispatcher = options.fetchImpl ? undefined : new Agent({ headersTimeout: upstreamTimeoutMs, bodyTimeout: upstreamTimeoutMs });
+  const dispatcher = options.fetchImpl ? undefined : createDispatcher(options,upstreamTimeoutMs);
 
   const server = createServer(async (request, response) => {
     const startedAt = Date.now();

@@ -1,0 +1,139 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { ProviderTaskRuntime } from '../scripts/lib/provider-task-runtime.mjs';
+
+const session='11111111-2222-4333-8444-555555555555',identity='a'.repeat(64);
+const message=(id,text=id)=>({clientMessageId:id,input:[{type:'text',text}]});
+const create=(id='test_thread_0001')=>({clientThreadId:id,source:'chat'});
+async function until(predicate){for(let i=0;i<200;i++){if(await predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail('Fixture state did not settle');}
+function fixture(t,options={}){
+  const directory=mkdtempSync(path.join(tmpdir(),'pritha-task-runtime-')),root=path.join(directory,'source'),stateRoot=path.join(directory,'state');mkdirSync(root);mkdirSync(stateRoot);
+  const runs=[],instances=[];
+  const launch=async input=>{
+    await input.beforeStart({identity,evidence:{schema:1,fixture:true}});
+    await input.onRawChunk(Buffer.from('{"type":"private.fixture"}\n'));
+    await input.onEvent({type:'thread.started',thread_id:session});
+    let resolve;
+    const completion=new Promise(done=>{resolve=done;});
+    const run={input,resolve,completion,stop(){resolve({ok:false,errorCode:'operator_cancel',processTreeExited:true});return true;}};
+    runs.push(run);return run;
+  };
+  const settings={modelId:'test-model',reasoningEffort:'low',timeoutMs:30000,sandbox:'read-only'};
+  const make=(connectorId='neuraldeep',override={})=>{
+    const runtime=new ProviderTaskRuntime({root,stateRoot,privateRoot:path.join(stateRoot,'private','task-chat'),executionDirectory:path.join(stateRoot,'codex-chat','execution'),connectorId,
+      configuration:()=>settings,preflight:async()=>({steer:false,interrupt:true}),launch,
+      normalizeEvent:(active,event)=>({item:{id:'item_'+active.turnId,kind:'assistant_message',status:'completed',startedAt:null,completedAt:null,message:{id:'item_'+active.turnId,role:'assistant',markdown:event.item.text,status:'completed',createdAt:new Date().toISOString()}},originalText:event.item.text}),...options,...override});
+    instances.push(runtime);return runtime;
+  };
+  t.after(async()=>{for(const runtime of instances)await runtime.dispose();rmSync(directory,{recursive:true,force:true});});
+  return {make,runs,settings,stateRoot};
+}
+
+test('external turns retain exact creation/model/session and replay the accepted receipt across workers',async t=>{
+  const f=fixture(t),a=f.make(),b=f.make();
+  const {binding}=await a.create(create()),chat=binding.chatId;
+  const first=await a.start(chat,message('message_first_1','Полный исходный запрос 🐉'));
+  await until(()=>f.runs.length===1);
+  f.settings.modelId='a-new-default';
+  assert.equal((await b.create(create())).binding.modelId,'test-model');
+  assert.equal((await b.start(chat,message('message_first_1','Полный исходный запрос 🐉'))).replayed,true);
+  assert.equal(f.runs.length,1);
+  await assert.rejects(b.start(chat,message('message_first_1','Changed')),{code:'idempotency_conflict'});
+  await assert.rejects(b.start(chat,{...message('message_first_2'),settings:{modelId:'a-new-default'}}),{code:'runtime_identity_mismatch'});
+  await f.runs[0].input.onEvent({type:'item.completed',item:{text:'Ответ '.repeat(5000)}});
+  f.runs[0].resolve({ok:true,processTreeExited:true,usage:{input_tokens:4,output_tokens:3}});
+  await until(()=>a.registry.turn(chat,first.accepted.turn.turnId).status==='completed');
+  const second=await b.start(chat,message('message_second_1'));
+  await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.resume,session);assert.equal(f.runs[1].input.model,'test-model');
+  assert.equal(f.runs[1].input.privateRoot,path.join(f.stateRoot,'private','task-chat','neuraldeep'));
+  const journals=readdirSync(path.join(f.stateRoot,'private','task-chat','neuraldeep','attempts'));
+  assert.equal(journals.length,2);assert.match(readFileSync(path.join(f.stateRoot,'private','task-chat','neuraldeep','attempts',journals[0]),'utf8'),/private.fixture/);
+  assert.notEqual(second.accepted.turn.turnId,first.accepted.turn.turnId);
+});
+
+test('providers use the same admission capacity, workspace claims and managed drain',async t=>{
+  const f=fixture(t),nd=f.make(),claude=f.make('claude');
+  nd.execution.setAdmission(true,1);
+  const n=(await nd.create(create())).binding.chatId,c=(await claude.create(create())).binding.chatId;
+  await nd.start(n,message('capacity_message_1'));await until(()=>f.runs.length===1);
+  await assert.rejects(claude.start(c,message('capacity_message_2')),{code:'turn_active'});
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>nd.active.size===0);
+  const holder=nd.execution.claim(['workspace:'+nd.root],'native-fixture',{kind:'turn',mode:'write'});
+  nd.execution.setAdmission(true,3);
+  await assert.rejects(claude.start(c,message('capacity_message_2')),{code:'workspace_busy'});
+  holder.release();nd.execution.setAdmission(false);
+  await assert.rejects(claude.start(c,message('capacity_message_2')),{code:'execution_draining'});
+  assert.equal(f.runs.length,1);
+});
+
+test('queue ordering, cancellation revisions and dispatch receipts remain exact across workers',async t=>{
+  const f=fixture(t),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId;
+  await a.start(chat,message('queue_running_1'));await until(()=>f.runs.length===1);
+  const first=(await b.enqueue(chat,message('queued_first_1')))[0];
+  await b.enqueue(chat,message('queued_second_1'));
+  await assert.rejects(a.cancelQueued(chat,first.id,first.revision+1),{code:'execution_revision_conflict'});
+  await a.cancelQueued(chat,first.id,first.revision);
+  assert.equal((await b.enqueue(chat,message('queued_second_1'))).length,1);
+  await assert.rejects(b.enqueue(chat,message('queued_second_1','Changed')),{code:'idempotency_conflict'});
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);
+  await b.drainQueue(chat);await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.prompt,'queued_second_1');assert.equal(b.queued(chat).length,0);
+  assert.equal((await b.start(chat,message('queued_second_1'))).replayed,true);assert.equal(f.runs.length,2);
+});
+
+test('unknown process exit fences workspace and retry while interrupted turns never drain their queue',async t=>{
+  const f=fixture(t),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId;
+  const result=await a.start(chat,message('unknown_message_1'));await until(()=>f.runs.length===1);
+  await b.enqueue(chat,message('unknown_queued_1'));
+  f.runs[0].resolve({ok:true,processTreeExited:false});await until(()=>a.active.size===0);
+  assert.equal(b.registry.turn(chat,result.accepted.turn.turnId).error.code,'provider_process_exit_unconfirmed');
+  assert.equal(b.activeIntent(chat).state,'unknown');assert.ok(b.execution.claims().length>0);
+  assert.equal((await b.start(chat,message('unknown_message_1'))).replayed,true);
+  await assert.rejects(b.start(chat,message('unknown_message_2')),{code:'turn_active'});
+  await b.drainQueue(chat);assert.equal(f.runs.length,1);
+});
+
+test('cross-worker Stop addresses the exact turn and SSE history survives dispatcher loss',async t=>{
+  const f=fixture(t),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId;
+  const events=[],unsubscribe=b.subscribe(chat,event=>events.push(event));t.after(unsubscribe);
+  const {accepted}=await a.start(chat,message('stop_message_1'));await until(()=>f.runs.length===1);
+  await until(()=>a.execution.getIntent('execution-channel:provider-control:'+chat)?.state==='available');
+  await assert.rejects(b.control(chat,{action:'interrupt',expectedTurnId:'another_turn',clientMessageId:'wrong_stop_1'}),{code:'control_turn_changed'});
+  await b.enqueue(chat,message('stop_queued_1'));
+  await b.control(chat,{action:'interrupt',expectedTurnId:accepted.turn.turnId,clientMessageId:'valid_stop_1'});
+  await until(()=>a.active.size===0);
+  assert.equal(a.registry.turn(chat,accepted.turn.turnId).status,'interrupted');
+  assert.equal((await b.control(chat,{action:'interrupt',expectedTurnId:accepted.turn.turnId,clientMessageId:'valid_stop_1'})).replayed,true);
+  await b.drainQueue(chat);assert.equal(f.runs.length,1);
+  await until(()=>events.some(event=>event.event==='turn.interrupted'));
+  assert.ok(b.registry.eventsAfter(chat,events[0].data.eventId).events.some(event=>event.event==='turn.interrupted'));
+  assert.equal(b.execution.claims().filter(row=>row.kind==='turn').length,0);
+});
+
+test('provider parallel slots supplement global capacity and release only after confirmed exit',async t=>{
+  const f=fixture(t,{preflight:async()=>({steer:false,parallelLimit:1})}),a=f.make(),b=f.make();
+  a.execution.setAdmission(true,4);
+  const one=(await a.create(create('parallel_thread_1'))).binding.chatId,two=(await b.create(create('parallel_thread_2'))).binding.chatId;
+  await a.start(one,message('parallel_message_1'));await until(()=>f.runs.length===1);
+  await assert.rejects(b.start(two,message('parallel_message_2')),{code:'provider_rate_limited'});
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);
+  await b.start(two,message('parallel_message_2'));await until(()=>f.runs.length===2);
+});
+
+test('recovery proves process exit before freeing a stale claim and never restarts an interrupted request',async t=>{
+  let exited=false;
+  const f=fixture(t,{proveExit:()=>exited}),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId;
+  const first=await a.start(chat,message('recovery_message_1'));await until(()=>f.runs.length===1);
+  await b.enqueue(chat,message('recovery_queued_1'));
+  f.runs[0].resolve({ok:false,processTreeExited:false});await until(()=>a.active.size===0);
+  b.reconcile(chat);assert.equal(b.activeIntent(chat).state,'unknown');
+  exited=true;b.reconcile(chat);
+  assert.equal(b.activeIntent(chat),null);assert.equal(b.execution.claims().length,0);
+  assert.equal(b.registry.turn(chat,first.accepted.turn.turnId).status,'interrupted');
+  assert.equal((await b.start(chat,message('recovery_message_1'))).replayed,true);
+  await b.drainQueue(chat);assert.equal(f.runs.length,1);assert.equal(b.queued(chat).length,1);
+});

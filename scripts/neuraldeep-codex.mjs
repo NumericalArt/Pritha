@@ -12,6 +12,7 @@ import { readProviderCredential } from './lib/provider-credential.mjs';
 import { providerProcessEnvironment, createProviderTemporaryDirectory } from './lib/provider-process-environment.mjs';
 import { privateStateDirectory } from './lib/private-state-path.mjs';
 import { resolvePrithaPython } from './lib/python-runtime.mjs';
+import { inspectProviderCliSession } from './neuraldeep/native-history-proof.mjs';
 
 const fail=(code,message='The selected NeuralDeep runtime could not complete this task.')=>Object.assign(new Error(message),{code});
 const modelPattern=/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/;
@@ -46,7 +47,7 @@ export function buildCodexExecArgs(options){
   };
   const effort=effectiveNeuralDeepEffort(options.model,options.effort);
   if(effort)config.model_reasoning_effort=effort;
-  const context=neuralDeepExecutionProfile(options.model).declaredContextTokens;
+  const context=Number.isSafeInteger(options.modelContextTokens) && options.modelContextTokens>0 ? options.modelContextTokens : neuralDeepExecutionProfile(options.model).declaredContextTokens;
   if(context)config.model_context_window=context;
   const args=['exec',...(options.resume?['resume']:[]),'--json','--strict-config','--ignore-user-config','--ignore-rules','--skip-git-repo-check','-m',options.model];
   for(const [key,value] of Object.entries(config))args.push('-c',`${key}=${toml(value)}`);
@@ -67,6 +68,10 @@ export async function startNeuralDeepRun(options,dependencies={}){
   const key=(dependencies.readCredential || readProviderCredential)('neuraldeep',{stateRoot,env:options.env || process.env});
   if(!key)throw fail('provider_pending_auth','Connect NeuralDeep in Settings before starting a task.');
   const codexHome=privateStateDirectory(stateRoot,path.join(privateRoot,'codex-home'));
+  if(options.resume){
+    const proof=(dependencies.inspectSession || inspectProviderCliSession)({stateRoot,codexHome,cwd,provider:'neuraldeep',sessionId:options.resume,model:options.model});
+    if(!proof.available)throw fail(proof.code,'The original provider session could not be verified. Its private files have been preserved.');
+  }
   const temporary=createProviderTemporaryDirectory({provider:'neuraldeep',stateRoot,temporaryRoot:options.temporaryRoot});
   const localToken=randomBytes(32).toString('base64url');
   const grace=Math.max(1,Math.min(30000,Math.floor(options.timeoutMs/10))),window=options.timeoutMs-grace,now=Date.now();
@@ -78,9 +83,11 @@ export async function startNeuralDeepRun(options,dependencies={}){
   let timer;
   try{
     server=await (dependencies.listenAdapter || listenNeuralDeepAdapter)({port:0,localToken,upstreamAuthorization:`Bearer ${key}`,deadline,providerRetryAttempts:1,responsesOnly:true,
+      createDispatcher:dependencies.createDispatcher,
       ...(dependencies.fetchImpl ? {fetchImpl:dependencies.fetchImpl} : {}),
       validateResponsesRequest(payload){if(payload.model!==options.model)throw fail('neuraldeep_model_identity_mismatch');},
-      prepareResponsesRequest(payload){const cap=neuralDeepExecutionProfile(options.model).applicationOutputCap;return {...payload,max_output_tokens:Math.min(Number.isSafeInteger(payload.max_output_tokens) && payload.max_output_tokens>0 ? payload.max_output_tokens : cap,cap)};},
+      prepareResponsesRequest(payload){const declared=Number.isSafeInteger(options.maxOutputTokens) && options.maxOutputTokens>0?options.maxOutputTokens:Infinity;
+        const cap=Math.min(declared,neuralDeepExecutionProfile(options.model).applicationOutputCap);return {...payload,max_output_tokens:Math.min(Number.isSafeInteger(payload.max_output_tokens) && payload.max_output_tokens>0 ? payload.max_output_tokens : cap,cap)};},
       beforeResponsesDispatch:options.beforeRequest,
       onRequest:event=>{if(event.error)providerError=event.error;options.onProviderRequest?.(event);},
     });
@@ -88,7 +95,7 @@ export async function startNeuralDeepRun(options,dependencies={}){
     const env=providerProcessEnvironment({provider:'neuraldeep',root,stateRoot,codexHome,temporary,env:options.env || process.env});
     env.PRITHA_PROVIDER_CAPABILITY=localToken;
     env.PRITHA_PYTHON=resolvePrithaPython({root,env:options.env || process.env});
-    owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(options.codexBin || 'codex',args,{cwd,env,beforeStart:async evidence=>{
+    owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(options.codexBin || 'codex',args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),beforeStart:async evidence=>{
       if(options.signal?.aborted)throw fail('operator_cancel');
       await options.beforeStart?.({identity,evidence,codexHome,model:options.model,resume:options.resume || null});
     },onEvidence:options.onEvidence});
@@ -129,7 +136,8 @@ export async function startNeuralDeepRun(options,dependencies={}){
     return {completion,stop:()=>closed?false:stop('operator_cancel'),identity};
   }catch(error){
     clearTimeout(timer);options.signal?.removeEventListener('abort',abort);owned?.stop();if(owned)verifiedExit=(await owned.completion).processTreeExited===true;
-    await closeNeuralDeepAdapter(server);if(!owned || verifiedExit)rmSync(temporary,{recursive:true,force:true});throw error;
+    error.processTreeExited=owned ? verifiedExit : error.processTreeExited!==false;
+    await closeNeuralDeepAdapter(server);if(error.processTreeExited)rmSync(temporary,{recursive:true,force:true});throw error;
   }
 }
 

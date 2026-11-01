@@ -222,7 +222,7 @@ export class CodexChatGateway {
   async activity(after = 0) {
     this.scheduleQueues();
     void import("../realtime/pritha-runtime").then(runtime=>runtime.wakeVoiceAdmissions()).catch(()=>undefined);
-    const active = this.store.execution.listIntents({kind:"turn",states:["dispatching","running","unknown"],limit:1000});
+    const active = this.store.execution.listIntents({kind:"turn",states:["dispatching","running","unknown"],limit:1000}).filter(row=>!row.connectorId || row.connectorId==="codex");
     if (!this.activityRefresh && Date.now() - this.activityRefreshAt > 5_000) {
       this.activityRefreshAt = Date.now();
       const pendingVoice=this.store.execution.listIntents({kind:"voice-turn",states:["dispatching","running","unknown"],limit:1000});
@@ -247,7 +247,7 @@ export class CodexChatGateway {
       capacity: this.store.execution.admission().capacity,
       counts:{
         active:new Set(this.store.execution.claims().filter(row=>row.kind==="turn").map(row=>row.owner)).size,
-        queued:this.store.execution.listIntents({kind:"queued-message",states:["queued"],limit:1000}).length+this.store.execution.listIntents({kind:"voice-admission",states:["queued"],limit:1000}).length,
+        queued:this.store.execution.listIntents({kind:"queued-message",states:["queued"],limit:1000}).length+this.store.execution.listIntents({kind:"provider-queued-message",states:["queued"],limit:1000}).length+this.store.execution.listIntents({kind:"voice-admission",states:["queued"],limit:1000}).length,
         waitingForOperator:this.store.execution.listIntents({kind:"voice-workflow",states:["waiting_for_operator"],limit:1000}).length,
         unknown:this.store.execution.listIntents({states:["unknown"],limit:1000}).length,
       },

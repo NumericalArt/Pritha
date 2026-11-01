@@ -33,7 +33,7 @@ function fakeSupervisor(capture,{resumeId=session,wrongModel=false,wait=false,tr
 test('owned runner pins model, isolates credentials, records request usage and preserves exact resume',async t=>{
   const options=fixture(t),capture={},events=[],requests=[];let authorized=false;
   const run=await startNeuralDeepRun({...options,resume:session,env:{...process.env,OPENAI_API_KEY:'FOREIGN_SECRET_CANARY',ANTHROPIC_API_KEY:'FOREIGN_SECRET_CANARY'},beforeStart:receipt=>{assert.equal(receipt.model,options.model);authorized=true;},onEvent:event=>events.push(event),onProviderRequest:event=>requests.push(event)},
-    {readCredential:()=> 'UPSTREAM_SECRET_CANARY',fetchImpl:async(_url,init)=>{assert.equal(authorized,true);assert.equal(init.headers.get('authorization'),'Bearer UPSTREAM_SECRET_CANARY');return providerResponse();},spawnSupervised:fakeSupervisor(capture)});
+    {inspectSession:()=>({available:true}),readCredential:()=> 'UPSTREAM_SECRET_CANARY',fetchImpl:async(_url,init)=>{assert.equal(authorized,true);assert.equal(init.headers.get('authorization'),'Bearer UPSTREAM_SECRET_CANARY');return providerResponse();},spawnSupervised:fakeSupervisor(capture)});
   const result=await run.completion;assert.equal(result.ok,true);assert.equal(result.sessionId,session);assert.equal(result.model,options.model);
   assert.deepEqual(result.usage,{input_tokens:4,output_tokens:2});assert.equal(requests.length,1);assert.equal(requests[0].usage.totalTokens,6);
   assert.doesNotMatch(JSON.stringify(capture.options.env)+JSON.stringify(capture.args),/UPSTREAM_SECRET_CANARY|FOREIGN_SECRET_CANARY/);
@@ -45,7 +45,7 @@ test('owned runner pins model, isolates credentials, records request usage and p
 test('wrong session and provider-side model drift fail without changing provider',async t=>{
   for(const mode of ['session','model']){
     const options=fixture(t),capture={};let calls=0;
-    const run=await startNeuralDeepRun({...options,resume:session},{readCredential:()=> 'KEY_CANARY',fetchImpl:async()=>{calls++;return providerResponse();},spawnSupervised:fakeSupervisor(capture,{resumeId:mode==='session'?'87654321-4321-4321-4321-210987654321':session,wrongModel:mode==='model'})});
+    const run=await startNeuralDeepRun({...options,resume:session},{inspectSession:()=>({available:true}),readCredential:()=> 'KEY_CANARY',fetchImpl:async()=>{calls++;return providerResponse();},spawnSupervised:fakeSupervisor(capture,{resumeId:mode==='session'?'87654321-4321-4321-4321-210987654321':session,wrongModel:mode==='model'})});
     const result=await run.completion;assert.equal(result.ok,false);
     if(mode==='session')assert.equal(result.errorCode,'runtime_identity_mismatch');else{assert.equal(calls,0);assert.equal(result.providerError.code,'neuraldeep_model_identity_mismatch');}
   }
@@ -64,4 +64,14 @@ test('credentials, unsafe sandbox and unverified images fail without stock CLI e
   assert.equal(starts,0);
   assert.throws(()=>buildCodexExecArgs({...options,baseUrl:'http://127.0.0.1:12345/v1',sandbox:'danger-full-access'}),{code:'provider_sandbox_invalid'});
   assert.throws(()=>buildCodexExecArgs({...options,baseUrl:'http://127.0.0.1:12345/v1',images:['/fixture/image.png']}),{code:'model_image_unverified'});
+});
+
+test('a missing resume proof prevents execution and an unconfirmed supervisor failure retains scratch',async t=>{
+  const options=fixture(t);let starts=0,temporary;
+  await assert.rejects(startNeuralDeepRun({...options,resume:session},{readCredential:()=> 'KEY',spawnSupervised:()=>{starts++;}}),{code:'provider_session_missing'});
+  assert.equal(starts,0);
+  await assert.rejects(startNeuralDeepRun(options,{readCredential:()=> 'KEY',fetchImpl:async()=>providerResponse(),spawnSupervised:async(_command,_args,options)=>{
+    temporary=options.env.TMPDIR;throw Object.assign(new Error('unconfirmed supervisor'),{processTreeExited:false});
+  }}),error=>error.processTreeExited===false);
+  assert.equal(existsSync(temporary),true);
 });

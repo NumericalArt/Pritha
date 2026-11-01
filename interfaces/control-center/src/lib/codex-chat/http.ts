@@ -3,6 +3,8 @@ import { HistoryError } from "./history-reader";
 import { randomUUID } from "node:crypto";
 import { CodexChatGatewayError } from "./gateway";
 import { AttachmentError } from "./attachment-store";
+import { ProviderTaskError } from "../../../../../scripts/lib/provider-task-runtime.mjs";
+import { ChatHistoryError } from "../../../../../scripts/neuraldeep/chat-history-store.mjs";
 import type { ApiErrorEnvelope, ApiSuccess } from "./types";
 
 const JSON_BODY_LIMIT = 256 * 1024;
@@ -22,7 +24,7 @@ export function apiSuccess<T>(data: T, options: { status?: number; replayed?: bo
 
 export function apiError(error: unknown) {
   const requestId = randomUUID();
-  const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError || error instanceof HistoryError;
+  const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError || error instanceof HistoryError || error instanceof ProviderTaskError || error instanceof ChatHistoryError;
   const registryCorrupt = !known && (error as { code?: unknown } | null)?.code === "codex_chat_registry_corrupt";
   const executionConflict = error instanceof ExecutionConflict;
   const status = known ? error.status : executionConflict ? 409 : registryCorrupt ? 503 : 500;
@@ -37,7 +39,7 @@ export function apiError(error: unknown) {
           : registryCorrupt
           ? "Task Chat history bindings are read-only until the private registry is recovered."
           : "Task Chat encountered an internal error.",
-      retryable: known ? error.retryable : registryCorrupt,
+      retryable: known ? 'retryable' in error && error.retryable === true : registryCorrupt,
       requestId,
       ...(error instanceof CodexChatGatewayError && error.details ? { details: error.details } : {}),
     },

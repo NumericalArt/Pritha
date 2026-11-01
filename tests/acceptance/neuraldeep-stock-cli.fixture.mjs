@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { appendFileSync,mkdtempSync,mkdirSync,rmSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { startNeuralDeepRun } from '../../scripts/neuraldeep-codex.mjs';
 
 test('installed stock Codex CLI starts and resumes through the protected NeuralDeep adapter with synthetic responses',{timeout:60000},async t=>{
@@ -13,7 +14,7 @@ test('installed stock Codex CLI starts and resumes through the protected NeuralD
   t.after(()=>{if(verifiedExit)rmSync(root,{recursive:true,force:true});});
   for(const iteration of [0,1]){
     const events=[];
-    const run=await startNeuralDeepRun({root:code,cwd:code,stateRoot:state,privateRoot:path.join(state,'private','neuraldeep'),temporaryRoot:root,
+    const run=await startNeuralDeepRun({root:fileURLToPath(new URL('../../',import.meta.url)),cwd:code,stateRoot:state,privateRoot:path.join(state,'private','neuraldeep'),temporaryRoot:root,
       model:'qwen3.8-27b',effort:'xhigh',timeoutMs:25000,sandbox:'read-only',resume:sessionId,
       prompt:'Reply exactly FIXTURE_OK. Do not run tools.',onEvent:event=>events.push(event),
       onDiagnosticChunk:chunk=>appendFileSync(path.join(state,'fixture-diagnostics.log'),chunk,{mode:0o600}),

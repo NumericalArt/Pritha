@@ -1,6 +1,6 @@
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import process from 'node:process';
 import { neuralDeepRuntimeIdentity } from "./runtime-identity.mjs";
 import { privateStateFile } from '../lib/private-state-path.mjs';
 
@@ -54,14 +54,21 @@ export function estimateWalletCost(usageValue, price) {
   return ((uncachedInput * inputRate) + (usage.cachedInputTokens * effectiveCachedRate) + (usage.outputTokens * outputRate)) / 1_000_000;
 }
 
-export function neuralDeepUsageLedgerPath(stateRoot) {
-  return path.join(path.resolve(stateRoot), "private", "neuraldeep", "neuraldeep-usage.sqlite");
+export function neuralDeepUsageLedgerPath(stateRoot,privateRoot=path.join(path.resolve(stateRoot),'private','neuraldeep')) {
+  return path.join(privateRoot, "neuraldeep-usage.sqlite");
 }
 
-function openLedger(stateRoot) {
-  const file = privateStateFile(stateRoot,neuralDeepUsageLedgerPath(stateRoot));
+function databaseType(){const Type=process.getBuiltinModule?.('node:sqlite')?.DatabaseSync;if(!Type)throw new Error('execution_runtime_unsupported');return Type;}
+function readLedger(stateRoot,privateRoot){
+  const file=privateStateFile(stateRoot,neuralDeepUsageLedgerPath(stateRoot,privateRoot),{createDirectory:false});
+  if(!file || !existsSync(file))return null;
+  privateStateFile(stateRoot,file+'-wal',{createDirectory:false});privateStateFile(stateRoot,file+'-shm',{createDirectory:false});
+  const db=new (databaseType())(file,{readOnly:true});db.exec('PRAGMA busy_timeout=1000; PRAGMA query_only=ON;');return db;
+}
+function openLedger(stateRoot,privateRoot) {
+  const file = privateStateFile(stateRoot,neuralDeepUsageLedgerPath(stateRoot,privateRoot));
   privateStateFile(stateRoot,`${file}-wal`);privateStateFile(stateRoot,`${file}-shm`);
-  const db = new DatabaseSync(file);
+  const db = new (databaseType())(file);
   // Install the busy handler before WAL/schema initialization so concurrent
   // Codex processes wait rather than losing usage rows during first-open races.
   db.exec("PRAGMA busy_timeout=5000;");
@@ -174,7 +181,7 @@ export function recordNeuralDeepRun(options) {
   const billing = options.billing || {};
   const billingMode = ["subscription", "wallet"].includes(billing.mode) ? billing.mode : "unknown";
   const price = billing.price || null;
-  const db = openLedger(options.stateRoot);
+  const db = openLedger(options.stateRoot,options.privateRoot);
   try {
     db.exec("BEGIN IMMEDIATE");
     const existing = db.prepare("SELECT * FROM runs WHERE run_id = ?").get(runId);
@@ -267,11 +274,10 @@ export function recordNeuralDeepRun(options) {
 }
 
 /** Read the existing provider ledger, never a second additive Task Chat counter. */
-export function readNeuralDeepSessionUsage({ stateRoot, profileIdentity, sessionId }) {
+export function readNeuralDeepSessionUsage({ stateRoot, privateRoot, profileIdentity, sessionId }) {
   if (!/^[a-f0-9]{64}$/.test(profileIdentity || "") || !safeToken(sessionId)) throw new Error("neuraldeep_usage_identity_invalid");
-  const file = neuralDeepUsageLedgerPath(stateRoot);
-  if (!existsSync(file)) return { observedTokens: null, measuredRuns: 0, unknownRuns: 0, legacyRuns: 0 };
-  const db = new DatabaseSync(file, { readOnly: true });
+  const db = readLedger(stateRoot,privateRoot);
+  if (!db) return { observedTokens: null, measuredRuns: 0, unknownRuns: 0, legacyRuns: 0 };
   try {
     db.exec("PRAGMA busy_timeout=1000");
     const columns = db.prepare("PRAGMA table_info(runs)").all();
@@ -308,9 +314,9 @@ function aggregateRows(rows, key) {
 }
 
 function legacyProvenanceRows(stateRoot, since, knownRunIds) {
-  const file = path.join(path.resolve(stateRoot), "logs", "neuraldeep-runtime.jsonl");
-  if (!existsSync(file)) return [];
   try {
+    const file = privateStateFile(stateRoot,path.join(path.resolve(stateRoot), "logs", "neuraldeep-runtime.jsonl"),{createDirectory:false});
+    if (!file || !existsSync(file)) return [];
     const size = statSync(file).size;
     const start = Math.max(0, size - MAX_LEGACY_PROVENANCE_BYTES);
     const buffer = Buffer.alloc(size - start);
@@ -353,13 +359,13 @@ function legacyProvenanceRows(stateRoot, since, knownRunIds) {
   }
 }
 
-export function summarizeNeuralDeepUsage({ stateRoot, range = "24h", now = Date.now() }) {
+export function summarizeNeuralDeepUsage({ stateRoot, privateRoot, range = "24h", now = Date.now() }) {
   if (!Object.hasOwn(RANGES, range)) throw new Error("invalid_neuraldeep_usage_range");
   const since = new Date(Number(now) - RANGES[range]).toISOString();
   let db;
   try {
-    db = openLedger(stateRoot);
-    const meteredRows = db.prepare("SELECT * FROM runs WHERE finished_at >= ? ORDER BY finished_at DESC").all(since);
+    db = readLedger(stateRoot,privateRoot);
+    const meteredRows = db ? db.prepare("SELECT * FROM runs WHERE finished_at >= ? ORDER BY finished_at DESC").all(since) : [];
     const rows = [...meteredRows, ...legacyProvenanceRows(stateRoot, since, new Set(meteredRows.map((row) => row.run_id)))]
       .sort((left, right) => String(right.finished_at).localeCompare(String(left.finished_at)));
     const totals = aggregateRows(rows, "__all")[0] || { id: "unknown", runs: 0, providerRequests: 0, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, estimatedCostRub: 0, estimatedCostRuns: 0 };

@@ -4,7 +4,7 @@
   "commit": "2ab22aeff5f1c167c86e925ec30311942b76023b",
   "source_version": "0.2.0",
   "verified": "2026-11-01",
-  "phase": "R4 transport foundation",
+  "phase": "R4 transport, history, shared execution and account integration",
   "files": [
     {
       "path": "scripts/neuraldeep/responses-adapter.mjs",
@@ -190,6 +190,24 @@
       "path": "scripts/neuraldeep-codex.mjs",
       "source_sha256": "5ba3bae9c83e0392ae89ec05de166f6108d0bc0d1afde0c1f8f8c9d7d7343dba",
       "adoption": "function-level adaptation into owned runner; canonical state roots, minimal environment, server-only credential, protected loopback adapter, no automatic replay"
+    },
+    {
+      "path": "scripts/neuraldeep/account-snapshot.mjs",
+      "source_path": "scripts/neuraldeep/account-snapshot.mjs",
+      "source_sha256": "06a53e20a234c34b4fc892deb99ba69dec976a3044e5c6a00827f35473f91164",
+      "adoption": "reviewed source; bounded metadata transport, no credentials on public requests, credential-scoped cache, private path validation and fail-closed unknown decisions"
+    },
+    {
+      "path": "scripts/neuraldeep/native-history-proof.mjs",
+      "source_path": "scripts/neuraldeep/native-history-proof.mjs",
+      "source_sha256": "78bcb77223fc152c7d0d430e21ad26c435da2e47b0f989c7cc13f32662a8e2fc",
+      "adoption": "function-level adaptation to canonical instance/provider/model/workspace bindings and readonly private session proof"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/normalize-cli.ts",
+      "source_path": "interfaces/control-center/src/lib/codex-chat/normalize.ts",
+      "source_sha256": "11cde70389ce5e6f1f2e53dbd44ef37c30902f7582c542cced24db01167f3cd1",
+      "adoption": "only normalizeCliItem and cliItemOriginalText adapted; native canonical normalizer preserved"
     }
   ]
 }

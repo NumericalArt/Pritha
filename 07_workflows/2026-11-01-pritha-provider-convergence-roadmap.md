@@ -791,6 +791,53 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   впереди shared admission/queue/events facade, account/model gates и Settings.
   R5–R9/R11/R11b/R12 остаются незавершёнными; MacBook/GitHub/services не менялись.
 
+### Checkpoint реализации 5 — shared external runtime / NeuralDeep integration
+
+- В facade зарегистрирован NeuralDeep driver рядом с native. Общий host runtime
+  сохраняет provider/model/effort/timeout/workspace, receipt первого и следующих
+  сообщений, полную историю и bounded replay events. HTTP/SSE envelope проверен
+  интеграционным test; изменение default не меняет модель и health старого чата.
+- Native и external используют один execution coordinator: общий admission,
+  managed drain, nested workspace conflicts и ambient resource claims. Отдельные
+  provider slots учитывают подтверждённый parallel limit. Native worker не
+  пытается исполнять external queue; global activity не удваивает capacity.
+- Queue/Cancel/Stop сохраняют exact identifiers и revisions; control идёт к
+  владельцу через private IPC. После interrupted/failed/unknown predecessor
+  следующий queued message автоматически не запускается. Unknown process exit
+  сохраняет claims/scratch. Recovery освобождает claims только после повторного
+  доказательства завершения дерева, оставляя прежний запрос interrupted.
+- Перед ND resume проверяется readonly native index и session header: private
+  home, provider, workspace, session, а при наличии — сохранённая модель. Чужой
+  home, symlink, missing proof или mismatch не запускают CLI. Установленный
+  Codex CLI 0.153.0 повторно прошёл synthetic new/resume через этот proof (1/1),
+  без account key и paid inference.
+- Limits/capability/catalog readiness fail closed: отсутствующий can_request
+  становится unknown; stale/unknown limits, недоступная модель, непроверенные
+  tools и Wallet restriction не дают ready. Night factors повторно не
+  применяются. Cache привязан к ключу; public tariff calls идут без ключа.
+  Metadata reads имеют timeout/size/redirect bounds; errors не раскрывают body.
+- Usage записывается по завершённым provider responses; unknown usage остаётся
+  unknown. Read-only summary не создаёт и не мигрирует SQLite. State paths,
+  cache, WAL/SHM и attempt journals проверяют instance boundary. Полные protocol
+  records остаются private; наружу выдаются bounded views с original-content refs.
+- Targeted evidence: shared lifecycle 7/7, owned runner 5/5, account/privacy
+  service 5/5, typed API envelope 1/1; предшествующая combined suite 98/98.
+  Production fixture build + browser concurrency 7/7; typecheck и privacy pass.
+  Full quality gate дал pass для environment/privacy/Markdown/rebuild/smoke/
+  factory-inspection/Telegram dry-run; unit branch выявил 9 тестов фабрики,
+  загружавших facade вместо выделенного native backend. После исправления
+  loader целиком повторён unit suite: 997/997, failures=0; отдельно factory
+  Task Delivery 19/19. Python 3.9 compatibility warning остаётся известным.
+  Это промежуточная проверка R4; общий final gate и live/manual acceptance впереди.
+- Уточнение R5 по [официальной sandbox документации](https://code.claude.com/docs/en/sandboxing),
+  проверенной 2026-11-01: встроенная Claude sandbox покрывает shell children,
+  но не file/web tools и helpers. `failIfUnavailable` нужен для отказа при
+  недоступной sandbox. Guard для файлов/permissions и clean configuration
+  проверяются отдельно; hooks сами по себе не считаются OS boundary.
+- Это промежуточный checkpoint: R4 voice/search/attachments, R5–R9, R11,
+  R11b и R12 ещё требуют реализации/проверок. Unsupported capability явно
+  возвращает ошибку; фиктивной готовности пяти connectors нет.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

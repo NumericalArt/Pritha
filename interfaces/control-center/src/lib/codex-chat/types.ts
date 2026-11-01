@@ -1,4 +1,5 @@
 export type RuntimeProviderId = "desktop_bundled" | "standalone_cli";
+export type ExternalRuntimeProviderId = "neuraldeep_runtime" | "claude_runtime" | "openrouter_runtime" | "local_runtime";
 export type RuntimeProtocol = "app_server" | "exec_resume" | "queue";
 export type Availability = "ready" | "degraded" | "unavailable";
 
@@ -47,12 +48,13 @@ export type RuntimeProviderView = {
 };
 
 export type RuntimeStatus = {
-  preferredProvider: "auto" | RuntimeProviderId;
-  effectiveProvider: RuntimeProviderId | null;
+  connectorId?: "codex" | "neuraldeep" | "claude" | "openrouter" | "local";
+  preferredProvider: "auto" | RuntimeProviderId | ExternalRuntimeProviderId;
+  effectiveProvider: RuntimeProviderId | ExternalRuntimeProviderId | null;
   effectiveProtocol: RuntimeProtocol | null;
   availability: Availability;
   fallbackEnabled: boolean;
-  providers: RuntimeProviderView[];
+  providers: Array<RuntimeProviderView | (Omit<RuntimeProviderView,"providerId" | "locationLabel"> & {providerId: ExternalRuntimeProviderId; locationLabel: string})>;
   models: RuntimeModelOption[];
   selected: {
     modelId: string | null;
@@ -78,7 +80,7 @@ export type ThreadContinuationState =
 export type RuntimeBindingView = {
   connectorId?: "codex" | "neuraldeep" | "claude" | "openrouter" | "local";
   modelId?: string;
-  providerId: RuntimeProviderId | null;
+  providerId: RuntimeProviderId | ExternalRuntimeProviderId | null;
   version: string | null;
   protocol: RuntimeProtocol;
   stateIdentityHash: string | null;

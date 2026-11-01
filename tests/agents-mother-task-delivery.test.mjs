@@ -173,7 +173,7 @@ async function gatewayFixture(t, createdAt) {
   });
   const execution=nativeCoordinator.nativeExecutionCoordinator();
   t.after(()=>execution.close());
-  const { CodexChatGateway } = load("gateway", {
+  const { CodexChatGateway } = load("native-gateway", {
     "../../../../../scripts/agents-mother/task-delivery.mjs": await import("../scripts/agents-mother/task-delivery.mjs"),
     "../../../../../scripts/agents-mother/phase-usage.mjs": await import("../scripts/agents-mother/phase-usage.mjs"),
     "./storage-identity": load("storage-identity"), "./normalize": load("normalize"), "./native-turn-coordinator": nativeCoordinator, "./budget-intent": load("budget-intent"),

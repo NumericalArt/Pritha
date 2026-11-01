@@ -13,6 +13,7 @@ const configuredDistDir = String(process.env.PRITHA_CONTROL_CENTER_DIST_DIR || "
 const nextConfig = {
   turbopack: { root: codeRoot },
   outputFileTracingRoot: codeRoot,
+  serverExternalPackages: ['undici'],
   ...(configuredDistDir ? { distDir: configuredDistDir } : {}),
   allowedDevOrigins: ["localhost", "127.0.0.1", "**.ts.net", ...configuredDevOrigins],
   devIndicators: false,

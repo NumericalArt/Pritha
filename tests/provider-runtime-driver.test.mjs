@@ -28,7 +28,7 @@ class FakeRoutes {
   close(){}
 }
 const {CodexChatGateway}=load("gateway",{
-  "./drivers/codex-app-server-driver":{},"../settings/provider-profile":profile,
+  "./drivers/codex-app-server-driver":{},"./drivers/neuraldeep-driver":{},"../settings/provider-profile":profile,
   "../settings/provider-settings-server":{getProviderSettings:()=>({activeConnectorId:"codex",providerPresets:Object.fromEntries(profile.PROVIDER_CONNECTOR_IDS.map(id=>[id,{modelId:`${id}-model`}] ))})},
   "./provider-thread-pages":pages,"./provider-activity":activity,
   "../../../../../scripts/lib/provider-thread-routing.mjs":{ProviderThreadRouting:FakeRoutes,ProviderRouteError:class extends Error{}},

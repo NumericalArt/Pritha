@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { chmodSync, existsSync, lstatSync, mkdirSync, realpathSync, constants, openSync, closeSync, fstatSync, readSync } from 'node:fs';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import process from 'node:process';
 import { NeuralDeepChatSummaries } from './chat-summary-projection.mjs';
 import { creationAssistantDialogue } from './creation-dialogue.mjs';
 
@@ -74,6 +74,8 @@ export class NeuralDeepChatHistoryStore {
     if (!databasePath || !instanceScope) throw new Error('history_storage_identity_required');
     if (readOnly && !existsSync(databasePath)) throw new ChatHistoryError('history_storage_missing', 'The history source does not exist.', 404);
     protectDatabase(databasePath);
+    const DatabaseSync = process.getBuiltinModule?.('node:sqlite')?.DatabaseSync;
+    if (!DatabaseSync) throw new ChatHistoryError('execution_runtime_unsupported', 'Task history requires Node.js 22.13 or newer.', 503);
     this.db = new DatabaseSync(databasePath, { readOnly });
     this.statements = new Map(); this.depth = 0;
     try {
