@@ -1161,6 +1161,7 @@ function formatScaffoldDecision(status, coverage, synthesis, repositoryBindingRe
     `- Missing required topics: ${markdownText(coverage.missingTopicIds.join(", ") || "none", 1200)}.`,
     `- Synthesis status: ${synthesis.complete ? "complete" : `pending (${markdownText(synthesis.errors.join(", "), 800)})`}.`,
     `- Repository contract binding: ${repositoryBindingReasons.length ? `pending (${markdownText(repositoryBindingReasons.join(", "), 1200)})` : "complete-or-not-applicable"}.`,
+    `- Blocking gate reasons: ${markdownText(overallGateReasons.join(", ") || "none beyond the evidence and synthesis checks above", 1600)}.`,
     "- Required next action: add valid evidence for every topic and an explicit memory comparison/architecture decision.",
   ].join("\n");
 }

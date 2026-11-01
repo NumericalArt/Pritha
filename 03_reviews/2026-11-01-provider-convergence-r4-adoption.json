@@ -346,6 +346,34 @@
       "source_sha256": "af1092649369e718b1b38f65984e5ccf3d7e557c02793367f32dfc4bda6bb274",
       "target_sha256": "1eb053deb69acc4a7f9f970bef77cf1c6f921957e21b589f2ce8b9040cab5b28",
       "adoption": "Tool descriptions/schema reference adapted to canonical owned MCP task host; model cannot choose owner, original intent, provider or budget. Detached research worker and key-in-child-env configuration not adopted."
+    },
+    {
+      "path": "scripts/agents-mother/source-passages.mjs",
+      "source_path": "scripts/neuraldeep/source-passages.mjs",
+      "source_sha256": "5268115359dfac97e3b2b758424ea87c7ff7d411299a80bbcc92ac2f6011c668",
+      "target_sha256": "5268115359dfac97e3b2b758424ea87c7ff7d411299a80bbcc92ac2f6011c668",
+      "adoption": "Unchanged reviewed exact Unicode passage ranking; 8 passages / 2400 bytes, navigation filtering, source-bound IDs added by canonical host."
+    },
+    {
+      "path": "scripts/agents-mother/source-authority.mjs",
+      "source_path": "scripts/agents-mother/external-research-topics.mjs",
+      "source_sha256": "56261e537072a0cf93236c4120d7a5fdee8f1d94bd1f7bf2c71342ca3d876fd2",
+      "target_sha256": "91e9d7d15214148337e17c38816acbe3996454c2d44615fdc67da1d56016f0a5",
+      "adoption": "Reviewed authority and primary URL tables only; existing canonical topic derivation and old locks are preserved."
+    },
+    {
+      "path": "scripts/agents-mother/host-research.mjs",
+      "source_path": "scripts/neuraldeep/creation-source-research.mjs",
+      "source_sha256": "857e9a2ff4370766f1e481400e7eace0080b27f0348ca638948d7c790d2d1c3d",
+      "target_sha256": "31002dc761f1ec063706e750f7bbd8226807323a76af84f7bf509ef5cf922ac7",
+      "adoption": "Function-level adaptation into existing canonical external-research CLI; private journal, 12 required topics, two explicit attempts, absolute total/per-source deadlines, exact passages, source/report binding and publication recovery. No fork-specific creation jobs or automatic worker/service."
+    },
+    {
+      "path": "tests/agents-mother-host-research.test.mjs",
+      "source_path": "tests/creation-source-policy.test.mjs",
+      "source_sha256": "e1b3df7baacfc92227cc30914bfe8ceacc2ee0d148f17d57b684ac9f9db65334",
+      "target_sha256": "a63b4aee588db4c7fe1cfac4d42ed4ba80be928808ec3601cc0f7de5cda2446f",
+      "adoption": "Adapted source acquisition/replay/exact-passage/Unicode/freshness cases, plus canonical report CAS recovery, independent gate preservation, cancellation and offline profiles."
     }
   ]
 }

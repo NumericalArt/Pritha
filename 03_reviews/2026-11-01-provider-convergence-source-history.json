@@ -1,0 +1,225 @@
+{
+  "schema": "pritha-source-history-review-v1",
+  "repository": "NumericalArt/Pritha-NeuralDeep",
+  "verified": "2026-11-01",
+  "sourcePin": "2ab22aeff5f1c167c86e925ec30311942b76023b",
+  "commits": [
+    {
+      "sha": "be82911a887daa3593523b64e0b30a606165e2f4",
+      "title": "Make process ownership probes locale independent and record pre-dispatch failures",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/be82911a887daa3593523b64e0b30a606165e2f4",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "scripts/neuraldeep-codex.mjs",
+        "scripts/neuraldeep/creation-runtime-receipt.mjs",
+        "scripts/neuraldeep/dispatch-blocker-message.mjs",
+        "scripts/neuraldeep/process-snapshot.mjs",
+        "tests/neuraldeep-codex-config.test.mjs",
+        "tests/neuraldeep-process-snapshot.test.mjs"
+      ]
+    },
+    {
+      "sha": "49c4a656a4ea3f51657bd950d287d5c26a87b352",
+      "title": "Fix sandbox cwd portability on the target MacBook and record verification",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/49c4a656a4ea3f51657bd950d287d5c26a87b352",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "scripts/agents-mother/execution-backends.mjs",
+        "scripts/neuraldeep/creation-delivery.mjs",
+        "tests/agents-mother-execution-backends.test.mjs"
+      ]
+    },
+    {
+      "sha": "dfe920275243c9a7d7876a605c561c7e2e38e0ee",
+      "title": "Pin model execution profile and distinguish Qwen effort from thinking",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/dfe920275243c9a7d7876a605c561c7e2e38e0ee",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "interfaces/control-center/src/components/codex/AgentCreationProgress.tsx",
+        "interfaces/control-center/src/components/settings/CodexSettingsSection.tsx",
+        "interfaces/control-center/src/lib/codex-chat/gateway.ts",
+        "interfaces/control-center/src/lib/settings/codex-model-catalog.ts",
+        "scripts/neuraldeep-codex.mjs",
+        "scripts/neuraldeep/agent-creation.d.mts",
+        "scripts/neuraldeep/creation-context-packet.mjs",
+        "scripts/neuraldeep/creation-delivery.mjs",
+        "scripts/neuraldeep/creation-execution-policy.d.mts",
+        "scripts/neuraldeep/creation-execution-policy.mjs",
+        "scripts/neuraldeep/model-execution-profile.d.mts",
+        "scripts/neuraldeep/model-execution-profile.mjs",
+        "scripts/neuraldeep/provider-budget.mjs",
+        "scripts/neuraldeep/responses-adapter.mjs",
+        "tests/control-center-codex-model-catalog.test.mjs",
+        "tests/control-center-codex-model-transports.test.mjs",
+        "tests/neuraldeep-codex-config.test.mjs"
+      ]
+    },
+    {
+      "sha": "9c508ed168e9ea2b069009bcbe6a48598d496e55",
+      "title": "fix(neuraldeep): diagnose capped responses and pin larger Qwen output budgets",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/9c508ed168e9ea2b069009bcbe6a48598d496e55",
+      "files": [
+        "docs/agent-creation-operator-guide.md",
+        "docs/agent-creation-reliability.md",
+        "docs/neuraldeep-codex.md",
+        "scripts/neuraldeep-codex.mjs",
+        "scripts/neuraldeep/agent-creation-store.mjs",
+        "scripts/neuraldeep/creation-preparation-policy.mjs",
+        "scripts/neuraldeep/dispatch-blocker-message.mjs",
+        "scripts/neuraldeep/model-execution-profile.mjs",
+        "scripts/neuraldeep/provider-budget.mjs",
+        "scripts/neuraldeep/provider-error.mjs",
+        "scripts/neuraldeep/responses-adapter.mjs",
+        "scripts/neuraldeep/responses-normalizer.mjs",
+        "tests/control-center-codex-model-catalog.test.mjs",
+        "tests/creation-brief-request.test.mjs",
+        "tests/creation-execution-policy.test.mjs",
+        "tests/neuraldeep-provider-budget.test.mjs",
+        "tests/neuraldeep-response-diagnostics.test.mjs"
+      ]
+    },
+    {
+      "sha": "edcb1f85a4a3e84f9af9c5b17b854c5ace7b1405",
+      "title": "Align build output limits with model profiles and extend host research acceptance",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/edcb1f85a4a3e84f9af9c5b17b854c5ace7b1405",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "scripts/neuraldeep/creation-source-research.mjs",
+        "scripts/neuraldeep/creation-stock-cli-acceptance.mjs",
+        "scripts/neuraldeep/provider-budget.mjs",
+        "tests/creation-research-context.test.mjs",
+        "tests/neuraldeep-attachment-capabilities.test.mjs",
+        "tests/neuraldeep-provider-budget.test.mjs"
+      ]
+    },
+    {
+      "sha": "4e395a37c85dfe889cfe52605f17bd38479212b2",
+      "title": "Collect applicable primary research on host with durable evidence checkpoints",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/4e395a37c85dfe889cfe52605f17bd38479212b2",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "interfaces/control-center/src/lib/codex-chat/gateway.ts",
+        "scripts/agents-mother/external-research-topics-v1.mjs",
+        "scripts/agents-mother/external-research-topics.mjs",
+        "scripts/agents-mother/pattern-research.mjs",
+        "scripts/neuraldeep/agent-creation-store.mjs",
+        "scripts/neuraldeep/creation-context-packet.mjs",
+        "scripts/neuraldeep/creation-preparation.mjs",
+        "scripts/neuraldeep/creation-research-request.mjs",
+        "scripts/neuraldeep/creation-source-research.d.mts",
+        "scripts/neuraldeep/creation-source-research.mjs",
+        "scripts/neuraldeep/provider-budget.mjs",
+        "tests/agents-mother-pattern-research.test.mjs",
+        "tests/agents-mother-research-topics.test.mjs",
+        "tests/creation-research-context.test.mjs"
+      ]
+    },
+    {
+      "sha": "7cae2809e4864248b643ac9f9338475f69009e04",
+      "title": "Pin creation deadlines and refuse requests before late reservations",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/7cae2809e4864248b643ac9f9338475f69009e04",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "interfaces/control-center/src/lib/codex-chat/gateway.ts",
+        "interfaces/control-center/src/lib/codex-chat/neuraldeep-cli-runner.ts",
+        "scripts/agents-mother/build-executors.mjs",
+        "scripts/agents-mother/delivery-loop.mjs",
+        "scripts/neuraldeep-codex.mjs",
+        "scripts/neuraldeep/agent-creation-store.mjs",
+        "scripts/neuraldeep/creation-delivery.mjs",
+        "scripts/neuraldeep/creation-execution-policy.d.mts",
+        "scripts/neuraldeep/creation-execution-policy.mjs",
+        "scripts/neuraldeep/provider-error.mjs",
+        "scripts/neuraldeep/responses-adapter.mjs",
+        "tests/creation-execution-policy.test.mjs",
+        "tests/neuraldeep-responses-adapter.test.mjs"
+      ]
+    },
+    {
+      "sha": "e89b7d5c54785c2680ce974d70cf179430376e9a",
+      "title": "Recover and adopt verified creation results without new inference",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/e89b7d5c54785c2680ce974d70cf179430376e9a",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "interfaces/control-center/src/components/codex/AgentCreationProgress.tsx",
+        "interfaces/control-center/src/components/codex/creation-client-state.ts",
+        "interfaces/control-center/src/lib/codex-chat/gateway.ts",
+        "interfaces/control-center/tests/e2e/agent-creation.spec.ts",
+        "scripts/agents-mother/delivery-loop.mjs",
+        "scripts/agents-mother/trial-model-use.mjs",
+        "scripts/neuraldeep/agent-creation-store.mjs",
+        "scripts/neuraldeep/agent-creation.d.mts",
+        "scripts/neuraldeep/agent-creation.mjs",
+        "scripts/neuraldeep/creation-delivery.d.mts",
+        "scripts/neuraldeep/creation-delivery.mjs",
+        "tests/agent-creation-gateway.test.mjs",
+        "tests/neuraldeep-creation-delivery.test.mjs"
+      ]
+    },
+    {
+      "sha": "56ef520566d190f7e6d2f7a1b63269d6bd30947e",
+      "title": "Bind research to exact passages and keep advisory registry freshness nonblocking",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/56ef520566d190f7e6d2f7a1b63269d6bd30947e",
+      "files": [
+        "docs/agent-creation-operator-guide.md",
+        "docs/agent-creation-reliability.md",
+        "scripts/agents-mother/github-research.mjs",
+        "scripts/neuraldeep/agent-creation-store.mjs",
+        "scripts/neuraldeep/creation-context-packet.mjs",
+        "scripts/neuraldeep/creation-preparation-control.mjs",
+        "scripts/neuraldeep/creation-research-request.mjs",
+        "scripts/neuraldeep/creation-source-research.mjs",
+        "scripts/neuraldeep/creation-stock-cli-acceptance.mjs",
+        "tests/agent-creation-store.test.mjs",
+        "tests/agents-mother-github-research.test.mjs",
+        "tests/creation-preparation-budget.test.mjs",
+        "tests/creation-research-context.test.mjs",
+        "tests/creation-source-policy.test.mjs"
+      ]
+    },
+    {
+      "sha": "19a37e01ebc2a6aff1108b467c522c2a7f2c5949",
+      "title": "Fix pinned research source selection and bounded page excerpts",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/19a37e01ebc2a6aff1108b467c522c2a7f2c5949",
+      "files": [
+        "docs/agent-creation-operator-guide.md",
+        "docs/agent-creation-reliability.md",
+        "scripts/agents-mother/external-research-topics-v2.mjs",
+        "scripts/agents-mother/external-research-topics.mjs",
+        "scripts/neuraldeep/agent-creation-store.mjs",
+        "scripts/neuraldeep/creation-preparation.mjs",
+        "scripts/neuraldeep/creation-source-research.mjs",
+        "tests/agent-creation-store.test.mjs",
+        "tests/creation-research-context.test.mjs",
+        "tests/creation-source-policy.test.mjs"
+      ]
+    },
+    {
+      "sha": "fcb880773bbce8ff9870fcd162423b4b77a1662f",
+      "title": "fix: honor creation preparation deadlines across the NeuralDeep runtime",
+      "url": "https://github.com/NumericalArt/Pritha-NeuralDeep/commit/fcb880773bbce8ff9870fcd162423b4b77a1662f",
+      "files": [
+        "docs/agent-creation-reliability.md",
+        "interfaces/control-center/src/lib/codex-chat/cli-runtime.ts",
+        "interfaces/control-center/src/lib/codex-chat/gateway.ts",
+        "interfaces/control-center/src/lib/codex-chat/neuraldeep-cli-runner.ts",
+        "scripts/neuraldeep-codex.mjs",
+        "scripts/neuraldeep/creation-execution-policy.d.mts",
+        "scripts/neuraldeep/creation-execution-policy.mjs",
+        "scripts/neuraldeep/creation-preparation-control.mjs",
+        "scripts/neuraldeep/creation-stock-cli-acceptance.mjs",
+        "scripts/neuraldeep/provider-error.mjs",
+        "scripts/neuraldeep/responses-adapter.mjs",
+        "tests/agent-creation-gateway.test.mjs",
+        "tests/creation-execution-policy.test.mjs",
+        "tests/creation-preparation-budget.test.mjs",
+        "tests/neuraldeep-cli-runner.test.mjs",
+        "tests/neuraldeep-cli-runtime.test.mjs",
+        "tests/neuraldeep-codex-config.test.mjs",
+        "tests/neuraldeep-provider-errors.test.mjs",
+        "tests/neuraldeep-queued-chat.test.mjs",
+        "tests/neuraldeep-responses-adapter.test.mjs"
+      ]
+    }
+  ]
+}

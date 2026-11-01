@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-10-21
+updated: 2026-11-01
 topics:
   - agent-engineering
   - agent-factory
@@ -890,3 +890,9 @@ An Agents Mother run is complete only when:
 ## Roadmap
 
 See `07_workflows/agents-mother-roadmap.md` for the full layered implementation roadmap.
+
+## Host source research
+
+Для сбора первичных страниц с checkpoints, deadline и точными passage IDs см.
+[host research workflow](agents-mother-host-research.md). Существующие ручной
+external research и независимые scaffold/delivery gates сохраняются.

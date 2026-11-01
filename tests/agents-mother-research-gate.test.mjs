@@ -165,6 +165,15 @@ test("not-applicable external research requires a contract reason", () => {
   assert.equal(fixtureDecision.status, "complete");
 });
 
+test('repository not-applicable with adoption none leaves independent evidence gates intact',()=>{
+  const data={...fixtureContract,repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchTopics:'none',selectedGitHubRepositories:'none',repositoryResearchWaiverReason:'No source repository is selected for this deterministic fixture.'};
+  const report=reportFor(data,{external_research_status:'not-applicable',synthesis_status:'not-applicable'});
+  const gate=researchGateDecisionForReport(data,report);assert.equal(gate.ok,true,gate.reasons.join(','));
+  const missingMemory=researchGateDecisionForReport(data,reportFor(data,{external_research_status:'not-applicable',synthesis_status:'not-applicable',memory_research_status:'pending'}));assert.equal(missingMemory.ok,false);
+  const selected={...data,repositoryAdoptionMode:'reference-only',selectedGitHubRepositories:'https://github.com/example/selected'};
+  assert.equal(researchGateDecisionForReport(selected,reportFor(selected)).ok,false);
+});
+
 test("research gate rejects reports that do not reference the contract", () => {
   const report = reportFor(contract, {}, "11_agents/contracts/other-agent-contract.md");
   const reference = reportReferencesContract(report, contract);

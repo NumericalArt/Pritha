@@ -363,15 +363,15 @@ budget exhaustion and crash recovery. Gate does not equate hook with sandbox.
 
 **Статус: in-progress; brief/presets, locale и advisory research verified; host source orchestration и все пять backends pending.** Зависимости R1–R5; независимые fixes можно делать раньше.
 
-- [ ] Сравнить изменения ND be82911a/49c4a656, dfe92027/9c508ed1/edcb1f85,
+- [x] Сравнить изменения ND be82911a/49c4a656, dfe92027/9c508ed1/edcb1f85,
   4e395a37/7cae2809/e89b7d5c, 56ef5205/19a37e01/fcb88077 по verified history.
 - [x] UTF-8 locale и существующий безопасный ASCII TMPDIR, chmod/ownership,
   кириллический cwd и heredoc regression; no user-specific hardcoded paths.
 - [ ] Model capability/effort/thinking/output policy per connector; high/xhigh
   constraints validate before dispatch. Native recover retains prior model.
-- [ ] Host deterministic research с durable checkpoints, total deadline и
+- [x] Host deterministic research с durable checkpoints, total deadline и
   bounded per-source timeouts; exact passages и bounded excerpts сохраняются.
-- [ ] not-applicable + adoption:none → корректный research gate без allow-pending;
+- [x] not-applicable + adoption:none → корректный research gate без allow-pending;
   не обходить остальные contract-specific evidence/synthesis требования.
 - [x] init --from-brief генерирует валидный runtime/interface/port/operations;
   валидатор перечисляет допустимые enum без секретного input echo.
@@ -1867,6 +1867,33 @@ unit child environment отдельно и изолировать оба aliases
 - Отдельный standalone Deep Research worker из fork не включается автоматически:
   ближайшая работа R6 — canonical factory source orchestration с checkpoints,
   deadline и точными passages, без подмены existing gates.
+
+### Checkpoint 28 — Canonical host source research и verified source history
+
+- Через GitHub read-only подтверждены полные SHA и diffs всех 11 названных R6
+  commits; metadata сохранена в source-history JSON. Locale/TMPDIR исправления
+  уже применены в canonical supervisor; model/deadline corrections продолжаются
+  в shared build integration. Fork-specific creation job storage не заменяет
+  существующие canonical contracts/reports/Trials.
+- В existing `external-research` добавлен backend `host`: durable collection,
+  exact passage selection и recoverable publication. Источники ограничены
+  authority policy; unknown/future dates, private URLs, неполный page read и
+  навигационные блоки не становятся evidence. Total deadline сохраняется между
+  перезапусками; unknown dispatch не повторяется автоматически.
+- Exact source/passages из ND адаптированы отдельными модулями. Host проверяет
+  12 required topics, две attempts, один Search/Read за attempt, 20s acquisition,
+  5min total. ND использует scoped Search; другие online profiles читают только
+  curated/явно выбранные primary URLs. Local offline сохраняется. Инструкция:
+  `07_workflows/agents-mother-host-research.md`.
+- Модель передаёт IDs и synthesis; host восстанавливает цитату и применяет
+  прежние external/repository gates. Publication journal + report CAS переживает
+  остановку после подготовки записи. Изменённые contract/pattern/report и чужие
+  source IDs не разрешают продолжение. Pending gate теперь выводит свою причину.
+- Existing not-applicable + adoption:none уже корректно исключал repository
+  research. Добавлена явная regression matrix: это не отменяет memory evidence
+  и не разрешает reference-only adoption без проверки.
+- Targeted host/external/repository/gate suite **87/87**. Полный suite после
+  связанного блока execution backends; R6 в целом остаётся in-progress.
 
 ## 7. Полные исходные материалы
 

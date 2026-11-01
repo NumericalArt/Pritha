@@ -16,7 +16,7 @@ import { markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
 import { searchCuratedMemory } from "../lib/curated-memory.mjs";
 import { redactSensitiveText, redactStructuredText } from "../lib/redaction.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaRoot, resolvePrithaStateRoot } from "../lib/paths.mjs";
 import { prepareInterviewOptions } from './interview-options.mjs';
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
@@ -128,7 +128,8 @@ function usage() {
   ${CLI_COMMAND} delivery cleanup --all-stale --older-than-days <N> [--apply --yes]
   ${CLI_COMMAND} research <contract-path> [--limit 12] [--github-mode auto|online|registry-only|skip] [--github-limit 5] [--github-timeout-ms 15000] [--github-fixture <json>]
   ${CLI_COMMAND} pattern-research <contract-path> [--limit 12] [--semantic-mode auto|skip]
-  ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days] [--input evidence.json]
+  ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days|host] [--input evidence.json]
+  ${CLI_COMMAND} external-research <contract-path> --backend host --connector <provider> [--phase collect|status|apply] [--sources urls.json] [--retry-failed] [--input selection.json]
   ${CLI_COMMAND} scaffold <contract-path> [--output <folder>] [--allow-draft-scaffold] [--allow-missing-research] [--allow-pending-external-verification]
   ${CLI_COMMAND} scaffold-plan <contract-path>
   ${CLI_COMMAND} probe-plan <agent-id-or-project> [--purpose health|test] [--timeout-ms 5000]
@@ -1527,7 +1528,7 @@ function readEvidenceInput(inputPath) {
   }
 }
 
-function externalResearchContract(contractPath, options = {}) {
+async function externalResearchContract(contractPath, options = {}) {
   ensureDirs();
   const data = contractData(contractPath);
   const report = findResearchReportFor(data);
@@ -1538,6 +1539,18 @@ function externalResearchContract(contractPath, options = {}) {
   const topics = deriveExternalResearchTopics(data, { patternPack });
   const backend = String(options.backend || (options.input ? "manual" : "status")).trim() || "status";
   const hasInput = Boolean(options.input);
+
+  if(backend==='host'){
+    if(!report || !patternPack)throw new Error('Run Pritha research for this exact contract before host source collection.');
+    const {HostResearch}=await import('./host-research.mjs');
+    const host=new HostResearch({root:ROOT,stateRoot:resolvePrithaStateRoot({root:ROOT}),data,report,patternLock:patternPack.lock,topics,connectorId:options.connector || 'codex'});
+    const phase=options.phase || (hasInput?'apply':'collect');let result;
+    if(phase==='status')result=host.status();
+    else if(phase==='collect')result=await host.collect({retryFailed:options['retry-failed']===true,sourceUrls:options.sources?readEvidenceInput(options.sources):{}});
+    else if(phase==='apply' && hasInput)result=await host.publish(readEvidenceInput(options.input),{evaluateOverallGate:text=>researchGateDecisionForReport(data,text)});
+    else throw new Error('Host research requires collect, status, or apply with a selection input.');
+    console.log(JSON.stringify(result,null,2));return;
+  }
 
   if (backend === "status" || (!hasInput && backend !== "last30days")) {
     console.log(`Contract: ${data.relPath}`);
@@ -2071,7 +2084,7 @@ async function main() {
   if (command === "external-research") {
     const target = options._[0];
     if (!target) throw new Error("Missing contract path.");
-    externalResearchContract(target, options);
+    await externalResearchContract(target, options);
     return;
   }
   if (command === "scaffold-plan") {
