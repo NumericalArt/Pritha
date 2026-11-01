@@ -10,6 +10,7 @@ import { privateStateDirectory, privateStateFile } from './private-state-path.mj
 import { providerProcessTreesExited } from './provider-process-proof.mjs';
 import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,expireProviderRequests } from './provider-approvals.mjs';
 import { normalizeProviderPreset } from './provider-profile.mjs';
+import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -50,6 +51,34 @@ export class ProviderTaskRuntime {
   get registry(){return this._registry ||= new ProviderChatRegistry({stateRoot:this.stateRoot,privateRoot:this.privateRoot,connectorId:this.connectorId});}
   get execution(){return this._execution ||= new ExecutionCoordinator({stateRoot:this.stateRoot,directory:this.options.executionDirectory});}
   require(chat){return this.registry.require(chat);}
+  get voiceBindings(){return this._voiceBindings ||= new VoiceTopicBindings({coordinator:this.execution,stateRoot:this.stateRoot});}
+  voiceTaskChat(taskId){
+    const task=this.voiceBindings.task(taskId),topic=task && this.voiceBindings.topic(task.topicId);
+    if(!topic?.chatId || topic.connectorId!==this.connectorId)return null;
+    const binding=this.require(topic.chatId);
+    if(binding.voiceTopicId!==topic.topicId || binding.voiceTopicGeneration!==topic.scope.generation)throw failure('voice_topic_chat_mismatch');
+    return binding.chatId;
+  }
+  voiceTaskLinks(chat){
+    const binding=this.require(chat);
+    if(binding.origin!=='voice')return binding.taskLinks;
+    const topic=this.voiceBindings.topic(binding.voiceTopicId);
+    if(!topic || topic.chatId!==chat || topic.connectorId!==this.connectorId || topic.scope.generation!==binding.voiceTopicGeneration)throw failure('voice_topic_chat_mismatch');
+    const pending=new Set(this.pendingRequests(chat).map(row=>row.turnId)),active=this.activeIntent(chat);
+    const statuses={completed:'complete',failed:'failed',interrupted:'aborted',in_progress:'running',queued:'queued',waiting_for_input:'waiting_for_operator',waiting_for_approval:'waiting_for_operator',waiting_for_provider:'waiting_for_operator'};
+    const links=this.voiceBindings.tasksForTopic(topic.topicId).map(task=>{
+      const receipt=this.registry.history.receipt(chat,task.clientMessageId);
+      const turn=receipt?.kind==='message'?this.registry.history.turnState(chat,receipt.value.turnId):null;
+      const queue=this.execution.getIntent(queueKey(chat,task.clientMessageId));
+      const status=turn?pending.has(turn.turnId) || active?.turnId===turn.turnId && active.state==='unknown'?'waiting_for_operator':statuses[turn.status] || 'waiting_for_operator'
+        :task.state==='cancelled' || queue?.state==='cancelled'?'aborted':queue?.state==='queued'?'queued':'waiting_for_operator';
+      return {taskId:task.taskId,shortId:null,label:'Voice · '+topic.scope.label,origin:'voice',mode:'shared_thread',subjectScope:topic.scope,status,linkedAt:task.createdAt};
+    });
+    // This index contains links only. Transcripts and execution truth stay in
+    // their existing stores; readback never dispatches or resumes a task.
+    if(JSON.stringify(links)!==JSON.stringify(binding.taskLinks))this.registry.mutate(chat,current=>({...current,taskLinks:links}));
+    return links;
+  }
   activeIntent(chat){return this.execution.listIntents({kind:'turn',states:activeStates,limit:1000}).find(row=>row.chatId===chat) || null;}
   async workspacePreview(){return inspectTaskWorkspace(this.root);}
   async create(input,{voice}={}){
@@ -106,7 +135,7 @@ export class ProviderTaskRuntime {
     if(queued.chatId!==chat || queued.input?.clientMessageId!==clientMessageId)throw failure('voice_task_receipt_mismatch');
     if(queued.state==='cancelled')return {...common,kind:'cancelled',queueId:queued.id};
     if(!waitingStates.includes(queued.state))throw failure('voice_task_receipt_unconfirmed');
-    return {...common,kind:'queue',queueId:queued.id,revision:queued.revision,status:queued.state};
+    return {...common,kind:'queue',queueId:queued.id,revision:queued.revision,status:queued.state,reason:queued.reason || null};
   }
   validateTurn(binding,input){
     if(input && Object.hasOwn(input,'subject'))throw failure('runtime_identity_mismatch','This chat retains its original subject and factory phase.');

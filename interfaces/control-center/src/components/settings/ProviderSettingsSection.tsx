@@ -65,6 +65,7 @@ export function ProviderSettingsSection({id}:{id:string}){
     try{const response=await fetch('/api/task-runtime/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:settings.revision,...(useDefault?{activeConnectorId:connectorId}:{connectorId,preset})})}),payload=await response.json();
       if(!alive.current)return;if(!response.ok || !payload.ok || !payload.settings){setNotice(response.status===409?'Settings changed elsewhere. Reload saved presets before saving.':payload.message || 'The preset could not be saved.');return;}
       const next=payload.settings as Settings;setSettings(next);setDrafts(current=>({...current,[connectorId]:draftOf(next.providerPresets[connectorId])}));setNotice(useDefault?`${PROVIDER_LABELS[connectorId]} selected for new chats.`:'Preset saved. Checking provider status…');setRefresh(value=>value+1);
+      window.dispatchEvent(new Event('pritha-task-provider-settings-changed'));
     }catch{if(alive.current)setNotice('Saving could not be confirmed. Reload saved presets to check the result.');}finally{if(alive.current)setBusy(false);}
   }
   return <div className="settings-section-stack provider-settings" data-testid="provider-settings">

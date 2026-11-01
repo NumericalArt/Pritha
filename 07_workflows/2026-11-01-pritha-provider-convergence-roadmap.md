@@ -1461,6 +1461,47 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   task-chat task links/index, connector/engine session snapshot и Auto preview,
   ND search, browser restart/reconnect и ручная microphone/provider проверка.
 
+### Checkpoint реализации 21 — Voice links и Settings Auto (verified-automated)
+
+- Task Chat строит voice links из canonical topic/task bindings и реальных
+  execution/history/queue receipts. Index хранит только ссылки и может быть
+  восстановлен после restart; открытие карточки не повторяет запуск. Readback
+  показывает завершение, отмену, blocked queue и uncertain execution, сохраняя
+  точный исходный provider. Внешняя задача без chat не ищет native fallback link.
+- Смена task provider обновляет Auto voice preview на той же странице Settings.
+  Несохранённые voice/timbre/language edits сохраняются, document revision
+  обновляется при независимом изменении. Concurrent voice change сохраняет draft
+  и блокирует overwrite до явного Reload saved voice settings.
+- Targeted gateway/topic/queue/readback tests **33/33**; TypeScript passed.
+  Chromium Settings/voice gate **10/10**, без skipped/flaky, включая desktop/mobile,
+  Auto preview, draft сохранность и конфликт revision. Общий unit gate прошёл
+  **1206/1206**, без skipped. Strict privacy, name guard (124 разрешённых
+  compatibility references) и Markdown validation (987 файлов) прошли.
+
+### Следующий checkpoint 22 — Session snapshot (in-progress)
+
+Private context store реализован отдельно и проверен **5/5** fixture tests;
+подключение к реальным session/tool endpoints ещё не выполнено.
+
+1. Immutable host-created session context в существующей private SQLite:
+   task connector/preset, voice engine/protocol/model/timbre и native service
+   tier; owner, instance, expiry, bounded capacity и закрытие. В нём нет
+   transcript, credentials и собственной execution queue.
+2. Native и NeuralDeep session creation создают context; браузер передаёт только
+   opaque ID вне model tool arguments. Wrong owner, expired/missing context
+   возвращают явную ошибку без переключения на текущие defaults.
+3. Shared tool host берёт task selection из context; explicit continuation
+   сохраняет исходную task/topic identity. Native model/effort/timeout/tier
+   закрепляются в task request и применяются после UI approval/queue/restart.
+   Existing native thread binding остаётся приоритетным.
+4. NeuralDeep каждый HTTP attempt проверяет закреплённый engine и актуальный
+   hard offline/admission запрет. Изменение default provider/voice preference
+   само по себе не переключает существующий transport. Native startup сохраняет
+   protocol/model; incompatible startup race требует reconnect.
+5. Tests: restart/owner/expiry/schema/capacity/secret rejection; task preset после
+   изменения defaults; OpenAI/ND tool path; no implicit cloud fallback; disconnect
+   cleanup, browser reconnect и сохранённая native voice/music regression.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

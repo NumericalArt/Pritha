@@ -20,6 +20,7 @@ export class VoiceTopicBindings {
   topic(topicId: string): VoiceTopicBinding | null;
   latest(scope: VoiceTopicScope): VoiceTopicBinding | null;
   task(taskId: string): VoiceTaskBinding | null;
+  tasksForTopic(topicId:string,limit?:number):VoiceTaskBinding[];
   reserve(input: { taskId: string; scope: VoiceTopicScope; connectorId: ProviderConnectorId; preset: ProviderPreset;
     workspace?:VoiceTopicBinding['workspace'];requestHash: string; reset?: boolean; continueTopicId?: string; expectedGeneration?: number }):
     { task: VoiceTaskBinding; topic: VoiceTopicBinding; replayed: boolean };

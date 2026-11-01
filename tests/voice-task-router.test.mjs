@@ -111,3 +111,16 @@ test('unreadable operator state cannot be projected as a running or completed ta
   assert.equal(answer.error, 'voice_task_control_unconfirmed');
   assert.equal(JSON.stringify(answer).includes('private'),false);
 });
+test('uncertain execution and a blocked queue stay visible as requiring attention',async t=>{
+  const f=fixture(t);await f.api.dispatchProviderVoiceTask('task-one',f.request);
+  f.detail.executionState='unknown';
+  const unknown=await f.api.providerVoiceTaskProjection('task-one');
+  assert.equal(unknown.status.status,'waiting_for_operator');assert.equal(unknown.status.error_code,'fallback_confirmation_required');
+  const q=fixture(t);q.detail.activeTurnId='prior-turn';
+  const receipt={kind:'queue',chatId:`chat_neuraldeep_${'f'.repeat(32)}`,clientMessageId:q.reservation.task.clientMessageId,queueId:'queue-one',revision:1,status:'queued'};
+  q.backend.enqueue=async()=>{q.receipts.set(receipt.clientMessageId,receipt);};
+  assert.equal((await q.api.dispatchProviderVoiceTask('task-one',q.request)).status.status,'queued');
+  receipt.status='blocked';receipt.reason='provider_pending_auth';receipt.revision++;
+  const blocked=await q.api.providerVoiceTaskProjection('task-one');
+  assert.equal(blocked.status.status,'waiting_for_operator');assert.equal(blocked.status.error_code,'provider_pending_auth');
+});

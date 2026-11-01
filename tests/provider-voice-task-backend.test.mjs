@@ -47,6 +47,8 @@ for (const connector of ['neuraldeep', 'claude', 'openrouter', 'local']) {
     const queuedBody = request('Second'); f.reserve('task-two', queuedBody);
     const queued = await f.bridge.dispatch('task-two', queuedBody);
     assert.equal(queued.task.state, 'queued'); assert.equal(f.runtime.queued(binding.chatId).length, 1);
+    assert.deepEqual(f.runtime.voiceTaskLinks(binding.chatId).map(link=>[link.taskId,link.status]),[['task-one','running'],['task-two','queued']]);
+    assert.equal(f.runtime.registry.history.chatForTask('task-one'),binding.chatId);
     f.settings.modelId = 'changed-after-start'; f.settings.timeoutMs = 60000;
     f.runs[0].resolve({ ok: true, processTreeExited: true });
     await until(() => f.runs.length === 2);
@@ -54,6 +56,7 @@ for (const connector of ['neuraldeep', 'claude', 'openrouter', 'local']) {
     assert.equal(f.runs[1].input.resume, binding.nativeThreadId);
     const second = await f.bridge.reconcile('task-two');
     assert.equal(second.task.state, 'accepted'); assert.notEqual(second.task.turnId, started.task.turnId);
+    assert.equal(f.runtime.voiceTaskLinks(binding.chatId)[0].status,'complete');
     await f.bridge.dispatch('task-one', body); assert.equal(f.runs.length, 2);
     f.runs[1].resolve({ ok: true, processTreeExited: true }); await until(() => f.runtime.active.size === 0);
     const typed = await f.runtime.start(binding.chatId, { clientMessageId: 'typed_after_voice', input: [{ type: 'text', text: 'Continue here' }] });
@@ -71,6 +74,8 @@ test('another worker recovers a lost voice acknowledgement from canonical histor
   await until(() => f.runs.length === 1);
   const worker = f.make(), recovered = await new VoiceTaskBridge({ bindings: f.bindings, backend: providerVoiceTaskBackend(worker) }).dispatch('task-one', body);
   assert.equal(recovered.task.turnId, receipt.task.turnId); assert.equal(f.runs.length, 1);
+  assert.equal(worker.voiceTaskChat('task-one'),receipt.topic.chatId);
+  assert.equal(worker.voiceTaskLinks(receipt.topic.chatId)[0].status,'running');assert.equal(f.runs.length,1);
   f.runs[0].resolve({ ok: true, processTreeExited: true }); await until(() => f.runtime.active.size === 0);
 });
 test('queued cancellation uses canonical CAS and never interrupts its active predecessor', async t => {
@@ -81,6 +86,7 @@ test('queued cancellation uses canonical CAS and never interrupts its active pre
   const cancelled = await f.bridge.stop('task-two', { generation: 1, revision: next.task.revision, clientMessageId: 'cancel_queue_001' });
   assert.equal(cancelled.task.state, 'cancelled'); assert.equal(f.runtime.activeIntent(first.topic.chatId).turnId, first.task.turnId);
   assert.equal((await f.bridge.reconcile('task-two')).receipt.kind, 'cancelled');
+  assert.equal(f.runtime.voiceTaskLinks(first.topic.chatId).find(link=>link.taskId==='task-two').status,'aborted');
   f.runs[0].resolve({ ok: true, processTreeExited: true }); await until(() => f.runtime.active.size === 0);
   assert.equal(f.runs.length, 1);
 });
@@ -95,6 +101,17 @@ test('voice readback retains the bounded authored answer beyond the last page of
   assert.equal(receipt.turn.items.some(item=>item.id==='answer_one'),false);
   assert.equal(receipt.resultText,'final '.repeat(4000).slice(0,16000));assert.equal(receipt.resultTruncated,true);
   f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+});
+test('queued work blocked by lost provider readiness remains cancellable and is not shown as running',async t=>{
+  const f=fixture(t),first=request('First'),next=request('Blocked next');f.reserve('task-one',first);await f.bridge.dispatch('task-one',first);await until(()=>f.runs.length===1);
+  f.reserve('task-two',next);const queued=await f.bridge.dispatch('task-two',next);
+  f.runtime.options.preflight=async()=>{throw Object.assign(new Error('not ready'),{code:'provider_pending_auth'});};
+  f.runs[0].resolve({ok:true,processTreeExited:true});
+  await until(()=>f.runtime.execution.getIntentById(queued.task.queueId)?.state==='blocked');
+  const view=await f.bridge.reconcile('task-two');assert.equal(view.receipt.status,'blocked');assert.equal(view.receipt.reason,'provider_pending_auth');
+  assert.equal(f.runtime.voiceTaskLinks(view.topic.chatId).find(link=>link.taskId==='task-two').status,'waiting_for_operator');
+  await f.bridge.stop('task-two',{generation:1,revision:view.task.revision,clientMessageId:'stop_blocked_queue'});
+  assert.equal(f.runtime.voiceTaskLinks(view.topic.chatId).find(link=>link.taskId==='task-two').status,'aborted');assert.equal(f.runs.length,1);
 });
 test('an ordinary HTTP-style creation cannot inject voice origin or replace a pinned topic', async t => {
   const f = fixture(t), body = request('Voice'); const r = f.reserve('task-one', body);

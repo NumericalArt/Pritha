@@ -1,7 +1,7 @@
 import type { ProviderChatBinding, ProviderChatRegistry, StoredProviderTurn } from './provider-chat-registry.mjs';
 import type { ExecutionCoordinator, ExecutionIntent } from './execution-coordinator.mjs';
 import type { ProviderConnectorId, ProviderPreset } from './provider-profile.mjs';
-import type { ChatEventRecord, ChatItemView, TurnView, AcceptedTurn, ThreadDetail } from '../../interfaces/control-center/src/lib/codex-chat/types';
+import type { ChatEventRecord, ChatItemView, TurnView, AcceptedTurn, ThreadDetail, TaskLinkView } from '../../interfaces/control-center/src/lib/codex-chat/types';
 import type { CreateThreadInput, StartTurnInput } from '../../interfaces/control-center/src/lib/codex-chat/native-gateway';
 import type { TaskChatBackend } from '../../interfaces/control-center/src/lib/codex-chat/driver-types';
 type Queued = Awaited<ReturnType<TaskChatBackend['queuedMessages']>>;
@@ -25,6 +25,8 @@ export class ProviderTaskRuntime {
   constructor(options:ProviderTaskOptions);
   readonly registry:ProviderChatRegistry;readonly execution:ExecutionCoordinator;
   require(chatId:string):ProviderChatBinding;
+  voiceTaskChat(taskId:string):string|null;
+  voiceTaskLinks(chatId:string):TaskLinkView[];
   activeIntent(chatId:string):ExecutionIntent|null;
   create(input:CreateThreadInput,host?:{voice:{topicId:string;generation:number;preset:ProviderPreset}}):Promise<{binding:ProviderChatBinding;replayed:boolean}>;
   voiceReceipt(chatId:string,clientMessageId:string):import('./voice-task-bridge.mjs').VoiceBackendReceipt|null;

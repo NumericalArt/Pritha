@@ -19,7 +19,7 @@ export class ExternalChatGateway implements TaskChatBackend {
       ...(binding.subject?{subject:binding.subject}:{}),
       status:binding.archived?'archived':active?'active':binding.lastStatus,activeFlags:active && active.state!=='unknown'?(pending.length?[pending.some(row=>row.kind==='user_input')?'waiting_on_input':'waiting_on_approval']:['streaming']):[],pinned:binding.pinned,archived:binding.archived,historyKind:'mirrored',createdAt:binding.createdAt,updatedAt:binding.updatedAt,
       runtime:{connectorId:binding.connectorId,modelId:binding.modelId,providerId:binding.providerId,version:null,protocol:'exec_resume',stateIdentityHash:binding.stateIdentityHash,compatibility:'bound'},
-      taskLinks:binding.taskLinks,continuationState:active?'blocked_active_turn':binding.continuationEnabled?'continuation_enabled':'read_only'};
+      taskLinks:this.core.voiceTaskLinks(binding.chatId),continuationState:active?'blocked_active_turn':binding.continuationEnabled?'continuation_enabled':'read_only'};
   }
   runtimeStatus:TaskChatBackend['runtimeStatus']=chatId=>this.runtimeView(chatId);
   previewRuntime=(preset:ProviderPreset)=>this.runtimeView(undefined,preset);
@@ -88,5 +88,5 @@ export class ExternalChatGateway implements TaskChatBackend {
   taskDeliveries:TaskChatBackend['taskDeliveries']=async()=>this.unsupported();
   deliveryAction:TaskChatBackend['deliveryAction']=async()=>this.unsupported();
   createTaskLink:TaskChatBackend['createTaskLink']=async()=>this.unsupported();
-  taskChatLinkForTask:TaskChatBackend['taskChatLinkForTask']=async taskId=>{const chat=this.core.registry.history.chatForTask(taskId);return chat?{chatId:chat,href:'/task-chat?chat='+encodeURIComponent(chat),historyAvailable:true,continuationState:this.summary(this.core.require(chat)).continuationState}:null;};
+  taskChatLinkForTask:TaskChatBackend['taskChatLinkForTask']=async taskId=>{const chat=this.core.voiceTaskChat(taskId) || this.core.registry.history.chatForTask(taskId);return chat?{chatId:chat,href:'/task-chat?group=voice_work&chat='+encodeURIComponent(chat),historyAvailable:true,continuationState:this.summary(this.core.require(chat)).continuationState}:null;};
 }

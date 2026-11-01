@@ -90,6 +90,11 @@ export class VoiceTopicBindings {
     if (!id(record.taskId) || record.taskId !== taskId || !taskStates.has(record.state) || !this.topic(record.topicId)) fail('voice_task_binding_invalid');
     return record;
   }
+  tasksForTopic(topicId, limit = 200) {
+    if (!this.topic(topicId) || !Number.isSafeInteger(limit) || limit < 1 || limit > 200) fail('voice_topic_query_invalid');
+    return this.db.prepare('SELECT task_id FROM voice_task_bindings WHERE topic_id=? ORDER BY rowid DESC LIMIT ?')
+      .all(topicId, limit).reverse().map(row => this.task(row.task_id));
+  }
   /** Selection is captured once. A changed connector starts a new generation;
    * another model for the same topic requires reset. Explicit continuation uses
    * its exact topic, even after the global default changes.

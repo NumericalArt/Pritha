@@ -13,6 +13,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     && 'status_detail' in result && result.status_detail && 'chat_id' in result.status_detail ? result.status_detail.chat_id : null;
   const taskChat = providerChat ? { chatId: String(providerChat), href: providerHref!, historyAvailable: true,
     continuationState: 'complete' in result && result.complete ? 'continuation_enabled' : 'blocked_active_turn' }
-    : result.ok ? await getCodexChatGateway().taskChatLinkForTask(String(result.task_id || id)).catch(() => null) : null;
+    : result.ok && (!('connector_id' in result) || result.connector_id === 'codex') ? await getCodexChatGateway().taskChatLinkForTask(String(result.task_id || id)).catch(() => null) : null;
   return NextResponse.json(result.ok ? { ...result, task_chat: taskChat } : result, { status: result.ok ? 200 : 404 });
 }

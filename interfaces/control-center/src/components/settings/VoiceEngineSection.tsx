@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { VoiceEngine } from "@/lib/settings/provider-profile";
 import {CHAINED_VOICES,DEFAULT_CHAINED_VOICE_SETTINGS,type ChainedVoiceSettings} from "@/lib/voice/settings";
 type VoiceStatus = { preference: VoiceEngine; engine: "openai" | "neuraldeep" | null; connectorId: string; reason: string; revision: number; chained:ChainedVoiceSettings };
@@ -9,26 +9,45 @@ export function VoiceEngineSection({onEngineChange}:{onEngineChange?:(engine:"op
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [chained,setChained]=useState<ChainedVoiceSettings>(DEFAULT_CHAINED_VOICE_SETTINGS);
+  const [conflict,setConflict]=useState(false);
+  const current=useRef({status,choice,chained,conflict}),requestId=useRef(0),alive=useRef(true),savingRef=useRef(false);
+  current.current={status,choice,chained,conflict};
   const engine=choice==='auto' ? status?.engine || (status?.connectorId==='neuraldeep'?'neuraldeep':'openai') : choice;
   useEffect(()=>{onEngineChange?.(engine);},[engine,onEngineChange]);
-  async function load() {
+  async function load(preserveEdits=false) {
+    if(savingRef.current)return;
+    const sequence=++requestId.current;
     const response = await fetch("/api/realtime/engine", { cache: "no-store" }).catch(() => null);
     const payload = response?.ok ? await response.json().catch(() => null) : null;
+    if(!alive.current || sequence!==requestId.current)return;
     if (!payload?.voice) { setMessage("Voice engine settings unavailable. Reload to try again."); return; }
-    setStatus(payload.voice); setChoice(payload.voice.preference);
-    setChained(payload.voice.chained || DEFAULT_CHAINED_VOICE_SETTINGS);
+    const saved=current.current.status,dirty=saved && (current.current.choice!==saved.preference || JSON.stringify(current.current.chained)!==JSON.stringify(saved.chained));
+    const changed=saved && (saved.preference!==payload.voice.preference || JSON.stringify(saved.chained)!==JSON.stringify(payload.voice.chained));
+    setStatus(payload.voice);
+    if(preserveEdits && dirty){
+      if(changed){setConflict(true);setMessage('Voice settings changed elsewhere. Your edits are retained. Reload saved voice settings before saving.');}
+      else if(!current.current.conflict)setMessage('Task provider updated. Your voice edits are retained.');
+      return;
+    }
+    setChoice(payload.voice.preference);setChained(payload.voice.chained || DEFAULT_CHAINED_VOICE_SETTINGS);setConflict(false);setMessage('');
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    alive.current=true;void load();
+    const refresh=()=>void load(true);
+    window.addEventListener('pritha-task-provider-settings-changed',refresh);
+    window.addEventListener('focus',refresh);
+    return()=>{alive.current=false;requestId.current++;window.removeEventListener('pritha-task-provider-settings-changed',refresh);window.removeEventListener('focus',refresh);};
+  }, []);
   async function save() {
-    if (!status) return;
-    setSaving(true); setMessage("");
+    if (!status || conflict || savingRef.current) return;
+    savingRef.current=true;requestId.current++;setSaving(true); setMessage("");
     const response = await fetch("/api/realtime/engine", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ voiceEngine: choice, expectedRevision: status.revision, chained }) }).catch(() => null);
     const payload = await response?.json().catch(() => null);
-    setSaving(false);
+    savingRef.current=false;if(!alive.current)return;setSaving(false);
     if (!response?.ok || !payload?.voice) {
       setMessage(payload?.message || "Could not save voice engine. Reload and try again.");
-      if (response?.status === 409) await load();
+      if (response?.status === 409) await load(true);
       return;
     }
     setStatus(payload.voice); setChoice(payload.voice.preference); setMessage("Voice engine saved. Reconnect to apply.");
@@ -56,7 +75,8 @@ export function VoiceEngineSection({onEngineChange}:{onEngineChange?:(engine:"op
       </div>
     </>}
     <div className="settings-action-row">
-      <button className="outline-button" type="button" disabled={!status || saving || (choice === status.preference && JSON.stringify(chained)===JSON.stringify(status.chained))} onClick={() => void save()}>{saving ? "Saving" : "Save Voice Engine"}</button>
+      <button className="outline-button" type="button" disabled={!status || saving || conflict || (choice === status.preference && JSON.stringify(chained)===JSON.stringify(status.chained))} onClick={() => void save()}>{saving ? "Saving" : "Save Voice Engine"}</button>
+      {conflict && <button className="outline-button" type="button" disabled={saving} onClick={()=>void load()}>Reload saved voice settings</button>}
       <span role="status">{message || (status ? resolved : "Loading voice engine...")}</span>
     </div>
   </>;

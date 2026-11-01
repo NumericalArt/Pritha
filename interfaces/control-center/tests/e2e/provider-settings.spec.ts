@@ -52,3 +52,51 @@ test('a stale browser save cannot overwrite a newer preset, and an invalid numbe
   await surface.getByRole('button',{name:'Reload saved presets'}).click();await expect(surface.getByLabel('OpenRouter model',{exact:true})).toHaveValue('vendor/alpha');
   const timeout=surface.getByLabel('OpenRouter timeout seconds');await timeout.fill('');await timeout.blur();await surface.getByRole('button',{name:'Save preset',exact:true}).click();await expect(surface).toContainText('Enter a timeout from 10 to 3600');await expect(timeout).toHaveValue('');
 });
+
+test('provider changes refresh Auto voice and retain an unsaved voice draft with a current save revision',async({page,request})=>{
+  const original=(await(await request.get('/api/realtime/engine')).json()).voice;
+  const saveVoice=async(voiceEngine:string,chained=original.chained)=>{
+    const current=(await(await request.get('/api/realtime/engine')).json()).voice;
+    expect((await request.post('/api/realtime/engine',{data:{voiceEngine,chained,expectedRevision:current.revision}})).ok()).toBe(true);
+  };
+  try{
+    await saveVoice('auto');await page.goto('/settings');
+    const voice=page.getByLabel('Voice engine',{exact:true}).filter({visible:true}),surface=panel(page);
+    await expect(voice).toBeEnabled();await voice.selectOption('neuraldeep');
+    const timbre=page.getByLabel('NeuralDeep voice',{exact:true}).filter({visible:true});await timbre.selectOption('vivian');
+    await select(page,'openrouter');await surface.getByLabel('OpenRouter model',{exact:true}).fill('vendor/alpha');
+    await surface.getByRole('button',{name:'Save preset',exact:true}).click();await expect(surface).toContainText('Preset saved.');
+    await surface.getByRole('button',{name:'Use for new chats'}).click();await expect(surface).toContainText('OpenRouter selected for new chats.');
+    await expect(page.getByText('Task provider updated. Your voice edits are retained.',{exact:true}).filter({visible:true})).toBeVisible();
+    await expect(voice).toHaveValue('neuraldeep');await expect(timbre).toHaveValue('vivian');
+    const save=page.getByRole('button',{name:'Save Voice Engine',exact:true}).filter({visible:true});
+    await save.click();await expect(page.getByText('Voice engine saved. Reconnect to apply.',{exact:true}).filter({visible:true})).toBeVisible();
+    expect((await(await request.get('/api/realtime/engine')).json()).voice.chained.voice).toBe('vivian');
+    await voice.selectOption('auto');await save.click();await expect(save).toBeDisabled();
+    // Reloading provider presets is explicit here because the voice save also
+    // advances the shared document revision.
+    await surface.getByRole('button',{name:'Reload saved presets'}).click();await select(page,'neuraldeep');
+    await surface.getByRole('button',{name:'Use for new chats'}).click();await expect(surface).toContainText('NeuralDeep selected for new chats.');
+    await expect(voice).toHaveValue('auto');await expect(timbre).toHaveValue('vivian');
+    await expect(page.getByLabel('Voice model',{exact:true}).filter({visible:true})).toHaveCount(0);
+  }finally{await saveVoice(original.preference);}
+});
+
+test('voice settings conflicts preserve edits until an explicit reload',async({page,request})=>{
+  const original=(await(await request.get('/api/realtime/engine')).json()).voice;
+  const saveVoice=async(voiceEngine:string)=>{
+    const current=(await(await request.get('/api/realtime/engine')).json()).voice;
+    expect((await request.post('/api/realtime/engine',{data:{voiceEngine,expectedRevision:current.revision}})).ok()).toBe(true);
+  };
+  try{
+    await saveVoice('auto');await page.goto('/settings');
+    const voice=page.getByLabel('Voice engine',{exact:true}).filter({visible:true});await expect(voice).toBeEnabled();await voice.selectOption('openai');
+    await saveVoice('neuraldeep');
+    await page.getByRole('button',{name:'Save Voice Engine',exact:true}).filter({visible:true}).click();
+    await expect(page.getByText(/Voice settings changed elsewhere\. Your edits are retained/).filter({visible:true})).toBeVisible();
+    await expect(voice).toHaveValue('openai');
+    await expect(page.getByRole('button',{name:'Save Voice Engine',exact:true}).filter({visible:true})).toBeDisabled();
+    expect((await(await request.get('/api/realtime/engine')).json()).voice.preference).toBe('neuraldeep');
+    await page.getByRole('button',{name:'Reload saved voice settings',exact:true}).filter({visible:true}).click();await expect(voice).toHaveValue('neuraldeep');
+  }finally{await saveVoice(original.preference);}
+});

@@ -63,20 +63,22 @@ export async function providerVoiceTaskProjection(taskId: string) {
   const pending = detail?.pendingRequests.filter(row => row.turnId === task.turnId) || [];
   const question = pending.find(row => row.kind === 'user_input');
   const turn = receipt?.kind === 'turn' ? receipt.turn : null;
+  const unknownExecution = detail?.activeTurnId === task.turnId && detail?.executionState === 'unknown';
+  const queue = receipt?.kind === 'queue' ? receipt : null;
   const statusMap: Record<string, string> = { completed: 'complete', failed: 'failed', interrupted: 'aborted', queued: 'queued',
     in_progress: 'running', waiting_for_input: 'waiting_for_operator', waiting_for_approval: 'waiting_for_operator', waiting_for_provider: 'waiting_for_operator' };
-  const status = turn ? pending.length ? 'waiting_for_operator' : statusMap[turn.status] || 'waiting_for_operator'
-    : task.state === 'queued' ? 'queued' : task.state === 'cancelled' ? 'aborted' : 'waiting_for_operator';
+  const status = turn ? pending.length || unknownExecution ? 'waiting_for_operator' : statusMap[turn.status] || 'waiting_for_operator'
+    : task.state === 'queued' && (!queue?.status || queue.status === 'queued') ? 'queued' : task.state === 'cancelled' ? 'aborted' : 'waiting_for_operator';
   const questions = question?.presentation && Array.isArray(question.presentation.questions) ? question.presentation.questions as Array<{id:string;question:string}> : [];
   const resultText = receipt?.kind === 'turn' ? receipt.resultText || '' : '';
   return { task, topic, resultText, status: {
-    status, phase: turn?.status || task.state, transport: 'task-chat', connector_id: topic.connectorId,
+    status, phase: unknownExecution ? 'execution_unknown' : turn?.status || queue?.status || task.state, transport: 'task-chat', connector_id: topic.connectorId,
     model: topic.resolvedModelId || topic.preset.modelId, chat_id: topic.chatId, turn_id: task.turnId,
     topic_id: topic.topicId, topic_generation: topic.scope.generation, task_revision: task.revision,
     task_chat_href: topic.chatId ? '/task-chat?group=voice_work&chat=' + encodeURIComponent(topic.chatId) : null,
     updated_at: turn?.completedAt || turn?.startedAt || task.updatedAt, completed_at: turn?.completedAt || null,
     result_truncated: receipt?.kind === 'turn' && receipt.resultTruncated === true,
-    error_code: turn?.error?.code || task.errorCode,
+    error_code: unknownExecution ? 'fallback_confirmation_required' : turn?.error?.code || queue?.reason || task.errorCode,
     question: questions.map(row => row.question).join('\n').slice(0, 2000),
     requires_operator_response: Boolean(question),
     operator_request: question ? { request_id: question.requestId, revision: question.presentation?.revision,
