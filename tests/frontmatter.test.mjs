@@ -43,3 +43,24 @@ test("yamlList emits project-compatible block lists", () => {
   assert.equal(yamlList([]), "[]");
   assert.equal(yamlList(["Codex", "Codex", "sqlite3"]), "\n  - Codex\n  - sqlite3");
 });
+
+test("flow subject metadata matches block metadata without mutating private authored files", () => {
+  const flow = parseFrontmatterData('---\nsubject: {kind: child-agent, id: "synthetic-agent"}\ntopics: ["commas, inside", nested]\nrelated: {workflows: [one, two]}\n---\n');
+  const block = parseFrontmatterData('---\nsubject:\n  kind: child-agent\n  id: synthetic-agent\n---\n');
+  assert.deepEqual(flow.subject, block.subject);
+  assert.deepEqual(flow.topics, ["commas, inside", "nested"]);
+  assert.deepEqual(flow.related.workflows, ["one", "two"]);
+  assert.equal(Object.getPrototypeOf(flow.subject), null);
+});
+
+test("flow metadata rejects pollution, ambiguous keys and malformed structures", () => {
+  const parsed = parseFrontmatterData('---\nsubject: {__proto__: {polluted: yes}, constructor: {prototype: unsafe}, kind: child-agent, id: safe}\n---\n');
+  assert.equal(Object.hasOwn(parsed.subject, "__proto__"), false);
+  assert.equal(Object.hasOwn(parsed.subject, "constructor"), false);
+  assert.equal(({}).polluted, undefined);
+  for (const value of ['{kind: agent, kind: other}', '{kind: "unclosed}', '{kind: [x}', '{kind: agent,, id: one}']) {
+    assert.equal(typeof parseFrontmatterData(`---\nsubject: ${value}\n---\n`).subject, "string");
+  }
+  const nested = "[".repeat(1000) + "payload" + "]".repeat(1000);
+  assert.doesNotThrow(() => parseFrontmatterData(`---\nsubject: ${nested}\n---\n`));
+});

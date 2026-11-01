@@ -23,6 +23,8 @@ export type ChatBinding = {
   createHash: string;
   nativeThreadId: string;
   providerId: RuntimeProviderId;
+  connectorId?: "codex";
+  modelId?: string;
   workspace?: TaskWorkspace;
   sandbox?: string;
   stateIdentityHash: string | null;
@@ -75,6 +77,8 @@ function normalizeBinding(value: unknown): ChatBinding | null {
   if (!String(row.chatId || "").startsWith("chat_")) return null;
   if (!String(row.nativeThreadId || "")) return null;
   if (row.providerId !== "desktop_bundled" && row.providerId !== "standalone_cli") return null;
+  if (row.connectorId !== undefined && row.connectorId !== "codex") return null;
+  if (row.modelId !== undefined && (typeof row.modelId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(row.modelId))) return null;
   if (row.goalBudgetRequests !== undefined && (!row.goalBudgetRequests || typeof row.goalBudgetRequests !== "object" || Array.isArray(row.goalBudgetRequests))) return null;
   if (row.deliveryBudgetRequests !== undefined && (!row.deliveryBudgetRequests || typeof row.deliveryBudgetRequests !== "object" || Array.isArray(row.deliveryBudgetRequests))) return null;
   const createdAt = String(row.createdAt || new Date(0).toISOString());
@@ -84,6 +88,8 @@ function normalizeBinding(value: unknown): ChatBinding | null {
     createHash: String(row.createHash || ""),
     nativeThreadId: String(row.nativeThreadId),
     providerId: row.providerId,
+    ...(row.connectorId ? { connectorId: row.connectorId } : {}),
+    ...(row.modelId ? { modelId: row.modelId } : {}),
     ...(row.workspace && typeof row.workspace === "object" ? {workspace:row.workspace} : {}),
     ...(typeof row.sandbox === "string" ? {sandbox:row.sandbox} : {}),
     stateIdentityHash: typeof row.stateIdentityHash === "string" ? row.stateIdentityHash : null,
@@ -214,12 +220,26 @@ export class CodexChatPrivateStore {
       const registry = await this.load(true);
       const current = registry.chats[chatId];
       if (!current) return null;
+      if (current.modelId && patch.modelId !== undefined && current.modelId !== patch.modelId) throw Object.assign(new Error("This thread's model binding cannot be changed."), { code: "runtime_identity_mismatch" });
       const next = normalizeBinding({ ...current, ...patch, chatId,
         messageReceipts: { ...current.messageReceipts, ...patch.messageReceipts },
         attachmentMessages: { ...current.attachmentMessages, ...patch.attachmentMessages },
         goalBudgetRequests: { ...current.goalBudgetRequests, ...patch.goalBudgetRequests },
         deliveryBudgetRequests: { ...current.deliveryBudgetRequests, ...patch.deliveryBudgetRequests },
       }) || current;
+      registry.chats[chatId] = next;
+      await this.persist(registry);
+      return next;
+    });
+  }
+
+  async pinModel(chatId: string, observedModel: string) {
+    return this.enqueueMutation(async () => {
+      if (this.readOnlyError) throw this.readOnlyError;
+      const registry = await this.load(true), current = registry.chats[chatId];
+      if (!current || current.modelId) return current || null;
+      const next = normalizeBinding({ ...current, connectorId: "codex", modelId: observedModel });
+      if (!next) return null;
       registry.chats[chatId] = next;
       await this.persist(registry);
       return next;

@@ -11,7 +11,7 @@ import ts from "../interfaces/control-center/node_modules/typescript/lib/typescr
 const root = "interfaces/control-center/src";
 const appServerSource = readFileSync(`${root}/lib/codex-chat/app-server.ts`, "utf8");
 const codexBinariesSource = readFileSync(`${root}/lib/settings/codex-binaries.ts`, "utf8");
-const gatewaySource = readFileSync(`${root}/lib/codex-chat/gateway.ts`, "utf8");
+const gatewaySource = readFileSync(`${root}/lib/codex-chat/native-gateway.ts`, "utf8");
 const nativeThreadErrorsSource = readFileSync(`${root}/lib/codex-chat/native-thread-errors.ts`, "utf8");
 const privateStoreSource = readFileSync(`${root}/lib/codex-chat/private-store.ts`, "utf8");
 const privateJsonSource = readFileSync(`${root}/lib/private-json.ts`, "utf8");
@@ -119,7 +119,7 @@ test("Codex Chat core keeps native history, stable browser ids and safe turn rep
   assert.match(gatewaySource, /reconciledStatus !== binding\.lastStatus/);
   assert.doesNotMatch(startTurnSource, /const defaults = this\.runtime\.turnDefaults\(\)/);
   assert.doesNotMatch(startTurnSource, /input\.settings\?\.modelId \|\| defaults\.model/);
-  assert.match(startTurnSource, /input\.settings\?\.modelId \? \{ model: input\.settings\.modelId \} : \{\}/);
+  assert.match(startTurnSource, /model: binding\.modelId \|\| input\.settings\?\.modelId/);
   assert.match(gatewaySource, /active\?\.acknowledged && !turns\.some/);
   assert.doesNotMatch(gatewaySource, /UNCERTAIN_TURN_LEASE_MS|deferUncertainTurnRelease/);
   assert.match(gatewaySource, /event\("turn-start-failed"|recordRuntimeEvent\("turn-start-failed"/);

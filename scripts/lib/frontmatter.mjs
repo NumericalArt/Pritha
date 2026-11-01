@@ -1,12 +1,47 @@
-function parseScalar(value) {
+const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+// Bounded YAML flow collections used by authored metadata. This is deliberately
+// a small data parser: no tags, anchors, object constructors or evaluation.
+function splitFlow(value, separator) {
+  const parts = [];
+  let start = 0, depth = 0, quote = "", escaped = false;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    if (quote) {
+      if (escaped) { escaped = false; continue; }
+      if (char === "\\" && quote === '"') { escaped = true; continue; }
+      if (char === quote) {
+        if (quote === "'" && value[i + 1] === "'") { i++; continue; }
+        quote = "";
+      }
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === "[" || char === "{") depth++;
+    else if (char === "]" || char === "}") { if (--depth < 0) return null; }
+    else if (char === separator && depth === 0) { parts.push(value.slice(start, i)); start = i + 1; }
+  }
+  return quote || depth ? null : [...parts, value.slice(start)];
+}
+
+function parseScalar(value, depth = 0) {
   const trimmed = String(value ?? "").trim();
   if (trimmed === "") return "";
   if (trimmed === "[]") return [];
   if (trimmed === "{}") return Object.create(null);
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+  if (depth >= 12 || trimmed.length > 65_536) return trimmed;
+  if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
     const inner = trimmed.slice(1, -1).trim();
-    if (!inner) return [];
-    return inner.split(",").map((item) => item.trim().replace(/^["']|["']$/g, ""));
+    const parts = inner ? splitFlow(inner, ",") : [];
+    if (parts === null || parts.some(item => !item.trim())) return trimmed;
+    if (trimmed.startsWith("[")) return parts.map(item => parseScalar(item, depth + 1));
+    const result = Object.create(null);
+    for (const part of parts) {
+      const pair = splitFlow(part, ":");
+      if (!pair || pair.length < 2) return trimmed;
+      const key = pair[0].trim().replace(/^["']|["']$/g, "");
+      if (!/^[A-Za-z0-9_-]+$/.test(key) || Object.hasOwn(result, key)) return trimmed;
+      if (!FORBIDDEN_KEYS.has(key.toLowerCase())) result[key] = parseScalar(pair.slice(1).join(":"), depth + 1);
+    }
+    return result;
   }
   return trimmed.replace(/^["']|["']$/g, "");
 }
@@ -35,14 +70,13 @@ function parseFrontmatterBlock(raw) {
   const data = Object.create(null);
   let currentKey = null;
   let currentNestedKey = null;
-  const forbiddenKeys = new Set(["__proto__", "constructor", "prototype"]);
 
   for (const line of lines) {
     if (!line.trim()) continue;
 
     const topMatch = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
     if (topMatch) {
-      if (forbiddenKeys.has(topMatch[1].toLowerCase())) {
+      if (FORBIDDEN_KEYS.has(topMatch[1].toLowerCase())) {
         currentKey = null;
         currentNestedKey = null;
         continue;
@@ -55,7 +89,7 @@ function parseFrontmatterBlock(raw) {
 
     const nestedMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
     if (nestedMatch && currentKey) {
-      if (forbiddenKeys.has(nestedMatch[1].toLowerCase())) {
+      if (FORBIDDEN_KEYS.has(nestedMatch[1].toLowerCase())) {
         currentNestedKey = null;
         continue;
       }

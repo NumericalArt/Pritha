@@ -446,10 +446,15 @@ export function CodexChatPage() {
   );
 
   const refreshRuntime = useCallback(async () => {
-    const response = await api<RuntimeStatus>("/api/codex-chat/v1/runtime");
-    setRuntime(response.data);
+    const chatId = selectedChatIdRef.current;
+    const response = await api<RuntimeStatus>(`/api/codex-chat/v1/runtime${chatId ? `?chatId=${encodeURIComponent(chatId)}` : ""}`);
+    if (selectedChatIdRef.current === chatId) setRuntime(response.data);
     return response.data;
   }, []);
+  useEffect(() => {
+    setRuntime(null);
+    void refreshRuntime().catch(() => { /* Existing runtime health polling will retry without changing this thread's provider. */ });
+  }, [selectedChatId, refreshRuntime]);
 
   const refreshThreads = useCallback(async () => {
     if (showArchived !== archiveViewRef.current) return [];

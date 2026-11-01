@@ -190,6 +190,7 @@ export class AppServerConnection {
   private nextId = 1;
   private pending = new Map<string | number, PendingRequest>();
   private loadedThreads = new Set<string>();
+  private loadedModels = new Map<string, string>();
   private startPromise: Promise<void> | null = null;
   private notificationHandler: NotificationHandler;
   private disposing = false;
@@ -256,14 +257,17 @@ export class AppServerConnection {
     stdin.write(`${JSON.stringify({ method, params })}\n`);
   }
 
-  markThreadLoaded(threadId: string) {
+  markThreadLoaded(threadId: string, model?: string) {
     if (threadId) this.loadedThreads.add(threadId);
+    if (model) this.loadedModels.set(threadId, model);
   }
 
   async ensureThreadLoaded(threadId: string) {
-    if (this.loadedThreads.has(threadId)) return;
-    await this.request("thread/resume", { threadId });
+    if (this.loadedThreads.has(threadId)) return this.loadedModels.get(threadId) || null;
+    const response = await this.request("thread/resume", { threadId }) as { model?: unknown } | null;
+    if (typeof response?.model === "string") this.loadedModels.set(threadId, response.model);
     this.loadedThreads.add(threadId);
+    return this.loadedModels.get(threadId) || null;
   }
 
   close(reason = new Error("Codex App Server connection closed.")) {
@@ -274,6 +278,7 @@ export class AppServerConnection {
     }
     this.pending.clear();
     this.loadedThreads.clear();
+    this.loadedModels.clear();
     this.child?.stdin.end();
     this.child?.kill("SIGTERM");
     this.child = null;

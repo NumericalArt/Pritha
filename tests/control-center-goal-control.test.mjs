@@ -10,7 +10,7 @@ import * as executionCoordinator from "../scripts/lib/execution-coordinator.mjs"
 const require = createRequire(import.meta.url);
 const sourceRoot = "interfaces/control-center/src/lib";
 function load(name, dependencies = {}) {
-  const output = ts.transpileModule(readFileSync(`${sourceRoot}/${name}.ts`, "utf8"), {
+  const output = ts.transpileModule(readFileSync(`${sourceRoot}/${name === "codex-chat/gateway" ? "codex-chat/native-gateway" : name}.ts`, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;
   const module = { exports: {} };

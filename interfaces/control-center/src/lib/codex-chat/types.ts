@@ -76,6 +76,8 @@ export type ThreadContinuationState =
   | "blocked_history_unavailable";
 
 export type RuntimeBindingView = {
+  connectorId?: "codex" | "neuraldeep" | "claude" | "openrouter" | "local";
+  modelId?: string;
   providerId: RuntimeProviderId | null;
   version: string | null;
   protocol: RuntimeProtocol;

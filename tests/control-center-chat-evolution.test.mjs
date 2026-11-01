@@ -18,7 +18,7 @@ export async function fixtureModules() {
   writeFileSync(path.join(tmp, "app-server.mjs"), "export class AppServerConnection {} export class CodexRuntimeManager {}");
   writeFileSync(path.join(tmp, "voice-links.mjs"), "export const queueVoiceTaskChatIndexRefresh=()=>{}; export const reconcileVoiceTaskChatLink=async()=>{}; export const voiceTaskChatIndexStatus=()=>({state:'ready'});");
   for (const name of ["history-reader", "attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "native-control", "native-requests", "private-store", "goal-control", "budget-intent", "operation-runtime", "gateway", "../private-json"]) {
-    const source = readFileSync(`interfaces/control-center/src/lib/codex-chat/${name}.ts`, "utf8");
+    const source = readFileSync(`interfaces/control-center/src/lib/codex-chat/${name === "gateway" ? "native-gateway" : name}.ts`, "utf8");
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
       .replaceAll('"@/lib/private-json"', '"./private-json.mjs"')
@@ -273,7 +273,8 @@ test("attachment-only first messages reconcile unknown delivery without a second
     const page = await gateway.listTurns(firstBinding.chatId);
     assert.equal(page.hasImageInputs, true);
     modalities = ["text"];
-    await assert.rejects(gateway.startTurn(firstBinding.chatId, { clientMessageId: randomUUID(), input: [{ type: "text", text: "Follow up" }], settings: { modelId: "text-only" } }), e => e.code === "model_image_unsupported");
+    await assert.rejects(gateway.startTurn(firstBinding.chatId, { clientMessageId: randomUUID(), input: [{ type: "text", text: "Follow up" }], settings: { modelId: "text-only" } }), e => e.code === "runtime_identity_mismatch");
+    await assert.rejects(gateway.startTurn(firstBinding.chatId, { clientMessageId: randomUUID(), input: [{ type: "text", text: "Follow up" }], settings: { modelId: "test" } }), e => e.code === "model_image_unsupported");
     assert.equal(starts, 1, "an incompatible follow-up cannot discard previous images");
   } finally { f.cleanup(); }
 });
@@ -290,6 +291,41 @@ async function coordinatedGateway(f, connection, native) {
   }});
   return gateway;
 }
+
+test('native model binding survives settings changes, worker reload and legacy resume', async () => {
+  const f=await fixtureModules();let gateway;
+  try {
+    let resumedModel='original-model';const calls=[];
+    const native={id:'native-pin',cwd:f.root,turns:[],status:'idle'};
+    const connection={markThreadLoaded:()=>{},ensureThreadLoaded:async()=>resumedModel,generation:'pin-fixture',request:async(method,params)=>{
+      if(method==='thread/start')return {thread:native,model:'original-model'};
+      if(method==='turn/start'){calls.push(params);return {turn:{id:'pin-turn',status:'inProgress',items:[]}};}
+      return {};
+    }};
+    gateway=await coordinatedGateway(f,connection,native);
+    const created=await gateway.createThread({clientThreadId:randomUUID(),source:'chat'}),id=created.detail.thread.chatId;
+    assert.equal(created.detail.thread.runtime.modelId,'original-model');
+    gateway.runtime.threadDefaults=()=>({model:'changed-default',cwd:f.root});
+    await assert.rejects(gateway.startTurn(id,{clientMessageId:randomUUID(),input:[{type:'text',text:'Wrong override'}],settings:{modelId:'changed-default'}}),{code:'runtime_identity_mismatch'});
+    assert.equal(calls.length,0);
+    await gateway.startTurn(id,{clientMessageId:randomUUID(),input:[{type:'text',text:'Use pinned model'}]});
+    assert.equal(calls[0].model,'original-model');gateway.releaseActiveTurn(id);
+    const {CodexChatPrivateStore}=await f.load('private-store');
+    gateway.store=new CodexChatPrivateStore();
+    assert.equal((await gateway.store.get(id)).modelId,'original-model');
+    await assert.rejects(gateway.store.patch(id,{modelId:'changed-default'}),{code:'runtime_identity_mismatch'});
+    resumedModel='foreign-session-model';
+    await assert.rejects(gateway.startTurn(id,{clientMessageId:randomUUID(),input:[{type:'text',text:'Wrong resume'}]}),{code:'runtime_identity_mismatch'});
+    assert.equal(calls.length,1);
+    native.id='native-legacy';
+    await gateway.store.put({chatId:'chat_legacypin',nativeThreadId:'native-legacy',providerId:'desktop_bundled',stateIdentityHash:'storage-v2:fixture',title:'Legacy',origin:'chat',group:'my_chats',continuationEnabled:true});
+    resumedModel='legacy-original';
+    await gateway.startTurn('chat_legacypin',{clientMessageId:randomUUID(),input:[{type:'text',text:'Continue original session'}]});
+    assert.equal(calls[1].model,'legacy-original');
+    assert.equal((await gateway.store.get('chat_legacypin')).modelId,'legacy-original');
+    gateway.releaseActiveTurn('chat_legacypin');
+  } finally { if(gateway)for(const id of gateway.activeTurns.keys())gateway.releaseActiveTurn(id);f.cleanup(); }
+});
 
 test('two gateway instances create exactly one native chat for a shared client key', async () => {
   const f=await fixtureModules();

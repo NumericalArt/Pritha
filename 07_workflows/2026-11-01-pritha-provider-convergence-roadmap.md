@@ -11,11 +11,13 @@ topics:
   - curated-retrieval
   - voice-control
   - regression-prevention
+  - pritha-rebranding
 tools: [Pritha, Codex, NeuralDeep, Claude Code, OpenRouter, Ollama, LM Studio, MLX, SQLite, Playwright]
 sources:
   - source-operator-provider-convergence-spec-1-2026-11-01
   - source-operator-provider-convergence-spec-2-2026-11-01
   - source-operator-provider-convergence-spec-3-2026-11-01
+  - source-operator-pritha-rebranding-addendum-2026-11-01
 related:
   workflows:
     - 07_workflows/control-center-staged-release.md
@@ -31,7 +33,7 @@ supersedes: []
 superseded_by: []
 source_published: 2026-11-01
 source_updated: 2026-11-01
-source_version: three-operator-specifications-v1
+source_version: three-operator-specifications-plus-rebranding-addendum-v2
 retrieved: 2026-11-01
 verified: 2026-11-01
 temporal_status: implementation-requires-current-provider-evidence
@@ -259,9 +261,9 @@ native history unchanged; exact model resume; no cross-provider fallback.
 
 ### R3 — Общий Task Chat facade и native driver
 
-**Статус: pending.** Зависимость R2.
+**Статус: in-progress; native extraction and contract tests passed.** Зависимость R2.
 
-- [ ] Извлечь driver types и native adapter вокруг app-server/native-control/
+- [x] Извлечь driver types и native adapter вокруг app-server/native-control/
   native-turn-coordinator/goal-control/history-reader; сохранить canonical source.
 - [ ] Gateway делегирует provider execution и history; общие attachments,
   normalization, idempotency, admission, queue и HTTP errors остаются общими.
@@ -269,7 +271,7 @@ native history unchanged; exact model resume; no cross-provider fallback.
   restart recovery, cancellation lease cleanup, retry-after и queue limits.
 - [ ] Не смешивать provider sessions в native history; cursor pagination,
   event replay/dedupe, reconnect, archive/rename и approvals проходят binding.
-- [ ] Контрактные tests драйвера на fake backend до подключения новой сети.
+- [x] Контрактные tests драйвера на fake backend до подключения новой сети.
 
 **R3 gate:** весь native chat suite; concurrency/double-submit/restart tests;
 typecheck; history pagination/quotes/image annotation/scroll не деградировали.
@@ -464,6 +466,97 @@ double Enter, lost response, stale revision/turn и mobile composition.
 two-instance isolation, demo scaffold sanity, profile switching, backwards
 compatibility и отсутствие long-running processes/credential provisioning.
 
+### R11b — Завершение ребрендинга Techscope → Pritha без потери состояния
+
+**Статус: planned; added by operator during execution.** Выполняется до R12.
+Зависимости: R1/R2 для state identity, R11 для bootstrap/distribution. Контракт
+имён и shared resolver можно вводить раньше, чтобы новые adapters не размножали
+старую терминологию. Исходные R0–R12 сохраняют номера и объём.
+
+**Оценка:** средний долг по DX/onboarding, низкий прямой эксплуатационный риск
+самого исторического имени; повышенный риск некорректной миграции путей. В коде
+подтверждены отдельные Node/TS/Python resolvers, CLI/shell entrypoints, setup,
+memory rebuild/query/embedding, instance migration и managed-runtime env. Это
+не косметическая замена строки. Лёгкая часть — package name и текущие подписи;
+основная сложность — единый path contract и upgrade/rollback. Обещания нулевого
+риска нет: риск ограничивается additive compatibility, изолированными тестами,
+снимком и явной транзакцией переноса.
+
+1. **R11b.1 — Инвентаризация и контракт.**
+   - [ ] Разделить упоминания на public/current API, внутренний compatibility
+     boundary, persisted schema/identity и неизменяемую историю/источники.
+   - [ ] Зафиксировать canonical имена: `PRITHA_ROOT`, `resolvePrithaRoot`,
+     `.pritha-setup.json` для legacy checkout layout, `pritha.sqlite` внутри
+     выбранного memory directory и package `pritha`. Внешний state-root уже
+     использует нейтральный `setup/setup.json`; его переименовывать не нужно.
+   - [ ] `TECHSCOPE_ROOT`, `resolveTechscopeRoot`, старые CLI entrypoints и
+     существующие файлы остаются compatibility aliases на переходный период.
+     Удаление aliases не входит в эту поставку. Старые артефакты, их IDs,
+     source URLs, цитаты и ссылки не переписывать массово.
+   - [ ] Отдельно проверить protocol/schema/table identifiers: переименовать
+     только при реальной необходимости с versioned reader/migration; не ломать
+     сохранённые foreign keys, citations, retrieval fixtures и историю задач.
+   - **Проверка:** versioned inventory/allowlist оставшихся имён с причиной;
+     Good State Alignment для memory, setup и instance isolation.
+2. **R11b.2 — Единое разрешение корня и совместимость окружения.**
+   - [ ] Нормализованный explicit `--root` > `PRITHA_ROOT` > `TECHSCOPE_ROOT`
+     > Git root > cwd. Два разных непустых env roots — actionable conflict,
+     а не молчаливый выбор; explicit root задаёт оба aliases одинаково в child.
+     Не существующий явно заданный root не должен переключать экземпляр.
+   - [ ] Одинаковое поведение Node, TS, Python, shell wrappers, bootstrap,
+     setup, CLI workers и managed-runtime manifests; import/export aliases
+     используют одну реализацию. Обновить redaction для обоих названий.
+   - [ ] Новые scaffold/config/examples используют Pritha; при запуске старых
+     дочерних entrypoints передавать совместимые env значения одного root.
+     `PRITHA_STATE_ROOT` и `PRITHA_AGENT_PARENT` сохраняют границы экземпляра.
+   - **Тесты:** neither/old-only/new-only/both-equal/both-conflicting, пробелы,
+     symlink/canonical identity, invalid root, explicit root, запуск вне checkout,
+     Python/Node parity, два экземпляра и child env без чужих credentials.
+3. **R11b.3 — Чтение старых данных и безопасный перенос.**
+   - [ ] Общие resolvers memory database и setup file вместо разбросанных
+     литералов. Fresh install создаёт canonical файл; old-only installation
+     читает прежний. Чтение/health/status не переименовывает и не создаёт файлы.
+   - [ ] При двух разных файлах не выбирать по mtime и не сливать автоматически:
+     показать конфликт и остановить запись до явного выбора источника.
+     Даже «одинаковые сейчас» копии не должны стать двумя writable truth sources.
+   - [ ] Подготовить read-only migration plan, private manifest, backup и
+     bounded transaction с lock, проверкой source fingerprint и destination
+     no-clobber. Повторный запуск идемпотентен; interruption оставляет понятный
+     recovery state, а не partly switched paths.
+   - [ ] SQLite переносить согласованным snapshot/backup API с учётом WAL/SHM,
+     integrity check и отсутствия конкурирующих writers; не делать raw rename
+     живой БД. Проверить schema, FTS, relations, embedding dimensions/counts,
+     semantic status и authored document identities до/после.
+   - [ ] Setup переносит version/profile/warnings/pointers без secrets в tracked
+     report. Проверить permissions, symlinks, path traversal и external state-root.
+   - [ ] Rollback восстанавливает исходные bytes/path selection из manifest;
+     никакого удаления исходного state до успешной приёмки. Проверить startup
+     предыдущего кода на сохранённом состоянии без рассинхронизации записей.
+   - **Тесты:** fresh/legacy/external layouts, dual-file conflict, corrupt source,
+     symlink escape, WAL activity, crash на границах транзакции, retry/rollback,
+     одновременные workers, пустая/полная память, unchanged retrieval holdout.
+4. **R11b.4 — Внешний вид репозитория и защита от возврата старых имён.**
+   - [ ] Package metadata, README/README.ru, текущие setup/help/error labels,
+     docs, AGENTS и templates описывают Pritha как primary и одну короткую
+     compatibility note. Existing historical Markdown и source appendices
+     остаются историей; актуальные ссылки на старые filenames сохраняются.
+   - [ ] Старые executable filenames становятся тонкими aliases к новым,
+     если это оправдано inventory; не создавать второй независимый runtime.
+   - [ ] Guard проверяет новые runtime references вне явного compatibility
+     allowlist; не требует нуля `Techscope` во всей истории репозитория.
+   - **Проверка:** legacy/current CLI smoke, fresh bootstrap, upgrade fixture,
+     typecheck, self-test, strict privacy, docs links, package commands и
+     Control Center показывает одну и ту же память/setup/чаты после перехода.
+
+**R11b gate:** новые установки и contributor-facing интерфейс используют Pritha;
+старый экземпляр открывается без потерь и молчаливого fallback; migration/rollback
+проверены на изолированных копиях; FTS/semantic не регрессируют. На Mac mini
+реальный перенос возможен лишь в рамках согласованного staged release без
+живых writers; изменения служб требуют отдельного непосредственного approval
+по уже действующему workflow. MacBook и GitHub остаются нетронутыми. Снятие
+старых aliases отложено до отдельной версии и не мешает завершить ребрендинг
+публичных интерфейсов в этой поставке.
+
 ### R12 — Полная верификация и локальная ручная приёмка
 
 **Статус: pending.** Зависимости все выше.
@@ -537,6 +630,7 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
 | C §4.2.3 Steer shortcut/attachments | R10 | Visible disabled if attachment |
 | C §4.2.4 Edit/Cancel/Stop | R10 | Revision and no draft overwrite |
 | C §5 all acceptance scenarios | R10, R12 | Unit + browser + manual |
+| D addendum Techscope → Pritha | R11b, R12 | Primary Pritha names, compatible readers, tested migration/rollback |
 
 ## 6. Журнал исполнения и открытые вопросы
 
@@ -626,9 +720,33 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   thread/start/resume, turn/start/steer/interrupt и terminal turn/completed.
   Publication date unavailable. Native history contract сохраняется.
 
+### Checkpoint реализации 3
+
+- Уточнение checkpoint 2: последняя ошибка private metadata оказалась
+  ограничением нашего YAML parser, а не некорректным артефактом. Добавлены
+  bounded flow mappings/arrays с nested/quoted values, duplicate/prototype и
+  depth guards. Private authored bytes не менялись. Реальная instance validation
+  теперь pass: 978 Markdown; parser/memory targeted suite 21/21.
+- R3: native gateway извлечён без смены источника истории. Общий facade
+  маршрутизирует по binding, объединяет pagination и activity cursors, запрещает
+  fallback при недоступном коннекторе. Контрактные fake drivers для всех пяти
+  IDs проверяют смену default, pagination без пропусков и failure/retry events.
+  В реальном registry пока подключён только native driver; остальные не ready.
+- R2/R3: новые native chats сохраняют connector/model; legacy model закрепляется
+  по подтверждённому resume. Изменение Settings не меняет модель старого чата;
+  несовпадающий resume/override отвергается. Runtime view выбранного чата
+  показывает его binding. Cross-provider creation receipt ещё предстоит.
+- Native/history/goal/driver suite: 67/67; TypeScript pass. Isolated production
+  browser harness: 36/36, skipped=0/flaky=0 (queue/steer/concurrency/composer
+  annotations/provider settings API). Это автоматические fixture tests;
+  операторская manual acceptance и live providers остаются R12.
+- Добавлено пользовательское дополнение D и R11b: завершить ребрендинг с
+  primary Pritha names, compatibility aliases и проверяемой migration/rollback.
+  Ни один этап A/B/C не удалён; реальные state paths пока не переименовывались.
+
 ## 7. Полные исходные материалы
 
-Ниже сохранены три пользовательских исходника целиком. Их первоначальные команды,
+Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,
 branch directions, defaults и обещания — историческое входное ТЗ; при конфликте
 исполняются уточнения выше и последнее поручение пользователя. Это обеспечивает
 полную проверяемую трассировку, а не повторное разрешение изменять fork/remote.
@@ -1093,4 +1211,19 @@ SHA-256: `1e2d34c1616fde8057ab8738240c32a7afcf667556f5510638bcead87a1b55b6`.
    - **Сценарий 2 (Транспорт с поддержкой `steer`, например `Codex App Server`):** во время активного хода убедиться, что рядом с кнопкой `Queue` видна кнопка `Steer now`. Набрать уточнение, нажать `Steer now` (или `Cmd+Enter`) и проверить, что вызывается `turn/steer` с точным `expectedTurnId`, а уточнение вливается в активный ход без создания нового хода в очереди.
    - **Сценарий 3 (Транспорт без `steer`, например `NeuralDeep CLI` / `Claude Code CLI`):** убедиться, что во время активного хода кнопка `Steer now` скрыта, а `Queue` и `Stop` работают штатно.
 4. **Полный прогон `node scripts/quality-gate.mjs` и `node scripts/privacy-audit.mjs --strict`:** 0 ошибок, 0 утечек ключей.
+````
+
+### Приложение D — дополнение пользователя о ребрендинге
+
+Source class: operator message; received/verified 2026-11-01. Дополнение к A/B/C,
+а не замена исходной цели. Полный текст сообщения:
+
+````text
+Забыли ещё про одну недоработку:
+
+Незавершённый ребрендинг `Techscope` → `Pritha`: 
+
+- Внутри кода, схем и переменных окружения (`TECHSCOPE_ROOT`, `.techscope-setup.json`, `.memory/techscope.sqlite`, `"name": "techscope"` в `package.json`) сохраняется историческое имя. Хотя это задокументировано как осознанный слой обратной совместимости, для внешнего контрибьютора двойная терминология создаёт лишний когнитивный шум.
+
+Насколько это серьёзно? Насколько трудно исправить без рисков? Добавишь в роадмэп?
 ````

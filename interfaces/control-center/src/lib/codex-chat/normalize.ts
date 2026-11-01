@@ -107,6 +107,8 @@ export function summarizeThread(binding: ChatBinding, provider: RuntimeProviderV
     updatedAt: isoTimestamp(native?.updatedAt, binding.updatedAt),
     runtime: {
       providerId: binding.providerId,
+      connectorId: "codex",
+      ...(binding.modelId ? { modelId: binding.modelId } : {}),
       version: provider?.version || null,
       protocol: "app_server",
       stateIdentityHash: provider?.stateIdentityHash || null,
