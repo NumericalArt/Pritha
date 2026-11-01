@@ -4,10 +4,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
+const ROOT = resolvePrithaRoot({ cwd: DEFAULT_ROOT });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 
 const argv = process.argv.slice(2);
@@ -102,7 +102,7 @@ const payload = {
 if (jsonMode) {
   console.log(JSON.stringify(payload, null, 2));
 } else {
-  console.log("Techscope queue health: pass");
+  console.log("Pritha queue health: pass");
   console.log(`Root: ${ROOT}`);
   console.log(`Stale threshold: ${staleDays} day(s)`);
   for (const queue of payload.queues) {

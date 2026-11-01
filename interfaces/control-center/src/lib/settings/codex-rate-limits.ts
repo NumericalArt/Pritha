@@ -1,7 +1,8 @@
+import { prithaEnvValue } from "@/lib/pritha-env";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import readline from "node:readline";
-import { resolveTechscopeRoot } from "@/lib/realtime/pritha-runtime";
+import { resolvePrithaRoot } from "@/lib/realtime/pritha-runtime";
 import { resolveCodexAppBinary } from "./codex-binaries";
 
 type RpcMessage = {
@@ -115,7 +116,7 @@ async function runCodexRateLimitsProbe(): Promise<CodexRateLimitsProbe> {
     );
   }
 
-  const connection = new RateLimitsAppServerConnection(selectedCodexBin, resolveTechscopeRoot());
+  const connection = new RateLimitsAppServerConnection(selectedCodexBin, resolvePrithaRoot());
   try {
     await connection.start(8_000);
     await connection.request(
@@ -274,7 +275,7 @@ function numberOrNull(value: unknown) {
 
 function codexEnv() {
   const env = { ...process.env };
-  if (process.env.PRITHA_REALTIME_CODEX_USE_PROXY === "1" || process.env.TECHSCOPE_VOICE_CODEX_USE_PROXY === "1") return env;
+  if (prithaEnvValue("PRITHA_REALTIME_CODEX_USE_PROXY") === "1") return env;
   for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
     delete env[key];
   }

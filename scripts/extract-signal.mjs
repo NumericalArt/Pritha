@@ -3,12 +3,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatter, unique, yamlList } from "./lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { today } from "./lib/date.mjs";
 import { createAnonymousSourceId, evidenceQualityValue, inferSourceClass, usefulnessValue } from "./lib/privacy.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const SIGNAL_DIR = path.join(ROOT, "01_sources", "signals");
 
 const TECH_TERMS = [
@@ -235,7 +235,7 @@ ${verifications.length ? verifications.map((item) => `- ${item}`).join("\n") : "
 
 ## Codex refinement required
 
-- Пройти harness \`07_workflows/prompts/signal-extraction-harness.md\` в этом Techscope thread.
+- Пройти harness \`07_workflows/prompts/signal-extraction-harness.md\` в этом Pritha thread.
 - Удалить случайные фразы, вопросы без пользы и source metadata, если они не являются technical signal.
 - Добавить missing technical details, agent-design implications, risks, verification tasks and candidate rules.
 - После ручного Codex-pass обновить \`status: refined\`, \`extraction_mode: codex-assisted\`, \`refinement_status: codex-refined\`.

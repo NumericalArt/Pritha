@@ -50,7 +50,8 @@ test("Control Center Codex write flag is read-only unless explicitly enabled", a
 test("Control Center Realtime runtime gates every effective workspace-write task", () => {
   const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
 
-  assert.match(runtimeSource, /codexWriteFlagFromValues\(env\("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""\), env\("TECHSCOPE_VOICE_CODEX_WRITE_ENABLED", ""\)\)/);
+  assert.match(runtimeSource, /codexWriteFlagFromValues\(env\("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""\), ""\)/);
+  assert.match(runtimeSource, /return prithaEnvValue\(name, fallback\)/);
   assert.doesNotMatch(runtimeSource, /CODEX_WRITE_ENABLED",\s*"explicit"/);
   assert.match(runtimeSource, /sandbox === "workspace-write"\) reasons\.push\("workspace_write_requested"\)/);
   assert.match(runtimeSource, /reasons\.includes\("workspace_write_requested"\)[\s\S]*\? "workspace_write"/);

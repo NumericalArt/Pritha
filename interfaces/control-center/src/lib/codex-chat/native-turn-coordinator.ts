@@ -1,12 +1,12 @@
 import path from "node:path";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "@/lib/pritha-paths";
 import { effectiveCodexHome, storageIdentity } from "./storage-identity";
 import { ExecutionCoordinator } from "../../../../../scripts/lib/execution-coordinator.mjs";
 
 const connections = new Map<string, ExecutionCoordinator>();
 
 export function nativeExecutionCoordinator() {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const stateRoot = resolvePrithaStateRoot(root);
   const directory = path.join(stateRoot === root ? path.join(root, ".private") : stateRoot, "codex-chat", "execution");
   let coordinator = connections.get(directory);

@@ -63,7 +63,7 @@ test("quality-gate markdown output includes a summary table", () => {
     encoding: "utf8",
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /# Techscope Quality Gate: planned/);
+  assert.match(result.stdout, /# Pritha Quality Gate: planned/);
   assert.match(result.stdout, /\| Status \| Check \| Command \| Duration \|/);
 });
 

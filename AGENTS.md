@@ -383,7 +383,7 @@ repository module child smoke/healthcheck читает только bounded regu
 
 Если новый агент принимает внешние сообщения, email, Telegram-посты, ссылки, сайты, media transcripts, файлы, скриншоты или другой некурированный ввод, контракт обязан определить `untrusted_input_policy`: источники, риск-уровень, лимиты токенов/медиа/стоимости, карантин, scanner/validation слой, запрет прямого влияния raw input на tools/memory и human approval gates.
 
-Предпочтительный путь реализации для v1: `codex-native` агент в соседней папке `<parent-of-TECHSCOPE_ROOT>/<agent-name>` с опциональным Telegram-интерфейсом. Telegram считается interface adapter, а не обязательной частью каждого агента.
+Предпочтительный путь реализации для v1: `codex-native` агент в `PRITHA_AGENT_PARENT` (fallback: `<parent-of-PRITHA_ROOT>/<agent-name>`) с опциональным Telegram-интерфейсом. Telegram считается interface adapter, а не обязательной частью каждого агента.
 
 Новый агент должен быть подготовлен как рабочий, проверяемый scaffold: `AGENTS.md` или runtime-native instructions, `README.md`, `.env.example`, workflows/scripts, smoke test или healthcheck, user handoff/training guide. После scaffold создавать `scaffold-report` и индексировать его в память Pritha.
 

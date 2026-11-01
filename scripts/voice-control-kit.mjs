@@ -14,9 +14,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { resolvePrithaAgentParent, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentParent, resolvePrithaRoot } from "./lib/paths.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const KIT_REL = "11_agents/reference-implementations/fespa26-voice-control";
 const KIT_DIR = path.join(ROOT, KIT_REL);
 const MANIFEST_PATH = path.join(KIT_DIR, "manifest.json");

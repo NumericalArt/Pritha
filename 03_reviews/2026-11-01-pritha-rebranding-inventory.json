@@ -26,7 +26,7 @@
     "Existing service labels remain until a separately approved staged activation",
     "Historical Markdown, citations, source URLs and stable artifact IDs are not mass rewritten"
   ],
-  "status": "root-and-package-contract-implemented; persisted-state-and-remaining-runtime-names-pending",
+  "status": "primary-runtime-names-and-compatible-offline-migration-implemented-and-locally-verified; live-state-migration-pending-staged-release",
   "baseline_file_count": 111,
   "entries": [
     {
@@ -1039,5 +1039,21 @@
         "public-label-or-redaction-placeholder"
       ]
     }
-  ]
+  ],
+  "compatibility_review": {
+    "reviewed": "2026-11-01",
+    "allowlist": "config/pritha-name-compatibility.json",
+    "guard": "scripts/check-pritha-names.mjs",
+    "references": 124,
+    "reviewed_line_hashes": 115,
+    "checks": "Root aliases, persisted schemas/filenames, historical classifications and installed-service identity remain explicit. New internal callers and option names use Pritha.",
+    "verification": {
+      "unit": "1115/1115",
+      "chromium_e2e": "28/28 history/archive/attachments + 14/14 Settings/provider/Voice",
+      "typecheck": "pass",
+      "privacy": "pass",
+      "markdown": "pass",
+      "live_state_migrated": false
+    }
+  }
 }

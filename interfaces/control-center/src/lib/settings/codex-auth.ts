@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { checkCodexAppServerAvailable } from "@/lib/realtime/codex-task/codex-app-server-client";
-import { resolveTechscopeRoot } from "@/lib/realtime/pritha-runtime";
+import { resolvePrithaRoot } from "@/lib/realtime/pritha-runtime";
 import { resolveCodexAppBinary, resolveCodexCliBinary } from "./codex-binaries";
 
 function runCodexVersion() {
   const result = spawnSync(resolveCodexCliBinary(), ["--version"], {
-    cwd: resolveTechscopeRoot(),
+    cwd: resolvePrithaRoot(),
     encoding: "utf8",
     timeout: 5_000,
   });
@@ -16,7 +16,7 @@ function runCodexVersion() {
 }
 
 export async function getCodexAuthStatus() {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const cli = runCodexVersion();
   const codexAppBin = resolveCodexAppBinary();
   const appServer = codexAppBin

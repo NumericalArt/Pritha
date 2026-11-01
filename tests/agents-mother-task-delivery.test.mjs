@@ -167,7 +167,7 @@ async function gatewayFixture(t, createdAt) {
     return module.exports;
   }
   const nativeCoordinator = load("native-turn-coordinator", {
-    "@/lib/pritha-paths": {resolveTechscopeRoot:()=>f.root,resolvePrithaStateRoot:()=>f.stateRoot},
+    "@/lib/pritha-paths": {resolvePrithaRoot:()=>f.root,resolvePrithaStateRoot:()=>f.stateRoot},
     "./storage-identity": {effectiveCodexHome:()=>f.root,storageIdentity:()=>task.stateIdentityHash},
     "../../../../../scripts/lib/execution-coordinator.mjs": await import("../scripts/lib/execution-coordinator.mjs"),
   });

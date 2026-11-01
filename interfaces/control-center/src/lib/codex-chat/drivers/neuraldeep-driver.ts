@@ -2,7 +2,7 @@ import path from 'node:path';
 import { Agent } from 'undici';
 import { ExternalChatGateway } from '../external-gateway';
 import type { TaskChatBackend, TaskChatBackendDriver, TaskProviderHealth, ProviderUsageView } from '../driver-types';
-import { resolveTechscopeRoot, resolvePrithaStateRoot, resolvePrithaStatePath } from '../../pritha-paths';
+import { resolvePrithaRoot, resolvePrithaStateRoot, resolvePrithaStatePath } from '../../pritha-paths';
 import { getProviderSettings } from '../../settings/provider-settings-server';
 import { getPrithaRuntimeSettings } from '../../realtime/pritha-runtime';
 import { NeuralDeepProviderService } from '../../../../../../scripts/neuraldeep/provider-service.mjs';
@@ -17,7 +17,7 @@ export class NeuralDeepDriver implements TaskChatBackendDriver {
   readonly backend:ExternalChatGateway;
   private readonly service:NeuralDeepProviderService;
   constructor(attachments:TaskChatBackend['attachments']){
-    const root=resolveTechscopeRoot(),stateRoot=resolvePrithaStateRoot(),privateRoot=resolvePrithaStatePath('private','task-chat');
+    const root=resolvePrithaRoot(),stateRoot=resolvePrithaStateRoot(),privateRoot=resolvePrithaStatePath('private','task-chat');
     const executionDirectory=path.join(stateRoot===root?path.join(root,'.private'):stateRoot,'codex-chat','execution');
     const codexBin=process.env.PRITHA_CODEX_CHAT_CLI_BIN || process.env.CODEX_BIN || 'codex';
     this.service=new NeuralDeepProviderService({root,stateRoot,privateRoot:path.join(privateRoot,'neuraldeep'),codexBin});

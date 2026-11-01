@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { resolvePrithaStatePathFrom, resolvePrithaStateRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaStatePathFrom, resolvePrithaStateRoot, resolvePrithaRoot } from "../lib/paths.mjs";
 import { findCatalogAgent, readAgentCatalog, readCatalogArtifact, readIdentityEvidence } from "./identity.mjs";
 import { normalizeDeliveryLedger, targetKey, validateDeliveryLedger } from "./delivery-ledger.mjs";
 import { approvedTrialPlan, verifyCompiledTrialPlan, latestOutcomeSpecForContract } from "./outcome-spec.mjs";
@@ -83,7 +83,7 @@ function verificationStatus(checked, counts) {
 // This read model never repairs files, executes Trials, accepts a result, merges
 // a branch or removes a worktree. The asynchronous host adapter bounds its work.
 export function readAgentResultReadiness(target, input = {}) {
-  const root = path.resolve(input.root || resolveTechscopeRoot());
+  const root = path.resolve(input.root || resolvePrithaRoot());
   const stateRoot = resolvePrithaStateRoot({ ...input, root });
   const options = { ...input, root, stateRoot, fresh: true };
   const agent = findCatalogAgent(readAgentCatalog(options), target);

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { loadPrithaRuntimeEnv } from './lib/env.mjs';
-import { resolveTechscopeRoot,resolvePrithaStateRoot } from './lib/paths.mjs';
+import { resolvePrithaRoot,resolvePrithaStateRoot } from './lib/paths.mjs';
 import { ExecutionCoordinator } from './lib/execution-coordinator.mjs';
 import { reviewTaskWorkspace,applyTaskWorkspace,cleanupTaskWorkspace } from './lib/task-workspace.mjs';
 const args=process.argv.slice(2),command=args.shift() || 'help';
@@ -13,7 +13,7 @@ if(command==='help' || args.includes('--help')) {
 } else {
   let coordinator;
   try {
-    const root=resolveTechscopeRoot();loadPrithaRuntimeEnv({root});
+    const root=resolvePrithaRoot();loadPrithaRuntimeEnv({root});
     const stateRoot=resolvePrithaStateRoot({root});
     coordinator=new ExecutionCoordinator({stateRoot,directory:path.join(stateRoot===root?path.join(root,'.private'):stateRoot,'codex-chat','execution')});
     if(command==='list')console.log(JSON.stringify(coordinator.listIntents({kind:'task-workspace',limit:1000}).map(row=>({id:row.workspace?.id || row.plannedWorkspace?.id,state:row.state,mode:row.workspace?.mode})),null,2));

@@ -17,10 +17,10 @@ import {
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = resolveTechscopeRoot({ cwd: path.resolve(SCRIPT_DIR, "..") });
+const ROOT = resolvePrithaRoot({ cwd: path.resolve(SCRIPT_DIR, "..") });
 const LOCK_PATH = path.join("tools", "web-search", "searxng-lock.json");
 const PYTHON_VERSION_PROBE =
   "import json,sys; print(json.dumps({'executable': sys.executable, 'version': '.'.join(map(str, sys.version_info[:3])), 'major': sys.version_info[0], 'minor': sys.version_info[1], 'micro': sys.version_info[2]}))";

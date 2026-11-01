@@ -6,7 +6,7 @@ import path from "node:path";
 import { parseFrontmatterData } from "../../lib/frontmatter.mjs";
 import { normalizeGitHubRepositoryUrl, normalizeRepositoryModulePath } from "../../lib/github-repository-radar.mjs";
 import { redactSensitiveText } from "../../lib/redaction.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaRoot } from "../../lib/paths.mjs";
 import { readBoundedRegularFile } from "../../lib/safe-file-read.mjs";
 import { slug as makeSlug } from "../../lib/slug.mjs";
 import { today } from "../../lib/date.mjs";
@@ -25,7 +25,7 @@ import { apiProcessFiles, apiProcessManifest } from "./api-process.mjs";
 import { hybridProcessFiles, hybridProcessManifest } from "./hybrid-process.mjs";
 import { toolServerFiles, toolServerManifest } from "./tool-server.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const REPORT_DIR = path.join(AGENT_MEMORY_ROOT, "reports");
 const RESEARCH_DIR = path.join(AGENT_MEMORY_ROOT, "research");

@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import {
   containsForbiddenText,
   isForbiddenRawPath,
@@ -13,7 +13,7 @@ import {
   isTextLikePath,
 } from "./lib/privacy.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
 const strictMode = args.has("--strict");

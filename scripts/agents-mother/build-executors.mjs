@@ -10,7 +10,7 @@ import { ExecutionCoordinator } from '../lib/execution-coordinator.mjs';
 import { providerProcessTreesExited } from '../lib/provider-process-proof.mjs';
 import { providerProcessEnvironment } from '../lib/provider-process-environment.mjs';
 import { privateStateFile } from '../lib/private-state-path.mjs';
-import { resolveTechscopeRoot,resolvePrithaStateRoot,resolvePrithaStatePathFrom } from '../lib/paths.mjs';
+import { resolvePrithaRoot,resolvePrithaStateRoot,resolvePrithaStatePathFrom } from '../lib/paths.mjs';
 
 export const BUILD_EXECUTOR_RESULT_SCHEMA = "pritha-build-executor-result-v2";
 export const CLAUDE_BUILD_REPORT_SCHEMA={type:'object',additionalProperties:false,required:['summary','changed_files','remaining_risks'],properties:{summary:{type:'string',minLength:1,maxLength:4000},changed_files:{type:'array',maxItems:200,items:{type:'string',maxLength:500}},remaining_risks:{type:'array',maxItems:50,items:{type:'string',maxLength:1000}}}};
@@ -536,7 +536,7 @@ export class CodexAppServerBuildExecutor {
 export class ClaudeCodeBuildExecutor {
   constructor(options={}){this.name='claude-code-build';this.options=options;this.active=new Set();}
   context(input={}){
-    const root=input.root || this.options.root?path.resolve(input.root || this.options.root):resolveTechscopeRoot(),stateRoot=resolvePrithaStateRoot({root,stateRoot:input.stateRoot || this.options.stateRoot});
+    const root=input.root || this.options.root?path.resolve(input.root || this.options.root):resolvePrithaRoot(),stateRoot=resolvePrithaStateRoot({root,stateRoot:input.stateRoot || this.options.stateRoot});
     const privateRoot=resolvePrithaStatePathFrom({root,stateRoot},'private','agents-mother','claude-build');
     const executionDirectory=path.join(stateRoot===root?path.join(root,'.private'):stateRoot,'codex-chat','execution');
     return {root,stateRoot,privateRoot,executionDirectory};

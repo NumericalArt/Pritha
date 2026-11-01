@@ -27,7 +27,7 @@ test("tracked report redaction replaces known roots and user-specific paths", ()
   assert.equal(redacted.includes(tempRoot), false);
   assert.match(redacted, /<PROJECT_ROOT>\/out\/result\.md/);
   assert.match(redacted, /<PRITHA_STATE_ROOT>\/builds\/run-1/);
-  assert.match(redacted, /<TECHSCOPE_ROOT>\/scripts\/pritha\.mjs/);
+  assert.match(redacted, /<PRITHA_ROOT>\/scripts\/pritha\.mjs/);
   assert.match(redacted, /relative=tests\/fixture\.md/);
 });
 

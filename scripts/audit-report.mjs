@@ -10,7 +10,7 @@ const ROOT=resolvePrithaRoot();
 
 function usage() {
   console.log(`Usage:
-  node scripts/audit-report.mjs --phase 7 --title "Techscope Quality Phase 7 Report" --output 11_agents/reports/report.md [--input gate.json]
+  node scripts/audit-report.mjs --phase 7 --title "Pritha Quality Phase 7 Report" --output 11_agents/reports/report.md [--input gate.json]
 
 If --input is omitted, the script runs:
   node scripts/quality-gate.mjs --json`);
@@ -57,8 +57,8 @@ const gate = input
 
 const date = new Date().toISOString().slice(0, 10);
 const phaseSlug = `phase-${phase}`;
-const id = `${date}-techscope-quality-${phaseSlug}-report`;
-const templatePath = path.join(ROOT, "08_templates", "techscope-audit-phase-report.md");
+const id = `${date}-pritha-quality-${phaseSlug}-report`;
+const templatePath = path.join(ROOT, "08_templates", "pritha-audit-phase-report.md");
 const template = readFileSync(templatePath, "utf8");
 
 function renderChecks() {
@@ -78,6 +78,7 @@ function renderChecks() {
 
 const replacements = {
   "{{id}}": id,
+  "{{pritha_report_id}}": id,
   "{{status}}": gate.status === "pass" ? "complete" : "failed",
   "{{date}}": date,
   "{{phase_slug}}": phaseSlug,

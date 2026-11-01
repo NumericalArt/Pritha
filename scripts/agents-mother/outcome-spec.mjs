@@ -6,7 +6,7 @@ import { atomicCompareAndSwapFile, atomicWriteFile, withFileLock } from "../lib/
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { today } from "../lib/date.mjs";
 import { parseFrontmatter } from "../lib/frontmatter.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePathFrom, resolvePrithaRoot } from "../lib/paths.mjs";
 import { redactSensitiveText } from "../lib/redaction.mjs";
 import { slug } from "../lib/slug.mjs";
 import { writeUniqueArtifact } from "./artifact-selection.mjs";
@@ -587,7 +587,7 @@ ${coreTrials}
 }
 
 export function createOutcomeSpec(contractPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const data = contractData(contractPath, { root });
   const contractDir = path.join(resolvePrithaAgentMemoryRoot({ root, stateRoot: options.stateRoot }), "contracts");
   mkdirSync(contractDir, { recursive: true });
@@ -599,7 +599,7 @@ export function createOutcomeSpec(contractPath, options = {}) {
 }
 
 export function reviseOutcomeSpec(specPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const fullPath = path.resolve(root, specPath);
   const original = readFileSync(fullPath, "utf8");
   const parsed = parseOutcomeSpecText(original);
@@ -644,7 +644,7 @@ export function reviseOutcomeSpec(specPath, options = {}) {
 }
 
 export function outcomeSpecsForContract(contractPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const data = contractData(contractPath, { root });
   const contractDir = path.join(resolvePrithaAgentMemoryRoot({ root, stateRoot: options.stateRoot }), "contracts");
   if (!existsSync(contractDir)) return [];
@@ -704,7 +704,7 @@ function replaceFrontmatterFields(text, updates) {
 }
 
 export function approvalEvidencePath(options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   return resolvePrithaStatePathFrom({ root, stateRoot: options.stateRoot }, "audit", "outcome-approvals.jsonl");
 }
 
@@ -730,7 +730,7 @@ function readApprovalEvents(options = {}) {
 }
 
 export function verifyOutcomeApproval(specPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const fullPath = path.resolve(root, specPath);
   if (!existsSync(fullPath)) return { ok: false, reasons: ["spec_missing"], event: null };
   const text = readFileSync(fullPath, "utf8");
@@ -754,7 +754,7 @@ export function verifyOutcomeApproval(specPath, options = {}) {
 }
 
 export function approveOutcomeSpec(specPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const approvedBy = String(options.approvedBy || "").trim();
   if (approvedBy !== "user") throw new Error("Outcome approval requires explicit --approved-by user");
   const fullPath = path.resolve(root, specPath);
@@ -810,7 +810,7 @@ export function approveOutcomeSpec(specPath, options = {}) {
 }
 
 export function preflightOutcomeTrialInputs(specPath, options = {}) {
-  const root = path.resolve(options.root || resolveTechscopeRoot());
+  const root = path.resolve(options.root || resolvePrithaRoot());
   const validation = outcomeSpecFile(specPath, { ...options, root });
   const base = { schema: "pritha-trial-input-preflight-v1", scope: "verification-inputs-only",
     specId: validation.parsed.frontmatter.id, semanticLock: outcomeSemanticLock(validation.parsed),
@@ -838,7 +838,7 @@ function safeRunId(value) {
 // Read-only compiler shared by the writer and host execution gates. Preserve the
 // v1 wire shape so existing immutable plans and evidence locks remain valid.
 export function approvedTrialPlan(specPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const fullPath = path.resolve(root, specPath);
   const text = readFileSync(fullPath, "utf8");
   const validation = validateOutcomeSpecText(text, { root });
@@ -899,7 +899,7 @@ export function verifyCompiledTrialPlan(plan, options = {}) {
 }
 
 export function compileOutcomeSpec(specPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const plan = approvedTrialPlan(specPath, options);
   const runId = safeRunId(options.runId || `plan-${plan.semantic_lock.slice(7, 19)}`);
   const runRoot = resolvePrithaStatePathFrom({ root, stateRoot: options.stateRoot }, "builds", plan.agent_slug, runId);
@@ -916,7 +916,7 @@ export function compileOutcomeSpec(specPath, options = {}) {
 }
 
 export function outcomeSpecFile(specPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const fullPath = path.resolve(root, specPath);
   const text = readFileSync(fullPath, "utf8");
   return { root, fullPath, relPath: path.relative(root, fullPath), text, ...validateOutcomeSpecText(text, { root }) };

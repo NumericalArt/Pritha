@@ -29,7 +29,7 @@ const budgetIntent = load("codex-chat/budget-intent");
 const coordinationRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-goal-coordination-"));
 test.after(() => rmSync(coordinationRoot, { recursive: true, force: true }));
 const coordinator = load("codex-chat/native-turn-coordinator", {
-  "@/lib/pritha-paths": {resolveTechscopeRoot:()=>coordinationRoot, resolvePrithaStateRoot:()=>coordinationRoot},
+  "@/lib/pritha-paths": {resolvePrithaRoot:()=>coordinationRoot, resolvePrithaStateRoot:()=>coordinationRoot},
   "./storage-identity": { effectiveCodexHome:()=>coordinationRoot, storageIdentity:()=>"storage-v2:fixture" },
 });
 const normalize = load("codex-chat/normalize");
@@ -325,7 +325,7 @@ test("Goal receipts survive private registry reload and share no transcript or a
   const tmp = mkdtempSync(path.join(os.tmpdir(), "pritha-goal-registry-"));
   try {
     const { CodexChatPrivateStore } = load("codex-chat/private-store", {
-      "@/lib/pritha-paths": { resolveTechscopeRoot: () => path.join(tmp, "checkout"), resolvePrithaStateRoot: () => path.join(tmp, "state") },
+      "@/lib/pritha-paths": { resolvePrithaRoot: () => path.join(tmp, "checkout"), resolvePrithaStateRoot: () => path.join(tmp, "state") },
       "@/lib/private-json": load("private-json"),
     });
     const f = fixture(); await control.changeThreadGoalBudget(f.context, await f.request());

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaRoot } from "../lib/paths.mjs";
 import { normalizeGitHubRepositoryUrl, normalizeRepositoryModulePath } from "../lib/github-repository-radar.mjs";
 import { authoredAgentId } from "./identity.mjs";
 import { readAgentKind } from "./agent-kind.mjs";
@@ -188,7 +188,7 @@ export function printIssues(issues) {
 }
 
 export function validateContract(contractPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const print = options.print !== false;
   const fullPath = path.resolve(root, contractPath);
   const issues = [];
@@ -427,7 +427,7 @@ export function validateContract(contractPath, options = {}) {
 }
 
 export function contractData(contractPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const fullPath = path.resolve(root, contractPath);
   if (!existsSync(fullPath)) throw new Error(`Contract not found: ${contractPath}`);
   const text = readFileSync(fullPath, "utf8");

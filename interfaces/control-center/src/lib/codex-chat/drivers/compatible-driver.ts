@@ -2,7 +2,7 @@ import path from 'node:path';
 import {Agent} from 'undici';
 import {ExternalChatGateway} from '../external-gateway';
 import type {TaskChatBackend,TaskChatBackendDriver,TaskProviderHealth,ProviderUsageView} from '../driver-types';
-import {resolveTechscopeRoot,resolvePrithaStateRoot,resolvePrithaStatePath} from '../../pritha-paths';
+import {resolvePrithaRoot,resolvePrithaStateRoot,resolvePrithaStatePath} from '../../pritha-paths';
 import {getProviderSettings} from '../../settings/provider-settings-server';
 import {getPrithaRuntimeSettings} from '../../realtime/pritha-runtime';
 import {CompatibleProviderService} from '../../../../../../scripts/openai-compatible/provider-service.mjs';
@@ -16,7 +16,7 @@ export class CompatibleDriver implements TaskChatBackendDriver {
   readonly backend:ExternalChatGateway;
   readonly service:CompatibleProviderService;
   constructor(readonly connectorId:'openrouter'|'local',attachments:TaskChatBackend['attachments']){
-    const root=resolveTechscopeRoot(),stateRoot=resolvePrithaStateRoot(),privateRoot=resolvePrithaStatePath('private','task-chat');
+    const root=resolvePrithaRoot(),stateRoot=resolvePrithaStateRoot(),privateRoot=resolvePrithaStatePath('private','task-chat');
     const executionDirectory=path.join(stateRoot===root?path.join(root,'.private'):stateRoot,'codex-chat','execution');
     const codexBin=process.env.PRITHA_CODEX_CHAT_CLI_BIN || process.env.CODEX_BIN || 'codex';
     this.service=new CompatibleProviderService({connectorId,root,stateRoot,privateRoot:path.join(privateRoot,connectorId),codexBin});

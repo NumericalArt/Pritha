@@ -6,7 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { today } from "./lib/date.mjs";
 import { parseFrontmatter, yamlString } from "./lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import {
   createAnonymousSourceId,
   evidenceQualityValue,
@@ -17,7 +17,7 @@ import {
   valueArray,
 } from "./lib/privacy.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 const jsonMode = args.has("--json");

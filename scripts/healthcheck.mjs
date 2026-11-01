@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { prithaEnvValue } from "./lib/pritha-env.mjs";
 import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
@@ -6,12 +7,12 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
-const root = resolveTechscopeRoot();
+const root = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root });
 const stateRoot = resolvePrithaStateRoot({ root });
-const platform = process.env.TECHSCOPE_HEALTHCHECK_PLATFORM || process.platform;
+const platform = prithaEnvValue("PRITHA_HEALTHCHECK_PLATFORM") || process.platform;
 const isDarwin = platform === "darwin";
 const checks = [];
 
@@ -53,7 +54,7 @@ function run(name, command, args, options = {}) {
   add(name, result.status === 0, detail);
 }
 
-add("TECHSCOPE_ROOT", existsSync(root), root);
+add("PRITHA_ROOT", existsSync(root), root);
 add("git root", existsSync(path.join(root, ".git")), path.join(root, ".git"));
 add("memory sqlite", existsSync(resolvePrithaMemoryDatabase()), "state-root/memory/techscope.sqlite");
 
@@ -73,8 +74,8 @@ for (const relPath of [
   "scripts/query-memory.mjs",
   "scripts/telegram-bot.mjs",
   "scripts/agents-mother.mjs",
-  "scripts/run-techscope-web.sh",
-  "scripts/run-techscope-telegram-bot.sh",
+  "scripts/run-pritha-web.sh",
+  "scripts/run-pritha-telegram-bot.sh",
 ]) {
   scriptExists(relPath);
 }

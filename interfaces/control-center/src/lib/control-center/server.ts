@@ -10,7 +10,7 @@ import {
   resolvePrithaAgentParent,
   resolvePrithaStatePath,
   resolvePrithaStateRoot,
-  resolveTechscopeRoot,
+  resolvePrithaRoot,
 } from "../pritha-paths";
 import type {
   CapabilityStatus,
@@ -1095,7 +1095,7 @@ function defaultSecretLabel(name: string) {
     ANTHROPIC: "Anthropic",
     WHATSAPP: "WhatsApp",
   };
-  const displayName = name.replace(/^TECHSCOPE_TELEGRAM_/, "TELEGRAM_").replace(/^TECHSCOPE_/, "");
+  const displayName = name.replace(/^(?:PRITHA|TECHSCOPE)_TELEGRAM_/, "TELEGRAM_").replace(/^(?:PRITHA|TECHSCOPE)_/, "");
   return displayName
     .split("_")
     .map((part) => acronyms[part] || part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
@@ -2374,13 +2374,13 @@ function latestReports(root: string) {
 const statusReadCache = sharedProbeCache("control-center-status-v1", { ttlMs: 1_000, maxEntries: 8 });
 
 export async function getControlCenterStatus(options: { freshIdentity?: boolean } = {}): Promise<ControlCenterStatus> {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const key = JSON.stringify([root, resolvePrithaStateRoot(root), resolvePrithaAgentParent(root), process.env.PRITHA_INSTANCE_ID, process.env.PRITHA_CONTROL_CENTER_PORT]);
   return statusReadCache.get(key, () => readControlCenterStatus(options), { fresh: options.freshIdentity });
 }
 
 async function readControlCenterStatus(options: { freshIdentity?: boolean } = {}): Promise<ControlCenterStatus> {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const registry = parseRegistry(root, options.freshIdentity);
   const records = liveRegistryRecords(root, registry.records);
   const accessPromise = accessLinks(options.freshIdentity);

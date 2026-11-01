@@ -1,3 +1,4 @@
+import { prithaEnvValue } from "../pritha-env";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -37,8 +38,7 @@ export function resolveCodexAppBinary(explicit?: string, options: CodexBinaryRes
   const env = options.env ?? process.env;
   const exists = options.existsSync ?? fs.existsSync;
   const configured = clean(explicit)
-    || clean(env.PRITHA_REALTIME_CODEX_BIN)
-    || clean(env.TECHSCOPE_VOICE_CODEX_BIN);
+    || clean(prithaEnvValue("PRITHA_REALTIME_CODEX_BIN", "", env));
   if (configured) return configured;
 
   const legacy = clean(env.CODEX_BIN);
@@ -51,8 +51,7 @@ export function resolveCodexCliBinary(explicit?: string, options: CodexBinaryRes
   const env = options.env ?? process.env;
   const exists = options.existsSync ?? fs.existsSync;
   const configured = clean(explicit)
-    || clean(env.PRITHA_REALTIME_CODEX_CLI_BIN)
-    || clean(env.TECHSCOPE_VOICE_CODEX_CLI_BIN);
+    || clean(prithaEnvValue("PRITHA_REALTIME_CODEX_CLI_BIN", "", env));
   if (configured) return configured;
 
   const legacy = clean(env.CODEX_BIN);

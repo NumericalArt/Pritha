@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { acquireFileLock, atomicWriteFile } from "../lib/atomic-file.mjs";
-import { resolvePrithaStatePathFrom, resolvePrithaStateRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaStatePathFrom, resolvePrithaStateRoot, resolvePrithaRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, readIdentityEvidence } from "./identity.mjs";
 import { deliveryTargetClaimPath, deliveryUsageStatus, normalizeDeliveryLedger, recoverDeliveryLedger, releaseDeliveryTarget, targetKey, updateDeliveryLedger, validateDeliveryLedger } from "./delivery-ledger.mjs";
 import { readAgentResultReadiness } from "./result-readiness.mjs";
@@ -13,7 +13,7 @@ const digest = value => createHash("sha256").update(JSON.stringify(value)).diges
 const identifier = value => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
 const fail = code => { const error = new Error(`Delivery reconciliation needs review: ${code}`); error.code = code; throw error; };
 function context(input) {
-  const root = path.resolve(input.root || resolveTechscopeRoot());
+  const root = path.resolve(input.root || resolvePrithaRoot());
   const stateRoot = resolvePrithaStateRoot({ ...input, root });
   return { ...input, root, stateRoot, buildsRoot: resolvePrithaStatePathFrom({ root, stateRoot }, "builds") };
 }

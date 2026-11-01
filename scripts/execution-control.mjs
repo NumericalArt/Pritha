@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { chmodSync,existsSync,mkdirSync,readFileSync,realpathSync,lstatSync } from 'node:fs';
 import path from 'node:path';
 import { loadPrithaRuntimeEnv } from './lib/env.mjs';
-import { prithaInstanceConfig,resolveTechscopeRoot } from './lib/paths.mjs';
+import { prithaInstanceConfig,resolvePrithaRoot } from './lib/paths.mjs';
 import { ExecutionCoordinator } from './lib/execution-coordinator.mjs';
 import { drainExecutions,executionBuildCompatible,executionDirectory,executionLifecycleStatus } from './lib/execution-lifecycle.mjs';
 const args=process.argv.slice(2),command=args.shift() || 'status';
@@ -13,7 +13,7 @@ if(command==='help' || args.includes('--help'))console.log('execution-control.mj
 else {
   let db;
   try {
-    const root=resolveTechscopeRoot();loadPrithaRuntimeEnv({root});const config=prithaInstanceConfig({root});
+    const root=resolvePrithaRoot();loadPrithaRuntimeEnv({root});const config=prithaInstanceConfig({root});
     if(['status','plan'].includes(command))console.log(JSON.stringify({readOnly:true,...executionLifecycleStatus(root,config.stateRoot),schemaVersion:1,defaultCapacity:3,requiresActivation:['primary','replica'].includes(config.instanceRole)},null,2));
     else {
       if(!args.includes('--yes'))throw new Error('explicit_action_required');

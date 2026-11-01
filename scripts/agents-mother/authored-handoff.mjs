@@ -4,7 +4,7 @@ import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { withFileLock } from "../lib/atomic-file.mjs";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
-import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaRoot } from "../lib/paths.mjs";
 import { redactSensitiveText } from "../lib/redaction.mjs";
 import { readAgentCatalog, findCatalogAgent, readCatalogArtifact, readIdentityEvidence, readAgentOperationsManifest, agentOperationsApplicability, authoredAgentId } from "./identity.mjs";
 import { contractData } from "./contract.mjs";
@@ -44,7 +44,7 @@ export function firstScenarioForHandoff(kind, { data, parsed, plan, manifest }) 
 }
 
 export function prepareAuthoredHandoff(target, options = {}) {
-  const root = path.resolve(options.root || resolveTechscopeRoot()), input = { ...options, root, fresh: true };
+  const root = path.resolve(options.root || resolvePrithaRoot()), input = { ...options, root, fresh: true };
   const memoryRoot = resolvePrithaAgentMemoryRoot(input);
   const agent = findCatalogAgent(readAgentCatalog(input), target);
   if (!agent?.agentId || !agent.contractSource) return null;

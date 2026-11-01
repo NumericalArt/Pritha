@@ -5,7 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
 import { CHILD_AGENT_TYPES } from "./lib/child-agent-artifacts.mjs";
-import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
 const PROMOTABLE_TYPES = new Map([
   ["assessment", "03_reviews/"],
@@ -20,7 +20,7 @@ function option(name) {
 }
 
 const command = process.argv[2] || "plan";
-const root = resolveTechscopeRoot();
+const root = resolvePrithaRoot();
 const localAgentsRoot = resolvePrithaAgentMemoryRoot({ root });
 const sourceArg = option("--source");
 const targetArg = option("--target");

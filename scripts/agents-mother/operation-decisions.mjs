@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { atomicWriteFile, withFileLock } from "../lib/atomic-file.mjs";
-import { resolvePrithaStateRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaStatePathFrom, resolvePrithaRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, findCatalogAgent, readAgentOperationsManifest, readIdentityEvidence } from "./identity.mjs";
 import { readAgentResultReadiness } from "./result-readiness.mjs";
 import { readTaskDelivery, TaskDeliveryError } from "./task-delivery.mjs";
@@ -15,7 +15,7 @@ const fail = (code, message) => { throw new TaskDeliveryError(code, message, 409
 
 export async function planOperationDecision(task, runId, action, options) {
   if (!["start", "tailscale-serve"].includes(action)) fail("operation_invalid", "Choose Start or Tailscale Serve.");
-  const root = path.resolve(options.root || resolveTechscopeRoot()), stateRoot = resolvePrithaStateRoot({ ...options, root });
+  const root = path.resolve(options.root || resolvePrithaRoot()), stateRoot = resolvePrithaStateRoot({ ...options, root });
   const input = { ...options, root, stateRoot };
   const run = readTaskDelivery(runId, task, input);
   if (run.bindingStatus !== "bound") fail("operation_task_unbound", "Bind this delivery to its original task first.");

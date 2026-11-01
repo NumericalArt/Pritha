@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { yamlList } from "../lib/frontmatter.mjs";
-import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaRoot } from "../lib/paths.mjs";
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
 import { AUTOSTART_MODES, PROACTIVE_MODES, SERVICE_MODES } from "./contract.mjs";
@@ -9,7 +9,7 @@ import { checkResult, detectProject, fileExists, readJsonIfExists, runProjectCom
 import { writeLifecycleReport } from "./lifecycle-report.mjs";
 import { readAgentCatalog, findCatalogAgent, agentOperationsApplicability } from "./identity.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const REPORT_DIR = path.join(resolvePrithaAgentMemoryRoot({ root: ROOT }), "reports");
 const slug = (value, fallback = "agent") => makeSlug(value, { fallback });
 

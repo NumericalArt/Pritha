@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { ExternalChatGateway } from '../external-gateway';
 import type { TaskChatBackend, TaskChatBackendDriver, TaskProviderHealth, ProviderUsageView } from '../driver-types';
-import { resolveTechscopeRoot,resolvePrithaStateRoot,resolvePrithaStatePath } from '../../pritha-paths';
+import { resolvePrithaRoot,resolvePrithaStateRoot,resolvePrithaStatePath } from '../../pritha-paths';
 import { getProviderSettings } from '../../settings/provider-settings-server';
 import { getPrithaRuntimeSettings } from '../../realtime/pritha-runtime';
 import { ClaudeProviderService } from '../../../../../../scripts/claude/provider-service.mjs';
@@ -15,7 +15,7 @@ export class ClaudeDriver implements TaskChatBackendDriver {
   readonly backend:ExternalChatGateway;
   readonly service:ClaudeProviderService;
   constructor(attachments:TaskChatBackend['attachments']){
-    const root=resolveTechscopeRoot(),stateRoot=resolvePrithaStateRoot(),privateRoot=resolvePrithaStatePath('private','task-chat');
+    const root=resolvePrithaRoot(),stateRoot=resolvePrithaStateRoot(),privateRoot=resolvePrithaStatePath('private','task-chat');
     const executionDirectory=path.join(stateRoot===root?path.join(root,'.private'):stateRoot,'codex-chat','execution');
     const claudeBin=process.env.PRITHA_CLAUDE_CLI_BIN || 'claude';
     this.service=new ClaudeProviderService({root,stateRoot,privateRoot:path.join(privateRoot,'claude'),claudeBin});

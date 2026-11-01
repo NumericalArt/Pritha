@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { appendPrivateAuditEvent } from "@/lib/private-json";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "@/lib/pritha-paths";
 import { CodexChatGatewayError } from "./gateway";
 import { CodexChatPrivateStore } from "./private-store";
 
@@ -71,7 +71,7 @@ export async function recordTaskChatUiActivity(input: TaskChatUiActivityInput) {
   const binding = input.chatId ? await store.get(input.chatId) : null;
   if (input.chatId && !binding) throw new CodexChatGatewayError("thread_not_found", "Chat not found.", 404);
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const stateRoot = resolvePrithaStateRoot(root);
   await appendPrivateAuditEvent({
     stateRoot,

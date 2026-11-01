@@ -6,14 +6,14 @@ import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 
 const DEFAULT_LABELS = ["com.techscope.web-dasha", "com.techscope.telegram-bot-dasha"];
 const args = process.argv.slice(2);
 const command = args[0] || "status";
 const jsonMode = args.includes("--json");
 const yes = args.includes("--yes");
-const root = resolveTechscopeRoot();
+const root = resolvePrithaRoot();
 const oldRoot = process.env.PRITHA_LAUNCHD_OLD_ROOT || path.join(path.dirname(root), "Techscope");
 const OLD_ROOT_PATTERN = new RegExp(oldRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
 const platform = process.env.PRITHA_LAUNCHD_AUDIT_PLATFORM || process.platform;

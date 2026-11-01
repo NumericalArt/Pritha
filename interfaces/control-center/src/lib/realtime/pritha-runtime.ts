@@ -1,3 +1,4 @@
+import { prithaEnvValue } from "../pritha-env";
 import { resolvePrithaMemoryDatabase } from "../pritha-paths";
 import { normalizeVoiceModel, type VoiceModel } from "./voice-settings";
 import { LIVE_MODEL, isLiveModel, liveSessionConfig, DEFAULT_LIVE_BACKEND } from "./live-session";
@@ -12,7 +13,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, 
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "../pritha-paths";
 import { atomicWritePrivateJson } from "../private-json";
 import {
   codexCliConfigEntries,
@@ -64,7 +65,7 @@ import {
   type VoiceBehaviorProfile,
 } from "./voice-settings";
 
-export { resolveTechscopeRoot } from "../pritha-paths";
+export { resolvePrithaRoot, resolveTechscopeRoot } from "../pritha-paths";
 
 type RealtimeToolDefinition = {
   type: "function";
@@ -490,7 +491,7 @@ function loadEnvFile(filePath: string) {
 function loadRuntimeEnv() {
   if (envLoaded) return;
   envLoaded = true;
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   loadEnvFile(path.join(root, ".env"));
   loadEnvFile(path.join(root, ".env.local"));
   loadEnvFile(path.join(process.cwd(), ".env"));
@@ -504,8 +505,7 @@ function loadRuntimeEnv() {
 
 function env(name: string, fallback = "") {
   loadRuntimeEnv();
-  const value = process.env[name];
-  return value === undefined || value === "" ? fallback : value;
+  return prithaEnvValue(name, fallback);
 }
 
 function realtimeBaseUrl() {
@@ -643,7 +643,7 @@ function isVideoOrTranscriptUrl(url: string) {
 async function purgeOldVoiceIntakeStaging(now = Date.now()) {
   const intakeRoot = voiceIntakeRoot();
   if (!existsSync(intakeRoot)) return;
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   for (const entry of readdirSync(intakeRoot)) {
     const directory = path.resolve(intakeRoot, entry);
     try {
@@ -670,7 +670,7 @@ async function cleanupVoiceIntakeStaging(intake: unknown, reason: string) {
   if (typeof intake !== "object" || intake === null) return false;
   const stagingDir = String((intake as { staging_dir?: unknown }).staging_dir || "");
   if (!stagingDir) return false;
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const absolute = path.resolve(root, stagingDir);
   const intakeRoot = voiceIntakeRoot();
   if (!isPathInsideOrSame(intakeRoot, absolute) || !existsSync(absolute)) return false;
@@ -679,7 +679,7 @@ async function cleanupVoiceIntakeStaging(intake: unknown, reason: string) {
   return true;
 }
 
-function memoryDbPath(root = resolveTechscopeRoot()) {
+function memoryDbPath(root = resolvePrithaRoot()) {
   return resolvePrithaMemoryDatabase({root});
 }
 
@@ -689,7 +689,7 @@ function memoryStatsMap() {
 }
 
 function autoEmbeddingRebuildEnabled() {
-  const value = env("PRITHA_REALTIME_AUTO_EMBEDDINGS", env("TECHSCOPE_VOICE_AUTO_EMBEDDINGS", "1")).toLowerCase();
+  const value = env("PRITHA_REALTIME_AUTO_EMBEDDINGS", "1").toLowerCase();
   return value !== "0" && value !== "false" && value !== "disabled" && value !== "off";
 }
 
@@ -699,7 +699,7 @@ function sqliteCliAvailable() {
 }
 
 function sqliteJson(sql: string) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const result = spawnSync("sqlite3", ["-readonly", "-json", memoryDbPath(root), sql], {
     cwd: root,
     encoding: "utf8",
@@ -755,7 +755,7 @@ function markdownFiles(root: string) {
 }
 
 function markdownFallbackSearch(query: string, limit: number): MemorySearchRow[] {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const terms = ftsQuery(query)
     .toLowerCase()
     .split(/\s+/)
@@ -846,7 +846,7 @@ LIMIT 1;
 }
 
 async function readArtifact(identifier: unknown, maxChars = 8_000) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const doc = existsSync(memoryDbPath(root)) && sqliteCliAvailable() ? findDocument(identifier) : null;
   const requestedPath = String(identifier || "").trim();
   const relative = doc?.path || requestedPath;
@@ -974,7 +974,7 @@ function synthesizeCodexOperatorAnswer(question: unknown, spokenAnswer: string) 
 }
 
 function commandResult(command: string, args: string[], options: { timeoutMs?: number; raw?: boolean; maxBuffer?: number } = {}) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const result = spawnSync(command, args, {
     cwd: root,
     env: envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
@@ -1102,11 +1102,11 @@ function startEmbeddingRebuild(reason = "requested") {
       started: false,
       status: "already_running",
       pid: current.pid,
-      status_path: rootRelative(resolveTechscopeRoot(), embeddingRebuildStatusPath()),
+      status_path: rootRelative(resolvePrithaRoot(), embeddingRebuildStatusPath()),
     };
   }
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const rebuildDir = embeddingRebuildDir();
   mkdirSync(rebuildDir, { recursive: true });
   const statusPath = embeddingRebuildStatusPath();
@@ -1392,7 +1392,7 @@ function listFilesRecursive(directory: string, maxFiles = 200) {
 }
 
 function searchRuntimeMemory(args: FullMemoryArgs) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const query = String(args.query || "").trim().toLowerCase();
   const limit = cappedLimit(args.limit, 12, 40);
   const maxChars = Math.max(500, Math.min(Number(args.max_chars) || 2_000, 8_000));
@@ -1425,7 +1425,7 @@ function searchRuntimeMemory(args: FullMemoryArgs) {
 }
 
 function curatedMemoryTargetDir(artifactType: string) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const normalized = artifactType.toLowerCase().replace(/_/g, "-");
   const map: Record<string, string> = {
     brief: "02_briefs",
@@ -1441,7 +1441,7 @@ function curatedMemoryTargetDir(artifactType: string) {
 }
 
 function isSafeCuratedMarkdownPath(fullPath: string) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const allowed = [
     "00_inbox",
     "01_sources",
@@ -1469,7 +1469,7 @@ async function writeFullMemoryNote(args: FullMemoryArgs) {
   if (!hasOperatorConfirmation(args.operator_confirmation)) {
     return { ok: false, error: "operator_confirmation_required", detail: "Ask the operator to confirm the memory write before calling this operation." };
   }
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const title = compactText(args.title || "Voice Control Memory Note", 140);
   const artifactType = String(args.artifact_type || "review").trim() || "review";
   const now = new Date();
@@ -1509,7 +1509,7 @@ async function appendFullMemoryArtifact(args: FullMemoryArgs) {
   if (!hasOperatorConfirmation(args.operator_confirmation)) {
     return { ok: false, error: "operator_confirmation_required", detail: "Ask the operator to confirm the memory update before calling this operation." };
   }
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const relative = String(args.target_path || args.id_or_path || "").trim();
   if (!relative) return { ok: false, error: "missing_target_path" };
   const fullPath = path.resolve(root, relative);
@@ -1648,7 +1648,7 @@ const FILESYSTEM_TEXT_EXTENSIONS = new Set([
 ]);
 
 function prithaFilesystemRoots(): FileSystemRoot[] {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   return [
     { id: "pritha", name: "Pritha", kind: "pritha", directory: root, aliases: ["pritha", "techscope", "\u043f\u0440\u0438\u0442\u0430"] },
     ...knownSiblingChildAgentProjects(root).map((project) => ({
@@ -1692,12 +1692,12 @@ function filesystemSafeRelativePath(root: string, requested: unknown) {
 function isExcludedFilesystemEntry(name: string, fullPath: string) {
   if (FILESYSTEM_EXCLUDED_NAMES.has(name)) return true;
   if (name.startsWith(".") && [".env", ".DS_Store"].includes(name)) return true;
-  const relative = rootRelative(resolveTechscopeRoot(), fullPath);
+  const relative = rootRelative(resolvePrithaRoot(), fullPath);
   return FILESYSTEM_EXCLUDED_FILE_PATTERNS.some((pattern) => pattern.test(name) || pattern.test(relative));
 }
 
 function isExcludedSecretPath(fullPath: string) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const name = path.basename(fullPath);
   if (FILESYSTEM_EXCLUDED_NAMES.has(name)) return true;
   const relative = rootRelative(root, fullPath);
@@ -1885,7 +1885,7 @@ function listFilesystemProjects() {
     id: root.id,
     name: root.name,
     kind: root.kind,
-    path: rootRelative(resolveTechscopeRoot(), root.directory) || ".",
+    path: rootRelative(resolvePrithaRoot(), root.directory) || ".",
     absolute_path: root.directory,
     aliases: root.aliases.slice(0, 8),
   }));
@@ -2303,7 +2303,7 @@ function ensureLocalSearxngSearchBackend() {
   if (!isLocalSearxngUrl(configuredUrl)) {
     return { ok: false, status: "skipped", reason: "nonlocal_searxng_url", searxng_url: redactUrlForStatus(configuredUrl) };
   }
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const scriptPath = path.join(/*turbopackIgnore: true*/ root, "scripts", "web-search-tools.mjs");
   if (!existsSync(scriptPath)) {
     return { ok: false, status: "skipped", reason: "web_search_tools_script_missing" };
@@ -2482,7 +2482,7 @@ async function runSearxngSearch(args: {
 }
 
 async function handleWebSearch(args: WebSearchArgs = {}) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const operation = normalizeWebSearchOperation(args.operation);
   const backend = webSearchBackend();
   if (backend !== "searxng") {
@@ -2571,7 +2571,7 @@ async function handleWebSearch(args: WebSearchArgs = {}) {
 }
 
 async function handleRecentExternalResearch(args: RecentExternalResearchArgs = {}) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const query = compactText(args.query, 300);
   if (!query) return { ok: false, status: "failed", error: "missing_query", summary: "Нужна тема поиска." };
 
@@ -3126,7 +3126,7 @@ export function buildRealtimeSessionConfig(options: RealtimeSessionBuildOptions 
           type: "semantic_vad",
         },
         transcription: {
-          model: env("TECHSCOPE_VOICE_TRANSCRIPTION_MODEL", env("OPENAI_INPUT_TRANSCRIBE_MODEL", DEFAULT_TRANSCRIPTION_MODEL)),
+          model: env("PRITHA_VOICE_TRANSCRIPTION_MODEL", env("OPENAI_INPUT_TRANSCRIBE_MODEL", DEFAULT_TRANSCRIPTION_MODEL)),
         },
       },
       output: {
@@ -3146,7 +3146,7 @@ export function buildLiveSessionConfig(options: RealtimeSessionBuildOptions = {}
     voice: config.audio.output.voice,
     instructions: config.instructions,
     tools: config.tools,
-    backend: env("TECHSCOPE_VOICE_BACKEND_MODEL", DEFAULT_LIVE_BACKEND),
+    backend: env("PRITHA_VOICE_BACKEND_MODEL", DEFAULT_LIVE_BACKEND),
     conversationInstructions: [
       "You are Pritha, the operator's voice assistant. Speak Russian by default and use feminine grammatical self-reference. Keep replies natural and concise.",
       "Delegate all requests for current facts, memory, tools, music, task execution or status to the backend. Never claim an action completed without a verified backend result. Ask clarifying questions when needed and respect corrections.",
@@ -3415,7 +3415,7 @@ async function writeGoodStateRecord(record: GoodStateSignalRecord) {
   await mkdir(dir, { recursive: true });
   const recordPath = path.join(dir, `${record.id}.json`);
   const tmpPath = `${recordPath}.${process.pid}.${Date.now()}.tmp`;
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const withPath = {
     ...record,
     paths: {
@@ -3484,7 +3484,7 @@ export async function recordPrithaGoodStateSignal(args: GoodStateSignalArgs = {}
 }
 
 function listPrithaGoodStateSignalsSync(limit = 5) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const dirs = [goodStateSignalsDir(), goodStateLegacyPendingDir()];
   const files = dirs
     .filter((dir) => existsSync(dir))
@@ -3554,7 +3554,7 @@ function rollingSummaryInputFromArgs(args: RollingSummaryArgs): RollingSummaryCh
 }
 
 async function writeRollingSummaryAtomic(checkpointPath: string, serialized: string) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   await atomicWritePrivateJson({
     stateRoot: resolvePrithaStateRoot(root),
     filePath: checkpointPath,
@@ -3572,7 +3572,7 @@ export async function upsertPrithaRollingSummary(args: RollingSummaryArgs = {}) 
   const input = rollingSummaryInputFromArgs({ ...args, sourceEvent });
   const topicKey = normalizeRollingSummaryTopicKey(input.topicKey);
   const checkpointPath = rollingSummaryCurrentPath();
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const nowMs = Date.now();
   const debounce = rollingSummaryDebounceDecision({
     topicKey: "current",
@@ -3629,7 +3629,7 @@ export async function upsertPrithaRollingSummary(args: RollingSummaryArgs = {}) 
 export async function getPrithaRollingSummary(args: RollingSummaryArgs = {}) {
   const requestedTopicKey = normalizeRollingSummaryTopicKey(args.topicKey ?? args.topic_key);
   const checkpointPath = rollingSummaryCurrentPath();
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   if (!existsSync(checkpointPath)) {
     return { ok: true, found: false, topic_key: requestedTopicKey, path: rootRelative(root, checkpointPath) };
   }
@@ -3914,10 +3914,10 @@ function runtimeSettingsPath() {
 function defaultRuntimeSettings(): PrithaRuntimeSettings {
   return {
     deepTaskPrimaryTransport: "codex-app",
-    codexModel: env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", "gpt-5.6-sol")),
+    codexModel: env("PRITHA_REALTIME_CODEX_MODEL", "gpt-5.6-sol"),
     codexReasoningEffort: normalizeCodexReasoningEffort(env("PRITHA_REALTIME_CODEX_REASONING_EFFORT", "medium")),
     codexServiceTier: normalizeCodexServiceTier(env("PRITHA_REALTIME_CODEX_SERVICE_TIER", "standard")),
-    codexWorkdir: resolveTechscopeRoot(),
+    codexWorkdir: resolvePrithaRoot(),
     codexSandbox: "auto",
     codexNetworkAccess: true,
     codexApproval: "never",
@@ -3932,11 +3932,11 @@ function defaultRuntimeSettings(): PrithaRuntimeSettings {
     codexAppThreadMaxTurns: 24,
     codexAppThreadMaxAgeHours: 168,
     voiceBehaviorProfile: normalizeVoiceBehaviorProfile(
-      env("PRITHA_REALTIME_BEHAVIOR_PROFILE", env("TECHSCOPE_VOICE_BEHAVIOR_PROFILE", DEFAULT_VOICE_BEHAVIOR_PROFILE)),
+      env("PRITHA_REALTIME_BEHAVIOR_PROFILE", DEFAULT_VOICE_BEHAVIOR_PROFILE),
     ),
-    voiceModel: normalizeVoiceModel(env("TECHSCOPE_VOICE_MODEL", env("OPENAI_REALTIME_MODEL", DEFAULT_MODEL))),
+    voiceModel: normalizeVoiceModel(env("PRITHA_VOICE_MODEL", env("OPENAI_REALTIME_MODEL", DEFAULT_MODEL))),
     prithaVoice: normalizePrithaVoice(
-      env("PRITHA_REALTIME_VOICE", env("TECHSCOPE_VOICE_REALTIME_VOICE", env("OPENAI_REALTIME_VOICE", DEFAULT_VOICE))),
+      env("PRITHA_REALTIME_VOICE", env("OPENAI_REALTIME_VOICE", DEFAULT_VOICE)),
     ),
     updatedAt: new Date(0).toISOString(),
   };
@@ -4119,7 +4119,7 @@ function bulletLines(events: ReturnType<typeof normalizeVoiceMemoryEvents>, limi
 }
 
 function runMemoryCommand(command: string, args: string[]) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const result = spawnSync(command, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   return {
     command: [command, ...args].join(" "),
@@ -4131,7 +4131,7 @@ function runMemoryCommand(command: string, args: string[]) {
 }
 
 export async function promoteVoiceSessionMemory(args: VoiceSessionMemoryArgs = {}) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const sessionId = slugPart(args.session_id || `voice-${new Date().toISOString()}`);
   const events = normalizeVoiceMemoryEvents(args.events);
   const classified = classifyVoiceSessionMemory(events);
@@ -4312,7 +4312,7 @@ export async function logPrithaRealtimeClientEvent(kind: string, payload: Record
 
 function envWithoutProxy(extra: Record<string, string> = {}) {
   const childEnv = { ...process.env, ...extra };
-  if (extra.TECHSCOPE_KEEP_PROXY === "1") return childEnv;
+  if (prithaEnvValue("PRITHA_KEEP_PROXY", "", extra) === "1") return childEnv;
   for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
     delete childEnv[key];
   }
@@ -4322,12 +4322,12 @@ function envWithoutProxy(extra: Record<string, string> = {}) {
 }
 
 function codexMode() {
-  const mode = env("PRITHA_REALTIME_CODEX_MODE", env("TECHSCOPE_VOICE_CODEX_MODE", "exec")).toLowerCase();
+  const mode = env("PRITHA_REALTIME_CODEX_MODE", "exec").toLowerCase();
   return mode === "queue" ? "queue" : "exec";
 }
 
 async function codexAvailable() {
-  const result=await runtimeProbe(codexCliBin(),["--version"],resolveTechscopeRoot());
+  const result=await runtimeProbe(codexCliBin(),["--version"],resolvePrithaRoot());
   return {available:result.ok,detail:compactText(result.stdout || result.stderr || "",1_200)};
 }
 
@@ -4340,12 +4340,12 @@ function codexAppBin() {
 }
 
 async function codexExecSupportsEphemeral() {
-  const result=await runtimeProbe(codexCliBin(),["exec","--help"],resolveTechscopeRoot());
+  const result=await runtimeProbe(codexCliBin(),["exec","--help"],resolvePrithaRoot());
   return /\s--ephemeral\b/.test(`${result.stdout}${result.stderr}`);
 }
 
 async function codexAppAvailable() {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const binary = codexAppBin();
   if (!binary) {
     return {
@@ -4368,12 +4368,12 @@ async function codexAppAvailable() {
 }
 
 function codexWorkspaceWriteAllowed() {
-  const value = codexWriteFlagFromValues(env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""), env("TECHSCOPE_VOICE_CODEX_WRITE_ENABLED", ""));
+  const value = codexWriteFlagFromValues(env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""), "");
   return codexWorkspaceWriteAllowedFromFlag(value);
 }
 
 function codexLegacyWriteEnabled() {
-  const value = codexWriteFlagFromValues(env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""), env("TECHSCOPE_VOICE_CODEX_WRITE_ENABLED", ""));
+  const value = codexWriteFlagFromValues(env("PRITHA_REALTIME_CODEX_WRITE_ENABLED", ""), "");
   return codexLegacyWriteEnabledFromFlag(value);
 }
 
@@ -4531,7 +4531,7 @@ function fallbackTaskScope(taskId: unknown): PrithaCodexThreadScope {
 
 export async function createPrithaVoiceIntakeCodexTask(request: VoiceIntakeRequest = {}) {
   await purgeOldVoiceIntakeStaging();
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const text = compactText(request.text, 6_000);
   const files = Array.isArray(request.files) ? request.files : [];
   const links = extractUrls(text);
@@ -4681,7 +4681,7 @@ function deriveCodexThreadScope(args: CodexTaskArgs, task: Record<string, unknow
     return threadScope(explicitKind, explicitId, String(args.subject_label || explicitId), "explicit");
   }
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const text = [
     task.task,
     task.expected_result,
@@ -4978,7 +4978,7 @@ function applyContinuationToTask(
 
 function codexSandboxForTask(taskType: string, writeMode: string) {
   const configured = getPrithaRuntimeSettings().codexSandbox;
-  const override = configured === "auto" ? env("PRITHA_REALTIME_CODEX_SANDBOX", env("TECHSCOPE_VOICE_CODEX_SANDBOX", "")).toLowerCase() : configured;
+  const override = configured === "auto" ? env("PRITHA_REALTIME_CODEX_SANDBOX", "").toLowerCase() : configured;
   if (["read-only", "workspace-write", "danger-full-access"].includes(override)) return override;
   if (!codexWorkspaceWriteAllowed()) return "read-only";
   const normalizedTaskType = taskType.toLowerCase();
@@ -5154,7 +5154,7 @@ function codexWritableRootEntries(root: string, additionalWritableDirs: string[]
 }
 
 function codexTimeoutMs() {
-  const value = Number(env("PRITHA_REALTIME_CODEX_TIMEOUT_MS", env("TECHSCOPE_VOICE_CODEX_TIMEOUT_MS", String(DEFAULT_CODEX_TIMEOUT_MS))));
+  const value = Number(env("PRITHA_REALTIME_CODEX_TIMEOUT_MS", String(DEFAULT_CODEX_TIMEOUT_MS)));
   return Number.isFinite(value) && value > 0 ? Math.max(10_000, Math.min(value, 3_600_000)) : DEFAULT_CODEX_TIMEOUT_MS;
 }
 
@@ -5163,7 +5163,7 @@ function codexEffectiveTimeoutMs() {
 }
 
 function buildCodexPrompt(task: Record<string, unknown>) {
-  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolvePrithaRoot();
   const childAgentProjects = knownSiblingChildAgentProjects(root);
   const childAgentList = childAgentProjects
     .map((project) => rootRelative(root, project.directory))
@@ -5324,7 +5324,7 @@ function agentCreationResearchGatePayload() {
 }
 
 function buildPrithaCodexTaskPayload(task: Record<string, unknown>): PrithaCodexTaskPayload {
-  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolvePrithaRoot();
   const threadScopeValue = typeof task.thread_scope === "object" && task.thread_scope !== null ? (task.thread_scope as PrithaCodexThreadScope) : undefined;
   return {
     requestId: String(task.id || randomUUID()),
@@ -5775,7 +5775,7 @@ function codexAppSandboxPolicyForTask(task: Record<string, unknown>, sandbox: st
 }
 
 function codexAppClientForTask(task: Record<string, unknown>, sandbox: string, writableRoots: Array<{ absolute_path: string }>) {
-  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolvePrithaRoot();
   return new PrithaCodexAppServerClient({
     codexBin: codexAppBin(),
     cwd: root,
@@ -6071,7 +6071,7 @@ export function wakeVoiceAdmissions() {
 }
 
 async function startAdmittedVoiceTask(transport:"codex-app"|"codex-cli",task:Record<string,unknown>,paths:CodexTaskRuntimePaths) {
-  const source=resolveTechscopeRoot();
+  const source=resolvePrithaRoot();
   const sandbox=codexSandboxForTask(String(task.task_type),String(task.write_mode));
   try {
     const agentRoots=codexAdditionalWritableDirs(source,task,sandbox);
@@ -6128,7 +6128,7 @@ async function startCodexAppTask(
   task: Record<string, unknown>,
   paths: CodexTaskRuntimePaths,
 ) {
-  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolvePrithaRoot();
   const taskType = String(task.task_type || "analysis");
   const sandbox = codexSandboxForTask(taskType, String(task.write_mode || "read_only"));
   const additionalWritableDirs = [
@@ -6503,7 +6503,7 @@ async function startCodexExec(
   paths: { resultPath: string; statusPath: string; stdoutPath: string; stderrPath: string; progressPath: string },
   existingWorkflow = false,
 ) {
-  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolveTechscopeRoot();
+  const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolvePrithaRoot();
   const settings = getPrithaRuntimeSettings();
   const taskType = String(task.task_type || "analysis");
   const sandbox = codexSandboxForTask(taskType, String(task.write_mode || "read_only"));
@@ -6540,7 +6540,7 @@ async function startCodexExec(
     "-",
   ];
   if (await codexExecSupportsEphemeral()) args.splice(1, 0, "--ephemeral");
-  const model = settings.codexModel || env("PRITHA_REALTIME_CODEX_MODEL", env("TECHSCOPE_VOICE_CODEX_MODEL", ""));
+  const model = settings.codexModel || env("PRITHA_REALTIME_CODEX_MODEL", "");
   if (model) args.splice(1, 0, "-m", model);
 
   const timeoutMs = codexEffectiveTimeoutMs();
@@ -6565,7 +6565,7 @@ async function startCodexExec(
     child = spawn(codexCliBin(), args, {
     cwd: root,
     env:
-      env("PRITHA_REALTIME_CODEX_USE_PROXY", env("TECHSCOPE_VOICE_CODEX_USE_PROXY", "0")) === "1"
+      env("PRITHA_REALTIME_CODEX_USE_PROXY", "0") === "1"
         ? { ...process.env, PRITHA_ROOT: root, TECHSCOPE_ROOT: root }
         : envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
     stdio: ["pipe", stdoutFd, stderrFd],
@@ -6754,7 +6754,7 @@ async function startCodexExec(
 }
 
 async function runCodexTask(args: CodexTaskArgs = {}) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const taskText = String(args.task || "").trim();
   if (!taskText) return { ok: false, error: "missing_task" };
 
@@ -7284,7 +7284,7 @@ async function repairStaleCodexTaskStatus(
 }
 
 async function codexTaskSummary(id: string) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
   const shortId = await ensureCodexTaskShortId(id);
   const requestPath = path.join(taskDir, "request.json");
@@ -7460,7 +7460,7 @@ export async function getPrithaCodexTask(taskId: string) {
     return { ok: false, error: "invalid_task_id" };
   }
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
   if (!isPathInsideOrSame(privateRoot(), taskDir) || !existsSync(taskDir)) {
     await logPrivateEvent("codex_task_readback", { ok: false, error: "task_not_found", task_id: id });
@@ -7797,7 +7797,7 @@ async function abortPrithaCodexTaskOwned(taskRef: string, reason?: unknown) {
     return { ok: false, error: "invalid_task_id" };
   }
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
   if (!isPathInsideOrSame(privateRoot(), taskDir) || !existsSync(taskDir)) {
     await logPrivateEvent("codex_task_abort", { ok: false, error: "task_not_found", task_id: id });
@@ -7953,7 +7953,7 @@ async function answerPrithaCodexTaskOwned(args: AnswerCodexTaskArgs) {
     return { ok: false, error: "missing_answer" };
   }
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   let id = await resolveCodexTaskIdRef(args.task_id);
   if (!id) id = await latestWaitingCodexTaskId();
   if (!id) {
@@ -8124,7 +8124,7 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
     return { ok: false, error: "invalid_task_id" };
   }
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
   if (!isPathInsideOrSame(privateRoot(), taskDir) || !existsSync(taskDir)) {
     await logPrivateEvent("codex_task_approval_decision", { ok: false, error: "task_not_found", task_id: id });
@@ -8320,7 +8320,7 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
 
 export async function getPrithaRealtimeStatus() {
   const config = buildRealtimeSessionConfig();
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const [codex,codexApp] = await Promise.all([codexAvailable(),codexAppAvailable()]);
   const runtimeSettings = getPrithaRuntimeSettings();
   const last30days = realtimeLast30DaysStatus(root);
@@ -8334,7 +8334,7 @@ export async function getPrithaRealtimeStatus() {
     behavior_profile_options: VOICE_BEHAVIOR_PROFILE_OPTIONS,
     transcription_model: usesLiveVoice() ? "gpt-live-1 (built-in)" : config.audio.input.transcription.model,
     voice_api: usesLiveVoice() ? "live" : "realtime",
-    backend_model: usesLiveVoice() ? env("TECHSCOPE_VOICE_BACKEND_MODEL", DEFAULT_LIVE_BACKEND) : null,
+    backend_model: usesLiveVoice() ? env("PRITHA_VOICE_BACKEND_MODEL", DEFAULT_LIVE_BACKEND) : null,
     tools: config.tools.map((tool) => tool.name),
     openai_key_configured: Boolean(env("OPENAI_API_KEY")),
     realtime_base_url: realtimeBaseUrl(),

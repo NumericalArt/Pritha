@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import {normalizeChatSubject,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "@/lib/pritha-paths";
 import { appendPrivateAuditEvent, atomicWritePrivateJson } from "@/lib/private-json";
 import { ExecutionCoordinator } from "../../../../../scripts/lib/execution-coordinator.mjs";
 import type { TaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
@@ -61,7 +61,7 @@ export function logicalChatKey(binding: ChatBinding) {
 }
 
 function privateChatLocations() {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const stateRoot = resolvePrithaStateRoot(root);
   return {
     stateRoot,

@@ -4,9 +4,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { printStatus, readJson, run } from "./status-lib.mjs";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 
-const root = resolveTechscopeRoot();
+const root = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root });
 const manifest = readJson("memory/manifest.json");
 const stats = run("node", ["scripts/query-memory.mjs", "stats"]);

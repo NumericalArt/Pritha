@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
+const ROOT = resolvePrithaRoot({ cwd: DEFAULT_ROOT });
 loadPrithaRuntimeEnv({ root: ROOT });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 
@@ -118,7 +118,7 @@ function previousBaseline() {
 
 function sanitizeText(value) {
   let text = value;
-  if (ROOT) text = text.split(ROOT).join("<TECHSCOPE_ROOT>");
+  if (ROOT) text = text.split(ROOT).join("<PRITHA_ROOT>");
   if (process.env.HOME) text = text.split(process.env.HOME).join("<USER_HOME>");
   return text;
 }
@@ -277,7 +277,7 @@ const payload = runSelfTest();
 if (jsonMode) {
   console.log(JSON.stringify(payload, null, 2));
 } else {
-  console.log(`Techscope self-test: ${payload.status}`);
+  console.log(`Pritha self-test: ${payload.status}`);
   console.log(`Root: ${payload.root}`);
   console.log(`Quality profile: ${payload.quality_gate.profile || "self-test"} / ${payload.quality_gate.status}`);
   console.log(`Memory documents: ${payload.memory_stats.documents}`);

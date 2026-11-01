@@ -473,7 +473,7 @@ compatibility и отсутствие long-running processes/credential provisio
 
 ### R11b — Завершение ребрендинга Techscope → Pritha без потери состояния
 
-**Статус: in progress; root compatibility/package/docs verified locally.** Выполняется до R12.
+**Статус: implemented and locally verified; live migration/manual gate in R12.** Выполняется до R12.
 Зависимости: R1/R2 для state identity, R11 для bootstrap/distribution. Контракт
 имён и shared resolver можно вводить раньше, чтобы новые adapters не размножали
 старую терминологию. Исходные R0–R12 сохраняют номера и объём.
@@ -488,17 +488,17 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 снимком и явной транзакцией переноса.
 
 1. **R11b.1 — Инвентаризация и контракт.**
-   - [ ] Разделить упоминания на public/current API, внутренний compatibility
+   - [x] Разделить упоминания на public/current API, внутренний compatibility
      boundary, persisted schema/identity и неизменяемую историю/источники.
    - [x] Зафиксировать canonical имена: `PRITHA_ROOT`, `resolvePrithaRoot`,
      `.pritha-setup.json` для legacy checkout layout, `pritha.sqlite` внутри
      выбранного memory directory и package `pritha`. Внешний state-root уже
      использует нейтральный `setup/setup.json`; его переименовывать не нужно.
-   - [ ] `TECHSCOPE_ROOT`, `resolveTechscopeRoot`, старые CLI entrypoints и
+   - [x] `TECHSCOPE_ROOT`, `resolveTechscopeRoot`, старые CLI entrypoints и
      существующие файлы остаются compatibility aliases на переходный период.
      Удаление aliases не входит в эту поставку. Старые артефакты, их IDs,
      source URLs, цитаты и ссылки не переписывать массово.
-   - [ ] Отдельно проверить protocol/schema/table identifiers: переименовать
+   - [x] Отдельно проверить protocol/schema/table identifiers: переименовать
      только при реальной необходимости с versioned reader/migration; не ломать
      сохранённые foreign keys, citations, retrieval fixtures и историю задач.
    - **Проверка:** versioned inventory/allowlist оставшихся имён с причиной;
@@ -508,10 +508,10 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
      > Git root > cwd. Два разных непустых env roots — actionable conflict,
      а не молчаливый выбор; explicit root задаёт оба aliases одинаково в child.
      Не существующий явно заданный root не должен переключать экземпляр.
-   - [ ] Одинаковое поведение Node, TS, Python, shell wrappers, bootstrap,
+   - [x] Одинаковое поведение Node, TS, Python, shell wrappers, bootstrap,
      setup, CLI workers и managed-runtime manifests; import/export aliases
      используют одну реализацию. Обновить redaction для обоих названий.
-   - [ ] Новые scaffold/config/examples используют Pritha; при запуске старых
+   - [x] Новые scaffold/config/examples используют Pritha; при запуске старых
      дочерних entrypoints передавать совместимые env значения одного root.
      `PRITHA_STATE_ROOT` и `PRITHA_AGENT_PARENT` сохраняют границы экземпляра.
    - **Тесты:** neither/old-only/new-only/both-equal/both-conflicting, пробелы,
@@ -541,13 +541,13 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
      symlink escape, WAL activity, crash на границах транзакции, retry/rollback,
      одновременные workers, пустая/полная память, unchanged retrieval holdout.
 4. **R11b.4 — Внешний вид репозитория и защита от возврата старых имён.**
-   - [ ] Package metadata, README/README.ru, текущие setup/help/error labels,
+   - [x] Package metadata, README/README.ru, текущие setup/help/error labels,
      docs, AGENTS и templates описывают Pritha как primary и одну короткую
      compatibility note. Existing historical Markdown и source appendices
      остаются историей; актуальные ссылки на старые filenames сохраняются.
-   - [ ] Старые executable filenames становятся тонкими aliases к новым,
+   - [x] Старые executable filenames становятся тонкими aliases к новым,
      если это оправдано inventory; не создавать второй независимый runtime.
-   - [ ] Guard проверяет новые runtime references вне явного compatibility
+   - [x] Guard проверяет новые runtime references вне явного compatibility
      allowlist; не требует нуля `Techscope` во всей истории репозитория.
    - **Проверка:** legacy/current CLI smoke, fresh bootstrap, upgrade fixture,
      typecheck, self-test, strict privacy, docs links, package commands и
@@ -1257,6 +1257,52 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   gate установленного экземпляра и ручная приёмка остаются частью R12.
   R11b.4 и исходные незавершённые этапы продолжаются; MacBook/GitHub/services
   не изменялись.
+
+### Checkpoint реализации 17 — Primary имена и compatibility guard
+
+- Внутренние Node/TS callers теперь используют `resolvePrithaRoot`; старый
+  export сохранён той же функцией в compatibility boundary. При переименовании
+  обнаружен одноимённый wrapper Music config: он заменён прямым re-export, чтобы
+  избежать рекурсивного вызова. Test fixtures используют текущий API; отдельные
+  legacy alias/parity tests сохранены.
+- `pritha-env.mjs` задаёт явную карту старых опций к новым. Telegram, CLI checks,
+  Voice, Codex binary/proxy settings читают её; `.env.example` и setup writer
+  используют primary имена. Новое явно заданное значение, включая пустую строку
+  и `0`, имеет приоритет, поэтому старый alias не включает отключённую возможность.
+  Root conflict policy остаётся отдельной и более строгой. Helper не пишет env
+  файлы и не добавляет credentials в subprocess environment.
+- Новые `pritha-web.mjs`, `pritha_web.py`, `run-pritha-web.sh` и
+  `run-pritha-telegram-bot.sh` содержат реализации. Четыре старые точки входа
+  только делегируют выполнение; Node/Python old/new smoke проверяют один Pritha UI
+  из изолированного root без создания памяти. Убран machine-specific host из
+  web wrapper: default loopback, explicit HOST сохраняется. Установленные службы
+  и существующие service labels не переименовывались.
+- Текущие CLI/UI labels, intake prompts, report generator, README, AGENTS и
+  библиотечная документация используют Pritha. Новый audit template сохраняет
+  ссылки на реальные исторические workflows. Operations manifest описывает
+  существующий managed Control Center contract и explicit lifecycle approval;
+  не содержит команд автоматического запуска legacy Telegram/web служб.
+- `config/pritha-name-compatibility.json` фиксирует 115 reviewed line hashes для
+  124 оставшихся references: aliases, persisted schemas/files, reserved identities,
+  legacy service recovery и сам guard. `scripts/check-pritha-names.mjs` включён
+  в golden checks. Новая, перемещённая или дублированная строка вне allowlist
+  блокирует проверку; историческая authored memory не переписывается и не входит
+  в runtime scope. Каждое исключение имеет причину.
+- Targeted env/guard/old-new web/safety tests, TypeScript, strict privacy и
+  Markdown validation прошли. Общий unit suite: **1115/1115**. Chromium E2E:
+  **28/28** Task Chat history/archive/attachments и **14/14** Settings/provider
+  selection/Voice; без skipped/flaky. Next candidate builds прошли отдельно
+  от live production. Rebranding snapshots изменены только для намеренного
+  `<PRITHA_ROOT>` redaction placeholder; остальные scaffold bytes сохранены.
+- Browser gate выявил и устранил ошибку R8: старый model catalog мог не содержать
+  capability arrays, а возврат после archive к новому черновику обращался к
+  отсутствующему `effortIds.length`. Теперь неполные данные скрывают неизвестные
+  controls без падения страницы. Исходные archive/restore/upload tests прошли
+  повторно. В `.env.example` удалены дубли ключей: current `exec` сохранил
+  приоритет над старой `queue` опцией; placeholder path не стал default значением.
+  Проверка уникальности ключей предотвращает повтор этой ошибки.
+- Реальное переименование данных и R12 acceptance не
+  объявлены завершёнными; остальные этапы исходного roadmap остаются в работе.
 
 ## 7. Полные исходные материалы
 

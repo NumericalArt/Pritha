@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaRoot } from "../lib/paths.mjs";
 import {
   containsHighRiskInstruction,
   quarantineUntrustedInstructionText,
@@ -11,7 +11,7 @@ import {
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const DEFAULT_CATALOG_ROOT = path.join(ROOT, "11_agents", "skills");
 
 export const SKILL_NEEDS = new Set(["auto", "none", "selected"]);

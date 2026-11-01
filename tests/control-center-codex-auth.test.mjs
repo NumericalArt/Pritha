@@ -23,7 +23,7 @@ for (const available of [true, false]) {
     const auth = loadModule("interfaces/control-center/src/lib/settings/codex-auth.ts", {
       "node:child_process": { spawnSync: () => ({ status: 0, stdout: "codex-cli fixture" }) },
       "@/lib/realtime/codex-task/codex-app-server-client": { checkCodexAppServerAvailable: () => probe },
-      "@/lib/realtime/pritha-runtime": { resolveTechscopeRoot: () => "/fixture/pritha" },
+      "@/lib/realtime/pritha-runtime": { resolvePrithaRoot: () => "/fixture/pritha" },
       "./codex-binaries": { resolveCodexCliBinary: () => "codex", resolveCodexAppBinary: () => "/fixture/codex" },
     });
     const route = loadModule("interfaces/control-center/src/app/api/settings/codex-auth/route.ts", {

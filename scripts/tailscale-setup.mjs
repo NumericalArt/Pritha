@@ -9,10 +9,10 @@ import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { isPrithaCodeCheckout, resolvePrithaAgentParent, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { isPrithaCodeCheckout, resolvePrithaAgentParent, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 import { resolveToolServerManifest } from "./agents-mother/tool-server-runtime.mjs";
 
-const ROOT = resolveTechscopeRoot({ cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") });
+const ROOT = resolvePrithaRoot({ cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") });
 loadPrithaRuntimeEnv({ root: ROOT, pathOnly: true });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 const DEFAULT_STATE_PATH = resolvePrithaSetupFile({root: ROOT, stateRoot: STATE_ROOT});

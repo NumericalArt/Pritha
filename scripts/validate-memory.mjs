@@ -4,10 +4,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
-import { resolvePrithaAgentMemoryRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 import { listAuthoredAgentMemoryFiles } from "./lib/authored-agent-memory.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const INCLUDE_DIRS = [

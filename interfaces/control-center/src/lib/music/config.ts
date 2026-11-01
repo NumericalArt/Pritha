@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "../pritha-paths";
 
 export type MusicRuntimeConfig = {
   root: string;
@@ -32,9 +32,7 @@ export type MusicRuntimeConfig = {
 
 let envLoaded = false;
 
-export function resolvePrithaRoot() {
-  return resolveTechscopeRoot();
-}
+export { resolvePrithaRoot };
 
 function loadEnvFile(filePath: string) {
   if (!existsSync(filePath)) return;

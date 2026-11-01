@@ -12,13 +12,13 @@ import {
   readGitHubRepositoryRegistry,
   searchGitHubRepositoryCandidates,
 } from "./lib/github-repository-radar.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import { atomicWriteFile, withFileLock } from "./lib/atomic-file.mjs";
 import { parseBoundedJson } from "./lib/bounded-json.mjs";
 import { redactSensitiveText } from "./lib/redaction.mjs";
 import { readBoundedRegularFile } from "./lib/safe-file-read.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const REGISTRY_PATH = path.join(ROOT, "01_sources", "registries", "github-agent-building-repos.md");
 const argv = process.argv.slice(2);
 const command = argv.find((arg) => !arg.startsWith("-")) || "status";
@@ -227,7 +227,7 @@ function initRegistry() {
       ok: false,
       status: "unsafe_registry",
       initialized: false,
-      detail: "Registry must be a bounded regular file inside TECHSCOPE_ROOT.",
+      detail: "Registry must be a bounded regular file inside PRITHA_ROOT.",
     };
   }
 }
@@ -298,7 +298,7 @@ function registerRepo() {
       ok: false,
       status: "unsafe_registry",
       registryPath: registryRelativePath(),
-      detail: "Registry must be a bounded regular file inside TECHSCOPE_ROOT.",
+      detail: "Registry must be a bounded regular file inside PRITHA_ROOT.",
     };
   }
 }

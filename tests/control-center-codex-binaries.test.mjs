@@ -16,7 +16,7 @@ async function loadBinaryModule() {
   }).outputText;
   const tmp = mkdtempSync(path.join(os.tmpdir(), "pritha-codex-binary-test-"));
   const modulePath = path.join(tmp, "codex-binaries.mjs");
-  writeFileSync(modulePath, output, "utf8");
+  writeFileSync(modulePath, output.replace('"../pritha-env"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/pritha-env.mjs")).href)), "utf8");
   return { module: await import(pathToFileURL(modulePath).href), cleanup: () => rmSync(tmp, { recursive: true, force: true }) };
 }
 

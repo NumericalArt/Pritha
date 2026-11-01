@@ -41,7 +41,7 @@ API_KEY=fixture-secret-value
       assert.match(text, new RegExp(`^id: ${written.artifactId}$`, "m"));
       assert.match(text, /<PROJECT_ROOT>/);
       assert.match(text, /<PRITHA_STATE_ROOT>/);
-      assert.match(text, /<TECHSCOPE_ROOT>/);
+      assert.match(text, /<PRITHA_ROOT>/);
       assert.match(text, /<USER_HOME>/);
       assert.match(text, /<TEMP_PATH>/);
       assert.match(text, /API_KEY=\[REDACTED\]/);

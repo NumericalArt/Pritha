@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = resolveTechscopeRoot({ cwd: path.resolve(SCRIPT_DIR, "..") });
+const ROOT = resolvePrithaRoot({ cwd: path.resolve(SCRIPT_DIR, "..") });
 loadPrithaRuntimeEnv({ root: ROOT });
 const PHASES = new Set(["plan", "prepare", "install", "verify", "start"]);
 const PROFILES = {

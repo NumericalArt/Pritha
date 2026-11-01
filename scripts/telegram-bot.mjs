@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { prithaEnvValue } from "./lib/pritha-env.mjs";
 
 import {
   spawnSync,
@@ -17,22 +18,22 @@ import {
 import path from "node:path";
 import { loadEnv } from "./lib/env.mjs";
 import { yamlList, yamlString } from "./lib/frontmatter.mjs";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { now, today } from "./lib/date.mjs";
 import { createAnonymousSourceId, inferSourceClass } from "./lib/privacy.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 const INBOX_DIR = path.join(ROOT, "00_inbox", "telegram");
 const QUEUE_DIR = resolvePrithaStatePath("queue", "telegram-intake");
 const CODEX_REVIEW_DIR = resolvePrithaStatePath("queue", "codex-media-review");
 const DEFAULT_ALLOWED_USER_IDS = [];
 const POLL_TIMEOUT_SECONDS = 30;
-const RETRY_DELAY_MS = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_INITIAL_MS || 3000);
-const MAX_RETRY_DELAY_MS = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_MAX_MS || 60000);
-const RETRY_JITTER_RATIO = Number(process.env.TECHSCOPE_TELEGRAM_RETRY_JITTER_RATIO || 0.25);
-const ERROR_LOG_INTERVAL_MS = Number(process.env.TECHSCOPE_TELEGRAM_ERROR_LOG_INTERVAL_MS || 60000);
+const RETRY_DELAY_MS = Number(prithaEnvValue("PRITHA_TELEGRAM_RETRY_INITIAL_MS") || 3000);
+const MAX_RETRY_DELAY_MS = Number(prithaEnvValue("PRITHA_TELEGRAM_RETRY_MAX_MS") || 60000);
+const RETRY_JITTER_RATIO = Number(prithaEnvValue("PRITHA_TELEGRAM_RETRY_JITTER_RATIO") || 0.25);
+const ERROR_LOG_INTERVAL_MS = Number(prithaEnvValue("PRITHA_TELEGRAM_ERROR_LOG_INTERVAL_MS") || 60000);
 const MAX_JOB_ATTEMPTS = 2;
 const QUEUE_STATUSES = ["pending", "processing", "awaiting_codex", "complete", "done", "failed"];
 let workerRunning = false;
@@ -51,8 +52,8 @@ function usage() {
   node scripts/telegram-bot.mjs codex-review-done <job-id>
 
 Environment:
-  TECHSCOPE_TELEGRAM_BOT_TOKEN=<telegram bot token>
-  TECHSCOPE_TELEGRAM_ALLOWED_USER_IDS=<telegram-user-id>`);
+  PRITHA_TELEGRAM_BOT_TOKEN=<telegram bot token>
+  PRITHA_TELEGRAM_ALLOWED_USER_IDS=<telegram-user-id>`);
 }
 
 function runCommand(command, args) {
@@ -79,15 +80,15 @@ class TelegramApiError extends Error {
 }
 
 function requireToken() {
-  const token = process.env.TECHSCOPE_TELEGRAM_BOT_TOKEN;
+  const token = prithaEnvValue("PRITHA_TELEGRAM_BOT_TOKEN");
   if (!token) {
-    throw new Error("Missing TECHSCOPE_TELEGRAM_BOT_TOKEN. Put it in .env.local or export it before running.");
+    throw new Error("Missing PRITHA_TELEGRAM_BOT_TOKEN. Put it in .env.local or export it before running.");
   }
   return token;
 }
 
 function allowedUserIds() {
-  const raw = process.env.TECHSCOPE_TELEGRAM_ALLOWED_USER_IDS || DEFAULT_ALLOWED_USER_IDS.join(",");
+  const raw = prithaEnvValue("PRITHA_TELEGRAM_ALLOWED_USER_IDS") || DEFAULT_ALLOWED_USER_IDS.join(",");
   return new Set(raw.split(",").map((item) => item.trim()).filter(Boolean));
 }
 
@@ -316,7 +317,7 @@ function enqueueCodexMediaReview(job, parsed) {
     assessment: parsed.assessment || "",
     signals: parsed.signals || [],
     media: mediaItems,
-    instruction: "Open media files in the current Techscope Codex thread, extract technical signal, update/refine signal/assessment, and create source-note/brief/review if useful.",
+    instruction: "Open media files in the current Pritha Codex thread, extract technical signal, update/refine signal/assessment, and create source-note/brief/review if useful.",
   };
   writeJson(codexReviewPath("pending", reviewJob.id), reviewJob);
   return reviewJob;
@@ -428,7 +429,7 @@ Retention: source-purged
 
 ## Why this may matter
 
-- Forwarded to Techscope for later expert assessment.
+- Forwarded to Pritha for later expert assessment.
 
 ## Neutral intake facts
 
@@ -534,7 +535,7 @@ async function handleUpdate(update, users) {
 
   const text = messageText(message);
   if (text === "/start" || text === "/help") {
-    await reply(chatId, "Techscope готов принимать материалы.\n\nПрисылай пост, ссылку, фото, видео или голосовое. Я проведу privacy-preserving intake: raw/provenance не сохраняются в Git-памяти, durable layer получает только processed knowledge и neutral metadata.\n\nКоманды:\n/help\n/queue\n/reindex");
+    await reply(chatId, "Pritha готов принимать материалы.\n\nПрисылай пост, ссылку, фото, видео или голосовое. Я проведу privacy-preserving intake: raw/provenance не сохраняются в Git-памяти, durable layer получает только processed knowledge и neutral metadata.\n\nКоманды:\n/help\n/queue\n/reindex");
     return;
   }
   if (text === "/reindex") {
@@ -545,7 +546,7 @@ async function handleUpdate(update, users) {
     const stats = queueStats();
     const reviewStats = codexReviewStats();
     const full = fullPipelineStatus();
-    await reply(chatId, `Очередь Techscope:\n\nполностью готово: ${stats.complete}\nждёт автоэтап: ${stats.pending}\nв работе: ${stats.processing}\nждёт Codex-разбор медиа: ${stats.awaiting_codex + reviewStats.pending}\nошибок: ${stats.failed}\nlegacy auto-done: ${stats.done}\n\nСтатус полного пайплайна: ${full.complete ? "чисто" : "есть незакрытые задачи"}`);
+    await reply(chatId, `Очередь Pritha:\n\nполностью готово: ${stats.complete}\nждёт автоэтап: ${stats.pending}\nв работе: ${stats.processing}\nждёт Codex-разбор медиа: ${stats.awaiting_codex + reviewStats.pending}\nошибок: ${stats.failed}\nlegacy auto-done: ${stats.done}\n\nСтатус полного пайплайна: ${full.complete ? "чисто" : "есть незакрытые задачи"}`);
     return;
   }
 
@@ -560,7 +561,7 @@ async function handleUpdate(update, users) {
 
 async function poll() {
   const users = allowedUserIds();
-  let offset = Number(process.env.TECHSCOPE_TELEGRAM_OFFSET || 0);
+  let offset = Number(prithaEnvValue("PRITHA_TELEGRAM_OFFSET") || 0);
   let failureCount = 0;
   let lastErrorMessage = "";
   let suppressedErrors = 0;
@@ -571,7 +572,7 @@ async function poll() {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Telegram deleteWebhook warning: ${message}; continuing with long polling retry loop.`);
   }
-  console.log(`Techscope Telegram bot polling. Allowed users: ${[...users].join(", ")}`);
+  console.log(`Pritha Telegram bot polling. Allowed users: ${[...users].join(", ")}`);
   recoverProcessingJobs();
   kickQueueWorker();
 

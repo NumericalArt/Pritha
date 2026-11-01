@@ -3,12 +3,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
 import { CHILD_AGENT_TYPES } from "./lib/child-agent-artifacts.mjs";
 import { containsForbiddenText, isForbiddenRawPath, isMemorySnapshotPath, isPrivacyTextTarget } from "./lib/privacy.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
 const strictMode = args.has("--strict");

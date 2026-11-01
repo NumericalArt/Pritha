@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -19,7 +19,7 @@ function parseArgs(argv) {
 }
 
 const options = parseArgs(process.argv.slice(2));
-const root = resolveTechscopeRoot();
+const root = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root });
 const stateRoot = resolvePrithaStateRoot({ root });
 const manifestPath = path.resolve(String(options.manifest || process.env.PRITHA_FLEET_CONFIG || path.join(stateRoot, "config", "fleet.json")));

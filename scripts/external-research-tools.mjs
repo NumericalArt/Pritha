@@ -5,7 +5,7 @@ import { runSyncProbe } from "./lib/sync-probe.mjs";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaRoot } from "./lib/paths.mjs";
 
 const LOCK_PATH = path.join("tools", "external-research", "last30days-lock.json");
 const PYTHON_VERSION_PROBE = "import json,sys; print(json.dumps({'executable': sys.executable, 'version': '.'.join(map(str, sys.version_info[:3])), 'major': sys.version_info[0], 'minor': sys.version_info[1], 'micro': sys.version_info[2]}))";
@@ -82,7 +82,7 @@ function clampInteger(value, fallback, min, max) {
 }
 
 export function loadExternalResearchToolLock(options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const lockPath = path.join(root, LOCK_PATH);
   const lock = JSON.parse(readFileSync(lockPath, "utf8"));
   return { root, lockPath, lock };
@@ -434,7 +434,7 @@ export function runRecentLast30DaysResearch(options = {}) {
     };
   }
 
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const status = statusForLast30Days({ root, env: options.env, pythonCandidates: options.pythonCandidates });
   if (!status.ok) {
     return {

@@ -1,3 +1,4 @@
+import { prithaEnvValue } from "@/lib/pritha-env";
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { promisify } from "node:util";
 import { createHash, randomUUID } from "node:crypto";
@@ -8,7 +9,7 @@ import readline from "node:readline";
 import { getPrithaRuntimeSettings } from "@/lib/realtime/pritha-runtime";
 import { DESKTOP_CODEX_BIN_CANDIDATES } from "@/lib/settings/codex-binaries";
 import { codexAppTurnSettings } from "@/lib/settings/codex-model-catalog";
-import { resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { resolvePrithaRoot } from "@/lib/pritha-paths";
 import { captureNativeRequest, expireNativeRequests } from "./native-requests";
 import { CodexChatPrivateStore } from "./private-store";
 import { effectiveCodexHome, legacyIdentityMatches, storageIdentity } from "./storage-identity";
@@ -81,7 +82,7 @@ function emptyCapabilities(): RuntimeCapabilityMap {
 
 function childEnvironment(home = effectiveCodexHome()) {
   const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home };
-  if (process.env.PRITHA_REALTIME_CODEX_USE_PROXY === "1" || process.env.TECHSCOPE_VOICE_CODEX_USE_PROXY === "1") return env;
+  if (prithaEnvValue("PRITHA_REALTIME_CODEX_USE_PROXY") === "1") return env;
   for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) delete env[key];
   env.NO_PROXY = env.NO_PROXY || "127.0.0.1,localhost";
   env.no_proxy = env.no_proxy || env.NO_PROXY;
@@ -426,7 +427,7 @@ export class CodexRuntimeManager {
   constructor(
     private readonly store: CodexChatPrivateStore,
     private readonly onNotification: NotificationHandler,
-    private readonly root = resolveTechscopeRoot(),
+    private readonly root = resolvePrithaRoot(),
   ) {}
 
   async status(): Promise<RuntimeStatus> {

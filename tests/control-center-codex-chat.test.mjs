@@ -269,7 +269,7 @@ test("corrupt Codex Chat registry restores a valid backup and otherwise stays re
       .replaceAll('"../../../../../scripts/lib/execution-coordinator.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-coordinator.mjs")).href));
   writeFileSync(path.join(tmp, "private-json.mjs"), helperOutput);
   writeFileSync(path.join(tmp, "pritha-paths.mjs"), `
-export const resolveTechscopeRoot = () => ${JSON.stringify(checkout)};
+export const resolvePrithaRoot = () => ${JSON.stringify(checkout)};
 export const resolvePrithaStateRoot = () => ${JSON.stringify(stateRoot)};
 `);
   writeFileSync(path.join(tmp, "private-store.mjs"), storeOutput);
@@ -531,7 +531,7 @@ test("Task Chat interaction telemetry is private, bounded and content-free", asy
   writeFileSync(path.join(tmp, "ui-activity.mjs"), output);
   writeFileSync(path.join(tmp, "private-json.mjs"), "export async function appendPrivateAuditEvent(value) { globalThis.__taskChatUiActivity = value; }\n");
   writeFileSync(path.join(tmp, "pritha-paths.mjs"), `
-export const resolveTechscopeRoot = () => ${JSON.stringify(tmp)};
+export const resolvePrithaRoot = () => ${JSON.stringify(tmp)};
 export const resolvePrithaStateRoot = () => ${JSON.stringify(tmp)};
 export const resolvePrithaStatePath = (...segments) => segments.join("/");
 `);

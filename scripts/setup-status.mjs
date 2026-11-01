@@ -4,10 +4,10 @@ import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaSetupFile } from "./lib/state-files.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 import { moduleReadiness } from "./lib/module-readiness.mjs";
 
-const root = resolveTechscopeRoot();
+const root = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: root, pathOnly: true });
 const stateRoot = resolvePrithaStateRoot({ root });
 const argv = process.argv.slice(2);

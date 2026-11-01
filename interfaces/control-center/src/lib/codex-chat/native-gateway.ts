@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {normalizeChatSubject,factorySubjectInstructions,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
 import path from "node:path";
 import { prepareTaskWorkspace, inspectTaskWorkspace, taskWorkspaceResources, verifyTaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
-import { resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { resolvePrithaRoot } from "@/lib/pritha-paths";
 import { AppServerConnection, CodexRuntimeManager, type RpcMessage, type RuntimeNotificationOrigin } from "./app-server";
 import { verifyNativeThreadIdentity } from "./storage-identity";
 import { ChatAttachmentStore, AttachmentError } from "./attachment-store";
@@ -191,7 +191,7 @@ export class CodexChatGateway {
   private readonly historyReader = new HistoryReader();
   private readonly store = new CodexChatPrivateStore();
   readonly attachments = new ChatAttachmentStore(this.store.stateRoot, this.store.root);
-  private readonly root = resolveTechscopeRoot();
+  private readonly root = resolvePrithaRoot();
   private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message, origin) => this.handleNotification(providerId, message, origin), this.root);
   private readonly activeTurns = new Map<string, ActiveAttempt>();
   private readonly activeTurnLeases = new Map<string, () => void>();

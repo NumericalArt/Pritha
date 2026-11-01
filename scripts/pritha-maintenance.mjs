@@ -7,9 +7,9 @@ import process from "node:process";
 import { rebuildRegistry } from "./agents-mother/registry.mjs";
 import { maintenanceContracts } from "./lib/maintenance-contract.mjs";
 import { now, today } from "./lib/date.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const argv = process.argv.slice(2);

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { RuntimeSettingsStore, providerSettingsSnapshot, updateStoredProviderSettings, type ProviderSettingsPatch } from "../../../../../scripts/lib/runtime-settings-store.mjs";
 import { ProviderConfigurationError, resolveProviderSelection } from "./provider-profile";
-import { PrithaStateFileError, resolvePrithaSetupFile, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
+import { PrithaStateFileError, resolvePrithaSetupFile, resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "../pritha-paths";
 import { getPrithaRuntimeSettings } from "../realtime/pritha-runtime";
 import { getCodexModelCatalog } from "./codex-model-catalog-server";
 import { validateCodexSelection, normalizeCodexReasoningEffortToken } from "./codex-model-catalog";
@@ -10,7 +10,7 @@ export function providerSettingsStore() {
   return new RuntimeSettingsStore(resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "realtime", "runtime-settings.json"), { allowedRoot: resolvePrithaStateRoot() });
 }
 function options() {
-  const root = resolveTechscopeRoot(), stateRoot = resolvePrithaStateRoot();
+  const root = resolvePrithaRoot(), stateRoot = resolvePrithaStateRoot();
   const instance = new RuntimeSettingsStore(path.join(root, ".pritha-instance.json"), { allowedRoot: root }).read();
   const setup = new RuntimeSettingsStore(resolvePrithaSetupFile({root, stateRoot}), { allowedRoot: stateRoot }).read();
   return { defaultConnector: resolveProviderSelection({ env: process.env, instance, setup }).connectorId, legacy: getPrithaRuntimeSettings() };

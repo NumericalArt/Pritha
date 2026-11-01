@@ -1,0 +1,697 @@
+{
+  "schema": "pritha-name-compatibility-v1",
+  "reviewed": "2026-11-01",
+  "policy": "Only reviewed compatibility boundaries, persisted identities and guard patterns. Historical authored artifacts are outside the runtime scope.",
+  "entries": [
+    {
+      "path": ".env.example",
+      "sha256": "9fe6e48d4ea2140e14abd2e1665fa102072bc106633945dddcab68c044736b46",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": ".env.example",
+      "sha256": "699594b7a05ec661abddc0bb11fce95f35b5194414368eeca8c3eb39d83b5793",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "8db79c64c703127a6a4afe4291855ee17e08a07560ac547f941f23f99c0f729e",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "33ff33404ec550563eeb37ebbb53cddd6755bddb4545a4d870cd0ee2563c3802",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "26d448db24221a1e33fb0df729ef02b50c6b1a2172c99ff18c415f0cca91fd60",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "9923d5c6ac8e17a1771149139cb0d5a3e7bed48a6a2992f28011ed1c998fb159",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "8692bfa7853f82f49b4d1ac7eb4962a12e0b2adeac13dc6813d4a9f612e5b15d",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "6d62b71e38c670cc7ce10ad21f717915543b54c67aa9071782f5ae37f7d8a723",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/operation-runtime.ts",
+      "sha256": "9ef02eb3a640fe0f8ba4c15061ae6120cfc137c4af4f890576a5bccd81d01f83",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/maintenance.ts",
+      "sha256": "b1f599b0866cbb634163cd00a9e4aa56cd08a5698bd64bf7c3a344d42c451702",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/server.ts",
+      "sha256": "b21b488c50749e7a069a6c6290f25d13ebb80e3a6f9d56b3bbdd95ea600d32ea",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/server.ts",
+      "sha256": "b1f599b0866cbb634163cd00a9e4aa56cd08a5698bd64bf7c3a344d42c451702",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/server.ts",
+      "sha256": "a036d2f0849912087f931e2d57fb97cf794f9ad42a7b40ca32a9644f46d828ae",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/server.ts",
+      "sha256": "94be8d50b6dc475b51c20a9c2c7835ddb94bb87041a772d983ed60e3f32b3b58",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/pritha-paths.ts",
+      "sha256": "3dd1cc88ab52c7d960f46f33646a21074a62fc3d199e53c28a68284a17a15be2",
+      "count": 1,
+      "reason": "Export alias for existing imports; new internal callers use resolvePrithaRoot."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/pritha-runtime.ts",
+      "sha256": "1085c0066a1e236705b15b8c8dea245a67bbaea4d49d537a2dc2f4ad725084df",
+      "count": 1,
+      "reason": "Export alias for existing imports; new internal callers use resolvePrithaRoot."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/pritha-runtime.ts",
+      "sha256": "739035e9199ed6a6485398de6ef586dc6153b7bbafd323adf23445b7801d8a30",
+      "count": 5,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/pritha-runtime.ts",
+      "sha256": "959f2e731845b04387d3b8c94ada87ea6801279f144425387b10a2d7a947965d",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/pritha-runtime.ts",
+      "sha256": "5a650683eceae1aa3236a865e1cac8994e931f16a4efe436537bf88b4abdff30",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/pritha-runtime.ts",
+      "sha256": "f9c9faa1b31abe5b8aef87373edf51b9784157bc7982a4f62a1df67bb002cffb",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "launchd/README.md",
+      "sha256": "9f5730302df550eb64b1181dbe7ad1a16b3f4cd01540a07e34e2f5b5fda9aac9",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.self-test.plist.template",
+      "sha256": "7e497c5d210ad5306e41f1b1b03eddfec64a9478c38f4ddc80602e5f086d157b",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.self-test.plist.template",
+      "sha256": "693fc20c18bd6ab1e1159b2d9d1d6a10c1a532f81e9d0bf6f307fb36c1f694aa",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.self-test.plist.template",
+      "sha256": "1a94f7021e7d1fe0c243d806b7cd9f198c7633bafef55cb6f40dc1102dbccc3b",
+      "count": 2,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.self-test.plist.template",
+      "sha256": "ba3c14533437cf82746499d5cad5d960b0d6cc8cc164851bfea867c1c3cb8d5c",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.self-test.plist.template",
+      "sha256": "c3875ddcd0716d25a8b783d92d55c54d147ba52472ef3b589a3f5b567f96abac",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.self-test.plist.template",
+      "sha256": "eb1cd629270dfd3358bc89b02e431b270ee579892833d42ba2b826d43dd848c7",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.telegram-bot.plist",
+      "sha256": "3e0af795cfdc3748c6b4c68671ae0f7d7da3c006da0e06d6ee2d983442b68f1a",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.telegram-bot.plist",
+      "sha256": "ab75371f1c85bb51e9323f7329ffca6bb7a0e81ae7b58d9e43b5a0417b454a50",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.telegram-bot.plist",
+      "sha256": "282418f61f0fbda6283adb8ce7d203d44af19bc9361d195e72f6cfef629d3a1a",
+      "count": 2,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.telegram-bot.plist",
+      "sha256": "ba3c14533437cf82746499d5cad5d960b0d6cc8cc164851bfea867c1c3cb8d5c",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.telegram-bot.plist",
+      "sha256": "d2a77bcc65b97df301bcddeb66774138119289d4bef76060461b256d369aa2ef",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.telegram-bot.plist",
+      "sha256": "c55b2b012e74db550ee22a61ee6890be709cda3b26272f2c684c6b4f0dc9cf81",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.web.plist",
+      "sha256": "05ed42605a6bec7ffa9072fa515712710cf5e153f43583ad820d050fbf44263c",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.web.plist",
+      "sha256": "90960eb6e569efe1cd8053bb75cac686bc408efec487a94ac02c31fa32bcb2a7",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.web.plist",
+      "sha256": "282418f61f0fbda6283adb8ce7d203d44af19bc9361d195e72f6cfef629d3a1a",
+      "count": 2,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.web.plist",
+      "sha256": "ba3c14533437cf82746499d5cad5d960b0d6cc8cc164851bfea867c1c3cb8d5c",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.web.plist",
+      "sha256": "f7c2aaf3fd8450e4de4877986ce9f643b949cc432501a35e8b49d69705cb3e36",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "launchd/com.techscope.web.plist",
+      "sha256": "2d176a53509f1cd4a64f35c5650d2e5dd60ab3496f7d163ed409a7e26cef5542",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "scripts/agents-mother/identity.mjs",
+      "sha256": "63835c1e2c187ee98b71d53e40865f829c64a4cc6139e5b69ac6537dfa28d9e3",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/agents-mother/identity.mjs",
+      "sha256": "41dcabd03f3b03bed1d171e40583dfdd54e2b2474ed3171ac3455d15d5a94434",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/agents-mother/result-readiness-async.mjs",
+      "sha256": "35a270b0ff9b728a28347ca841c95ad31ea7b1fee215ac39349072c18d36a1bc",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/api-process.mjs",
+      "sha256": "20908944381d321e332626475a9a5c0459c02ab72615ed0b050192e9da923495",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/index.mjs",
+      "sha256": "a2e854f9cd31023979a02d9ff92f9dca44ca8a495cc6203d541f190601ed3768",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/index.mjs",
+      "sha256": "0a5efe852e62d2f908caeffcb6f0224d2a3359a77e56fafefe9a14da84b3de04",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/agents-mother/skills.mjs",
+      "sha256": "0c0980375a5516f84a9001432cc2067d720e62fbc32e5bdcdb0e19e420c5a510",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/agents-mother/test.mjs",
+      "sha256": "94bdb218ed376066e61b0778b760434f5cb312fcc2f15d472b9d311d50601f58",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/agents-mother/test.mjs",
+      "sha256": "73b09dc2983caf952984c1239a941ab3a3543f12b8b41e60c6ba0f9cf5672e39",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/agents-mother/test.mjs",
+      "sha256": "006f81f14b7a8246f5c46b0840bb1c081c91bd57c997afb84429e4b3894877df",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/audit-report.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/bootstrap.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/control-center-runtime.mjs",
+      "sha256": "f420edca194e534ab81c133a62e90eda9c65b0f97caf0708ac9c02dc5bbf5934",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/golden-checks.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/healthcheck.mjs",
+      "sha256": "b1f599b0866cbb634163cd00a9e4aa56cd08a5698bd64bf7c3a344d42c451702",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/healthcheck.mjs",
+      "sha256": "a8440b3f737f6e7b6955e63a18549b2da6fc5e902608b3db42797f327231d7e5",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/healthcheck.mjs",
+      "sha256": "d7fba3b5092c4e6e36c19e4575e7f1e6ca1d30b31c8622527855d0596b5a9724",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "scripts/healthcheck.mjs",
+      "sha256": "5f73177eac52d73628f0509e3b916c5d4350af9468d6028203d9f62c93635bcd",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "scripts/launchd-root-audit.mjs",
+      "sha256": "a7ee8972d8e515d499e8ad1a45dd560f089cfec442bffd259feca890a0ee84e4",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "scripts/launchd-root-audit.mjs",
+      "sha256": "604bc07ccc4df62d17ff1ed95b9aeaa6cd4884a9d0259c3777e5cbfa3b6272b7",
+      "count": 1,
+      "reason": "Existing legacy service identity or migration audit; no service activation or label rewrite."
+    },
+    {
+      "path": "scripts/lib/README.md",
+      "sha256": "d5639e5b31cbbc201957e24349ad5ff07baece6edf5666a012df034cd2b6a03c",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": "scripts/lib/README.md",
+      "sha256": "694f78856d82720946ca904f9147a504f711183b1a0c92672bacc5c28174aa61",
+      "count": 1,
+      "reason": "Explicit compatibility documentation; current instructions use Pritha."
+    },
+    {
+      "path": "scripts/lib/chat-subject.mjs",
+      "sha256": "0ef374732e930412011ed92ec819d5292d30b3ae59909d4abf9bb78eb289746c",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/lib/curated-memory.mjs",
+      "sha256": "f5748e2599d60dfec48f7d76fdd843287df6b142f2eedc57a09e8cc51bf1f6ef",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/lib/env.mjs",
+      "sha256": "3d508b5efc24eb70e2556ee7c38e39ce9a7a50b5cb9bfd1babbe5c616292fb03",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/lib/paths.d.mts",
+      "sha256": "0722aea77da6fe22c8ee292dab9fa04f571e4fb26f3a225c15f70c3d09e4061a",
+      "count": 1,
+      "reason": "Export alias for existing imports; new internal callers use resolvePrithaRoot."
+    },
+    {
+      "path": "scripts/lib/paths.mjs",
+      "sha256": "0722aea77da6fe22c8ee292dab9fa04f571e4fb26f3a225c15f70c3d09e4061a",
+      "count": 1,
+      "reason": "Export alias for existing imports; new internal callers use resolvePrithaRoot."
+    },
+    {
+      "path": "scripts/lib/pritha-env.mjs",
+      "sha256": "eccb3852030c1229e948dc138df561e802795cc330dc58c2b332f0d901903e35",
+      "count": 1,
+      "reason": "Explicit legacy environment option map; current names are primary."
+    },
+    {
+      "path": "scripts/lib/pritha-env.mjs",
+      "sha256": "68470939bd17a3da3e2c28756894f6f4bf97e33447e955eef7e7e6d464c3b6a1",
+      "count": 1,
+      "reason": "Explicit legacy environment option map; current names are primary."
+    },
+    {
+      "path": "scripts/lib/pritha-env.mjs",
+      "sha256": "6eeeee9b481a7973da7651750b3df53887b3796c9bcd19d35246f626772156aa",
+      "count": 1,
+      "reason": "Explicit legacy environment option map; current names are primary."
+    },
+    {
+      "path": "scripts/lib/pritha-name-guard.mjs",
+      "sha256": "a26f5597120d0cf1436f120b3d2cdb8119425632b52cb78d8f7458364de5dc94",
+      "count": 1,
+      "reason": "Guard detects the historical token; not a product label."
+    },
+    {
+      "path": "scripts/lib/provider-process-environment.mjs",
+      "sha256": "55c042ed0f764c6ab4322bde8e62a0da50662f392c5d7fb5249927131c8a657d",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/lib/root-resolution.d.mts",
+      "sha256": "c580ba7eb71657b48b2707300f4f35e901165afc68a22ef9e2e3d86e0c2f4529",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/lib/root-resolution.d.mts",
+      "sha256": "ab8beaafe4bba662fcdfeee0da07ba3ae6ff138dd93f27f037e185d6d2406e4a",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/lib/root-resolution.mjs",
+      "sha256": "e1ff27d235c9971dc3171b82a56af6f72cc6f79ee0d13a0ae90c3ab12e8f9373",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/lib/root-resolution.mjs",
+      "sha256": "de78cd37ed4896796eb8c92bb0e0fdc890eac51cc5de8cd6d17e53ba5636a7de",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/lib/root-resolution.mjs",
+      "sha256": "5ca79e5fc673c9cddc6e21ac39f44b435c973bfb627c692140383f1f1034960c",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/lib/root-resolution.mjs",
+      "sha256": "395ef2f956f4b058297c1eb141faae9b6479189e1343ac92fcf35dbd55772d05",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/lib/root-resolution.mjs",
+      "sha256": "d7a6eccc5657cbcedcbb4609d22cbea3dc9b58d98e8bec362070b7f1eb7075e5",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/lib/state-files.mjs",
+      "sha256": "98013afe2dc837617979dac93e542cad9817778727cb703e28d1f0ccd4ffdef7",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/lib/state-files.mjs",
+      "sha256": "027aa5d934c4bdcb1d91cca7537e50eedb17e5044a93a5d1ea3778ad3f47adf4",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/lib/task-workspace.mjs",
+      "sha256": "946c4217b355acdcf282517c1195cd5b68b33e98ca2f0069b980b4a06b1fe6be",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/lib/task-workspace.mjs",
+      "sha256": "a5de4865d67e8197d1aa45bef99012899721be6b9d4348cd165b55ca6cf67263",
+      "count": 1,
+      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+    },
+    {
+      "path": "scripts/pre-push-audit.mjs",
+      "sha256": "eff71de212c0c197562035c6417b9db46a3746c8ad4597dcac5ba0d6f91fea76",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/pre-push-audit.mjs",
+      "sha256": "c1501031311b4897a1c7acddd1feb7af24182d63909d254b0c9a48434fab3e04",
+      "count": 1,
+      "reason": "Protect old private filenames from Git publication."
+    },
+    {
+      "path": "scripts/pre-push-audit.mjs",
+      "sha256": "9a75b23d0380258138aa8a10e1e32ccce17f1ebc13069ee02d5b45792322d753",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/pritha-fleet.mjs",
+      "sha256": "da78bbc2ccc28bb4239c06094b8ff8a6258b177f6d26468aaac3973d4979adda",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/pritha-instance.mjs",
+      "sha256": "ddcf874354e9f2e067e41038f323c3a7ef068a4faee70e1e9ff7f2d3af3fb44e",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/pritha-instance.mjs",
+      "sha256": "e6398550b81859edbefd4e02dbe49d706cc12d16dd4deb9eec4920c11e2b6f84",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/pritha-maintenance.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/pritha_paths.py",
+      "sha256": "fda0d3a42fd69b66a50903311a4c21a26a204a756acf820075a0182108f9e779",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/pritha_paths.py",
+      "sha256": "f0192b04e15d20571e5b3f7b829b172db5a13f5a368d0b674c27b77df4c5da95",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/pritha_paths.py",
+      "sha256": "ed2343f583699584f840fc8d8a0fc4ac66ef1e4c06666fa4bb2a0b39d3084f58",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/pritha_paths.py",
+      "sha256": "29db6b308f9fe6468ea5676453131e36fa1f8a8c3253c251c6bcebdf05262fb4",
+      "count": 1,
+      "reason": "Root environment and API compatibility with existing instances."
+    },
+    {
+      "path": "scripts/pritha_python_compat.py",
+      "sha256": "54fe6f9383df78bf13db0feb9f68bc7e29cba4170edf2cad8e4113ea5256a8ad",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/pritha_state_files.py",
+      "sha256": "923f749c5187fc8ef6e597011331d3ff7c61959ca0e310ce2be7b55a64425e03",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/pritha_state_migration.py",
+      "sha256": "d2f991f952119baee7559e23e56d4d78faf58607a660cb98b585ab5f1e3c4d50",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/quality-gate.mjs",
+      "sha256": "732a9a3f2347737c050fb3371f58b9b9bcd071a0871010936d73a638dbef8a2f",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/quality-gate.mjs",
+      "sha256": "ba1bda748421e902a529b7852f3ed49a36fa7b542fe9cf6cc436e811addd62a9",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/queue-health.mjs",
+      "sha256": "e58690d168eb51a131c6276146c1da420b404996f9fc88b7f0c341c75602a2b3",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/run-pritha-telegram-bot.sh",
+      "sha256": "7c014143c425aec304915b435373f202c5c9b72f486bb5c89514f75acf1c39fe",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/run-pritha-web.sh",
+      "sha256": "7c014143c425aec304915b435373f202c5c9b72f486bb5c89514f75acf1c39fe",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/self-test.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 3,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/self-test.mjs",
+      "sha256": "c0b92998abd94443035e3f1a0dec8860aede72e3972c9d4e380ea39d76800801",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/setup-status.mjs",
+      "sha256": "00ae369020f64e3ef7ab6a7d64f6e4aa7229c791219429a11ae0276eaf8170d8",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "sha256": "a528b3132d89153d920a0167024a22009858ba8f2b82310a0e158c6b496815a1",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "sha256": "ea924d807c3b9926c7cdbe2c6124f4140e5dd7e210be7597f1a0612ac5376757",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "sha256": "aef083147a38d01703f5296826d964cb191bb216b6c83ddce3b404d773d1aa40",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "sha256": "bfeaedb9f0c09ceb0f3e599cfefdd3f97861629a6a38141b2f213c7dd993af2e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "sha256": "00ae369020f64e3ef7ab6a7d64f6e4aa7229c791219429a11ae0276eaf8170d8",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/status-lib.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/tailscale-setup.mjs",
+      "sha256": "5178f446e557159a208707b9e9e4ed3c0896656670f9ba55778199df8a97682e",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/tailscale-setup.mjs",
+      "sha256": "00ae369020f64e3ef7ab6a7d64f6e4aa7229c791219429a11ae0276eaf8170d8",
+      "count": 1,
+      "reason": "Persisted filename or schema compatibility; no destructive identity rewrite."
+    },
+    {
+      "path": "scripts/task-workspace.mjs",
+      "sha256": "f664775ffddfc740948418cf9d7e56ff793913afc77eb13da66ea4678bac9b8c",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    },
+    {
+      "path": "scripts/web-search-tools.mjs",
+      "sha256": "3e8469e7a211b905b0b5ef81162f1a6a861926ebc93d85c179df0399a78e7477",
+      "count": 1,
+      "reason": "Pinned child root alias, root environment loading, or root key filtering for old entrypoints."
+    }
+  ]
+}

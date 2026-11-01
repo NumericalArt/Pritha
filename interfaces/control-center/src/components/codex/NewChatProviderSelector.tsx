@@ -17,8 +17,11 @@ export function NewChatProviderSelector({value,runtime,disabled,onChange}:{value
   }catch{if(!signal.aborted){setReady([]);setParallelLimits({});setChecked(true);}}},[]);
   useEffect(()=>{let controller=new AbortController();void load(controller.signal);const focus=()=>{controller.abort();controller=new AbortController();void load(controller.signal);};window.addEventListener('focus',focus);return()=>{controller.abort();window.removeEventListener('focus',focus);};},[load]);
   const connectorId=value?.connectorId || runtime?.connectorId || settings?.activeConnectorId || 'codex';
-  const selection:DraftProviderSelection={connectorId,...(runtime?.selected.modelId?{modelId:runtime.selected.modelId}:{}),...(runtime?.selected.effortId?{effortId:runtime.selected.effortId}:{}),...(connectorId==='codex' && runtime?.selected.serviceTierId?{serviceTierId:runtime.selected.serviceTierId}:{}),...value};
-  const models=runtime?.models.filter(row=>row.id) || [],model=models.find(row=>row.id===selection.modelId);
+  const selection:DraftProviderSelection={connectorId,...(runtime?.selected?.modelId?{modelId:runtime.selected.modelId}:{}),...(runtime?.selected?.effortId?{effortId:runtime.selected.effortId}:{}),...(connectorId==='codex' && runtime?.selected?.serviceTierId?{serviceTierId:runtime.selected.serviceTierId}:{}),...value};
+  const models=Array.isArray(runtime?.models)?runtime.models.filter(row=>row.id):[],model=models.find(row=>row.id===selection.modelId);
+  // Older catalogs can omit optional capability arrays. Missing metadata must
+  // hide unsupported controls, not crash when returning to the new-chat draft.
+  const effortIds=Array.isArray(model?.effortIds)?model.effortIds:[], serviceTierIds=Array.isArray(model?.serviceTierIds)?model.serviceTierIds:[];
   return <div className="new-chat-provider-selector" aria-label="New chat provider settings">
     <label>Provider<select aria-label="New chat provider" value={connectorId} disabled={disabled || !settings || !checked} onChange={event=>{const next=event.currentTarget.value as ProviderConnectorId;if(!ready.includes(next) || !settings)return;const preset=settings.providerPresets[next];onChange({connectorId:next,...(preset.modelId?{modelId:preset.modelId}:{}),effortId:preset.reasoningEffort});}}>
       {!ready.includes(connectorId)?<option value={connectorId} disabled>{PROVIDER_LABELS[connectorId]} · {checked?'not ready':'checking'}</option>:null}{ready.map(id=><option key={id} value={id}>{PROVIDER_LABELS[id]}</option>)}
@@ -26,10 +29,10 @@ export function NewChatProviderSelector({value,runtime,disabled,onChange}:{value
     <label>Model<select aria-label="New chat model" value={selection.modelId || ''} disabled={disabled || !runtime || !models.length} onChange={event=>onChange({...selection,modelId:event.currentTarget.value})}>
       {!model?<option value={selection.modelId || ''} disabled>{selection.modelId || 'Choose in Settings'}</option>:null}{models.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}
     </select></label>
-    {model?.effortIds.length?<label>Reasoning<select aria-label="New chat reasoning" value={selection.effortId || ''} disabled={disabled} onChange={event=>onChange({...selection,effortId:event.currentTarget.value})}>
-      {!model.effortIds.includes(selection.effortId || '')?<option value={selection.effortId || ''} disabled>{selection.effortId || 'Choose'} · unsupported</option>:null}{model.effortIds.map(id=><option key={id} value={id}>{id==='default'?'Model default':id==='none'?'Off':id}</option>)}
+    {effortIds.length?<label>Reasoning<select aria-label="New chat reasoning" value={selection.effortId || ''} disabled={disabled} onChange={event=>onChange({...selection,effortId:event.currentTarget.value})}>
+      {!effortIds.includes(selection.effortId || '')?<option value={selection.effortId || ''} disabled>{selection.effortId || 'Choose'} · unsupported</option>:null}{effortIds.map(id=><option key={id} value={id}>{id==='default'?'Model default':id==='none'?'Off':id}</option>)}
     </select></label>:null}
-    {connectorId==='codex' && model?.serviceTierIds.length?<label>Service tier<select aria-label="New chat service tier" value={selection.serviceTierId || ''} disabled={disabled} onChange={event=>onChange({...selection,serviceTierId:event.currentTarget.value})}>{!model.serviceTierIds.includes(selection.serviceTierId || '')?<option value="" disabled>Choose</option>:null}{model.serviceTierIds.map(id=><option key={id} value={id}>{id}</option>)}</select></label>:null}
+    {connectorId==='codex' && serviceTierIds.length?<label>Service tier<select aria-label="New chat service tier" value={selection.serviceTierId || ''} disabled={disabled} onChange={event=>onChange({...selection,serviceTierId:event.currentTarget.value})}>{!serviceTierIds.includes(selection.serviceTierId || '')?<option value="" disabled>Choose</option>:null}{serviceTierIds.map(id=><option key={id} value={id}>{id}</option>)}</select></label>:null}
     <a href="/settings#providers">Configure providers</a>
     {parallelLimits[connectorId]?<small className="provider-parallel-limit">Provider parallel limit: {parallelLimits[connectorId]}</small>:null}
   </div>;

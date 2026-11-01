@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { atomicWriteFile, withFileLock } from "../lib/atomic-file.mjs";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "../lib/paths.mjs";
 import { readIdentityEvidence } from "./identity.mjs";
 import { deliveryUsageStatus } from "./delivery-ledger.mjs";
 
@@ -14,7 +14,7 @@ const nativeId = value => typeof value === "string" && value.length > 0 && value
 const terminal = new Set(["completed", "failed", "interrupted", "not-started"]);
 
 function contextFor(options) {
-  const root = path.resolve(options.root || resolveTechscopeRoot());
+  const root = path.resolve(options.root || resolvePrithaRoot());
   return { root, stateRoot: resolvePrithaStateRoot({ ...options, root }) };
 }
 

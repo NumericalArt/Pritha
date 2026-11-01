@@ -1,3 +1,4 @@
+import { prithaEnvValue } from "@/lib/pritha-env";
 import { runtimeProbe } from "../../../../../../scripts/lib/runtime-probe.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -912,7 +913,7 @@ function remainingMs(startedAt: number, timeoutMs: number) {
 
 function codexEnv() {
   const env = { ...process.env };
-  if (process.env.PRITHA_REALTIME_CODEX_USE_PROXY === "1" || process.env.TECHSCOPE_VOICE_CODEX_USE_PROXY === "1") return env;
+  if (prithaEnvValue("PRITHA_REALTIME_CODEX_USE_PROXY") === "1") return env;
   for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
     delete env[key];
   }

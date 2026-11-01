@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
 import path from "node:path";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "@/lib/pritha-paths";
 
 export type EnvSecretSource = "process_env" | "control_center_env_file" | "root_env_local" | "root_env" | "unknown";
 
@@ -15,7 +15,7 @@ function controlCenterEnvFile() {
   const configured = process.env.PRITHA_CONTROL_CENTER_ENV_FILE?.trim();
   if (configured) return path.resolve(configured);
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   for (const envPath of [path.join(root, ".env.local"), path.join(root, ".env")]) {
     const value = readEnvFile(envPath).get("PRITHA_CONTROL_CENTER_ENV_FILE")?.trim();
     if (value) return path.resolve(root, value);
@@ -26,7 +26,7 @@ function controlCenterEnvFile() {
 }
 
 export function envStoreTargetPath() {
-  return controlCenterEnvFile() || path.join(resolveTechscopeRoot(), ".env.local");
+  return controlCenterEnvFile() || path.join(resolvePrithaRoot(), ".env.local");
 }
 
 function readEnvFile(filePath: string) {
@@ -53,7 +53,7 @@ export function findEnvSecret(name: string): EnvEntry {
   const envValue = process.env[name];
   if (envValue) return { value: envValue, source: "process_env" };
 
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const candidates: Array<{ filePath: string; source: EnvSecretSource }> = [
     ...(controlCenterEnvFile() ? [{ filePath: controlCenterEnvFile(), source: "control_center_env_file" as const }] : []),
     { filePath: path.join(root, ".env.local"), source: "root_env_local" },
@@ -123,13 +123,13 @@ export function writeEnvSecret(name: string, value: string) {
     // Best-effort on filesystems that support POSIX permissions.
   }
   process.env[name] = value;
-  appendSettingsEvent("env_secret_updated", { name, target: path.relative(resolveTechscopeRoot(), targetPath) || path.basename(targetPath) });
+  appendSettingsEvent("env_secret_updated", { name, target: path.relative(resolvePrithaRoot(), targetPath) || path.basename(targetPath) });
   return { targetPath, lastUpdated: fileUpdatedAt(targetPath) };
 }
 
 function appendSettingsEvent(kind: string, payload: Record<string, unknown>) {
   try {
-    const root = resolveTechscopeRoot();
+    const root = resolvePrithaRoot();
     const eventDir = resolvePrithaStatePath("private", "interface-lab", "pritha-control-center", "settings");
     mkdirSync(eventDir, { recursive: true });
     writeFileSync(

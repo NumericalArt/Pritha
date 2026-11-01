@@ -3,7 +3,7 @@ import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStateRoot, resolveTechscopeRoot, isPrithaCodeCheckout } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStateRoot, resolvePrithaRoot, isPrithaCodeCheckout } from "../lib/paths.mjs";
 import { CHILD_AGENT_TYPES } from "../lib/child-agent-artifacts.mjs";
 import { readAgentKind, operationsApplicability } from "./agent-kind.mjs";
 
@@ -257,7 +257,7 @@ function assemble(artifacts, folders, rows, context, diagnostics) {
 }
 
 export function readAgentCatalog(options = {}) {
-  const root = path.resolve(options.root || resolveTechscopeRoot());
+  const root = path.resolve(options.root || resolvePrithaRoot());
   const stateRoot = resolvePrithaStateRoot({ ...options, root });
   const memoryRoot = options.memoryRoot || resolvePrithaAgentMemoryRoot({ ...options, root });
   const agentParent = resolvePrithaAgentParent({ ...options, root });
@@ -315,7 +315,7 @@ export function findCatalogAgent(catalog, target) {
 
 export function currentAgentMission(agent, options = {}) {
   if (!agent.missionSource) return { text: agent.mission, source: null };
-  const root = options.root || resolveTechscopeRoot();
+  const root = options.root || resolvePrithaRoot();
   const memoryRoot = options.memoryRoot || resolvePrithaAgentMemoryRoot({ ...options, root });
   // The selected authored source is checked on every projection, so an in-place
   // mission edit is visible immediately without rereading all Markdown files.
@@ -329,7 +329,7 @@ export function currentAgentMission(agent, options = {}) {
 export function readCatalogArtifact(agent, file, options = {}) {
   const selected = agent.artifacts.find((item) => item.path === file);
   if (!selected) return "";
-  const root = options.root || resolveTechscopeRoot();
+  const root = options.root || resolvePrithaRoot();
   const memoryRoot = options.memoryRoot || resolvePrithaAgentMemoryRoot({ ...options, root });
   const text = safeText(file, memoryRoot);
   const fm = parseFrontmatterData(text.replaceAll("\r\n", "\n")) || {};

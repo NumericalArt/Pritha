@@ -3,7 +3,7 @@ import {FACTORY_PHASES} from '../../../../../scripts/lib/chat-subject.mjs';
 import {composeDraftSubject,DEFAULT_FACTORY_SELECTION,type DraftFactorySelection} from '@/lib/codex-chat/draft-session';
 
 export function FactoryChatSelector({value=DEFAULT_FACTORY_SELECTION,disabled,onChange}:{value?:DraftFactorySelection;disabled:boolean;onChange:(value:DraftFactorySelection)=>void}){
-  let error='';try{composeDraftSubject(value);}catch{error='Use a child slug with lowercase letters, digits and hyphens (up to 64 characters). Reserve Pritha and Techscope for the parent.';}
+  let error='';try{composeDraftSubject(value);}catch{error='Use a child slug with lowercase letters, digits and hyphens (up to 64 characters). Parent instance names are reserved.';}
   return <div className="factory-chat-selector" aria-label="Factory task settings">
     <div className="factory-chat-fields">
       <label>Subject<select aria-label="Chat subject" disabled={disabled} value={value.kind} onChange={event=>onChange({...value,kind:event.currentTarget.value as DraftFactorySelection['kind']})}><option value="self">Pritha</option><option value="child">Child agent</option></select></label>

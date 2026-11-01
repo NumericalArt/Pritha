@@ -1,5 +1,7 @@
 # Pritha
 
+Current code, commands and configuration use Pritha. Historical environment names and entrypoints remain compatibility aliases; existing state files stay readable. See [state migration and recovery](docs/pritha-state-filename-migration.md) for the optional offline transition.
+
 <p align="center">
   <img src="docs/assets/pritha-logo.png" alt="Pritha logo" width="220">
 </p>

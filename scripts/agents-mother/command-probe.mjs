@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { atomicWriteFile } from "../lib/atomic-file.mjs";
-import { resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaStatePathFrom, resolvePrithaRoot } from "../lib/paths.mjs";
 import { redactStructuredText, redactSensitiveText } from "../lib/redaction.mjs";
 import { timeoutPolicy } from "../lib/timeout-policy.mjs";
 import { readAgentCatalog, findCatalogAgent, readCatalogArtifact, readIdentityEvidence, readAgentOperationsManifest } from "./identity.mjs";
@@ -25,7 +25,7 @@ function safeProjectPath(root, value) {
 }
 
 export function planAgentCommandProbe(target, options = {}) {
-  const root = path.resolve(options.root || resolveTechscopeRoot());
+  const root = path.resolve(options.root || resolvePrithaRoot());
   const purpose = options.purpose || "health";
   if (!["health", "test"].includes(purpose)) fail("probe_purpose_invalid");
   const timeoutMs = timeoutPolicy(purpose === "test" ? "childTest" : "healthCommand", { env: options.env || process.env, value: options.timeoutMs });
@@ -74,7 +74,7 @@ export async function runAgentCommandProbe(target, options = {}) {
     const result = { schema: "pritha-agent-command-probe-result-v1", id: randomUUID(), at: new Date().toISOString(),
       agentId: plan.agentId, planLock: plan.planLock, scope: plan.scope,
       status: !unchanged ? "revision-changed" : execution.timedOut ? "timeout" : execution.exitCode === 0 ? "runnable" : "failed", execution };
-    const root = path.resolve(options.root || resolveTechscopeRoot());
+    const root = path.resolve(options.root || resolvePrithaRoot());
     const report = resolvePrithaStatePathFrom({ ...options, root }, "audit", "agent-probes", `${result.id}.json`);
     const safe = redactStructuredText(result, { ...options, root, projectRoot: plan.projectPath });
     mkdirSync(path.dirname(report), { recursive: true }); atomicWriteFile(report, `${JSON.stringify(safe, null, 2)}\n`);

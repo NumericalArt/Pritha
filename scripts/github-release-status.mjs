@@ -3,9 +3,9 @@ import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
 const strictMode = args.has("--strict");

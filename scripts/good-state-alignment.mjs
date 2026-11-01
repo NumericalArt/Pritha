@@ -6,9 +6,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { parseFrontmatterData } from "./lib/frontmatter.mjs";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 const DB_PATH = resolvePrithaMemoryDatabase();
@@ -262,7 +262,7 @@ function buildPayload(options) {
       limit: options.limit,
       status: "memory-index-missing",
       baselines: [],
-      message: "Missing state-root/memory/techscope.sqlite. Run node scripts/rebuild-memory.mjs before Good State Alignment.",
+      message: "Pritha memory database is missing from the selected state root. Run node scripts/rebuild-memory.mjs before Good State Alignment.",
     };
   }
 

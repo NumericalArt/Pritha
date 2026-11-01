@@ -7,11 +7,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import path from "node:path";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { parseFrontmatter } from "./lib/frontmatter.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolvePrithaRoot } from "./lib/paths.mjs";
 import { slug } from "./lib/slug.mjs";
 import { listAuthoredAgentMemoryFiles } from "./lib/authored-agent-memory.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const MEMORY_DIR = resolvePrithaStatePath("memory");

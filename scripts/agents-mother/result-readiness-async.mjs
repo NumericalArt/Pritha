@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolvePrithaAgentParent, resolvePrithaStateRoot, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentParent, resolvePrithaStateRoot, resolvePrithaRoot } from "../lib/paths.mjs";
 import { timeoutPolicy } from "../lib/timeout-policy.mjs";
 
 const active = new Map();
@@ -23,7 +23,7 @@ export function unavailableResultReadiness(reason = "readiness-unavailable") {
 
 export async function readAgentResultReadinessAsync(target, input = {}) {
   if (typeof target !== "string" || !target || target.length > 256) return unavailableResultReadiness("agent-identity-invalid");
-  const root = path.resolve(input.root || resolveTechscopeRoot());
+  const root = path.resolve(input.root || resolvePrithaRoot());
   const options = { ...input, root };
   const request = { target, root, stateRoot: resolvePrithaStateRoot(options), agentParent: resolvePrithaAgentParent(options) };
   let timeout;

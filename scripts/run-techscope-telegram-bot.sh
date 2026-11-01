@@ -1,9 +1,4 @@
 #!/bin/zsh
+# Compatibility entrypoint; preserve argv and the selected instance.
 set -euo pipefail
-
-SCRIPT_DIR="${0:a:h}"
-PRITHA_ROOT="$(node "$SCRIPT_DIR/pritha-root.mjs" --cwd "${SCRIPT_DIR:h}")"
-export PRITHA_ROOT TECHSCOPE_ROOT="$PRITHA_ROOT"
-cd "$PRITHA_ROOT"
-
-exec /usr/bin/env node scripts/telegram-bot.mjs poll
+exec "${0:a:h}/run-pritha-telegram-bot.sh" "$@"

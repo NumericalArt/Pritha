@@ -1,16 +1,17 @@
 #!/usr/bin/env node
+import { prithaEnvValue } from "./lib/pritha-env.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
-const strictMode = args.has("--strict") || process.env.TECHSCOPE_ENV_DOCTOR_STRICT === "1";
+const strictMode = args.has("--strict") || prithaEnvValue("PRITHA_ENV_DOCTOR_STRICT") === "1";
 const isDarwin = process.platform === "darwin";
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const argv = process.argv.slice(2);
 const profileIndex = argv.indexOf("--profile");
 const profile = profileIndex >= 0 ? argv[profileIndex + 1] || "" : "full";
@@ -168,7 +169,7 @@ function checkPython() {
     strictMode ? "critical" : "warning",
     result.status === 0 && versionAtLeast(actual, [3, 10, 0]),
     output || "python3 not found",
-    "New Techscope setups should use Python 3.10+; current 3.9 support is transitional.",
+    "New Pritha setups should use Python 3.10+; current 3.9 support is transitional.",
   );
 }
 
@@ -338,7 +339,7 @@ const payload = {
 if (jsonMode) {
   console.log(JSON.stringify(payload, null, 2));
 } else {
-  console.log(`Techscope env doctor: ${payload.status}${warnings.length ? ` (${warnings.length} warning${warnings.length === 1 ? "" : "s"})` : ""}`);
+  console.log(`Pritha env doctor: ${payload.status}${warnings.length ? ` (${warnings.length} warning${warnings.length === 1 ? "" : "s"})` : ""}`);
   for (const check of checks) {
     const marker = check.ok ? "PASS" : check.level === "critical" ? "FAIL" : "WARN";
     console.log(`- ${marker} ${check.label}: ${check.detail}`);

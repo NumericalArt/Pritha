@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
+import * as prithaEnvironment from '../scripts/lib/pritha-env.mjs';
 const require = createRequire(import.meta.url);
 const directory = mkdtempSync(path.join(os.tmpdir(), "pritha-history-transport-"));
 const binary = path.join(directory, "fake-codex");
@@ -25,6 +26,7 @@ const output = ts.transpileModule(source, { compilerOptions: { module: ts.Module
 const module = { exports: {} };
 new Function("require", "module", "exports", output)(id => {
  if (id.startsWith("node:")) return require(id);
+ if (id === '@/lib/pritha-env') return prithaEnvironment;
  if (id === "./storage-identity") return { effectiveCodexHome: () => directory, storageIdentity: () => "fixture" };
  return {};
 }, module, module.exports);

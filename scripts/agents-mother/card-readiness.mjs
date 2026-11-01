@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { latestOutcomeSpecForContract } from "./outcome-spec.mjs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, findCatalogAgent, agentAlias, agentOperationsApplicability, readAgentOperationsManifest } from "./identity.mjs";
 import { readAgentResultReadinessAsync, unavailableResultReadiness } from "./result-readiness-async.mjs";
 
@@ -170,7 +170,7 @@ async function liveControlCenterCard(params) {
 }
 
 export async function checkCardReadiness(target, options = {}) {
-  const root = options.root || resolveTechscopeRoot();
+  const root = options.root || resolvePrithaRoot();
   const normalizedTarget = controlCenterSlug(target);
   const registry = readAgentCatalog({ ...options, root, fresh: true });
   const record = findCatalogAgent(registry, String(target || ""));

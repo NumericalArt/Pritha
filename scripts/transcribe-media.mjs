@@ -2,7 +2,7 @@
 
 import { copyFileSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import { inferSourceClass } from "./lib/privacy.mjs";
 import { parseSource } from "./media/core/source.mjs";
 import { resolveAdapter } from "./media/core/adapter-registry.mjs";
@@ -13,7 +13,7 @@ import { ensureMediaTooling, run } from "./media/core/tooling.mjs";
 import { transcribeAudio } from "./media/core/transcription.mjs";
 import { readTranscriptText } from "./media/core/transcript-writer.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const DEFAULT_MODEL = "mlx-community/whisper-small-mlx";
 const DEFAULT_LANGUAGE = "ru";
 

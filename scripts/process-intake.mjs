@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { prithaEnvValue } from "./lib/pritha-env.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import {
@@ -10,12 +11,12 @@ import {
 import path from "node:path";
 import { loadEnv } from "./lib/env.mjs";
 import { indentedYamlList, parseFrontmatter, unique, yamlList } from "./lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import { slug as makeSlug } from "./lib/slug.mjs";
 import { today } from "./lib/date.mjs";
 import { createAnonymousSourceId, evidenceQualityValue, inferSourceClass, usefulnessValue } from "./lib/privacy.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const REVIEWS_DIR = path.join(ROOT, "03_reviews");
 const FETCH_TIMEOUT_MS = 10000;
 
@@ -147,8 +148,8 @@ function telegramMediaItems(message) {
 }
 
 async function telegramApi(method, payload = {}) {
-  const token = process.env.TECHSCOPE_TELEGRAM_BOT_TOKEN;
-  if (!token) throw new Error("TECHSCOPE_TELEGRAM_BOT_TOKEN is not available for media download.");
+  const token = prithaEnvValue("PRITHA_TELEGRAM_BOT_TOKEN");
+  if (!token) throw new Error("PRITHA_TELEGRAM_BOT_TOKEN is not available for media download.");
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -160,7 +161,7 @@ async function telegramApi(method, payload = {}) {
 }
 
 async function downloadTelegramFile(fileId, destinationDir, basename, fallbackExt) {
-  const token = process.env.TECHSCOPE_TELEGRAM_BOT_TOKEN;
+  const token = prithaEnvValue("PRITHA_TELEGRAM_BOT_TOKEN");
   const file = await telegramApi("getFile", { file_id: fileId });
   const ext = extensionFromFilePath(file.file_path, fallbackExt);
   const outPath = path.join(destinationDir, `${basename}${ext}`);
@@ -201,7 +202,7 @@ async function inspectUrl(url) {
       redirect: "follow",
       signal: controller.signal,
       headers: {
-        "user-agent": "TechscopeBot/0.1 (+local knowledge intake)",
+        "user-agent": "PrithaBot/0.1 (+local knowledge intake)",
       },
     });
     const contentType = response.headers.get("content-type") || "";
@@ -318,7 +319,7 @@ function memorySearch(text, excludeRel = "") {
       .filter((item) => TECH_KEYWORDS.some((keyword) => item.includes(keyword) || keyword.includes(item)))
       .slice(0, 5),
   ).join(" ");
-  if (!query) return "No strong Techscope search terms detected yet.";
+  if (!query) return "No strong Pritha search terms detected yet.";
   try {
     const output = run("node", ["scripts/query-memory.mjs", "search", query], { timeout: 30 * 1000 });
     const filtered = output
@@ -385,7 +386,7 @@ Retention: source-purged
 
 ## Why it matters
 
-- Материал попал во входящий поток Techscope и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
+- Материал попал во входящий поток Pritha и должен быть оценен относительно миссии: программирование, LLM agents, coding agents, agent workflows, tooling и технологические стандарты.
 - Автоматический pass создает processed knowledge draft без сохранения raw/provenance breadcrumbs.
 - Если материал содержит media sources или внешние ссылки, они используются только transiently; durable memory keeps neutral metadata and processed conclusions.
 
@@ -399,11 +400,11 @@ ${signalPaths.length ? signalPaths.map((item) => `- ${item}`).join("\n") : "- No
 
 ## Codex-assisted refinement
 
-${signalPaths.length ? "- Required. The created signal artifacts are heuristic drafts and must be refined in this Techscope Codex thread with `07_workflows/prompts/signal-extraction-harness.md` before promotion to brief, review, decision or standard." : "- Required after a signal artifact is created."}
+${signalPaths.length ? "- Required. The created signal artifacts are heuristic drafts and must be refined in this Pritha Codex thread with `07_workflows/prompts/signal-extraction-harness.md` before promotion to brief, review, decision or standard." : "- Required after a signal artifact is created."}
 
 For Telegram and other forwarded media this step is especially important: forwarded text often mixes useful signal, commentary, ads, missing context and privacy-sensitive provenance.
 
-## Related Techscope memory
+## Related Pritha memory
 
 \`\`\`text
 ${compact(relatedMemory, 2400)}
@@ -443,7 +444,7 @@ Score: ${scores.evidence}/5
 
 Score: ${scores.practicality}/5
 
-Практичность определяется после сравнения с существующими стандартами и решениями Techscope.
+Практичность определяется после сравнения с существующими стандартами и решениями Pritha.
 
 ## Leverage
 

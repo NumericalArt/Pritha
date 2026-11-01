@@ -12,10 +12,10 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { parseFrontmatter } from "./lib/frontmatter.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import { now, today } from "./lib/date.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const WIKI_DIR = path.join(ROOT, "10_wiki");
 const PAGES_DIR = path.join(WIKI_DIR, "pages");
 const INDEX_PATH = path.join(WIKI_DIR, "index.md");
@@ -167,7 +167,7 @@ function ensureWiki() {
 function assertCuratedArtifact(inputPath) {
   const fullPath = path.resolve(ROOT, inputPath);
   if (!fullPath.startsWith(ROOT + path.sep)) {
-    throw new Error("Artifact path must be inside the Techscope workspace.");
+    throw new Error("Artifact path must be inside the Pritha workspace.");
   }
   if (!existsSync(fullPath) || !statSync(fullPath).isFile()) {
     throw new Error(`Artifact not found: ${inputPath}`);
@@ -267,7 +267,7 @@ Confidence: ${pageData.confidence}
 
 ## Generated summary
 
-This generated page tracks ${spec.name} as a ${spec.kind} in the Techscope knowledge base. Use it for navigation and synthesis only; follow the sources before making standards or decisions.
+This generated page tracks ${spec.name} as a ${spec.kind} in the Pritha knowledge base. Use it for navigation and synthesis only; follow the sources before making standards or decisions.
 
 ## Current synthesis
 

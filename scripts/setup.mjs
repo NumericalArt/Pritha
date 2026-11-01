@@ -10,10 +10,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 import { moduleReadiness } from "./lib/module-readiness.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: ROOT, pathOnly: true });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 const DEFAULT_STATE_PATH = resolvePrithaSetupFile({root: ROOT, stateRoot: STATE_ROOT});
@@ -280,14 +280,14 @@ function buildEnv(config) {
     values.PORT = config.web.port;
   }
   if (config.interfaces.telegram) {
-    values.TECHSCOPE_TELEGRAM_BOT_TOKEN = config.telegram.token || "";
-    values.TECHSCOPE_TELEGRAM_ALLOWED_USER_IDS = config.telegram.allowedUserIds || "";
+    values.PRITHA_TELEGRAM_BOT_TOKEN = config.telegram.token || "";
+    values.PRITHA_TELEGRAM_ALLOWED_USER_IDS = config.telegram.allowedUserIds || "";
   }
   if (config.interfaces.realtime && config.realtime.openaiApiKey) {
     values.OPENAI_API_KEY = config.realtime.openaiApiKey;
   }
   if (config.interfaces.realtime) {
-    values.TECHSCOPE_REALTIME_TOOLS = realtimeToolEnvValue(config);
+    values.PRITHA_REALTIME_TOOLS = realtimeToolEnvValue(config);
   }
   return values;
 }

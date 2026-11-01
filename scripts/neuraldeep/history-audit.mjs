@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NeuralDeepChatHistoryStore } from './chat-history-store.mjs';
 import { loadPrithaRuntimeEnv } from '../lib/env.mjs';
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from '../lib/paths.mjs';
+import { resolvePrithaStateRoot, resolvePrithaRoot } from '../lib/paths.mjs';
 
 export function auditChatHistory(options) {
   const store = new NeuralDeepChatHistoryStore({ ...options, readOnly: true });
@@ -23,7 +23,7 @@ export function auditChatHistory(options) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     if (process.argv.slice(2).some(arg => arg !== '--json')) throw new Error('unsupported_audit_option');
-    const root = resolveTechscopeRoot(); loadPrithaRuntimeEnv({ root });
+    const root = resolvePrithaRoot(); loadPrithaRuntimeEnv({ root });
     const stateRoot = resolvePrithaStateRoot({ root }), chatRoot = path.join(stateRoot, ...(stateRoot === root ? ['.private', 'codex-chat'] : ['codex-chat']));
     const databasePath = path.join(chatRoot, 'history.sqlite');
     if (!existsSync(databasePath)) throw new Error('history_storage_missing');

@@ -1,27 +1,18 @@
 # Pritha launchd templates
 
-The plist files in this directory are portable templates. They intentionally
-contain placeholders instead of machine-specific paths.
+The current Control Center template is
+`com.numericalart.pritha.control-center.instance.plist.template`. Use
+`scripts/control-center-runtime.mjs plan` and
+`07_workflows/control-center-staged-release.md` for rendering, ownership checks,
+installation and recovery. Lifecycle mutations require immediate explicit
+approval and `--yes`. Bootstrap does not install or enable a service.
 
-The current public project name is Pritha. Existing launchd labels and
-`TECHSCOPE_ROOT` placeholders remain as compatibility contracts for already
-installed local services.
+The existing `com.techscope.*` files are compatibility templates for older web,
+Telegram and self-test services. Their labels and placeholders are retained for
+recovery of already installed configurations. They are not the current Control
+Center deployment path. Legacy executable names delegate to the Pritha scripts.
+Do not rename an installed service or enable one merely to change its label.
 
-Before installing a service, copy the plist to `~/Library/LaunchAgents/` and
-replace:
-
-- `__TECHSCOPE_ROOT__` with the absolute path to this checkout.
-- `__HOME__` with your home directory.
-- `__USER__` with your short macOS user name.
-
-Do not commit a filled plist back to the repository or to a fork. Filled plist
-files contain local paths and may reveal machine-specific configuration.
-
-Copy rendered plists with Dasha-specific filenames, then validate them before loading:
-
-```sh
-plutil -lint ~/Library/LaunchAgents/com.techscope.web-dasha.plist
-plutil -lint ~/Library/LaunchAgents/com.techscope.telegram-bot-dasha.plist
-```
-
-Installing or enabling launchd services is always an explicit user action.
+Filled plists, real paths, credentials and private endpoints belong in local
+state. Never commit a rendered plist. Optional Telegram polling and scheduled
+self-tests require their own explicit deployment decision.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { prithaEnvValue } from "./lib/pritha-env.mjs";
 import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 import { existsSync } from "node:fs";
@@ -6,17 +7,17 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
+const ROOT = resolvePrithaRoot({ cwd: DEFAULT_ROOT });
 loadPrithaRuntimeEnv({ root: ROOT });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
 
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has("--json");
 const dryRun = args.has("--dry-run");
-const withEmbeddings = args.has("--with-embeddings") || process.env.TECHSCOPE_GOLDEN_EMBEDDINGS === "1";
+const withEmbeddings = args.has("--with-embeddings") || prithaEnvValue("PRITHA_GOLDEN_EMBEDDINGS") === "1";
 
 function run(name, command, commandArgs, options = {}) {
   const started = Date.now();
@@ -55,6 +56,7 @@ function run(name, command, commandArgs, options = {}) {
 }
 
 const checks = [
+  run("Pritha runtime name compatibility", "node", ["scripts/check-pritha-names.mjs"]),
   run("Privacy retention audit", "node", ["scripts/privacy-audit.mjs", "--strict"]),
   run("Markdown integrity", "node", ["scripts/validate-memory.mjs"]),
   run("Memory rebuild", "node", ["scripts/rebuild-memory.mjs"]),
@@ -71,7 +73,7 @@ checks.push(run(
   ["scripts/embed-memory.py"],
   {
     skip: !withEmbeddings,
-    reason: "optional; pass --with-embeddings or TECHSCOPE_GOLDEN_EMBEDDINGS=1",
+    reason: "optional; pass --with-embeddings or PRITHA_GOLDEN_EMBEDDINGS=1",
     timeoutMs: 600000,
   },
 ));
@@ -100,7 +102,7 @@ const payload = {
 if (jsonMode) {
   console.log(JSON.stringify(payload, null, 2));
 } else {
-  console.log(`Techscope golden checks: ${payload.status}`);
+  console.log(`Pritha golden checks: ${payload.status}`);
   console.log(`Root: ${ROOT}`);
   for (const check of checks) {
     const suffix = check.status === "skipped" || check.status === "planned" ? ` (${check.notes})` : ` (${check.durationMs}ms)`;

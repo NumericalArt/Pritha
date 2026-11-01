@@ -431,7 +431,7 @@ export function redactFilesystemPaths(value, options = {}) {
   const mappings = [
     [options.projectRoot, "<PROJECT_ROOT>"],
     [options.stateRoot, "<PRITHA_STATE_ROOT>"],
-    [options.root, "<TECHSCOPE_ROOT>"],
+    [options.root, "<PRITHA_ROOT>"],
     [options.homeDir || os.homedir(), "<USER_HOME>"],
   ]
     .map(([candidate, replacement]) => [normalizedFilesystemPath(candidate), replacement])

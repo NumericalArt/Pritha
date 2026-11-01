@@ -16,7 +16,7 @@ import { markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
 import { searchCuratedMemory } from "../lib/curated-memory.mjs";
 import { redactSensitiveText, redactStructuredText } from "../lib/redaction.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaRoot } from "../lib/paths.mjs";
 import { prepareInterviewOptions } from './interview-options.mjs';
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
@@ -87,7 +87,7 @@ import { deliveryUsageStatus, deliveryTokenPreflight } from "./delivery-ledger.m
 import { readDeliveryUsage } from "./phase-usage.mjs";
 import { readTaskDelivery } from "./task-delivery.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const CONTRACT_DIR = path.join(AGENT_MEMORY_ROOT, "contracts");
 const REPORT_DIR = path.join(AGENT_MEMORY_ROOT, "reports");

@@ -7,11 +7,11 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 loadPrithaRuntimeEnv({ root: DEFAULT_ROOT });
-const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
+const ROOT = resolvePrithaRoot({ cwd: DEFAULT_ROOT });
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);
@@ -230,7 +230,7 @@ function printGitHubAnnotations() {
 }
 
 function printMarkdown() {
-  console.log(`# Techscope Quality Gate: ${payload.status}`);
+  console.log(`# Pritha Quality Gate: ${payload.status}`);
   console.log();
   console.log(`- Root: \`${payload.root}\``);
   console.log(`- Created: \`${payload.createdAt}\``);
@@ -257,7 +257,7 @@ function printMarkdown() {
 }
 
 function printHuman() {
-  console.log(`Techscope quality gate: ${payload.status}`);
+  console.log(`Pritha quality gate: ${payload.status}`);
   console.log(`Root: ${payload.root}`);
   for (const warning of payload.warnings) console.log(`- WARNING ${warning}`);
   for (const check of checks) {

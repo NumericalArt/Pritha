@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { acquireFileLock, atomicWriteFile } from "../lib/atomic-file.mjs";
 import { today } from "../lib/date.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePathFrom, resolvePrithaRoot } from "../lib/paths.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
@@ -920,7 +920,7 @@ async function runDeliveryLoopLocked(input = {}) {
 }
 
 export async function deliverOutcome(specPath, projectPath, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const compiled = compileOutcomeSpec(specPath, {
     root,
     stateRoot: options.stateRoot,
@@ -940,7 +940,7 @@ export async function deliverOutcome(specPath, projectPath, options = {}) {
 }
 
 export function findDeliveryRun(runId, options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const buildsRoot = resolvePrithaStatePathFrom({ root, stateRoot: options.stateRoot }, "builds");
   const requested = String(runId || "").trim();
   if (!/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(requested) || !existsSync(buildsRoot)) return null;
@@ -1230,7 +1230,7 @@ function deliveryRunRoots(buildsRoot) {
 }
 
 export function cleanupStaleDeliveryRuns(options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot();
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const buildsRoot = options.buildsRoot || resolvePrithaStatePathFrom({ root, stateRoot: options.stateRoot }, "builds");
   const olderThanDays = Number(options.olderThanDays);
   if (!Number.isSafeInteger(olderThanDays) || olderThanDays < 1) {

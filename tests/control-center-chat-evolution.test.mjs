@@ -14,7 +14,7 @@ export async function fixtureModules() {
   const root = path.join(tmp, "project");
   const state = path.join(tmp, "state");
   mkdirSync(root); mkdirSync(state);
-  writeFileSync(path.join(tmp, "paths.mjs"), `export const resolveTechscopeRoot=()=>${JSON.stringify(root)}; export const resolvePrithaStateRoot=()=>${JSON.stringify(state)};`);
+  writeFileSync(path.join(tmp, "paths.mjs"), `export const resolvePrithaRoot=()=>${JSON.stringify(root)}; export const resolvePrithaStateRoot=()=>${JSON.stringify(state)};`);
   writeFileSync(path.join(tmp, "app-server.mjs"), "export class AppServerConnection {} export class CodexRuntimeManager {}");
   writeFileSync(path.join(tmp, "voice-links.mjs"), "export const queueVoiceTaskChatIndexRefresh=()=>{}; export const reconcileVoiceTaskChatLink=async()=>{}; export const voiceTaskChatIndexStatus=()=>({state:'ready'});");
   for (const name of ["history-reader", "attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "native-control", "native-requests", "private-store", "goal-control", "budget-intent", "operation-runtime", "gateway", "../private-json"]) {
@@ -400,6 +400,7 @@ async function voiceClientFixture(f, mode='complete') {
       .replaceAll('"../../codex-chat/native-requests"','"./native-requests.mjs"')
       .replaceAll('"./voice-execution"','"./voice-execution.mjs"')
       .replaceAll('"../../settings/codex-binaries"','"./voice-settings.mjs"')
+      .replaceAll('"@/lib/pritha-env"',JSON.stringify(pathToFileURL(path.resolve('scripts/lib/pritha-env.mjs')).href))
       .replaceAll('"../../settings/codex-model-catalog"','"./voice-settings.mjs"');
     writeFileSync(path.join(f.tmp,`${name}.mjs`),output);
   }

@@ -97,7 +97,7 @@ test("setup CLI configures default realtime tools when voice is selected", () =>
     assert.equal(payload.sections["realtime.tool.internet"].status, "configured");
     assert.equal(payload.sections["realtime.tool.memory"].status, "configured");
     assert.ok(["configured", "failed"].includes(payload.sections["realtime.tool.codexCli"].status));
-    assert.match(readFileSync(path.join(dir, ".env.local"), "utf8"), /^TECHSCOPE_REALTIME_TOOLS=internet,memory,codex-cli$/m);
+    assert.match(readFileSync(path.join(dir, ".env.local"), "utf8"), /^PRITHA_REALTIME_TOOLS=internet,memory,codex-cli$/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -4,11 +4,11 @@ import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaRoot } from "./lib/paths.mjs";
 import { searchCuratedMemory } from "./lib/curated-memory.mjs";
 import { resolvePrithaPython } from "./lib/python-runtime.mjs";
 
-const ROOT = resolveTechscopeRoot();
+const ROOT = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
 const DB_PATH = resolvePrithaMemoryDatabase();
 

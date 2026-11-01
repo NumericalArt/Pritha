@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { atomicWritePrivateJson } from "@/lib/private-json";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "@/lib/pritha-paths";
+import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "@/lib/pritha-paths";
 import { isDesktopCodexBinary, resolveCodexAppBinary } from "@/lib/settings/codex-binaries";
 import type { CodexRuntimeManager } from "./app-server";
 import { CodexChatPrivateStore, type ChatBinding } from "./private-store";
@@ -157,7 +157,7 @@ async function reconcileTask(store: CodexChatPrivateStore, runtime: CodexRuntime
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(taskId)) return false;
   const directory = path.join(taskRoot(), taskId);
   if (!existsSync(path.join(directory, "request.json"))) return false;
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const stateRoot = resolvePrithaStateRoot(root);
   const rows = resolvedThreads(taskId);
   if (!rows.length) return true;
@@ -234,7 +234,7 @@ async function reconcileTask(store: CodexChatPrivateStore, runtime: CodexRuntime
 async function refreshIndex(store: CodexChatPrivateStore, runtime: CodexRuntimeManager, force = false) {
   const tasksDirectory = taskRoot();
   if (!existsSync(tasksDirectory)) return;
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const stateRoot = resolvePrithaStateRoot(root);
   const taskIds = readdirSync(tasksDirectory)
     .filter((entry) => existsSync(path.join(tasksDirectory, entry, "request.json")))

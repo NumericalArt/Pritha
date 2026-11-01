@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { atomicWriteFile } from "../lib/atomic-file.mjs";
-import { resolvePrithaStateRoot, resolvePrithaStatePathFrom, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaStateRoot, resolvePrithaStatePathFrom, resolvePrithaRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, readCatalogArtifact, readIdentityEvidence } from "./identity.mjs";
 import { DELIVERY_ACTIVE_STATUSES, deliveryUsageStatus, grantDeliveryBudget, readDeliveryLedger, targetKey } from "./delivery-ledger.mjs";
 import { canHostVerifyDelivery, defaultDeliveryTrialBackend, withDeliveryBudgetControl, withDeliveryHostControl } from "./delivery-loop.mjs";
@@ -21,7 +21,7 @@ export class TaskDeliveryError extends Error {
 const fail = (code, message, status) => { throw new TaskDeliveryError(code, message, status); };
 
 function optionsFor(options) {
-  const root = path.resolve(options.root || resolveTechscopeRoot());
+  const root = path.resolve(options.root || resolvePrithaRoot());
   const stateRoot = resolvePrithaStateRoot({ ...options, root });
   return { ...options, root, stateRoot, buildsRoot: resolvePrithaStatePathFrom({ root, stateRoot }, "builds") };
 }

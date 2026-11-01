@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { resolveTechscopeRoot } from "../pritha-paths";
+import { resolvePrithaRoot } from "../pritha-paths";
 
 function parseJson(stdout: string) {
   try {
@@ -16,7 +16,7 @@ function parseJson(stdout: string) {
 }
 
 export function runPrithaMaintenance(args: string[], options: { timeoutMs?: number } = {}) {
-  const root = resolveTechscopeRoot();
+  const root = resolvePrithaRoot();
   const result = spawnSync("node", args, {
     cwd: root,
     encoding: "utf8",
