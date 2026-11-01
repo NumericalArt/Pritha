@@ -2073,6 +2073,21 @@ unit child environment отдельно и изолировать оба aliases
 - Targeted file/admission/provider-service tests **19/19**. Parent credentials
   для Local не читались; платных вызовов/моделей/сервисных изменений нет.
 
+### Checkpoint 35 — Dependency patches и подготовка полного gate
+
+- Next 16.4.3, Sharp 0.35.5, Undici 7.30.1, browser-mapping 2.11.0 и
+  source-map-js 1.2.2 закреплены в manifest/lockfile после проверки registry и
+  primary release/advisory sources. Install без lifecycle scripts; typecheck pass.
+- npm audit: **0 critical / 0 moderate / 2 high**, вместо 1/1/5. Оставшиеся две
+  записи — один transitive Zod finding через sandbox-runtime 0.0.81. Совместимого
+  исправления нет; bounded host-plan reachability и residual risk описаны в
+  `03_reviews/2026-11-01-provider-convergence-dependency-audit.md`. Нет force upgrade.
+- Unit children quality-gate очищают оба root aliases, чтобы не наследовать live
+  checkout вместо fixture. Targeted quality tests **6/6**, names guard passed.
+- Полный quality gate и production browser candidate запускаются следующим шагом;
+  этот checkpoint не утверждает, что они уже завершились. Voice factory creation,
+  optional Claude CLI auth и ручная приёмка остаются отдельными открытыми пунктами.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

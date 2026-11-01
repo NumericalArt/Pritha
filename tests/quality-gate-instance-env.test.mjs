@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 test("quality-gate unit tests do not inherit live instance configuration", () => {
   if (process.env.PRITHA_QUALITY_GATE_CHILD !== "1") return;
   for (const key of [
+    "PRITHA_ROOT",
+    "TECHSCOPE_ROOT",
     "PRITHA_STATE_ROOT",
     "PRITHA_AGENT_PARENT",
     "PRITHA_INSTANCE_ID",

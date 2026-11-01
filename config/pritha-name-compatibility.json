@@ -704,6 +704,12 @@
       "sha256": "9e23e1c90d1a615e8e84ee02b712e1d47d8482b3ba4116f17fdf585e1dc61648",
       "count": 1,
       "reason": "Existing root alias and legacy-state detection remain compatible while provider selection and private instance roots are added."
+    },
+    {
+      "path": "scripts/quality-gate.mjs",
+      "sha256": "c31a4a53cec204626de64b9e7e73d474697de8cae0671d13aa91dc91cafbd87e",
+      "count": 1,
+      "reason": "Unset the legacy root alias in unit-test child processes so each fixture controls its own checkout."
     }
   ]
 }

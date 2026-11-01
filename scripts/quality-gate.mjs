@@ -114,6 +114,8 @@ const allCheckSpecs = [
     timeoutMs: 900000,
     env: { PRITHA_QUALITY_GATE_CHILD: "1" },
     unsetEnv: [
+      "PRITHA_ROOT",
+      "TECHSCOPE_ROOT",
       "PRITHA_STATE_ROOT",
       "PRITHA_AGENT_PARENT",
       "PRITHA_INSTANCE_ID",
