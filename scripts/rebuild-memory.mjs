@@ -8,6 +8,7 @@ import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { parseFrontmatter } from "./lib/frontmatter.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
 import { slug } from "./lib/slug.mjs";
+import { listAuthoredAgentMemoryFiles } from "./lib/authored-agent-memory.mjs";
 
 const ROOT = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
@@ -133,7 +134,7 @@ function canonicalMarkdownFiles() {
   addFiles(trackedFiles, "tracked", 1);
 
   if (path.resolve(AGENT_MEMORY_ROOT) !== path.resolve(trackedAgentRoot)) {
-    const instanceAgentFiles = listMarkdownFiles(AGENT_MEMORY_ROOT).sort();
+    const instanceAgentFiles = listAuthoredAgentMemoryFiles(AGENT_MEMORY_ROOT);
     addFiles(instanceAgentFiles, "instance-agent-state", 2);
   }
 

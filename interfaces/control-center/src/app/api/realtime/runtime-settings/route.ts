@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateRuntimeNumbers } from "@/lib/settings/runtime-numbers";
+import { providerSettingsErrorResponse } from "@/lib/settings/provider-settings-server";
 import {
   getPrithaRealtimeStatus,
   getPrithaRuntimeSettings,
@@ -74,6 +75,7 @@ function isCodexAppThreadRoutingMode(value: unknown) {
 }
 
 export async function GET() {
+  try {
   return NextResponse.json({
     ok: true,
     settings: getPrithaRuntimeSettings(),
@@ -82,9 +84,11 @@ export async function GET() {
     voiceOptions: PRITHA_FEMININE_VOICE_OPTIONS,
     voiceModels: VOICE_MODEL_OPTIONS,
   });
+  } catch (error) { return providerSettingsErrorResponse(error); }
 }
 
 export async function POST(request: Request) {
+  try {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ ok: false, error: "invalid_request", message: "Settings must be a JSON object." }, { status: 400 });
   const numericError = validateRuntimeNumbers(body);
@@ -206,4 +210,5 @@ export async function POST(request: Request) {
     voiceOptions: PRITHA_FEMININE_VOICE_OPTIONS,
     voiceModels: VOICE_MODEL_OPTIONS,
   });
+  } catch (error) { return providerSettingsErrorResponse(error); }
 }

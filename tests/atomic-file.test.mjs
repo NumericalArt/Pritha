@@ -5,6 +5,16 @@ import path from "node:path";
 import test from "node:test";
 import { acquireFileLock, atomicCompareAndSwapFile, withFileLock } from "../scripts/lib/atomic-file.mjs";
 
+test("a freshly opened lock with incomplete owner metadata is never stolen", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pritha-lock-initializing-"));
+  const target = path.join(root, "settings.json");
+  for (const partial of ["", '{"pid":']) {
+    writeFileSync(`${target}.lock`, partial);
+    assert.throws(() => acquireFileLock(target), /locked by another operation/);
+    assert.equal(readFileSync(`${target}.lock`, "utf8"), partial);
+  }
+});
+
 test("file lock rejects an active local owner", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-active-lock-"));
   const target = path.join(root, "state.json");

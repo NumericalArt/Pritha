@@ -1,6 +1,7 @@
 import { normalizeVoiceModel, type VoiceModel } from "./voice-settings";
 import { LIVE_MODEL, isLiveModel, liveSessionConfig, DEFAULT_LIVE_BACKEND } from "./live-session";
 import { runtimeProbe } from "../../../../../scripts/lib/runtime-probe.mjs";
+import { RuntimeSettingsStore, mergeLegacyRuntimeSettings } from "../../../../../scripts/lib/runtime-settings-store.mjs";
 import { registerExecutionChannel, callExecutionChannel, executionChannelView } from "../../../../../scripts/lib/execution-channel.mjs";
 import { prepareAgentWorkspaceTarget, scopedAgentWorkspace, inspectTaskWorkspace, prepareTaskWorkspace, verifyTaskWorkspace, type TaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
 import { ownChildProcess, signalOwnedProcess, ownedGroupExited, type OwnedProcess } from "../../../../../scripts/lib/owned-process.mjs";
@@ -435,7 +436,7 @@ type ExternalResearchToolModule = {
   runRecentLast30DaysResearch: (options: Record<string, unknown>) => unknown;
 };
 
-const DEFAULT_MODEL = LIVE_MODEL;
+const DEFAULT_MODEL = "gpt-realtime-2";
 const DEFAULT_VOICE = DEFAULT_PRITHA_VOICE;
 const DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe";
 const DEFAULT_CODEX_TIMEOUT_MS = 300_000;
@@ -4011,20 +4012,15 @@ function normalizeRuntimeSettings(raw: unknown): PrithaRuntimeSettings {
 }
 
 export function getPrithaRuntimeSettings() {
-  const settingsPath = runtimeSettingsPath();
-  if (!existsSync(settingsPath)) return defaultRuntimeSettings();
-  try {
-    return normalizeRuntimeSettings(JSON.parse(readFileSync(settingsPath, "utf8")));
-  } catch {
-    return defaultRuntimeSettings();
-  }
+  return normalizeRuntimeSettings(new RuntimeSettingsStore(runtimeSettingsPath(), { allowedRoot: resolvePrithaStateRoot() }).read());
 }
 
 export async function updatePrithaRuntimeSettings(patch: Partial<PrithaRuntimeSettings>) {
-  const current = getPrithaRuntimeSettings();
-  const next = normalizeRuntimeSettings({ ...current, ...patch, updatedAt: new Date().toISOString() });
-  await mkdir(path.dirname(runtimeSettingsPath()), { recursive: true });
-  await writeFile(runtimeSettingsPath(), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  const document = new RuntimeSettingsStore(runtimeSettingsPath(), { allowedRoot: resolvePrithaStateRoot() }).mutate(current => {
+    const next = normalizeRuntimeSettings({ ...normalizeRuntimeSettings(current), ...patch, updatedAt: new Date().toISOString() });
+    return mergeLegacyRuntimeSettings(current, next);
+  });
+  const next = normalizeRuntimeSettings(document);
   await logPrivateEvent("runtime_settings_updated", {
     deepTaskPrimaryTransport: next.deepTaskPrimaryTransport,
     codexModel: next.codexModel,

@@ -19,7 +19,7 @@ import dynamic from "next/dynamic";
 import { useChatAttachments } from "./useChatAttachments";
 import { readDraftSession, writeDraftSession } from "@/lib/codex-chat/draft-session";
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
-import { TaskChatControls } from "./TaskChatControls";
+import { TaskChatControls, type TaskChatComposerHandle } from "./TaskChatControls";
 import { ActivityFeed } from "./ActivityFeed";
 import { ActivityAction } from "./ActivityAction";
 import { HistoryTurn } from "./HistoryTurn";
@@ -378,6 +378,7 @@ export function CodexChatPage() {
   }, [draftKey, imageEditor, attachmentDraft.cancelEdit]);
   const filePickerRef = useRef<HTMLInputElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerControlRef = useRef<TaskChatComposerHandle | null>(null);
   const attachmentIds = attachmentDraft.items.flatMap(file => file.state === "ready" ? [file.id] : []);
   const attachmentsIncomplete = attachmentDraft.items.some(file => file.state !== "ready");
   const selectedModalities = runtime?.models.find(model => model.id === runtime.selected.modelId)?.inputModalities;
@@ -1000,11 +1001,11 @@ export function CodexChatPage() {
   const displayedTurns = selectionChanging ? [] : turns;
   const visibleThreads = useMemo(() => threads.filter((thread) => thread.group === activeGroup && thread.archived === showArchived), [activeGroup, threads, showArchived]);
 
-  const hasActiveTurn = displayedTurns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
+  const displayedDetail = selectionChanging ? null : detail;
+  const hasActiveTurn = Boolean(displayedDetail?.activeTurnId || displayedDetail?.controls || displayedDetail?.thread.status === "active") || displayedTurns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
   const workingLabel = displayedTurns.some(turn => turn.status === "waiting_for_approval" || turn.status === "waiting_for_input") ? null
     : displayedTurns.some(turn => turn.status === "in_progress") ? "Pritha is working"
     : displayedTurns.some(turn => turn.status === "queued") ? "In queue" : null;
-  const displayedDetail = selectionChanging ? null : detail;
   const displayedThread = displayedDetail?.thread || selectedSummary;
   const effectiveProvider = runtime?.providers.find((provider) => provider.providerId === (displayedThread?.runtime.providerId || runtime.effectiveProvider));
   const visibleError = error && (error.chatId == null || error.chatId === selectedChatId) ? error : null;
@@ -1271,7 +1272,8 @@ export function CodexChatPage() {
 
   async function sendMessage(workspaceBase?: string) {
     const text = draft.trim();
-    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || imageEditorRef.current?.owner === draftKey || attachmentDraft.isBusy(draftKey) || draftSubmissionLocksRef.current[draftKey] || sending || hasActiveTurn || (!selectedChatId && pendingNewChatDelivery) || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
+    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || imageEditorRef.current?.owner === draftKey || attachmentDraft.isBusy(draftKey) || draftSubmissionLocksRef.current[draftKey] || sending || backendOffline || runtime?.availability !== "ready" || Boolean(selectedChatId && historyState !== "ready") || (!selectedChatId && pendingNewChatDelivery) || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
+    if (hasActiveTurn && selectedChatId) { await composerControlRef.current?.send("queue"); return; }
     const chatId = selectedChatId;
     const intent = parseBudgetIntent(text);
     if (intent.kind === "clarification" || ((intent.kind === "goal_budget" || intent.kind === "delivery_budget") && (!chatId || attachmentIds.length > 0))) {
@@ -1620,7 +1622,13 @@ export function CodexChatPage() {
         </div>
 
         <div className="codex-composer-wrap">
-          <TaskChatControls canSend={!attachmentsIncomplete && !imageCapabilityMissing && !annotationBusy} onDraftLockChange={onDraftLockChange} chatId={selectedChatId} detail={displayedDetail} draft={draft} attachments={attachmentsIncomplete?[]:attachmentIds} settings={runtime?.selected} refresh={loadThreadDetail} onSent={(chatId,text,files)=>{
+          <TaskChatControls composerControlRef={composerControlRef} canEditDraft={!draft && !attachmentDraft.items.length && !pendingDelivery && !draftSubmissionLocks[draftKey]} onRestore={(chatId, text, files) => {
+            if (draftsByChatRef.current[chatId] || pendingDeliveriesRef.current[chatId] || draftSubmissionLocksRef.current[chatId] || attachmentDraft.hasItems(chatId) || attachmentDraft.isBusy(chatId)) return false;
+            if (!attachmentDraft.restoreQueued(chatId, files)) return false;
+            updateDraftForChat(chatId, text);
+            if (selectedChatIdRef.current === chatId) composerRef.current?.focus();
+            return true;
+          }} canSend={!attachmentsIncomplete && !imageCapabilityMissing && !annotationBusy && !pendingDelivery && historyState === "ready" && !backendOffline && runtime?.availability === "ready"} onDraftLockChange={onDraftLockChange} chatId={selectedChatId} detail={displayedDetail} draft={draft} attachments={attachmentsIncomplete?[]:attachmentIds} settings={runtime?.selected} refresh={loadThreadDetail} onSent={(chatId,text,files)=>{
             updateDraftForChat(chatId,current=>current.trim()===text?"":current);
             attachmentDraft.clear(chatId,files);
           }} />
@@ -1668,12 +1676,14 @@ export function CodexChatPage() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && !event.repeat) {
                     event.preventDefault();
-                    void sendMessage();
+                    if (event.metaKey || event.ctrlKey) {
+                      if (hasActiveTurn && displayedDetail?.controls?.steer && draft.trim() && !attachmentDraft.items.length && !draftSubmissionLocksRef.current[draftKey]) void composerControlRef.current?.send("steer");
+                    } else void sendMessage();
                   }
                 }}
-                placeholder={workingLabel ? "" : pendingDelivery?.status === "delivery_unknown"
+                placeholder={hasActiveTurn ? (displayedDetail?.controls?.steer ? "Write a follow-up to queue (Enter) or steer this turn now (⌘/Ctrl+Enter)…" : "Write the next message to send after completion (Enter to queue)…") : pendingDelivery?.status === "delivery_unknown"
                   ? "Delivery confirmation is pending…"
                   : selectedChatId && historyState === "error"
                     ? "Retry history before sending…"
@@ -1689,8 +1699,8 @@ export function CodexChatPage() {
             <div className="codex-composer-actions">
               <small>
                 {dictationSupported
-                  ? "Enter to send · Dictation stays editable · browser speech may use an online service"
-                  : "Enter to send · Browser dictation unavailable; use system dictation"}
+                  ? `${hasActiveTurn ? "Enter to queue" : "Enter to send"} · Dictation stays editable · browser speech may use an online service`
+                  : `${hasActiveTurn ? "Enter to queue" : "Enter to send"} · Browser dictation unavailable; use system dictation`}
               </small>
               <div className="codex-composer-controls">
                 <input ref={filePickerRef} type="file" multiple hidden aria-label="Attach files" onChange={event => { if (!pendingDelivery && !sending && !annotationBusy && !draftSubmissionLocksRef.current[draftKey] && !attachmentDraft.isBusy(draftKey)) attachmentDraft.add(Array.from(event.target.files || [])); event.target.value = ""; }} />
@@ -1723,8 +1733,10 @@ export function CodexChatPage() {
                 >
                   <Mic size={16} /> {!dictationSupported ? "Unavailable" : dictation === "listening" ? "Listening" : dictation === "error" ? "Try again" : "Dictate"}
                 </button>
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || hasActiveTurn || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
-                  {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} Send
+                {hasActiveTurn && displayedDetail?.controls?.steer && <button className="codex-text-action" type="button" disabled={!draft.trim() || attachmentDraft.items.length > 0 || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || Boolean(pendingDelivery) || backendOffline || historyState !== "ready"} title={attachmentDraft.items.length ? "Attachments can only be queued for the next turn" : "Inject this instruction immediately into the running reasoning turn (⌘/Ctrl+Enter)"} onClick={() => void composerControlRef.current?.send("steer")}>⚡ Steer now</button>}
+                {hasActiveTurn && displayedDetail?.controls?.interrupt && !displayedDetail.voiceWorkflow && <button className="codex-text-action" type="button" onClick={() => void composerControlRef.current?.send("interrupt")}>■ Stop</button>}
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                  {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} {hasActiveTurn ? "Queue" : "Send"}
                 </button>
               </div>
             </div>

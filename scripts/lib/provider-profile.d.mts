@@ -1,0 +1,21 @@
+export type ProviderConnectorId = "codex" | "neuraldeep" | "claude" | "openrouter" | "local";
+export type VoiceEngine = "auto" | "openai" | "neuraldeep";
+export type ProviderPreset = { modelId: string; reasoningEffort: string; timeoutMs: number; thinkingBudget?: number; baseUrl?: string; authMode?: "api-key" | "local-cli-session" };
+export type ProviderSettings = { version: 1; activeConnectorId: ProviderConnectorId; providerPresets: Record<ProviderConnectorId, ProviderPreset> };
+export type ProviderBinding = { connectorId: ProviderConnectorId; modelId: string; sessionId: string };
+export const PROVIDER_CONNECTOR_IDS: readonly ProviderConnectorId[];
+export const PROVIDER_LABELS: Readonly<Record<ProviderConnectorId, string>>;
+export const VOICE_ENGINES: readonly VoiceEngine[];
+export class ProviderConfigurationError extends Error { readonly code: string; constructor(code: string, message: string); }
+export function isProviderConnectorId(value: unknown): value is ProviderConnectorId;
+export function normalizeProviderConnectorId(value: unknown): ProviderConnectorId;
+export function connectorForBootstrapProfile(profile: string): ProviderConnectorId;
+export function resolveProviderSelection(options?: { connector?: unknown; env?: Record<string, unknown>; instance?: {providerProfile?: unknown}; setup?: {providerProfile?: unknown} }): { connectorId: ProviderConnectorId; providerProfile: "codex-native" | Exclude<ProviderConnectorId, "codex">; source: string };
+export function defaultProviderPreset(connectorId: ProviderConnectorId): ProviderPreset;
+export function normalizeLocalProviderUrl(value: unknown): string;
+export function normalizeProviderPreset(connectorId: ProviderConnectorId, value: unknown, fallback?: ProviderPreset): ProviderPreset;
+export function normalizeProviderSettings(value?: unknown, options?: {legacy?: {codexModel?: string; codexReasoningEffort?: string; codexTimeoutMs?: number}; defaultConnector?: ProviderConnectorId}): ProviderSettings;
+export function updateProviderPreset(settings: ProviderSettings, connectorId: ProviderConnectorId, patch: Partial<ProviderPreset>): ProviderSettings;
+export function readyProviderConnectors(statuses: Partial<Record<ProviderConnectorId, {status: string}>>): ProviderConnectorId[];
+export function assertProviderBinding(binding: unknown, requested: {connectorId: ProviderConnectorId; modelId?: string; sessionId?: string}): ProviderBinding;
+export function resolveVoiceEngine(options: {connectorId: ProviderConnectorId; engine?: VoiceEngine; configured?: {openai?: boolean; neuraldeep?: boolean}; offline?: boolean; preferredEngine?: "openai" | "neuraldeep"}): {engine: "openai" | "neuraldeep" | null; reason: "offline" | "configured" | "pending-auth"};

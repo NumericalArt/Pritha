@@ -200,12 +200,12 @@ test("editor Enter never sends, text supports Unicode, queue sends only after ed
   const f = await fixture(page); f.control.active = true; await page.goto("/task-chat?chat=chat_A"); await attach(page);
   await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page);
   await page.getByRole("dialog").press("Enter"); expect(f.control.sent).toHaveLength(0);
-  await expect(page.getByRole("button", { name: "Send after completion" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Stop this turn", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Queue" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "■ Stop", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Текст", exact: true }).click(); await page.getByLabel("Холст разметки").click({ position: { x: 20, y: 20 } });
   await page.getByRole("textbox", { name: "Текст пометки" }).fill("Пометка 🪷"); await page.getByRole("textbox", { name: "Текст пометки" }).press("Enter"); expect(f.control.sent).toHaveLength(0);
   await page.getByRole("button", { name: "Добавить текст", exact: true }).click(); await page.getByRole("button", { name: "Применить", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0); await page.getByRole("button", { name: "Send after completion" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0); await page.getByRole("button", { name: "Queue" }).click();
   await expect.poll(() => f.control.sent.length).toBe(1); expect(f.control.sent[0].attachments).toEqual([f.control.puts.at(-1)!.id]);
 });
 
@@ -247,7 +247,7 @@ test("unknown delivery freezes the edited attachment ID through exact replay", a
 test("pending queue locks its image and rejection unlocks editing", async ({ page }) => {
   const f = await fixture(page); f.control.active = true; f.control.holdQueue = true;
   await page.goto("/task-chat?chat=chat_A"); await attach(page);
-  await page.getByRole("button", { name: "Send after completion", exact: true }).click(); await expect.poll(() => f.control.queueRoutes.length).toBe(1);
+  await page.getByRole("button", { name: "Queue", exact: true }).click(); await expect.poll(() => f.control.queueRoutes.length).toBe(1);
   await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeDisabled();
   await f.control.queueRoutes[0].fulfill({ status: 409, json: { apiVersion: "1", error: { code: "queue_target_ended", requestId: "fixture", message: "Queue rejected", retryable: false } } });
   await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeEnabled();

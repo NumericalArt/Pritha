@@ -200,7 +200,7 @@ export type PendingRequestView = {
 
 export type ThreadDetail = {
   voiceWorkflow?: {taskId:string;state:string;revision:number;question:string|null;questionId:string|null} | null;
-  queued?: Array<{id:string;revision:number;state:string;text:string;clientMessageId:string;createdAt:string;reason:string|null}>;
+  queued?: Array<{id:string;revision:number;state:string;text:string;clientMessageId:string;createdAt:string;reason:string|null;attachments?:AttachmentView[];attachmentsUnavailable?:boolean}>;
   controls?: {turnId:string;steer:boolean;interrupt:boolean} | null;
   thread: ThreadSummary;
   activeTurnId: string | null;

@@ -195,14 +195,14 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 - [x] Прочитать repo instructions, release workflow, выполнить Good State Alignment.
 - [x] Зафиксировать canonical HEAD и чужие untracked изменения.
 - [x] Создать локальную `codex/provider-convergence` ветку без смены дерева.
-- [ ] Проверить GitHub metadata/branch/commit ND. Указанная в ТЗ branch при первом
+- [x] Проверить GitHub metadata/branch/commit ND. Указанная в ТЗ branch при первом
   connector search не найдена: проверить default branch и SHA, не выдумывать ref.
-- [ ] Получить read-only source snapshot по полному SHA, без secrets/state;
+- [x] Получить read-only source snapshot по полному SHA, без secrets/state;
   сохранить file inventory и diff map canonical ↔ ND. Не исполнять fork scripts
   до чтения кода и review. Никаких install hooks из source snapshot.
 - [ ] Проверить official docs используемых protocol/CLI/API/capabilities и
   установленную toolchain без чтения приватной авторизации.
-- [ ] Запустить baseline quality-gate/self-test, native unit, typecheck и memory
+- [x] Запустить baseline quality-gate/self-test, native unit, typecheck и memory
   acceptance. Full gate записать один раз; последующие прогоны только после
   изменений/ошибок, которые их оправдывают. Отделить existing failures.
 
@@ -212,23 +212,23 @@ fixtures/branch после review, не reset/stash пользовательск
 
 ### R1 — Сохранность Curated FTS v2 и portable Python
 
-**Статус: pending.** Зависимость R0. Результат: общий поиск для всех профилей.
+**Статус: implemented; isolated gate passed; final instance gate pending.** Зависимость R0. Результат: общий поиск для всех профилей.
 
-- [ ] Инвентаризировать `pritha_memory_retrieval.py`, `memory-retrieve.py`,
+- [x] Инвентаризировать `pritha_memory_retrieval.py`, `memory-retrieve.py`,
   `memory-retrieval-eval.py`, `memory-retrieval-acceptance.py`, `curated-memory.mjs`.
-- [ ] Сохранить русскую нормализацию, симметричный глоссарий, веса sections,
+- [x] Сохранить русскую нормализацию, симметричный глоссарий, веса sections,
   pre-BM25 фильтры privacy/domain/history и явную cosine reduction MiniLM.
-- [ ] Общий interpreter resolver: explicit supported override, instance venv,
+- [x] Общий interpreter resolver: explicit supported override, instance venv,
   совместимый legacy/system Python. Проверить paths с пробелами/кириллицей,
   отсутствующий/неисполняемый interpreter и bounded spawn errors.
-- [ ] `query-memory curated` + search/semantic/stats backward compatibility;
+- [x] `query-memory curated` + search/semantic/stats backward compatibility;
   lexical path не импортирует torch/sentence_transformers и не делает network.
 - [ ] Сохранить curated `agent-building-knowledge` factory retrieval; ND exact
   passage binding и bounded excerpts переносить точечно на R6.
-- [ ] Сверить весь октябрьский knowledge pack из A §1.3: два intake, registry
+- [x] Сверить весь октябрьский knowledge pack из A §1.3: два intake, registry
   24 repos/10 accepted-for-review как исторический факт, все signals, шесть briefs,
   reviews MD/JSON, superseded/active decisions, три workflow, failure template.
-- [ ] Проверить все шесть tests/fixtures из A §1.4; acceptance SHA-256 неизменен:
+- [x] Проверить все шесть tests/fixtures из A §1.4; acceptance SHA-256 неизменен:
   `b6e60c6559288cce982770c64e4065f0645a54b4a45b6b724b9fe4d2dce89118`.
 - [ ] Validate/rebuild memory в изолированном state. После финальных Markdown
   changes обновить authored index и embeddings по принятому workflow.
@@ -241,11 +241,11 @@ generated indexes воспроизводимы, не коммитятся.
 
 ### R2 — Provider schema, presets, identity и migration
 
-**Статус: pending.** Зависимости R0–R1.
+**Статус: in-progress.** Зависимости R0–R1.
 
-- [ ] Общий JS provider resolver + typed TS boundary, пять IDs и legacy aliases.
-- [ ] Bootstrap names отдельно; precedence и invalid-value fail-closed.
-- [ ] Версионированный runtime-settings schema с per-provider presets;
+- [x] Общий JS provider resolver + typed TS boundary, пять IDs и legacy aliases.
+- [x] Bootstrap names отдельно; precedence и invalid-value fail-closed.
+- [x] Версионированный runtime-settings schema с per-provider presets;
   migrate native model/effort/timeout без destructive rewrite.
 - [ ] Namespaced thread/provider/model/session binding, legacy native migration,
   atomic storage, corruption recovery, optimistic revision и validation.
@@ -424,7 +424,7 @@ music/duplex/reconnect. Browser mic/audio checks later mark manual evidence.
 
 ### R10 — Умный composer: Queue, Steer, Edit, Cancel, Stop
 
-**Статус: pending.** Зависимость R3; выполнить независимо до всех live providers.
+**Статус: native implemented; cross-provider gate pending.** Зависимость R3; выполнить независимо до всех live providers.
 
 - [ ] Textarea/attachments доступны во время running turn; send validation
   различает empty draft, upload in progress, busy request и active turn.
@@ -588,6 +588,43 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   который является estimate и допускает overshoot. [Ollama FAQ](https://docs.ollama.com/faq)
   подтверждает отдельный cloud mode и `OLLAMA_NO_CLOUD`; loopback сам по себе
   не доказывает offline. Docs retrieved/verified 2026-11-01, publication dates unknown.
+
+### Checkpoint реализации 2
+
+- R1: весь requested knowledge/test/core inventory сохранён в
+  [R1 inventory](../03_reviews/2026-11-01-provider-convergence-r1-inventory.json):
+  37 файлов, 6 октябрьских briefs. Core retrieval не заменялся fork-версией.
+- Повторные validate/rebuild в disposable state: 774 документа / 7267 chunks.
+  Paired FTS acceptance: pass; 45/48 Hit@5, 46/48 Hit@10, holdout 23/24,
+  leaks=0, regressions@10=0, warm p95=3.000 ms. Strict privacy pass.
+  Команда paired gate (пути задаются оператором):
+  `python3 scripts/memory-retrieval-acceptance.py --split all --modes fts --baseline <baseline.json> --check --output <result.json>`.
+  Это проверка FTS; semantic/hybrid финальная проверка остаётся R12.
+- Реальный instance validator после boundary fix: 676 исходных issues → 1.
+  Оставшаяся ошибка — существующие некорректные `subject` metadata private
+  artifact; его содержание не переносилось в отчёт и не редактировалось.
+  Поэтому реальный instance memory gate пока не объявлен зелёным.
+- R2: пять пресетов реально сохраняются в существующем runtime-settings.json.
+  Native legacy writer и новый API используют единый atomic store; optimistic
+  revision защищает от stale saves, backup/recovery сохраняет повреждённые bytes,
+  settings symlinks отклоняются. Native voice/model/tier поля сохранены.
+- Race test обнаружил старый дефект file lock: неполная запись владельца могла
+  считаться stale. Исправлены initialization gap и сериализация stale recovery.
+  Оставшийся после аварии recovery-lock требует проверки оператора; самовольно
+  удалять guard file нельзя. Ошибка сохранения не разрешает runtime fallback.
+- Full isolated quality gate: pass (environment/privacy/Markdown/rebuild/smoke/unit/Agents Mother/Telegram dry-run). Unit stage 226.808 s.
+- Installed toolchain: Node 24.15.0, Python 3.9.6, Git 2.50.1, Codex CLI 0.153.0, Claude Code 2.1.296; bounded version-only probes, без auth reads.
+- Targeted Node suite после исправления: 64/64; typecheck pass; diff check pass.
+  Composer browser suite: 15/15 desktop/mobile. Settings/API + composer:
+  12/12, без skipped/flaky. Production candidate используется только внутри
+  isolated E2E harness, managed production service не менялся.
+- R10: Enter/Queue, exact-turn Steer, Stop, revision-bound Edit/Cancel, attachment
+  restore, reload recovery и draft preservation подтверждены browser tests.
+  Проверки для ещё не подключённых drivers не считаются выполненными.
+- [Codex App Server lifecycle](https://learn.chatgpt.com/docs/app-server#lifecycle-overview)
+  проверен по official fetched docs 2026-11-01: initialize/initialized,
+  thread/start/resume, turn/start/steer/interrupt и terminal turn/completed.
+  Publication date unavailable. Native history contract сохраняется.
 
 ## 7. Полные исходные материалы
 

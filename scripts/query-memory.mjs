@@ -5,6 +5,7 @@ import path from "node:path";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
 import { searchCuratedMemory } from "./lib/curated-memory.mjs";
+import { resolvePrithaPython } from "./lib/python-runtime.mjs";
 
 const ROOT = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
@@ -239,10 +240,12 @@ if (command === "semantic") {
     console.error("Missing semantic search text.");
     process.exit(1);
   }
-  const output = execFileSync("python3", ["scripts/semantic-search.py", arg], {
+  const output = execFileSync(resolvePrithaPython({ root: ROOT }), ["scripts/semantic-search.py", arg], {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    timeout: 120_000,
+    maxBuffer: 4 * 1024 * 1024,
   });
   console.log(output);
   process.exit(0);

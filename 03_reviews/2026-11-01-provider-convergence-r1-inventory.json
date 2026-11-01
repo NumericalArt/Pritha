@@ -1,0 +1,156 @@
+{
+  "schema": "pritha-convergence-r1-inventory-v1",
+  "date": "2026-11-01",
+  "source": "canonical local checkout; no fork mutation",
+  "files": [
+    {
+      "path": "00_inbox/texts/2026-10-21-agent-stack-repository-intake.md",
+      "sha256": "dd819d16dc0b99193f8bef63564fe02a284ce7322498c91004956d0a588cbf8c"
+    },
+    {
+      "path": "00_inbox/texts/2026-10-21-agent-updates-research-intake.md",
+      "sha256": "d77c4994b067df34024a52681ab3c201b7f6c552e1860a5108e561cc9d48527a"
+    },
+    {
+      "path": "01_sources/registries/github-agent-building-repos.md",
+      "sha256": "63ef818381d76bc7d2a46025467a23a2d27df4bd9eb25b51c8f6cd2fbe21400d"
+    },
+    {
+      "path": "01_sources/signals/2026-10-21-agent-stack-repository-signal.md",
+      "sha256": "28a1031479c08e23098b1fc6019060803c57cb5ad476dea33804ff0d098cf75d"
+    },
+    {
+      "path": "01_sources/signals/2026-10-21-agent-updates-research-signal.md",
+      "sha256": "83425462d837a0cc9090f76769b704307b593079e1916365cc2d87fc415f540f"
+    },
+    {
+      "path": "02_briefs/2026-10-21-agent-backend-selection.md",
+      "sha256": "54b6e187b24aac53a440a1c40aac5ebffe08f08680d0b27d58ef6aa9483fe39d"
+    },
+    {
+      "path": "02_briefs/2026-10-21-agent-harness-patterns.md",
+      "sha256": "1fd45223f77a9a3f25a65690e034124e9c380fe1960ba4a849a074298bb7aa41"
+    },
+    {
+      "path": "02_briefs/2026-10-21-agent-recovery-boundaries.md",
+      "sha256": "3d59cbc87f1a4447f10404fd8b8b8d53c5fc9bf2c65bbe02bbfadacd9744294a"
+    },
+    {
+      "path": "02_briefs/2026-10-21-agent-retrieval-evaluation.md",
+      "sha256": "8e3f9a211f44fcf70e396e9390fdb80715fff5bcee06922078e4e648284c3ed7"
+    },
+    {
+      "path": "02_briefs/2026-10-21-agent-routing-voice-cache.md",
+      "sha256": "62dcb9c7330fcf439929f4f24c453a7a071c019544b1bc8e743c7bd01266d500"
+    },
+    {
+      "path": "02_briefs/2026-10-21-mcp-apps-memory-explorer.md",
+      "sha256": "b5857bc9476f44ce39cbc5b06f70ae31ae55f2c0e8ebb56176751922ffb83163"
+    },
+    {
+      "path": "03_reviews/2026-10-21-agent-building-repository-shortlist.md",
+      "sha256": "b8c881c4fafd021b48d100592360b4461ff5eacde0a098e61f13e56ac15e985c"
+    },
+    {
+      "path": "03_reviews/2026-10-21-agent-enrichment-measurements.json",
+      "sha256": "560961f2f3e2efe17d292135abeb122b86c93d2c2f3dd959555386c7d67fb9a4"
+    },
+    {
+      "path": "03_reviews/2026-10-21-agent-repository-deep-review.md",
+      "sha256": "8d3bae4564286b4a5d2c2f54649d4c779b7a6f257245c007cc55d6ff28619827"
+    },
+    {
+      "path": "03_reviews/2026-10-21-agent-repository-evidence.json",
+      "sha256": "79399525567d6cd990916e023011d6dd1a22ef546b26ad2a51de12edfdb1a436"
+    },
+    {
+      "path": "03_reviews/2026-10-21-agent-stack-repository-assessment.md",
+      "sha256": "9c0376021b717b5bf9f51b6dbcbaa0dae8e5f750523f54c778d06049788c4621"
+    },
+    {
+      "path": "03_reviews/2026-10-21-agent-updates-for-pritha-assessment.md",
+      "sha256": "ec3aa1fd4ff197d010cd80732cddffda477aa284ffd7f05a068b2042ad436947"
+    },
+    {
+      "path": "03_reviews/2026-10-21-pritha-agent-enrichment-execution-review.md",
+      "sha256": "a1ad9a8da17d2d2a3de2e2b3723e2156fea7e557f8ce12285e0bdd5aacc2cee2"
+    },
+    {
+      "path": "03_reviews/2026-10-21-pritha-retrieval-and-runtime-verification.md",
+      "sha256": "71f01d8da14c5ab9716b9c3cf209b8c09369943972233d900011be42cd2a18af"
+    },
+    {
+      "path": "03_reviews/2026-10-21-retrieval-runtime-measurements.json",
+      "sha256": "1370b2d9cba06a0c867213c425ce0e135ba374610f37d7aa0337bade0dcf9098"
+    },
+    {
+      "path": "05_decisions/2026-10-21-curated-agent-knowledge-and-retrieval.md",
+      "sha256": "bd015a7ec74fb5bd28076a72b776ac47bd0b605eb471b470eead9c29ced3c4b3"
+    },
+    {
+      "path": "05_decisions/2026-10-21-curated-retrieval-promotion.md",
+      "sha256": "cb6a475471673a950f4028dda9825966f16bcb0681ce97ff6dae284c20a2a070"
+    },
+    {
+      "path": "07_workflows/agent-failure-to-trial.md",
+      "sha256": "6c691659236aa40f28edf63e80102ae676a5dbeb08a80c359a063f16bb781183"
+    },
+    {
+      "path": "07_workflows/agent-sensor-and-eval-design.md",
+      "sha256": "576f89ed345d4330b5f19e5cff9c8c8ad8de8a1edd044814ab3fd16802279e3c"
+    },
+    {
+      "path": "07_workflows/agents-mother.md",
+      "sha256": "7e012d3ad1f420daae4326e8ac9ed9233a3e27c6c9f90b98f8b6d01d2a50f97d"
+    },
+    {
+      "path": "07_workflows/memory-indexing.md",
+      "sha256": "330b71e79b42d34a4495c601eb36f61ab1047d0e41b36484a28ac65426a87745"
+    },
+    {
+      "path": "08_templates/agent-failure-evidence.md",
+      "sha256": "f57810325a9c3ce1603602dd17fcd5f718aeeedab0ee61747fadcd710d56e7d2"
+    },
+    {
+      "path": "scripts/memory-retrieval-acceptance.py",
+      "sha256": "7afef0c3751af834db3e465dc42a49c0709f89d543c18c90d56e1e55614bc3e6"
+    },
+    {
+      "path": "scripts/memory-retrieval-eval.py",
+      "sha256": "86e969042573b7c205b8f1ddec489f24ba5854f77df39770ddee65bf604895f4"
+    },
+    {
+      "path": "scripts/memory-retrieve.py",
+      "sha256": "1a6ca2c2d6a6be9e4ee88c7d042af57c84cb8622c340ca8aa00d10bd2c4244c6"
+    },
+    {
+      "path": "scripts/pritha_memory_retrieval.py",
+      "sha256": "d72d8748f349d013a6362ef04231f1650f17098cc1511c543b59023f203816fe"
+    },
+    {
+      "path": "tests/fixtures/memory/check-curated-retrieval.py",
+      "sha256": "c6cfe701d512d3df8b38b9595b797d34c171fe654106330e144d867082c27d7d"
+    },
+    {
+      "path": "tests/fixtures/memory/retrieval-acceptance-cases.json",
+      "sha256": "b6e60c6559288cce982770c64e4065f0645a54b4a45b6b724b9fe4d2dce89118"
+    },
+    {
+      "path": "tests/fixtures/memory/retrieval-baseline.json",
+      "sha256": "19b9fd306d52a423376f9c3c1c7a0cb32b1e1b44e8fb6b08a5cd0de4bcd8dbd4"
+    },
+    {
+      "path": "tests/fixtures/memory/retrieval-cases.json",
+      "sha256": "ae86a7a8846ecf6b37e99ada07a4f2fea2e9e2201ca0f3ff3738573efd87f2f2"
+    },
+    {
+      "path": "tests/memory-curated-node-bridge.test.mjs",
+      "sha256": "8d187a2cc6ad3c003d444363326907a956473247846ecaecd02e55c6e6d1a07e"
+    },
+    {
+      "path": "tests/memory-curated-retrieval.test.mjs",
+      "sha256": "0ba9bf1f40a9d0c8df8f6cefad947e4c95553e15fdeb7c3bd81877ef307c2db1"
+    }
+  ],
+  "brief_count": 6
+}

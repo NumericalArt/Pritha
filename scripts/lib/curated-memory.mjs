@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { resolvePrithaPython } from "./python-runtime.mjs";
 
 const script = fileURLToPath(new URL("../memory-retrieve.py", import.meta.url));
 const domains = new Set(["agent-building-knowledge", "pritha-self", "governance"]);
@@ -12,7 +13,7 @@ export function searchCuratedMemory(query, { domain = "agent-building-knowledge"
     throw new Error("Invalid curated memory request");
   }
   const env = { ...process.env, TECHSCOPE_ROOT: root };
-  const output = execFileSync(process.env.PRITHA_PYTHON || "python3", [script, query, "--domain", domain, "--limit", String(limit), ...(json ? ["--json"] : [])], {
+  const output = execFileSync(resolvePrithaPython({ root, env }), [script, query, "--domain", domain, "--limit", String(limit), ...(json ? ["--json"] : [])], {
     cwd: root, env, encoding: "utf8", timeout: 15000, maxBuffer: 4 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
   });
   if (!json) return output;

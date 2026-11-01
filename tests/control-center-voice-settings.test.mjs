@@ -42,6 +42,18 @@ test("Control Center voice settings normalize behavior profile and Pritha voice"
   }
 });
 
+test("Realtime 2 is the default while an explicit Live 1 selection remains intact", async () => {
+  const loaded = await loadVoiceSettingsModule();
+  try {
+    const mod = loaded.module;
+    for (const missing of [undefined, null, "", "unsupported"]) assert.equal(mod.normalizeVoiceModel(missing), "gpt-realtime-2");
+    assert.equal(mod.normalizeVoiceModel("gpt-live-1"), "gpt-live-1");
+    assert.equal(mod.normalizeVoiceModel(undefined, "gpt-live-1"), "gpt-live-1");
+    assert.equal(mod.VOICE_MODEL_OPTIONS[0].id, "gpt-realtime-2");
+    assert.match(mod.VOICE_MODEL_OPTIONS[1].label, /Experimental/);
+  } finally { loaded.cleanup(); }
+});
+
 test("Control Center voice behavior prompt covers depth override, feminine grammar and spoken-output hygiene", async () => {
   const loaded = await loadVoiceSettingsModule();
   try {

@@ -32,6 +32,7 @@ import {
 } from "./normalize";
 import type {
   AcceptedTurn,
+  AttachmentView,
   ChatEvent,
   ChatEventRecord,
   RuntimeProviderId,
@@ -255,8 +256,13 @@ export class CodexChatGateway {
 
   async queuedMessages(chatId: string) {
     await this.requireBinding(chatId);
-    return this.store.execution.listIntents({kind:"queued-message",states:["queued","dispatching","unknown","blocked"],limit:1000})
-      .filter(row=>row.chatId===chatId).map(row=>({id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || null}));
+    const rows = this.store.execution.listIntents({kind:"queued-message",states:["queued","dispatching","unknown","blocked"],limit:1000}).filter(row=>row.chatId===chatId);
+    return Promise.all(rows.map(async row => {
+      const ids: string[] = row.input.attachments || [];
+      const files = await Promise.all(ids.map(id => this.attachments.resolve(id).then(file=>file.view).catch(()=>null)));
+      return {id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || null,
+        attachments:files.filter((file): file is AttachmentView => file !== null), attachmentsUnavailable:files.some(file=>file === null)};
+    }));
   }
 
   async enqueueMessage(chatId: string, input: StartTurnInput) {

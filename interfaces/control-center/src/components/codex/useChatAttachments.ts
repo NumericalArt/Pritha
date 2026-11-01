@@ -85,6 +85,12 @@ export function useChatAttachments(key: string) {
     values.current={...values.current,[from]:[],[to]:[...(values.current[to] || []),...files]};
     setDrafts(values.current);persist();
   },[persist]);
+  const restoreQueued = useCallback((owner: string, views: AttachmentView[]) => {
+    if ((values.current[owner] || []).length || views.length > 10 || views.some(view => !validView(view)) || new Set(views.map(view=>view.id)).size !== views.length || views.reduce((sum, view)=>sum + view.size, 0) > 250 * 1024 * 1024) return false;
+    for (const view of views) owners.current.set(view.id, owner);
+    update(owner, () => views.map(view => ({ id: view.id, file: new File([], view.name), view, localFileMissing: true, state: "ready" })));
+    return true;
+  }, [update]);
   const cancelEdit = useCallback((owner: string, id: string) => {
     edits.current.get(id)?.abort(); edits.current.delete(id);
     if (mounted.current) update(owner, files => files.map(file => file.id === id ? { ...file, edit: undefined, restoring: false } : file));
@@ -135,5 +141,5 @@ export function useChatAttachments(key: string) {
     finally { clearTimeout(timer); if (edits.current.get(id) === controller) { edits.current.delete(id); if (mounted.current) update(owner, files => files.map(file => file.id === id ? { ...file, restoring: false } : file)); } }
   }, [update]);
   const isBusy = useCallback((owner: string) => edits.current.size > 0 && (values.current[owner] || []).some(file => edits.current.has(file.id)), []);
-  return { items: drafts[key] || [], notice: editNotices[key] || notice, add, clear, move, cancelEdit, applyEdit, restoreOriginal, isBusy, remove: (id: string) => clear(key, [id]), retry: (file: DraftAttachment) => void upload(key, file) };
+  return { items: drafts[key] || [], notice: editNotices[key] || notice, add, clear, move, restoreQueued, hasItems: (owner: string) => Boolean(values.current[owner]?.length), cancelEdit, applyEdit, restoreOriginal, isBusy, remove: (id: string) => clear(key, [id]), retry: (file: DraftAttachment) => void upload(key, file) };
 }

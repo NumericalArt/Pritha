@@ -2,6 +2,7 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -36,10 +37,37 @@ function lockCanBeRecovered(lockPath, options = {}) {
   const metadata = existingLockMetadata(lockPath);
   const staleAfterMs = Number.isFinite(options.staleAfterMs) ? Math.max(0, options.staleAfterMs) : 6 * 60 * 60 * 1000;
   const createdAt = Date.parse(metadata?.created_at || "");
-  const ageMs = Number.isFinite(createdAt) ? Date.now() - createdAt : Number.POSITIVE_INFINITY;
+  // A new lock is visible between open("wx") and writing its owner metadata.
+  // Missing/partial metadata is not evidence that its owner is dead.
+  let stat;
+  try { stat = lstatSync(lockPath); } catch { return false; }
+  if (!stat.isFile() || stat.isSymbolicLink()) return false;
+  const ageMs = Date.now() - (Number.isFinite(createdAt) ? createdAt : stat.mtimeMs);
   const sameHost = !metadata?.hostname || metadata.hostname === os.hostname();
   if (sameHost && Number.isSafeInteger(metadata?.pid)) return !processIsAlive(metadata.pid);
-  return ageMs >= staleAfterMs;
+  return ageMs >= Math.max(5_000, staleAfterMs);
+}
+
+function recoverLock(lockPath, token, options) {
+  // Serialize stale-owner recovery separately. Otherwise two recoverers can
+  // both observe a dead PID and the second can rename the first's new lock.
+  const recoveryPath = `${lockPath}.recovery`;
+  let descriptor;
+  try { descriptor = openSync(recoveryPath, "wx", 0o600); }
+  catch (error) { if (error.code === "EEXIST") return false; throw error; }
+  try {
+    writeFileSync(descriptor, `${JSON.stringify({ pid: process.pid, token })}\n`);
+    fsyncSync(descriptor);
+    if (!lockCanBeRecovered(lockPath, options)) return false;
+    renameSync(lockPath, `${lockPath}.stale.${Date.now()}.${token}`);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return true;
+    throw error;
+  } finally {
+    closeSync(descriptor);
+    rmSync(recoveryPath, { force: true });
+  }
 }
 
 export function acquireFileLock(filePath, options = {}) {
@@ -64,14 +92,7 @@ export function acquireFileLock(filePath, options = {}) {
       if (descriptor !== undefined) closeSync(descriptor);
       descriptor = undefined;
       if (error?.code !== "EEXIST") throw error;
-      if (attempt === 0 && lockCanBeRecovered(lockPath, options)) {
-        try {
-          renameSync(lockPath, `${lockPath}.stale.${Date.now()}.${token}`);
-          continue;
-        } catch (renameError) {
-          if (renameError?.code === "ENOENT") continue;
-        }
-      }
+      if (attempt === 0 && recoverLock(lockPath, token, options)) continue;
       const owner = existingLockMetadata(lockPath);
       const ownerSummary = owner?.pid ? ` pid=${owner.pid}` : "";
       throw new Error(`File is locked by another operation:${ownerSummary} ${filePath}`);

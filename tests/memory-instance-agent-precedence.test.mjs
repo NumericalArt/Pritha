@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -9,6 +9,34 @@ const rebuildScript = path.resolve("scripts/rebuild-memory.mjs");
 const queryScript = path.resolve("scripts/query-memory.mjs");
 const validateScript = path.resolve("scripts/validate-memory.mjs");
 const schema = readFileSync(path.resolve(".memory/schema.sql"), "utf8");
+
+test("memory never ingests build checkouts, dependencies or symlinks inside instance agents", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "pritha-memory-authored-boundary-"));
+  const codeRoot = path.join(base, "code"), stateRoot = path.join(base, "state");
+  try {
+    write(path.join(codeRoot, ".memory/schema.sql"), schema);
+    const document = id => `---\nid: ${id}\ntype: note\nstatus: accepted\n---\n\n# ${id}\n`;
+    write(path.join(codeRoot, "03_reviews/platform.md"), document("platform"));
+    write(path.join(stateRoot, "agents/contracts/agent.md"), document("agent-contract"));
+    // A build copy would collide with platform IDs; malformed fixtures would fail validation.
+    write(path.join(stateRoot, "agents/worktrees/build/03_reviews/platform.md"), document("platform"));
+    write(path.join(stateRoot, "agents/worktrees/build/tests/invalid.md"), "not authored memory");
+    write(path.join(stateRoot, "agents/reports/node_modules/library/README.md"), "not authored memory");
+    write(path.join(stateRoot, "agents/reports/nested-checkout/.git"), "gitdir: fixture");
+    write(path.join(stateRoot, "agents/reports/nested-checkout/doc.md"), document("checkout-copy"));
+    write(path.join(base, "outside/secret.md"), document("SYNTHETIC_PRIVATE_OUTSIDE"));
+    symlinkSync(path.join(base, "outside"), path.join(stateRoot, "agents/reports/link"));
+    symlinkSync(path.join(base, "outside/secret.md"), path.join(stateRoot, "agents/contracts/linked.md"));
+    const env = { ...process.env, TECHSCOPE_ROOT: codeRoot, PRITHA_STATE_ROOT: stateRoot };
+    for (const script of [validateScript, rebuildScript]) {
+      const result = run(process.execPath, [script], { env });
+      assert.equal(result.status, 0, result.stderr);
+    }
+    const query = run("sqlite3", [path.join(stateRoot, "memory/techscope.sqlite"), "SELECT id FROM documents ORDER BY id;"]);
+    assert.equal(query.status, 0, query.stderr);
+    assert.deepEqual(query.stdout.trim().split("\n"), ["agent-contract", "platform"]);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
 
 function write(filePath, content) {
   mkdirSync(path.dirname(filePath), { recursive: true });
