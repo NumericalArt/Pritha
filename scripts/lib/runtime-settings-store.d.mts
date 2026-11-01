@@ -1,7 +1,7 @@
-import type { ProviderSettings, ProviderPreset, ProviderConnectorId, VoiceEngine } from "./provider-profile.mjs";
+import type { ProviderSettings, ProviderPresetPatch, ProviderConnectorId, VoiceEngine } from "./provider-profile.mjs";
 export type RuntimeSettingsDocument = Record<string, unknown>;
 export type ProviderSettingsSnapshot = ProviderSettings & { revision: number; voiceEngine: VoiceEngine };
-export type ProviderSettingsPatch = { expectedRevision: number; activeConnectorId?: ProviderConnectorId; connectorId?: ProviderConnectorId; preset?: Partial<ProviderPreset>; voiceEngine?: VoiceEngine };
+export type ProviderSettingsPatch = { expectedRevision: number; activeConnectorId?: ProviderConnectorId; connectorId?: ProviderConnectorId; preset?: ProviderPresetPatch; voiceEngine?: VoiceEngine };
 export class RuntimeSettingsStore {
   constructor(file: string, options?: { allowedRoot?: string });
   read(): RuntimeSettingsDocument;

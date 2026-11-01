@@ -16,6 +16,7 @@ for (const width of [1280, 390]) {
     const keys = ["codexTimeoutMs", "codexPromptTokenBudget", "codexMaxPlanSteps", "codexAppThreadMaxTurns", "codexAppThreadMaxAgeHours", "deepTaskPrimaryTransport"];
     try {
       await page.goto("/settings");
+      await page.locator('[role="tab"]:visible').filter({hasText:/^Codex/}).click();
       const input = (label: string) => page.locator(`input[aria-label="${label}"]:visible`);
       const save = page.locator('button:visible', { hasText: "Save Codex Runtime" });
       const timeout = input("Codex task timeout seconds");

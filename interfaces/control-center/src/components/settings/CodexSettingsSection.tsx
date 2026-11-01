@@ -65,7 +65,7 @@ const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   updatedAt: "",
 };
 
-export function CodexSettingsSection() {
+export function CodexSettingsSection({onSaved}:{onSaved?:()=>void}={}) {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const [modelCatalog, setModelCatalog] = useState<CodexModelCatalog>(() => fallbackCodexModelCatalog(new Date(0)));
   const [runtimeSettingsLoaded, setRuntimeSettingsLoaded] = useState(false);
@@ -161,6 +161,7 @@ export function CodexSettingsSection() {
     setNumberDrafts(runtimeNumberDrafts(nextSettings, timeoutUnit));
     setTransportStatus(payload.transports || {});
     setRuntimeStatus("Codex runtime settings saved");
+    onSaved?.();
     setSelectionNotice("");
   }
 

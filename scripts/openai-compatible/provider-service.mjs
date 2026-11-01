@@ -25,7 +25,11 @@ export class CompatibleProviderService {
   async snapshot(input){
     let preset,key='';
     try{
-      preset=normalizeProviderPreset(this.connectorId,input);
+      // Task bindings add a host sandbox policy to the saved preset. Validate
+      // that boundary separately; it is not an upstream model setting.
+      const {sandbox,...configuration}=input || {};
+      if(sandbox!==undefined && !['read-only','workspace-write'].includes(sandbox))throw new Error('provider_sandbox_invalid');
+      preset=normalizeProviderPreset(this.connectorId,configuration);
       if(this.connectorId==='openrouter'){key=(this.options.readCredential || readProviderCredential)('openrouter',{stateRoot:this.options.stateRoot,env:this.options.env || process.env});if(!key)return result('openrouter','not-configured','provider_pending_auth');}
     }catch{return result(this.connectorId,'configured','provider_metadata_invalid');}
     const identity=createHash('sha256').update(JSON.stringify([preset,key])).digest('hex'),saved=this.cache.get(identity);

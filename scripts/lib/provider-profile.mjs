@@ -56,6 +56,7 @@ export function normalizeProviderPreset(connectorId, value, fallback = defaultPr
   const allowed = new Set(["modelId", "reasoningEffort", "thinkingBudget", "timeoutMs", "baseUrl", "authMode"]);
   if (Object.keys(value).some(key => !allowed.has(key))) invalid("provider_preset_field_invalid");
   const preset = { ...fallback, ...value };
+  for (const key of ['thinkingBudget','baseUrl','authMode']) if (preset[key] === null) delete preset[key];
   if (typeof preset.modelId !== "string" || (preset.modelId !== "" && !/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(preset.modelId))) invalid("provider_model_invalid");
   if (!EFFORTS.has(preset.reasoningEffort) && !(preset.reasoningEffort === 'default' && ['openrouter','local'].includes(connectorId))) invalid("provider_effort_invalid");
   if (!Number.isSafeInteger(preset.timeoutMs) || preset.timeoutMs < 10_000 || preset.timeoutMs > 3_600_000) invalid("provider_timeout_invalid");

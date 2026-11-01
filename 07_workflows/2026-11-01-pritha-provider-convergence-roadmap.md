@@ -388,13 +388,13 @@ wrong-project rejection. Live providers readiness только по реальн
 
 ### R8 — Единый пульт Settings и быстрый выбор в Task Chat
 
-**Статус: pending.** Зависимости R2–R7.
+**Статус: in-progress; единый Settings проверен, new-chat selector и factory phase controls впереди.** Зависимости R2–R7.
 
-- [ ] ProviderConnectorBar ровно из пяти компактных pills: label/status/model.
-- [ ] Один выбранный settings panel: native CodexAuth/CodexSettings, ND keys/
+- [x] ProviderConnectorBar ровно из пяти компактных pills: label/status/model.
+- [x] Один выбранный settings panel: native CodexAuth/CodexSettings, ND keys/
   limits/wallet, Claude CLI/auth/model/effort, OpenRouter key/balance/model,
   Local endpoint/discovered models. Preserve native transport/routing/tier.
-- [ ] Per-provider presets не сбрасываются при переключении, stale save не
+- [x] Per-provider presets не сбрасываются при переключении, stale save не
   перетирает другой panel. Keys не входят в presets/client state persistence.
 - [ ] New-chat provider/model selector only `ready`; ссылка Configure providers.
   Existing thread показывает pinned provider; active task не меняется.
@@ -1070,6 +1070,33 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   Настоящие credentials, OAuth и платная inference не использовались.
 - R7 child provisioning/Local execution, R8 UI, остальные незавершённые этапы
   и R12 остаются в работе. Runtime на Mac mini, MacBook и GitHub не изменялись.
+
+### Checkpoint реализации 11 — Один Settings для пяти провайдеров
+
+- Добавлены ровно пять компактных вкладок со status/model и один открытый
+  provider panel. Native Auth/Settings, transport/routing/tier сохранены;
+  OpenAI Voice keys находятся в Voice. ND показывает billing/parallel/wallet,
+  Claude — auth lane/model/effort, OpenRouter — catalog/shortlist/budget,
+  Local — discovery/explicit endpoint и непроверенную offline isolation.
+- Вкладка не переключает действующие чаты. `Use for new chats` доступна только
+  после сохранения preset и ready probe. Drafts разных provider panels сохраняются
+  при переключении; stale revision даёт конфликт и явную перезагрузку saved
+  presets. Поздняя initial загрузка не отменяет уже сделанный выбор вкладки.
+- Password input очищается при отправке и смене вкладки. Ключ не входит в
+  presets, local/session storage или ответ API. Optional thinking budget/endpoint
+  можно явно очистить через null patch без сброса остальных настроек. Пустое
+  числовое поле сохраняется как draft до проверки на Save.
+- Общий bounded JSON reader ограничивает и credentials, и settings POST: 16 KiB,
+  5 секунд, strict UTF-8/JSON. Сбой probe одного provider не скрывает остальных.
+  Исправлена интеграционная граница compatible service: сохранённый host sandbox
+  проверяется отдельно от model preset, а произвольные поля остаются запрещёнными.
+- Проверки: **36/36** composed/unit tests; **7/7** Chromium E2E без skipped/flaky,
+  real isolated settings API и browser fixtures без сохранения настоящих ключей.
+  Next candidate build/typecheck pass. Desktop 1440px и mobile 390px визуально
+  просмотрены; keyboard End/roving focus и отсутствие page overflow проверены.
+  Native numeric/transport regressions проходят также на 1280/390px.
+- R8 new-chat provider/model selection и factory phase controls, R7 Local/child,
+  голос, bootstrap/rebranding и финальная staged/manual приёмка ещё не завершены.
 
 ## 7. Полные исходные материалы
 

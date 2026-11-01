@@ -70,6 +70,11 @@ test("missing and failed providers never dispatch through an available native pr
   assert.equal(health.length,5);assert.equal(health.find(row=>row.connectorId==="neuraldeep").status,"unavailable");
   assert.throws(()=>new CodexChatGateway([native,native]),{code:"provider_registry_invalid"});
 });
+test('an unavailable provider probe cannot hide the health of its siblings',async()=>{
+  const native=driver('codex'),external=driver('openrouter');external.getRuntimeHealth=async()=>{throw new Error('PRIVATE_PROVIDER_ERROR');};
+  const gateway=new CodexChatGateway([native,external],()=> 'codex'),health=await gateway.providerHealth();
+  assert.equal(health.find(row=>row.connectorId==='codex').status,'ready');assert.equal(health.find(row=>row.connectorId==='openrouter').status,'unavailable');assert.doesNotMatch(JSON.stringify(health),/PRIVATE_PROVIDER_ERROR/);
+});
 
 test("merged pagination returns every provider thread once without putting previews in cursors", async () => {
   const drivers=["codex","claude"].map((connectorId,index)=>({

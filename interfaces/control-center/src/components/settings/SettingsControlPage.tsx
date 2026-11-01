@@ -27,8 +27,7 @@ import { selectTheme, type ControlCenterTheme } from "@/lib/theme";
 import { useControlCenterTheme } from "@/components/shell/ThemeSync";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { CodexAuthSection } from "@/components/settings/CodexAuthSection";
-import { CodexSettingsSection } from "@/components/settings/CodexSettingsSection";
+import { ProviderSettingsSection } from "@/components/settings/ProviderSettingsSection";
 import { LimitsSettingsSection } from "@/components/settings/LimitsSettingsSection";
 import { MusicSettingsSection } from "@/components/settings/MusicSettingsSection";
 import { OpenAIKeysSection } from "@/components/settings/OpenAIKeysSection";
@@ -143,7 +142,7 @@ type SettingsSectionId = "general" | "access" | "codex" | "voice" | "music" | "l
 const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: "general", label: "General" },
   { id: "access", label: "Access" },
-  { id: "codex", label: "Codex" },
+  { id: "codex", label: "Providers" },
   { id: "voice", label: "Voice" },
   { id: "music", label: "Music" },
   { id: "limits", label: "Limits" },
@@ -1041,8 +1040,6 @@ function SettingsContent({ prefix, access, status }: AccessProps & { prefix: str
       <SettingsTabs activeSection={activeSection} onSelect={scrollToSection} controlsPrefix={prefix} />
       <SettingsAnchorSection prefix={prefix} section="general">
         <LanguageSection id={`${prefix}-language`} />
-        <OpenAIKeysSection />
-        <CodexAuthSection />
         <AppearanceSection />
         <DataStorageSection status={status} />
       </SettingsAnchorSection>
@@ -1050,9 +1047,10 @@ function SettingsContent({ prefix, access, status }: AccessProps & { prefix: str
         <AccessSection access={access} />
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="codex">
-        <CodexSettingsSection />
+        <ProviderSettingsSection id={`${prefix}-providers`} />
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="voice">
+        <OpenAIKeysSection />
         <VoiceSettingsSection />
       </SettingsAnchorSection>
       <SettingsAnchorSection prefix={prefix} section="music">

@@ -3,7 +3,7 @@ const credentials=new Set(['neuraldeep','claude','openrouter']);
 const valid=new Set(['codex','neuraldeep','claude','openrouter','local']);
 const reply=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
 const failure=(code,status=400)=>Object.assign(new Error('Review this provider in Settings and try again.'),{code,status});
-async function input(request){
+export async function readProviderSettingsInput(request){
   if(!/^application\/json(?:;|$)/i.test(request.headers.get('content-type') || ''))throw failure('provider_content_type_invalid',415);
   if(Number(request.headers.get('content-length') || 0)>16384)throw failure('provider_input_too_large',413);
   const reader=request.body?.getReader();if(!reader)throw failure('provider_input_invalid');
@@ -11,7 +11,7 @@ async function input(request){
   try{
     for(;;){const {done,value}=await Promise.race([reader.read(),timeout]);if(done)break;size+=value.length;if(size>16384){await reader.cancel();throw failure('provider_input_too_large',413);}chunks.push(Buffer.from(value));}
     let value;try{value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks,size)));}catch{throw failure('provider_input_invalid');}
-    if(!value || typeof value!=='object' || Array.isArray(value) || Object.keys(value).some(key=>!['value','confirmation'].includes(key)))throw failure('provider_input_invalid');return value;
+    if(!value || typeof value!=='object' || Array.isArray(value))throw failure('provider_input_invalid');return value;
   }finally{clearTimeout(timer);reader.releaseLock();}
 }
 /** Shared route contract. Credential values go only to the instance Keychain;
@@ -23,7 +23,8 @@ export async function providerSettingsRequest(request,connectorId,{stateRoot,sna
     const options={stateRoot,env};
     if(request.method==='POST'){
       if(!credentials.has(connectorId))throw failure('provider_credentials_not_applicable');
-      const body=await input(request);
+      const body=await readProviderSettingsInput(request);
+      if(Object.keys(body).some(key=>!['value','confirmation'].includes(key)))throw failure('provider_input_invalid');
       if(body.confirmation!=='save-'+connectorId+'-key' || typeof body.value!=='string')throw failure('provider_confirmation_required');
       await save(connectorId,body.value,options);
       stored=true;

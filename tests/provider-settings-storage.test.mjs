@@ -12,6 +12,12 @@ function fixture(t) {
   const file = path.join(root, "private", "runtime-settings.json");
   return { root, file, store: new RuntimeSettingsStore(file, { allowedRoot: root }) };
 }
+test('optional provider controls can be cleared without resetting other fields or another provider',t=>{
+  const {store}=fixture(t);let value=updateStoredProviderSettings(store,{expectedRevision:0,connectorId:'local',preset:{baseUrl:'http://127.0.0.1:1234',modelId:'fixture',thinkingBudget:2048}});
+  const before=value.providerPresets.openrouter;
+  value=updateStoredProviderSettings(store,{expectedRevision:value.revision,connectorId:'local',preset:{baseUrl:null,thinkingBudget:null}});
+  assert.equal(value.providerPresets.local.baseUrl,undefined);assert.equal(value.providerPresets.local.thinkingBudget,undefined);assert.equal(value.providerPresets.local.modelId,'fixture');assert.deepEqual(value.providerPresets.openrouter,before);
+});
 test("saved native settings migrate lazily and all provider presets survive legacy writes", t => {
   const {file,store} = fixture(t);
   const legacy = { codexModel:"native-pinned", codexReasoningEffort:"high", codexTimeoutMs:45000, codexServiceTier:"fast", voiceModel:"gpt-live-1" };

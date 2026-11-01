@@ -23,6 +23,9 @@ test('OpenRouter uses bounded read-only /key and /models probes, fixed attributi
   const [a,b]=await Promise.all([service.snapshot(preset),service.snapshot(preset)]);assert.equal(a.status,'ready');assert.equal(b.status,'ready');assert.equal(seen.length,2);assert.equal(a.capabilities.tools,true);assert.equal(a.capabilities.offline,false);
   assert.deepEqual(seen.map(row=>row.url).sort(),['https://openrouter.ai/api/v1/key','https://openrouter.ai/api/v1/models']);assert.doesNotMatch(JSON.stringify(a),/PRIVATE_KEY_CANARY/);
   await service.snapshot(preset);assert.equal(seen.length,2);
+  assert.equal((await service.require({...preset,sandbox:'workspace-write'})).status,'ready');assert.equal(seen.length,2);
+  assert.notEqual((await service.snapshot({...preset,sandbox:'danger-full-access'})).status,'ready');
+  assert.notEqual((await service.snapshot({...preset,unexpected:'PRIVATE_CANARY'})).status,'ready');
 });
 
 test('model, effort, protocol, tools, auth, budget and CLI failures never authorize dispatch or substitute a model',async()=>{

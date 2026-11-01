@@ -59,7 +59,7 @@ export class CodexChatGateway {
   async providerHealth(): Promise<TaskProviderHealth[]> {
     return Promise.all(PROVIDER_CONNECTOR_IDS.map(async connectorId => {
       const driver = this.drivers.get(connectorId);
-      if (driver) return driver.getRuntimeHealth();
+      if (driver) try {return await driver.getRuntimeHealth();} catch { /* A failed provider must not hide healthy siblings. */ }
       return { connectorId, status: "unavailable", version: null, checkedAt: new Date().toISOString(), error: { code: "provider_runtime_unavailable", message: "This provider runtime is not connected." }, capabilities: { steer: false, interrupt: false, approvals: false, tools: false, attachments: { files: false, images: false }, usage: "unavailable", resume: false, sandbox: "unavailable", offline: false } };
     }));
   }

@@ -1,6 +1,7 @@
 export type ProviderConnectorId = "codex" | "neuraldeep" | "claude" | "openrouter" | "local";
 export type VoiceEngine = "auto" | "openai" | "neuraldeep";
 export type ProviderPreset = { modelId: string; reasoningEffort: string; timeoutMs: number; thinkingBudget?: number; baseUrl?: string; authMode?: "api-key" | "local-cli-session" };
+export type ProviderPresetPatch = Omit<Partial<ProviderPreset>,"thinkingBudget"|"baseUrl"|"authMode"> & {thinkingBudget?:number|null;baseUrl?:string|null;authMode?:ProviderPreset['authMode']|null};
 export type ProviderSettings = { version: 1; activeConnectorId: ProviderConnectorId; providerPresets: Record<ProviderConnectorId, ProviderPreset> };
 export type ProviderBinding = { connectorId: ProviderConnectorId; modelId: string; sessionId: string };
 export const PROVIDER_CONNECTOR_IDS: readonly ProviderConnectorId[];
@@ -15,7 +16,7 @@ export function defaultProviderPreset(connectorId: ProviderConnectorId): Provide
 export function normalizeLocalProviderUrl(value: unknown): string;
 export function normalizeProviderPreset(connectorId: ProviderConnectorId, value: unknown, fallback?: ProviderPreset): ProviderPreset;
 export function normalizeProviderSettings(value?: unknown, options?: {legacy?: {codexModel?: string; codexReasoningEffort?: string; codexTimeoutMs?: number}; defaultConnector?: ProviderConnectorId}): ProviderSettings;
-export function updateProviderPreset(settings: ProviderSettings, connectorId: ProviderConnectorId, patch: Partial<ProviderPreset>): ProviderSettings;
+export function updateProviderPreset(settings: ProviderSettings, connectorId: ProviderConnectorId, patch: ProviderPresetPatch): ProviderSettings;
 export function readyProviderConnectors(statuses: Partial<Record<ProviderConnectorId, {status: string}>>): ProviderConnectorId[];
 export function assertProviderBinding(binding: unknown, requested: {connectorId: ProviderConnectorId; modelId?: string; sessionId?: string}): ProviderBinding;
 export function resolveVoiceEngine(options: {connectorId: ProviderConnectorId; engine?: VoiceEngine; configured?: {openai?: boolean; neuraldeep?: boolean}; offline?: boolean; preferredEngine?: "openai" | "neuraldeep"}): {engine: "openai" | "neuraldeep" | null; reason: "offline" | "configured" | "pending-auth"};

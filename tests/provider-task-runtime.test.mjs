@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ProviderTaskRuntime } from '../scripts/lib/provider-task-runtime.mjs';
 import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
+import { CompatibleProviderService } from '../scripts/openai-compatible/provider-service.mjs';
 
 const session='11111111-2222-4333-8444-555555555555',identity='a'.repeat(64);
 const message=(id,text=id)=>({clientMessageId:id,input:[{type:'text',text}]});
@@ -32,6 +33,17 @@ function fixture(t,options={}){
   t.after(async()=>{for(const runtime of instances)await runtime.dispose();rmSync(directory,{recursive:true,force:true});});
   return {make,runs,settings,stateRoot};
 }
+
+test('compatible metadata preflight accepts the real host execution binding and preserves its model and sandbox',async t=>{
+  const f=fixture(t);Object.assign(f.settings,{modelId:'vendor/model',reasoningEffort:'default'});
+  const service=new CompatibleProviderService({connectorId:'openrouter',root:'/fixture',stateRoot:f.stateRoot,readCredential:()=> 'SYNTHETIC_KEY',probeCli:async()=>({available:true,version:'0.153.0'}),probeSandbox:()=>true,
+    fetchImpl:async url=>Response.json(url.endsWith('/key')?{data:{is_free_tier:false}}:{data:[{id:'vendor/model',supported_parameters:['tools'],context_length:32768,top_provider:{max_completion_tokens:4096}}]})});
+  const runtime=f.make('openrouter',{preflight:async binding=>(await service.require(binding.executionConfig)).capabilities,beforeRequest:binding=>service.require(binding.executionConfig)});
+  const binding=(await runtime.create(create('openrouter_contract_1'))).binding;
+  assert.equal(binding.executionConfig.sandbox,'read-only');assert.equal(binding.modelId,'vendor/model');
+  await runtime.start(binding.chatId,message('openrouter_message_1'));await until(()=>f.runs.length===1);
+  await f.runs[0].input.beforeRequest();assert.equal(f.runs[0].input.effort,'default');assert.equal(f.runs[0].input.maxOutputTokens,4096);assert(f.runs[0].input.hostExecutionContext);
+});
 
 test('external turns retain exact creation/model/session and replay the accepted receipt across workers',async t=>{
   const f=fixture(t),a=f.make(),b=f.make();

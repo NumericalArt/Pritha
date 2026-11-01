@@ -7383,3 +7383,28 @@ button:active,
 .codex-task-controls:empty { display: none; }
 .codex-goal-panel.codex-goal-warning { border-color: #b9944b; }
 .codex-goal-warning > summary { color: #dfbb70; }
+
+/* Each connector keeps a preset while sharing the existing Settings theme. */
+.provider-connector-bar { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:20px 0 16px; }
+.provider-connector-pill { min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding:12px 10px; border:1px solid var(--border-soft); border-radius:14px; color:var(--text-secondary); background:var(--surface-control); text-align:left; cursor:pointer; }
+.provider-connector-pill.active { color:var(--text-primary); background:var(--surface-selected); border-color:var(--border-strong); }
+.provider-connector-pill:focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+.provider-connector-pill strong { font-size:13px; }
+.provider-connector-pill small { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-muted); font-size:11px; }
+.provider-status-dot { display:flex; align-items:center; gap:5px; font-size:10px; }
+.provider-status-dot::before { content:""; width:6px; height:6px; flex:0 0 6px; border-radius:50%; background:currentColor; opacity:.5; }
+.provider-status-dot.ready::before { background:var(--accent-green); opacity:1; }
+.provider-preset-fields { padding:0; margin:0; border:0; min-width:0; }
+.provider-input-row input { min-width:0; width:min(100%,300px); padding:10px 12px; border-radius:10px; border:1px solid var(--border-soft); color:var(--text-primary); background:var(--surface-input); font:inherit; }
+.provider-discovery,.provider-shortlist,.provider-account { display:flex; gap:8px 14px; flex-wrap:wrap; margin:12px 0; }
+.provider-shortlist button,.provider-discovery button { min-width:0; max-width:100%; overflow-wrap:anywhere; white-space:normal; font-size:12px; }
+.provider-account { padding-top:16px; font-size:13px; color:var(--text-secondary); }
+.provider-settings [role=status] { min-height:1.4em; font-size:13px; overflow-wrap:anywhere; }
+.provider-settings .settings-secret-form [role=status] { grid-column:1/-1; }
+.provider-settings .info-note { overflow-wrap:anywhere; }
+@media(max-width:700px) {
+  .provider-connector-bar { display:flex; overflow-x:auto; padding:4px 2px 10px; scroll-snap-type:x proximity; }
+  .provider-connector-pill { min-width:116px; flex:0 0 116px; scroll-snap-align:start; }
+  .provider-input-row input { width:100%; }
+  .provider-settings .settings-action-row { flex-wrap:wrap; }
+}
