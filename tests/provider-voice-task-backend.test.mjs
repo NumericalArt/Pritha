@@ -84,6 +84,18 @@ test('queued cancellation uses canonical CAS and never interrupts its active pre
   f.runs[0].resolve({ ok: true, processTreeExited: true }); await until(() => f.runtime.active.size === 0);
   assert.equal(f.runs.length, 1);
 });
+test('voice readback retains the bounded authored answer beyond the last page of tool activity', async t => {
+  const f=fixture(t),body=request('Long transcript');f.reserve('task-one',body);
+  const started=await f.bridge.dispatch('task-one',body);await until(()=>f.runs.length===1);
+  const chat=started.topic.chatId,turn=started.task.turnId;
+  f.runtime.registry.putItem(chat,turn,{id:'answer_one',kind:'assistant_message',status:'completed',startedAt:null,completedAt:null,message:{id:'answer_one',role:'assistant',markdown:'final '.repeat(4000),status:'completed',createdAt:new Date().toISOString()}});
+  for(let i=0;i<25;i++)f.runtime.registry.putItem(chat,turn,{id:'tool_'+i,kind:'tool',status:'completed',startedAt:null,completedAt:null,toolName:'fixture',displayName:'Fixture',summary:'Fixture activity'});
+  f.runtime.registry.putItem(chat,turn,{id:'commentary_one',kind:'assistant_message',status:'completed',startedAt:null,completedAt:null,message:{id:'commentary_one',role:'assistant',phase:'commentary',markdown:'Do not speak this activity as the result.',status:'completed',createdAt:new Date().toISOString()}});
+  const receipt=f.runtime.voiceReceipt(chat,started.task.clientMessageId);
+  assert.equal(receipt.turn.items.some(item=>item.id==='answer_one'),false);
+  assert.equal(receipt.resultText,'final '.repeat(4000).slice(0,16000));assert.equal(receipt.resultTruncated,true);
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+});
 test('an ordinary HTTP-style creation cannot inject voice origin or replace a pinned topic', async t => {
   const f = fixture(t), body = request('Voice'); const r = f.reserve('task-one', body);
   const plain = await f.runtime.create({ clientThreadId: 'plain_fake_voice_1', source: 'chat', hostVoice: { topicId: r.topic.topicId, generation: 1 } });
@@ -126,4 +138,22 @@ test('a lost operator acknowledgement replays the exact saved broker answer with
   await assert.rejects(f.bridge.answer('task-one', { ...context, revision: context.revision + 1 }), { code: 'voice_question_changed' });
   await assert.rejects(f.bridge.answer('task-one', { ...context, response: { answers: { choice_001: ['Fixture B'] } } }), { code: 'native_request_changed' });
   f.runs[0].resolve({ ok: true, processTreeExited: true }); await until(() => f.runtime.active.size === 0);
+});
+test('two new tasks racing on the same topic create one chat despite different task titles', async t => {
+  const f = fixture(t), a = request('First concurrent task'), b = { ...request('Second concurrent task'), chat: { title: 'A different task label', workspace: { mode: 'read-only' } } };
+  f.reserve('task-one', a); f.reserve('task-two', b);
+  const [first, second] = await Promise.all([f.bridge.dispatch('task-one', a), f.bridge.dispatch('task-two', b)]);
+  assert.equal(first.topic.chatId, second.topic.chatId);
+  assert.equal(f.runtime.registry.list({ group: 'all' }).data.length, 1);
+  assert.deepEqual([first.task.state, second.task.state].sort(), ['accepted', 'queued']);
+  await until(() => f.runs.length === 1);
+  f.runs[0].resolve({ ok: true, processTreeExited: true }); await until(() => f.runs.length === 2);
+  f.runs[1].resolve({ ok: true, processTreeExited: true }); await until(() => f.runtime.active.size === 0);
+});
+test('voice creation cannot substitute a workspace or elevate the configured read-only policy', async t => {
+  const f = fixture(t), body = request('Read only'), saved = f.reserve('task-one', body);
+  const backend = providerVoiceTaskBackend(f.runtime);
+  await assert.rejects(backend.create(saved.topic, { ...body, chat: { workspace: { mode: 'isolated' } } }), { code: 'voice_topic_workspace_mismatch' });
+  await assert.rejects(backend.create({ ...saved.topic, workspace: { mode: 'isolated' } }, { ...body, chat: { workspace: { mode: 'isolated' } } }), { code: 'voice_workspace_write_unavailable' });
+  assert.equal(f.runtime.registry.list({ group: 'all' }).data.length, 0); assert.equal(f.runs.length, 0);
 });

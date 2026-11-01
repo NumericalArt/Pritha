@@ -66,6 +66,7 @@ export class ProviderTaskRuntime {
       const raced=this.registry.findByClient(input.clientThreadId);
       if(raced){if(raced.createHash!==hash(request))throw failure('idempotency_conflict');return {binding:raced,replayed:true};}
       const current=this.options.configuration(),config=voicePreset?{...voicePreset,sandbox:current.sandbox}:current;
+      if(voice && input.workspace?.mode==='isolated' && config.sandbox!=='workspace-write')throw failure('voice_workspace_write_unavailable');
       const modelId=input.settings?.modelId || config.modelId;
       const sandbox=input.workspace?.mode==='read-only' ? 'read-only' : config.sandbox || 'read-only';
       if(!['read-only','workspace-write'].includes(sandbox))throw failure('provider_sandbox_invalid','This provider requires a bounded workspace sandbox.');
@@ -88,7 +89,17 @@ export class ProviderTaskRuntime {
     if(receipt?.kind==='message'){
       const turn=this.registry.turn(chat,receipt.value.turnId);
       if(!turn || turn.clientMessageId!==clientMessageId)throw failure('history_receipt_incomplete');
-      return {...common,kind:'turn',turnId:turn.turnId,turn:providerTurnView(turn)};
+      // Voice reads authored answers, not the last page of tool activity. A
+      // long transcript can otherwise hide the final answer from its receipt.
+      let resultText='',resultTruncated=false;
+      try{resultText=this.registry.history.originalAssistantText(chat,turn.turnId,128000);}
+      catch(error){
+        if(error?.code!=='creation_context_too_large')throw error;
+        resultText=this.registry.history.turn(chat,turn.turnId,{compact:true})?.items[0]?.message?.markdown || '';
+        resultTruncated=true;
+      }
+      resultTruncated ||= resultText.length>16000;
+      return {...common,kind:'turn',turnId:turn.turnId,turn:providerTurnView(turn),resultText:resultText.slice(0,16000),resultTruncated};
     }
     const queued=this.execution.getIntent(queueKey(chat,clientMessageId));
     if(!queued)return null;

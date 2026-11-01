@@ -133,7 +133,7 @@
   ],
   "sourceVersion": "0.2.0",
   "verified": "2026-11-01",
-  "phase": "R9 audio transport, persistent topic bindings and canonical backend bridge; public voice task routing and manual acceptance pending",
+  "phase": "R9 audio transport, persistent topics, canonical backend bridge and public task routing in the canonical workspace; child workspace, file intake, session context and manual acceptance pending",
   "referenceAdaptations": [
     {
       "source": "interfaces/control-center/src/lib/codex-chat/voice-topic-store.ts",

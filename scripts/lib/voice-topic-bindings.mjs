@@ -25,6 +25,11 @@ function presetOf(connectorId, value) {
   if (!preset.modelId) fail('voice_topic_model_missing');
   return preset;
 }
+function workspaceOf(value = { mode: 'read-only' }) {
+  if (!value || !['read-only', 'isolated'].includes(value.mode) || Object.keys(value).some(key => !['mode', 'baseRevision'].includes(key))
+      || value.baseRevision !== undefined && (typeof value.baseRevision !== 'string' || !/^[a-f0-9]{40,64}$/.test(value.baseRevision))) fail('voice_topic_workspace_invalid');
+  return { mode: value.mode, ...(value.baseRevision ? { baseRevision: value.baseRevision } : {}) };
+}
 
 /** Persistent identity only. Admission, FIFO, process proof and history belong to
  * the canonical Task Chat runtime. No task is replayed by opening this store.
@@ -69,6 +74,8 @@ export class VoiceTopicBindings {
     if (topic.stateIdentity !== this.stateIdentity || !generation(topic.scope.generation)
         || topic.topicId !== this.topicId(scope, topic.scope.generation)) fail('voice_binding_instance_mismatch');
     presetOf(topic.connectorId, topic.preset);
+    if (!topic.workspace) fail('voice_binding_workspace_missing');
+    workspaceOf(topic.workspace);
     return topic;
   }
   latest(scope) {
@@ -87,12 +94,12 @@ export class VoiceTopicBindings {
    * another model for the same topic requires reset. Explicit continuation uses
    * its exact topic, even after the global default changes.
    */
-  reserve({ taskId, scope, connectorId, preset, requestHash, reset = false, continueTopicId, expectedGeneration }) {
+  reserve({ taskId, scope, connectorId, preset, workspace, requestHash, reset = false, continueTopicId, expectedGeneration }) {
     if (!id(taskId) || typeof requestHash !== 'string' || !/^[a-f0-9]{64}$/.test(requestHash)) fail('voice_task_identity_invalid');
-    scope = scopeOf(scope); preset = presetOf(connectorId, preset);
+    scope = scopeOf(scope); preset = presetOf(connectorId, preset); workspace = workspaceOf(workspace);
     if (typeof reset !== 'boolean' || expectedGeneration !== undefined && (!generation(expectedGeneration) || !continueTopicId)) fail('voice_topic_generation_invalid');
     if (continueTopicId && (reset || expectedGeneration === undefined)) fail('voice_topic_generation_required');
-    const reservationHash = digest({ scope, connectorId, preset, requestHash, reset, continueTopicId, expectedGeneration });
+    const reservationHash = digest({ scope, connectorId, preset, workspace, requestHash, reset, continueTopicId, expectedGeneration });
     return this.coordinator.transaction(() => {
       const prior = this.task(taskId);
       if (prior) {
@@ -102,12 +109,13 @@ export class VoiceTopicBindings {
       let topic = continueTopicId ? this.topic(continueTopicId) : this.latest(scope);
       if (continueTopicId && (!topic || topic.scope.kind !== scope.kind || topic.scope.id !== scope.id
           || topic.scope.generation !== expectedGeneration)) fail('voice_topic_generation_conflict');
-      if (!continueTopicId && (reset || topic?.connectorId !== connectorId)) {
+      if (continueTopicId && digest(topic.workspace) !== digest(workspace)) fail('voice_topic_workspace_mismatch');
+      if (!continueTopicId && (reset || topic?.connectorId !== connectorId || digest(topic.workspace) !== digest(workspace))) {
         const next = (this.latest(scope)?.scope.generation || 0) + 1;
         if (!generation(next)) fail('voice_topic_generation_exhausted');
         const now = stamp();
         topic = { topicId: this.topicId(scope, next), scope: { ...scope, generation: next },
-          connectorId, preset, resolvedModelId: null, stateIdentity: this.stateIdentity, chatId: null, sessionId: null,
+          connectorId, preset, workspace, resolvedModelId: null, stateIdentity: this.stateIdentity, chatId: null, sessionId: null,
           clientThreadId: 'voice_' + digest([this.stateIdentity, scope.kind, scope.id, next]).slice(0, 48),
           revision: 1, createdAt: now, updatedAt: now };
         this.db.prepare('INSERT INTO voice_topic_bindings VALUES (?,?,?,?,?)').run(topic.topicId, scope.kind, scope.id, next, JSON.stringify(topic));

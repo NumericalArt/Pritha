@@ -11,6 +11,7 @@ export type CodexContinuationThreadScope = {
 };
 
 export type CodexContinuationCandidate = {
+  connectorId?: string;
   taskId: string;
   shortId?: string;
   status: string;

@@ -3,7 +3,7 @@ import type { ProviderConnectorId, ProviderPreset } from './provider-profile.mjs
 export type VoiceTopicScope = { kind: 'agent' | 'pritha' | 'task' | 'control'; id: string; label?: string };
 export type VoiceTopicBinding = {
   topicId: string; scope: VoiceTopicScope & { generation: number }; connectorId: ProviderConnectorId;
-  preset: ProviderPreset; resolvedModelId: string | null; stateIdentity: string; chatId: string | null; sessionId: string | null;
+  preset: ProviderPreset; workspace: {mode:'read-only'|'isolated';baseRevision?:string}; resolvedModelId: string | null; stateIdentity: string; chatId: string | null; sessionId: string | null;
   clientThreadId: string; revision: number; createdAt: string; updatedAt: string;
 };
 export type VoiceTaskBinding = {
@@ -21,7 +21,7 @@ export class VoiceTopicBindings {
   latest(scope: VoiceTopicScope): VoiceTopicBinding | null;
   task(taskId: string): VoiceTaskBinding | null;
   reserve(input: { taskId: string; scope: VoiceTopicScope; connectorId: ProviderConnectorId; preset: ProviderPreset;
-    requestHash: string; reset?: boolean; continueTopicId?: string; expectedGeneration?: number }):
+    workspace?:VoiceTopicBinding['workspace'];requestHash: string; reset?: boolean; continueTopicId?: string; expectedGeneration?: number }):
     { task: VoiceTaskBinding; topic: VoiceTopicBinding; replayed: boolean };
   bindChat(topicId: string, chatId: string, expectedRevision: number, resolvedModelId?: string): VoiceTopicBinding;
   pinSession(topicId: string, sessionId: string, expectedRevision: number): VoiceTopicBinding;

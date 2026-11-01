@@ -429,10 +429,11 @@ active-thread switch, native feature regression и no-secret DOM/storage checks.
 - [ ] Подключить этот registry/bridge к публичным voice task tools, карточкам и
   intake; common run-task routes to pinned selected task
   connector, exact queue/admission handoff and cancellation. Текущая промежуточная
-  защита возвращает `voice_task_binding_required` для нового внешнего task intent;
-  она не подменяет выбранный коннектор нативным Codex. Existing native task refs
-  сохраняют существующий маршрут. Этот guard должен быть заменён рабочим общим
-  task binding до итоговой приёмки.
+  guard checkpoint 18 заменён общим binding для задач в canonical workspace.
+  Existing native task refs сохраняют исходный маршрут. Child-agent workspace
+  и file intake пока возвращают явные blockers до проверки своих transports;
+  canonical workspace прошёл unit/browser gate checkpoint 20; перечисленные
+  исключения и остальная интеграция остаются в работе.
 - [ ] Связать активный task context и engine/session snapshot так, чтобы изменение
   default connector во время сессии не меняло provider/model существующей темы.
   В Settings обновлять Auto preview после смены task connector без потери edits.
@@ -1416,6 +1417,49 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   pinned voice dispatch test. Не заявляется новый единый all-green full run:
   следующий общий gate будет выполнен после public voice wiring. TypeScript,
   Markdown validation (986 файлов), name guard и strict privacy audit прошли.
+
+### Checkpoint реализации 20 — Public voice task wiring (verified-automated)
+
+- Voice task entry point сохраняет выбранный connector; explicit continuation
+  берёт connector из исходной задачи. Новый внешний run не выполняет native
+  availability probes и не имеет native fallback. Native карточки продолжаются
+  прежним путём независимо от нового default.
+- Прежние handoff confirmation и UI approval для записи сохранены. Provider
+  task резервируется без inference; публичные start/approve используют stored
+  dispatch request и общий backend bridge. Подготовка отклоняется до создания
+  task directory при invalid preset, неподдержанном child workspace/file intake.
+- Workspace policy включена в topic identity: read-only и isolated write имеют
+  разные generations; explicit continuation не может расширить права. Request
+  не может подменить workspace. Создание одного topic chat детерминировано даже
+  при двух разных задачах с разными заголовками, пришедших одновременно.
+- Server router проецирует фактические provider history/queue/operator receipts
+  в прежние Voice task карточки. Timeout heuristics native runner не могут
+  объявить внешнюю задачу завершённой. Provider task link открывает точный chat.
+  Drawer показывает connector, а вопрос исполнителя содержит exact request ID,
+  revision и topic generation для безопасного ответа.
+- Stop направляется точному turn/queue receipt; запись о requested stop не
+  заменяет backend proof завершения процесса. Answer для одного user-input
+  вопроса сохраняет первоначальный контекст; повтор после потери acknowledgement
+  возвращает сохранённый результат. Command approval или несколько вопросов
+  требуют существующего structured UI в Task Chat.
+- Полный unit gate прошёл **1201/1201**. Последующий review добавил защиту от
+  approve/abort race, structured errors ответа/отмены и явный readback blocker
+  при недоступных operator requests. Итоговый текст берётся из authored history,
+  включая ответ за пределами последней страницы tool activity; bounded excerpt
+  помечается как truncated. Дополнительный targeted gate прошёл **26/26**,
+  topic/bridge/name regression — **28/28**. Native/shared-tool regression ранее
+  в этом checkpoint — **55/55**, workspace/topic/backend — **33/33**.
+- Chromium gate прошёл **10/10**, без skipped/flaky: new Local voice task,
+  сохранение его provider после смены default, явный недоступный endpoint и
+  реальная карточка; voice engines, models, mocked speech/disconnect. Два
+  исправленных тестовых ожидания: unreachable endpoint даёт provider_unavailable,
+  а desktop locator должен исключать скрытую mobile-разметку.
+  TypeScript и isolated browser build, strict privacy, name guard (124 допустимых
+  исторических ссылок), Markdown validation (987 файлов) прошли. Live
+  process/state не менялись; платные вызовы не выполнялись.
+- Pending R9: child-agent workspace routing, verified intake file delivery,
+  task-chat task links/index, connector/engine session snapshot и Auto preview,
+  ND search, browser restart/reconnect и ручная microphone/provider проверка.
 
 ## 7. Полные исходные материалы
 

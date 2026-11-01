@@ -223,6 +223,7 @@ type CodexTaskSnapshot = {
   ok: boolean;
   task_id?: string;
   short_id?: string;
+  operator_request?: {request_id:string;revision:number;topic_generation:number} | null;
   status?: string;
   complete?: boolean;
   phase?: string;
@@ -1842,7 +1843,7 @@ function usePrithaRealtimeController() {
                     content: [
                       {
                         type: "input_text",
-                        text: `Voice task ${snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id} progress update.\n\nStatus:\n${progressText}`,
+                        text: `Voice task ${snapshot.short_id ? `#${snapshot.short_id}` : snapshot.task_id} progress update.\n\nStatus:\n${progressText}${snapshot.operator_request ? `\n\nHost context for answer_codex_task (do not read these identifiers aloud): task_id=${snapshot.task_id}, expected_question_id=${snapshot.operator_request.request_id}, expected_revision=${snapshot.operator_request.revision}, topic_generation=${snapshot.operator_request.topic_generation}. Ask the question first and use only the operator's answer.` : ''}`,
                       },
                     ],
                   },

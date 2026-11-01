@@ -1,4 +1,6 @@
 import { dispatchVoiceTool, type VoiceToolHandlers } from "./core/voice-tools-dispatcher";
+import type { VoiceDispatchRequest } from '../../../../../scripts/lib/voice-task-bridge.mjs';
+import type { ProviderConnectorId, ProviderPreset } from '../settings/provider-profile';
 import { prithaEnvValue } from "../pritha-env";
 import { resolvePrithaMemoryDatabase } from "../pritha-paths";
 import { DEFAULT_VOICE_MODEL, normalizeVoiceModel, type VoiceModel } from "./voice-settings";
@@ -178,6 +180,7 @@ type InspectCodexTaskArgs = {
 };
 
 type AnswerCodexTaskArgs = {
+  topic_generation?: number;
   expected_question_id?: string;
   expected_revision?: number;
   task_id?: unknown;
@@ -4313,6 +4316,7 @@ function continuationThreadScopeFromUnknown(value: unknown): PrithaCodexThreadSc
 
 function codexContinuationCandidateFromSummary(task: Record<string, unknown>): CodexContinuationCandidate {
   return {
+    connectorId: String(task.connector_id || 'codex'),
     taskId: String(task.task_id || ""),
     shortId: String(task.short_id || ""),
     status: String(task.status || "unknown"),
@@ -4492,7 +4496,7 @@ async function resolveContinuationForTask(args: CodexTaskArgs, task: Record<stri
   const continuationMode = normalizeCodexContinuationMode(args.continuation_mode);
   if (continuationMode === "force_new") return { action: "none" as const };
 
-  const candidates = await recentCodexContinuationCandidates(12);
+  const candidates = (await recentCodexContinuationCandidates(12)).filter(candidate => (candidate.connectorId || 'codex') === (task.task_chat_connector || 'codex'));
   const resolution = resolveCodexTaskContinuation(
     {
       taskText: String(task.task || ""),
@@ -4508,7 +4512,7 @@ async function resolveContinuationForTask(args: CodexTaskArgs, task: Record<stri
   if (resolution.action === "ask") return { action: "return" as const, response: continuationChoiceResponse(resolution, task) };
 
   const selected = resolution.selected;
-  const blocked = continuationBlockedResponse(selected);
+  const blocked = task.task_chat_connector && ['running', 'queued'].includes(selected.status) ? null : continuationBlockedResponse(selected);
   if (blocked) return { action: "return" as const, response: blocked };
 
   const detail = await getPrithaCodexTask(selected.taskId);
@@ -4758,7 +4762,7 @@ function buildCodexPrompt(task: Record<string, unknown>) {
     .slice(0, 20)
     .join(", ");
   return [
-    "You are the Codex sidecar for Pritha Control Center realtime voice.",
+    task.task_chat_connector ? `You are the ${task.task_chat_connector} task executor for Pritha Voice Control.` : "You are the Codex sidecar for Pritha Control Center realtime voice.",
     "Work in the current Pritha repository and follow AGENTS.md.",
     "Return a concise non-empty final result for the voice operator. Do not expose secrets.",
     "If the task needs current internet facts, browse or use available network-capable tools through Codex.",
@@ -6340,6 +6344,41 @@ async function startCodexExec(
   };
 }
 
+async function prepareProviderVoiceTask(task: Record<string, unknown>, preset: ProviderPreset) {
+  const { reserveProviderVoiceTask } = await import('../voice/task-router');
+  const scope = continuationThreadScopeFromUnknown(task.thread_scope);
+  if (scope?.kind === 'agent' || task.task_type === 'agent_creation') throw Object.assign(new Error('This task needs a scoped child-agent workspace.'), { code: 'provider_voice_agent_workspace_pending' });
+  if (task.intake && typeof task.intake === 'object' && Array.isArray((task.intake as {files?:unknown}).files) && ((task.intake as {files:unknown[]}).files.length > 0)) throw Object.assign(new Error('This provider needs verified file delivery.'), { code: 'provider_attachments_unverified' });
+  const workspace = { mode: task.write_mode === 'workspace_write' ? 'isolated' as const : 'read-only' as const,
+    ...(typeof task.workspace_base_revision === 'string' ? { baseRevision: task.workspace_base_revision } : {}) };
+  const promptTask = { ...task, approval: undefined, status: undefined };
+  const request: VoiceDispatchRequest = { chat: { workspace }, turn: { input: [{ type: 'text', text: buildCodexPrompt(promptTask) }] } };
+  const reservation = reserveProviderVoiceTask({ taskId: String(task.id),
+    scope: { kind: normalizeThreadScopeKind(scope?.kind) || 'task', id: scope?.id || String(task.id), label: scope?.label || 'Voice task' },
+    connectorId: task.task_chat_connector as ProviderConnectorId, preset, workspace, request,
+    reset: Boolean(task.thread_reset), ...(task.parent_task_id ? { continueTaskId: String(task.parent_task_id) } : {}) });
+  task.task_chat_request = request;
+  task.voice_topic_id = reservation.topic.topicId;
+  task.thread_scope = { ...scope, ...reservation.topic.scope };
+}
+
+async function startProviderVoiceTask(task: Record<string, unknown>, paths: CodexTaskRuntimePaths) {
+  const { dispatchProviderVoiceTask } = await import('../voice/task-router');
+  let status: Record<string, unknown>;
+  try {
+    const projection = await dispatchProviderVoiceTask(String(task.id), task.task_chat_request as VoiceDispatchRequest);
+    status = projection?.status || { status: 'waiting_for_operator', error_code: 'voice_task_binding_missing' };
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+    status = { status: 'waiting_for_operator', phase: 'provider_dispatch_attention',
+      error_code: /^[a-z][a-z0-9_]{0,79}$/.test(code) ? code : 'voice_dispatch_unconfirmed' };
+  }
+  await atomicWritePrivateJson({ stateRoot: resolvePrithaStateRoot(), filePath: paths.statusPath,
+    value: { ...status, transport: 'task-chat', short_id: task.short_id, thread_scope: task.thread_scope,
+      connector_id: task.task_chat_connector, updated_at: new Date().toISOString() } });
+  return { transport: 'task-chat', ...status };
+}
+
 async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: string } = {}) {
   const root = resolvePrithaRoot();
   const taskText = String(args.task || "").trim();
@@ -6352,10 +6391,18 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
   if (host.reservedTaskId && existsSync(taskDir)) return {ok:false,error:"voice_operation_recovery_required",task_id:taskId};
 
   const settings = getPrithaRuntimeSettings();
+  const { getProviderSettings } = await import('../settings/provider-settings-server');
+  const { isProviderConnectorId } = await import('../settings/provider-profile');
+  const providerSettings = getProviderSettings();
+  const priorId = args.continue_task_id ? await resolveCodexTaskIdRef(args.continue_task_id) : null;
+  const priorRequest = priorId ? await readJsonFile(path.join(privateRoot(), 'codex-tasks', priorId, 'request.json')) : null;
+  const connectorId = priorRequest ? priorRequest.task_chat_connector || 'codex' : providerSettings.activeConnectorId;
+  if (!isProviderConnectorId(connectorId)) return { ok: false, error: 'provider_profile_invalid' };
+  const external = connectorId !== 'codex';
   const requestedMode = codexMode();
   const requestedTransport = settings.deepTaskPrimaryTransport;
-  const cli = await codexAvailable();
-  const app = requestedMode === "queue" ? { available: false, detail: "disabled by queue mode" } : await codexAppAvailable();
+  const cli = external ? { available: false, detail: 'Provider Task Chat owns this task.' } : await codexAvailable();
+  const app = external || requestedMode === "queue" ? { available: false, detail: "Native transport is not selected." } : await codexAppAvailable();
   const fallbackTransport = requestedTransport === "codex-app" ? "codex-cli" : "codex-app";
   const effectiveTransport: DeepTaskPrimaryTransport | "queue" =
     requestedMode === "queue"
@@ -6375,7 +6422,7 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
     id: taskId,
     created_at: now.toISOString(),
     source: "pritha-control-center-realtime",
-    status: effectiveMode === "exec" ? "running" : "queued",
+    status: external || effectiveMode === "exec" ? "running" : "queued",
     task: taskText.slice(0, 8_000),
     task_type: taskType,
     write_mode: normalizeCodexWriteMode(args.write_mode),
@@ -6391,9 +6438,10 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
     root: rootRelative(root, root),
     sibling_agent_parent: rootRelative(root, resolvePrithaAgentParent(root)),
     sibling_agent_parent_absolute: resolvePrithaAgentParent(root),
-    requested_transport: requestedTransport,
-    fallback_transport: fallbackTransport,
-    effective_transport: effectiveTransport,
+    requested_transport: external ? connectorId : requestedTransport,
+    fallback_transport: external ? null : fallbackTransport,
+    effective_transport: external ? 'task-chat' : effectiveTransport,
+    ...(external ? { task_chat_connector: connectorId } : {}),
     codex_app_thread_routing_mode: settings.codexAppThreadRoutingMode,
     ...(taskType === "agent_creation" ? { agent_creation_research_gate: agentCreationResearchGatePayload() } : {}),
   };
@@ -6439,6 +6487,13 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
     });
   }
 
+  if (external) {
+    try { await prepareProviderVoiceTask(task, providerSettings.providerPresets[connectorId]); }
+    catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      return { ok: false, error: /^[a-z][a-z0-9_]{0,79}$/.test(code) ? code : 'voice_task_preparation_failed', connector_id: connectorId };
+    }
+  }
   if (host.reservedTaskId) {
     await mkdir(path.dirname(taskDir), {recursive:true});
     try { await mkdir(taskDir, {recursive:false}); }
@@ -6463,9 +6518,9 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
   const voiceFeedbackPath = codexTaskVoiceFeedbackPath(taskDir);
   const progress = (event: PrithaCodexTaskProgressEvent) => appendCodexTaskProgress(taskId, progressPath, event);
 
-  await applyCodexOutboundPromptBudget(task, codexOutboundTransports(effectiveTransport, fallbackTransport), progress);
+  if (!external) await applyCodexOutboundPromptBudget(task, codexOutboundTransports(effectiveTransport, fallbackTransport), progress);
   await writeFile(requestPath, `${JSON.stringify(task, null, 2)}\n`, "utf8");
-  await writeFile(promptPath, `${buildCodexPrompt(task)}\n`, "utf8");
+  await writeFile(promptPath, `${external ? (task.task_chat_request as VoiceDispatchRequest).turn.input[0].text : buildCodexPrompt(task)}\n`, "utf8");
   await writeFile(
     statusPath,
     `${JSON.stringify(
@@ -6497,16 +6552,20 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
     message:
       task.status === "decision_required"
         ? "Codex task captured and waiting for explicit operator approval."
-        : effectiveTransport === "queue"
+        : external
+          ? "Task prepared for the selected provider."
+          : effectiveTransport === "queue"
           ? "Codex task captured in the private local queue."
           : "Codex task created and ready for sidecar execution.",
   });
 
-  let exec: Awaited<ReturnType<typeof startAdmittedVoiceTask>> | null = null;
+  let exec: Awaited<ReturnType<typeof startAdmittedVoiceTask>> | Record<string, unknown> | null = null;
   await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
     if (await codexTaskIsAborted(statusPath)) return;
     if (task.status === "decision_required") {
       await logPrivateEvent("codex_task_decision_required", { task_id: taskId, approval });
+    } else if (external) {
+      exec = await startProviderVoiceTask(task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
     } else if (effectiveTransport === "codex-app") {
       exec = await startAdmittedVoiceTask("codex-app", task, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
     } else if (effectiveTransport === "codex-cli") {
@@ -6519,11 +6578,12 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
     task_id: taskId,
     short_id: shortId,
     status: (exec as {status?:string}|null)?.status || task.status,
-    mode: task.status === "decision_required" ? "approval" : effectiveMode,
+    mode: task.status === "decision_required" ? "approval" : external ? "exec" : effectiveMode,
     requested_mode: requestedMode,
-    requested_transport: requestedTransport,
-    effective_transport: effectiveTransport,
-    fallback_transport: fallbackTransport,
+    requested_transport: external ? connectorId : requestedTransport,
+    effective_transport: external ? 'task-chat' : effectiveTransport,
+    connector_id: connectorId,
+    fallback_transport: external ? null : fallbackTransport,
     thread_scope: task.thread_scope,
     parent_task_id: task.parent_task_id,
     continuation: task.continuation,
@@ -6548,6 +6608,8 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
     operator_note:
       task.status === "decision_required"
         ? "Codex task is waiting for explicit approval in the Pritha UI task card."
+        : external
+          ? `Task registered with ${connectorId}. Read the task card for its current execution status.`
         : effectiveTransport === "codex-app"
         ? "Codex App sidecar started in the local Pritha environment."
         : effectiveTransport === "codex-cli"
@@ -6806,6 +6868,16 @@ async function repairStaleCodexTaskStatus(
   paths: { statusPath: string; resultPath: string; progressPath: string; voiceFeedbackPath?: string },
   resultText: string,
 ) {
+  if (request?.task_chat_connector) {
+    const approval = request.approval as {status?:string}|undefined;
+    if (approval?.status === 'pending' || approval?.status === 'rejected') return { status, resultText, repaired: false };
+    const { providerVoiceTaskProjection } = await import('../voice/task-router');
+    const projection = await providerVoiceTaskProjection(id);
+    return { status: projection ? { ...status, ...projection.status,
+      error_code: projection.task.state === 'reserved' ? status?.error_code || projection.status.error_code : projection.status.error_code }
+      : { ...status, status: 'waiting_for_operator', phase: 'voice_task_binding_missing' },
+      resultText: projection?.resultText || resultText, repaired: false };
+  }
   const statusValue = String(status?.status || request?.status || "unknown");
   if (statusValue !== "running") return { status, resultText, repaired: false };
 
@@ -6876,6 +6948,21 @@ async function repairStaleCodexTaskStatus(
   return { status: repaired, resultText: nextResultText, repaired: true };
 }
 
+function providerVoiceTaskFields(request: Record<string, unknown> | null, status: Record<string, unknown> | null) {
+  return { connector_id: request?.task_chat_connector || 'codex', task_chat_href: status?.task_chat_href,
+    topic_generation: status?.topic_generation, task_revision: status?.task_revision,
+    operator_request: status?.operator_request, question: status?.question,
+    approval_in_task_chat: status?.approval_in_task_chat };
+}
+function providerVoiceTaskFeedback(id: string, request: Record<string, unknown> | null, status: Record<string, unknown> | null): CodexTaskVoiceFeedbackEvent | null {
+  if (!request?.task_chat_connector || status?.status !== 'waiting_for_operator') return null;
+  const question = compactText(status.question, 2000);
+  const text = question || (status.approval_in_task_chat ? 'Задача ожидает подтверждения действия в Task Chat. Откройте её карточку.'
+    : 'Задача не продолжилась автоматически. Откройте её карточку, чтобы проверить причину.');
+  return {task_id:id,timestamp:String(status.updated_at || request.created_at || ''),phase:question?'operator_question':'provider_attention',
+    priority:'high',speakable:true,voice_text:text,requires_response:Boolean(question)};
+}
+
 async function codexTaskSummary(id: string) {
   const root = resolvePrithaRoot();
   const taskDir = path.join(privateRoot(), "codex-tasks", id);
@@ -6900,7 +6987,7 @@ async function codexTaskSummary(id: string) {
   const progress = progressForMetrics.slice(-12);
   const plan = await readJsonFile(planPath);
   const voiceFeedback = readCodexVoiceFeedback(voiceFeedbackPath, 8);
-  const latestVoiceFeedback = latestSpeakableFeedback(voiceFeedback);
+  const latestVoiceFeedback = providerVoiceTaskFeedback(id, request, status) || latestSpeakableFeedback(voiceFeedback);
   const lastProgress = latestProgressEvent(progress);
   const handoffSent = lastPrivateEvent(telemetry, "codex_task_result_handoff_sent");
   const handoffSkipped = lastPrivateEvent(telemetry, "codex_task_result_handoff_skipped");
@@ -6950,6 +7037,7 @@ async function codexTaskSummary(id: string) {
   return {
     task_id: id,
     short_id: shortId,
+    ...providerVoiceTaskFields(request, status),
     status: statusValue,
     complete,
     phase: activity.phase,
@@ -7085,7 +7173,7 @@ export async function getPrithaCodexTask(taskId: string) {
   const progress = progressForMetrics.slice(-30);
   const plan = await readJsonFile(planPath);
   const voiceFeedback = readCodexVoiceFeedback(voiceFeedbackPath, 20);
-  const latestVoiceFeedback = latestSpeakableFeedback(voiceFeedback);
+  const latestVoiceFeedback = providerVoiceTaskFeedback(id, request, status) || latestSpeakableFeedback(voiceFeedback);
   const approval = request?.approval || (status && "approval" in status ? status.approval : null);
   const progressMetrics = codexTaskProgressMetrics({
     statusValue,
@@ -7145,6 +7233,7 @@ export async function getPrithaCodexTask(taskId: string) {
 	    ok: true,
 	    task_id: id,
 	    short_id: shortId,
+    ...providerVoiceTaskFields(request, status),
 	    status: statusValue,
     complete,
     phase: activity.phase,
@@ -7206,6 +7295,13 @@ function codexTaskToolView(task: Record<string, unknown>, maxEvents = 8) {
   return {
     task_id: task.task_id,
     short_id: task.short_id,
+    connector_id: task.connector_id,
+    task_chat_href: task.task_chat_href,
+    topic_generation: task.topic_generation,
+    task_revision: task.task_revision,
+    operator_request: task.operator_request,
+    question: task.question,
+    approval_in_task_chat: task.approval_in_task_chat,
     status: task.status,
     complete: task.complete,
     phase: task.phase,
@@ -7375,6 +7471,23 @@ async function codexTaskIsAborted(statusPath: string) {
 export async function abortPrithaCodexTask(taskRef: string, reason?: unknown, expectedRevision?:number):Promise<Record<string,any>> {
   const id = await resolveCodexTaskIdRef(taskRef);
   if (!id) return abortPrithaCodexTaskOwned(taskRef,reason);
+  const requestPath = path.join(privateRoot(), 'codex-tasks', id, 'request.json');
+  const request = await readJsonFile(requestPath);
+  if (request?.task_chat_connector) {
+    return nativeExecutionCoordinator().withMutation(`voice-control:${id}`, async () => {
+      const { providerVoiceTaskBinding, stopProviderVoiceTask } = await import('../voice/task-router');
+      const current = await readJsonFile(requestPath);
+      const bound = providerVoiceTaskBinding(id);
+      if (!current || !bound) return {ok:false,error:'voice_task_binding_missing',task_id:id};
+      const stopped = await stopProviderVoiceTask(id, expectedRevision ?? bound.task.revision, bound.topic.scope.generation);
+      if (!stopped.ok) return stopped;
+      if ((current.approval as {status?:string}|undefined)?.status === 'pending') {
+        await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:requestPath,value:{...current,status:'aborted',approval:{...(current.approval as object),status:'rejected'}}});
+        await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:path.join(path.dirname(requestPath),'status.json'),value:{status:'aborted',phase:'cancelled_before_dispatch'}});
+      }
+      return getPrithaCodexTask(id);
+    });
+  }
   const coordinator=nativeExecutionCoordinator();
   if(!activeCodexAppAbortHandles.has(id) && !activeCodexCliProcesses.has(id) && executionChannelView(coordinator,`voice-workflow-control:${id}`))return callExecutionChannel(coordinator,`voice-workflow-control:${id}`,{reason,expectedRevision});
   return coordinator.withMutation(`voice-control:${id}`, () => {
@@ -7536,6 +7649,14 @@ async function abortPrithaCodexTaskOwned(taskRef: string, reason?: unknown) {
 export async function answerPrithaCodexTask(args: AnswerCodexTaskArgs = {}) {
   const id = await resolveCodexTaskIdRef(args.task_id) || await latestWaitingCodexTaskId();
   if (!id) return answerPrithaCodexTaskOwned(args);
+  const request = await readJsonFile(path.join(privateRoot(), 'codex-tasks', id, 'request.json'));
+  if (request?.task_chat_connector) {
+    if (!args.task_id || !args.expected_question_id || !Number.isSafeInteger(args.expected_revision) || !Number.isSafeInteger(args.topic_generation)) return {ok:false,error:'operator_request_context_required',task_id:id};
+    const { answerProviderVoiceTask } = await import('../voice/task-router');
+    const result = await answerProviderVoiceTask(id,{answer:compactText(args.answer,4000),questionId:args.expected_question_id,
+      revision:args.expected_revision!,generation:args.topic_generation!});
+    return result.ok ? {...await getPrithaCodexTask(id),answer_accepted:true} : result;
+  }
   return nativeExecutionCoordinator().withMutation(`voice-control:${id}`, () => answerPrithaCodexTaskOwned({...args,task_id:id}));
 }
 
@@ -7805,11 +7926,11 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
 
   const effectiveTransport = String(request.effective_transport || "queue");
   nextRequest.status = effectiveTransport === "queue" ? "queued" : "running";
-  await applyCodexOutboundPromptBudget(nextRequest, codexOutboundTransports(effectiveTransport), progress);
+  if (!nextRequest.task_chat_connector) await applyCodexOutboundPromptBudget(nextRequest, codexOutboundTransports(effectiveTransport), progress);
   await writeFile(requestPath, `${JSON.stringify(nextRequest, null, 2)}\n`, "utf8");
-  await writeFile(promptPath, `${buildCodexPrompt(nextRequest)}\n`, "utf8");
+  await writeFile(promptPath, `${nextRequest.task_chat_connector ? (nextRequest.task_chat_request as VoiceDispatchRequest).turn.input[0].text : buildCodexPrompt(nextRequest)}\n`, "utf8");
 
-  let exec: Awaited<ReturnType<typeof startAdmittedVoiceTask>> | null = null;
+  let exec: Awaited<ReturnType<typeof startAdmittedVoiceTask>> | Record<string, unknown> | null = null;
   await progress({
     phase: "approval_approved",
     level: "info",
@@ -7825,7 +7946,9 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
     voice_text: "Approve получен в UI. Codex-задача запущена или поставлена в очередь.",
     requires_response: false,
   });
-  if (effectiveTransport === "codex-app") {
+  if (nextRequest.task_chat_connector) {
+    exec = await startProviderVoiceTask(nextRequest, {resultPath,statusPath,stdoutPath,stderrPath,progressPath});
+  } else if (effectiveTransport === "codex-app") {
     exec = await startAdmittedVoiceTask("codex-app", nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath, planPath, voiceFeedbackPath });
   } else if (effectiveTransport === "codex-cli") {
     exec = await startAdmittedVoiceTask("codex-cli", nextRequest, { resultPath, statusPath, stdoutPath, stderrPath, progressPath });
@@ -7865,13 +7988,11 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
 export async function handlePrithaRealtimeTool(name: string, args: Record<string, unknown> = {}, host: { reservedTaskId?: string } = {}) {
   await logPrivateEvent("tool_call_started", { name, args });
 
-  if (["run_codex_task", "run_voice_task", "answer_codex_task", "answer_voice_task", "inspect_codex_task", "inspect_voice_task"].includes(name)) {
+  if (["answer_codex_task", "answer_voice_task"].includes(name)) {
     const {getProviderSettings} = await import("../settings/provider-settings-server");
-    const explicitTask = name.startsWith("run_") ? args.continue_task_id : args.task_id;
+    const explicitTask = args.task_id;
     if (getProviderSettings().activeConnectorId !== "codex" && !(typeof explicitTask === "string" && explicitTask.trim())) {
-      // Existing native task references retain their provider. New external task
-      // commands must wait for the persistent task binding; never fall back here.
-      return {ok:false,error:"voice_task_binding_required"};
+      return {ok:false,error:"operator_request_context_required"};
     }
   }
 

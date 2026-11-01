@@ -242,6 +242,9 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
       parameters: {
         type: "object",
         properties: {
+          expected_question_id: { type: "string", description: "Copy the exact operator_request.request_id from inspect_codex_task for a provider task." },
+          expected_revision: { type: "integer", minimum: 1, description: "Copy operator_request.revision. A stale question cannot receive an answer." },
+          topic_generation: { type: "integer", minimum: 1, maximum: 999, description: "Copy operator_request.topic_generation. Required for provider task answers." },
 	          task_id: {
 	            type: "string",
 	            description: "Optional Codex task id or the 3-character short id shown on the task card. If omitted, the most recent waiting_for_operator task is used.",
@@ -356,7 +359,7 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
       type: "function",
       name: "run_codex_task",
       description:
-        "Start or queue a Codex sidecar task in the current Pritha environment. Use for implementation, repo inspection, deep analysis, review, or internet/current-source research. Do not claim the task is complete unless the returned status says complete.",
+        "Start or queue a task with the selected Pritha task provider. Existing tasks retain their original provider and model. Use for implementation, repo inspection, deep analysis, review, or internet/current-source research. Do not claim the task is complete unless the returned status says complete.",
       parameters: {
         type: "object",
         properties: {

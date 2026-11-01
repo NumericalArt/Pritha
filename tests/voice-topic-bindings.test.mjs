@@ -151,3 +151,12 @@ test('native chat bindings reject another provider namespace and unsupported sch
   assert.throws(() => open(), error('voice_binding_schema_unsupported'));
   assert.equal(bindings.db.prepare('SELECT value FROM voice_binding_meta WHERE key=?').get('schema').value, 'future');
 });
+test('workspace policy is pinned per topic and an explicit continuation cannot gain write access', t => {
+  const { bindings } = fixture(t), first = bindings.reserve(input());
+  assert.deepEqual(first.topic.workspace, { mode: 'read-only' });
+  const write = bindings.reserve(input('write-task', 'neuraldeep', { workspace: { mode: 'isolated', baseRevision: 'a'.repeat(40) } }));
+  assert.equal(write.topic.scope.generation, 2);
+  assert.throws(() => bindings.reserve(input('escalate', 'neuraldeep', { continueTopicId: first.topic.topicId, expectedGeneration: 1,
+    workspace: { mode: 'isolated' } })), error('voice_topic_workspace_mismatch'));
+  assert.throws(() => bindings.reserve(input('unsafe', 'neuraldeep', { workspace: { mode: 'configured', cwd: '/untrusted' } })), error('voice_topic_workspace_invalid'));
+});

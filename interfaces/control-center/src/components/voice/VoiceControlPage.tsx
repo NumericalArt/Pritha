@@ -45,6 +45,7 @@ type CodexTaskDetail = {
   ok: boolean;
   task_id?: string;
   short_id?: string;
+  connector_id?: string;
   status?: string;
   complete?: boolean;
   phase?: string;
@@ -665,6 +666,8 @@ function TaskDetailDrawer({
               <strong>{detail.status || "unknown"}</strong>
               <span>Short ID</span>
               <strong>{detail.short_id ? `#${detail.short_id}` : "unknown"}</strong>
+              <span>Task provider</span>
+              <strong>{detail.connector_id || 'codex'}</strong>
               <span>Phase</span>
               <strong>{detail.phase || "unknown"}</strong>
               <span>Complete</span>
