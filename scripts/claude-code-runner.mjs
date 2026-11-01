@@ -17,7 +17,7 @@ import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import { listenProviderToolServer } from './lib/provider-tool-server.mjs';
 import { ClaudeRequestBudget } from './claude/request-budget.mjs';
 import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
-import {nativeClaudeAuthPaths,probeClaudeNativeAuth,nativeClaudeEnvironment} from './claude/native-auth.mjs';
+import {nativeClaudeAuthPaths,probeClaudeNativeAuth,nativeClaudeEnvironment,nativeClaudeSandboxRoots} from './claude/native-auth.mjs';
 import {listenClaudeNativeTunnel} from './claude/native-tunnel.mjs';
 
 const fail=code=>Object.assign(new Error('The configured Claude runtime could not complete this task safely.'),{code});
@@ -111,11 +111,11 @@ export async function startClaudeCodeRun(options,dependencies={}){
     const env=native?nativeClaudeEnvironment({...options,root,stateRoot},nativePaths,temporary):providerProcessEnvironment({provider:'claude',root,stateRoot,claudeConfigDir:config,temporary,env:options.env || process.env});
     if(!native)Object.assign(env,{ANTHROPIC_API_KEY:localToken,ANTHROPIC_BASE_URL:proxy.baseUrl,CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST:'1'});
     else env.CLAUDE_CODE_MAX_OUTPUT_TOKENS=String(options.maxOutputTokens || 8192);
-    Object.assign(env,{HOME:home,CLAUDE_CODE_TMPDIR:temporary,
+    Object.assign(env,{HOME:native?env.HOME:home,CLAUDE_CODE_TMPDIR:temporary,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1',DISABLE_AUTOUPDATER:'1',DISABLE_TELEMETRY:'1',DISABLE_ERROR_REPORTING:'1',CLAUDE_CODE_DISABLE_AUTO_MEMORY:'1',PRITHA_PYTHON:resolvePrithaPython({root,env:options.env || process.env})});
     env.CLAUDE_CODE_MAX_RETRIES='0';env.CLAUDE_CODE_NONSTREAMING_TIMEOUT_RETRIES='0';env.CLAUDE_CODE_DISABLE_REFUSAL_RETRY='1';env.MCP_CONNECTION_NONBLOCKING='0';env.ENABLE_TOOL_SEARCH='false';
     if(options.hostExecutionContext?.factory){env.MCP_TOOL_TIMEOUT=String(options.timeoutMs+5000);env.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT=env.MCP_TOOL_TIMEOUT;env.CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS='0';}
-    sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[home,config],writeRoots:[home,config],loopbackPorts:[proxy.port,...(toolServer?[toolServer.port]:[])]});
+    sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,...(native?{...nativeClaudeSandboxRoots(nativePaths,{refresh:true}),runtime:'claude-native'}:{readRoots:[home,config],writeRoots:[home,config]}),loopbackPorts:[proxy.port,...(toolServer?[toolServer.port]:[])]});
     owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(sandboxPlan.command,sandboxPlan.args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),
       beforeStart:async evidence=>{if(options.signal?.aborted)throw fail('operator_cancel');trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),model:options.model,sessionId,budgetId:budget?budgetId:null,resume:options.resume || null});},onEvidence:evidence=>recordTree('cli',evidence)});
     options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();

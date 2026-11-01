@@ -410,6 +410,7 @@ command runs in the foreground.`);
   const steps = plannedSteps(sequence, profile, config, { ...options, start: startTarget });
   if(instance.providerProfile!=='codex')steps.push(note('provider-connection','verify','Complete provider readiness in Settings',instance.providerProfile==='local'
     ?'Configure and probe an installed owned Local model process. No model downloads or services start during bootstrap.'
+    :instance.providerProfile==='claude'?'In Settings, choose an Anthropic API key or Local CLI session. For the latter, copy the sign-in command and finish browser login. A compatible installed Claude Code CLI is required in both modes; see docs/claude-connection.md.'
     :'Connect this instance’s own API credential in Settings and verify the selected model. Bootstrap does not read, copy or provision provider credentials.'));
   const planOnly = sequence.length === 1 && sequence[0] === "plan";
   let blocked=false;

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {loadPrithaRuntimeEnv} from './lib/env.mjs';
 import {resolvePrithaRoot,resolvePrithaStateRoot} from './lib/paths.mjs';
 import {resolveClaudeBinary} from './claude-code-runner.mjs';
@@ -12,7 +13,7 @@ import {atomicWriteFile} from './lib/atomic-file.mjs';
 
 try{
   const [action,...rest]=process.argv.slice(2);if(rest.length || !['plan','status','login'].includes(action))throw new Error();
-  const root=resolvePrithaRoot();loadPrithaRuntimeEnv({root,pathOnly:true});const options={root,stateRoot:resolvePrithaStateRoot({root})};
+  const root=resolvePrithaRoot({cwd:path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..')});loadPrithaRuntimeEnv({root,pathOnly:true});const options={root,stateRoot:resolvePrithaStateRoot({root})};
   if(action==='plan')console.log(JSON.stringify(nativeClaudeLoginPlan(options)));
   else {
     const binary=resolveClaudeBinary(process.env.PRITHA_CLAUDE_CLI_BIN || 'claude');
@@ -37,6 +38,11 @@ try{
         process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);
         if(owned && !exited){owned.stop();exited=(await owned.completion).processTreeExited===true;}
         if(exited || !owned && !uncertain){fs.rmSync(temporary,{recursive:true,force:true});if(ownLease)fs.rmSync(lease,{force:true});}
+      }
+      if(process.exitCode===0){
+        const status=await probeClaudeNativeAuth({...options,binary});
+        console.log(JSON.stringify({authenticated:status.authenticated,status:status.status,code:status.code || null}));
+        if(!status.authenticated)process.exitCode=1;
       }
     }
   }

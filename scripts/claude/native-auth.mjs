@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {privateStateDirectory} from '../lib/private-state-path.mjs';
 import {createProviderTemporaryDirectory,providerProcessEnvironment} from '../lib/provider-process-environment.mjs';
 import {prepareProviderSandbox} from '../lib/provider-sandbox.mjs';
 import {spawnSupervisedCli} from '../neuraldeep/process-supervisor.mjs';
 import {atomicWriteFile} from '../lib/atomic-file.mjs';
+import {prithaRootEnvironment} from '../lib/paths.mjs';
 
 const fail=code=>Object.assign(new Error('Review the native Claude session for this Pritha instance.'),{code});
 export const CLAUDE_NATIVE_MODELS=Object.freeze(['sonnet','opus','haiku'].map(line=>Object.freeze({id:`claude-${line}-5-5`,label:`Claude ${line[0].toUpperCase()+line.slice(1)} 5.5`,line,lifecycle:'active',efforts:['low','medium','high'],maxOutputTokens:128000,contextTokens:1000000,source:'reviewed-native-cli-catalog-2026-11-01'})));
@@ -24,17 +26,37 @@ export function nativeClaudeAuthPaths({stateRoot},{prepare=false}={}){
   }
   try{const st=fs.lstatSync(path.join(config,'.credentials.json'));if(!st.isFile() || st.isSymbolicLink() || st.nlink!==1 || st.uid!==process.getuid() || (st.mode&0o077)!==0)throw fail('provider_native_auth_unsafe');}
   catch(error){if(error.code!=='ENOENT')throw error;}
-  return {base,home,config,available};
+  let keychain=null;
+  if(process.platform==='darwin'){
+    const directory=path.join(os.userInfo().homedir,'Library','Keychains');
+    try{const st=fs.lstatSync(directory);if(!st.isDirectory() || st.isSymbolicLink() || st.uid!==process.getuid())throw fail('provider_native_auth_unsafe');keychain=fs.realpathSync(directory);}
+    catch(error){if(error.code!=='ENOENT')throw error;}
+  }
+  return {base,home,config,available,keychain};
+}
+// Only the trusted, unmodified native CLI gets its macOS credential store.
+// Security.framework needs directory writes for atomic refresh. Model tools
+// run in separate sandboxes and must never receive these roots. Account and
+// history selection remain pinned to this instance's CLAUDE_CONFIG_DIR.
+export function nativeClaudeSandboxRoots(paths,{refresh=false}={}){
+  const roots=[paths.home,paths.config,...(paths.keychain?[paths.keychain]:[])];
+  return {readRoots:roots,writeRoots:refresh?roots:[paths.home,paths.config]};
 }
 export function nativeClaudeEnvironment(options,paths,temporary){
   const env=providerProcessEnvironment({provider:'claude',root:options.root,stateRoot:options.stateRoot,claudeConfigDir:paths.config,temporary,env:options.env || process.env});
-  Object.assign(env,{HOME:paths.home,CLAUDE_CODE_TMPDIR:temporary,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1',DISABLE_AUTOUPDATER:'1',DISABLE_TELEMETRY:'1',DISABLE_ERROR_REPORTING:'1',CLAUDE_CODE_DISABLE_AUTO_MEMORY:'1',ENABLE_CLAUDEAI_MCP_SERVERS:'false',CLAUDE_CODE_DISABLE_ARTIFACT:'1',CLAUDE_CODE_MAX_RETRIES:'0'});
+  // macOS selects the user's Keychain through HOME. A synthetic home hides the
+  // login keychain, so the native CLI cannot save its login. CLAUDE_CONFIG_DIR
+  // still scopes this instance's account and history; only its Keychain
+  // directory is accessible in the real home. Resolve it from the OS account,
+  // never an inherited HOME supplied by another task.
+  Object.assign(env,{HOME:process.platform==='darwin'?os.userInfo().homedir:paths.home,CLAUDE_CODE_TMPDIR:temporary,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1',DISABLE_AUTOUPDATER:'1',DISABLE_TELEMETRY:'1',DISABLE_ERROR_REPORTING:'1',CLAUDE_CODE_DISABLE_AUTO_MEMORY:'1',ENABLE_CLAUDEAI_MCP_SERVERS:'false',CLAUDE_CODE_DISABLE_ARTIFACT:'1',CLAUDE_CODE_MAX_RETRIES:'0'});
   return env;
 }
 export const NATIVE_AUTH_SETTINGS=Object.freeze({disableAllHooks:true,disableClaudeAiConnectors:true,autoUpdates:false,apiKeyHelper:''});
-export function nativeClaudeLoginPlan({root}){
+export function nativeClaudeLoginPlan({root,stateRoot}){
   const quote=value=>"'"+value.replaceAll("'","'\\''")+"'";
-  return {command:`${quote(process.execPath)} ${quote(path.join(root,'scripts/claude-auth.mjs'))} login`,automatic:false};
+  const environment={...prithaRootEnvironment(root),PRITHA_STATE_ROOT:stateRoot};
+  return {command:`${Object.entries(environment).map(([key,value])=>`${key}=${quote(value)}`).join(' ')} ${quote(process.execPath)} ${quote(path.join(root,'scripts/claude-auth.mjs'))} login`,automatic:false};
 }
 
 /** Only the unmodified CLI reads its own auth store. The host accepts a small
@@ -53,7 +75,7 @@ async function probeOwnedNativeAuth(options,dependencies){
     let descriptor;try{descriptor=fs.openSync(lease,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);ownLease=true;fs.writeFileSync(descriptor,JSON.stringify({schema:1,status:'prepared',ownerPid:process.pid})+'\n');fs.fsyncSync(descriptor);}
     catch{throw fail('provider_native_auth_unavailable');}finally{if(descriptor!==undefined)fs.closeSync(descriptor);}
     const args=['--setting-sources','','--settings',JSON.stringify(NATIVE_AUTH_SETTINGS),'auth','status','--json'];
-    plan=(dependencies.prepareSandbox || prepareProviderSandbox)({root:options.root,stateRoot:options.stateRoot,privateRoot:paths.base,command:options.binary,args,cwd:temporary,temporary,readRoots:[paths.home,paths.config],writeRoots:[paths.home,paths.config]});
+    plan=(dependencies.prepareSandbox || prepareProviderSandbox)({root:options.root,stateRoot:options.stateRoot,privateRoot:paths.base,command:options.binary,args,cwd:temporary,temporary,...nativeClaudeSandboxRoots(paths)});
     const record=evidence=>atomicWriteFile(lease,JSON.stringify({schema:1,status:'running',ownerPid:process.pid,evidence})+'\n');
     owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(plan.command,plan.args,{cwd:temporary,env:nativeClaudeEnvironment(options,paths,temporary),beforeStart:record,onEvidence:record});
     const buffers=[];let bytes=0,invalid=false;

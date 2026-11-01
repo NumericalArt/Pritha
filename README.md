@@ -58,8 +58,12 @@ assistant with unrestricted access. It does not trust raw input or repository
 candidates automatically, install discovered code during research, or enable
 external access and long-running services without an explicit operator action.
 
-The current release is Codex-native. Other coding-agent runtimes may be explored
-through future adapters, but are not presented as implemented compatibility.
+Task Chat supports Codex, NeuralDeep, Claude Code, OpenRouter and an owned Local
+model process. Each connector checks its own runtime, credentials and model;
+readiness and feature support are shown separately. See [Start here](START_HERE.md)
+for preparation and [Connect Claude](docs/claude-connection.md) for API-key or
+native account sign-in. The release roadmap records live acceptance separately
+from implemented adapters.
 
 ## What You Can Do
 
@@ -169,8 +173,8 @@ node scripts/bootstrap.mjs --profile local --start control-center
 
 The active Control Center provides `/agents`, `/voice`, `/settings`, and
 read-only diagnostics. Its integrated Voice surface supports realtime operator
-work and can route deeper tasks to Codex. Some Voice and hosted-model features
-require explicit credentials and can incur provider costs.
+work and can route deeper tasks to the selected task provider. Some Voice and
+hosted-model features require explicit credentials and can incur provider costs.
 
 The start command runs the UI in the foreground on localhost. It does not
 install launchd, cron, Tailscale, credentials, or a durable service. Private

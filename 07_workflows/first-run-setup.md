@@ -3,7 +3,7 @@ id: first-run-setup
 type: workflow
 status: active
 created: 2026-05-28
-updated: 2026-11-01
+updated: 2026-11-02
 topics:
   - pritha
   - setup
@@ -133,7 +133,9 @@ node scripts/self-test.mjs
 - Task providers are separate from these interface switches. Use bootstrap
   profiles `neuraldeep`, `claude`, `openrouter`, `local-model`, or explicit
   `--provider-profile`. Keys are configured in Settings, never inherited by a
-  new child. Claude supports its API-key lane; Local requires verified owned
+  new child. Claude offers an API key or an explicit native terminal sign-in;
+  its budgeted factory uses the API-key lane. Follow `docs/claude-connection.md`
+  without copying credentials between modes. Local requires verified owned
   process isolation. See `START_HERE.md` and `07_workflows/local-provider-offline.md`.
 
 ## Instance preparation

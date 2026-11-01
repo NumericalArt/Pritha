@@ -31,6 +31,13 @@ try{
     // The pinned srt version quotes the complete profile as one POSIX literal.
     // These constant bytes contain no single quote, shell expansion or input.
     inner.argv[2]=inner.argv[2].replace(marker,marker+'\n(allow file-read-metadata (literal "/etc") (subpath "/private/etc"))');
+  }else if(plan.runtime==='claude-native'){
+    // Security.framework names its atomic Keychain refresh file using this
+    // read-only sysctl. It still needs the exact host-granted filesystem roots.
+    // See anthropics/sandbox-runtime#431; do not enable weaker networking.
+    const marker='  (vnode-type DIRECTORY))';
+    if(inner.argv.length!==3 || inner.argv[1]!=='-c' || inner.argv[2].split(marker).length!==2 || !inner.argv[2].includes('/usr/bin/sandbox-exec -p '))throw new Error();
+    inner.argv[2]=inner.argv[2].replace(marker,marker+'\n(allow sysctl-read (sysctl-name "security.mac.sandbox.sentinel"))');
   }else if(plan.runtime!==undefined)throw new Error();
   const child=spawn(inner.argv[0],inner.argv.slice(1),{cwd:plan.cwd,env:inner.env,stdio:'inherit',shell:false});
   const code=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',(status)=>resolve(status ?? 1));});

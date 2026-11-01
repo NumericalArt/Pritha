@@ -188,16 +188,18 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 ## 4. Пошаговый roadmap
 
 Текущий срез на 2026-11-02 (Europe/Moscow): R0–R11b реализованы, выполняется R12.
-После отдельного непосредственного согласия пользователя кандидат `15a17c1`
-активирован на canonical Mac mini через managed stop/start. Strict и operational
-health прошли: 5 страниц, 12 JS chunks, правильные instance/build, включённый
-приём задач, доступные каталог и история. SQLite перенесён в `pritha.sqlite`
-с проверкой содержимого и сохранённым обратным планом. Полный post-activation
-self-test прошёл: 1443/1443 unit tests, семь групп, warnings отсутствуют.
-В Safari проверены новый/старый native chat, Queue/Edit/Cancel, Steer, Stop,
-настоящее файловое вложение и восстановление после reload. Продолжаются Local
-и оставшиеся provider/voice/child проверки; операторская приёмка ещё открыта.
-Подробности и ограничения — в deployment report.
+Кандидат `3853e0a` активирован на canonical Mac mini с отдельного согласия
+пользователя; managed lifecycle, exact identity, 5 страниц / 12 JS chunks,
+admission и operational health прошли. Post-activation self-test: 1445/1445,
+семь групп без предупреждений. SQLite уже использует имя `pritha.sqlite`;
+повторная миграция не выполнялась, обе предыдущие recovery-точки сохранены.
+Native Safari chat/queue/steer/stop/files/reload проверены технически. Пользователь
+подтвердил живой голосовой ответ и прерывание без потери связи. Claude API прошёл
+реальное вложение и продолжение диалога. NeuralDeep прошёл file tool + resume
+на явно выбранной `gpt-oss-20b` через исправленный source adapter; финальная
+сборка/активация этих исправлений ещё предстоит. OpenRouter live acceptance
+отложена по прямому указанию пользователя. Открыты native Claude sign-in,
+Local recovery/performance, полный child pilot и итоговая приёмка.
 
 Предыдущий счётчик цели до активации: около 13 ч 53 мин / 6 071 672 токена. Это общий usage
 counter задачи, не output-токены или денежный расчёт. Оценка до рабочей локальной
@@ -621,7 +623,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; оба обязательных режима реализованы. Кандидат 15a17c1 активирован с явного согласия пользователя; strict/operational health и post-activation self-test прошли. Full quality 1443/1443, browser 163/163, secrets 23/23, network 80/80. Реальные Local/provider/voice/child checks и операторская приёмка ещё открыты.** Зависимости все выше.
+**Статус: in-progress; активирован 3853e0a, post-activation 1445/1445 и strict/operational health passed. Native UI и Claude API проверены живыми запросами; голосовой ответ/прерывание приняты пользователем. Новые auth/model fixes ещё проходят отдельную приёмку. OpenRouter deferred by user; Local/native Claude/full child/final acceptance остаются открыты.** Зависимости все выше.
 
 - [x] Full `node scripts/quality-gate.mjs`, self-test, privacy strict,
   validate/rebuild memory, Curated acceptance frozen fixture, ND security/network
@@ -639,7 +641,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
   same-origin JS chunks, identity/build, admission and operational read-only checks.
   Сначала isolated loopback/fixture state; затем approved production activation,
   exact build/source identity, admission activation и operational read-only gate.
-- [ ] Sanitized review с changed-file/source map, test commands/counts, failures,
+- [x] Sanitized review с changed-file/source map, test commands/counts, failures,
   limitations, schema migration/recovery, no-push proof и manual script.
 - [x] Подготовить staged local activation и rollback; только тогда запросить
   непосредственный approval на конкретный managed service action, если он нужен.
@@ -653,6 +655,13 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
   Steer точного turn; переключение presets; ND key/limits/wallet; Claude auth/
   guarded child creation; OpenRouter key/model/child preset; Local без сети;
   Realtime 2 nine tools/music; explicit Live; ND voice; voice→active tasks.
+- [x] Пользователь подтвердил слышимый Voice ответ и прерывание без потери связи
+  на активной сборке. Это acceptance только этих двух голосовых сценариев.
+- [ ] Claude onboarding из чистого экземпляра: одна копируемая команда с
+  привязанными root/state, запуск из произвольного cwd, независимость от другого
+  экземпляра и ambient credentials, browser sign-in, persisted auth check,
+  первый реальный task и resume. Проверить понятное действие при locked Keychain;
+  никаких ручных правок путей, копирования OAuth или отключения защиты.
 - [ ] Child pilot interview→contract→outcome→scaffold→deliver/implement в
   изолированном parent/state с раздельными approvals, измерением turns/cache tokens
   и protection gates. Не выдавать mocked pilot за боевой.
@@ -2343,6 +2352,82 @@ unit child environment отдельно и изолировать оба aliases
 - Пользователю переданы конкретные действия для native Claude sign-in,
   provider credentials через Settings и microphone/interruption acceptance.
   Ключи не запрашиваются в переписке; OAuth остаётся внутри native CLI.
+
+### Checkpoint 43 — approved update, live providers and operator voice acceptance
+
+- `3853e0a` активирован штатной транзакцией. Source/build/dependencies прежнего
+  `15a17c1` проверены в isolated recovery и сохранены вместе с ещё более ранней
+  recovery-точкой. Первое cold-readiness наблюдение было слишком ранним;
+  последующий strict gate прошёл без повторного рестарта.
+- Post-activation self-test: 1445/1445, seven groups, no warnings. Current generated
+  memory: 993 documents / 11012 chunks / 10791 embeddings. Frozen acceptance
+  SHA-256 неизменён: FTS 45/48@5, 46/48@10, holdout 23/24; semantic 31/48@5,
+  hybrid 41/48@5; regressions@10=0, private leaks=0. Retrieval quality не
+  подменяет качество итогового ответа.
+- Реальный Claude API: immutable synthetic attachment → correct answer → same
+  chat resume, provider binding сохранён, queue/active slots пусты. Host file-tool
+  execution отдельно не утверждается: наблюдалась интерпретация вложения.
+- NeuralDeep для `qwen3.8-27b` возвращал другую terminal model
+  `qwen3.8-flash-next`. Этот ответ остаётся rejected; автоматического fallback
+  и разрешения подменять модель нет. Для явно выбранной `gpt-oss-20b` live upstream
+  вернул publisher-qualified `openai/gpt-oss-20b`; добавлено только это точное
+  соответствие. Provisional wrong-model metadata блокирует публикацию текста
+  и tool calls до подтверждённого terminal model, целого stream и durable usage.
+  Wrong/missing model, truncation, foreign tool и accounting failure остаются
+  fail-closed. Real host read_file + same-session resume прошли с exit proof.
+- Пользователь сообщил: «Проверил: ответ и прерывание работают». Это отдельная
+  ручная приёмка Voice audio/interruption, без расширения на весь release,
+  другие voice providers или voice child factory.
+- В Local сохранён unknown process-coverage receipt после process_snapshot_timeout.
+  Отсутствующий PID не считается доказательством выхода всех потомков. Подготовлен
+  private reboot checkpoint с hash receipt и kernel boot UUID; очистка не выполнена,
+  перезагрузка не разрешена. Background inference также не прошла bounded deadline.
+- Claude native login выявил дефект synthetic HOME: macOS не находила login
+  Keychain. Исправляются OS account home, scoped config, terminal status check и
+  copyable command с обоими root aliases/state. Native CLI — отдельная доверенная
+  граница: ему нужен macOS credential store; model host tools этого доступа не
+  получают. Atomic refresh требует narrow read-only sandbox sentinel sysctl,
+  подтверждённого upstream issue и тестом отдельного synthetic Keychain.
+  Текущая пользовательская Keychain locked; real login остаётся pending.
+- Подготовлены private Contract/Outcome и immutable independent verifier для
+  line-counter child pilot. Все core/deliverable покрыты, negative controls
+  отвергают stub/wrong product. Два явных approvals и бюджет запрошены отдельно;
+  child пока не создан. OpenRouter live gate отложен пользователем.
+- Новое требование пользователя: подключение Claude для fresh GitHub download
+  должно быть обычным поддерживаемым сценарием, без ручного подбора путей.
+  Включено в R12 как отдельная приёмка; текущий partial auth check не считается pass.
+
+### Checkpoint 44 — Claude onboarding and corrected provider candidate
+
+- Подключение Claude для нового пользователя описано единообразно в Settings,
+  bootstrap, Start Here и `docs/claude-connection.md`: установленная совместимая
+  CLI, выбор режима, одна полностью готовая команда, browser sign-in, проверка
+  сохранённого входа и первая задача. Ручная подстановка путей не требуется.
+  Изолированный внешний runtime пока проверен только на macOS; Windows/Linux
+  не объявляются поддержанными по аналогии с самой Claude CLI.
+- Native CLI использует OS account home и отдельный instance config. Команда
+  получает оба root aliases через общий resolver. Только доверенной native CLI
+  предоставляется Keychain directory для чтения/atomic refresh; model tools и
+  API lane не получают этот доступ. Узкий read-only sentinel sysctl проверен
+  на отдельной synthetic Keychain без расширения сетевых разрешений.
+- NeuralDeep provisional metadata целиком удерживается до подтверждённого
+  terminal model и durable accounting. Повторный prelude с непустым output
+  тоже запрещён, включая совпадающий или отсутствующий model ID. Единственный
+  добавленный model alias остаётся `gpt-oss-20b` → `openai/gpt-oss-20b`.
+- Финальный full quality: **1452/1452**, zero skips, eight groups pass. Отдельно
+  focused tests 43/43, service/auth 13/13, browser Settings/API 12/12,
+  network audit 85/85, secrets audit 26/26. Сохранены неудачные прогоны 1450/1452
+  и 1451/1452: исправлены дублирующий legacy literal, README slogan и fixture с
+  несуществующим корнем. Naming/path guards не ослаблялись. Старые предупреждения
+  о формате четырёх commit messages остаются, история не переписывалась.
+- Подготовлена отдельная recovery-точка для активного `3853e0a`: source/build и
+  matching dependencies, five pages/twelve JS chunks pass, process tree exited.
+  Новая staging build ещё не активирована. Ни служба, ни другие компьютеры,
+  ни GitHub на этом шаге не изменялись; девять чужих файлов сохранили hashes.
+- Sanitized review дополнен общей картой реализации, полным changed-file map,
+  provenance, отрицательными результатами, recovery и manual script. Реальный
+  native login по-прежнему `pending-auth`; full child, Local recovery и остальные
+  ручные gates не закрыты. OpenRouter остаётся отложенным по решению пользователя.
 
 ## 7. Полные исходные материалы
 

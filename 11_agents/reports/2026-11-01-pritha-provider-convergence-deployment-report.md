@@ -26,12 +26,44 @@ confidence: medium
 
 This report covers only the canonical Mac mini instance. GitHub and both
 MacBook instances remain outside the transaction. The operator explicitly
-approved activation of `15a17c1`; the managed transaction is complete and
+approved activation of `15a17c1`, then the tested update `3853e0a`; both managed transactions are complete and
 operational health passes. Final operator acceptance remains pending.
 Exact machine paths, endpoints, build IDs and recovery
 receipts are private under the instance state root.
 
-## Activated evidence — 2026-11-02, Europe/Moscow
+## Current update — 2026-11-02, Europe/Moscow
+
+`3853e0a` is active. Its source/build identity, five pages, twelve JavaScript
+chunks, admission and operational health passed. Post-activation self-test
+passed 1445/1445 tests, seven groups, no warnings. Matching source, dependencies
+and build for `15a17c1` passed isolated recovery checks and remain retained.
+No second database migration or recovery cleanup was performed.
+
+Frozen retrieval acceptance remains passing with no private leaks; generated
+memory has 993 documents, 11012 chunks and 10791 embeddings. The operator
+explicitly accepted audible Voice responses and interruption without losing
+connection. This acceptance does not extend to other providers or child creation.
+Claude API completed an attachment request and same-chat continuation. NeuralDeep
+completed real host file-tool access and session continuation using a source-level
+adapter correction and explicitly selected gpt-oss-20b; its final compiled
+release remains pending. Qwen terminal model substitution is still rejected.
+OpenRouter live acceptance is deferred at the operator's explicit request.
+
+Claude native login exposed an integration error in HOME/Keychain discovery.
+The corrected command pins this instance's root/state and verifies persisted
+native auth. Tests cover separate synthetic Keychain writes and refresh without
+weakening network isolation. The user's current login Keychain is locked, so
+real native auth remains pending the user's local unlock/sign-in. Secrets and
+OAuth payloads are neither copied nor logged by Pritha.
+
+Local has an older unknown process-coverage receipt after a process snapshot
+failure. It is retained even though the original service owner has exited.
+A private checkpoint can establish that all those processes are gone after an
+explicitly approved host reboot and an unchanged-receipt hash check. Neither
+reboot nor receipt removal has occurred. Background inference timed out;
+foreground fixture success must not be described as live service performance.
+
+## Initial activation evidence — 2026-11-02, Europe/Moscow
 
 - Managed stop confirmed the service and listener were absent before migration
   and build replacement. The current offline migration plan moved only the
@@ -66,7 +98,7 @@ receipts are private under the instance state root.
   this configuration. Network/file isolation and process ownership are unchanged;
   no model service or autostart was installed. Live task checks continue.
 
-### Local follow-up awaiting staged verification
+### Local startup correction activated; inference/recovery remain open
 
 A real Local Task Chat accepted an isolated workspace and started its owned
 model, but did not return a response within the bounded observation period.
@@ -82,8 +114,8 @@ deadline, and aligns metadata/CLI probes to a forty-five-second total lease.
 Slow loading gets a dedicated error instead of asking the operator to select a
 different model. Real sandboxed regressions cover loading after ten seconds
 and early deadline cleanup; the targeted suite passes 13/13. This source change
-is not yet active in the running `15a17c1` build. The private model's smaller CPU
-batch profile still needs a completed inference check.
+is active in `3853e0a`. The private model's smaller CPU batch profile still
+needs a completed background inference check after safe recovery.
 
 The compact Local model is an integration fixture, not a qualified autonomous
 coding backend. A protected coding pilot failed its Trials and exhausted the
@@ -129,6 +161,48 @@ full voice-to-agent lifecycle or human Contract/Outcome approval.
 - Dependency audit retains one transitive Zod advisory (two package records).
   Bounded host-authored sandbox configuration mitigations and limits are in the
   linked assessment. This is not a clean dependency audit.
+
+## Implementation and source map
+
+The original three specifications, the later branding requirement and all
+implementation checkpoints remain in the roadmap, including its complete source
+appendices. The table below maps their stages to the local implementation.
+It does not replace the exact per-file provenance inventories or imply completed
+manual acceptance.
+
+The [complete local changed-file map](../../03_reviews/2026-11-02-provider-convergence-local-change-map.json)
+records path, change kind and SHA-256 against the initial canonical base. Its
+working-tree snapshot is bound to the subsequent candidate commit by the private
+preparation receipt; the manifest itself is excluded to avoid a recursive hash.
+
+The auth/onboarding follow-up passed 1452/1452 unit tests and all eight quality
+groups, 12/12 targeted browser cases, 85/85 network-boundary cases and 26/26
+secret-boundary cases. These are automated gates. The earlier failed runs and
+their corrections are retained in the linked auth review and private receipts.
+
+| Roadmap scope | Main implementation and review anchors |
+| --- | --- |
+| R0 source discovery | [Pinned source inventory](../../03_reviews/2026-11-01-provider-convergence-source-inventory.json), [source history](../../03_reviews/2026-11-01-provider-convergence-source-history.json) |
+| R1 canonical knowledge and retrieval | [Preserved knowledge inventory](../../03_reviews/2026-11-01-provider-convergence-r1-inventory.json), memory rebuild and frozen retrieval acceptance |
+| R2 configuration and provider identity | `scripts/lib/provider-profile.mjs`, shared settings/revisions and instance root resolvers |
+| R3 task lifecycle and history | `scripts/lib/provider-task-runtime.mjs`, Control Center gateway/drivers, persistent provider/session bindings and shared execution coordination |
+| R4 NeuralDeep | `scripts/neuraldeep/`, [module adoption map](../../03_reviews/2026-11-01-provider-convergence-r4-adoption.json) |
+| R5 Claude | `scripts/claude/`, `scripts/claude-code-runner.mjs`, host tools, API budgets and [native auth review](../../03_reviews/2026-11-02-provider-auth-onboarding-review.md) |
+| R6 factory hardening | `scripts/agents-mother/`, immutable Trials, budgets, process ownership and [factory history](../../03_reviews/2026-11-01-provider-convergence-factory-history.json) |
+| R7 OpenRouter and Local | `scripts/openai-compatible/`, `scripts/local-provider.mjs`, owned offline engine and provider capability gates |
+| R8 provider Settings | `interfaces/control-center/src/components/settings/`, server-side provider services and independent presets |
+| R9 Voice | `interfaces/control-center/src/lib/realtime/`, provider task bridge, private child-factory artifacts and separate approvals |
+| R10 composer and queue | `interfaces/control-center/src/components/codex/`, exact-turn Steer, persistent Queue/Edit/Cancel/Stop and attachments |
+| R11 installation | `scripts/bootstrap.mjs`, [Start Here](../../START_HERE.md), [Claude connection](../../docs/claude-connection.md), reviewed Brief Desk import |
+| R11b public naming | `scripts/lib/root-resolution.mjs`, `scripts/lib/pritha-env.mjs`, naming guard and [state migration/recovery](../../docs/pritha-state-filename-migration.md) |
+| R12 verification and activation | `scripts/quality-gate.mjs`, provider boundary audits, browser tests, strict/operational health and private managed-release receipts |
+
+The task has performed no push, PR creation or remote mutation. The local
+`origin/main` tracking reference still records the initial canonical base
+`e1c00eb007103c13f57b8139c1c462f18cb2d87a`; this is a cached local reference,
+not an assertion about changes other people might make remotely. Work remains on
+the local `codex/provider-convergence` branch. Nine unrelated untracked artifacts
+retain their original recorded hashes. No MacBook checkout or state was accessed.
 
 ## Runtime incident found during preflight
 
@@ -186,6 +260,8 @@ build. Never label an old build on mismatched source/dependencies as recovered.
 Operator acceptance of this matrix remains pending. Native technical checks
 listed above have actual Safari results; the remaining provider/audio/child
 rows still require their own live evidence and relevant user participation.
+The user's later Voice response/interrupt confirmation closes only that narrow
+subset; reconnect, other voice engines and full factory handoff remain separate.
 Automated fixtures do not establish live authentication, microphone quality,
 provider billing, local model compatibility or user acceptance.
 
@@ -233,5 +309,7 @@ provider billing, local model compatibility or user acceptance.
   establish integration, not general coding quality of the compact model.
 - Unsupported image formats/providers remain visibly gated, rather than silently
   dropping attachments. The verified PNG path is NeuralDeep with the pinned CLI.
-- Manual microphone, provider auth, real child pilot and operator acceptance are
-  pending. No Git/tag Good State baseline or publication has been performed.
+- Further voice-engine/handoff checks, native Claude auth, the real child pilot
+  and final operator acceptance are pending. Audible Voice response and
+  interruption are already accepted. No Git/tag Good State baseline or
+  publication has been performed.

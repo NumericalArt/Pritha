@@ -1,0 +1,4018 @@
+{
+  "schema": "pritha-local-source-review-v1",
+  "createdAt": "2026-11-01T22:47:47.718608+00:00",
+  "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
+  "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
+  "snapshot": "working-tree-before-candidate-commit",
+  "candidateBinding": "The private preparation receipt binds this exact map to the candidate commit.",
+  "neuralDeepSourcePin": "2ab22aeff5f1c167c86e925ec30311942b76023b",
+  "provenanceInventories": [
+    "03_reviews/2026-11-01-provider-convergence-source-inventory.json",
+    "03_reviews/2026-11-01-provider-convergence-r1-inventory.json",
+    "03_reviews/2026-11-01-provider-convergence-r4-adoption.json",
+    "03_reviews/2026-11-01-provider-convergence-factory-history.json"
+  ],
+  "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
+  "unrelatedUntrackedFilesExcluded": 9,
+  "fileCount": 571,
+  "filesSha256": "f7482d439bb74b6737fc52a0af6564666f7a0de15336bb2909e1b929aca88b8b",
+  "files": [
+    {
+      "path": ".env.example",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3872,
+      "sha256": "1ebc1a48fcb0558d07d3327618c5e30e01c830b6da26e39bcbf02d1423ca8797"
+    },
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1336,
+      "sha256": "ad2090cacb8dc5d2cfabcd5493142c63730d49b6f025263c51a93251cca583de"
+    },
+    {
+      "path": ".memory/README.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3456,
+      "sha256": "294e05d92b2b761288e048e33a15a2e5d0e99f3746c6d413179de60924bb4e22"
+    },
+    {
+      "path": ".memory/schema.sql",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2173,
+      "sha256": "b0ee262b26fab9022ae25217810ab15cef3832cd0d2a5796600f41f13b0d4a0f"
+    },
+    {
+      "path": "03_reviews/2026-11-01-brief-desk-adoption.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9190,
+      "sha256": "65d600f5164006bf40c5f61c1a765b5d98a7a42ebd7d1534084d92a1b48e28c5"
+    },
+    {
+      "path": "03_reviews/2026-11-01-compatible-provider-evidence.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5358,
+      "sha256": "40e627f11d9d607e4d224a596c1b0a1973cd328d608edcfc021c31a8c345f616"
+    },
+    {
+      "path": "03_reviews/2026-11-01-neuraldeep-voice-adoption.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10472,
+      "sha256": "ee179c325bdcb6b332b7acb3efec57d13b2649bd7e031e18309c52f07e72dbbb"
+    },
+    {
+      "path": "03_reviews/2026-11-01-pritha-rebranding-inventory.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 37258,
+      "sha256": "45a3ec7dd5a64ee26ed946913b17c3a7e4469ad43be11d11b2f7468ba776cf04"
+    },
+    {
+      "path": "03_reviews/2026-11-01-provider-convergence-dependency-audit.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3558,
+      "sha256": "3371214beb18cda2eb9599abb661a2877d1aba376e25181d05734290123b33aa"
+    },
+    {
+      "path": "03_reviews/2026-11-01-provider-convergence-factory-history.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12616,
+      "sha256": "409d7d81aa5148d52c7e9e4b83e6ce3c6c8b47858ebf6f3d77f96cf726e497f5"
+    },
+    {
+      "path": "03_reviews/2026-11-01-provider-convergence-r1-inventory.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6194,
+      "sha256": "342975fe111e35ac53bfd99d9e08a7c665352a4110dc008f34470a4a7641ae6f"
+    },
+    {
+      "path": "03_reviews/2026-11-01-provider-convergence-r4-adoption.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 29215,
+      "sha256": "da57f1d63a70b32f32e8d4bd81b8c68cbf77b1ffa8cc3c3266a7edbf53cef6f0"
+    },
+    {
+      "path": "03_reviews/2026-11-01-provider-convergence-source-history.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11294,
+      "sha256": "e750e3e0522c11589f1039bc5c434bb40174b31f1500c2a77da1544f96800039"
+    },
+    {
+      "path": "03_reviews/2026-11-01-provider-convergence-source-inventory.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 260980,
+      "sha256": "ad60fb97781712604dfea8d4477f15f27ac83d3979766b88aaa9594b49d781e1"
+    },
+    {
+      "path": "03_reviews/2026-11-02-provider-auth-onboarding-review.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8347,
+      "sha256": "965254b6fe34ab82df111b9f3bb7470d363453914477d21431134443620b30c5"
+    },
+    {
+      "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 292514,
+      "sha256": "6ac536dc91a5b39efd86511141db3c0989124c0538de94352774ae2aba0c5097"
+    },
+    {
+      "path": "07_workflows/agents-mother-host-research.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5296,
+      "sha256": "5bb6aecad6a4ac089d324596d15a4865e2645f03db5fe1670a575c2c8c7ff050"
+    },
+    {
+      "path": "07_workflows/agents-mother.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 46332,
+      "sha256": "78cd9084ce873877213660f4b35943a8cd4b5e6c1a0a65486dbf32dc7c155e32"
+    },
+    {
+      "path": "07_workflows/child-provider-setup.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5298,
+      "sha256": "a7e8c4fc6f9b359bdfeaf6cfb7ba6d11ffc49582564a75bb444e96ceeeec15ca"
+    },
+    {
+      "path": "07_workflows/delivery-usage-accounting.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11380,
+      "sha256": "171aebf6fc8a1a94ef0bdb3dad50ba243a1cc7c26b7057f32d07bdd211654688"
+    },
+    {
+      "path": "07_workflows/first-run-setup.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 7236,
+      "sha256": "0dd3b6abf7d1c1461e1983eba20052ecb575eeee6934610a5f25f5ac3894b8d9"
+    },
+    {
+      "path": "07_workflows/local-provider-offline.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6305,
+      "sha256": "f30fbf98aad63b46eeab6596ae0695e0c6abb6191a611ed20e75f8eb5c11b566"
+    },
+    {
+      "path": "07_workflows/task-chat-composer-tools-compatibility.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 12681,
+      "sha256": "b89955ccd85e63beb7d54f30ad52df99fe822c98ed363815531f46e030843ed5"
+    },
+    {
+      "path": "08_templates/agent-project-contract.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 21264,
+      "sha256": "37f97d06cddfb7fa7e6345d60cce547c66c0a9d9e26729421797655c93deee44"
+    },
+    {
+      "path": "08_templates/pritha-audit-phase-report.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 920,
+      "sha256": "ff21eb4781244ce1c37cbcbf0590a5e72994b1bee99b648887eb13881aad0ed5"
+    },
+    {
+      "path": "11_agents/reports/2026-11-01-pritha-provider-convergence-deployment-report.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 23332,
+      "sha256": "2ae28cc85597c68543f4384b0db75659bbc6e2fc3c3d8cfcc1598c6c67a6c455"
+    },
+    {
+      "path": "AGENTS.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 62594,
+      "sha256": "8503fc6f6e3d496fac923ef9dae982454bec87af7697dc4d04e281b92297266d"
+    },
+    {
+      "path": "CLAUDE.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1436,
+      "sha256": "d91e828f43e31a258dd9759a7cbd82785600a846b6809ec5f76a945fbd88b44a"
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9183,
+      "sha256": "517db4da820897a5d48810888f7938b2abd0364cc3854a9db141374552868d6d"
+    },
+    {
+      "path": "README.ru.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5959,
+      "sha256": "922e56dfbed4d00348fa97e944f0e54a8036faeb663ef7250933b953a838e3f7"
+    },
+    {
+      "path": "START_HERE.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7813,
+      "sha256": "7eb53cdb09943be19038aec184450e6631028ddba29e137a31bdb0054c790e29"
+    },
+    {
+      "path": "config/pritha-name-compatibility.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 31900,
+      "sha256": "555ca6bd5db748801e35922e1189c167017cf7dea99a7aee7d019a1ace2cfd4a"
+    },
+    {
+      "path": "docs/architecture.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9375,
+      "sha256": "f5137e772acd82a64644c9bddcf67c6939b2a277d76b17d337f8c64d01b54376"
+    },
+    {
+      "path": "docs/claude-connection.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4822,
+      "sha256": "96cfe0714ab8ddb264bf067ed819f0971a6723cfd180d82a3413384a20efb747"
+    },
+    {
+      "path": "docs/getting-started.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9721,
+      "sha256": "09272f5b931cb566ba7f504416451c1c876838b97a58b554d6debeed550ff9f2"
+    },
+    {
+      "path": "docs/getting-started.ru.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 7514,
+      "sha256": "f40af75feecf0af54f5db5b0c797692a9921f0933b7f4c0cd073af8c77b20b26"
+    },
+    {
+      "path": "docs/instance-isolation.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4335,
+      "sha256": "f0a61fc97cd0a6cb0171a587f798b781b017d29c22cd326fb7233683a3d21583"
+    },
+    {
+      "path": "docs/pritha-state-filename-migration.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9574,
+      "sha256": "1822f0030439a0d50c2b2f36170be226eadcad9a9c1b4903f72b9a1079f16cdc"
+    },
+    {
+      "path": "docs/pritha.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11257,
+      "sha256": "2d758503ddbbdb7f54d0e516560861f242427f94f0d76025430154ec59774f56"
+    },
+    {
+      "path": "docs/troubleshooting.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 6444,
+      "sha256": "ba34243a7e57d39908940493ae8b8f9f35880ff7ad4995d5cbe29fe2fc2d43ef"
+    },
+    {
+      "path": "examples/brief-desk-nd/agent-memory/contracts/brief-desk-nd.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1473,
+      "sha256": "1bb807f382687357176e1182aeda4c5c787e8408c948aaac6a6597e0afe001d3"
+    },
+    {
+      "path": "examples/brief-desk-nd/agent-memory/outcome-specs/brief-desk-nd.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1394,
+      "sha256": "6d05ef8e5d192a0650e17f238f3d6da064ff498c6dbf41338a887e13da068c88"
+    },
+    {
+      "path": "examples/brief-desk-nd/agent-memory/profiles/brief-desk-nd.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 816,
+      "sha256": "9cbcb3efe0d121c90e1e562986da738024e007a8520df5717f693357d5e55bc0"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/.env.example",
+      "status": "A",
+      "kind": "file",
+      "bytes": 182,
+      "sha256": "be94690d7f77e0749eec0f5280582d6bd50690f9490784dc28348755ec6d59f9"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/.gitignore",
+      "status": "A",
+      "kind": "file",
+      "bytes": 76,
+      "sha256": "00307da5fa97ef9e6a1e90dc68d16861fd4493eceb76a2729fafd123da0eb5d6"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/AGENTS.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1843,
+      "sha256": "e88306bb4d301b425b9c7f46bfc517b22f3d7074de53ceda5846b8e6c8a69de0"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/README.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1938,
+      "sha256": "7bdc51575b7fa41bdfe633ffe0681b105dbe2a821c81155b1e1c6e22262f3a2c"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/app.js",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9302,
+      "sha256": "4c2adc137a99482b0d352f6e4d2c521f5265719bc805a2acedb9ac25ba2b325b"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/demo/brief.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 893,
+      "sha256": "94999ece910b440d370194166286d1718f11ac864904114cf97bd55158cd34b8"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/docs/e2e-manual-test.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2306,
+      "sha256": "0fbd9fa0bcc7cca69b1dcfd536a81df190b2316f54fd12643af2d1bfdbee0763"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/docs/handoff.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 495,
+      "sha256": "c4150976c8a8759d12d7a5de00c7c07dd321900ac39d6294c5f245101a4eeb33"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/docs/telegram.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1894,
+      "sha256": "db2fe690869adafa1a1fd0f0f343efe05512e4555fb8172263111666c9b0fb2f"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/docs/usage.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 490,
+      "sha256": "ebe8a9597351af11470f27225debdde7ed7b5da577684fbe642dfbc325d49871"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/fixtures/clean-page.html",
+      "status": "A",
+      "kind": "file",
+      "bytes": 599,
+      "sha256": "60e050839f0e9592da1cb7386dd8bffc5702b6fd61df802a2c2c7ff2084c3a01"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/fixtures/injection-page.html",
+      "status": "A",
+      "kind": "file",
+      "bytes": 319,
+      "sha256": "c904516e2526f0b5965e607bd46cb413633a6dbf096a13833eea0f6c9102ff33"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/lib-runtime.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8991,
+      "sha256": "14b847d151f4125ba35479914da8b425ae5d3e8ff3489aecf735bd25eb5abbca"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/operations/manifest.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1718,
+      "sha256": "19c6c678c494a3023ac0b525a61f762e28f37b1524393298d7de7a80e2e53d54"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/package.json",
+      "status": "A",
+      "kind": "file",
+      "bytes": 322,
+      "sha256": "1706e2fcd275fdc893f69a7c0e383a2c77d7950b001a766cba063b8a3b2b3dae"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/provider-credential.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1537,
+      "sha256": "d7edfd542ac682ce533f503626d3f09763e4f5035bff2cc4eaa79437f4dd5f31"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/scripts/deploy-service.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 115,
+      "sha256": "26f169fb1e75c997404829705e2c07ae0df50987aa4f4e3753a1a1d7a59252a6"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/scripts/run-trials.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 344,
+      "sha256": "4591d3d5e174a66ada30fb3513dbae971fb697076d93bdd11899ad4723c65512"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/scripts/service-control.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4399,
+      "sha256": "f4a5b8fa98671f0feb8a7ecbb7c07933e38d44d38e02d960ed78a4b883a1d606"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/scripts/telegram-destination.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 848,
+      "sha256": "c16fbb04de8b3b47abf77e36be2075671960961d7879227bb3563f0f262d3ff8"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/server.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 16311,
+      "sha256": "b01c0f37fda85bc649e4bc917cbbf7f0f3cdbe00b02940542b6b7bf76ed917bc"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/settings.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4210,
+      "sha256": "b73fa77a3a11521155da6d4fcbb99320b6869c4be32bf50bb5f87d6dca528bd8"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/tests/brief-desk.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9955,
+      "sha256": "8ee6ee727f1734d87b94627b4803370602a89d795ef800796a985bef81c490f4"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/tests/settings.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5828,
+      "sha256": "3912388a9bfbe27ef82c78ebacf028730f3904afc39c6329818992247d94cea7"
+    },
+    {
+      "path": "examples/brief-desk-nd/project/ui.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9734,
+      "sha256": "bee9691bb367fc925c5b2714e219676147b9392035949cd4f59412ff8a4a7c3c"
+    },
+    {
+      "path": "interfaces/control-center/next.config.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1081,
+      "sha256": "aa8e9b9110aee75794bcfe47ecbf4576fdb6dd2250704b8464deb95dea797550"
+    },
+    {
+      "path": "interfaces/control-center/package-lock.json",
+      "status": "M",
+      "kind": "file",
+      "bytes": 64690,
+      "sha256": "b046c23918dad812d89d9a24dbc8546305cc0b53d89965736567b38305d68e19"
+    },
+    {
+      "path": "interfaces/control-center/package.json",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1603,
+      "sha256": "6d073878d6184ac68381309b16113b5460068a6b265debc2d56c38ad8febf313"
+    },
+    {
+      "path": "interfaces/control-center/scripts/e2e.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 6764,
+      "sha256": "023b27cfac552a087c127ca35f92888b67068ff22b24135550c1aabe1c91bed7"
+    },
+    {
+      "path": "interfaces/control-center/scripts/voice-assets.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1196,
+      "sha256": "d454243cf1538952a255cb50ecbee324eb5c989e812950ebb813c015ee2bbafc"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/agents/[id]/credentials/[name]/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2184,
+      "sha256": "ba6c584ebb8d3c9b5e7a0752887c38afb3b847cfa2bb60d2932eb6232c1627f2"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/codex-chat/v1/attachments/[attachmentId]/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1650,
+      "sha256": "0d595fc4891a2ada97d3513b66d6a0d7ea4c6a4cf5a95da46bd91701f56c80d6"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/codex-chat/v1/runtime/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 766,
+      "sha256": "1771e98fdfc483088456c02476790e2cf52f6cc85acc98b5861e876d22c02a0f"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/codex-chat/v1/threads/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3465,
+      "sha256": "89beb81421760af4d2e219499e915126882d9c7e350fb65c44ccd0d116260bca"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/codex-chat/v1/workspace/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 528,
+      "sha256": "9726a1556955be93f4a35943afe7bc7a4e13a0f019125ee8e232d2fb61b834f9"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/call/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2348,
+      "sha256": "35e3611a605cabdac1edd627ad84413e33e7e89ced449e7fbc9d61de5318a014"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/codex-task/[id]/answer/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 878,
+      "sha256": "902433cfe14ec2f08af7ce2936d9d1e45dbd9edbe53bfdd38ea3fc1121bd13cf"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/codex-task/[id]/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1271,
+      "sha256": "41a165cc38cec412d1311c7cababa1af80357edbc38eaa98ddafda705b7401b6"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/engine/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2185,
+      "sha256": "c8bd27e4b561a5fff8bd477d04be70b5181120963d21c264f89da5e8e2b77391"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/intake/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 6198,
+      "sha256": "7f66d68421abbdbd76549956c0cab912e0eb2adad0adf18ace82baa7e691334b"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/runtime-settings/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10549,
+      "sha256": "f97c721be63005f5a2e9d88a8c72c73df6a78d4965ab02b04e152541b252e6da"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/session-config/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1228,
+      "sha256": "b84d0cad59cae0d8b5a41e866508509a3ada8373ea6c12c4b69d50191371fa6a"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/session/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2871,
+      "sha256": "376bed8dfa37837c3964d50cfe0463171e0586297fe2747dff04e19b4141bf41"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/status/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 808,
+      "sha256": "1de035c03625c4427015e7cc2de5d9609baa20e872e94d506d61c51331236315"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/realtime/tool/route.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2090,
+      "sha256": "6879fe77037c0b3e871cbae4d715bedae12b9be68966b7658baf083a407ec493"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/settings/openrouter-credentials/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 352,
+      "sha256": "688dddc786d20ce4810d772382c6fcce68f3f62deab5406f4372d17730ef7ad9"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/task-runtime/providers/[connectorId]/attachments/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 809,
+      "sha256": "f338fca8151d5fccb1c89108a46a30a621318618f6fde0b96efc738dcbd53a50"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/task-runtime/providers/[connectorId]/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 481,
+      "sha256": "3d140797c735b2a5e027338e96ac63a07dc1528ae507f3ee2fcaab4398a1b23f"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/task-runtime/providers/neuraldeep/search/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 461,
+      "sha256": "394ee6ae10f29b616ef61e9a5a704889e16e1d6159ec73d58b2612320090f45b"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/task-runtime/providers/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 437,
+      "sha256": "914f6ce2da74344c9de5bf2da13fcdf4594e44044b699069f3fc488aea49af47"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/task-runtime/settings/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1233,
+      "sha256": "c9bb883bb256d6215b8d457b923089a4ea7f592b0d4f2c6817cedb556211433f"
+    },
+    {
+      "path": "interfaces/control-center/src/app/api/voice/[...path]/route.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9447,
+      "sha256": "162ef62df7bfcf757dfa00d7b049c9f23fe8f8f92201f499c3f6a91994922c4c"
+    },
+    {
+      "path": "interfaces/control-center/src/components/agents/AgentsOperatorExperience.tsx",
+      "status": "M",
+      "kind": "file",
+      "bytes": 36000,
+      "sha256": "5775454db1ae7cb2e386aeb25c0d9bd04f4ef91b1e5064d12f1bb871172d7e11"
+    },
+    {
+      "path": "interfaces/control-center/src/components/codex/CodexChatPage.tsx",
+      "status": "M",
+      "kind": "file",
+      "bytes": 107666,
+      "sha256": "17a409d732a60b0377378e4681699ea2c1d1e1a951dacb9b07d53c59f417b9f6"
+    },
+    {
+      "path": "interfaces/control-center/src/components/codex/FactoryChatSelector.tsx",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1903,
+      "sha256": "c1d66a2825ea25e327b8bc4a27da8c68260d184eb655d0bf25637dfe4af0cbda"
+    },
+    {
+      "path": "interfaces/control-center/src/components/codex/NewChatProviderSelector.tsx",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5657,
+      "sha256": "695272aab12c13a2f0f3fa887b4fcab213929dd5614c376c19b72b3307dedde9"
+    },
+    {
+      "path": "interfaces/control-center/src/components/codex/TaskChatControls.tsx",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14759,
+      "sha256": "ada17046904872e3c50c335e418c783fba76be0d48c46f59d927adea356e81ad"
+    },
+    {
+      "path": "interfaces/control-center/src/components/codex/useChatAttachments.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 13009,
+      "sha256": "60cb9bae37e806a7e250b5c4c01a119dc9954e587f1cbf4f4155538a987953f5"
+    },
+    {
+      "path": "interfaces/control-center/src/components/settings/CodexSettingsSection.tsx",
+      "status": "M",
+      "kind": "file",
+      "bytes": 26515,
+      "sha256": "6d507b7f75672211e6a083c9b1b9bc1e4f97617d455edd62f42badc2a0b10e5c"
+    },
+    {
+      "path": "interfaces/control-center/src/components/settings/NeuralDeepSearchSettings.tsx",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2274,
+      "sha256": "35609e64f2b31ba88a0bb973e10c680f6b1b6c18b9c0c69fdcdc555dcda3ba1d"
+    },
+    {
+      "path": "interfaces/control-center/src/components/settings/ProviderConnectorBar.tsx",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2129,
+      "sha256": "6957c38244178d033b43f373d4c88b39baff929a6a61179406ca0e0a04324f8a"
+    },
+    {
+      "path": "interfaces/control-center/src/components/settings/ProviderSettingsSection.tsx",
+      "status": "A",
+      "kind": "file",
+      "bytes": 20837,
+      "sha256": "09d8f0245cd3b42cd2b0397bcdede34722addd7ce9ad99d2143d9e4aca28e8d9"
+    },
+    {
+      "path": "interfaces/control-center/src/components/settings/SettingsControlPage.tsx",
+      "status": "M",
+      "kind": "file",
+      "bytes": 44384,
+      "sha256": "47f5dcfe2d557afcc3847fec98e4738e57e89b78a9adcb92cb44439deab35403"
+    },
+    {
+      "path": "interfaces/control-center/src/components/settings/VoiceEngineSection.tsx",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6413,
+      "sha256": "ed9e7202cca9f96a4c36022413eb54c3fc7707090c380022c2f5ab005631d270"
+    },
+    {
+      "path": "interfaces/control-center/src/components/settings/VoiceSettingsSection.tsx",
+      "status": "M",
+      "kind": "file",
+      "bytes": 7151,
+      "sha256": "a1d88e8c542c5110442ed353074fb2e9a01be263c74eda63314dc31468f0651e"
+    },
+    {
+      "path": "interfaces/control-center/src/components/voice/NeuralDeepVoiceTransport.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 19243,
+      "sha256": "1c2174d2b2ef162ba68d1905b526d6e17116659f3e21fb41e5478fee4dbac016"
+    },
+    {
+      "path": "interfaces/control-center/src/components/voice/VoiceControlPage.tsx",
+      "status": "M",
+      "kind": "file",
+      "bytes": 67803,
+      "sha256": "21d3b92fa965b18d14ed1c342b4265a4456296ebd604a0673d15ad9fd6066630"
+    },
+    {
+      "path": "interfaces/control-center/src/components/voice/usePrithaRealtime.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 118062,
+      "sha256": "32572a68d9c7bc3cb166ca292dca752a2cff6b3f8cc4b3cd231c9df9341127c7"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/app-server.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 32129,
+      "sha256": "830122c91aa7a94304fc457551be397f9f40dc3eba65d0eb3360714e91d3fa12"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/attachment-store.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 900,
+      "sha256": "d9dbb27add7e627ec6013ad6cc6d29858ede99e9b5f0cc719c2869d890d8119d"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/draft-session.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4780,
+      "sha256": "94a4883ec45c3d349851068418b58ccd0be350f0662ce378f84bbff274b41596"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/driver-types.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2065,
+      "sha256": "2c0e5241a7cc12f7b8afc7b1eaba53da04e878805f55328938c3145f14763825"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/drivers/claude-driver.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3998,
+      "sha256": "736d1ee323d7f247b060a0f8941e561bb737d4bb749b921df1dd04978dfd0f23"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/drivers/codex-app-server-driver.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2620,
+      "sha256": "9bf0e6af16d448b577e8ce8afdc2c45515ff678944c12952c08b04518cdf4e40"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/drivers/compatible-driver.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4789,
+      "sha256": "0a5b14a21ca92ffb84268086acbe436ad597708acc0ad7c29020148621c05234"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/drivers/neuraldeep-driver.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5544,
+      "sha256": "7dadccc1042302c03a53fa5b692021c6c5129e97400bd1062ab167b7ac991eeb"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/external-gateway.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12263,
+      "sha256": "a095a495bee6f77b1d921cea401a810728a57b7ef431409675d1672febd9b0b7"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/gateway.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14701,
+      "sha256": "1a0bf94ccaf89c868ab42fbe1116ba1798da8f2e6ce904bf1c309806ea052286"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/http.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4465,
+      "sha256": "acf584cf233bccd3057f02143399915a7aecc40c801a608f4574cea843511650"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/native-gateway.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 117492,
+      "sha256": "fcc7785ba723dc1887f6723a5c144c558d629336124a259a49c3d52f77e6548c"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/native-turn-coordinator.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1729,
+      "sha256": "c33618f7333b7dedf89f79d09983fc07ae0266fc9515fcd897945d2386c71018"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/normalize-cli.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2016,
+      "sha256": "80b700c5308f12c9171df6672ae9b54e31c7ff767b0d99f046a134464bb33a87"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/normalize.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 12607,
+      "sha256": "d3d6c862b4ae1b56d5767a93996acb31bb1ab8989c916b0de5b796254aa0f32c"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/operation-runtime.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2438,
+      "sha256": "0face1342a0a373002430592e86fe9cb9d9969aa38934888cf5416284f79c98d"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/private-store.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 20743,
+      "sha256": "77fa3e7e0758ce5c48d5f94da6242a9889380714d53012f8b0c7839bec9c8dc1"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/provider-activity.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2456,
+      "sha256": "420a1def457a46b881681317d41ffad2fb1be42b17ba3659117fd6b48d157492"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/provider-thread-pages.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3803,
+      "sha256": "c08a69ad05e536f7d08559984d2552e811ee3b1bdc332d63af6919d36abb15a4"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/types.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9450,
+      "sha256": "de2d1fe32e2420f30f91ce653c90c211b01ceeb4c8b58fa46724b30464f04193"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/ui-activity.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5211,
+      "sha256": "6331fcdbca28da1379c6cc27eb92b14cbd801903bed8d369315ea9508697ea5b"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/voice-links.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 12593,
+      "sha256": "02aaa3d1ab74ec602e30ac551588490a2de49cb90c927ed7fcd3076e10d36fc6"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/maintenance.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1645,
+      "sha256": "94577932fb6894e1ab12be4e39e7ab17b278a17f15a86eb5a73058219102af24"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/server.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 171233,
+      "sha256": "8150eac2122bdfad61001cf4b377be8c3f3122206d88d23c08582020303290d9"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/types.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 21506,
+      "sha256": "e6bc1f30fec86b8114b88d238cb1dea518b3f358080f2c2f524e7d1d2eac11da"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/music/config.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5433,
+      "sha256": "a5d3391d063905d676b6ae8f3fff040421e89f6941bb885f0644fd667cbedea3"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/pritha-env.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 100,
+      "sha256": "9df17ba8d49e764ea66e7d66f3040c01743f65bc14e6e7838f738c60b811caf5"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/pritha-paths.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 905,
+      "sha256": "8af4ab251d28b12d79f7936a3f5709cab6f4d1f480745d43b06d2119f093acbe"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/codex-task/codex-app-server-client.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 49306,
+      "sha256": "63ab2719f3776c300c2c116a86787699c5bad1340eb0ea7a9bb3476ecf40fd76"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/codex-task/continuation.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9600,
+      "sha256": "cd17e82c0f51be37e4341732c3688bf958c9db599247bef2da30686803dc635a"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/core/voice-tool-definitions.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 20374,
+      "sha256": "88618e5b8ee6b29728fe40a4e7b7fd90a9a34fa550f58c50a270331a7f69e645"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/core/voice-tools-dispatcher.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2339,
+      "sha256": "ac1ae445d3db0ba193ddb9d6b88a14421ac675c964c305b0d052004bbe2aecb6"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/pritha-runtime.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 371021,
+      "sha256": "a98194639e0986dcbc131b90b093b02aa55f4948d5feb8b7b31e2069c9438f05"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/voice-engine-server.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2294,
+      "sha256": "1ffd6c8b2727d5158d6beb0a1e15b477647acf7c220c298c6803ac8c39370c6a"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/voice-settings.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5139,
+      "sha256": "5ab8a525a6cb538b084b7fc2d2a63dc0a91881f92a8625d7a57f9cdbfa788a17"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-auth.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1932,
+      "sha256": "58ece7c6f46aa1bba98a5974babb7b9cf3e99b28e58b9d3426f5ff779d25d357"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-binaries.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2604,
+      "sha256": "386260e95c86d6d0d910116f603788bd22e413d754df59d7e6f14917a416ffbf"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-model-catalog-server.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4544,
+      "sha256": "38de05e0f5edccbb712dfc95d7d238d5160fc3d63d719716c3a36e69a92eb3f2"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-rate-limits.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11924,
+      "sha256": "344e943477dfc41fa246f07f5fb30d84b373c7852b6b75bdf35312566743dcf2"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/env-store.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5188,
+      "sha256": "131844d508d097ad8302cc0da5909277b4b95233f6b7b0fb3513e164ab09b439"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/provider-credentials.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 447,
+      "sha256": "c4d31f2affeb39ea7d121ce69ac4906a5bed67502020b299acb0cff5727c793d"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/provider-profile.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 152,
+      "sha256": "be6ccaa432932fbf678552416faa10f4376da1ae54ad548b2a237de3b5252e58"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/provider-settings-server.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3257,
+      "sha256": "124648feb2be6757e12f4ac14788da3b00eaeb3d95d4264611e90321335c1f39"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/host.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3851,
+      "sha256": "16358f93e9785fd462604604230eac3c84903b8604a5e52ec27dc7ca175a414b"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/provider.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8673,
+      "sha256": "f9d2aeaa93083feeb853cefda12ba9298c5718e15b3c32e8f586d409295b97b7"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/search-server.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1528,
+      "sha256": "f3c4702a9c42738c2832077b6a397fee71069bacf08369a4f5e4af509349b301"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/session-context.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4714,
+      "sha256": "bc227f722dfe7b4ce25194748333c7fbb6add38ea26c5a0f20bcb787305dd88c"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/sessions.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 17871,
+      "sha256": "bc72b5905638e855cc5d30ed40c6c9f6cd905ea0d79e5ae61c964185543b7cb9"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/settings.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1415,
+      "sha256": "4fcb330cabff9be700386be08e4e97cc5ebdf1a73497e94dc083b9f4200d6dc3"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/task-router.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8910,
+      "sha256": "1681e0db3566f4545e14a6458d6a7a26670dfbe3e50fab677059a2ab6156a0c4"
+    },
+    {
+      "path": "interfaces/control-center/src/lib/voice/tool-service.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3033,
+      "sha256": "081607e75b4168646134f1480ed5013c82b7e017c441432fef9deb0041eb829a"
+    },
+    {
+      "path": "interfaces/control-center/src/styles/globals.css",
+      "status": "M",
+      "kind": "file",
+      "bytes": 153906,
+      "sha256": "fbd7c966d309ecb74a70da5a75c1ae26ebe68025603327d823bff57e2f2c2ba5"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/agent-nested-credentials.spec.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4453,
+      "sha256": "37714b2cb4c644f19af116ee93579b4f487b28ce5ad01d1102e4e5381fe13b8d"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/candidate-health.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 887,
+      "sha256": "a8e85b583263b8b0a379feded6716e15b74cf3208056e405ede0255b682b0494"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/provider-settings.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 17595,
+      "sha256": "0781cb3d0f39d285a33d959e6e1d4f965fba1ffc65f21f31175f6230bc342c58"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/settings-evolution.spec.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4913,
+      "sha256": "2bf54be62ae0223a1c44dcbddfa6a25ffb683393985fd8495a2bb2035f215f23"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/task-chat-attachment-storage.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2063,
+      "sha256": "19d9d6ac4762852a23cdb5f9093c7b3f291b01c57d51eee8d9d78dd2f9bee46b"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/task-chat-composer-tools.spec.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 32042,
+      "sha256": "1e3462f3980cc09ab5428bc11e7f50cdf205b8963352232984e5d40ece4b862f"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/task-chat-concurrency.spec.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 12059,
+      "sha256": "e1034df4332522ae39e6e4bd6699738ea5150595a0868d2e0e9eeac92d12905f"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/task-chat-provider-approvals.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3424,
+      "sha256": "3061f254ee170148fe65543b61700473340719f8ce3ef930ec2000fd7119492c"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/task-chat-provider-selector.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 15030,
+      "sha256": "ea9802b9602956f839ae266e43401cb983cfbff4b26f272983bf5eb10a5a0159"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/task-chat-steer-queue.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9728,
+      "sha256": "aebbb7011bd7cba8a48d69f7eca953ee87214fd72f7784d5066c12b1860f7967"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/task-provider-settings-api.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2266,
+      "sha256": "ebb2ffb3ba0bad447768d529e006f65f040e90e506d07968377212f33aaf7d05"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/voice-engine.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9534,
+      "sha256": "beddf40770e699373444e0f75c214a83c200f89ce774afd9f5760ecf9a78224c"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/voice-models.spec.ts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10021,
+      "sha256": "22ff7d62c1c0174063a6e2f24d15dee147df69f7634f4d5afd97aae65ba09bd4"
+    },
+    {
+      "path": "interfaces/control-center/tests/e2e/voice-task-provider.spec.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3740,
+      "sha256": "eb0429b2c4d7663b88c6a2afc76658366f8a787b2c11bd718a70fe8f21fab55e"
+    },
+    {
+      "path": "launchd/README.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1020,
+      "sha256": "224fabf153e4f3583cc5ab3ebcad6702e8076ed358248c67944df5b753df5a63"
+    },
+    {
+      "path": "memory/manifest.json",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1388,
+      "sha256": "0c7efe93156ed297e638b7104307338ba7e091495a16fc2bf9390a7642bfc33d"
+    },
+    {
+      "path": "operations/manifest.json",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1726,
+      "sha256": "0f968bfdf345caa552f0a22a3b1d34308396a9c4bbce4e7ca3e32ba23261e321"
+    },
+    {
+      "path": "package.json",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2127,
+      "sha256": "191276f394aa838054adda27dffa9d274a2c86002734a84f3b4df66ffef76b42"
+    },
+    {
+      "path": "scripts/agents-mother.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 509,
+      "sha256": "7235621797f493698e03dc3682552ae2c09c32a5d340e883bb209ac4ccbf6ace"
+    },
+    {
+      "path": "scripts/agents-mother/authored-handoff.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11597,
+      "sha256": "3ca0fbc18005a7a52a66d78cc010249e87886146412c4ac96c46700ddd4f88de"
+    },
+    {
+      "path": "scripts/agents-mother/build-executors.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 48950,
+      "sha256": "eb2bc0ab204c149f799f5eed7573569cae81bee627945cf45d4e35fc439fff15"
+    },
+    {
+      "path": "scripts/agents-mother/card-readiness.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 15654,
+      "sha256": "1583ca29d5049afd85f4544735f586c7aef04c95f3f0f5f80126a7743dfa1a3d"
+    },
+    {
+      "path": "scripts/agents-mother/command-probe.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 7547,
+      "sha256": "2cde55ba0e4d65ed6845f827d1cfcdac48a9ba2ebce05180834e08ac8145ef12"
+    },
+    {
+      "path": "scripts/agents-mother/contract.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 29213,
+      "sha256": "c771a727c5ca21a266587821e02935ae751f6f26f1e711b7753810146fafd6e3"
+    },
+    {
+      "path": "scripts/agents-mother/delivery-loop.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 65207,
+      "sha256": "05a0decd001b837f6414c16bf2a23bb73d0eb1d790fbccee64245f1831e23b21"
+    },
+    {
+      "path": "scripts/agents-mother/delivery-reconcile.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 13200,
+      "sha256": "914f9b87220a127da690e8996551ea88566c916e31b90fb7dacc6614cdac520c"
+    },
+    {
+      "path": "scripts/agents-mother/external-research-topics.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 12390,
+      "sha256": "e0efae811c1e8d764fac9041e0c3fce988ad6d58b8fb095c575b9f758d34aaba"
+    },
+    {
+      "path": "scripts/agents-mother/external-research.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 60731,
+      "sha256": "032cba35c643a171e3cd3d04f92401c5715640d963bcde9ed655d32a3c5e4df9"
+    },
+    {
+      "path": "scripts/agents-mother/factory-build-delegation.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1756,
+      "sha256": "af592bba852a901b0d2d5a3d0b4532f54f50a65082705e34971555aaf37c8e2f"
+    },
+    {
+      "path": "scripts/agents-mother/github-research.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 57178,
+      "sha256": "cea95c4b0a627afcb8088e47a26ae155320d5855ee710e452196dd4b41fbc8f2"
+    },
+    {
+      "path": "scripts/agents-mother/handoff.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10634,
+      "sha256": "4ef5b84e6af31d113d274085368b9364a8282edd84334407689f5b1bb3f9b239"
+    },
+    {
+      "path": "scripts/agents-mother/host-research.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 13407,
+      "sha256": "31002dc761f1ec063706e750f7bbd8226807323a76af84f7bf509ef5cf922ac7"
+    },
+    {
+      "path": "scripts/agents-mother/identity.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 23798,
+      "sha256": "6f7a8311534edab952d81214285f3cc47cb13ffe51ba5743d2ee3075a71ef8a1"
+    },
+    {
+      "path": "scripts/agents-mother/index.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 109832,
+      "sha256": "abca8d80c361ce53d2ad7456e1d3e0ee8fb997067cf4dc3755f5363ce0e61a14"
+    },
+    {
+      "path": "scripts/agents-mother/interview-brief.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12774,
+      "sha256": "f3dd345b87eebe1ce67f26c418c5b35abbb265be7850a37da99ee0ad42f2432f"
+    },
+    {
+      "path": "scripts/agents-mother/interview-options.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4552,
+      "sha256": "8d39ccfaf27c46da4d5218d7a41feeeafc6c804ca4ca0b7e4da86ad116af44d9"
+    },
+    {
+      "path": "scripts/agents-mother/operation-decisions.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9207,
+      "sha256": "3220d4e1a40dae1b59f070b5d258d5d4264aefbe5b40c03c7ca5c47370ee87f6"
+    },
+    {
+      "path": "scripts/agents-mother/operations.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14547,
+      "sha256": "fe6c43fc6f464c3e391e05ad075fa2c47468d933749d91ae2d71ea4e25dfcd0a"
+    },
+    {
+      "path": "scripts/agents-mother/outcome-spec.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 44956,
+      "sha256": "21b43ee5757ec55fd4e36688256ff2b35b864e168f1cc77eccf7b315fb6c0a8d"
+    },
+    {
+      "path": "scripts/agents-mother/pattern-research.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 23230,
+      "sha256": "d774383c77a595de7324b2a242244f0da16e0f3c316bbb1fd64a2e00f0f6b3f9"
+    },
+    {
+      "path": "scripts/agents-mother/phase-usage.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 12013,
+      "sha256": "4b56fec1055d39e8106b9e1109730982046edfe216fc7fc6e06edb51deb01faf"
+    },
+    {
+      "path": "scripts/agents-mother/registry.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 18899,
+      "sha256": "537509eeabf4e7942be96bd69e445f90a6516c315bb8f266e0af4efbba78c75e"
+    },
+    {
+      "path": "scripts/agents-mother/result-readiness-async.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4224,
+      "sha256": "dc8151009c2c3fdd22fb12579d4ec4ef7cb91ae27d71c4c7480e49c805e60087"
+    },
+    {
+      "path": "scripts/agents-mother/result-readiness.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11066,
+      "sha256": "ca8ce7d952714443ab11959c2b4182d476a1740d6f39eca91b5a691de0f27f0d"
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/api-process.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 8785,
+      "sha256": "09883c40a0a3622e58ac190797e6f4ede6535b1c257a61cd8a874bc1b69577b3"
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/index.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 90840,
+      "sha256": "53784361113a1f3ebda8614d8ad609373596a1063ef060e75e56de1d4134be79"
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/provider.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4172,
+      "sha256": "d348795e11e1bed27ca380c1bcdf77526f7ed5257729cae7fc3395f3998725e1"
+    },
+    {
+      "path": "scripts/agents-mother/skills.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 27901,
+      "sha256": "f0c04c134093a34c4825356859acbd92efe45d160bd4a3093282689b91e1b9aa"
+    },
+    {
+      "path": "scripts/agents-mother/source-authority.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2440,
+      "sha256": "593e7181d705d148b430f258540d955c3af7dbb4dd9b77724894942f2b0c34b2"
+    },
+    {
+      "path": "scripts/agents-mother/source-passages.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3124,
+      "sha256": "5268115359dfac97e3b2b758424ea87c7ff7d411299a80bbcc92ac2f6011c668"
+    },
+    {
+      "path": "scripts/agents-mother/task-delivery.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 24164,
+      "sha256": "e6970338cd6c44c6afdf58684b45ec28cf8d048297badfef069f5f0c6f089b8f"
+    },
+    {
+      "path": "scripts/agents-mother/test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 17503,
+      "sha256": "3710458452925507633af9243e5c7f7fbaa29ba2b9d7c3f6a92b4f893e6d9792"
+    },
+    {
+      "path": "scripts/agents-mother/voice-factory-state.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3705,
+      "sha256": "9235047edb1c88098dd52ab178d1a9d2d16a213bdbb26382b37ef44780cb30ee"
+    },
+    {
+      "path": "scripts/agents-mother/voice-factory-worker.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 14344,
+      "sha256": "8275352a009984d6723de2479c54fbbd8d81e2397db2b31cfc56e7675036db99"
+    },
+    {
+      "path": "scripts/audit-neuraldeep-runtime-network.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 282,
+      "sha256": "6c83eb0ad61c9b5038d2b312f9aa15781b7e779c00db1dc0878ba9567c4c4c53"
+    },
+    {
+      "path": "scripts/audit-neuraldeep-secret-leaks.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 306,
+      "sha256": "4baf9186a2c89fda81f3f0660fa891ba87bb40c94ed66f749b9fc3b1eae717e6"
+    },
+    {
+      "path": "scripts/audit-report.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3395,
+      "sha256": "97a8b919da79aeaafaa96ff979ef4deff452b0359a03fa0f51512f4b8cad4e77"
+    },
+    {
+      "path": "scripts/bootstrap.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 17323,
+      "sha256": "b2498b5e010a97c5667629d1a6faad75892ec490f42a37345d2f42cc21f7c65b"
+    },
+    {
+      "path": "scripts/check-pritha-names.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 678,
+      "sha256": "5b1c29d26cc8fddba34e9e226ad7f20f9c1f473b2df3474f07d2838277c5cb44"
+    },
+    {
+      "path": "scripts/claude-auth.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3844,
+      "sha256": "e5f333a64f7f21cafab0e5c1b38990df3c961a6023441d258820cbed15f808b5"
+    },
+    {
+      "path": "scripts/claude-code-runner.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 219,
+      "sha256": "b3b0c6156416107a73f9bf3497eca8655c5827a82ee2919444a67c7e3fe401cf"
+    },
+    {
+      "path": "scripts/claude-code-runner.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 16221,
+      "sha256": "6b046f545488eed10b40238026017136045830d4edf5ea62a8b264fa06381408"
+    },
+    {
+      "path": "scripts/claude/api-proxy.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6039,
+      "sha256": "fbb6c0068b29b12f1967264d557b2f12e069cc6c5e11c0edf8ad50b9bfb1d45d"
+    },
+    {
+      "path": "scripts/claude/cli-probe.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1682,
+      "sha256": "27d55c71d6e6be3b8eaadaa034565c35aaee544fb8fc3eb91435eaa0c938a489"
+    },
+    {
+      "path": "scripts/claude/messages-client.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9785,
+      "sha256": "106d7a940f3177641363ec87888df96d54e5f1198754dfb19497a321f123cbe3"
+    },
+    {
+      "path": "scripts/claude/native-auth.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9128,
+      "sha256": "37ce0d42c9d173738923635d2bc06641d33fe2816635a066020d40053de88d30"
+    },
+    {
+      "path": "scripts/claude/native-tunnel.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3590,
+      "sha256": "8873b6c4b5a8c2b947b8f61038ef101cb5a865ee6a48722ae59fe55086c6e96e"
+    },
+    {
+      "path": "scripts/claude/provider-service.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 697,
+      "sha256": "f52238f7e787f9978ad0fc38934d84a37a9ee22220f2cd4a6a63fe17f020108e"
+    },
+    {
+      "path": "scripts/claude/provider-service.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7356,
+      "sha256": "27f4149e49aab883929ee4be61ce24d07057f6e2d897b0a66ad28ae85af278ef"
+    },
+    {
+      "path": "scripts/claude/request-budget.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8160,
+      "sha256": "ca1e8a6b65124f71f3ce1af91dd7d94d5fc9664a134d3b89d054ace141714b5b"
+    },
+    {
+      "path": "scripts/claude/stream-state.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8298,
+      "sha256": "ce365ee3f3e7934ada9e92d061e2443a3a2d24e99697b3dd6867cf6d066fdb09"
+    },
+    {
+      "path": "scripts/control-center-runtime.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 34528,
+      "sha256": "3199e1b077d52475af024a5143863a8bb615aae3bd1ae4ba717e5f6686bb466c"
+    },
+    {
+      "path": "scripts/embed-memory.py",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3154,
+      "sha256": "824fa8de4619d137a07c7b45f2636edc83930e3849bef30f46350217666cd947"
+    },
+    {
+      "path": "scripts/env-doctor.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11797,
+      "sha256": "8a7c522ce2f67e2859f70e023122deb29711995407dadb767674c82e636af346"
+    },
+    {
+      "path": "scripts/execution-control.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4055,
+      "sha256": "402d9a2ba33ee434fc510ad3a5a959cff033c89de8d43838c843e22ece0f4ba3"
+    },
+    {
+      "path": "scripts/experiments/agent-pilots/README.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4558,
+      "sha256": "a744a797e12a15a7aa6fbc0b386504ec7121152603aa0fb81dd7858e0ff217dd"
+    },
+    {
+      "path": "scripts/external-research-tools.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 27837,
+      "sha256": "3e3dccde6d4ff46975184dda90d4b7667e87f34362e18e2bd9e34dfdf92d14d0"
+    },
+    {
+      "path": "scripts/extract-signal.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10599,
+      "sha256": "2cb8fbb6964f4cff7633958a7135b0a512e640e3cd56f16324db5678a26543be"
+    },
+    {
+      "path": "scripts/github-knowledge-radar.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14147,
+      "sha256": "60af29ca260d2eb3f24a0ae2efb200d102fa3b547d2b6064410528e11d7aa3a2"
+    },
+    {
+      "path": "scripts/github-release-status.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 8645,
+      "sha256": "8baec4cc0e66cf1f4a1e577a2bf3aeaf4e41c4d87e7f4e3cddf285666f06698d"
+    },
+    {
+      "path": "scripts/golden-checks.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4523,
+      "sha256": "efc0845ae09b5142e8d5969de68c3233c2508884864eabab0bbd8ed614e546e0"
+    },
+    {
+      "path": "scripts/good-state-alignment.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14158,
+      "sha256": "0e5c35a0fc3b0aadb8b893c5a815bd194e85c0046c760f8d1e251d9b168cbb4a"
+    },
+    {
+      "path": "scripts/healthcheck.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3385,
+      "sha256": "10d635aa8cbe770fe78b8df500789615d167a3312984e793baad5fee9bf671bd"
+    },
+    {
+      "path": "scripts/install-brief-desk.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8219,
+      "sha256": "f429db0d09165e744ac2b77daf7f4c54600166b0a7456888f214d751d7f9ca81"
+    },
+    {
+      "path": "scripts/launchd-root-audit.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9040,
+      "sha256": "6c252da91a1daf0ce74607d7430cb488a3d4edd7e690013c33d834830c1d4d77"
+    },
+    {
+      "path": "scripts/lib/README.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1508,
+      "sha256": "d66336a6e96ab7c5fb98556e4974a8030da04b468bc437b876f91f088c152ba3"
+    },
+    {
+      "path": "scripts/lib/atomic-file.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5287,
+      "sha256": "4ea5f6d80ca3090d75287d0b7f86810003eab10a9099320c5333a929a607ff45"
+    },
+    {
+      "path": "scripts/lib/authored-agent-memory.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2341,
+      "sha256": "2241a51ef42f8f29206f51d7ce3391158eb5889f2dc3c23fcf4df62d14983fea"
+    },
+    {
+      "path": "scripts/lib/chat-attachment-store.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1637,
+      "sha256": "97b1074444f00eb050348f3f30ada112e81ecb0a3810a7572f59e744261e2c66"
+    },
+    {
+      "path": "scripts/lib/chat-attachment-store.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 22687,
+      "sha256": "8e8db9c4de9c032fc0205c91ad2c21e710eb09788ce40301aee95b743dde0fc5"
+    },
+    {
+      "path": "scripts/lib/chat-subject.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 480,
+      "sha256": "05eef8c1a637e3afb2c0777070b5f228d1815367a576aaaaf32e7ef881540b37"
+    },
+    {
+      "path": "scripts/lib/chat-subject.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3998,
+      "sha256": "c9256008f9d06ecc9875020028a7dd0d5df0c93d702a4f1cefd4bd09d7c04f47"
+    },
+    {
+      "path": "scripts/lib/child-model-client.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7879,
+      "sha256": "e51bee34a663d548046f596423127914f4d41ff1914845fedc3865c2505f32bd"
+    },
+    {
+      "path": "scripts/lib/child-provider-configuration.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 576,
+      "sha256": "4f6d3bfcccb7b01ea4762cc7f97e797e52dee6fc754834a7270e5d55a3a449d7"
+    },
+    {
+      "path": "scripts/lib/child-provider-configuration.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2129,
+      "sha256": "48d3112788feb066ed8210658231a578507792afa37bc28162239c12b1b4d7e4"
+    },
+    {
+      "path": "scripts/lib/curated-memory.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1416,
+      "sha256": "fad766908a1daa8e6688c321cee626161e3b9124dbc25ee9d6d4f2c6142b993d"
+    },
+    {
+      "path": "scripts/lib/distribution-instance.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5197,
+      "sha256": "9f748ab2922efc346963f4ab98678d4dfadf8786330bd98f7b591dba7a48c3af"
+    },
+    {
+      "path": "scripts/lib/env.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2640,
+      "sha256": "2d6f1b03f5aa4e1893165fc87fe2bc361076d8c0ebcd789837200d6fee7526ec"
+    },
+    {
+      "path": "scripts/lib/execution-coordinator.d.mts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2156,
+      "sha256": "8f737efdfc06a10659e82333a7e2a3fdd679ca456042484e270ffd0c026527d0"
+    },
+    {
+      "path": "scripts/lib/execution-coordinator.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 18106,
+      "sha256": "f8c7d145b79d4436276cd905b4fca19392c71e69fbbb5379390d06f2be1cb6f4"
+    },
+    {
+      "path": "scripts/lib/frontmatter.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5183,
+      "sha256": "d14512de9d6c3fad91a8dcdf28f8b940a3cf7788bf38238390b271fccec589ad"
+    },
+    {
+      "path": "scripts/lib/paths.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1418,
+      "sha256": "3201c1899502df1fde5edd97c4e2f9d30be3d3a70e93615c000401a55030765d"
+    },
+    {
+      "path": "scripts/lib/paths.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4554,
+      "sha256": "7bf141ea21152ed60eb125e7e5894d8479903f13106104ea19c8ab6cf80476c9"
+    },
+    {
+      "path": "scripts/lib/pritha-env.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 197,
+      "sha256": "59a88ce0e9dca8e83c7c629895650b072cc0c766b5713823676f104d9b599719"
+    },
+    {
+      "path": "scripts/lib/pritha-env.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1534,
+      "sha256": "fd1d4f1631bbf2ce1abb045f62741dcbda5c36bf7990e75e02196f9398d55d81"
+    },
+    {
+      "path": "scripts/lib/pritha-name-guard.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2608,
+      "sha256": "2cd7995c308a8960d51093f1268b2ecee1b2455440ac34696b7975033b9b0ee3"
+    },
+    {
+      "path": "scripts/lib/private-state-path.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1976,
+      "sha256": "00524269fd89b60daf1e484199c7f2cb3615d567288154f30ff8f7ed59fa1dbf"
+    },
+    {
+      "path": "scripts/lib/provider-agent-workspace.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 153,
+      "sha256": "75bc320e1bdd571d0731c9f4821a871640b7e8528586498568abeda37adb5391"
+    },
+    {
+      "path": "scripts/lib/provider-agent-workspace.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1474,
+      "sha256": "84089dd8be30bc8049be5ed1f27b72e92ca12721d036b28369efce2051d03064"
+    },
+    {
+      "path": "scripts/lib/provider-approvals.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7299,
+      "sha256": "97b54a3dd2e353035a4654c0435dd7a25c74bd705c34205654735633967560f0"
+    },
+    {
+      "path": "scripts/lib/provider-attachment-verification-api.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 236,
+      "sha256": "81c492c0bad9151d82e22246b3acfb31545c07d272128567c75b7d496b09c8ae"
+    },
+    {
+      "path": "scripts/lib/provider-attachment-verification-api.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2505,
+      "sha256": "add7082f0e6023c9286c7da2dfcaeccab1a85e08a89bb6c58c54f424c4bdd8b0"
+    },
+    {
+      "path": "scripts/lib/provider-boundary-audit.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4173,
+      "sha256": "447184de75c472a73af8dcaaccca9b4f9817c0825e0bb2e03802d3d2f1c55595"
+    },
+    {
+      "path": "scripts/lib/provider-chat-registry.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3080,
+      "sha256": "dadf81d801382dd4e21d9095c480b6715d37bf7fa03fdd0e39da04abbaffed50"
+    },
+    {
+      "path": "scripts/lib/provider-chat-registry.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11230,
+      "sha256": "3ef2d006db264a8ee31b5aaf39f8307302d9f424cd09f5c351684b43ecf4f0f6"
+    },
+    {
+      "path": "scripts/lib/provider-credential.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 720,
+      "sha256": "08b2ce6a702841ab478aa1460505acf4d74caf08d5d3a0b6f05124e339d02dea"
+    },
+    {
+      "path": "scripts/lib/provider-credential.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4447,
+      "sha256": "162ae12f0693930387e493c5183f83b1889f1e83a21043f87828980f5a422ed1"
+    },
+    {
+      "path": "scripts/lib/provider-factory-tools.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12391,
+      "sha256": "5370f7457ccc6711aba47a0d6ad82c85579d6b422dc02d9eb3fd2d06ff3e1508"
+    },
+    {
+      "path": "scripts/lib/provider-file-attachments.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1527,
+      "sha256": "559806ebc38b62dc4f04f3b2c7799a07c10c486fa8bd98de3c105b7ce752f57f"
+    },
+    {
+      "path": "scripts/lib/provider-file-attachments.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10244,
+      "sha256": "0e1c94ec4785912d603636a48d86937022cf8216fb267815f6a9143acdfe8544"
+    },
+    {
+      "path": "scripts/lib/provider-host-tools.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 19864,
+      "sha256": "d013f295299f19880fe421f486b54a3c46f5608d7753b460c118725db47415e0"
+    },
+    {
+      "path": "scripts/lib/provider-http.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2386,
+      "sha256": "ddd62ce36360cd8b899432274c351480bd45cac1f57434280a5b3f2e96aa2c15"
+    },
+    {
+      "path": "scripts/lib/provider-process-environment.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 418,
+      "sha256": "731dfb1956010594674d010a2a463ce496a64964a82baa4f9c7e8a27a0183206"
+    },
+    {
+      "path": "scripts/lib/provider-process-environment.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2391,
+      "sha256": "b5326862df0a527cb7fc4afa55e43f599fd49ac255d8c90a85b262412c8420bb"
+    },
+    {
+      "path": "scripts/lib/provider-process-proof.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 765,
+      "sha256": "73fb3fbb3bb319b58db5c7ce93edff777a3e0d886a22dceb8b08f9bb51629b7b"
+    },
+    {
+      "path": "scripts/lib/provider-profile.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2929,
+      "sha256": "56b1f07d4073c75a323e837f3e98e8fe1e00ab638349c7819cea5511d18dde82"
+    },
+    {
+      "path": "scripts/lib/provider-profile.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7962,
+      "sha256": "31c56ce1d4884ccfe40b7f65fc5b5ff240caab3b4ed2268921cc7d0e8ca1968b"
+    },
+    {
+      "path": "scripts/lib/provider-sandbox-run.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3638,
+      "sha256": "fc4d214539f19e1a133d809c3b8a72f8c39d0a9a3c552c769c94a31b0dd721f7"
+    },
+    {
+      "path": "scripts/lib/provider-sandbox.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4488,
+      "sha256": "824fa2a1cf24c91d7a6e69a7c7cd8706a378d934928d28fa5b40b28a74c1a7c5"
+    },
+    {
+      "path": "scripts/lib/provider-settings-api.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 559,
+      "sha256": "c6bea989029a0f6ce57756f07df0736411806837306a171024055f3266928bf7"
+    },
+    {
+      "path": "scripts/lib/provider-settings-api.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3530,
+      "sha256": "21e7f4bd27ce08ad96d320344fac32f010e6017df7153603585427e333b224d6"
+    },
+    {
+      "path": "scripts/lib/provider-task-runtime.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5309,
+      "sha256": "896b5ecf119b39ca44f83ef560d7ee317df7109333d3be2d76e36799afe3a8b4"
+    },
+    {
+      "path": "scripts/lib/provider-task-runtime.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 39407,
+      "sha256": "81987476626fd4324a9432f8c02e776be5c2e278c7610ad371cfcc2c1b3c5740"
+    },
+    {
+      "path": "scripts/lib/provider-thread-routing.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 570,
+      "sha256": "dabd1788a6b7515142962187700cf412cd5f7d597291d1c96122525c00c841b2"
+    },
+    {
+      "path": "scripts/lib/provider-thread-routing.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2941,
+      "sha256": "13180564d1d6d9328a05b68e7707e10655abd186ffb475883a69e809ee7c80ab"
+    },
+    {
+      "path": "scripts/lib/provider-tool-projection.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3074,
+      "sha256": "bd0a393581ff649b264810359c6c53267d0730b43c0e3723904c47daf8b025fb"
+    },
+    {
+      "path": "scripts/lib/provider-tool-server.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4343,
+      "sha256": "471edd37448a994f1e615c86fb3d421e4fbc5ba69081799e13f11cc409945920"
+    },
+    {
+      "path": "scripts/lib/provider-voice-task-backend.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 227,
+      "sha256": "fc5c4265e52e109232dacf950850049b6ca6d04d7a031236585edc46a8d1af27"
+    },
+    {
+      "path": "scripts/lib/provider-voice-task-backend.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5615,
+      "sha256": "25fbfb8d3e1556542f7154f5ee5ee836e2e29e6b34ee98a63abb3b3da572b293"
+    },
+    {
+      "path": "scripts/lib/python-runtime.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2876,
+      "sha256": "f647a2a33dac225d66ce78c6c21a4b685bffaf347ec679095981d0687bfab0b8"
+    },
+    {
+      "path": "scripts/lib/redaction.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 21541,
+      "sha256": "5e36622cd8682d80d6ad8e5a2c39a5d04aba7da30a9da53c4790d8dc5d2926c7"
+    },
+    {
+      "path": "scripts/lib/responses-request-budget.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6979,
+      "sha256": "289cf885ebdcf3db00a289db3398d4ede8c76e677a0cfd13b3ce59b3dd764c50"
+    },
+    {
+      "path": "scripts/lib/root-resolution.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 418,
+      "sha256": "b8b1b174d6fcc80b2f4a282fbaf303e7fcae183115ffac48289f7d37abe97833"
+    },
+    {
+      "path": "scripts/lib/root-resolution.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2662,
+      "sha256": "4119f0ee167241bbeb07bcc83858ffae2f486623ae770b0413975a4798d4c23e"
+    },
+    {
+      "path": "scripts/lib/runtime-settings-store.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1506,
+      "sha256": "c964fb445c2ecacf72e1b20832ed9a7f5146f45827749133eec86f79653e77fc"
+    },
+    {
+      "path": "scripts/lib/runtime-settings-store.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9348,
+      "sha256": "2e261e3b74c351c671998bd55e7bc4f0379c29a43e1be48fc0dc5764f4622ef5"
+    },
+    {
+      "path": "scripts/lib/sqlite-snapshot.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1009,
+      "sha256": "550ab9e90fa1af94d54a802bedda5ad00f60d4bf8b653991264b11a42a3909cf"
+    },
+    {
+      "path": "scripts/lib/state-files.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 898,
+      "sha256": "5e179813298386637168f8dfa304e23b4802fc15c8f7959b3c701067a368f5dc"
+    },
+    {
+      "path": "scripts/lib/state-files.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4036,
+      "sha256": "647ab8776f78c1b59aa5552f348f56a8270a9250afc8f826a45f5625ecf12b20"
+    },
+    {
+      "path": "scripts/lib/task-workspace.d.mts",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1522,
+      "sha256": "171ec326447bb5963cd0dbecfcb0e31f6d5377eb855f463eecb99742048eb00a"
+    },
+    {
+      "path": "scripts/lib/voice-intake-receipts.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1169,
+      "sha256": "32ed18b9848c01f335c9616d4d924312eecfdc6dc72a6dae25bb8f46afee63e7"
+    },
+    {
+      "path": "scripts/lib/voice-intake-receipts.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6195,
+      "sha256": "88a4295d57bcf3818e2972d9b746ebe027f18bfcc539907a10fa06dee865f351"
+    },
+    {
+      "path": "scripts/lib/voice-session-contexts.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 949,
+      "sha256": "82d06699664798f056127666f97b47ef03edb3a1a3a911ce7c69292018f95f52"
+    },
+    {
+      "path": "scripts/lib/voice-session-contexts.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6032,
+      "sha256": "bfa118df3327d7f9a0a80c3f36132c5a4d8e02796022143d326290ed9aabab51"
+    },
+    {
+      "path": "scripts/lib/voice-task-bridge.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2770,
+      "sha256": "c81a79f1965e7f3529c3edd45d6e8ac29980b7d3585bef4128fdeff078ebcf82"
+    },
+    {
+      "path": "scripts/lib/voice-task-bridge.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7688,
+      "sha256": "5e4b5933392d505cc2c62535c842d3eb58eab684a4f7c8fc7af5b6e09c7c9b6b"
+    },
+    {
+      "path": "scripts/lib/voice-topic-bindings.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2346,
+      "sha256": "60eb166bbe209982632f81050bb672cdc17519babfcc948e12de699438b5c63a"
+    },
+    {
+      "path": "scripts/lib/voice-topic-bindings.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 13017,
+      "sha256": "6ed356e0cafdff135e3f76c878cebf4b4a9ac0ee4438129393dfa7185c625add"
+    },
+    {
+      "path": "scripts/llm-wiki.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 17916,
+      "sha256": "32bbe796a157288d1ca2423c7d4b9f801bf36377eaa6b8a2c7eab6ff50f14a8b"
+    },
+    {
+      "path": "scripts/local-provider.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1956,
+      "sha256": "523bd6a231fd6edf1fcb718e62be1bf9753240e8215b7b717f44997b27789b3d"
+    },
+    {
+      "path": "scripts/memory-retrieval-acceptance.py",
+      "status": "M",
+      "kind": "file",
+      "bytes": 6250,
+      "sha256": "1f30f710ec440c654a8e0759dafc97d276824b6d52ce0118af66d0abee8f1967"
+    },
+    {
+      "path": "scripts/memory-retrieval-eval.py",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5509,
+      "sha256": "e17d3832d63dfc420fbfbfa130cfa6db342ff7f298bbfd04f4fbca3ed2d606b2"
+    },
+    {
+      "path": "scripts/memory-retrieve.py",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2065,
+      "sha256": "185060ba3f237a72f13ad5cb5c76bb3cb9ac698bc252179d0baf307482924738"
+    },
+    {
+      "path": "scripts/memory-status.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1196,
+      "sha256": "fd19b7648748009b210b09295a44d862183d317002d15e047db8692091b26e55"
+    },
+    {
+      "path": "scripts/neuraldeep-codex.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 315,
+      "sha256": "aca2e5ff286cc71bf0b6a499d17f50dd65510ed14c39635c72df134ee0e8b2b0"
+    },
+    {
+      "path": "scripts/neuraldeep-codex.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 18358,
+      "sha256": "aeac59a0d8819564a4c13c0ebb0c73c89fe0fc0fe03f8d123a3b59b17f75978b"
+    },
+    {
+      "path": "scripts/neuraldeep/account-snapshot.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 16490,
+      "sha256": "c7c6a67dce8e14b1f3c688d77d278cad3fc1770c9d401f4036c611a6fa62001e"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-policy.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 778,
+      "sha256": "ec168e6080796148ecbbcad076256e9fadc24ff6aa89cb264395a9c06438d2c1"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-policy.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4232,
+      "sha256": "dbfbacde2512effd8a0692a06ad63d0b1e4dd3eedfea88e9e5b1767f349b77bc"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-store.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 234,
+      "sha256": "ef0c6757fd5351c0f3ffba90590bb97c4369f7639ae79621093086121712c17a"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-store.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 236,
+      "sha256": "ddd45b04a52cf3f6dcdba21b776328681ccbafd6896a168a965075cbbb407dd1"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-transport.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 909,
+      "sha256": "d2ff518d4406419c5b9de5c2fad8e9b454df67c634f34455a92cb28f45612da7"
+    },
+    {
+      "path": "scripts/neuraldeep/attachment-transport.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8833,
+      "sha256": "ae4f4fddcc3081272b7f75c413f4ed8d861ad50d521890a2c26300f79a4518af"
+    },
+    {
+      "path": "scripts/neuraldeep/chat-history-store.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 128,
+      "sha256": "06e5f64c1908deeab2fcb382665cddf19bbd5c8d503f57bb14af1e7e97a48def"
+    },
+    {
+      "path": "scripts/neuraldeep/chat-history-store.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 44995,
+      "sha256": "7a77e7a3fe5b3dcb1ab62c2983e92b5550f8606e28186630b89cd6b2b1d27120"
+    },
+    {
+      "path": "scripts/neuraldeep/chat-summary-projection.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8322,
+      "sha256": "0e38ea707eab15fe166c747cfb4739c49fe1eb5fd0fcf16b432e2b7ee6da1bba"
+    },
+    {
+      "path": "scripts/neuraldeep/creation-dialogue.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1202,
+      "sha256": "7de42fff5cb91eb5f64b1d56689a392f5c2b64a4e15d4b1fd466d5bcfcdea299"
+    },
+    {
+      "path": "scripts/neuraldeep/creation-execution-policy.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1169,
+      "sha256": "255b82b08c7708d039a31e026c31c1d44cfaae17d04fa66b907756dc3adb10ca"
+    },
+    {
+      "path": "scripts/neuraldeep/creation-execution-policy.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4260,
+      "sha256": "7c0e0e118c8fadfac4a8fcf5e030595e176a98f33457d86ea8747d069d54183a"
+    },
+    {
+      "path": "scripts/neuraldeep/file-preview.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1887,
+      "sha256": "e32336939a53b5ab856b21d6405044f0258aebc4cee75e8737f43776bfe9a2e1"
+    },
+    {
+      "path": "scripts/neuraldeep/history-audit.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2223,
+      "sha256": "19cb71d283c69d77ccd4be9281903b4ff459fdda51da5fb459b88328c493ccb8"
+    },
+    {
+      "path": "scripts/neuraldeep/jsonl-reader.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 201,
+      "sha256": "d79470bf551913044f46e2b0a8f00cfbaa8cfb30bf8524d5744300098b646f10"
+    },
+    {
+      "path": "scripts/neuraldeep/jsonl-reader.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1033,
+      "sha256": "a1c7a176d8dbf8e87d3a41230ea75a2e42c1425ce2ddcde5d1911fa067386914"
+    },
+    {
+      "path": "scripts/neuraldeep/model-execution-profile.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 457,
+      "sha256": "998e61c9e97a391d763a2ce1deb8ec0470eb14b96860070b1cc1e16653149a88"
+    },
+    {
+      "path": "scripts/neuraldeep/model-execution-profile.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2868,
+      "sha256": "529d1a1013d99be8060c575b0630f4957c020b207d14ddaef7929ed9a0c11b19"
+    },
+    {
+      "path": "scripts/neuraldeep/model-input-capabilities.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 158,
+      "sha256": "f05cec3edef2166bfdb65ecca6e36b0b39f017c22f4a0b07e6b754ba0645f059"
+    },
+    {
+      "path": "scripts/neuraldeep/model-input-capabilities.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 852,
+      "sha256": "14bd7642cd14aa5468c972906258958cc15ee4c4e788ee6ce2d7b3d4ea8890bf"
+    },
+    {
+      "path": "scripts/neuraldeep/native-history-proof.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3551,
+      "sha256": "052d260019f4d614efe7d0675cb4fd5452c35088894bc34d1274de141b916e4f"
+    },
+    {
+      "path": "scripts/neuraldeep/process-snapshot.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 580,
+      "sha256": "18a3794a1cc6343f6cf536155ba8af9b329ccaed44c6403e61a2c0859b8013ad"
+    },
+    {
+      "path": "scripts/neuraldeep/process-snapshot.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4671,
+      "sha256": "1e59806e68f0e4d10924e9b9c91b14034486100175c3988468356d9705a9c795"
+    },
+    {
+      "path": "scripts/neuraldeep/process-supervisor.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 787,
+      "sha256": "74acbaa0ca278d8c4dfa4d13c94a9c4bbdebf19e6f047b6a372f5c7d74a2b781"
+    },
+    {
+      "path": "scripts/neuraldeep/process-supervisor.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11494,
+      "sha256": "eb6598a85648fc6180fb8aeaf541cc1877107e6eebfcdc948a87c40a4ec0a608"
+    },
+    {
+      "path": "scripts/neuraldeep/provider-error.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6960,
+      "sha256": "df97618d2bf6cafc2ba9ee358648924f43cb9f44394288783f00059c9e953f85"
+    },
+    {
+      "path": "scripts/neuraldeep/provider-service.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 920,
+      "sha256": "a8226272248c224b9fa01f33267894c469841197f877335cda50bd9fc05a7d27"
+    },
+    {
+      "path": "scripts/neuraldeep/provider-service.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9632,
+      "sha256": "e5e107b80fbbf2cc38cb09c78a8ea8df20f08fbf6b295a215fe17950cdc42da6"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-adapter.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 30434,
+      "sha256": "a90e4bb47d66d954960963fe10434032c34dd2aaee5ae0f3964c780a288aaabb"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-input-policy.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 379,
+      "sha256": "85dd93a4824a95ddb21dbaf089c723e822a732e29ad6057a65b8b90f064ca401"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-input-policy.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2305,
+      "sha256": "4567593767c725bf763c59ffdd4e585fe5867fa706b8f9763cf2c78067783f68"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-normalizer.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9629,
+      "sha256": "5bfcc51aa1445ad3e459deb7e264575a317b63da0bd158b036ab19e221bf9c4f"
+    },
+    {
+      "path": "scripts/neuraldeep/responses-stream.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 17151,
+      "sha256": "57ac89335d05887a7b48e27296f5b64abe60b1bb01b9eeb639c3ab66089cc5c7"
+    },
+    {
+      "path": "scripts/neuraldeep/runtime-identity.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 314,
+      "sha256": "360fe5b1732a1867438fac841b7c6cb59b0e5be7c9d14e403282156c5b6143b2"
+    },
+    {
+      "path": "scripts/neuraldeep/runtime-identity.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1062,
+      "sha256": "b373391b4fd8f6797281b4a69f56a9320ad01026198372d3203c151beca31942"
+    },
+    {
+      "path": "scripts/neuraldeep/usage-ledger.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 229,
+      "sha256": "9e3032c6ae5d0de747d419ad2ab2d0420cf25eb2ea556c1384507a39d1cf2422"
+    },
+    {
+      "path": "scripts/neuraldeep/usage-ledger.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 21538,
+      "sha256": "e1b1cf1288b06eb5872b1b1f7acc9d1ab035dd8304e2751756506ffb605c794d"
+    },
+    {
+      "path": "scripts/neuraldeep/verify-attachment-transport.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8982,
+      "sha256": "e6e7cf42e11c672d06ac5a97c635e963058326bc4faa0231448c88aea5b811fc"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-audio.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 133,
+      "sha256": "51fb935b9302be3e0e976f97d5883c6b26612d1525050be12c2448420283fc28"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-audio.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 845,
+      "sha256": "b21b4926d2e7fb6ab5c9f79375de175666804270c116cdf3ef6a5c3fcf55f800"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-journal-store.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 318,
+      "sha256": "1c72d5254aa9ea795028301a5ac49516e1403f0d8ae7eec02ea0b99895b2d16b"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-journal-store.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1026,
+      "sha256": "b23dbcb901940c9003a07a8b6e150d33c4cc4b77b7f9198acadf8994ff4842b4"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-journal.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2020,
+      "sha256": "a794921c389219d19f145c52d20a8b29716ff7c243571e094ef4446d0e5b32e7"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-journal.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7068,
+      "sha256": "2fac24605826fe2b3809b48af3324af94ad25eadabe814259e5cbc10df732a8b"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-provider.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 739,
+      "sha256": "347b0032d080284d01a6e7f155f49ae76c03e33be9f889aa296f20940ece0b38"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-provider.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6489,
+      "sha256": "140e5ea88e5af025417d4f11263d08926a1abbbddc8de770f6e3e34285bf9861"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-runtime-config.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 266,
+      "sha256": "e72de1b3f98c8a22b5bb4aeebe0cf6dd5d1aa9c42e811a8ea9acd9745e9c8c40"
+    },
+    {
+      "path": "scripts/neuraldeep/voice-runtime-config.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1239,
+      "sha256": "94edbc0de026eb8cb0025edb4de0b2ee78f35ebce77452db6ceb943d492c9cd7"
+    },
+    {
+      "path": "scripts/openai-compatible-codex.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 294,
+      "sha256": "f0ad94cc0a528d11880454df88b8722b1ed9dd05ee0cd3a055eef36f6e8c8428"
+    },
+    {
+      "path": "scripts/openai-compatible-codex.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 15996,
+      "sha256": "725c2314b7a147867a6685b68639c4207e06ace8eb1054b075ab9c311cc4afc1"
+    },
+    {
+      "path": "scripts/openai-compatible/catalog.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6576,
+      "sha256": "a369d8544dad49bcf477b05bcee700808aa1c6b11d89ff24f2eb4112b022b8ae"
+    },
+    {
+      "path": "scripts/openai-compatible/cli-probe.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2034,
+      "sha256": "b62c8fd33a331bfd4e3b2b9d000ae7c6e034ac78f2706558859872d71542ff10"
+    },
+    {
+      "path": "scripts/openai-compatible/owned-local-server.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12438,
+      "sha256": "883b658cc88c8604181ed67d20feba0315ae08498c2a2cbf550911f6369b240e"
+    },
+    {
+      "path": "scripts/openai-compatible/provider-service.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1004,
+      "sha256": "9da8ff72328f07d35882497841301c8ab9798728327358357d0bf080d57dcb6f"
+    },
+    {
+      "path": "scripts/openai-compatible/provider-service.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10649,
+      "sha256": "64553c0923340b168adcf14f270914e0b62c8a1322645995d3f07ccca9ed80fc"
+    },
+    {
+      "path": "scripts/openai-compatible/responses-adapter.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 13889,
+      "sha256": "89d9e67a7909cdef2c63cadeb1f22c22d09a263c24cab5d62e8b43feff8ed018"
+    },
+    {
+      "path": "scripts/pre-push-audit.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 12789,
+      "sha256": "c9e41f68e466678dab4b51c00a96ef53ad4327edc29ca5d1f9ae1252e16d6abe"
+    },
+    {
+      "path": "scripts/pritha-fleet.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 7821,
+      "sha256": "b44e342b57e2d70bc7814c49c6114edca41c1c4a7d0207ec435274a0be8237f8"
+    },
+    {
+      "path": "scripts/pritha-instance.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 40160,
+      "sha256": "49975b3ae74cc18f37669386e6c93014478aa426553e7027daad2c555f345414"
+    },
+    {
+      "path": "scripts/pritha-maintenance.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 19119,
+      "sha256": "3f8c334f5c753c5b4bd74844fa8649b21c554a0ec7ce11fc8fc571bfecab6928"
+    },
+    {
+      "path": "scripts/pritha-promote.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4100,
+      "sha256": "42abafb1ffb9b3ea36d22e9e2fe589c9ae43e69667a86eea09348d07e5e8ef6a"
+    },
+    {
+      "path": "scripts/pritha-root.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 446,
+      "sha256": "e5d529d25f51f3186bb5b99eddd51b92a67b2d8a4c5b7241978e5d1212e3b0fc"
+    },
+    {
+      "path": "scripts/pritha-state-migrate.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5199,
+      "sha256": "2170a6458591a4a5bcee1454af8144d88ffd060fa4699c720cf4e5afacf51c3a"
+    },
+    {
+      "path": "scripts/pritha-web.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11268,
+      "sha256": "f51dd4c0db0780e499ac92168477619275af3bfbfd8d8e620be7ce7ebfc76128"
+    },
+    {
+      "path": "scripts/pritha.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 305,
+      "sha256": "66f0e27e483f7d7c4f34c787d1a96eb3054c6a4763608d580a5fb763cc0863cf"
+    },
+    {
+      "path": "scripts/pritha_paths.py",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2370,
+      "sha256": "522a582ab5ad431849e7b8d7133a868abaa869a5f5996edab92dda564c157c83"
+    },
+    {
+      "path": "scripts/pritha_python_compat.py",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3527,
+      "sha256": "7a447667ba07ae2873a672828c842dab99df82c8a2bb7279e7d3ac32239bb7ab"
+    },
+    {
+      "path": "scripts/pritha_sqlite_snapshot.py",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5472,
+      "sha256": "5f71e55c62c79db6c844f918993ecc231ee7559ae835023c4ea3646bfba0ef3f"
+    },
+    {
+      "path": "scripts/pritha_state_files.py",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3766,
+      "sha256": "484730a8813148697365265a88802533579f2a68d13ed398b58c3e2f83c9091f"
+    },
+    {
+      "path": "scripts/pritha_state_migration.py",
+      "status": "A",
+      "kind": "file",
+      "bytes": 23384,
+      "sha256": "2f3ddf3ea04d265eb960b8b01e950e032268d45e3a1c1b521e2c6df493100cae"
+    },
+    {
+      "path": "scripts/pritha_web.py",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12045,
+      "sha256": "ee428aa4f7b69d4085b08d4e3ed242646da676f02128ee6cf315e4e09ad87fa2"
+    },
+    {
+      "path": "scripts/privacy-audit.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3211,
+      "sha256": "c7bc32a771c84bf0fb45363fe49f18cfb763266924ffb518326c202c529ac951"
+    },
+    {
+      "path": "scripts/privacy-sanitize-current-state.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 8415,
+      "sha256": "0fbfe0164ad28b3c47573a173517270990ee3d02d81061b50624a5ff7d10f46c"
+    },
+    {
+      "path": "scripts/process-intake.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 22111,
+      "sha256": "790fb229cda317fa8a591a2f9353a8f039856da38cfa154eec6c68e8b6615f98"
+    },
+    {
+      "path": "scripts/quality-gate.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10090,
+      "sha256": "ebf176b5cedf200d838909e5f805edf0e1296b49f2fb78448923c3c963d3b395"
+    },
+    {
+      "path": "scripts/query-memory.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 6877,
+      "sha256": "34c4339aa79dfc18061b36c535b27a5fedffe8502cbf91140678a720542feb81"
+    },
+    {
+      "path": "scripts/queue-health.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3892,
+      "sha256": "874c0ba5a9f3d018413633db4a7543bed7ecbe47ba026592c85a0dc5f3dae212"
+    },
+    {
+      "path": "scripts/rebuild-memory.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14700,
+      "sha256": "0067bb32b65ecff410eb6e350afe81970055f873ad1d717eaa14aaace799d360"
+    },
+    {
+      "path": "scripts/reconcile-task-chat-links.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2518,
+      "sha256": "8023c0299b6229021300fd30e0daa5e6d3053ba2f50d1756d8c664cdb060fa32"
+    },
+    {
+      "path": "scripts/run-pritha-telegram-bot.sh",
+      "status": "A",
+      "kind": "file",
+      "bytes": 249,
+      "sha256": "e6b18cd5951256ba7fe580951e70802dc05859d02db73ca86ce135409cb34f46"
+    },
+    {
+      "path": "scripts/run-pritha-web.sh",
+      "status": "A",
+      "kind": "file",
+      "bytes": 530,
+      "sha256": "292ef03adceccd2b61dbfa7cbf06b89a9c3c22e301af0287eff1a01794cee200"
+    },
+    {
+      "path": "scripts/run-techscope-telegram-bot.sh",
+      "status": "M",
+      "kind": "file",
+      "bytes": 146,
+      "sha256": "b60cb16eab8aa7788a165c0c527f17b76303123fe4634b9ad695e3a0df47fbe5"
+    },
+    {
+      "path": "scripts/run-techscope-web.sh",
+      "status": "M",
+      "kind": "file",
+      "bytes": 137,
+      "sha256": "65d2d2e62b1694aa12e5e8e1a6b78416c5e09f9ace00bfbe275e852964aaef52"
+    },
+    {
+      "path": "scripts/search/child-reader.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2670,
+      "sha256": "7062ca2fe3791c6c68120329381573ee82b86b191034b97238afac28c0463546"
+    },
+    {
+      "path": "scripts/search/contracts.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3277,
+      "sha256": "3b6bfcbe6d846be8bab5bbc05e9298fd68694561b8d82eb3165c827156f8e2f0"
+    },
+    {
+      "path": "scripts/search/dependencies.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 292,
+      "sha256": "fd9cf2767dc5b2f368e2023ce4d219e5232cc551fe9d102cce1aefdf6822ddc9"
+    },
+    {
+      "path": "scripts/search/host.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2363,
+      "sha256": "1eb053deb69acc4a7f9f970bef77cf1c6f921957e21b589f2ce8b9040cab5b28"
+    },
+    {
+      "path": "scripts/search/intent.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 105,
+      "sha256": "16baf5ade388cec7210c9753af494a2b998b85dc5da844d57edbff570c94e306"
+    },
+    {
+      "path": "scripts/search/intent.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1256,
+      "sha256": "700ce2006f2a41a02f275ee404e98bdcdfbf370f1ec20b0d75768fa5b714ccbb"
+    },
+    {
+      "path": "scripts/search/policy.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2408,
+      "sha256": "e661bb0ae5a7c8bb5e940096ca8ba0faed5f82f8c56a51d5d5d2b1ea1788e325"
+    },
+    {
+      "path": "scripts/search/provider.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5569,
+      "sha256": "07852f0c7a8b60809fe1c5bd08abc500cdb739186fdffbb5d718c50c5ca39470"
+    },
+    {
+      "path": "scripts/search/service.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2291,
+      "sha256": "1b8c10650089d8149d96fb2e04503d270933726c733b1d6ac97e2ca5e7d7baea"
+    },
+    {
+      "path": "scripts/search/service.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 15929,
+      "sha256": "b589e07ed26274902bb09ed465986735320a5959f75b46abfb5579a1eea81084"
+    },
+    {
+      "path": "scripts/search/settings-api.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 156,
+      "sha256": "2ed7a035d7eee9d1d478f2968333f2adb20b59813d99bc0eb5fb04e99d54771a"
+    },
+    {
+      "path": "scripts/search/settings-api.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1282,
+      "sha256": "f06cc3c3d89eec06c590a8615f7981f0809e33fde976c123e66a1a206bbef13f"
+    },
+    {
+      "path": "scripts/search/store.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9626,
+      "sha256": "e117fe99d87476e15d115ef86578c5a8c6fb631b94b218ad5bea0bc3d620736e"
+    },
+    {
+      "path": "scripts/self-test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10965,
+      "sha256": "332823e29b5860d67330d02ee29dcb7f1a2ebfd7df7e344c8fa43a38ebf00e11"
+    },
+    {
+      "path": "scripts/semantic-search.py",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2842,
+      "sha256": "7d26dc21d0b51e83027ea0990b3ec524892d63c635f54f406f50c6ab4c8b9120"
+    },
+    {
+      "path": "scripts/setup-status.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1664,
+      "sha256": "b04e4c8e44459a698e656b29ba3b44f8ef985fe7121b38344e5dd7429fca34f0"
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 15424,
+      "sha256": "156a98ff7f3a2ed3e48f85deb2589666d56404f19b71633afe1afef9ae5bee5f"
+    },
+    {
+      "path": "scripts/status-lib.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1811,
+      "sha256": "8fe02afb7653080dc1de59fd76fb02d219671d12b30f1e1fd490570d4e3f1b0d"
+    },
+    {
+      "path": "scripts/tailscale-setup.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 27225,
+      "sha256": "fbdc956c0f7f051ab0171700f9964ac53e90f18d57dba9a4dafccd8a31534f81"
+    },
+    {
+      "path": "scripts/task-workspace.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3090,
+      "sha256": "6fbe384dca78123a0fe8b0ed086c84dbb2f583e7532fb7d7f134f7bd4931f0d0"
+    },
+    {
+      "path": "scripts/techscope-web.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 127,
+      "sha256": "e02577442eccb6c4c63a58e2917bb96673fb7ac3c73fb82e8405c4e43632cb82"
+    },
+    {
+      "path": "scripts/techscope_web.py",
+      "status": "M",
+      "kind": "file",
+      "bytes": 192,
+      "sha256": "cb4db2031d0d67e361dddd0d3500580dac1cf0f1c464b24b218c830949a8c3bd"
+    },
+    {
+      "path": "scripts/telegram-bot.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 29730,
+      "sha256": "d5d443b0fa3a33665af3086413ba7c39bbdd6103ddd68c86469a2eb1977db3f3"
+    },
+    {
+      "path": "scripts/transcribe-media.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5149,
+      "sha256": "d9492f4ea7759c5a9bdc048bdd60866f587a250def610dd09f515979877027bb"
+    },
+    {
+      "path": "scripts/validate-memory.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11697,
+      "sha256": "cd6bf49d36ecb2c39e9b6935ca50dcb58f63bf5b1878b78a4f7f4f757ebe1e76"
+    },
+    {
+      "path": "scripts/voice-control-kit.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 7878,
+      "sha256": "2f9b91d9ecc4f0465525c44c017b28c9c15b63852f0f6c9892c27fffbfb4b665"
+    },
+    {
+      "path": "scripts/web-search-tools.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 20851,
+      "sha256": "c1e54119bf6e40625f419ae652c45f5394033bed5c942f548dc0e57779cf68a6"
+    },
+    {
+      "path": "tests/acceptance/claude-stock-cli.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9385,
+      "sha256": "f8768db943409e503bd4ea70880751fa4276b78f46f9bde2da8e4206e89f4aaf"
+    },
+    {
+      "path": "tests/acceptance/compatible-stock-cli.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7231,
+      "sha256": "754e6407e9ce871f04a28e8074988fdc9932a5de7adac2430e0f037f8fc92a83"
+    },
+    {
+      "path": "tests/acceptance/local-stock-cli.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4191,
+      "sha256": "16e4a4083e225ee85e1b61409adda46865470e3f74aa07b693522fcdb171e0f6"
+    },
+    {
+      "path": "tests/acceptance/neuraldeep-image-attachments.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1715,
+      "sha256": "583346dbf9cdc2cd74ddd3a87755f8e7e386464c11bffefdb64feeae88491793"
+    },
+    {
+      "path": "tests/acceptance/neuraldeep-search.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4123,
+      "sha256": "92fd3fca7e26ff463bfd2e963f6b2adbd75018e6bb85326b2344577d6a79aa93"
+    },
+    {
+      "path": "tests/acceptance/neuraldeep-stock-cli.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3544,
+      "sha256": "e476ecd93843b8a3ce082fef2ade477eb74d05da72ea7a30aa760b1a5aea3c27"
+    },
+    {
+      "path": "tests/acceptance/provider-file-attachments.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10679,
+      "sha256": "14aa3bda3b61c0aefb33d597b358704d11d8201844d3e7b0b1c596d61a8b1ced"
+    },
+    {
+      "path": "tests/acceptance/responses-build.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5079,
+      "sha256": "cfa6abecef2ae2177a5d7ee819589964ab0e0802d877a95a8067cdeb00a9783f"
+    },
+    {
+      "path": "tests/agent-credential-store.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 8790,
+      "sha256": "316be1aeb95aaad88d24648ff8a27fa775d0f854298768e1780d2bc5fa76d238"
+    },
+    {
+      "path": "tests/agents-mother-card-readiness.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14132,
+      "sha256": "c3181f16dab1f72ddf6964ea6512feb7029daddb6064ac7a5fcd47c3abfed99c"
+    },
+    {
+      "path": "tests/agents-mother-command-modules.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 8416,
+      "sha256": "1691cc12e2ee0fee63b269beac1dfc67c4ab977036234361a41eb96ce8eefc78"
+    },
+    {
+      "path": "tests/agents-mother-contract.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 15892,
+      "sha256": "a1ba607a790e418ee16e0f216593311131fce869955fa98829aa466a0bf4cc1a"
+    },
+    {
+      "path": "tests/agents-mother-delivery-loop.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 33009,
+      "sha256": "f3b17fb0ac4b06e21d9a9e90ba5f114e753d2b32e21dd7244f638a173f9d1dad"
+    },
+    {
+      "path": "tests/agents-mother-evidence-input.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2325,
+      "sha256": "47be61e8543269d6439f729cba09af0edb55d44ca9ed1cb36f4f516faa1733af"
+    },
+    {
+      "path": "tests/agents-mother-github-e2e.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 19590,
+      "sha256": "48ea81e03e1f7c370fed6ae92243277d083c342b9eedf373e9978ce9cc43164e"
+    },
+    {
+      "path": "tests/agents-mother-github-research.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 58394,
+      "sha256": "27e987c42cb3e0239ce89b3b7a0cd30a4367160dd02cd9c86e44207e6d236289"
+    },
+    {
+      "path": "tests/agents-mother-host-research.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10423,
+      "sha256": "a63b4aee588db4c7fe1cfac4d42ed4ba80be928808ec3601cc0f7de5cda2446f"
+    },
+    {
+      "path": "tests/agents-mother-identity.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 17607,
+      "sha256": "9a651c796fb01ef0a65d02e9f39cbcc79ba207321b49911600a553e02dac3c17"
+    },
+    {
+      "path": "tests/agents-mother-init-brief.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8049,
+      "sha256": "7ab32d9eaf90651e1255ae9badc4a1b2b7aae80c1f6d2ff6d0da4559a55b3a48"
+    },
+    {
+      "path": "tests/agents-mother-outcome-spec.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11022,
+      "sha256": "582cc166fdcba5311c5fcfcf6e72d6fbcc7c0e67615e44e1250ed2c97569b266"
+    },
+    {
+      "path": "tests/agents-mother-pattern-research.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9253,
+      "sha256": "ef44327afd983cb4fbc79aba52bdbc9e0136c6a79d99ed32b7c686fbce6f43ed"
+    },
+    {
+      "path": "tests/agents-mother-research-gate.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 28994,
+      "sha256": "a6cad9feed0cd5b62a8eb5e1364c30302783b0f347d599af174e1d71fba56dc7"
+    },
+    {
+      "path": "tests/agents-mother-task-delivery.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 33461,
+      "sha256": "524407c91c022f277459291117b10ff00b13fe5014289bec49a2f53fca851f19"
+    },
+    {
+      "path": "tests/atomic-file.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2821,
+      "sha256": "fa749bf7ec3717a18b78c0ca38777022ee5f3e9f343a8706528acf8def4f41de"
+    },
+    {
+      "path": "tests/bootstrap.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 7429,
+      "sha256": "40cbc4b5ef3cba76c1d547033035e747c900e6973a573a42228f54a067523132"
+    },
+    {
+      "path": "tests/brief-desk-import.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5160,
+      "sha256": "e79d90b850b1b8be9b2c59d1af6487b0a9a5a50b8fda51f14e271fd3b0093977"
+    },
+    {
+      "path": "tests/chat-subject.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2805,
+      "sha256": "9db956c169694fc2d0fa590415206fe14b441efd898ef24e4b646c3987cc8f24"
+    },
+    {
+      "path": "tests/child-model-provider.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8783,
+      "sha256": "342473d3b833d9c36f2aa360326459f97833eb79081382cae8defa220f8d7758"
+    },
+    {
+      "path": "tests/claude-api-proxy.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2621,
+      "sha256": "dc0dfd97baf840198cc7eadbb5e53697103349ff745a0ce7c14811dbbd62a60b"
+    },
+    {
+      "path": "tests/claude-build-executor.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11548,
+      "sha256": "69f0ffd4e84f2a9d6e198366db5c544c5c9cca68632afdbd13c48a5436281bba"
+    },
+    {
+      "path": "tests/claude-messages-client.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5345,
+      "sha256": "7bdd6379b970fe65eaea6ac51431a81671f2ed8bf984db14a9def7f342e13983"
+    },
+    {
+      "path": "tests/claude-native-auth.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12732,
+      "sha256": "703bf88af2123e24dd9b52904bacbecbe2db647a65a97ada700dfc569fbd0ce0"
+    },
+    {
+      "path": "tests/claude-native-tunnel.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3144,
+      "sha256": "5458782394a88481d5ffa07caa32be36a693c77c8c825664119d5f46bde1bff4"
+    },
+    {
+      "path": "tests/claude-owned-runner.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7803,
+      "sha256": "804c83b87c11253484b07c5293bab8c75ea9d2f8e99653628be04289d901f986"
+    },
+    {
+      "path": "tests/claude-provider-service.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4263,
+      "sha256": "095907e0dcd4f817a2bd6f093ebff2e90fe712c4cb04b1b5524ce5b47d5edab9"
+    },
+    {
+      "path": "tests/claude-request-budget.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5516,
+      "sha256": "1616ee0e29dac3fd1aeab2bf07949f3282ad999b501a19c0b22451de90c56844"
+    },
+    {
+      "path": "tests/claude-stream-state.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6221,
+      "sha256": "5b4b591eeeeada7438b3e51dd234435f46a44228be5977c6b9662cf9404207be"
+    },
+    {
+      "path": "tests/compatible-owned-runner.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6260,
+      "sha256": "42c131b9e416800f30d345b846530fe8ecb8a47bb4de8b6c481b45cd9c17148c"
+    },
+    {
+      "path": "tests/compatible-provider-service.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8368,
+      "sha256": "ea93003eafd4fb66665c6c9d5f938f2297468915a21b1474d7bdc30ab3bd15fc"
+    },
+    {
+      "path": "tests/compatible-responses-adapter.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10813,
+      "sha256": "84beabcae90937a0492a58135aff5743482ada6b0d3992351c88a3547c53628a"
+    },
+    {
+      "path": "tests/control-center-chat-evolution.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 59772,
+      "sha256": "9c36d72c74e2387086769fef6f1f3803838b1f13ae0b9d55ab52f4844ca14ada"
+    },
+    {
+      "path": "tests/control-center-codex-auth.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2125,
+      "sha256": "08c37148d1ced149c90f576f382df3d2203ddcb8fd380f9cbc2e795213a39345"
+    },
+    {
+      "path": "tests/control-center-codex-binaries.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5974,
+      "sha256": "3709d9bd94bce084e1849b4849d2d8ba9c4d2129e47647c4c5748262066509c1"
+    },
+    {
+      "path": "tests/control-center-codex-chat.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 36083,
+      "sha256": "b562f293d65e138faae0fa629a0831dfe83bb7815eca43eee713d96f8741e5e0"
+    },
+    {
+      "path": "tests/control-center-codex-planning.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10458,
+      "sha256": "4ed86d567ee6ff2f1191325a975df85673db86660e98215bd128e9d120e3a37c"
+    },
+    {
+      "path": "tests/control-center-codex-safety.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3461,
+      "sha256": "77ed8471c1d3bbaeee874d83d74387ca45b91500c124ce9d9e7be809a3988092"
+    },
+    {
+      "path": "tests/control-center-composer-tools.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 8001,
+      "sha256": "8ea5585f33428ff05d6954f7f7836ea4ca162209ec10add14815d9a70483e229"
+    },
+    {
+      "path": "tests/control-center-goal-control.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 25167,
+      "sha256": "4ec9ad168a9c546c12e9a9f779781e3616bd22f496952da48eb0e8cf08d680d9"
+    },
+    {
+      "path": "tests/control-center-history-transport.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 4175,
+      "sha256": "df523fe4278679aaea28290872e3c3f79151b2599a3f152a8b2f842d9504eea1"
+    },
+    {
+      "path": "tests/control-center-music.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 18575,
+      "sha256": "e04d2e4ddf66081d0c6f6cf8fadae7297161bfc1017336d5083589c26d68571d"
+    },
+    {
+      "path": "tests/control-center-rolling-summary.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 21542,
+      "sha256": "cec8a9a496907450838e8462e840ec3118fdb3225c45c165a39ab7ecfee54be6"
+    },
+    {
+      "path": "tests/control-center-voice-settings.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5161,
+      "sha256": "cda6b12788b20bf1378591bf8ad194c5cf4867de758398a3a5c6d7f5aec0923d"
+    },
+    {
+      "path": "tests/distribution-instance.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4270,
+      "sha256": "badda929228f1b3878d2b0d1182c42c5ae11cd3a87c2d4ab427a884a5c2e2394"
+    },
+    {
+      "path": "tests/env-doctor.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2640,
+      "sha256": "065f93306b4337fd68234492ec80929886cd72a6a2a33936c4fceff644456adf"
+    },
+    {
+      "path": "tests/frontmatter.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3152,
+      "sha256": "f716832fc7ec395fce5a85642ee31bd4b745b02c914d5a79be69076ef25798df"
+    },
+    {
+      "path": "tests/helpers/control-center-ts.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3534,
+      "sha256": "3c71bceb6cd509e8094f691eaf81c1d4dda4bc3369947af9272c74caa7b31258"
+    },
+    {
+      "path": "tests/lifecycle-report-redaction.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2775,
+      "sha256": "f9524341cdf4140b323aff59846db727765bc8152f1d0970e30b568ca180364c"
+    },
+    {
+      "path": "tests/memory-instance-agent-precedence.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 9648,
+      "sha256": "3b4f808464990cdc5857d200ec9df80aa209117fbe0f7f485fafb04b2f4b8b32"
+    },
+    {
+      "path": "tests/memory-python-runtime-env.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3293,
+      "sha256": "a7d267ddd145349f4f77c5d061c5d0e985fc9538da1c574d5a5475f185e01b72"
+    },
+    {
+      "path": "tests/native-chat-subject.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4043,
+      "sha256": "91c51b07434ca0a7c59fa75dc6208f83154a7dd08c2a2eeb2fad6f1257465d61"
+    },
+    {
+      "path": "tests/neuraldeep-chat-attachments.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10477,
+      "sha256": "5ebaf358e37193eaf273942af264b9e64755270e5e769e707f25b4345b4d20d1"
+    },
+    {
+      "path": "tests/neuraldeep-chat-history-store.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 20939,
+      "sha256": "5fe9c87c488801045a2a74516ca7882109074565b6e1b4f048b44d8bae11dfb0"
+    },
+    {
+      "path": "tests/neuraldeep-chat-summary.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6563,
+      "sha256": "a3be5abf74482948350f7d6cc707760365d02b8a6f9d34702923d89a445fab2b"
+    },
+    {
+      "path": "tests/neuraldeep-image-attachments.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 13249,
+      "sha256": "b5c76c888f52ced74a066f273de717a9b42027b25492fba1b44ca63e3350f8cf"
+    },
+    {
+      "path": "tests/neuraldeep-jsonl-reader.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1682,
+      "sha256": "6315d4be4fcf4bc852591fe1fdeacb429a89b3ec57c6fac6ec5c5021542cb61b"
+    },
+    {
+      "path": "tests/neuraldeep-owned-runner.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7970,
+      "sha256": "6a64e21ae7c3bd992fc5da6d6913ad28ce3c0a490badf5e737ad55843a408c4e"
+    },
+    {
+      "path": "tests/neuraldeep-process-supervisor.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12354,
+      "sha256": "0c84d2664f25a3f104fc58d6f1f3ea0bcdc2af7be8236f22e8380c4629832eac"
+    },
+    {
+      "path": "tests/neuraldeep-provider-errors.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3216,
+      "sha256": "685a1cf43106819aa41661a3eae892409b0ec939c9eb47c870cc059df87cdf33"
+    },
+    {
+      "path": "tests/neuraldeep-provider-service.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8363,
+      "sha256": "781260c7b48c254d0bfd6787fb3578c958c7d54ecf8f4ce6be3b969c60da3c3d"
+    },
+    {
+      "path": "tests/neuraldeep-responses-adapter.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 23284,
+      "sha256": "f2a1ed56ea8c8e905642184353bd9a537b38b4b87d07d3378901739ed4c4968f"
+    },
+    {
+      "path": "tests/neuraldeep-transport-boundary.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4496,
+      "sha256": "821755c028d875990105bfdc35346a671aa26f533aeb36ba6c8ca43ce8ef6837"
+    },
+    {
+      "path": "tests/neuraldeep-voice-audio.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1747,
+      "sha256": "2ca077c7fc113df3905b1427544bfb875d7af88817b7c83334cef143babb6d02"
+    },
+    {
+      "path": "tests/neuraldeep-voice-host.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5241,
+      "sha256": "f71d1ceeff3b0bee186597c8c57c0090cffd9975fce0f3fdb7340e1627eae4db"
+    },
+    {
+      "path": "tests/neuraldeep-voice-journal.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5042,
+      "sha256": "cdca53bcf727e4b3215618b32fd25c0e57cfa02be40bfb1c44bcc63c1666fa5b"
+    },
+    {
+      "path": "tests/neuraldeep-voice-provider.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4822,
+      "sha256": "34b8c639caec5b4127833c08e7cc81c7832b084b3dc72d1a9b3f6b91492db724"
+    },
+    {
+      "path": "tests/neuraldeep-voice-sessions.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11711,
+      "sha256": "51174a419989d1531ef88012be1642432defa2d9533e622cff1f5ebd7f9039f8"
+    },
+    {
+      "path": "tests/neuraldeep-voice-transport.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6251,
+      "sha256": "eda929569905487639665ce6c9b09c409c15ac7a2b4a597699dd293b8fe6e4e2"
+    },
+    {
+      "path": "tests/owned-local-server.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8882,
+      "sha256": "2d9bed495567dc06c95b5bffc5af3c910ecc2a6ae807823534b44bd6596fed88"
+    },
+    {
+      "path": "tests/paths.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1610,
+      "sha256": "721191ad278c007bd23fc2655a3cb6b6db85404a2085f189e1887d07d1d94588"
+    },
+    {
+      "path": "tests/pritha-instance-paths.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 5396,
+      "sha256": "31b1905a96bf8a3d414af9db620726186df2d04c12f81bbc7aa8f5a2f19575dc"
+    },
+    {
+      "path": "tests/pritha-instance-update.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 32681,
+      "sha256": "2c4a7309ebef8cd0f0fe9b43378c8b3d0c3b616c2474b38a24741f43e600c1cc"
+    },
+    {
+      "path": "tests/pritha-public-names.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4061,
+      "sha256": "4a12ba8a8ba77cda9bb3cf45876ca2e07446abfbc79b1d3dcba9c43ee0d47bb6"
+    },
+    {
+      "path": "tests/pritha-root-compatibility.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5805,
+      "sha256": "bc26096c2ab804dbce729e935403419dfbbfa50d853988d7ca36fe25252e46fb"
+    },
+    {
+      "path": "tests/pritha-sqlite-snapshot.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6038,
+      "sha256": "a1c22c072378aeeb0e48e8b1ddf03f06931ff709c07f8770791cc05d404211b9"
+    },
+    {
+      "path": "tests/pritha-state-files.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6276,
+      "sha256": "ff2b68611a70bad727044225ced6f83f75512527f9ddd04164382c6a6bfd8016"
+    },
+    {
+      "path": "tests/pritha-state-migration.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5718,
+      "sha256": "c6cef847bf0dd3252548f510109f97a485f265b2c842c12d2b0d7837dcee99b0"
+    },
+    {
+      "path": "tests/pritha-state-readers.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7274,
+      "sha256": "4bac6b2e3933b6bc949c375a8d38a35f7e0a452a6ab9b9566c8e74e7c6c74b2c"
+    },
+    {
+      "path": "tests/pritha-voice-control.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 15983,
+      "sha256": "f0b46cb0a63b7ca45bf6f83a103cad6963429357005ec366140d685f9d344c1c"
+    },
+    {
+      "path": "tests/provider-approvals.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5010,
+      "sha256": "e54241846a29f5bfb1e3229927b539a54c65586952940792fc869f4442a1ea09"
+    },
+    {
+      "path": "tests/provider-attachment-verification-api.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3377,
+      "sha256": "5be7707171b03ceac0e20bb608a3620a9f7366d94f41a8a8e9cc26a8534dc04d"
+    },
+    {
+      "path": "tests/provider-boundary-audit.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1133,
+      "sha256": "ebc0cf339db565d347f85f423bd364c94cb14add7ed37a2f63c822b436ff0638"
+    },
+    {
+      "path": "tests/provider-chat-registry.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3994,
+      "sha256": "ef301ef3263f9064ee022ac29c662820c6286d468865f4e9d109d26743ae7d76"
+    },
+    {
+      "path": "tests/provider-connector-presets.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5057,
+      "sha256": "bc2705f3a0977803ea54cf637d2dd757263d343673f5f5113d04f0be1c438802"
+    },
+    {
+      "path": "tests/provider-credentials.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3270,
+      "sha256": "5583b2dabbc0e623024981a27e5e9467b578110d491e4e51e2804add64aa9a62"
+    },
+    {
+      "path": "tests/provider-draft-session.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3885,
+      "sha256": "74eed541d1f1cce16a3472f9463cd3ab6cd51512a91f36265ceebd1b787ebc09"
+    },
+    {
+      "path": "tests/provider-external-gateway.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6035,
+      "sha256": "aa45e35f6d645ef4eaac4f564f480a763706b95f531e659ec8210700b47d231b"
+    },
+    {
+      "path": "tests/provider-file-attachments.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11186,
+      "sha256": "4fefad069aa82a5fbd925874c76c3924ad8c0299769d85087a322319b9098147"
+    },
+    {
+      "path": "tests/provider-host-tools.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7351,
+      "sha256": "d00db93ccebd1a58652caa5ac51f921a34007509d98d2ae2cf6a8c1a46762033"
+    },
+    {
+      "path": "tests/provider-process-environment.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 3816,
+      "sha256": "41ee102d10b57f085e655fe8d4118695272e169df595566f2e2b9e9af63a7ff4"
+    },
+    {
+      "path": "tests/provider-runtime-driver.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12130,
+      "sha256": "950ac0c43f93ce2b1a37b91a94212a0b32d3ca59d38e8e118ef7b588e9f43da5"
+    },
+    {
+      "path": "tests/provider-sandbox.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6201,
+      "sha256": "a63bb10047283e63bd5fde3396306b19ac8d61a781e480be4ecf6d07dd8eeb5e"
+    },
+    {
+      "path": "tests/provider-settings-api.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4506,
+      "sha256": "a5f32ac4047aafcddbed78e9ac66ae7576e815f2576cb358e9e77dfa3473e7bd"
+    },
+    {
+      "path": "tests/provider-settings-storage.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7415,
+      "sha256": "aecfb2d8bffdadacb71f89d8babbedb4b6589b28f16e9f76ff4204e8fe8bd730"
+    },
+    {
+      "path": "tests/provider-task-runtime.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 30797,
+      "sha256": "f76a86098f56008f4bc6e1199521617f98b463093b53ca2ba0b4f4a7a176e005"
+    },
+    {
+      "path": "tests/provider-thread-routing.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2957,
+      "sha256": "b59f978f5845b6227cf8cbf5ebefe8bc2c94b823d8876fe7aedd9100a58c6d19"
+    },
+    {
+      "path": "tests/provider-tool-projection.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12497,
+      "sha256": "0c4fe901c9c59bf43f40dc5e2aaef6991e601a65ca0cfe75af2a3de92b492be2"
+    },
+    {
+      "path": "tests/provider-tool-server.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1771,
+      "sha256": "8df92a2cc823e31e2474166f9cd29a573c7a29821ba277c4b34f069695dfbf20"
+    },
+    {
+      "path": "tests/provider-voice-factory.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12350,
+      "sha256": "4becce216aa6cbcdd079398e18e9835833564c4a9ad9f703de7d2be1432e5a4d"
+    },
+    {
+      "path": "tests/provider-voice-task-backend.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 27159,
+      "sha256": "5b7c54d0b30eea52a7ef2c3f91c94767232562a930bf044956e80ebbc05632d7"
+    },
+    {
+      "path": "tests/python-runtime.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2771,
+      "sha256": "1187bbb289059c33e54fd1aa5667c927dacfb37fb4bfd84e1fc71b847dc9cd97"
+    },
+    {
+      "path": "tests/python/test_pritha_state_migration.py",
+      "status": "A",
+      "kind": "file",
+      "bytes": 16023,
+      "sha256": "fdeb2d0caacc35e68f9c20550d66dec24d8046816da5c72b5c46f22696659296"
+    },
+    {
+      "path": "tests/quality-gate-instance-env.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 597,
+      "sha256": "d564b0088fc541fcc59e196db885da9baf614a621d22dfbb50908a4633532813"
+    },
+    {
+      "path": "tests/quality-gate.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3139,
+      "sha256": "e5579c3bd95d3aa3a2a5806a115e90d0f9c76cb79086dccdc622355252d1c9eb"
+    },
+    {
+      "path": "tests/redaction-paths.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 1720,
+      "sha256": "c7166ac611842ca7696b07dc90e01a129322dd512dfbffe7a40e8d946ff3685f"
+    },
+    {
+      "path": "tests/responses-request-budget.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6908,
+      "sha256": "e3324c03f42d8552e55445a6305c43c7e6e66c0937ac206516e518af101d4956"
+    },
+    {
+      "path": "tests/scaffold-hybrid-process.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11635,
+      "sha256": "ab718f51fab1cb6dc4ae8e16295d9bfa8fd90e09a04b4e977341169c76d750fe"
+    },
+    {
+      "path": "tests/scaffold-snapshot.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 48379,
+      "sha256": "bf3d0d18b11194b27453c1c839aa30eba64293164d2ae1b17f811e95bc276c79"
+    },
+    {
+      "path": "tests/search/canonical-boundaries.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5933,
+      "sha256": "5da9ef243543664bc84aa67724777de6e904a3800ba6c180301ef1f8455ff115"
+    },
+    {
+      "path": "tests/search/service.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12343,
+      "sha256": "820769a35834138d5e792c537e3cb8205d33f25c788c0eec20538d3754536537"
+    },
+    {
+      "path": "tests/setup-cli.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 3577,
+      "sha256": "bb9d03ebb8640b0a1d41cd053a8ec36f938f35ab5a84c142e0f16767d7bdc0fc"
+    },
+    {
+      "path": "tests/shared-chat-attachments.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 11788,
+      "sha256": "d077d657d41b73e1423dec440add2902f5453913a07a5f14f8cb3f88dc3f06c2"
+    },
+    {
+      "path": "tests/snapshots/scaffold-template-hashes.json",
+      "status": "M",
+      "kind": "file",
+      "bytes": 76394,
+      "sha256": "0b392b0a6db012534ed886f2b4425acd7b13fa6ad6d8066821ef62b9aa8124ae"
+    },
+    {
+      "path": "tests/voice-engine-routing.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5508,
+      "sha256": "20ab0deff5000374753557443ed740b43e79364034712ad3de6a5ceddb165160"
+    },
+    {
+      "path": "tests/voice-intake-receipts.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6841,
+      "sha256": "0b7d2845f4498ec2a01da2ab6941da04cc09de88eb7b1434d1b784ccc71ec2b9"
+    },
+    {
+      "path": "tests/voice-public-task-routing.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 20758,
+      "sha256": "aea97e2a903391586d9cc07ca601bf5e9268c583333bf4b701118db26b25e657"
+    },
+    {
+      "path": "tests/voice-session-contexts.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 4832,
+      "sha256": "62a503e6605a46e1cdb9a6f2402505d6cb19cc257825029ec33a0b05bca50092"
+    },
+    {
+      "path": "tests/voice-session-host-context.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 17150,
+      "sha256": "375507bc27777c0dfb4b4062b8d173fe56c28c8995b69cd8a1ad91973bc2125a"
+    },
+    {
+      "path": "tests/voice-task-bridge.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8896,
+      "sha256": "2eff3f762bc58a8a0d12ed11996ea1e28d85854d58faff50707917df7fe75554"
+    },
+    {
+      "path": "tests/voice-task-router.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 10064,
+      "sha256": "2d7380fb5952164c6a0bd176ff436968c6967af62fa3a0bb271fd72add33fe75"
+    },
+    {
+      "path": "tests/voice-tools-dispatcher.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 5155,
+      "sha256": "b1117db9e5e1ba2b40ce74e9752c232e529bddbb84348a1982ab36d23e9e2600"
+    },
+    {
+      "path": "tests/voice-topic-bindings.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 12683,
+      "sha256": "c12afa9ba4bf442e48a025925261bfb9205f0e91f9dfa6836c40bc017583d110"
+    }
+  ]
+}

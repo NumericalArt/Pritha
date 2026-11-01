@@ -31,6 +31,7 @@ test('owned Claude runner isolates keys and configuration, pins resume and persi
   const first=await (await startClaudeCodeRun({...options,env:{...process.env,OPENAI_API_KEY:'FOREIGN_KEY_CANARY',CLAUDE_CODE_OAUTH_TOKEN:'OAUTH_CANARY',NODE_OPTIONS:'FOREIGN_HOOK_CANARY'},onRawChunk:chunk=>records.push(String(chunk))},dependencies(capture))).completion;
   assert.equal(first.ok,true);assert.equal(first.usage.totalTokens,6);assert.doesNotMatch(JSON.stringify(capture.env)+JSON.stringify(capture.args),/REAL_KEY_CANARY|FOREIGN_KEY_CANARY|OAUTH_CANARY|FOREIGN_HOOK_CANARY/);
   assert.doesNotMatch(records.join(''),/PRIVATE_REASONING_CANARY/);assert.ok(capture.env.ANTHROPIC_API_KEY.length>=32);assert.equal(capture.env.CLAUDE_CODE_MAX_RETRIES,'0');assert.equal(existsSync(capture.env.TMPDIR),false);
+  assert.equal(capture.sandbox.runtime,undefined);assert(!capture.sandbox.readRoots.some(dir=>dir.endsWith('/Library/Keychains')));
   const second=await (await startClaudeCodeRun({...options,resume:first.sessionId},dependencies(capture))).completion;
   assert.equal(second.ok,true);assert.equal(second.sessionId,first.sessionId);assert.equal(capture.args.includes('--resume'),true);assert.equal(capture.args.includes('--continue'),false);
   await assert.rejects(startClaudeCodeRun({...options,resume:'87654321-4321-4321-4321-210987654321'},dependencies({})),{code:'runtime_identity_mismatch'});
@@ -51,6 +52,8 @@ test('native Claude session never reads API keys, uses opaque transport, pins ac
   const deps={...dependencies(capture),readCredential:()=>assert.fail('Native mode must not read an API key'),listenProxy:()=>assert.fail('Native mode must not use the API proxy'),probeNativeAuth:async()=>({authenticated:true,identity}),listenNativeTunnel:async()=>({port:45678,close:async()=>{closed++;}})};
   const first=await(await startClaudeCodeRun({...options,env:{...process.env,ANTHROPIC_API_KEY:'API_CANARY',CLAUDE_CODE_OAUTH_TOKEN:'OAUTH_CANARY',ANTHROPIC_BASE_URL:'https://wrong'}},deps)).completion;
   assert.equal(first.ok,true);assert(!capture.args.includes('--bare'));assert(!capture.args.includes('--dangerously-skip-permissions'));assert.equal(capture.args[capture.args.indexOf('--tools')+1],'');assert.doesNotMatch(JSON.stringify(capture.env),/CANARY|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_BASE_URL|CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST/);assert.deepEqual(capture.sandbox.loopbackPorts,[45678]);assert.equal(closed,1);
+  assert.equal(capture.sandbox.runtime,'claude-native');assert(!capture.sandbox.readRoots.includes(os.userInfo().homedir));
+  if(process.platform==='darwin')assert.equal(capture.env.HOME,os.userInfo().homedir);
   assert.equal((await(await startClaudeCodeRun({...options,resume:first.sessionId},deps)).completion).ok,true);
   identity='2'.repeat(64);await assert.rejects(startClaudeCodeRun({...options,resume:first.sessionId},deps),{code:'runtime_identity_mismatch'});
   await assert.rejects(startClaudeCodeRun({...options,tokenBudget:10000},deps),{code:'provider_budget_mode_unavailable'});

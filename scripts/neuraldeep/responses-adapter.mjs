@@ -18,6 +18,11 @@ function createDispatcher(options,timeout){
 const DEFAULT_UPSTREAM = "https://api.neuraldeep.ru";
 const DEFAULT_REQUEST_LIMIT = RESPONSES_REQUEST_LIMIT;
 const DEFAULT_RESPONSE_LIMIT = 32 * 1024 * 1024;
+// The catalog uses an unqualified ID; the verified upstream terminal uses
+// this model's publisher-qualified ID. This is an explicit equivalence, not
+// generic prefix stripping or permission to accept a different model family.
+const responseModelMatches=(requested,returned)=>returned===requested
+  || requested==='gpt-oss-20b' && returned==='openai/gpt-oss-20b';
 // NeuralDeep advertises a 900-second gateway deadline; allow its terminal response to arrive.
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 930_000;
 const upstreamDispatchers = new WeakMap();
@@ -199,16 +204,30 @@ export function createNeuralDeepAdapter(options = {}) {
     response.once("close", abortIfClientLeaves);
     let upstreamAttempted = false;
     let requestHash = null, dispatchHash = null, responsesPayload = null,toolMapping=null;
+    let pendingModelMetadata=false;
     const projectResponse=value=>{
       if(!toolMapping)return value;
-      if(value?.model && value.model!==responsesPayload?.model)throw Object.assign(new Error('Provider model identity changed.'),{code:'neuraldeep_model_identity_mismatch',statusCode:502});
+      if((value?.model || pendingModelMetadata) && !responseModelMatches(responsesPayload?.model,value?.model))throw Object.assign(new Error('Provider model identity changed.'),{code:'neuraldeep_model_identity_mismatch',statusCode:502});
       return Array.isArray(value?.output)?{...value,output:value.output.map(item=>wireCall(item,toolMapping))}:value;
     };
     const transformResponseStream=raw=>{
       const value=transformStream?transformStream(raw):raw;if(!toolMapping)return value;
       return parseSseData(value).map(event=>{
         if(event.item)event.item=wireCall(event.item,toolMapping);
-        if(event.response)event.response=projectResponse(event.response);
+        if(event.response){
+          const prelude=['response.created','response.in_progress'].includes(event.type);
+          if(prelude && (pendingModelMetadata || event.response.model && !responseModelMatches(responsesPayload?.model,event.response.model))){
+            // Live NeuralDeep can announce a gateway placeholder model before
+            // the selected model appears in its terminal snapshot. Quarantine
+            // this metadata, and all output, until that exact identity and the
+            // complete stream are verified. Never normalize an actual result
+            // from another model or release a tool on provisional metadata.
+            if(response.headersSent || !['queued','in_progress'].includes(event.response.status)
+              || !Array.isArray(event.response.output) || event.response.output.length)throw Object.assign(new Error('Provider model identity changed.'),{code:'neuraldeep_model_identity_mismatch',statusCode:502});
+            pendingModelMetadata=true;
+            const {model:unverifiedModel,...metadata}=event.response;event.response=metadata;
+          }else event.response=projectResponse(event.response);
+        }
         return 'data: '+JSON.stringify(event)+'\n\n';
       }).join('');
     };
@@ -332,14 +351,23 @@ export function createNeuralDeepAdapter(options = {}) {
       const stream=isResponses && upstream.ok && isEventStream && typeof response.write==='function'
         && (!options.validateResponsesResponse || options.requiresBufferedResponse?.()===false);
       if(stream) {
+        const deferred=[];let deferredBytes=0;
+        const write=async chunk=>{
+          if(!response.headersSent){copyResponseHeaders(upstream,response,protectedBoundary);response.writeHead(upstream.status);}
+          await writeResponseChunk(response,chunk,controller.signal);
+        };
         const normalizer=new ResponsesStreamNormalizer({maxBytes:responseLimit,transform:transformResponseStream,
           onTerminal:event=>{
             providerUsage=responsesUsage(JSON.stringify(event.response),'application/json');
             responseSummary=responsesTerminalSummary(event.response,{eventType:event.type,outputLimit});
           },
           write:async chunk=>{
-            if(!response.headersSent){copyResponseHeaders(upstream,response,protectedBoundary);response.writeHead(upstream.status);}
-            await writeResponseChunk(response,chunk,controller.signal);
+            if(pendingModelMetadata){
+              deferredBytes+=Buffer.byteLength(chunk);
+              if(deferredBytes>responseLimit)throw Object.assign(new Error('Deferred response exceeds its bounded size.'),{code:'neuraldeep_response_too_large',statusCode:502});
+              deferred.push(chunk);return;
+            }
+            await write(chunk);
           }});
         for await(const chunk of upstream.body || []) {if(chunk.length)received(chunk.length);await normalizer.push(chunk);}
         timings.responseCompletedMs=Date.now()-upstreamStartedAt;
@@ -348,7 +376,9 @@ export function createNeuralDeepAdapter(options = {}) {
         // Close the accounting gap before any complete tool can cause Codex to
         // submit another request. Partial public text never settles the turn.
         await notifyRequest({status:upstream.status,error});
-        await normalizer.flush(events);response.end();progress('finished',true);return;
+        await normalizer.flush(events);
+        for(const chunk of deferred)await write(chunk);
+        response.end();progress('finished',true);return;
       }
       const upstreamBody = rejectedBody ?? bufferedBody ?? await readWebBody(upstream, responseLimit, received);
       if (protectedBoundary && !upstream.ok) {

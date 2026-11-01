@@ -17,8 +17,9 @@ export function providerBoundaryAuditPlan({kind,connector='neuraldeep'}={}){
 }
 export function runProviderBoundaryAudit(options){
   const plan=providerBoundaryAuditPlan(options);if(options.plan)return {...plan,status:'planned'};
-  // No Keychain lookup, live key matching, real provider request or modification
-  // of native auth. The ND proxy-only audit is replaced by real OS denial tests.
+  // No live credential lookup, key matching, provider request or native auth
+  // modification. Native tests inspect default Keychain metadata and use a
+  // separate synthetic store; model tools receive no credential-store access.
   const temporary=mkdtempSync(path.join(os.tmpdir(),'pritha-boundary-audit-'));
   let cleanup=true;
   try{

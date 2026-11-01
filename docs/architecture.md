@@ -163,9 +163,11 @@ after a completed turn, the result is preserved and no further iteration starts.
 
 Pritha is not a hosted SaaS, a hardened public or multi-user control plane, or a
 single general assistant with unlimited context and tools. Control Center and
-Voice are functional but remain optional to core onboarding. The current public
-runtime is Codex-native; a different coding-agent runtime requires a future
-adapter and must not be inferred from the architecture.
+Voice are functional but remain optional to core onboarding. Codex remains the
+primary repository workbench. Task adapters support Codex, NeuralDeep, Claude
+Code, OpenRouter and an owned Local process, with separate readiness and
+capability checks. An implemented adapter does not establish account access or
+live acceptance. See [Start here](../START_HERE.md) for the current setup paths.
 
 See [Getting Started](getting-started.md) for the core and optional start paths,
 and [Security](../SECURITY.md) for vulnerability reporting and exposure rules.

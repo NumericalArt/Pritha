@@ -96,3 +96,53 @@ test('failed durable receipts never release a NeuralDeep tool in JSON or SSE',as
     assert.doesNotMatch(body,/"type":"function_call"|PRIVATE_RECEIPT_ERROR/);assert.equal(calls,1);assert.equal(receipts,1);
   }
 });
+
+const metadataPrelude=()=>({type:'response.created',response:{id:'response_fixture',model:'qwen3.8-flash-next',status:'in_progress',output:[]}});
+const sse=event=>'data: '+JSON.stringify(event)+'\n\n';
+
+test('provisional NeuralDeep model metadata holds all output until exact terminal identity and accounting pass',async t=>{
+  const started=Promise.withResolvers(),finish=Promise.withResolvers(),receipts=[];
+  let released=false;
+  const post=await fixture(t,{onRequest:event=>receipts.push(event),fetchImpl:async()=>new Response(new ReadableStream({async start(controller){
+    controller.enqueue(new TextEncoder().encode(sse(metadataPrelude())));started.resolve();await finish.promise;
+    controller.enqueue(new TextEncoder().encode(sse({type:'response.completed',response:terminal([call(allowedTools[0])])})+'data: [DONE]\n\n'));controller.close();
+  }}),{headers:{'content-type':'text/event-stream'}})});
+  const pending=post().then(value=>{released=true;return value;});await started.promise;
+  try{await new Promise(resolve=>setTimeout(resolve,50));assert.equal(released,false);}finally{finish.resolve();}
+  const result=await pending,body=await result.text();assert.equal(result.status,200);
+  assert.doesNotMatch(body,/qwen3\.8-flash-next/);assert.match(body,/"model":"qwen3.8-27b"/);assert.match(body,/"name":"read_file"/);
+  assert.equal(receipts.length,1);assert.equal(receipts[0].error,null);assert.equal(receipts[0].usage.totalTokens,6);
+});
+
+test('quarantined NeuralDeep metadata never permits wrong or absent terminal identity, truncated streams, foreign tools or failed accounting',async t=>{
+  for(const mode of ['wrong-model','missing-model','truncated','foreign-tool','receipt']){
+    const completed=terminal([call(mode==='foreign-tool'?'request_user_input':allowedTools[0])]);
+    if(mode==='wrong-model')completed.model='foreign-model';if(mode==='missing-model')delete completed.model;
+    const post=await fixture(t,{onRequest:()=>{if(mode==='receipt')throw Error('PRIVATE_RECEIPT_ERROR');},fetchImpl:async()=>new Response(
+      sse(metadataPrelude())+(mode==='truncated'?'':sse({type:'response.completed',response:completed})+'data: [DONE]\n\n'),{headers:{'content-type':'text/event-stream'}})});
+    const result=await post(),body=await result.text();assert.equal(result.status,mode==='receipt'?503:502);
+    assert.doesNotMatch(body,/"type":"function_call"|"type":"response.created"|qwen3\.8-flash-next|PRIVATE_RECEIPT_ERROR/);
+    assert.match(body,/neuraldeep_model_identity_mismatch|neuraldeep_stream_truncated|provider_tool_identity_mismatch|provider_receipt_failed/);
+  }
+});
+
+test('a model mismatch in nonempty, terminal or already-published metadata is never treated as a provisional placeholder',async t=>{
+  for(const mode of ['nonempty','terminal-status','late','quarantined-matching-model','quarantined-missing-model']){
+    const prelude=metadataPrelude();if(mode==='nonempty')prelude.response.output=[call(allowedTools[0])];if(mode==='terminal-status')prelude.response.status='completed';
+    const quarantined=mode.startsWith('quarantined-');
+    if(quarantined){prelude.response.output=[call('request_user_input')];if(mode==='quarantined-matching-model')prelude.response.model=model;else delete prelude.response.model;}
+    const prefix=quarantined?sse(metadataPrelude()):mode==='late'?sse({type:'response.created',response:{...prelude.response,model}}):'';
+    const post=await fixture(t,{fetchImpl:async()=>new Response(prefix+sse(prelude)+sse({type:'response.completed',response:terminal([call(allowedTools[0])])})+'data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}})});
+    const body=await (await post()).text();assert.match(body,/neuraldeep_model_identity_mismatch/);assert.doesNotMatch(body,/"type":"function_call"/);
+  }
+});
+
+test('only the verified publisher-qualified model ID is equivalent; another publisher or model remains blocked',async t=>{
+  for(const returned of ['openai/gpt-oss-20b','other/gpt-oss-20b','openai/gpt-oss-120b','openai/openai/gpt-oss-20b']){
+    const prelude={type:'response.created',response:{id:'response_fixture',model:'openai/openai/gpt-oss-20b',status:'in_progress',output:[]}};
+    const post=await fixture(t,{fetchImpl:async()=>new Response(sse(prelude)+sse({type:'response.completed',response:terminal([call(allowedTools[0])],{model:returned})})+'data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}})});
+    const result=await post({model:'gpt-oss-20b'}),body=await result.text();
+    if(returned==='openai/gpt-oss-20b'){assert.equal(result.status,200);assert.match(body,/"name":"read_file"/);assert.match(body,/"model":"openai\/gpt-oss-20b"/);}
+    else{assert.equal(result.status,502);assert.match(body,/neuraldeep_model_identity_mismatch/);assert.doesNotMatch(body,/"type":"function_call"/);}
+  }
+});

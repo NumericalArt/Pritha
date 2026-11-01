@@ -25,7 +25,7 @@ export function prepareProviderSandbox({root,stateRoot,privateRoot,command,args,
   const dependency=providerSandboxDependency(root);
   if(typeof command!=='string' || !path.isAbsolute(command) || !Array.isArray(args) || args.some(arg=>typeof arg!=='string' || arg.includes('\0'))
       || Buffer.byteLength(JSON.stringify(args))>128000 || readRoots.length>32 || readOnlyRoots.length>10 || writeRoots.length>16 || denyWriteRoots.length>256 || loopbackPorts.length>2
-      || loopbackPorts.some(port=>!Number.isSafeInteger(port) || port<1 || port>65535) || runtime!==undefined && runtime!=='codex')failure();
+      || loopbackPorts.some(port=>!Number.isSafeInteger(port) || port<1 || port>65535) || runtime!==undefined && !['codex','claude-native'].includes(runtime))failure();
   const binary=realpathSync(command),working=realpathSync(cwd),scratch=realpathSync(temporary);
   const protectedFiles=denyWriteRoots.map(value=>{const target=realpathSync(value);if(!target.startsWith(working+path.sep))failure();return target;});
   const system=['/usr','/bin','/sbin','/System','/Library/Apple','/private/etc/ssl','/private/etc/localtime','/private/etc/hosts','/dev/null','/dev/random','/dev/urandom'].filter(existsSync);

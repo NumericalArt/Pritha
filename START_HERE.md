@@ -3,7 +3,7 @@ id: pritha-start-here
 type: workflow
 status: active
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-02
 topics: [pritha, setup, providers, distribution]
 tools: [Pritha, Node.js, Python, Codex, NeuralDeep, Claude Code, OpenRouter]
 sources:
@@ -98,8 +98,11 @@ should review the directory and initialize their own repository explicitly.
 Use Settings to save this instance's API key and choose an exact supported model.
 NeuralDeep and OpenRouter use their own credentials. Claude supports either an
 Anthropic API key or this instance's native Claude Code session. For the latter,
-save **Local CLI session** in Settings and run its displayed terminal sign-in
-command (`node scripts/claude-auth.mjs login`). Only the unmodified Claude CLI
+save **Local CLI session** in Settings, copy its complete terminal sign-in
+command and finish the browser flow. Wait for `authenticated: true`, refresh
+status and try a new task. The copied command already pins this instance's
+paths. See [Connect Claude](docs/claude-connection.md) for both modes and login
+troubleshooting. Only the unmodified Claude CLI
 handles authentication in a dedicated private configuration; Pritha does not
 extract OAuth tokens. `plan` and `status` do not initiate login. The reviewed
 model catalog does not guarantee account entitlement; the first real task is

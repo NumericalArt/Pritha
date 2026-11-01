@@ -214,9 +214,11 @@ Codex tasks until the operator approves or rejects them in the UI task card.
 Secret values should be entered through the child-agent credential UI, not
 spoken into the Realtime session.
 
-## Compatibility Roadmap
+## Provider Compatibility
 
-Pritha v0.1 is Codex-native. A Claude Code version is coming through a future
-adapter path that translates selected Pritha/Codex-native project surfaces into
-Claude Code-compatible guidance without replacing `AGENTS.md` as the Pritha
-source of truth.
+The Codex workbench and `AGENTS.md` remain the repository's primary working
+surface and instruction source. Task adapters support NeuralDeep, Claude Code,
+OpenRouter and an owned Local process alongside native Codex. Each runtime
+declares its own capabilities and checks readiness before a task. Follow
+[Start here](../START_HERE.md) and [Connect Claude](claude-connection.md); live
+provider and manual acceptance results are tracked in the release roadmap.
