@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -75,6 +75,13 @@ test("Outcome Spec proposal covers V1 functions and deliverables", () => {
   assert.equal(result.automatedTrials, 1);
   assert.equal(result.coverage.length, 4);
   assert.equal(result.coverage.every((entry) => entry.covered), true);
+});
+
+test("a ZIP root can read a historical contract while authoring the new outcome only in private agent memory",t=>{
+  const f=fixture();t.after(()=>rmSync(f.root,{recursive:true,force:true}));
+  assert.equal(path.dirname(f.specPath),path.join(f.root,'.private','agents','contracts'));
+  assert.deepEqual(readdirSync(path.dirname(f.contractPath)),[path.basename(f.contractPath)]);
+  assert.match(readFileSync(f.specPath,'utf8'),/type: agent-outcome-spec/);
 });
 
 test("semantic and document locks ignore approval metadata but not outcome meaning", () => {

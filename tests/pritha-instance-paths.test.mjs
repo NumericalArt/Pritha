@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,6 +11,7 @@ import {
   resolvePrithaAgentParent,
   resolvePrithaStateRoot,
   resolvePrithaStatePath,
+  resolvePrithaStatePathFrom,
   resolveSiblingAgentPath,
 } from "../scripts/lib/paths.mjs";
 
@@ -96,4 +97,26 @@ test("explicit instance roots take precedence and isolate live state", () => {
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+});
+
+test("Git checkout, linked worktree and ZIP distribution share the same private agent layout", t => {
+  const base=mkdtempSync(path.join(os.tmpdir(),'pritha-distribution-memory-'));
+  t.after(()=>rmSync(base,{recursive:true,force:true}));
+  for(const kind of ['git','worktree','zip']){
+    const root=path.join(base,kind);mkdirSync(path.join(root,'11_agents'),{recursive:true});
+    if(kind==='git')mkdirSync(path.join(root,'.git'));
+    if(kind==='worktree')writeFileSync(path.join(root,'.git'),'gitdir: ../git/.git/worktrees/fixture\n');
+    const options={root,env:{}};
+    assert.equal(resolvePrithaAgentMemoryRoot(options),path.join(root,'.private','agents'));
+    assert.equal(resolvePrithaAgentMemoryRoot(options),resolvePrithaStatePathFrom(options,'agents'));
+    const stateRoot=path.join(base,kind+'-state');mkdirSync(stateRoot);
+    assert.equal(resolvePrithaAgentMemoryRoot({...options,stateRoot}),path.join(stateRoot,'agents'));
+  }
+});
+
+test("a state alias to a non-Git root preserves private layout and cannot select tracked agent history",t=>{
+  const base=mkdtempSync(path.join(os.tmpdir(),'pritha-memory-alias-')),root=path.join(base,'source'),alias=path.join(base,'alias');
+  t.after(()=>rmSync(base,{recursive:true,force:true}));
+  mkdirSync(path.join(root,'11_agents'),{recursive:true});symlinkSync(root,alias);
+  assert.equal(resolvePrithaAgentMemoryRoot({root,stateRoot:alias,env:{}}),path.join(root,'.private','agents'));
 });

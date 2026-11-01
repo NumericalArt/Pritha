@@ -34,6 +34,17 @@ test("placeholder-only lifecycle reports are diagnostics and do not synthesize a
   assert.ok(f.catalog().diagnostics.some(row => row.code === "unbound-legacy-report"));
 });
 
+test("non-Git distribution excludes tracked agent history from its live catalog",t=>{
+  const f=fixture(t),history=path.join(f.root,'11_agents','contracts'),local=path.join(f.root,'.private','agents','contracts');
+  mkdirSync(history,{recursive:true});mkdirSync(local,{recursive:true});
+  const contract=id=>`---\nid: ${id}\ntype: agent-contract\nagent_id: ${id}\n---\n- Agent name: ${id}\n`;
+  writeFileSync(path.join(history,'historical.md'),contract('historical'));
+  writeFileSync(path.join(local,'local.md'),contract('local'));
+  const catalog=readAgentCatalog({root:f.root,stateRoot:f.root,agentParent:f.agentParent,env:{},fresh:true});
+  assert.equal(catalog.artifacts.length,1);assert.equal(catalog.agents.length,1);
+  assert.equal(catalog.agents[0].agentId,'local');assert.equal(findCatalogAgent(catalog,'historical'),null);
+});
+
 test("frontmatter-only reports use exact stable ID; display and artifact renames preserve identity", (t) => {
   const f = fixture(t);
   const folder = f.folder("alpha");

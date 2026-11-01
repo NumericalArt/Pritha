@@ -72,8 +72,8 @@ test("remaining Agents Mother command modules run against an isolated root", () 
     assert.equal(result.status, 0, `${args.join(" ")}\n${result.stdout}\n${result.stderr}`);
   }
 
-  const reportsDir = path.join(root, "11_agents", "reports");
-  assert.ok(existsSync(path.join(root, "11_agents", "registry.md")));
+  const reportsDir = path.join(root, ".private", "agents", "reports");
+  assert.ok(existsSync(path.join(root, ".private", "agents", "registry.md")));
   const reports = readdirSync(reportsDir).filter((entry) => entry.endsWith(".md"));
   assert.ok(reports.some((entry) => entry.includes("agent-handoff-report")));
   assert.ok(reports.some((entry) => entry.includes("agent-operations-report")));
@@ -85,7 +85,7 @@ test("registry does not promote roadmap phase reports to agents", () => {
   const root = mkdtemp();
   write(
     root,
-    "11_agents/reports/2026-06-21-pritha-github-install-reproducibility-baseline-report.md",
+    ".private/agents/reports/2026-06-21-pritha-github-install-reproducibility-baseline-report.md",
     `---
 id: 2026-06-21-pritha-github-install-reproducibility-baseline-report
 type: agent-operations-report
@@ -105,7 +105,7 @@ Phase: 0 - Baseline And Acceptance
 
   const result = run(root, ["registry"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  const registry = readFileSync(path.join(root, "11_agents", "registry.md"), "utf8");
+  const registry = readFileSync(path.join(root, ".private", "agents", "registry.md"), "utf8");
   assert.match(registry, /Agents tracked: 0/);
   assert.match(registry, /Reports: 1/);
   assert.doesNotMatch(registry, /Pritha GitHub Install Reproducibility Baseline \| unknown/);
@@ -115,7 +115,7 @@ test("registry classifies Outcome Specs separately from agent contracts", () => 
   const root = mkdtemp();
   write(
     root,
-    "11_agents/contracts/2026-08-16-alpha-agent-contract.md",
+    ".private/agents/contracts/2026-08-16-alpha-agent-contract.md",
     `---
 id: 2026-08-16-alpha-agent-contract
 type: agent-contract
@@ -136,7 +136,7 @@ created: 2026-08-16
   );
   write(
     root,
-    "11_agents/contracts/2026-08-16-alpha-agent-outcome-spec.md",
+    ".private/agents/contracts/2026-08-16-alpha-agent-outcome-spec.md",
     `---
 id: 2026-08-16-alpha-agent-outcome-spec
 type: agent-outcome-spec
@@ -152,7 +152,7 @@ created: 2026-08-16
   );
   write(
     root,
-    "11_agents/reports/2026-08-16-alpha-agent-delivery-report.md",
+    ".private/agents/reports/2026-08-16-alpha-agent-delivery-report.md",
     `---
 id: 2026-08-16-alpha-agent-delivery-report
 type: agent-delivery-report
@@ -171,7 +171,7 @@ subject:
 
   const result = run(root, ["registry"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  const registry = readFileSync(path.join(root, "11_agents", "registry.md"), "utf8");
+  const registry = readFileSync(path.join(root, ".private", "agents", "registry.md"), "utf8");
   assert.match(registry, /Agents tracked: 1/);
   assert.match(registry, /Contracts: 1/);
   assert.match(registry, /Outcome specs: 1/);
@@ -183,7 +183,7 @@ test("registry joins display names, technical slugs and contract-bound revisions
   for (const [date, revision] of [["2026-08-14", 3], ["2026-08-19", 4]]) {
     write(
       root,
-      `11_agents/contracts/${date}-fixture-executive-agent-contract.md`,
+      `.private/agents/contracts/${date}-fixture-executive-agent-contract.md`,
       `---
 id: ${date}-fixture-executive-agent-contract-revision-${revision}
 type: agent-contract
@@ -209,14 +209,14 @@ subject:
   }
   write(
     root,
-    "11_agents/contracts/2026-08-19-fixture-executive-agent-outcome-spec.md",
+    ".private/agents/contracts/2026-08-19-fixture-executive-agent-outcome-spec.md",
     `---
 id: 2026-08-19-fixture-executive-agent-outcome-spec
 type: agent-outcome-spec
 status: approved
 outcome_spec_status: approved
 agent_slug: fixture-executive-agent
-contract_path: 11_agents/contracts/2026-08-19-fixture-executive-agent-contract.md
+contract_path: .private/agents/contracts/2026-08-19-fixture-executive-agent-contract.md
 approved_by: user
 created: 2026-08-19
 ---
@@ -226,7 +226,7 @@ created: 2026-08-19
   );
   write(
     root,
-    "11_agents/reports/2026-08-19-fixture-executive-agent-handoff-report.md",
+    ".private/agents/reports/2026-08-19-fixture-executive-agent-handoff-report.md",
     `---
 id: 2026-08-19-fixture-executive-agent-handoff-report
 type: agent-handoff-report
@@ -246,7 +246,7 @@ subject:
 
   const result = run(root, ["registry"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  const registry = readFileSync(path.join(root, "11_agents", "registry.md"), "utf8");
+  const registry = readFileSync(path.join(root, ".private", "agents", "registry.md"), "utf8");
   assert.match(registry, /Agents tracked: 1/);
   assert.match(registry, /\| Fixture Executive Agent \| Revision 4 mission/);
   assert.match(registry, /contracts:2 outcome:1 scaffold:0 delivery:0 test:0 handoff:1/);

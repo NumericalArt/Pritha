@@ -53,9 +53,7 @@ export function resolvePrithaAgentMemoryRoot(options = {}) {
   const root = options.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
   const stateRoot = resolvePrithaStateRoot({ ...options, root });
   if (stateRoot !== root) return path.join(stateRoot, PRITHA_STATE_LAYOUT.agents);
-  return existsSync(path.join(root, ".git"))
-    ? path.join(root, LEGACY_STATE_LAYOUT.agents)
-    : path.join(root, "11_agents");
+  return path.join(root, LEGACY_STATE_LAYOUT.agents);
 }
 
 export function isPrithaCodeCheckout(candidate) {

@@ -142,7 +142,7 @@ test("generated contracts keep sources and related as separate frontmatter field
       env: { ...process.env, TECHSCOPE_ROOT: root, PRITHA_AGENT_PARENT:path.join(root,'children') },
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    const contractsDir = path.join(root, "11_agents", "contracts");
+    const contractsDir = path.join(root, ".private", "agents", "contracts");
     const contractPath = path.join(contractsDir, readdirSync(contractsDir).find((name) => name.endsWith("-agent-contract.md")));
     const contractText = readFileSync(contractPath, "utf8");
     const frontmatter = parseFrontmatterData(contractText);

@@ -121,7 +121,7 @@ function evidenceForTopics(topicIds) {
 test("registry-only reference adoption reaches the full gate through fresh exact evidence", async () => {
   const repositoryUrl = "https://github.com/bytedance/deer-flow";
   const contract = {
-    relPath: "11_agents/contracts/registry-reference-agent-contract.md",
+    relPath: ".private/agents/contracts/registry-reference-agent-contract.md",
     runtimeFamily: "codex-native",
     repositoryResearchPolicy: "registry-only",
     repositoryResearchTopics: "agent-harness",
@@ -247,7 +247,7 @@ test("contract-aware GitHub research reaches scaffold through verified gates wit
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-github-e2e-"));
   try {
     const memoryDir = path.join(root, ".memory");
-    const contractDir = path.join(root, "11_agents", "contracts");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
     const registryDir = path.join(root, "01_sources", "registries");
     mkdirSync(memoryDir, { recursive: true });
     mkdirSync(contractDir, { recursive: true });
@@ -308,7 +308,7 @@ test("contract-aware GitHub research reaches scaffold through verified gates wit
     const repeatedResearchOutput = run(root, researchArgs);
     assert.match(repeatedResearchOutput, /agent-research-2\.md/);
 
-    const researchDir = path.join(root, "11_agents", "research");
+    const researchDir = path.join(root, ".private", "agents", "research");
     const researchFiles = readdirSync(researchDir).filter((name) => /-agent-research(?:-\d+)?\.md$/.test(name));
     assert.equal(researchFiles.length, 2);
     const researchFile = researchFiles.find((name) => name.endsWith("-agent-research-2.md"));
@@ -383,7 +383,7 @@ test("contract-aware GitHub research reaches scaffold through verified gates wit
     assert.equal(existsSync(path.join(outputDir, "node_modules")), false);
     assert.equal(readFileSync(path.join(registryDir, "github-agent-building-repos.md"), "utf8"), registryBefore);
 
-    const reportsDir = path.join(root, "11_agents", "reports");
+    const reportsDir = path.join(root, ".private", "agents", "reports");
     const scaffoldReport = readFileSync(
       path.join(reportsDir, readdirSync(reportsDir).find((name) => name.endsWith("-scaffold-report.md"))),
       "utf8",

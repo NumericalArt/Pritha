@@ -1478,7 +1478,7 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   **1206/1206**, без skipped. Strict privacy, name guard (124 разрешённых
   compatibility references) и Markdown validation (987 файлов) прошли.
 
-### Checkpoint реализации 22 — Session snapshot (verified-targeted; cumulative gate pending)
+### Checkpoint реализации 22 — Session snapshot (verified-automated)
 
 Private host context подключён к обоим session transports, native call/config
 endpoints и общему tool dispatcher. Порядок реализации и проверки:
@@ -1519,10 +1519,10 @@ endpoints и общему tool dispatcher. Порядок реализации �
   синтаксис вызова/config. Config assertion заменён исполнением реального
   builder с pinned/default моделью/голосом; route assertion учитывает host
   argument. После исправления целевой набор **37/37**. Совокупный полный rerun
-  включён в следующий checkpoint. Privacy/name/Markdown gates прошли
+  завершён в checkpoint 23: **1223/1223**, оба исправленных tests зелёные. Privacy/name/Markdown gates прошли
   (124 compatibility references, 987 Markdown files).
 
-### Следующий checkpoint 23 — Live agent memory fallback (planned)
+### Checkpoint реализации 23 — Live agent memory fallback (verified-automated)
 
 При чтении R11 обнаружен ранее существовавший fallback: checkout без `.git`
 направляет новые live agent artifacts в `11_agents/`. Это нарушает AGENTS и
@@ -1536,6 +1536,40 @@ endpoints и общему tool dispatcher. Порядок реализации �
    явно выбранный private layout. Не ослаблять runtime boundary ради fixtures.
 3. Targeted paths/factory/state tests, общий unit gate, name/privacy/Markdown
    validation. Реальные private contracts, registry и рабочие сервисы не менять.
+
+
+- Resolver исправлен; targeted paths/catalog/outcome/CLI tests **63/63** и
+  GitHub fixture research/scaffold tests **21/21**. Legacy fixture paths заменены
+  private paths без изменения research, approval или sandbox gate. Проверено
+  чтение исторического контракта с записью нового Outcome только в private root,
+  а также исключение tracked history из live catalog non-Git distribution.
+- Good State Alignment: aligned с instance isolation и canonical history.
+  Markdown/privacy/name guards прошли. После исправления 13 fixture expectations
+  на прежний `11_agents` layout полный unit gate прошёл **1223/1223**, без skipped.
+  Этот прогон также закрывает cumulative gate checkpoint 22.
+
+### Следующий checkpoint 24 — Voice intake context (planned)
+
+1. Передавать opaque host context из callback активного разговора при spoken
+   confirmation. Не брать provider/model из model arguments или изменившихся
+   глобальных Settings. Общая owner cookie для доступа к host context работает
+   с OpenAI и ND; ND audio session сохраняет собственный owner/transport.
+2. Intake endpoint проверяет context/owner/expiry/hard offline до чтения файлов
+   и передаёт immutable task selection в общий run-task. Missing/closed/foreign
+   context требует reconnect без fallback или запуска другой модели.
+3. Ограничить multipart body и проверять count/per-file/total до выделения
+   дополнительных buffers. Прежние confirmation/retention/approval boundaries
+   сохраняются; неподтверждённый attachment transport остаётся явным blocker.
+4. Проверить native/ND, пять task connectors, смену defaults, wrong owner,
+   закрытие сессии, malformed/oversized payload и отсутствие task/staging при
+   отклонении. Browser test подтверждает передачу host context вне model args.
+   Durable intake replay и проверенная доставка originals входят в последующий
+   общий attachment этап; этот checkpoint сам по себе их не объявляет готовыми.
+
+R12 дополнительная проверка runner: quality-gate задаёт оба root aliases для
+child commands, а часть legacy test fixtures переопределяет только один. Проверить
+unit child environment отдельно и изолировать оба aliases для fixture runner,
+чтобы новая conflict detection не давала ложных ошибок в финальном quality gate.
 
 ## 7. Полные исходные материалы
 

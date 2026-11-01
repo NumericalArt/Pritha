@@ -28,7 +28,7 @@ function listFiles(root) {
 }
 
 function writeFixtureResearch(root, contractPath, slug = "snapshot-agent") {
-  const researchDir = path.join(root, "11_agents", "research");
+  const researchDir = path.join(root, ".private", "agents", "research");
   execFileSync("mkdir", ["-p", researchDir]);
   const contractRel = path.relative(root, contractPath).split(path.sep).join("/");
   const fingerprint = contractFingerprint(readFileSync(contractPath, "utf8"));
@@ -67,7 +67,7 @@ function writeFixtureResearch(root, contractPath, slug = "snapshot-agent") {
       "external_research_status: not-applicable",
       "synthesis_status: not-applicable",
       `contract_fingerprint: ${fingerprint}`,
-      `pattern_pack: 11_agents/research/${packName}`,
+      `pattern_pack: .private/agents/research/${packName}`,
       `pattern_pack_lock: ${pack.lock}`,
       `pattern_pack_contract_fingerprint: ${fingerprint}`,
       "repository_research_required: false",
@@ -100,7 +100,7 @@ function writeFixtureResearch(root, contractPath, slug = "snapshot-agent") {
 }
 
 function writeLegacyResearch(root, contractPath, slug = "snapshot-agent") {
-  const researchDir = path.join(root, "11_agents", "research");
+  const researchDir = path.join(root, ".private", "agents", "research");
   execFileSync("mkdir", ["-p", researchDir]);
   writeFileSync(
     path.join(researchDir, `2026-06-15-${slug}-legacy-research.md`),
@@ -131,7 +131,7 @@ function writeLegacyResearch(root, contractPath, slug = "snapshot-agent") {
 }
 
 function writePendingResearch(root, contractPath, slug = "snapshot-agent") {
-  const researchDir = path.join(root, "11_agents", "research");
+  const researchDir = path.join(root, ".private", "agents", "research");
   execFileSync("mkdir", ["-p", researchDir]);
   const relContract = path.relative(root, contractPath).split(path.sep).join("/");
   writeFileSync(
@@ -178,7 +178,7 @@ function writePendingResearch(root, contractPath, slug = "snapshot-agent") {
 }
 
 function writeMismatchedCompletedResearch(root, contractPath, slug = "snapshot-agent") {
-  const researchDir = path.join(root, "11_agents", "research");
+  const researchDir = path.join(root, ".private", "agents", "research");
   const relContract = path.relative(root, contractPath).split(path.sep).join("/");
   writeFileSync(path.join(researchDir, `9999-12-31-${slug}-agent-research.md`), [
     "---",
@@ -191,10 +191,10 @@ function writeMismatchedCompletedResearch(root, contractPath, slug = "snapshot-a
     "synthesis_status: not-applicable",
     `contract_fingerprint: ${contractFingerprint(readFileSync(contractPath, "utf8"))}`,
     "sources:",
-    "  - 11_agents/contracts/a-different-contract.md",
+    "  - .private/agents/contracts/a-different-contract.md",
     "related:",
     "  agent_contracts:",
-    "    - 11_agents/contracts/a-different-contract.md",
+    "    - .private/agents/contracts/a-different-contract.md",
     "---",
     "",
     "# Misleading same-slug report",
@@ -204,7 +204,7 @@ function writeMismatchedCompletedResearch(root, contractPath, slug = "snapshot-a
 }
 
 function writeFingerprintMismatchedResearch(root, contractPath, slug = "snapshot-agent") {
-  const researchDir = path.join(root, "11_agents", "research");
+  const researchDir = path.join(root, ".private", "agents", "research");
   mkdirSync(researchDir, { recursive: true });
   const relContract = path.relative(root, contractPath).split(path.sep).join("/");
   const actualFingerprint = contractFingerprint(readFileSync(contractPath, "utf8"));
@@ -237,7 +237,7 @@ function writeFingerprintMismatchedResearch(root, contractPath, slug = "snapshot
 
 test("Agents Mother scaffold output matches the frozen file-list snapshot", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "techscope-scaffold-test-"));
-  const contractDir = path.join(root, "11_agents", "contracts");
+  const contractDir = path.join(root, ".private", "agents", "contracts");
   execFileSync("mkdir", ["-p", contractDir]);
   const contractPath = path.join(contractDir, "valid-agent-contract.md");
   cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
@@ -268,7 +268,7 @@ test("Agents Mother scaffold output matches the frozen file-list snapshot", () =
   assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: outputDir, encoding: "utf8" }).trim(), "");
   assert.match(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: outputDir, encoding: "utf8" }), /Pritha scaffold baseline/);
 
-  const reportPath = path.join(root, "11_agents", "reports");
+  const reportPath = path.join(root, ".private", "agents", "reports");
   const reportFiles = listFiles(reportPath).filter((filePath) => filePath.endsWith("scaffold-report.md"));
   assert.equal(reportFiles.length, 1);
   const report = readFileSync(path.join(reportPath, reportFiles[0]), "utf8");
@@ -286,7 +286,7 @@ test("default sibling target resolves through PRITHA_AGENT_PARENT", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-scaffold-parent-root-"));
   const agentParent = mkdtempSync(path.join(os.tmpdir(), "pritha-scaffold-parent-agents-"));
   try {
-    const contractDir = path.join(root, "11_agents", "contracts");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
     mkdirSync(contractDir, { recursive: true });
     const contractPath = path.join(contractDir, "valid-agent-contract.md");
     writeFileSync(
@@ -318,7 +318,7 @@ test("scaffold rejects an existing symlink target without writing through it", (
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-scaffold-target-symlink-"));
   const outside = mkdtempSync(path.join(os.tmpdir(), "pritha-scaffold-target-outside-"));
   try {
-    const contractDir = path.join(root, "11_agents", "contracts");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
     mkdirSync(contractDir, { recursive: true });
     const contractPath = path.join(contractDir, "valid-agent-contract.md");
     cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
@@ -433,7 +433,7 @@ test("generated executable files encode hostile contract text as data", () => {
 
 test("scaffold command blocks draft contracts unless explicitly allowed", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "techscope-draft-scaffold-test-"));
-  const contractDir = path.join(root, "11_agents", "contracts");
+  const contractDir = path.join(root, ".private", "agents", "contracts");
   execFileSync("mkdir", ["-p", contractDir]);
   const contractPath = path.join(contractDir, "draft-agent-contract.md");
   const draftContract = readFileSync("tests/fixtures/contracts/valid-agent-contract.md", "utf8").replace("status: accepted", "status: draft");
@@ -471,7 +471,7 @@ test("scaffold command blocks draft contracts unless explicitly allowed", () => 
 
 test("scaffold ignores legacy research reports without machine-readable gate fields", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "techscope-legacy-research-gate-test-"));
-  const contractDir = path.join(root, "11_agents", "contracts");
+  const contractDir = path.join(root, ".private", "agents", "contracts");
   execFileSync("mkdir", ["-p", contractDir]);
   const contractPath = path.join(contractDir, "valid-agent-contract.md");
   cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
@@ -496,7 +496,7 @@ test("scaffold ignores legacy research reports without machine-readable gate fie
 test("scaffold selects an older exact-fingerprint report over a newer stale contract revision", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-research-exact-selection-"));
   try {
-    const contractDir = path.join(root, "11_agents", "contracts");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
     mkdirSync(contractDir, { recursive: true });
     const contractPath = path.join(contractDir, "valid-agent-contract.md");
     cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
@@ -522,7 +522,7 @@ test("scaffold selects an older exact-fingerprint report over a newer stale cont
 test("scaffold exposes a mismatch-only report as stale and blocks rerun", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-research-mismatch-only-"));
   try {
-    const contractDir = path.join(root, "11_agents", "contracts");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
     mkdirSync(contractDir, { recursive: true });
     const contractPath = path.join(contractDir, "valid-agent-contract.md");
     cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
@@ -551,8 +551,8 @@ test("scaffold ignores research-report symlinks that escape Pritha memory", () =
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-research-symlink-gate-"));
   const outside = mkdtempSync(path.join(os.tmpdir(), "pritha-research-symlink-outside-"));
   try {
-    const contractDir = path.join(root, "11_agents", "contracts");
-    const researchDir = path.join(root, "11_agents", "research");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
+    const researchDir = path.join(root, ".private", "agents", "research");
     mkdirSync(contractDir, { recursive: true });
     mkdirSync(researchDir, { recursive: true });
     const contractPath = path.join(contractDir, "valid-agent-contract.md");
@@ -587,12 +587,12 @@ test("scaffold fails closed when the research directory itself is a symlink", ()
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-research-directory-symlink-gate-"));
   const outside = mkdtempSync(path.join(os.tmpdir(), "pritha-research-directory-symlink-outside-"));
   try {
-    const contractDir = path.join(root, "11_agents", "contracts");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
     mkdirSync(contractDir, { recursive: true });
     const contractPath = path.join(contractDir, "valid-agent-contract.md");
     cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
     writeFileSync(path.join(outside, "secret-report-name.md"), "outside memory");
-    symlinkSync(outside, path.join(root, "11_agents", "research"));
+    symlinkSync(outside, path.join(root, ".private", "agents", "research"));
 
     const blocked = spawnSync("node", [
       path.resolve("scripts/agents-mother.mjs"),
@@ -619,8 +619,8 @@ test("external research ignores pattern-pack symlinks that escape Pritha memory"
   const root = mkdtempSync(path.join(os.tmpdir(), "pritha-pattern-pack-symlink-gate-"));
   const outside = mkdtempSync(path.join(os.tmpdir(), "pritha-pattern-pack-symlink-outside-"));
   try {
-    const contractDir = path.join(root, "11_agents", "contracts");
-    const researchDir = path.join(root, "11_agents", "research");
+    const contractDir = path.join(root, ".private", "agents", "contracts");
+    const researchDir = path.join(root, ".private", "agents", "research");
     mkdirSync(contractDir, { recursive: true });
     mkdirSync(researchDir, { recursive: true });
     const contractPath = path.join(contractDir, "valid-agent-contract.md");
@@ -668,7 +668,7 @@ test("external research ignores pattern-pack symlinks that escape Pritha memory"
 
 test("scaffold blocks pending external research unless explicitly overridden", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "techscope-pending-research-gate-test-"));
-  const contractDir = path.join(root, "11_agents", "contracts");
+  const contractDir = path.join(root, ".private", "agents", "contracts");
   execFileSync("mkdir", ["-p", contractDir]);
   const contractPath = path.join(contractDir, "valid-agent-contract.md");
   cpSync("tests/fixtures/contracts/valid-agent-contract.md", contractPath);
@@ -703,8 +703,8 @@ test("scaffold blocks pending external research unless explicitly overridden", (
   });
   assert.match(allowed, /Smoke test: pass/);
   assert.match(allowed, /experimental scaffold overrides: allow-pending-external-verification/);
-  const reports = listFiles(path.join(root, "11_agents", "reports"));
-  const report = readFileSync(path.join(root, "11_agents", "reports", reports.find((file) => file.endsWith("scaffold-report.md"))), "utf8");
+  const reports = listFiles(path.join(root, ".private", "agents", "reports"));
+  const report = readFileSync(path.join(root, ".private", "agents", "reports", reports.find((file) => file.endsWith("scaffold-report.md"))), "utf8");
   assert.match(report, /experimental_scaffold: true/);
   assert.match(report, /allow-pending-external-verification/);
   assert.match(report, /## Experimental Override Warning/);

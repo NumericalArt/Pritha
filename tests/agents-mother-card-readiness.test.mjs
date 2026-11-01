@@ -6,7 +6,7 @@ import test from "node:test";
 import { checkCardReadiness } from "../scripts/agents-mother/card-readiness.mjs";
 
 function writeRegistry(root, rows = []) {
-  const registryDir = path.join(root, "11_agents");
+  const registryDir = path.join(root, ".private", "agents");
   mkdirSync(registryDir, { recursive: true });
   writeFileSync(
     path.join(registryDir, "registry.md"),
@@ -68,7 +68,7 @@ function writeManifest(projectRoot, overrides = {}) {
 }
 
 function writeContract(root, { name, technicalSlug, targetFolder }) {
-  const contractDir = path.join(root, "11_agents", "contracts");
+  const contractDir = path.join(root, ".private", "agents", "contracts");
   mkdirSync(contractDir, { recursive: true });
   writeFileSync(
     path.join(contractDir, `${technicalSlug}-agent-contract.md`),
@@ -88,8 +88,8 @@ function writeContract(root, { name, technicalSlug, targetFolder }) {
 }
 
 function writeOutcomeLifecycle(root, { name, technicalSlug, deliveryStatus = "awaiting_acceptance" }) {
-  const contractDir = path.join(root, "11_agents", "contracts");
-  const reportDir = path.join(root, "11_agents", "reports");
+  const contractDir = path.join(root, ".private", "agents", "contracts");
+  const reportDir = path.join(root, ".private", "agents", "reports");
   mkdirSync(contractDir, { recursive: true });
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(
@@ -203,7 +203,7 @@ test("card readiness exposes Outcome Spec and delivery as separate lifecycle sta
   assert.deepEqual(result.lifecycle.outcome, {
     present: true,
     id: "alpha-agent-agent-outcome-spec",
-    path: "11_agents/contracts/alpha-agent-agent-outcome-spec.md",
+    path: ".private/agents/contracts/alpha-agent-agent-outcome-spec.md",
     status: "approved",
     approved: true,
   });
