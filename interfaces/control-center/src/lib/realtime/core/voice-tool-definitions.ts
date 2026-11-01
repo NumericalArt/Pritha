@@ -314,14 +314,14 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
       type: "function",
       name: "web_search",
       description:
-        "Search the current public web through Pritha's local SearXNG backend. Use for ordinary voice questions that need current sources, official pages, release pages, documentation, news lookup, or source discovery. Returns compact cited search results, coverage, warnings, timings and a private artifact path. This is read-only and does not update curated memory.",
+        "Search the current public web through the search backend pinned to this task provider. Use for ordinary voice questions that need current sources, official pages, release pages, documentation, news lookup, or source discovery. Returns compact source URLs, snippets, warnings and timings. This is read-only and does not update curated memory.",
       parameters: {
         type: "object",
         properties: {
           operation: {
             type: "string",
             enum: ["search", "diagnose"],
-            description: "search is the normal path. diagnose runs a tiny SearXNG JSON smoke test and reports backend readiness.",
+            description: "search is the normal path. diagnose checks NeuralDeep quota or runs a tiny SearXNG JSON smoke test, depending on the task provider.",
           },
           query: {
             type: "string",
@@ -340,7 +340,7 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
           freshness: {
             type: "string",
             enum: ["day", "month", "year"],
-            description: "Optional SearXNG time_range hint. Support depends on selected engines.",
+            description: "Optional freshness hint. Verify the publication date of returned sources.",
           },
           domains: {
             type: "array",

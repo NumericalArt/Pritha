@@ -16,7 +16,7 @@ class JsonResponse extends Response{
 }
 function load(file,modules,environment={env:{}}){
   const module={exports:{}};
-  new Function('require','module','exports','process',ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>Object.hasOwn(modules,name)?modules[name]:require(name),module,module.exports,environment);
+  new Function('require','module','exports','process',ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>Object.hasOwn(modules,name)?modules[name]:createRequire(path.resolve(file))(name),module,module.exports,environment);
   return module.exports;
 }
 function fixture(t){
@@ -163,4 +163,16 @@ test('closing a context during upload prevents the pending intake from starting 
   const form=new FormData();form.set('text','Fixture');const encoded=f.intakeRequest(body.voiceContext.id,cookie,form),bytes=new Uint8Array(await encoded.arrayBuffer());
   const request=new Request(encoded.url,{method:'POST',duplex:'half',headers:encoded.headers,body:new ReadableStream({pull(controller){f.api.closeRequestVoiceSessionContext(encoded,body.voiceContext.id);controller.enqueue(bytes);controller.close();}},{highWaterMark:0})});
   assert.equal((await f.routes.intake.POST(request)).status,409);assert.equal(f.calls.some(row=>row[0]==='intake'),false);
+});
+
+test('voice search pins the observed user turn and ignores model-written permission fields',async t=>{
+  const f=fixture(t);f.settings.activeConnectorId='neuraldeep';f.settings.voiceEngine='openai';
+  const created=await f.routes.session.POST(f.request({})),body=await created.json(),cookie=created.headers.get('set-cookie').split(';')[0];
+  for(const [text,explicit,denied] of [['Найди документацию',true,false],['Объясни этот термин',false,false],['Не ищи в интернете',false,true]]){
+    const response=await f.routes.tool.POST(f.request({contextId:body.voiceContext.id,name:'web_search',arguments:{query:'public',explicit:true},searchTurn:{id:'turn_search',text}},cookie));
+    assert.equal(response.status,200);const host=f.calls.at(-1)[2];assert.equal(host.taskSelection.connectorId,'neuraldeep');assert.equal(host.searchTurnId,'turn_search');assert.equal(host.explicitSearch,explicit);assert.equal(Boolean(host.searchDenied),denied);
+  }
+  const count=f.calls.length;
+  const invalid=await f.routes.tool.POST(f.request({contextId:body.voiceContext.id,name:'web_search',searchTurn:{id:'bad/turn',text:'Search'}},cookie));
+  assert.equal(invalid.status,400);assert.equal(f.calls.length,count);
 });

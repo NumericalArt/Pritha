@@ -296,7 +296,7 @@ typecheck; history pagination/quotes/image annotation/scroll не дегради
 
 ### R4 — NeuralDeep как полноценный adapter
 
-**Статус: in-progress; transport/history/tools/files/PNG/voice verified; Search и final profile audit впереди.** Зависимости R2–R3, подтверждённый ND pin.
+**Статус: in-progress; transport/history/tools/files/PNG/voice/Search verified; final profile audit впереди.** Зависимости R2–R3, подтверждённый ND pin.
 
 - [x] Перенести reviewed transport core `scripts/neuraldeep-codex.mjs`, `scripts/neuraldeep/*`,
   loopback Responses SSE adapter, credential boundary и model capability data.
@@ -305,7 +305,7 @@ typecheck; history pagination/quotes/image annotation/scroll не дегради
 - [x] Сохранить limits/concurrency/Pro/Wallet/requires_wallet gating, bounded
   retries, output budgets, tool receipts, model pin и cleaned process env.
 - [x] ND STT/TTS/voice topics подключены через отдельные modules.
-- [ ] Search Auto через отдельный host module с budgets и source evidence.
+- [x] Search Auto через отдельный host module с budgets и source evidence.
 - [ ] Перенести все relevant ND тесты с provenance, инвентаризировать реальное
   число файлов и subtests; «93» не hardcoded обещание полноты.
 - [ ] Audit secret leaks и runtime network адаптировать к profiles: разрешённые
@@ -1836,6 +1836,37 @@ R12 дополнительная проверка runner: quality-gate зада�
 child commands, а часть legacy test fixtures переопределяет только один. Проверить
 unit child environment отдельно и изолировать оба aliases для fixture runner,
 чтобы новая conflict detection не давала ложных ошибок в финальном quality gate.
+
+### Checkpoint 27 — NeuralDeep Search Auto в общем host и голосе
+
+- Перенесены reviewed Search contracts/policy/provider/store/service/child reader
+  из pinned GitHub archive; 60 entries в R4 adoption inventory. Установка locked
+  `ipaddr.js@2.5.0` и `zod@4.6.6` выполнена с `--ignore-scripts`.
+- Search Auto/Requested/Off подключены к Task Chat через owned MCP инструменты
+  `web_search` и `read_page`. Семь существующих host tools сохранены. Поисковый
+  ключ остаётся в host; команда в sandbox не получает новые network permissions.
+  Нет скрытого fallback на другой provider; неизвестные даты не подменяются
+  retrieval date. Private/signed URLs, private queries и local/offline contexts
+  блокируются до обращения к provider; source text проходит quarantine.
+- SQLite, кэш, quotas и журналы находятся в private instance-state. Скопированная
+  база другого instance, hardlinks, чужой source ID, старый settings revision
+  не дают полномочий. По умолчанию на ход: Task 3 search/3 read, Voice 1/1;
+  search timeout 8s, read 20s, cache 5/30 min. Provider quota — наблюдение.
+- Voice backend выбирается по pinned Task provider. Requested получает intent
+  из исходной реплики пользователя; tool arguments не могут включить permission.
+  Повторные tool calls одного хода делят budget. Для старого клиента без turn ID
+  применяется консервативный budget всего context. Local/Voice Offline блокирует
+  cloud search. Legacy SearXNG сохраняется для прежних voice profiles.
+- В Settings добавлен выбор режима с CAS и явным reload после конфликта.
+  Settings response не содержит queries/history/raw upstream quota fields.
+- Targeted core/host tests **40/40**, search/voice/context **65/65**;
+  installed CLI + real sandbox + synthetic provider: Search initial/resume и
+  повторная PNG verification **2/2**. Платных calls 0. Browser desktop/mobile
+  settings/voice **10/10**; TypeScript passed. Общий suite следует после связанного
+  factory block согласно ускоренному плану; это не финальная ручная приёмка.
+- Отдельный standalone Deep Research worker из fork не включается автоматически:
+  ближайшая работа R6 — canonical factory source orchestration с checkpoints,
+  deadline и точными passages, без подмены existing gates.
 
 ## 7. Полные исходные материалы
 

@@ -15,6 +15,7 @@ import {
   speechPhrases,
 } from "../../../../../scripts/neuraldeep/voice-provider.mjs";
 import { voiceRuntimeCredentials } from "../../../../../scripts/neuraldeep/voice-runtime-config.mjs";
+import {searchIntent} from '../../../../../scripts/search/intent.mjs';
 import { executeVoiceTool, validateVoiceTool } from "./tool-service";
 import {
   voiceCompletion,
@@ -467,6 +468,9 @@ async function runVoiceTurn(
                 id: operationId,
                 sessionId: s.id,
                 turnId: turn.id,
+                explicitSearch: !input.hostNotification && searchIntent(text).explicit,
+                searchDenied: searchIntent(text).denied,
+                researchExplicit: !input.hostNotification && searchIntent(text).researchExplicit,
                 signal,
                 model: getPrithaRuntimeSettings().codexModel,
                 taskSelection:voiceTaskSelection(s.hostContext),

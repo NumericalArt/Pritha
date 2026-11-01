@@ -738,6 +738,7 @@ function usePrithaRealtimeController() {
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const eventsChannelRef = useRef<VoiceEventChannel | null>(null);
   const assistantDraftRef = useRef("");
+  const searchTurnRef = useRef<{id:string;text:string}|null>(null);
   const responseInProgressRef = useRef(false);
   const responseQueuedRef = useRef(false);
   const processingToolBatchRef = useRef(false);
@@ -869,6 +870,7 @@ function usePrithaRealtimeController() {
     (role: VoiceTranscriptItem["role"], text: string) => {
       const compact = text.replace(/\s+/g, " ").trim();
       if (!compact) return;
+      if(role==='user')searchTurnRef.current={id:itemId(),text:compact.slice(0,16000)};
       setTranscript((items) => [
         ...items.slice(-40),
         {
@@ -965,6 +967,7 @@ function usePrithaRealtimeController() {
   }, []);
 
   const closeConnection = useCallback(() => {
+    searchTurnRef.current=null;
     connectionGenerationRef.current++;
     if (pendingVoiceIntakeRef.current?.promptSent) {
       pendingVoiceIntakeRef.current.handlers.status?.('failed');
@@ -2021,7 +2024,7 @@ function usePrithaRealtimeController() {
       if (output === undefined) {
         const response = await fetch("/api/realtime/tool", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: item.name, arguments: args, contextId:voiceContextIdRef.current || undefined }),
+          body: JSON.stringify({ name: item.name, arguments: args, contextId:voiceContextIdRef.current || undefined, ...(item.name==='web_search' && searchTurnRef.current ? {searchTurn:searchTurnRef.current}: {}) }),
         });
         output = await response.json().catch(() => ({ok:false,error:"tool returned non-json"})) as Record<string, unknown>;
       }
@@ -2425,6 +2428,7 @@ function usePrithaRealtimeController() {
             let group = [...groups].reverse().find(row => row.text.length < 8000 && row.role === role && startMs <= row.end + 1200 && endMs >= row.start - 1200);
             if (!group) { group = { id: itemId(), role, start: startMs, end: endMs, text: "" }; groups.push(group); }
             group.text += delta;
+            if(role==='user')searchTurnRef.current={id:group.id,text:group.text.slice(0,16000)};
             group.start = Math.min(group.start, startMs); group.end = Math.max(group.end, endMs);
             const entry = { id: group.id, role, text: group.text, timestamp: nowTime() };
             const memoryEvent: VoiceSessionEvent = { id: group.id, kind: role, text: group.text.slice(-3000), timestamp: nowTime() };

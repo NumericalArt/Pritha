@@ -21,6 +21,7 @@ import {listenProviderToolServer} from './lib/provider-tool-server.mjs';
 import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
 import {validateResponsesInputs} from './neuraldeep/responses-input-policy.mjs';
 import {NeuralDeepImageAttachments} from './neuraldeep/attachment-transport.mjs';
+import {createSearchHost} from './search/host.mjs';
 
 const fail=(code,message='The selected NeuralDeep runtime could not complete this task.')=>Object.assign(new Error(message),{code});
 const modelPattern=/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/;
@@ -63,7 +64,7 @@ export function buildCodexExecArgs(options){
     config['mcp_servers.pritha.default_tools_approval_mode']='approve';
     config['mcp_servers.pritha.startup_timeout_sec']=10;
     config['mcp_servers.pritha.tool_timeout_sec']=180;
-    config['mcp_servers.pritha.enabled_tools']=PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>tool.name);
+    config['mcp_servers.pritha.enabled_tools']=(options.toolServer.definitions || PROVIDER_HOST_TOOL_DEFINITIONS).map(tool=>tool.name);
   }
   if(effort)config.model_reasoning_effort=effort;
   const context=Number.isSafeInteger(options.modelContextTokens) && options.modelContextTokens>0 ? options.modelContextTokens : neuralDeepExecutionProfile(options.model).declaredContextTokens;
@@ -106,21 +107,22 @@ export async function startNeuralDeepRun(options,dependencies={}){
   const localToken=randomBytes(32).toString('base64url');
   const grace=Math.max(1,Math.min(30000,Math.floor(options.timeoutMs/10))),window=options.timeoutMs-grace,now=Date.now();
   const deadline={version:2,hardDeadlineAt:now+options.timeoutMs,softDeadlineAt:now+window-Math.max(1,Math.min(60000,Math.floor(window/2))),requestTimeoutMs:Math.min(window,930000),settlementGraceMs:grace};
-  let server,owned,sandboxPlan,hostTools,toolServer,providerError=null,closed=false,stopReason=null,verifiedExit=false;
+  let server,owned,sandboxPlan,hostTools,toolServer,searchHost,providerError=null,closed=false,stopReason=null,verifiedExit=false;
   const controller=new AbortController(),trees=new Map();
   const proof=()=>({kind:'provider-process-set',version:1,trees:[...trees].map(([id,evidence])=>({id,evidence}))});
   const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
   const identity=createHash('sha256').update(JSON.stringify([realpathSync(stateRoot),codexHome,cwd,'neuraldeep',options.model])).digest('hex');
   const stop=reason=>{stopReason ||= reason;controller.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;};
-  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
+  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();await searchHost?.close();return result?.processTreeExited!==false;};
   const abort=()=>stop('operator_cancel');
   let timer;
   try{
     if(options.hostExecutionContext){
-      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'neuraldeep',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments});
+      searchHost=createSearchHost({root,stateRoot,connectorId:'neuraldeep',chatId:options.hostExecutionContext.chatId,turnId:options.hostExecutionContext.turnId,signal:controller.signal,text:options.searchUserText || '',environment:options.env || process.env,check:()=>options.hostExecutionContext.lease.assertOwned(),service:dependencies.searchService});
+      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'neuraldeep',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments,search:searchHost});
       toolServer=await listenProviderToolServer({hostTools});
     }
-    const allowedTools=toolServer?PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name):[];
+    const allowedTools=toolServer?hostTools.definitions.map(tool=>'mcp__pritha__'+tool.name):[];
     server=await (dependencies.listenAdapter || listenNeuralDeepAdapter)({port:0,localToken,upstreamAuthorization:`Bearer ${key}`,deadline,providerRetryAttempts:1,responsesOnly:true,
       allowedTools,
       createDispatcher:dependencies.createDispatcher,

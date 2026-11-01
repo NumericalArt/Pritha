@@ -11,6 +11,7 @@ export type VoiceOperationIdentity = {
   turnId: string;
   signal?: AbortSignal;
   explicitSearch?: boolean;
+  searchDenied?: boolean;
   researchExplicit?: boolean;
   model?: string;
   taskSelection?:VoiceTaskSelection;
@@ -64,7 +65,7 @@ export async function executeVoiceTool(
         'append_artifact',
       ].includes(String(args.operation)));
   if (!identity || !mutating)
-    return (await handlePrithaRealtimeTool(name, args, identity?.taskSelection ? {taskSelection:identity.taskSelection} : {})) as Record<
+    return (await handlePrithaRealtimeTool(name, args, identity?.taskSelection ? {taskSelection:identity.taskSelection,searchTurnId:identity.turnId,explicitSearch:identity.explicitSearch,searchDenied:identity.searchDenied,signal:identity.signal} : {})) as Record<
       string,
       unknown
     >;

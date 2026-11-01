@@ -221,7 +221,7 @@ export class ProviderTaskRuntime {
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
-        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:delivery.prompt?[text,delivery.prompt].filter(Boolean).join('\n\n'):text,
+        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:delivery.prompt?[text,delivery.prompt].filter(Boolean).join('\n\n'):text,searchUserText:binding.origin==='voice'?'':text,
         ...(binding.subject?{factorySubject:binding.subject}:{}),
         images:delivery.images || [],...(delivery.attachmentManifest?{attachmentManifest:delivery.attachmentManifest}:{}),signal:active.controller.signal,
         ...(delivery.hostAttachments?{hostAttachments:delivery.hostAttachments}:{}),

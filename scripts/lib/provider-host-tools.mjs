@@ -30,6 +30,7 @@ export const PROVIDER_HOST_TOOL_DEFINITIONS=[
  * immutable receipt. Model arguments never select a credential, root or policy. */
 export class ProviderHostTools {
   constructor(options){this.options=options;this.cwd=realpathSync(options.cwd);this.pending=new Map();this.commands=new Set();this.serial=Promise.resolve();this.closed=false;this.exitConfirmed=true;this.calls=0;this.commandCount=0;
+    this.definitions=[...PROVIDER_HOST_TOOL_DEFINITIONS,...(options.search?.definitions || [])];
     if(options.protectedPaths!==undefined && (!Array.isArray(options.protectedPaths) || options.protectedPaths.length>256))throw fail('provider_tool_policy_invalid');
     this.protectedPaths=(options.protectedPaths || []).map(value=>this.target(value));
   }
@@ -54,6 +55,10 @@ export class ProviderHostTools {
   saved(operationId){const file=this.resultPath(operationId);if(!existsSync(file))throw fail('provider_tool_result_missing');try{return JSON.parse(this.read(file,20*1024*1024).toString('utf8'));}catch(error){throw error.code?error:fail('provider_tool_result_invalid');}}
   async call(name,input){
     this.check();if(++this.calls>10000)throw fail('provider_tool_call_limit');
+    if(['web_search','read_page'].includes(name)){
+      if(!this.options.search)throw fail('provider_tool_unknown');
+      const result=await this.options.search.call(name,input);this.check();return result;
+    }
     if(name==='read_file'){
       fields(input,['path','offset','length']);
       if(typeof input.path==='string' && input.path.startsWith('attachment:')){

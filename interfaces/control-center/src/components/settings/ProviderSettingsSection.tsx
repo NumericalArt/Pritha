@@ -6,6 +6,7 @@ import {PROVIDER_CONNECTOR_IDS,PROVIDER_LABELS,type ProviderConnectorId,type Pro
 import {ProviderConnectorBar,providerStatusLabel} from './ProviderConnectorBar';
 import {CodexAuthSection} from './CodexAuthSection';
 import {CodexSettingsSection} from './CodexSettingsSection';
+import {NeuralDeepSearchSettings} from './NeuralDeepSearchSettings';
 import type {TaskProviderHealth} from '@/lib/codex-chat/driver-types';
 
 type Settings=ProviderSettings & {revision:number};
@@ -105,6 +106,7 @@ export function ProviderSettingsSection({id}:{id:string}){
           </fieldset>:<p>Loading saved preset…</p>}
           {selected==='openrouter' && detail?.provider.account?<div className="provider-account" aria-label="OpenRouter account"><span>Usage: {amount(detail.provider.account.usageUsd,' USD')}</span><span>Key limit: {amount(detail.provider.account.limitUsd,' USD')}</span><span>Remaining: {amount(detail.provider.account.remainingUsd,' USD')}</span><span>{detail.provider.account.isFreeTier?'Free tier':'Paid tier'}</span></div>:null}
           {selected==='neuraldeep' && detail?.provider.account?.limits?<div className="provider-account" aria-label="NeuralDeep account"><span>Billing: {detail.provider.account.limits.billingMode || 'Unknown'}</span><span>Parallel tasks: {amount(detail.provider.account.limits.parallelLimit)}</span><span>Wallet: {amount(detail.provider.account.limits.wallet?.balanceRub,' RUB')}</span></div>:null}
+          {selected==='neuraldeep'?<NeuralDeepSearchSettings/>:null}
           {selected==='neuraldeep' && model?.visionAdvertised===true && model.inputModalities?.includes('image')?<div className="settings-rowline"><div><strong>Image attachments</strong><span>{health?.capabilities.attachments.images?'Original PNG delivery verified.':'Run a local check with test images before sending originals. No paid model request is made.'}</span></div><button className="outline-button" type="button" onClick={()=>void verifyImages()} disabled={busy || loading || dirty || health?.status!=='ready'}>Verify image delivery</button></div>:null}
         </>}
       </section>

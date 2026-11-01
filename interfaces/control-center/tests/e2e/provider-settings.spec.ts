@@ -5,6 +5,20 @@ const labels={codex:'Codex',neuraldeep:'NeuralDeep',claude:'Claude Code',openrou
 const health=(connectorId:string)=>({connectorId,status:connectorId==='local'?'configured':'ready',version:'fixture',checkedAt:new Date().toISOString(),error:connectorId==='local'?{code:'provider_offline_unverified',message:'Network isolation has not been verified.'}:null,capabilities:{steer:false,interrupt:true,approvals:true,tools:true,attachments:{files:false,images:false},usage:'observed',resume:true,sandbox:'host-enforced',offline:false}});
 const panel=(page:Page)=>page.locator('[data-testid="provider-settings"]:visible');
 const select=async(page:Page,id:keyof typeof labels)=>{await panel(page).getByRole('tab',{name:new RegExp('^'+labels[id])}).click();};
+
+for(const width of [390,1280])test(`NeuralDeep Search mode persists and rejects stale saves at ${width}px`,async({page,request})=>{
+  const endpoint='/api/task-runtime/providers/neuraldeep/search';
+  const original=(await(await request.get(endpoint)).json()).settings;
+  try{
+    await page.setViewportSize({width,height:900});await page.goto('/settings');await select(page,'neuraldeep');const surface=panel(page),mode=surface.getByLabel('NeuralDeep Search mode',{exact:true});
+    await expect(mode).toBeEnabled();await mode.selectOption(original.mode==='requested'?'auto':'requested');await surface.getByRole('button',{name:'Save search mode',exact:true}).click();await expect(surface).toContainText('Search mode saved.');
+    const current=(await(await request.get(endpoint)).json()).settings;expect(current.mode).not.toBe(original.mode);
+    expect((await request.post(endpoint,{data:{mode:'off',expectedRevision:current.revision}})).ok()).toBe(true);
+    await mode.selectOption('auto');if(current.mode==='auto')await mode.selectOption('requested');
+    await surface.getByRole('button',{name:'Save search mode',exact:true}).click();await expect(surface).toContainText('Search settings changed elsewhere.');
+    await surface.getByRole('button',{name:'Reload search mode',exact:true}).click();await expect(mode).toHaveValue('off');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }finally{const saved=(await(await request.get(endpoint)).json()).settings;expect((await request.post(endpoint,{data:{mode:original.mode,expectedRevision:saved.revision}})).ok()).toBe(true);}
+});
 async function fixtures(page:Page){
   await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:ids.map(health)}}));
   await page.route(/\/api\/task-runtime\/providers\/[^/?]+$/,async route=>{

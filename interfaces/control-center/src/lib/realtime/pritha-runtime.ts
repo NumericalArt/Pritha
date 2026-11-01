@@ -2674,8 +2674,8 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     "When a Codex task is waiting_for_operator or latest_voice_feedback.requires_response is true, ask the Codex question plainly and wait for the operator's direct answer. If Codex asks for an exact confirmation phrase and the operator gives a clear short confirmation such as да, ок, подтверждаю, передавай, запускай, yes, ok or go ahead, do not force the operator to repeat the phrase word for word; call answer_codex_task and let the runtime synthesize the exact Codex answer when possible. Do not start a new run_codex_task just to answer that clarification.",
     "When the UI sends a 'Voice Intake Clarification Pending' message, do not call run_codex_task. First ask the operator what they want done with the files, screenshots, PDFs, pasted links, YouTube/video links, audio files, or nearby pasted text. Offer concise options when useful: quick analysis, extract facts, memory candidate, context for a specific child agent, transcription/summarization, research/citation, import supported audio into Music Local Folder for Music mode playback, or cancel. After the operator gives a clear intent, call confirm_voice_intake with the same intake_id. Use action=ask_more if the instruction is still ambiguous, action=cancel if the operator cancels, and action=submit only when operator_instruction is clear. If the operator chooses Music Local Folder, set intent=music_local_folder; the UI imports audio locally and does not upload it to Codex.",
     "Use web_search for ordinary current web lookup: official pages, docs, release pages, current facts, source discovery, news lookup or a quick cited search before answering by voice. Prefer source_policy=official_first and domains when the operator asks for a reliable or official answer. Use operation=diagnose if the operator asks whether search is working.",
-    "web_search is read-only and uses Pritha's local SearXNG backend. It returns compact search results with URLs, snippets, coverage, warnings and timings, plus a private artifact path. Do not treat snippets as final truth when the topic is high-stakes, security-sensitive, legal/medical/financial, or requires code changes.",
-    "If web_search returns backend_unavailable, timeout, invalid JSON or no results, say that the local SearXNG search backend did not provide usable results and offer to run run_codex_task for deeper internet research. Do not claim that no reliable sources exist just because the backend is unavailable.",
+    "web_search is read-only and uses the search backend pinned to this task provider. NeuralDeep uses its own private search service; other providers use the configured local SearXNG backend. Results include source URLs, snippets, warnings and timings. Do not treat snippets as final truth when the topic is high-stakes, security-sensitive, legal/medical/financial, or requires code changes.",
+    "If web_search returns backend_unavailable, timeout, invalid JSON or no results, say that the selected search backend did not provide usable results and offer to run run_codex_task for deeper internet research. Do not claim that no reliable sources exist just because the backend is unavailable.",
     "recent_external_research/last30days remains available in the backend but is intentionally not exposed as an active Realtime tool. Do not call it directly. For last-7/30-days community pulse checks, use run_codex_task or ask the operator to re-enable that tool.",
     "Use run_codex_task for implementation, codebase changes, deep repo analysis, reviews, or internet/current-source research. If internet is needed, set requires_internet=true; Codex handles web access.",
     "run_codex_task has one public tool surface but routes internally through the configured deep task transport. Codex App is the default primary transport; Codex CLI is the v1 fallback. New Codex App tasks first create or synthesize a plan, choose inline_progress or step_orchestrator by policy, and emit voice-safe semantic progress events.",
@@ -8046,7 +8046,7 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
   return { ...(await getPrithaCodexTask(id)), exec };
 }
 
-export async function handlePrithaRealtimeTool(name: string, args: Record<string, unknown> = {}, host: { reservedTaskId?: string; taskSelection?:VoiceTaskSelection } = {}) {
+export async function handlePrithaRealtimeTool(name: string, args: Record<string, unknown> = {}, host: { reservedTaskId?: string; taskSelection?:VoiceTaskSelection;searchTurnId?:string;explicitSearch?:boolean;searchDenied?:boolean;signal?:AbortSignal } = {}) {
   await logPrivateEvent("tool_call_started", { name, args });
 
   if (["answer_codex_task", "answer_voice_task"].includes(name)) {
@@ -8070,7 +8070,17 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
     },
     answer_codex_task: answerPrithaCodexTask,
     record_good_state_signal: recordPrithaGoodStateSignal,
-    web_search: handleWebSearch,
+    web_search: async args=>{
+      const {getProviderSettings}=await import('../settings/provider-settings-server');
+      const connector=host.taskSelection?.connectorId || getProviderSettings().activeConnectorId;
+      if(connector==='local' || process.env.PRITHA_VOICE_OFFLINE==='1')return {ok:false,error:'search_offline'};
+      if(connector==='neuraldeep'){
+        if(!host.taskSelection)return {ok:false,error:'voice_context_unavailable'};
+        const {neuralDeepVoiceSearch}=await import('../voice/search-server');
+        return neuralDeepVoiceSearch(args,{...host,taskSelection:host.taskSelection});
+      }
+      return handleWebSearch(args);
+    },
     recent_external_research: handleRecentExternalResearch,
     run_codex_task: args => runCodexTask(args, host),
   };

@@ -276,6 +276,76 @@
       "source_sha256": "a98edb68033e4105973dbbf377acd4028333c412f94af359d28ca553bd57d23a",
       "target_sha256": "583346dbf9cdc2cd74ddd3a87755f8e7e386464c11bffefdb64feeae88491793",
       "adoption": "Canonical acceptance wrapper checks private persisted transport evidence after the real installed CLI and sandbox complete all synthetic image turns."
+    },
+    {
+      "path": "scripts/search/contracts.mjs",
+      "source_path": "scripts/search/contracts.mjs",
+      "source_sha256": "187829043875ccb1962ee2041836afd270b75d0abb9df7424af7f839255ff3ed",
+      "target_sha256": "3b6bfcbe6d846be8bab5bbc05e9298fd68694561b8d82eb3165c827156f8e2f0",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/intent.mjs",
+      "source_path": "scripts/search/intent.mjs",
+      "source_sha256": "02fa93eb758d02c1e9f775d60515776cc39920e49a09bdf2774105c51d6d0d47",
+      "target_sha256": "700ce2006f2a41a02f275ee404e98bdcdfbf370f1ec20b0d75768fa5b714ccbb",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/policy.mjs",
+      "source_path": "scripts/search/policy.mjs",
+      "source_sha256": "7e5106fdd6fcdb3cea46415e73372583cd4276fa7005c0b4cae254fb2c21e37d",
+      "target_sha256": "e661bb0ae5a7c8bb5e940096ca8ba0faed5f82f8c56a51d5d5d2b1ea1788e325",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/provider.mjs",
+      "source_path": "scripts/search/provider.mjs",
+      "source_sha256": "7cd85975da53be1999655b9d8fb250e117dc5f72d38ed78f65d64332eac74513",
+      "target_sha256": "07852f0c7a8b60809fe1c5bd08abc500cdb739186fdffbb5d718c50c5ca39470",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/store.mjs",
+      "source_path": "scripts/search/store.mjs",
+      "source_sha256": "d8cde0a741f663a6a86d9e9ee5b8129fe94b34776fe8f6503cdc0630ad2306a1",
+      "target_sha256": "e117fe99d87476e15d115ef86578c5a8c6fb631b94b218ad5bea0bc3d620736e",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/service.mjs",
+      "source_path": "scripts/search/service.mjs",
+      "source_sha256": "9650aff628d7305fde8079448c490a18cd8724f7b202f3ed3260ab61f59ae7b3",
+      "target_sha256": "b589e07ed26274902bb09ed465986735320a5959f75b46abfb5579a1eea81084",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/child-reader.mjs",
+      "source_path": "scripts/search/child-reader.mjs",
+      "source_sha256": "7062ca2fe3791c6c68120329381573ee82b86b191034b97238afac28c0463546",
+      "target_sha256": "7062ca2fe3791c6c68120329381573ee82b86b191034b97238afac28c0463546",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/service.d.mts",
+      "source_path": "scripts/search/service.d.mts",
+      "source_sha256": "345c7c449e74a0da7e66723e8335307e6b9df4f28bb0a21de24b6efa1c8e0d21",
+      "target_sha256": "1b8c10650089d8149d96fb2e04503d270933726c733b1d6ac97e2ca5e7d7baea",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "tests/search/service.test.mjs",
+      "source_path": "tests/search/service.test.mjs",
+      "source_sha256": "cc3006d035e7e097ebcd1fe37fac601f9fe3a7b8f15aecece32584cb69d60d4a",
+      "target_sha256": "820769a35834138d5e792c537e3cb8205d33f25c788c0eec20538d3754536537",
+      "adoption": "Reviewed pinned source; canonical instance-scoped credentials/state, no provider fallback, hard offline gate, exact owner/turn budgets, private query rejection, untrusted-source quarantine, bounded quota projection and cancellation. Seventeen source behavioral tests retained with canonical no-fallback policy."
+    },
+    {
+      "path": "scripts/search/host.mjs",
+      "source_path": "scripts/search/tools.mjs",
+      "source_sha256": "af1092649369e718b1b38f65984e5ccf3d7e557c02793367f32dfc4bda6bb274",
+      "target_sha256": "1eb053deb69acc4a7f9f970bef77cf1c6f921957e21b589f2ce8b9040cab5b28",
+      "adoption": "Tool descriptions/schema reference adapted to canonical owned MCP task host; model cannot choose owner, original intent, provider or budget. Detached research worker and key-in-child-env configuration not adopted."
     }
   ]
 }

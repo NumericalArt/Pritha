@@ -78,15 +78,15 @@
       "source": "interfaces/control-center/src/lib/voice/sessions.ts",
       "target": "interfaces/control-center/src/lib/voice/sessions.ts",
       "sourceSha256": "5b476b2b2ce6a94dc332fdfed000ba6e340fd2f5178a48e23110ea7e7ac0d0c6",
-      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "d3b9c103b42ff91df3f546aad467ba0fec65336f35529d221a71b636ce42a980"
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff; host-owned original user search intent and stable turn budget, no model-provided permission",
+      "targetSha256": "bc72b5905638e855cc5d30ed40c6c9f6cd905ea0d79e5ae61c964185543b7cb9"
     },
     {
       "source": "interfaces/control-center/src/lib/voice/tool-service.ts",
       "target": "interfaces/control-center/src/lib/voice/tool-service.ts",
       "sourceSha256": "98f07993cd97fe62fbcf1c6b94d0197381e15345dd7d337fda93bb078e86b6dc",
-      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
-      "targetSha256": "f131a7c3deb6ec83ffe8c726a6b3220ece7f99299b77536d21e243ee661559d4"
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff; host-owned original user search intent and stable turn budget, no model-provided permission",
+      "targetSha256": "081607e75b4168646134f1480ed5013c82b7e017c441432fef9deb0041eb829a"
     },
     {
       "source": "interfaces/control-center/src/components/voice/NeuralDeepVoiceTransport.ts",

@@ -10,7 +10,7 @@ const safeCode=error=>/^[a-z_]{1,80}$/.test(error?.code || '')?error.code:'provi
  * request cannot cancel or repeat its host action: the tool receipt owns it. */
 export async function listenProviderToolServer({hostTools,token=randomBytes(32).toString('base64url')}){
   if(typeof token!=='string' || token.length<32 || token.length>256)throw new Error('provider_tool_token_invalid');
-  let closed=false,port;
+  let closed=false,port;const definitions=hostTools.definitions || PROVIDER_HOST_TOOL_DEFINITIONS;
   const authorized=request=>{
     const supplied=Buffer.from(request.headers.authorization || ''),expected=Buffer.from('Bearer '+token);
     return supplied.length===expected.length && timingSafeEqual(supplied,expected);
@@ -36,14 +36,14 @@ export async function listenProviderToolServer({hostTools,token=randomBytes(32).
       return answer({protocolVersion:value.params.protocolVersion,capabilities:{tools:{}},serverInfo:{name:'pritha',version:'1.0.0'}});
     }
     if(value.method==='ping')return answer({});
-    if(value.method==='tools/list')return answer({tools:PROVIDER_HOST_TOOL_DEFINITIONS});
+    if(value.method==='tools/list')return answer({tools:definitions});
     if(value.method!=='tools/call')return error(-32601,'Method unavailable');
-    if(!object(value.params) || !PROVIDER_HOST_TOOL_DEFINITIONS.some(tool=>tool.name===value.params.name) || !object(value.params.arguments))return error(-32602,'Invalid tool request');
+    if(!object(value.params) || !definitions.some(tool=>tool.name===value.params.name) || !object(value.params.arguments))return error(-32602,'Invalid tool request');
     try{answer(await hostTools.call(value.params.name,value.params.arguments));}
     catch(failure){answer({isError:true,content:[{type:'text',text:safeCode(failure)}]});}
   });
   server.headersTimeout=10000;server.requestTimeout=10000;server.maxHeadersCount=32;
   server.on('connect',(_req,socket)=>socket.destroy());server.on('upgrade',(_req,socket)=>socket.destroy());
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',()=>{server.off('error',reject);resolve();});});port=server.address().port;
-  return {port,token,url:'http://127.0.0.1:'+port+'/mcp',async close(){if(closed)return;closed=true;const stopped=new Promise(resolve=>server.close(resolve));server.closeAllConnections();await stopped;}};
+  return {port,token,url:'http://127.0.0.1:'+port+'/mcp',definitions,async close(){if(closed)return;closed=true;const stopped=new Promise(resolve=>server.close(resolve));server.closeAllConnections();await stopped;}};
 }

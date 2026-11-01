@@ -55,7 +55,7 @@ for(const connectorId of ['neuraldeep','claude','openrouter'])test(`${connectorI
       try{
         assert.equal(String(url).startsWith(connectorId==='claude'?'https://api.anthropic.com/v1/messages':connectorId==='neuraldeep'?'https://api.neuraldeep.ru/v1/responses':'https://openrouter.ai/api/v1/responses'),true);
         if(String(url).includes('/count_tokens'))return Response.json({input_tokens:10});
-        requests++;step++;const payload=JSON.parse(init.body),encoded=JSON.stringify(payload);assert.equal(payload.model,model);assert.equal(payload.tools.length,7);
+        requests++;step++;const payload=JSON.parse(init.body),encoded=JSON.stringify(payload);assert.equal(payload.model,model);assert.equal(payload.tools.length,connectorId==='neuraldeep'?9:7);
         if(step===2){assert.match(encoded,/ATTACHMENT_UTF8_Привет/);assert.ok(encoded.includes(hash(text)));}
         if(step===3){assert.ok(encoded.includes(hash(body)));assert.match(encoded,/readOnlyPath/);}
         if(step===4){assert.match(encoded,/BINARY_EXACT/);assert.match(encoded,/WRITE_DENIED/);assert.match(encoded,/ORIGINAL_DENIED/);}
