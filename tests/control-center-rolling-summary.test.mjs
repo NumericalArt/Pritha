@@ -397,7 +397,7 @@ test("rolling summary key event debounce rejects token-level noise", async () =>
 });
 
 test("Control Center wires rolling summaries to private storage and debounced client updates", () => {
-  const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
+  const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8") + "\n" + readFileSync("interfaces/control-center/src/lib/realtime/core/voice-tool-definitions.ts", "utf8");
   const hookSource = readFileSync("interfaces/control-center/src/components/voice/usePrithaRealtime.ts", "utf8");
   const routeSource = readFileSync("interfaces/control-center/src/app/api/realtime/rolling-summary/route.ts", "utf8");
 

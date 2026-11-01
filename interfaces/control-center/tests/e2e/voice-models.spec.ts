@@ -1,5 +1,20 @@
 import { expect, test } from '@playwright/test';
 
+test('incomplete Voice settings use Realtime 2 while an explicit Live choice remains intact', async ({page}) => {
+  let model:string|undefined, writes=0;
+  await page.route('**/api/realtime/runtime-settings',async route=>{
+    if(route.request().method()==='POST'){writes++;model=route.request().postDataJSON().voiceModel;}
+    return route.fulfill({json:{ok:true,settings:model?{voiceModel:model}:{}}});
+  });
+  await page.goto('/settings');
+  const selector=page.getByLabel('Voice model',{exact:true}).filter({visible:true});
+  await expect(selector).toHaveValue('gpt-realtime-2');expect(writes).toBe(0);
+  await selector.selectOption('gpt-live-1');
+  await page.getByRole('button',{name:'Save Voice Runtime',exact:true}).filter({visible:true}).click();
+  await expect(page.getByText('Runtime settings saved',{exact:true}).filter({visible:true})).toBeVisible();
+  await page.reload();await expect(selector).toHaveValue('gpt-live-1');expect(writes).toBe(1);
+});
+
 for (const width of [1280,390]) {
   test(`Voice model selection persists and rejects unsupported models at ${width}px`, async ({ page }) => {
     expect(process.env.PRITHA_E2E_ISOLATED_STATE).toBe('1');

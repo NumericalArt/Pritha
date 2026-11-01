@@ -1,0 +1,137 @@
+{
+  "repository": "NumericalArt/Pritha-NeuralDeep",
+  "commit": "2ab22aeff5f1c167c86e925ec30311942b76023b",
+  "retrievedAt": "2026-11-01",
+  "status": "in-progress",
+  "files": [
+    {
+      "source": "scripts/neuraldeep/voice-audio.mjs",
+      "target": "scripts/neuraldeep/voice-audio.mjs",
+      "sourceSha256": "b21b4926d2e7fb6ab5c9f79375de175666804270c116cdf3ef6a5c3fcf55f800",
+      "adaptation": "unchanged initial port",
+      "targetSha256": "b21b4926d2e7fb6ab5c9f79375de175666804270c116cdf3ef6a5c3fcf55f800"
+    },
+    {
+      "source": "scripts/neuraldeep/voice-audio.d.mts",
+      "target": "scripts/neuraldeep/voice-audio.d.mts",
+      "sourceSha256": "51fb935b9302be3e0e976f97d5883c6b26612d1525050be12c2448420283fc28",
+      "adaptation": "unchanged initial port",
+      "targetSha256": "51fb935b9302be3e0e976f97d5883c6b26612d1525050be12c2448420283fc28"
+    },
+    {
+      "source": "scripts/neuraldeep/voice-provider.mjs",
+      "target": "scripts/neuraldeep/voice-provider.mjs",
+      "sourceSha256": "140e5ea88e5af025417d4f11263d08926a1abbbddc8de770f6e3e34285bf9861",
+      "adaptation": "unchanged initial port",
+      "targetSha256": "140e5ea88e5af025417d4f11263d08926a1abbbddc8de770f6e3e34285bf9861"
+    },
+    {
+      "source": "scripts/neuraldeep/voice-provider.d.mts",
+      "target": "scripts/neuraldeep/voice-provider.d.mts",
+      "sourceSha256": "347b0032d080284d01a6e7f155f49ae76c03e33be9f889aa296f20940ece0b38",
+      "adaptation": "unchanged initial port",
+      "targetSha256": "347b0032d080284d01a6e7f155f49ae76c03e33be9f889aa296f20940ece0b38"
+    },
+    {
+      "source": "scripts/neuraldeep/voice-journal.mjs",
+      "target": "scripts/neuraldeep/voice-journal.mjs",
+      "sourceSha256": "2fac24605826fe2b3809b48af3324af94ad25eadabe814259e5cbc10df732a8b",
+      "adaptation": "unchanged initial port",
+      "targetSha256": "2fac24605826fe2b3809b48af3324af94ad25eadabe814259e5cbc10df732a8b"
+    },
+    {
+      "source": "scripts/neuraldeep/voice-journal.d.mts",
+      "target": "scripts/neuraldeep/voice-journal.d.mts",
+      "sourceSha256": "e437da17196985254838b5ce964722b7441c809a7358449f62f33ba361bce349",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "a794921c389219d19f145c52d20a8b29716ff7c243571e094ef4446d0e5b32e7"
+    },
+    {
+      "source": "interfaces/control-center/src/lib/voice/settings.ts",
+      "target": "interfaces/control-center/src/lib/voice/settings.ts",
+      "sourceSha256": "f410cd1ad8bd43341063c7b3b4e5f9e37e018ca2c721e410dadf777a10e629f5",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "4fcb330cabff9be700386be08e4e97cc5ebdf1a73497e94dc083b9f4200d6dc3"
+    },
+    {
+      "source": "tests/neuraldeep-voice-provider.test.mjs",
+      "target": "tests/neuraldeep-voice-provider.test.mjs",
+      "sourceSha256": "34b8c639caec5b4127833c08e7cc81c7832b084b3dc72d1a9b3f6b91492db724",
+      "adaptation": "unchanged initial port",
+      "targetSha256": "34b8c639caec5b4127833c08e7cc81c7832b084b3dc72d1a9b3f6b91492db724"
+    },
+    {
+      "source": "tests/neuraldeep-voice-audio.test.mjs",
+      "target": "tests/neuraldeep-voice-audio.test.mjs",
+      "sourceSha256": "2ca077c7fc113df3905b1427544bfb875d7af88817b7c83334cef143babb6d02",
+      "adaptation": "unchanged initial port",
+      "targetSha256": "2ca077c7fc113df3905b1427544bfb875d7af88817b7c83334cef143babb6d02"
+    },
+    {
+      "source": "interfaces/control-center/src/lib/voice/provider.ts",
+      "target": "interfaces/control-center/src/lib/voice/provider.ts",
+      "sourceSha256": "a2a8fdb446556e4025571458bda50a213d1b1e113fae270d1693d22c91d1dce7",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "2535daf42934a71347598c00ae759a179593d2dce74f2a04a91c363234c9eacf"
+    },
+    {
+      "source": "interfaces/control-center/src/lib/voice/sessions.ts",
+      "target": "interfaces/control-center/src/lib/voice/sessions.ts",
+      "sourceSha256": "5b476b2b2ce6a94dc332fdfed000ba6e340fd2f5178a48e23110ea7e7ac0d0c6",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "5c158e5caf5983b17a18a1eaed7df1aaa0b53529ec20ffb470dd6336b3c3eab7"
+    },
+    {
+      "source": "interfaces/control-center/src/lib/voice/tool-service.ts",
+      "target": "interfaces/control-center/src/lib/voice/tool-service.ts",
+      "sourceSha256": "98f07993cd97fe62fbcf1c6b94d0197381e15345dd7d337fda93bb078e86b6dc",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "146dbcf820f46ae9519c84a5ef33c071d1192f28b6d6d45b451d5e9eb3b650a1"
+    },
+    {
+      "source": "interfaces/control-center/src/components/voice/NeuralDeepVoiceTransport.ts",
+      "target": "interfaces/control-center/src/components/voice/NeuralDeepVoiceTransport.ts",
+      "sourceSha256": "1c2174d2b2ef162ba68d1905b526d6e17116659f3e21fb41e5478fee4dbac016",
+      "adaptation": "canonical host integration in progress; source base preserved in pinned GitHub commit",
+      "targetSha256": "1c2174d2b2ef162ba68d1905b526d6e17116659f3e21fb41e5478fee4dbac016"
+    },
+    {
+      "source": "interfaces/control-center/scripts/voice-assets.mjs",
+      "target": "interfaces/control-center/scripts/voice-assets.mjs",
+      "sourceSha256": "d454243cf1538952a255cb50ecbee324eb5c989e812950ebb813c015ee2bbafc",
+      "adaptation": "canonical host integration in progress; source base preserved in pinned GitHub commit",
+      "targetSha256": "d454243cf1538952a255cb50ecbee324eb5c989e812950ebb813c015ee2bbafc"
+    },
+    {
+      "source": "interfaces/control-center/src/app/api/voice/[...path]/route.ts",
+      "target": "interfaces/control-center/src/app/api/voice/[...path]/route.ts",
+      "sourceSha256": "e84e211f88fe614b73dd8cd4e31d19ea6e80e4790583f9e002cd948436698c3d",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "e852a5658a3879f6e6dfdcc574beae8ca7fca1701e90c0ee07408f0c67ca61ce"
+    },
+    {
+      "source": "scripts/neuraldeep/voice-runtime-config.mjs",
+      "target": "scripts/neuraldeep/voice-runtime-config.mjs",
+      "sourceSha256": "edaf45d49a558f4e5db2010c709659070c4b3f4f11cf500e514d19d8d88d77d2",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "94edbc0de026eb8cb0025edb4de0b2ee78f35ebce77452db6ceb943d492c9cd7"
+    },
+    {
+      "source": "scripts/neuraldeep/voice-runtime-config.d.mts",
+      "target": "scripts/neuraldeep/voice-runtime-config.d.mts",
+      "sourceSha256": "e72de1b3f98c8a22b5bb4aeebe0cf6dd5d1aa9c42e811a8ea9acd9745e9c8c40",
+      "adaptation": "canonical host integration in progress; source base preserved in pinned GitHub commit",
+      "targetSha256": "e72de1b3f98c8a22b5bb4aeebe0cf6dd5d1aa9c42e811a8ea9acd9745e9c8c40"
+    },
+    {
+      "source": "tests/neuraldeep-voice-sessions.test.mjs",
+      "target": "tests/neuraldeep-voice-sessions.test.mjs",
+      "sourceSha256": "ca072a8398095f50fc72c0d2b89261d3747ef407de2095ca9e227e31a1f818de",
+      "adaptation": "reviewed canonical root, credential, shared admission, dispatcher or test integration; see checkpoint 18 and Git diff",
+      "targetSha256": "e571d8320b431dd1ee69962e9dc6fdab2dd98b497c5d6dea9f000f319532c7a6"
+    }
+  ],
+  "sourceVersion": "0.2.0",
+  "verified": "2026-11-01",
+  "phase": "R9 audio transport and shared host integration; persistent task binding pending"
+}

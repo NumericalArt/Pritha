@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MemoryStick, Save } from "lucide-react";
 import {
   PRITHA_FEMININE_VOICE_OPTIONS,
+  DEFAULT_VOICE_MODEL,
   VOICE_MODEL_OPTIONS,
   type VoiceModel,
   VOICE_BEHAVIOR_PROFILE_OPTIONS,
@@ -11,6 +12,7 @@ import {
   type VoiceBehaviorProfile,
 } from "@/lib/realtime/voice-settings";
 import { readStickyContextSetting, writeStickyContextSetting } from "@/components/voice/voicePreferences";
+import { VoiceEngineSection } from "./VoiceEngineSection";
 
 type RuntimeSettings = {
   voiceBehaviorProfile: VoiceBehaviorProfile;
@@ -22,11 +24,12 @@ type RuntimeSettings = {
 const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   voiceBehaviorProfile: "advanced",
   prithaVoice: "marin",
-  voiceModel: "gpt-live-1",
+  voiceModel: DEFAULT_VOICE_MODEL,
   updatedAt: "",
 };
 
 export function VoiceSettingsSection() {
+  const [engine,setEngine]=useState<"openai"|"neuraldeep">("openai");
   const [stickyContextEnabled, setStickyContextEnabled] = useState(true);
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
   const [runtimeSettingsLoaded, setRuntimeSettingsLoaded] = useState(false);
@@ -102,6 +105,7 @@ export function VoiceSettingsSection() {
           </div>
         </div>
       </div>
+      <VoiceEngineSection onEngineChange={setEngine} />
       <div className="settings-rowline">
         <div>
           <strong>Sticky Context</strong>
@@ -121,7 +125,7 @@ export function VoiceSettingsSection() {
         </div>
       ) : (
         <>
-          <div className="settings-rowline">
+          {engine === "openai" && <div className="settings-rowline">
             <div>
               <strong>Voice Model</strong>
               <span>Choose the model for your next voice session. Live 1 uses a separately billed backend for tools.</span>
@@ -130,7 +134,7 @@ export function VoiceSettingsSection() {
               onChange={(event) => updateRuntimeSetting("voiceModel", event.currentTarget.value as VoiceModel)}>
               {VOICE_MODEL_OPTIONS.map(option => <option value={option.id} key={option.id}>{option.label}</option>)}
             </select>
-          </div>
+          </div>}
           <div className="settings-rowline">
             <div>
               <strong>Behavior Detail</strong>
@@ -148,7 +152,7 @@ export function VoiceSettingsSection() {
               ))}
             </select>
           </div>
-          <div className="settings-rowline">
+          {engine === "openai" && <div className="settings-rowline">
             <div>
               <strong>Pritha Voice</strong>
               <span>Approved feminine voices only. Changes apply on the next voice session or reconnect.</span>
@@ -164,7 +168,7 @@ export function VoiceSettingsSection() {
                 </option>
               ))}
             </select>
-          </div>
+          </div>}
           <div className="settings-action-row">
             <button className="outline-button" type="button" onClick={saveRuntimeSettings} disabled={saving}>
               <Save size={16} />

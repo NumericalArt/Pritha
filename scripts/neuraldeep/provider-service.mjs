@@ -27,6 +27,7 @@ export function normalizeNeuralDeepModels(payload){
 export class NeuralDeepProviderService {
   constructor(options){this.options=options;this.cache=new Map();this.pending=new Map();}
   async cli(){
+    if(this.options.requireCli===false)return null;
     if(this.cliCache && Date.now()-this.cliCache.at<60000)return this.cliCache.version;
     try{
       const env=providerProcessEnvironment({provider:'neuraldeep',root:this.options.root,stateRoot:this.options.stateRoot,env:this.options.env || process.env});
@@ -61,7 +62,7 @@ export class NeuralDeepProviderService {
       ]);
       version=installed;const models=normalizeNeuralDeepModels(payload),model=models.find(row=>row.id===modelId),limits=account.limits;
       const extra={models,account,billing:billingContextForModel(account,modelId)};
-      if(!version)return this.result('unavailable','provider_runtime_unavailable',null,extra);
+      if(!version && this.options.requireCli!==false)return this.result('unavailable','provider_runtime_unavailable',null,extra);
       if(!limits || account.sections.limits.stale || limits.decision.canRequest===null || !Number.isSafeInteger(limits.parallelLimit) || limits.parallelLimit<1 || limits.parallelLimit>64)return this.result('configured','provider_limits_unknown',version,extra);
       if(limits.keyStatus!=='ok')return this.result('pending-auth','provider_pending_auth',version,extra);
       if(limits.decision.canRequest!==true)return this.result('rate-limited','provider_rate_limited',version,extra);

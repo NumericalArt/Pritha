@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/host-policy.mjs && next dev --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
-    "build": "node scripts/build-preflight.mjs && next build && node scripts/write-execution-protocol.mjs",
+    "dev": "node scripts/host-policy.mjs && node scripts/voice-assets.mjs && next dev --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
+    "build": "node scripts/build-preflight.mjs && node scripts/voice-assets.mjs && next build && node scripts/write-execution-protocol.mjs",
     "serve": "npm run build && npm run start",
     "start": "node scripts/host-policy.mjs && next start --hostname 127.0.0.1 --port ${PRITHA_CONTROL_CENTER_PORT:-3420}",
     "test:e2e": "node scripts/e2e.mjs",
@@ -15,9 +15,12 @@
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "0.0.81",
     "@audio/decode-mp3": "^1.1.0",
+    "@ricky0123/vad-web": "0.0.30",
     "@types/qrcode": "1.5.6",
+    "ajv": "8.20.0",
     "lucide-react": "1.17.0",
     "next": "16.2.11",
+    "onnxruntime-web": "1.29.0",
     "qrcode": "1.5.4",
     "react": "19.2.7",
     "react-dom": "19.2.7",

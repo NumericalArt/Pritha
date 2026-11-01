@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireVoiceEngine, VoiceEngineError } from "@/lib/realtime/voice-engine-server";
 import { createRealtimeCall, createLiveCall, usesLiveVoice, RealtimeProviderError } from "@/lib/realtime/pritha-runtime";
 
 export const runtime = "nodejs";
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
   const payload = (await request.json().catch(() => ({}))) as RealtimeCallPayload;
 
   try {
+    requireVoiceEngine("openai");
     if (payload.voiceApi && payload.voiceApi !== (usesLiveVoice() ? "live" : "realtime")) {
       return NextResponse.json({ error: "Voice model changed during startup. Please reconnect." }, { status: 409 });
     }
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
     const answerSdp = await createRealtimeCall(String(payload.offerSdp || ""), String(payload.ephemeralKey || ""));
     return NextResponse.json({ answerSdp });
   } catch (error) {
+    if (error instanceof VoiceEngineError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     if (error instanceof RealtimeProviderError) {
       return NextResponse.json(
         {

@@ -409,19 +409,33 @@ active-thread switch, native feature regression и no-secret DOM/storage checks.
 
 ### R9 — Голос: shared tools и отдельные transports
 
-**Статус: pending.** Зависимости R2–R8.
+**Статус: in-progress.** Shared core, настройки и chained transport реализованы
+локально; persistent topics и маршрутизация голосовых задач к пяти коннекторам
+ещё не завершены. Зависимости R2–R8.
 
-- [ ] Extract shared voice-tools dispatcher и existing transport boundaries
+- [x] Extract shared voice-tools dispatcher и existing transport boundaries
   небольшими проверяемыми шагами; не переписывать весь runtime одним diff.
-- [ ] Preserve 9 инструментов: Full Pritha Memory, Inspect Pritha Files,
+- [x] Preserve 9 инструментов: Full Pritha Memory, Inspect Pritha Files,
   Inspect Voice Task, Rolling Summary, Good State Signal, Answer Voice Task,
   Confirm Voice Intake, Web Search, Run Voice Task; capability/privacy checks.
-- [ ] Native model default `gpt-realtime-2`; options order/default label, Live 1
+- [x] Native model default `gpt-realtime-2`; options order/default label, Live 1
   Experimental explicit only. Existing live-session/delegation code сохраняется.
-- [ ] Voice engine Auto/OpenAI/NeuralDeep, resolution по правилам §2. Поддержать
+- [x] Voice engine Auto/OpenAI/NeuralDeep, resolution по правилам §2. Поддержать
   no-key/both-keys/offline cases; не переключать engine при error.
-- [ ] ND transport + persistent voice topics; common run-task routes to pinned
-  selected task connector, exact queue/admission handoff and cancellation.
+- [x] ND STT → LLM/tool loop → TTS transport: bounded audio/SSE, private receipts,
+  локальные VAD assets, прерывание, browser-owned music/intake tools и usage.
+- [ ] Persistent voice topics; common run-task routes to pinned selected task
+  connector, exact queue/admission handoff and cancellation. Текущая промежуточная
+  защита возвращает `voice_task_binding_required` для нового внешнего task intent;
+  она не подменяет выбранный коннектор нативным Codex. Existing native task refs
+  сохраняют существующий маршрут. Этот guard должен быть заменён рабочим общим
+  task binding до итоговой приёмки.
+- [ ] Связать активный task context и engine/session snapshot так, чтобы изменение
+  default connector во время сессии не меняло provider/model существующей темы.
+  В Settings обновлять Auto preview после смены task connector без потери edits.
+- [ ] Проверить browser restart/reconnect, восстановление persistent topic,
+  unconfirmed handoff, отмену очереди и ответ на operator decision для каждого
+  поддерживаемого коннектора; не считать одного успешного аудиодиалога достаточным.
 - [ ] Preserve music ducking/manual volume, interruption, reconnect, summaries,
   private Good State capture (без создания task или поддельного UI approval).
 
@@ -1303,6 +1317,62 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   Проверка уникальности ключей предотвращает повтор этой ошибки.
 - Реальное переименование данных и R12 acceptance не
   объявлены завершёнными; остальные этапы исходного roadmap остаются в работе.
+
+### Checkpoint реализации 18 — Общий голос и NeuralDeep audio transport
+
+- `realtime/core/voice-tool-definitions.ts` содержит те же девять схем и optional
+  music tool; `voice-tools-dispatcher.ts` сохраняет имена существующих tools и
+  принимает нейтральные task aliases. Хостовые handlers сохраняют privacy,
+  approvals, memory/files и voice-confirmed Good State behavior. Инструмент,
+  завершивший действие при прерывании речи, возвращает свой настоящий receipt.
+- Realtime 2 стал единым default для runtime, Settings, Voice page и env example.
+  Явно сохранённый Live 1 остаётся отдельным протоколом с прежней delegation.
+  Auto/OpenAI/NeuralDeep сохраняются с revision check; Local + Auto отключает
+  облачный голос. `PRITHA_VOICE_OFFLINE=1` блокирует cloud audio независимо от
+  saved choice. OpenAI session/call routes проверяют engine до provider I/O;
+  ошибки ключа или движка не переключают звук к другому сервису.
+- Settings показывают параметры выбранного голосового движка; NeuralDeep voice
+  и language сохраняются отдельно от OpenAI voice/model и пяти task presets.
+  Chained settings отвергают unknown fields и coercion. Runtime reads получают
+  preferences и revision из одного сохранённого документа.
+- Из GitHub NeuralDeep на закреплённом `2ab22aeff5f1c167c86e925ec30311942b76023b`
+  перенесены audio/SSE bounds, STT/LLM/TTS, session events, tool loop, browser
+  transport, voice journal и поведенческие tests. Provenance с source hashes:
+  `03_reviews/2026-11-01-neuraldeep-voice-adoption.json`. Credentials берутся из
+  общего instance-local boundary; origin фиксирован, redirects и replay запрещены.
+- Voice receipts используют canonical ExecutionCoordinator database. HTTP leases
+  учитывают общую ёмкость и те же NeuralDeep account slots, что Task Chat. Они
+  освобождаются до tools/TTS следующего шага. Metadata preflight для прямого
+  голосового HTTP не требует Codex CLI, но сохраняет account/model/tool gates.
+  Drain и abort повторно проверяются после async metadata read.
+- Аварийный HTTP owner восстанавливается только при доказанном завершении его
+  процесса: receipt остаётся interrupted/unknown, запрос не повторяется. Только
+  lease с host-owned `executionKind: voice-http` подлежит такому восстановлению;
+  native/provider CLI owners требуют прежнего process-tree proof. Изменение
+  journal и освобождение ёмкости выполняются в одной SQLite transaction.
+- Клиент использует локальные VAD/ONNX assets из pinned dependencies, хранит
+  аудиофрагменты с прежними bounds, поддерживает mute/interruption/reconnect и
+  manual decision для длинного retained draft. Серверные tool receipts проходят
+  через существующую UI обработку без повторного вызова tool endpoint. Music
+  ducking получает assistant stream; TTS не воспроизводится вторым audio player.
+- Browser gate обнаружил пропущенную подготовку VAD в изолированном E2E builder;
+  генерация assets теперь обязательна и там, и в обычном build/dev. Исправлены
+  OpenAI-only key indicators и последний Live 1 fallback на Voice page. Assets
+  являются generated/ignored, а не tracked binary snapshots.
+- Проверки: targeted transport/session/journal/host tests, TypeScript и strict
+  privacy прошли. Chromium **9/9**: settings persistence/conflict, отсутствие
+  microphone/cloud calls при offline/missing key, локальный VAD без OpenAI key,
+  дедупликация host receipts, Live/Realtime protocols и default/explicit models.
+  Полный unit gate: **1152/1152**, без skipped; дополнительно **3/3** новых
+  admission host tests (capacity/drain/race), добавленных после запуска suite.
+  Markdown validation: 986 файлов; strict privacy audit и name guard прошли.
+- Dependency audit после добавления pinned VAD/ONNX/Ajv не выявил новых advisory
+  для этих пакетов; прежние Next/Sharp/Undici/source-map/browser-mapping/Zod/SRT
+  замечания остаются открытыми в R12. Не выполнялся `audit fix --force`.
+- R9 остаётся незавершённым: external task binding/topics/queue/operator routing,
+  NeuralDeep search integration и ручные microphone/speaker/provider проверки
+  ещё впереди. Никаких paid provider calls, установки candidate в live service,
+  изменения реальных state filenames, MacBook или GitHub не выполнялось.
 
 ## 7. Полные исходные материалы
 

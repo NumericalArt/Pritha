@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireVoiceEngine, VoiceEngineError } from "@/lib/realtime/voice-engine-server";
 import {
   buildRealtimeSessionConfig,
   usesLiveVoice,
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => ({}))) as RealtimeSessionRequest;
     const options = { musicControlEnabled: body.musicControlEnabled === true };
+    requireVoiceEngine("openai");
     const live = usesLiveVoice();
     const session = live ? null : await createEphemeralRealtimeSession(options);
     const config = buildRealtimeSessionConfig(options);
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
       tools: config.tools.map((tool) => tool.name),
     });
   } catch (error) {
+    if (error instanceof VoiceEngineError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     if (error instanceof RealtimeProviderError) {
       return NextResponse.json(
         {

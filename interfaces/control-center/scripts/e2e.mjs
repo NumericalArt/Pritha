@@ -73,7 +73,7 @@ try {
   }
   mkdirSync(path.join(app, "test-results"), { recursive: true });
   rmSync(env.PRITHA_E2E_REPORT, { force: true });
-  const buildInputs = execFileSync("git", ["ls-files", "-cz", "--others", "--exclude-standard"], { cwd: source, encoding: "utf8" }).split("\0").filter(file => /^(scripts\/|interfaces\/control-center\/(src\/|next\.config\.mjs$|package(?:-lock)?\.json$))/.test(file)).sort();
+  const buildInputs = execFileSync("git", ["ls-files", "-cz", "--others", "--exclude-standard"], { cwd: source, encoding: "utf8" }).split("\0").filter(file => /^(scripts\/|interfaces\/control-center\/(src\/|scripts\/|next\.config\.mjs$|package(?:-lock)?\.json$))/.test(file)).sort();
   const hash = createHash("sha256").update(process.version);
   for (const file of buildInputs) hash.update(file).update("\0").update(readFileSync(path.join(source, file)));
   const fingerprint = hash.digest("hex");
@@ -84,7 +84,10 @@ try {
   const reusable = cached?.fingerprint === fingerprint && existsSync(buildIdPath) && cached.buildId === readFileSync(buildIdPath, "utf8").trim();
   const metadata = ["next-env.d.ts", "tsconfig.json"].map(file => ({ file: path.join(app, file), content: readFileSync(path.join(app, file)) }));
   let build;
-  try { build = reusable ? 0 : await run(["node_modules/next/dist/bin/next", "build"], 300_000); }
+  try {
+    const assets = await run(["scripts/voice-assets.mjs"], 30_000);
+    build = assets || (reusable ? 0 : await run(["node_modules/next/dist/bin/next", "build"], 300_000));
+  }
   finally { for (const item of metadata) writeFileSync(item.file, item.content); }
   if (!build && !reusable) writeFileSync(receiptPath, JSON.stringify({ fingerprint, buildId: readFileSync(buildIdPath, "utf8").trim() }));
   if (build) process.exitCode = build;

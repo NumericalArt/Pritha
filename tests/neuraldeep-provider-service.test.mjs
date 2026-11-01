@@ -35,6 +35,13 @@ test('NeuralDeep readiness requires current limits, declared tools and the exact
   assert.equal((await service.snapshot('missing-model')).status,'configured');
   const cache=readFileSync(path.join(f.options.privateRoot,'account-snapshot.json'),'utf8');assert.ok(!cache.includes('PRIVATE_KEY_CANARY'));
 });
+test('direct voice checks account and model readiness without probing or requiring a CLI',async t=>{
+  const f=fixture(t);let probes=0;f.options.probeCli=async()=>{probes++;throw new Error('no CLI installed');};
+  const voice=await new NeuralDeepProviderService({...f.options,requireCli:false}).snapshot('qwen3.8-27b');
+  assert.equal(voice.status,'ready');assert.equal(voice.version,null);assert.equal(probes,0);
+  const task=await new NeuralDeepProviderService(f.options).snapshot('qwen3.8-27b');
+  assert.equal(task.status,'unavailable');assert.equal(probes,1);
+});
 
 test('unknown decision is not permission and rotated credentials cannot inherit old account limits',async t=>{
   const f=fixture(t),service=new NeuralDeepProviderService(f.options);

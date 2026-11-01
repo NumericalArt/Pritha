@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { DEFAULT_VOICE_MODEL } from "@/lib/realtime/voice-settings";
 import type { ControlCenterStatus } from "@/lib/control-center/types";
 import { MAX_MUSIC_LEVEL_PERCENT, musicPercentToUserVolume, musicSourceCapabilities, musicUserVolumeToPercent } from "@/lib/music/volume";
 import { PrithaStarScene } from "./PrithaStarScene";
@@ -116,14 +117,18 @@ function subtitleForState(phase: RealtimePhase) {
 function keyStatusLabel(status: PrithaRealtimeStatus | null, error?: string | null) {
   if (error) return error;
   if (!status) return "Checking key...";
+  if (status.voice_engine?.reason === "offline") return "Cloud voice is off";
+  if (status.voice_engine) return status.voice_engine.reason === "configured" ? "Ready" : "Voice provider key missing";
   return status.openai_key_configured ? "Ready" : "Key missing";
 }
 
 function keyIsMissing(status: PrithaRealtimeStatus | null) {
+  if (status?.voice_engine) return status.voice_engine.reason !== "configured";
   return status !== null && !status.openai_key_configured;
 }
 
 function primaryButtonLabel(phase: RealtimePhase, status: PrithaRealtimeStatus | null) {
+  if (phase === "idle" && status?.voice_engine?.reason === "offline") return "Cloud Voice Off";
   if (phase === "idle" && keyIsMissing(status)) return "Missing API Key";
   if (phase === "idle") return "Start Listening";
   if (phase === "connecting") return "Connecting...";
@@ -1308,7 +1313,7 @@ function ConnectionCard({
 }) {
   const connected = phase === "listening" || phase === "speaking" || phase === "working";
   const statusLoaded = status !== null;
-  const keyReady = status?.openai_key_configured === true;
+  const keyReady = status !== null && !keyIsMissing(status);
   const headerTone = connected || keyReady ? "green" : statusLoaded ? "orange" : "";
   const headerLabel = connected ? "Good" : keyReady ? "Ready" : statusLoaded ? "Needs key" : "Checking";
   const realtimeLabel = connected ? "Connected" : keyReady ? "Configured" : statusLoaded ? "Missing key" : "Checking";
@@ -1382,7 +1387,7 @@ function VoiceSessionPanel({
   onMicInputLevelChange: (value: number) => void;
   mobile?: boolean;
 }) {
-  const model = status?.model || "gpt-live-1";
+  const model = status?.model || DEFAULT_VOICE_MODEL;
   const active = phaseIsActive(phase);
   const keyMissing = keyIsMissing(status);
   const primaryDisabled = phase === "connecting" || (phase === "idle" && keyMissing);
@@ -1490,7 +1495,7 @@ function VoiceSessionPanel({
 
 function MobileStatusChips({ status }: { status: PrithaRealtimeStatus | null }) {
   const codexReady = status?.codex.available === true;
-  const realtimeReady = status?.openai_key_configured === true;
+  const realtimeReady = status !== null && !keyIsMissing(status);
 
   return (
     <div className="mobile-status-grid">
@@ -1596,6 +1601,11 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
 
   return (
     <>
+      {realtime.voiceDraftAvailable && <div className="settings-rowline" role="status">
+        <span>Достигнут предел записи. Отправьте сохранённый фрагмент или удалите его.</span>
+        <button className="outline-button" onClick={() => void realtime.resolveVoiceDraft(true)}>Отправить запись</button>
+        <button className="outline-button" onClick={() => void realtime.resolveVoiceDraft(false)}>Удалить запись</button>
+      </div>}
       <div className="mobile-voice-screen">
         <MobileStatusChips status={realtime.status} />
         <VoiceSessionPanel

@@ -1,6 +1,8 @@
 "use client";
 
 import { LiveSession } from "@/lib/realtime/live-session";
+import type { NeuralDeepVoiceTransport, VoiceEventChannel } from "./NeuralDeepVoiceTransport";
+import { chainedInputGain } from "../../../../../scripts/neuraldeep/voice-audio.mjs";
 
 import { nowIso } from "@/lib/time";
 
@@ -9,7 +11,7 @@ import { readStickyContextSetting, STICKY_CONTEXT_CHANGED_EVENT, STICKY_CONTEXT_
 import { useVoiceMusicController } from "./useVoiceMusic";
 
 
-function sendVoiceEvent(channel: RTCDataChannel, live: LiveSession | null, event: Record<string, any>, context?: "thinking" | "commentary" | "instructions") {
+function sendVoiceEvent(channel: VoiceEventChannel, live: LiveSession | null, event: Record<string, any>, context?: "thinking" | "commentary" | "instructions") {
   if (!live) { channel.send(JSON.stringify(event)); return true; }
   if (!live.ready || live.closing) return false;
   if (context) return live.context(String(event.item?.content?.[0]?.text || ""), context);
@@ -161,6 +163,7 @@ export type PrithaRealtimeStatus = {
   transcription_model: string;
   tools: string[];
   openai_key_configured: boolean;
+  voice_engine?: { engine: "openai" | "neuraldeep" | null; reason: "offline" | "pending-auth" | "configured" };
   memory: {
     sqlite: boolean;
     sqlite_cli: boolean;
@@ -182,7 +185,8 @@ type SessionErrorPayload = {
 
 type RealtimeSessionPayload = {
   client_secret?: { value: string };
-  voice_api?: "live" | "realtime";
+  voice_api?: "live" | "realtime" | "neuraldeep";
+  sessionId?: string;
   model: string;
   voice: string;
   tools: string[];
@@ -730,7 +734,7 @@ function usePrithaRealtimeController() {
   const micInputLevelRef = useRef(micInputLevel);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
-  const eventsChannelRef = useRef<RTCDataChannel | null>(null);
+  const eventsChannelRef = useRef<VoiceEventChannel | null>(null);
   const assistantDraftRef = useRef("");
   const responseInProgressRef = useRef(false);
   const responseQueuedRef = useRef(false);
@@ -943,6 +947,9 @@ function usePrithaRealtimeController() {
   }, [loadStatus]);
 
   const liveSessionRef = useRef<LiveSession | null>(null);
+  const neuralDeepTransportRef = useRef<NeuralDeepVoiceTransport | null>(null);
+  const neuralDeepSessionIdRef = useRef<string | null>(null);
+  const [voiceDraftAvailable, setVoiceDraftAvailable] = useState(false);
   const liveCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveAudioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const connectionGenerationRef = useRef(0);
@@ -957,6 +964,11 @@ function usePrithaRealtimeController() {
     connectionGenerationRef.current++;
     callAbortRef.current?.abort();
     callAbortRef.current = null;
+    neuralDeepTransportRef.current?.close();
+    neuralDeepTransportRef.current = null;
+    if (neuralDeepSessionIdRef.current) void fetch(`/api/voice/sessions/${encodeURIComponent(neuralDeepSessionIdRef.current)}`, {method:"DELETE",keepalive:true}).catch(() => {});
+    neuralDeepSessionIdRef.current = null;
+    setVoiceDraftAvailable(false);
     liveSessionRef.current?.close();
     liveSessionRef.current?.dispose();
     liveSessionRef.current = null;
@@ -1953,7 +1965,7 @@ function usePrithaRealtimeController() {
   );
 
   const runToolCall = useCallback(
-    async (item: RealtimeFunctionCallItem) => {
+    async (item: RealtimeFunctionCallItem, deliveredOutput?: Record<string, unknown>) => {
       let args: Record<string, unknown> = {};
       try {
         args = item.arguments ? (JSON.parse(item.arguments) as Record<string, unknown>) : {};
@@ -1977,12 +1989,14 @@ function usePrithaRealtimeController() {
         return output;
       }
 
-      const response = await fetch("/api/realtime/tool", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: item.name, arguments: args }),
-      });
-      const output = (await response.json().catch(() => ({ ok: false, error: "tool returned non-json" }))) as Record<string, unknown>;
+      let output = deliveredOutput;
+      if (output === undefined) {
+        const response = await fetch("/api/realtime/tool", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: item.name, arguments: args }),
+        });
+        output = await response.json().catch(() => ({ok:false,error:"tool returned non-json"})) as Record<string, unknown>;
+      }
       setToolStatus(JSON.stringify(output, null, 2));
 
       if (item.name === "run_codex_task" || item.name === "answer_codex_task") {
@@ -2167,7 +2181,7 @@ function usePrithaRealtimeController() {
 
   const start = useCallback(async () => {
     if (phase !== "idle" && phase !== "error") return;
-    if (peerConnectionRef.current) closeConnection();
+    if (peerConnectionRef.current || neuralDeepTransportRef.current || neuralDeepSessionIdRef.current) closeConnection();
     setError(null);
     setPhase("connecting");
     const t0 = performance.now();
@@ -2177,12 +2191,15 @@ function usePrithaRealtimeController() {
 
     try {
       const runtimeStatus = await loadStatus();
-      if (!runtimeStatus.openai_key_configured) {
+      if (runtimeStatus.voice_engine?.reason === "offline") throw new Error("Cloud voice is off. Choose a voice engine explicitly in Settings before starting cloud audio.");
+      if (runtimeStatus.voice_engine?.reason === "pending-auth") throw new Error("Configure the selected voice provider in Settings before starting voice.");
+      const chained = runtimeStatus.voice_engine?.engine === "neuraldeep";
+      if (!chained && !runtimeStatus.openai_key_configured) {
         throw new Error("OPENAI_API_KEY is not configured for the control-center server.");
       }
 
       if (generation !== connectionGenerationRef.current) return;
-      const sessionResponse = await fetch("/api/realtime/session", {
+      const sessionResponse = await fetch(chained ? "/api/voice/sessions" : "/api/realtime/session", {
         signal: attempt.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2192,7 +2209,11 @@ function usePrithaRealtimeController() {
         const payload = (await sessionResponse.json().catch(() => ({}))) as SessionErrorPayload;
         throw new Error(payload.error || `Realtime session failed with status ${sessionResponse.status}`);
       }
-      const sessionData = (await sessionResponse.json()) as RealtimeSessionPayload;
+      const sessionPayload = await sessionResponse.json();
+      const sessionData: RealtimeSessionPayload = chained
+        ? {voice_api:"neuraldeep",sessionId:sessionPayload.sessionId,model:sessionPayload.settings.model,voice:sessionPayload.settings.voice,tools:sessionPayload.tools}
+        : sessionPayload;
+      if (chained && sessionData.sessionId) neuralDeepSessionIdRef.current = sessionData.sessionId;
       if (generation !== connectionGenerationRef.current) return;
       const nextSessionId = `voice-${itemId()}`;
       sessionIdRef.current = nextSessionId;
@@ -2239,7 +2260,7 @@ function usePrithaRealtimeController() {
           const source = audioContext.createMediaStreamSource(stream);
           const gain = audioContext.createGain();
           const destination = audioContext.createMediaStreamDestination();
-          gain.gain.value = inputLevelToGain(micInputLevelRef.current);
+          gain.gain.value = chained ? chainedInputGain(micInputLevelRef.current) : inputLevelToGain(micInputLevelRef.current);
           source.connect(gain);
           gain.connect(destination);
           const processedTrack = destination.stream.getAudioTracks()[0];
@@ -2282,6 +2303,23 @@ function usePrithaRealtimeController() {
       localTrackRef.current = track;
 
       if (generation !== connectionGenerationRef.current) return;
+      if (chained) {
+        if (!audioContextRef.current || !sessionData.sessionId) throw new Error("NeuralDeep Voice requires Web Audio support.");
+        const {NeuralDeepVoiceTransport} = await import("./NeuralDeepVoiceTransport");
+        const transport = await NeuralDeepVoiceTransport.create({
+          signal:attempt.signal,sessionId:sessionData.sessionId,stream:streamForPeer,audioContext:audioContextRef.current,
+          onEvent:handleRealtimeEvent,onTool:runToolCall,onPhase:setPhase,onDraft:setVoiceDraftAvailable,
+          onAssistantStream:remoteStream=>{remoteStreamRef.current=remoteStream;if(musicControlEnabledRef.current)void music.attachAssistantStream(remoteStream);setRemoteAudioReady(true);},
+          onLatency:setLastLatencyMs,onMuted:setIsMuted,
+          onDisconnected:()=>{if(generation===connectionGenerationRef.current){closeConnection();setPhase("error");setError("Voice connection lost. Reconnect to continue.");}},
+        });
+        if (generation !== connectionGenerationRef.current) {transport.close();return;}
+        neuralDeepTransportRef.current=transport;eventsChannelRef.current=transport;
+        rollingSummarySessionActiveRef.current=true;setPhase("listening");
+        setToolStatus(`NeuralDeep Voice connected. Tools: ${sessionData.tools.join(", ")}.`);
+        sendPendingVoiceIntakeClarification("data_channel_open");
+        return;
+      }
       const peerConnection = new RTCPeerConnection();
       peerConnectionRef.current = peerConnection;
       peerConnection.addTrack(track, streamForPeer);
@@ -2490,6 +2528,7 @@ function usePrithaRealtimeController() {
     if (!localTrackRef.current) return;
     const nextMuted = !isMuted;
     localTrackRef.current.enabled = !nextMuted;
+    void neuralDeepTransportRef.current?.setMuted(nextMuted);
     setIsMuted(nextMuted);
   }, [isMuted]);
 
@@ -2499,7 +2538,7 @@ function usePrithaRealtimeController() {
     setMicInputLevelState(next);
     saveMicInputLevel(next);
     const node = gainNodeRef.current;
-    if (node) node.gain.setTargetAtTime(inputLevelToGain(next), node.context.currentTime, 0.01);
+    if (node) node.gain.setTargetAtTime(neuralDeepTransportRef.current ? chainedInputGain(next) : inputLevelToGain(next), node.context.currentTime, 0.01);
   }, []);
 
   const sendTextMessage = useCallback(
@@ -2507,6 +2546,11 @@ function usePrithaRealtimeController() {
       const compact = text.trim();
       const channel = eventsChannelRef.current;
       if (!compact || !channel || channel.readyState !== "open" || (liveSessionRef.current && (!liveSessionRef.current.ready || liveSessionRef.current.closing))) return false;
+
+      if (neuralDeepTransportRef.current) {
+        if (!neuralDeepTransportRef.current.sendUserText(compact)) return false;
+        addTranscript("user", compact); requestResponse("text_message"); return true;
+      }
 
       sendVoiceEvent(channel, liveSessionRef.current, {
           type: "conversation.item.create",
@@ -2640,6 +2684,8 @@ function usePrithaRealtimeController() {
     phase,
     isMuted,
     micInputLevel,
+    voiceDraftAvailable,
+    resolveVoiceDraft:(send:boolean)=>neuralDeepTransportRef.current?.resolveDraft(send),
     error,
     status,
     transcript,

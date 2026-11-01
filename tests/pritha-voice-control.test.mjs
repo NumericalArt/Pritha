@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
+const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8") + "\n" + readFileSync("interfaces/control-center/src/lib/realtime/core/voice-tool-definitions.ts", "utf8");
 const toolRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/tool/route.ts", "utf8");
 const intakeRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/intake/route.ts", "utf8");
 const voicePageSource = readFileSync("interfaces/control-center/src/components/voice/VoiceControlPage.tsx", "utf8");
@@ -31,7 +31,8 @@ test("Control Center realtime config exposes filesystem inspection for harness q
 
 test("Control Center /api/realtime/tool routes inspect_pritha_files to the filesystem handler", () => {
   assert.match(toolRouteSource, /handlePrithaRealtimeTool\(name, payload\.arguments \|\| \{\}\)/);
-  assert.match(runtimeSource, /if \(name === "inspect_pritha_files"\) \{\s*output = await handlePrithaFiles\(args\);/s);
+  assert.match(runtimeSource, /inspect_pritha_files: handlePrithaFiles/);
+  assert.match(runtimeSource, /dispatchVoiceTool\(name, args, handlers\)/);
   assert.match(runtimeSource, /async function handlePrithaFiles\(args: PrithaFilesArgs = \{\}\)/);
   assert.match(runtimeSource, /if \(operation === "read_file"\) return readFilesystemFile\(args\);/);
   assert.match(runtimeSource, /if \(operation === "search"\) return searchFilesystem\(args\);/);
@@ -161,14 +162,14 @@ test("Voice intake requires spoken clarification before Codex upload", () => {
 test("Voice Control exposes web search as the active eighth tool and keeps last30days disabled from Realtime", () => {
   assert.match(runtimeSource, /name:\s*"web_search"/);
   assert.doesNotMatch(runtimeSource, /name:\s*"recent_external_research"/);
-  assert.match(runtimeSource, /name === "recent_external_research"/);
+  assert.match(runtimeSource, /recent_external_research: handleRecentExternalResearch/);
   assert.match(runtimeSource, /Search the current public web through Pritha's local SearXNG backend/);
   assert.match(runtimeSource, /PRITHA_SEARXNG_URL/);
   assert.match(runtimeSource, /PRITHA_WEB_SEARCH_AUTO_ENSURE/);
   assert.match(runtimeSource, /ensureLocalSearxngSearchBackend/);
   assert.match(runtimeSource, /local_searxng_auto_ensure_ran/);
   assert.match(runtimeSource, /operation=diagnose/);
-  assert.match(runtimeSource, /output = await handleWebSearch\(args\);/);
+  assert.match(runtimeSource, /web_search: handleWebSearch/);
   assert.match(webSearchToolsSource, /searxng-lock\.json/);
   assert.match(webSearchToolsSource, /install searxng --yes/);
   assert.match(webSearchToolsSource, /start searxng --yes/);
@@ -176,7 +177,7 @@ test("Voice Control exposes web search as the active eighth tool and keeps last3
   assert.match(runtimeSource, /recent_external_research\/last30days remains available in the backend but is intentionally not exposed as an active Realtime tool/);
   assert.match(runtimeSource, /RECENT_RESEARCH_DEFAULT_SOURCES = "reddit,hackernews,polymarket,grounding"/);
   assert.match(runtimeSource, /RECENT_RESEARCH_ALLOWED_SOURCES = new Set\(\["reddit", "hackernews", "polymarket", "grounding", "github", "jobs"\]\)/);
-  assert.match(runtimeSource, /output = await handleRecentExternalResearch\(args\);/);
+  assert.match(runtimeSource, /recent_external_research: handleRecentExternalResearch/);
   assert.match(runtimeSource, /external_research:/);
   assert.match(runtimeSource, /last30days_realtime_tool_surface: "disabled"/);
   assert.match(runtimeSource, /web_search: realtimeWebSearchStatus\(\)/);

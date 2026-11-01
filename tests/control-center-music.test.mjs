@@ -29,7 +29,7 @@ const {
 
 const aceStepClientSource = readFileSync("interfaces/control-center/src/lib/music/ace-step-client.ts", "utf8");
 const queueSource = readFileSync("interfaces/control-center/src/lib/music/queue.ts", "utf8");
-const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8");
+const runtimeSource = readFileSync("interfaces/control-center/src/lib/realtime/pritha-runtime.ts", "utf8") + "\n" + readFileSync("interfaces/control-center/src/lib/realtime/core/voice-tool-definitions.ts", "utf8");
 const voiceMusicSource = readFileSync("interfaces/control-center/src/components/voice/useVoiceMusic.ts", "utf8");
 const realtimeHookSource = readFileSync("interfaces/control-center/src/components/voice/usePrithaRealtime.ts", "utf8");
 const sessionConfigRouteSource = readFileSync("interfaces/control-center/src/app/api/realtime/session-config/route.ts", "utf8");

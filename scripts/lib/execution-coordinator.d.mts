@@ -16,6 +16,7 @@ export class ExecutionCoordinator {
   eventWindow(): {oldest:number;newest:number};
   claims(): Array<{resource: string; owner: string; generation: string; kind: string; mode: string; pid: number; process_stamp: string | null; detail: Record<string, any>}>;
   reconcileRelease(owner: string, generation: string): number;
+  reconcileVoiceHttpRequests(recordOutcome: (detail: Record<string, any>) => void): number;
   extend(owner: string, generation: string, resources: string[], options?: {mode?: "read" | "write"}): boolean;
   appendEvent(value: Record<string, unknown>): void;
   events(after?: number): Array<Record<string, any> & {sequence: number}>;

@@ -281,6 +281,22 @@ export class ExecutionCoordinator {
     return this.transaction(() => Number(this.db.prepare("DELETE FROM execution_claims WHERE owner=? AND generation=?").run(owner, generation).changes));
   }
 
+  /** Direct voice HTTP has no subprocess that can outlive its server owner.
+   * Native/provider CLI leases still require their separate process-tree proof.
+   * Record uncertain HTTP outcomes in the same transaction before releasing. */
+  reconcileVoiceHttpRequests(recordOutcome) {
+    return this.transaction(() => {
+      const released = new Set();
+      for (const row of this.claims()) {
+        if (row.kind !== "turn" || row.detail.executionKind !== "voice-http" || released.has(row.owner) || !metadataOwnerGone(row)) continue;
+        recordOutcome(row.detail);
+        this.db.prepare("DELETE FROM execution_claims WHERE owner=? AND generation=?").run(row.owner, row.generation);
+        released.add(row.owner);
+      }
+      return released.size;
+    });
+  }
+
   /** Add resources to an already verified logical owner without releasing earlier claims. */
   extend(owner, generation, resources, { mode = "write" } = {}) {
     const keys = [...new Set(resources.map(validKey))].sort();

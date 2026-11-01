@@ -15,7 +15,8 @@ function options() {
   const setup = new RuntimeSettingsStore(resolvePrithaSetupFile({root, stateRoot}), { allowedRoot: stateRoot }).read();
   return { defaultConnector: resolveProviderSelection({ env: process.env, instance, setup }).connectorId, legacy: getPrithaRuntimeSettings() };
 }
-export function getProviderSettings() { return providerSettingsSnapshot(providerSettingsStore().read(), options()); }
+export function getProviderSettingsDocument() { const document=providerSettingsStore().read();return {settings:providerSettingsSnapshot(document,options()),document}; }
+export function getProviderSettings() { return getProviderSettingsDocument().settings; }
 export async function updateProviderSettings(patch: ProviderSettingsPatch) {
   // Native settings keep their existing catalog/effort constraints through the new API too.
   if (patch?.connectorId === "codex" && patch.preset) {

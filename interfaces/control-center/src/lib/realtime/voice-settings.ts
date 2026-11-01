@@ -3,10 +3,11 @@ export const VOICE_MODEL_OPTIONS = [
   { id: "gpt-live-1", label: "GPT Live 1 (Experimental · Delegated tools)" },
 ] as const;
 export type VoiceModel = (typeof VOICE_MODEL_OPTIONS)[number]["id"];
+export const DEFAULT_VOICE_MODEL: VoiceModel = "gpt-realtime-2";
 export function isVoiceModel(value: unknown): value is VoiceModel {
   return VOICE_MODEL_OPTIONS.some(option => option.id === value);
 }
-export function normalizeVoiceModel(value: unknown, fallback: VoiceModel = "gpt-realtime-2"): VoiceModel {
+export function normalizeVoiceModel(value: unknown, fallback: VoiceModel = DEFAULT_VOICE_MODEL): VoiceModel {
   return isVoiceModel(value) ? value : fallback;
 }
 
