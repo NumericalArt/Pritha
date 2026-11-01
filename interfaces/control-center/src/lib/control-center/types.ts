@@ -67,7 +67,7 @@ export type ControlCenterCardAction =
 
 export type ControlCenterCommandReadiness = "missing" | "legacy_declared" | "human_instruction" | "structured_executable";
 
-export type ControlCenterSecretProvider = "openai" | "telegram" | "anthropic" | "whatsapp" | "generic" | "codex_external";
+export type ControlCenterSecretProvider = "openai" | "telegram" | "anthropic" | "neuraldeep" | "openrouter" | "whatsapp" | "generic" | "codex_external";
 
 export type ControlCenterSecretValidationMethod = "format" | "manual" | "none";
 
@@ -83,6 +83,7 @@ export type ControlCenterSecretDefinition = {
   validation: ControlCenterSecretValidationMethod;
   storageTarget: string;
   browserExposure: ControlCenterSecretBrowserExposure;
+  providerConfiguration?: import('../../../../../scripts/lib/child-provider-configuration.mjs').ChildCredentialConfiguration;
   source: "operations_manifest" | "env_example" | "contract_inferred" | "default";
   status: ControlCenterSecretReadiness;
   configured: boolean;

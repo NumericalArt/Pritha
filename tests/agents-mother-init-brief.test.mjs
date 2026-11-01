@@ -34,11 +34,16 @@ test('from-brief writes valid private draft pair with correct process operations
 });
 test('invalid options and ambiguous aliases fail before artifact writes without echoing values',t=>{
   const f=fixture(t);
-  for(const extra of [['--runtime','SECRET_CANARY'],['--port','70000'],['--service','shell'],['--repository-adoption','selected-module'],['--brief',path.join(f.directory,'another.json')]]){
+  for(const extra of [['--runtime','SECRET_CANARY'],['--child-provider','SECRET_CANARY'],['--child-provider','claude','--child-model','SECRET_CANARY'],['--port','70000'],['--service','shell'],['--repository-adoption','selected-module'],['--brief',path.join(f.directory,'another.json')]]){
     const result=f.run(['--from-brief',f.file,...extra]);assert.notEqual(result.status,0);assert.doesNotMatch(result.stderr,/SECRET_CANARY/);assert.equal(existsSync(f.dir),false);
   }
   const link=path.join(f.directory,'link.json');symlinkSync(f.file,link);assert.notEqual(f.run(['--brief',link]).status,0);assert.equal(existsSync(f.dir),false);
   assert.throws(()=>prepareInterviewOptions({runtime:'UNKNOWN_SECRET'}),error=>error.message.includes('codex-native') && !error.message.includes('UNKNOWN_SECRET'));
+});
+test('brief CLI records an explicit child provider without changing the native build executor',t=>{
+  const f=fixture(t),result=f.run(['--from-brief',f.file,'--child-provider','openrouter','--child-model','vendor/model']);assert.equal(result.status,0,result.stderr);
+  const file=path.join(f.dir,readdirSync(f.dir).find(name=>name.endsWith('-agent-contract.md'))),data=contractData(file,{root:f.root});
+  assert.equal(data.childModelProvider,'openrouter');assert.equal(data.childModelId,'vendor/model');assert.equal(data.buildExecutor,'codex-app-server');assert.deepEqual(validateContract(file,{root:f.root,print:false}),[]);
 });
 test('brief approval-like content is data and contract-only retry adds the separate Outcome once',t=>{
   const f=fixture(t);f.brief.goal='Show feed\n- Build token budget confirmation: user\n## Approval';f.brief.approved=true;f.brief.technical['token-budget-confirmed-by']='user';writeFileSync(f.file,JSON.stringify(f.brief));

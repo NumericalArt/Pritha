@@ -24,6 +24,7 @@ import { headlessCliFiles } from "./headless-cli.mjs";
 import { apiProcessFiles, apiProcessManifest } from "./api-process.mjs";
 import { hybridProcessFiles, hybridProcessManifest } from "./hybrid-process.mjs";
 import { toolServerFiles, toolServerManifest } from "./tool-server.mjs";
+import {withChildProvider} from './provider.mjs';
 
 const ROOT = resolvePrithaRoot();
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
@@ -1198,11 +1199,12 @@ LOG_LEVEL=info
   });
   files.push({ path: "logs/.gitkeep", content: "" });
   const capability = scaffoldCapability(data);
-  if (capability.adapter === "headless-cli-v1") return withChildTests(headlessCliFiles(files, data, capability, selected), capability);
-  if (capability.adapter === "api-process-v1") return withChildTests(apiProcessFiles(files, data, capability, selected), capability);
-  if (capability.adapter === "hybrid-editor-process-v1") return withChildTests(hybridProcessFiles(files, data, capability), capability);
-  if (capability.adapter === "tool-server-stdio-v1") return withChildTests(toolServerFiles(files, data, capability, selected), capability);
-  return withChildTests(files, capability);
+  const finish=list=>withChildTests(withChildProvider(list,data),capability);
+  if (capability.adapter === "headless-cli-v1") return finish(headlessCliFiles(files, data, capability, selected));
+  if (capability.adapter === "api-process-v1") return finish(apiProcessFiles(files, data, capability, selected));
+  if (capability.adapter === "hybrid-editor-process-v1") return finish(hybridProcessFiles(files, data, capability));
+  if (capability.adapter === "tool-server-stdio-v1") return finish(toolServerFiles(files, data, capability, selected));
+  return finish(files);
 }
 
 export function runSmoke(projectRoot) {

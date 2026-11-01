@@ -143,6 +143,8 @@ function secretProviderLabel(definition: ControlCenterSecretDefinition) {
   if (definition.provider === "openai") return "OpenAI";
   if (definition.provider === "telegram") return "Telegram";
   if (definition.provider === "anthropic") return "Anthropic";
+  if (definition.provider === "neuraldeep") return "NeuralDeep";
+  if (definition.provider === "openrouter") return "OpenRouter";
   if (definition.provider === "whatsapp") return "WhatsApp";
   if (definition.provider === "codex_external") return "External task runtime";
   return "Generic";
@@ -317,10 +319,12 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
       return;
     }
     setCredentialsPanel((current) => ({ ...current, busySecret: name, error: undefined }));
+    const definition=credentialsPanel.response?.credentials.definitions.find(item=>item.name===name),selection=definition?.providerConfiguration;
+    const expectedProviderConfiguration=selection?.status==='selected'?{modelId:selection.modelId,baseUrl:selection.baseUrl,storageTarget:definition?.storageTarget}:undefined;
     try {
       const result = await fetchJson<ControlCenterSecretMutationResult>(`/api/agents/${credentialsAgentId}/credentials/${encodeURIComponent(name)}`, {
         method: "PUT",
-        body: JSON.stringify({ value }),
+        body: JSON.stringify({ value,expectedProviderConfiguration }),
       });
       setCredentialsPanel((current) => ({
         ...current,

@@ -6,6 +6,7 @@ import test from "node:test";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
 import { credentialFilePath, normalizeCredentialTarget, readCredentialFile, updateCredentialFile } from "../scripts/lib/credential-store.mjs";
 import { readProjectMetadataAsync } from "../scripts/agents-mother/project-metadata-async.mjs";
+import {childCredentialConfiguration} from '../scripts/lib/child-provider-configuration.mjs';
 
 const server = readFileSync("interfaces/control-center/src/lib/control-center/server.ts", "utf8");
 const tree = ts.createSourceFile("server.ts", server, ts.ScriptTarget.Latest, true);
@@ -69,7 +70,7 @@ test("production credential projection and CRUD share the declared nested target
   const api = loadProduction([
     "isSecretName", "providerForSecretName", "isCredentialLikeName", "defaultSecretLabel", "defaultSecretValidation", "defaultBrowserExposure", "defaultRequiredForSecret", "secretDefinitionFromManifest", "envExampleSecretNames", "secretDefinitionFromEnvExample", "mergeSecretDefinitions", "unquoteEnvValue", "parseEnvValues", "quoteEnvValue", "upsertEnvValue", "removeEnvValue", "maskSecretValue", "credentialStorage", "credentialsForAgent", "findCredential", "safeSecretInput", "setAgentCredentialSecret", "removeAgentCredentialSecret", "validateSecretFormat", "validateAgentCredentialSecret",
   ], {
-    path, normalizeCredentialTarget, credentialFilePath, readCredentialFile, updateCredentialFile,
+    path, normalizeCredentialTarget, credentialFilePath, readCredentialFile, updateCredentialFile,childCredentialConfiguration,
     relativePath: (base, file) => path.relative(base, file),
     getControlCenterStatus: async () => { await refresh(); return { root: path.dirname(root), childAgents: [agent] }; },
     selectAgent: agents => agents[0], resolveAgentFolderPath: () => root,
@@ -92,4 +93,12 @@ test("production credential projection and CRUD share the declared nested target
   assert.match(remaining, /^DATABASE_URL=postgres:\/\/fixture\nASSISTANT_ENABLED=false\n/);
   assert.doesNotMatch(remaining, /NEURALDEEP_API_KEY|synthetic-canary-secret/);
   assert.equal(agent.credentials.status, "pending_auth");
+  const baseUrl='https://api.neuraldeep.ru/v1',modelId='qwen3.8-27b',definition={name:'NEURALDEEP_API_KEY',provider:'neuraldeep',storage_target:'mvp/.env.local',provider_configuration:{base_url:baseUrl,model_id:modelId}};
+  writeFileSync(path.join(root,'operations/manifest.json'),JSON.stringify({credentials:[definition]}));
+  await assert.rejects(api.setAgentCredentialSecret('fixture','NEURALDEEP_API_KEY','synthetic-canary-secret-9362'),/provider_configuration_changed/);
+  assert.equal(readCredentialFile(root,'mvp/.env.local'),remaining);
+  await api.setAgentCredentialSecret('fixture','NEURALDEEP_API_KEY','synthetic-canary-secret-9362',{expectedProviderConfiguration:{baseUrl,modelId,storageTarget:'mvp/.env.local'}});
+  const configured=readCredentialFile(root,'mvp/.env.local');assert.match(configured,/NEURALDEEP_BASE_URL=https:\/\/api.neuraldeep.ru\/v1/);assert.match(configured,/NEURALDEEP_MODEL=qwen3.8-27b/);
+  writeFileSync(path.join(root,'operations/manifest.json'),JSON.stringify({credentials:[{...definition,provider_configuration:{base_url:'https://other.invalid',model_id:modelId}}]}));
+  await assert.rejects(api.setAgentCredentialSecret('fixture','NEURALDEEP_API_KEY','synthetic-canary-secret-9362'),/secret_not_writable/);assert.equal(readCredentialFile(root,'mvp/.env.local'),configured);
 });

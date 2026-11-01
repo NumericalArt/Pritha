@@ -1,4 +1,5 @@
 import path from 'node:path';
+import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {parseInterviewBrief,interviewBriefOptions,INTERVIEW_PRESETS} from './interview-brief.mjs';
 import {RUNTIME_FAMILIES,SERVICE_MODES,AUTOSTART_MODES,PROACTIVE_MODES,RUNTIME_PLACEMENT_PROFILES,TELEGRAM_MODES,BUILD_EXECUTORS,BUILD_GIT_MODES,TRIAL_BACKEND_POLICIES,REPOSITORY_RESEARCH_POLICIES,REPOSITORY_ADOPTION_MODES,parseRepositoryResearchTopics} from './contract.mjs';
@@ -10,6 +11,7 @@ export function prepareInterviewOptions(input={}){
   const source=input.brief || input['from-brief'];let brief={};
   if(source){if(typeof source!=='string')throw new Error('Specify a brief file path');let text;try{text=readBoundedRegularFile(path.resolve(source),{maxBytes:128000}).text;}catch{throw new Error('Interview brief must be an accessible bounded regular file');}brief=interviewBriefOptions(parseInterviewBrief(text));}
   let options={...brief,...input},preset=options.preset || 'generic';
+  childProviderConfiguration({childModelProvider:options['child-provider'],childModelId:options['child-model']});
   if(!INTERVIEW_PRESETS.has(preset))throw new Error('Invalid interview preset. Expected: generic, local-feed, llm-app');
   if(options['source-format'] && !['json','rss','atom','mixed'].includes(options['source-format']))throw new Error('Invalid source format. Expected: json, rss, atom, mixed');
   if(preset!=='generic'){

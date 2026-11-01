@@ -1,5 +1,6 @@
 // Reviewed primary-source policy from the pinned NeuralDeep repository.
 const authority={
+ 'anthropic-messages-api':['platform.claude.com','docs.anthropic.com'], 'openrouter-model-api':['openrouter.ai'],
  'node-http-runtime':['nodejs.org'], 'neuraldeep-model-api':['neuraldeep.ru','docs.neuraldeep.ru'],
  'openai-agents-sdk':['openai.github.io','platform.openai.com','developers.openai.com'],
  'openai-realtime':['platform.openai.com','developers.openai.com'], 'voice-transport':['developer.mozilla.org','w3.org'],
@@ -14,6 +15,8 @@ const authority={
 };
 // Curated public entry points, never URLs copied from operator text or a search snippet.
 const primaryUrls={
+ 'anthropic-messages-api':['https://platform.claude.com/docs/en/api/messages/create'],
+ 'openrouter-model-api':['https://openrouter.ai/docs/api_reference/overview'],
  'node-http-runtime':['https://nodejs.org/api/http.md','https://nodejs.org/api/http.html'],
  'neuraldeep-model-api':['https://neuraldeep.ru/llms-full.txt'],
  'interface-runtime-security':['https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html','https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/XSS'],

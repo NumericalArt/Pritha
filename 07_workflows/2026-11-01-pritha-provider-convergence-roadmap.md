@@ -318,7 +318,7 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
 
 ### R5 — Claude Code: runner, decisions, build и child API
 
-**Статус: in-progress; API lane / host MCP / shared Task Chat / BuildExecutor verified; local CLI auth и child wiring pending.** Зависимости R2–R4 (общие contracts, не ND subscription).
+**Статус: in-progress; API lane / host MCP / Task Chat / BuildExecutor и child API wiring verified; optional local CLI auth и live acceptance pending.** Зависимости R2–R4 (общие contracts, не ND subscription).
 
 - [x] Проверить current CLI flags/stream schema/SDK terms по official docs,
   локально `claude --version` bounded 5s. SDK не обязателен для CLI runner.
@@ -351,7 +351,7 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
   pinned API version, timeout/abort, sanitized errors, bounded output, tool policy.
 - [x] Root `CLAUDE.md` with `@AGENTS.md` + narrow Claude rules, YAML frontmatter;
   do not duplicate AGENTS. Sonnet/Opus/Haiku catalog with verified IDs/capabilities.
-- [ ] Existing `claude-tools-pilot.mjs` conformance remains valid; live single turn
+- [x] Existing `claude-tools-pilot.mjs` offline conformance passed; live single turn
   only through configured authorized credentials. Child pilot through UI later.
 
 **R5 tests:** synthetic fragmented stream, parallel tools/missing receipt, error
@@ -392,7 +392,7 @@ recover model pin; output large-file/truncation fixture.
   подтверждённому official endpoint; usage/limit/free tier в normalized DTO.
 - [x] Model catalog из проверенного shortlist с manual vendor/model slug;
   исторические пять IDs из C §1.1 сверить, не silently substitute.
-- [ ] Child credentials drawer: OpenRouter наравне с ND, API key/base URL/model
+- [x] Child credentials drawer: OpenRouter наравне с ND, API key/base URL/model
   только после операторского выбора и проверки child/.env.local boundary.
 - [ ] Local server discovery Ollama 11434, LM Studio 1234, custom MLX loopback;
   /v1/models, selected model validation, endpoint-specific capabilities.
@@ -1923,6 +1923,37 @@ unit child environment отдельно и изолировать оба aliases
 - Инструкция обновлена в `07_workflows/delivery-usage-accounting.md`; provenance
   inventory содержит 66 source adaptations. R5 local auth/child, R7 offline/child,
   R9 child voice, R11 и R12 остаются открыты. Runtime/MacBook/GitHub не изменены.
+
+### Checkpoint 30 — Child API clients и явное provisioning
+
+- Contract/CLI получили отдельные `Child model provider` и `Child model ID`.
+  Native build executor остаётся прежним, если не выбран другой. Invalid provider
+  или model отклоняется до создания артефактов; API selection добавляет required
+  current-source research и меняет contract fingerprint. Старые scaffolds без
+  выбора остались byte-identical по snapshot gate.
+- Selected scaffolds включают dependency-free Anthropic Messages client и
+  bounded ND/OpenRouter text client, config, private dotenv declarations и
+  status/pilot command. Нет parent key/env inheritance, arbitrary URL,
+  redirects, model fallback, tool execution или retries после ambiguity.
+  Unknown usage и incomplete output сохраняют честную семантику.
+- Credentials drawer различает Anthropic/ND/OpenRouter. Один Save записывает
+  ключ, BASE_URL и MODEL в объявленный child store. Selected configuration
+  передаётся обратно с действием; stale model/URL/target блокирует запись.
+  Неверный endpoint закрывает Save. Private nested targets, backups, foreign
+  state и отсутствие ключей в JSON/DOM сохраняют существующие guards.
+- Targeted suite **92/93**: один VM harness не передавал новый pure helper;
+  harness исправлен и дополнен atomic binding/stale/invalid endpoint checks.
+  Финальный связанный subset **16/16**, ранее API/scaffold/client gate **60/60**,
+  factory/contract gate **13/13**. Typecheck passed. Real browser **3/3**, каждый
+  provider на desktop/mobile: save tuple, stale refusal, remove, no secret echo.
+- Исторический Claude SDK **0.3.306** pilot прошёл четыре offline conformance
+  checks после locked install во внешней временной workspace с ignore-scripts.
+  API loop остаётся `pending-auth`, реальный платный вызов не выполнялся.
+- Инструкция: `07_workflows/child-provider-setup.md`. Verified primary sources:
+  Anthropic Messages API **2026-10-21**, OpenRouter API overview; ND authority
+  остаётся pinned GitHub source. Optional Claude local-session lane, Local
+  offline execution, child voice, bootstrap и R12 продолжаются. Никакие живые
+  child credentials, сервисы, MacBook или GitHub не менялись.
 
 ## 7. Полные исходные материалы
 

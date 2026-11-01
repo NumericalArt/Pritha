@@ -6,6 +6,7 @@ function statusForError(error: unknown) {
   const message = error instanceof Error ? error.message : "credential_error";
   if (message === "unknown_secret") return { status: 404, message };
   if (message === "agent_folder_unavailable") return { status: 409, message };
+  if (message === "provider_configuration_changed") return { status: 409, message };
   if (message === "secret_not_writable" || message === "secret_not_removable") return { status: 409, message };
   if (message === "invalid_secret_value") return { status: 400, message };
   return { status: 500, message: "credential_error" };
@@ -13,10 +14,10 @@ function statusForError(error: unknown) {
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string; name: string }> }) {
   const { id, name } = await context.params;
-  const body = (await request.json().catch(() => ({}))) as { value?: unknown; dryRun?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { value?: unknown; dryRun?: unknown; expectedProviderConfiguration?: unknown };
 
   try {
-    const result = await setAgentCredentialSecret(id, decodeURIComponent(name), body.value, { dryRun: body.dryRun === true });
+    const result = await setAgentCredentialSecret(id, decodeURIComponent(name), body.value, { dryRun: body.dryRun === true,expectedProviderConfiguration:body.expectedProviderConfiguration });
     if (!result) return Response.json({ ok: false, error: "agent_not_found", id }, { status: 404 });
     return Response.json(result);
   } catch (error) {

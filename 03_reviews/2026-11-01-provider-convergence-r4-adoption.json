@@ -360,7 +360,7 @@
       "path": "scripts/agents-mother/source-authority.mjs",
       "source_path": "scripts/agents-mother/external-research-topics.mjs",
       "source_sha256": "56261e537072a0cf93236c4120d7a5fdee8f1d94bd1f7bf2c71342ca3d876fd2",
-      "target_sha256": "91e9d7d15214148337e17c38816acbe3996454c2d44615fdc67da1d56016f0a5",
+      "target_sha256": "593e7181d705d148b430f258540d955c3af7dbb4dd9b77724894942f2b0c34b2",
       "adoption": "Reviewed authority and primary URL tables only; existing canonical topic derivation and old locks are preserved."
     },
     {

@@ -91,6 +91,10 @@ function addPatternDerivedTopics(topics, patternPack, { hybridEditor = false } =
 export function deriveExternalResearchTopics(data = {}, options = {}) {
   const text = combinedContractText(data);
   const topics = [];
+  if(['claude','neuraldeep','openrouter'].includes(data.childModelProvider)){
+    const id={claude:'anthropic-messages-api',neuraldeep:'neuraldeep-model-api',openrouter:'openrouter-model-api'}[data.childModelProvider];
+    pushTopic(topics,id,'Selected child model API',data.childModelProvider+' official API authentication model tool usage limits documentation','The contract explicitly selects this child API, independently of its build executor.');
+  }
   const runtime = String(data.runtimeFamily || "").trim();
   const telegramMode = String(data.telegramMode || "none").trim();
   const serviceMode = String(data.serviceMode || "none").trim();

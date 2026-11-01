@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { resolvePrithaMemoryDatabase } from "../lib/state-files.mjs";
+import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
 import { parseLongArgs as parseArgs } from "../lib/cli-args.mjs";
 
 import { execFileSync } from "node:child_process";
@@ -106,6 +107,7 @@ function usage() {
   ${CLI_COMMAND} interview [--name <name>] [--mission <text>] [--build-token-budget 1000000] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} init --name <name> --mission <text> [--build-token-budget <positive-int> --token-budget-confirmed-by user] [--runtime codex-native] [--runtime-placement frontier-first] [--interface "Codex project"] [--telegram none] [--service none] [--autostart disabled]
   ${CLI_COMMAND} init --from-brief <path> [--preset generic|local-feed|llm-app] [--port <1..65535>] [--contract-only] (alias: --brief)
+  ${CLI_COMMAND} init --name <name> --mission <text> [--child-provider claude|neuraldeep|openrouter --child-model <exact-id>]
   ${CLI_COMMAND} outcome init <contract-path> [--interaction-mode interface|headless|hybrid]
   ${CLI_COMMAND} outcome validate <outcome-spec-path>
   ${CLI_COMMAND} outcome status <outcome-spec-path>
@@ -567,6 +569,8 @@ ${bulletList(data.criticalWorkflows)}
 ## Runtime and interface
 
 - Runtime family: ${runtimeFamily}
+- Child model provider: ${scalar(data.childModelProvider, "none")}
+- Child model ID: ${scalar(data.childModelId, "none")}
 - Primary interface: ${primaryInterface}
 - Secondary interfaces: ${scalar(data.secondaryInterfaces, "none")}
 - Telegram mode: ${telegramMode}
@@ -805,6 +809,9 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   data.targetFolder = options["target-folder"] || path.join(resolvePrithaAgentParent({root:ROOT}),data.technicalSlug);
   data.buildGitMode = options["build-git-mode"] || "disposable-worktree";
   data.buildExecutor = options["build-executor"] || "codex-app-server";
+  data.childModelProvider = options["child-provider"] || "none";
+  data.childModelId = options["child-model"] || "none";
+  childProviderConfiguration(data);
   data.trialBackendPolicy = options["trial-backend-policy"] || "local-or-app-server";
   data.buildIterationBudget = options["build-iterations"] || "6";
   data.buildElapsedBudgetMs = options["build-elapsed-ms"] || "5400000";

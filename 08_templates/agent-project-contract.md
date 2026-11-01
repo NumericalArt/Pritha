@@ -117,6 +117,8 @@ Existing accepted v1 contracts retain their original locks and are not rewritten
 ## Runtime and interface
 
 - Runtime family: codex-native | cli | api | local-model | hybrid | environment-specific
+- Child model provider: none
+- Child model ID: none
 - Codex surface profile: none | cli-local | app-supervised | cloud-task | ide-attached | app-server | sdk-orchestrated | workspace-agent | bedrock-backed | mixed | unknown
 - Primary interface: Codex project | Telegram | CLI | web | API | mixed
 - Secondary interfaces:

@@ -54,6 +54,7 @@ import type {
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
 import { runAsyncProbe, createProbeCache, sharedProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
 import { credentialFilePath, normalizeCredentialTarget, readCredentialFile, updateCredentialFile } from "../../../../../scripts/lib/credential-store.mjs";
+import {childCredentialConfiguration, type ChildCredentialConfiguration} from '../../../../../scripts/lib/child-provider-configuration.mjs';
 import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
 import { resolveToolServerManifest, toolServerLaunchEnvironment, toolServerRuntimeBinding } from "../../../../../scripts/agents-mother/tool-server-runtime.mjs";
 import { deliveryStateView } from "./delivery-state";
@@ -85,6 +86,7 @@ type OperationsCommand =
     };
 
 type OperationsCredentialDefinition = {
+  provider_configuration?: {model_id?:string;base_url?:string};
   name?: string;
   variable?: string;
   label?: string;
@@ -1074,6 +1076,8 @@ function providerForSecretName(name: string): ControlCenterSecretProvider {
   if (name.startsWith("OPENAI_")) return "openai";
   if (name.startsWith("TELEGRAM_")) return "telegram";
   if (name.startsWith("ANTHROPIC_")) return "anthropic";
+  if (name.startsWith("NEURALDEEP_")) return "neuraldeep";
+  if (name.startsWith("OPENROUTER_")) return "openrouter";
   if (name.startsWith("WHATSAPP_")) return "whatsapp";
   if (name.startsWith("CODEX_")) return "codex_external";
   return "generic";
@@ -1093,6 +1097,8 @@ function defaultSecretLabel(name: string) {
     OPENAI: "OpenAI",
     TELEGRAM: "Telegram",
     ANTHROPIC: "Anthropic",
+    NEURALDEEP: "NeuralDeep",
+    OPENROUTER: "OpenRouter",
     WHATSAPP: "WhatsApp",
   };
   const displayName = name.replace(/^(?:PRITHA|TECHSCOPE)_TELEGRAM_/, "TELEGRAM_").replace(/^(?:PRITHA|TECHSCOPE)_/, "");
@@ -1123,10 +1129,13 @@ function secretDefinitionFromManifest(definition: OperationsCredentialDefinition
   const name = (definition.name || definition.variable || "").trim().toUpperCase();
   if (!isSecretName(name)) return null;
   const provider = definition.provider || providerForSecretName(name);
+  let providerConfiguration:ChildCredentialConfiguration|undefined;
+  try{providerConfiguration=childCredentialConfiguration({...definition,name,provider});}catch{providerConfiguration={status:'invalid'};}
   return {
     name,
     label: definition.label || defaultSecretLabel(name),
     provider,
+    providerConfiguration,
     required: definition.required ?? defaultRequiredForSecret(name),
     validation: definition.validation || defaultSecretValidation(provider),
     storageTarget: definition.storage_target || ".env.local",
@@ -1286,10 +1295,10 @@ function credentialsForAgent(root: string, folder: { absolutePath: string } | nu
       configured,
       maskedValue: maskSecretValue(value),
       lastUpdated: configured ? lastUpdated : undefined,
-      canWrite: file.status !== "unavailable" && Boolean(normalizeCredentialTarget(definition.storageTarget)) && definition.provider !== "codex_external",
+      canWrite: file.status !== "unavailable" && definition.providerConfiguration?.status!=='invalid' && Boolean(normalizeCredentialTarget(definition.storageTarget)) && definition.provider !== "codex_external",
       canRemove: file.status !== "unavailable" && configured && Boolean(normalizeCredentialTarget(definition.storageTarget)) && definition.provider !== "codex_external",
       note:
-        definition.note ||
+        (definition.providerConfiguration?.status==='invalid'?'The declared provider/model/URL does not match a supported child configuration. Correct the child manifest before saving.':definition.note) ||
         (definition.provider === "codex_external"
           ? "Codex App/CLI auth is configured outside child-agent secret storage."
           : definition.browserExposure === "ephemeral_only"
@@ -1373,6 +1382,8 @@ function validateSecretFormat(definition: ControlCenterSecretDefinition, value: 
     openai: /^sk-[A-Za-z0-9_-]{16,}$/,
     telegram: /^\d+:[A-Za-z0-9_-]{20,}$/,
     anthropic: /^sk-ant-[A-Za-z0-9_-]{16,}$/,
+    neuraldeep: /^[A-Za-z0-9_.:-]{16,8192}$/,
+    openrouter: /^sk-or-[A-Za-z0-9_-]{16,}$/,
     whatsapp: /^[A-Za-z0-9_.:-]{20,}$/,
   };
   const pattern = patterns[definition.provider];
@@ -2488,7 +2499,7 @@ export async function setAgentCredentialSecret(
   agentId: string,
   name: string,
   value: unknown,
-  options: { dryRun?: boolean } = {},
+  options: { dryRun?: boolean; expectedProviderConfiguration?: unknown } = {},
 ): Promise<ControlCenterSecretMutationResult | null> {
   const status = await getControlCenterStatus({ freshIdentity: true });
   const agent = selectAgent(status.childAgents, agentId);
@@ -2496,6 +2507,10 @@ export async function setAgentCredentialSecret(
   const definition = findCredential(agent, name);
   if (!definition) throw new Error("unknown_secret");
   if (!definition.canWrite) throw new Error("secret_not_writable");
+  if(definition.providerConfiguration?.status==='selected'){
+    const selected=definition.providerConfiguration,expected=options.expectedProviderConfiguration as {modelId?:unknown;baseUrl?:unknown;storageTarget?:unknown}|undefined;
+    if(!expected || expected.modelId!==selected.modelId || expected.baseUrl!==selected.baseUrl || expected.storageTarget!==definition.storageTarget)throw new Error('provider_configuration_changed');
+  }
   const secretValue = safeSecretInput(value);
   if (!secretValue) throw new Error("invalid_secret_value");
   const folderPath = resolveAgentFolderPath(status, agent);
@@ -2503,7 +2518,11 @@ export async function setAgentCredentialSecret(
 
   credentialFilePath(folderPath, definition.storageTarget);
   if (!options.dryRun) {
-    updateCredentialFile(folderPath, definition.storageTarget, current => upsertEnvValue(current, definition.name, secretValue));
+    updateCredentialFile(folderPath, definition.storageTarget, current => {
+      let next=upsertEnvValue(current, definition.name, secretValue);
+      if(definition.providerConfiguration?.status==='selected')for(const [variable,value] of Object.entries(definition.providerConfiguration.assignments))next=upsertEnvValue(next,variable,value);
+      return next;
+    });
   }
 
   const refreshed = options.dryRun ? agent : (await getControlCenterAgent(agentId)).agent;

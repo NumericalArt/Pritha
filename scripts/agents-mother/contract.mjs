@@ -6,6 +6,7 @@ import { resolvePrithaRoot } from "../lib/paths.mjs";
 import { normalizeGitHubRepositoryUrl, normalizeRepositoryModulePath } from "../lib/github-repository-radar.mjs";
 import { authoredAgentId } from "./identity.mjs";
 import { readAgentKind } from "./agent-kind.mjs";
+import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
 
 export const RUNTIME_FAMILIES = new Set(["codex-native", "cli", "api", "local-model", "hybrid", "environment-specific"]);
 export const TELEGRAM_MODES = new Set(["none", "primary-chat", "intake-channel", "notifications-only", "operator-control"]);
@@ -207,6 +208,8 @@ export function validateContract(contractPath, options = {}) {
   if (!STATUS_VALUES.has(fm.status)) issues.push(`status must be one of: ${Array.from(STATUS_VALUES).join(", ")}`);
 
   const runtime = bodyValue(text, "Runtime family");
+  try{childProviderConfiguration({childModelProvider:bodyValue(text,'Child model provider') || 'none',childModelId:bodyValue(text,'Child model ID')});}
+  catch{issues.push('invalid child model selection. Choose none, claude, neuraldeep or openrouter with an exact model ID.');}
   const runtimePlacement = bodyValue(text, "Runtime placement profile");
   const multiModelRouting = bodyValue(text, "Multi-model routing requested");
   const telegram = bodyValue(text, "Telegram mode");
@@ -497,6 +500,8 @@ export function contractData(contractPath, options = {}) {
     outcomeApprovalPolicy: bodyValue(text, "Outcome approval policy") || "separate-explicit-user",
     buildGitMode: bodyValue(text, "Build Git mode") || "disposable-worktree",
     buildExecutor: bodyValue(text, "Build executor") || "codex-app-server",
+    childModelProvider: bodyValue(text, "Child model provider") || "none",
+    childModelId: bodyValue(text, "Child model ID"),
     trialBackendPolicy: bodyValue(text, "Trial backend policy") || "local-or-app-server",
     buildIterationBudget: Number(bodyValue(text, "Build iteration budget") || 6),
     buildElapsedBudgetMs: Number(bodyValue(text, "Build elapsed budget ms") || 5_400_000),
