@@ -30,5 +30,6 @@ export interface TaskChatBackendDriver {
   cancelTurn: TaskChatBackend["controlTurn"];
   resolveApproval: TaskChatBackend["answerRequest"];
   getRuntimeHealth(): Promise<TaskProviderHealth>;
+  getSettingsSnapshot?(): Promise<TaskProviderHealth & Record<string,unknown>>;
   getRateLimitsAndUsage(): Promise<ProviderUsageView>;
 }

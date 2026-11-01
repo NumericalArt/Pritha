@@ -35,5 +35,6 @@ export class ClaudeDriver implements TaskChatBackendDriver {
   cancelTurn:TaskChatBackend['controlTurn']=(...args)=>this.backend.controlTurn(...args);
   resolveApproval:TaskChatBackend['answerRequest']=(...args)=>this.backend.answerRequest(...args);
   async getRuntimeHealth(modelId?:string):Promise<TaskProviderHealth>{const preset=getProviderSettings().providerPresets.claude;const {models,model,...health}=await this.service.snapshot({...preset,...(modelId?{modelId}:{})});return health;}
+  async getSettingsSnapshot(){return this.service.snapshot(getProviderSettings().providerPresets.claude);}
   async getRateLimitsAndUsage():Promise<ProviderUsageView>{return {available:false,source:'unavailable',limits:null};}
 }

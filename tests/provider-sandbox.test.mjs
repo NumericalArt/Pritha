@@ -13,7 +13,7 @@ import { providerProcessEnvironment } from '../scripts/lib/provider-process-envi
 const execute=promisify(execFile);
 function fixture(t){const directory=mkdtempSync(path.join(os.tmpdir(),'pritha-sandbox-')),workspace=path.join(directory,'workspace'),scratch=path.join(directory,'scratch'),state=path.join(directory,'state');for(const d of [workspace,scratch,state])mkdirSync(d);t.after(()=>rmSync(directory,{recursive:true,force:true}));return {directory,workspace,scratch,state};}
 async function run(f,command,args,options={}){
-  const plan=prepareProviderSandbox({root:process.cwd(),stateRoot:f.state,privateRoot:f.state,command,args,cwd:f.workspace,temporary:f.scratch,writeRoots:options.write?[f.workspace]:[],denyWriteRoots:options.protected || [],loopbackPorts:options.ports || []});
+  const plan=prepareProviderSandbox({root:process.cwd(),stateRoot:f.state,privateRoot:f.state,command,args,cwd:f.workspace,temporary:f.scratch,writeRoots:options.write?[f.workspace]:[],denyWriteRoots:options.protected || [],loopbackPorts:options.ports || [],runtime:options.runtime});
   const env=providerProcessEnvironment({provider:'claude',root:process.cwd(),stateRoot:f.state,temporary:f.scratch,env:{PATH:process.env.PATH,HOME:f.scratch}});
   return execute(plan.command,plan.args,{env,timeout:15000,maxBuffer:100000,encoding:'utf8'});
 }
@@ -25,6 +25,12 @@ test('real OS sandbox permits workspace access and blocks outside files, secrets
   const output=await run(f,process.execPath,['-e',script],{write:true});const result=JSON.parse(output.stdout);
   assert.deepEqual(result,{read:'public',outside:'denied',secret:'denied',link:'denied',git:'denied',outsideWrite:'denied',secretWrite:'denied'});
   assert.equal(readFileSync(path.join(f.workspace,'output.txt'),'utf8'),'done');assert.equal(readFileSync(outside,'utf8'),'PRIVATE_CANARY');
+});
+test('Codex policy lookup can observe missing policy while unrelated system file contents remain denied',{skip:process.platform!=='darwin'},async t=>{
+  const f=fixture(t);
+  const script="const fs=require('fs');let policy,content;try{fs.readFileSync('/etc/codex/requirements.toml');policy='present'}catch(error){policy=error.code}try{fs.readFileSync('/etc/passwd');content='ESCAPED'}catch{content='denied'}console.log(JSON.stringify({policy,content,temp:process.env.TMPDIR}));";
+  const output=JSON.parse((await run(f,process.execPath,['-e',script],{runtime:'codex'})).stdout);
+  assert(['ENOENT','present'].includes(output.policy));assert.equal(output.content,'denied');assert(output.temp.endsWith('/scratch'));
 });
 
 test('readonly sandbox and arbitrary quoted arguments cannot widen the filesystem policy',{skip:process.platform!=='darwin'},async t=>{

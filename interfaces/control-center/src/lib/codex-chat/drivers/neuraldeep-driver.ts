@@ -42,6 +42,7 @@ export class NeuralDeepDriver implements TaskChatBackendDriver {
   cancelTurn:TaskChatBackend['controlTurn']=(...args)=>this.backend.controlTurn(...args);
   resolveApproval:TaskChatBackend['answerRequest']=(...args)=>this.backend.answerRequest(...args);
   async getRuntimeHealth(modelId?:string):Promise<TaskProviderHealth>{const {models,account,billing,...health}=await this.service.snapshot(modelId || getProviderSettings().providerPresets.neuraldeep.modelId);return health;}
+  async getSettingsSnapshot(){return this.service.snapshot(getProviderSettings().providerPresets.neuraldeep.modelId);}
   async getRateLimitsAndUsage():Promise<ProviderUsageView>{const snapshot=await this.service.snapshot(getProviderSettings().providerPresets.neuraldeep.modelId),limits=snapshot.account?.limits;
     return {available:Boolean(limits) && snapshot.account?.sections.limits.stale===false,source:limits?'provider':'unavailable',limits:limits?{parallelLimit:limits.parallelLimit,billingMode:limits.billingMode,canRequest:limits.decision.canRequest,sessionRemaining:limits.chat.session.remaining,weekRemaining:limits.chat.week.remaining,walletBalanceRub:limits.wallet?.balanceRub ?? null}:null};}
 }

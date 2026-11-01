@@ -132,6 +132,7 @@ export class ProviderTaskRuntime {
       journal=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
+        reasoningControl:active.capabilities.reasoningControl,
         model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:attachments.prompt?text+'\n\n'+attachments.prompt:text,
         images:attachments.images || [],signal:active.controller.signal,
         ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),

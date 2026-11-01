@@ -365,13 +365,13 @@ recover model pin; output large-file/truncation fixture.
 
 ### R7 — OpenRouter и Local
 
-**Статус: pending.** Зависимости R2–R4, R6 contracts.
+**Статус: in-progress; OpenRouter transport/Task Chat проверены, Local execution и child provisioning впереди.** Зависимости R2–R4, R6 contracts.
 
-- [ ] Выделить reusable OpenAI-compatible loopback bridge без ND billing/auth
+- [x] Выделить reusable OpenAI-compatible loopback bridge без ND billing/auth
   assumptions. OpenRouter uses fixed upstream and HTTP-Referer/X-Title metadata.
-- [ ] OpenRouter Keychain + credential API; bounded 5s key/balance probe по
+- [x] OpenRouter Keychain + credential API; bounded 5s key/balance probe по
   подтверждённому official endpoint; usage/limit/free tier в normalized DTO.
-- [ ] Model catalog из проверенного shortlist с manual vendor/model slug;
+- [x] Model catalog из проверенного shortlist с manual vendor/model slug;
   исторические пять IDs из C §1.1 сверить, не silently substitute.
 - [ ] Child credentials drawer: OpenRouter наравне с ND, API key/base URL/model
   только после операторского выбора и проверки child/.env.local boundary.
@@ -1027,6 +1027,49 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
 - R6 не завершён: exact source passages/checkpoints/deadlines в общей factory
   orchestration и registry всех пяти backends ещё впереди. R5 local auth/child
   wiring, R7–R9, R11/R11b и финальная R12 также остаются в работе.
+
+### Checkpoint реализации 10 — OpenRouter и проверяемый compatible bridge
+
+- OpenRouter подключён к общему Task Chat: отдельный saved preset, history,
+  pinned session/model, queue, Stop, общий admission и durable usage. Ключ
+  остаётся в host/instance Keychain; CLI получает только одноразовую capability.
+  Добавлены общий credentials endpoint и `/api/settings/openrouter-credentials`.
+  При сохранённом ключе и неудачном probe API различает эти два результата.
+- Исправлен endpoint исходника: account metadata берётся через GET
+  `https://openrouter.ai/api/v1/key`, не `/auth/key`. Bounded 5s metadata probe
+  сохраняет unknown как null; effective budget имеет приоритет над key limit.
+  Public catalog проверен без авторизации: 433 модели, все пять исторических
+  shortlist IDs существуют. Provenance и hash — в
+  `03_reviews/2026-11-01-compatible-provider-evidence.json`.
+- OpenRouter Responses требует полную stateless историю; store/previous response,
+  request routing overrides, server tools и remote media отклоняются. Fixed
+  upstream, redirects запрещены, timeout абсолютный, платный retry отсутствует.
+  Hash отмечается до dispatch; usage receipt записывается до передачи complete
+  tool calls. Незавершённый поток и сбой receipt не разрешают выполнить tool.
+- Реальный Codex 0.153.0 использует namespace tools. Bridge проецирует только
+  семь разрешённых host tools в flat function names и обратно, включая resume
+  history; посторонние calls не принимаются. Host MCP сохраняет exact approval
+  до write/edit/command. Built-in shell выключен; commands идут через отдельную
+  OS sandbox без сети, CLI может писать только в собственные home/scratch.
+- SRT 0.0.81 policy для Codex допускает metadata lookup отсутствующего
+  `/etc/codex` и использует private TMPDIR. Содержимое прочих system files
+  остаётся запрещённым. Изменение profile имеет строгую проверку pinned wrapper
+  и не расширяет файловые/сетевые права команд.
+- Capability policy различает `default` (без override) и `none` (отключение
+  reasoning только при объявленной поддержке). Модели с обязательным thinking
+  и без effort knob доступны с собственным default; high/xhigh не выдумываются.
+- Local обнаруживает Ollama/LM Studio, принимает explicit IPv4/IPv6 loopback,
+  читает native model metadata и обнаруживает cloud aliases. Пока inference
+  process не получил проверяемую network isolation, Local остаётся configured
+  с `provider_offline_unverified`; localhost сам по себе не означает offline.
+  Owned inference boundary и Local runtime acceptance ещё предстоят.
+- Проверки: **56/56** focused integration tests, **2/2** installed stock Codex
+  acceptance tests на synthetic upstream и реальной OS sandbox; typecheck pass.
+  Проверены start/resume, approval, запрет чтения secrets/command egress,
+  остановка unknown process, slow request body, failed receipt и namespace calls.
+  Настоящие credentials, OAuth и платная inference не использовались.
+- R7 child provisioning/Local execution, R8 UI, остальные незавершённые этапы
+  и R12 остаются в работе. Runtime на Mac mini, MacBook и GitHub не изменялись.
 
 ## 7. Полные исходные материалы
 

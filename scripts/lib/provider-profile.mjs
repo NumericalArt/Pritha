@@ -39,7 +39,7 @@ export function resolveProviderSelection({ connector, env = {}, instance = {}, s
 
 export function defaultProviderPreset(connectorId) {
   if (!isProviderConnectorId(connectorId)) invalid("provider_profile_invalid");
-  return { modelId: DEFAULT_MODELS[connectorId], reasoningEffort: connectorId === "neuraldeep" ? "xhigh" : "medium", timeoutMs: 1_800_000 };
+  return { modelId: DEFAULT_MODELS[connectorId], reasoningEffort: connectorId === "neuraldeep" ? "xhigh" : ['openrouter','local'].includes(connectorId) ? 'default' : "medium", timeoutMs: 1_800_000 };
 }
 
 export function normalizeLocalProviderUrl(value) {
@@ -57,7 +57,7 @@ export function normalizeProviderPreset(connectorId, value, fallback = defaultPr
   if (Object.keys(value).some(key => !allowed.has(key))) invalid("provider_preset_field_invalid");
   const preset = { ...fallback, ...value };
   if (typeof preset.modelId !== "string" || (preset.modelId !== "" && !/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(preset.modelId))) invalid("provider_model_invalid");
-  if (!EFFORTS.has(preset.reasoningEffort)) invalid("provider_effort_invalid");
+  if (!EFFORTS.has(preset.reasoningEffort) && !(preset.reasoningEffort === 'default' && ['openrouter','local'].includes(connectorId))) invalid("provider_effort_invalid");
   if (!Number.isSafeInteger(preset.timeoutMs) || preset.timeoutMs < 10_000 || preset.timeoutMs > 3_600_000) invalid("provider_timeout_invalid");
   if (preset.thinkingBudget !== undefined && (!Number.isSafeInteger(preset.thinkingBudget) || preset.thinkingBudget < 0 || preset.thinkingBudget > 200_000)) invalid("provider_thinking_budget_invalid");
   if (preset.baseUrl !== undefined) {

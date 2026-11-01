@@ -1,6 +1,7 @@
 import { CodexAppServerDriver } from "./drivers/codex-app-server-driver";
 import { NeuralDeepDriver } from "./drivers/neuraldeep-driver";
 import { ClaudeDriver } from "./drivers/claude-driver";
+import { CompatibleDriver } from "./drivers/compatible-driver";
 import { CodexChatGatewayError } from "./native-gateway";
 import type { CreateThreadInput, CreateThreadWithFirstTurnInput } from "./native-gateway";
 import type { TaskChatBackendDriver, TaskChatBackend, TaskProviderHealth } from "./driver-types";
@@ -15,7 +16,7 @@ export type { CreateThreadInput, StartTurnInput, CreateThreadWithFirstTurnInput 
 
 type Create = CreateThreadInput & { connectorId?: ProviderConnectorId };
 type CreateWithTurn = CreateThreadWithFirstTurnInput & { connectorId?: ProviderConnectorId };
-function defaultDrivers():TaskChatBackendDriver[] {const native=new CodexAppServerDriver();return [native,new NeuralDeepDriver(native.backend.attachments),new ClaudeDriver(native.backend.attachments)];}
+function defaultDrivers():TaskChatBackendDriver[] {const native=new CodexAppServerDriver();return [native,new NeuralDeepDriver(native.backend.attachments),new ClaudeDriver(native.backend.attachments),new CompatibleDriver('openrouter',native.backend.attachments),new CompatibleDriver('local',native.backend.attachments)];}
 
 /** HTTP/UI facade. Execution, native history and provider credentials live in drivers. */
 export class CodexChatGateway {
@@ -54,6 +55,7 @@ export class CodexChatGateway {
     return this.driver((namespace || "codex") as ProviderConnectorId).backend;
   }
   runtimeStatus(chatId?: string) { return chatId ? this.thread(chatId).runtimeStatus(chatId) : this.selected().backend.runtimeStatus(); }
+  providerSettingsSnapshot(connectorId:ProviderConnectorId) {const driver=this.driver(connectorId);return driver.getSettingsSnapshot?.() || driver.getRuntimeHealth();}
   async providerHealth(): Promise<TaskProviderHealth[]> {
     return Promise.all(PROVIDER_CONNECTOR_IDS.map(async connectorId => {
       const driver = this.drivers.get(connectorId);

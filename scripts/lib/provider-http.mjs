@@ -2,10 +2,11 @@
 export class ProviderHttpError extends Error {
   constructor(status,code,retryAfter=null){super('Provider metadata is temporarily unavailable.');this.status=status;this.code=code;this.retryAfter=retryAfter;}
 }
-export async function providerJson(url,{headers={},fetchImpl=globalThis.fetch,timeoutMs=12000,maxBytes=2*1024*1024}={}){
+export async function providerJson(url,{headers={},fetchImpl=globalThis.fetch,timeoutMs=12000,maxBytes=2*1024*1024,method='GET',jsonBody}={}){
+  if(!['GET','POST'].includes(method) || method==='GET' && jsonBody!==undefined)throw new ProviderHttpError(400,'provider_metadata_invalid');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
   try{
-    const response=await fetchImpl(url,{method:'GET',headers:{accept:'application/json',...headers},redirect:'error',signal:controller.signal});
+    const response=await fetchImpl(url,{method,headers:{accept:'application/json',...(jsonBody!==undefined?{'content-type':'application/json'}:{}),...headers},...(jsonBody!==undefined?{body:JSON.stringify(jsonBody)}:{}),redirect:'error',signal:controller.signal});
     if(!response.ok){
       await response.body?.cancel();
       const retry=response.headers.get('retry-after');
