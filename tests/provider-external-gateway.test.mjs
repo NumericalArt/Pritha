@@ -29,6 +29,7 @@ test('external gateway preserves the existing HTTP/SSE envelope and probes the p
   const chat=first.data.detail.thread.chatId;assert.match(chat,/^chat_neuraldeep_/);assert.equal(first.data.detail.thread.runtime.connectorId,'neuraldeep');
   assert.equal((await backend.createThreadWithFirstTurn(input)).replayed,true);
   defaultModel='changed-default';const runtime=await backend.runtimeStatus(chat);assert.equal(runtime.selected.modelId,'original-model');assert.equal(probed.at(-1),'original-model');assert.equal(runtime.fallbackEnabled,false);
+  const preview=await backend.previewRuntime({modelId:'preview-model',reasoningEffort:'high',timeoutMs:60000});assert.equal(preview.selected.modelId,'preview-model');assert.equal(probed.at(-1),'preview-model');assert.equal(preview.selected.effortId,'high');assert.equal((await backend.listThreads({group:'all'})).data.length,1);assert.equal((await backend.runtimeStatus(chat)).selected.modelId,'original-model');
   const queue=await backend.enqueueMessage(chat,{clientMessageId:'provider_api_queue',input:[{type:'text',text:'next'}]});assert.deepEqual(queue[0].attachments,[]);assert.equal(queue[0].attachmentsUnavailable,false);
   await backend.cancelQueued(chat,queue[0].id,queue[0].revision);
   finish({ok:true,processTreeExited:true});await new Promise(resolve=>setTimeout(resolve,20));

@@ -4,11 +4,13 @@ import { executionChannelView } from '../../../../../scripts/lib/execution-chann
 import type { TaskChatBackend, TaskProviderHealth } from './driver-types';
 import type { ThreadSummary, RuntimeStatus, ThreadGroup } from './types';
 import { CodexChatGatewayError } from './native-gateway';
+import type {ProviderPreset} from '../settings/provider-profile';
+type CatalogHealth=TaskProviderHealth & {models?:Array<{id:string;efforts?:string[];tools?:boolean;responses?:boolean;available?:boolean|null}>};
 
 /** UI protocol adapter for private provider history. Native history is never mirrored here. */
 export class ExternalChatGateway implements TaskChatBackend {
   readonly core:ProviderTaskRuntime;
-  constructor(readonly attachments:TaskChatBackend['attachments'],private readonly options:ProviderTaskOptions,private readonly health:(modelId?:string,preset?:ProviderChatBinding['executionConfig'])=>Promise<TaskProviderHealth>){this.core=new ProviderTaskRuntime(options);}
+  constructor(readonly attachments:TaskChatBackend['attachments'],private readonly options:ProviderTaskOptions,private readonly health:(modelId?:string,preset?:ProviderChatBinding['executionConfig'])=>Promise<CatalogHealth>){this.core=new ProviderTaskRuntime(options);}
   private summary(binding:ProviderChatBinding):ThreadSummary {
     const active=this.core.activeIntent(binding.chatId),pending=this.core.pendingRequests(binding.chatId);
     return {chatId:binding.chatId,title:binding.title,preview:binding.preview,group:binding.group,origin:binding.origin,
@@ -16,16 +18,18 @@ export class ExternalChatGateway implements TaskChatBackend {
       runtime:{connectorId:binding.connectorId,modelId:binding.modelId,providerId:binding.providerId,version:null,protocol:'exec_resume',stateIdentityHash:binding.stateIdentityHash,compatibility:'bound'},
       taskLinks:binding.taskLinks,continuationState:active?'blocked_active_turn':binding.continuationEnabled?'continuation_enabled':'read_only'};
   }
-  runtimeStatus:TaskChatBackend['runtimeStatus']=async chatId=>{
-    const binding=chatId?this.core.require(chatId):null,selected=binding?.executionConfig || this.options.configuration(),status=await this.health(binding?.modelId,selected);
+  runtimeStatus:TaskChatBackend['runtimeStatus']=chatId=>this.runtimeView(chatId);
+  previewRuntime=(preset:ProviderPreset)=>this.runtimeView(undefined,preset);
+  private async runtimeView(chatId?:string,preset?:ProviderPreset):Promise<RuntimeStatus>{
+    const binding=chatId?this.core.require(chatId):null,selected=binding?.executionConfig || {...this.options.configuration(),...preset},status=await this.health(binding?.modelId || selected.modelId,selected);
     const providerId=(this.options.connectorId+'_runtime') as NonNullable<RuntimeStatus['effectiveProvider']> & `${string}_runtime`;
     const c=status.capabilities,availability=status.status==='ready'?'ready':status.status==='not-configured' || status.status==='unavailable'?'unavailable':'degraded';
     return {connectorId:this.options.connectorId,preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:'exec_resume',availability,fallbackEnabled:false,
       providers:[{providerId,label:this.options.connectorId,availability,version:status.version,protocol:'exec_resume',locationLabel:this.options.connectorId==='local'?'Local model':this.options.connectorId,stateIdentityHash:binding?.stateIdentityHash || null,warning:status.error?.message || null,
         capabilities:{fullChat:status.status==='ready',nativeHistory:false,listThreads:true,readThread:true,forkThread:false,archiveThread:true,unarchiveThread:true,renameThread:false,pinThread:false,steerTurn:c.steer,interruptTurn:c.interrupt,commandApprovals:c.approvals,fileChangeApprovals:c.approvals,permissionApprovals:c.approvals,requestUserInput:c.approvals,historyPagination:true,audioInput:false,imageInput:c.attachments.images,fileMetadata:c.attachments.files,goalControl:false}}],
-      models:[{id:binding?.modelId || selected.modelId,label:binding?.modelId || selected.modelId,effortIds:selected.reasoningEffort?[selected.reasoningEffort]:[],serviceTierIds:[],defaultEffortId:selected.reasoningEffort || null,inputModalities:c.attachments.images?['text','image']:['text']}],
+      models:(binding || !status.models?.length?[{id:binding?.modelId || selected.modelId,efforts:selected.reasoningEffort?[selected.reasoningEffort]:[]}]:status.models.filter(row=>row.tools!==false && row.responses!==false && row.available!==false)).map(row=>({id:row.id,label:row.id,effortIds:row.efforts || (selected.reasoningEffort?[selected.reasoningEffort]:[]),serviceTierIds:[],defaultEffortId:selected.reasoningEffort || null,inputModalities:c.attachments.images?['text','image']:['text']})),
       selected:{modelId:binding?.modelId || selected.modelId,effortId:binding?.effortId || selected.reasoningEffort || null,serviceTierId:null,sandboxMode:selected.sandbox==='workspace-write'?'workspace_write':'read_only',approvalMode:c.approvals?'on_request':'never'},probedAt:status.checkedAt};
-  };
+  }
   listThreads:TaskChatBackend['listThreads']=async(input={})=>{
     if(input.group && !['all','my_chats','voice_work','other_sessions'].includes(input.group))throw new CodexChatGatewayError('invalid_request','Unknown chat group.',400);
     if(input.view==='legacy')return {data:[],nextCursor:null};

@@ -17,7 +17,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import dynamic from "next/dynamic";
 import { useChatAttachments } from "./useChatAttachments";
-import { readDraftSession, writeDraftSession } from "@/lib/codex-chat/draft-session";
+import { readDraftSession, writeDraftSession,type DraftProviderSelection } from "@/lib/codex-chat/draft-session";
+import {PROVIDER_LABELS,type ProviderConnectorId} from '@/lib/settings/provider-profile';
+import {NewChatProviderSelector} from './NewChatProviderSelector';
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { TaskChatControls, type TaskChatComposerHandle } from "./TaskChatControls";
 import { ActivityFeed } from "./ActivityFeed";
@@ -96,6 +98,7 @@ type PendingDelivery = {
 };
 
 type PendingNewChatDelivery = {
+  connectorId?:ProviderConnectorId;
   draftId: string;
   draftRevision: number;
   navigationEpoch: number;
@@ -295,6 +298,9 @@ export function CodexChatPage() {
   const draftRevisionsRef = useRef<Record<string, number>>({});
   const creationIdsRef = useRef<Record<string,string>>({});
   const [workspaceModes,setWorkspaceModes]=useState<Record<string,"isolated"|"configured"|"read-only">>({});
+  const [providerSelections,setProviderSelections]=useState<Record<string,DraftProviderSelection>>({});
+  const providerSelectionsRef=useRef(providerSelections);providerSelectionsRef.current=providerSelections;
+  const runtimeRequest=useRef(0);
   const workspaceMode=workspaceModes[newDraftId] || "isolated";
   newDraftIdRef.current = newDraftId;
   const [error, setError] = useState<ChatFailure | null>(null);
@@ -383,6 +389,7 @@ export function CodexChatPage() {
   const attachmentsIncomplete = attachmentDraft.items.some(file => file.state !== "ready");
   const selectedModalities = runtime?.models.find(model => model.id === runtime.selected.modelId)?.inputModalities;
   const imageCapabilityMissing = attachmentDraft.items.some(file => file.view?.kind === "image") && !selectedModalities?.includes("image");
+  const fileCapabilityMissing=attachmentDraft.items.some(file=>file.view?.kind!=='image') && runtime?.providers.find(row=>row.providerId===runtime.effectiveProvider)?.capabilities.fileMetadata===false;
   const pendingDelivery = selectedChatId ? pendingDeliveries[selectedChatId] || null : pendingNewChatDelivery;
   const sending = pendingDelivery?.status === "sending";
 
@@ -418,12 +425,13 @@ export function CodexChatPage() {
 
   saveSessionRef.current = () => {
     if(!sessionLoadedRef.current)return;
-    writeDraftSession({version:1,workspaceModes,drafts:draftsByChatRef.current,revisions:draftRevisionsRef.current,creationIds:creationIdsRef.current,newDraftId:newDraftIdRef.current,pending:pendingDeliveriesRef.current,pendingNew:pendingNewChatDeliveriesRef.current});
+    writeDraftSession({version:1,workspaceModes,providerSelections:providerSelectionsRef.current,drafts:draftsByChatRef.current,revisions:draftRevisionsRef.current,creationIds:creationIdsRef.current,newDraftId:newDraftIdRef.current,pending:pendingDeliveriesRef.current,pendingNew:pendingNewChatDeliveriesRef.current});
   };
   useEffect(() => {
     const saved=readDraftSession();
     if(saved) {
       setWorkspaceModes(saved.workspaceModes || {});
+      providerSelectionsRef.current=saved.providerSelections || {};setProviderSelections(providerSelectionsRef.current);
       draftsByChatRef.current=saved.drafts;setDraftsByChat(saved.drafts);
       draftRevisionsRef.current=saved.revisions;creationIdsRef.current=saved.creationIds;
       pendingDeliveriesRef.current=saved.pending as Record<string,PendingDelivery>;setPendingDeliveries(pendingDeliveriesRef.current);
@@ -438,7 +446,7 @@ export function CodexChatPage() {
     const save=()=>saveSessionRef.current();window.addEventListener("pagehide",save);
     return ()=>{save();window.removeEventListener("pagehide",save);};
   },[]);
-  useEffect(()=>saveSessionRef.current(),[draftsByChat,newDraftId,pendingDeliveries,pendingNewChatDeliveries,workspaceModes]);
+  useEffect(()=>saveSessionRef.current(),[draftsByChat,newDraftId,pendingDeliveries,pendingNewChatDeliveries,workspaceModes,providerSelections]);
 
   const selectedSummary = useMemo(
     () => threads.find((thread) => thread.chatId === selectedChatId) || null,
@@ -446,15 +454,17 @@ export function CodexChatPage() {
   );
 
   const refreshRuntime = useCallback(async () => {
-    const chatId = selectedChatIdRef.current;
-    const response = await api<RuntimeStatus>(`/api/codex-chat/v1/runtime${chatId ? `?chatId=${encodeURIComponent(chatId)}` : ""}`);
-    if (selectedChatIdRef.current === chatId) setRuntime(response.data);
+    const chatId = selectedChatIdRef.current,draftId=newDraftIdRef.current,selection=chatId?undefined:providerSelectionsRef.current[draftId],sequence=++runtimeRequest.current;
+    const query=new URLSearchParams(chatId?{chatId}:selection?Object.fromEntries(Object.entries(selection).filter(([,value])=>value!==undefined)) as Record<string,string>:{});
+    const response = await api<RuntimeStatus>(`/api/codex-chat/v1/runtime${query.size?'?'+query:''}`);
+    if (sequence===runtimeRequest.current && selectedChatIdRef.current === chatId && (chatId || newDraftIdRef.current===draftId && JSON.stringify(providerSelectionsRef.current[draftId])===JSON.stringify(selection))) setRuntime(response.data);
     return response.data;
   }, []);
+  const providerSelectionKey=selectedChatId?'':JSON.stringify(providerSelections[newDraftId] || null);
   useEffect(() => {
-    setRuntime(null);
+    setRuntime(current=>{const selection=selectedChatId?null:providerSelectionsRef.current[newDraftIdRef.current];return selection && current && (current.connectorId || 'codex')===selection.connectorId?{...current,availability:'degraded',selected:{...current.selected,...(selection.modelId?{modelId:selection.modelId}:{}),...(selection.effortId?{effortId:selection.effortId}:{}),...(selection.serviceTierId?{serviceTierId:selection.serviceTierId}:{})}}:null;});
     void refreshRuntime().catch(() => { /* Existing runtime health polling will retry without changing this thread's provider. */ });
-  }, [selectedChatId, refreshRuntime]);
+  }, [selectedChatId,newDraftId,providerSelectionKey, refreshRuntime]);
 
   const refreshThreads = useCallback(async () => {
     if (showArchived !== archiveViewRef.current) return [];
@@ -1090,6 +1100,7 @@ export function CodexChatPage() {
     setActiveGroup("my_chats");
     navigationEpochRef.current += 1;
     setSelectedChatId(null);
+    setRuntime(null);
     setDetail(null);
     setTurns([]);
     setHistoryState("idle");
@@ -1231,6 +1242,7 @@ export function CodexChatPage() {
         body: JSON.stringify({
           clientThreadId: delivery.clientThreadId,
           source: "chat",
+          ...(delivery.connectorId?{connectorId:delivery.connectorId}:{}),
           ...(delivery.workspace ? {workspace:delivery.workspace} : {}),
           initialTurn: {
             clientMessageId: delivery.clientMessageId,
@@ -1277,7 +1289,7 @@ export function CodexChatPage() {
 
   async function sendMessage(workspaceBase?: string) {
     const text = draft.trim();
-    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || imageEditorRef.current?.owner === draftKey || attachmentDraft.isBusy(draftKey) || draftSubmissionLocksRef.current[draftKey] || sending || backendOffline || runtime?.availability !== "ready" || Boolean(selectedChatId && historyState !== "ready") || (!selectedChatId && pendingNewChatDelivery) || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
+    if ((!text && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || fileCapabilityMissing || annotationBusy || imageEditorRef.current?.owner === draftKey || attachmentDraft.isBusy(draftKey) || draftSubmissionLocksRef.current[draftKey] || sending || backendOffline || runtime?.availability !== "ready" || Boolean(selectedChatId && historyState !== "ready") || (!selectedChatId && pendingNewChatDelivery) || (selectedChatId && pendingDeliveriesRef.current[selectedChatId])) return;
     if (hasActiveTurn && selectedChatId) { await composerControlRef.current?.send("queue"); return; }
     const chatId = selectedChatId;
     const intent = parseBudgetIntent(text);
@@ -1288,12 +1300,16 @@ export function CodexChatPage() {
     setBudgetNotice(null);
     if (!chatId) {
       const draftId = newDraftIdRef.current;
+      const requestedSelection=providerSelectionsRef.current[draftId],connectorId=runtime.connectorId || 'codex';
+      if(requestedSelection && requestedSelection.connectorId!==connectorId)return;
+      const selectionFingerprint=JSON.stringify(requestedSelection);
       if (workspacePreflights.current.has(draftId)) return;
       const snapshot = {draftId,draftRevision:draftRevisionsRef.current[draftId] || 0,navigationEpoch:navigationEpochRef.current};
       if (workspaceMode !== "read-only" && runtime?.selected.sandboxMode !== "read_only" && (workspaceMode === "isolated" || runtime?.selected.sandboxMode === "workspace_write") && !workspaceBase) {
         workspacePreflights.current.add(draftId);
         try {
-          const preview=(await api<{git:boolean;dirty:boolean;baseRevision:string|null}>("/api/codex-chat/v1/workspace")).data;
+          const preview=(await api<{git:boolean;dirty:boolean;baseRevision:string|null}>(`/api/codex-chat/v1/workspace?connectorId=${encodeURIComponent(connectorId)}`)).data;
+          if(JSON.stringify(providerSelectionsRef.current[draftId])!==selectionFingerprint)return;
           if(preview.git && preview.dirty && preview.baseRevision) {
             setWorkspaceChoices(current=>({...current,[draftId]:preview.baseRevision!}));
             return;
@@ -1305,6 +1321,7 @@ export function CodexChatPage() {
       }
       await deliverNewChatMessage({
         ...snapshot,
+        connectorId,
         workspace:{mode:workspaceMode,...(workspaceBase ? {baseRevision:workspaceBase} : {})},
         clientThreadId: creationIdsRef.current[draftId] ||= crypto.randomUUID(),
         clientMessageId: crypto.randomUUID(),
@@ -1467,7 +1484,7 @@ export function CodexChatPage() {
         <button type="button" role="tab" aria-selected={activeGroup === "my_chats"} className={activeGroup === "my_chats" ? "active" : ""} onClick={() => switchGroup("my_chats")}>Direct Chats</button>
         <button type="button" role="tab" aria-selected={activeGroup === "voice_work"} className={activeGroup === "voice_work" ? "active" : ""} onClick={() => switchGroup("voice_work")}>Voice Tasks</button>
       </div>
-      {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={startNewDraft} disabled={runtime?.availability === "unavailable"}>
+      {activeGroup === "my_chats" ? <button className="codex-new-chat" type="button" onClick={startNewDraft}>
         <Plus size={17} /> New chat
       </button> : null}
       <button type="button" className="codex-text-action" onClick={changeArchiveView}>{showArchived ? "Show active" : "Show archived"}</button>
@@ -1521,7 +1538,7 @@ export function CodexChatPage() {
               <span className={`codex-runtime-pill ${backendOffline || threadUnavailable ? "unavailable" : runtime?.availability || "unavailable"}`}>{threadUnavailable ? "Thread unavailable" : backendOffline ? "Offline" : runtime?.availability === "ready" ? "Ready" : runtime?.availability || "Checking"}</span>
             </div>
             <p>
-              Pritha · {runtime?.selected.modelId || "Task runtime"} · {effectiveProvider?.locationLabel || "Resolving runtime"}
+              Pritha · {PROVIDER_LABELS[displayedThread?.runtime.connectorId || runtime?.connectorId || 'codex']} · {runtime?.selected.modelId || displayedThread?.runtime.modelId || "Task runtime"} · {effectiveProvider?.locationLabel || "Resolving runtime"}
               {effectiveProvider?.protocol === "app_server" ? " · App Server" : ""}
               {runtime?.selected.sandboxMode ? ` · ${runtime.selected.sandboxMode.replaceAll("_", " ")}` : ""}
             </p>
@@ -1531,11 +1548,17 @@ export function CodexChatPage() {
 
       {admissionPaused&&<div className="codex-inline-notice info" role="status">New task starts are paused for an update. Drafts and existing task controls remain available.</div>}
         {runtime?.availability !== "ready" ? (
-          <div className="codex-runtime-warning"><AlertTriangle size={17} /><span>{runtime?.availability === "degraded" ? "The task runtime is installed but the full chat capability probe did not pass." : "No compatible task runtime is available."}</span></div>
+          <div className="codex-runtime-warning"><AlertTriangle size={17} /><span>{effectiveProvider?.warning || (runtime?.availability === "degraded" ? "The task runtime is installed but the full chat capability probe did not pass." : "No compatible task runtime is available.")}</span></div>
         ) : null}
         {connection === "reconnecting" && !backendOffline ? (
           <div className="codex-runtime-warning"><LoaderCircle className="spin" size={17} /><span>Event stream is reconnecting. The last synchronized history remains visible and read-only.</span></div>
         ) : null}
+        {!selectedChatId?<NewChatProviderSelector value={providerSelections[newDraftId]} runtime={runtime} disabled={Boolean(pendingNewChatDelivery)} onChange={selection=>{
+          const id=newDraftIdRef.current;if(selectedChatIdRef.current || pendingNewChatDeliveriesRef.current[id])return;
+          if(JSON.stringify(providerSelectionsRef.current[id])===JSON.stringify(selection))return;
+          const next={...providerSelectionsRef.current,[id]:selection};providerSelectionsRef.current=next;setProviderSelections(next);delete creationIdsRef.current[id];
+          setRuntime(current=>current && (current.connectorId || 'codex')===selection.connectorId?{...current,availability:'degraded'}:null);setError(null);setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
+        }}/>:null}
         {!selectedChatId ? <label className="codex-runtime-warning codex-workspace-choice">Workspace
           <select aria-label="New chat workspace" value={workspaceMode} disabled={Boolean(pendingNewChatDelivery)} onChange={event=>setWorkspaceModes(current=>({...current,[newDraftId]:event.target.value as "isolated"|"configured"|"read-only"}))}>
             <option value="isolated">Isolated workspace · parallel tasks</option>
@@ -1571,7 +1594,7 @@ export function CodexChatPage() {
               <Bot size={34} />
               <h2>{activeGroup === "voice_work" ? "Voice task threads" : "Work directly with Pritha"}</h2>
               <p>Start a persistent conversation with the runtime selected in Settings.</p>
-              {activeGroup === "my_chats" ? <button className="codex-new-chat codex-empty-action" type="button" onClick={startNewDraft} disabled={runtime?.availability !== "ready"}><Plus size={17} /> New chat</button> : null}
+              {activeGroup === "my_chats" ? <button className="codex-new-chat codex-empty-action" type="button" onClick={startNewDraft}><Plus size={17} /> New chat</button> : null}
             </div>
           ) : null}
           {selectedChatId && displayedTurns.length === 0 && historyBusy ? (
@@ -1633,7 +1656,7 @@ export function CodexChatPage() {
             updateDraftForChat(chatId, text);
             if (selectedChatIdRef.current === chatId) composerRef.current?.focus();
             return true;
-          }} canSend={!attachmentsIncomplete && !imageCapabilityMissing && !annotationBusy && !pendingDelivery && historyState === "ready" && !backendOffline && runtime?.availability === "ready"} onDraftLockChange={onDraftLockChange} chatId={selectedChatId} detail={displayedDetail} draft={draft} attachments={attachmentsIncomplete?[]:attachmentIds} settings={runtime?.selected} refresh={loadThreadDetail} onSent={(chatId,text,files)=>{
+          }} canSend={!attachmentsIncomplete && !imageCapabilityMissing && !fileCapabilityMissing && !annotationBusy && !pendingDelivery && historyState === "ready" && !backendOffline && runtime?.availability === "ready"} onDraftLockChange={onDraftLockChange} chatId={selectedChatId} detail={displayedDetail} draft={draft} attachments={attachmentsIncomplete?[]:attachmentIds} settings={runtime?.selected} refresh={loadThreadDetail} onSent={(chatId,text,files)=>{
             updateDraftForChat(chatId,current=>current.trim()===text?"":current);
             attachmentDraft.clear(chatId,files);
           }} />
@@ -1669,6 +1692,7 @@ export function CodexChatPage() {
             }} restore={id => void attachmentDraft.restoreOriginal(draftKey, id)} />
             {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
             {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
+            {fileCapabilityMissing?<span role="status" className="codex-attachment-notice">This provider does not support these attachments yet. Your files are preserved; choose a supported provider or remove the attachments.</span>:null}
             <div className="codex-composer-input">
               <textarea
                 ref={composerRef}
@@ -1740,7 +1764,7 @@ export function CodexChatPage() {
                 </button>
                 {hasActiveTurn && displayedDetail?.controls?.steer && <button className="codex-text-action" type="button" disabled={!draft.trim() || attachmentDraft.items.length > 0 || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || Boolean(pendingDelivery) || backendOffline || historyState !== "ready"} title={attachmentDraft.items.length ? "Attachments can only be queued for the next turn" : "Inject this instruction immediately into the running reasoning turn (⌘/Ctrl+Enter)"} onClick={() => void composerControlRef.current?.send("steer")}>⚡ Steer now</button>}
                 {hasActiveTurn && displayedDetail?.controls?.interrupt && !displayedDetail.voiceWorkflow && <button className="codex-text-action" type="button" onClick={() => void composerControlRef.current?.send("interrupt")}>■ Stop</button>}
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || attachmentsIncomplete || imageCapabilityMissing || fileCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} {hasActiveTurn ? "Queue" : "Send"}
                 </button>
               </div>

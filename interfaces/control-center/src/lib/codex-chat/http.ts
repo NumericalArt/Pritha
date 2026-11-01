@@ -5,6 +5,7 @@ import { CodexChatGatewayError } from "./gateway";
 import { AttachmentError } from "./attachment-store";
 import { ProviderTaskError } from "../../../../../scripts/lib/provider-task-runtime.mjs";
 import { ChatHistoryError } from "../../../../../scripts/neuraldeep/chat-history-store.mjs";
+import {ProviderConfigurationError} from '../settings/provider-profile';
 import type { ApiErrorEnvelope, ApiSuccess } from "./types";
 
 const JSON_BODY_LIMIT = 256 * 1024;
@@ -24,10 +25,10 @@ export function apiSuccess<T>(data: T, options: { status?: number; replayed?: bo
 
 export function apiError(error: unknown) {
   const requestId = randomUUID();
-  const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError || error instanceof HistoryError || error instanceof ProviderTaskError || error instanceof ChatHistoryError;
+  const known = error instanceof CodexChatGatewayError || error instanceof AttachmentError || error instanceof HistoryError || error instanceof ProviderTaskError || error instanceof ChatHistoryError || error instanceof ProviderConfigurationError;
   const registryCorrupt = !known && (error as { code?: unknown } | null)?.code === "codex_chat_registry_corrupt";
   const executionConflict = error instanceof ExecutionConflict;
-  const status = known ? error.status : executionConflict ? 409 : registryCorrupt ? 503 : 500;
+  const status = known ? 'status' in error && typeof error.status==='number'?error.status:400 : executionConflict ? 409 : registryCorrupt ? 503 : 500;
   const payload: ApiErrorEnvelope = {
     apiVersion: "1",
     error: {

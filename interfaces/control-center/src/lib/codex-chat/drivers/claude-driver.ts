@@ -36,5 +36,6 @@ export class ClaudeDriver implements TaskChatBackendDriver {
   resolveApproval:TaskChatBackend['answerRequest']=(...args)=>this.backend.answerRequest(...args);
   async getRuntimeHealth(modelId?:string):Promise<TaskProviderHealth>{const preset=getProviderSettings().providerPresets.claude;const {models,model,...health}=await this.service.snapshot({...preset,...(modelId?{modelId}:{})});return health;}
   async getSettingsSnapshot(){return this.service.snapshot(getProviderSettings().providerPresets.claude);}
+  previewRuntime:NonNullable<TaskChatBackendDriver['previewRuntime']>=preset=>this.backend.previewRuntime(preset);
   async getRateLimitsAndUsage():Promise<ProviderUsageView>{return {available:false,source:'unavailable',limits:null};}
 }

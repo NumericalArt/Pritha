@@ -1,5 +1,6 @@
 import { apiError, apiSuccess, integerQuery, readJsonBody, requireIdempotencyKey } from "@/lib/codex-chat/http";
 import { CodexChatGatewayError, getCodexChatGateway } from "@/lib/codex-chat/gateway";
+import type {ProviderConnectorId} from '@/lib/settings/provider-profile';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       clientThreadId: string;
       title?: string;
       source: "chat";
+      connectorId?:ProviderConnectorId;
       workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only"};
       settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
       initialTurn?: {

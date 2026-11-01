@@ -388,7 +388,7 @@ wrong-project rejection. Live providers readiness только по реальн
 
 ### R8 — Единый пульт Settings и быстрый выбор в Task Chat
 
-**Статус: in-progress; единый Settings проверен, new-chat selector и factory phase controls впереди.** Зависимости R2–R7.
+**Статус: in-progress; Settings и new-chat selector проверены, factory phase controls впереди.** Зависимости R2–R7.
 
 - [x] ProviderConnectorBar ровно из пяти компактных pills: label/status/model.
 - [x] Один выбранный settings panel: native CodexAuth/CodexSettings, ND keys/
@@ -396,11 +396,11 @@ wrong-project rejection. Live providers readiness только по реальн
   Local endpoint/discovered models. Preserve native transport/routing/tier.
 - [x] Per-provider presets не сбрасываются при переключении, stale save не
   перетирает другой panel. Keys не входят в presets/client state persistence.
-- [ ] New-chat provider/model selector only `ready`; ссылка Configure providers.
+- [x] New-chat provider/model selector only `ready`; ссылка Configure providers.
   Existing thread показывает pinned provider; active task не меняется.
 - [ ] Factory phase presets interview/contract/outcome/scaffold/implement,
   Subject=child + slug, admission queue/limits feedback без hidden prompt headers.
-- [ ] Preserve quote replies, image annotation, stream scroll anchoring,
+- [x] Preserve quote replies, image annotation, stream scroll anchoring,
   activity pagination и release receipts.
 
 **R8 gate:** component/state tests + desktop/mobile Playwright, keyboard/focus,
@@ -1097,6 +1097,29 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   Native numeric/transport regressions проходят также на 1280/390px.
 - R8 new-chat provider/model selection и factory phase controls, R7 Local/child,
   голос, bootstrap/rebranding и финальная staged/manual приёмка ещё не завершены.
+
+### Checkpoint реализации 12 — Провайдер, модель и reasoning нового чата
+
+- У каждого нового draft собственный provider/model/effort и native service tier.
+  Список показывает готовые коннекторы, а настройка остальных открывается по
+  ссылке Settings. Read-only preview использует реальный каталог выбранного
+  провайдера; неподдерживаемый preset виден как ошибка, без автоматической замены.
+- Preview не создаёт тред и не сохраняет глобальные настройки. Поздний ответ
+  другого провайдера или draft не меняет текущий выбор. Созданный чат показывает
+  закреплённый provider; попытка переопределить его через preview отклоняется.
+- Первая отправка фиксирует connector/model/effort/tier вместе с idempotency ID.
+  При неизвестном результате и после reload повторяется тот же запрос даже при
+  изменившемся глобальном default. Выбор заморожен до разрешения этой отправки.
+  Проверка workspace также относится к выбранному коннектору. Вложения остаются
+  в draft, если модель их не поддерживает; отправка объяснимо недоступна.
+- **20/20** focused unit/integration tests, TypeScript и Next candidate build
+  прошли. **50/50** Chromium E2E, 0 skipped/flaky: desktop/mobile provider picker,
+  reload/replay, late preview, exact native continuation, queue/Steer/Stop,
+  quote replies, image editing, pagination/scroll and concurrent draft delivery.
+  Strict candidate `/codex` и JavaScript chunks входят в этот browser gate.
+- Проверки используют isolated state и synthetic provider responses; реальные
+  ключи, платная inference, GitHub и работающие экземпляры не менялись.
+  Factory phase controls и остальные незавершённые этапы сохраняют pending status.
 
 ## 7. Полные исходные материалы
 

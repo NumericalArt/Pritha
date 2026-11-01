@@ -5,7 +5,7 @@ import { CompatibleDriver } from "./drivers/compatible-driver";
 import { CodexChatGatewayError } from "./native-gateway";
 import type { CreateThreadInput, CreateThreadWithFirstTurnInput } from "./native-gateway";
 import type { TaskChatBackendDriver, TaskChatBackend, TaskProviderHealth } from "./driver-types";
-import { PROVIDER_CONNECTOR_IDS, ProviderConfigurationError, isProviderConnectorId, type ProviderConnectorId } from "../settings/provider-profile";
+import { PROVIDER_CONNECTOR_IDS, ProviderConfigurationError, isProviderConnectorId, normalizeProviderPreset, type ProviderConnectorId } from "../settings/provider-profile";
 import { getProviderSettings } from "../settings/provider-settings-server";
 import { providerThreadPage } from "./provider-thread-pages";
 import { ProviderActivity } from "./provider-activity";
@@ -16,6 +16,7 @@ export type { CreateThreadInput, StartTurnInput, CreateThreadWithFirstTurnInput 
 
 type Create = CreateThreadInput & { connectorId?: ProviderConnectorId };
 type CreateWithTurn = CreateThreadWithFirstTurnInput & { connectorId?: ProviderConnectorId };
+export type RuntimePreviewSelection={connectorId?:ProviderConnectorId;modelId?:string;effortId?:string;serviceTierId?:string};
 function defaultDrivers():TaskChatBackendDriver[] {const native=new CodexAppServerDriver();return [native,new NeuralDeepDriver(native.backend.attachments),new ClaudeDriver(native.backend.attachments),new CompatibleDriver('openrouter',native.backend.attachments),new CompatibleDriver('local',native.backend.attachments)];}
 
 /** HTTP/UI facade. Execution, native history and provider credentials live in drivers. */
@@ -54,7 +55,21 @@ export class CodexChatGateway {
     const namespace = /^chat_(codex|neuraldeep|claude|openrouter|local)_/.exec(chatId)?.[1];
     return this.driver((namespace || "codex") as ProviderConnectorId).backend;
   }
-  runtimeStatus(chatId?: string) { return chatId ? this.thread(chatId).runtimeStatus(chatId) : this.selected().backend.runtimeStatus(); }
+  async runtimeStatus(chatId?: string,selection?:RuntimePreviewSelection) {
+    if(chatId){if(selection && Object.values(selection).some(value=>value!==undefined))throw new CodexChatGatewayError('runtime_identity_mismatch','Existing chats retain their original provider and model.',409);return this.thread(chatId).runtimeStatus(chatId);}
+    const driver=this.selected(selection?.connectorId),connectorId=driver.connectorId;
+    if(driver.previewRuntime){
+      if(selection?.serviceTierId)throw new CodexChatGatewayError('provider_tier_unavailable','This provider does not expose native service tiers.',422);
+      const preset=normalizeProviderPreset(connectorId,{...(selection?.modelId!==undefined?{modelId:selection.modelId}:{}),...(selection?.effortId!==undefined?{reasoningEffort:selection.effortId}:{})},getProviderSettings().providerPresets[connectorId]);
+      return driver.previewRuntime(preset);
+    }
+    const status=await driver.backend.runtimeStatus();
+    if(!selection)return {...status,connectorId};
+    const preset=normalizeProviderPreset(connectorId,{...(selection.modelId!==undefined?{modelId:selection.modelId}:{}),...(selection.effortId!==undefined?{reasoningEffort:selection.effortId}:{})},getProviderSettings().providerPresets[connectorId]);
+    const model=status.models.find(row=>row.id===preset.modelId),tier=selection.serviceTierId ?? status.selected.serviceTierId;
+    const valid=Boolean(model && model.effortIds.includes(preset.reasoningEffort) && (!tier || model.serviceTierIds.includes(tier)));
+    return {...status,connectorId,availability:valid?status.availability:'degraded' as const,selected:{...status.selected,modelId:preset.modelId,effortId:preset.reasoningEffort,serviceTierId:tier},providers:status.providers.map(row=>valid?row:{...row,warning:'Choose an available model, reasoning effort and service tier for this new chat.'})};
+  }
   providerSettingsSnapshot(connectorId:ProviderConnectorId) {const driver=this.driver(connectorId);return driver.getSettingsSnapshot?.() || driver.getRuntimeHealth();}
   async providerHealth(): Promise<TaskProviderHealth[]> {
     return Promise.all(PROVIDER_CONNECTOR_IDS.map(async connectorId => {
@@ -84,11 +99,13 @@ export class CodexChatGateway {
   }
   createThreadWithFirstTurn(input: CreateWithTurn) {
     if (input.settings?.modelId && input.initialTurn.settings?.modelId && input.settings.modelId !== input.initialTurn.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "The first turn must use the chat's model.", 409);
-    const route = this.creationRoute({ ...input, settings: { ...input.settings, modelId: input.settings?.modelId ?? input.initialTurn.settings?.modelId } }), { connectorId: _connectorId, ...request } = input;
-    return this.driver(route.connectorId).backend.createThreadWithFirstTurn({ ...request, settings: { ...request.settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
+    for(const field of ['effortId','serviceTierId'] as const)if(input.settings?.[field] && input.initialTurn.settings?.[field] && input.settings[field]!==input.initialTurn.settings[field])throw new CodexChatGatewayError('runtime_identity_mismatch','The first turn must use the chat’s execution settings.',409);
+    const settings={...input.initialTurn.settings,...input.settings};
+    const route = this.creationRoute({ ...input, settings }), { connectorId: _connectorId, ...request } = input;
+    return this.driver(route.connectorId).backend.createThreadWithFirstTurn({ ...request, settings: { ...settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
   }
   activity(after = 0) { return this.drivers.size === 1 ? this.driver("codex").backend.activity(after) : this.activityMux.read(after); }
-  workspacePreview() { return this.selected().backend.workspacePreview(); }
+  workspacePreview(connectorId?:ProviderConnectorId) { return this.selected(connectorId).backend.workspacePreview(); }
   async taskChatLinkForTask(taskId: string) {
     for (const driver of this.drivers.values()) { const found = await driver.backend.taskChatLinkForTask(taskId); if (found) return found; }
     return null;

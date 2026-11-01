@@ -33,7 +33,7 @@ export class NeuralDeepDriver implements TaskChatBackendDriver {
           model:binding.modelId,sessionId:result.sessionId,profileIdentity:attempt.identity,status:result.ok?'completed':'failed',usage:row?.providerUsage,usageKnown:row?.providerUsageKnown===true,
           providerRequests:row?.providerRequests || 0,cumulative:false,billing:snapshot.billing,startedAt:row?.createdAt,finishedAt:new Date().toISOString()});
       },
-    },modelId=>this.getRuntimeHealth(modelId));
+    },(modelId,preset)=>this.service.snapshot(modelId || preset?.modelId || getProviderSettings().providerPresets.neuraldeep.modelId));
   }
   listThreads:TaskChatBackend['listThreads']=(...args)=>this.backend.listThreads(...args);
   getThreadHistory:TaskChatBackend['historyPage']=(...args)=>this.backend.historyPage(...args);
@@ -43,6 +43,7 @@ export class NeuralDeepDriver implements TaskChatBackendDriver {
   resolveApproval:TaskChatBackend['answerRequest']=(...args)=>this.backend.answerRequest(...args);
   async getRuntimeHealth(modelId?:string):Promise<TaskProviderHealth>{const {models,account,billing,...health}=await this.service.snapshot(modelId || getProviderSettings().providerPresets.neuraldeep.modelId);return health;}
   async getSettingsSnapshot(){return this.service.snapshot(getProviderSettings().providerPresets.neuraldeep.modelId);}
+  previewRuntime:NonNullable<TaskChatBackendDriver['previewRuntime']>=preset=>this.backend.previewRuntime(preset);
   async getRateLimitsAndUsage():Promise<ProviderUsageView>{const snapshot=await this.service.snapshot(getProviderSettings().providerPresets.neuraldeep.modelId),limits=snapshot.account?.limits;
     return {available:Boolean(limits) && snapshot.account?.sections.limits.stale===false,source:limits?'provider':'unavailable',limits:limits?{parallelLimit:limits.parallelLimit,billingMode:limits.billingMode,canRequest:limits.decision.canRequest,sessionRemaining:limits.chat.session.remaining,weekRemaining:limits.chat.week.remaining,walletBalanceRub:limits.wallet?.balanceRub ?? null}:null};}
 }

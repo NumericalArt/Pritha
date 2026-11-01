@@ -41,6 +41,7 @@ export class CompatibleDriver implements TaskChatBackendDriver {
   resolveApproval:TaskChatBackend['answerRequest']=(...args)=>this.backend.answerRequest(...args);
   async getRuntimeHealth():Promise<TaskProviderHealth>{const {models,account,shortlist,endpoint,discovery,...health}=await this.service.snapshot(getProviderSettings().providerPresets[this.connectorId]);return health;}
   async getSettingsSnapshot(){return this.service.snapshot(getProviderSettings().providerPresets[this.connectorId]);}
+  previewRuntime:NonNullable<TaskChatBackendDriver['previewRuntime']>=preset=>this.backend.previewRuntime(preset);
   async getRateLimitsAndUsage():Promise<ProviderUsageView>{
     const snapshot=await this.service.snapshot(getProviderSettings().providerPresets[this.connectorId]),account=snapshot.account;
     return {available:account!==null,source:account?'provider':'unavailable',limits:account?{usageUsd:account.usageUsd,limitUsd:account.limitUsd,remainingUsd:account.remainingUsd,remainingSource:account.remainingSource,isFreeTier:account.isFreeTier}:null};

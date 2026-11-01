@@ -1,5 +1,6 @@
 import type { CodexChatGateway } from "./native-gateway";
-import type { ProviderConnectorId } from "../settings/provider-profile";
+import type { ProviderConnectorId,ProviderPreset } from "../settings/provider-profile";
+import type {RuntimeStatus} from './types';
 
 /** Host protocol stays stable while each backend owns its execution and history. */
 export type TaskChatBackend = Pick<CodexChatGateway, keyof CodexChatGateway>;
@@ -31,5 +32,6 @@ export interface TaskChatBackendDriver {
   resolveApproval: TaskChatBackend["answerRequest"];
   getRuntimeHealth(): Promise<TaskProviderHealth>;
   getSettingsSnapshot?(): Promise<TaskProviderHealth & Record<string,unknown>>;
+  previewRuntime?(preset:ProviderPreset):Promise<RuntimeStatus>;
   getRateLimitsAndUsage(): Promise<ProviderUsageView>;
 }

@@ -29,7 +29,7 @@ class FakeRoutes {
 }
 const {CodexChatGateway}=load("gateway",{
   "./drivers/codex-app-server-driver":{},"./drivers/neuraldeep-driver":{},"./drivers/claude-driver":{},"./drivers/compatible-driver":{},"../settings/provider-profile":profile,
-  "../settings/provider-settings-server":{getProviderSettings:()=>({activeConnectorId:"codex",providerPresets:Object.fromEntries(profile.PROVIDER_CONNECTOR_IDS.map(id=>[id,{modelId:`${id}-model`}] ))})},
+  "../settings/provider-settings-server":{getProviderSettings:()=>({activeConnectorId:"codex",providerPresets:Object.fromEntries(profile.PROVIDER_CONNECTOR_IDS.map(id=>[id,{...profile.defaultProviderPreset(id),modelId:`${id}-model`}] ))})},
   "./provider-thread-pages":pages,"./provider-activity":activity,
   "../../../../../scripts/lib/provider-thread-routing.mjs":{ProviderThreadRouting:FakeRoutes,ProviderRouteError:class extends Error{}},
   "../pritha-paths":{resolvePrithaStateRoot:()=>"fixture",resolvePrithaStatePath:()=>"fixture"},
@@ -74,6 +74,27 @@ test('an unavailable provider probe cannot hide the health of its siblings',asyn
   const native=driver('codex'),external=driver('openrouter');external.getRuntimeHealth=async()=>{throw new Error('PRIVATE_PROVIDER_ERROR');};
   const gateway=new CodexChatGateway([native,external],()=> 'codex'),health=await gateway.providerHealth();
   assert.equal(health.find(row=>row.connectorId==='codex').status,'ready');assert.equal(health.find(row=>row.connectorId==='openrouter').status,'unavailable');assert.doesNotMatch(JSON.stringify(health),/PRIVATE_PROVIDER_ERROR/);
+});
+test('new-chat runtime previews stay read-only, validate exact capabilities and cannot override an existing thread',async()=>{
+  const native=driver('codex'),external=driver('openrouter'),routes=new FakeRoutes(),seen=[];
+  native.backend.runtimeStatus=async()=>({availability:'ready',providers:[],models:[{id:'codex-model',effortIds:['low','medium'],serviceTierIds:['standard']}],selected:{modelId:'codex-model',effortId:'medium',serviceTierId:'standard'}});
+  external.previewRuntime=async preset=>{seen.push(preset);return {connectorId:'openrouter',selected:{modelId:preset.modelId,effortId:preset.reasoningEffort}};};
+  const gateway=new CodexChatGateway([native,external],()=> 'codex',routes);
+  const before=await gateway.runtimeStatus();assert.equal(before.connectorId,'codex');
+  assert.equal((await gateway.runtimeStatus(undefined,{connectorId:'openrouter',modelId:'vendor/chosen',effortId:'high'})).selected.modelId,'vendor/chosen');
+  assert.deepEqual(seen,[{...profile.defaultProviderPreset('openrouter'),modelId:'vendor/chosen',reasoningEffort:'high'}]);assert.equal(routes.rows.size,0);
+  const invalid=await gateway.runtimeStatus(undefined,{connectorId:'codex',modelId:'codex-model',effortId:'xhigh'});assert.equal(invalid.availability,'degraded');assert.equal(invalid.selected.effortId,'xhigh');
+  assert.equal((await gateway.runtimeStatus(undefined,{connectorId:'codex',effortId:'low'})).availability,'ready');
+  await assert.rejects(gateway.runtimeStatus('chat_existing',{connectorId:'openrouter'}),{code:'runtime_identity_mismatch'});
+  await assert.rejects(gateway.runtimeStatus(undefined,{connectorId:'openrouter',serviceTierId:'fast'}),{code:'provider_tier_unavailable'});
+  await assert.rejects(gateway.runtimeStatus(undefined,{connectorId:'not-a-provider'}),{code:'provider_profile_invalid'});
+});
+test('first-turn model effort and tier are captured by creation instead of falling back to global defaults',()=>{
+  const native=driver('codex'),external=driver('openrouter'),gateway=new CodexChatGateway([native,external],()=> 'codex');
+  const input={clientThreadId:'exact-first-settings',source:'chat',connectorId:'openrouter',initialTurn:{clientMessageId:'exact-first-message',input:[{type:'text',text:'test'}],settings:{modelId:'openrouter-model',effortId:'high'}}};
+  gateway.createThreadWithFirstTurn(input);assert.deepEqual(external.calls[0].args[0].settings,{modelId:'openrouter-model',effortId:'high'});assert.equal(native.calls.length,0);
+  assert.throws(()=>gateway.createThreadWithFirstTurn({...input,settings:{effortId:'low'}}),{code:'runtime_identity_mismatch'});
+  assert.equal(external.calls.length,1);
 });
 
 test("merged pagination returns every provider thread once without putting previews in cursors", async () => {

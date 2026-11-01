@@ -152,6 +152,7 @@ const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
 
 function useSettingsAnchors(prefix: string) {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("general");
+  useEffect(()=>{if(window.location.hash!=="#providers")return;const frame=requestAnimationFrame(()=>{const target=document.getElementById(`${prefix}-codex`);if(target?.getClientRects().length){setActiveSection('codex');target.scrollIntoView({block:'start'});}});return()=>cancelAnimationFrame(frame);},[prefix]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof IntersectionObserver === "undefined") return;
