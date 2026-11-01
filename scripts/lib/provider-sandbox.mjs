@@ -7,7 +7,7 @@ import { privateStateFile } from './private-state-path.mjs';
 export const PROVIDER_SANDBOX_VERSION='0.0.81';
 const failure=()=>{throw Object.assign(new Error('A verified host sandbox is required for this provider.'),{code:'provider_sandbox_unavailable'});};
 const literal=value=>({path:realpathSync(value),literal:true});
-const protectedNames=['**/.env','**/.env.*','**/.git/**','**/.claude/**','**/.mcp.json','**/.codex/**','**/.private/**','**/.memory-private/**','**/.queue/**','**/.logs/**','**/credentials.json','**/.credentials.json'];
+const protectedNames=['**/.env','**/.env.*','**/.mcp.json','**/credentials.json','**/.credentials.json','**/id_rsa','**/id_ed25519',...['.git','.claude','.codex','.private','.memory-private','.queue','.logs','.ssh','.aws','.config'].flatMap(name=>['**/'+name,'**/'+name+'/**'])];
 
 /** Version and host support are checked before an attempt may be dispatched. */
 export function providerSandboxDependency(root){

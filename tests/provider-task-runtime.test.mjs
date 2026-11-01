@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ProviderTaskRuntime } from '../scripts/lib/provider-task-runtime.mjs';
+import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
 
 const session='11111111-2222-4333-8444-555555555555',identity='a'.repeat(64);
 const message=(id,text=id)=>({clientMessageId:id,input:[{type:'text',text}]});
@@ -136,4 +137,23 @@ test('recovery proves process exit before freeing a stale claim and never restar
   assert.equal(b.registry.turn(chat,first.accepted.turn.turnId).status,'interrupted');
   assert.equal((await b.start(chat,message('recovery_message_1'))).replayed,true);
   await b.drainQueue(chat);assert.equal(f.runs.length,1);assert.equal(b.queued(chat).length,1);
+});
+
+test('host approvals survive a different HTTP worker, expire on Stop and cannot leak across provider chats',async t=>{
+  const f=fixture(t,{preflight:async()=>({steer:false,approvals:true})}),a=f.make('claude'),b=f.make('claude'),chat=(await a.create(create())).binding.chatId;
+  const first=await a.start(chat,message('approval_message_1'));await until(()=>f.runs.length===1);
+  const pending=f.runs[0].input.approve({operationId:'approval_fixture_001',kind:'file_change_approval',presentation:{path:'file',proposedContent:'exact'},reason:'Exact fixture write'});
+  await until(()=>b.pendingRequests(chat).length && executionChannelView(a.execution,'provider-answer:'+b.pendingRequests(chat)[0].requestId));
+  const row=b.pendingRequests(chat)[0];assert.equal(row.turnId,first.accepted.turn.turnId);
+  await b.answerRequest(chat,{requestId:row.requestId,revision:row.presentation.revision,decision:'accept',clientMessageId:'answer_fixture_001'});assert.deepEqual(await pending,{decision:'accept'});
+  const next=f.runs[0].input.approve({operationId:'approval_fixture_002',kind:'command_approval',presentation:{command:['node','--test']},reason:'Verification'}),expired=assert.rejects(next,{code:'provider_request_expired'});
+  await until(()=>b.pendingRequests(chat).length===1);const old=b.pendingRequests(chat)[0];
+  await until(()=>executionChannelView(b.execution,'provider-control:'+chat));await b.control(chat,{action:'interrupt',expectedTurnId:first.accepted.turn.turnId,clientMessageId:'stop_fixture_001'});
+  await expired;assert.equal(b.pendingRequests(chat).length,0);await assert.rejects(b.answerRequest(chat,{requestId:old.requestId,revision:old.presentation.revision,decision:'accept',clientMessageId:'answer_fixture_002'}),{code:'native_request_changed'});
+});
+
+test('alias resolution is captured in the new binding and never rerun on creation replay',async t=>{
+  let resolved='claude-sonnet-5-5',calls=0;const f=fixture(t,{resolveConfiguration:async config=>{calls++;return {...config,modelId:resolved};}}),a=f.make('claude');f.settings.modelId='sonnet';
+  const first=await a.create(create());resolved='claude-sonnet-6-0';assert.equal((await a.create(create())).binding.modelId,'claude-sonnet-5-5');assert.equal(calls,1);
+  await a.start(first.binding.chatId,message('alias_message_001'));await until(()=>f.runs.length===1);assert.equal(f.runs[0].input.model,'claude-sonnet-5-5');
 });

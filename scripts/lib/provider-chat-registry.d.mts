@@ -1,11 +1,11 @@
-import type { ProviderConnectorId } from './provider-profile.mjs';
+import type { ProviderConnectorId,ProviderPreset } from './provider-profile.mjs';
 import type { TaskWorkspace } from './task-workspace.mjs';
 import type { AttachmentView, ChatEventRecord, ChatItemView, ExternalRuntimeProviderId, HistoryContentPage, HistoryItemsPage, TaskLinkView, ThreadGroup, ThreadOrigin, ThreadStatus, TurnView } from '../../interfaces/control-center/src/lib/codex-chat/types';
 export type ProviderChatBinding = {
   chatId:string;clientThreadId:string;createHash:string;connectorId:Exclude<ProviderConnectorId,'codex'>;providerId:ExternalRuntimeProviderId;
   modelId:string;effortId:string|null;timeoutMs:number;workspacePath:string;workspace:TaskWorkspace;nativeThreadId:string;profileIdentity:string|null;stateIdentityHash:string;
   title:string;preview:string;createdAt:string;updatedAt:string;group:ThreadGroup;origin:ThreadOrigin;continuationEnabled:boolean;pinned:boolean;archived:boolean;lastStatus:ThreadStatus;taskLinks:TaskLinkView[];
-  capabilitySnapshot:Record<string,unknown>|null;executionConfig:Record<string,any>;messageReceipts:Record<string,unknown>;turns:TurnView[];
+  capabilitySnapshot:Record<string,unknown>|null;executionConfig:ProviderPreset & {sandbox:string};messageReceipts:Record<string,unknown>;turns:TurnView[];
 };
 export type StoredProviderTurn = Omit<TurnView,'history'> & {history?:{activityState:string;itemCount:number;itemsCursor:string|null}};
 export class ProviderChatRegistry {

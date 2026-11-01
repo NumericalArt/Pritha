@@ -32,6 +32,9 @@ export function pendingProviderRequests(coordinator,chatId){
   return coordinator.listIntents({kind:'provider-request',states:['pending'],limit:200}).filter(row=>row.chatId===chatId).map(row=>({requestId:row.id,chatId,turnId:row.turnId,itemId:null,kind:row.requestKind,
     title:row.requestKind==='user_input'?'Input needed':'Approval needed',reason:row.reason || null,expiresAt:row.expiresAt,resolved:false,presentation:{...row.presentation,revision:row.revision,state:row.state}}));
 }
+export function expireProviderRequests(coordinator,chatId,turnId){
+  for(const row of coordinator.listIntents({kind:'provider-request',states:['pending'],limit:1000}))if(row.chatId===chatId && row.turnId===turnId && validId(row.operationId))coordinator.updateIntent('provider-request:'+chatId+':'+turnId+':'+row.operationId,{state:'expired'},row.revision);
+}
 
 /** Permission answers authorize one exact host action. They do not execute it,
  * relax a sandbox, amend policies, or authorize another turn. */
@@ -44,7 +47,7 @@ export class ProviderApprovalBroker {
     if(kind==='user_input' && (!Array.isArray(presentation.questions) || presentation.questions.length<1 || presentation.questions.length>3
         || presentation.questions.some(q=>!validId(q.id) || typeof q.question!=='string' || !q.question.trim() || q.question.length>2000 || q.isSecret===true)))throw failure('native_answer_invalid');
     const key='provider-request:'+this.chatId+':'+this.turnId+':'+operationId;
-    const reserved=this.coordinator.reserveIntent(key,hash({kind,presentation,reason}),{kind:'provider-request',chatId:this.chatId,turnId:this.turnId,owner:this.lease.owner,generation:this.lease.generation,requestKind:kind,presentation,reason,
+    const reserved=this.coordinator.reserveIntent(key,hash({kind,presentation,reason}),{kind:'provider-request',chatId:this.chatId,turnId:this.turnId,operationId,owner:this.lease.owner,generation:this.lease.generation,requestKind:kind,presentation,reason,
       expiresAt:new Date(Date.now()+timeoutMs).toISOString()},{limit:{max:128,states:['pending']}});
     if(reserved.intent.state==='answered')return reserved.intent.response;
     if(this.waiters.has(key))return this.waiters.get(key).promise;

@@ -1,5 +1,5 @@
 import { createHash,randomUUID,randomBytes } from 'node:crypto';
-import { accessSync,constants,existsSync,readFileSync,realpathSync,rmSync } from 'node:fs';
+import { accessSync,constants,closeSync,fstatSync,openSync,readFileSync,realpathSync,rmSync } from 'node:fs';
 import path from 'node:path';
 import { readJsonlLines } from './neuraldeep/jsonl-reader.mjs';
 import { spawnSupervisedCli } from './neuraldeep/process-supervisor.mjs';
@@ -12,6 +12,8 @@ import { resolvePrithaPython } from './lib/python-runtime.mjs';
 import { listenClaudeApiProxy } from './claude/api-proxy.mjs';
 import { ClaudeStreamState,CLAUDE_SESSION_ID,CLAUDE_MODEL_ID } from './claude/stream-state.mjs';
 import { probeClaudeCli } from './claude/cli-probe.mjs';
+import { ProviderHostTools,PROVIDER_HOST_TOOL_DEFINITIONS } from './lib/provider-host-tools.mjs';
+import { listenProviderToolServer } from './lib/provider-tool-server.mjs';
 
 const fail=code=>Object.assign(new Error('The configured Claude runtime could not complete this task safely.'),{code});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -30,6 +32,7 @@ export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxT
   args.push(resume?'--resume':'--session-id',sessionId);
   if(mcpConfigPath)args.push('--mcp-config',mcpConfigPath);
   if(allowedTools.length)args.push('--allowedTools',...allowedTools);
+  args.push('--append-system-prompt','This task is hosted by Pritha. Read the workspace AGENTS.md and applicable nested instructions before editing. Use only the supplied Pritha tools. Preserve operation_id when retrying an identical tool request; never retry an ambiguous effect under a new ID. Host approval authorizes only the displayed action. Do not bypass protected paths, network restrictions, tests or the host verifier. Report unavailable tools and incomplete verification honestly.');
   return args;
 }
 
@@ -50,29 +53,41 @@ export async function startClaudeCodeRun(options,dependencies={}){
   const sessionId=options.resume || randomUUID(),identity=hash([realpathSync(stateRoot),profile,cwd,options.model,'api-key']);
   const proofFile=privateStateFile(stateRoot,path.join(profile,'sessions',sessionId+'.json'));
   if(options.resume){
-    let proof;try{proof=JSON.parse(readFileSync(proofFile,'utf8'));}catch{throw fail('runtime_identity_mismatch');}
+    let proof,fd;try{fd=openSync(proofFile,constants.O_RDONLY|constants.O_NOFOLLOW);const stat=fstatSync(fd);if(!stat.isFile() || stat.nlink!==1 || stat.size>8000)throw fail('runtime_identity_mismatch');proof=JSON.parse(readFileSync(fd,'utf8'));}catch{throw fail('runtime_identity_mismatch');}finally{if(fd!==undefined)closeSync(fd);}
     if(proof.identity!==identity || proof.sessionId!==sessionId || proof.model!==options.model || proof.observedInit!==true)throw fail('runtime_identity_mismatch');
   }
   const temporary=createProviderTemporaryDirectory({provider:'claude',stateRoot,temporaryRoot:options.temporaryRoot});
   const localToken=randomBytes(32).toString('base64url');
-  let proxy,owned,timer,verifiedExit=false,closed=false,stopReason=null,sandboxPlan;
-  const stop=reason=>{stopReason ||= reason;return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
+  let proxy,owned,timer,verifiedExit=false,closed=false,stopReason=null,sandboxPlan,hostTools,toolServer;
+  const controller=new AbortController(),trees=new Map();
+  const proof=()=>({kind:'provider-process-set',version:1,trees:[...trees].map(([id,evidence])=>({id,evidence}))});
+  const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
+  const stop=reason=>{stopReason ||= reason;controller.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
+  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
   const events=new ClaudeStreamState({model:options.model,sessionId,onEvent:async event=>{
     if(event.type==='thread.started')atomicWriteFile(proofFile,JSON.stringify({version:1,identity,sessionId,model:options.model,cliVersion:cli.version,observedInit:true})+'\n');
     // The journal holds the same visible records as the UI, not private thinking.
     await options.onRawChunk?.(Buffer.from(JSON.stringify(event)+'\n'));await options.onEvent?.(event);
   }});
   try{
+    let mcpConfigPath,allowedTools=[];
+    if(options.hostExecutionContext){
+      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'claude',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree});
+      toolServer=await listenProviderToolServer({hostTools});
+      mcpConfigPath=path.join(temporary,'mcp.json');
+      atomicWriteFile(mcpConfigPath,JSON.stringify({mcpServers:{pritha:{type:'http',url:toolServer.url,headers:{Authorization:'Bearer '+toolServer.token}}}})+'\n');
+      allowedTools=PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name);
+    }
     proxy=await (dependencies.listenProxy || listenClaudeApiProxy)({localToken,apiKey:key,model:options.model,timeoutMs:options.timeoutMs,maxOutputTokens:options.maxOutputTokens || 8192,
-      allowedTools:options.allowedTools || [],beforeRequest:options.beforeRequest,fetchImpl:dependencies.fetchImpl});
-    const args=buildClaudeExecArgs({...options,sessionId});
+      allowedTools,beforeRequest:options.beforeRequest,fetchImpl:dependencies.fetchImpl});
+    const args=buildClaudeExecArgs({...options,sessionId,mcpConfigPath,allowedTools});
     const env=providerProcessEnvironment({provider:'claude',root,stateRoot,claudeConfigDir:config,temporary,env:options.env || process.env});
     Object.assign(env,{HOME:home,ANTHROPIC_API_KEY:localToken,ANTHROPIC_BASE_URL:proxy.baseUrl,CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST:'1',CLAUDE_CODE_TMPDIR:temporary,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1',DISABLE_AUTOUPDATER:'1',DISABLE_TELEMETRY:'1',DISABLE_ERROR_REPORTING:'1',CLAUDE_CODE_DISABLE_AUTO_MEMORY:'1',PRITHA_PYTHON:resolvePrithaPython({root,env:options.env || process.env})});
-    env.CLAUDE_CODE_MAX_RETRIES='0';env.CLAUDE_CODE_NONSTREAMING_TIMEOUT_RETRIES='0';env.CLAUDE_CODE_DISABLE_REFUSAL_RETRY='1';
-    sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[home,config],writeRoots:[home,config],loopbackPorts:[proxy.port]});
+    env.CLAUDE_CODE_MAX_RETRIES='0';env.CLAUDE_CODE_NONSTREAMING_TIMEOUT_RETRIES='0';env.CLAUDE_CODE_DISABLE_REFUSAL_RETRY='1';env.MCP_CONNECTION_NONBLOCKING='0';env.ENABLE_TOOL_SEARCH='false';
+    sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[home,config],writeRoots:[home,config],loopbackPorts:[proxy.port,...(toolServer?[toolServer.port]:[])]});
     owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(sandboxPlan.command,sandboxPlan.args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),
-      beforeStart:async evidence=>{if(options.signal?.aborted)throw fail('operator_cancel');await options.beforeStart?.({identity,evidence,model:options.model,resume:options.resume || null});},onEvidence:options.onEvidence});
+      beforeStart:async evidence=>{if(options.signal?.aborted)throw fail('operator_cancel');trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),model:options.model,resume:options.resume || null});},onEvidence:evidence=>recordTree('cli',evidence)});
     options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
     timer=setTimeout(()=>stop('provider_timeout'),options.timeoutMs);
     let parseError=null;
@@ -86,12 +101,12 @@ export async function startClaudeCodeRun(options,dependencies={}){
     owned.child.stdin.on('error',()=>{});owned.child.stdin.end(options.prompt);
     const completion=(async()=>{
       try{
-        const [exit]=await Promise.all([owned.completion,consume,diagnostic]);verifiedExit=exit.processTreeExited===true;
+        const [exit]=await Promise.all([owned.completion,consume,diagnostic]);const toolsExited=await closeTools();verifiedExit=exit.processTreeExited===true && toolsExited;
         const result=await events.finish(parseError || stopReason || (!verifiedExit?'provider_process_exit_unconfirmed':exit.code!==0?'provider_runtime_failed':null));
         return {...result,identity,cliVersion:cli.version,processTreeExited:verifiedExit,exitCode:exit.code};
       }finally{closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);await proxy?.close();if(verifiedExit){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan?.planPath)rmSync(sandboxPlan.planPath,{force:true});}}
     })();
     return {identity,completion,stop:()=>closed?false:stop('operator_cancel')};
   }catch(error){clearTimeout(timer);options.signal?.removeEventListener('abort',abort);owned?.stop();if(owned)verifiedExit=(await owned.completion).processTreeExited===true;
-    error.processTreeExited=owned?verifiedExit:error.processTreeExited!==false;await proxy?.close();if(error.processTreeExited){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan?.planPath)rmSync(sandboxPlan.planPath,{force:true});}throw error;}
+    const toolsExited=await closeTools();error.processTreeExited=(owned?verifiedExit:error.processTreeExited!==false) && toolsExited;await proxy?.close();if(error.processTreeExited){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan?.planPath)rmSync(sandboxPlan.planPath,{force:true});}throw error;}
 }

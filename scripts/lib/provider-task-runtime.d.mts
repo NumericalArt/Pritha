@@ -13,6 +13,7 @@ export type ProviderLaunch = (options:ProviderRunOptions)=>Promise<{stop:()=>boo
 export type ProviderTaskOptions = {
   connectorId:Exclude<ProviderConnectorId,'codex'>;root:string;stateRoot:string;privateRoot:string;executionDirectory:string;
   configuration:()=>ProviderPreset & {sandbox:string};preflight:(binding:Partial<ProviderChatBinding>,context:{phase:'create'|'turn'})=>Promise<Record<string,unknown>>;
+  resolveConfiguration?:(configuration:ProviderPreset & {sandbox:string})=>Promise<ProviderPreset & {sandbox:string}>;
   launch:ProviderLaunch;validateText?:(text:string)=>void;
   beforeRequest?:(binding:ProviderChatBinding,attempt:ProviderAttempt)=>Promise<unknown>|unknown;
   normalizeEvent?:(attempt:ProviderAttempt,event:Record<string,any>,binding:ProviderChatBinding)=>{item:ChatItemView;originalText?:string}|null;
@@ -28,6 +29,8 @@ export class ProviderTaskRuntime {
   create(input:CreateThreadInput):Promise<{binding:ProviderChatBinding;replayed:boolean}>;
   start(chatId:string,input:StartTurnInput,options?:{fromQueue?:string}):Promise<{accepted:AcceptedTurn;replayed:boolean}>;
   control(chatId:string,input:{action:'steer'|'interrupt';expectedTurnId:string;clientMessageId:string;text?:string}):Promise<{status:string;action:'steer'|'interrupt';replayed:boolean}>;
+  pendingRequests(chatId:string):ThreadDetail['pendingRequests'];
+  answerRequest:TaskChatBackend['answerRequest'];
   queued(chatId:string):Queued;
   enqueue(chatId:string,input:StartTurnInput):Promise<Queued>;
   cancelQueued(chatId:string,id:string,revision:number):Promise<Queued>;

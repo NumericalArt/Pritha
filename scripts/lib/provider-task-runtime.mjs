@@ -6,7 +6,8 @@ import { ExecutionCoordinator } from './execution-coordinator.mjs';
 import { callExecutionChannel, executionChannelView, registerExecutionChannel } from './execution-channel.mjs';
 import { inspectTaskWorkspace, prepareTaskWorkspace, taskWorkspaceResources, verifyTaskWorkspace } from './task-workspace.mjs';
 import { privateStateDirectory, privateStateFile } from './private-state-path.mjs';
-import { processTreeExited } from '../neuraldeep/process-snapshot.mjs';
+import { providerProcessTreesExited } from './provider-process-proof.mjs';
+import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,expireProviderRequests } from './provider-approvals.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -61,12 +62,13 @@ export class ProviderTaskRuntime {
       const modelId=input.settings?.modelId || config.modelId;
       const sandbox=input.workspace?.mode==='read-only' ? 'read-only' : config.sandbox || 'read-only';
       if(!['read-only','workspace-write'].includes(sandbox))throw failure('provider_sandbox_invalid','This provider requires a bounded workspace sandbox.');
-      const executionConfig={...config,modelId,sandbox,reasoningEffort:input.settings?.effortId || config.reasoningEffort};
-      const capabilities=await this.options.preflight({connectorId:this.connectorId,modelId,executionConfig},{phase:'create'});
+      let executionConfig={...config,modelId,sandbox,reasoningEffort:input.settings?.effortId || config.reasoningEffort};
+      if(this.options.resolveConfiguration)executionConfig=await this.options.resolveConfiguration(executionConfig);
+      const capabilities=await this.options.preflight({connectorId:this.connectorId,modelId:executionConfig.modelId,executionConfig},{phase:'create'});
       privateStateDirectory(this.stateRoot,path.join(this.privateRoot,'workspaces'));
       const workspace=await prepareTaskWorkspace({coordinator:this.execution,source:this.root,directory:path.join(this.privateRoot,'workspaces'),id:this.connectorId+':'+input.clientThreadId,
         mode:sandbox==='read-only'?'read-only':'worktree',baseRevision:input.workspace?.baseRevision});
-      const result=this.registry.create({clientThreadId:input.clientThreadId,request,title:input.title,modelId,effortId:executionConfig.reasoningEffort,timeoutMs:executionConfig.timeoutMs,
+      const result=this.registry.create({clientThreadId:input.clientThreadId,request,title:input.title,modelId:executionConfig.modelId,effortId:executionConfig.reasoningEffort,timeoutMs:executionConfig.timeoutMs,
         workspacePath:workspace.cwd,workspace,capabilitySnapshot:capabilities,executionConfig});
       this.changed(result.binding.chatId);return {binding:result.binding,replayed:!result.created};
     });
@@ -112,6 +114,7 @@ export class ProviderTaskRuntime {
         this.execution.updateIntent(key,{state:'dispatching',turnId:turn.turnId,owner:lease.owner,generation:lease.generation},intent.revision);
         const active={chat,turnId:turn.turnId,clientMessageId:input.clientMessageId,key,lease,capabilities,controller:new AbortController(),run:null,identity:null,started:false,stopping:false,finished:false};
         this.active.set(chat,active);
+        if(capabilities.approvals===true)active.approvals=new ProviderApprovalBroker({coordinator:this.execution,chatId:chat,turnId:turn.turnId,lease,signal:active.controller.signal,emit:()=>this.emit(chat,'history.changed',{})});
         active.cleanup=registerExecutionChannel(this.execution,channelKey(chat),{view:()=>active.finished?null:{turnId:active.turnId,steer:capabilities.steer===true,interrupt:true},call:request=>this.controlOwned(active,request)});
         this.registry.updateTurn(chat,turn.turnId,row=>({...row,status:'in_progress'}));
         this.registry.mutate(chat,row=>({...row,lastStatus:'active',updatedAt:stamp()}));
@@ -131,6 +134,7 @@ export class ProviderTaskRuntime {
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:attachments.prompt?text+'\n\n'+attachments.prompt:text,
         images:attachments.images || [],signal:active.controller.signal,
+        ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
         beforeStart:async proof=>{
           active.lease.assertOwned();
           if(binding.profileIdentity && binding.profileIdentity!==proof.identity)throw failure('runtime_identity_mismatch');
@@ -188,7 +192,7 @@ export class ProviderTaskRuntime {
     this.registry.updateTurn(active.chat,active.turnId,row=>({...row,status,error,completedAt:stamp(),usage:result.usage || null}));
     this.registry.mutate(active.chat,row=>({...row,lastStatus:exited?'idle':'system_error',updatedAt:stamp()}));
     this.execution.updateIntent(active.key,{state:exited?status:'unknown',exitConfirmed:exited,errorCode:error?.code || null});
-    active.cleanup?.();this.active.delete(active.chat);
+    active.approvals?.close();active.cleanup?.();this.active.delete(active.chat);
     if(exited)active.lease.release();
     this.emit(active.chat,'turn.'+status,{turn:providerTurnView(this.registry.turn(active.chat,active.turnId))},{turnId:active.turnId});
     this.scheduleQueues();
@@ -220,11 +224,12 @@ export class ProviderTaskRuntime {
     this.require(chat);if(this.active.has(chat))return;
     const row=this.activeIntent(chat);if(!row)return;
     let exited=false;
-    try{exited=Boolean(row.processProof && (this.options.proveExit || processTreeExited)(row.processProof));}catch{/* Unknown coverage cannot release resources. */}
+    try{exited=Boolean(row.processProof && (this.options.proveExit || providerProcessTreesExited)(row.processProof));}catch{/* Unknown coverage cannot release resources. */}
     if(!exited){
-      if(row.state!=='unknown' && !executionChannelView(this.execution,channelKey(chat)) && Date.now()-Date.parse(row.updatedAt)>5000)this.execution.updateIntent(turnKey(chat,row.clientMessageId),{state:'unknown'});
+      if(!executionChannelView(this.execution,channelKey(chat)) && Date.now()-Date.parse(row.updatedAt)>5000){expireProviderRequests(this.execution,chat,row.turnId);if(row.state!=='unknown')this.execution.updateIntent(turnKey(chat,row.clientMessageId),{state:'unknown'});}
       return;
     }
+    expireProviderRequests(this.execution,chat,row.turnId);
     this.registry.updateTurn(chat,row.turnId,turn=>({...turn,status:'interrupted',completedAt:stamp(),error:{code:'provider_owner_restarted',message:'The previous execution owner ended. Its output is preserved; continue explicitly when ready.'}}));
     this.registry.mutate(chat,binding=>({...binding,lastStatus:'idle',updatedAt:stamp()}));
     this.execution.updateIntent(turnKey(chat,row.clientMessageId),{state:'interrupted',exitConfirmed:true,recoveredAt:stamp()},row.revision);
@@ -284,6 +289,8 @@ export class ProviderTaskRuntime {
     });
   }
   changed(chat){this.execution.appendEvent({chatId:chat,connectorId:this.connectorId});}
+  pendingRequests(chat){this.require(chat);return pendingProviderRequests(this.execution,chat);}
+  async answerRequest(chat,input){this.require(chat);return answerProviderRequest(this.execution,chat,input);}
   emit(chat,event,payload={},refs={}){const record=this.registry.appendEvent(chat,event,payload,refs);this.changed(chat);return record;}
   subscribe(chat,send,close=null){
     this.require(chat);let cursor=this.registry.latestEventId(chat) || this.emit(chat,'connection.ready',{}).data.eventId,closed=false;

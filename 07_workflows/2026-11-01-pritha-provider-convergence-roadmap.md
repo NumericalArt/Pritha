@@ -299,23 +299,23 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
 
 ### R5 — Claude Code: runner, decisions, build и child API
 
-**Статус: in-progress; API lane / parser / host sandbox foundations verified.** Зависимости R2–R4 (общие contracts, не ND subscription).
+**Статус: in-progress; API lane / host MCP / shared Task Chat verified; build and local CLI auth pending.** Зависимости R2–R4 (общие contracts, не ND subscription).
 
-- [ ] Проверить current CLI flags/stream schema/SDK terms по official docs,
+- [x] Проверить current CLI flags/stream schema/SDK terms по official docs,
   локально `claude --version` bounded 5s. SDK не обязателен для CLI runner.
 - [ ] Instance Keychain для Anthropic; auth modes api-key / local-cli-session.
   Не читать/извлекать OAuth. SDK без допустимого auth → pending-auth.
-- [ ] `claude-code-runner.mjs`: shell:false, stdin prompt, cleaned env,
+- [x] `claude-code-runner.mjs`: shell:false, stdin prompt, cleaned env,
   --output-format stream-json --verbose, selected model, bounded max-turns,
   --resume exact session, allowed/disallowed tools и supported permission mode.
-- [ ] NDJSON parser: bounded buffer, fragmented UTF-8, system/init → thread,
+- [x] NDJSON parser: bounded buffer, fragmented UTF-8, system/init → thread,
   assistant text → content, tools → activity, tool results by ID. Не раскрывать
   raw thinking/private reasoning; использовать разрешённые summaries/activity.
-- [ ] Resume mismatch fail before continuing; interruption records unresolved
+- [x] Resume mismatch fail before continuing; interruption records unresolved
   tool pairs as cancelled_or_ambiguous_tool_receipt. No fabricated success.
-- [ ] Usage: fresh input + cache write + cache read + output; cumulative deltas,
+- [x] Usage: fresh input + cache write + cache read + output; cumulative deltas,
   deduped result receipts, total_cost_usd, unavailable usage marked unknown.
-- [ ] Host-owned PreToolUse guard + durable decision state/approval UI; validate
+- [x] Host-owned PreToolUse guard + durable decision state/approval UI; validate
   cwd/roots/symlinks, protected paths, shell/network, git push/remote, services,
   secret writes. Task hooks cannot approve themselves or overwrite guard files.
   Уточнение по CLI 2.1.296: API lane `--bare` не исполняет hooks. Здесь guard
@@ -323,14 +323,14 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
   tools отключены. Нельзя включить `--bare` и одновременно полагаться на hook.
   Shell tool и CLI проходят проверяемую OS sandbox; approvals разрешают только
   конкретный эффект в прежних границах, не отключение sandbox.
-- [ ] Claude driver supports start/resume/interrupt/queue and honest capabilities.
+- [x] Claude driver supports start/resume/interrupt/queue and honest capabilities.
 - [ ] `ClaudeCodeBuildExecutor`: probe/execute/recover, disposable worktree,
   standard result schema, protected verifier, isolation check, schema output,
   budgets and ledger. Recover reconstructs status without duplicate start and
   preserves observed model. Adversarial sandbox tests, not only string matches.
-- [ ] Lightweight fetch Anthropic Messages client for selected child runtime:
+- [x] Lightweight fetch Anthropic Messages client for selected child runtime:
   pinned API version, timeout/abort, sanitized errors, bounded output, tool policy.
-- [ ] Root `CLAUDE.md` with `@AGENTS.md` + narrow Claude rules, YAML frontmatter;
+- [x] Root `CLAUDE.md` with `@AGENTS.md` + narrow Claude rules, YAML frontmatter;
   do not duplicate AGENTS. Sonnet/Opus/Haiku catalog with verified IDs/capabilities.
 - [ ] Existing `claude-tools-pilot.mjs` conformance remains valid; live single turn
   only through configured authorized credentials. Child pilot through UI later.
@@ -897,6 +897,50 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   Claude driver ещё впереди; этот checkpoint не объявляет R5 завершённым.
   Объединённый foundation suite 24/24, privacy strict pass; дальнейшая интеграция
   потребует нового полного gate.
+
+### Checkpoint реализации 7 — Claude в Task Chat и host tools
+
+- `ClaudeDriver` зарегистрирован в общей facade вместе с native и NeuralDeep.
+  Проверка CLI/sandbox и read-only Anthropic catalog предшествует новой задаче.
+  Sonnet/Opus/Haiku разрешаются в exact model ID один раз; registry, replay,
+  последующие ходы и health сохраняют model/effort/auth preset исходной беседы.
+  Неизвестные модели/effort/auth не становятся Ready через fallback.
+- Host MCP endpoint живёт только в течение owned attempt: exact loopback port,
+  capability token, Host/Origin/method/body limits, фиксированные шесть tools,
+  отсутствие CONNECT/forward proxy. Модель не выбирает credential/root/policy.
+- `read_file`/`list_files` читают ограниченное окно без private/secret paths.
+  `write_file` требует точного content approval и expected SHA-256, повторно
+  проверяет файл после ответа, сохраняет executable mode, fsync/atomic rename.
+  `run_command` получает argv без shell interpolation, отдельное owned дерево,
+  OS sandbox и закрытую сеть. Длинный вывод сохраняется в private receipt и
+  читается через `read_result`. `ask_user` использует тот же UI request protocol.
+- Operation receipts не позволяют повторить запись/команду после потери ответа;
+  изменённый payload с прежним ID отвергается. Shared broker фиксирует answer
+  до исполнения, проверяет chat/turn/revision/owner и гасит pending при Stop,
+  timeout и подтверждённом recovery. Approval не расширяет sandbox.
+- Composite process proof включает CLI и каждую host command. Shared runtime
+  освобождает workspace только после подтверждения выхода всех деревьев.
+  Unknown coverage сохраняет claim, историю и запрет автоматического replay.
+- Найден и исправлен macOS Unix-socket path overflow: provider scratch по
+  умолчанию использует короткий системный `/tmp` с instance hash, owner check и
+  mode 0700. Никаких user-specific абсолютных runtime paths не добавлено.
+- Создан тонкий `CLAUDE.md` с `@AGENTS.md`; hosted `--bare` lane получает явные
+  инструкции читать workspace AGENTS и сохранять host guard/Trials/receipts.
+- Установленный Claude Code 2.1.296 прошёл две synthetic acceptance проверки:
+  exact start/resume; реальные MCP file write и sandboxed command с отдельными
+  approvals и двумя process proofs. 2/2 pass; реальных API keys, платных model
+  requests и OAuth не использовано. Последний CLI+broker прогон 7/7 pass.
+- Production build и Playwright: новые Claude approvals после reload на
+  1440/390 px 2/2 pass; предыдущие Queue/Steer сценарии 8/8 pass. Первоначальная
+  ошибка нового browser fixture была отсутствующим `requestId` в mock envelope;
+  fixture исправлен, product validation не ослаблена. TypeScript clean,
+  strict privacy pass, Markdown validation 981 artifacts.
+- Полный unit run: 1030 entries, 1029 pass; единственный failure — загрузчик
+  `provider-runtime-driver.test.mjs` не имел import stub нового Claude driver.
+  Stub добавлен; отдельный повтор всех четырёх routing tests 4/4 pass. Полный
+  повтор после этого test-only исправления не делался. R5 ещё не завершён: local-cli-session auth lane, BuildExecutor,
+  его budget/recovery/Protected Trials и child scaffold wiring впереди. R6–R9,
+  R11/R11b и финальная приёмка R12 сохраняются в полном объёме.
 
 ## 7. Полные исходные материалы
 

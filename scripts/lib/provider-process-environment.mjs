@@ -21,7 +21,7 @@ export function providerProcessEnvironment({provider,root,stateRoot,codexHome,cl
 }
 
 /** ASCII-only private scratch directory for CLIs with filesystem encoding assumptions. */
-export function createProviderTemporaryDirectory({provider,stateRoot,temporaryRoot=os.tmpdir()}) {
+export function createProviderTemporaryDirectory({provider,stateRoot,temporaryRoot=process.platform==='darwin'?'/tmp':os.tmpdir()}) {
   if(!isProviderConnectorId(provider))throw new Error('provider_profile_invalid');
   const parent=path.resolve(temporaryRoot);
   if(!/^[\x20-\x7e]+$/.test(parent))throw new Error('provider_temporary_root_non_ascii');

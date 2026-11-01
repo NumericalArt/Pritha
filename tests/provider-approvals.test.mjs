@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ExecutionCoordinator } from '../scripts/lib/execution-coordinator.mjs';
 import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
-import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests } from '../scripts/lib/provider-approvals.mjs';
+import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,expireProviderRequests } from '../scripts/lib/provider-approvals.mjs';
 
 const chat='chat_claude_fixture',turn='turn_fixture',request={operationId:'operation_001',kind:'command_approval',presentation:{command:['node','--test'],cwdLabel:'Task workspace'},reason:'Run the proposed verification in the task sandbox.'};
 const answer=(row,decision='accept')=>({requestId:row.requestId,revision:row.presentation.revision,clientMessageId:'answer_fixture_001',decision});
@@ -38,4 +38,10 @@ test('user input validates exact questions and cannot be exchanged for a general
   await assert.rejects(answerProviderRequest(f.b,chat,answer(row)),{code:'native_answer_invalid'});
   await assert.rejects(answerProviderRequest(f.b,chat,{...answer(row),answers:{foreign:['text']}}),{code:'native_answer_invalid'});
   await answerProviderRequest(f.b,chat,{...answer(row),answers:{question_001:['Fixture']}});assert.deepEqual(await pending,{answers:{question_001:['Fixture']}});
+});
+test('reconciliation expires only the ended owner turn without confusing hashed receipt IDs',async t=>{
+  const f=fixture(t),pending=f.broker.ask(request),expired=assert.rejects(pending,{code:'provider_request_expired'}),row=await ready(f.a);
+  expireProviderRequests(f.b,chat,'other_turn');assert.equal(pendingProviderRequests(f.b,chat).length,1);
+  expireProviderRequests(f.b,chat,turn);assert.equal(pendingProviderRequests(f.b,chat).length,0);
+  await assert.rejects(answerProviderRequest(f.b,chat,answer(row)),{code:'native_request_changed'});f.broker.close();await expired;
 });
