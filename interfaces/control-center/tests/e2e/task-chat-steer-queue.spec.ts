@@ -1,15 +1,16 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AttachmentView } from "../../src/lib/codex-chat/types";
 
-async function fixture(page: Page, steer: boolean) {
+async function fixture(page: Page, steer: boolean, connectorId = steer ? "codex" : "neuraldeep") {
+  const chatId=`chat_${connectorId}_queue`,providerId=connectorId==="codex"?"desktop_bundled":`${connectorId}_runtime`;
   const now = "2026-11-01T00:00:00.000Z";
   const files = new Map<string, AttachmentView>();
   const queued: Array<any> = [];
   const calls: Array<{path:string;key:string;body:any}> = [];
   const controls = {holdCancel:false, held:null as Route|null, dropQueueResponse:false};
-  const thread = {chatId:"chat_queue",title:"Composer fixture",preview:"Running",group:"my_chats",origin:"chat",status:"active",activeFlags:[],taskLinks:[],archived:false,historyKind:"native",createdAt:now,updatedAt:now,runtime:{providerId:"desktop_bundled",compatibility:"bound"},continuationState:"continuation_enabled"};
-  const runtime = {preferredProvider:"auto",effectiveProvider:"desktop_bundled",availability:"ready",providers:[{providerId:"desktop_bundled",label:"Fixture",locationLabel:"Fixture",protocol:"app_server",availability:"ready",capabilities:{fullChat:true,imageInput:true,fileMetadata:true},stateIdentityHash:"fixture"}],models:[{id:"fixture",inputModalities:["text","image"]}],selected:{modelId:"fixture",sandboxMode:"read_only"}};
-  const detail = () => ({thread,activeTurnId:"turn_running",controls:{turnId:"turn_running",steer,interrupt:true},pendingRequests:[],queued:[...queued],streamUrl:"/api/codex-chat/v1/threads/chat_queue/events",continuationState:"continuation_enabled",history:{state:"available"}});
+  const thread = {chatId,title:"Composer fixture",preview:"Running",group:"my_chats",origin:"chat",status:"active",activeFlags:[],taskLinks:[],archived:false,historyKind:"native",createdAt:now,updatedAt:now,runtime:{connectorId,providerId,compatibility:"bound"},continuationState:"continuation_enabled"};
+  const runtime = {connectorId,preferredProvider:providerId,effectiveProvider:providerId,availability:"ready",providers:[{providerId,label:"Fixture",locationLabel:"Fixture",protocol:"app_server",availability:"ready",capabilities:{fullChat:true,imageInput:true,fileMetadata:true},stateIdentityHash:"fixture"}],models:[{id:"fixture",inputModalities:["text","image"]}],selected:{modelId:"fixture",sandboxMode:"read_only"}};
+  const detail = () => ({thread,activeTurnId:"turn_running",controls:{turnId:"turn_running",steer,interrupt:true},pendingRequests:[],queued:[...queued],streamUrl:`/api/codex-chat/v1/threads/${chatId}/events`,continuationState:"continuation_enabled",history:{state:"available"}});
   const respond = (route:Route, data:unknown) => route.fulfill({json:{apiVersion:"1",requestId:"fixture",data}});
   await page.route("**/api/codex-chat/v1/**", async route => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
@@ -44,15 +45,16 @@ async function fixture(page: Page, steer: boolean) {
     if(path.endsWith("/history"))return respond(route,{data:[{turnId:"turn_running",status:"in_progress",userMessage:{id:"user",role:"user",markdown:"Original task"},items:[],pendingRequestIds:[],startedAt:now,completedAt:null,error:null}],olderCursor:null});
     return respond(route,detail());
   });
-  await page.goto("/task-chat?chat=chat_queue");
+  await page.goto(`/task-chat?chat=${chatId}`);
   await expect(page.getByRole("textbox",{name:"Message Pritha"})).toBeEnabled();
   await expect(page.getByRole("button",{name:"Queue",exact:true})).toBeVisible();
-  return {calls,queued,controls,respond};
+  return {calls,queued,controls,respond,chatId};
 }
 
-for(const steer of [true,false]) for(const width of [1280,390]) {
-  test(`running composer queues, restores files, cancels and stops: steer=${steer}, width=${width}`,async({page})=>{
-    await page.setViewportSize({width,height:900});const f=await fixture(page,steer);
+for(const connectorId of ["codex","neuraldeep","claude","openrouter","local"]) for(const width of [1280,390]) {
+  test(`running composer queues, restores files, cancels and stops: provider=${connectorId}, width=${width}`,async({page})=>{
+    const steer=connectorId==="codex";
+    await page.setViewportSize({width,height:900});const f=await fixture(page,steer,connectorId);
     const input=page.getByRole("textbox",{name:"Message Pritha"});
     await input.fill("Следующая задача");
     await page.locator('input[type="file"]').setInputFiles({name:"evidence.txt",mimeType:"text/plain",buffer:Buffer.from("evidence")});
@@ -61,7 +63,7 @@ for(const steer of [true,false]) for(const width of [1280,390]) {
     else await expect(page.getByRole("button",{name:"⚡ Steer now",exact:true})).toHaveCount(0);
     await input.press("Enter");
     await expect(input).toHaveValue("");await expect(page.locator(".codex-queued-message")).toHaveCount(1);
-    expect(f.calls[0].path).toContain("/queue");expect(f.calls[0].key).toBe(f.calls[0].body.clientMessageId);
+    expect(f.calls[0].path).toBe(`/api/codex-chat/v1/threads/${f.chatId}/queue`);expect(f.calls[0].key).toBe(f.calls[0].body.clientMessageId);
     const attachment=f.calls[0].body.attachments[0];
     await page.locator(".codex-queued-message").getByRole("button",{name:"Edit",exact:true}).click();
     await expect(input).toHaveValue("Следующая задача");await expect(page.getByLabel("Draft attachments").getByRole("button",{name:"Remove evidence.txt",exact:true})).toBeVisible();

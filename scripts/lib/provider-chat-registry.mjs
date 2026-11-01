@@ -71,7 +71,7 @@ export class ProviderChatRegistry {
   }
   reserveTurn(chatId,input){
     this.require(chatId);
-    if(!client.test(input.clientMessageId || '') || typeof input.text!=='string' || !input.text.trim() || Buffer.byteLength(input.text)>64000)throw fail('invalid_request');
+    if(!client.test(input.clientMessageId || '') || typeof input.text!=='string' || (!input.text.trim() && !input.attachments?.length) || Buffer.byteLength(input.text)>64000)throw fail('invalid_request');
     const requestHash=digest(input.request);
     return this.history.transaction(()=>{
       const prior=this.history.receipt(chatId,input.clientMessageId);
@@ -81,7 +81,7 @@ export class ProviderChatRegistry {
         userMessage:{id:`item_${randomUUID().replaceAll('-','')}`,role:'user',markdown:input.text,status:'completed',createdAt:stamp,...(input.attachments?.length?{attachments:input.attachments}: {})}};
       this.history.putTurn(chatId,turn);
       this.history.putReceipt(chatId,input.clientMessageId,'message',{clientMessageId:input.clientMessageId,requestHash,turnId,startedAt:stamp});
-      this.mutate(chatId,current=>({...current,preview:input.text.slice(0,500),updatedAt:stamp}));
+      this.mutate(chatId,current=>({...current,preview:(input.text || input.attachments.map(file=>file.name).join(', ')).slice(0,500),updatedAt:stamp}));
       return {turn:this.history.turn(chatId,turnId),created:true};
     });
   }

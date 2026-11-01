@@ -1637,7 +1637,7 @@ history, отсутствие повторного turn после unknown recei
   alias/uppercase совместимость. Strict privacy, name guard (124 references)
   и Markdown validation (987 files) прошли. Services, MacBook и GitHub не менялись.
 
-### Следующий checkpoint 26 — Provider queue attachments и delivery (planned)
+### Checkpoint реализации 26 — Provider queue attachments и delivery (in-progress)
 
 1. Разделить проверку attachments при enqueue и подготовку dispatch: до принятия
    сообщения проверить immutable IDs/bytes/limits и конкретный transport; до
@@ -1661,6 +1661,29 @@ history, отсутствие повторного turn после unknown recei
    unsupported modality, interrupted publication, initial/resume bytes и
    отсутствие автозапуска/извлечения приложенного executable/archive. Затем
    подключить voice intake к тем же receipts, включая повтор spoken confirmation.
+
+Промежуточный результат 26a (verified-automated):
+
+- Общий provider runtime принимает attachment-only input, сохраняет SHA-256 и
+  metadata originals в private receipt/history и удерживает файлы до принятия
+  queue/turn receipt. Queue readback сверяет текущие bytes и metadata; недоступные
+  вложения явно отмечены, текст и идентичность сообщения сохраняются.
+- Перед dispatch повторяются integrity и transport checks. Queue handoff требует
+  точного request hash и состояния dispatching; потерянный acknowledgement
+  возвращает существующий receipt без повторного запуска. Исторические image
+  inputs требуют capability check и при последующем текстовом resume.
+- Общий API store используется внешними gateway; private hashes исключены из
+  публичного DTO. Проверены reload/two workers, retained originals после draft
+  TTL, Edit/Cancel CAS, FIFO auto-start, policy change, подмена/удаление/retagging,
+  attachment-only turn и Stop во время подготовки snapshot.
+- Фактические адаптеры пока не включают attachment capability. Tests используют
+  synthetic transport и настоящий общий store; это доказывает queue foundation,
+  но не доставку файлов или изображений в installed provider CLI. Пункты 3–5
+  (реальный transport, lifecycle cleanup, voice intake) остаются незавершёнными.
+- Targeted **54/54**, browser **15/15** (Queue на пяти connector identities и
+  public voice binding), TypeScript passed; full unit **1259/1259**, без skipped.
+  Strict privacy, name guard (124 references), Markdown (987 files) и diff check
+  прошли. Изменений live services, MacBook, GitHub и платных provider calls нет.
 
 R12 дополнительная проверка runner: quality-gate задаёт оба root aliases для
 child commands, а часть legacy test fixtures переопределяет только один. Проверить

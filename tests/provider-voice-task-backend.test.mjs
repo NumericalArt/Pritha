@@ -46,7 +46,7 @@ for (const connector of ['neuraldeep', 'claude', 'openrouter', 'local']) {
     assert.equal(f.runs[0].input.effort, 'low'); assert.equal(f.runs[0].input.timeoutMs, 30000);
     const queuedBody = request('Second'); f.reserve('task-two', queuedBody);
     const queued = await f.bridge.dispatch('task-two', queuedBody);
-    assert.equal(queued.task.state, 'queued'); assert.equal(f.runtime.queued(binding.chatId).length, 1);
+    assert.equal(queued.task.state, 'queued'); assert.equal((await f.runtime.queued(binding.chatId)).length, 1);
     assert.deepEqual(f.runtime.voiceTaskLinks(binding.chatId).map(link=>[link.taskId,link.status]),[['task-one','running'],['task-two','queued']]);
     assert.equal(f.runtime.registry.history.chatForTask('task-one'),binding.chatId);
     f.settings.modelId = 'changed-after-start'; f.settings.timeoutMs = 60000;

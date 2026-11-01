@@ -12,7 +12,7 @@ type CatalogHealth=TaskProviderHealth & {models?:Array<{id:string;efforts?:strin
 export class ExternalChatGateway implements TaskChatBackend {
   readonly core:ProviderTaskRuntime;
   voiceTaskBackend=()=>providerVoiceTaskBackend(this.core);
-  constructor(readonly attachments:TaskChatBackend['attachments'],private readonly options:ProviderTaskOptions,private readonly health:(modelId?:string,preset?:ProviderChatBinding['executionConfig'])=>Promise<CatalogHealth>){this.core=new ProviderTaskRuntime(options);}
+  constructor(readonly attachments:TaskChatBackend['attachments'],private readonly options:ProviderTaskOptions,private readonly health:(modelId?:string,preset?:ProviderChatBinding['executionConfig'])=>Promise<CatalogHealth>){this.core=new ProviderTaskRuntime({...options,attachmentStore:attachments});}
   private summary(binding:ProviderChatBinding):ThreadSummary {
     const active=this.core.activeIntent(binding.chatId),pending=this.core.pendingRequests(binding.chatId);
     return {chatId:binding.chatId,title:binding.title,preview:binding.preview,group:binding.group,origin:binding.origin,
@@ -48,7 +48,7 @@ export class ExternalChatGateway implements TaskChatBackend {
   };
   threadDetail:TaskChatBackend['threadDetail']=async chat=>{
     this.core.reconcile(chat);const binding=this.core.require(chat),thread=this.summary(binding),active=this.core.activeIntent(chat),control=executionChannelView(this.core.execution,'provider-control:'+chat);
-    return {thread,activeTurnId:active?.turnId || null,controls:control?{turnId:String(control.turnId),steer:control.steer===true,interrupt:control.interrupt===true}:null,pendingRequests:this.core.pendingRequests(chat),queued:this.core.queued(chat),streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events',continuationState:thread.continuationState,history:{state:'available',code:null,recoverable:false}};
+    return {thread,activeTurnId:active?.turnId || null,controls:control?{turnId:String(control.turnId),steer:control.steer===true,interrupt:control.interrupt===true}:null,pendingRequests:this.core.pendingRequests(chat),queued:await this.core.queued(chat),streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events',continuationState:thread.continuationState,history:{state:'available',code:null,recoverable:false}};
   };
   startTurn:TaskChatBackend['startTurn']=(chat,input,options)=>this.core.start(chat,input,options);
   queuedMessages:TaskChatBackend['queuedMessages']=async chat=>this.core.queued(chat);

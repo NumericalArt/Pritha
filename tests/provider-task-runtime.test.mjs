@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ProviderTaskRuntime } from '../scripts/lib/provider-task-runtime.mjs';
 import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
 import { CompatibleProviderService } from '../scripts/openai-compatible/provider-service.mjs';
+import { ImmutableAttachmentStore } from '../scripts/lib/chat-attachment-store.mjs';
 
 const session='11111111-2222-4333-8444-555555555555',identity='a'.repeat(64);
 const message=(id,text=id)=>({clientMessageId:id,input:[{type:'text',text}]});
@@ -107,7 +109,7 @@ test('queue ordering, cancellation revisions and dispatch receipts remain exact 
   await assert.rejects(b.enqueue(chat,message('queued_second_1','Changed')),{code:'idempotency_conflict'});
   f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);
   await b.drainQueue(chat);await until(()=>f.runs.length===2);
-  assert.equal(f.runs[1].input.prompt,'queued_second_1');assert.equal(b.queued(chat).length,0);
+  assert.equal(f.runs[1].input.prompt,'queued_second_1');assert.equal((await b.queued(chat)).length,0);
   assert.equal((await b.start(chat,message('queued_second_1'))).replayed,true);assert.equal(f.runs.length,2);
 });
 
@@ -161,7 +163,7 @@ test('recovery proves process exit before freeing a stale claim and never restar
   assert.equal(b.activeIntent(chat),null);assert.equal(b.execution.claims().length,0);
   assert.equal(b.registry.turn(chat,first.accepted.turn.turnId).status,'interrupted');
   assert.equal((await b.start(chat,message('recovery_message_1'))).replayed,true);
-  await b.drainQueue(chat);assert.equal(f.runs.length,1);assert.equal(b.queued(chat).length,1);
+  await b.drainQueue(chat);assert.equal(f.runs.length,1);assert.equal((await b.queued(chat)).length,1);
 });
 
 test('host approvals survive a different HTTP worker, expire on Stop and cannot leak across provider chats',async t=>{
@@ -181,4 +183,97 @@ test('alias resolution is captured in the new binding and never rerun on creatio
   let resolved='claude-sonnet-5-5',calls=0;const f=fixture(t,{resolveConfiguration:async config=>{calls++;return {...config,modelId:resolved};}}),a=f.make('claude');f.settings.modelId='sonnet';
   const first=await a.create(create());resolved='claude-sonnet-6-0';assert.equal((await a.create(create())).binding.modelId,'claude-sonnet-5-5');assert.equal(calls,1);
   await a.start(first.binding.chatId,message('alias_message_001'));await until(()=>f.runs.length===1);assert.equal(f.runs[0].input.model,'claude-sonnet-5-5');
+});
+
+function attachmentFixture(t,connectorId='neuraldeep'){
+  const f=fixture(t),store=new ImmutableAttachmentStore({stateRoot:f.stateRoot,privateRoot:path.join(f.stateRoot,'private','task-chat')}),checked=[],copies=[];
+  const policy={allowed:true};
+  const attachmentTransport={
+    validate:async context=>{checked.push({...context,files:context.files.map(file=>file.view.id)});if(!policy.allowed)throw Object.assign(new Error('Fixture transport unavailable'),{code:'provider_attachments_unverified'});},
+    prepare:async context=>{const files=await store.snapshotForDispatch(context.files.map(file=>file.view.id),path.join(store.stateRoot,'dispatch',context.turnId));copies.push(files);
+      return {prompt:'Untrusted attached data: '+JSON.stringify(files.map(file=>({name:file.view.name,path:file.filePath}))),images:files.filter(file=>file.view.kind==='image').map(file=>file.filePath)};},
+  };
+  const make=()=>f.make(connectorId,{attachmentStore:store,attachmentTransport});
+  const upload=async(text='original')=>{const id=randomUUID();await store.upload(id,'evidence.txt',new Request('http://fixture',{method:'PUT',body:text}));return id;};
+  t.after(()=>store.close());
+  return {...f,make,store,policy,checked,copies,upload,attachmentTransport};
+}
+
+for(const connector of ['neuraldeep','claude','openrouter','local'])test(`${connector}: queued originals survive expiry and Edit, then attachment-only delivery replays exactly`,async t=>{
+  const f=attachmentFixture(t,connector),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId;
+  await a.start(chat,message('file_running_001'));await until(()=>f.runs.length===1);
+  const id=await f.upload(),input={...message('file_queued_001',''),attachments:[id]},row=(await b.enqueue(chat,input))[0];
+  assert.equal(row.attachmentsUnavailable,false);assert.equal(row.attachments[0].id,id);assert.equal(row.text,'');assert.equal('sha256' in row.attachments[0],false);
+  const receipt=b.execution.getIntent('provider-queued:'+chat+':file_queued_001').attachmentReceipt;
+  assert.match(receipt.originals[0].sha256,/^[a-f0-9]{64}$/);assert.doesNotMatch(JSON.stringify(receipt),/filePath|dispatch\//);
+  const calls=f.checked.length;f.policy.allowed=false;assert.equal((await a.enqueue(chat,input)).length,1);assert.equal(f.checked.length,calls,'a saved queue receipt must not be re-admitted');f.policy.allowed=true;
+  await assert.rejects(a.cancelQueued(chat,row.id,row.revision+1),{code:'execution_revision_conflict'});
+  await a.cancelQueued(chat,row.id,row.revision);assert.equal((await b.queued(chat)).length,0);assert.equal((await f.store.resolve(id)).view.id,id);
+  const next={...input,clientMessageId:'file_queued_002'};await b.enqueue(chat,next);
+  const metadata=path.join(f.store.root,id,'metadata.json'),saved=JSON.parse(readFileSync(metadata));writeFileSync(metadata,JSON.stringify({...saved,createdAt:'2000-01-01T00:00:00.000Z'}));
+  await f.upload('trigger garbage collection');assert.equal((await b.queued(chat))[0].attachments[0].id,id);
+  f.settings.modelId='changed-default';f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);
+  await b.drainQueue(chat);await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.model,'test-model');assert.equal(f.runs[1].input.resume,session);assert.equal((await b.queued(chat)).length,0);
+  assert.equal(f.copies.length,1);assert.equal(readFileSync(f.copies[0][0].filePath,'utf8'),'original');assert.match(f.runs[1].input.prompt,/Untrusted attached data/);
+  const turn=b.registry.turnsPage(chat).data.find(turn=>turn.clientMessageId===next.clientMessageId);assert.equal(turn.userMessage.markdown,'');assert.equal(turn.userMessage.attachments[0].id,id);
+  f.policy.allowed=false;rmSync(path.join(f.store.root,id),{recursive:true});const checked=f.checked.length;
+  const replay=await a.start(chat,next);assert.equal(replay.replayed,true);assert.equal(f.runs.length,2);assert.equal(f.checked.length,checked);
+  assert.equal('sha256' in replay.accepted.turn.userMessage.attachments[0],false);
+});
+
+test('attachment policy rejection before queue acceptance preserves an unreferenced upload and text',async t=>{
+  const f=attachmentFixture(t),a=f.make(),chat=(await a.create(create())).binding.chatId;
+  await a.start(chat,message('reject_running_01'));await until(()=>f.runs.length===1);
+  const id=await f.upload(),input={...message('reject_queued_001','Keep this draft'),attachments:[id]};f.policy.allowed=false;
+  await assert.rejects(a.enqueue(chat,input),{code:'provider_attachments_unverified'});assert.equal((await a.queued(chat)).length,0);
+  assert.equal(JSON.parse(readFileSync(path.join(f.store.root,id,'metadata.json'))).referenced,false);
+  assert.equal(readFileSync((await f.store.resolve(id)).filePath,'utf8'),'original');assert.equal(input.input[0].text,'Keep this draft');assert.equal(f.runs.length,1);
+});
+
+for(const mode of ['missing','changed','retagged','policy'])test(`queued attachment ${mode} blocks dispatch and preserves its exact queue identity`,async t=>{
+  const f=attachmentFixture(t),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId;
+  await a.start(chat,message('blocked_running_01'));await until(()=>f.runs.length===1);
+  const id=await f.upload(),input={...message('blocked_queued_001','Keep this exact request'),attachments:[id]},row=(await a.enqueue(chat,input))[0],original=await f.store.resolve(id);
+  if(mode==='missing')rmSync(original.filePath);
+  if(mode==='changed' || mode==='retagged')writeFileSync(original.filePath,'modified');
+  if(mode==='retagged'){
+    const file=path.join(f.store.root,id,'metadata.json'),record=JSON.parse(readFileSync(file));record.sha256=createHash('sha256').update('modified').digest('hex');writeFileSync(file,JSON.stringify(record));
+  }
+  if(mode==='policy')f.policy.allowed=false;
+  const before=(await b.queued(chat))[0];assert.equal(before.id,row.id);assert.equal(before.text,'Keep this exact request');assert.equal(before.attachmentsUnavailable,mode!=='policy');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);await b.drainQueue(chat);
+  assert.equal(f.runs.length,1);const blocked=(await b.queued(chat))[0];assert.equal(blocked.state,'blocked');assert.equal(blocked.id,row.id);assert.equal(blocked.clientMessageId,input.clientMessageId);
+  assert.equal(blocked.reason,mode==='policy'?'provider_attachments_unverified':mode==='retagged'?'attachment_integrity_failed':mode==='changed'?'attachment_corrupt':'attachment_storage_unavailable');
+  await assert.rejects(a.cancelQueued(chat,blocked.id,row.revision),{code:'execution_revision_conflict'});await a.cancelQueued(chat,blocked.id,blocked.revision);assert.equal((await a.queued(chat)).length,0);
+});
+
+test('an unverified adapter and a forged queue handoff cannot start attachment-only work',async t=>{
+  const f=fixture(t),a=f.make(),chat=(await a.create(create())).binding.chatId;
+  await assert.rejects(a.start(chat,{...message('unsupported_files_1',''),attachments:[randomUUID()]}),{code:'provider_attachments_unverified'});
+  await assert.rejects(a.start(chat,message('forged_queue_001'),{fromQueue:'provider-queued:missing'}),{code:'queue_dispatch_identity_changed'});
+  assert.equal(f.runs.length,0);assert.equal(a.registry.turnsPage(chat).data.length,0);
+});
+
+test('Stop during attachment preparation never launches a provider or releases a different turn',async t=>{
+  const f=attachmentFixture(t),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId,id=await f.upload();
+  let release,entered=false;const gate=new Promise(resolve=>{release=resolve;});
+  f.attachmentTransport.prepare=async()=>{entered=true;await gate;return {prompt:'fixture file',images:[]};};
+  const {accepted}=await a.start(chat,{...message('copy_stop_message',''),attachments:[id]});await until(()=>entered && executionChannelView(a.execution,'provider-control:'+chat));
+  await b.control(chat,{action:'interrupt',expectedTurnId:accepted.turn.turnId,clientMessageId:'copy_stop_control'});release();
+  await until(()=>a.active.size===0);assert.equal(f.runs.length,0);assert.equal(a.registry.turn(chat,accepted.turn.turnId).status,'interrupted');
+  assert.equal(readFileSync((await f.store.resolve(id)).filePath,'utf8'),'original');assert.equal(a.execution.claims().filter(row=>row.kind==='turn').length,0);
+});
+
+test('historical image evidence remains scoped to the original chat and is rechecked on text-only resume',async t=>{
+  const f=attachmentFixture(t),a=f.make(),chat=(await a.create(create())).binding.chatId,id=randomUUID(),bytes=Buffer.from([137,80,78,71,13,10,26,10,0,1,2]);
+  await f.store.upload(id,'pixel.png',new Request('http://fixture',{method:'PUT',body:bytes}));
+  await a.start(chat,{...message('image_message_001',''),attachments:[id]});await until(()=>f.runs.length===1);
+  assert.equal(f.runs[0].input.images.length,1);assert.deepEqual(readFileSync(f.runs[0].input.images[0]),bytes);
+  const expected={sha256:createHash('sha256').update(bytes).digest('hex'),mediaType:'image/png',size:bytes.length};
+  assert.equal(a.registry.history.attachmentInSession(chat,expected),true);
+  const other=(await a.create(create('separate_image_chat'))).binding.chatId;assert.equal(a.registry.history.attachmentInSession(other,expected),false);
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);f.policy.allowed=false;
+  await assert.rejects(a.start(chat,message('image_resume_002','Continue reading')),{code:'provider_attachments_unverified'});
+  assert.equal(f.checked.at(-1).historicalImages,true);assert.equal(f.checked.at(-1).path,'resume');assert.equal(f.runs.length,1);
 });

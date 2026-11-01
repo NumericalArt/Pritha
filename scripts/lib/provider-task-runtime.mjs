@@ -27,15 +27,16 @@ const streamUrl=chat=>'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/e
 
 export function providerTurnView(turn){
   if(!turn)return null;
-  const {history,...value}=turn;
-  return {...value,...(history?.itemsCursor ? {history:{itemsRef:history.itemsCursor,itemsState:'not_loaded',sourceMode:'compatibility'}} : {})};
+  const {history,userMessage,...value}=turn;
+  const message=userMessage?{...userMessage,...(userMessage.attachments?{attachments:userMessage.attachments.map(({sha256,...view})=>view)}:{})}:userMessage;
+  return {...value,...(message?{userMessage:message}:{}),...(history?.itemsCursor ? {history:{itemsRef:history.itemsCursor,itemsState:'not_loaded',sourceMode:'compatibility'}} : {})};
 }
 
 export function providerTurnText(input){
   if(!validClient(input?.clientMessageId) || !Array.isArray(input.input) || input.input.length!==1 || input.input[0]?.type!=='text' || typeof input.input[0].text!=='string')throw failure('invalid_request','A valid message identifier and text are required.',400);
   const text=input.input[0].text.trim();
-  if(!text || Buffer.byteLength(text)>64000)throw failure('invalid_request','A message must contain at most 64,000 UTF-8 bytes.',400);
   if(input.attachments!=null && (!Array.isArray(input.attachments) || input.attachments.some(id=>typeof id!=='string')))throw failure('invalid_request','Invalid attachment identifiers.',400);
+  if((!text && !input.attachments?.length) || Buffer.byteLength(text)>64000)throw failure('invalid_request','A message needs text or attachments and at most 64,000 UTF-8 text bytes.',400);
   return text;
 }
 
@@ -142,10 +143,20 @@ export class ProviderTaskRuntime {
     const text=providerTurnText(input);
     if(binding.archived)throw failure('chat_archived','Restore this chat before sending a message.');
     if(input.settings?.modelId && input.settings.modelId!==binding.modelId || input.settings?.effortId && input.settings.effortId!==binding.effortId || input.settings?.serviceTierId)throw failure('runtime_identity_mismatch','This chat retains its original provider, model and execution settings.');
-    // Attachments are admitted only by a transport that verifies their delivery.
-    if(input.attachments?.length && !this.options.prepareAttachments)throw failure('provider_attachments_unverified','Attachment transport is not verified for this provider. Your originals are preserved.',422);
     this.options.validateText?.(text);
     return text;
+  }
+  async attachmentInput(binding,input,{phase,expected,retain=false}={}){
+    const ids=input.attachments || [],historicalImages=this.registry.history.attachmentInSession(binding.chatId);
+    if(!ids.length && !historicalImages)return {files:[],receipt:{version:1,originals:[]}};
+    const store=this.options.attachmentStore,transport=this.options.attachmentTransport;
+    if(!store || !transport)throw failure('provider_attachments_unverified','Attachment transport is not verified for this provider. Your originals are preserved.',422);
+    const files=await store.prepare(ids);
+    const receipt={version:1,originals:files.map(({view,sha256})=>({...view,sha256}))};
+    if(expected && JSON.stringify(expected)!==JSON.stringify(receipt))throw failure('attachment_integrity_failed','The accepted attachment references changed. Your message and originals have been kept.');
+    await transport.validate({binding,files,historicalImages,path:binding.nativeThreadId?'resume':'initial',phase});
+    if(retain && ids.length)await store.retain(ids);
+    return {files,receipt};
   }
   async start(chat,input,{fromQueue}={}){
     return this.execution.withMutation('provider-admission:'+chat,async()=>{
@@ -155,11 +166,16 @@ export class ProviderTaskRuntime {
       if(prior){if(prior.kind!=='message' || prior.value.requestHash!==requestHash)throw failure('idempotency_conflict');const turn=this.registry.turn(chat,prior.value.turnId);if(!turn)throw failure('history_receipt_incomplete');return {accepted:{turn:providerTurnView(turn),streamUrl:streamUrl(chat)},replayed:true};}
       if(this.activeIntent(chat))throw failure('turn_active','This chat already owns an active or unconfirmed turn.');
       if(!fromQueue && this.queuedRows(chat).some(row=>row.input.clientMessageId!==input.clientMessageId))throw failure('queue_waiting','Send this draft to the queue or cancel the queued messages first.');
-      const intent=this.execution.reserveIntent(key,requestHash,{kind:'turn',connectorId:this.connectorId,chatId:chat,clientMessageId:input.clientMessageId}).intent;
+      const queue=fromQueue?this.execution.getIntent(fromQueue):null;
+      if(fromQueue && (!queue || queue.kind!=='provider-queued-message' || queue.chatId!==chat || queue.hash!==requestHash || queue.state!=='dispatching'
+        || input.attachments?.length && !queue.attachmentReceipt))throw failure('queue_dispatch_identity_changed');
+      let intent=this.execution.reserveIntent(key,requestHash,{kind:'turn',connectorId:this.connectorId,chatId:chat,clientMessageId:input.clientMessageId}).intent;
       if(!['reserved','not_dispatched'].includes(intent.state))throw failure('fallback_confirmation_required','The original dispatch is unconfirmed and will not be repeated.');
+      if(queue?.attachmentReceipt && intent.attachmentReceipt && JSON.stringify(queue.attachmentReceipt)!==JSON.stringify(intent.attachmentReceipt))throw failure('attachment_integrity_failed');
       await verifyTaskWorkspace(binding.workspace);
       const capabilities=await this.options.preflight(binding,{phase:'turn'});
-      const attachments=await this.options.prepareAttachments?.(binding,input) || {views:[],prompt:''};
+      const attachments=await this.attachmentInput(binding,input,{phase:'turn',expected:queue?.attachmentReceipt || intent.attachmentReceipt,retain:true});
+      if(attachments.files.length && !intent.attachmentReceipt)intent=this.execution.updateIntent(key,{attachmentReceipt:attachments.receipt},intent.revision);
       const lease=this.execution.claim(['provider-thread:'+this.registry.scope+':'+chat,'chat-binding:'+chat],key,{kind:'turn',capacity:this.execution.admission().capacity,detail:{chatId:chat,connectorId:this.connectorId,intentKey:key}});
       if(!lease)throw failure('turn_active','Execution capacity or this task is already reserved.');
       let accepted=false;
@@ -174,7 +190,7 @@ export class ProviderTaskRuntime {
           if(!slot)throw failure('provider_rate_limited','This provider has no free parallel execution slot.');
         }
         lease.assertOwned();
-        const {turn,created}=this.registry.reserveTurn(chat,{clientMessageId:input.clientMessageId,text,request:input,attachments:attachments.views});
+        const {turn,created}=this.registry.reserveTurn(chat,{clientMessageId:input.clientMessageId,text,request:input,attachments:attachments.receipt.originals});
         if(!created){lease.release();return {accepted:{turn:providerTurnView(turn),streamUrl:streamUrl(chat)},replayed:true};}
         this.execution.updateIntent(key,{state:'dispatching',turnId:turn.turnId,owner:lease.owner,generation:lease.generation},intent.revision);
         const active={chat,turnId:turn.turnId,clientMessageId:input.clientMessageId,key,lease,capabilities,controller:new AbortController(),run:null,identity:null,started:false,stopping:false,finished:false};
@@ -185,7 +201,7 @@ export class ProviderTaskRuntime {
         this.registry.mutate(chat,row=>({...row,lastStatus:'active',updatedAt:stamp()}));
         this.emit(chat,'turn.started',{turn:providerTurnView(this.registry.turn(chat,turn.turnId))},{turnId:turn.turnId});
         accepted=true;
-        active.completion=this.launch(binding,active,text,attachments).catch(()=>{/* State is fenced; a storage failure never releases its claim. */});
+        active.completion=this.launch(binding,active,text,{...attachments,input}).catch(()=>{/* State is fenced; a storage failure never releases its claim. */});
         return {accepted:{turn:providerTurnView(this.registry.turn(chat,turn.turnId)),streamUrl:streamUrl(chat)},replayed:false};
       }finally{if(!accepted)lease.release();}
     });
@@ -195,12 +211,16 @@ export class ProviderTaskRuntime {
     try{
       const file=privateStateFile(this.stateRoot,path.join(this.privateRoot,this.connectorId,'attempts',active.turnId+'.jsonl'));
       journal=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+      const checked=await this.attachmentInput(binding,attachments.input,{phase:'dispatch',expected:attachments.receipt});
+      const delivery=checked.files.length?await this.options.attachmentTransport.prepare({binding,files:checked.files,receipt:checked.receipt,turnId:active.turnId,store:this.options.attachmentStore}):{prompt:'',images:[]};
+      active.lease.assertOwned();
+      if(active.controller.signal.aborted)throw failure('operator_cancel');
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
-        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:attachments.prompt?text+'\n\n'+attachments.prompt:text,
+        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:delivery.prompt?[text,delivery.prompt].filter(Boolean).join('\n\n'):text,
         ...(binding.subject?{factorySubject:binding.subject}:{}),
-        images:attachments.images || [],signal:active.controller.signal,
+        images:delivery.images || [],...(delivery.attachmentManifest?{attachmentManifest:delivery.attachmentManifest}:{}),signal:active.controller.signal,
         ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
         beforeStart:async proof=>{
           active.lease.assertOwned();
@@ -304,7 +324,21 @@ export class ProviderTaskRuntime {
     this.emit(chat,'turn.interrupted',{turn:providerTurnView(this.registry.turn(chat,row.turnId))},{turnId:row.turnId});
   }
   queuedRows(chat){return this.execution.listIntents({kind:'provider-queued-message',states:waitingStates,limit:1000}).filter(row=>row.chatId===chat);}
-  queued(chat){this.require(chat);return this.queuedRows(chat).map(row=>({id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || null,attachments:[],attachmentsUnavailable:Boolean(row.input.attachments?.length)}));}
+  async queued(chat){
+    this.require(chat);
+    return Promise.all(this.queuedRows(chat).map(async row=>{
+      const ids=row.input.attachments || [],saved=row.attachmentReceipt?.version===1?row.attachmentReceipt.originals:null;
+      const files=await Promise.all(ids.map(async(id,index)=>{
+        try{
+          if(!this.options.attachmentStore || !saved || saved.length!==ids.length)return null;
+          const {view,sha256}=await this.options.attachmentStore.resolve(id);
+          return JSON.stringify({...view,sha256})===JSON.stringify(saved[index])?view:null;
+        }catch{return null;}
+      }));
+      return {id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || null,
+        attachments:files.filter(Boolean),attachmentsUnavailable:files.some(file=>!file)};
+    }));
+  }
   async enqueue(chat,input){
     return this.execution.withMutation('provider-admission:'+chat,async()=>{
       const binding=this.require(chat);this.validateTurn(binding,input);
@@ -313,7 +347,8 @@ export class ProviderTaskRuntime {
         const tail=this.queuedRows(chat).at(-1),direct=this.activeIntent(chat);
         if(!tail && !direct)throw failure('queue_target_ended','The preceding task ended. Send this draft as a new turn.');
         const predecessorKey=tail?turnKey(chat,tail.input.clientMessageId):turnKey(chat,direct.clientMessageId);
-        this.execution.reserveIntent(key,hash(input),{kind:'provider-queued-message',connectorId:this.connectorId,chatId:chat,input,predecessorKey},{initialState:'queued',limit:{max:128,scopeField:'chatId',scopeMax:16,states:waitingStates}});
+        const attachments=await this.attachmentInput(binding,input,{phase:'queue',retain:true});
+        this.execution.reserveIntent(key,hash(input),{kind:'provider-queued-message',connectorId:this.connectorId,chatId:chat,input,predecessorKey,...(attachments.files.length?{attachmentReceipt:attachments.receipt}:{})},{initialState:'queued',limit:{max:128,scopeField:'chatId',scopeMax:16,states:waitingStates}});
       }else if(prior.hash!==hash(input))throw failure('idempotency_conflict');
       this.changed(chat);this.scheduleQueues();return this.queued(chat);
     });
