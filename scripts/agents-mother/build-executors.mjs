@@ -13,6 +13,7 @@ import {neuralDeepExecutionProfile,buildResponseCap,effectiveNeuralDeepEffort} f
 import { ClaudeProviderService } from '../claude/provider-service.mjs';
 import { startClaudeCodeRun } from '../claude-code-runner.mjs';
 import { ExecutionCoordinator } from '../lib/execution-coordinator.mjs';
+import {factoryBuildDelegation} from './factory-build-delegation.mjs';
 import { providerProcessTreesExited } from '../lib/provider-process-proof.mjs';
 import { providerProcessEnvironment } from '../lib/provider-process-environment.mjs';
 import { privateStateFile } from '../lib/private-state-path.mjs';
@@ -583,11 +584,13 @@ export class ClaudeCodeBuildExecutor {
         const prior=coordinator.getIntent(key);
         if(prior){if(prior.hash!==requestHash)throw new ExecutionBackendError('executor_recovery_mismatch','The saved attempt has different approved inputs.');if(prior.receipt?.process_exited===true)return {replay:prior.receipt};throw new ExecutionBackendError('executor_recovery_required','Recover the original build attempt before starting another.',{executorResult:prior.receipt});}
         const ready=await this.service(context).require(this.preset()),model=ready.model.id,attemptId=randomUUID();
-        lease=coordinator.claim(['delivery-attempt:'+key,'workspace:'+cwd],key,{kind:'turn',capacity:coordinator.admission().capacity,detail:{runId:input.runId,connectorId:this.connectorId}});
+        const delegated=factoryBuildDelegation(coordinator,this.options.factoryParent,this.connectorId);
+        lease=coordinator.claim(['delivery-attempt:'+key,'workspace:'+cwd,...(delegated?[delegated.resource]:[])],key,{kind:delegated?'factory-build':'turn',...(delegated?{}:{capacity:coordinator.admission().capacity}),detail:{runId:input.runId,connectorId:this.connectorId}});
         if(!lease)throw new ExecutionBackendError('workspace_busy','Another task owns this build workspace or execution capacity.');
+        if(delegated){const assertChild=lease.assertOwned;lease.assertOwned=()=>{assertChild();delegated.check();};}
         const parallel=ready.capabilities?.parallelLimit ?? (this.connectorId==='neuraldeep'?null:1);
         if(!Number.isSafeInteger(parallel) || parallel<1 || parallel>64)throw new ExecutionBackendError('provider_limits_unknown','The provider concurrency limit is unavailable.');
-        let providerSlot=false;for(let index=0;index<parallel && !providerSlot;index++)providerSlot=coordinator.extend(lease.owner,lease.generation,['provider-slot:'+this.connectorId+':'+index]);
+        let providerSlot=false;for(let index=0;index<parallel && !providerSlot;index++)providerSlot=Boolean(delegated?.hasProviderSlot(index)) || coordinator.extend(lease.owner,lease.generation,['provider-slot:'+this.connectorId+':'+index]);
         if(!providerSlot)throw new ExecutionBackendError('provider_rate_limited','Another task owns the available provider capacity.');
         if(!coordinator.extend(lease.owner,lease.generation,['execution-ambient-effects'],{mode:'read'}))throw new ExecutionBackendError('execution_draining','The host is preparing a managed update.');
         receipt={schema:BUILD_EXECUTOR_RESULT_SCHEMA,executor:this.name,provider:this.connectorId,run_id:input.runId,iteration:input.iteration,attempt_id:attemptId,budget_id:attemptId,
@@ -625,7 +628,9 @@ export class ClaudeCodeBuildExecutor {
       if(receipt && !started){exitConfirmed=true;receipt={...receipt,status:'not-started',turn_status:'not-started',process_exited:true,thread_cleanup:'not-created'};coordinator.updateIntent(key,{state:'not-started',receipt:sanitized(receipt,{projectRoot:cwd,stateRoot:context.stateRoot,root:context.root})});if(error.details?.executorResult)error.details.executorResult=receipt;}
       if(error.processTreeExited===true){exitConfirmed=true;if(receipt){receipt={...receipt,process_exited:true,thread_cleanup:'closed'};try{await checkpoint();}catch{/* Recovery can read the host receipt. */}if(error.details?.executorResult)error.details.executorResult=receipt;}}
       if(receipt && !error.details?.executorResult){exitConfirmed=error.processTreeExited===true || (!started && error.processTreeExited!==false);receipt={...receipt,status:exitConfirmed?'not-started':'uncertain',process_exited:exitConfirmed,thread_cleanup:exitConfirmed?'closed':'pending',error_code:/^[a-z_]+$/.test(error.code || '')?error.code:'build_executor_failed'};try{await checkpoint();}catch{/* The durable intent remains authoritative. */}}
-      if(error instanceof ExecutionBackendError)throw error;throw new ExecutionBackendError('build_executor_failed','The bounded provider build could not complete.',{executorResult:receipt});
+      if(error instanceof ExecutionBackendError)throw error;
+      if(error.code==='factory_delegation_invalid')throw new ExecutionBackendError(error.code,'The waiting factory no longer owns this build delegation.',{executorResult:receipt});
+      throw new ExecutionBackendError('build_executor_failed','The bounded provider build could not complete.',{executorResult:receipt});
     }finally{if(control)this.active.delete(control);if(lease && (exitConfirmed || !started))lease.release();coordinator.close();}
   }
   async recover(input,saved){

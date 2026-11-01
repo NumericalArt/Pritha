@@ -64,7 +64,7 @@ export function buildCodexExecArgs(options){
     config['mcp_servers.pritha.required']=true;
     config['mcp_servers.pritha.default_tools_approval_mode']='approve';
     config['mcp_servers.pritha.startup_timeout_sec']=10;
-    config['mcp_servers.pritha.tool_timeout_sec']=180;
+    config['mcp_servers.pritha.tool_timeout_sec']=options.hostExecutionContext?.factory?Math.ceil(options.timeoutMs/1000)+5:180;
     config['mcp_servers.pritha.enabled_tools']=(options.toolServer.definitions || PROVIDER_HOST_TOOL_DEFINITIONS).map(tool=>tool.name);
   }
   if(effort)config.model_reasoning_effort=effort;

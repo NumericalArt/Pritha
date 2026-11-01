@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 // Execution worktrees, generated evidence, dependencies and logs are not authored
@@ -6,6 +6,18 @@ import path from "node:path";
 // over everything a builder happened to place below state/agents.
 const COLLECTIONS = ["contracts", "reports", "profiles", "research"];
 const EXCLUDED = new Set(["worktrees", "builds", "node_modules", "vendor", "coverage", "test-results"]);
+
+/** Keep links resolvable within private authored memory even in temporary state.
+ * Only an existing exact artifact can bypass prose path redaction. */
+export function privateAgentArtifactReference(reference,{root,memoryRoot}={}) {
+  if(!root || !memoryRoot || typeof reference!=='string' || path.isAbsolute(reference))return null;
+  try{
+    const base=realpathSync(memoryRoot),file=path.resolve(root,reference),info=lstatSync(file);
+    if(!info.isFile() || info.nlink!==1 || file!==realpathSync(file) || !file.startsWith(base+path.sep)
+        || !COLLECTIONS.includes(path.relative(base,file).split(path.sep)[0]) || !file.endsWith('.md'))return null;
+    return reference;
+  }catch{return null;}
+}
 
 export function listAuthoredAgentMemoryFiles(root) {
   if (!existsSync(root) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return [];

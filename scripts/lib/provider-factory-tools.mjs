@@ -1,0 +1,102 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {privateStateDirectory,privateStateFile} from './private-state-path.mjs';
+import {atomicWriteFile} from './atomic-file.mjs';
+import {providerProcessEnvironment,createProviderTemporaryDirectory} from './provider-process-environment.mjs';
+import {resolvePrithaPython} from './python-runtime.mjs';
+import {spawnSupervisedCli} from '../neuraldeep/process-supervisor.mjs';
+import {normalizeInterviewBrief,validateInterviewBrief} from '../agents-mother/interview-brief.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals} from '../agents-mother/voice-factory-state.mjs';
+
+const actions=['status','read_artifact','init','write_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_apply','scaffold_plan','scaffold','deliver','delivery_status','delivery_resume','verify','finish'];
+const readonly=new Set(['status','read_artifact']);
+const briefSchema={type:'object',properties:{
+  identity:{type:'object',properties:{name:{type:'string'},slug:{type:'string'}},required:['name'],additionalProperties:false},
+  goal:{type:'string'},user:{type:'string'},
+  ...Object.fromEntries(['successCriteria','coreFunctions','workflows','sources','constraints','nonGoals'].map(key=>[key,{type:'array',items:{type:'string'}}])),
+  permissions:{type:'object',properties:{network:{type:'array',items:{type:'string'}},filesystem:{type:'array',items:{type:'string'}},authorization:{type:'string'}},additionalProperties:false},
+  technical:{type:'object',description:'Optional proposed preset, runtimeFamily, primaryInterface, serviceMode, runtimePlacementProfile and repository research policy. The host fixes the target, executor, Git isolation and autostart.'},
+  design:{type:'object',description:'Optional memoryModel, storedData, inputDataTypes, sensitiveData and riskNotes.'},
+},required:['identity','goal','user','successCriteria'],additionalProperties:false};
+export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound new child. Start with init and a complete product brief. Read and revise private draft contract/outcome artifacts, then request their TWO separate approvals. Research and scaffold use canonical gates; deliver/verify use the pinned provider and protected Trials. No push, deploy, services, credential provisioning or final user acceptance. status/read_artifact are read-only. Every other step requires an exact host approval. Never infer approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
+const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources'],research_apply:['selection'],delivery_resume:['answer']};
+PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
+export class ProviderFactoryTools {
+  constructor(host){this.host=host;this.options=host.options;this.paths=voiceFactoryPaths({...this.options,...this.options.factory});if(this.options.factory.target!==this.paths.target)throw factoryFail('factory_binding_changed');}
+  state(){return loadVoiceFactory(this.paths,this.options);}
+  validate(input){
+    if(!input || !actions.includes(input.action) || Object.keys(input).some(key=>!['operation_id','action',...(fields[input.action] || [])].includes(key)) || Buffer.byteLength(JSON.stringify(input))>60000)throw factoryFail('factory_input_invalid');
+  }
+  read(input){
+    this.validate(input);const state=this.state();
+    if(input.action==='status')return {slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase:state?.phase || 'not-started',running:state?.running || null,
+      artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,manualAcceptance:'pending'};
+    if(input.action!=='read_artifact')throw factoryFail('factory_input_invalid');
+    const row=factoryArtifact(this.paths,state,input.artifact),offset=input.offset ?? 0;
+    if(!Number.isSafeInteger(offset) || offset<0)throw factoryFail('factory_input_invalid');
+    return {artifact:input.artifact,sha256:row.sha256,...this.host.window(row.text,{offset,length:24000})};
+  }
+  isRead(input){return readonly.has(input?.action);}
+  prepare(input){
+    this.validate(input);const state=this.state(),p=this.paths;
+    if(state?.running)throw factoryFail('factory_step_unconfirmed');
+    if(input.action==='init' ? Boolean(state?.contract) || fs.existsSync(p.target) : !state)throw factoryFail(input.action==='init'?'factory_target_exists':'factory_not_started');
+    if(input.action==='init'){
+      if(!Number.isSafeInteger(input.build_token_budget) || input.build_token_budget<1 || input.build_token_budget>10000000)throw factoryFail('factory_budget_required');
+      const brief=normalizeInterviewBrief(input.brief);
+      if(brief.identity.slug && brief.identity.slug!==p.slug)throw factoryFail('factory_subject_changed');
+      if(validateInterviewBrief(brief,{requireComplete:true}).length)throw factoryFail('factory_brief_incomplete');
+    }
+    if(['approve_contract','approve_outcome','write_draft'].includes(input.action)){
+      const kind=input.action==='write_draft'?input.artifact:input.action==='approve_contract'?'contract':'outcome';
+      const row=factoryArtifact(p,state,kind);
+      if(!['contract','outcome'].includes(kind) || row.frontmatter.status!=='draft' || input.expected_sha256!==row.sha256)throw factoryFail('factory_draft_changed');
+      if(input.action==='write_draft' && (typeof input.content!=='string' || Buffer.byteLength(input.content)>48000))throw factoryFail('factory_input_invalid');
+    }
+    if(input.action==='create_outcome' || input.action==='approve_outcome')requireFactoryApprovals(p,state,{outcome:false});
+    if(['research','research_status','research_collect','research_apply','scaffold_plan','scaffold','deliver','delivery_status','delivery_resume','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
+    const reviewKind=input.action==='approve_contract'?'contract':input.action==='approve_outcome'?'outcome':null;
+    const review=reviewKind?factoryArtifact(p,state,reviewKind):null;
+    const presentation=review?{path:reviewKind+' · '+p.slug,beforeSha256:review.sha256,proposedContent:review.text,approvalScope:reviewKind+' only'}
+      :{command:['Pritha factory',input.action,p.slug],cwdLabel:'Bound child and instance-private factory artifacts',provider:this.options.connectorId,model:this.options.factory.model,...(this.options.connectorId==='claude' && input.action.startsWith('deliver')?{buildAuthentication:'separate Anthropic API key; host-reserved budget'}:{}),network:['research','research_collect'].includes(input.action)?this.options.connectorId==='local'?'disabled':'bounded primary-source research':input.action.startsWith('deliver')?'pinned build provider only':'disabled',
+        ...(input.action==='init'?{brief:input.brief,proposedBuildTokenBudget:input.build_token_budget}:{}),...(input.action==='write_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,proposedContent:input.content}:{}),...(input.sources?{sources:input.sources}:{}),...(input.selection?{selection:input.selection}:{}),...(input.answer?{answer:input.answer}:{})};
+    if(Buffer.byteLength(JSON.stringify(presentation))>60000)throw factoryFail('factory_review_too_large');
+    return {kind:review?'file_change_approval':'command_approval',presentation,perform:()=>this.execute(input,state)};
+  }
+  async execute(input,expected){
+    this.host.check();const p=this.paths,o=this.options;
+    // A decision is tied to the same complete context, not merely its slug.
+    this.prepare(input);if(factoryHash(this.state())!==factoryHash(expected))throw factoryFail('factory_context_changed');
+    privateStateDirectory(p.stateRoot,p.directory);
+    const state=expected || {schema:'pritha-voice-factory-v1',slug:p.slug,chatId:o.chatId,connectorId:o.connectorId,stateRoot:p.stateRoot,target:p.target,phase:'draft',revision:0};
+    const work=privateStateDirectory(p.stateRoot,path.join(p.directory,'operations',randomUUID()));
+    const requestFile=privateStateFile(p.stateRoot,path.join(work,'request.json')),resultFile=path.join(work,'result.json');
+    const next={...state,revision:state.revision+1,running:{operationId:input.operation_id,action:input.action,turnId:o.turnId}};
+    atomicWriteFile(p.file,JSON.stringify(next));
+    atomicWriteFile(requestFile,JSON.stringify({version:1,root:p.root,stateRoot:p.stateRoot,agentParent:p.parent,slug:p.slug,chatId:o.chatId,connectorId:o.connectorId,model:o.factory.model,effort:o.factory.effort,preset:o.factory.preset,factoryParent:{owner:o.lease.owner,generation:o.lease.generation,chatId:o.chatId,turnId:o.turnId,operationId:input.operation_id,target:p.target},state:next,input,resultFile}));
+    const temporary=createProviderTemporaryDirectory({provider:o.connectorId,stateRoot:p.stateRoot});
+    const env=providerProcessEnvironment({provider:o.connectorId,root:p.root,stateRoot:p.stateRoot,temporary,env:process.env});
+    env.PRITHA_AGENT_PARENT=p.parent;env.PRITHA_PYTHON=resolvePrithaPython({root:p.root});
+    let owned,timer,exited=false,reason=null;const buffers=[];let bytes=0;
+    const stop=()=>{reason ||= 'operator_cancel';owned?.stop();};
+    try{
+      owned=await spawnSupervisedCli(process.execPath,[path.join(p.root,'scripts','agents-mother','voice-factory-worker.mjs'),requestFile],{cwd:p.root,env,
+        beforeStart:evidence=>{this.host.check();o.onProcessEvidence?.('factory-'+input.operation_id,evidence);},onEvidence:evidence=>o.onProcessEvidence?.('factory-'+input.operation_id,evidence)});
+      this.host.commands.add(owned);o.signal?.addEventListener('abort',stop,{once:true});if(o.signal?.aborted)stop();
+      timer=setTimeout(()=>{reason='factory_step_timeout';owned.stop();},['deliver','delivery_resume','verify'].includes(input.action)?3600000:600000);
+      const drain=async stream=>{for await(const chunk of stream){bytes+=chunk.length;if(bytes>8*1024*1024){reason='factory_output_limit';owned.stop();break;}buffers.push(chunk);}};
+      owned.child.stdin.end();const [done]=await Promise.all([owned.completion,drain(owned.child.stdout),drain(owned.child.stderr)]);exited=done.processTreeExited===true;
+      if(!exited){this.host.exitConfirmed=false;throw factoryFail('factory_process_exit_unconfirmed');}
+      if(reason)throw factoryFail(reason);
+      const result=JSON.parse(factoryRead(resultFile,work,500000));
+      if(result.version!==1 || result.operationId!==input.operation_id || !result.state || result.state.revision!==next.revision)throw factoryFail('factory_result_invalid');
+      // The worker owns only this bound context; a lost result keeps running set.
+      const saved=validateVoiceFactory(p,{...result.state,running:null},o);atomicWriteFile(p.file,JSON.stringify(saved));
+      return {status:result.ok?'completed':'failed',exitCode:done.code,output:JSON.stringify({ok:result.ok,...result.value,diagnostic:result.diagnostic || undefined,phase:saved.phase,manualAcceptance:'pending'})};
+    }catch(error){
+      owned?.stop();if(owned)exited=(await owned.completion).processTreeExited===true;else exited=error.processTreeExited!==false;
+      if(!exited)this.host.exitConfirmed=false;throw error;
+    }finally{clearTimeout(timer);o.signal?.removeEventListener('abort',stop);if(owned)this.host.commands.delete(owned);if(exited)fs.rmSync(temporary,{recursive:true,force:true});}
+  }
+}

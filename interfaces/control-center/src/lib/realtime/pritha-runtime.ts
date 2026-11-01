@@ -6396,19 +6396,26 @@ async function startCodexExec(
 async function prepareProviderVoiceTask(task: Record<string, unknown>, preset: ProviderPreset) {
   const { reserveProviderVoiceTask } = await import('../voice/task-router');
   let scope = continuationThreadScopeFromUnknown(task.thread_scope);
-  if (task.task_type === 'agent_creation') throw Object.assign(new Error('This task needs a scoped factory creation workspace.'), { code: 'provider_voice_agent_creation_pending' });
+  let factorySlug:string|undefined;
+  if(task.task_type==='agent_creation'){
+    if(task.write_mode!=='workspace_write')throw Object.assign(new Error('Factory creation requires the requested write workflow.'),{code:'factory_write_mode_required'});
+    const {normalizeChatSubject}=await import('../../../../../scripts/lib/chat-subject.mjs');
+    const slug=task.subject_kind==='agent'?task.subject_id:scope?.kind==='agent'?scope.id:undefined;
+    factorySlug=normalizeChatSubject({kind:'child',slug,phase:'interview'})!.slug;
+    scope={kind:'agent',id:factorySlug,label:String(task.subject_label || factorySlug),source:'explicit',generation:scope?.generation || 1};
+  }
   let agentId:string|undefined;
-  if(scope?.kind==='agent'){
+  if(scope?.kind==='agent' && !factorySlug){
     const {resolveProviderAgentWorkspace}=await import('../../../../../scripts/lib/provider-agent-workspace.mjs');
     const child=resolveProviderAgentWorkspace({root:resolvePrithaRoot(),stateRoot:resolvePrithaStateRoot(),agentParent:resolvePrithaAgentParent()},scope.id);
     agentId=child.agentId;scope={...scope,id:agentId};
   }
   const {getCodexChatGateway}=await import('../codex-chat/gateway');
   const attachments=await voiceIntakeAttachmentIds(task.intake,getCodexChatGateway().attachments);
-  const workspace = { mode: task.write_mode === 'workspace_write' ? 'isolated' as const : 'read-only' as const,
-    ...(typeof task.workspace_base_revision === 'string' ? { baseRevision: task.workspace_base_revision } : {}),...(agentId?{agentId}:{}) };
+  const workspace = { mode: !factorySlug && task.write_mode === 'workspace_write' ? 'isolated' as const : 'read-only' as const,
+    ...(!factorySlug && typeof task.workspace_base_revision === 'string' ? { baseRevision: task.workspace_base_revision } : {}),...(agentId?{agentId}:{}),...(factorySlug?{factorySlug}:{}) };
   const promptTask = { ...task, approval: undefined, status: undefined };
-  const request: VoiceDispatchRequest = { chat: { workspace }, turn: { input: [{ type: 'text', text: buildCodexPrompt(promptTask) }], ...(attachments.length?{attachments}:{}) } };
+  const request: VoiceDispatchRequest = { chat: { workspace,...(factorySlug?{subject:{kind:'child' as const,slug:factorySlug,phase:'interview' as const}}:{}) }, turn: { input: [{ type: 'text', text: buildCodexPrompt(promptTask)+(factorySlug?'\nUse factory_step for this exact new child. General workspace tools cannot write factory state. Read/refine the draft contract, obtain its independent approval, then create/refine and separately approve the Outcome Spec. Use research, host current sources and locked synthesis before scaffold; deliver and verify with the pinned backend. Finish with registry/card evidence and pending manual acceptance. Never treat the spoken brief confirmation as either artifact approval.':'') }], ...(attachments.length?{attachments}:{}) } };
   const reservation = reserveProviderVoiceTask({ taskId: String(task.id),
     scope: { kind: normalizeThreadScopeKind(scope?.kind) || 'task', id: scope?.id || String(task.id), label: scope?.label || 'Voice task' },
     connectorId: task.task_chat_connector as ProviderConnectorId, preset, workspace, request,

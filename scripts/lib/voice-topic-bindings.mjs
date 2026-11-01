@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { isProviderConnectorId, normalizeProviderPreset } from './provider-profile.mjs';
+import {normalizeChatSubject} from './chat-subject.mjs';
 
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp = () => new Date().toISOString();
@@ -26,9 +27,10 @@ function presetOf(connectorId, value) {
   return preset;
 }
 function workspaceOf(value = { mode: 'read-only' }) {
-  if (!value || !['read-only', 'isolated'].includes(value.mode) || Object.keys(value).some(key => !['mode', 'baseRevision','agentId'].includes(key)) || value.agentId!==undefined && !id(value.agentId)
+  if (!value || !['read-only', 'isolated'].includes(value.mode) || Object.keys(value).some(key => !['mode', 'baseRevision','agentId','factorySlug'].includes(key)) || value.agentId!==undefined && !id(value.agentId)
       || value.baseRevision !== undefined && (typeof value.baseRevision !== 'string' || !/^[a-f0-9]{40,64}$/.test(value.baseRevision))) fail('voice_topic_workspace_invalid');
-  return { mode: value.mode, ...(value.baseRevision ? { baseRevision: value.baseRevision } : {}),...(value.agentId?{agentId:value.agentId}:{}) };
+  if(value.factorySlug!==undefined && (value.mode!=='read-only' || value.agentId || value.baseRevision || !normalizeChatSubject({kind:'child',slug:value.factorySlug,phase:'interview'})))fail('voice_topic_workspace_invalid');
+  return { mode: value.mode, ...(value.baseRevision ? { baseRevision: value.baseRevision } : {}),...(value.agentId?{agentId:value.agentId}:{}),...(value.factorySlug?{factorySlug:value.factorySlug}:{}) };
 }
 
 /** Persistent identity only. Admission, FIFO, process proof and history belong to

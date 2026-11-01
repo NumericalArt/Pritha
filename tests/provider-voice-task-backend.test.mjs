@@ -52,6 +52,26 @@ function childFixture(f,{git=false}={}){
     f.bindings.reserve({taskId:id,scope:{kind:'agent',id:child.agentId},workspace,connectorId:f.runtime.connectorId,preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
   return {...child,project,reserve};
 }
+for(const connector of ['neuraldeep','claude','openrouter','local'])test(`${connector}: voice creation pins one new child, approvals and tools through queue and restart`,async t=>{
+  const f=fixture(t,connector,{preflight:async()=>({interrupt:true,steer:false,approvals:true,tools:true})}),slug='factory-child',workspace={mode:'read-only',factorySlug:slug};
+  const reserve=(id,text)=>{const body={...request(text),chat:{workspace,subject:{kind:'child',slug,phase:'interview'}}};f.bindings.reserve({taskId:id,scope:{kind:'agent',id:slug},workspace,connectorId:connector,preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
+  const first=await f.bridge.dispatch('factory-first',reserve('factory-first','Create a line counter'));await until(()=>f.runs.length===1);
+  assert.equal(f.runs[0].input.cwd,realpathSync(f.root));assert.equal(f.runs[0].input.sandbox,'read-only');
+  const bound=f.runs[0].input.hostExecutionContext.factory;assert.equal(bound.slug,slug);assert.equal(bound.target,path.join(realpathSync(f.agentParent),slug));assert.equal(bound.model,'voice-pinned');
+  assert.ok(f.runtime.execution.claims().some(row=>row.mode==='write' && row.detail.workspacePath===bound.target));
+  const queued=await f.bridge.dispatch('factory-second',reserve('factory-second','Continue the contract'));assert.equal(queued.task.state,'queued');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runs.length===2);assert.deepEqual(f.runs[1].input.hostExecutionContext.factory,bound);
+  f.runs[1].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+  const worker=f.make();await new VoiceTaskBridge({bindings:f.bindings,backend:providerVoiceTaskBackend(worker)}).dispatch('factory-third',reserve('factory-third','Continue after restart'));await until(()=>f.runs.length===3);assert.deepEqual(f.runs[2].input.hostExecutionContext.factory,bound);
+  await assert.rejects(worker.start(first.topic.chatId,{clientMessageId:'factory_redirect',subject:{kind:'child',slug:'another',phase:'interview'},input:[{type:'text',text:'Switch'}]}),{code:'runtime_identity_mismatch'});
+  f.runs[2].resolve({ok:true,processTreeExited:true});await until(()=>worker.active.size===0);
+});
+test('a factory cannot start without host approvals or through an ordinary HTTP-style creation',async t=>{
+  const f=fixture(t),workspace={mode:'read-only',factorySlug:'factory-child'},subject={kind:'child',slug:'factory-child',phase:'interview'};
+  await assert.rejects(f.runtime.create({clientThreadId:'plain_factory_creation',workspace,subject}),{code:'voice_factory_subject_binding_required'});
+  const body={...request('Create a child'),chat:{workspace,subject}};f.bindings.reserve({taskId:'factory-missing-tools',scope:{kind:'agent',id:'factory-child'},workspace,connectorId:'neuraldeep',preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});
+  await assert.rejects(f.bridge.dispatch('factory-missing-tools',body),{code:'voice_factory_tools_unavailable'});assert.equal(f.runs.length,0);
+});
 for(const connector of ['neuraldeep','claude','openrouter','local'])test(`${connector}: existing child voice stays in its exact instance workspace through queue and restart`,async t=>{
   const f=fixture(t,connector),child=childFixture(f),body=child.reserve('child-first','Read the child');
   const first=await f.bridge.dispatch('child-first',body);await until(()=>f.runs.length===1);

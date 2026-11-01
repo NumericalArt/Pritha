@@ -8,6 +8,7 @@ import { resolvePrithaStateRoot } from "../lib/paths.mjs";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { markdownBodyText, markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
+import {privateAgentArtifactReference} from '../lib/authored-agent-memory.mjs';
 
 export const SEMANTIC_FAILURE_LOG_REL = ".private/agents-mother/semantic-memory-failures.jsonl";
 const ISOLATED_SEMANTIC_FAILURE_LOG_REL = "private/agents-mother/semantic-memory-failures.jsonl";
@@ -439,7 +440,9 @@ function formatPattern(pattern) {
 }
 
 export function patternPackMarkdown(data = {}, inputs = {}, options = {}) {
+  const reference=privateAgentArtifactReference(data.relPath,{root:options.root,memoryRoot:options.artifactMemoryRoot});
   data = redactStructuredText(data, options);
+  if(reference)data.relPath=reference;
   inputs = redactStructuredText(inputs, options);
   const date = today();
   const agentSlug = slug(data.agentName, "agent");

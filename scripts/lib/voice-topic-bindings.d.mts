@@ -3,7 +3,7 @@ import type { ProviderConnectorId, ProviderPreset } from './provider-profile.mjs
 export type VoiceTopicScope = { kind: 'agent' | 'pritha' | 'task' | 'control'; id: string; label?: string };
 export type VoiceTopicBinding = {
   topicId: string; scope: VoiceTopicScope & { generation: number }; connectorId: ProviderConnectorId;
-  preset: ProviderPreset; workspace: {mode:'read-only'|'isolated';baseRevision?:string;agentId?:string}; resolvedModelId: string | null; stateIdentity: string; chatId: string | null; sessionId: string | null;
+  preset: ProviderPreset; workspace: {mode:'read-only'|'isolated';baseRevision?:string;agentId?:string;factorySlug?:string}; resolvedModelId: string | null; stateIdentity: string; chatId: string | null; sessionId: string | null;
   clientThreadId: string; revision: number; createdAt: string; updatedAt: string;
 };
 export type VoiceTaskBinding = {

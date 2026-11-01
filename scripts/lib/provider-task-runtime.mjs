@@ -12,6 +12,7 @@ import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,ex
 import { normalizeProviderPreset } from './provider-profile.mjs';
 import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
 import {resolveProviderAgentWorkspace} from './provider-agent-workspace.mjs';
+import {voiceFactoryPaths} from '../agents-mother/voice-factory-state.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -85,6 +86,9 @@ export class ProviderTaskRuntime {
   async workspacePreview(){return inspectTaskWorkspace(this.root);}
   async create(input,{voice}={}){
     const subject=normalizeChatSubject(input?.subject);
+    const factorySlug=input?.workspace?.factorySlug;
+    if(factorySlug!==undefined && (!voice || subject?.slug!==factorySlug || subject.phase!=='interview' || input.workspace.mode!=='read-only' || input.workspace.agentId || input.workspace.baseRevision))throw failure('voice_factory_subject_binding_required');
+    const factory=factorySlug?voiceFactoryPaths({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug:factorySlug}):null;
     const child=input?.workspace?.agentId===undefined?null:resolveProviderAgentWorkspace({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent},input.workspace.agentId);
     if(child && child.agentId!==input.workspace.agentId)throw failure('provider_agent_workspace_identity');
     if(!validClient(input?.clientThreadId) || input.source!=='chat' || (input.workspace?.mode!==undefined && !['isolated','configured','read-only'].includes(input.workspace.mode)))throw failure('invalid_request','A valid chat request is required.',400);
@@ -106,12 +110,14 @@ export class ProviderTaskRuntime {
       let executionConfig={...config,modelId,sandbox,reasoningEffort:input.settings?.effortId || config.reasoningEffort};
       if(this.options.resolveConfiguration)executionConfig=await this.options.resolveConfiguration(executionConfig);
       const capabilities=await this.options.preflight({connectorId:this.connectorId,modelId:executionConfig.modelId,executionConfig},{phase:'create'});
+      if(factory && (capabilities.approvals!==true || capabilities.tools!==true))throw failure('voice_factory_tools_unavailable');
       if(child && resolveProviderAgentWorkspace({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent},child.agentId).source!==child.source)throw failure('provider_agent_workspace_identity');
       if(voice && sandbox==='workspace-write' && !(await inspectTaskWorkspace(child?.source || this.root)).git)throw failure('voice_workspace_isolation_required','Voice write tasks require a committed Git project.');
       privateStateDirectory(this.stateRoot,path.join(this.privateRoot,'workspaces'));
       const workspace=await prepareTaskWorkspace({coordinator:this.execution,source:child?.source || this.root,directory:path.join(this.privateRoot,'workspaces'),id:this.connectorId+':'+input.clientThreadId,
         mode:sandbox==='read-only'?'read-only':'worktree',baseRevision:input.workspace?.baseRevision});
       if(child)workspace.agentId=child.agentId;
+      if(factory){workspace.factorySlug=factory.slug;workspace.factoryTarget=factory.target;}
       const result=this.registry.create({clientThreadId:input.clientThreadId,request,title:input.title,modelId:executionConfig.modelId,effortId:executionConfig.reasoningEffort,timeoutMs:executionConfig.timeoutMs,
         workspacePath:workspace.cwd,workspace,capabilitySnapshot:capabilities,executionConfig,...(subject?{subject}:{}),...(voice?{voice:{topicId:voice.topicId,generation:voice.generation}}:{})});
       this.changed(result.binding.chatId);return {binding:result.binding,replayed:!result.created};
@@ -184,6 +190,7 @@ export class ProviderTaskRuntime {
         if(child.agentId!==binding.workspace.agentId || child.source!==binding.workspace.source)throw failure('provider_agent_workspace_identity');
       }
       const capabilities=await this.options.preflight(binding,{phase:'turn'});
+      if(binding.workspace.factorySlug && (capabilities.approvals!==true || capabilities.tools!==true))throw failure('voice_factory_tools_unavailable');
       const attachments=await this.attachmentInput(binding,input,{phase:'turn',expected:queue?.attachmentReceipt || intent.attachmentReceipt,retain:true});
       if(attachments.files.length && !intent.attachmentReceipt)intent=this.execution.updateIntent(key,{attachmentReceipt:attachments.receipt},intent.revision);
       const lease=this.execution.claim(['provider-thread:'+this.registry.scope+':'+chat,'chat-binding:'+chat],key,{kind:'turn',capacity:this.execution.admission().capacity,detail:{chatId:chat,connectorId:this.connectorId,intentKey:key}});
@@ -192,6 +199,10 @@ export class ProviderTaskRuntime {
       try{
         const policy=taskWorkspaceResources(binding.workspace,binding.executionConfig.sandbox);
         if(!this.execution.extend(lease.owner,lease.generation,policy.resources,{mode:policy.mode}) || !this.execution.extend(lease.owner,lease.generation,['execution-ambient-effects'],{mode:'read'}))throw failure('workspace_busy','Another task owns this workspace.');
+        if(binding.workspace.factorySlug){
+          const factory=voiceFactoryPaths({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug:binding.workspace.factorySlug});
+          if(factory.target!==binding.workspace.factoryTarget || !this.execution.extend(lease.owner,lease.generation,['workspace:'+factory.target]))throw failure('workspace_busy','Another task owns this factory target.');
+        }
         if(capabilities.parallelLimit!==undefined){
           const limit=capabilities.parallelLimit;
           if(!Number.isSafeInteger(limit) || limit<1 || limit>64)throw failure('provider_limits_unknown');
@@ -235,7 +246,7 @@ export class ProviderTaskRuntime {
         ...(binding.subject?{factorySubject:binding.subject}:{}),
         images:delivery.images || [],...(delivery.attachmentManifest?{attachmentManifest:delivery.attachmentManifest}:{}),signal:active.controller.signal,
         ...(delivery.hostAttachments?{hostAttachments:delivery.hostAttachments}:{}),
-        ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
+        ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease,...(binding.workspace.factorySlug?{factory:{slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,agentParent:this.options.agentParent,preset:binding.executionConfig,model:binding.modelId,effort:binding.effortId}}:{})},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
         beforeStart:async proof=>{
           active.lease.assertOwned();
           if(binding.profileIdentity && binding.profileIdentity!==proof.identity)throw failure('runtime_identity_mismatch');

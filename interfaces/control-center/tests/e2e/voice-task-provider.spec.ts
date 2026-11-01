@@ -21,6 +21,10 @@ test('public Voice task stays with Local and shows its explicit blocker after ch
     expect(task.status).toBe('waiting_for_operator');
     const detail=(await(await page.request.get(`/api/realtime/codex-task/${encodeURIComponent(task.task_id)}`)).json());
     expect(detail.connector_id).toBe('local');expect(detail.complete).toBe(false);expect(detail.status_detail.error_code).toBe('provider_unavailable');
+    const creation=await(await page.request.post('/api/realtime/tool',{data:{name:'run_codex_task',arguments:{task:'Create a local line-counting agent from the complete product brief.',task_type:'agent_creation',write_mode:'workspace_write',subject_kind:'agent',subject_id:'voice-factory-e2e',continuation_mode:'force_new',operator_confirmation:'Да, ТЗ полностью проговорено, запускай.'}}})).json();
+    expect(creation.ok).toBe(true);expect(creation.connector_id).toBe('local');expect(creation.effective_transport).toBe('task-chat');expect(creation.fallback_transport).toBeNull();
+    const factoryDetail=(await(await page.request.get(`/api/realtime/codex-task/${encodeURIComponent(creation.task_id)}`)).json());
+    expect(factoryDetail.complete).toBe(false);expect(factoryDetail.status_detail.error_code).toBe('provider_unavailable');
     await save({activeConnectorId:'codex'});
     const inspected=await(await page.request.post('/api/realtime/tool',{data:{name:'inspect_codex_task',arguments:{task_id:task.task_id}}})).json();
     expect(inspected.ok).toBe(true);

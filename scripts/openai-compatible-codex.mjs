@@ -47,8 +47,8 @@ export function buildCompatibleCodexArgs(options){
     // approval before executing. The CLI must not add an unanswerable prompt.
     config['mcp_servers.pritha.default_tools_approval_mode']='approve';
     config['mcp_servers.pritha.startup_timeout_sec']=10;
-    config['mcp_servers.pritha.tool_timeout_sec']=180;
-    config['mcp_servers.pritha.enabled_tools']=PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>tool.name);
+    config['mcp_servers.pritha.tool_timeout_sec']=options.hostExecutionContext?.factory?Math.ceil(options.timeoutMs/1000)+5:180;
+    config['mcp_servers.pritha.enabled_tools']=(options.toolServer.definitions || PROVIDER_HOST_TOOL_DEFINITIONS).map(tool=>tool.name);
   }
   if(Number.isSafeInteger(options.modelContextTokens) && options.modelContextTokens>0)config.model_context_window=options.modelContextTokens;
   const args=['exec',...(options.resume?['resume']:[]),'--json','--strict-config','--ignore-user-config','--ignore-rules','--skip-git-repo-check','-m',options.model];
@@ -94,7 +94,7 @@ export async function startCompatibleRun(options,dependencies={}){
       toolServer=await listenProviderToolServer({hostTools});
     }
     adapter=await (dependencies.listenAdapter || listenCompatibleAdapter)({connectorId:provider,localToken,...(localServer?{baseUrl:localServer.baseUrl}:{apiKey:key}),model:options.model,effort:options.effort || 'default',reasoningControl:options.reasoningControl,thinkingBudget:options.thinkingBudget,
-      allowedTools:toolServer?PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name):[],
+      allowedTools:toolServer?hostTools.definitions.map(tool=>'mcp__pritha__'+tool.name):[],
       timeoutMs:options.timeoutMs,hardDeadlineAt:deadline,maxOutputTokens:options.maxOutputTokens || 16384,fetchImpl:dependencies.fetchImpl,dispatcher:dependencies.dispatcher,
       ...(budget?{prepareRequest:(payload,context)=>budget.begin(payload,context)}:{}),
       beforeRequest:async request=>{if(controller.signal.aborted)throw failure('operator_cancel');await localServer?.verify();await options.beforeRequest?.(request);},

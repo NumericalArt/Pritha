@@ -118,9 +118,11 @@ provider billing, local model compatibility or user acceptance.
 
 ## Remaining limits
 
-- Claude local CLI session authentication and external-provider voice creation
-  are not yet implemented. The operator explicitly chose to finish both in this
-  task. Claude API and five factory build executors already exist.
+- Claude local CLI session authentication is implemented in `c0c2ee2`;
+  external-provider voice creation is implemented with private bound artifacts,
+  two separate approvals and the canonical delivery gates. Focused synthetic
+  and owned-process checks pass; the refreshed full gate and real provider
+  acceptance remain required. Both modes stay in this task's scope.
   Official [authentication](https://code.claude.com/docs/en/authentication) and
   [credential-use](https://code.claude.com/docs/en/legal-and-compliance) documentation
   was rechecked on 2026-11-01: a native session must use the unmodified CLI and

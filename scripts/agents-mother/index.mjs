@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { resolvePrithaMemoryDatabase } from "../lib/state-files.mjs";
 import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
+import {privateAgentArtifactReference} from '../lib/authored-agent-memory.mjs';
 import { parseLongArgs as parseArgs } from "../lib/cli-args.mjs";
 
 import { execFileSync } from "node:child_process";
@@ -847,7 +848,7 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   return data;
 }
 
-async function interview(options) {
+export async function interview(options) {
   options=prepareInterviewOptions(options);
   ensureDirs();
   const interactive = Boolean(process.stdin.isTTY && !options["no-input"]);
@@ -895,6 +896,7 @@ async function interview(options) {
   } else {
     console.log("Contract validation passed.");
   }
+  return {contractPath:outPath,outcomePath,reused};
 }
 
 export function createInterviewArtifacts(data,{contractOnly=false,idempotent=true}={}){
@@ -983,7 +985,7 @@ function writePatternPack(data, researchContext, options = {}) {
   const written = writeUniqueArtifact(
     path.join(RESEARCH_DIR, `${today()}-${slug(data.agentName)}-agent-pattern-pack.md`),
     ({ artifactId }) => {
-      pack = patternPackMarkdown(data, { ...researchContext, semantic }, { ...options, artifactId });
+      pack = patternPackMarkdown(data, { ...researchContext, semantic }, { ...options, artifactId,root:ROOT,artifactMemoryRoot:AGENT_MEMORY_ROOT });
       return pack.text;
     },
   );
@@ -1099,7 +1101,10 @@ function formatExternalResearchTopics(topics) {
 }
 
 export function researchMarkdown(data, memoryResults, domainResults, knownDocs, skillSelection, options = {}) {
+  const references={contract:privateAgentArtifactReference(data.relPath,{root:ROOT,memoryRoot:options.artifactMemoryRoot}),pattern:privateAgentArtifactReference(options.patternPack?.relPath,{root:ROOT,memoryRoot:options.artifactMemoryRoot})};
   [data, memoryResults, domainResults, knownDocs, skillSelection, options] = redactStructuredText([data, memoryResults, domainResults, knownDocs, skillSelection, options], { root: ROOT });
+  if(references.contract)data.relPath=references.contract;
+  if(references.pattern && options.patternPack)options.patternPack.relPath=references.pattern;
   const date = today();
   const agentSlug = slug(data.agentName);
   const title = `${data.agentName || agentSlug} agent architecture research`;
@@ -1354,7 +1359,7 @@ Run external verification for the checklist above, update this review or the con
   );
 }
 
-async function researchContract(contractPath, options = {}) {
+export async function researchContract(contractPath, options = {}) {
   ensureDirs();
   const data = contractData(contractPath);
   const validationIssues = validateContract(data.fullPath, { print: false });
@@ -1380,6 +1385,7 @@ async function researchContract(contractPath, options = {}) {
       patternPack,
       repositoryResearch,
       artifactId,
+      artifactMemoryRoot:AGENT_MEMORY_ROOT,
     }),
   );
   const outPath = written.path;
@@ -1396,6 +1402,7 @@ async function researchContract(contractPath, options = {}) {
     for (const issue of validationIssues) console.log(`- ${issue}`);
   }
   console.log("Next: complete external verification checklist before scaffold.");
+  return {reportPath:outPath,patternPath:path.resolve(ROOT,patternPack.relPath),validationIssues};
 }
 
 function patternResearchContract(contractPath, options = {}) {
@@ -1535,7 +1542,7 @@ function readEvidenceInput(inputPath) {
   }
 }
 
-async function externalResearchContract(contractPath, options = {}) {
+export async function externalResearchContract(contractPath, options = {}) {
   ensureDirs();
   const data = contractData(contractPath);
   const report = findResearchReportFor(data);
@@ -1556,7 +1563,7 @@ async function externalResearchContract(contractPath, options = {}) {
     else if(phase==='collect')result=await host.collect({retryFailed:options['retry-failed']===true,sourceUrls:options.sources?readEvidenceInput(options.sources):{}});
     else if(phase==='apply' && hasInput)result=await host.publish(readEvidenceInput(options.input),{evaluateOverallGate:text=>researchGateDecisionForReport(data,text)});
     else throw new Error('Host research requires collect, status, or apply with a selection input.');
-    console.log(JSON.stringify(result,null,2));return;
+    console.log(JSON.stringify(result,null,2));return result;
   }
 
   if (backend === "status" || (!hasInput && backend !== "last30days")) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync,mkdirSync,writeFileSync,rmSync } from 'node:fs';
+import { mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -70,5 +70,26 @@ test(connectorId+': Task Chat provider slot also blocks a factory build',async t
   const f=fixture(t,{connectorId}),db=f.coordinator(),lease=db.claim(['provider-slot:'+connectorId+':0'],'occupied-task');assert.ok(lease);
   try{await assert.rejects(f.executor.execute(f.input),{code:'provider_rate_limited'});assert.equal(f.calls.length,0);assert.equal(db.claims().length,1);}
   finally{lease.release();db.close();}
+});
+test(connectorId+': a bound waiting voice factory lends one slot without releasing its parent on completion or recovery',async t=>{
+  for(const unknown of [false,true]){
+    const f=fixture(t,{connectorId,unknown}),db=f.coordinator();db.setAdmission(true,1);
+    const target=realpathSync(path.join(path.dirname(f.input.worktree),'source')),chatId='chat_voice_factory',turnId='turn_voice_factory',operationId='factory_deliver_001';
+    const parent=db.claim(['workspace:'+target,'provider-slot:'+connectorId+':0'],'voice-parent',{kind:'turn',capacity:1,detail:{chatId,connectorId}});assert.ok(parent);
+    const factoryParent={owner:parent.owner,generation:parent.generation,chatId,turnId,operationId,target},key='provider-tool:'+turnId+':'+operationId;
+    db.reserveIntent(key,'a'.repeat(64),{kind:'provider-tool',tool:'factory_step',state:'running',factoryAction:'deliver',factoryTarget:target,connectorId,...factoryParent});db.updateIntent(key,{state:'running'});
+    f.executor.options.factoryParent=factoryParent;const parentCount=db.claims().length;
+    if(unknown){let saved;await assert.rejects(f.executor.execute(f.input),error=>{saved=error.details.executorResult;return error.code==='goal_usage_unavailable';});assert.ok(db.claims().length>parentCount);
+      const recovery=new f.Executor({root,service:f.service,launch:f.launch,proveExit:()=>true});await recovery.recover(f.input,saved);recovery.close();
+    }else assert.equal((await f.executor.execute(f.input)).status,'completed');
+    assert.equal(f.calls.length,1);assert.equal(db.claims().length,parentCount);parent.assertOwned();parent.release();db.close();
+  }
+});
+test(connectorId+': a forged or stale factory parent cannot bypass occupied capacity',async t=>{
+  const f=fixture(t,{connectorId}),db=f.coordinator();db.setAdmission(true,1);
+  const target=realpathSync(path.join(path.dirname(f.input.worktree),'source')),chatId='chat_voice_factory',turnId='turn_voice_factory',operationId='factory_deliver_001';
+  const parent=db.claim(['workspace:'+target,'provider-slot:'+connectorId+':0'],'voice-parent',{kind:'turn',capacity:1,detail:{chatId,connectorId}});
+  f.executor.options.factoryParent={owner:parent.owner,generation:parent.generation,chatId,turnId,operationId,target};
+  await assert.rejects(f.executor.execute(f.input),{code:'factory_delegation_invalid'});assert.equal(f.calls.length,0);parent.assertOwned();parent.release();db.close();
 });
 }

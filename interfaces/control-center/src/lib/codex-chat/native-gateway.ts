@@ -54,7 +54,7 @@ export type CreateThreadInput = {
   clientThreadId: string;
   title?: string;
   source: "chat";
-  workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only";agentId?:string};
+  workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only";agentId?:string;factorySlug?:string};
   settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
 };
 

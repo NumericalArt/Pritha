@@ -6,6 +6,7 @@ import { prepareProviderSandbox } from './provider-sandbox.mjs';
 import { providerProcessEnvironment,createProviderTemporaryDirectory } from './provider-process-environment.mjs';
 import { spawnSupervisedCli } from '../neuraldeep/process-supervisor.mjs';
 import { resolvePrithaPython } from './python-runtime.mjs';
+import {ProviderFactoryTools,PROVIDER_FACTORY_TOOL} from './provider-factory-tools.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const validId=value=>typeof value==='string' && /^[A-Za-z0-9_-]{8,128}$/.test(value);
@@ -30,7 +31,8 @@ export const PROVIDER_HOST_TOOL_DEFINITIONS=[
  * immutable receipt. Model arguments never select a credential, root or policy. */
 export class ProviderHostTools {
   constructor(options){this.options=options;this.cwd=realpathSync(options.cwd);this.pending=new Map();this.commands=new Set();this.serial=Promise.resolve();this.closed=false;this.exitConfirmed=true;this.calls=0;this.commandCount=0;
-    this.definitions=[...PROVIDER_HOST_TOOL_DEFINITIONS,...(options.search?.definitions || [])];
+    this.factory=options.factory?new ProviderFactoryTools(this):null;
+    this.definitions=[...PROVIDER_HOST_TOOL_DEFINITIONS,...(options.search?.definitions || []),...(this.factory?[PROVIDER_FACTORY_TOOL]:[])];
     if(options.protectedPaths!==undefined && (!Array.isArray(options.protectedPaths) || options.protectedPaths.length>256))throw fail('provider_tool_policy_invalid');
     this.protectedPaths=(options.protectedPaths || []).map(value=>this.target(value));
   }
@@ -55,6 +57,7 @@ export class ProviderHostTools {
   saved(operationId){const file=this.resultPath(operationId);if(!existsSync(file))throw fail('provider_tool_result_missing');try{return JSON.parse(this.read(file,20*1024*1024).toString('utf8'));}catch(error){throw error.code?error:fail('provider_tool_result_invalid');}}
   async call(name,input){
     this.check();if(++this.calls>10000)throw fail('provider_tool_call_limit');
+    if(name==='factory_step' && this.factory?.isRead(input))return text(this.factory.read(input));
     if(['web_search','read_page'].includes(name)){
       if(!this.options.search)throw fail('provider_tool_unknown');
       const result=await this.options.search.call(name,input);this.check();return result;
@@ -78,7 +81,7 @@ export class ProviderHostTools {
     if(name==='read_result'){
       fields(input,['operation_id','offset','length']);const saved=this.saved(input.operation_id);return text({...this.window(saved.output,input),status:saved.status,exitCode:saved.exitCode ?? null});
     }
-    if(!['write_file','edit_file','run_command','ask_user'].includes(name))throw fail('provider_tool_unknown');
+    if(!['write_file','edit_file','run_command','ask_user',...(this.factory?['factory_step']:[])].includes(name))throw fail('provider_tool_unknown');
     if(!validId(input?.operation_id))throw fail('provider_tool_input_invalid');
     const key='provider-tool:'+this.options.turnId+':'+input.operation_id,requestHash=hash(JSON.stringify([name,input]));
     const existing=this.options.coordinator.getIntent(key);
@@ -94,7 +97,9 @@ export class ProviderHostTools {
     if(prior?.state==='completed' || prior?.state==='declined'){const saved=this.saved(input.operation_id);return {...text({...this.window(saved.output,{}),status:saved.status,exitCode:saved.exitCode ?? null,operationId:input.operation_id}),isError:saved.status!=='completed'};}
     if(prior)throw fail('provider_tool_execution_unconfirmed');
     let presentation,kind,perform;
-    if(name==='write_file' || name==='edit_file'){
+    if(name==='factory_step'){
+      ({kind,presentation,perform}=this.factory.prepare(input));
+    }else if(name==='write_file' || name==='edit_file'){
       fields(input,name==='write_file'?['operation_id','path','content','expected_sha256']:['operation_id','path','old_text','new_text','expected_sha256']);
       if(this.options.sandbox!=='workspace-write' || input.expected_sha256!==null && !/^[a-f0-9]{64}$/.test(input.expected_sha256 || ''))throw fail('provider_tool_write_denied');
       const target=this.target(input.path,{missing:name==='write_file'});if(this.protectedPaths.includes(target))throw fail('provider_protected_trial_input');
@@ -131,11 +136,11 @@ export class ProviderHostTools {
       fields(input,['operation_id','question']);if(typeof input.question!=='string' || !input.question.trim() || input.question.length>2000)throw fail('provider_tool_input_invalid');
       kind='user_input';presentation={questions:[{id:'question_001',question:input.question,isSecret:false}]};perform=async response=>({status:'completed',output:JSON.stringify(response.answers)});
     }
-    coordinator.reserveIntent(key,requestHash,{kind:'provider-tool',chatId:this.options.chatId,turnId:this.options.turnId,operationId:input.operation_id,tool:name,owner:this.options.lease.owner,generation:this.options.lease.generation});
+    coordinator.reserveIntent(key,requestHash,{kind:'provider-tool',chatId:this.options.chatId,turnId:this.options.turnId,operationId:input.operation_id,tool:name,owner:this.options.lease.owner,generation:this.options.lease.generation,...(name==='factory_step'?{factoryAction:input.action,factoryTarget:this.factory.paths.target,connectorId:this.options.connectorId}:{})});
     coordinator.updateIntent(key,{state:'approval_pending'});
     let result;
     try{
-      const response=await this.options.approve({operationId:input.operation_id,kind,presentation,reason:name==='ask_user'?'The task needs your answer.':'Review the exact action before it runs in the task workspace.'});
+      const response=await this.options.approve({operationId:input.operation_id,kind,presentation,reason:name==='ask_user'?'The task needs your answer.':name==='factory_step'?'Review this exact factory step. Contract approval, Outcome approval and final acceptance are separate decisions.':'Review the exact action before it runs in the task workspace.'});
       this.check();
       if(kind!=='user_input' && response.decision!=='accept')result={status:'declined',output:'The operator declined this action.'};
       else{coordinator.updateIntent(key,{state:'running'});result=await perform(response);}

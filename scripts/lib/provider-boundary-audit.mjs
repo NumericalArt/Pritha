@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const providers=['neuraldeep','claude','openrouter','local'];
 const network={neuraldeep:['neuraldeep-responses-adapter','neuraldeep-owned-runner'],claude:['claude-api-proxy','claude-owned-runner','claude-native-auth','claude-native-tunnel'],openrouter:['compatible-responses-adapter','compatible-owned-runner'],local:['compatible-responses-adapter','compatible-owned-runner','owned-local-server']};
-const common={secrets:['provider-credentials','agent-credential-store','provider-process-environment','redaction-encoded-input','redaction-paths'],network:['provider-process-environment','provider-sandbox','provider-host-tools']};
+const common={secrets:['provider-credentials','agent-credential-store','provider-process-environment','redaction-encoded-input','redaction-paths'],network:['provider-process-environment','provider-sandbox','provider-host-tools','provider-voice-factory']};
 export function providerBoundaryAuditPlan({kind,connector='neuraldeep'}={}){
   if(!Object.hasOwn(common,kind)||!providers.includes(connector)&&connector!=='all')throw new Error('provider_boundary_audit_selection_invalid');
   const selected=connector==='all'?providers:[connector];

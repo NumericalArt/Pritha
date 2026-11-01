@@ -114,6 +114,15 @@ Ollama/LM Studio listener can be discovered without being declared offline.
 Cloud speech and Search are disabled for Local. For online connectors, choose
 Voice Auto or an explicitly configured voice engine in Settings.
 
+Voice can create a new child through the selected external task provider. Confirm
+the complete product brief and choose a stable child slug. The factory prepares
+private Contract and Outcome drafts for two separate reviews, then runs the
+canonical research, scaffold, isolated build and protected Trials. Normal task
+tools keep the Pritha checkout read-only. Review each host action in Task Chat;
+successful Trials still require a live card check, demonstration and manual
+acceptance. No step publishes, deploys or starts services. An uncertain stopped
+step retains its evidence and must be reconciled before it can run again.
+
 ## Run and check
 
 For an explicitly requested standalone development instance, `bootstrap start`

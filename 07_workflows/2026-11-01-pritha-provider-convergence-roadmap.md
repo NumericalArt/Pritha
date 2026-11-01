@@ -2210,6 +2210,45 @@ unit child environment отдельно и изолировать оба aliases
   entitlement и paid inference остаются ручными проверками. Good State alignment
   — aligned; production/MacBook/GitHub не изменены. Далее external voice factory.
 
+### Checkpoint 40 — external-provider voice factory
+
+- Для NeuralDeep, Claude, OpenRouter и Local voice `agent_creation` связывается
+  с одним новым child slug и private factory session. Общие инструменты сохраняют
+  read-only корень Pritha. Узкий `factory_step` выполняет только фиксированные
+  действия для этого ребёнка; модель не выбирает исполняемый код, state root,
+  соседний checkout или каталог назначения.
+- Реальные owned workers вызывают canonical interview, research, scaffold,
+  delivery и card-readiness. Contract и Outcome проходят отдельные host approvals
+  с полным содержимым и SHA-256. Spoken brief confirmation не заменяет эти решения.
+  Изменённые после review документы, подмена identity, foreign artifacts и
+  неизвестные результаты останавливают дальнейшие изменения.
+- Вложенная сборка использует pinned backend/model и отдельный lease. Пока
+  родитель ожидает `factory_step`, она может занять его единственный provider slot;
+  только один child получает эту возможность. Recovery дочерней сборки не снимает
+  родительский lease. Claude factory использует явно показанный API lane с host
+  token reservation; native account credentials не копируются.
+- Вызовы сохраняют operation identity и run ID до dispatch. Stop завершает owned
+  worker tree; неизвестный исход удерживает fence и не разрешает повтор платной
+  работы. Queue/restart сохраняют child, provider и preset. Полная ручная приёмка,
+  merge, публикация, credentials provisioning и services не автоматизируются.
+- Исследования сохраняют разрешимые ссылки только на существующие exact private
+  artifacts, включая external state под временным каталогом. Произвольный текст
+  и пути вне private artifact boundary по-прежнему проходят redaction. Исходный
+  дефект обнаружен actual worker test, а не заменён исключением research gate.
+- Проверено: scoped routing/build suite **62/62**; расширенный actual factory
+  lifecycle **4/4**, включая separate approval/CAS, memory research, pinned
+  delivery, card blocker, Stop и неизвестный исход. TypeScript pass. Итоговые
+  quality/browser/boundary gates запускаются после этой реализации.
+- Factory MCP deadline ограничен временем задачи; CLI не должен фоново завершать
+  ожидающий host action. Сверено 2026-11-01 с официальными
+  [Claude environment variables](https://code.claude.com/docs/en/env-vars) и
+  [MCP time limits](https://code.claude.com/docs/en/mcp), installed CLI 2.1.296.
+- Good State alignment: additive/aligned. Оба обязательных режима реализованы;
+  production activation, реальные auth/model/microphone/child checks и R12
+  acceptance остаются открытыми. MacBook/GitHub и managed service не изменены.
+  Временный каталог ранних логов исчез; новые протоколы сохраняются в private
+  release preparation directory, текущий candidate получает новый полный gate.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

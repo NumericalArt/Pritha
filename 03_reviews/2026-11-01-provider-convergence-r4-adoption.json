@@ -193,7 +193,7 @@
       "path": "scripts/neuraldeep-codex.mjs",
       "source_sha256": "5ba3bae9c83e0392ae89ec05de166f6108d0bc0d1afde0c1f8f8c9d7d7343dba",
       "adoption": "function-level adaptation into owned runner; canonical state roots, isolated HOME and OS sandbox, host MCP tools and exact approvals, composite process evidence, shared immutable files, server-only credential, protected loopback adapter, no automatic replay",
-      "target_sha256": "ac187ae1d588ae481f487667073cc4f59adee972ad36362697dfcd7151132602"
+      "target_sha256": "aeac59a0d8819564a4c13c0ebb0c73c89fe0fc0fe03f8d123a3b59b17f75978b"
     },
     {
       "path": "scripts/neuraldeep/account-snapshot.mjs",
@@ -407,7 +407,7 @@
       "path": "START_HERE.md",
       "source_sha256": "30af3a5441df48ad332fd8a2f3d303eeb6c75d3abc2b77992b5da7252613ae3e",
       "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
-      "target_sha256": "7354edf891f2d9d7f465bc0787401fe0907a4c006966ab7a96ddd0a0d975cb54"
+      "target_sha256": "45da2747e879600812cf7d0fdfd1f5e804e8b0e06cab91314ec43aaf4d2a9108"
     },
     {
       "path": "scripts/audit-neuraldeep-secret-leaks.mjs",
@@ -427,7 +427,7 @@
       "path": "scripts/lib/provider-boundary-audit.mjs",
       "source_path": "scripts/audit-neuraldeep-runtime-network.mjs",
       "source_sha256": "efd6f99c067319b8ea6f1e071dbca92b1378cd0a5880c2b98b82229ea050e70f",
-      "target_sha256": "1238ba578666b0d80c25736f3be5effdbd83582894bc4f032a27dc57311042f5",
+      "target_sha256": "4a777ab8bda26d454e9e8f55dc99e9ffb58658282a5ead18656f870564d6df8f",
       "adoption": "Shared reviewed audit entry point, fixed bounded test inventory, clean temporary HOME, sanitized counts and diagnostic hash; native auth remains untouched."
     }
   ]
