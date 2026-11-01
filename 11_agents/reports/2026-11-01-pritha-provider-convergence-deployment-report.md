@@ -31,31 +31,56 @@ receipts are private under the instance state root.
 
 ## Prepared evidence
 
-- Tested candidate baseline: `0c10dd0fd9c4dcf97489115887fc9b1023ef5e00`.
-  The subsequent CLI path repair has a separate 15/15 targeted gate. Final exact
+- Tested implementation: `6a9402cc0c1fa3ca1b3beee07e4ad06664aef053`, including
+  both required additional modes. A subsequent test-only repair has a separate
+  24/24 targeted gate and refreshed full unit gate. Final exact
   local commit/build identity is recorded in the private preparation receipt
   after staging is refreshed; activation must match that receipt.
-- Full quality gate: all eight check groups passed, including 1410/1410 unit
-  tests and zero skips. Self-test: 1408/1408, no warnings/regressions. Targeted
-  bootstrap repair: 13/13; subsequent instance-path CLI repair: 15/15.
-- Final full browser run: **161/161**. The earlier 159/160 run and one read-only
+- Full quality gate: all eight check groups passed, including **1443/1443** unit
+  tests and zero skips. Its first refreshed run had 1437 passes and two stale
+  tests: a source-extraction delimiter and the superseded factory-creation
+  blocker. Both are repaired; four public factory-route checks were added.
+  Historical self-test before the two additional modes: 1408/1408, no warnings.
+  Targeted bootstrap repair: 13/13; instance-path CLI repair: 15/15.
+- Final full browser run: **163/163**. The earlier 159/160 run and one read-only
   voice-status ECONNRESET remain recorded; no assertion or retry policy changed.
 - Real production staging copied into an isolated `.next`: 5 pages and 12
   referenced JS chunks passed; all owned probe processes exited.
   An initial probe compared the full source SHA to the health contract's
   12-character SHA; its checker was corrected to the actual contract and the
   exact expected prefix verified. The original failed probe is retained.
-- Synthetic credential audit 18/18 and real OS/network boundary audit 67/67,
+- Synthetic credential audit **23/23** and real OS/network boundary audit **80/80**,
   zero skips. No real credentials or paid provider requests used by these audits.
 - Fresh Local bootstrap passed through real dependency installation, memory,
-  offline cached embeddings, search, typecheck and production build. Connecting
-  a real model remains pending. Minimal ZIP preparation/idempotence passed earlier.
+  offline cached embeddings, search, typecheck and production build. Real owned
+  llama.cpp / Qwen3 4B CPU inference, host file-tool access and same-session resume
+  now pass. Minimal ZIP preparation/idempotence passed earlier.
+- Canonical instance Python 3.11 is installed with requirements-core. Memory
+  rebuilt to 993 documents / 11008 chunks, with 10787 offline cached embeddings.
+  Frozen retrieval acceptance passes: FTS Hit@5 45/48, Hit@10 46/48, holdout
+  Hit@5 23/24, regressions@10=0, private leaks=0 across FTS/semantic/hybrid.
 - Private recovery contains the previous build, source archive and separately
   installed dependencies from its exact lockfile. Nine unrelated untracked files
   have recorded hashes and must remain unchanged.
 - Dependency audit retains one transitive Zod advisory (two package records).
   Bounded host-authored sandbox configuration mitigations and limits are in the
   linked assessment. This is not a clean dependency audit.
+
+## Runtime incident found during preflight
+
+Read-only inspection found the installed service loaded but stopped, with
+`circuit_open` and no listener. Logs show automatic wrapper starts followed by
+`ENOENT .next/server/preview-props.json`; the old retained build was produced
+with Next 16.2.11 while installed dependencies are now Next 16.4.3. This supports
+a build/dependency mismatch after automatic restart. No operator stop/start was
+performed by this task; the reason for the initial automatic restart is unproven.
+
+The new matched build/dependency pair passed isolated strict health. Activation
+must replace the pair coherently, clear the circuit only through the managed
+start operation, then verify operational health. Rollback must use the retained
+old dependencies with the old source and build. Swapping only an old `.next`
+into the new dependency tree is not a valid recovery. Future dependency updates
+must preserve a runnable current pair until the managed activation transaction.
 
 ## Controlled activation sequence
 
@@ -106,13 +131,14 @@ provider billing, local model compatibility or user acceptance.
 | 4. Switch all configured providers and return | Per-provider model/effort/timeout preserved; only ready providers in fast selector | Existing chats keep their pinned provider/model; errors do not fall back |
 | 5. NeuralDeep task and resume | Own key, selected model, limits/wallet display, text/file/verified PNG and host tools work | One bounded live task, usage/receipt, approval result |
 | 6. Claude API task and resume | Own API key, exact model, guarded tools, stop/queue, billing/cache usage | No extraction of native CLI OAuth or inherited credentials |
+| 6a. Claude native CLI session | Explicit sign-in through the unmodified CLI; native task/resume and guarded tools | Separate instance account, no API fallback or OAuth extraction; factory API requirement remains explicit |
 | 7. OpenRouter task and resume | Own key and exact model; tool approvals and usage correct | No silent model routing or fallback |
 | 8. Owned Local model | Configured command/model starts as owned process; real answer/file access succeeds offline | Remote and foreign loopback denied; process tree exits; no cloud key reads |
 | 9. Agent pilot | Interview, separate contract/outcome reviews, research, scaffold, delivery and protected Trials | Selected backend, budget/cache/turns, real output and isolation; no mocked claim |
 | 10. Realtime 2 | Default engine, nine tools, private Good State capture, memory and task handoff | Actual mic/speaker interaction; no spurious task for a Good State signal |
 | 11. Voice continuity | Interruption, reconnect/browser restart, persistent topic, handoff recovery and decision answers | Task identity unchanged; no duplicate dispatch; music ducking and manual volume preserved |
 | 12. Explicit Live and NeuralDeep Voice | Only explicitly selected engine runs; Auto preview matches configured provider | Real session, stop/reconnect; unavailable credentials remain explicit |
-| 13. Voice to child workspace and factory | Correct instance/child context and selected task provider; separate creation approvals | No other instance or sibling access; unresolved creation mode remains pending |
+| 13. Voice to child workspace and factory | Correct instance/child context and selected task provider; separate Contract/Outcome approvals, research, delivery and Trials | No other instance or sibling access; observe a real factory lifecycle and pending manual acceptance |
 | 14. Reviewed Brief Desk example | Own settings, offline demo, separate child artifacts and safe repeated import | No inherited parent key or Telegram send; actual sending requires its own instruction |
 | 15. Branding and restart | Primary Pritha names, legacy state preserved, migrated SQLite and setup readable | Before/after document counts; health after managed restart; recovery receipt |
 
@@ -121,15 +147,24 @@ provider billing, local model compatibility or user acceptance.
 - Claude local CLI session authentication is implemented in `c0c2ee2`;
   external-provider voice creation is implemented with private bound artifacts,
   two separate approvals and the canonical delivery gates. Focused synthetic
-  and owned-process checks pass; the refreshed full gate and real provider
-  acceptance remain required. Both modes stay in this task's scope.
+  and owned-process checks, refreshed full quality, browser and boundary gates
+  pass. Real provider acceptance remains required. Both modes stay in scope.
   Official [authentication](https://code.claude.com/docs/en/authentication) and
   [credential-use](https://code.claude.com/docs/en/legal-and-compliance) documentation
   was rechecked on 2026-11-01: a native session must use the unmodified CLI and
   Anthropic's own sign-in flow; Pritha must not collect or intermediate its OAuth
   credentials. The API-key proxy is not evidence that this separate lane works.
-- No real local engine/model is installed for this acceptance run; its selection
-  and live proof are pending. Synthetic owned-model tests passed.
+- Local uses verified [llama.cpp v0.8.0 / b11960](https://github.com/ggml-org/llama.cpp/releases/tag/b11960)
+  and official [Qwen3 4B Q4_K_M](https://huggingface.co/Qwen/Qwen3-4B-GGUF/tree/bc640142c66e1fdd12af0bd68f40445458f3869b).
+  Revision, byte count and SHA-256 were verified. Real CPU Responses inference,
+  host read_file and same-session resume passed, with three task requests and
+  complete process-tree exit. The private configuration is saved without a
+  background service or changing the active task provider. Metal remains denied
+  by the existing sandbox; GPU performance is not verified. The initial 0.6B
+  attempt failed tool use and is not the selected configuration. Installed CLI
+  reports fallback model metadata and shortened skill descriptions; explicit
+  context size is pinned, and this is not cloud/provider fallback. These checks
+  establish integration, not general coding quality of the compact model.
 - Unsupported image formats/providers remain visibly gated, rather than silently
   dropping attachments. The verified PNG path is NeuralDeep with the pinned CLI.
 - Manual microphone, provider auth, real child pilot and operator acceptance are

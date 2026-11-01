@@ -187,6 +187,24 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
+Текущий срез после checkpoint 40: реализация R0–R11b, включая два обязательных
+дополнительных режима, находится на финальной проверке R12. Далее — повтор
+общего gate, реальные Local проверки, semantic memory после итоговых документов
+и managed activation. Изолированная production-сборка прошла 5 страниц и 12 JS
+chunks. Действующий сервис обнаружен в circuit_open; операторские stop/start
+в этой задаче ещё не выполнялись. Подробности — в deployment report.
+
+Последний счётчик цели: около 13 ч 53 мин / 6 071 672 токена. Это общий usage
+counter задачи, не output-токены или денежный расчёт. Оценка до рабочей локальной
+версии и приёмки: 2–4 активных часа / 0,5–1,2 млн токенов, плюс ожидание
+авторизации и ручных действий пользователя. Реальный Local protocol, живой child
+pilot и аудио остаются источниками неопределённости. Сокращение вдвое — целевой
+ориентир, пока не доказанный итог. Полные проверки повторяются только после
+существенных изменений или обнаруженных сбоев. GitHub/MacBook rollout не разрешён.
+
+Исторический прогноз ниже сохранён для сравнения; его список открытых работ
+не является текущим статусом:
+
 Срез исполнения на 2026-11-01 15:30 UTC: текущая работа — checkpoint 26c,
 NeuralDeep image delivery. Checkpoint 26c.1 (файлы/host tools) сохранён локально
 в `8da09b7`: full unit 1290/1290, targeted 102/102, browser 28/28. Image initial,
@@ -205,7 +223,7 @@ Local, фабрики и реального аудио. Ожидание опе�
 
 ### R0 — План, входные свидетельства и исходное состояние
 
-**Статус: in-progress.** Зависимости: нет. Результат: этот документ, source hashes,
+**Статус: verified-automated.** Зависимости: нет. Результат: этот документ, source hashes,
 точные pins и baseline evidence.
 
 - [x] Полностью прочитать все три приложения; сохранить все исходные пункты в
@@ -218,7 +236,7 @@ Local, фабрики и реального аудио. Ожидание опе�
 - [x] Получить read-only source snapshot по полному SHA, без secrets/state;
   сохранить file inventory и diff map canonical ↔ ND. Не исполнять fork scripts
   до чтения кода и review. Никаких install hooks из source snapshot.
-- [ ] Проверить official docs используемых protocol/CLI/API/capabilities и
+- [x] Проверить official docs используемых protocol/CLI/API/capabilities и
   установленную toolchain без чтения приватной авторизации.
 - [x] Запустить baseline quality-gate/self-test, native unit, typecheck и memory
   acceptance. Full gate записать один раз; последующие прогоны только после
@@ -230,7 +248,7 @@ fixtures/branch после review, не reset/stash пользовательск
 
 ### R1 — Сохранность Curated FTS v2 и portable Python
 
-**Статус: implemented; isolated gate passed; final instance gate pending.** Зависимость R0. Результат: общий поиск для всех профилей.
+**Статус: verified-automated; isolated и canonical instance retrieval gates passed.** Зависимость R0. Результат: общий поиск для всех профилей.
 
 - [x] Инвентаризировать `pritha_memory_retrieval.py`, `memory-retrieve.py`,
   `memory-retrieval-eval.py`, `memory-retrieval-acceptance.py`, `curated-memory.mjs`.
@@ -241,14 +259,14 @@ fixtures/branch после review, не reset/stash пользовательск
   отсутствующий/неисполняемый interpreter и bounded spawn errors.
 - [x] `query-memory curated` + search/semantic/stats backward compatibility;
   lexical path не импортирует torch/sentence_transformers и не делает network.
-- [ ] Сохранить curated `agent-building-knowledge` factory retrieval; ND exact
+- [x] Сохранить curated `agent-building-knowledge` factory retrieval; ND exact
   passage binding и bounded excerpts переносить точечно на R6.
 - [x] Сверить весь октябрьский knowledge pack из A §1.3: два intake, registry
   24 repos/10 accepted-for-review как исторический факт, все signals, шесть briefs,
   reviews MD/JSON, superseded/active decisions, три workflow, failure template.
 - [x] Проверить все шесть tests/fixtures из A §1.4; acceptance SHA-256 неизменен:
   `b6e60c6559288cce982770c64e4065f0645a54b4a45b6b724b9fe4d2dce89118`.
-- [ ] Validate/rebuild memory в изолированном state. После финальных Markdown
+- [x] Validate/rebuild memory в изолированном state. После финальных Markdown
   changes обновить authored index и embeddings по принятому workflow.
 
 **R1 gate:** memory validation/rebuild 0 ошибок; оба curated tests pass;
@@ -277,7 +295,7 @@ native history unchanged; exact model resume; no cross-provider fallback.
 
 ### R3 — Общий Task Chat facade и native driver
 
-**Статус: shared facade/queue/history verified; image delivery и live gates продолжаются.** Зависимость R2.
+**Статус: verified-automated; shared facade/queue/history, verified PNG и voice files проверены. Live acceptance — R12.** Зависимость R2.
 
 - [x] Извлечь driver types и native adapter вокруг app-server/native-control/
   native-turn-coordinator/goal-control/history-reader; сохранить canonical source.
@@ -288,7 +306,7 @@ native history unchanged; exact model resume; no cross-provider fallback.
 - [x] Не смешивать provider sessions в native history; cursor pagination,
   event replay/dedupe, reconnect, archive/rename и approvals проходят binding.
 - [x] Контрактные tests драйвера на fake backend до подключения новой сети.
-- [ ] Завершить image delivery и voice attachment handoff поверх общего store
+- [x] Завершить image delivery и voice attachment handoff поверх общего store
   и queue receipts (checkpoint 26); Local execution остаётся gated до R7.
 
 **R3 gate:** весь native chat suite; concurrency/double-submit/restart tests;
@@ -306,9 +324,9 @@ typecheck; history pagination/quotes/image annotation/scroll не дегради
   retries, output budgets, tool receipts, model pin и cleaned process env.
 - [x] ND STT/TTS/voice topics подключены через отдельные modules.
 - [x] Search Auto через отдельный host module с budgets и source evidence.
-- [ ] Перенести все relevant ND тесты с provenance, инвентаризировать реальное
+- [x] Перенести все relevant ND тесты с provenance, инвентаризировать реальное
   число файлов и subtests; «93» не hardcoded обещание полноты.
-- [ ] Audit secret leaks и runtime network адаптировать к profiles: разрешённые
+- [x] Audit secret leaks и runtime network адаптировать к profiles: разрешённые
   native строки в репозитории не должны ложно считаться ND runtime fallback.
 
 **R4 tests:** SSE chunk boundaries, tool calls, errors, timeout, abort, 429,
@@ -318,11 +336,11 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
 
 ### R5 — Claude Code: runner, decisions, build и child API
 
-**Статус: in-progress; API lane / host MCP / Task Chat / BuildExecutor и child API wiring verified; optional local CLI auth и live acceptance pending.** Зависимости R2–R4 (общие contracts, не ND subscription).
+**Статус: verified-automated; API lane, native local CLI auth, host MCP, Task Chat, BuildExecutor и child API реализованы. Реальный login и live acceptance — R12.** Зависимости R2–R4 (общие contracts, не ND subscription).
 
 - [x] Проверить current CLI flags/stream schema/SDK terms по official docs,
   локально `claude --version` bounded 5s. SDK не обязателен для CLI runner.
-- [ ] Instance Keychain для Anthropic; auth modes api-key / local-cli-session.
+- [x] Instance Keychain для Anthropic; auth modes api-key / local-cli-session.
   Не читать/извлекать OAuth. SDK без допустимого auth → pending-auth.
 - [x] `claude-code-runner.mjs`: shell:false, stdin prompt, cleaned env,
   --output-format stream-json --verbose, selected model, bounded max-turns,
@@ -428,9 +446,9 @@ active-thread switch, native feature regression и no-secret DOM/storage checks.
 
 ### R9 — Голос: shared tools и отдельные transports
 
-**Статус: in-progress.** Shared core, настройки и chained transport реализованы
-локально; persistent topics, canonical workspace routing и session snapshot
-прошли automated gates. Child workspace/intake и manual checks остаются. Зависимости R2–R8.
+**Статус: verified-automated.** Shared core, chained transport, persistent topics,
+canonical/child workspace routing, file intake и external-provider voice factory
+реализованы и проверены. Реальный звук, авторизация и ручная приёмка — R12. Зависимости R2–R8.
 
 - [x] Extract shared voice-tools dispatcher и existing transport boundaries
   небольшими проверяемыми шагами; не переписывать весь runtime одним diff.
@@ -445,21 +463,18 @@ active-thread switch, native feature regression и no-secret DOM/storage checks.
   локальные VAD assets, прерывание, browser-owned music/intake tools и usage.
 - [x] Persistent topic/task registry и внутренний bridge к общей provider queue;
   restart, idempotency, alias pin и точные operator receipts проверены на fixtures.
-- [ ] Подключить этот registry/bridge к публичным voice task tools, карточкам и
-  intake; common run-task routes to pinned selected task
-  connector, exact queue/admission handoff and cancellation. Текущая промежуточная
-  guard checkpoint 18 заменён общим binding для задач в canonical workspace.
-  Existing native task refs сохраняют исходный маршрут. Child-agent workspace
-  и file intake пока возвращают явные blockers до проверки своих transports;
-  canonical workspace прошёл unit/browser gate checkpoint 20; перечисленные
-  исключения и остальная интеграция остаются в работе.
+- [x] Подключить registry/bridge к публичным voice task tools, карточкам и
+  intake: pinned connector, queue/admission, cancellation, child workspace и
+  immutable files. Existing native task refs сохраняют исходный маршрут.
+  External-provider agent_creation проходит узкий factory_step, отдельные
+  Contract/Outcome approvals и canonical research/delivery/Trials (checkpoint 40).
 - [x] Связать активный task context и engine/session snapshot так, чтобы изменение
   default connector во время сессии не меняло provider/model существующей темы.
   В Settings обновлять Auto preview после смены task connector без потери edits.
-- [ ] Проверить browser restart/reconnect, восстановление persistent topic,
+- [x] Проверить browser restart/reconnect, восстановление persistent topic,
   unconfirmed handoff, отмену очереди и ответ на operator decision для каждого
   поддерживаемого коннектора; не считать одного успешного аудиодиалога достаточным.
-- [ ] Preserve music ducking/manual volume, interruption, reconnect, summaries,
+- [x] Preserve music ducking/manual volume, interruption, reconnect, summaries,
   private Good State capture (без создания task или поддельного UI approval).
 
 **R9 tests:** default/explicit Live; nine tools; transport routing matrix 5×3;
@@ -501,7 +516,7 @@ double Enter, lost response, stale revision/turn и mobile composition.
   сохраняются; demo setup локально/идемпотентно, без server autostart и secrets.
 - [x] Native и ND onboarding одной codebase; Claude/API/OpenRouter/Local setup,
   pending-auth/offline statuses, external runtime requirements и recovery guide.
-- [ ] Fresh sandbox install/upgrade from legacy config, no runtime data copied;
+- [x] Fresh sandbox install/upgrade from legacy config, no runtime data copied;
   CLI --help, samples, manifests и selected modules coherent.
 
 **R11 gate:** bootstrap dry-run + isolated prepare, dependency/venv resolution,
@@ -601,7 +616,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; полный quality gate 1410/1410, browser 161/161, security/semantic и isolated staging health passed. После этого узкий CLI path repair проверен 15/15. Production activation, operator acceptance и перечисленные feature gaps ещё открыты.** Зависимости все выше.
+**Статус: in-progress; оба обязательных режима реализованы. Full quality 1443/1443, browser 163/163, secrets 23/23, network 80/80 и isolated candidate health passed. Первый refreshed unit прогон: 1437 pass / 2 устаревших теста; repair suite 24/24, повтор полного gate зелёный. Production activation, реальные Local/provider/voice/child checks и ручная приёмка ещё открыты.** Зависимости все выше.
 
 - [x] Full `node scripts/quality-gate.mjs`, self-test, privacy strict,
   validate/rebuild memory, Curated acceptance frozen fixture, ND security/network
@@ -2248,6 +2263,46 @@ unit child environment отдельно и изолировать оба aliases
   acceptance остаются открытыми. MacBook/GitHub и managed service не изменены.
   Временный каталог ранних логов исчез; новые протоколы сохраняются в private
   release preparation directory, текущий candidate получает новый полный gate.
+
+### Checkpoint 41 — Общая регрессия и готовность к локальной активации
+
+- После двух дополнительных режимов полный quality gate: **1443/1443**, без
+  skips, все восемь групп pass. Первый прогон выявил два устаревших теста:
+  delimiter извлечения функции и прежний запрет external factory creation.
+  Обновлены точные ожидаемые ошибки, добавлены четыре публичных factory-route
+  проверки. Узкий repair suite **24/24**. Production-код этим ремонтом не менялся.
+- Browser: **163/163**, без flaky/skips; secrets **23/23** и real OS/network
+  boundary **80/80**. Actual factory/research/lifecycle scoped gate **90/90**.
+  Проверены 34 target hashes adoption manifest и неизменность девяти посторонних
+  файлов. Полные исходные приложения этого roadmap сохранены без изменений.
+- Создано постоянное instance-local Python 3.11 окружение из requirements-core;
+  общий resolver выбирает его автоматически. Rebuild: 993 documents / 11008
+  chunks; восстановлены 10787 cached offline embeddings. Frozen retrieval fixture
+  не менялся; код CuratedRetriever byte-identical исходному canonical commit.
+  Парное сравнение: FTS 45/48 Hit@5, 46/48 Hit@10, holdout 23/24,
+  regressions@10=0, private leaks=0 во всех трёх modes. Semantic отдельно 31/48,
+  hybrid 41/48 Hit@5: они не подменяют принятый FTS gate. После итоговых правок
+  документов индекс и embeddings синхронизируются повторно.
+- Read-only runtime preflight обнаружил circuit_open и отсутствие listener.
+  Автоматические рестарты завершались ENOENT preview-props.json: старый build
+  Next 16.2.11 оказался рядом с установленными dependencies 16.4.3. Это
+  подтверждает mismatch; причина первоначального автоматического запуска не
+  доказана. Manager stop/start в этой задаче не выполнялись. Согласованный новый
+  build прошёл isolated health; recovery хранит согласованную старую тройку
+  source/build/dependencies. Подробности и transaction — в deployment report.
+- Реальный Local проверяется отдельно: официальный llama.cpp v0.8.0/b11960,
+  release SHA-256 подтверждён; модель загружена по pinned revision и digest.
+  CPU Responses inference 0.6B прошёл, но tool-use завершился буквальным JSON
+  вместо вызова инструмента. Выбрана Qwen3 4B Q4_K_M: реальные Responses,
+  host read_file и resume той же сессии прошли, три task requests, полный выход
+  model/CLI process trees подтверждён. Private configuration сохранена, active
+  provider не переключён. Metal запрещён текущей изоляцией: CPU sandbox сохранён
+  без ослабления network/filesystem policy. CLI предупреждает о fallback model
+  metadata и сокращённых skill descriptions; облачного fallback нет. Это
+  проверка интеграции, не оценка общей coding quality небольшой модели.
+- R12 остаётся открыт: managed activation, реальные provider auth/model/child
+  и microphone checks, операторская ручная приёмка. GitHub/MacBook не изменены;
+  private receipts не публикуются. Queue health и launchd-root audit pass.
 
 ## 7. Полные исходные материалы
 

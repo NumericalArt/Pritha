@@ -10,6 +10,7 @@ import * as profile from '../scripts/lib/provider-profile.mjs';
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
 import {ImmutableAttachmentStore} from '../scripts/lib/chat-attachment-store.mjs';
 import {VoiceIntakeReceipts,voiceIntakeAttachmentIds} from '../scripts/lib/voice-intake-receipts.mjs';
+import {normalizeChatSubject} from '../scripts/lib/chat-subject.mjs';
 
 const file = ts.createSourceFile('runtime.ts', readFileSync('interfaces/control-center/src/lib/realtime/pritha-runtime.ts', 'utf8'), ts.ScriptTarget.Latest, true);
 const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'abortPrithaCodexTask', 'runtimeSettingsForVoiceTask', 'createPrithaVoiceIntakeCodexTask'];
@@ -53,6 +54,7 @@ function fixture(t, options = {}) {
     startAdmittedVoiceTask: async transport => { calls.push('native-start'); return { status: 'running', transport }; },
     atomicWritePrivateJson: async ({ filePath, value }) => writeFile(filePath, JSON.stringify(value)),
     require: id => {
+      if(id.endsWith('/chat-subject.mjs'))return {normalizeChatSubject};
       if(id.endsWith('/provider-agent-workspace.mjs'))return {resolveProviderAgentWorkspace:()=>{throw Object.assign(new Error('Missing child'),{code:'provider_agent_workspace_unavailable'});}};
       if (id === '../settings/provider-settings-server') return { getProviderSettings: () => settings };
       if (id === '../settings/provider-profile') return profile;
@@ -96,12 +98,24 @@ test('handoff and preparation failures make no task directory and never start a 
     assert.equal(existsSync(path.join(f.privateRoot, 'codex-tasks')), false);
   }
 });
-test('unverified child workspaces and file delivery remain explicit blockers before a provider call', async t => {
-  for (const args of [{ subject_kind: 'agent' }, { task_type: 'agent_creation' }, { intake: { files: [{ id: 'file-one' }] } }]) {
+test('unverified child workspaces, read-only factory requests and file delivery fail before a provider call', async t => {
+  for (const [args,error] of [
+    [{ subject_kind: 'agent' },'provider_agent_workspace_unavailable'],
+    [{ task_type: 'agent_creation' },'factory_write_mode_required'],
+    [{ intake: { files: [{ id: 'file-one' }] } },'provider_attachments_unverified'],
+  ]) {
     const f = fixture(t), result = await f.run({ task: 'Inspect fixture', ...args });
-    assert.equal(result.ok, false); assert.ok(['provider_agent_workspace_unavailable','provider_voice_agent_creation_pending', 'provider_attachments_unverified'].includes(result.error),result.error);
+    assert.equal(result.ok, false); assert.equal(result.error,error);
     assert.deepEqual(f.calls, []); assert.equal(existsSync(path.join(f.privateRoot, 'codex-tasks')), false);
   }
+});
+for(const connector of ['neuraldeep','claude','openrouter','local'])test(`${connector}: a confirmed factory brief pins the new child without granting general workspace writes`,async t=>{
+  const f=fixture(t,{connector}),result=await f.run({task:'Create a small offline notes agent.',task_type:'agent_creation',write_mode:'workspace_write',subject_kind:'agent',subject_id:'notes-fixture',operator_confirmation:'Create the proposed notes agent.'});
+  assert.equal(result.ok,true);assert.equal(result.connector_id,connector);assert.deepEqual(f.calls,['provider-start']);
+  assert.deepEqual(f.reservations[0].workspace,{mode:'read-only',factorySlug:'notes-fixture'});
+  const stored=await f.json(path.join(f.privateRoot,'codex-tasks',result.task_id,'request.json'));
+  assert.deepEqual(stored.task_chat_request.chat.subject,{kind:'child',slug:'notes-fixture',phase:'interview'});
+  assert.match(stored.task_chat_request.turn.input[0].text,/Never treat the spoken brief confirmation as either artifact approval/);
 });
 test('an explicit native task keeps its original backend after changing the default connector', async t => {
   const f = fixture(t), dir = path.join(f.privateRoot, 'codex-tasks', 'native-parent'); await mkdir(dir, { recursive: true });
