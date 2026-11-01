@@ -20,6 +20,7 @@ privacy: public
 retention: durable
 review_status: verified-automated
 confidence: medium
+recommendation: adopt-with-mitigations
 ---
 
 # Dependency audit for the local candidate

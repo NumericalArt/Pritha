@@ -7,6 +7,7 @@ import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
+import { resolvePrithaPython } from "./lib/python-runtime.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = resolvePrithaRoot({ cwd: DEFAULT_ROOT });
@@ -137,7 +138,7 @@ function runSelfTest() {
     ? runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--dry-run", "--json"])
     : runJson("node", ["scripts/quality-gate.mjs", "--profile", "self-test", "--json"], { timeoutMs: 1200000 });
   const embeddingsRestore = !dryRun
-    ? runCommand("python3", ["scripts/embed-memory.py"], { timeoutMs: 600000 })
+    ? runCommand(resolvePrithaPython({root:ROOT}), ["scripts/embed-memory.py"], { timeoutMs: 600000 })
     : { ok: true, status: 0, stdout: "", stderr: "", skipped: true };
   const queue = runJson("node", ["scripts/queue-health.mjs", "--json"]);
   const launchdRoot = runCommand("node", ["scripts/launchd-root-audit.mjs", "status", "--json"], { timeoutMs: 60000 });

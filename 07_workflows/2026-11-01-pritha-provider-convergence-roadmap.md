@@ -2088,6 +2088,39 @@ unit child environment отдельно и изолировать оба aliases
   этот checkpoint не утверждает, что они уже завершились. Voice factory creation,
   optional Claude CLI auth и ручная приёмка остаются отдельными открытыми пунктами.
 
+### Checkpoint 36 — Полный прогон, ремонты и boundary audits
+
+- Первый full quality gate: env/privacy/rebuild/Telegram passed; unit **1386/1407**.
+  Все 21 failures происходили в update fixture: после нового paths import он не
+  копировал distribution-instance и provider-profile. Исправлено; весь update/
+  rollback suite теперь **21/21**, включая ownership, chunks, timeouts и cleanup.
+- Новый assessment требовал поле recommendation; оно добавлено. Это устранило
+  общий blocker validate-memory, smoke и Agents Mother inspection. Markdown **992**.
+- Первый полный production browser run: **159/160**, один ECONNRESET на read-only
+  voice status. Без изменения assertion/retry policy повтор Voice **5/5**, затем
+  Voice + отдельный strict health **6/6**. Strict проверяет /codex, /agents,
+  /voice, /task-chat, /settings и реальные same-origin JS chunks. Первый сбой
+  сохранён в журнале; он не переписан как изначально успешный прогон.
+- Исправлены оставшиеся Python entrypoints self-test, golden embeddings и
+  legacy web semantic search: используют instance interpreter. Env-doctor
+  больше не рекомендует global pip --user. Targeted helpers **6/6**.
+- Полный golden gate с embeddings/semantic search **pass**; **10776** embeddings
+  восстановлены из текущего Markdown. Никаких загрузок модели или cloud inference:
+  HF/Transformers offline flags, существующий локальный cache.
+- Reviewed ND audit concepts сохранены в совместимых CLI entrypoints. Исходные
+  real-key Keychain scan и live proxy-only inference осознанно заменены: явные
+  external provider scopes, чистое временное HOME, synthetic secrets, реальные
+  OS-denial проверки. `--connector all`: secrets **18/18**, network **67/67**,
+  skips **0**. Live key leakage/provider calls не объявляются проверенными.
+  Inventory вырос до **72** записей; planner invalid-input test **1/1**.
+- Read-only runtime status: managed canonical service работает. Name migration
+  планирует только techscope.sqlite → pritha.sqlite и правильно блокируется
+  `managed_runtime_loaded`. Runtime не останавливался; rename ещё не выполнен.
+- Следующий gate — повтор self-test/full unit после ремонтов и staging candidate.
+  Optional Claude session auth / external voice factory scope ожидают решения
+  пользователя; пока не исключены из исходного объёма. Live/manual acceptance
+  по-прежнему не подменяется synthetic tests.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

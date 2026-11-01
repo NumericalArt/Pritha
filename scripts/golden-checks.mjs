@@ -8,6 +8,7 @@ import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
+import { resolvePrithaPython } from "./lib/python-runtime.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = resolvePrithaRoot({ cwd: DEFAULT_ROOT });
@@ -69,7 +70,7 @@ const checks = [
 
 checks.push(run(
   "Embeddings rebuild",
-  "python3",
+  withEmbeddings ? resolvePrithaPython({root:ROOT}) : "python3",
   ["scripts/embed-memory.py"],
   {
     skip: !withEmbeddings,

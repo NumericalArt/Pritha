@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
 import { resolvePrithaRoot } from "./lib/paths.mjs";
+import { resolvePrithaPython } from "./lib/python-runtime.mjs";
 
 const ROOT = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: ROOT, pathOnly: true });
@@ -107,7 +108,7 @@ LIMIT 30;
 
 function semanticSearch(q) {
   if (!q) return "";
-  const result = spawnSync("python3", ["scripts/semantic-search.py", q, "--limit", "8"], {
+  const result = spawnSync(resolvePrithaPython({root:ROOT}), ["scripts/semantic-search.py", q, "--limit", "8"], {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

@@ -239,7 +239,7 @@ function checkMlxWhisperExecutable() {
     Boolean(fromPythonScripts),
     fromPythonScripts || "not found in PATH or Python scripts directory",
     isDarwin
-      ? "Install with `python3 -m pip install --user mlx-whisper` and add Python user bin to PATH, or set MLX_WHISPER_BIN."
+      ? "Install macOS dependencies with `node scripts/bootstrap.mjs prepare --profile local`, or set MLX_WHISPER_BIN."
       : "mlx-whisper is a local macOS transcription helper; Linux CI may skip it.",
   );
 }
@@ -280,14 +280,14 @@ if (profileConfig[profile].pythonPackages) {
     "Python package sentence-transformers",
     "sentence_transformers",
     "sentence-transformers",
-    "Install with `python3 -m pip install --user -r requirements-core.txt`.",
+    "Install this instance’s dependencies with `node scripts/bootstrap.mjs prepare --profile local`.",
   );
   checkPythonPackage(
     "imageio-ffmpeg",
     "Python package imageio-ffmpeg",
     "imageio_ffmpeg",
     "imageio-ffmpeg",
-    "Install with `python3 -m pip install --user -r requirements-core.txt`.",
+    "Install this instance’s dependencies with `node scripts/bootstrap.mjs prepare --profile local`.",
   );
 }
 if (profileConfig[profile].macosTranscription) {
@@ -297,7 +297,7 @@ if (profileConfig[profile].macosTranscription) {
     "mlx_whisper",
     "mlx-whisper",
     isDarwin
-      ? "Install with `python3 -m pip install --user -r requirements-macos.txt`."
+      ? "Install this instance’s macOS dependencies with `node scripts/bootstrap.mjs prepare --profile local`."
       : "mlx-whisper is a local macOS transcription helper; Linux CI may skip it.",
     isDarwin ? "critical" : "warning",
   );

@@ -94,6 +94,8 @@ if (action === "start") {
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "atomic-file.mjs"), path.join(lib, "atomic-file.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "env.mjs"), path.join(lib, "env.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "distribution-instance.mjs"), path.join(lib, "distribution-instance.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "provider-profile.mjs"), path.join(lib, "provider-profile.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "root-resolution.mjs"), path.join(lib, "root-resolution.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "state-files.mjs"), path.join(lib, "state-files.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "sqlite-snapshot.mjs"), path.join(lib, "sqlite-snapshot.mjs"));
