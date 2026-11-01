@@ -11,6 +11,7 @@ import { recordNeuralDeepRun } from '../../../../../../scripts/neuraldeep/usage-
 import { normalizeCliItem, cliItemOriginalText } from '../normalize-cli';
 import { parseBudgetIntent } from '../budget-intent';
 import { CodexChatGatewayError } from '../native-gateway';
+import {hostFileAttachmentTransport} from '../../../../../../scripts/lib/provider-file-attachments.mjs';
 
 export class NeuralDeepDriver implements TaskChatBackendDriver {
   readonly connectorId='neuraldeep' as const;
@@ -24,6 +25,7 @@ export class NeuralDeepDriver implements TaskChatBackendDriver {
     this.backend=new ExternalChatGateway(attachments,{connectorId:this.connectorId,root,stateRoot,privateRoot,executionDirectory,
       configuration:()=>({...getProviderSettings().providerPresets.neuraldeep,sandbox:getPrithaRuntimeSettings().codexSandbox==='read-only'?'read-only':'workspace-write'}),
       preflight:binding=>this.service.require(binding.modelId!),beforeRequest:binding=>this.service.require(binding.modelId),
+      attachmentTransport:hostFileAttachmentTransport({stateRoot,privateRoot:path.join(privateRoot,'neuraldeep'),snapshot:binding=>this.service.snapshot(binding.modelId)}),
       launch:options=>startNeuralDeepRun({...options,codexBin},{createDispatcher:timeout=>new Agent({headersTimeout:timeout,bodyTimeout:timeout})}),
       validateText:text=>{if(parseBudgetIntent(text).kind!=='none')throw new CodexChatGatewayError('budget_control_required','Use the task budget control for budget changes.',422);},
       normalizeEvent:(attempt,event,binding)=>{const item=normalizeCliItem(attempt.chat+':'+attempt.turnId,event.item,binding.workspacePath,new Date().toISOString());return item?{item,originalText:cliItemOriginalText(event.item,item)}:null;},

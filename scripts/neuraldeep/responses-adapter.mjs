@@ -8,6 +8,7 @@ import { ResponsesStreamNormalizer, writeResponseChunk } from "./responses-strea
 export { normalizeResponsesSse, responsesUsage } from "./responses-normalizer.mjs";
 import { requestDeadlineWindow } from './creation-execution-policy.mjs';
 import {normalizeModelExecutionRequest} from './model-execution-profile.mjs';
+import {projectProviderToolRequest,wireCall} from '../lib/provider-tool-projection.mjs';
 
 function createDispatcher(options,timeout){
   if(options.createDispatcher)return options.createDispatcher(timeout);
@@ -197,7 +198,20 @@ export function createNeuralDeepAdapter(options = {}) {
     };
     response.once("close", abortIfClientLeaves);
     let upstreamAttempted = false;
-    let requestHash = null, dispatchHash = null, responsesPayload = null;
+    let requestHash = null, dispatchHash = null, responsesPayload = null,toolMapping=null;
+    const projectResponse=value=>{
+      if(!toolMapping)return value;
+      if(value?.model && value.model!==responsesPayload?.model)throw Object.assign(new Error('Provider model identity changed.'),{code:'neuraldeep_model_identity_mismatch',statusCode:502});
+      return Array.isArray(value?.output)?{...value,output:value.output.map(item=>wireCall(item,toolMapping))}:value;
+    };
+    const transformResponseStream=raw=>{
+      const value=transformStream?transformStream(raw):raw;if(!toolMapping)return value;
+      return parseSseData(value).map(event=>{
+        if(event.item)event.item=wireCall(event.item,toolMapping);
+        if(event.response)event.response=projectResponse(event.response);
+        return 'data: '+JSON.stringify(event)+'\n\n';
+      }).join('');
+    };
     let providerUsage = null;
     let responseSummary = null, outputLimit = null;
     const progress=(state,force=false)=>{
@@ -211,8 +225,9 @@ export function createNeuralDeepAdapter(options = {}) {
       timings.firstByteMs ??= elapsedMs;timings.lastByteMs=elapsedMs;timings.responseBytes+=bytes;
       progress('receiving',first);
     };
-    const notifyRequest=event=>{if(!notified){notified=true;options.onRequest?.({method:request.method,path:requestUrl.pathname,
-      durationMs:Date.now()-startedAt,timings:{...timings},cancellationReason,requestHash:dispatchHash,upstreamAttempted,usage:providerUsage,responseSummary,...event});}};
+    const notifyRequest=event=>{if(!notified){notified=true;try{options.onRequest?.({method:request.method,path:requestUrl.pathname,
+      durationMs:Date.now()-startedAt,timings:{...timings},cancellationReason,requestHash:dispatchHash,upstreamAttempted,usage:providerUsage,responseSummary,...event});}
+      catch{throw Object.assign(new Error('The host could not record the provider receipt.'),{code:'provider_receipt_failed',statusCode:503});}}};
     try {
       const window=requestDeadlineWindow(options.deadline);
       const requestDeadlineAt=startedAt+Math.min(upstreamTimeoutMs,window ?? upstreamTimeoutMs);
@@ -228,6 +243,7 @@ export function createNeuralDeepAdapter(options = {}) {
         catch { throw Object.assign(new Error("Invalid Responses JSON request."), { statusCode: 400 }); }
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw Object.assign(new Error("Invalid Responses request."), { statusCode: 400 });
         await options.validateResponsesRequest?.(payload, body);
+        if(options.allowedTools){const projection=projectProviderToolRequest(payload,options.allowedTools);payload=projection.payload;toolMapping=projection.map;}
         if (options.transformResponsesRequest) payload = options.transformResponsesRequest(payload);
         payload=normalizeModelExecutionRequest(payload);
         // Identity belongs to the caller's request. A shrinking host response
@@ -316,7 +332,7 @@ export function createNeuralDeepAdapter(options = {}) {
       const stream=isResponses && upstream.ok && isEventStream && typeof response.write==='function'
         && (!options.validateResponsesResponse || options.requiresBufferedResponse?.()===false);
       if(stream) {
-        const normalizer=new ResponsesStreamNormalizer({maxBytes:responseLimit,transform:transformStream,
+        const normalizer=new ResponsesStreamNormalizer({maxBytes:responseLimit,transform:transformResponseStream,
           onTerminal:event=>{
             providerUsage=responsesUsage(JSON.stringify(event.response),'application/json');
             responseSummary=responsesTerminalSummary(event.response,{eventType:event.type,outputLimit});
@@ -346,12 +362,8 @@ export function createNeuralDeepAdapter(options = {}) {
       if(isResponses)responseSummary=responsesSummary(upstreamBody.toString('utf8'),upstream.headers.get('content-type') || '',{outputLimit});
       if(isResponses && upstream.ok)await options.validateResponsesResponse?.(upstreamBody.toString('utf8'),upstream.headers.get('content-type') || '');
       const output = isResponses && isEventStream
-        ? Buffer.from(normalizeResponsesSse(transformStream ? transformStream(upstreamBody.toString("utf8")) : upstreamBody.toString("utf8")))
-        : upstreamBody;
-      copyResponseHeaders(upstream, response,protectedBoundary);
-      response.setHeader("content-length", output.length);
-      response.writeHead(upstream.status);
-      response.end(output);
+        ? Buffer.from(normalizeResponsesSse(transformResponseStream(upstreamBody.toString("utf8"))))
+        : isResponses && upstream.ok && toolMapping ? Buffer.from(JSON.stringify(projectResponse(JSON.parse(upstreamBody.toString('utf8'))))) : upstreamBody;
       notifyRequest({
         method: request.method,
         path: requestUrl.pathname,
@@ -371,6 +383,12 @@ export function createNeuralDeepAdapter(options = {}) {
           retryAfter: upstream.headers.get("retry-after"),
         }),
       });
+      // Buffered JSON can contain executable tools too. Persist accounting
+      // before releasing any output, just as for the streaming path above.
+      copyResponseHeaders(upstream, response,protectedBoundary);
+      response.setHeader("content-length", output.length);
+      response.writeHead(upstream.status);
+      response.end(output);
       progress('finished',true);
     } catch (error) {
       if(error?.code==='neuraldeep_empty_response' && responseSummary?.outputLimitReached) {

@@ -2,6 +2,8 @@ const SAFE_CODE = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,95}$/;
 const PUBLIC_CODES = new Set(['invalid_api_key','invalid_credentials','key_model_access_denied','insufficient_balance','insufficient_quota','payment_required','billing_access_required','policy_denied','access_denied','model_unavailable','model_not_found','rate_limited','rate_limit_exceeded','context_length_exceeded','invalid_request_error','provider_unavailable']);
 const TRANSPORT_CODES = new Set(['provider_timeout','provider_iteration_deadline','iteration_deadline','job_deadline','operator_cancel','client_disconnect','host_shutdown','host_signal','provider_token_budget','provider_budget_endpoint','provider_budget_exhausted','provider_budget_unknown','provider_usage_unconfirmed','provider_retry_exhausted','provider_retry_window','neuraldeep_empty_response','neuraldeep_output_limit','neuraldeep_tool_arguments','neuraldeep_response_incomplete','neuraldeep_response_failed','neuraldeep_response_cancelled','neuraldeep_response_too_large','neuraldeep_stream_encoding','neuraldeep_stream_failed','neuraldeep_stream_identity','neuraldeep_stream_malformed','neuraldeep_stream_order','neuraldeep_stream_size','neuraldeep_stream_text_changed','neuraldeep_stream_truncated','neuraldeep_stream_unsupported_item','neuraldeep_model_identity_mismatch','attachment_original_not_preserved','attachment_provider_payload_too_large','attachment_runtime_unsupported','model_image_unsupported','model_image_unverified','image_format_unverified','invalid_image_encoding','econnreset','econnrefused','etimedout','enotfound','und_err_socket','und_err_body_timeout']);
 
+const LOCAL_TOOL_CODES = new Set(['provider_tools_unsupported', 'provider_tool_identity_mismatch', 'invalid_responses_input', 'provider_receipt_failed']);
+
 export function safeProviderRetryAfter(value) {
   const text = typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
   if (/^\d{1,6}$/.test(text)) return String(Math.min(Number(text), 86400));
@@ -38,8 +40,12 @@ export function classifyNeuralDeepProviderError({ status, payload, transportCode
   const statusCode = status != null && status !== "" && Number.isInteger(Number(status)) ? Number(status) : null;
   const details = providerDetails(payload);
   const candidate = safeCode(transportCode);
-  const transport = TRANSPORT_CODES.has(candidate) ? candidate : null;
+  const transport = TRANSPORT_CODES.has(candidate) || LOCAL_TOOL_CODES.has(candidate) ? candidate : null;
   const retry = safeProviderRetryAfter(retryAfter);
+
+  if (LOCAL_TOOL_CODES.has(transport)) {
+    return { class: 'input', code: transport, status: statusCode, retryAfter: null };
+  }
 
   if (['provider_timeout','provider_iteration_deadline','iteration_deadline','job_deadline','operator_cancel','client_disconnect','host_shutdown','host_signal'].includes(transport)) {
     return {class:'control',code:transport,status:statusCode,retryAfter:null};

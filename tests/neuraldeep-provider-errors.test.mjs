@@ -41,3 +41,10 @@ test("local image validation remains an input error without an outage retry or r
     class: "input", code: "attachment_original_not_preserved", status: 409, retryAfter: null,
   });
 });
+
+test('host tool and input refusals keep typed errors without an outage retry',()=>{
+  for(const code of ['provider_tools_unsupported','provider_tool_identity_mismatch','invalid_responses_input']){
+    assert.deepEqual(classifyNeuralDeepProviderError({status:502,transportCode:code,retryAfter:'5'}),
+      {class:'input',code,status:502,retryAfter:null});
+  }
+});

@@ -5,7 +5,7 @@ status: active
 created: 2026-10-28
 updated: 2026-11-01
 topics: [control-center, task-chat, quote-reply, image-annotation, claude-code, compatibility]
-tools: [Pritha, Codex, Claude Code, Playwright, Canvas]
+tools: [Pritha, Codex, NeuralDeep, Claude Code, OpenRouter, Playwright, Canvas]
 sources:
   - interfaces/control-center/src/lib/codex-chat/quote-reply.ts
   - interfaces/control-center/src/lib/codex-chat/image-annotation.ts
@@ -71,12 +71,20 @@ existing semantics.
 
 ## Boundaries for a future adapter
 
-Canonical Task Chat now has a separate host-tool file path for the Claude API
-lane and OpenRouter. This is independent of the future terminal UI integration
+Canonical Task Chat now has a shared host-tool file path for NeuralDeep, the
+Claude API lane and OpenRouter. This is independent of the future terminal UI integration
 described below. Files are accepted only with ready model/tool metadata and the
-exact verified CLI version (Claude Code 2.1.296 or Codex 0.153.0 respectively).
+exact verified CLI version (Claude Code 2.1.296; Codex 0.153.0 for NeuralDeep and OpenRouter).
 The runner checks the installed version again before dispatch. A CLI upgrade
 keeps text execution available while file readiness requires re-verification.
+
+NeuralDeep task tools use the same host approval broker and OS sandbox as the
+other external task providers. The provider receives only the host's approved
+MCP definitions. Responses must match the selected model and exact tool
+namespace. Unsupported historic tool namespaces stop resume with a typed error;
+the saved session and transcript remain intact. They are never silently rewritten
+or replayed with different permissions. Voice metadata checks do not require a
+CLI or tool sandbox; a voice task still passes normal task admission.
 
 `read_file` accepts `attachment:<id>` only for originals already recorded in
 that exact private chat. It verifies stored hashes and metadata, creates a

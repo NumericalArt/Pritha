@@ -7,11 +7,13 @@ import { providerJson } from '../lib/provider-http.mjs';
 import { ProviderTaskError } from '../lib/provider-task-runtime.mjs';
 import { loadNeuralDeepAccountSnapshot, billingContextForModel } from './account-snapshot.mjs';
 import { declaredModelInputs } from './model-input-capabilities.mjs';
+import {hostFileAttachmentVerified} from '../lib/provider-file-attachments.mjs';
+import {providerSandboxDependency} from '../lib/provider-sandbox.mjs';
 
 const execute=promisify(execFile),token=value=>typeof value==='string' && /^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(value)?value:null;
 const positive=value=>Number.isSafeInteger(value) && value>0?value:null;
 const capabilities=()=>({steer:false,interrupt:true,approvals:false,tools:false,attachments:{files:false,images:false},usage:'observed',resume:true,sandbox:'runtime-enforced',offline:false});
-const messages={provider_pending_auth:'Connect NeuralDeep in Settings.',provider_model_unavailable:'The selected model is absent from the current key catalog.',provider_billing_required:'The selected model requires Wallet access.',provider_limits_unknown:'Current account limits could not be verified.',provider_rate_limited:'NeuralDeep currently limits new requests.',provider_tools_unverified:'The selected model has not declared tool support.',provider_runtime_unavailable:'A compatible installed Codex CLI is required.',provider_unavailable:'NeuralDeep metadata is temporarily unavailable.'};
+const messages={provider_pending_auth:'Connect NeuralDeep in Settings.',provider_model_unavailable:'The selected model is absent from the current key catalog.',provider_billing_required:'The selected model requires Wallet access.',provider_limits_unknown:'Current account limits could not be verified.',provider_rate_limited:'NeuralDeep currently limits new requests.',provider_tools_unverified:'The selected model has not declared tool support.',provider_runtime_unavailable:'A compatible installed Codex CLI is required.',provider_sandbox_unavailable:'The required host sandbox is unavailable.',provider_unavailable:'NeuralDeep metadata is temporarily unavailable.'};
 
 export function normalizeNeuralDeepModels(payload){
   if(!Array.isArray(payload?.data) || payload.data.length>1000)throw new ProviderTaskError('provider_metadata_invalid','The provider model catalog is invalid.',503);
@@ -63,6 +65,7 @@ export class NeuralDeepProviderService {
       version=installed;const models=normalizeNeuralDeepModels(payload),model=models.find(row=>row.id===modelId),limits=account.limits;
       const extra={models,account,billing:billingContextForModel(account,modelId)};
       if(!version && this.options.requireCli!==false)return this.result('unavailable','provider_runtime_unavailable',null,extra);
+      if(this.options.requireCli!==false)try{(this.options.checkSandbox || providerSandboxDependency)(this.options.root);}catch{return this.result('unavailable','provider_sandbox_unavailable',version,extra);}
       if(!limits || account.sections.limits.stale || limits.decision.canRequest===null || !Number.isSafeInteger(limits.parallelLimit) || limits.parallelLimit<1 || limits.parallelLimit>64)return this.result('configured','provider_limits_unknown',version,extra);
       if(limits.keyStatus!=='ok')return this.result('pending-auth','provider_pending_auth',version,extra);
       if(limits.decision.canRequest!==true)return this.result('rate-limited','provider_rate_limited',version,extra);
@@ -72,7 +75,7 @@ export class NeuralDeepProviderService {
       const allowance=limits.specialAllowances?.some(row=>row.name===modelId && row.active && typeof row.remaining==='number' && row.remaining>0);
       if(walletOnly && !allowance && (limits.billingMode!=='wallet' || !(limits.wallet?.balanceRub>0)))return this.result('billing-required','provider_billing_required',version,extra);
       if(!model.tools)return this.result('configured','provider_tools_unverified',version,extra);
-      return this.result('ready',null,version,{...extra,capabilities:{...capabilities(),tools:true,parallelLimit:limits.parallelLimit,contextTokens:model.contextTokens,outputTokens:model.outputTokens}});
+      return this.result('ready',null,version,{...extra,capabilities:{...capabilities(),tools:true,approvals:this.options.requireCli!==false,sandbox:this.options.requireCli===false?'runtime-enforced':'host-enforced',attachments:{files:hostFileAttachmentVerified('neuraldeep',version),images:false},parallelLimit:limits.parallelLimit,contextTokens:model.contextTokens,outputTokens:model.outputTokens}});
     }catch(error){const code=['provider_pending_auth','provider_billing_required','provider_rate_limited'].includes(error.code)?error.code:'provider_unavailable';return this.result(code==='provider_pending_auth'?'pending-auth':code==='provider_billing_required'?'billing-required':code==='provider_rate_limited'?'rate-limited':'error',code,version);}
   }
   async require(modelId){const snapshot=await this.snapshot(modelId);if(snapshot.status!=='ready')throw new ProviderTaskError(snapshot.error.code,snapshot.error.message,snapshot.status==='rate-limited'?429:snapshot.status==='billing-required'?402:503);return snapshot.capabilities;}

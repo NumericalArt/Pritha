@@ -9,7 +9,7 @@
     {
       "path": "scripts/neuraldeep/responses-adapter.mjs",
       "source_sha256": "391a5c359246dfbf767e85763d2202b7c221b9c72ce6047411d12ea552866a35",
-      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+      "adoption": "reviewed source base; canonical protected upstream, request-local host tool projection, exact returned model/tool identity; source accounting and deadlines retained"
     },
     {
       "path": "scripts/neuraldeep/responses-normalizer.mjs",
@@ -19,7 +19,7 @@
     {
       "path": "scripts/neuraldeep/responses-stream.mjs",
       "source_sha256": "faef9c2ead26ebe99c9b51c67ab778803290b4e2645ed956da478e8208bede1a",
-      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+      "adoption": "reviewed source base; preserve typed host policy refusals separately from malformed event decoding"
     },
     {
       "path": "scripts/neuraldeep/usage-ledger.mjs",
@@ -39,7 +39,7 @@
     {
       "path": "scripts/neuraldeep/provider-error.mjs",
       "source_sha256": "5ea58e5b93ff0d633d242d2f42b525eacc10c9adde54b9bb531cc03e57263c72",
-      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+      "adoption": "reviewed source base; classified host tool/input refusals without outage retries or raw upstream content"
     },
     {
       "path": "scripts/neuraldeep/jsonl-reader.mjs",
@@ -191,7 +191,7 @@
     {
       "path": "scripts/neuraldeep-codex.mjs",
       "source_sha256": "5ba3bae9c83e0392ae89ec05de166f6108d0bc0d1afde0c1f8f8c9d7d7343dba",
-      "adoption": "function-level adaptation into owned runner; canonical state roots, minimal environment, server-only credential, protected loopback adapter, no automatic replay"
+      "adoption": "function-level adaptation into owned runner; canonical state roots, isolated HOME and OS sandbox, host MCP tools and exact approvals, composite process evidence, shared immutable files, server-only credential, protected loopback adapter, no automatic replay"
     },
     {
       "path": "scripts/neuraldeep/account-snapshot.mjs",

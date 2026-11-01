@@ -1742,6 +1742,38 @@ history, отсутствие повторного turn после unknown recei
    в Settings/Task Chat и подключать те же receipts к voice intake. Live model
    interpretation и ручная приёмка остаются отдельными R12 проверками.
 
+Промежуточный результат 26c.1 (verified-automated):
+
+- Good State Alignment для ND inputs/tools повторён: aligned с accepted reliable
+  Codex Control Center и voice ducking; native history, music и managed runtime
+  не изменяются. CLI flags сверены с установленным Codex 0.153.0, source image
+  acceptance/input policy — с pinned GitHub snapshot 2ab22ae.
+- NeuralDeep использует общий immutable file transport и семь host tools.
+  Command/file approvals проходят через durable broker; CLI и команды работают
+  в OS sandbox с отдельным HOME, provider state и loopback capabilities. Exact
+  session identity, model, request deadlines, usage и admission slots сохранены.
+  Готовность файлов проверяется повторно по версии CLI перед запуском.
+- Tool projection вынесена из OpenRouter в общий модуль: builtin definitions
+  (включая добавляемый CLI request_user_input) не передаются провайдеру. Обратная
+  проекция допускает только точный разрешённый MCP tool. Подмена model/namespace,
+  custom/local-shell call и foreign history — typed refusal без платного retry.
+  Старый transcript не изменяется при отказе; неизвестный исторический namespace
+  не получает новых прав и не переносится в новый session автоматически.
+- JSON и SSE сохраняют typed policy errors; concurrent requests имеют разные
+  tool maps. Cleanup и освобождение lease требуют подтверждённого завершения
+  CLI и всех host command processes. Voice-only readiness не зависит от CLI.
+- Accounting receipt записывается до освобождения executable calls и для JSON,
+  и для SSE. Ошибка записи останавливает ответ без повторной оплаты. Targeted
+  **102/102**, full unit **1290/1290**, без skipped. Installed-CLI scenarios:
+  **4/4** (ND plain initial/resume + файлы ND/Claude/OpenRouter; только synthetic
+  upstream). Browser **28/28**: реальные upload/download, composer, voice binding
+  и approval после reload на трёх providers при desktop/mobile ширинах.
+- TypeScript, strict privacy, name guard (124 references), Markdown (987 files)
+  и diff check passed. Внешние ключи, платный inference, live services, MacBook и
+  GitHub не использовались/не изменялись для этих проверок.
+- Изображения остаются gated до выполнения пунктов 3–6 выше. File transport
+  verification не считается подтверждением image support или live interpretation.
+
 R12 дополнительная проверка runner: quality-gate задаёт оба root aliases для
 child commands, а часть legacy test fixtures переопределяет только один. Проверить
 unit child environment отдельно и изолировать оба aliases для fixture runner,

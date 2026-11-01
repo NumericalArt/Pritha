@@ -23,7 +23,7 @@ function fixture(t){
     const payload=target.pathname==='/v1/limits'?limits:target.pathname==='/v1/models'?{data:[model]}:target.pathname.endsWith('wallet-prices')?{prices:[price]}:{};
     return Response.json(payload);
   };
-  const options={root,stateRoot,privateRoot:path.join(stateRoot,'private','neuraldeep'),fetchImpl,readCredential:()=>key,probeCli:async()=> '0.153.0'};
+  const options={root,stateRoot,privateRoot:path.join(stateRoot,'private','neuraldeep'),fetchImpl,readCredential:()=>key,probeCli:async()=> '0.153.0',checkSandbox:()=>true};
   return {options,calls,stateRoot,setKey:value=>{key=value;},setLimits:value=>{limits=value;},setModel:value=>{model=value;},setPrice:value=>{price=value;}};
 }
 
@@ -31,6 +31,7 @@ test('NeuralDeep readiness requires current limits, declared tools and the exact
   const f=fixture(t),service=new NeuralDeepProviderService(f.options),ready=await service.snapshot('qwen3.8-27b');
   assert.equal(ready.status,'ready');assert.equal(ready.capabilities.parallelLimit,2);assert.equal(ready.account.limits.chat.session.remaining,100);
   assert.equal(ready.capabilities.attachments.images,false);assert.equal(f.calls.length,6);
+  assert.equal(ready.capabilities.attachments.files,true);assert.equal(ready.capabilities.approvals,true);assert.equal(ready.capabilities.sandbox,'host-enforced');
   await service.snapshot('qwen3.8-27b');assert.equal(f.calls.length,6);
   assert.equal((await service.snapshot('missing-model')).status,'configured');
   const cache=readFileSync(path.join(f.options.privateRoot,'account-snapshot.json'),'utf8');assert.ok(!cache.includes('PRIVATE_KEY_CANARY'));
@@ -39,8 +40,16 @@ test('direct voice checks account and model readiness without probing or requiri
   const f=fixture(t);let probes=0;f.options.probeCli=async()=>{probes++;throw new Error('no CLI installed');};
   const voice=await new NeuralDeepProviderService({...f.options,requireCli:false}).snapshot('qwen3.8-27b');
   assert.equal(voice.status,'ready');assert.equal(voice.version,null);assert.equal(probes,0);
+  assert.equal(voice.capabilities.attachments.files,false);assert.equal(voice.capabilities.approvals,false);
   const task=await new NeuralDeepProviderService(f.options).snapshot('qwen3.8-27b');
   assert.equal(task.status,'unavailable');assert.equal(probes,1);
+});
+test('task file readiness requires the verified CLI and host sandbox without coupling direct voice to them',async t=>{
+  const f=fixture(t),changed=await new NeuralDeepProviderService({...f.options,probeCli:async()=> '0.154.0'}).snapshot('qwen3.8-27b');
+  assert.equal(changed.status,'ready');assert.equal(changed.capabilities.attachments.files,false);
+  const options={...f.options,checkSandbox:()=>{throw new Error('unavailable');}};
+  assert.equal((await new NeuralDeepProviderService(options).snapshot('qwen3.8-27b')).error.code,'provider_sandbox_unavailable');
+  assert.equal((await new NeuralDeepProviderService({...options,requireCli:false}).snapshot('qwen3.8-27b')).status,'ready');
 });
 
 test('unknown decision is not permission and rotated credentials cannot inherit old account limits',async t=>{

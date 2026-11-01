@@ -8,14 +8,14 @@ import { AttachmentError,ATTACHMENT_LIMITS } from './chat-attachment-store.mjs';
 
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const turn=/^turn_[a-f0-9]{32}$/;
-const chat=/^chat_(?:claude|openrouter|local)_[a-f0-9]{32}$/;
+const chat=/^chat_(?:neuraldeep|claude|openrouter|local)_[a-f0-9]{32}$/;
 const fail=(code='attachment_integrity_failed')=>new AttachmentError(code,'This attachment could not be verified for the current task. Its original has been preserved.',409);
 const reference=file=>({...file.view,sha256:file.sha256});
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export const HOST_FILE_ATTACHMENT_PROTOCOL='pritha-host-files-v1';
 // These exact CLI versions are exercised with initial/resume MCP calls, real
 // Seatbelt and synthetic upstreams. A new CLI does not inherit file readiness.
-export const HOST_FILE_ATTACHMENT_CLI=Object.freeze({claude:'2.1.296',openrouter:'0.153.0'});
+export const HOST_FILE_ATTACHMENT_CLI=Object.freeze({neuraldeep:'0.153.0',claude:'2.1.296',openrouter:'0.153.0'});
 export function hostFileAttachmentVerified(connectorId,version){return Object.hasOwn(HOST_FILE_ATTACHMENT_CLI,connectorId) && HOST_FILE_ATTACHMENT_CLI[connectorId]===version;}
 
 function location(options,receipt){

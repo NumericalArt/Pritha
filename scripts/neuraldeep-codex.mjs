@@ -14,6 +14,12 @@ import { providerProcessEnvironment, createProviderTemporaryDirectory } from './
 import { privateStateDirectory } from './lib/private-state-path.mjs';
 import { resolvePrithaPython } from './lib/python-runtime.mjs';
 import { inspectProviderCliSession } from './neuraldeep/native-history-proof.mjs';
+import {resolveCodexProviderBinary,probeCompatibleCli} from './openai-compatible/cli-probe.mjs';
+import {prepareProviderSandbox} from './lib/provider-sandbox.mjs';
+import {ProviderHostTools,PROVIDER_HOST_TOOL_DEFINITIONS} from './lib/provider-host-tools.mjs';
+import {listenProviderToolServer} from './lib/provider-tool-server.mjs';
+import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
+import {validateResponsesInputs} from './neuraldeep/responses-input-policy.mjs';
 
 const fail=(code,message='The selected NeuralDeep runtime could not complete this task.')=>Object.assign(new Error(message),{code});
 const modelPattern=/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/;
@@ -31,7 +37,7 @@ export function buildCodexExecArgs(options){
   if(roots.length>16)throw fail('provider_writable_roots_invalid');
   const sandbox=options.sandbox || 'read-only';
   const config={
-    model_provider:'neuraldeep',approval_policy:'never',sandbox_mode:sandbox,
+    model_provider:'neuraldeep',approval_policy:'never',sandbox_mode:sandbox,web_search:'disabled',
     'model_providers.neuraldeep.name':'NeuralDeep through Pritha',
     'model_providers.neuraldeep.base_url':endpoint.href,
     'model_providers.neuraldeep.wire_api':'responses',
@@ -49,12 +55,21 @@ export function buildCodexExecArgs(options){
   };
   const effort=effectiveNeuralDeepEffort(options.model,options.effort);
   if(factoryInstructions)config.developer_instructions=factoryInstructions;
+  if(options.toolServer){
+    config['mcp_servers.pritha.url']=options.toolServer.url;
+    config['mcp_servers.pritha.bearer_token_env_var']='PRITHA_TOOL_CAPABILITY';
+    config['mcp_servers.pritha.required']=true;
+    config['mcp_servers.pritha.default_tools_approval_mode']='approve';
+    config['mcp_servers.pritha.startup_timeout_sec']=10;
+    config['mcp_servers.pritha.tool_timeout_sec']=180;
+    config['mcp_servers.pritha.enabled_tools']=PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>tool.name);
+  }
   if(effort)config.model_reasoning_effort=effort;
   const context=Number.isSafeInteger(options.modelContextTokens) && options.modelContextTokens>0 ? options.modelContextTokens : neuralDeepExecutionProfile(options.model).declaredContextTokens;
   if(context)config.model_context_window=context;
   const args=['exec',...(options.resume?['resume']:[]),'--json','--strict-config','--ignore-user-config','--ignore-rules','--skip-git-repo-check','-m',options.model];
   for(const [key,value] of Object.entries(config))args.push('-c',`${key}=${toml(value)}`);
-  for(const feature of ['remote_plugin','plugins','plugin_sharing','apps'])args.push('--disable',feature);
+  for(const feature of ['remote_plugin','plugins','plugin_sharing','apps','multi_agent','multi_agent_v2','goals','hooks','image_generation','view_image','computer_use','browser_use','browser_use_external','in_app_browser','workspace_dependencies','skill_search','skill_mcp_dependency_install','unbounded_connection_retries','remote_compaction_v2','shell_tool','unified_exec'])args.push('--disable',feature);
   if(options.images?.length)throw fail('model_image_unverified','This NeuralDeep image path still requires transport verification. The originals are preserved.');
   if(options.resume)args.push(options.resume,'-');else args.push('--color','never','-s',sandbox,'-C',realpathSync(options.cwd),'-');
   return args;
@@ -66,11 +81,16 @@ export async function startNeuralDeepRun(options,dependencies={}){
   if(!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs<1000 || options.timeoutMs>3600000)throw fail('provider_timeout_invalid');
   if(options.resume && !sessionPattern.test(options.resume))throw fail('runtime_identity_mismatch');
   if(options.signal?.aborted)throw fail('operator_cancel');
+  if(options.hostAttachments && !options.hostExecutionContext)throw fail('provider_attachments_unverified');
   const root=realpathSync(options.root),cwd=realpathSync(options.cwd);
   const stateRoot=path.resolve(options.stateRoot),privateRoot=path.resolve(options.privateRoot);
   const key=(dependencies.readCredential || readProviderCredential)('neuraldeep',{stateRoot,env:options.env || process.env});
   if(!key)throw fail('provider_pending_auth','Connect NeuralDeep in Settings before starting a task.');
-  const codexHome=privateStateDirectory(stateRoot,path.join(privateRoot,'codex-home'));
+  const binary=resolveCodexProviderBinary(options.codexBin,options.env || process.env);
+  const cli=await (dependencies.probeCli || probeCompatibleCli)({root,stateRoot,connectorId:'neuraldeep',codexBin:binary,env:options.env || process.env});
+  if(!cli.available)throw fail(cli.code);
+  if(options.hostAttachments && !hostFileAttachmentVerified('neuraldeep',cli.version))throw fail('provider_attachments_unverified');
+  const codexHome=privateStateDirectory(stateRoot,path.join(privateRoot,'codex-home')),home=privateStateDirectory(stateRoot,path.join(privateRoot,'home'));
   if(options.resume){
     const proof=(dependencies.inspectSession || inspectProviderCliSession)({stateRoot,codexHome,cwd,provider:'neuraldeep',sessionId:options.resume,model:options.model});
     if(!proof.available)throw fail(proof.code,'The original provider session could not be verified. Its private files have been preserved.');
@@ -79,29 +99,44 @@ export async function startNeuralDeepRun(options,dependencies={}){
   const localToken=randomBytes(32).toString('base64url');
   const grace=Math.max(1,Math.min(30000,Math.floor(options.timeoutMs/10))),window=options.timeoutMs-grace,now=Date.now();
   const deadline={version:2,hardDeadlineAt:now+options.timeoutMs,softDeadlineAt:now+window-Math.max(1,Math.min(60000,Math.floor(window/2))),requestTimeoutMs:Math.min(window,930000),settlementGraceMs:grace};
-  let server,owned,providerError=null,closed=false,stopReason=null,verifiedExit=false;
+  let server,owned,sandboxPlan,hostTools,toolServer,providerError=null,closed=false,stopReason=null,verifiedExit=false;
+  const controller=new AbortController(),trees=new Map();
+  const proof=()=>({kind:'provider-process-set',version:1,trees:[...trees].map(([id,evidence])=>({id,evidence}))});
+  const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
   const identity=createHash('sha256').update(JSON.stringify([realpathSync(stateRoot),codexHome,cwd,'neuraldeep',options.model])).digest('hex');
-  const stop=reason=>{stopReason ||= reason;return owned?.stop('SIGTERM') || false;};
+  const stop=reason=>{stopReason ||= reason;controller.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;};
+  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
   const abort=()=>stop('operator_cancel');
   let timer;
   try{
+    if(options.hostExecutionContext){
+      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'neuraldeep',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments});
+      toolServer=await listenProviderToolServer({hostTools});
+    }
+    const allowedTools=toolServer?PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name):[];
     server=await (dependencies.listenAdapter || listenNeuralDeepAdapter)({port:0,localToken,upstreamAuthorization:`Bearer ${key}`,deadline,providerRetryAttempts:1,responsesOnly:true,
+      allowedTools,
       createDispatcher:dependencies.createDispatcher,
       ...(dependencies.fetchImpl ? {fetchImpl:dependencies.fetchImpl} : {}),
-      validateResponsesRequest(payload){if(payload.model!==options.model)throw fail('neuraldeep_model_identity_mismatch');},
+      async validateResponsesRequest(payload){
+        if(payload.model!==options.model)throw fail('neuraldeep_model_identity_mismatch');
+        await validateResponsesInputs(payload,{model:options.model});
+      },
       prepareResponsesRequest(payload){const declared=Number.isSafeInteger(options.maxOutputTokens) && options.maxOutputTokens>0?options.maxOutputTokens:Infinity;
         const cap=Math.min(declared,neuralDeepExecutionProfile(options.model).applicationOutputCap);return {...payload,max_output_tokens:Math.min(Number.isSafeInteger(payload.max_output_tokens) && payload.max_output_tokens>0 ? payload.max_output_tokens : cap,cap)};},
       beforeResponsesDispatch:options.beforeRequest,
       onRequest:event=>{if(event.error)providerError=event.error;options.onProviderRequest?.(event);},
     });
-    const args=buildCodexExecArgs({...options,cwd,writableRoots:[...(options.writableRoots || []),temporary],baseUrl:`http://127.0.0.1:${server.address().port}/v1`});
+    const args=buildCodexExecArgs({...options,cwd,toolServer,writableRoots:[temporary],baseUrl:`http://127.0.0.1:${server.address().port}/v1`});
     const env=providerProcessEnvironment({provider:'neuraldeep',root,stateRoot,codexHome,temporary,env:options.env || process.env});
-    env.PRITHA_PROVIDER_CAPABILITY=localToken;
+    env.HOME=home;env.PRITHA_PROVIDER_CAPABILITY=localToken;
+    if(toolServer)env.PRITHA_TOOL_CAPABILITY=toolServer.token;
     env.PRITHA_PYTHON=resolvePrithaPython({root,env:options.env || process.env});
-    owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(options.codexBin || 'codex',args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),beforeStart:async evidence=>{
+    sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[codexHome,home],writeRoots:[codexHome,home],loopbackPorts:[server.address().port,...(toolServer?[toolServer.port]:[])],runtime:'codex'});
+    owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(sandboxPlan.command,sandboxPlan.args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),beforeStart:async evidence=>{
       if(options.signal?.aborted)throw fail('operator_cancel');
-      await options.beforeStart?.({identity,evidence,codexHome,model:options.model,resume:options.resume || null});
-    },onEvidence:options.onEvidence});
+      trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),codexHome,model:options.model,resume:options.resume || null});
+    },onEvidence:evidence=>recordTree('cli',evidence)});
     options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
     timer=setTimeout(()=>stop('provider_timeout'),Math.max(1,deadline.hardDeadlineAt-Date.now()));
     const state={sessionId:null,usage:null,completed:false,failed:false,eventCount:0,errorCode:null};
@@ -128,19 +163,19 @@ export async function startNeuralDeepRun(options,dependencies={}){
     const completion=(async()=>{
       try{
         const [result]=await Promise.all([owned.completion,consume,stderr]);
-        verifiedExit=result.processTreeExited===true;
-        const errorCode=state.errorCode || stopReason || (providerError?'provider_'+providerError.class:null) || (!result.processTreeExited?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
-        return {ok:!errorCode,sessionId:state.sessionId,model:options.model,identity,usage:state.usage,providerError,errorCode,processTreeExited:result.processTreeExited,exitCode:result.code};
+        const toolsExited=await closeTools();verifiedExit=result.processTreeExited===true && toolsExited;
+        const errorCode=state.errorCode || stopReason || (providerError?'provider_'+providerError.class:null) || (!verifiedExit?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
+        return {ok:!errorCode,sessionId:state.sessionId,model:options.model,identity,cliVersion:cli.version,usage:state.usage,providerError,errorCode,processTreeExited:verifiedExit,exitCode:result.code};
       }finally{
         closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);
-        await closeNeuralDeepAdapter(server);if(verifiedExit)rmSync(temporary,{recursive:true,force:true});
+        await closeNeuralDeepAdapter(server);if(verifiedExit){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan?.planPath)rmSync(sandboxPlan.planPath,{force:true});}
       }
     })();
     return {completion,stop:()=>closed?false:stop('operator_cancel'),identity};
   }catch(error){
     clearTimeout(timer);options.signal?.removeEventListener('abort',abort);owned?.stop();if(owned)verifiedExit=(await owned.completion).processTreeExited===true;
-    error.processTreeExited=owned ? verifiedExit : error.processTreeExited!==false;
-    await closeNeuralDeepAdapter(server);if(error.processTreeExited)rmSync(temporary,{recursive:true,force:true});throw error;
+    const toolsExited=await closeTools();error.processTreeExited=(owned ? verifiedExit : error.processTreeExited!==false) && toolsExited;
+    await closeNeuralDeepAdapter(server);if(error.processTreeExited){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan?.planPath)rmSync(sandboxPlan.planPath,{force:true});}throw error;
   }
 }
 

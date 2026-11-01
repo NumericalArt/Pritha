@@ -4,38 +4,13 @@ import {normalizeLocalProviderUrl} from '../lib/provider-profile.mjs';
 import {ResponsesStreamNormalizer,writeResponseChunk} from '../neuraldeep/responses-stream.mjs';
 import {normalizeNeuralDeepUsage,neuralDeepUsageKnown} from '../neuraldeep/usage-ledger.mjs';
 import {OPENROUTER_BASE_URL,OPENROUTER_HEADERS,modelId} from './catalog.mjs';
+import {toolProjection,projectProviderToolRequest,wireCall} from '../lib/provider-tool-projection.mjs';
 const failure=(code,status=400)=>Object.assign(new Error('The selected provider request could not complete.'),{code,status});
 const object=value=>value!==null && typeof value==='object' && !Array.isArray(value);
 const digest=value=>createHash('sha256').update(value).digest();
 const send=(response,status,body)=>{if(response.destroyed)return;response.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});response.end(JSON.stringify(body));};
 const codeFor=status=>status===401 || status===403?'provider_pending_auth':status===402?'provider_billing_required':status===429?'provider_rate_limited':'provider_unavailable';
 const safeCode=error=>/^provider_[a-z_]+$/.test(error?.code || '')?error.code:'provider_stream_invalid';
-function toolProjection(input,allowed){
-  if(input!==undefined && (!Array.isArray(input) || input.length>128))throw failure('provider_tools_unsupported');
-  const tools=[],map=new Map();
-  for(const tool of input || []){
-    if(!object(tool))throw failure('provider_tools_unsupported');
-    if(tool.type==='namespace'){
-      if(!allowed || tool.name!=='mcp__pritha' || !Array.isArray(tool.tools) || tool.tools.length>128)throw failure('provider_tools_unsupported');
-      for(const member of tool.tools){
-        if(member?.type!=='function' || !/^[a-z_]{1,60}$/.test(member.name || ''))throw failure('provider_tools_unsupported');
-        const name=tool.name+'__'+member.name;if(!allowed.includes(name))continue;
-        if(map.has(name))throw failure('provider_tools_unsupported');map.set(name,{namespace:tool.name,name:member.name});tools.push({...member,name});
-      }
-    }else{
-      if(!['function','custom'].includes(tool.type))throw failure('provider_tools_unsupported');
-      if(allowed && !allowed.includes(tool.name))continue;
-      if(map.has(tool.name))throw failure('provider_tools_unsupported');map.set(tool.name,{name:tool.name});tools.push(tool);
-    }
-  }
-  if(tools.length>128)throw failure('provider_tools_unsupported');return {tools,map};
-}
-function wireCall(item,map){
-  if(item?.type!=='function_call')return item;
-  const target=map.get(item.name);if(!target)throw failure('provider_tool_identity_mismatch',502);
-  return {...item,...target};
-}
-
 /** No provider routing hints, remote tools, URLs in media, or server-side history. */
 export function compatibleRequest(input,{model,effort='default',maxOutputTokens=16384,thinkingBudget,reasoningControl,allowedTools}={}){
   if(!object(input) || input.model!==model)throw failure('provider_model_identity_mismatch');
@@ -47,22 +22,10 @@ export function compatibleRequest(input,{model,effort='default',maxOutputTokens=
     if(!['message','function_call','function_call_output','reasoning','custom_tool_call','custom_tool_call_output',undefined].includes(item.type))throw failure('provider_input_unsupported');
     if(Array.isArray(item.content) && item.content.some(part=>!['input_text','output_text','refusal'].includes(part?.type)))throw failure('provider_attachment_unverified');
   }
-  const projection=toolProjection(input.tools,allowedTools);
+  const projection=projectProviderToolRequest(input,allowedTools),toolInput=projection.payload;
   if(!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens<1 || maxOutputTokens>200000)throw failure('provider_output_limit_invalid');
-  const result={model,input:input.input,store:false,stream:true,max_output_tokens:Math.min(Number.isSafeInteger(input.max_output_tokens) && input.max_output_tokens>0?input.max_output_tokens:maxOutputTokens,maxOutputTokens)};
-  for(const field of ['instructions','tools','tool_choice','parallel_tool_calls','text','include'])if(input[field]!==undefined)result[field]=input[field];
-  if(allowedTools){
-    result.tools=projection.tools;if(!result.tools.length)result.tool_choice='none';
-    if(Array.isArray(result.input))result.input=result.input.map(item=>{
-      if(item.type!=='function_call' || !item.namespace)return item;
-      const name=item.namespace+'__'+item.name;if(!projection.map.has(name))throw failure('provider_tool_identity_mismatch');
-      const {namespace,...rest}=item;return {...rest,name};
-    });
-    if(object(result.tool_choice) && result.tool_choice.type==='function'){
-      const {namespace,name,...rest}=result.tool_choice,qualified=namespace?namespace+'__'+name:name;
-      if(!projection.map.has(qualified))throw failure('provider_tool_identity_mismatch');result.tool_choice={...rest,name:qualified};
-    }
-  }
+  const result={model,input:toolInput.input,store:false,stream:true,max_output_tokens:Math.min(Number.isSafeInteger(input.max_output_tokens) && input.max_output_tokens>0?input.max_output_tokens:maxOutputTokens,maxOutputTokens)};
+  for(const field of ['instructions','tools','tool_choice','parallel_tool_calls','text','include'])if(toolInput[field]!==undefined)result[field]=toolInput[field];
   // Host-pinned effort wins over arbitrary CLI defaults. A model without effort
   // control receives no effort field; mandatory reasoning is checked in preflight.
   if(effort!=='default' && (effort!=='none' || reasoningControl===true) || thinkingBudget!==undefined)result.reasoning={...(effort!=='default'?{effort}:{}),...(thinkingBudget!==undefined?{max_tokens:thinkingBudget}:{})};

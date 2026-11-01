@@ -82,8 +82,10 @@ export class ResponsesStreamNormalizer {
     let event;
     try {
       event=JSON.parse(data);
-      if(this.transform)event=parseSseData(this.transform(frame(event)))[0];
     } catch {fail('neuraldeep_stream_malformed','The Responses stream contains a malformed event.');}
+    // A host policy refusal is not a JSON decoding failure. Preserve its typed
+    // code so the caller does not misclassify or retry a rejected tool/model.
+    if(this.transform)event=parseSseData(this.transform(frame(event)))[0];
     if(!event || typeof event.type!=='string')fail('neuraldeep_stream_malformed','The Responses stream contains an invalid event.');
     this.record(event);
     if(terminalTypes.has(event.type)) {

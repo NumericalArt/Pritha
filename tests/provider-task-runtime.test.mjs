@@ -286,7 +286,7 @@ function hostFileFixture(t,connectorId='claude'){
   const upload=async()=>{const id=randomUUID();await store.upload(id,'data.txt',new Request('http://fixture',{method:'POST',body:'IMMUTABLE_ORIGINAL'}));return id;};
   t.after(()=>store.close());return {...f,make,store,policy,upload};
 }
-for(const connectorId of ['claude','openrouter'])test(`${connectorId}: host file scope survives worker resume and cleans only copies after confirmed exit`,async t=>{
+for(const connectorId of ['neuraldeep','claude','openrouter'])test(`${connectorId}: host file scope survives worker resume and cleans only copies after confirmed exit`,async t=>{
   const f=hostFileFixture(t,connectorId),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId,id=await f.upload();
   const first=await a.start(chat,{...message('host_files_first','Read attached data'),attachments:[id]});await until(()=>f.runs.length===1);
   const scope=f.runs[0].input.hostAttachments,read=await scope.read('attachment:'+id),copy=read.attachment.readOnlyPath;
