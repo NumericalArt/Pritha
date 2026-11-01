@@ -8,23 +8,11 @@ import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from pritha_paths import resolve_pritha_root
 
 
 def resolve_root():
-    if os.environ.get("TECHSCOPE_ROOT"):
-        return Path(os.environ["TECHSCOPE_ROOT"]).expanduser().resolve()
-    try:
-        output = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            text=True,
-            capture_output=True,
-            check=True,
-        ).stdout.strip()
-        if output:
-            return Path(output).resolve()
-    except Exception:
-        pass
-    return Path.cwd().resolve()
+    return resolve_pritha_root()
 
 
 ROOT = resolve_root()

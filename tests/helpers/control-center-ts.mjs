@@ -69,7 +69,8 @@ async function transpileMusicModules() {
     },
     fileName: sourcePath,
   });
-  await writeFile(path.join(fixtureRoot, `${stem}.mjs`), pathCompiled.outputText, "utf8");
+  const sharedPaths = JSON.stringify(pathToFileURL(path.join(repoRoot, "scripts/lib/paths.mjs")).href);
+  await writeFile(path.join(fixtureRoot, `${stem}.mjs`), pathCompiled.outputText.replace(/["']\.\.\/\.\.\/\.\.\/\.\.\/scripts\/lib\/paths\.mjs["']/g, sharedPaths), "utf8");
   }
   return outRoot;
 }

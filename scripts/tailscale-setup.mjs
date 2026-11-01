@@ -59,7 +59,7 @@ function run(command, args, options = {}) {
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs || 30000,
     maxBuffer: 10 * 1024 * 1024,
-    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+    env: { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT },
   });
   return {
     ok: result.status === 0,

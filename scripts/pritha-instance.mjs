@@ -29,7 +29,8 @@ import {
   isPrithaCodeCheckout,
   prithaInstanceConfig,
   resolvePrithaStatePath,
-  resolveTechscopeRoot,
+  resolvePrithaRoot,
+  prithaRootEnvironment,
 } from "./lib/paths.mjs";
 
 function parseArgs(argv) {
@@ -49,20 +50,20 @@ function parseArgs(argv) {
 }
 
 const options = parseArgs(process.argv.slice(2));
-if (options.root) process.env.TECHSCOPE_ROOT = path.resolve(String(options.root));
+if (options.root) Object.assign(process.env,prithaRootEnvironment(String(options.root)));
 
 loadEnvFile(String(options.env || process.env.PRITHA_CONTROL_CENTER_ENV_FILE || ""));
-loadPrithaRuntimeEnv({ root: resolveTechscopeRoot() });
+loadPrithaRuntimeEnv({ root: resolvePrithaRoot() });
 
 const config = prithaInstanceConfig({
-  root: process.env.TECHSCOPE_ROOT,
+  root: resolvePrithaRoot(),
   stateRoot: options["state-root"],
   agentParent: options["agent-parent"],
   instanceId: options["instance-id"],
   instanceRole: options.role,
   controlCenterPort: options.port,
 });
-process.env.TECHSCOPE_ROOT = config.codeRoot;
+Object.assign(process.env,prithaRootEnvironment(config.codeRoot));
 process.env.PRITHA_STATE_ROOT = config.stateRoot;
 process.env.PRITHA_AGENT_PARENT = config.agentParent;
 process.env.PRITHA_INSTANCE_ID = config.instanceId;
@@ -355,6 +356,7 @@ function writeRuntimeEnv() {
   const sourceText = existsSync(sourceEnv) ? readFileSync(sourceEnv, "utf8") : existsSync(target) ? readFileSync(target, "utf8") : "";
   const entries = envAssignments(sourceText);
   entries.set("TECHSCOPE_ROOT", JSON.stringify(config.codeRoot));
+  entries.set("PRITHA_ROOT", JSON.stringify(config.codeRoot));
   entries.set("PRITHA_INSTANCE_ID", JSON.stringify(config.instanceId));
   entries.set("PRITHA_INSTANCE_ROLE", JSON.stringify(config.instanceRole));
   entries.set("PRITHA_STATE_ROOT", JSON.stringify(config.stateRoot));
@@ -841,7 +843,7 @@ function usage() {
   node scripts/pritha-instance.mjs update --plan [--json]
   node scripts/pritha-instance.mjs update --apply --yes [--json]
 
-Environment: TECHSCOPE_ROOT, PRITHA_INSTANCE_ID, PRITHA_INSTANCE_ROLE,
+Environment: PRITHA_ROOT (legacy alias: TECHSCOPE_ROOT), PRITHA_INSTANCE_ID, PRITHA_INSTANCE_ROLE,
 PRITHA_STATE_ROOT, PRITHA_AGENT_PARENT, PRITHA_CONTROL_CENTER_PORT,
 PRITHA_CONTROL_CENTER_ENV_FILE and PRITHA_SEARXNG_URL.`);
 }

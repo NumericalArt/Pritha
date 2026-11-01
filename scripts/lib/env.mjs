@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { resolveTechscopeRoot } from "./paths.mjs";
+import { resolvePrithaRoot,resolvePrithaStateRoot,prithaRootEnvironment } from "./paths.mjs";
 
 export function loadEnvFile(filePath, target = process.env) {
   if (!existsSync(filePath)) return false;
@@ -18,7 +18,7 @@ export function loadEnvFile(filePath, target = process.env) {
 }
 
 export function loadEnv(options = {}) {
-  const root = options.root || resolveTechscopeRoot();
+  const root = options.root || resolvePrithaRoot({env:options.target || process.env});
   const target = options.target || process.env;
   loadEnvFile(path.join(root, ".env"), target);
   loadEnvFile(path.join(root, ".env.local"), target);
@@ -26,14 +26,16 @@ export function loadEnv(options = {}) {
 }
 
 export function loadPrithaRuntimeEnv(options = {}) {
-  const root = path.resolve(options.root || resolveTechscopeRoot());
   const target = options.target || process.env;
-  loadEnv({ root, target });
-  const stateRoot = target.PRITHA_STATE_ROOT
-    ? path.resolve(target.PRITHA_STATE_ROOT)
-    : root;
+  const initialRoot=resolvePrithaRoot({root:options.root,env:target});
+  if(options.root!==undefined)Object.assign(target,prithaRootEnvironment(initialRoot));
+  loadEnv({ root:initialRoot, target });
+  const root=resolvePrithaRoot({cwd:initialRoot,env:target});
+  const stateRoot = resolvePrithaStateRoot({root,stateRoot:target.PRITHA_STATE_ROOT,env:target});
   if (stateRoot !== root) {
     loadEnvFile(path.join(stateRoot, "config", "runtime.env"), target);
   }
-  return { root, stateRoot, target };
+  const configuredRoot=resolvePrithaRoot({cwd:root,env:target});
+  Object.assign(target,prithaRootEnvironment(configuredRoot));
+  return { root:configuredRoot, stateRoot, target };
 }

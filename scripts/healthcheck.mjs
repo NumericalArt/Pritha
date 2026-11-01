@@ -41,7 +41,7 @@ function run(name, command, args, options = {}) {
     cwd: options.cwd || root,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, TECHSCOPE_ROOT: root },
+    env: { ...process.env, PRITHA_ROOT: root, TECHSCOPE_ROOT: root },
     timeout: options.timeoutMs || 60000,
   });
   const detail = (result.stdout || result.stderr || "").trim();

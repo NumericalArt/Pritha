@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import {resolvePrithaRoot} from './lib/paths.mjs';
 
-const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ENV_ROOT = process.env.TECHSCOPE_ROOT ? path.resolve(process.env.TECHSCOPE_ROOT) : "";
-const ROOT = ENV_ROOT && existsSync(ENV_ROOT) ? ENV_ROOT : DEFAULT_ROOT;
+const ROOT=resolvePrithaRoot();
 
 function usage() {
   console.log(`Usage:
@@ -29,7 +27,7 @@ if (process.argv.includes("--help")) {
 }
 
 const phase = option("--phase");
-const title = option("--title", `Techscope Quality Phase ${phase} Report`);
+const title = option("--title", `Pritha Quality Phase ${phase} Report`);
 const output = option("--output");
 const input = option("--input");
 
@@ -45,7 +43,7 @@ function runGate() {
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 300000,
     maxBuffer: 20 * 1024 * 1024,
-    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+    env: { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT },
   });
   if (result.status !== 0) {
     throw new Error(`quality-gate failed:\n${result.stdout || result.stderr}`);

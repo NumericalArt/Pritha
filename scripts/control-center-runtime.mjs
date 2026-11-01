@@ -24,7 +24,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { loadEnvFile, loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { isPrithaCodeCheckout, prithaInstanceConfig, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { isPrithaCodeCheckout, prithaInstanceConfig, resolvePrithaRoot,prithaRootEnvironment } from "./lib/paths.mjs";
 
 const SERVICE_PREFIX = "com.numericalart.pritha.control-center";
 const HEALTH_SCHEMA = "pritha-control-center-health-v2";
@@ -56,18 +56,18 @@ function parseArgs(argv) {
 }
 
 const options = parseArgs(process.argv.slice(2));
-if (options.root) process.env.TECHSCOPE_ROOT = path.resolve(String(options.root));
+if (options.root) Object.assign(process.env,prithaRootEnvironment(String(options.root)));
 if (options["state-root"]) process.env.PRITHA_STATE_ROOT = path.resolve(String(options["state-root"]));
 if (options["instance-id"]) process.env.PRITHA_INSTANCE_ID = String(options["instance-id"]);
 if (options.role) process.env.PRITHA_INSTANCE_ROLE = String(options.role);
 if (options.port) process.env.PRITHA_CONTROL_CENTER_PORT = String(options.port);
 
-const preliminaryRoot = resolveTechscopeRoot();
 loadEnvFile(String(options.env || process.env.PRITHA_CONTROL_CENTER_ENV_FILE || ""));
+const preliminaryRoot = resolvePrithaRoot();
 loadPrithaRuntimeEnv({ root: preliminaryRoot });
 
 const config = prithaInstanceConfig({
-  root: process.env.TECHSCOPE_ROOT,
+  root: resolvePrithaRoot(),
   stateRoot: process.env.PRITHA_STATE_ROOT,
   instanceId: process.env.PRITHA_INSTANCE_ID,
   instanceRole: process.env.PRITHA_INSTANCE_ROLE,
@@ -231,12 +231,15 @@ function listenerPids() {
   };
 }
 
+function canonicalDirectory(value){try{return typeof value==='string' && value?realpathSync(value):null;}catch{return null;}}
+function sameDirectory(left,right){const actual=canonicalDirectory(left),expected=canonicalDirectory(right);return Boolean(actual && expected && actual===expected);}
+
 function identityMatches(record) {
   return Boolean(record)
     && record.schema === STATE_SCHEMA
     && record.instanceId === config.instanceId
-    && path.resolve(record.codeRoot || ".") === path.resolve(config.codeRoot)
-    && path.resolve(record.stateRoot || ".") === path.resolve(config.stateRoot)
+    && sameDirectory(record.codeRoot,config.codeRoot)
+    && sameDirectory(record.stateRoot,config.stateRoot)
     && record.port === config.controlCenterPort
     && record.label === label;
 }
@@ -249,10 +252,10 @@ function listenerOwnership(record, listener = listenerPids()) {
   }
   const details = listener.pids.map(processInfo).filter(Boolean);
   const ownerMatch = details.length === listener.pids.length && details.every((item) => {
-    const expectedCwd = path.resolve(appRoot);
+    const expectedCwd = canonicalDirectory(appRoot),actualCwd=canonicalDirectory(item.cwd);
     return item.pgid === record.processGroupId
-      && Boolean(item.cwd)
-      && (path.resolve(item.cwd) === expectedCwd || path.resolve(item.cwd).startsWith(`${expectedCwd}${path.sep}`));
+      && Boolean(expectedCwd && actualCwd)
+      && (actualCwd === expectedCwd || actualCwd.startsWith(`${expectedCwd}${path.sep}`));
   });
   return { ownerMatch, listenerPids: listener.pids, details, error: ownerMatch ? null : "owner_mismatch" };
 }
@@ -548,7 +551,7 @@ async function runService() {
       env: {
         ...process.env,
         PATH: runtimeExecutablePath(),
-        TECHSCOPE_ROOT: config.codeRoot,
+        PRITHA_ROOT: config.codeRoot, TECHSCOPE_ROOT: config.codeRoot,
         PRITHA_STATE_ROOT: config.stateRoot,
         PRITHA_INSTANCE_ID: config.instanceId,
         PRITHA_INSTANCE_ROLE: config.instanceRole,
@@ -664,7 +667,7 @@ async function stopService() {
       || currentState.processGroupId !== state?.processGroupId
       || !Number.isSafeInteger(state?.childPid) || state.childPid <= 1
       || state.processGroupId !== state.childPid
-      || child?.pgid !== state.childPid || path.resolve(child?.cwd || ".") !== path.resolve(appRoot)) {
+      || child?.pgid !== state.childPid || !sameDirectory(child?.cwd,appRoot)) {
       throw new Error("owner_mismatch:listener_changed_during_stop");
     }
     try { process.kill(-state.processGroupId, "SIGKILL"); }

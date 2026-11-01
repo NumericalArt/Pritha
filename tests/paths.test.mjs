@@ -18,11 +18,11 @@ test("resolveTechscopeRoot honors TECHSCOPE_ROOT", () => {
   }
 });
 
-test("resolveTechscopeRoot ignores stale missing TECHSCOPE_ROOT", () => {
+test("resolveTechscopeRoot rejects a stale explicit root without choosing another instance", () => {
   const oldRoot = process.env.TECHSCOPE_ROOT;
   process.env.TECHSCOPE_ROOT = path.join(os.tmpdir(), "missing-techscope-root-for-test");
   try {
-    assert.equal(resolveTechscopeRoot(), process.cwd());
+    assert.throws(()=>resolveTechscopeRoot(),{code:'pritha_root_invalid'});
   } finally {
     if (oldRoot === undefined) delete process.env.TECHSCOPE_ROOT;
     else process.env.TECHSCOPE_ROOT = oldRoot;

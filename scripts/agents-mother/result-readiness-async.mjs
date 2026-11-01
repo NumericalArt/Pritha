@@ -56,7 +56,7 @@ export async function readAgentResultReadinessAsync(target, input = {}) {
       try {
         child = spawn(process.execPath, [path.join(codeRoot, "scripts/agents-mother/result-readiness-worker.mjs")], {
           cwd: root, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32",
-          env: { ...process.env, TECHSCOPE_ROOT: root, PRITHA_STATE_ROOT: request.stateRoot, PRITHA_AGENT_PARENT: request.agentParent },
+          env: { ...process.env, PRITHA_ROOT: root, TECHSCOPE_ROOT: root, PRITHA_STATE_ROOT: request.stateRoot, PRITHA_AGENT_PARENT: request.agentParent },
         });
         child.stdout.on("data", chunk => { bytes += chunk.length; if (bytes > 1_000_000) stop("readiness-output-limit"); else stdout += chunk.toString("utf8"); });
         child.stderr.on("data", chunk => { bytes += chunk.length; if (bytes > 1_000_000) stop("readiness-output-limit"); });

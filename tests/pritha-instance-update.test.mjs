@@ -94,6 +94,7 @@ if (action === "start") {
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "atomic-file.mjs"), path.join(lib, "atomic-file.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "env.mjs"), path.join(lib, "env.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "root-resolution.mjs"), path.join(lib, "root-resolution.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "timeout-policy.mjs"), path.join(lib, "timeout-policy.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "cli-args.mjs"), path.join(lib, "cli-args.mjs"));
   writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "version"), "good\n");

@@ -49,7 +49,7 @@ function invoke(instance, commandArgs) {
   const checkout = path.resolve(instance.checkout);
   const env = {
     ...process.env,
-    TECHSCOPE_ROOT: checkout,
+    PRITHA_ROOT: checkout, TECHSCOPE_ROOT: checkout,
     PRITHA_INSTANCE_ID: instance.id,
     PRITHA_INSTANCE_ROLE: instance.role || "replica",
     PRITHA_STATE_ROOT: path.resolve(instance.state_root),

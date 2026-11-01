@@ -2,9 +2,10 @@
 
 Pritha is the preferred CLI surface.
 
-The public repository/check-out name is Pritha. Historical `Techscope` names
-remain in compatibility paths, environment variables and memory artifacts until
-a separate migration removes them.
+The public repository/check-out and package name is Pritha. Use `PRITHA_ROOT`
+to select the code checkout. `TECHSCOPE_ROOT` remains a compatible alias: when
+both are set they must resolve to the same directory. Existing persisted
+Techscope filenames remain readable during the separate state migration.
 
 Conceptually, Pritha is a harness for an agent that builds the harness of a new
 agent. It uses a genetic lineage model: a Seed carries the specification,

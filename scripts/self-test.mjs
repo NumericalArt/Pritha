@@ -27,7 +27,7 @@ function runJson(command, commandArgs, options = {}) {
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs || 180000,
     maxBuffer: options.maxBuffer || 20 * 1024 * 1024,
-    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+    env: { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT },
   });
   const stdout = String(result.stdout || "").trim();
   const stderr = String(result.stderr || "").trim();
@@ -74,7 +74,7 @@ function runCommand(command, commandArgs, options = {}) {
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs || 180000,
     maxBuffer: options.maxBuffer || 20 * 1024 * 1024,
-    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+    env: { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT },
   });
   return {
     ok: result.status === 0,
@@ -93,7 +93,7 @@ function stats() {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 60000,
-    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+    env: { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT },
   });
   if (result.status !== 0) {
     throw new Error(result.stderr || result.stdout || "query-memory stats failed");

@@ -50,7 +50,7 @@ CLI-агент, который складывает два числа и воз�
 ```sh
 git clone https://github.com/NumericalArt/Pritha.git Pritha
 cd Pritha
-export TECHSCOPE_ROOT="$PWD"
+export PRITHA_ROOT="$PWD"
 export PRITHA_STATE_ROOT="$PWD/../Pritha-state"
 export PRITHA_AGENT_PARENT="$PWD/../Pritha-agents"
 mkdir -p "$PRITHA_STATE_ROOT" "$PRITHA_AGENT_PARENT"

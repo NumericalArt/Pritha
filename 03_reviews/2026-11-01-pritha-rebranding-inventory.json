@@ -1,0 +1,1043 @@
+{
+  "schema_version": 1,
+  "created": "2026-11-01",
+  "source": {
+    "repository": "NumericalArt/Pritha",
+    "commit": "e181af23f036a02e1dd06199b2017eeb2afd8b53",
+    "scope": [
+      "scripts/",
+      "interfaces/control-center/src/",
+      "launchd/",
+      ".githooks/",
+      "operations/"
+    ]
+  },
+  "canonical_contract": {
+    "root_env": "PRITHA_ROOT",
+    "root_function": "resolvePrithaRoot",
+    "checkout_setup_file": ".pritha-setup.json",
+    "external_setup_file": "setup/setup.json",
+    "memory_basename": "pritha.sqlite",
+    "package_name": "pritha"
+  },
+  "preserved_compatibility": [
+    "TECHSCOPE_ROOT and resolveTechscopeRoot remain aliases",
+    "Old state filenames remain readable; migration must be explicit and recoverable",
+    "Existing service labels remain until a separately approved staged activation",
+    "Historical Markdown, citations, source URLs and stable artifact IDs are not mass rewritten"
+  ],
+  "status": "root-and-package-contract-implemented; persisted-state-and-remaining-runtime-names-pending",
+  "baseline_file_count": 111,
+  "entries": [
+    {
+      "path": "interfaces/control-center/src/components/codex/FactoryChatSelector.tsx",
+      "source_sha256": "df602b80a56d9b1ce0b8dc6c1d8ea97a51a8401ebee03bb67d509b65659c1164",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/app-server.ts",
+      "source_sha256": "ecec645733949a53211ab5c315b5b5e2ae9b038f47630a3aef96345089df096d",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/drivers/claude-driver.ts",
+      "source_sha256": "550c69d1b5aa43b08beeb85770eb87ef0a6883e9c606f553b365b94fa78c47ab",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/drivers/compatible-driver.ts",
+      "source_sha256": "9b433d01a219c85f1f444523586e98f249a60d63b51292b4a8d6ef20aef610e4",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/drivers/neuraldeep-driver.ts",
+      "source_sha256": "70ac8e4925d78f7418ae800201296e8e582f94a8391906b519985363646eedeb",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/native-gateway.ts",
+      "source_sha256": "87aa7ffb70e647c317d12fa2c525b2c08e9677443bb8dd43756e619fadafe30d",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/native-turn-coordinator.ts",
+      "source_sha256": "9f5bbcfa067bd3afe8a50bfbd157211e34ed354808c35a5457be75e7f0cfc788",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/operation-runtime.ts",
+      "source_sha256": "ec1b5735a1907ca0be1f8d457eac52a7ed22073a8eda96e597f32fe0e8a7d3a4",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/private-store.ts",
+      "source_sha256": "e6f11c8cfeef7a1cd1b07cbd63d6c5c269f95fccb391b8cca0858047c6d5cb43",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/ui-activity.ts",
+      "source_sha256": "b2c194821655aa6c03717b5fc6cac6154b432bd5512279adb0a607c5f71b903f",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/codex-chat/voice-links.ts",
+      "source_sha256": "cd380fc046517148f70d395bb09a1eba5d95d750c71dbb1435ecb37c95cf7936",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/maintenance.ts",
+      "source_sha256": "552bc4f948a0ada8f2487653a133bcf173f5e06704d9a7c92edddbe2a179d655",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/control-center/server.ts",
+      "source_sha256": "637aa68d5779a3f3e0059e901444954f73ee43ebe5b707b09b6b53a199279812",
+      "case_insensitive_occurrences": 10,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/music/config.ts",
+      "source_sha256": "027d910ab98454bd92296f915195a82e8a6e250f79bb3a66dd7cf7c5bba48db5",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/pritha-paths.ts",
+      "source_sha256": "f70e2c455ac8c04ed237b77c8366b142b7beba333c123abf09902e2204635e85",
+      "case_insensitive_occurrences": 7,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/codex-task/codex-app-server-client.ts",
+      "source_sha256": "92b4df280fdd63da4d2a7ea1cddad06a57cc4742fa97449c8e3e7b5119bfd5c0",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "legacy-environment-option"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/realtime/pritha-runtime.ts",
+      "source_sha256": "51f013084260eac49ea07823590566497bd2c07dc9cf4b00ce21616de6325a97",
+      "case_insensitive_occurrences": 75,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-auth.ts",
+      "source_sha256": "80171df902278ec3b06f4e793aa59a5ec8e430c8d0369f169a61b4fc55e059fe",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-binaries.ts",
+      "source_sha256": "23a8fa4694490c3656a04e5e6cdaa850539904de5571000d4d72748f3d8f8247",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "legacy-environment-option"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-model-catalog-server.ts",
+      "source_sha256": "3e86e38f6622d3a5a3f0eefbf124dbfa5dbae55fefb5c952b6c6340b33b4b990",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/codex-rate-limits.ts",
+      "source_sha256": "f3081fbf45c5274a7f93d4c0461e09a6ca74dd10ad7489fb5457bbca08336d99",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/env-store.ts",
+      "source_sha256": "d322ab54d3c2ddb97fb71b3db6f6a6b2496e28a4af291610d0eb084a4badb139",
+      "case_insensitive_occurrences": 6,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "interfaces/control-center/src/lib/settings/provider-settings-server.ts",
+      "source_sha256": "ebc3d25b43ce453040f614a0f14c959c54c1867d26c815abc3af82a0fb6a60f6",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "launchd/README.md",
+      "source_sha256": "205b27d787794e926591b327853dd10cc6b743ba28f32881d91120be00af7f83",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-entrypoint-or-service-identity"
+      ]
+    },
+    {
+      "path": "launchd/com.techscope.self-test.plist.template",
+      "source_sha256": "dc3a2adf9e2cda0e751364421d4775b35847813aff3c191e993953bce87d1718",
+      "case_insensitive_occurrences": 7,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-entrypoint-or-service-identity"
+      ]
+    },
+    {
+      "path": "launchd/com.techscope.telegram-bot.plist",
+      "source_sha256": "2bd286eeb1a872f4ea06fd1ee95a10f4079f608d49124b18d134f3340b840f82",
+      "case_insensitive_occurrences": 10,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-entrypoint-or-service-identity"
+      ]
+    },
+    {
+      "path": "launchd/com.techscope.web.plist",
+      "source_sha256": "83bc417cb03eeff15847a539c5745d13aad8686b3cb36ef77066bac6108b1b92",
+      "case_insensitive_occurrences": 10,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-entrypoint-or-service-identity"
+      ]
+    },
+    {
+      "path": "operations/manifest.json",
+      "source_sha256": "f7c58b5fa84abb7c59634c7203c666d54e9717d295c89f5c81ffd3acd014b411",
+      "case_insensitive_occurrences": 7,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-entrypoint-or-service-identity"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother.mjs",
+      "source_sha256": "167f277317dc2f02f9ef27053e1f122585cc19d22eafc8c903d5b31b6e6fb5bf",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/authored-handoff.mjs",
+      "source_sha256": "79777e8156a6f354f866b4a6bd0a93b70771a94c68f00eee735287edea116a8a",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/build-executors.mjs",
+      "source_sha256": "560703a1d15e956ef056406b6f6b905649f5097da9202466bd2f918804a9791d",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/card-readiness.mjs",
+      "source_sha256": "8708baf7754dbd3416cd2b5b2a5598ffdd48f4f731b384516256950b8556b413",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/command-probe.mjs",
+      "source_sha256": "f34b451fc4dd9f49e7e23fb2da237829e2b0349e98d47c7c5db0ace53ae174b7",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/contract.mjs",
+      "source_sha256": "30cd695f4b31dcb7454eb553f8ad24cc9b70d4ed79a8e2b7bf663c68713e9317",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/delivery-loop.mjs",
+      "source_sha256": "533aaa83495b1f7baf10d5322982128247c81ed45819784c79bb0ff97acf7db0",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/delivery-reconcile.mjs",
+      "source_sha256": "5973123648bfb964ef8e042ff2e1f2bad4e465b346532def9b7a38f9e207119c",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/handoff.mjs",
+      "source_sha256": "36d492cc03842c123ab424392e2201700f9d31c610ae3a418c30669debd2d64e",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/identity.mjs",
+      "source_sha256": "b7c6f2407a4e12a1ff50e7ac60f4f8f8181968dab63b268f783585bdb728c103",
+      "case_insensitive_occurrences": 6,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/index.mjs",
+      "source_sha256": "04036826bf72861f03d0d8e7e8525692bb2d3abb4a29af01ddc39cad535dbc64",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/operation-decisions.mjs",
+      "source_sha256": "997d2d6fbf6976ad18c2b5af8390bf0c7b5bbcf19d30e0f2df9b2b2c7953cc7f",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/operations.mjs",
+      "source_sha256": "419641f466c7d63507455a40cc1b5c52dc214a139db93726f49b9562943a5a85",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/outcome-spec.mjs",
+      "source_sha256": "115b2b321030817ad6547481ec52d04898cedef46e006292514f41758623de5d",
+      "case_insensitive_occurrences": 11,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/phase-usage.mjs",
+      "source_sha256": "b5b8154aa5c461e793f1a18e2f3b2b75c6855ea81a173a50d401659d5f611a05",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/registry.mjs",
+      "source_sha256": "ae9bafe71a793a5d5288a30f196301289991c6314080df76161dfa78ca853c1a",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/result-readiness-async.mjs",
+      "source_sha256": "907ba114b66cd329c0c592a6119af3cd95190979f2e689ba8daae03396524f5e",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/result-readiness.mjs",
+      "source_sha256": "36db8078ab8b150c64a71fcb5030ba674fb2f0cf175688ef35958e73c64e8317",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/api-process.mjs",
+      "source_sha256": "2cbb2077661b9ea3c9ad87da6d9eb56d7abb2aee9d7a79740ee3e2f9384a3476",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/scaffold/index.mjs",
+      "source_sha256": "733ba78eec716ea41455ecd1ac9e6e3b020a7cd6cad6fde539d14da3dda782b9",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/skills.mjs",
+      "source_sha256": "0d0e9e248c66575596b081b21704e338eba4cdac50930353ad8318fb6b5a1f51",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/task-delivery.mjs",
+      "source_sha256": "ed85f1d31ba76ee52c81ab7cb0fde851aa7fd2492002d6f07c9a34e7f865afe8",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/agents-mother/test.mjs",
+      "source_sha256": "7dcad86e950b2e1aff72cc844dd99dbc715a5d17489c3e7771d32674e425623f",
+      "case_insensitive_occurrences": 5,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/audit-report.mjs",
+      "source_sha256": "a83472cf6da81cacd60b6ae787ee34b348b51fe1bba9c4d048e384b559c181eb",
+      "case_insensitive_occurrences": 7,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/bootstrap.mjs",
+      "source_sha256": "b0356a369f80fc79787b455d7cce0be8e65b812c93cd8ebd1dc561875febb50c",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/control-center-runtime.mjs",
+      "source_sha256": "804369ad1297ae43da9c8e8af76e26b428e5cdbfeafd245288d1404d4c0a1ed3",
+      "case_insensitive_occurrences": 5,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/embed-memory.py",
+      "source_sha256": "d60792c5b6d9d4a68622f8798516ae85b8635a83d85d6019150075bb05ae4cb0",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "persisted-state-filename"
+      ]
+    },
+    {
+      "path": "scripts/env-doctor.mjs",
+      "source_sha256": "d18270a689e8191134dc52106fb2434625958c36968542192a08e08e168ddb4e",
+      "case_insensitive_occurrences": 5,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/execution-control.mjs",
+      "source_sha256": "d186148a3b76af7c28262e4d90831c196198129cf98cb27ed09ac003088c85b4",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/experiments/agent-pilots/README.md",
+      "source_sha256": "a744a797e12a15a7aa6fbc0b386504ec7121152603aa0fb81dd7858e0ff217dd",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "persisted-state-filename"
+      ]
+    },
+    {
+      "path": "scripts/external-research-tools.mjs",
+      "source_sha256": "219f634f7646e675b207820c4ebb5368d63e9376ff8d4d8ef5e4504a3edd40fc",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/extract-signal.mjs",
+      "source_sha256": "6fb9e07352d1957df3b88454e1eccee926995f57fe4be2509910559f29402878",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/github-knowledge-radar.mjs",
+      "source_sha256": "02eeea6eb300c866f4d40bb1d3102a9624dd5f45d7d829e31c9134d5cc0ebc15",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/github-release-status.mjs",
+      "source_sha256": "551a92308a7c3834800e771205f6e71ab75b95c946210334fb897eb77b549755",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/golden-checks.mjs",
+      "source_sha256": "e34c785f57082ecd726c705b9a955182afc6f45b7d2d715f0e1e518f81098e72",
+      "case_insensitive_occurrences": 7,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/good-state-alignment.mjs",
+      "source_sha256": "b536530b24ded07038220702fe7fa529035e1ea629026a5ad5f68ca186ffd632",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/healthcheck.mjs",
+      "source_sha256": "cdaf2e6060289043e055ea21a6970a3a1197dbcb6857d8abb317b6611d4bff50",
+      "case_insensitive_occurrences": 11,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "legacy-environment-option",
+        "legacy-entrypoint-or-service-identity",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/launchd-root-audit.mjs",
+      "source_sha256": "4635351474992fadb022d5e7ac26c0633818041b5eb06e46c1fede79ac651ae9",
+      "case_insensitive_occurrences": 5,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-entrypoint-or-service-identity",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/lib/README.md",
+      "source_sha256": "57b2c15ea2b5951121ba4ad1d9055c4e73cebb53f5b48c127705c43bacea13c6",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/lib/chat-subject.mjs",
+      "source_sha256": "c9256008f9d06ecc9875020028a7dd0d5df0c93d702a4f1cefd4bd09d7c04f47",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "review-required-identifier-or-history-reference"
+      ]
+    },
+    {
+      "path": "scripts/lib/curated-memory.mjs",
+      "source_sha256": "86ddbdfb9afd910512b4e2a3c93418722b029378152f0ac460eb3f16a9f6c835",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "scripts/lib/env.mjs",
+      "source_sha256": "ab1e2fe7994912eaa658d03043a8189c955a0d84301b8dbf1cdb73a7431f8248",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/lib/paths.mjs",
+      "source_sha256": "95663ba2d626976da11a421962821f96d1c5be1e7b6ce13378fc9983a13e4d3e",
+      "case_insensitive_occurrences": 10,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/lib/provider-process-environment.mjs",
+      "source_sha256": "b5326862df0a527cb7fc4afa55e43f599fd49ac255d8c90a85b262412c8420bb",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "scripts/lib/redaction.mjs",
+      "source_sha256": "024aeebb57860e91dd361053c2aec7b4a4a1fa776331b1954a37a588392109b9",
+      "case_insensitive_occurrences": 1,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/lib/task-workspace.mjs",
+      "source_sha256": "01de7dc99525785f6184f657dcfbdbaec2e0b22cd0b3201574e906d9162c0e0d",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "review-required-identifier-or-history-reference"
+      ]
+    },
+    {
+      "path": "scripts/llm-wiki.mjs",
+      "source_sha256": "484ef03c4e4da7d344566dd8e228996c41b55aa607aa727df3d2e8e977d194f0",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/memory-retrieval-acceptance.py",
+      "source_sha256": "7afef0c3751af834db3e465dc42a49c0709f89d543c18c90d56e1e55614bc3e6",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "persisted-state-filename"
+      ]
+    },
+    {
+      "path": "scripts/memory-retrieval-eval.py",
+      "source_sha256": "86e969042573b7c205b8f1ddec489f24ba5854f77df39770ddee65bf604895f4",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "persisted-state-filename"
+      ]
+    },
+    {
+      "path": "scripts/memory-retrieve.py",
+      "source_sha256": "1a6ca2c2d6a6be9e4ee88c7d042af57c84cb8622c340ca8aa00d10bd2c4244c6",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "persisted-state-filename"
+      ]
+    },
+    {
+      "path": "scripts/memory-status.mjs",
+      "source_sha256": "948c0e7c373b7fd137b43a4e7d99af82aa33cfbaa2acd58ff332a35c691fabb6",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/neuraldeep/history-audit.mjs",
+      "source_sha256": "0a1cb4323a1500de3e79d1405ee9afae73e34ed09b5f30b53dbef5341b95d828",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/pre-push-audit.mjs",
+      "source_sha256": "a467c409c5cc17e08e1761ad392c498f7cabc49e6be997d61ccfdae430575da6",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/pritha-fleet.mjs",
+      "source_sha256": "81b1c90b3c7d1cdcb7a6dd8274f14ed1697d5303d869514339e3c894bdad307d",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/pritha-instance.mjs",
+      "source_sha256": "e44d8bf99d840dd2450d4e64a0ff549c5d31d71bc71e23868cfd9e7b63297fd9",
+      "case_insensitive_occurrences": 11,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/pritha-maintenance.mjs",
+      "source_sha256": "d1adc5347cc09577d0283417a2d4888e4c4a6a549c791e8f7158b6b3d019125f",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/pritha-promote.mjs",
+      "source_sha256": "61ebdfa1d1c1b00f77f1cffe766447d14d3e594097790e85ce5c2a92eae7bb1d",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/pritha.mjs",
+      "source_sha256": "e39a21a85e9ee525b38352c243e94a0a5fe20538c9b4158d42e47404cc885f01",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/pritha_python_compat.py",
+      "source_sha256": "3e72d087def449440c1fba8d1a65fb84a02f70271f62f5446040c9984aa7fc7a",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "scripts/privacy-audit.mjs",
+      "source_sha256": "3c9c933dc37629728a75fbc9d94167eabf4e9551d5a4516025b8d4d3d6bed932",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/privacy-sanitize-current-state.mjs",
+      "source_sha256": "7e47de79e8fda1f0fe65c9280cc9a4bd492577073ca54502f88310016811a39a",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/process-intake.mjs",
+      "source_sha256": "d4232ace66b63d0c967347838dfebbe2c65736ff657a034855f9ec500d5c858e",
+      "case_insensitive_occurrences": 11,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/quality-gate.mjs",
+      "source_sha256": "5f17bfc8dea7cc0b2c02ca2f852a0bcf82cd2cc45af0945c918ee28a44b611ca",
+      "case_insensitive_occurrences": 6,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/query-memory.mjs",
+      "source_sha256": "b350d9ba4538a598d3bc5b6debf805ce6d6c66afc8bbf22155b3e7e79a8ff8f2",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/queue-health.mjs",
+      "source_sha256": "b6ca1b2bf528e95f13c616d2590694799f5c84e54c21d93d9c9ae7fe51889e61",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/rebuild-memory.mjs",
+      "source_sha256": "02939046aca86608c8b7ab8170e8d3858fbba1d0977bcf36341e15ad65064f28",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/reconcile-task-chat-links.mjs",
+      "source_sha256": "5d5bc510d1dd1f2e3f910b319ae7ee2a1da8273025fa5471a212da88152d013b",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "scripts/run-techscope-telegram-bot.sh",
+      "source_sha256": "4d7dcfe1e50941d562080ac3daf618a36e3acdc29a94a69b5ca2cef9e942e029",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary"
+      ]
+    },
+    {
+      "path": "scripts/run-techscope-web.sh",
+      "source_sha256": "2983ea09f781e15d69a524b64c5db7a5111bbcfcc2cb4cda7cac94c5c770174c",
+      "case_insensitive_occurrences": 5,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-entrypoint-or-service-identity",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/self-test.mjs",
+      "source_sha256": "d18b93ea43b65fcaf2d25203d5e164fec500d3b8c16faaa4c9fabfc839acd05a",
+      "case_insensitive_occurrences": 8,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/semantic-search.py",
+      "source_sha256": "2801871688ee3a16e1bd188c478968027f008fce56477e55da311bec914f0fea",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "persisted-state-filename"
+      ]
+    },
+    {
+      "path": "scripts/setup-status.mjs",
+      "source_sha256": "6460b6390d0135f85537adcb1d8079d0dd2e01b173b4466749feeb6953b34bd7",
+      "case_insensitive_occurrences": 4,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "source_sha256": "5f1ba2661a7ddd01d1c8ba3fe17fc3f6489d5e02cb4f1f2a62a8fa31c1e259fd",
+      "case_insensitive_occurrences": 12,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/status-lib.mjs",
+      "source_sha256": "337d6618ce6178682916a538f5baf81aca638b038d37153ca050434a0eb6928e",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/tailscale-setup.mjs",
+      "source_sha256": "c6381ed57df66c4c5dc971ac0ff0f13d88e564eb36758ab1f16b96d8f825de56",
+      "case_insensitive_occurrences": 5,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/task-workspace.mjs",
+      "source_sha256": "5872b08cbc02b4caca9061a38f45738d712a23ac9aa76551f80fb1f24a5ca76e",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/techscope-web.mjs",
+      "source_sha256": "5118a4d8da9edaeb277f84cbbcb3ec0601d7d170867beeea45d47fa8977525d7",
+      "case_insensitive_occurrences": 8,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/techscope_web.py",
+      "source_sha256": "24f9679490f2520054d777f70aa6ee2b2ea99b3582e27e828f6b6ba2692d9ed2",
+      "case_insensitive_occurrences": 7,
+      "categories": [
+        "root-compatibility-boundary",
+        "persisted-state-filename",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/telegram-bot.mjs",
+      "source_sha256": "e467a21c82b3f1bd0f17339a9a48a46897e03f137baa9e054d7c50a832fac251",
+      "case_insensitive_occurrences": 17,
+      "categories": [
+        "root-compatibility-boundary",
+        "legacy-environment-option",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/transcribe-media.mjs",
+      "source_sha256": "c99e47213497ea40b4c9e474a87a3aedd1f87a38371c63db6aa11180da255d50",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/validate-memory.mjs",
+      "source_sha256": "59ca9e9a71cdc20a503dd4d047fb7ca9932638ebc0ddb30b5ad8ea20830ee19e",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/voice-control-kit.mjs",
+      "source_sha256": "1850bde23c4e957dc9c6584bb5db8d86d7c4a5f3c0d9ae29aa278e126b584658",
+      "case_insensitive_occurrences": 2,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    },
+    {
+      "path": "scripts/web-search-tools.mjs",
+      "source_sha256": "ea37fb083597fa72ac0fbec0cfe75331348deb6bf033bae257d3a30b5614d224",
+      "case_insensitive_occurrences": 3,
+      "categories": [
+        "root-compatibility-boundary",
+        "public-label-or-redaction-placeholder"
+      ]
+    }
+  ]
+}

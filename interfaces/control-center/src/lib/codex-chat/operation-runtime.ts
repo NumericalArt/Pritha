@@ -6,7 +6,7 @@ export function operationRuntime(root: string, stateRoot: string): OperationRunt
   async function access(action: "plan" | "serve", target: { agentId: string; port: number; healthPath: string }) {
     const state = path.join(stateRoot, ...(stateRoot === root ? [".snapshots", "audit"] : ["audit"]), "operation-decisions", `${target.agentId}-setup.json`);
     const args = ["node", "scripts/tailscale-setup.mjs", action, "--app", target.agentId, "--port", String(target.port), "--health-path", target.healthPath, "--state", state, "--json", ...(action === "serve" ? ["--yes"] : [])];
-    const result = await new LocalExecBackend().execute({ argv: args, cwd: root, env: { TECHSCOPE_ROOT: root, PRITHA_STATE_ROOT: stateRoot }, timeoutMs: action === "plan" ? 15000 : 120000, outputBytesCap: 256000 });
+    const result = await new LocalExecBackend().execute({ argv: args, cwd: root, env: { PRITHA_ROOT: root, TECHSCOPE_ROOT: root, PRITHA_STATE_ROOT: stateRoot }, timeoutMs: action === "plan" ? 15000 : 120000, outputBytesCap: 256000 });
     if (result.exitCode !== 0 || result.timedOut || result.stdoutTruncated) return null;
     try { return JSON.parse(result.stdout); } catch { return null; }
   }

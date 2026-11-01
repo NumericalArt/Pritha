@@ -2,8 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="${0:a:h}"
-export TECHSCOPE_ROOT="${TECHSCOPE_ROOT:-${SCRIPT_DIR:h}}"
-cd "$TECHSCOPE_ROOT"
+PRITHA_ROOT="$(node "$SCRIPT_DIR/pritha-root.mjs" --cwd "${SCRIPT_DIR:h}")"
+export PRITHA_ROOT TECHSCOPE_ROOT="$PRITHA_ROOT"
+cd "$PRITHA_ROOT"
 
 export HOST="${HOST:-100.85.19.71}"
 export PORT="${PORT:-3000}"

@@ -529,7 +529,7 @@ async function launchdRootWarnings(root: string) {
     // The full operator audit may take 30 seconds. Page reads use the shorter
     // runtime budget and explicitly show unavailable diagnostics on expiry.
     policy: "runtimeRead",
-    env: { ...process.env, TECHSCOPE_ROOT: root },
+    env: { ...process.env, PRITHA_ROOT: root, TECHSCOPE_ROOT: root },
   });
   if (result.error) {
     const timedOut = "code" in result.error && result.error.code === "ETIMEDOUT";

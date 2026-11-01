@@ -496,7 +496,7 @@ export async function startSearxng(options = {}) {
     stdio: ["ignore", logFd, logFd],
     env: {
       ...process.env,
-      TECHSCOPE_ROOT: cfg.root,
+      PRITHA_ROOT: cfg.root, TECHSCOPE_ROOT: cfg.root,
       SEARXNG_SETTINGS_PATH: cfg.settingsPath,
       SEARXNG_SECRET: randomBytes(32).toString("base64url"),
     },

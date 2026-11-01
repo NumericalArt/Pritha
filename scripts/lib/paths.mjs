@@ -1,7 +1,10 @@
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync,realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import {resolvePrithaRoot} from './root-resolution.mjs';
+export {resolvePrithaRoot,resolveTechscopeRoot,prithaRootEnvironment,PrithaRootError} from './root-resolution.mjs';
+const normalizedPath=value=>path.resolve(value);
+const sameDirectory=(left,right)=>{if(left===right)return true;try{return realpathSync(left)===realpathSync(right);}catch{return false;}};
 
 export const PRITHA_STATE_LAYOUT = Object.freeze({
   config: "config",
@@ -33,41 +36,21 @@ const LEGACY_STATE_LAYOUT = Object.freeze({
   releases: path.join(".snapshots", "releases"),
 });
 
-function gitRootFromCwd(cwd) {
-  try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return "";
-  }
-}
-
-export function resolveTechscopeRoot(options = {}) {
-  const cwd = options.cwd ? path.resolve(options.cwd) : process.cwd();
-  if (process.env.TECHSCOPE_ROOT) {
-    const envRoot = path.resolve(process.env.TECHSCOPE_ROOT);
-    if (existsSync(envRoot)) return envRoot;
-  }
-  return gitRootFromCwd(cwd) || cwd;
-}
-
 export function resolvePrithaStateRoot(options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
-  const configured = options.stateRoot || process.env.PRITHA_STATE_ROOT;
-  return configured ? path.resolve(configured) : root;
+  const root = options.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
+  const configured = options.stateRoot || (options.env || process.env).PRITHA_STATE_ROOT;
+  const stateRoot=configured ? normalizedPath(configured) : root;
+  return sameDirectory(root,stateRoot) ? root : stateRoot;
 }
 
 export function resolvePrithaAgentParent(options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
-  const configured = options.agentParent || process.env.PRITHA_AGENT_PARENT;
-  return configured ? path.resolve(configured) : path.dirname(root);
+  const root = options.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
+  const configured = options.agentParent || (options.env || process.env).PRITHA_AGENT_PARENT;
+  return configured ? normalizedPath(configured) : path.dirname(root);
 }
 
 export function resolvePrithaAgentMemoryRoot(options = {}) {
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
+  const root = options.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
   const stateRoot = resolvePrithaStateRoot({ ...options, root });
   if (stateRoot !== root) return path.join(stateRoot, PRITHA_STATE_LAYOUT.agents);
   return existsSync(path.join(root, ".git"))
@@ -86,7 +69,7 @@ export function resolvePrithaStatePathFrom(options, kind, ...segments) {
   if (!Object.hasOwn(PRITHA_STATE_LAYOUT, kind)) {
     throw new Error(`Unknown Pritha state path kind: ${kind}`);
   }
-  const root = options?.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
+  const root = options?.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
   const stateRoot = resolvePrithaStateRoot({ ...options, root });
   const directory = stateRoot === root ? LEGACY_STATE_LAYOUT[kind] : PRITHA_STATE_LAYOUT[kind];
   return path.join(stateRoot, directory, ...segments);
@@ -99,7 +82,7 @@ export function resolvePrithaStatePath(kind, ...segments) {
 
 
 export function prithaInstanceConfig(options = {}) {
-  const codeRoot = options.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
+  const codeRoot = resolvePrithaRoot(options);
   const stateRoot = resolvePrithaStateRoot({ ...options, root: codeRoot });
   const agentParent = resolvePrithaAgentParent({ ...options, root: codeRoot });
   return {
@@ -119,10 +102,10 @@ export function resolveSiblingAgentPath(name, options = {}) {
   if (!name || typeof name !== "string") {
     throw new Error("resolveSiblingAgentPath(name) requires a non-empty agent name.");
   }
-  const root = options.root ? path.resolve(options.root) : resolveTechscopeRoot(options);
+  const root = options.root ? normalizedPath(options.root) : resolvePrithaRoot(options);
   return path.join(resolvePrithaAgentParent({ ...options, root }), name);
 }
 
 export function pathFromRoot(...segments) {
-  return path.join(resolveTechscopeRoot(), ...segments);
+  return path.join(resolvePrithaRoot(), ...segments);
 }

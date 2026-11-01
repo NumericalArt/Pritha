@@ -79,7 +79,7 @@ function run(id, name, command, commandArgs, options = {}) {
     };
   }
 
-  const childEnv = { ...process.env, TECHSCOPE_ROOT: ROOT, ...(options.env || {}) };
+  const childEnv = { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT, ...(options.env || {}) };
   for (const key of options.unsetEnv || []) delete childEnv[key];
   const result = runSyncProbe(command, commandArgs, {
     cwd: ROOT,

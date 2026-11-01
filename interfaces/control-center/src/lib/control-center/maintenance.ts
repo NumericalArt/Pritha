@@ -23,7 +23,7 @@ export function runPrithaMaintenance(args: string[], options: { timeoutMs?: numb
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs || 120000,
     maxBuffer: 20 * 1024 * 1024,
-    env: { ...process.env, TECHSCOPE_ROOT: root },
+    env: { ...process.env, PRITHA_ROOT: root, TECHSCOPE_ROOT: root },
   });
   const stdout = String(result.stdout || "").trim();
   const stderr = String(result.stderr || "").trim();

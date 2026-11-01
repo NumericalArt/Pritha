@@ -12,7 +12,7 @@ export function searchCuratedMemory(query, { domain = "agent-building-knowledge"
       || !Number.isInteger(limit) || limit < 1 || limit > 20 || !root || !path.isAbsolute(root)) {
     throw new Error("Invalid curated memory request");
   }
-  const env = { ...process.env, TECHSCOPE_ROOT: root };
+  const env = { ...process.env, PRITHA_ROOT: root, TECHSCOPE_ROOT: root };
   const output = execFileSync(resolvePrithaPython({ root, env }), [script, query, "--domain", domain, "--limit", String(limit), ...(json ? ["--json"] : [])], {
     cwd: root, env, encoding: "utf8", timeout: 15000, maxBuffer: 4 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
   });

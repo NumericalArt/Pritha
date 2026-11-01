@@ -473,7 +473,7 @@ compatibility и отсутствие long-running processes/credential provisio
 
 ### R11b — Завершение ребрендинга Techscope → Pritha без потери состояния
 
-**Статус: planned; added by operator during execution.** Выполняется до R12.
+**Статус: in progress; root compatibility/package/docs verified locally.** Выполняется до R12.
 Зависимости: R1/R2 для state identity, R11 для bootstrap/distribution. Контракт
 имён и shared resolver можно вводить раньше, чтобы новые adapters не размножали
 старую терминологию. Исходные R0–R12 сохраняют номера и объём.
@@ -490,7 +490,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 1. **R11b.1 — Инвентаризация и контракт.**
    - [ ] Разделить упоминания на public/current API, внутренний compatibility
      boundary, persisted schema/identity и неизменяемую историю/источники.
-   - [ ] Зафиксировать canonical имена: `PRITHA_ROOT`, `resolvePrithaRoot`,
+   - [x] Зафиксировать canonical имена: `PRITHA_ROOT`, `resolvePrithaRoot`,
      `.pritha-setup.json` для legacy checkout layout, `pritha.sqlite` внутри
      выбранного memory directory и package `pritha`. Внешний state-root уже
      использует нейтральный `setup/setup.json`; его переименовывать не нужно.
@@ -504,7 +504,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
    - **Проверка:** versioned inventory/allowlist оставшихся имён с причиной;
      Good State Alignment для memory, setup и instance isolation.
 2. **R11b.2 — Единое разрешение корня и совместимость окружения.**
-   - [ ] Нормализованный explicit `--root` > `PRITHA_ROOT` > `TECHSCOPE_ROOT`
+   - [x] Нормализованный explicit `--root` > `PRITHA_ROOT` > `TECHSCOPE_ROOT`
      > Git root > cwd. Два разных непустых env roots — actionable conflict,
      а не молчаливый выбор; explicit root задаёт оба aliases одинаково в child.
      Не существующий явно заданный root не должен переключать экземпляр.
@@ -1150,6 +1150,39 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
 - R8 закрыт на уровне реализации/UI. Это не завершение R6 factory orchestration,
   R7 offline Local/child provisioning, R9 voice, R11 bootstrap, R11b migration
   или R12 live/manual acceptance. Сервисы, MacBook и GitHub не изменялись.
+
+### Checkpoint реализации 14 — Основное имя Pritha и совместимый корень
+
+- Зафиксирована инвентаризация 111 runtime-файлов на исходном commit
+  `e181af23f036a02e1dd06199b2017eeb2afd8b53`:
+  `03_reviews/2026-11-01-pritha-rebranding-inventory.json`. Разделены root aliases,
+  persisted filenames, environment options, service/entrypoint identities и
+  текущие подписи. Исторические артефакты и source appendices не переписывались.
+- Общий Node resolver и тонкий TS adapter используют explicit root → PRITHA_ROOT
+  → TECHSCOPE_ROOT → Git → cwd. Старый export является alias той же функции.
+  Python и shell entrypoints следуют тому же контракту. Разные реальные env roots
+  и неверный явно заданный каталог останавливают выбор; Git probe ограничен
+  временем и не наследует чужие GIT_DIR/GIT_WORK_TREE.
+- Проверяется physical identity, но сохраняется написание выбранного абсолютного
+  пути. Это существенно для уже сохранённых research/Outcome ссылок и approvals:
+  автоматическая замена `/var` на `/private/var` меняла их identity. Общий прогон
+  выявил это, и исправление подтверждено прежними lifecycle tests. Runtime owner
+  comparison принимает разные написания одного каталога, сохраняя instance ID,
+  process group, cwd, port и service-label проверки.
+- При выборе child root передаются обе env aliases; runtime env не может
+  переключить явно выбранный checkout. Новый package name — `pritha`, основной
+  пример и текущая документация используют PRITHA_ROOT с compatibility note.
+  Setup/env writers сохраняют совместимость со старыми дочерними entrypoints.
+- Проверки: **1090/1090** полный unit suite; **26/26** Chromium E2E без skipped/
+  flaky; TypeScript и отдельная Next candidate build прошли. В полном наборе
+  есть root parity Node/TS/Python, fresh/legacy path selection, native receipts,
+  исследования/approvals, managed ownership, staged update и rollback fixtures.
+  Тестовые загрузчики обновлены для общих модулей; проверки поведения сохранены.
+- Это завершает первый пакет R11b, а не всю миграцию. Общие readers для новых/
+  старых SQLite/setup filenames, offline migration/rollback, остальные current
+  labels/aliases и guard ещё в работе. На реальном экземпляре файлы состояния
+  не переносились; сервисы, MacBook и GitHub не менялись. Исходные незавершённые
+  R4/R5/R6/R7/R9/R11/R12 сохраняются.
 
 ## 7. Полные исходные материалы
 

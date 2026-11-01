@@ -15,7 +15,7 @@ export function apiProcessManifest(data) {
   const { port, variable } = portConfiguration(data);
   const command = action => ({ argv: ["node", "scripts/service-control.mjs", action], cwd: ".",
     control_center_managed: true, background: false, timeout_ms: 5000, success_exit_codes: [0],
-    env_allowlist: [...new Set([variable, `${slug(data.agentName).toUpperCase().replaceAll("-", "_")}_REPO`, "TECHSCOPE_ROOT", "PRITHA_STATE_ROOT"])] });
+    env_allowlist: [...new Set([variable, `${slug(data.agentName).toUpperCase().replaceAll("-", "_")}_REPO`, "PRITHA_ROOT", "TECHSCOPE_ROOT", "PRITHA_STATE_ROOT"])] });
   return { version: 1, generated_by: "Pritha", agent: text(data.agentName), agent_id: data.agentId,
     agent_kind: "service", runtime_family: "api", scaffold_adapter: "api-process-v1", outcome_status: "implementation-required",
     deployment_target: text(data.deploymentTarget), deployment_profile: text(data.deploymentProfile),

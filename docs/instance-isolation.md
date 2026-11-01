@@ -43,7 +43,7 @@ agent boundary.
 Store real values only in `<state-root>/config/runtime.env` with mode `0600`:
 
 ```dotenv
-TECHSCOPE_ROOT=<git-checkout>
+PRITHA_ROOT=<git-checkout>
 PRITHA_INSTANCE_ID=<stable-instance-id>
 PRITHA_INSTANCE_ROLE=primary|replica|developer
 PRITHA_STATE_ROOT=<external-state-directory>
@@ -53,7 +53,11 @@ PRITHA_SEARXNG_URL=<local-instance-url>
 PRITHA_CONTROL_CENTER_ENV_FILE=<state-root>/config/runtime.env
 ```
 
-`TECHSCOPE_ROOT` resolves code. `PRITHA_STATE_ROOT` resolves generated/private
+`PRITHA_ROOT` resolves code. `TECHSCOPE_ROOT` is a compatible alias; if both
+are set, they must resolve to the same directory (including symlinks).
+Managed child processes receive both aliases for their explicitly selected
+checkout. No invalid root silently falls back to another instance.
+`PRITHA_STATE_ROOT` resolves generated/private
 state. `PRITHA_AGENT_PARENT` is the only sibling tree visible to the Control
 Center and Realtime file tools.
 

@@ -2,9 +2,10 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import {resolvePrithaRoot} from './lib/paths.mjs';
 
 function repoRoot() {
-  return process.env.TECHSCOPE_ROOT ? path.resolve(process.env.TECHSCOPE_ROOT) : process.cwd();
+  return resolvePrithaRoot();
 }
 
 function privateTaskRoot(root) {

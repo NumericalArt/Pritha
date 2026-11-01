@@ -38,7 +38,7 @@ function run(name, command, commandArgs, options = {}) {
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs || 120000,
     maxBuffer: options.maxBuffer || 20 * 1024 * 1024,
-    env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+    env: { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT },
   });
 
   return {

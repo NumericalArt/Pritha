@@ -162,10 +162,14 @@ node scripts/queue-health.mjs
 
 ## Path Mismatch
 
-Use `TECHSCOPE_ROOT=/path/to/repo` if scripts are launched from another directory.
-
-New public docs use the Pritha name, but `TECHSCOPE_ROOT` remains the compatible
-runtime environment variable until a separate migration removes it.
+Use `PRITHA_ROOT=/path/to/repo` if scripts are launched from another directory.
+`TECHSCOPE_ROOT` remains a compatible alias. A `pritha_root_conflict` means that
+both variables point to different real directories: unset the legacy alias,
+set both to the intended checkout, or use an explicit `--root` where supported.
+Symlinks to the same directory are accepted. A `pritha_root_invalid` means the
+selected directory is missing or inaccessible; correct the path. Neither error
+silently selects another instance. `node scripts/pritha-root.mjs` prints the
+resolved directory without creating or migrating any state.
 
 ## Embeddings Not Available
 

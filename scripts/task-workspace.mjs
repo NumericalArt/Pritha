@@ -30,7 +30,7 @@ if(command==='help' || args.includes('--help')) {
           const expectedSource=value('--source-sha'),requestId=value('--request-id'),script=value('--check-script');
           if(!/^[a-f0-9]{40,64}$/.test(expectedSource || '') || !requestId || !/^[a-zA-Z0-9:_-]{1,80}$/.test(script || ''))throw new Error('apply_arguments_required');
           result=await applyTaskWorkspace({coordinator,workspace,expectedSource,expectedHead,requestId,verify:async(source,head)=>{
-            try {await promisify(execFile)('npm',['run',script],{cwd:source,timeout:900_000,maxBuffer:16*1024*1024,env:{...process.env,TECHSCOPE_ROOT:source}});return {passed:true,command:['npm','run',script],head};}
+            try {await promisify(execFile)('npm',['run',script],{cwd:source,timeout:900_000,maxBuffer:16*1024*1024,env:{...process.env,PRITHA_ROOT: source, TECHSCOPE_ROOT: source}});return {passed:true,command:['npm','run',script],head};}
             catch{return {passed:false,command:['npm','run',script],head};}
           }});
         } else throw new Error('unknown_command');

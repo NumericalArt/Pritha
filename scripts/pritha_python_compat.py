@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from pritha_paths import resolve_pritha_root, pritha_root_environment
 
 
 def _load_path_env_file(file_path):
@@ -11,7 +12,7 @@ def _load_path_env_file(file_path):
     except OSError:
         return False
 
-    allowed = {"TECHSCOPE_ROOT", "PRITHA_STATE_ROOT"}
+    allowed = {"PRITHA_ROOT", "TECHSCOPE_ROOT", "PRITHA_STATE_ROOT"}
     for line in lines:
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
@@ -26,15 +27,20 @@ def _load_path_env_file(file_path):
 
 def load_pritha_runtime_env(root=None):
     """Resolve the instance-local state pointer for direct Python entrypoints."""
-    default_root = Path(__file__).resolve().parent.parent
-    code_root = Path(root or os.environ.get("TECHSCOPE_ROOT") or default_root).resolve()
+    code_root = resolve_pritha_root(root=root)
+    if root is not None:
+        os.environ.update(pritha_root_environment(code_root))
     _load_path_env_file(code_root / ".env")
     _load_path_env_file(code_root / ".env.local")
 
-    configured_root = Path(os.environ.get("TECHSCOPE_ROOT") or code_root).resolve()
-    state_root = Path(os.environ.get("PRITHA_STATE_ROOT") or configured_root).resolve()
+    configured_root = resolve_pritha_root(cwd=code_root)
+    state_root = Path(os.path.abspath(os.environ.get("PRITHA_STATE_ROOT") or configured_root))
+    if state_root.resolve() == configured_root.resolve():
+        state_root = configured_root
     if state_root != configured_root:
         _load_path_env_file(state_root / "config" / "runtime.env")
+    configured_root = resolve_pritha_root(cwd=configured_root)
+    os.environ.update(pritha_root_environment(configured_root))
     return configured_root, state_root
 
 

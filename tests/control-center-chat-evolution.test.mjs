@@ -25,6 +25,7 @@ export async function fixtureModules() {
       .replaceAll('"../../../../../scripts/lib/task-workspace.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/task-workspace.mjs")).href))
     .replaceAll('"../../../../../scripts/lib/execution-channel.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-channel.mjs")).href))
       .replaceAll('"../../../../../scripts/lib/execution-coordinator.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-coordinator.mjs")).href))
+      .replace(/["']\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/scripts\/lib\/chat-subject\.mjs["']/g, JSON.stringify(pathToFileURL(path.resolve("scripts/lib/chat-subject.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/task-delivery.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/task-delivery.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/phase-usage.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/phase-usage.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/operation-decisions.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/operation-decisions.mjs")).href))

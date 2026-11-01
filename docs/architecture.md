@@ -46,8 +46,11 @@ accumulate tracked binary history.
 
 Runtime paths resolve through explicit boundaries:
 
-- `TECHSCOPE_ROOT` selects the canonical project root when set; the Git root and
-  current working directory are compatibility fallbacks.
+- `PRITHA_ROOT` selects the canonical project root. An explicit command `--root`
+  takes priority; `TECHSCOPE_ROOT`, the Git root, and the current directory are
+  compatibility fallbacks. Conflicting environment aliases or an invalid
+  explicit root stop before selecting an instance. Node, the Control Center,
+  Python, and shell entrypoints use the same resolution contract.
 - `PRITHA_STATE_ROOT` places generated memory, setup, private data, queues, logs,
   snapshots, and other runtime state outside the checkout.
 - `PRITHA_AGENT_PARENT` selects the one parent directory where this Pritha

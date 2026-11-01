@@ -7,6 +7,7 @@ import test from "node:test";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
 
 import * as executionCoordinator from "../scripts/lib/execution-coordinator.mjs";
+import * as chatSubject from "../scripts/lib/chat-subject.mjs";
 const require = createRequire(import.meta.url);
 const sourceRoot = "interfaces/control-center/src/lib";
 function load(name, dependencies = {}) {
@@ -17,6 +18,7 @@ function load(name, dependencies = {}) {
   new Function("require", "module", "exports", output)(id => {
     if (Object.hasOwn(dependencies, id)) return dependencies[id];
     if (id === "../../../../../scripts/lib/execution-coordinator.mjs") return executionCoordinator;
+    if (id === "../../../../../scripts/lib/chat-subject.mjs") return chatSubject;
     if (id.startsWith("node:")) return require(id);
     throw new Error(`Unexpected test dependency: ${id}`);
   }, module, module.exports);

@@ -976,7 +976,7 @@ function commandResult(command: string, args: string[], options: { timeoutMs?: n
   const root = resolveTechscopeRoot();
   const result = spawnSync(command, args, {
     cwd: root,
-    env: envWithoutProxy({ TECHSCOPE_ROOT: root }),
+    env: envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: options.timeoutMs,
@@ -1116,7 +1116,7 @@ function startEmbeddingRebuild(reason = "requested") {
   const startedAt = new Date().toISOString();
   const child = spawn("python3", ["scripts/embed-memory.py"], {
     cwd: root,
-    env: envWithoutProxy({ TECHSCOPE_ROOT: root }),
+    env: envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
     stdio: ["ignore", stdoutFd, stderrFd],
   });
 
@@ -2001,7 +2001,7 @@ function detectLast30DaysPython(root: string) {
   for (const command of localLast30DaysPythonCandidates(root)) {
     const result = spawnSync(command, ["-c", LAST30DAYS_PYTHON_PROBE], {
       cwd: root,
-      env: envWithoutProxy({ TECHSCOPE_ROOT: root }),
+      env: envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 10_000,
@@ -2039,7 +2039,7 @@ function detectLast30DaysPython(root: string) {
 function last30DaysGitAvailable(root: string) {
   const result = spawnSync("git", ["--version"], {
     cwd: root,
-    env: envWithoutProxy({ TECHSCOPE_ROOT: root }),
+    env: envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 10_000,
@@ -2055,7 +2055,7 @@ function last30DaysCheckoutCommit(root: string, installPath: string) {
   if (!existsSync(path.join(installPath, ".git"))) return "";
   const result = spawnSync("git", ["rev-parse", "HEAD"], {
     cwd: installPath,
-    env: envWithoutProxy({ TECHSCOPE_ROOT: root }),
+    env: envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 10_000,
@@ -6565,8 +6565,8 @@ async function startCodexExec(
     cwd: root,
     env:
       env("PRITHA_REALTIME_CODEX_USE_PROXY", env("TECHSCOPE_VOICE_CODEX_USE_PROXY", "0")) === "1"
-        ? { ...process.env, TECHSCOPE_ROOT: root }
-        : envWithoutProxy({ TECHSCOPE_ROOT: root }),
+        ? { ...process.env, PRITHA_ROOT: root, TECHSCOPE_ROOT: root }
+        : envWithoutProxy({ PRITHA_ROOT: root, TECHSCOPE_ROOT: root }),
     stdio: ["pipe", stdoutFd, stderrFd],
     detached: true,
   });

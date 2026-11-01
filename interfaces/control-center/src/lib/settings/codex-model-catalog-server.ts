@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import readline from "node:readline";
 import { resolveCodexAppBinary } from "./codex-binaries";
 import { createCodexModelCatalogLoader } from "./codex-model-catalog";
+import {resolvePrithaRoot} from '../pritha-paths';
 
 const CODEX_MODEL_LIST_TIMEOUT_MS = 3_000;
 const CODEX_MODEL_CATALOG_TTL_MS = 5 * 60_000;
@@ -16,7 +17,7 @@ async function requestCodexModelList(timeoutMs = CODEX_MODEL_LIST_TIMEOUT_MS) {
   const codexBin = resolveCodexAppBinary();
   if (!codexBin) throw new Error("Codex App bundled binary is unavailable");
   const child = spawn(codexBin, ["app-server", "--listen", "stdio://"], {
-    cwd: process.env.TECHSCOPE_ROOT?.trim() || process.cwd(),
+    cwd: resolvePrithaRoot(),
     env: process.env,
     stdio: ["pipe", "pipe", "ignore"],
   });

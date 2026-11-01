@@ -30,7 +30,7 @@ export function run(command, args, options = {}) {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       timeout: options.timeout || 30000,
-      env: { ...process.env, TECHSCOPE_ROOT: ROOT },
+      env: { ...process.env, PRITHA_ROOT: ROOT, TECHSCOPE_ROOT: ROOT },
     }).trim();
     return { ok: true, output };
   } catch (error) {

@@ -1,0 +1,14 @@
+export {resolvePrithaRoot,resolveTechscopeRoot,prithaRootEnvironment,PrithaRootError} from './root-resolution.mjs';
+import type {PrithaRootOptions} from './root-resolution.mjs';
+export type PrithaPathOptions=PrithaRootOptions & {stateRoot?:string;agentParent?:string;instanceId?:string;instanceRole?:string;controlCenterPort?:number|string;overridePath?:string};
+export type PrithaStateKind='config'|'setup'|'memory'|'private'|'queue'|'logs'|'audit'|'snapshots'|'voiceDrafts'|'agents'|'builds'|'releases';
+export const PRITHA_STATE_LAYOUT:Readonly<Record<PrithaStateKind,string>>;
+export function resolvePrithaStateRoot(options?:PrithaPathOptions):string;
+export function resolvePrithaAgentParent(options?:PrithaPathOptions):string;
+export function resolvePrithaAgentMemoryRoot(options?:PrithaPathOptions):string;
+export function isPrithaCodeCheckout(candidate:string):boolean;
+export function resolvePrithaStatePathFrom(options:PrithaPathOptions,kind:PrithaStateKind,...segments:string[]):string;
+export function resolvePrithaStatePath(kind:PrithaStateKind,...segments:string[]):string;
+export function prithaInstanceConfig(options?:PrithaPathOptions):{codeRoot:string;stateRoot:string;agentParent:string;instanceId:string;instanceRole:string;controlCenterPort:number};
+export function resolveSiblingAgentPath(name:string,options?:PrithaPathOptions):string;
+export function pathFromRoot(...segments:string[]):string;
