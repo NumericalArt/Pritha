@@ -85,7 +85,7 @@ test("future Claude fixtures document unverified capabilities, never enable a ru
 test("real private attachment storage accepts an immutable copy and preserves the original", async () => {
   for (const [name, sourcePath] of [["private-json", "interfaces/control-center/src/lib/private-json.ts"], ["attachment-store", "interfaces/control-center/src/lib/codex-chat/attachment-store.ts"]]) {
     const source = readFileSync(sourcePath, "utf8");
-    writeFileSync(path.join(tmp, `${name}.mjs`), ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText.replaceAll('"@/lib/private-json"', '"./private-json.mjs"'));
+    writeFileSync(path.join(tmp, `${name}.mjs`), ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText.replaceAll('"@/lib/private-json"', '"./private-json.mjs"').replaceAll('"../../../../../scripts/lib/chat-attachment-store.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/chat-attachment-store.mjs")).href)));
   }
   const { ChatAttachmentStore } = await import(pathToFileURL(path.join(tmp, "attachment-store.mjs")).href);
   const state = path.join(tmp, "state"), store = new ChatAttachmentStore(state, path.join(state, "chat"));

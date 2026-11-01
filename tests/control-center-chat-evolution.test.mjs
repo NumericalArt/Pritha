@@ -22,6 +22,7 @@ export async function fixtureModules() {
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
       .replaceAll('"@/lib/private-json"', '"./private-json.mjs"')
+      .replaceAll('"../../../../../scripts/lib/chat-attachment-store.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/chat-attachment-store.mjs")).href))
       .replaceAll('"../../../../../scripts/lib/task-workspace.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/task-workspace.mjs")).href))
     .replaceAll('"../../../../../scripts/lib/execution-channel.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-channel.mjs")).href))
       .replaceAll('"../../../../../scripts/lib/execution-coordinator.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/lib/execution-coordinator.mjs")).href))
@@ -192,8 +193,9 @@ test("referenced attachments survive expiry, and corrupt metadata never triggers
     await store.upload(randomUUID(), "next", new Request("http://localhost/upload", { method: "PUT", body: "x" }));
     assert.equal((await store.resolve(first)).view.size, 8);
     await assert.rejects(store.resolve(unused), e => e.code === "attachment_not_found");
-    ATTACHMENT_LIMITS.storageBytes = 9;
-    await assert.rejects(store.upload(randomUUID(), "quota", new Request("http://localhost/upload", { method: "PUT", body: "xx" })), e => e.code === "attachment_storage_full");
+    const constrained = new ChatAttachmentStore(f.state, path.join(f.state, "codex-chat"), { limits: { storageBytes: 9 } });
+    await assert.rejects(constrained.upload(randomUUID(), "quota", new Request("http://localhost/upload", { method: "PUT", body: "xx" })), e => e.code === "attachment_storage_full");
+    await constrained.close();
     assert.equal((await store.resolve(first)).view.size, 8);
     writeFileSync(path.join(store.root, first, "metadata.json"), "damaged");
     await assert.rejects(store.upload(randomUUID(), "new", new Request("http://localhost/upload", { method: "PUT", body: "x" })), e => e.code === "attachment_storage_unavailable");

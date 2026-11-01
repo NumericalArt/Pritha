@@ -1,5 +1,3 @@
-import { constants } from "node:fs";
-import { open } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { getCodexChatGateway } from "@/lib/codex-chat/gateway";
 import { AttachmentError } from "@/lib/codex-chat/attachment-store";
@@ -20,9 +18,8 @@ export async function PUT(request: Request, context: Context) {
 
 export async function GET(_request: Request, context: Context) {
   try {
-    const { filePath, view } = await getCodexChatGateway().attachments.resolve((await context.params).attachmentId);
-    const file = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
-    return new Response(Readable.toWeb(file.createReadStream()) as ReadableStream<Uint8Array>, { headers: {
+    const { handle, view } = await getCodexChatGateway().attachments.openOriginal((await context.params).attachmentId);
+    return new Response(Readable.toWeb(handle.createReadStream({start:0})) as ReadableStream<Uint8Array>, { headers: {
       "Content-Type": view.mediaType,
       "Content-Length": String(view.size),
       "Content-Disposition": `${view.kind === "image" ? "inline" : "attachment"}; filename="attachment"; filename*=UTF-8''${encodeURIComponent(view.name)}`,

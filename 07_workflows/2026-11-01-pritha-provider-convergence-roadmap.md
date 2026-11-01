@@ -1583,7 +1583,7 @@ endpoints и общему tool dispatcher. Порядок реализации �
 - Полный unit gate **1231/1231**, без skipped. Strict privacy, name guard
   (124 compatibility references) и Markdown validation (987 files) прошли.
 
-### Следующий checkpoint 25 — Общие originals и подготовка attachment delivery (planned)
+### Checkpoint реализации 25 — Общие originals и подготовка attachment delivery (verified-automated)
 
 1. Адаптировать reviewed ND immutable store из pinned GitHub в общий модуль;
    native API и прежние IDs/hrefs сохраняются. Прежняя canonical metadata без
@@ -1609,6 +1609,58 @@ endpoints и общему tool dispatcher. Порядок реализации �
 Good State Alignment для этого этапа: aligned. Сохраняются canonical native
 history, отсутствие повторного turn после unknown receipt, instance privacy,
 точные files и сохранность draft; production lifecycle не меняется.
+
+- Canonical и ND wrappers используют один `ImmutableAttachmentStore` и тот же
+  storage path. Сохраняются старые metadata без version, href/ID и uppercase ID;
+  read-only доступ не переписывает metadata. Явный state-root alias допустим,
+  symlink/hardlink внутри private storage и неизвестная version отклоняются.
+- Cross-process SQLite mutex объединяет quota/reference accounting. Exact
+  upload replay проверяет hash без второй копии и работает при исчерпанной
+  квоте. Abort/stall снимает только собственную блокировку; partial publication
+  восстанавливается по receipt без замены чужих bytes. Corrupt originals дают
+  отдельную typed error и сохраняются для восстановления.
+- Download отдаёт уже проверенный descriptor, а не повторно открытый путь.
+  Private dispatch snapshots проверяют hash, повторно используют только точную
+  копию и не могут попасть вне state-root или поверх originals. Их дальнейшее
+  подключение к provider dispatch и lifecycle cleanup входит в checkpoint 26;
+  native delivery/history/reconciliation не переключались на новый protocol.
+- Source adoption фиксирует общий модуль и **9** перенесённых behavioral tests
+  из pinned ND GitHub; дополнительная canonical suite проверяет legacy/alias,
+  multi-process quota, abort, snapshots и настоящий download route. Совокупно
+  targeted **50/50**, TypeScript passed. Browser composer/queue **28/28**;
+  настоящий isolated attachment API **1/1**, включая точные bytes, Unicode name,
+  MIME sniffing, conflict/replay и missing ID. Первое API assertion ожидало ровно
+  `no-store`, тогда как proxy добавляет max-age/must-revalidate; проверка уточнена
+  до обязательного no-store directive, сам cache policy не менялся. После alias
+  дополнения actual API/build повторно прошли. Live credentials не использовались.
+- Полный unit gate **1247/1247**, без skipped; итоговый targeted rerun покрывает
+  alias/uppercase совместимость. Strict privacy, name guard (124 references)
+  и Markdown validation (987 files) прошли. Services, MacBook и GitHub не менялись.
+
+### Следующий checkpoint 26 — Provider queue attachments и delivery (planned)
+
+1. Разделить проверку attachments при enqueue и подготовку dispatch: до принятия
+   сообщения проверить immutable IDs/bytes/limits и конкретный transport; до
+   публикации queue receipt удержать originals. Queue readback восстанавливает
+   metadata через общий store; потерянный файл блокирует Edit/dispatch, но не
+   скрывает сообщение и не удаляет его текст.
+2. Queue идемпотентна по полному input; receipt содержит hash originals для
+   повторной проверки перед dispatch. Attachment-only сообщения допустимы;
+   exact repeats не запускают повторную проверку, способную изменить уже
+   подтверждённый результат. Admission/revision/FIFO/unknown fences сохраняются.
+3. Подключить адаптеры с host-owned capability evidence: ND CLI initial/resume,
+   Claude host tools и compatible bridge. Различать файлы и изображения;
+   metadata alone не доказывает транспорт. Учитывать исторические image inputs,
+   exact model/CLI/adapter pin, encoding limit, request fingerprint и snapshots.
+4. Проверять source/hash перед launch, manifest/path policy и cleanup только
+   после подтверждённого завершения process tree. Unknown receipt сохраняет
+   копии, originals и блокировку повторного execution. Credentials/production
+   model calls не нужны для deterministic transport fixtures.
+5. Проверки: Queue+Edit+Cancel+Stop+auto-start с файлами на каждом поддерживаемом
+   connector, reload/two workers, expiry, stale revision, model/policy change,
+   unsupported modality, interrupted publication, initial/resume bytes и
+   отсутствие автозапуска/извлечения приложенного executable/archive. Затем
+   подключить voice intake к тем же receipts, включая повтор spoken confirmation.
 
 R12 дополнительная проверка runner: quality-gate задаёт оба root aliases для
 child commands, а часть legacy test fixtures переопределяет только один. Проверить

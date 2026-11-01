@@ -64,12 +64,14 @@
     {
       "path": "scripts/neuraldeep/attachment-store.mjs",
       "source_sha256": "519a15cc7aeb9833dd8561d23c61e76984775828e802bb2733332679665f2004",
-      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+      "adoption": "Compatibility exports of the shared scripts/lib/chat-attachment-store module; source implementation adapted there without a second storage engine.",
+      "target_sha256": "ddd45b04a52cf3f6dcdba21b776328681ccbafd6896a168a965075cbbb407dd1"
     },
     {
       "path": "scripts/neuraldeep/attachment-store.d.mts",
       "source_sha256": "38628ff03a8cc3c059701abc93b31fce4dbe56ef02e5d2394a119d3c9043c25b",
-      "adoption": "reviewed source base; canonical integration patches tracked in Git"
+      "adoption": "Compatibility exports of the shared scripts/lib/chat-attachment-store module; source implementation adapted there without a second storage engine.",
+      "target_sha256": "ef0c6757fd5351c0f3ffba90590bb97c4369f7639ae79621093086121712c17a"
     },
     {
       "path": "scripts/neuraldeep/creation-execution-policy.mjs",
@@ -218,6 +220,27 @@
       "path": "interfaces/control-center/src/lib/codex-chat/chat-subject.ts",
       "source_sha256": "51c80c225da118905bae27e1e0d7191726783ea289d89e85b4d96347a4720d21",
       "adoption": "Reviewed child Subject/slug design; canonical implementation uses exact lowercase slug and explicit phase, rejects extra authority fields, and retains native history. Token-budget input deferred to an enforceable shared factory budget contract."
+    },
+    {
+      "path": "scripts/lib/chat-attachment-store.mjs",
+      "source_path": "scripts/neuraldeep/attachment-store.mjs",
+      "source_sha256": "519a15cc7aeb9833dd8561d23c61e76984775828e802bb2733332679665f2004",
+      "target_sha256": "57cd61243f445ea8c5b92c02b10c87c07e7d492b1acccf132caeb2d22451143f",
+      "adoption": "Shared immutable originals store; canonical legacy metadata/uppercase IDs and explicit state-root aliases, cross-process quota and references, verified descriptor downloads, exact snapshot replay, no automatic migration."
+    },
+    {
+      "path": "scripts/lib/chat-attachment-store.d.mts",
+      "source_path": "scripts/neuraldeep/attachment-store.d.mts",
+      "source_sha256": "38628ff03a8cc3c059701abc93b31fce4dbe56ef02e5d2394a119d3c9043c25b",
+      "target_sha256": "706ce2ef649191bd4f5a90a566b9cb2ee7d62e09614c73288118d89db13a4630",
+      "adoption": "Shared types with canonical resolve/retain methods and explicit legacy metadata compatibility."
+    },
+    {
+      "path": "tests/neuraldeep-chat-attachments.test.mjs",
+      "source_path": "tests/neuraldeep-chat-attachments.test.mjs",
+      "source_sha256": "ea3885bac9ddfe50f4ae84f46980ffaa9561c8c3c8266dafc2b9d7849077bd49",
+      "target_sha256": "5ebaf358e37193eaf273942af264b9e64755270e5e769e707f25b4345b4d20d1",
+      "adoption": "Nine source behavioral tests retained; hash mismatch uses the shared attachment_corrupt typed error."
     }
   ]
 }
