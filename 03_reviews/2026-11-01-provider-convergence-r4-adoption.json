@@ -401,13 +401,13 @@
       "path": "scripts/bootstrap.mjs",
       "source_sha256": "38f94f8360d6521a02a370af03d7a67e3a9f4f68233171d13a3843efc7fef887",
       "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
-      "target_sha256": "f130936d9a6f807d22c869da3f62be46d26ba85db1e46842a5d358ad460cedaa"
+      "target_sha256": "b2b9939d7884530854cf6e12d17c93eafacebc529d97767e0967e30ee58c62fc"
     },
     {
       "path": "START_HERE.md",
       "source_sha256": "30af3a5441df48ad332fd8a2f3d303eeb6c75d3abc2b77992b5da7252613ae3e",
       "adoption": "Reviewed unified instance/bootstrap adaptation: preserve occupied legacy roots, bind a private pointer to the checkout, isolate Python and all five provider profiles; no automatic Git add/commit, credential inheritance, runtime copying or service start.",
-      "target_sha256": "a286cccaad2340623c4a8e2701a014f85e1840f0e1c92434ccd48858e3b2fc19"
+      "target_sha256": "07e8c37f41964bb383d040efacb708667d3e0c2ddf1396220150d5ffbfe1f7b7"
     }
   ]
 }

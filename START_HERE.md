@@ -63,6 +63,30 @@ checkout retains its existing data layout; migration is a separate operation.
 
 Preparation does not initialize Git, commit the directory, copy runtime data,
 provision credentials, install a background service or expose a network endpoint.
+
+## Brief Desk example
+
+The `neuraldeep` profile imports the reviewed Brief Desk into this instance’s
+agent parent. Other profiles can inspect/import it explicitly:
+
+```sh
+node scripts/install-brief-desk.mjs --plan
+node scripts/install-brief-desk.mjs --install
+```
+
+The import has no dependencies to install and starts no server. Contract,
+outcome and profile drafts live in private agent memory; they do not count as
+factory acceptance or authorization to publish. Run its `npm test`, then start
+it manually and use **Open demo** for a synthetic offline brief. For live work,
+enter its own NeuralDeep/Telegram credentials in its Settings. Parent keys are
+never inherited. Every publication requires explicit confirmation.
+
+A second import preserves edits, credentials and history. An existing unrelated
+directory, changed identity or interrupted import stops with a recovery error.
+Inspect the private `agents/imports/brief-desk-nd.json` journal and any retained
+staging directory before deciding which local files to keep; never delete a
+user project or rerun by clearing the receipt blindly. No automatic upgrade,
+Git initialization, credential provisioning or service activation is performed.
 Dependency/model downloads needed for semantic memory require connectivity;
 Local inference itself remains offline. ZIP users who need Git-based delivery
 should review the directory and initialize their own repository explicitly.

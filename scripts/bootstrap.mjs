@@ -147,6 +147,7 @@ function installSteps(profile, config, options) {
       timeoutMs: 240000,
     }),
   ];
+  if(profile==='neuraldeep')steps.push(step('brief-desk-import','install','Import the reviewed Brief Desk example without credentials or startup','node',['scripts/install-brief-desk.mjs','--install'],{writes:true,timeoutMs:30000}));
   if (config.pythonCore) {
     const python=instancePythonPath({root:ROOT});
     steps.push(step('python-venv','install','Create this instance’s isolated Python environment','python3',['-m','venv',path.dirname(path.dirname(python))],{writes:true,timeoutMs:240000}));

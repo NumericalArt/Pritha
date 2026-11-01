@@ -491,13 +491,13 @@ double Enter, lost response, stale revision/turn и mobile composition.
 
 ### R11 — Bootstrap, distribution и инструкции
 
-**Статус: in-progress; unified profiles, private roots/venv и fresh preparation проверены. Reviewed demo installer впереди.** Зависимости R1–R10.
+**Статус: unified profiles, private roots/venv, fresh preparation и reviewed demo import проверены; финальный install/upgrade gate в R12.** Зависимости R1–R10.
 
 - [x] Unified PROFILES minimal/local/control-center/control-center-tailscale,
   neuraldeep/claude и явные OpenRouter/Local selectors без конфликта имён.
 - [x] Instance-local venv/state/agent parent; provider profile persisted без keys.
   prepareDistributionInstance переносится с isolation regression tests.
-- [ ] Reviewed `examples/brief-desk-nd`, install-brief-desk и START_HERE/docs
+- [x] Reviewed `examples/brief-desk-nd`, install-brief-desk и START_HERE/docs
   сохраняются; demo setup локально/идемпотентно, без server autostart и secrets.
 - [x] Native и ND onboarding одной codebase; Claude/API/OpenRouter/Local setup,
   pending-auth/offline statuses, external runtime requirements и recovery guide.
@@ -2035,6 +2035,30 @@ unit child environment отдельно и изолировать оба aliases
   канонической машине. Это fixture, не обновление живого runtime.
 - Names **125**, Markdown **991**; обновлены START_HERE и first-run workflow.
   Reviewed Brief Desk + безопасный installer остаются следующей частью R11.
+
+### Checkpoint 33b — Reviewed Brief Desk и локальный import
+
+- Перенесены 27 файлов pinned ND example и добавлен безопасный `.env.example`.
+  Отдельный `03_reviews/2026-11-01-brief-desk-adoption.json` содержит source/target
+  SHA-256 всех 28 файлов. Исходные tests сохранены и расширены.
+- Own credentials only: parent Keychain/ref/ambient provider keys не читаются.
+  Settings сохраняют `.env.local` атомарно mode 0600; symlink/hardlink rejected.
+  Managed manual startup передаёт только базовое окружение, без parent secrets.
+  Read Source дополнительно закрывает reserved documentation/transition ranges.
+- Installer имеет read-only plan, проверяет reviewed hashes, использует private
+  import journal/identity и staging. Collision, linked paths, partial import и
+  identity mismatch закрыты. Повтор сохраняет пользовательские edits/keys/history.
+  Исправлен путь identity для ещё не созданного state-root под macOS `/var` alias.
+- Пример импортируется в instance agent parent, contract/outcome/profile — только
+  в private `agents/`. Это drafts для local review, а не поддельный accepted
+  factory contract. Нет Git init, dependency install, keys, server/startup или
+  сообщений. ND bootstrap включает import; START_HERE описывает отдельный CLI,
+  offline demo, собственные ключи и recovery без слепого удаления receipt.
+- Targeted gate: **29/29** (demo, settings, importer, bootstrap, distribution).
+  Проверены два instance/catalog, idempotence, collisions, interrupted import,
+  parent credential rejection, CSRF/revision/explicit publication и offline demo.
+  Privacy/names/Markdown passed; actual provider/Telegram send не выполнялись.
+- Локальная установка примера для ручной приёмки и весь R12 ещё впереди.
 
 ## 7. Полные исходные материалы
 

@@ -16,6 +16,7 @@ test('external bootstrap profiles isolate Python, persist only a selection and n
   for(const [profile,connector] of [['neuraldeep','neuraldeep'],['claude','claude'],['openrouter','openrouter'],['local-model','local']]){
     const result=runBootstrap(['prepare','--profile',profile,'--dry-run','--json']);assert.equal(result.status,0,result.stderr);const plan=JSON.parse(result.stdout);
     assert.equal(plan.providerProfile,connector);assert.equal(plan.providerReadiness,'configuration-required');assert.equal(plan.steps[0].id,'instance-prepare');
+    assert.equal(plan.steps.some(item=>item.id==='brief-desk-import'),profile==='neuraldeep');
     assert(plan.steps.some(item=>item.id==='python-venv'));assert(plan.steps.find(item=>item.id==='python-core').command.includes('/venv/'));
     assert(!plan.steps.some(item=>item.args?.includes('--user') || item.startsForegroundProcess || item.id.startsWith('web-search')));
     assert(!JSON.stringify(plan).includes('git add'));assert(plan.steps.some(item=>item.id==='provider-connection'));

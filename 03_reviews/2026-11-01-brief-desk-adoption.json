@@ -1,0 +1,177 @@
+{
+  "schema": "pritha-bundled-example-v1",
+  "source_repository": "https://github.com/NumericalArt/Pritha-NeuralDeep",
+  "source_pin": "2ab22aeff5f1c167c86e925ec30311942b76023b",
+  "retrieved": "2026-11-01",
+  "review": "Own child credentials only; no parent Keychain, Git initialization, services or automatic messages. Draft private artifacts are imported separately from factory acceptance. Conservative SSRF and atomic private settings. Original tests retained and extended.",
+  "files": [
+    {
+      "path": "agent-memory/contracts/brief-desk-nd.md",
+      "target_sha256": "1bb807f382687357176e1182aeda4c5c787e8408c948aaac6a6597e0afe001d3",
+      "source_path": "examples/brief-desk-nd/agent-memory/contracts/brief-desk-nd.md",
+      "source_sha256": "5b0751520f955833126e8f35fe7f69921dc865b239e0ca09aa14688eaf143382"
+    },
+    {
+      "path": "agent-memory/outcome-specs/brief-desk-nd.md",
+      "target_sha256": "6d05ef8e5d192a0650e17f238f3d6da064ff498c6dbf41338a887e13da068c88",
+      "source_path": "examples/brief-desk-nd/agent-memory/outcome-specs/brief-desk-nd.md",
+      "source_sha256": "e5e716f44b5f479b1fb777ba75e067a5837f8d4e465c476744bcfb5fb39a1324"
+    },
+    {
+      "path": "agent-memory/profiles/brief-desk-nd.md",
+      "target_sha256": "9cbcb3efe0d121c90e1e562986da738024e007a8520df5717f693357d5e55bc0",
+      "source_path": "examples/brief-desk-nd/agent-memory/profiles/brief-desk-nd.md",
+      "source_sha256": "98cdf284ec6eef8dd50b885027f00788bc908441acd7b17308f0ceea7810e578"
+    },
+    {
+      "path": "project/.env.example",
+      "target_sha256": "be94690d7f77e0749eec0f5280582d6bd50690f9490784dc28348755ec6d59f9",
+      "source_path": null,
+      "source_sha256": null
+    },
+    {
+      "path": "project/.gitignore",
+      "target_sha256": "00307da5fa97ef9e6a1e90dc68d16861fd4493eceb76a2729fafd123da0eb5d6",
+      "source_path": "examples/brief-desk-nd/project/.gitignore",
+      "source_sha256": "00307da5fa97ef9e6a1e90dc68d16861fd4493eceb76a2729fafd123da0eb5d6"
+    },
+    {
+      "path": "project/AGENTS.md",
+      "target_sha256": "e88306bb4d301b425b9c7f46bfc517b22f3d7074de53ceda5846b8e6c8a69de0",
+      "source_path": "examples/brief-desk-nd/project/AGENTS.md",
+      "source_sha256": "4a84a4fb51f19716fc4ec42db5cbe241fc8fdae5200a574787440e7c0923a26e"
+    },
+    {
+      "path": "project/README.md",
+      "target_sha256": "7bdc51575b7fa41bdfe633ffe0681b105dbe2a821c81155b1e1c6e22262f3a2c",
+      "source_path": "examples/brief-desk-nd/project/README.md",
+      "source_sha256": "09fb6f938c34e15fd9b945b6c940e63a6803d29e7d3db72b85b504d3b40693fd"
+    },
+    {
+      "path": "project/app.js",
+      "target_sha256": "4c2adc137a99482b0d352f6e4d2c521f5265719bc805a2acedb9ac25ba2b325b",
+      "source_path": "examples/brief-desk-nd/project/app.js",
+      "source_sha256": "abc5127e2d8254949e0a8ce27c7033b3b53a9648d666068df62a04ec9a52f7b9"
+    },
+    {
+      "path": "project/demo/brief.json",
+      "target_sha256": "94999ece910b440d370194166286d1718f11ac864904114cf97bd55158cd34b8",
+      "source_path": "examples/brief-desk-nd/project/demo/brief.json",
+      "source_sha256": "94999ece910b440d370194166286d1718f11ac864904114cf97bd55158cd34b8"
+    },
+    {
+      "path": "project/docs/e2e-manual-test.md",
+      "target_sha256": "0fbd9fa0bcc7cca69b1dcfd536a81df190b2316f54fd12643af2d1bfdbee0763",
+      "source_path": "examples/brief-desk-nd/project/docs/e2e-manual-test.md",
+      "source_sha256": "488ad041e291fcf7a4683f4a624b2749ff9ce6aea490e0fbc5429ba8d97150f8"
+    },
+    {
+      "path": "project/docs/handoff.md",
+      "target_sha256": "c4150976c8a8759d12d7a5de00c7c07dd321900ac39d6294c5f245101a4eeb33",
+      "source_path": "examples/brief-desk-nd/project/docs/handoff.md",
+      "source_sha256": "b4acdce5ae8c12f8304fb7374f60a940d9ad62538de46a04e2dff7ee3297dc43"
+    },
+    {
+      "path": "project/docs/telegram.md",
+      "target_sha256": "db2fe690869adafa1a1fd0f0f343efe05512e4555fb8172263111666c9b0fb2f",
+      "source_path": "examples/brief-desk-nd/project/docs/telegram.md",
+      "source_sha256": "07f4a95807a5ad7722d94262f4b9f8c568780a4287508b3436c01fb6a8ea7d3d"
+    },
+    {
+      "path": "project/docs/usage.md",
+      "target_sha256": "ebe8a9597351af11470f27225debdde7ed7b5da577684fbe642dfbc325d49871",
+      "source_path": "examples/brief-desk-nd/project/docs/usage.md",
+      "source_sha256": "e6b6b047a1635bb56881951315ca18f9aa5c02556dc2b105762eef26eb915a0c"
+    },
+    {
+      "path": "project/fixtures/clean-page.html",
+      "target_sha256": "60e050839f0e9592da1cb7386dd8bffc5702b6fd61df802a2c2c7ff2084c3a01",
+      "source_path": "examples/brief-desk-nd/project/fixtures/clean-page.html",
+      "source_sha256": "60e050839f0e9592da1cb7386dd8bffc5702b6fd61df802a2c2c7ff2084c3a01"
+    },
+    {
+      "path": "project/fixtures/injection-page.html",
+      "target_sha256": "c904516e2526f0b5965e607bd46cb413633a6dbf096a13833eea0f6c9102ff33",
+      "source_path": "examples/brief-desk-nd/project/fixtures/injection-page.html",
+      "source_sha256": "c904516e2526f0b5965e607bd46cb413633a6dbf096a13833eea0f6c9102ff33"
+    },
+    {
+      "path": "project/lib-runtime.mjs",
+      "target_sha256": "14b847d151f4125ba35479914da8b425ae5d3e8ff3489aecf735bd25eb5abbca",
+      "source_path": "examples/brief-desk-nd/project/lib-runtime.mjs",
+      "source_sha256": "19998337d6c8a488859f27ab0f086303f488a8b8161dd87ab9244c3cb0aad2e5"
+    },
+    {
+      "path": "project/operations/manifest.json",
+      "target_sha256": "19c6c678c494a3023ac0b525a61f762e28f37b1524393298d7de7a80e2e53d54",
+      "source_path": "examples/brief-desk-nd/project/operations/manifest.json",
+      "source_sha256": "cb6583ffd88d303112d79519510180ab6b3b3c0b2fad08610f41d7c30285c29b"
+    },
+    {
+      "path": "project/package.json",
+      "target_sha256": "1706e2fcd275fdc893f69a7c0e383a2c77d7950b001a766cba063b8a3b2b3dae",
+      "source_path": "examples/brief-desk-nd/project/package.json",
+      "source_sha256": "1706e2fcd275fdc893f69a7c0e383a2c77d7950b001a766cba063b8a3b2b3dae"
+    },
+    {
+      "path": "project/provider-credential.mjs",
+      "target_sha256": "d7edfd542ac682ce533f503626d3f09763e4f5035bff2cc4eaa79437f4dd5f31",
+      "source_path": "examples/brief-desk-nd/project/provider-credential.mjs",
+      "source_sha256": "77e5dd37ebb996f79fbb73066ef669e4468c7303ad4c4a29e50cb785a6c86b38"
+    },
+    {
+      "path": "project/scripts/deploy-service.mjs",
+      "target_sha256": "26f169fb1e75c997404829705e2c07ae0df50987aa4f4e3753a1a1d7a59252a6",
+      "source_path": "examples/brief-desk-nd/project/scripts/deploy-service.mjs",
+      "source_sha256": "26f169fb1e75c997404829705e2c07ae0df50987aa4f4e3753a1a1d7a59252a6"
+    },
+    {
+      "path": "project/scripts/run-trials.mjs",
+      "target_sha256": "4591d3d5e174a66ada30fb3513dbae971fb697076d93bdd11899ad4723c65512",
+      "source_path": "examples/brief-desk-nd/project/scripts/run-trials.mjs",
+      "source_sha256": "00825c4b594e5c36727b26f2650f45cc09f23428a0bbd5e4e0e6ac8e4917e30b"
+    },
+    {
+      "path": "project/scripts/service-control.mjs",
+      "target_sha256": "f4a5b8fa98671f0feb8a7ecbb7c07933e38d44d38e02d960ed78a4b883a1d606",
+      "source_path": "examples/brief-desk-nd/project/scripts/service-control.mjs",
+      "source_sha256": "45eabb0acd8621bd3f7e9f2a7df3b670526e9d4d0dee27ee6a1f44fd6681f179"
+    },
+    {
+      "path": "project/scripts/telegram-destination.mjs",
+      "target_sha256": "c16fbb04de8b3b47abf77e36be2075671960961d7879227bb3563f0f262d3ff8",
+      "source_path": "examples/brief-desk-nd/project/scripts/telegram-destination.mjs",
+      "source_sha256": "c16fbb04de8b3b47abf77e36be2075671960961d7879227bb3563f0f262d3ff8"
+    },
+    {
+      "path": "project/server.mjs",
+      "target_sha256": "b01c0f37fda85bc649e4bc917cbbf7f0f3cdbe00b02940542b6b7bf76ed917bc",
+      "source_path": "examples/brief-desk-nd/project/server.mjs",
+      "source_sha256": "b01c0f37fda85bc649e4bc917cbbf7f0f3cdbe00b02940542b6b7bf76ed917bc"
+    },
+    {
+      "path": "project/settings.mjs",
+      "target_sha256": "b73fa77a3a11521155da6d4fcbb99320b6869c4be32bf50bb5f87d6dca528bd8",
+      "source_path": "examples/brief-desk-nd/project/settings.mjs",
+      "source_sha256": "7c4a48555ff643e7c7f76703196dc9c4e12cc67a8d317fc4e587a9f5ff7edeca"
+    },
+    {
+      "path": "project/tests/brief-desk.test.mjs",
+      "target_sha256": "8ee6ee727f1734d87b94627b4803370602a89d795ef800796a985bef81c490f4",
+      "source_path": "examples/brief-desk-nd/project/tests/brief-desk.test.mjs",
+      "source_sha256": "944aa5d3bcdd17f01b3df4f0866450468e8222119169d0ddd76815b617f41be3"
+    },
+    {
+      "path": "project/tests/settings.test.mjs",
+      "target_sha256": "3912388a9bfbe27ef82c78ebacf028730f3904afc39c6329818992247d94cea7",
+      "source_path": "examples/brief-desk-nd/project/tests/settings.test.mjs",
+      "source_sha256": "4daaba75c3f06b7841ad9f8d61866cb7608041c38659a1135dba1df8f6341acf"
+    },
+    {
+      "path": "project/ui.mjs",
+      "target_sha256": "bee9691bb367fc925c5b2714e219676147b9392035949cd4f59412ff8a4a7c3c",
+      "source_path": "examples/brief-desk-nd/project/ui.mjs",
+      "source_sha256": "bccc58cee88afa5eac6c6ad3c6f67d1c07e0092110f1425fc037ab484cc5bb69"
+    }
+  ]
+}
