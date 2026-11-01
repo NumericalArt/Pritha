@@ -728,7 +728,7 @@ async function runDeliveryLoopLocked(input = {}) {
 
   const buildExecutor = typeof input.buildExecutor === "object" && input.buildExecutor
     ? input.buildExecutor
-    : createBuildExecutor(input.buildExecutor || "codex-app-server", input.buildExecutorOptions || {});
+    : createBuildExecutor(input.buildExecutor || "codex-app-server", { ...input.buildExecutorOptions,root:input.root,stateRoot:input.stateRoot });
   const trialBackend = input.trialBackend || "local";
   let buildProbeCompleted = false;
   let failures = [];
@@ -814,7 +814,7 @@ async function runDeliveryLoopLocked(input = {}) {
       try {
         if (!buildProbeCompleted) {
           const probe = typeof buildExecutor.probe === "function"
-            ? await buildExecutor.probe({ cwd: worktree.worktree, worktree: worktree.worktree, timeoutMs: input.probeTimeoutMs })
+            ? await buildExecutor.probe({ cwd: worktree.worktree, worktree: worktree.worktree,root:input.root,stateRoot:input.stateRoot, timeoutMs: input.probeTimeoutMs })
             : {
                 backend: buildExecutor.name || "custom-build-executor",
                 available: true,

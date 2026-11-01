@@ -87,9 +87,10 @@ export function claudeAssistantTurn(reply){
 
 /** A key catalog is evidence of model visibility, not a paid inference probe. */
 export async function listClaudeModels({apiKey,fetchImpl=globalThis.fetch}={}){
-  const requestHeaders=headers(apiKey),rows=[],seen=new Set();let after;
+  const requestHeaders=headers(apiKey),rows=[],seen=new Set(),deadline=Date.now()+5000;let after;
   for(let page=0;page<10;page++){
-    const value=await providerJson(API+'/models?limit=100'+(after?'&after_id='+encodeURIComponent(after):''),{headers:requestHeaders,fetchImpl,timeoutMs:5000});
+    const remaining=deadline-Date.now();if(remaining<=0)throw new ProviderHttpError(503,'provider_timeout');
+    const value=await providerJson(API+'/models?limit=100'+(after?'&after_id='+encodeURIComponent(after):''),{headers:requestHeaders,fetchImpl,timeoutMs:remaining});
     if(!Array.isArray(value.data) || value.data.length>100 || typeof value.has_more!=='boolean')throw new ProviderHttpError(502,'provider_metadata_invalid');
     for(const row of value.data){
       if(!CLAUDE_MODEL_ID.test(row?.id || '') || seen.has(row.id))throw new ProviderHttpError(502,'provider_metadata_invalid');seen.add(row.id);

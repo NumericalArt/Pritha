@@ -13,7 +13,7 @@ import { providerProcessEnvironment } from '../scripts/lib/provider-process-envi
 const execute=promisify(execFile);
 function fixture(t){const directory=mkdtempSync(path.join(os.tmpdir(),'pritha-sandbox-')),workspace=path.join(directory,'workspace'),scratch=path.join(directory,'scratch'),state=path.join(directory,'state');for(const d of [workspace,scratch,state])mkdirSync(d);t.after(()=>rmSync(directory,{recursive:true,force:true}));return {directory,workspace,scratch,state};}
 async function run(f,command,args,options={}){
-  const plan=prepareProviderSandbox({root:process.cwd(),stateRoot:f.state,privateRoot:f.state,command,args,cwd:f.workspace,temporary:f.scratch,writeRoots:options.write?[f.workspace]:[],loopbackPorts:options.ports || []});
+  const plan=prepareProviderSandbox({root:process.cwd(),stateRoot:f.state,privateRoot:f.state,command,args,cwd:f.workspace,temporary:f.scratch,writeRoots:options.write?[f.workspace]:[],denyWriteRoots:options.protected || [],loopbackPorts:options.ports || []});
   const env=providerProcessEnvironment({provider:'claude',root:process.cwd(),stateRoot:f.state,temporary:f.scratch,env:{PATH:process.env.PATH,HOME:f.scratch}});
   return execute(plan.command,plan.args,{env,timeout:15000,maxBuffer:100000,encoding:'utf8'});
 }
@@ -38,4 +38,9 @@ test('network closure includes loopback; only an exact host capability port is r
   const port=server.address().port,url='http://127.0.0.1:'+port;
   await assert.rejects(run(f,'/usr/bin/curl',['--noproxy','*','--max-time','2','-sf',url]));assert.equal(hits,0);
   assert.equal((await run(f,'/usr/bin/curl',['--noproxy','*','--max-time','2','-sf',url],{ports:[port]})).stdout,'CAPABILITY_OK');assert.equal(hits,1);
+});
+test('host protected Trial files survive direct writes, deletion, hardlink and ancestor-rename attacks',{skip:process.platform!=='darwin'},async t=>{
+  const f=fixture(t),directory=path.join(f.workspace,'trials');mkdirSync(directory);const verifier=path.join(directory,'verify.mjs');writeFileSync(verifier,'IMMUTABLE_VERIFIER');
+  const script=`const fs=require('fs');const result={};for(const [name,attempt] of Object.entries({write:()=>fs.writeFileSync('trials/verify.mjs','weakened'),unlink:()=>fs.unlinkSync('trials/verify.mjs'),rename:()=>fs.renameSync('trials','moved'),link:()=>{fs.linkSync('trials/verify.mjs','alias');fs.writeFileSync('alias','weakened');}})){try{attempt();result[name]='ESCAPED';}catch{result[name]='denied';}}fs.writeFileSync('product.mjs','implemented');console.log(JSON.stringify(result));`;
+  const output=await run(f,process.execPath,['-e',script],{write:true,protected:[verifier]});assert.deepEqual(JSON.parse(output.stdout),{write:'denied',unlink:'denied',rename:'denied',link:'denied'});assert.equal(readFileSync(verifier,'utf8'),'IMMUTABLE_VERIFIER');assert.equal(readFileSync(path.join(f.workspace,'product.mjs'),'utf8'),'implemented');
 });

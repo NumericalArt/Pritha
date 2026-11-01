@@ -3,7 +3,7 @@ id: template-agent-project-contract
 type: template
 status: draft
 created: 2026-05-18
-updated: 2026-09-06
+updated: 2026-11-01
 template_for: agent-contract
 contract_schema_version: 2
 agent_kind: service | one-shot-cli | job-runner | tool-server | library | interactive-agent
@@ -102,7 +102,7 @@ Existing accepted v1 contracts retain their original locks and are not rewritten
 - Outcome Spec path: proposed after contract | explicit relative path
 - Outcome approval policy: separate-explicit-user
 - Build Git mode: disposable-worktree | no-git-in-place
-- Build executor: codex-app-server | manual
+- Build executor: codex-app-server | claude-code | manual
 - Trial backend policy: local-or-app-server | app-server-required | local-trusted-only
 - Build iteration budget: 6
 - Build elapsed budget ms: 5400000

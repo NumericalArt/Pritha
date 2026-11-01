@@ -1,10 +1,19 @@
-import { existsSync, lstatSync, realpathSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { existsSync, lstatSync, realpathSync,constants,openSync,closeSync,fstatSync,readFileSync } from "node:fs";
+import { createHash,randomUUID } from "node:crypto";
+import { execFileSync } from 'node:child_process';
 import path from "node:path";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { CodexAppServerConnection, ExecutionBackendError } from "./execution-backends.mjs";
+import { ClaudeProviderService } from '../claude/provider-service.mjs';
+import { startClaudeCodeRun } from '../claude-code-runner.mjs';
+import { ExecutionCoordinator } from '../lib/execution-coordinator.mjs';
+import { providerProcessTreesExited } from '../lib/provider-process-proof.mjs';
+import { providerProcessEnvironment } from '../lib/provider-process-environment.mjs';
+import { privateStateFile } from '../lib/private-state-path.mjs';
+import { resolveTechscopeRoot,resolvePrithaStateRoot,resolvePrithaStatePathFrom } from '../lib/paths.mjs';
 
 export const BUILD_EXECUTOR_RESULT_SCHEMA = "pritha-build-executor-result-v2";
+export const CLAUDE_BUILD_REPORT_SCHEMA={type:'object',additionalProperties:false,required:['summary','changed_files','remaining_risks'],properties:{summary:{type:'string',minLength:1,maxLength:4000},changed_files:{type:'array',maxItems:200,items:{type:'string',maxLength:500}},remaining_risks:{type:'array',maxItems:50,items:{type:'string',maxLength:1000}}}};
 
 function bounded(value, maximum = 20_000) {
   const text = String(value || "").trim();
@@ -521,8 +530,122 @@ export class CodexAppServerBuildExecutor {
   }
 }
 
+/** The delivery contract authorizes implementation within its disposable
+ * worktree. Host tools still enforce immutable verifier paths and closed egress;
+ * an approval callback cannot widen that boundary. */
+export class ClaudeCodeBuildExecutor {
+  constructor(options={}){this.name='claude-code-build';this.options=options;this.active=new Set();}
+  context(input={}){
+    const root=input.root || this.options.root?path.resolve(input.root || this.options.root):resolveTechscopeRoot(),stateRoot=resolvePrithaStateRoot({root,stateRoot:input.stateRoot || this.options.stateRoot});
+    const privateRoot=resolvePrithaStatePathFrom({root,stateRoot},'private','agents-mother','claude-build');
+    const executionDirectory=path.join(stateRoot===root?path.join(root,'.private'):stateRoot,'codex-chat','execution');
+    return {root,stateRoot,privateRoot,executionDirectory};
+  }
+  isolated(input,context){
+    const cwd=worktreeRoot(input.worktree || input.cwd),gitFile=path.join(cwd,'.git');
+    if(cwd===realpathSync(context.root) || !existsSync(gitFile) || !lstatSync(gitFile).isFile() || lstatSync(gitFile).isSymbolicLink())throw new ExecutionBackendError('build_isolation_unavailable','Claude builds require a disposable Git worktree.');
+    const env=providerProcessEnvironment({provider:'claude',root:context.root,stateRoot:context.stateRoot});
+    try{const git=(...args)=>execFileSync('git',args,{cwd,env,encoding:'utf8',timeout:5000,maxBuffer:8000,stdio:['ignore','pipe','ignore']}).trim();
+      const top=git('rev-parse','--show-toplevel'),directory=realpathSync(git('rev-parse','--absolute-git-dir')),common=realpathSync(path.resolve(cwd,git('rev-parse','--git-common-dir')));
+      if(realpathSync(top)!==cwd || directory===common || realpathSync(readFileSync(path.join(directory,'gitdir'),'utf8').trim())!==realpathSync(gitFile))throw new Error();}
+    catch{throw new ExecutionBackendError('build_isolation_unavailable','The delivery worktree identity could not be verified.');}return cwd;
+  }
+  service(context){return this.options.service || new ClaudeProviderService({...context,claudeBin:this.options.claudeBin});}
+  preset(){return {modelId:this.options.model || 'sonnet',reasoningEffort:this.options.effort || 'high',authMode:'api-key',timeoutMs:900000,sandbox:'workspace-write'};}
+  report(text){
+    try{const value=JSON.parse(text);if(!value || typeof value!=='object' || Array.isArray(value) || Object.keys(value).some(key=>!['summary','changed_files','remaining_risks'].includes(key))
+      || typeof value.summary!=='string' || !value.summary.trim() || value.summary.length>4000 || !Array.isArray(value.changed_files) || value.changed_files.length>200
+      || value.changed_files.some(file=>typeof file!=='string' || !file || file.length>500 || path.isAbsolute(file) || file.includes('\0') || file.split(/[\\/]/).includes('..'))
+      || !Array.isArray(value.remaining_risks) || value.remaining_risks.length>50 || value.remaining_risks.some(risk=>typeof risk!=='string' || risk.length>1000))throw new Error();return value;
+    }catch{return null;}
+  }
+  async probe(input={}){
+    try{const context=this.context(input);this.isolated(input,context);const ready=await this.service(context).require(this.preset());
+      return {backend:this.name,available:true,isolation:'sandboxed',runtimeVersion:ready.version,capabilities:{commandExec:true,threadStart:true,goal:false,tokenBudget:'host-reservation-estimate',protectedTrials:true},error:null};
+    }catch(error){return {backend:this.name,available:false,isolation:'unavailable',runtimeVersion:null,capabilities:{commandExec:false,threadStart:false,goal:false},error:/^[a-z_]+$/.test(error.code || '')?error.code:'build_runtime_unavailable'};}
+  }
+  async execute(input){
+    const context=this.context(input),cwd=this.isolated(input,context),tokenBudget=Number(input.tokenBudget);
+    if(!Number.isSafeInteger(tokenBudget) || tokenBudget<1)throw new ExecutionBackendError('token_budget_exhausted','A positive build token budget is required.');
+    if(typeof input.runId!=='string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(input.runId) || !Number.isSafeInteger(input.iteration) || input.iteration<1)throw new ExecutionBackendError('executor_input_invalid','A stable delivery run and iteration are required.');
+    const key='claude-build:'+input.runId+':'+input.iteration,requestHash=createHash('sha256').update(JSON.stringify([cwd,input.plan,input.failures,input.protectedPaths,input.guidance,tokenBudget])).digest('hex');
+    const coordinator=new ExecutionCoordinator({stateRoot:context.stateRoot,directory:context.executionDirectory});
+    let lease,receipt,started=false,run,exitConfirmed=false,control;
+    const checkpoint=async()=>{const safe=sanitized(receipt,{projectRoot:cwd,stateRoot:context.stateRoot,root:context.root});coordinator.updateIntent(key,{receipt:safe});try{await input.onCheckpoint?.(safe);}catch{throw new ExecutionBackendError('executor_checkpoint_failed','The build checkpoint could not be saved.',{executorResult:safe});}return safe;};
+    try{
+      const prepared=await coordinator.withMutation(key,async()=>{
+        const prior=coordinator.getIntent(key);
+        if(prior){if(prior.hash!==requestHash)throw new ExecutionBackendError('executor_recovery_mismatch','The saved attempt has different approved inputs.');if(prior.receipt?.process_exited===true)return {replay:prior.receipt};throw new ExecutionBackendError('executor_recovery_required','Recover the original build attempt before starting another.',{executorResult:prior.receipt});}
+        const ready=await this.service(context).require(this.preset()),model=ready.model.id,attemptId=randomUUID();
+        lease=coordinator.claim(['delivery-attempt:'+key,'workspace:'+cwd],key,{kind:'turn',capacity:coordinator.admission().capacity,detail:{runId:input.runId,connectorId:'claude'}});
+        if(!lease)throw new ExecutionBackendError('workspace_busy','Another task owns this build workspace or execution capacity.');
+        if(!coordinator.extend(lease.owner,lease.generation,['execution-ambient-effects'],{mode:'read'}))throw new ExecutionBackendError('execution_draining','The host is preparing a managed update.');
+        receipt={schema:BUILD_EXECUTOR_RESULT_SCHEMA,executor:this.name,provider:'claude',run_id:input.runId,iteration:input.iteration,attempt_id:attemptId,budget_id:attemptId,
+          worktree_identity:worktreeIdentity(cwd),runtime_version:ready.version,model_requested:this.options.model || 'sonnet',model_pinned:model,model_observed:null,effort_requested:this.preset().reasoningEffort,provider_observed:null,
+          status:'prepared',turn_status:'not-started',thread_id:null,turn_id:attemptId,process_exited:false,thread_cleanup:'not-created',token_budget:tokenBudget,tokens_used:null,usage_scope:'build-executor',usage_status:'not-started',usage_source:'anthropic-host-response',goal_enforcement:'not-applicable',budget_enforcement:'host-reservation-estimate',duration_ms:0};
+        coordinator.reserveIntent(key,requestHash,{kind:'build-executor',connectorId:'claude',runId:input.runId,iteration:input.iteration,owner:lease.owner,generation:lease.generation,receipt});return {};
+      });
+      if(prepared.replay)return prepared.replay;
+      await checkpoint();const began=Date.now(),controller=new AbortController(),abort=()=>controller.abort();input.signal?.addEventListener('abort',abort,{once:true});if(input.signal?.aborted)abort();
+      control={stop:()=>{controller.abort();run?.stop();}};this.active.add(control);
+      try{
+        const prompt=buildPrompt(input)+'\n\nReturn the final report as a JSON object, without code fences, matching this host-validated schema. changed_files must contain only relative workspace paths.\n'+JSON.stringify(CLAUDE_BUILD_REPORT_SCHEMA);
+        let finalText='';
+        run=await (this.options.launch || startClaudeCodeRun)({...context,cwd,claudeBin:this.options.claudeBin,model:receipt.model_pinned,effort:receipt.effort_requested,authMode:'api-key',sandbox:'workspace-write',prompt,
+          timeoutMs:Number.isSafeInteger(input.timeoutMs)?Math.max(1000,Math.min(input.timeoutMs,3600000)):900000,maxTurns:Math.min(this.options.maxTurns || 32,128),tokenBudget,budgetId:receipt.budget_id,signal:controller.signal,
+          hostExecutionContext:{coordinator,lease,chatId:'build_'+input.runId,turnId:receipt.attempt_id,protectedPaths:(input.protectedPaths || []).map(entry=>entry.path || entry)},
+          approve:async request=>{lease.assertOwned();if(controller.signal.aborted)throw new ExecutionBackendError('operator_cancel','Build cancelled.');if(request.kind==='user_input')throw new ExecutionBackendError('build_operator_input_required','The build requires operator guidance.');return {decision:'accept'};},
+          beforeStart:async proof=>{lease.assertOwned();started=true;receipt.status='dispatching';receipt.thread_id=proof.sessionId;receipt.profile_identity=proof.identity;receipt.thread_cleanup='pending';coordinator.updateIntent(key,{state:'dispatching',processProof:proof.evidence});await checkpoint();},
+          onEvidence:proof=>coordinator.updateIntent(key,{processProof:proof}),
+          beforeRequest:()=>{lease.assertOwned();if(controller.signal.aborted)throw new ExecutionBackendError('operator_cancel','Build cancelled.');},
+          onBudgetCheckpoint:async value=>{receipt.tokens_used=value.usageKnown?value.tokensUsed:null;receipt.usage_status=value.requests.length?(value.usageKnown?'measured':'unknown'):'not-started';await checkpoint();},
+          onEvent:event=>{if(event.type==='item.completed' && event.item?.type==='agent_message')finalText=event.item.text;},
+        });
+        const result=await run.completion;exitConfirmed=result.processTreeExited===true;
+        const accounting=result.budget,measured=accounting?.usageKnown===true && Number.isSafeInteger(accounting.tokensUsed);
+        const report=this.report(finalText),ok=result.ok && report!==null,errorCode=result.errorCode || (!report?'build_summary_invalid':null);
+        receipt={...receipt,...(report || {summary:'The build returned no valid structured summary.',changed_files:[],remaining_risks:['Review the recorded tool results and independent Trials.']}),status:exitConfirmed?(ok?'completed':'failed'):'uncertain',turn_status:exitConfirmed?(ok?'completed':'interrupted'):'unknown',process_exited:exitConfirmed,
+          model_observed:result.sessionId?result.model || receipt.model_pinned:null,provider_observed:result.sessionId?'anthropic':null,thread_id:result.sessionId || receipt.thread_id,
+          thread_cleanup:exitConfirmed?'closed':'pending',tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':'unknown',duration_ms:Date.now()-began,error_code:errorCode};
+        coordinator.updateIntent(key,{state:exitConfirmed?receipt.status:'unknown'});const stored=await checkpoint();
+        if(!exitConfirmed || !measured)throw new ExecutionBackendError('goal_usage_unavailable','The previous build execution or its usage remains unconfirmed.',{executorResult:stored});
+        if(!ok)throw new ExecutionBackendError(errorCode==='provider_budget_exhausted'?'token_budget_exhausted':errorCode || 'build_executor_failed','The bounded Claude build stopped before completion.',{executorResult:stored});return stored;
+      }finally{input.signal?.removeEventListener('abort',abort);}
+    }catch(error){
+      if(receipt && !started){exitConfirmed=true;receipt={...receipt,status:'not-started',turn_status:'not-started',process_exited:true,thread_cleanup:'not-created'};coordinator.updateIntent(key,{state:'not-started',receipt:sanitized(receipt,{projectRoot:cwd,stateRoot:context.stateRoot,root:context.root})});if(error.details?.executorResult)error.details.executorResult=receipt;}
+      if(error.processTreeExited===true){exitConfirmed=true;if(receipt){receipt={...receipt,process_exited:true,thread_cleanup:'closed'};try{await checkpoint();}catch{/* Recovery can read the host receipt. */}if(error.details?.executorResult)error.details.executorResult=receipt;}}
+      if(receipt && !error.details?.executorResult){exitConfirmed=error.processTreeExited===true || (!started && error.processTreeExited!==false);receipt={...receipt,status:exitConfirmed?'not-started':'uncertain',process_exited:exitConfirmed,thread_cleanup:exitConfirmed?'closed':'pending',error_code:/^[a-z_]+$/.test(error.code || '')?error.code:'build_executor_failed'};try{await checkpoint();}catch{/* The durable intent remains authoritative. */}}
+      if(error instanceof ExecutionBackendError)throw error;throw new ExecutionBackendError('build_executor_failed','The bounded Claude build could not complete.',{executorResult:receipt});
+    }finally{if(control)this.active.delete(control);if(lease && (exitConfirmed || !started))lease.release();coordinator.close();}
+  }
+  async recover(input,saved){
+    const context=this.context(input),cwd=this.isolated(input,context),key='claude-build:'+input.runId+':'+saved.iteration,coordinator=new ExecutionCoordinator({stateRoot:context.stateRoot,directory:context.executionDirectory});
+    try{
+      const intent=coordinator.getIntent(key),receipt=intent?.receipt;
+      if(saved.executor!==this.name || saved.run_id!==input.runId || !receipt || receipt.attempt_id!==saved.attempt_id || receipt.worktree_identity!==worktreeIdentity(cwd))throw new ExecutionBackendError('executor_recovery_mismatch','The build recovery identity does not match.');
+      let exited=receipt.process_exited===true;try{exited ||= Boolean(intent.processProof && (this.options.proveExit || providerProcessTreesExited)(intent.processProof));}catch{/* Keep the original unknown state. */}
+      if(!exited)return receipt;
+      let accounting;
+      try{const file=privateStateFile(context.stateRoot,path.join(context.privateRoot,'budgets',receipt.budget_id+'.json')),fd=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW);
+        try{const stat=fstatSync(fd);if(!stat.isFile() || stat.nlink!==1 || stat.size>2*1024*1024)throw new Error();accounting=JSON.parse(readFileSync(fd,'utf8'));}finally{closeSync(fd);}
+        if(accounting.identity!==receipt.profile_identity || accounting.model!==receipt.model_pinned || accounting.sessionId!==receipt.thread_id || accounting.budgetId!==receipt.budget_id)throw new Error();
+      }catch{accounting=null;}
+      const measured=accounting?.usageKnown===true && Number.isSafeInteger(accounting.tokensUsed) && accounting.tokensUsed>=0 && accounting.tokenBudget===receipt.token_budget
+        && Array.isArray(accounting.requests) && accounting.requests.length<=384 && accounting.requests.every(row=>row.status==='measured' && Number.isSafeInteger(row.usage?.totalTokens) && row.usage.totalTokens>=0)
+        && accounting.requests.reduce((sum,row)=>sum+row.usage.totalTokens,0)===accounting.tokensUsed;
+      const notStarted=receipt.process_exited===true && receipt.usage_status==='not-started';
+      const result={...receipt,process_exited:true,thread_cleanup:'closed',status:receipt.status==='completed'?'completed':'interrupted',turn_status:receipt.status==='completed'?'completed':'interrupted',
+        tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':notStarted?'not-started':'unknown',
+        model_observed:receipt.model_observed || (accounting?.requests?.some(row=>row.status==='measured')?receipt.model_pinned:null)};
+      coordinator.updateIntent(key,{state:result.status,receipt:result});coordinator.reconcileRelease(intent.owner,intent.generation);await input.onCheckpoint?.(result);return result;
+    }finally{coordinator.close();}
+  }
+  close(){for(const active of this.active)active.stop();}
+}
+
 export function createBuildExecutor(name = "codex-app-server", options = {}) {
   if (name === "codex-app-server" || name === "app-server") return new CodexAppServerBuildExecutor(options);
+  if (name === 'claude-code') return new ClaudeCodeBuildExecutor(options);
   if (name === "manual") return new ManualBuildExecutor();
   throw new Error(`Unknown build executor: ${name}`);
 }

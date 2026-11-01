@@ -39,6 +39,14 @@ test('file changes during operator review invalidate that exact proposed write',
   const response=result(await f.tools.call('write_file',{operation_id:'write_fixture_001',path:'file',expected_sha256:hash('old'),content:'new'}));
   assert.equal(response.status,'failed');assert.equal(response.text,'provider_tool_file_changed');assert.equal(readFileSync(file,'utf8'),'concurrent');
 });
+test('bounded exact edits support large files and refuse ambiguous matches and protected verifier writes',async t=>{
+  const f=fixture(t),content='prefix\n'+'large content\n'.repeat(6000)+'unique END\n';writeFileSync(path.join(f.cwd,'large.txt'),content);writeFileSync(path.join(f.cwd,'verify.mjs'),'immutable');
+  const protectedTools=new ProviderHostTools({...f.tools.options,protectedPaths:['verify.mjs']});t.after(()=>protectedTools.close());
+  const edit={operation_id:'edit_fixture_001',path:'large.txt',expected_sha256:hash(content),old_text:'unique END',new_text:'changed END'};
+  assert.equal(result(await protectedTools.call('edit_file',edit)).status,'completed');assert.equal(readFileSync(path.join(f.cwd,'large.txt'),'utf8'),content.replace('unique END','changed END'));
+  await assert.rejects(protectedTools.call('edit_file',{...edit,operation_id:'edit_fixture_002',expected_sha256:hash(content.replace('unique END','changed END')),old_text:'large content'}),{code:'provider_tool_edit_ambiguous'});
+  await assert.rejects(protectedTools.call('write_file',{operation_id:'write_fixture_001',path:'verify.mjs',expected_sha256:hash('immutable'),content:'weakened'}),{code:'provider_protected_trial_input'});
+});
 test('approved command runs in owned OS sandbox; Stop terminates its tree and long output stays retrievable',{skip:process.platform!=='darwin',timeout:30000},async t=>{
   const f=fixture(t);const out=await f.tools.call('run_command',{operation_id:'command_fixture_001',argv:[process.execPath,'-e','process.stdout.write("x".repeat(20000))']});
   assert.equal(result(out).status,'completed',JSON.stringify(out));assert.equal(result(out).nextOffset,16000);assert.equal(result(await f.tools.call('read_result',{operation_id:'command_fixture_001',offset:16000})).text.length,4000);assert.ok(f.proofs.length);

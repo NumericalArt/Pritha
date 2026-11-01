@@ -20,6 +20,7 @@ export const PROVIDER_HOST_TOOL_DEFINITIONS=[
   {name:'read_file',description:'Read a bounded UTF-8 window inside this task workspace. Returns the whole-file SHA-256 needed for a later edit.',inputSchema:schema({path:string,offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:24000}},['path']),annotations:{readOnlyHint:true}},
   {name:'list_files',description:'List one workspace directory; secrets and runtime state are excluded.',inputSchema:schema({path:string},['path']),annotations:{readOnlyHint:true}},
   {name:'write_file',description:'Propose one exact file write for operator approval. expected_sha256 must match the current file or be null for a new file. Never grants access outside the task sandbox.',inputSchema:schema({operation_id:operation,path:string,expected_sha256:{type:['string','null']},content:string},['operation_id','path','expected_sha256','content'])},
+  {name:'edit_file',description:'Propose one exact text replacement in a file, including large files. old_text must occur exactly once and expected_sha256 must match the whole file.',inputSchema:schema({operation_id:operation,path:string,expected_sha256:string,old_text:string,new_text:string},['operation_id','path','expected_sha256','old_text','new_text'])},
   {name:'run_command',description:'Propose an argv array for operator approval. The command runs in the task OS sandbox with no network and no host credentials. Use read_result to retrieve long output.',inputSchema:schema({operation_id:operation,argv:{type:'array',items:string,minItems:1,maxItems:64},timeout_ms:{type:'integer',minimum:1,maximum:120000}},['operation_id','argv'])},
   {name:'read_result',description:'Read a bounded window of a previous tool result from this exact turn.',inputSchema:schema({operation_id:operation,offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:24000}},['operation_id']),annotations:{readOnlyHint:true}},
   {name:'ask_user',description:'Ask one concise task question through Pritha. Do not ask for secrets or credentials.',inputSchema:schema({operation_id:operation,question:string},['operation_id','question'])},
@@ -28,7 +29,10 @@ export const PROVIDER_HOST_TOOL_DEFINITIONS=[
 /** All model-facing tools execute in this host, with a fixed workspace and an
  * immutable receipt. Model arguments never select a credential, root or policy. */
 export class ProviderHostTools {
-  constructor(options){this.options=options;this.cwd=realpathSync(options.cwd);this.pending=new Map();this.commands=new Set();this.serial=Promise.resolve();this.closed=false;this.exitConfirmed=true;this.calls=0;}
+  constructor(options){this.options=options;this.cwd=realpathSync(options.cwd);this.pending=new Map();this.commands=new Set();this.serial=Promise.resolve();this.closed=false;this.exitConfirmed=true;this.calls=0;this.commandCount=0;
+    if(options.protectedPaths!==undefined && (!Array.isArray(options.protectedPaths) || options.protectedPaths.length>256))throw fail('provider_tool_policy_invalid');
+    this.protectedPaths=(options.protectedPaths || []).map(value=>this.target(value));
+  }
   check(){if(this.closed || this.options.signal?.aborted)throw fail('operator_cancel');this.options.lease.assertOwned();}
   target(relative,{directory=false,missing=false}={}){
     if(typeof relative!=='string' || relative.length>2048 || path.isAbsolute(relative) || relative.includes('\0') || relative.split(/[\\/]/).some(part=>part==='..' || denied(part)))throw fail('provider_tool_path_denied');
@@ -62,7 +66,7 @@ export class ProviderHostTools {
     if(name==='read_result'){
       fields(input,['operation_id','offset','length']);const saved=this.saved(input.operation_id);return text({...this.window(saved.output,input),status:saved.status,exitCode:saved.exitCode ?? null});
     }
-    if(!['write_file','run_command','ask_user'].includes(name))throw fail('provider_tool_unknown');
+    if(!['write_file','edit_file','run_command','ask_user'].includes(name))throw fail('provider_tool_unknown');
     if(!validId(input?.operation_id))throw fail('provider_tool_input_invalid');
     const key='provider-tool:'+this.options.turnId+':'+input.operation_id,requestHash=hash(JSON.stringify([name,input]));
     const existing=this.options.coordinator.getIntent(key);
@@ -78,21 +82,28 @@ export class ProviderHostTools {
     if(prior?.state==='completed' || prior?.state==='declined'){const saved=this.saved(input.operation_id);return {...text({...this.window(saved.output,{}),status:saved.status,exitCode:saved.exitCode ?? null,operationId:input.operation_id}),isError:saved.status!=='completed'};}
     if(prior)throw fail('provider_tool_execution_unconfirmed');
     let presentation,kind,perform;
-    if(name==='write_file'){
-      fields(input,['operation_id','path','content','expected_sha256']);
-      if(this.options.sandbox!=='workspace-write' || typeof input.content!=='string' || Buffer.byteLength(input.content)>24000 || input.expected_sha256!==null && !/^[a-f0-9]{64}$/.test(input.expected_sha256 || ''))throw fail('provider_tool_write_denied');
-      const target=this.target(input.path,{missing:true}),before=existsSync(target)?hash(this.read(target)):null;
+    if(name==='write_file' || name==='edit_file'){
+      fields(input,name==='write_file'?['operation_id','path','content','expected_sha256']:['operation_id','path','old_text','new_text','expected_sha256']);
+      if(this.options.sandbox!=='workspace-write' || input.expected_sha256!==null && !/^[a-f0-9]{64}$/.test(input.expected_sha256 || ''))throw fail('provider_tool_write_denied');
+      const target=this.target(input.path,{missing:name==='write_file'});if(this.protectedPaths.includes(target))throw fail('provider_protected_trial_input');
+      const bytes=existsSync(target)?this.read(target):null,before=bytes?hash(bytes):null;let content=input.content;
       if(before!==input.expected_sha256)throw fail('provider_tool_file_changed');
-      kind='file_change_approval';presentation={path:input.path,beforeSha256:before,afterSha256:hash(input.content),proposedContent:input.content};
+      if(name==='edit_file'){
+        if(typeof input.old_text!=='string' || !input.old_text || typeof input.new_text!=='string' || Buffer.byteLength(input.old_text)+Buffer.byteLength(input.new_text)>24000)throw fail('provider_tool_input_invalid');
+        let original;try{original=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{throw fail('provider_tool_binary_file');}
+        const offset=original.indexOf(input.old_text);if(offset<0 || original.indexOf(input.old_text,offset+1)>=0)throw fail('provider_tool_edit_ambiguous');
+        content=original.slice(0,offset)+input.new_text+original.slice(offset+input.old_text.length);if(Buffer.byteLength(content)>2*1024*1024)throw fail('provider_tool_file_too_large');
+      }else if(typeof content!=='string' || Buffer.byteLength(content)>24000)throw fail('provider_tool_input_invalid');
+      kind='file_change_approval';presentation={path:input.path,beforeSha256:before,afterSha256:hash(content),...(name==='edit_file'?{oldText:input.old_text,newText:input.new_text}:{proposedContent:content})};
       perform=async()=>{
         this.check();const checked=this.target(input.path,{missing:true});if(checked!==target || (existsSync(checked)?hash(this.read(checked)):null)!==before)throw fail('provider_tool_file_changed');
         const temporary=path.join(path.dirname(target),'.pritha-write-'+randomUUID());
         const mode=existsSync(target)?lstatSync(target).mode&0o777:0o600;
         const fd=openSync(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,mode);
-        try{writeFileSync(fd,input.content);fsyncSync(fd);}finally{closeSync(fd);}
+        try{writeFileSync(fd,content);fsyncSync(fd);}finally{closeSync(fd);}
         try{renameSync(temporary,target);}finally{rmSync(temporary,{force:true});}
         const directory=openSync(path.dirname(target),constants.O_RDONLY);try{fsyncSync(directory);}finally{closeSync(directory);}
-        return {status:'completed',output:JSON.stringify({path:input.path,sha256:hash(input.content),bytes:Buffer.byteLength(input.content)})};
+        return {status:'completed',output:JSON.stringify({path:input.path,sha256:hash(content),bytes:Buffer.byteLength(content)})};
       };
     }else if(name==='run_command'){
       fields(input,['operation_id','argv','timeout_ms']);const argv=input.argv,timeout=input.timeout_ms ?? 60000;
@@ -123,8 +134,9 @@ export class ProviderHostTools {
     return {...text({...this.window(result.output,{}),status:result.status,exitCode:result.exitCode ?? null,operationId:input.operation_id}),isError:result.status!=='completed'};
   }
   async command(key,operationId,command,args,timeoutMs){
+    if(++this.commandCount>128)throw fail('provider_tool_call_limit');
     const o=this.options,scratch=createProviderTemporaryDirectory({provider:o.connectorId,stateRoot:o.stateRoot});let plan;
-    try{plan=prepareProviderSandbox({root:o.root,stateRoot:o.stateRoot,privateRoot:o.privateRoot,command,args,cwd:this.cwd,temporary:scratch,writeRoots:o.sandbox==='workspace-write'?[this.cwd]:[]});}catch(error){rmSync(scratch,{recursive:true,force:true});throw error;}
+    try{plan=prepareProviderSandbox({root:o.root,stateRoot:o.stateRoot,privateRoot:o.privateRoot,command,args,cwd:this.cwd,temporary:scratch,writeRoots:o.sandbox==='workspace-write'?[this.cwd]:[],denyWriteRoots:this.protectedPaths});}catch(error){rmSync(scratch,{recursive:true,force:true});throw error;}
     const env=providerProcessEnvironment({provider:o.connectorId,root:o.root,stateRoot:o.stateRoot,temporary:scratch,env:{PATH:process.env.PATH,HOME:scratch}});env.PRITHA_PYTHON=resolvePrithaPython({root:o.root});
     let owned,timer,reason=null,exited=false;const stop=()=>{reason ||= 'operator_cancel';owned?.stop();};
     try{

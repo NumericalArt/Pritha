@@ -1,5 +1,5 @@
 import { createHash,randomUUID,randomBytes } from 'node:crypto';
-import { accessSync,constants,closeSync,fstatSync,openSync,readFileSync,realpathSync,rmSync } from 'node:fs';
+import { accessSync,constants,closeSync,fstatSync,fsyncSync,openSync,readFileSync,realpathSync,rmSync,writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readJsonlLines } from './neuraldeep/jsonl-reader.mjs';
 import { spawnSupervisedCli } from './neuraldeep/process-supervisor.mjs';
@@ -14,6 +14,7 @@ import { ClaudeStreamState,CLAUDE_SESSION_ID,CLAUDE_MODEL_ID } from './claude/st
 import { probeClaudeCli } from './claude/cli-probe.mjs';
 import { ProviderHostTools,PROVIDER_HOST_TOOL_DEFINITIONS } from './lib/provider-host-tools.mjs';
 import { listenProviderToolServer } from './lib/provider-tool-server.mjs';
+import { ClaudeRequestBudget } from './claude/request-budget.mjs';
 
 const fail=code=>Object.assign(new Error('The configured Claude runtime could not complete this task safely.'),{code});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -41,7 +42,8 @@ export function buildClaudeExecArgs({model,sessionId,resume,effort='medium',maxT
 export async function startClaudeCodeRun(options,dependencies={}){
   if(options.authMode && options.authMode!=='api-key')throw fail('provider_auth_mode_unverified');
   if(!CLAUDE_MODEL_ID.test(options.model || '') || typeof options.prompt!=='string' || !options.prompt.trim() || Buffer.byteLength(options.prompt)>256000
-      || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs<1000 || options.timeoutMs>3600000 || options.resume && !CLAUDE_SESSION_ID.test(options.resume))throw fail('provider_input_invalid');
+      || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs<1000 || options.timeoutMs>3600000 || options.resume && !CLAUDE_SESSION_ID.test(options.resume)
+      || options.tokenBudget!==undefined && (!Number.isSafeInteger(options.tokenBudget) || options.tokenBudget<1) || options.budgetId!==undefined && !CLAUDE_SESSION_ID.test(options.budgetId))throw fail('provider_input_invalid');
   if(options.signal?.aborted)throw fail('operator_cancel');
   const root=realpathSync(options.root),cwd=realpathSync(options.cwd),stateRoot=path.resolve(options.stateRoot),privateRoot=privateStateDirectory(stateRoot,options.privateRoot);
   const key=(dependencies.readCredential || readProviderCredential)('claude',{stateRoot,env:options.env || process.env});if(!key)throw fail('provider_pending_auth');
@@ -58,7 +60,9 @@ export async function startClaudeCodeRun(options,dependencies={}){
   }
   const temporary=createProviderTemporaryDirectory({provider:'claude',stateRoot,temporaryRoot:options.temporaryRoot});
   const localToken=randomBytes(32).toString('base64url');
-  let proxy,owned,timer,verifiedExit=false,closed=false,stopReason=null,sandboxPlan,hostTools,toolServer;
+  const budgetId=options.budgetId || randomUUID();
+  if(options.tokenBudget!==undefined && !CLAUDE_SESSION_ID.test(budgetId))throw fail('provider_budget_invalid');
+  let proxy,owned,timer,verifiedExit=false,closed=false,stopReason=null,sandboxPlan,hostTools,toolServer,budget=null;
   const controller=new AbortController(),trees=new Map();
   const proof=()=>({kind:'provider-process-set',version:1,trees:[...trees].map(([id,evidence])=>({id,evidence}))});
   const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
@@ -70,6 +74,14 @@ export async function startClaudeCodeRun(options,dependencies={}){
     await options.onRawChunk?.(Buffer.from(JSON.stringify(event)+'\n'));await options.onEvent?.(event);
   }});
   try{
+    if(options.tokenBudget!==undefined){
+      const budgetFile=privateStateFile(stateRoot,path.join(privateRoot,'budgets',budgetId+'.json'));
+      const serialized=snapshot=>JSON.stringify({identity,model:options.model,sessionId,budgetId,...snapshot})+'\n';
+      budget=new ClaudeRequestBudget({tokenBudget:options.tokenBudget,checkpoint:async snapshot=>{atomicWriteFile(budgetFile,serialized(snapshot));await options.onBudgetCheckpoint?.(snapshot);}});
+      let fd;try{fd=openSync(budgetFile,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);writeFileSync(fd,serialized(budget.snapshot()));fsyncSync(fd);}
+      catch(error){if(error.code==='EEXIST')throw Object.assign(fail('provider_attempt_already_started'),{processTreeExited:false});throw error;}finally{if(fd!==undefined)closeSync(fd);}
+      await options.onBudgetCheckpoint?.(budget.snapshot());
+    }
     let mcpConfigPath,allowedTools=[];
     if(options.hostExecutionContext){
       hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'claude',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree});
@@ -79,7 +91,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
       allowedTools=PROVIDER_HOST_TOOL_DEFINITIONS.map(tool=>'mcp__pritha__'+tool.name);
     }
     proxy=await (dependencies.listenProxy || listenClaudeApiProxy)({localToken,apiKey:key,model:options.model,timeoutMs:options.timeoutMs,maxOutputTokens:options.maxOutputTokens || 8192,
-      allowedTools,beforeRequest:options.beforeRequest,fetchImpl:dependencies.fetchImpl});
+      allowedTools,beforeRequest:options.beforeRequest,budget,fetchImpl:dependencies.fetchImpl});
     const args=buildClaudeExecArgs({...options,sessionId,mcpConfigPath,allowedTools});
     const env=providerProcessEnvironment({provider:'claude',root,stateRoot,claudeConfigDir:config,temporary,env:options.env || process.env});
     Object.assign(env,{HOME:home,ANTHROPIC_API_KEY:localToken,ANTHROPIC_BASE_URL:proxy.baseUrl,CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST:'1',CLAUDE_CODE_TMPDIR:temporary,
@@ -87,7 +99,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
     env.CLAUDE_CODE_MAX_RETRIES='0';env.CLAUDE_CODE_NONSTREAMING_TIMEOUT_RETRIES='0';env.CLAUDE_CODE_DISABLE_REFUSAL_RETRY='1';env.MCP_CONNECTION_NONBLOCKING='0';env.ENABLE_TOOL_SEARCH='false';
     sandboxPlan=(dependencies.prepareSandbox || prepareProviderSandbox)({root,stateRoot,privateRoot,command:binary,args,cwd,temporary,readRoots:[home,config],writeRoots:[home,config],loopbackPorts:[proxy.port,...(toolServer?[toolServer.port]:[])]});
     owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(sandboxPlan.command,sandboxPlan.args,{cwd,env,supervisorPath:path.join(root,'scripts','neuraldeep','process-supervisor.mjs'),
-      beforeStart:async evidence=>{if(options.signal?.aborted)throw fail('operator_cancel');trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),model:options.model,resume:options.resume || null});},onEvidence:evidence=>recordTree('cli',evidence)});
+      beforeStart:async evidence=>{if(options.signal?.aborted)throw fail('operator_cancel');trees.set('cli',evidence);await options.beforeStart?.({identity,evidence:proof(),model:options.model,sessionId,budgetId:budget?budgetId:null,resume:options.resume || null});},onEvidence:evidence=>recordTree('cli',evidence)});
     options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
     timer=setTimeout(()=>stop('provider_timeout'),options.timeoutMs);
     let parseError=null;
@@ -102,8 +114,9 @@ export async function startClaudeCodeRun(options,dependencies={}){
     const completion=(async()=>{
       try{
         const [exit]=await Promise.all([owned.completion,consume,diagnostic]);const toolsExited=await closeTools();verifiedExit=exit.processTreeExited===true && toolsExited;
-        const result=await events.finish(parseError || stopReason || (!verifiedExit?'provider_process_exit_unconfirmed':exit.code!==0?'provider_runtime_failed':null));
-        return {...result,identity,cliVersion:cli.version,processTreeExited:verifiedExit,exitCode:exit.code};
+        const accounting=budget?.snapshot();
+        const result=await events.finish(stopReason || accounting?.errorCode || parseError || (!verifiedExit?'provider_process_exit_unconfirmed':exit.code!==0?'provider_runtime_failed':null));
+        return {...result,identity,cliVersion:cli.version,processTreeExited:verifiedExit,exitCode:exit.code,...(budget?{budgetId,budget:accounting}:{})};
       }finally{closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);await proxy?.close();if(verifiedExit){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan?.planPath)rmSync(sandboxPlan.planPath,{force:true});}}
     })();
     return {identity,completion,stop:()=>closed?false:stop('operator_cancel')};

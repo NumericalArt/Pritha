@@ -299,7 +299,7 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
 
 ### R5 — Claude Code: runner, decisions, build и child API
 
-**Статус: in-progress; API lane / host MCP / shared Task Chat verified; build and local CLI auth pending.** Зависимости R2–R4 (общие contracts, не ND subscription).
+**Статус: in-progress; API lane / host MCP / shared Task Chat / BuildExecutor verified; local CLI auth и child wiring pending.** Зависимости R2–R4 (общие contracts, не ND subscription).
 
 - [x] Проверить current CLI flags/stream schema/SDK terms по official docs,
   локально `claude --version` bounded 5s. SDK не обязателен для CLI runner.
@@ -324,7 +324,7 @@ secrets canaries и запрет внешнего OpenAI/native fallback. ND reg
   Shell tool и CLI проходят проверяемую OS sandbox; approvals разрешают только
   конкретный эффект в прежних границах, не отключение sandbox.
 - [x] Claude driver supports start/resume/interrupt/queue and honest capabilities.
-- [ ] `ClaudeCodeBuildExecutor`: probe/execute/recover, disposable worktree,
+- [x] `ClaudeCodeBuildExecutor`: probe/execute/recover, disposable worktree,
   standard result schema, protected verifier, isolation check, schema output,
   budgets and ledger. Recover reconstructs status without duplicate start and
   preserves observed model. Adversarial sandbox tests, not only string matches.
@@ -941,6 +941,46 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   повтор после этого test-only исправления не делался. R5 ещё не завершён: local-cli-session auth lane, BuildExecutor,
   его budget/recovery/Protected Trials и child scaffold wiring впереди. R6–R9,
   R11/R11b и финальная приёмка R12 сохраняются в полном объёме.
+
+### Checkpoint реализации 8 — Claude BuildExecutor и бюджет на стороне host
+
+- Добавлен `claude-code` executor в контракт и delivery CLI. Перед сборкой
+  проверяется связанный Git worktree (отдельный gitdir/common-dir и обратная
+  ссылка), exact model из каталога и общий execution lease. Одновременные
+  Task Chat/другой delivery не получают тот же workspace или лишнюю capacity.
+- Executor использует тот же owned CLI, host MCP и OS sandbox. Protected Trial
+  inputs запрещены для write/edit/command; реальные macOS проверки подтвердили
+  запрет прямой записи, удаления, hardlink и переименования родителя, сохранив
+  возможность писать обычные продуктовые файлы. Добавлен bounded `edit_file`
+  с точным SHA и единственным совпадением; всего семь host tools.
+- `probe` честно сообщает `goal:false`, `tokenBudget:host-reservation-estimate`.
+  Перед каждым платным запросом host вызывает Count Tokens, резервирует estimate
+  плюс запас и ограничивает max output. Параллельные запросы сериализованы;
+  reservation записывается до dispatch, measured usage — до следующего запроса.
+  Unknown response, превышение, ошибка checkpoint или недостаточный остаток
+  запрещают следующий вызов; автоматического retry платного запроса нет.
+- Уточнение исходника: [официальный Count Tokens API](https://platform.claude.com/docs/en/api/messages/count_tokens)
+  и [token counting guide](https://platform.claude.com/docs/en/build-with-claude/token-counting),
+  проверены 2026-11-01, API context 2026-10-21: count является оценкой. Поэтому
+  это не обещание математически точного hard cap; возможный overshoot измеряется
+  и останавливает цикл. Фактические input/cache/output счётчики берутся из
+  завершённого upstream ответа, без двойного счёта и без reasoning в ledger.
+- Structured summary валидируется host по явной JSON schema. Ошибка формата
+  даёт `build_summary_invalid` с сохранёнными usage и receipts, без дополнительного
+  платного форматирующего вызова. Независимые Trials проверяют продукт;
+  self-report модели не подтверждает готовность.
+- `recover` читает сохранённые session/model/usage и проверяет выход всех owned
+  процессов без нового запуска. Старый measured checkpoint не заменяет более
+  свежий unknown. Сбой первого checkpoint до dispatch сохраняется как not-started
+  и освобождает lease; ошибка записи после dispatch требует восстановления.
+- Проверки: factory regressions 85/85; последний focused budget/build/stock CLI
+  run 13/13. В нём три реальных Claude Code 2.1.296 acceptance сценария на
+  synthetic API: start/resume; BuildExecutor с защитой Trials и host budget;
+  host tool approvals/ownership. Реальные ключи, OAuth и платные запросы не
+  использовались. Предыдущий compatibility run с native executor — 27/27.
+- Остались local-cli-session lane, child Anthropic wiring/pilot, R6–R9,
+  bootstrap, ребрендинг и полная staged/manual приёмка. GitHub/MacBook и
+  запущенные экземпляры не изменялись.
 
 ## 7. Полные исходные материалы
 
