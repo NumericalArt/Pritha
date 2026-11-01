@@ -147,14 +147,14 @@ export class ProviderTaskRuntime {
     return text;
   }
   async attachmentInput(binding,input,{phase,expected,retain=false}={}){
-    const ids=input.attachments || [],historicalImages=this.registry.history.attachmentInSession(binding.chatId);
-    if(!ids.length && !historicalImages)return {files:[],receipt:{version:1,originals:[]}};
+    const ids=input.attachments || [],historicalImages=this.registry.history.attachmentInSession(binding.chatId),historicalAttachments=this.registry.hasAttachments(binding.chatId);
+    if(!ids.length && !historicalAttachments)return {files:[],receipt:{version:1,originals:[]}};
     const store=this.options.attachmentStore,transport=this.options.attachmentTransport;
     if(!store || !transport)throw failure('provider_attachments_unverified','Attachment transport is not verified for this provider. Your originals are preserved.',422);
     const files=await store.prepare(ids);
     const receipt={version:1,originals:files.map(({view,sha256})=>({...view,sha256}))};
     if(expected && JSON.stringify(expected)!==JSON.stringify(receipt))throw failure('attachment_integrity_failed','The accepted attachment references changed. Your message and originals have been kept.');
-    await transport.validate({binding,files,historicalImages,path:binding.nativeThreadId?'resume':'initial',phase});
+    await transport.validate({binding,files,historicalImages,historicalAttachments,path:binding.nativeThreadId?'resume':'initial',phase});
     if(retain && ids.length)await store.retain(ids);
     return {files,receipt};
   }
@@ -207,12 +207,15 @@ export class ProviderTaskRuntime {
     });
   }
   async launch(binding,active,text,attachments){
-    let journal;
+    let journal,delivery;
     try{
       const file=privateStateFile(this.stateRoot,path.join(this.privateRoot,this.connectorId,'attempts',active.turnId+'.jsonl'));
       journal=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
       const checked=await this.attachmentInput(binding,attachments.input,{phase:'dispatch',expected:attachments.receipt});
-      const delivery=checked.files.length?await this.options.attachmentTransport.prepare({binding,files:checked.files,receipt:checked.receipt,turnId:active.turnId,store:this.options.attachmentStore}):{prompt:'',images:[]};
+      const check=()=>{active.lease.assertOwned();if(active.controller.signal.aborted)throw failure('operator_cancel');};
+      delivery=this.options.attachmentTransport && (checked.files.length || this.registry.hasAttachments(binding.chatId))
+        ?await this.options.attachmentTransport.prepare({binding,files:checked.files,receipt:checked.receipt,turnId:active.turnId,store:this.options.attachmentStore,registry:this.registry,check}):{prompt:'',images:[]};
+      if(delivery.receipt)this.execution.updateIntent(active.key,{attachmentDelivery:delivery.receipt,attachmentCleanup:'pending'});
       active.lease.assertOwned();
       if(active.controller.signal.aborted)throw failure('operator_cancel');
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
@@ -221,6 +224,7 @@ export class ProviderTaskRuntime {
         model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:delivery.prompt?[text,delivery.prompt].filter(Boolean).join('\n\n'):text,
         ...(binding.subject?{factorySubject:binding.subject}:{}),
         images:delivery.images || [],...(delivery.attachmentManifest?{attachmentManifest:delivery.attachmentManifest}:{}),signal:active.controller.signal,
+        ...(delivery.hostAttachments?{hostAttachments:delivery.hostAttachments}:{}),
         ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
         beforeStart:async proof=>{
           active.lease.assertOwned();
@@ -247,10 +251,21 @@ export class ProviderTaskRuntime {
       if(active.stopping)active.run.stop();
       const result=await active.run.completion;
       try{await this.options.recordUsage?.(binding,active,result);}catch{this.execution.updateIntent(active.key,{usageRecording:'failed'});}
+      await delivery.hostAttachments?.close();await this.cleanupAttachmentDelivery(active.key,result.processTreeExited===true);
       this.finish(active,result);
     }catch(error){
-      this.finish(active,{ok:false,errorCode:safeCode(error),processTreeExited:error?.processTreeExited===true || (error?.processTreeExited!==false && !active.started && !active.run)});
+      const exited=error?.processTreeExited===true || (error?.processTreeExited!==false && !active.started && !active.run);
+      await delivery?.hostAttachments?.close();await this.cleanupAttachmentDelivery(active.key,exited);
+      this.finish(active,{ok:false,errorCode:safeCode(error),processTreeExited:exited});
     }finally{if(journal!==undefined)closeSync(journal);}
+  }
+  async cleanupAttachmentDelivery(key,exited){
+    const row=this.execution.getIntent(key);if(!row?.attachmentDelivery || row.attachmentCleanup==='complete')return;
+    let status='preserved';
+    if(exited && this.options.attachmentTransport?.cleanup){
+      try{status=await this.options.attachmentTransport.cleanup({receipt:row.attachmentDelivery,store:this.options.attachmentStore});}catch{status='recovery_required';}
+    }
+    this.execution.updateIntent(key,{attachmentCleanup:status});
   }
   handleEvent(binding,active,event){
     if(active.finished)return;
@@ -307,8 +322,9 @@ export class ProviderTaskRuntime {
       catch(error){this.execution.updateIntent(key,{state:'unknown'});throw failure('control_delivery_unknown','The owner did not confirm this control. It will not be repeated.');}
     });
   }
-  reconcile(chat){
+  async reconcile(chat){
     this.require(chat);if(this.active.has(chat))return;
+    return this.execution.withMutation('provider-reconcile:'+chat,async()=>{
     const row=this.activeIntent(chat);if(!row)return;
     let exited=false;
     try{exited=Boolean(row.processProof && (this.options.proveExit || providerProcessTreesExited)(row.processProof));}catch{/* Unknown coverage cannot release resources. */}
@@ -316,12 +332,14 @@ export class ProviderTaskRuntime {
       if(!executionChannelView(this.execution,channelKey(chat)) && Date.now()-Date.parse(row.updatedAt)>5000){expireProviderRequests(this.execution,chat,row.turnId);if(row.state!=='unknown')this.execution.updateIntent(turnKey(chat,row.clientMessageId),{state:'unknown'});}
       return;
     }
+    await this.cleanupAttachmentDelivery(turnKey(chat,row.clientMessageId),true);
     expireProviderRequests(this.execution,chat,row.turnId);
     this.registry.updateTurn(chat,row.turnId,turn=>({...turn,status:'interrupted',completedAt:stamp(),error:{code:'provider_owner_restarted',message:'The previous execution owner ended. Its output is preserved; continue explicitly when ready.'}}));
     this.registry.mutate(chat,binding=>({...binding,lastStatus:'idle',updatedAt:stamp()}));
-    this.execution.updateIntent(turnKey(chat,row.clientMessageId),{state:'interrupted',exitConfirmed:true,recoveredAt:stamp()},row.revision);
+    this.execution.updateIntent(turnKey(chat,row.clientMessageId),{state:'interrupted',exitConfirmed:true,recoveredAt:stamp()});
     this.execution.reconcileRelease(row.owner,row.generation);
     this.emit(chat,'turn.interrupted',{turn:providerTurnView(this.registry.turn(chat,row.turnId))},{turnId:row.turnId});
+    });
   }
   queuedRows(chat){return this.execution.listIntents({kind:'provider-queued-message',states:waitingStates,limit:1000}).filter(row=>row.chatId===chat);}
   async queued(chat){

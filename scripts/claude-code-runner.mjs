@@ -16,6 +16,7 @@ import { ProviderHostTools,PROVIDER_HOST_TOOL_DEFINITIONS } from './lib/provider
 import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import { listenProviderToolServer } from './lib/provider-tool-server.mjs';
 import { ClaudeRequestBudget } from './claude/request-budget.mjs';
+import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
 
 const fail=code=>Object.assign(new Error('The configured Claude runtime could not complete this task safely.'),{code});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -47,11 +48,13 @@ export async function startClaudeCodeRun(options,dependencies={}){
       || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs<1000 || options.timeoutMs>3600000 || options.resume && !CLAUDE_SESSION_ID.test(options.resume)
       || options.tokenBudget!==undefined && (!Number.isSafeInteger(options.tokenBudget) || options.tokenBudget<1) || options.budgetId!==undefined && !CLAUDE_SESSION_ID.test(options.budgetId))throw fail('provider_input_invalid');
   if(options.signal?.aborted)throw fail('operator_cancel');
+  if(options.images?.length || options.hostAttachments && !options.hostExecutionContext)throw fail('provider_attachments_unverified');
   const root=realpathSync(options.root),cwd=realpathSync(options.cwd),stateRoot=path.resolve(options.stateRoot),privateRoot=privateStateDirectory(stateRoot,options.privateRoot);
   const key=(dependencies.readCredential || readProviderCredential)('claude',{stateRoot,env:options.env || process.env});if(!key)throw fail('provider_pending_auth');
   const binary=resolveClaudeBinary(options.claudeBin,options.env || process.env);
   const cli=await (dependencies.probeCli || probeClaudeCli)({binary,root,stateRoot,env:options.env || process.env});
   if(!cli.available)throw fail(cli.code);
+  if(options.hostAttachments && !hostFileAttachmentVerified('claude',cli.version))throw fail('provider_attachments_unverified');
   const profile=privateStateDirectory(stateRoot,path.join(privateRoot,'profiles',hash([cwd,options.model,'api-key'])));
   const home=privateStateDirectory(stateRoot,path.join(profile,'home')),config=privateStateDirectory(stateRoot,path.join(profile,'config'));
   const sessionId=options.resume || randomUUID(),identity=hash([realpathSync(stateRoot),profile,cwd,options.model,'api-key']);
@@ -86,7 +89,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
     }
     let mcpConfigPath,allowedTools=[];
     if(options.hostExecutionContext){
-      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'claude',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree});
+      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'claude',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments});
       toolServer=await listenProviderToolServer({hostTools});
       mcpConfigPath=path.join(temporary,'mcp.json');
       atomicWriteFile(mcpConfigPath,JSON.stringify({mcpServers:{pritha:{type:'http',url:toolServer.url,headers:{Authorization:'Bearer '+toolServer.token}}}})+'\n');

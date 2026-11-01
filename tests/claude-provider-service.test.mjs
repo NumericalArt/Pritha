@@ -8,9 +8,14 @@ function fixture(options={}){return new ClaudeProviderService({root:'/fixture',s
 test('Claude readiness resolves an alias once using current metadata and verifies effort',async()=>{
   let calls=0;const service=fixture({listModels:async()=>{calls++;return models;}}),ready=await service.snapshot(preset);
   assert.equal(ready.status,'ready');assert.equal(ready.capabilities.sandbox,'host-enforced');assert.equal(ready.model.id,models[0].id);
+  assert.deepEqual(ready.capabilities.attachments,{files:true,images:false});
   const pinned=await service.resolveConfiguration(preset);assert.equal(pinned.modelId,models[0].id);assert.equal(calls,1);
   assert.equal((await service.snapshot({...preset,reasoningEffort:'max'})).error.code,'provider_effort_unavailable');
   await assert.rejects(service.require({...preset,modelId:'claude-retired-1'}),{code:'provider_model_unavailable'});
+});
+test('a new supported Claude CLI retains text execution but needs file transport verification',async()=>{
+  const value=await fixture({probeCli:async()=>({available:true,version:'2.1.297'})}).snapshot(preset);
+  assert.equal(value.status,'ready');assert.deepEqual(value.capabilities.attachments,{files:false,images:false});
 });
 test('unavailable auth, CLI and sandbox cannot look ready or trigger inference',async()=>{
   const missing=fixture({readCredential:()=>null,listModels:async()=>assert.fail('No key must not invoke a catalog')});assert.equal((await missing.snapshot(preset)).status,'not-configured');

@@ -5,6 +5,7 @@ import {normalizeLocalProviderUrl,normalizeProviderPreset} from '../lib/provider
 import {providerSandboxDependency} from '../lib/provider-sandbox.mjs';
 import {ProviderTaskError} from '../lib/provider-task-runtime.mjs';
 import {probeCompatibleCli} from './cli-probe.mjs';
+import {hostFileAttachmentVerified} from '../lib/provider-file-attachments.mjs';
 import {OPENROUTER_BASE_URL,OPENROUTER_HEADERS,normalizeOpenRouterAccount,normalizeOpenRouterModels,openRouterShortlist,normalizeLocalModels,ollamaModelMetadata,lmStudioModelMetadata} from './catalog.mjs';
 
 export const LOCAL_DISCOVERY_ENDPOINTS=Object.freeze(['http://127.0.0.1:11434/v1','http://127.0.0.1:1234/v1']);
@@ -54,7 +55,7 @@ export class CompatibleProviderService {
       // A loopback address is not evidence of server egress policy. Local stays
       // configured until the owned inference-process boundary is implemented.
       if(this.connectorId==='local')return result('local','configured','provider_offline_unverified',extra);
-      return result(this.connectorId,'ready',null,{...extra,capabilities:{...capabilities(this.connectorId),tools:true,contextTokens:model.contextTokens,outputTokens:model.outputTokens,reasoningControl:model.reasoningControl===true,parallelLimit:1}});
+      return result(this.connectorId,'ready',null,{...extra,capabilities:{...capabilities(this.connectorId),tools:true,attachments:{files:hostFileAttachmentVerified(this.connectorId,runtime.version),images:false},contextTokens:model.contextTokens,outputTokens:model.outputTokens,reasoningControl:model.reasoningControl===true,parallelLimit:1}});
     }catch(error){return result(this.connectorId,statusFor(error.code),Object.hasOwn(messages,error.code)?error.code:'provider_unavailable');}
   }
   async openrouter(preset,key){

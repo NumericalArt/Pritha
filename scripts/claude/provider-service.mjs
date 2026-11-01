@@ -5,6 +5,7 @@ import { ProviderTaskError } from '../lib/provider-task-runtime.mjs';
 import { resolveClaudeBinary } from '../claude-code-runner.mjs';
 import { probeClaudeCli } from './cli-probe.mjs';
 import { listClaudeModels,resolveClaudeModel } from './messages-client.mjs';
+import {hostFileAttachmentVerified} from '../lib/provider-file-attachments.mjs';
 
 const capabilities=()=>({steer:false,interrupt:true,approvals:true,tools:true,attachments:{files:false,images:false},usage:'observed',resume:true,sandbox:'host-enforced',offline:false});
 const messages={provider_pending_auth:'Connect an Anthropic API key in Settings.',provider_auth_mode_unverified:'This Claude authentication mode is not available in the isolated task runtime.',provider_runtime_unavailable:'Install a supported Claude Code CLI.',provider_runtime_unverified:'The installed Claude Code version is not verified for this runtime.',provider_sandbox_unavailable:'The required host sandbox is unavailable.',provider_model_unavailable:'Choose a currently available Claude model.',provider_effort_unavailable:'The selected model does not support this effort level.',provider_billing_required:'Anthropic billing is required.',provider_rate_limited:'Anthropic currently limits requests.',provider_unavailable:'Anthropic model metadata is temporarily unavailable.'};
@@ -31,7 +32,7 @@ export class ClaudeProviderService {
       models=await (this.options.listModels || listClaudeModels)({apiKey:key,fetchImpl:this.options.fetchImpl});
       const model=resolveClaudeModel(preset.modelId,models);
       if(preset.reasoningEffort && !model.efforts.includes(preset.reasoningEffort))return this.result('configured','provider_effort_unavailable',{version,models,model});
-      return this.result('ready',null,{version,models,model,capabilities:{...capabilities(),outputTokens:model.maxOutputTokens?Math.min(8192,model.maxOutputTokens):8192}});
+      return this.result('ready',null,{version,models,model,capabilities:{...capabilities(),attachments:{files:hostFileAttachmentVerified('claude',version),images:false},outputTokens:model.maxOutputTokens?Math.min(8192,model.maxOutputTokens):8192}});
     }catch(error){const code=Object.hasOwn(messages,error.code)?error.code:'provider_unavailable';return this.result(code==='provider_pending_auth'?'pending-auth':code==='provider_model_unavailable'?'configured':code==='provider_rate_limited'?'rate-limited':code==='provider_billing_required'?'billing-required':code.startsWith('provider_runtime') || code==='provider_sandbox_unavailable'?'unavailable':'error',code,{version,models});}
   }
   async require(preset){const snapshot=await this.snapshot(preset);if(snapshot.status!=='ready')throw new ProviderTaskError(snapshot.error.code,snapshot.error.message,snapshot.status==='rate-limited'?429:snapshot.status==='billing-required'?402:503);return snapshot;}

@@ -21,11 +21,16 @@ test('OpenRouter normalizes only budget metadata, preserves unknowns and retains
 test('OpenRouter uses bounded read-only /key and /models probes, fixed attribution, deduplicated cache and no inference',async()=>{
   const seen=[];const service=new CompatibleProviderService({...options,fetchImpl:async(url,request)=>{seen.push({url,request});assert.equal(request.method,'GET');assert.equal(request.redirect,'error');assert.equal(request.headers.authorization,'Bearer PRIVATE_KEY_CANARY');assert.equal(request.headers['X-Title'],'Pritha Control Center');return response(url.endsWith('/key')?{data:{is_free_tier:false,usage:5,limit:null}}:catalog);}});
   const [a,b]=await Promise.all([service.snapshot(preset),service.snapshot(preset)]);assert.equal(a.status,'ready');assert.equal(b.status,'ready');assert.equal(seen.length,2);assert.equal(a.capabilities.tools,true);assert.equal(a.capabilities.offline,false);
+  assert.deepEqual(a.capabilities.attachments,{files:true,images:false});
   assert.deepEqual(seen.map(row=>row.url).sort(),['https://openrouter.ai/api/v1/key','https://openrouter.ai/api/v1/models']);assert.doesNotMatch(JSON.stringify(a),/PRIVATE_KEY_CANARY/);
   await service.snapshot(preset);assert.equal(seen.length,2);
   assert.equal((await service.require({...preset,sandbox:'workspace-write'})).status,'ready');assert.equal(seen.length,2);
   assert.notEqual((await service.snapshot({...preset,sandbox:'danger-full-access'})).status,'ready');
   assert.notEqual((await service.snapshot({...preset,unexpected:'PRIVATE_CANARY'})).status,'ready');
+});
+test('a changed Codex version does not inherit verified OpenRouter file transport',async()=>{
+  const service=new CompatibleProviderService({...options,probeCli:async()=>({available:true,version:'0.154.0'}),fetchImpl:async url=>response(url.endsWith('/key')?{data:{is_free_tier:false}}:catalog)});
+  const value=await service.snapshot(preset);assert.equal(value.status,'ready');assert.deepEqual(value.capabilities.attachments,{files:false,images:false});
 });
 
 test('model, effort, protocol, tools, auth, budget and CLI failures never authorize dispatch or substitute a model',async()=>{

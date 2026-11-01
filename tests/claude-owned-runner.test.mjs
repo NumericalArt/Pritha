@@ -45,3 +45,8 @@ test('auth and version failures stop before a CLI task, and no unrestricted perm
   const probe=await probeClaudeCli({binary:process.execPath,root:options.root,stateRoot:options.stateRoot,executeImpl:async()=>({stdout:'2.1.200 (Claude Code)'})});assert.equal(probe.available,false);
   assert.throws(()=>buildClaudeExecArgs({model:'sonnet',sessionId:'12345678-1234-1234-1234-123456789012'}),{code:'provider_input_invalid'});
 });
+test('file dispatch rechecks the installed Claude version after a cached capability decision',async t=>{
+  const options=fixture(t),capture={};
+  await assert.rejects(startClaudeCodeRun({...options,hostAttachments:{},hostExecutionContext:{}},{...dependencies(capture),probeCli:async()=>({available:true,version:'2.1.297'})}),{code:'provider_attachments_unverified'});
+  assert.equal(capture.command,undefined);assert.equal(existsSync(path.join(options.privateRoot,'profiles')),false);
+});

@@ -5,6 +5,7 @@ import type { ChatEventRecord, ChatItemView, TurnView, AcceptedTurn, ThreadDetai
 import type { CreateThreadInput, StartTurnInput } from '../../interfaces/control-center/src/lib/codex-chat/native-gateway';
 import type { TaskChatBackend } from '../../interfaces/control-center/src/lib/codex-chat/driver-types';
 import type { ImmutableAttachmentStore, PreparedAttachment, AttachmentView } from './chat-attachment-store.mjs';
+import type {ProviderFileAttachments} from './provider-file-attachments.mjs';
 type Queued = Awaited<ReturnType<TaskChatBackend['queuedMessages']>>;
 export type ProviderAttempt = {chat:string;turnId:string;clientMessageId:string;key:string;identity:string|null};
 export class ProviderTaskError extends Error {code:string;status:number;retryable:false;constructor(code:string,message?:string,status?:number);}
@@ -12,9 +13,11 @@ export type ProviderRunOptions = Record<string,any> & {root:string;stateRoot:str
 export type ProviderRunResult = {ok:boolean;processTreeExited:boolean;errorCode?:string|null;sessionId?:string|null;identity?:string;usage?:Record<string,number>|null};
 export type ProviderLaunch = (options:ProviderRunOptions)=>Promise<{stop:()=>boolean;completion:Promise<ProviderRunResult>}>;
 export type ProviderAttachmentReceipt = {version:1;originals:Array<AttachmentView & {sha256:string}>};
+export type ProviderAttachmentDeliveryReceipt={protocol:string;chatId:string;turnId:string;nonce:string};
 export type ProviderAttachmentTransport = {
-  validate:(context:{binding:ProviderChatBinding;files:PreparedAttachment[];historicalImages:boolean;path:'initial'|'resume';phase:'queue'|'turn'|'dispatch'})=>Promise<void>|void;
-  prepare:(context:{binding:ProviderChatBinding;files:PreparedAttachment[];receipt:ProviderAttachmentReceipt;turnId:string;store:ImmutableAttachmentStore})=>Promise<{prompt:string;images?:string[];attachmentManifest?:string}>;
+  validate:(context:{binding:ProviderChatBinding;files:PreparedAttachment[];historicalImages:boolean;historicalAttachments:boolean;path:'initial'|'resume';phase:'queue'|'turn'|'dispatch'})=>Promise<void>|void;
+  prepare:(context:{binding:ProviderChatBinding;files:PreparedAttachment[];receipt:ProviderAttachmentReceipt;turnId:string;store:ImmutableAttachmentStore;registry:ProviderChatRegistry;check:()=>void})=>Promise<{prompt:string;images?:string[];attachmentManifest?:string;hostAttachments?:ProviderFileAttachments;receipt?:ProviderAttachmentDeliveryReceipt}>;
+  cleanup?:(context:{receipt:ProviderAttachmentDeliveryReceipt;store:ImmutableAttachmentStore})=>Promise<'complete'>;
 };
 export type ProviderTaskOptions = {
   connectorId:Exclude<ProviderConnectorId,'codex'>;root:string;stateRoot:string;privateRoot:string;executionDirectory:string;
@@ -45,7 +48,7 @@ export class ProviderTaskRuntime {
   queued(chatId:string):Promise<Queued>;
   enqueue(chatId:string,input:StartTurnInput):Promise<Queued>;
   cancelQueued(chatId:string,id:string,revision:number):Promise<Queued>;
-  reconcile(chatId:string):void;
+  reconcile(chatId:string):Promise<void>;
   scheduleQueues():void;
   emit(chatId:string,event:string,payload?:Record<string,unknown>,refs?:{turnId?:string;itemId?:string;requestId?:string}):ChatEventRecord;
   subscribe(chatId:string,send:(event:ChatEventRecord)=>void,close?:(()=>void)|null):()=>void;

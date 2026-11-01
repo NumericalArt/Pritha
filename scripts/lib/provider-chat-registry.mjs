@@ -25,6 +25,16 @@ export class ProviderChatRegistry {
     this.history.db.exec('CREATE TABLE IF NOT EXISTS provider_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,chat TEXT NOT NULL,record TEXT NOT NULL); CREATE INDEX IF NOT EXISTS provider_events_chat ON provider_events(chat,sequence);');
   }
   close(){this.history.close();}
+  hasAttachments(chatId){this.require(chatId);return Boolean(this.history.statement('SELECT 1 FROM attachment_refs WHERE chat=? LIMIT 1').get(chatId));}
+  attachmentReference(chatId,id){
+    this.require(chatId);
+    if(typeof id!=='string' || !/^[a-f0-9-]{36}$/i.test(id))return null;
+    const rows=this.history.statement('SELECT turn_id,sha256,media_type,size,kind FROM attachment_refs WHERE chat=? AND id=? GROUP BY sha256,media_type,size,kind LIMIT 2').all(chatId,id);
+    if(rows.length>1)throw fail('history_attachment_conflict');if(!rows.length)return null;
+    const file=this.history.turn(chatId,rows[0].turn_id,{compact:true})?.userMessage?.attachments?.find(row=>row.id===id);
+    if(!file || file.sha256!==rows[0].sha256 || file.size!==rows[0].size || file.kind!==rows[0].kind || file.mediaType!==rows[0].media_type)throw fail('history_attachment_conflict');
+    return file;
+  }
   assertId(chatId){if(!new RegExp(`^chat_${this.connectorId}_[a-f0-9]{32}$`).test(chatId))throw fail('thread_not_found','Task Chat was not found.');}
   get(chatId){
     this.assertId(chatId);const value=this.history.get(chatId,{turnLimit:0});

@@ -17,7 +17,7 @@ const text=value=>({content:[{type:'text',text:typeof value==='string'?value:JSO
 const schema=(properties,required)=>({type:'object',properties,required,additionalProperties:false});
 const string={type:'string'},operation={type:'string',description:'Stable operation ID; retain it when retrying the same action.'};
 export const PROVIDER_HOST_TOOL_DEFINITIONS=[
-  {name:'read_file',description:'Read a bounded UTF-8 window inside this task workspace. Returns the whole-file SHA-256 needed for a later edit.',inputSchema:schema({path:string,offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:24000}},['path']),annotations:{readOnlyHint:true}},
+  {name:'read_file',description:'Read a bounded UTF-8 window inside this task workspace or an attachment:<id> URI from this exact chat. Attachments are read-only; binary or large inputs return a verified snapshot path for an approved command. Workspace reads return the whole-file SHA-256 needed for a later edit.',inputSchema:schema({path:string,offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:24000}},['path']),annotations:{readOnlyHint:true}},
   {name:'list_files',description:'List one workspace directory; secrets and runtime state are excluded.',inputSchema:schema({path:string},['path']),annotations:{readOnlyHint:true}},
   {name:'write_file',description:'Propose one exact file write for operator approval. expected_sha256 must match the current file or be null for a new file. Never grants access outside the task sandbox.',inputSchema:schema({operation_id:operation,path:string,expected_sha256:{type:['string','null']},content:string},['operation_id','path','expected_sha256','content'])},
   {name:'edit_file',description:'Propose one exact text replacement in a file, including large files. old_text must occur exactly once and expected_sha256 must match the whole file.',inputSchema:schema({operation_id:operation,path:string,expected_sha256:string,old_text:string,new_text:string},['operation_id','path','expected_sha256','old_text','new_text'])},
@@ -35,7 +35,7 @@ export class ProviderHostTools {
   }
   check(){if(this.closed || this.options.signal?.aborted)throw fail('operator_cancel');this.options.lease.assertOwned();}
   target(relative,{directory=false,missing=false}={}){
-    if(typeof relative!=='string' || relative.length>2048 || path.isAbsolute(relative) || relative.includes('\0') || relative.split(/[\\/]/).some(part=>part==='..' || denied(part)))throw fail('provider_tool_path_denied');
+    if(typeof relative!=='string' || relative.length>2048 || relative.startsWith('attachment:') || path.isAbsolute(relative) || relative.includes('\0') || relative.split(/[\\/]/).some(part=>part==='..' || denied(part)))throw fail('provider_tool_path_denied');
     const target=path.resolve(this.cwd,relative);if(target!==this.cwd && !target.startsWith(this.cwd+path.sep))throw fail('provider_tool_path_denied');
     let cursor=this.cwd;
     for(const part of path.relative(this.cwd,target).split(path.sep).filter(Boolean)){
@@ -55,7 +55,14 @@ export class ProviderHostTools {
   async call(name,input){
     this.check();if(++this.calls>10000)throw fail('provider_tool_call_limit');
     if(name==='read_file'){
-      fields(input,['path','offset','length']);const bytes=this.read(this.target(input.path));let value;try{value=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{throw fail('provider_tool_binary_file');}
+      fields(input,['path','offset','length']);
+      if(typeof input.path==='string' && input.path.startsWith('attachment:')){
+        this.window('',input);if(!this.options.attachments)throw fail('attachment_not_in_chat');
+        const {bytes,attachment}=await this.options.attachments.read(input.path);this.check();let value=null;
+        if(bytes)try{value=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{/* Binary files remain exact bytes; no automatic extraction or conversion. */}
+        return text({attachment,sha256:attachment.sha256,...(value===null?{text:'Binary or large attachment. Use its readOnlyPath with an explicitly approved run_command if this task requires processing it.',binary:true}:this.window(value,input))});
+      }
+      const bytes=this.read(this.target(input.path));let value;try{value=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{throw fail('provider_tool_binary_file');}
       return text({...this.window(value,input),sha256:hash(bytes)});
     }
     if(name==='list_files'){
@@ -135,8 +142,9 @@ export class ProviderHostTools {
   }
   async command(key,operationId,command,args,timeoutMs){
     if(++this.commandCount>128)throw fail('provider_tool_call_limit');
-    const o=this.options,scratch=createProviderTemporaryDirectory({provider:o.connectorId,stateRoot:o.stateRoot});let plan;
-    try{plan=prepareProviderSandbox({root:o.root,stateRoot:o.stateRoot,privateRoot:o.privateRoot,command,args,cwd:this.cwd,temporary:scratch,writeRoots:o.sandbox==='workspace-write'?[this.cwd]:[],denyWriteRoots:this.protectedPaths});}catch(error){rmSync(scratch,{recursive:true,force:true});throw error;}
+    const o=this.options,readOnlyRoots=await o.attachments?.readOnlyPaths() || [];this.check();
+    const scratch=createProviderTemporaryDirectory({provider:o.connectorId,stateRoot:o.stateRoot});let plan;
+    try{plan=prepareProviderSandbox({root:o.root,stateRoot:o.stateRoot,privateRoot:o.privateRoot,command,args,cwd:this.cwd,temporary:scratch,readOnlyRoots,writeRoots:o.sandbox==='workspace-write'?[this.cwd]:[],denyWriteRoots:this.protectedPaths});}catch(error){rmSync(scratch,{recursive:true,force:true});throw error;}
     const env=providerProcessEnvironment({provider:o.connectorId,root:o.root,stateRoot:o.stateRoot,temporary:scratch,env:{PATH:process.env.PATH,HOME:scratch}});env.PRITHA_PYTHON=resolvePrithaPython({root:o.root});
     let owned,timer,reason=null,exited=false;const stop=()=>{reason ||= 'operator_cancel';owned?.stop();};
     try{

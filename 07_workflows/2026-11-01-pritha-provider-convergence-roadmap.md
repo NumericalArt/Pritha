@@ -1685,6 +1685,63 @@ history, отсутствие повторного turn после unknown recei
   Strict privacy, name guard (124 references), Markdown (987 files) и diff check
   прошли. Изменений live services, MacBook, GitHub и платных provider calls нет.
 
+Промежуточный результат 26b (verified-automated):
+
+- Claude API и OpenRouter подключены к общему host-owned file transport. Модель
+  получает `attachment:<id>`; `read_file` разрешает только immutable reference
+  из текущего private chat и сверяет bytes/metadata. Готовность требует текущего
+  provider/model/tool admission и exact CLI (2.1.296 / 0.153.0). Runner повторно
+  проверяет версию после service cache; обновление CLI не наследует file readiness.
+- UTF-8 возвращается ограниченным окном; binary/large file даёт проверенный
+  snapshot path для отдельной command approval. Нет автоматического extract,
+  conversion или execution. Команда видит только копии этого хода и workspace,
+  сохраняет прежние network/secret restrictions; нельзя менять или переименовывать
+  snapshot directory даже при legacy state-root внутри workspace.
+- Копии удерживаются при unknown process exit; после подтверждённого exit
+  удаляются без затрагивания originals. Private execution receipt фиксирует
+  cleanup state. Recovery после restart использует тот же receipt; partial
+  cleanup возобновляется, неизвестные/изменённые файлы сохраняются. На resume
+  предыдущие attachment URI разрешаются через durable history в новые копии.
+  Перед удалением также проверяется сохранность originals: повреждённый original
+  не приводит к удалению последней целой рабочей копии.
+- Per-turn materialization ограничена 10 файлами / 250 MiB, включая historical
+  files. Прямая подмена URI на path, доступ к соседнему chat, symlink/hardlink,
+  изменение original/metadata/snapshot и лишние файлы в snapshot scope закрыты.
+- Настоящие installed CLI + macOS sandbox + synthetic upstream прошли initial
+  и resume: **2/2** provider scenarios (16 requests, 4 exact command approvals).
+  Финальный targeted набор вместе с этими fixtures: **93/93**; TypeScript passed.
+  Browser composer/queue/actual upload-download/voice binding: **36/36**, без
+  skipped/flaky. Full unit **1277/1277** прошёл; после него добавлены два negative
+  runner cases для смены CLI и ещё один recovery case для повреждённого original.
+  Они и последний cleanup проходят в финальном targeted наборе 93/93. Strict
+  privacy, name guard (124 references), Markdown (987 files), diff check passed.
+- NeuralDeep delivery, изображения на внешних transports, Local inference
+  isolation и voice intake receipts остаются отдельными незавершёнными пунктами.
+  Код этого checkpoint не объявляет их готовыми и не выполняет live inference.
+
+Следующая часть 26c — ND files/images и общий image boundary:
+
+1. Сверить новый scope с accepted baseline для ND tools/permissions, проверить
+   stock CLI flags и pinned source `stock-cli-acceptance.mjs` / input policy.
+   Сохранить exact resume identity, pricing/rate slots и request deadline.
+2. Дать NeuralDeep тот же host-owned file scope и bounded command approval,
+   сохранив исходные data/prompt/queue receipts. Закрыть чтение соседнего state
+   и snapshot writes реальным OS sandbox; проверить initial/resume ownership.
+3. Для изображений сохранить declared/unknown/unsupported metadata без
+   превращения отсутствующего флага в false. Транспорт доказывается отдельно:
+   exact CLI, adapter hash, image format и initial/resume path. Не подменять
+   отсутствие доказательств рекламой модели или размером preview.
+4. Сверять actual encoded Responses inputs с SHA-256 originals текущего хода
+   и image references именно этой durable chat history. Не resize/convert/drop;
+   превышение request/encoding limit — явный отказ с сохранением draft/originals.
+5. Портировать только применимые pinned-source tests; canonical stock CLI
+   fixture выполняется с synthetic upstream, без настоящего ключа/inference.
+   Отдельно проверить repeated image, text-only resume with image history,
+   missing/foreign image, modified copy, Stop/unknown exit и cleanup recovery.
+6. Только после transport gate показывать фактические file/image capabilities
+   в Settings/Task Chat и подключать те же receipts к voice intake. Live model
+   interpretation и ручная приёмка остаются отдельными R12 проверками.
+
 R12 дополнительная проверка runner: quality-gate задаёт оба root aliases для
 child commands, а часть legacy test fixtures переопределяет только один. Проверить
 unit child environment отдельно и изолировать оба aliases для fixture runner,

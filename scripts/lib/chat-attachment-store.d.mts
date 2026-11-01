@@ -17,5 +17,7 @@ export class ImmutableAttachmentStore {
   prepare(ids: string[], options?: { retain?: boolean }): Promise<PreparedAttachment[]>;
   retain(ids: string[]): Promise<void>;
   snapshotForDispatch(ids: string[], directory: string): Promise<(PreparedAttachment & { filePath: string })[]>;
+  openSnapshot(filePath:string,record:PreparedAttachment):Promise<FileHandle>;
+  verifySnapshot(filePath:string,record:PreparedAttachment):Promise<void>;
   close(): Promise<void>;
 }

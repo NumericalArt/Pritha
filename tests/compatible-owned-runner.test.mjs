@@ -38,3 +38,8 @@ test('unverified Local, missing auth, invalid isolation and mismatched provider 
   assert.throws(()=>buildCompatibleCodexArgs({...options,adapterBaseUrl:'http://127.0.0.1:8765/v1',sandbox:'danger-full-access'}),{code:'provider_sandbox_invalid'});
   assert.throws(()=>buildCompatibleCodexArgs({...options,adapterBaseUrl:'https://remote.invalid/v1'}),{code:'provider_adapter_endpoint_invalid'});
 });
+test('file dispatch rechecks the installed Codex version before starting an OpenRouter adapter',async t=>{
+  const options=fixture(t),capture={};
+  await assert.rejects(startCompatibleRun({...options,hostAttachments:{},hostExecutionContext:{}},{...deps(capture),probeCli:async()=>({available:true,version:'0.154.0'})}),{code:'provider_attachments_unverified'});
+  assert.equal(capture.command,undefined);assert.equal(capture.adapter,undefined);
+});

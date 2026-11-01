@@ -16,6 +16,8 @@ export class ProviderChatRegistry {
   constructor(options:{stateRoot:string;privateRoot:string;connectorId:Exclude<ProviderConnectorId,'codex'>});
   readonly history:{chatForTask(taskId:string):string|null};
   close():void;
+  hasAttachments(chatId:string):boolean;
+  attachmentReference(chatId:string,id:string):(AttachmentView & {sha256:string})|null;
   require(chatId:string):ProviderChatBinding;
   get(chatId:string):ProviderChatBinding|null;
   findByClient(clientThreadId:string):ProviderChatBinding|null;

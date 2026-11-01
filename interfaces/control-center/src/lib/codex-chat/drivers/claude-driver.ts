@@ -9,6 +9,7 @@ import { startClaudeCodeRun } from '../../../../../../scripts/claude-code-runner
 import { normalizeCliItem,cliItemOriginalText } from '../normalize-cli';
 import { parseBudgetIntent } from '../budget-intent';
 import { CodexChatGatewayError } from '../native-gateway';
+import {hostFileAttachmentTransport} from '../../../../../../scripts/lib/provider-file-attachments.mjs';
 
 export class ClaudeDriver implements TaskChatBackendDriver {
   readonly connectorId='claude' as const;
@@ -23,6 +24,7 @@ export class ClaudeDriver implements TaskChatBackendDriver {
       configuration:()=>({...getProviderSettings().providerPresets.claude,sandbox:getPrithaRuntimeSettings().codexSandbox==='read-only'?'read-only':'workspace-write'}),
       resolveConfiguration:preset=>this.service.resolveConfiguration(preset),
       preflight:async binding=>(await this.service.require(binding.executionConfig!)).capabilities,
+      attachmentTransport:hostFileAttachmentTransport({stateRoot,privateRoot:path.join(privateRoot,'claude'),snapshot:binding=>this.service.require(binding.executionConfig)}),
       launch:options=>startClaudeCodeRun({...options,claudeBin}),
       validateText:text=>{if(parseBudgetIntent(text).kind!=='none')throw new CodexChatGatewayError('budget_control_required','Use the task budget control for budget changes.',422);},
       normalizeEvent:(attempt,event,binding)=>{const item=normalizeCliItem(attempt.chat+':'+attempt.turnId,event.item,binding.workspacePath,new Date().toISOString());return item?{item,originalText:cliItemOriginalText(event.item,item)}:null;},

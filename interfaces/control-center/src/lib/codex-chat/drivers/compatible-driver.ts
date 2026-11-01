@@ -10,6 +10,7 @@ import {startCompatibleRun} from '../../../../../../scripts/openai-compatible-co
 import {normalizeCliItem,cliItemOriginalText} from '../normalize-cli';
 import {parseBudgetIntent} from '../budget-intent';
 import {CodexChatGatewayError} from '../native-gateway';
+import {hostFileAttachmentTransport} from '../../../../../../scripts/lib/provider-file-attachments.mjs';
 
 /** Shared transport, distinct identity, saved configuration, credentials and history. */
 export class CompatibleDriver implements TaskChatBackendDriver {
@@ -24,6 +25,7 @@ export class CompatibleDriver implements TaskChatBackendDriver {
       configuration:()=>({...getProviderSettings().providerPresets[connectorId],sandbox:getPrithaRuntimeSettings().codexSandbox==='read-only'?'read-only':'workspace-write'}),
       preflight:async binding=>(await this.service.require(binding.executionConfig!)).capabilities,
       beforeRequest:binding=>this.service.require(binding.executionConfig),
+      attachmentTransport:hostFileAttachmentTransport({stateRoot,privateRoot:path.join(privateRoot,connectorId),snapshot:binding=>this.service.require(binding.executionConfig)}),
       launch:async options=>{
         const dispatcher=new Agent({headersTimeout:options.timeoutMs,bodyTimeout:options.timeoutMs});
         try{const run=await startCompatibleRun({...options,connectorId,codexBin},{dispatcher});return {...run,completion:run.completion.finally(()=>dispatcher.close())};}

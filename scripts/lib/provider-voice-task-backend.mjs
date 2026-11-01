@@ -36,7 +36,7 @@ export function providerVoiceTaskBackend(runtime) {
     },
     async receipt(topic, clientMessageId) { check(topic); return runtime.voiceReceipt(topic.chatId, clientMessageId); },
     async detail(topic) {
-      check(topic); runtime.reconcile(topic.chatId);
+      check(topic); await runtime.reconcile(topic.chatId);
       const active=runtime.activeIntent(topic.chatId);
       return { activeTurnId: active?.turnId || null,executionState:active?.state || null,
         queued: await runtime.queued(topic.chatId), pendingRequests: runtime.pendingRequests(topic.chatId) };

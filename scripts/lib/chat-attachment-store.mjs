@@ -349,9 +349,10 @@ export class ImmutableAttachmentStore {
     });
   }
 
-  async verifySnapshot(filePath, record) {
+  async openSnapshot(filePath, record) {
     let handle;
     try {
+      await safeDirectory(path.dirname(filePath));
       handle = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
       const before = await handle.stat(), current = await lstat(filePath), hash = createHash('sha256');
       if (!before.isFile() || before.nlink !== 1 || before.size !== record.view.size || !current.isFile()
@@ -359,10 +360,14 @@ export class ImmutableAttachmentStore {
       for await (const chunk of handle.createReadStream({ start:0, autoClose:false })) hash.update(chunk);
       const after = await handle.stat();
       if (hash.digest('hex') !== record.sha256 || before.mtimeMs !== after.mtimeMs || before.size !== after.size) throw unavailable();
+      return handle;
     } catch {
+      await handle?.close();
       throw new AttachmentError('attachment_snapshot_conflict', 'The prepared attachment copy changed. Its original has been preserved.', 409);
-    } finally { await handle?.close(); }
+    }
   }
+
+  async verifySnapshot(filePath, record) { const handle=await this.openSnapshot(filePath,record);await handle.close(); }
 
   async close() { await this.initializing; this.db?.close(); this.db = null; }
 }

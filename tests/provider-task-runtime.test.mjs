@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,6 +8,7 @@ import { ProviderTaskRuntime } from '../scripts/lib/provider-task-runtime.mjs';
 import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
 import { CompatibleProviderService } from '../scripts/openai-compatible/provider-service.mjs';
 import { ImmutableAttachmentStore } from '../scripts/lib/chat-attachment-store.mjs';
+import {hostFileAttachmentTransport} from '../scripts/lib/provider-file-attachments.mjs';
 
 const session='11111111-2222-4333-8444-555555555555',identity='a'.repeat(64);
 const message=(id,text=id)=>({clientMessageId:id,input:[{type:'text',text}]});
@@ -158,8 +159,8 @@ test('recovery proves process exit before freeing a stale claim and never restar
   const first=await a.start(chat,message('recovery_message_1'));await until(()=>f.runs.length===1);
   await b.enqueue(chat,message('recovery_queued_1'));
   f.runs[0].resolve({ok:false,processTreeExited:false});await until(()=>a.active.size===0);
-  b.reconcile(chat);assert.equal(b.activeIntent(chat).state,'unknown');
-  exited=true;b.reconcile(chat);
+  await b.reconcile(chat);assert.equal(b.activeIntent(chat).state,'unknown');
+  exited=true;await b.reconcile(chat);
   assert.equal(b.activeIntent(chat),null);assert.equal(b.execution.claims().length,0);
   assert.equal(b.registry.turn(chat,first.accepted.turn.turnId).status,'interrupted');
   assert.equal((await b.start(chat,message('recovery_message_1'))).replayed,true);
@@ -276,4 +277,46 @@ test('historical image evidence remains scoped to the original chat and is reche
   f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);f.policy.allowed=false;
   await assert.rejects(a.start(chat,message('image_resume_002','Continue reading')),{code:'provider_attachments_unverified'});
   assert.equal(f.checked.at(-1).historicalImages,true);assert.equal(f.checked.at(-1).path,'resume');assert.equal(f.runs.length,1);
+});
+
+function hostFileFixture(t,connectorId='claude'){
+  const f=fixture(t),store=new ImmutableAttachmentStore({stateRoot:f.stateRoot,privateRoot:path.join(f.stateRoot,'originals')}),policy={version:connectorId==='claude'?'2.1.296':'0.153.0',exited:false};
+  const attachmentTransport=hostFileAttachmentTransport({stateRoot:f.stateRoot,privateRoot:path.join(f.stateRoot,'private','task-chat',connectorId),snapshot:async()=>({status:'ready',version:policy.version,capabilities:{attachments:{files:true}}})});
+  const make=()=>f.make(connectorId,{attachmentStore:store,attachmentTransport,preflight:async()=>({approvals:true,tools:true}),proveExit:()=>policy.exited});
+  const upload=async()=>{const id=randomUUID();await store.upload(id,'data.txt',new Request('http://fixture',{method:'POST',body:'IMMUTABLE_ORIGINAL'}));return id;};
+  t.after(()=>store.close());return {...f,make,store,policy,upload};
+}
+for(const connectorId of ['claude','openrouter'])test(`${connectorId}: host file scope survives worker resume and cleans only copies after confirmed exit`,async t=>{
+  const f=hostFileFixture(t,connectorId),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId,id=await f.upload();
+  const first=await a.start(chat,{...message('host_files_first','Read attached data'),attachments:[id]});await until(()=>f.runs.length===1);
+  const scope=f.runs[0].input.hostAttachments,read=await scope.read('attachment:'+id),copy=read.attachment.readOnlyPath;
+  assert.equal(read.bytes.toString(),'IMMUTABLE_ORIGINAL');assert.match(f.runs[0].input.prompt,/untrusted task data/);assert(f.runs[0].input.hostExecutionContext);
+  assert.equal(b.execution.getIntent('turn:'+chat+':host_files_first').attachmentCleanup,'pending');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.registry.turn(chat,first.accepted.turn.turnId).status==='completed');
+  assert.equal(existsSync(copy),false);assert.equal(b.execution.getIntent('turn:'+chat+':host_files_first').attachmentCleanup,'complete');
+  assert.equal((await f.store.resolve(id)).view.id,id);await assert.rejects(scope.read('attachment:'+id),{code:'attachment_scope_closed'});
+  await b.start(chat,message('host_files_resume','Continue with the earlier data'));await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.resume,session);const resumed=await f.runs[1].input.hostAttachments.read('attachment:'+id);assert.equal(resumed.bytes.toString(),'IMMUTABLE_ORIGINAL');assert.notEqual(resumed.attachment.readOnlyPath,copy);
+  f.runs[1].resolve({ok:true,processTreeExited:true});await until(()=>b.active.size===0);f.policy.version='unverified';
+  await assert.rejects(a.start(chat,message('host_files_policy','Continue')),{code:'provider_attachments_unverified'});assert.equal(f.runs.length,2);
+});
+
+test('unconfirmed provider exit preserves attachment copies and a later proven restart cleans them',async t=>{
+  const f=hostFileFixture(t),a=f.make(),b=f.make(),chat=(await a.create(create())).binding.chatId,id=await f.upload(),input={...message('host_unknown_exit'),attachments:[id]};
+  await a.start(chat,input);await until(()=>f.runs.length===1);const copy=(await f.runs[0].input.hostAttachments.read('attachment:'+id)).attachment.readOnlyPath;
+  f.runs[0].resolve({ok:false,processTreeExited:false});await until(()=>a.active.size===0);
+  assert.equal(existsSync(copy),true);assert.equal(b.execution.getIntent('turn:'+chat+':host_unknown_exit').attachmentCleanup,'preserved');
+  await b.reconcile(chat);assert.equal(existsSync(copy),true);assert.equal((await b.start(chat,input)).replayed,true);assert.equal(f.runs.length,1);
+  f.policy.exited=true;await b.reconcile(chat);assert.equal(existsSync(copy),false);assert.equal(b.activeIntent(chat),null);assert.equal(b.execution.getIntent('turn:'+chat+':host_unknown_exit').attachmentCleanup,'complete');
+  assert.equal((await f.store.resolve(id)).view.id,id);
+});
+
+for(const damaged of ['copy','original'])test(`a damaged ${damaged} preserves recovery data without misreporting the provider result`,async t=>{
+  const f=hostFileFixture(t),a=f.make(),chat=(await a.create(create())).binding.chatId,id=await f.upload();
+  const started=await a.start(chat,{...message('host_changed_copy'),attachments:[id]});await until(()=>f.runs.length===1);
+  const copy=(await f.runs[0].input.hostAttachments.read('attachment:'+id)).attachment.readOnlyPath,original=(await f.store.resolve(id)).filePath;
+  writeFileSync(damaged==='copy'?copy:original,'PRESERVE_DAMAGED_DATA');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);
+  assert.equal(a.registry.turn(chat,started.accepted.turn.turnId).status,'completed');assert.equal(a.execution.getIntent('turn:'+chat+':host_changed_copy').attachmentCleanup,'recovery_required');
+  assert.equal(readFileSync(copy,'utf8'),damaged==='copy'?'PRESERVE_DAMAGED_DATA':'IMMUTABLE_ORIGINAL');assert.equal(readFileSync(original,'utf8'),damaged==='original'?'PRESERVE_DAMAGED_DATA':'IMMUTABLE_ORIGINAL');
 });

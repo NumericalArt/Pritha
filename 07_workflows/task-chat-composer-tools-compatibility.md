@@ -3,13 +3,15 @@ id: task-chat-composer-tools-compatibility
 type: workflow
 status: active
 created: 2026-10-28
-updated: 2026-10-29
+updated: 2026-11-01
 topics: [control-center, task-chat, quote-reply, image-annotation, claude-code, compatibility]
 tools: [Pritha, Codex, Claude Code, Playwright, Canvas]
 sources:
   - interfaces/control-center/src/lib/codex-chat/quote-reply.ts
   - interfaces/control-center/src/lib/codex-chat/image-annotation.ts
   - tests/fixtures/composer-tools/claude-compatibility.json
+  - scripts/lib/provider-file-attachments.mjs
+  - tests/acceptance/provider-file-attachments.fixture.mjs
 related:
   contracts:
     - 11_agents/contracts/2026-05-28-pritha-claude-code-adapter-agent-contract.md
@@ -28,8 +30,8 @@ privacy: public
 retention: durable
 review_status: reviewed
 confidence: medium
-source_version: paste-preview-0.2.0-d1550099; quote-reply-0.1.0-e99bc062
-verified: 2026-10-28
+source_version: paste-preview-0.2.0-d1550099; quote-reply-0.1.0-e99bc062; pritha-host-files-v1; claude-2.1.296; codex-0.153.0
+verified: 2026-11-01
 ---
 
 # Task Chat composer tools and future Claude Code compatibility
@@ -48,7 +50,8 @@ Use **Разметить** on a ready image attachment. The editor has arrow, re
 pen, text, seven colours, three line widths, three font sizes, undo and redo.
 It accepts static PNG, JPEG and WebP up to 16 megapixels, 8192 pixels per side
 and the existing 100 MiB attachment limit. Animated/unsupported/oversized images
-can still be sent unchanged. Export produces a PNG at the decoded image's
+can remain attached unchanged; dispatch still requires the selected runtime's
+image capability. Export produces a PNG at the decoded image's
 original resolution, with orientation and alpha preserved. No external editor,
 model, SDK, service or graphics dependency is introduced.
 
@@ -67,6 +70,41 @@ by subsequent annotation. Stop and native approval/input controls keep their
 existing semantics.
 
 ## Boundaries for a future adapter
+
+Canonical Task Chat now has a separate host-tool file path for the Claude API
+lane and OpenRouter. This is independent of the future terminal UI integration
+described below. Files are accepted only with ready model/tool metadata and the
+exact verified CLI version (Claude Code 2.1.296 or Codex 0.153.0 respectively).
+The runner checks the installed version again before dispatch. A CLI upgrade
+keeps text execution available while file readiness requires re-verification.
+
+`read_file` accepts `attachment:<id>` only for originals already recorded in
+that exact private chat. It verifies stored hashes and metadata, creates a
+bounded read-only copy and returns UTF-8 text or a processing path for a binary
+or large file. Processing commands retain the existing exact operator approval,
+network restriction and workspace write policy. Archives and executables are
+never opened or run automatically. Images remain unavailable on these paths
+until their separate modality/transport gate passes.
+
+Copies are removed only after all owned processes have exited. Unknown exit
+preserves copies and the execution claim; recovery verifies exit before cleanup.
+A modified copy is preserved for inspection. Cleanup can resume after a partial
+deletion. Originals and their immutable history references remain available on
+later turns; the attachment URI obtains a new copy after resume. At most ten
+files and 250 MiB can be materialized in one turn, including historical files.
+
+The explicit offline check is:
+
+```sh
+node --test tests/acceptance/provider-file-attachments.fixture.mjs
+```
+
+It uses installed CLIs, the real macOS sandbox, synthetic upstream responses and
+synthetic file contents; no account key or paid inference is used. Both initial
+and resumed MCP requests must carry the exact text/hash, process unchanged binary
+bytes through an approved command, reject writes and direct original access,
+and retain originals after cleanup. This verifies transport and permissions;
+live model usefulness and the full operator journey remain manual R12 tests.
 
 | Layer | Responsibility | Current status |
 | --- | --- | --- |

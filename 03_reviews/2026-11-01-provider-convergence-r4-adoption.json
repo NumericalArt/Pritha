@@ -225,15 +225,15 @@
       "path": "scripts/lib/chat-attachment-store.mjs",
       "source_path": "scripts/neuraldeep/attachment-store.mjs",
       "source_sha256": "519a15cc7aeb9833dd8561d23c61e76984775828e802bb2733332679665f2004",
-      "target_sha256": "57cd61243f445ea8c5b92c02b10c87c07e7d492b1acccf132caeb2d22451143f",
-      "adoption": "Shared immutable originals store; canonical legacy metadata/uppercase IDs and explicit state-root aliases, cross-process quota and references, verified descriptor downloads, exact snapshot replay, no automatic migration."
+      "target_sha256": "8e8db9c4de9c032fc0205c91ad2c21e710eb09788ce40301aee95b743dde0fc5",
+      "adoption": "Shared immutable originals store; canonical legacy metadata/uppercase IDs and explicit state-root aliases, cross-process quota and references, verified descriptor downloads, exact snapshot replay, no automatic migration. Verified snapshot descriptors support host-owned read-only file tools and bounded post-exit cleanup."
     },
     {
       "path": "scripts/lib/chat-attachment-store.d.mts",
       "source_path": "scripts/neuraldeep/attachment-store.d.mts",
       "source_sha256": "38628ff03a8cc3c059701abc93b31fce4dbe56ef02e5d2394a119d3c9043c25b",
-      "target_sha256": "706ce2ef649191bd4f5a90a566b9cb2ee7d62e09614c73288118d89db13a4630",
-      "adoption": "Shared types with canonical resolve/retain methods and explicit legacy metadata compatibility."
+      "target_sha256": "97b1074444f00eb050348f3f30ada112e81ecb0a3810a7572f59e744261e2c66",
+      "adoption": "Shared types with canonical resolve/retain methods and explicit legacy metadata compatibility. Verified snapshot descriptors support host-owned read-only file tools and bounded post-exit cleanup."
     },
     {
       "path": "tests/neuraldeep-chat-attachments.test.mjs",

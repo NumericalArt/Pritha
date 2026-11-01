@@ -16,6 +16,7 @@ import {prepareProviderSandbox} from './lib/provider-sandbox.mjs';
 import {resolvePrithaPython} from './lib/python-runtime.mjs';
 import {ProviderHostTools,PROVIDER_HOST_TOOL_DEFINITIONS} from './lib/provider-host-tools.mjs';
 import {listenProviderToolServer} from './lib/provider-tool-server.mjs';
+import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
 const failure=code=>Object.assign(new Error('The selected provider task could not complete safely.'),{code});
 const sessionPattern=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
@@ -66,10 +67,12 @@ export async function startCompatibleRun(options,dependencies={}){
   if(provider!=='openrouter' || !modelId(options.model) || !options.model.includes('/') || typeof options.prompt!=='string' || !options.prompt.trim() || Buffer.byteLength(options.prompt)>256000
     || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs<1000 || options.timeoutMs>3600000 || options.resume && !sessionPattern.test(options.resume))throw failure('provider_input_invalid');
   if(options.signal?.aborted)throw failure('operator_cancel');
+  if(options.hostAttachments && !options.hostExecutionContext)throw failure('provider_attachments_unverified');
   const root=realpathSync(options.root),cwd=realpathSync(options.cwd),stateRoot=path.resolve(options.stateRoot),privateRoot=privateStateDirectory(stateRoot,options.privateRoot);
   const key=(dependencies.readCredential || readProviderCredential)(provider,{stateRoot,env:options.env || process.env});if(!key)throw failure('provider_pending_auth');
   const binary=resolveCodexProviderBinary(options.codexBin,options.env || process.env);
   const cli=await (dependencies.probeCli || probeCompatibleCli)({root,stateRoot,connectorId:provider,codexBin:binary,env:options.env || process.env});if(!cli.available)throw failure(cli.code);
+  if(options.hostAttachments && !hostFileAttachmentVerified(provider,cli.version))throw failure('provider_attachments_unverified');
   const codexHome=privateStateDirectory(stateRoot,path.join(privateRoot,'codex-home')),home=privateStateDirectory(stateRoot,path.join(privateRoot,'home'));
   if(options.resume){const proof=(dependencies.inspectSession || inspectProviderCliSession)({stateRoot,codexHome,cwd,provider,sessionId:options.resume,model:options.model});if(!proof.available)throw failure(proof.code);}
   const temporary=createProviderTemporaryDirectory({provider,stateRoot,temporaryRoot:options.temporaryRoot}),localToken=randomBytes(32).toString('base64url');
@@ -81,7 +84,7 @@ export async function startCompatibleRun(options,dependencies={}){
   const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
   try{
     if(options.hostExecutionContext){
-      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:provider,sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree});
+      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:provider,sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments});
       toolServer=await listenProviderToolServer({hostTools});
     }
     adapter=await (dependencies.listenAdapter || listenCompatibleAdapter)({connectorId:provider,localToken,apiKey:key,model:options.model,effort:options.effort || 'default',reasoningControl:options.reasoningControl,thinkingBudget:options.thinkingBudget,

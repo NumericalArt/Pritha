@@ -47,7 +47,7 @@ export class ExternalChatGateway implements TaskChatBackend {
     return {data:{detail:await this.threadDetail(created.detail.thread.chatId),accepted:started.accepted},replayed:created.replayed && started.replayed};
   };
   threadDetail:TaskChatBackend['threadDetail']=async chat=>{
-    this.core.reconcile(chat);const binding=this.core.require(chat),thread=this.summary(binding),active=this.core.activeIntent(chat),control=executionChannelView(this.core.execution,'provider-control:'+chat);
+    await this.core.reconcile(chat);const binding=this.core.require(chat),thread=this.summary(binding),active=this.core.activeIntent(chat),control=executionChannelView(this.core.execution,'provider-control:'+chat);
     return {thread,activeTurnId:active?.turnId || null,controls:control?{turnId:String(control.turnId),steer:control.steer===true,interrupt:control.interrupt===true}:null,pendingRequests:this.core.pendingRequests(chat),queued:await this.core.queued(chat),streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events',continuationState:thread.continuationState,history:{state:'available',code:null,recoverable:false}};
   };
   startTurn:TaskChatBackend['startTurn']=(chat,input,options)=>this.core.start(chat,input,options);
@@ -72,7 +72,7 @@ export class ExternalChatGateway implements TaskChatBackend {
   activity:TaskChatBackend['activity']=async(after=0)=>{
     this.core.scheduleQueues();const execution=this.core.execution,window=execution.eventWindow(),reset=after===0 || after>window.newest || window.oldest>0 && after<window.oldest-1;
     const events=execution.events(reset?0:after),active=execution.listIntents({kind:'turn',states:['dispatching','running','unknown'],limit:1000}).filter(row=>row.connectorId===this.options.connectorId);
-    for(const row of active.slice(0,4))this.core.reconcile(row.chatId);
+    for(const row of active.slice(0,4))await this.core.reconcile(row.chatId);
     const changed=reset?this.core.registry.list({group:'all',limit:50}).data.map(row=>row.chatId):[...new Set(events.filter(row=>String(row.chatId || '').startsWith('chat_'+this.options.connectorId+'_')).map(row=>String(row.chatId)))];
     const waiting=execution.listIntents({kind:'provider-request',states:['pending'],limit:1000}).filter(row=>String(row.chatId || '').startsWith('chat_'+this.options.connectorId+'_'));
     return {cursor:reset?window.newest:events.at(-1)?.sequence || after,reset,changed,admissionEnabled:execution.admission().enabled,active:active.map(row=>({chatId:row.chatId,state:row.state,revision:row.revision})),capacity:0,counts:{active:0,queued:0,waitingForOperator:waiting.length,unknown:0}};
