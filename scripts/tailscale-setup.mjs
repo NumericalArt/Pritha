@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
+import { resolvePrithaSetupFile } from "./lib/state-files.mjs";
+import { atomicWriteFile } from "./lib/atomic-file.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
@@ -10,8 +13,9 @@ import { isPrithaCodeCheckout, resolvePrithaAgentParent, resolvePrithaStateRoot,
 import { resolveToolServerManifest } from "./agents-mother/tool-server-runtime.mjs";
 
 const ROOT = resolveTechscopeRoot({ cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") });
+loadPrithaRuntimeEnv({ root: ROOT, pathOnly: true });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
-const DEFAULT_STATE_PATH = STATE_ROOT === ROOT ? path.join(ROOT, ".techscope-setup.json") : path.join(STATE_ROOT, "setup", "setup.json");
+const DEFAULT_STATE_PATH = resolvePrithaSetupFile({root: ROOT, stateRoot: STATE_ROOT});
 const INSTALL_URL = "https://tailscale.com/download/mac";
 const DOCS = {
   macInstall: "https://tailscale.com/docs/install/mac",
@@ -406,10 +410,7 @@ function readJsonIfExists(filePath) {
 }
 
 function writeJsonAtomic(filePath, payload) {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
-  writeFileSync(tempPath, `${JSON.stringify(payload, null, 2)}\n`);
-  renameSync(tempPath, filePath);
+  atomicWriteFile(filePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function updateSetupState(payload, statePath = DEFAULT_STATE_PATH) {

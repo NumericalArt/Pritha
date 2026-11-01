@@ -518,10 +518,10 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
      symlink/canonical identity, invalid root, explicit root, запуск вне checkout,
      Python/Node parity, два экземпляра и child env без чужих credentials.
 3. **R11b.3 — Чтение старых данных и безопасный перенос.**
-   - [ ] Общие resolvers memory database и setup file вместо разбросанных
+   - [x] Общие resolvers memory database и setup file вместо разбросанных
      литералов. Fresh install создаёт canonical файл; old-only installation
      читает прежний. Чтение/health/status не переименовывает и не создаёт файлы.
-   - [ ] При двух разных файлах не выбирать по mtime и не сливать автоматически:
+   - [x] При двух разных файлах не выбирать по mtime и не сливать автоматически:
      показать конфликт и остановить запись до явного выбора источника.
      Даже «одинаковые сейчас» копии не должны стать двумя writable truth sources.
    - [ ] Подготовить read-only migration plan, private manifest, backup и
@@ -1183,6 +1183,44 @@ acceptance. GitHub/MacBook остались неизменны. Subsequent rollo
   labels/aliases и guard ещё в работе. На реальном экземпляре файлы состояния
   не переносились; сервисы, MacBook и GitHub не менялись. Исходные незавершённые
   R4/R5/R6/R7/R9/R11/R12 сохраняются.
+
+### Checkpoint реализации 15 — Совместимые файлы памяти и setup
+
+- Общий Node reader (также используемый TS) и Python parity contract выбирают
+  `pritha.sqlite` / `.pritha-setup.json` на новой установке и существующие
+  `techscope.sqlite` / `.techscope-setup.json` на старой. Внешний `setup/setup.json`
+  не переименовывается. Read-only resolution не создаёт даже директории; две
+  копии блокируют операции, в том числе при одинаковых bytes. Symlink/hardlink,
+  неверный тип файла и незавершённая migration barrier дают явную ошибку.
+- Подключены rebuild/query/status, curated/semantic/embedding Python entrypoints,
+  Good State Alignment, factory memory lookup, Control Center/Voice, setup и
+  instance status. Проверены прямые команды вне checkout, с пробелами и внешним
+  state pointer. Setup/status загружают только параметры путей. Setup JSON теперь
+  атомарно создаётся с mode 0600; persisted schema IDs и прежние поля не меняются
+  только ради ребрендинга. Ignore/publication guard включает новые filenames.
+- SQLite queries используют read-only open, поэтому запрос отсутствующей памяти
+  не создаёт пустую БД. Fresh/legacy rebuild сохраняет document/chunk identities,
+  FTS и embeddings. В fixture проверено, что две competing databases не меняются
+  ни query, ни rebuild. Текущая память Mac mini прочитана без записи:
+  `ok=true`, stats available; setup completed, warnings=0.
+- В существующем `pritha-instance migrate` обнаружены только старые имена и raw
+  copy SQLite. Он теперь видит обе семьи файлов и делает согласованный snapshot
+  через SQLite backup API, проверяет integrity/foreign keys и содержимое таблиц,
+  не перезаписывает другую destination DB, сохраняет source. Snapshot является
+  самостоятельной БД с DELETE journal mode: исходный WAL не копируется как будто
+  это отдельная полноценная база, режим исходника не меняется. Повтор совпадающего
+  snapshot сохраняет bytes destination. Перенос данных в другой state-root и
+  переименование внутри одного state-root остаются разными операциями.
+- Проверки readers: **1101/1101** полный unit suite, **20/20** Chromium E2E,
+  TypeScript и отдельная Next candidate build pass. После добавления snapshot:
+  **23/23** instance migration/update/rollback fixtures и **3/3** snapshot tests.
+  WAL test держит исходное соединение открытым и подтверждает committed rows,
+  FTS, relations, binary embedding values и неизменность основного source file.
+  Проверены corrupt input, destination conflict, idempotency и обе семьи имён.
+- Весь R11b ещё не закрыт: offline переименование текущего state-root с durable
+  manifest/barrier, fault injection/retry/rollback и current-runtime name guard
+  остаются обязательными следующими шагами. На живом экземпляре файлы не
+  переносились. Сервисы, MacBook и GitHub не изменялись; исходная цель продолжается.
 
 ## 7. Полные исходные материалы
 

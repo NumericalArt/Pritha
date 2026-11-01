@@ -8,16 +8,12 @@ import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
-from pritha_paths import resolve_pritha_root
+from pritha_state_files import resolve_pritha_memory_database
+from pritha_python_compat import load_pritha_runtime_env
 
 
-def resolve_root():
-    return resolve_pritha_root()
-
-
-ROOT = resolve_root()
-STATE_ROOT = Path(os.environ["PRITHA_STATE_ROOT"]).expanduser().resolve() if os.environ.get("PRITHA_STATE_ROOT") else ROOT
-DB_PATH = STATE_ROOT / "memory" / "techscope.sqlite" if STATE_ROOT != ROOT else ROOT / ".memory" / "techscope.sqlite"
+ROOT, STATE_ROOT = load_pritha_runtime_env()
+DB_PATH = resolve_pritha_memory_database(root=ROOT, state_root=STATE_ROOT)
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "3000"))
 
@@ -107,7 +103,7 @@ PAGE = """<!doctype html>
 
 
 def rows(sql, args=()):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH.as_uri() + "?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
         return [dict(row) for row in conn.execute(sql, args).fetchall()]

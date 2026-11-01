@@ -10,3 +10,5 @@ export {resolvePrithaRoot,resolveTechscopeRoot,prithaRootEnvironment,PrithaRootE
 export function resolvePrithaStateRoot(root?:string){return stateRoot({root});}
 export function resolvePrithaAgentParent(root?:string){return agentParent({root});}
 export function resolvePrithaAgentMemoryRoot(root?:string){return agentMemoryRoot({root});}
+
+export {resolvePrithaMemoryDatabase,resolvePrithaSetupFile,PrithaStateFileError} from "../../../../scripts/lib/state-files.mjs";

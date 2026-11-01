@@ -32,7 +32,7 @@ test("memory never ingests build checkouts, dependencies or symlinks inside inst
       const result = run(process.execPath, [script], { env });
       assert.equal(result.status, 0, result.stderr);
     }
-    const query = run("sqlite3", [path.join(stateRoot, "memory/techscope.sqlite"), "SELECT id FROM documents ORDER BY id;"]);
+    const query = run("sqlite3", [path.join(stateRoot, "memory/pritha.sqlite"), "SELECT id FROM documents ORDER BY id;"]);
     assert.equal(query.status, 0, query.stderr);
     assert.deepEqual(query.stdout.trim().split("\n"), ["agent-contract", "platform"]);
   } finally { rmSync(base, { recursive: true, force: true }); }
@@ -96,7 +96,7 @@ CANONICAL_INSTANCE_MARKER
     });
     assert.equal(rebuilt.status, 0, `${rebuilt.stdout}\n${rebuilt.stderr}`);
 
-    const database = path.join(stateRoot, "memory", "techscope.sqlite");
+    const database = path.join(stateRoot, "memory", "pritha.sqlite");
     const query = spawnSync(
       "sqlite3",
       [database, "SELECT d.path || char(10) || c.text FROM documents d JOIN chunks c ON c.document_id=d.id WHERE d.id='shared-agent-contract';"],
@@ -162,7 +162,7 @@ test("two instances sharing one checkout index only their own child agents and l
         env: { ...process.env, TECHSCOPE_ROOT: codeRoot, PRITHA_STATE_ROOT: stateRoot, PRITHA_AGENT_PARENT: path.join(base, `agents-${index}`) },
       });
       assert.equal(rebuilt.status, 0, rebuilt.stderr);
-      const query = run("sqlite3", [path.join(stateRoot, "memory", "techscope.sqlite"), "SELECT group_concat(id, ',') FROM documents;"]);
+      const query = run("sqlite3", [path.join(stateRoot, "memory", "pritha.sqlite"), "SELECT group_concat(id, ',') FROM documents;"]);
       assert.equal(query.status, 0, query.stderr);
       assert.match(query.stdout, new RegExp(`fixture-agent-${index === 0 ? "a" : "b"}`));
       assert.doesNotMatch(query.stdout, new RegExp(`fixture-agent-${index === 0 ? "b" : "a"}`));
@@ -187,8 +187,8 @@ test("memory entrypoints load PRITHA_STATE_ROOT from checkout .env.local", () =>
     delete env.PRITHA_STATE_ROOT;
     const rebuilt = run("node", [rebuildScript], { env });
     assert.equal(rebuilt.status, 0, rebuilt.stderr);
-    assert.equal(existsSync(path.join(stateRoot, "memory", "techscope.sqlite")), true);
-    assert.equal(existsSync(path.join(codeRoot, ".memory", "techscope.sqlite")), false);
+    assert.equal(existsSync(path.join(stateRoot, "memory", "pritha.sqlite")), true);
+    assert.equal(existsSync(path.join(codeRoot, ".memory", "pritha.sqlite")), false);
 
     const queried = run("node", [queryScript, "stats"], { env });
     assert.equal(queried.status, 0, queried.stderr);

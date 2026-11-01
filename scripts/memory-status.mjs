@@ -1,15 +1,16 @@
 #!/usr/bin/env node
+import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { printStatus, readJson, run } from "./status-lib.mjs";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const root = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root });
 const manifest = readJson("memory/manifest.json");
 const stats = run("node", ["scripts/query-memory.mjs", "stats"]);
-const databasePath = resolvePrithaStatePath("memory", "techscope.sqlite");
+const databasePath = resolvePrithaMemoryDatabase();
 const status = {
   name: "memory",
   ok: Boolean(manifest.source_of_truth) && existsSync(databasePath) && stats.ok,

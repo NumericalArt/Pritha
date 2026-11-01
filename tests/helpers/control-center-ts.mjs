@@ -69,8 +69,8 @@ async function transpileMusicModules() {
     },
     fileName: sourcePath,
   });
-  const sharedPaths = JSON.stringify(pathToFileURL(path.join(repoRoot, "scripts/lib/paths.mjs")).href);
-  await writeFile(path.join(fixtureRoot, `${stem}.mjs`), pathCompiled.outputText.replace(/["']\.\.\/\.\.\/\.\.\/\.\.\/scripts\/lib\/paths\.mjs["']/g, sharedPaths), "utf8");
+  const linked = pathCompiled.outputText.replace(/["']\.\.\/\.\.\/\.\.\/\.\.\/scripts\/lib\/(paths|state-files)\.mjs["']/g, (_, module) => JSON.stringify(pathToFileURL(path.join(repoRoot, `scripts/lib/${module}.mjs`)).href));
+  await writeFile(path.join(fixtureRoot, `${stem}.mjs`), linked, "utf8");
   }
   return outRoot;
 }

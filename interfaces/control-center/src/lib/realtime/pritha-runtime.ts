@@ -1,3 +1,4 @@
+import { resolvePrithaMemoryDatabase } from "../pritha-paths";
 import { normalizeVoiceModel, type VoiceModel } from "./voice-settings";
 import { LIVE_MODEL, isLiveModel, liveSessionConfig, DEFAULT_LIVE_BACKEND } from "./live-session";
 import { runtimeProbe } from "../../../../../scripts/lib/runtime-probe.mjs";
@@ -679,7 +680,7 @@ async function cleanupVoiceIntakeStaging(intake: unknown, reason: string) {
 }
 
 function memoryDbPath(root = resolveTechscopeRoot()) {
-  return resolvePrithaStatePath("memory", "techscope.sqlite");
+  return resolvePrithaMemoryDatabase({root});
 }
 
 function memoryStatsMap() {
@@ -699,7 +700,7 @@ function sqliteCliAvailable() {
 
 function sqliteJson(sql: string) {
   const root = resolveTechscopeRoot();
-  const result = spawnSync("sqlite3", ["-json", memoryDbPath(root), sql], {
+  const result = spawnSync("sqlite3", ["-readonly", "-json", memoryDbPath(root), sql], {
     cwd: root,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

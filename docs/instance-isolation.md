@@ -66,7 +66,7 @@ Center and Realtime file tools.
 ```text
 config/runtime.env
 setup/setup.json
-memory/techscope.sqlite
+memory/pritha.sqlite
 memory/last-self-test.json
 private/
 queue/

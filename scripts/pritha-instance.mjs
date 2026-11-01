@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { resolvePrithaMemoryDatabase, resolvePrithaSetupFile } from "./lib/state-files.mjs";
+import { snapshotPrithaDatabase } from "./lib/sqlite-snapshot.mjs";
 import { atomicWriteFile } from "./lib/atomic-file.mjs";
 
 import { createHash } from "node:crypto";
@@ -242,9 +244,9 @@ function childAgentFolders() {
 }
 
 function memoryDocuments() {
-  const database = resolvePrithaStatePath("memory", "techscope.sqlite");
+  const database = resolvePrithaMemoryDatabase();
   if (!existsSync(database)) return null;
-  const result = run("sqlite3", [database, "SELECT COUNT(*) FROM documents;"], { timeoutMs: 10_000 });
+  const result = run("sqlite3", ["-readonly", database, "SELECT COUNT(*) FROM documents;"], { timeoutMs: 10_000 });
   return result.ok ? Number(result.stdout || 0) : null;
 }
 
@@ -316,9 +318,10 @@ function migrationOperations() {
   add(path.join(config.codeRoot, ".queue"), path.join(config.stateRoot, "queue"));
   add(path.join(config.codeRoot, ".logs"), path.join(config.stateRoot, "logs"));
   add(path.join(config.codeRoot, ".memory-private"), path.join(config.stateRoot, "private", "memory-private"));
-  add(path.join(config.codeRoot, ".memory", "techscope.sqlite"), path.join(config.stateRoot, "memory", "techscope.sqlite"));
+  const localOptions = {root: config.codeRoot, stateRoot: config.codeRoot, env: {}};
+  add(resolvePrithaMemoryDatabase(localOptions), resolvePrithaMemoryDatabase(), "sqlite-snapshot");
   add(path.join(config.codeRoot, ".memory", "last-self-test.json"), path.join(config.stateRoot, "memory", "last-self-test.json"));
-  add(path.join(config.codeRoot, ".techscope-setup.json"), path.join(config.stateRoot, "setup", "setup.json"));
+  add(resolvePrithaSetupFile(localOptions), resolvePrithaSetupFile());
   add(path.join(config.codeRoot, ".snapshots", "audit"), path.join(config.stateRoot, "audit"));
   add(path.join(config.codeRoot, ".snapshots", "child-agents"), path.join(config.stateRoot, "snapshots", "child-agents"));
 
@@ -334,6 +337,9 @@ function migrationOperations() {
 
 function copyOperation(operation) {
   mkdirSync(path.dirname(operation.destination), { recursive: true });
+  if (operation.kind === "sqlite-snapshot") {
+    return snapshotPrithaDatabase(operation.source, operation.destination, {root: config.codeRoot});
+  }
   if (statSync(operation.source).isDirectory()) {
     cpSync(operation.source, operation.destination, { recursive: true, force: true, preserveTimestamps: true });
   } else {
@@ -436,7 +442,9 @@ async function migrate() {
   if (!options.yes) throw new Error("migrate --apply requires --yes");
   if (config.stateRoot === config.codeRoot) throw new Error("PRITHA_STATE_ROOT must be outside the checkout for migration");
   for (const directory of Object.values(PRITHA_STATE_LAYOUT)) mkdirSync(path.join(config.stateRoot, directory), { recursive: true });
-  for (const operation of plan.operations) copyOperation(operation);
+  // Reject a conflicting database before copying any other instance state.
+  for (const operation of plan.operations.filter(item => item.kind === "sqlite-snapshot")) copyOperation(operation);
+  for (const operation of plan.operations.filter(item => item.kind !== "sqlite-snapshot")) copyOperation(operation);
   const runtimeEnv = writeRuntimeEnv();
   const registry = writeLocalRegistry();
   const checksums = plan.operations.flatMap((operation) => walkFiles(operation.destination))

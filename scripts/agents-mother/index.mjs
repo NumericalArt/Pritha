@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { resolvePrithaMemoryDatabase } from "../lib/state-files.mjs";
 import { parseLongArgs as parseArgs } from "../lib/cli-args.mjs";
 
 import { execFileSync } from "node:child_process";
@@ -15,7 +16,7 @@ import { markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
 import { searchCuratedMemory } from "../lib/curated-memory.mjs";
 import { redactSensitiveText, redactStructuredText } from "../lib/redaction.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStatePath, resolveTechscopeRoot } from "../lib/paths.mjs";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolveTechscopeRoot } from "../lib/paths.mjs";
 import { prepareInterviewOptions } from './interview-options.mjs';
 import { slug as makeSlug } from "../lib/slug.mjs";
 import { today } from "../lib/date.mjs";
@@ -92,7 +93,7 @@ const CONTRACT_DIR = path.join(AGENT_MEMORY_ROOT, "contracts");
 const REPORT_DIR = path.join(AGENT_MEMORY_ROOT, "reports");
 const RESEARCH_DIR = path.join(AGENT_MEMORY_ROOT, "research");
 const REGISTRY_PATH = path.join(AGENT_MEMORY_ROOT, "registry.md");
-const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
+const DB_PATH = resolvePrithaMemoryDatabase();
 
 const INVOKED_SCRIPT = path.basename(process.argv[1] || "pritha.mjs");
 const CLI_COMMAND = INVOKED_SCRIPT.includes("pritha") ? "node scripts/pritha.mjs" : "node scripts/agents-mother.mjs";
@@ -415,9 +416,9 @@ function sqlString(value) {
 
 function runSqlJson(sql) {
   if (!existsSync(DB_PATH)) {
-    throw new Error("Missing .memory/techscope.sqlite. Run: node scripts/rebuild-memory.mjs");
+    throw new Error("Missing Pritha memory index. Run: node scripts/rebuild-memory.mjs");
   }
-  const outputText = execFileSync("sqlite3", ["-json", DB_PATH, sql], {
+  const outputText = execFileSync("sqlite3", ["-readonly", "-json", DB_PATH, sql], {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],

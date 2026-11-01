@@ -3,7 +3,7 @@ id: AGENTS
 type: artifact
 status: processed
 created: 2026-06-01
-updated: 2026-09-06
+updated: 2026-11-01
 topics:
   - privacy-preserving-intake
 tools:[]
@@ -170,7 +170,7 @@ node scripts/tailscale-setup.mjs auth-status
 
 Не запускать реальные mutating Tailscale actions без separate explicit user approval непосредственно перед действием: `install --yes`, `serve --yes`, `off --yes`, `tailscale up`, auth-key команды, Funnel/public exposure, launchd/cron/service changes. Codex должен объяснить пользователю, что peer access считается непроверенным, пока Tailscale URL не открыт с телефона или другого trusted peer device. Реальные Tailscale URLs, tailnet names, device names и auth keys не записывать в tracked Markdown, reports, setup state intended for Git или `.memory`; использовать placeholders.
 
-Если последний `.techscope-setup.json` имеет `status: completed-with-warnings`, при следующем заходе в Codex thread проактивно предложить `node scripts/self-test.mjs` и коротко перечислить warnings. Не включать Telegram, Realtime, Tailscale, launchd, cron, heartbeat или другие долгоживущие процессы без явного подтверждения пользователя.
+Если последний setup-state имеет `status: completed-with-warnings`, при следующем заходе в Codex thread проактивно предложить `node scripts/self-test.mjs` и коротко перечислить warnings. Файл выбирать через `resolvePrithaSetupFile`: новая установка использует `.pritha-setup.json`, существующий `.techscope-setup.json` остаётся совместимым; внешний state-root использует `setup/setup.json`. Не включать Telegram, Realtime, Tailscale, launchd, cron, heartbeat или другие долгоживущие процессы без явного подтверждения пользователя.
 
 ## Операционная самопроверка
 
@@ -271,9 +271,9 @@ node scripts/good-state-alignment.mjs --scope "<affected surface>" --limit 3
 - `subject`: объект с `kind` и `id`, если артефакт явно относится к Pritha, child agent, стандарту, workflow, marketing narrative или другому устойчивому субъекту.
 - `privacy`, `retention`, `review_status`, `confidence`: использовать для новых curated artifacts, когда важно зафиксировать границы доступа, долговечность и степень уверенности.
 
-Markdown-файлы являются canonical authored knowledge и главным GitHub source of truth для памяти. SQLite/FTS/relations/embeddings являются локальными generated indexes: они должны полностью пересоздаваться из tracked Markdown, `.memory/schema.sql` и bootstrap/rebuild scripts, но не требуют длинной Git-истории бинарных snapshot-файлов. Fresh clone или обновлённый checkout должен запускать `node scripts/bootstrap.mjs prepare --profile local`, чтобы восстановить полноценную `.memory/techscope.sqlite` и embeddings локально.
+Markdown-файлы являются canonical authored knowledge и главным GitHub source of truth для памяти. SQLite/FTS/relations/embeddings являются локальными generated indexes: они должны полностью пересоздаваться из tracked Markdown, `.memory/schema.sql` и bootstrap/rebuild scripts, но не требуют длинной Git-истории бинарных snapshot-файлов. Fresh clone или обновлённый checkout должен запускать `node scripts/bootstrap.mjs prepare --profile local`, чтобы восстановить `pritha.sqlite` в выбранном memory directory и embeddings локально. Существующий `techscope.sqlite` читается через общий `resolvePrithaMemoryDatabase`; два файла одновременно означают конфликт, а не разрешение выбрать новый по дате или объединить их автоматически. Read-only проверки не переименовывают состояние.
 
-`privacy: local-private` и primary `memory_domain: user-model` не должны попадать в tracked Markdown или `.memory/techscope.sqlite`; для этого использовать `.private/user-memory/` и `.memory-private/`, которые не коммитятся.
+`privacy: local-private` и primary `memory_domain: user-model` не должны попадать в tracked Markdown или общий SQLite index; для этого использовать `.private/user-memory/` и `.memory-private/`, которые не коммитятся.
 
 ## Generated LLM Wiki Layer
 

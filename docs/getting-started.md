@@ -48,9 +48,15 @@ result. See [Prerequisites](prerequisites.md) for the supported Node.js, Python,
 Git, and SQLite versions.
 
 By default, local configuration is written to `.env.local` and non-secret setup
-state to `.techscope-setup.json`; both are ignored by Git. When
+state to `.pritha-setup.json`; both are ignored by Git. Existing installations
+keep reading `.techscope-setup.json` until an explicit migration. When
 `PRITHA_STATE_ROOT` is configured, generated and private runtime state belongs
 under that external state root instead of the checkout.
+
+New memory indexes use `pritha.sqlite` in the selected memory directory.
+An existing `techscope.sqlite` remains readable and rebuilds in place. If both
+names exist, the reader reports a conflict and preserves both files; status
+commands do not choose by modification time or rename state automatically.
 
 Do not copy `.env.example` as a mandatory fresh-clone step. Real credentials are
 optional and must remain local and untracked.

@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
+import { resolvePrithaSetupFile } from "./lib/state-files.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 import { moduleReadiness } from "./lib/module-readiness.mjs";
 
 const root = resolveTechscopeRoot();
+loadPrithaRuntimeEnv({ root: root, pathOnly: true });
 const stateRoot = resolvePrithaStateRoot({ root });
 const argv = process.argv.slice(2);
 const args = new Set(argv);
 const stateIndex = argv.indexOf("--state");
 const statePath = stateIndex >= 0
   ? path.resolve(argv[stateIndex + 1] || "")
-  : stateRoot === root
-    ? path.join(root, ".techscope-setup.json")
-    : path.join(stateRoot, "setup", "setup.json");
+  : resolvePrithaSetupFile({root, stateRoot});
 
 const payload = existsSync(statePath)
   ? JSON.parse(readFileSync(statePath, "utf8"))

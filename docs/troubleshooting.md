@@ -191,7 +191,7 @@ that needs them:
 - Tailscale private access;
 - service deployment.
 
-Do not put real secret values in Markdown, `.techscope-setup.json`, reports or
+Do not put real secret values in Markdown, `.pritha-setup.json` (or legacy `.techscope-setup.json`), reports or
 Git history. Use `.env.local`, the Control Center credential UI or the child
 agent's documented private secret store.
 

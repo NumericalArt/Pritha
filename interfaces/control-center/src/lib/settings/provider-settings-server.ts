@@ -1,7 +1,7 @@
 import path from "node:path";
 import { RuntimeSettingsStore, providerSettingsSnapshot, updateStoredProviderSettings, type ProviderSettingsPatch } from "../../../../../scripts/lib/runtime-settings-store.mjs";
 import { ProviderConfigurationError, resolveProviderSelection } from "./provider-profile";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
+import { PrithaStateFileError, resolvePrithaSetupFile, resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "../pritha-paths";
 import { getPrithaRuntimeSettings } from "../realtime/pritha-runtime";
 import { getCodexModelCatalog } from "./codex-model-catalog-server";
 import { validateCodexSelection, normalizeCodexReasoningEffortToken } from "./codex-model-catalog";
@@ -12,7 +12,7 @@ export function providerSettingsStore() {
 function options() {
   const root = resolveTechscopeRoot(), stateRoot = resolvePrithaStateRoot();
   const instance = new RuntimeSettingsStore(path.join(root, ".pritha-instance.json"), { allowedRoot: root }).read();
-  const setup = new RuntimeSettingsStore(stateRoot === root ? path.join(root, ".techscope-setup.json") : path.join(stateRoot, "setup", "setup.json"), { allowedRoot: stateRoot }).read();
+  const setup = new RuntimeSettingsStore(resolvePrithaSetupFile({root, stateRoot}), { allowedRoot: stateRoot }).read();
   return { defaultConnector: resolveProviderSelection({ env: process.env, instance, setup }).connectorId, legacy: getPrithaRuntimeSettings() };
 }
 export function getProviderSettings() { return providerSettingsSnapshot(providerSettingsStore().read(), options()); }
@@ -30,7 +30,7 @@ export async function updateProviderSettings(patch: ProviderSettingsPatch) {
   return updateStoredProviderSettings(providerSettingsStore(), patch, options());
 }
 export function providerSettingsErrorResponse(error: unknown) {
-  const known = error instanceof ProviderConfigurationError;
-  const status = known ? /revision_conflict|busy/.test(error.code) ? 409 : /corrupt|unreadable|write_failed|path_invalid/.test(error.code) ? 503 : 400 : 500;
+  const known = error instanceof ProviderConfigurationError || error instanceof PrithaStateFileError;
+  const status = known ? /conflict|busy/.test(error.code) ? 409 : /corrupt|unreadable|write_failed|path_invalid|migration_pending/.test(error.code) ? 503 : 400 : 500;
   return Response.json({ ok: false, error: known ? error.code : "settings_unavailable", message: known ? error.message : "Settings are unavailable. Reload and try again." }, { status, headers: { "Cache-Control": "no-store" } });
 }

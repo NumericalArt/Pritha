@@ -11,6 +11,7 @@ import resource
 import sys
 import time
 
+from pritha_state_files import resolve_pritha_memory_database
 from pritha_python_compat import load_pritha_runtime_env
 from pritha_memory_retrieval import CuratedRetriever, MODEL, readonly_connection
 
@@ -72,7 +73,7 @@ def main():
     baseline = json.loads((args.baseline or root / "tests/fixtures/memory/retrieval-baseline.json").read_text())
     if baseline["fixture_sha256"] != hashlib.sha256(raw).hexdigest():
         raise ValueError("Baseline and query fixture must have the same hash")
-    database = state / "memory/techscope.sqlite" if os.environ.get("PRITHA_STATE_ROOT", "").strip() else root / ".memory/techscope.sqlite"
+    database = resolve_pritha_memory_database(root=root, state_root=state)
     start = time.perf_counter()
     with readonly_connection(database) as conn:
         retriever = CuratedRetriever(conn)

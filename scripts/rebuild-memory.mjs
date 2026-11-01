@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -14,7 +15,7 @@ const ROOT = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
 const AGENT_MEMORY_ROOT = resolvePrithaAgentMemoryRoot({ root: ROOT });
 const MEMORY_DIR = resolvePrithaStatePath("memory");
-const DB_PATH = path.join(MEMORY_DIR, "techscope.sqlite");
+const DB_PATH = resolvePrithaMemoryDatabase();
 const SCHEMA_PATH = path.join(ROOT, ".memory", "schema.sql");
 
 const INCLUDE_DIRS = [

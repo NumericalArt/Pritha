@@ -18,6 +18,7 @@ Untitled*.canvas
 .memory-private/
 data/logs/
 .techscope-setup.json
+.pritha-setup.json
 .obsidian/
 .snapshots/audit/
 03_reviews/*-voice-session-memory.md
@@ -56,6 +57,7 @@ interfaces/control-center/test-results/
 # Generated memory indexes; rebuild with `node scripts/bootstrap.mjs prepare --profile local`.
 .memory/techscope.sqlite
 .memory/techscope.sqlite-*
+.memory/pritha.sqlite-*
 .memory/*.sqlite
 .memory/*.sqlite3
 .memory/*.db

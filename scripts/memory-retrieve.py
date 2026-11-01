@@ -6,6 +6,7 @@ import os
 import sqlite3
 import sys
 
+from pritha_state_files import resolve_pritha_memory_database
 from pritha_python_compat import load_pritha_runtime_env
 from pritha_memory_retrieval import CuratedRetriever, DOMAINS, readonly_connection
 
@@ -20,7 +21,7 @@ def main():
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     root, state = load_pritha_runtime_env()
-    database = state / "memory/techscope.sqlite" if os.environ.get("PRITHA_STATE_ROOT", "").strip() else root / ".memory/techscope.sqlite"
+    database = resolve_pritha_memory_database(root=root, state_root=state)
     with readonly_connection(database) as conn:
         retriever = CuratedRetriever(conn, args.domain, args.include_history)
         hits = retriever.search(args.query, args.mode, args.limit)

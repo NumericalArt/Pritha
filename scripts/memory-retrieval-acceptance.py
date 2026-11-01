@@ -14,6 +14,7 @@ import re
 import sys
 import time
 
+from pritha_state_files import resolve_pritha_memory_database
 from pritha_python_compat import load_pritha_runtime_env
 from pritha_memory_retrieval import CuratedRetriever, readonly_connection
 
@@ -82,7 +83,7 @@ def main():
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         cls = module.CuratedRetriever
-    database = state / "memory/techscope.sqlite" if os.environ.get("PRITHA_STATE_ROOT", "").strip() else root / ".memory/techscope.sqlite"
+    database = resolve_pritha_memory_database(root=root, state_root=state)
     with readonly_connection(database) as conn:
         r = cls(conn)
         # Cold model load is outside warm per-query latency.

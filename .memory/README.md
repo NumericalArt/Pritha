@@ -1,14 +1,19 @@
-# Techscope Memory
+# Pritha Memory
 
 This tracked directory contains the portable schema and memory contract. With
 `PRITHA_STATE_ROOT` configured, generated indexes live under
 `<state-root>/memory/`.
 
 The Markdown files in the repository are the canonical authored knowledge.
-Files such as `techscope.sqlite`, SQL rebuild dumps and embeddings are generated
+Files such as `pritha.sqlite`, SQL rebuild dumps and embeddings are generated
 from tracked Markdown, `.memory/schema.sql` and rebuild scripts. A fresh clone
 restores them with `node scripts/bootstrap.mjs prepare --profile local` instead
 of carrying long binary database history in Git.
+
+Existing `techscope.sqlite` remains readable and rebuilds in place. Readers and
+status commands never rename it automatically. If both names are present, they
+report a conflict and preserve both files until an explicit offline migration.
+Table names, document IDs, citations and embedding rows keep their identities.
 
 Tracked artifacts:
 
@@ -17,7 +22,7 @@ Tracked artifacts:
 
 Ignored generated artifacts:
 
-- `<state-root>/memory/techscope.sqlite`: SQLite sidecar index with FTS,
+- `<state-root>/memory/pritha.sqlite`: SQLite sidecar index with FTS,
   relations and embeddings.
 - `<state-root>/memory/last-self-test.json`: instance self-test baseline.
 - `<state-root>/memory/last-rebuild.sql`: generated rebuild diagnostics.
@@ -95,7 +100,7 @@ The current implementation supports:
 - SQLite FTS5 full-text search;
 - topic/tool/source entities;
 - typed relations from frontmatter.
-- local chunk embeddings stored in `techscope.sqlite`.
+- local chunk embeddings stored in `pritha.sqlite`.
 
 ## Local Embeddings
 
@@ -125,7 +130,7 @@ sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
 
 Notes:
 
-- Embeddings are generated artifacts stored in `.memory/techscope.sqlite`.
+- Embeddings are generated artifacts stored in `.memory/pritha.sqlite`.
 - Run `node scripts/rebuild-memory.mjs` before `python3 scripts/embed-memory.py` after Markdown changes.
 - Fresh clones and updated checkouts should run `node scripts/bootstrap.mjs prepare --profile local` to rebuild the local SQLite index and embeddings.
 - The current search computes cosine similarity locally over SQLite-stored vectors.

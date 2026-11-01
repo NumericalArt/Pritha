@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 
+import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
 import { searchCuratedMemory } from "./lib/curated-memory.mjs";
 import { resolvePrithaPython } from "./lib/python-runtime.mjs";
 
 const ROOT = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
-const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
+const DB_PATH = resolvePrithaMemoryDatabase();
 
 function sqlString(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
@@ -24,14 +25,14 @@ function ftsQuery(value) {
 }
 
 function runSql(sql) {
-  return execFileSync("sqlite3", ["-header", "-column", DB_PATH, sql], {
+  return execFileSync("sqlite3", ["-readonly", "-header", "-column", DB_PATH, sql], {
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],
   });
 }
 
 function runScalarSql(sql) {
-  return execFileSync("sqlite3", ["-noheader", DB_PATH, sql], {
+  return execFileSync("sqlite3", ["-readonly", "-noheader", DB_PATH, sql], {
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],
   }).trim();

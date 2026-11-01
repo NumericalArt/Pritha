@@ -1,3 +1,4 @@
+import { resolvePrithaMemoryDatabase } from "../pritha-paths";
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -447,11 +448,12 @@ function emptyMemoryStats(): MemoryStats {
 }
 
 async function sqliteMemoryStats(root: string): Promise<MemoryStats | null> {
-  const databasePath = resolvePrithaStatePath("memory", "techscope.sqlite");
+  const databasePath = resolvePrithaMemoryDatabase({root});
   if (!existsSync(databasePath)) return null;
   const result = await runAsyncProbe(
     "sqlite3",
     [
+      "-readonly",
       "-json",
       databasePath,
       `
@@ -4285,7 +4287,7 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
       lastSession: "unknown",
     },
     memoryIndex: {
-      status: existsSync(resolvePrithaStatePath("memory", "techscope.sqlite")) ? "up_to_date" : "unknown",
+      status: existsSync(resolvePrithaMemoryDatabase()) ? "up_to_date" : "unknown",
       documents: status.selfTest.memoryStats.documents,
       chunks: status.selfTest.memoryStats.chunks,
       lastUpdated: status.selfTest.createdAt ? status.selfTest.ageLabel : "unknown",

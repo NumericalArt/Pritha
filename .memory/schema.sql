@@ -1,6 +1,6 @@
--- Techscope memory sidecar schema.
--- Authored Markdown is canonical. This committed database is rebuildable and
--- is part of Pritha's portable memory snapshot.
+-- Pritha memory sidecar schema.
+-- Authored Markdown is canonical. The database is a local generated index;
+-- this tracked schema supports rebuilding it without binary Git history.
 
 PRAGMA foreign_keys = ON;
 

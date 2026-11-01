@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 
+import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
+import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
-import { resolvePrithaStatePath, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const ROOT = resolveTechscopeRoot();
-const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
+loadPrithaRuntimeEnv({ root: ROOT, pathOnly: true });
+const DB_PATH = resolvePrithaMemoryDatabase();
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "127.0.0.1";
 
@@ -18,7 +21,7 @@ function sqlString(value) {
 }
 
 function sqliteJson(sql) {
-  const out = execFileSync("sqlite3", ["-json", DB_PATH, sql], {
+  const out = execFileSync("sqlite3", ["-readonly", "-json", DB_PATH, sql], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();

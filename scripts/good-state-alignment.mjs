@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -10,7 +11,7 @@ import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } 
 const ROOT = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root: ROOT });
 const STATE_ROOT = resolvePrithaStateRoot({ root: ROOT });
-const DB_PATH = resolvePrithaStatePath("memory", "techscope.sqlite");
+const DB_PATH = resolvePrithaMemoryDatabase();
 
 function usage() {
   return `Usage:
@@ -67,7 +68,7 @@ function parseArgs(argv) {
 }
 
 function runJsonSql(sql) {
-  const output = execFileSync("sqlite3", ["-json", DB_PATH, sql], {
+  const output = execFileSync("sqlite3", ["-readonly", "-json", DB_PATH, sql], {
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],
     maxBuffer: 10 * 1024 * 1024,

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = resolveTechscopeRoot({ cwd: DEFAULT_ROOT });
@@ -80,7 +81,7 @@ checks.push(run(
   "node",
   ["scripts/query-memory.mjs", "semantic", "agent factory"],
   {
-    skip: !withEmbeddings || !existsSync(resolvePrithaStatePath("memory", "techscope.sqlite")),
+    skip: !withEmbeddings || !existsSync(resolvePrithaMemoryDatabase()),
     reason: "optional; requires embeddings rebuild",
     timeoutMs: 120000,
   },

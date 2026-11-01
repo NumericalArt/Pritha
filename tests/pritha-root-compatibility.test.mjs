@@ -35,11 +35,12 @@ test('Node, TS and Python agree on explicit/new/legacy/Git/cwd identity without 
 });
 test('explicit child root replaces both aliases and path-env loading cannot retarget it',t=>{
   const f=fixture(t),state=path.join(f.base,'state');mkdirSync(path.join(state,'config'),{recursive:true});
-  writeFileSync(path.join(f.root,'.env.local'),`TECHSCOPE_ROOT="${f.other}"\nPRITHA_STATE_ROOT="${state}"\n`);
+  writeFileSync(path.join(f.root,'.env.local'),`TECHSCOPE_ROOT="${f.other}"\nPRITHA_STATE_ROOT="${state}"\nUNRELATED_PRIVATE_CANARY=must-not-load\n`);
   writeFileSync(path.join(state,'config','runtime.env'),`PRITHA_ROOT="${f.other}"\nTECHSCOPE_ROOT="${f.other}"\n`);
   const target={PRITHA_ROOT:f.other,TECHSCOPE_ROOT:f.other};const resolved=loadPrithaRuntimeEnv({root:f.alias,target});
   assert.equal(resolved.root,f.alias);assert.equal(resolved.stateRoot,state);assert.deepEqual({PRITHA_ROOT:target.PRITHA_ROOT,TECHSCOPE_ROOT:target.TECHSCOPE_ROOT},paths.prithaRootEnvironment(f.alias));
   const child=spawnSync(process.execPath,[path.resolve('scripts/pritha-root.mjs'),'--cwd',f.other],{env:{...cleanEnv(),...paths.prithaRootEnvironment(f.alias)},encoding:'utf8'});assert.equal(child.status,0,child.stderr);assert.equal(child.stdout.trim(),f.alias);
   const invalid=spawnSync(process.execPath,[path.resolve('scripts/pritha-root.mjs'),'--cwd',f.other],{env:{...cleanEnv(),PRITHA_ROOT:f.root,TECHSCOPE_ROOT:f.other},encoding:'utf8'});assert.equal(invalid.status,2);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/different directories/);
   assert.equal(paths.resolvePrithaStateRoot({root:f.root,stateRoot:f.alias}),f.root);assert.equal(paths.resolvePrithaStatePathFrom({root:f.root,stateRoot:f.alias},'memory','fixture.sqlite'),path.join(f.root,'.memory','fixture.sqlite'));
+  const pathEnv={};loadPrithaRuntimeEnv({root:f.root,target:pathEnv,pathOnly:true});assert.equal(pathEnv.PRITHA_STATE_ROOT,state);assert.equal(pathEnv.UNRELATED_PRIVATE_CANARY,undefined);
 });

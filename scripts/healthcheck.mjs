@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+import { resolvePrithaMemoryDatabase } from "./lib/state-files.mjs";
 import { runSyncProbe } from "./lib/sync-probe.mjs";
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
-import { resolvePrithaStatePath, resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
+import { resolvePrithaStateRoot, resolveTechscopeRoot } from "./lib/paths.mjs";
 
 const root = resolveTechscopeRoot();
 loadPrithaRuntimeEnv({ root });
@@ -54,7 +55,7 @@ function run(name, command, args, options = {}) {
 
 add("TECHSCOPE_ROOT", existsSync(root), root);
 add("git root", existsSync(path.join(root, ".git")), path.join(root, ".git"));
-add("memory sqlite", existsSync(resolvePrithaStatePath("memory", "techscope.sqlite")), "state-root/memory/techscope.sqlite");
+add("memory sqlite", existsSync(resolvePrithaMemoryDatabase()), "state-root/memory/techscope.sqlite");
 
 for (const relPath of [
   "interfaces/manifest.json",

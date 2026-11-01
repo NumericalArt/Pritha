@@ -134,6 +134,7 @@ const requiredMemorySnapshotFiles = [
 ];
 const generatedMemoryIndexFiles = [
   ".memory/techscope.sqlite",
+  ".memory/pritha.sqlite",
   ".memory/last-rebuild.sql",
   ".memory/last-self-test.json",
 ];
@@ -141,6 +142,9 @@ const secretHistory = git(["log", "--all", "--oneline", "--", ".env", ".env.loca
 const forbiddenTracked = files.filter((file) => existsSync(path.join(ROOT, file)) && (
   file === ".env" ||
   file === ".env.local" ||
+  file === ".pritha-setup.json" ||
+  file === ".techscope-setup.json" ||
+  /^\.memory\/(?:pritha|techscope)\.sqlite(?:-(?:wal|shm|journal))?$/.test(file) ||
   file.endsWith(".token") ||
   file.startsWith("secrets/") ||
   file.startsWith(".queue/") ||

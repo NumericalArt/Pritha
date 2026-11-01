@@ -9,6 +9,9 @@ Shared helpers for local CLI scripts. Keep these modules small and dependency-fr
   `prithaRootEnvironment(root)` pins both names at subprocess boundaries.
 - `frontmatter.mjs` parses the project frontmatter subset used before Phase 3.
 - `env.mjs` loads `.env` and `.env.local` without overriding existing env vars.
+- `state-files.mjs` selects the existing memory/setup file or a fresh Pritha
+  filename without creating directories, renaming files, or choosing between
+  conflicting legacy/current copies. Python uses the same tested contract.
 - `slug.mjs` provides slug/transliteration helpers with options for legacy Cyrillic slugs.
 - `date.mjs` provides ISO `today()` and `now()`.
 

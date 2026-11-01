@@ -6,16 +6,16 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 
+from pritha_state_files import resolve_pritha_memory_database
 from pritha_python_compat import apply_runtime_compat, load_pritha_runtime_env
 
-load_pritha_runtime_env()
+ROOT, STATE_ROOT = load_pritha_runtime_env()
 apply_runtime_compat()
 
 from sentence_transformers import SentenceTransformer
 
 
-STATE_ROOT = os.environ.get("PRITHA_STATE_ROOT", "").strip()
-DB_PATH = os.path.join(STATE_ROOT, "memory", "techscope.sqlite") if STATE_ROOT else ".memory/techscope.sqlite"
+DB_PATH = resolve_pritha_memory_database(root=ROOT, state_root=STATE_ROOT)
 PROVIDER = "sentence-transformers"
 MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 DIMENSIONS = 384

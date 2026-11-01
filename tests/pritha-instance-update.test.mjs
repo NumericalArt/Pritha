@@ -95,6 +95,9 @@ if (action === "start") {
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "env.mjs"), path.join(lib, "env.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "paths.mjs"), path.join(lib, "paths.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "root-resolution.mjs"), path.join(lib, "root-resolution.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "state-files.mjs"), path.join(lib, "state-files.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "sqlite-snapshot.mjs"), path.join(lib, "sqlite-snapshot.mjs"));
+  copyFileSync(path.join(sourceRoot, "scripts", "lib", "python-runtime.mjs"), path.join(lib, "python-runtime.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "timeout-policy.mjs"), path.join(lib, "timeout-policy.mjs"));
   copyFileSync(path.join(sourceRoot, "scripts", "lib", "cli-args.mjs"), path.join(lib, "cli-args.mjs"));
   writeFileSync(path.join(checkout, "interfaces", "control-center", ".next", "version"), "good\n");

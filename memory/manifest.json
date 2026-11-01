@@ -10,8 +10,8 @@
     "10_wiki generated pages"
   ],
   "derived_indexes": [
-    "<state-root>/memory/techscope.sqlite",
-    "sentence-transformer embeddings in <state-root>/memory/techscope.sqlite",
+    "<state-root>/memory/pritha.sqlite",
+    "sentence-transformer embeddings in <state-root>/memory/pritha.sqlite",
     "<state-root>/memory/last-rebuild.sql",
     "<state-root>/memory/last-self-test.json"
   ],
