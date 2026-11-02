@@ -79,7 +79,10 @@ billing. Never put a key into a chat message or a tracked repository file.
 | Message or symptom | Next action |
 | --- | --- |
 | Claude CLI is unavailable or its version is unverified | Check the CLI installation and version using the official guide; retry the readiness check. |
-| Claude cannot save the login / Keychain is locked | Unlock the login Keychain using macOS Keychain Access, then repeat the copied sign-in command. Enter the password only in the local macOS prompt. |
+| macOS confirms that the login Keychain is locked | Unlock it using macOS Keychain Access, then retry the copied sign-in command once. Enter the password only in the local macOS prompt. |
+| Saving the login or API key fails although Keychain is unlocked; access is denied | Stop repeated key entry or sign-in attempts. An unlocked Keychain does not prove that a particular credential can be read or saved. Preserve the diagnostic code and refresh readiness after the macOS access problem is resolved. |
+| Saving times out or cannot be confirmed | Refresh provider status before trying again. The write may have finished even when its response was lost; an error alone does not prove that the key was not saved. |
+| The key is saved, but the connection is not ready | Refresh provider status and address its reported authentication, model or runtime issue. Do not resave the key just because readiness failed. |
 | Browser sign-in finished, but `authenticated` is false | Use this instance's complete copied command and finish its terminal prompt. A browser page alone does not confirm that credentials were saved. |
 | Sign-in is ready, but the first task reports model access or billing failure | Check that the selected account and model are available in the chosen connection mode. |
 | Native session cannot be verified after an interrupted command | Preserve the private state and report the diagnostic code. Do not delete locks or credentials to force another run. |

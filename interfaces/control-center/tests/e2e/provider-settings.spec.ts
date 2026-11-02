@@ -166,3 +166,23 @@ for(const width of [390,1440])test(`Keychain save failures are actionable withou
   await expect(surface).toContainText('Keychain did not finish saving in time. Refresh status before trying again.');await expect(input).toHaveValue('');expect(writes).toBe(2);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+for(const width of [390,1440])test(`Keychain save confirmation reflects persistence rather than HTTP status at ${width}px`,async({page})=>{
+  let writes=0,httpStatus=200,reply:Record<string,unknown>={ok:true,stored:false};
+  await page.route('**/api/task-runtime/providers/claude',async route=>{
+    if(route.request().method()==='POST'){writes++;return route.fulfill({status:httpStatus,json:reply});}
+    await route.fallback();
+  });
+  await page.setViewportSize({width,height:1000});await page.goto('/settings');await select(page,'claude');
+  const surface=panel(page),input=surface.getByLabel('Claude Code API key',{exact:true}),save=surface.getByRole('button',{name:'Save key',exact:true});
+  await input.fill('UNCONFIRMED_SAVE_CANARY');await save.click();
+  await expect(surface).toContainText('Saving could not be confirmed.');await expect(surface).not.toContainText('Key saved');await expect(input).toHaveValue('');expect(writes).toBe(1);
+  httpStatus=503;reply={ok:false,stored:true,error:'provider_settings_unavailable'};
+  await input.fill('STORED_STATUS_UNAVAILABLE_CANARY');await save.click();
+  await expect(surface).toContainText('Key saved to this Pritha’s Keychain. Connection is not ready; refresh provider status.');await expect(input).toHaveValue('');expect(writes).toBe(2);
+  httpStatus=200;reply={ok:true,stored:true,provider:{status:'ready'}};
+  await input.fill('STORED_READY_CANARY');await save.click();
+  await expect(surface).toContainText('Key saved to this Pritha’s Keychain.');await expect(surface).not.toContainText('Connection is not ready;');await expect(input).toHaveValue('');expect(writes).toBe(3);
+  expect(await page.evaluate(()=>JSON.stringify(localStorage)+JSON.stringify(sessionStorage))).not.toContain('CANARY');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

@@ -29,13 +29,75 @@ MacBook instances remain outside the transaction. The operator explicitly
 approved activation of `15a17c1`, then the tested update `3853e0a`; both initial
 managed transactions completed and passed operational health at that time.
 A later approved activation of `0bcf566` was rolled back after the operational
-catalog gate failed. Runtime is `3853e0a`; candidate `94f3a33` is staged while the combined
-credential-diagnostic and typed-factory follow-up is being verified.
+catalog gate failed. The subsequently approved combined update `b404a6d` is now
+active and passed strict and operational health. The follow-up credential-save
+diagnostic fix `bcb7c3b` remains isolated and is not deployed.
 Final operator acceptance remains pending. Exact machine paths, endpoints and
 recovery receipts remain private under the instance state root; non-secret
 release identities are recorded below.
 
-## Current checkpoint — diagnostic and typed-factory follow-up
+## Current checkpoint — b404a6d active; Keychain recovery pending
+
+The approved managed transaction completed on 2026-11-02 at 10:47 Europe/Moscow.
+Build `jL62rGMtb_W3itHa0cD3z` matches `b404a6d`; exact identity, five pages,
+twelve JavaScript chunks, admission and operational health pass. The durable
+`deployment-receipt.json` retains the prior source/build/dependency recovery
+materials and confirms all nine unrelated files are unchanged. The transaction
+used a local pinned fast-forward while stopped; it did not fetch or publish.
+No second SQLite rename or schema migration was performed.
+
+Canonical memory refresh is complete: **1005 documents, 11258 chunks, 11037
+embeddings**. Rebuild, offline embeddings and frozen retrieval exited completely.
+FTS Hit@5 is **45/48**, Hit@10 **46/48**, holdout Hit@5 **23/24**; semantic
+Hit@5/Hit@10 is **31/35**, hybrid **41/45**. There are **zero retrieval regressions
+and zero private leaks**. The frozen fixture SHA is unchanged; the isolated
+verification database never replaced instance memory.
+
+The first compiled native attempt stopped with `native_not_ready` before model
+dispatch or chat creation. Its preset restoration, failed receipt and one-shot
+attempt lock remain intact. Historical native file-tool/resume success is retained
+but does not prove current readiness. SDK live has not run. The child run remains
+blocked before inference, **0/40000 tokens and 1/3 iterations**; its elapsed window
+has expired. Continue that same run only after readiness and a separate elapsed
+budget amendment, without resetting the clock or creating a duplicate.
+
+The operator reports that NeuralDeep previously worked and that saving either
+provider key now fails. This agrees with the earlier successful live evidence.
+Current ordinary Keychain reads fail with exit 51 before provider traffic, although
+Keychain reports unlocked/readable/writable. System diagnostics also report
+`CSSMERR_CSP_INVALID_DATA`. This does not establish corruption or identify which
+application caused the problem. Credential service naming and the complete write
+function are unchanged between `3853e0a` and `b404a6d`; the latter adds honest read
+error classification. No Keychain reset, ACL change, password collection or repeat
+secret entry is requested. The operator has deferred reboot. A normal password
+screen unlock was suggested as an optional recovery attempt, not performed by
+the agent and not a confirmed remedy. The retained Local process receipt still
+requires the approved boot-session recovery path.
+
+Prepared `bcb7c3b` removes the misleading re-enter-and-retry instruction. It
+classifies write denial and timeout, handles unknown results without claiming
+success, clears the secret input and performs no automatic retry. **23/23 focused
+unit tests and 6/6 unique desktop/mobile browser cases** pass, with full owned
+process exit. Four original cases and two additional confirmation cases verify
+denial, timeout, missing storage confirmation and successful persistence despite
+a subsequent status failure. This fixes feedback; it does not repair the system Keychain. The complete
+self-test on `bcb7c3b` passes **1497/1497 tests**, zero skipped, seven groups;
+separate Agents Mother self-inspection completes **eight of eight groups**.
+There are no regressions or top-level warnings; the nested warning about four
+historical commit prefixes remains. All owned processes exited. Activation requires an exact candidate
+build and a separately approved managed transaction.
+Good State Alignment is **aligned**: private state,
+native history, accepted voice behavior and managed recovery remain intact.
+
+Fresh Claude sign-in/first-task acceptance, compiled provider continuation, SDK,
+Local background ownership recovery, representative voice tools and voice-engine
+continuity, a full voice-origin factory lifecycle and final operator acceptance
+remain open. OpenRouter live is deferred by the operator. The previously accepted
+audible response/interruption and native composer technical checks remain valid
+within their recorded scope.
+
+## Historical preparation checkpoint — before b404a6d activation
+
 
 A fresh operational check of running `3853e0a` passes after the approved child
 scaffold (`current-operational-health-94-preparation.json`). Earlier failed
@@ -364,8 +426,9 @@ must preserve a runnable current pair until the managed activation transaction.
 2. Refresh managed runtime identity and execution status. Require no active or
    ambiguous owned work. Record whether admission was intentionally paused by
    the operator. A paused instance must not be silently enabled.
-3. Verify private recovery materials and all unrelated-file hashes. No source
-   reset, origin fast-forward or Git operation is part of activation.
+3. Verify private recovery materials and all unrelated-file hashes. A prepared
+   local commit may be fast-forwarded only while the managed service is stopped.
+   Do not fetch, push, reset or discard unrelated work as part of activation.
 4. Obtain immediate approval for this concrete managed stop / migration / build
    swap / managed start transaction. AGENTS.md requires separate lifecycle approval.
 5. Stop only through `control-center-runtime.mjs stop --yes`. Verify owned

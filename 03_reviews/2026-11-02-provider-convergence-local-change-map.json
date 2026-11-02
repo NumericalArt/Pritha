@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-02T07:24:57.096570+00:00",
+  "createdAt": "2026-11-02T08:37:03.305638+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -15,7 +15,7 @@
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
   "fileCount": 574,
-  "filesSha256": "981a87c6945c2d47b54fd52994d10b2b205eaee26aaaf74874ee4381cf60f637",
+  "filesSha256": "a1a76868956be3f57c8a6c4f85373f8b808a874b12bc19088851d1ab84f28311",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 312224,
-      "sha256": "74c4f70042da8ed1e08a1eddc2b710360e366a20d867cb5ccea6dca4b0d614f3"
+      "bytes": 317578,
+      "sha256": "aeec764488dc1ce1245423ab47d7ea7ae08ab757ce4a92bae450bdf9ec46a501"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -196,8 +196,8 @@
       "path": "11_agents/reports/2026-11-01-pritha-provider-convergence-deployment-report.md",
       "status": "A",
       "kind": "file",
-      "bytes": 32734,
-      "sha256": "91bbc16f4f30db9bb4a0aa9bce7ab53093237574fd59f373b27d935fef68f698"
+      "bytes": 36957,
+      "sha256": "a2c798dbeafb27d04474906aec80d1f7728c839eb1d8c67f4a2d1351cf15dff7"
     },
     {
       "path": "AGENTS.md",
@@ -252,8 +252,8 @@
       "path": "docs/claude-connection.md",
       "status": "A",
       "kind": "file",
-      "bytes": 4822,
-      "sha256": "96cfe0714ab8ddb264bf067ed819f0971a6723cfd180d82a3413384a20efb747"
+      "bytes": 5532,
+      "sha256": "06866de1f562588960e0b8b35b2b6a305b130f69389e190babfd2e6438244599"
     },
     {
       "path": "docs/getting-started.md",
@@ -749,8 +749,8 @@
       "path": "interfaces/control-center/src/components/settings/ProviderSettingsSection.tsx",
       "status": "A",
       "kind": "file",
-      "bytes": 20837,
-      "sha256": "09d8f0245cd3b42cd2b0397bcdede34722addd7ce9ad99d2143d9e4aca28e8d9"
+      "bytes": 21496,
+      "sha256": "9406ee6e3c59b57c1d3f8d385b10956be22281a4e620c951f5df51e12ebae892"
     },
     {
       "path": "interfaces/control-center/src/components/settings/SettingsControlPage.tsx",
@@ -1176,8 +1176,8 @@
       "path": "interfaces/control-center/tests/e2e/provider-settings.spec.ts",
       "status": "A",
       "kind": "file",
-      "bytes": 17595,
-      "sha256": "0781cb3d0f39d285a33d959e6e1d4f965fba1ffc65f21f31175f6230bc342c58"
+      "bytes": 21079,
+      "sha256": "5b9c0392133a978327f5834d36fa2c77e795ee482d117f14f8839c5d14279763"
     },
     {
       "path": "interfaces/control-center/tests/e2e/settings-evolution.spec.ts",
@@ -1974,8 +1974,8 @@
       "path": "scripts/lib/provider-credential.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 6488,
-      "sha256": "4eef2d908aec68e8189301590b4632c0cc6bbd3360636cf67820f21d3b0fae1c"
+      "bytes": 7191,
+      "sha256": "0ec4471a2045a39984814cdc5472c83565864be635e535b69711daca8baa80ee"
     },
     {
       "path": "scripts/lib/provider-factory-tools.mjs",
@@ -3759,8 +3759,8 @@
       "path": "tests/provider-credential-diagnostics.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 6994,
-      "sha256": "078c2e368b8d19cd01b028d0d5bca40059453cf7634a872561d70091bf7d8733"
+      "bytes": 9302,
+      "sha256": "b1ba8f393e16537e5565352ce0328da9ee2b9a3cad971f44ac8c7a1cc0e3a424"
     },
     {
       "path": "tests/provider-credentials.test.mjs",

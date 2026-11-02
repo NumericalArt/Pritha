@@ -647,7 +647,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; runtime 3853e0a после управляемого отката с 0bcf566. Кандидат 94f3a33: 1471/1471, восемь групп, staging и isolated strict health passed; новая активация ещё не выполнена. Native Claude source 2/2 pass, compiled/manual checks pending; child scaffold создан, delivery blocked до inference на provider_pending_auth. OpenRouter live deferred by user; Local, SDK live, voice factory и final acceptance остаются открыты.** Зависимости все выше.
+**Статус: in-progress; активен b404a6d, managed activation, 5 страниц / 12 JS chunks, admission и operational health passed. Каноническая память обновлена: 1005 docs / 11258 chunks / 11037 embeddings, frozen retrieval без регрессий и утечек. Текущий blocker — доступ к Keychain: Claude API, NeuralDeep и native Claude ещё не готовы; прежние live passes сохранены как историческое evidence. Новый diagnostic fix bcb7c3b проверяется отдельно и ещё не активирован. Child scaffold создан, delivery остановлен до inference; Local reboot отложен пользователем. SDK live, voice factory, onboarding и final acceptance открыты; OpenRouter live deferred by user.** Зависимости все выше.
 
 Исторический статус до последней попытки обновления:
 
@@ -2620,6 +2620,51 @@ unit child environment отдельно и изолировать оба aliases
   восстановление API credential access, явное продление elapsed window того же
   line-counter run, Local reboot и remaining voice/onboarding/factory/manual
   acceptance остаются открыты. Goal не завершён; GitHub и MacBook не затронуты.
+
+### Checkpoint 48 — b404a6d активирован; память проверена; Keychain остаётся блокером
+
+- После отдельного approval оператором выполнен управляемый переход с `3853e0a`
+  сразу на `b404a6d`. Build `jL62rGMtb_W3itHa0cD3z`, точная source/instance
+  identity, **5 страниц / 12 JS chunks**, admission и operational health прошли.
+  Durable receipt сохранён до cleanup; предыдущие source/build/dependencies и
+  девять посторонних untracked файлов сохранены. GitHub и MacBook не изменялись.
+- Канонические memory rebuild, offline embeddings и frozen retrieval завершены
+  с полным выходом owned процессов: **1005 docs / 11258 chunks / 11037 embeddings**.
+  FTS Hit@5 **45/48**, Hit@10 **46/48**, holdout Hit@5 **23/24**; semantic **31/35**,
+  hybrid **41/45** (Hit@5/Hit@10). **0 regressions, 0 private leaks**; SHA frozen
+  fixture не изменился. Изолированная тестовая база не подменяла каноническую.
+- Единственная compiled-native попытка на `b404a6d` завершилась `native_not_ready`
+  **до model dispatch и создания чата**. Temporary preset восстановлен через CAS;
+  attempt lock и failure receipt сохранены. Source-native pass 2/2 остаётся
+  историческим результатом. SDK live не запускался; dry 10/10 не заменяет его.
+- Пользователь подтвердил прежнюю исправную работу NeuralDeep и сообщил отказ
+  повторного сохранения ключа. Ordinary credential reader теперь получает exit 51
+  до HTTP/model call; default Keychain при этом unlocked/readable/writable.
+  `securityd` сообщает `CSSMERR_CSP_INVALID_DATA`. Это не доказывает повреждение
+  хранилища и не устанавливает виновную программу. Имя service и функция записи
+  ключа полностью совпадают между ранее рабочей `3853e0a` и текущей `b404a6d`.
+  Секреты не запрашиваются повторно; ACL, пароли и Keychain не сбрасывались.
+- `bcb7c3b` различает отказ Keychain, timeout и неизвестный результат записи;
+  UI считает сохранение успешным только при `stored: true`, очищает поле и не
+  запускает автоматические повторы. Проверены **23/23 targeted unit** и **4/4
+  desktop/mobile browser cases**, без пропусков; owned browser tree завершён.
+  Дополнительные **2/2** browser cases проверили HTTP 200 без подтверждённой
+  записи и успешную запись при последующем HTTP 503: всего **6 уникальных passes**.
+  Это исправление диагностики, не доказательство восстановления Keychain.
+  Полный self-test на `bcb7c3b`: **1497/1497 tests**, **0 skipped**, семь групп
+  pass; отдельная Agents Mother self-inspection завершила **8/8 quality groups**.
+  Регрессий и top-level warnings нет; вложенное предупреждение о четырёх старых
+  commit prefixes сохранено. Все owned trees завершены. Runtime больше не менялся;
+  новый exact build обязателен перед отдельной активацией.
+- Перезагрузка сейчас отложена пользователем. Предложенная обычная блокировка/
+  разблокировка экрана — только возможная попытка восстановления системной сессии,
+  не выполненное действие и не гарантированное решение. Local receipt остаётся
+  неприкосновенным: screen unlock не заменяет проверку новой boot session.
+- У approved line-counter run осталось **0/40000 использованных токенов, 1/3
+  итераций**, но истёк тридцатиминутный elapsed window. Перед продолжением нужны
+  readiness и отдельное продление времени того же run, без сброса ledger.
+  Fresh onboarding, оставшаяся voice/factory и финальная операторская приёмка
+  остаются открыты. Goal возобновлён; ожидание перезагрузки не закрывает R12.
 
 ## 7. Полные исходные материалы
 
