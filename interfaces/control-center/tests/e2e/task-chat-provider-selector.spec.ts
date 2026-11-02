@@ -105,7 +105,7 @@ test('factory mode can be disabled after capabilities change and switching to Co
   const provider=page.getByLabel('New chat provider',{exact:true}),create=page.getByLabel('Create new agent',{exact:true}),send=page.getByRole('button',{name:'Send',exact:true});
   await provider.selectOption('claude');await create.check();await page.getByLabel('New agent slug').fill('typed-counter');await page.locator('.codex-composer textarea').fill('Keep my draft.');
   f.setApprovalReady(false);await page.reload();await expect(create).toBeChecked();await expect(create).toBeEnabled();await expect(send).toBeDisabled();await expect(page.getByRole('alert').filter({hasText:'Agent creation is unavailable'})).toBeVisible();
-  await create.uncheck();await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await expect(send).toBeEnabled();expect(f.requests).toHaveLength(0);
+  await create.click();await expect(create).toHaveCount(0);await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await expect(send).toBeEnabled();expect(f.requests).toHaveLength(0);
   f.setApprovalReady(true);await page.reload();await create.check();await expect(page.getByLabel('New agent slug')).toHaveValue('typed-counter');await provider.selectOption('codex');
   await expect(create).toHaveCount(0);await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await send.click();await expect.poll(()=>f.requests.length).toBe(1);expect(f.requests[0].body.connectorId).toBe('codex');expect(f.requests[0].body.factoryIntent).toBeUndefined();await f.finish(0,'chat_codex_regular');
 });
