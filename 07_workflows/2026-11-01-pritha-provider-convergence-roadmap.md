@@ -2868,6 +2868,38 @@ unit child environment отдельно и изолировать оба aliases
   разрешения не расширены, код guardrails не менялся. GitHub/MacBook и production
   lifecycle не затрагивались.
 
+### Checkpoint 55 — действующий Local 4B и профиль интерактивной службы
+
+- Gate `ffebc60`: **1503/1504**. Единственная регрессия — Codex-facing Tailscale
+  protocol test требовал конкретные mutating command forms прямо в index.
+  `install --yes`, `serve --yes`, `off --yes`, immediate separate approval и
+  peer-device verification возвращены в обязательный короткий index. Полная
+  старая политика по-прежнему сохранена побайтово; тест не ослаблялся.
+- Прежняя **Qwen3 4B Q4_K_M**, с теми же engine, model и canonical CPU settings,
+  прошла real owned Responses, файл с непредсказуемым nonce через завершённый
+  `read_file` и продолжение той же native session. **Все четыре проверки passed**,
+  process trees exited; первые/вторые task turns сделали 2/1 model requests.
+  Source-level test использовал routed project index и полный policy document.
+  Он занял около четырёх минут целиком; compiled installed check ещё впереди.
+- Установленная macOS manual `launchd.plist(5)` подтверждает: `Background`
+  ограничивает CPU/I/O для не запрошенной пользователем работы; `Interactive`
+  соответствует ресурсам приложения; `Adaptive` зависит от XPC transactions.
+  Control Center обслуживает HTTP-запросы пользователя и не использует такие XPC
+  transactions. Template переведён в **Interactive** без новых process wrappers,
+  permissions или model configuration changes.
+- Managed installation test сначала воспроизвёл старый Background profile;
+  после template change **18/18** runtime/Tailscale tests прошли, включая drain,
+  uncertain/unowned listeners, circuit, state-root lock и private profile paths.
+  Source сам по себе не меняет уже установленный job.
+- Staged workflow уточняет approved profile migration: stop → source/build swap →
+  manager `install --yes` (может запустить RunAtLoad job) → identity/health/admission.
+  Предыдущие installed/private profiles и hashes входят в rollback. Этот шаг
+  требует отдельного immediate approval вместе с конкретным candidate; реальная
+  установка профиля и остановка production сейчас не выполнялись.
+- Full candidate gate/build/browser/rollback preparation выполняются следующим
+  шагом. Local compiled и оставшаяся manual Voice/factory приёмка остаются открыты.
+  Good State alignment — **aligned**; MacBook и GitHub не изменялись.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

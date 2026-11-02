@@ -3,7 +3,7 @@ id: control-center-staged-release
 type: workflow
 status: active
 created: 2026-08-27
-updated: 2026-09-23
+updated: 2026-11-02
 topics:
   - control-center
   - staged-release
@@ -26,7 +26,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-08-27
 source_updated: 2026-09-23
-source_version: control-center-staged-release-v4; durable receipt before retired-build cleanup
+source_version: control-center-staged-release-v5; approved interactive profile migration after build swap
 retrieved: 2026-08-27
 verified: 2026-09-23
 valid_for: Pritha Control Center production and fleet releases
@@ -102,6 +102,7 @@ node scripts/execution-control.mjs activate --yes --expected-build <verified-BUI
 node scripts/control-center-health.mjs --port <instance-port> --strict --operational --json
 ```
 
+
 Activation verifies the live build and its page/chunk health before admitting
 tasks. Do not call a release complete while admission remains paused. Preserve
 an intentional pre-existing operator pause. The operational checker is for
@@ -128,6 +129,29 @@ instance, pages and chunks. It does not confuse the checkout's current Git HEAD
 with the identity of the restored compiled build. A missing build ID is detected
 before stopping the service. An unconfirmed managed stop still prevents swapping
 or restoring files under a live process.
+
+### An installed launchd profile changes
+
+Control Center handles browser-requested voice, tools and owned local inference.
+Its template uses `ProcessType=Interactive`: the macOS `launchd.plist` manual
+reserves `Background` for work that was not directly requested by the user and
+applies CPU/I/O limits to it. HTTP requests do not provide the XPC transactions
+that the `Adaptive` classification uses. Applying the job classification preserves the existing
+model launcher, sandbox and ownership checks.
+
+Changing the tracked template does not replace an already installed profile.
+Include the profile change and `install --yes` in the immediate explicit
+lifecycle approval. After managed stop and the verified source/build swap,
+run the approved manager installation. `install` may bootstrap the RunAtLoad
+job, so the new build must already be in place. Then use managed start as needed,
+verify the installed profile, exact live identity, strict/operational health and
+admission. Do not install over a running instance: the manager preserves an
+owned running service rather than silently replacing its definition.
+
+Retain the previous private installed profile and its hash with the rollback
+bundle. If rollback is needed, managed stop first; restore previous source/build,
+reinstall the previous profile through the manager under the same explicit
+rollback authorization, and verify its identity and health before admission.
 
 ### Bounded release timeouts
 

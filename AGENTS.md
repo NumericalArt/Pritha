@@ -61,6 +61,10 @@ Explicit user instructions take precedence over project guidelines.
   health, task admission verification and a reviewed rollback path.
 - Do not enable Realtime, Telegram, Tailscale mutation, services, cron, heartbeat,
   schedules or other long-lived processes without explicit authorization.
+  Tailscale plan/status are read-only. Mutations such as `install --yes`,
+  `serve --yes`, `off --yes` and `tailscale up` need separate explicit user approval
+  immediately before the action. Peer access stays unverified until a trusted
+  peer device opens the private URL; keep real endpoints and auth keys private.
 - Agent creation is proposal-first. Write an `agent-contract` and a separate
   `agent-outcome-spec`; obtain their separate approvals. Accepted Contract,
   approved Outcome, memory research and required current primary evidence precede

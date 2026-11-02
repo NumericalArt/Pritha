@@ -139,6 +139,8 @@ test("runtime install renders only private absolute paths and never calls real l
     const installed = path.join(item.testHome, "Library", "LaunchAgents", "com.numericalart.pritha.control-center.main.plist");
     assert.equal(existsSync(generated), true);
     assert.equal(existsSync(installed), true);
+    assert.match(readFileSync(installed, "utf8"), /<key>ProcessType<\/key>\s*<string>Interactive<\/string>/,
+      "Browser-requested voice and model work must not inherit background-job CPU/I/O throttling");
     assert.match(readFileSync(generated, "utf8"), new RegExp(item.checkout.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(readFileSync(generated, "utf8"), /OPENAI_API_KEY|PRITHA_STATE_ROOT=/);
     assert.match(readFileSync(item.launchctlLog, "utf8"), /bootstrap gui\//);
