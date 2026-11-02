@@ -12,6 +12,7 @@ import { authoredAgentId } from "./identity.mjs";
 import { contractFingerprint } from "./contract.mjs";
 import { createBuildExecutor } from "./build-executors.mjs";
 import {
+  DELIVERY_ACTIVE_STATUSES,
   accountDeliveryExecutorResult as accountExecutorResult,
   budgetBlocker,
   deliveryUsageStatus,
@@ -1146,6 +1147,15 @@ async function resumeDeliveryLocked(runId, options) {
         options,
       );
     }
+  }
+  // A budget amendment may already have cleared the blocker (including when
+  // budget and resume are separate CLI commands). Keep new guidance even when
+  // resolveDeliveryBlocker was not called; the executor reads the durable ledger.
+  if (!hostOnly && options.guidance !== undefined && DELIVERY_ACTIVE_STATUSES.has(state.status)
+      && state.status !== "blocked" && bounded(options.guidance) !== state.operator_guidance) {
+    state = updateDeliveryLedger(status.runRoot, current => ({ ...current, operator_guidance: bounded(options.guidance) }), {
+      eventType: "delivery_guidance_updated", payload: { source: "resume" },
+    }).state;
   }
   return runDeliveryLoopLocked({
     ...bound,

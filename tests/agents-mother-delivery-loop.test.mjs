@@ -604,18 +604,20 @@ for (const scenario of ["overshoot", "modified-verifier"]) {
   });
 }
 
-test("a user budget extension finishes the same run without changing the approved plan or replaying charges", async () => {
+for (const separateAmendment of [false, true]) {
+test(`a user budget extension preserves resume guidance and the approved plan (${separateAmendment ? 'separate commands' : 'combined command'})`, async () => {
   const project = repository();
   const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-budget-continue-"));
   const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-extend");
   let executions = 0;
   const executor = {
     name: "fixture-charged-build",
-    async execute({ worktree, runId, tokenBudget }) {
+    async execute({ worktree, runId, tokenBudget, guidance }) {
       executions++;
       assert.equal(runId, "run-extend");
       if (executions === 2) {
         assert.equal(tokenBudget, 200);
+        assert.equal(guidance, "Write ready to implementation.txt; keep the verifier unchanged.");
         writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
       }
       return chargedResult({ executor: this.name, run_id: runId, thread_id: `thread-${executions}`, tokens_used: executions === 1 ? 100 : 80 });
@@ -627,9 +629,12 @@ test("a user budget extension finishes the same run without changing the approve
   assert.ok(paused.state.blockers[0].options.some(option => option.id === "extend-budget"));
   const frozenPlan = readFileSync(path.join(runRoot, "trial-plan.json"), "utf8");
   const initialTrials = readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8");
-  const amendment = { root: project, stateRoot, allowDraft: true, answeredBy: "user", budgetRequestId: "extend-200", addTokens: 200, buildExecutor: executor, trialBackend: "local", reportDir: false };
-  const finished = await resumeDelivery("run-extend", amendment);
+  const amendment = { root: project, stateRoot, allowDraft: true, answeredBy: "user", budgetRequestId: "extend-200", addTokens: 200, buildExecutor: executor, trialBackend: "local", reportDir: false,
+    guidance: "Write ready to implementation.txt; keep the verifier unchanged." };
+  if (separateAmendment) await amendDeliveryBudget("run-extend", amendment);
+  const finished = await resumeDelivery("run-extend", { ...amendment, ...(separateAmendment ? { addTokens: undefined } : {}) });
   assert.equal(finished.state.status, "verified");
+  assert.equal(finished.state.operator_guidance, amendment.guidance);
   assert.equal(finished.worktree.worktree, paused.worktree.worktree);
   assert.deepEqual(finished.state.spec, paused.state.spec);
   assert.equal(finished.state.budget.tokens_used, 180);
@@ -641,6 +646,7 @@ test("a user budget extension finishes the same run without changing the approve
   assert.equal(readFileSync(path.join(runRoot, "trial-plan.json"), "utf8"), frozenPlan);
   assert.equal(readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8"), initialTrials);
 });
+}
 
 for (const turnStatus of ["completed", "unknown"]) {
   test(`host-only verification respects the ${turnStatus} execution state without a new model turn`, async () => {

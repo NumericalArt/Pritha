@@ -647,7 +647,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный ограниченный прогон открыт. Child pilot выполнил две оплаченные итерации, израсходовал 35718/40000 токенов, остановлен на 3/3; Trials выявили неверный успешный ответ CLI без аргументов. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory, fresh onboarding и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
+**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный прогон с лимитом 550 секунд также interrupted без готового ответа. Child pilot после разрешённого продления израсходовал 55530/60000 токенов, остановлен на 4/4; Trials выявили неверный успешный ответ CLI без аргументов. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory, fresh onboarding и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
 
 Исторический статус до последней попытки обновления:
 
@@ -2712,6 +2712,34 @@ unit child environment отдельно и изолировать оба aliases
 - Good State alignment: **aligned** с Reliable Control Center и Voice Ducking.
   Production lifecycle, остальные экземпляры, MacBook и GitHub не менялись.
   Обновлённый код остаётся в отдельном локальном checkout до staged acceptance.
+
+### Checkpoint 50 — передача уточнения после продления бюджета
+
+- Пользователь разрешил общий лимит child pilot **60000 tokens / 4 iterations**
+  и ещё 30 минут. Применено к тому же run; Contract, Outcome и verifier сохранены.
+  Исполнитель использовал исправленный локальный source `2ed2bf4`; production
+  Control Center оставался на `b404a6d`.
+- Четвёртая итерация израсходовала 19812 tokens; общий наблюдаемый расход
+  **55530/60000**, **4/4**. Остановлена с правильным `token_budget_exhausted`,
+  measured usage и полным process exit. Исправление пустого argv ещё не сделано;
+  это не успешный child delivery. Новые платные итерации не запущены.
+- Найдена отдельная причина отсутствия прогресса: `resume --guidance` передавал
+  уточнение только через handler существующего blocker. После budget amendment
+  статус уже `correcting`, и уточнение не доходило до executor. Теперь resume
+  сохраняет bounded guidance после проверки approved plan и свежести Trials,
+  до dispatch, для активного run. Host-only verification и terminal results
+  не получают этот побочный эффект. Отдельные `budget`/`resume` и совмещённая
+  команда покрыты воспроизведёнными регрессиями.
+- **58/58** delivery/reconciliation/task-control/readiness tests passed после
+  исправления. Предыдущие **56/56** Claude tests и проверка настоящей CLI без
+  inference остаются отдельными свидетельствами. Полный gate готовится для
+  совокупного изменения; production activation не выполнена.
+- Повторная Local Task Chat проверка с тем же CPU model, полным контекстом и
+  лимитом 550 секунд на turn также не завершилась. Exact-turn interrupt и
+  освобождение owned receipt подтверждены. Увеличение времени не объявляется
+  решением производительности; live compiled Local file/resume остаётся открыт.
+- Оставшиеся gates R12 не сокращены. GitHub, MacBook, secrets и служба не
+  изменялись. Все три исходных приложения сохранены дословно.
 
 ## 7. Полные исходные материалы
 
