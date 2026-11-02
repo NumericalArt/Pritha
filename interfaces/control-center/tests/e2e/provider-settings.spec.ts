@@ -149,3 +149,20 @@ for(const width of [1440,390])test(`image verification keeps the saved model and
   await panel(page).getByLabel('NeuralDeep timeout seconds').fill('45');await expect(panel(page).getByRole('button',{name:'Verify image delivery',exact:true})).toBeDisabled();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+for(const width of [390,1440])test(`Keychain save failures are actionable without exposing or retrying the key at ${width}px`,async({page})=>{
+  let writes=0,error='provider_credential_access_denied';
+  await page.route('**/api/task-runtime/providers/claude',async route=>{
+    if(route.request().method()==='POST'){writes++;return route.fulfill({status:400,json:{ok:false,stored:false,error,message:'PRIVATE_RAW_KEYCHAIN_ERROR'}});}
+    await route.fallback();
+  });
+  await page.setViewportSize({width,height:1000});await page.goto('/settings');await select(page,'claude');
+  const surface=panel(page),input=surface.getByLabel('Claude Code API key',{exact:true}),save=surface.getByRole('button',{name:'Save key',exact:true});
+  await input.fill('PRIVATE_PROVIDER_KEY_CANARY');await save.click();
+  await expect(surface).toContainText('macOS Keychain denied access.');await expect(input).toHaveValue('');await expect(save).toBeDisabled();
+  await expect(surface).not.toContainText('Re-enter it and try again.');await expect(surface).not.toContainText('PRIVATE_RAW_KEYCHAIN_ERROR');
+  expect(writes).toBe(1);expect(await page.evaluate(()=>JSON.stringify(localStorage)+JSON.stringify(sessionStorage))).not.toContain('PRIVATE_PROVIDER_KEY_CANARY');
+  error='provider_credential_write_timeout';await input.fill('ANOTHER_CANARY');await save.click();
+  await expect(surface).toContainText('Keychain did not finish saving in time. Refresh status before trying again.');await expect(input).toHaveValue('');expect(writes).toBe(2);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

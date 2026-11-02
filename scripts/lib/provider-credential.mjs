@@ -5,7 +5,9 @@ import path from 'node:path';
 
 const NAMES={neuraldeep:['PRITHA_NEURALDEEP_API_KEY','NEURALDEEP_API_KEY'],claude:['PRITHA_ANTHROPIC_API_KEY','ANTHROPIC_API_KEY'],openrouter:['PRITHA_OPENROUTER_API_KEY','OPENROUTER_API_KEY']};
 const credentialMessages=Object.freeze({
-  provider_credential_access_denied:'The saved provider key could not be read from macOS Keychain. Review its access in Settings and retry.',
+  provider_credential_access_denied:'macOS Keychain denied access to this provider key. Review Keychain access before trying again.',
+  provider_credential_write_timeout:'Saving the provider key timed out. Refresh its status before trying again.',
+  provider_credential_write_failed:'Saving the provider key could not be confirmed. Review Keychain access and refresh its status before trying again.',
   provider_credential_read_timeout:'Reading the saved provider key timed out. Check macOS Keychain and retry.',
   provider_credential_read_failed:'The saved provider key could not be read. Review this provider in Settings and retry.',
   provider_credential_invalid:'The configured provider key is invalid. Review this provider in Settings.',
@@ -73,13 +75,18 @@ export function providerCredentialStatus(provider,options={}){
 export async function storeProviderCredential(provider,value,options={}){
   const key=keyValue(value),service=providerCredentialService(provider,options);
   if((options.platform || process.platform)!=='darwin')throw failure('provider_credential_storage_unavailable');
-  const child=(options.spawnImpl || spawn)('/usr/bin/security',['add-generic-password','-U','-a','pritha','-s',service,'-w'],{stdio:['pipe','ignore','ignore'],shell:false});
-  let timedOut=false;
-  const timer=setTimeout(()=>{timedOut=true;child.kill('SIGKILL');},10000);
+  let child,timer,timedOut=false;
   try{
-    const closed=new Promise((resolve,reject)=>{child.once('error',()=>reject(failure('provider_credential_write_failed')));child.once('close',code=>resolve(code));});
+    child=(options.spawnImpl || spawn)('/usr/bin/security',['add-generic-password','-U','-a','pritha','-s',service,'-w'],{stdio:['pipe','ignore','ignore'],shell:false});
+    const closed=new Promise((resolve,reject)=>{child.once('error',()=>reject(failure('provider_credential_write_failed')));child.once('close',(code,signal)=>resolve({code,signal}));});
+    timer=setTimeout(()=>{timedOut=true;child.kill('SIGKILL');},10000);
     child.stdin.on('error',()=>{});child.stdin.end(`${key}\n${key}\n`);
-    if(await closed!==0 || timedOut)throw failure('provider_credential_write_failed');
+    const result=await closed;
+    if(timedOut)throw failure('provider_credential_write_timeout');
+    if(result.signal || result.code!==0)throw failure(!result.signal && [36,51].includes(result.code)?'provider_credential_access_denied':'provider_credential_write_failed');
     return {stored:true,...providerCredentialStatus(provider,options)};
+  }catch(error){
+    const code=['provider_credential_access_denied','provider_credential_write_timeout','provider_credential_write_failed'].includes(error?.code)?error.code:'provider_credential_write_failed';
+    throw failure(code);
   }finally{clearTimeout(timer);}
 }

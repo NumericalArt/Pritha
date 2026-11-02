@@ -76,3 +76,22 @@ test('successful storage remains reported when the subsequent metadata check is 
     assert.equal(stored.stored,true);assert.equal(stored.status,'unavailable');assert.ok(stored.error);assert.ok(args.every(argv=>!argv.includes('-w')));safe(stored);
   }
 });
+
+test('saving distinguishes Keychain denial from uncertain writes and never claims persistence',async()=>{
+  for(const [exit,signal,expected] of [[51,null,'provider_credential_access_denied'],[36,null,'provider_credential_access_denied'],[7,null,'provider_credential_write_failed'],[null,'SIGTERM','provider_credential_write_failed']]){
+    let metadataReads=0;const opts={...options(()=>{metadataReads++;throw new Error(canary);}),spawnImpl:()=>{
+      const child=new EventEmitter();child.stdin=new PassThrough();child.stdin.resume();child.stdin.on('finish',()=>child.emit('close',exit,signal));child.kill=()=>{};return child;
+    }};
+    await assert.rejects(storeProviderCredential('claude',canary,opts),error=>{assert.equal(error.code,expected);safe(error);return true;});
+    const response=await providerSettingsRequest(new Request('http://127.0.0.1/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:canary,confirmation:'save-claude-key'})}),'claude',{stateRoot:'/fixture',save:(provider,key)=>storeProviderCredential(provider,key,opts),snapshot:()=>assert.fail('A failed write must not continue to readiness')});
+    const body=await response.json();assert.equal(body.stored,false);assert.equal(body.error,expected);safe(body);assert.equal(metadataReads,0);
+  }
+  await assert.rejects(storeProviderCredential('claude',canary,{...options(()=>({status:0})),spawnImpl:()=>{throw Object.assign(new Error(canary),{code:privatePath});}}),error=>{assert.equal(error.code,'provider_credential_write_failed');safe(error);return true;});
+});
+test('a Keychain save deadline terminates its process and reports an uncertain write',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});let stopped=false;
+  const attempt=storeProviderCredential('claude',canary,{...options(()=>assert.fail('Timed-out writes have no metadata success')),
+    spawnImpl:()=>{const child=new EventEmitter();child.stdin=new PassThrough();child.stdin.resume();child.kill=signal=>{assert.equal(signal,'SIGKILL');stopped=true;child.emit('close',null,signal);};return child;}});
+  const rejected=assert.rejects(attempt,error=>{assert.equal(error.code,'provider_credential_write_timeout');safe(error);return true;});
+  t.mock.timers.tick(10000);await rejected;assert.equal(stopped,true);
+});

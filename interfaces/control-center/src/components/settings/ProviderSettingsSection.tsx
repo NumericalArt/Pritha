@@ -25,7 +25,11 @@ function CredentialForm({connectorId,detail,onSaved}:{connectorId:Exclude<Provid
   const [value,setValue]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   async function save(){if(!value.trim() || busy)return;const key=value;setValue('');setBusy(true);setNotice('');
     try{const response=await fetch(`/api/task-runtime/providers/${connectorId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:key,confirmation:`save-${connectorId}-key`})});const payload=await response.json();
-      setNotice(payload.stored?'Key saved to this Pritha’s Keychain.':response.ok?'Key saved.':'The key could not be saved. Re-enter it and try again.');if(payload.stored || response.ok)onSaved();
+      if(payload.stored===true){setNotice(payload.provider?.status==='ready'?'Key saved to this Pritha’s Keychain.':'Key saved to this Pritha’s Keychain. Connection is not ready; refresh provider status.');onSaved();}
+      else if(payload.error==='provider_credential_access_denied')setNotice('macOS Keychain denied access. Check Keychain access before saving again; re-entering the API key will not fix this denial.');
+      else if(payload.error==='provider_credential_write_timeout')setNotice('Keychain did not finish saving in time. Refresh status before trying again.');
+      else if(payload.error==='provider_credential_invalid')setNotice('The API key format is invalid. Paste the complete key without spaces or line breaks.');
+      else setNotice('Saving could not be confirmed. Check Keychain access and refresh status before trying again.');
     }catch{setNotice('Saving could not be confirmed. Refresh status before trying again.');}finally{setBusy(false);}
   }
   return <div className="settings-rowline settings-secret-row"><div><strong>{PROVIDER_LABELS[connectorId]} API key</strong><span>{detail?.credentials.configured?'Configured':'Not configured'}{detail?.credentials.source==='environment'?' · An environment key takes precedence over Keychain.':''}</span></div>
