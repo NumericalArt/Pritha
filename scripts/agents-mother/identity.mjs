@@ -80,10 +80,13 @@ function artifact(file, text, context) {
   const legacyContractPath = Boolean(contractPath && path.dirname(contractPath) === oldContractRoot && context.memoryRoot !== path.join(context.root, "11_agents"));
   if (legacyContractPath) contractPath = path.join(context.memoryRoot, "contracts", path.basename(contractPath));
   const projectRef = value(fm.project_path) || bodyValue(text, "Project path") || bodyValue(text, "Target folder");
+  const draftTarget = fm.type === "agent-contract" && fm.status === "draft"
+    && !value(fm.project_path) && !bodyValue(text, "Project path")
+    && Boolean(bodyValue(text, "Target folder")) && !/^existing project\s+/i.test(projectRef);
   if (!identity.id && !name && !projectRef && !contractRef) return null;
   return {
     path: file, type: fm.type, fm, name, agentId: identity.id, issue,
-    contractPath, projectRef, legacyContractPath,
+    contractPath, projectRef, legacyContractPath, draftTarget,
     standalone: Boolean(identity.id || concreteProjectRef(projectRef) || bodyValue(text, "Agent name") || ["agent-contract", "child-agent-profile"].includes(fm.type)),
     aliases: [...new Set([name, bodyValue(text, "Technical slug"), value(fm.agent_slug), identity.id].map(agentAlias).filter(Boolean))],
     mission: missionText(text, fm),
@@ -104,7 +107,7 @@ function registryRows(text) {
   }).filter((row) => row.name && row.evidence);
 }
 
-function projectFolder(ref, context, folders) {
+function projectReferencePath(ref, context) {
   let reference = ref;
   const quoted = reference.match(/^(?:existing project\s+)?`([^`]+)`[.;]?$/i);
   if (quoted) reference = quoted[1];
@@ -112,18 +115,61 @@ function projectFolder(ref, context, folders) {
   const sibling = reference.match(/^<SIBLING_AGENT_ROOT>\/([^/`]+)`?[.;]?$/);
   if (sibling) reference = path.join(context.agentParent, sibling[1]);
   if (logicalProjectRef(reference)) return null;
-  const resolved = path.resolve(context.root, reference);
+  return path.resolve(context.root, reference);
+}
+
+function permittedProjectBoundary(cursor, context) {
+  if (canonical(cursor) === canonical(context.root) || isPrithaCodeCheckout(cursor)) return null;
+  if (["Pritha", "Techscope"].some((name) => isPrithaCodeCheckout(path.join(cursor, name)) && canonical(path.join(cursor, name)) !== canonical(context.root))) return null;
+  return true;
+}
+
+function projectFolder(ref, context, folders) {
+  const resolved = projectReferencePath(ref, context);
+  if (!resolved) return null;
   if (!safePath(resolved, context.agentParent)) return null;
   try {
     if (!lstatSync(resolved).isDirectory()) return null;
     let cursor = resolved;
     while (cursor !== path.resolve(context.agentParent)) {
-      if (canonical(cursor) === canonical(context.root) || isPrithaCodeCheckout(cursor)) return null;
-      if (["Pritha", "Techscope"].some((name) => isPrithaCodeCheckout(path.join(cursor, name)) && canonical(path.join(cursor, name)) !== canonical(context.root))) return null;
+      if (!permittedProjectBoundary(cursor, context)) return null;
       cursor = path.dirname(cursor);
     }
     return resolved;
   } catch { return null; }
+}
+
+// A proposed destination is not an existing project binding. Only an absent,
+// safe path may explain a draft's missing folder; this never authorizes access.
+function missingPlannedProject(ref, context) {
+  const resolved = projectReferencePath(ref, context);
+  if (!resolved) return null;
+  const boundary = path.resolve(context.agentParent);
+  const relative = path.relative(boundary, resolved);
+  if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return null;
+  let cursor = boundary;
+  let missing = false;
+  for (const segment of ["", ...relative.split(path.sep)]) {
+    cursor = path.join(cursor, segment);
+    let stat;
+    try { stat = lstatSync(cursor); }
+    catch (error) {
+      if (error.code !== "ENOENT" || cursor === boundary) return null;
+      missing = true;
+      continue;
+    }
+    if (missing || stat.isSymbolicLink() || !stat.isDirectory()) return null;
+    if (cursor !== boundary && !permittedProjectBoundary(cursor, context)) return null;
+  }
+  return missing ? resolved : null;
+}
+
+function isUncreatedDraft(group, context) {
+  if (!group.agentId || !group.artifacts.every((item) => item.agentId === group.agentId && item.fm.status === "draft"
+    && (item.type === "agent-contract" ? item.draftTarget : item.type === "agent-outcome-spec" && item.contractPath && !item.projectRef))) return false;
+  const contracts = group.artifacts.filter((item) => item.type === "agent-contract");
+  const targets = contracts.map((item) => missingPlannedProject(item.projectRef, context));
+  return targets.length > 0 && targets.every(Boolean) && new Set(targets).size === 1;
 }
 
 function assemble(artifacts, folders, rows, context, diagnostics) {
@@ -203,7 +249,7 @@ function assemble(artifacts, folders, rows, context, diagnostics) {
     if (paths.length > 1) group.diagnostics.push("conflicting-project-paths");
     else if (paths.length === 1) group.projectPath = paths[0];
     else if (selected.some(({ item }) => !logicalProjectRef(item.projectRef))) {
-      group.diagnostics.push("project-path-outside-or-missing");
+      group.diagnostics.push(isUncreatedDraft(group, context) ? "project-planned-not-created" : "project-path-outside-or-missing");
     } else {
       const matching = folders.filter((folder) => group.aliases.includes(agentAlias(folder.name)));
       if (matching.length === 1) { group.projectPath = matching[0].path; group.diagnostics.push("legacy-folder-attribution"); }

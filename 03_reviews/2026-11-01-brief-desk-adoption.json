@@ -3,7 +3,7 @@
   "source_repository": "https://github.com/NumericalArt/Pritha-NeuralDeep",
   "source_pin": "2ab22aeff5f1c167c86e925ec30311942b76023b",
   "retrieved": "2026-11-01",
-  "review": "Own child credentials only; no parent Keychain, Git initialization, services or automatic messages. Draft private artifacts are imported separately from factory acceptance. Conservative SSRF and atomic private settings. Original tests retained and extended.",
+  "review": "Own child credentials only; no parent Keychain, Git initialization, services or automatic messages. Draft private artifacts are imported separately from factory acceptance. Conservative SSRF and atomic private settings. Original tests retained and extended. Manual acceptance guide corrected for foreground startup, current default port, offline demo, CSRF/revision-aware UI and operator-selected publication destination.",
   "files": [
     {
       "path": "agent-memory/contracts/brief-desk-nd.md",
@@ -61,7 +61,7 @@
     },
     {
       "path": "project/docs/e2e-manual-test.md",
-      "target_sha256": "0fbd9fa0bcc7cca69b1dcfd536a81df190b2316f54fd12643af2d1bfdbee0763",
+      "target_sha256": "42ec0f6335e10d50839f28382735bc35b3de2f4bf56af371f76833130943182a",
       "source_path": "examples/brief-desk-nd/project/docs/e2e-manual-test.md",
       "source_sha256": "488ad041e291fcf7a4683f4a624b2749ff9ce6aea490e0fbc5429ba8d97150f8"
     },

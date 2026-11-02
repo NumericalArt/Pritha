@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -7,6 +7,7 @@ import test from "node:test";
 import { agentInstanceKey, authoredAgentId, currentAgentMission, findCatalogAgent, readAgentCatalog } from "../scripts/agents-mother/identity.mjs";
 import { parseFrontmatterData } from "../scripts/lib/frontmatter.mjs";
 import { approveOutcomeSpec, createOutcomeSpec, validateOutcomeSpecText } from "../scripts/agents-mother/outcome-spec.mjs";
+import { resolveProviderAgentWorkspace } from "../scripts/lib/provider-agent-workspace.mjs";
 
 function fixture(t) {
   const parent = realpathSync(mkdtempSync(path.join(os.tmpdir(), "pritha-identity-")));
@@ -174,6 +175,104 @@ test("declared project outside this instance parent cannot fall back to a matchi
   const agent = findCatalogAgent(f.catalog(), "alpha");
   assert.equal(agent.projectPath, null);
   assert.ok(agent.diagnostics.includes("project-path-outside-or-missing"));
+});
+
+function draftProposal(f, target, { extra = "", body = "", status = "draft" } = {}) {
+  const contract = f.write("contracts/proposal.md", "agent-contract", "planned-agent",
+    `- Agent name: Planned Agent\n- Primary mission: Count lines\n- Target folder: ${target}\n${body}`,
+    `${status ? `status: ${status}\n` : ""}${extra}`);
+  f.write("contracts/proposal-outcome.md", "agent-outcome-spec", "planned-agent", "",
+    `status: draft\ncontract_path: ${contract}\n`);
+  return contract;
+}
+
+test("a draft destination stays visible without binding or creating an executable workspace", t => {
+  const f = fixture(t), target = path.join(f.agentParent, "future project", "child");
+  draftProposal(f, target);
+  const catalog = f.catalog(), agent = findCatalogAgent(catalog, "planned-agent");
+  assert.equal(catalog.agents.length, 1);
+  assert.equal(agent.identityStatus, "identified");
+  assert.deepEqual(agent.diagnostics, ["project-planned-not-created"]);
+  assert.equal(agent.projectPath, null);
+  assert.equal(agent.artifacts.length, 2);
+  assert.equal(currentAgentMission(agent, f.options).text, "Count lines");
+  assert.equal(findCatalogAgent(catalog, target), null);
+  assert.throws(() => resolveProviderAgentWorkspace(f.options, agent.id), { code: "provider_agent_workspace_unavailable" });
+  assert.equal(existsSync(path.dirname(target)), false, "catalog reads never create the proposed project");
+});
+
+test("a draft target cannot use a matching sibling as its execution binding", t => {
+  const f = fixture(t), sibling = f.folder("Planned Agent"), target = path.join(f.agentParent, "other");
+  draftProposal(f, target);
+  const agent = findCatalogAgent(f.catalog(), "planned-agent");
+  assert.equal(agent.projectPath, null);
+  assert.notEqual(agent.projectPath, sibling);
+  assert.deepEqual(agent.diagnostics, ["project-planned-not-created"]);
+});
+
+for (const kind of ["outside", "linked-leaf", "broken-linked-leaf", "linked-parent", "foreign-instance", "canonical-checkout", "regular-file"]) {
+  test(`draft destinations retain path isolation: ${kind}`, t => {
+    const f = fixture(t), foreign = fixture(t);
+    let target = path.join(f.agentParent, "planned");
+    if (kind === "outside") target = path.join(foreign.agentParent, "missing");
+    if (kind === "linked-leaf") symlinkSync(foreign.folder("child"), target);
+    if (kind === "broken-linked-leaf") symlinkSync(path.join(foreign.agentParent, "missing"), target);
+    if (kind === "linked-parent") { symlinkSync(foreign.agentParent, target); target = path.join(target, "missing"); }
+    if (kind === "regular-file") writeFileSync(target, "not a directory");
+    if (kind === "canonical-checkout") { f.options.agentParent = path.dirname(f.root); target = path.join(f.root, "missing"); }
+    if (kind === "foreign-instance") {
+      const owner = path.join(f.agentParent, "another-instance");
+      for (const part of ["Pritha/11_agents", "Pritha/scripts", "Pritha/interfaces/control-center"]) mkdirSync(path.join(owner, part), { recursive: true });
+      writeFileSync(path.join(owner, "Pritha/scripts/pritha.mjs"), "// canonical checkout\n");
+      target = path.join(owner, "missing-child");
+    }
+    draftProposal(f, target);
+    const agent = findCatalogAgent(f.catalog(), "planned-agent");
+    assert.equal(agent.identityStatus, "conflict");
+    assert.equal(agent.projectPath, null);
+    assert.ok(agent.diagnostics.includes("project-path-outside-or-missing"));
+  });
+}
+
+for (const kind of ["accepted", "unknown-status", "frontmatter-project", "body-project", "existing-project", "profile", "scaffold-report", "approved-outcome"]) {
+  test(`a missing project is not reclassified as an uncreated draft: ${kind}`, t => {
+    const f = fixture(t), target = path.join(f.agentParent, "missing");
+    const options = kind === "accepted" ? { status: "accepted" } : kind === "unknown-status" ? { status: "" }
+      : kind === "frontmatter-project" ? { extra: `project_path: ${target}\n` }
+      : kind === "body-project" ? { body: `- Project path: ${target}` } : {};
+    draftProposal(f, kind === "existing-project" ? `existing project \`${target}\`` : target, options);
+    if (kind === "profile") f.write("profiles/planned.md", "child-agent-profile", "planned-agent", "", "status: draft\n");
+    if (kind === "scaffold-report") f.write("reports/planned.md", "scaffold-report", "planned-agent", "", "status: draft\n");
+    if (kind === "approved-outcome") {
+      const outcome = path.join(f.memoryRoot, "contracts/proposal-outcome.md");
+      writeFileSync(outcome, readFileSync(outcome, "utf8").replace("status: draft", "status: approved"));
+    }
+    const agent = findCatalogAgent(f.catalog(), "planned-agent");
+    assert.equal(agent.identityStatus, "conflict");
+    assert.equal(agent.projectPath, null);
+    assert.ok(agent.diagnostics.includes("project-path-outside-or-missing"));
+  });
+}
+
+test("different missing targets for one draft identity remain a conflict", t => {
+  const f = fixture(t);
+  draftProposal(f, path.join(f.agentParent, "first"));
+  f.write("contracts/revision.md", "agent-contract", "planned-agent", `- Target folder: ${path.join(f.agentParent, "second")}`, "status: draft\n");
+  assert.equal(findCatalogAgent(f.catalog(), "planned-agent").identityStatus, "conflict");
+});
+
+test("a previously created project with lifecycle evidence stays conflicted after its folder disappears", t => {
+  const f = fixture(t), target = f.folder("planned");
+  draftProposal(f, target);
+  f.write("reports/scaffold.md", "scaffold-report", "planned-agent", `- Project path: ${target}`, "status: created\n");
+  const present = findCatalogAgent(f.catalog(), "planned-agent");
+  assert.equal(present.identityStatus, "identified");
+  assert.equal(present.projectPath, target);
+  rmSync(target, { recursive: true });
+  const missing = findCatalogAgent(f.catalog(), "planned-agent");
+  assert.equal(missing.id, present.id);
+  assert.equal(missing.identityStatus, "conflict");
+  assert.equal(missing.projectPath, null);
 });
 
 test("mission reflects an in-place authored edit and new profiles without a registry rebuild", (t) => {
