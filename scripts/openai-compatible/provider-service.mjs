@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {readProviderCredential} from '../lib/provider-credential.mjs';
+import {readProviderCredential,providerCredentialError} from '../lib/provider-credential.mjs';
 import {providerJson} from '../lib/provider-http.mjs';
 import {normalizeLocalProviderUrl,normalizeProviderPreset} from '../lib/provider-profile.mjs';
 import {providerSandboxDependency} from '../lib/provider-sandbox.mjs';
@@ -34,8 +34,12 @@ export class CompatibleProviderService {
       const {sandbox,...configuration}=input || {};
       if(sandbox!==undefined && !['read-only','workspace-write'].includes(sandbox))throw new Error('provider_sandbox_invalid');
       preset=normalizeProviderPreset(this.connectorId,configuration);
-      if(this.connectorId==='openrouter'){key=(this.options.readCredential || readProviderCredential)('openrouter',{stateRoot:this.options.stateRoot,env:this.options.env || process.env});if(!key)return result('openrouter','not-configured','provider_pending_auth');}
     }catch{return result(this.connectorId,'configured','provider_metadata_invalid');}
+    if(this.connectorId==='openrouter'){
+      try{key=(this.options.readCredential || readProviderCredential)('openrouter',{stateRoot:this.options.stateRoot,env:this.options.env || process.env});}
+      catch(error){return result('openrouter','error',null,{error:providerCredentialError(error)});}
+      if(!key)return result('openrouter','not-configured','provider_pending_auth');
+    }
     const identity=createHash('sha256').update(JSON.stringify([preset,key])).digest('hex'),saved=this.cache.get(identity);
     if(saved && Date.now()-saved.at<15000)return saved.result;
     if(this.pending.has(identity))return this.pending.get(identity);

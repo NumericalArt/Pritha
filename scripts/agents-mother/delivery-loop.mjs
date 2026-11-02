@@ -334,7 +334,7 @@ function blockerForError(error) {
     build_runtime_unavailable: {
       question: "How should Pritha obtain a working build runtime before the next implementation turn?",
       options: [
-        { id: "retry-after-upgrade", label: "Upgrade and retry", effect: "Repair or update Codex, then repeat the build runtime probe." },
+        { id: "retry-after-upgrade", label: "Repair and retry", effect: "Repair the selected executor or its provider connection, then repeat the build runtime probe." },
         { id: "replace-executor", label: "Replace executor", effect: "Select another approved build executor and re-probe it before use." },
         { id: "stop-run", label: "Stop run", effect: "Abandon delivery without starting a build turn." },
       ],

@@ -414,6 +414,7 @@ test("Goal absence requires an explicit user-only one-turn waiver", async () => 
     buildExecutor: executor, trialBackend: "local", reportDir: false,
   });
   assert.equal(blocked.state.blockers[0].code, "goal_api_unavailable");
+  assert.match(blocked.state.blockers[0].options.find(option => option.id === "retry-after-upgrade").effect, /Codex/);
   assert.equal(executions, 0);
 
   await assert.rejects(
@@ -686,4 +687,23 @@ test("concurrent delivery orchestration cannot dispatch a second attempt for the
   } finally { finish(); }
   assert.equal((await first).state.status, "verified");
   assert.equal(executions, 1);
+});
+
+
+test("unavailable provider build runtime preserves its retry action without recommending Codex", async () => {
+  const project = repository();
+  const runRoot = path.join(mkdtempSync(path.join(os.tmpdir(), "pritha-provider-runtime-")), "builds", "fixture-agent", "run-provider-runtime");
+  let executions = 0;
+  const executor = {
+    name: "claude-code-build",
+    async probe() { return { backend: this.name, available: false, error: "provider_credential_access_denied" }; },
+    async execute() { executions++; throw new Error("Must not execute before credential access works"); },
+    close() {},
+  };
+  const result = await runDeliveryLoop({ plan: plan(), projectPath: project, runRoot, runId: "run-provider-runtime", buildExecutor: executor, trialBackend: "local", reportDir: false });
+  assert.equal(result.state.status, "blocked");assert.equal(executions, 0);
+  const blocker = result.state.blockers[0];assert.equal(blocker.code, "build_runtime_unavailable");
+  assert.equal(blocker.summary, "provider_credential_access_denied");
+  const retry = blocker.options.find(option => option.id === "retry-after-upgrade");
+  assert.ok(retry);assert.match(retry.effect, /selected executor|provider connection/);assert.doesNotMatch(JSON.stringify(blocker), /Codex/);
 });

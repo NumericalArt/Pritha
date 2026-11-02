@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readProviderCredential } from '../lib/provider-credential.mjs';
+import { readProviderCredential,providerCredentialError } from '../lib/provider-credential.mjs';
 import { providerProcessEnvironment } from '../lib/provider-process-environment.mjs';
 import { providerJson } from '../lib/provider-http.mjs';
 import { ProviderTaskError } from '../lib/provider-task-runtime.mjs';
@@ -48,7 +48,8 @@ export class NeuralDeepProviderService {
     }catch{return null;}
   }
   async snapshot(modelId){
-    const key=(this.options.readCredential || readProviderCredential)('neuraldeep',{stateRoot:this.options.stateRoot,env:this.options.env || process.env});
+    let key;try{key=(this.options.readCredential || readProviderCredential)('neuraldeep',{stateRoot:this.options.stateRoot,env:this.options.env || process.env});}
+    catch(error){return this.result('error',null,null,{error:providerCredentialError(error)});}
     if(!key)return this.result('not-configured','provider_pending_auth',null);
     const identity=createHash('sha256').update(key+'\0'+modelId).digest('hex'),cached=this.cache.get(identity);
     if(cached && Date.now()-cached.at<15000)return cached.result;

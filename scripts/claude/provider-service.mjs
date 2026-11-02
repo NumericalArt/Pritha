@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readProviderCredential } from '../lib/provider-credential.mjs';
+import { readProviderCredential,providerCredentialError } from '../lib/provider-credential.mjs';
 import { providerSandboxDependency } from '../lib/provider-sandbox.mjs';
 import { ProviderTaskError } from '../lib/provider-task-runtime.mjs';
 import { resolveClaudeBinary } from '../claude-code-runner.mjs';
@@ -18,7 +18,7 @@ export class ClaudeProviderService {
   async snapshot(preset){
     if(preset.authMode==='local-cli-session')return this.nativeSnapshot(preset);
     if(preset.authMode && preset.authMode!=='api-key')return this.result('unavailable','provider_auth_mode_unverified');
-    let key;try{key=(this.options.readCredential || readProviderCredential)('claude',{stateRoot:this.options.stateRoot,env:this.options.env || process.env});}catch{return this.result('pending-auth','provider_pending_auth');}
+    let key;try{key=(this.options.readCredential || readProviderCredential)('claude',{stateRoot:this.options.stateRoot,env:this.options.env || process.env});}catch(error){return this.result('error',null,{error:providerCredentialError(error)});}
     if(!key)return this.result('not-configured','provider_pending_auth');
     const identity=createHash('sha256').update(key+'\0'+JSON.stringify([preset.modelId,preset.reasoningEffort])).digest('hex'),cached=this.cache.get(identity);
     if(cached && Date.now()-cached.at<15000)return cached.result;if(this.pending.has(identity))return this.pending.get(identity);
