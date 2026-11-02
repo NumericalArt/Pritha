@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-02T11:05:42.606680+00:00",
+  "createdAt": "2026-11-02T11:17:41.201162+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -15,7 +15,7 @@
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
   "fileCount": 574,
-  "filesSha256": "828cf2bdedceeb8f18450b7f1a7f3ff28373bb3ec4baf7f76f1739bd7e3df64f",
+  "filesSha256": "b83a7ddc1bda45fc6c2ebbddb203d47d98cb388768ed5e7bac12093c50e3c535",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 328693,
-      "sha256": "6ba6c926c415655415c17c7d81561df30a0bebee204f47abed525485aa1d88bf"
+      "bytes": 331795,
+      "sha256": "10efa433e933e6bfdaba4f78df2869983913c21244a7c71faa4473e458e885b2"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -238,8 +238,8 @@
       "path": "config/pritha-name-compatibility.json",
       "status": "A",
       "kind": "file",
-      "bytes": 31900,
-      "sha256": "555ca6bd5db748801e35922e1189c167017cf7dea99a7aee7d019a1ace2cfd4a"
+      "bytes": 31948,
+      "sha256": "a188a7a22e334c13f9b87c993f6b238d09c0ce632d69e45be3aad50adba1da19"
     },
     {
       "path": "docs/architecture.md",

@@ -1,6 +1,6 @@
 {
   "schema": "pritha-name-compatibility-v1",
-  "reviewed": "2026-11-01",
+  "reviewed": "2026-11-02",
   "policy": "Only reviewed compatibility boundaries, persisted identities and guard patterns. Historical authored artifacts are outside the runtime scope.",
   "entries": [
     {
@@ -485,9 +485,9 @@
     },
     {
       "path": "scripts/lib/task-workspace.mjs",
-      "sha256": "946c4217b355acdcf282517c1195cd5b68b33e98ca2f0069b980b4a06b1fe6be",
+      "sha256": "774b0fdc8c8ff45044aac9b3bcde31e28e2c069879bcb3e385e237245ec85510",
       "count": 1,
-      "reason": "Read historical classifications and protect reserved parent names; preserve identity and isolation."
+      "reason": "Reserve parent and legacy clone names; a prefixed existing child requires its accepted instance-local contract and retains checkout/path isolation."
     },
     {
       "path": "scripts/lib/task-workspace.mjs",

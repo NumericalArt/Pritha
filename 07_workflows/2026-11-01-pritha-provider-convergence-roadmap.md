@@ -647,7 +647,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный прогон с лимитом 550 секунд также interrupted без готового ответа. Child pilot после разрешённого продления израсходовал 55530/60000 токенов, остановлен на 4/4; Trials выявили неверный успешный ответ CLI без аргументов. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory, fresh onboarding и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
+**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный прогон с лимитом 550 секунд также interrupted без готового ответа. Child pilot завершён: после отдельно разрешённых 90000 tokens / 5 iterations Claude исправил CLI; общий расход 83335, неизменённые независимые Trials прошли, пользователь принял результат и разрешил применение README/CLI. Основной child checkout обновлён до 98c3805; Trials и smoke повторно прошли там. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory, fresh onboarding и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
 
 Исторический статус до последней попытки обновления:
 
@@ -690,7 +690,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
   экземпляра и ambient credentials, browser sign-in, persisted auth check,
   первый реальный task и resume. Проверить понятное действие при locked Keychain;
   никаких ручных правок путей, копирования OAuth или отключения защиты.
-- [ ] Child pilot interview→contract→outcome→scaffold→deliver/implement в
+- [x] Child pilot interview→contract→outcome→scaffold→deliver/implement в
   изолированном parent/state с раздельными approvals, измерением turns/cache tokens
   и protection gates. Не выдавать mocked pilot за боевой.
 - [ ] Зафиксировать операторскую ручную приёмку и оставшиеся внешние ограничения.
@@ -2767,6 +2767,34 @@ unit child environment отдельно и изолировать оба aliases
   операторская приёмка и общий performance pass не заявляются.
 - Good State alignment с Reliable Control Center и Voice Ducking — **aligned**.
   Production остаётся на принятой сборке; остальные gates R12 остаются открыты.
+
+### Checkpoint 52 — принятый живой пилот и строгий naming gate
+
+- Пользователь разрешил тот же Claude run до **90000 tokens / 5 iterations**
+  и ещё 30 минут. Уточнение записано в ledger до начала пятой итерации и
+  передано executor. Claude исправил пустые аргументы; финальный provider turn
+  остановился на бюджетной reservation после записи изменения. Наблюдаемый
+  итог **83335/90000**, **5/5**, usage полностью сохранён.
+- Host-only verification без новых model turns прошла исходные независимые
+  Trials: 10 content cases, 6 ошибок аргументов/пути, help и README. Verifier,
+  Contract и Outcome неизменны. Прежние неудачи остаются в private ledger.
+- Пользователь принял демонстрацию и отдельно разрешил применение двух файлов.
+  Проверенный commit `98c3805` применён к основному child checkout; прежние
+  Trials и structural smoke снова прошли, tracked tree чист. Private handoff
+  report сохраняет accepted behavior, расходы и локальный recovery anchor.
+  Это закрывает реальный пилот фабрики; голосовое создание ещё не принято.
+- Общий gate source `af51679`: **1503/1504**. Единственный отказ — naming
+  allowlist сохранил старый SHA строки reserved-name guard после его изменения.
+  Review заменил ровно эту устаревшую строку; новых legacy allowances нет.
+  **6/6** проверок имён/alias entrypoints после исправления успешны. Полный
+  повторный gate выполняется на следующем зафиксированном snapshot.
+- Дополнительный compiled Local trial в небольшом существующем child workspace
+  также достиг лимита 330 секунд. Own-turn interruption, освобождение receipt
+  и неизменность tracked child files подтверждены. Performance gate остаётся
+  открытым. Подготовлена ограниченная диагностика scheduling ephemeral CPU
+  inference; настройка production-службы не менялась.
+- Исходные материалы сохранены целиком; R12 не закрыт. MacBook и GitHub не
+  изменялись. Публикация и полный Git/tag baseline отдельно не разрешались.
 
 ## 7. Полные исходные материалы
 
