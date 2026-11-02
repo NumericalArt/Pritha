@@ -63,3 +63,21 @@ test('parser limits and missing init reject malformed records without exposing p
   await assert.rejects(async()=>{for await(const line of readJsonlLines(Readable.from([Buffer.alloc(1024,65)]),{maximumLineBytes:100}))void line;},{code:'cli_record_too_large'});
   await assert.rejects(async()=>{for await(const line of readJsonlLines(Readable.from([Buffer.from([0xff,10])])) )void line;},TypeError);
 });
+
+test('stock CLI synthetic API errors stay failures without impersonating a model or exposing diagnostics',async()=>{
+  const emitted=[],state=new ClaudeStreamState({model,sessionId:session,onEvent:event=>emitted.push(event)});
+  const apiError={type:'assistant',session_id:session,error:'server_error',message:{id:'cli_error_1',model:'<synthetic>',content:[{type:'text',text:'PRIVATE_PROXY_DIAGNOSTIC'}],usage:usage(0,0,0,0)}};
+  await state.accept(init);await state.accept(apiError);await state.accept(result({usage:usage(0,0,0,0)}));
+  const done=await state.finish();assert.equal(done.ok,false);assert.equal(done.errorCode,'provider_runtime_failed');
+  assert.equal(state.messages.size,0);assert.equal(emitted.length,1);assert.doesNotMatch(JSON.stringify(done)+JSON.stringify(emitted),/PRIVATE_PROXY/);
+  for(const changed of [
+    {...apiError,error:undefined},
+    {...apiError,error:'unrecognized_error'},
+    {...apiError,session_id:'87654321-4321-4321-4321-210987654321'},
+    {...apiError,message:{...apiError.message,model:'claude-opus-5-5'}},
+    {...apiError,message:{...apiError.message,content:[{type:'tool_use',id:'tool_one',name:'read_file',input:{path:'private'}}]}},
+  ]){
+    const invalid=new ClaudeStreamState({model,sessionId:session});await invalid.accept(init);
+    await assert.rejects(invalid.accept(changed),{code:'runtime_identity_mismatch'});
+  }
+});

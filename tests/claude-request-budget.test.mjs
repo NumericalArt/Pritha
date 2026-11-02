@@ -12,12 +12,22 @@ test('budget reserves input estimate plus margin and bounded output before dispa
   await budget.settle(id,{messageId:'msg_a',usage:usage(1100)});assert.equal(budget.snapshot().tokensUsed,1100);assert.equal(budget.snapshot().usageKnown,true);
   await assert.rejects(budget.settle(id,{messageId:'msg_a',usage:usage(1100)}),{code:'provider_usage_invalid'});
   await assert.rejects(budget.begin(payload(),{}),{code:'provider_budget_exhausted'});assert.equal(budget.snapshot().tokensUsed,1100);
+  assert.equal(checkpoints.at(-1).errorCode,'provider_budget_exhausted');assert.equal(checkpoints.at(-1).usageKnown,true);
+  assert.equal(checkpoints.at(-1).requests.length,1);assert.equal(checkpoints.at(-1).tokensUsed,1100);
 });
 test('unknown response, checkpoint failure and provider overshoot cannot authorize another request',async()=>{
   const make=checkpoint=>new ClaudeRequestBudget({tokenBudget:5000,checkpoint:checkpoint || (async()=>{}),countTokens:async()=>100});
   const unknown=make(),id=await unknown.begin(payload(),{});await unknown.unknown(id);assert.equal(unknown.snapshot().tokensUsed,null);await assert.rejects(unknown.begin(payload(),{}),{code:'provider_usage_unconfirmed'});
   const broken=make(async()=>{throw new Error('HOST_PRIVATE_CANARY');});await assert.rejects(broken.begin(payload(),{}),{code:'provider_budget_checkpoint_failed'});assert.equal(broken.snapshot().usageKnown,false);
   const over=make(),sequence=await over.begin(payload(),{});await over.settle(sequence,{messageId:'msg_over',usage:usage(6000)});assert.equal(over.snapshot().tokensUsed,6000);await assert.rejects(over.begin(payload(),{}),{code:'provider_budget_overshoot'});
+});
+test('a failed refusal checkpoint keeps the budget fenced without reserving or recounting another request',async()=>{
+  let counted=0,checkpoints=0;
+  const budget=new ClaudeRequestBudget({tokenBudget:1,countTokens:async()=>{counted++;return 1000;},checkpoint:async()=>{checkpoints++;throw new Error('PRIVATE_CHECKPOINT_FAILURE');}});
+  await assert.rejects(budget.begin(payload(),{}),{code:'provider_budget_checkpoint_failed'});
+  await assert.rejects(budget.begin(payload(),{}),{code:'provider_budget_checkpoint_failed'});
+  assert.equal(counted,1);assert.equal(checkpoints,1);assert.equal(budget.snapshot().tokensUsed,0);
+  assert.equal(budget.snapshot().usageKnown,true);assert.deepEqual(budget.snapshot().requests,[]);
 });
 test('response usage handles fragmented UTF-8/cache counts and requires terminal evidence without persisting reasoning',()=>{
   const observer=new ClaudeResponseUsage(model,true),events=[{type:'message_start',message:{id:'msg_a',model,usage:{input_tokens:100,cache_creation_input_tokens:20,cache_read_input_tokens:30,output_tokens:0}}},{type:'content_block_delta',delta:{type:'thinking_delta',thinking:'PRIVATE_REASONING_Прита'}},{type:'message_delta',usage:{output_tokens:40}},{type:'message_stop'}];

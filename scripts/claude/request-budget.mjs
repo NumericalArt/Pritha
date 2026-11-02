@@ -67,7 +67,14 @@ export class ClaudeRequestBudget {
       payload.max_tokens=Math.min(payload.max_tokens,available);
       const row={sequence:this.rows.length+1,requestHash:hash(payload),status:'reserved',inputEstimate:estimate,estimateMargin:margin,maxOutputTokens:payload.max_tokens,reservedTokens:estimate+margin+payload.max_tokens,usage:null,createdAt:new Date().toISOString()};
       this.rows.push(row);this.inflight=row;await this.checkpoint(this.snapshot());return row.sequence;
-    }catch(error){this.errorCode=error.code || 'provider_budget_checkpoint_failed';throw fail(this.errorCode);}
+    }catch(error){
+      this.errorCode=error.code || 'provider_budget_checkpoint_failed';
+      // A refusal before reservation still needs durable evidence. Otherwise
+      // recovery sees only the last successful charge and can misdiagnose the
+      // CLI's subsequent synthetic API error as a different model.
+      if(!this.inflight)try{await this.checkpoint(this.snapshot());}catch{this.errorCode='provider_budget_checkpoint_failed';}
+      throw fail(this.errorCode);
+    }
     finally{this.preparing=false;}
   }
   async settle(sequence,result){

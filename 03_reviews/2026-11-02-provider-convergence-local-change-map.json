@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-02T08:37:03.305638+00:00",
+  "createdAt": "2026-11-02T10:35:53.689748+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -15,7 +15,7 @@
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
   "fileCount": 574,
-  "filesSha256": "a1a76868956be3f57c8a6c4f85373f8b808a874b12bc19088851d1ab84f28311",
+  "filesSha256": "7654ea3694bd22724011c337b355480ef86687a552302c6b8efacc1099b40774",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 317578,
-      "sha256": "aeec764488dc1ce1245423ab47d7ea7ae08ab757ce4a92bae450bdf9ec46a501"
+      "bytes": 323125,
+      "sha256": "f6305c33afba00e91d1b85423e8e575d0168dcafe1c8fb6400b5a79c0cf772fa"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -1645,15 +1645,15 @@
       "path": "scripts/claude/request-budget.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 8160,
-      "sha256": "ca1e8a6b65124f71f3ce1af91dd7d94d5fc9664a134d3b89d054ace141714b5b"
+      "bytes": 8531,
+      "sha256": "a2d13cdb1000394e11677a30d7d5f5634dc941e529041c6b867c35a06a36014d"
     },
     {
       "path": "scripts/claude/stream-state.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 8298,
-      "sha256": "ce365ee3f3e7934ada9e92d061e2443a3a2d24e99697b3dd6867cf6d066fdb09"
+      "bytes": 9245,
+      "sha256": "13e5e8b3f07b845e7793b52241841815486f8adc09ecbce45e35a8001662d929"
     },
     {
       "path": "scripts/control-center-runtime.mjs",
@@ -3304,8 +3304,8 @@
       "path": "tests/claude-build-executor.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 11548,
-      "sha256": "69f0ffd4e84f2a9d6e198366db5c544c5c9cca68632afdbd13c48a5436281bba"
+      "bytes": 12466,
+      "sha256": "2f06c91da44fce313d90bd11080b93c811572516d7ba746f3b19f3313c33ad7e"
     },
     {
       "path": "tests/claude-messages-client.test.mjs",
@@ -3332,8 +3332,8 @@
       "path": "tests/claude-owned-runner.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 7803,
-      "sha256": "804c83b87c11253484b07c5293bab8c75ea9d2f8e99653628be04289d901f986"
+      "bytes": 10783,
+      "sha256": "ed3f45082fec5e7bf04aa79e7d977ac19a79ff3eb702bc7f691fbda20949d830"
     },
     {
       "path": "tests/claude-provider-service.test.mjs",
@@ -3346,15 +3346,15 @@
       "path": "tests/claude-request-budget.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 5516,
-      "sha256": "1616ee0e29dac3fd1aeab2bf07949f3282ad999b501a19c0b22451de90c56844"
+      "bytes": 6470,
+      "sha256": "971ce063ddc8fcf3d3c4ab09707ef4748b6bb695c985267140e86166bc16dec2"
     },
     {
       "path": "tests/claude-stream-state.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 6221,
-      "sha256": "5b4b591eeeeada7438b3e51dd234435f46a44228be5977c6b9662cf9404207be"
+      "bytes": 7602,
+      "sha256": "4148fd0b2c7c3f362c98d638c3a0bbbc64a93ee1d2a4618e03547d119d427a69"
     },
     {
       "path": "tests/compatible-owned-runner.test.mjs",

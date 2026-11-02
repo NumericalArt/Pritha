@@ -9,6 +9,8 @@ const fail=code=>{throw Object.assign(new Error('Claude returned an incomplete o
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fields=['inputTokens','cacheWriteTokens','cacheReadTokens','outputTokens'];
 const sourceFields=['input_tokens','cache_creation_input_tokens','cache_read_input_tokens','output_tokens'];
+// Stock CLI stream-json / SDKAssistantMessageError (CLI 2.1.296, SDK 0.3.306).
+const cliApiErrors=new Set(['authentication_failed','oauth_org_not_allowed','account_on_hold','verification_required','billing_error','rate_limit','overloaded','invalid_request','model_not_found','server_error','unknown','max_output_tokens','cloud_credential_error']);
 
 /** Cache writes and cache hits are additional input tokens, never fresh input. */
 export function claudeUsage(value){
@@ -66,6 +68,14 @@ export class ClaudeStreamState {
     if(!object(message) || !Array.isArray(message.content))fail('provider_stream_malformed');
     if(message.content.length>10000)fail('provider_output_limit');
     if(event.type==='assistant'){
+      // The stock CLI represents an API failure as a local synthetic assistant
+      // record. It is neither model output nor a chargeable assistant message.
+      // Keep it failed and private; the host's budget receipt supplies the more
+      // precise cause when a request was refused before upstream dispatch.
+      if(cliApiErrors.has(event.error) && message.model==='<synthetic>' && id(message.id)
+          && message.content.length>0 && message.content.every(block=>block?.type==='text' && typeof block.text==='string')){
+        this.errorCode='provider_runtime_failed';return;
+      }
       if(message.model!==this.model || !id(message.id))fail('runtime_identity_mismatch');
       const usage=claudeUsage(message.usage),prior=this.messages.get(message.id) || {usage:null,text:null};
       if(usage){const merged={};for(const key of fields)merged[key]=Math.max(prior.usage?.[key] || 0,usage[key]);merged.totalTokens=fields.reduce((sum,key)=>sum+merged[key],0);prior.usage=merged;}

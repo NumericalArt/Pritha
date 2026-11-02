@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync,mkdirSync,rmSync,existsSync } from 'node:fs';
+import { mkdtempSync,mkdirSync,rmSync,existsSync,readFileSync,readdirSync } from 'node:fs';
 import { PassThrough } from 'node:stream';
 import os from 'node:os';
 import path from 'node:path';
@@ -63,4 +63,34 @@ test('file dispatch rechecks the installed Claude version after a cached capabil
   const options=fixture(t),capture={};
   await assert.rejects(startClaudeCodeRun({...options,hostAttachments:{},hostExecutionContext:{}},{...dependencies(capture),probeCli:async()=>({available:true,version:'2.1.297'})}),{code:'provider_attachments_unverified'});
   assert.equal(capture.command,undefined);assert.equal(existsSync(path.join(options.privateRoot,'profiles')),false);
+});
+
+test('budget refusal survives a stock CLI synthetic error and persists measured usage without another model request',async t=>{
+  const options={...fixture(t),tokenBudget:2300},capture={},deps=dependencies(capture);let paid=0,counted=0;
+  deps.fetchImpl=async url=>{
+    if(url.endsWith('/count_tokens')){counted++;return Response.json({input_tokens:1000});}
+    paid++;return Response.json({id:'msg_paid',model,stop_reason:'end_turn',content:[{type:'text',text:'partial'}],usage:{input_tokens:1000,output_tokens:200}});
+  };
+  deps.spawnSupervised=async(_command,args,spawnOptions)=>{
+    await spawnOptions.beforeStart({version:1,session:42,escaped:[]});
+    const child={stdin:new PassThrough(),stdout:new PassThrough(),stderr:new PassThrough()};let finish;
+    const completion=new Promise(resolve=>{finish=resolve;});
+    const close=()=>{child.stdout.end();child.stderr.end();finish({code:1,processTreeExited:true});};
+    child.stdin.resume();child.stdin.once('finish',()=>{void(async()=>{
+      const sessionId=args[args.indexOf('--session-id')+1],emit=event=>child.stdout.write(JSON.stringify({...event,session_id:sessionId})+'\n');
+      emit({type:'system',subtype:'init',model});
+      const send=text=>fetch(spawnOptions.env.ANTHROPIC_BASE_URL+'/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':spawnOptions.env.ANTHROPIC_API_KEY,'anthropic-version':'2026-10-21'},body:JSON.stringify({model,messages:[{role:'user',content:text}],max_tokens:1000,stream:false})});
+      const first=await send('first');assert.equal(first.status,200);emit({type:'assistant',message:await first.json()});
+      const second=await send('second');assert.equal(second.status,502);await second.body.cancel();
+      emit({type:'assistant',error:'server_error',message:{id:'cli_error_1',model:'<synthetic>',content:[{type:'text',text:'PRIVATE_PROXY_DIAGNOSTIC'}]}});
+      emit({type:'result',subtype:'error_during_execution',is_error:true,usage:{input_tokens:1000,output_tokens:200},modelUsage:{[model]:{}}});
+    })().catch(error=>{capture.fixtureError=error;}).finally(close);});
+    return {child,completion,stop:()=>{close();return true;}};
+  };
+  const records=[],done=await(await startClaudeCodeRun({...options,onRawChunk:chunk=>records.push(String(chunk))},deps)).completion;
+  assert.equal(capture.fixtureError,undefined);assert.equal(done.ok,false);assert.equal(done.errorCode,'provider_budget_exhausted');
+  assert.equal(done.processTreeExited,true);assert.equal(done.budget.usageKnown,true);assert.equal(done.budget.tokensUsed,1200);
+  assert.equal(paid,1);assert.equal(counted,2);assert.doesNotMatch(records.join(''),/PRIVATE_PROXY/);
+  const directory=path.join(options.privateRoot,'budgets'),saved=JSON.parse(readFileSync(path.join(directory,readdirSync(directory)[0]),'utf8'));
+  assert.equal(saved.errorCode,'provider_budget_exhausted');assert.equal(saved.tokensUsed,1200);assert.equal(saved.requests.length,1);
 });

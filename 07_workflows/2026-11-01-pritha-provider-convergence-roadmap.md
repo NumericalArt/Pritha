@@ -647,7 +647,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активен b404a6d, managed activation, 5 страниц / 12 JS chunks, admission и operational health passed. Каноническая память обновлена: 1005 docs / 11258 chunks / 11037 embeddings, frozen retrieval без регрессий и утечек. Текущий blocker — доступ к Keychain: Claude API, NeuralDeep и native Claude ещё не готовы; прежние live passes сохранены как историческое evidence. Новый diagnostic fix bcb7c3b проверяется отдельно и ещё не активирован. Child scaffold создан, delivery остановлен до inference; Local reboot отложен пользователем. SDK live, voice factory, onboarding и final acceptance открыты; OpenRouter live deferred by user.** Зависимости все выше.
+**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный ограниченный прогон открыт. Child pilot выполнил две оплаченные итерации, израсходовал 35718/40000 токенов, остановлен на 3/3; Trials выявили неверный успешный ответ CLI без аргументов. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory, fresh onboarding и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
 
 Исторический статус до последней попытки обновления:
 
@@ -2665,6 +2665,53 @@ unit child environment отдельно и изолировать оба aliases
   readiness и отдельное продление времени того же run, без сброса ledger.
   Fresh onboarding, оставшаяся voice/factory и финальная операторская приёмка
   остаются открыты. Goal возобновлён; ожидание перезагрузки не закрывает R12.
+
+### Checkpoint 49 — восстановление подключений и ошибки бюджетного отказа
+
+- Пользователь перезагрузил Mac mini. Смена kernel boot identity проверена;
+  прежний Local receipt с неизвестным завершением архивирован с сохранением
+  исходных байтов и SHA-256. Проверка не ослабляет process ownership и не
+  трактует отсутствие отдельных PID как подтверждение полного завершения.
+- После повторного сохранения активного API-ключа Claude catalog отвечает ready.
+  NeuralDeep также ready. Native Claude на действующей сборке выполнил реальное
+  чтение неизвестного заранее токена через host tool и продолжение того же чата:
+  **2/2**. Preset восстановлен до dispatch; live HTTP подтверждает terminal
+  contract и отсутствие активного turn, но не заменяет прямой OS process proof.
+- SDK **0.3.306 / bundled CLI 2.1.306**: один фиксированный MCP tool,
+  два Messages-запроса, **1404 observed tokens**, 6247 ms, полный process exit.
+  Настоящий ключ оставался у host; native OAuth не использовался. Это отдельная
+  SDK-проверка, а не завершённый child pilot.
+- Одобренное пользователем продление окна child pilot на 30 минут применено к
+  исходному ledger; токены и итерации не обнулены. Две оставшиеся итерации
+  создали реализацию, но независимый неизменённый verifier пока failed:
+  вызов CLI без аргументов ошибочно возвращает успешную справку.
+  Израсходовано **35718/40000**, использовано **3/3** итерации. Никакого
+  дополнительного платного запуска без нового разрешения не выполнено.
+- Выявлена ошибка Pritha: stock Claude CLI сообщает ошибку API как assistant
+  с `model: <synthetic>` и типизированным полем `error`. Stream validator
+  принимал её за подмену модели; цикл мог потратить следующую итерацию вместо
+  остановки на бюджетном blocker. Этот узкий error envelope теперь остаётся
+  отказом без публикации текста диагностики и без добавления usage. Настоящая
+  подмена model/session и synthetic tool payload по-прежнему отклоняются.
+- Budget отказ до reservation теперь сохраняет terminal error checkpoint,
+  оставляя измеренные расходы и отсутствие нового inference проверяемыми при
+  recovery. Ошибка сохранения checkpoint останавливает исполнение.
+- **56/56** целевых тестов: parser, budget, runner, proxy и executor для
+  четырёх provider backends. Регрессии сначала
+  воспроизведены на старом коде. Отдельная проверка установленной CLI **2.1.296**
+  с локальной имитацией token-count endpoint и бюджетом 1 подтвердила правильный
+  `provider_budget_exhausted`, zero inference и полный process exit.
+  Полный gate нового source snapshot ещё предстоит.
+- Local загрузился и закрыл readiness probe. Первый compiled тест исправлен
+  только в части слишком короткого HTTP observation timeout; следующий реальный
+  turn не уложился в 270 секунд и штатно interrupted, receipt освобождён.
+  Диагностика показала около 48 тысяч символов базовых/project instructions
+  до tool schemas. Новая ограниченная проверка сохраняет весь контекст,
+  CPU-конфигурацию, offline sandbox и начинает отдельный turn после полного
+  завершения прежнего. Успех производительности не заявляется.
+- Good State alignment: **aligned** с Reliable Control Center и Voice Ducking.
+  Production lifecycle, остальные экземпляры, MacBook и GitHub не менялись.
+  Обновлённый код остаётся в отдельном локальном checkout до staged acceptance.
 
 ## 7. Полные исходные материалы
 

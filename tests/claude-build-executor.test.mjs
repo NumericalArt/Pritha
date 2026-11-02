@@ -31,6 +31,17 @@ function fixture(t,{unknown=false,wait=false,report,connectorId='claude'}={}){
   const coordinator=()=>new ExecutionCoordinator({stateRoot,directory:path.join(stateRoot,'codex-chat','execution')});
   t.after(()=>{executor.close();rmSync(directory,{recursive:true,force:true});});return {input,executor,Executor,service,launch,checkpoints,calls,persist,coordinator,finish:()=>finish?.()};
 }
+test('a measured Claude host budget refusal raises the delivery budget blocker and keeps its original receipt',async t=>{
+  const f=fixture(t);f.executor.options.launch=async options=>{
+    const run=await f.launch(options);
+    return {...run,completion:run.completion.then(result=>({...result,ok:false,errorCode:'provider_budget_exhausted',budget:{...result.budget,errorCode:'provider_budget_exhausted'}}))};
+  };
+  let receipt;
+  await assert.rejects(f.executor.execute(f.input),error=>{receipt=error.details.executorResult;return error.code==='token_budget_exhausted';});
+  assert.equal(receipt.error_code,'provider_budget_exhausted');assert.equal(receipt.process_exited,true);assert.equal(receipt.tokens_used,120);
+  assert.equal(receipt.usage_status,'measured');assert.equal(f.calls.length,1);
+  assert.equal((await f.executor.execute(f.input)).attempt_id,receipt.attempt_id);assert.equal(f.calls.length,1);
+});
 for(const connectorId of ['claude','neuraldeep','openrouter','local']){
 test(connectorId+': builds require isolated worktrees, pin model, account every request and replay without another launch',async t=>{
   const f=fixture(t,{connectorId});assert.ok(createBuildExecutor('claude-code') instanceof ClaudeCodeBuildExecutor);assert.equal((await f.executor.probe(f.input)).available,true);
