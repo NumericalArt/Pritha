@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-02T11:49:12.248632+00:00",
+  "createdAt": "2026-11-02T12:54:19.710565+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -14,8 +14,8 @@
   ],
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
-  "fileCount": 574,
-  "filesSha256": "5f9231814e5dad0aeb5c791a28a6ab8101076e77dfad440ad96d8abab2901588",
+  "fileCount": 575,
+  "filesSha256": "f717044165896dd9209a1f788a7c789dc1228d9fc9eb7902e1fd12fcd33bb911",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 335350,
-      "sha256": "42f562df0fbc751e566cd388834b5e200e612a65b148fb2ee2c76abe753af215"
+      "bytes": 338705,
+      "sha256": "6b6b8a5622179fde0d7f008c21b902672439cd4f5175691e9e5635c1244a49fc"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -203,8 +203,8 @@
       "path": "AGENTS.md",
       "status": "M",
       "kind": "file",
-      "bytes": 62594,
-      "sha256": "8503fc6f6e3d496fac923ef9dae982454bec87af7697dc4d04e281b92297266d"
+      "bytes": 6186,
+      "sha256": "7821173a55f0e46eeb66e939b6a9fa087143b51c00b59f7c6a24ad8c0caf8ff3"
     },
     {
       "path": "CLAUDE.md",
@@ -275,6 +275,13 @@
       "kind": "file",
       "bytes": 4335,
       "sha256": "f0a61fc97cd0a6cb0171a587f798b781b017d29c22cd326fb7233683a3d21583"
+    },
+    {
+      "path": "docs/pritha-agent-policy.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 62594,
+      "sha256": "8503fc6f6e3d496fac923ef9dae982454bec87af7697dc4d04e281b92297266d"
     },
     {
       "path": "docs/pritha-state-filename-migration.md",
@@ -2695,8 +2702,8 @@
       "path": "scripts/openai-compatible/owned-local-server.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 12845,
-      "sha256": "0b5e05806344fa86a7c44d38fb3d07a10421bfd7e5e0c1ac96822aae26411a03"
+      "bytes": 12438,
+      "sha256": "883b658cc88c8604181ed67d20feba0315ae08498c2a2cbf550911f6369b240e"
     },
     {
       "path": "scripts/openai-compatible/provider-service.d.mts",
@@ -3647,8 +3654,8 @@
       "path": "tests/owned-local-server.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 10008,
-      "sha256": "142baecad09f608db277e7ae2fa554ef21856e622f06b0f2c78ebe097ae22c51"
+      "bytes": 8882,
+      "sha256": "2d9bed495567dc06c95b5bffc5af3c910ecc2a6ae807823534b44bd6596fed88"
     },
     {
       "path": "tests/paths.test.mjs",

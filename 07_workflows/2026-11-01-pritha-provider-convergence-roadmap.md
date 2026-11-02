@@ -2833,6 +2833,41 @@ unit child environment отдельно и изолировать оба aliases
   изоляцию, ownership и recovery. Voice factory и остальные manual gates R12
   сохранены; GitHub и MacBook не изменялись.
 
+### Checkpoint 54 — отклонённые scheduling prototypes и полный policy index
+
+- Application resource policy ускорила отдельный foreground component, но
+  повторные background-parent trials не подтвердили эффект: изменение PID,
+  pre-start supervisor, throughput/latency tiers и отдельный thread QoS не
+  завершили контрольный запрос. Эти prototypes **не продвигаются**: Local runtime
+  и связанные tests возвращены побайтово к проверенному `d619a5e`. Private
+  patches и все неудачные receipts сохранены. Служба не менялась.
+- Официальный Qwen3 1.7B Q8_0 с выключенным thinking прошёл real owned Responses
+  и exit probe, но первый tool turn с прежним большим контекстом достиг
+  550 секунд. Это не успешная Local приёмка и не основание менять live preset.
+- Запрос установленной Codex CLI **0.153.0** проверен без модели через отдельный
+  loopback receiver, отвечающий фиксированным HTTP 400. Исходный `AGENTS.md`
+  занимает **62594 bytes**; в стандартном запросе project instructions неполны.
+  Штатный `model_instructions_file` меняет built-in layer отдельно от project
+  layer, но этот runtime override не выбран для продвижения.
+- `AGENTS.md` теперь содержит обязательный invariant/routing index **6186 bytes**.
+  **Полный прежний файл, включая frontmatter и stable ID, сохранён побайтово**
+  в `docs/pritha-agent-policy.md` и остаётся обязательной политикой. Его SHA-256
+  сверён с исходным Git blob; исходный policy body SHA-256
+  `be56f9e19043b5b4b424b775caa3b0b425a8425ba023e451c5dd952d1103839b`.
+  Core сохраняет always-on privacy, instance isolation, approvals, budgets,
+  lifecycle, Good State и acceptance; детальные процедуры читаются по scope.
+- Zero-model paired capture подтвердил, что **весь новый index присутствует**:
+  default request уменьшился **57602 → 30793 bytes** при том же built-in layer.
+  Full policy доступна по прямой ссылке. Никакие runtime permissions, sandbox,
+  default provider, model/session bindings или CLI flags не ослаблены.
+- Markdown validation, privacy strict и **6/6** naming/alias tests успешны.
+  Полный candidate gate, memory checks и повторный actual Local file/resume
+  с routed instructions ещё предстоят. Исходные A/B/C приложения сохранены
+  целиком; scope остальных R12 gates не сокращён.
+- Good State alignment — **aligned**: подробные правила сохранены целиком,
+  разрешения не расширены, код guardrails не менялся. GitHub/MacBook и production
+  lifecycle не затрагивались.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,
