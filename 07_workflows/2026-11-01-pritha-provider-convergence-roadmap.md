@@ -187,7 +187,31 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
-Текущий срез на 2026-11-02 (Europe/Moscow): R0–R11b реализованы, выполняется R12.
+Текущий срез на 2026-11-02 06:45 UTC: продолжается R12. После разрешённой
+попытки активировать `0bcf566` выполнен управляемый откат на `3853e0a`:
+страницы и JS прошли, но operational agent-catalog выявил ошибку обработки
+ещё не созданного draft-проекта. Исправленный кандидат `94f3a33` подготовлен,
+но не активирован: full quality **1471/1471**, zero skips, восемь групп pass;
+staging build `Zu0payZPo2t-vkJUCB2Ra`, isolated strict health **5 страниц / 12 JS**
+и полный выход дерева probe-процессов подтверждены. Новая активация требует
+непосредственного approval; текущая служба продолжает использовать `3853e0a`.
+Подробности и имена private receipts — checkpoint 45.
+
+Native Claude CLI прошёл source-level file tool + resume (**2/2**); compiled
+Task Chat и fresh-instance onboarding ещё не приняты. Brief Desk реально
+импортирован и прошёл offline demo/edit/reimport с сохранением состояния.
+Отдельные Contract/Outcome approvals пилота получены, настоящий scaffold создан;
+Claude delivery остановлен **до inference** на `provider_pending_auth`:
+**0/40000 токенов, 1/3 итераций**. Metadata ключа существует, default Keychain
+разблокирован, но штатное чтение credential не проходит; причина пока не
+установлена. SDK live, Local recovery после отдельно разрешённого reboot,
+voice-origin factory и остальные live/manual gates остаются открыты.
+OpenRouter live отложен пользователем. Итоговая приёмка и goal не завершены.
+
+Исторический срез перед попыткой активации `0bcf566` сохранён ниже; его слова
+«текущий» и список ожиданий относятся к тому моменту:
+
+Срез на 2026-11-02 (Europe/Moscow): R0–R11b реализованы, выполняется R12.
 Кандидат `3853e0a` активирован на canonical Mac mini с отдельного согласия
 пользователя; managed lifecycle, exact identity, 5 страниц / 12 JS chunks,
 admission и operational health прошли. Post-activation self-test: 1445/1445,
@@ -622,6 +646,10 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 публичных интерфейсов в этой поставке.
 
 ### R12 — Полная верификация и локальная ручная приёмка
+
+**Статус: in-progress; runtime 3853e0a после управляемого отката с 0bcf566. Кандидат 94f3a33: 1471/1471, восемь групп, staging и isolated strict health passed; новая активация ещё не выполнена. Native Claude source 2/2 pass, compiled/manual checks pending; child scaffold создан, delivery blocked до inference на provider_pending_auth. OpenRouter live deferred by user; Local, SDK live, voice factory и final acceptance остаются открыты.** Зависимости все выше.
+
+Исторический статус до последней попытки обновления:
 
 **Статус: in-progress; активирован 3853e0a, post-activation 1445/1445 и strict/operational health passed. Native UI и Claude API проверены живыми запросами; голосовой ответ/прерывание приняты пользователем. Новые auth/model fixes ещё проходят отдельную приёмку. OpenRouter deferred by user; Local/native Claude/full child/final acceptance остаются открыты.** Зависимости все выше.
 
@@ -2428,6 +2456,129 @@ unit child environment отдельно и изолировать оба aliases
   provenance, отрицательными результатами, recovery и manual script. Реальный
   native login по-прежнему `pending-auth`; full child, Local recovery и остальные
   ручные gates не закрыты. OpenRouter остаётся отложенным по решению пользователя.
+
+### Checkpoint 45 — откат, исправленный каталог и реальные acceptance pilots
+
+- Good State Alignment для documentation выполнен read-only: прямого scope
+  match нет, проверены два последних baseline Reliable Codex Control Center и
+  Voice Ducking. Классификация **aligned**: этот checkpoint уточняет доказательства
+  и открытые gates, не изменяет lifecycle, privacy или принятую функциональность.
+- Пользователь разрешил активацию `0bcf566`. Managed stop/build swap/start,
+  strict health пяти страниц и двенадцати JS chunks прошли, admission восстановлен.
+  Operational health остановил приёмку из-за agent-catalog: безопасный draft
+  Contract/Outcome с ещё не созданной целевой папкой ошибочно считался identity
+  conflict. Выполнен разрешённый управляемый откат на `3853e0a`, strict health и
+  admission восстановлены. Каталожный blocker воспроизвёлся и на прежней сборке;
+  это не доказательство успешного operational gate после отката. Сохранены
+  `activation-operational-health.json`, `activation-failure.json`,
+  `rollback-strict-health.json`, `rollback-operational-health.json` и
+  `rollback-receipt.json` в private release evidence.
+- Кандидат `94f3a33` исправляет только безопасный draft-case: согласованный
+  Contract/Outcome с отсутствующей запланированной папкой получает
+  `project-planned-not-created` и `projectPath: null`, без разрешения execution.
+  Missing accepted/scaffolded project, чужой checkout, symlink и противоречивые
+  пути остаются конфликтами. Identity/readiness/scaffold tests **54/54**,
+  naming guard **126 references**; boundary allowlist не расширялся.
+- `quality-94f3a33.json`: полный gate **1471/1471**, **0 skipped**, все **8 групп
+  pass**. Сохранено прежнее предупреждение о формате четырёх commit messages;
+  историю не переписывали. Typecheck и production staging build прошли.
+  Build `Zu0payZPo2t-vkJUCB2Ra` проверена в изолированном экземпляре:
+  **5 страниц / 12 JS chunks**, exact source/build identity и полный выход дерева
+  процессов (`probe-94f3a33/health.json`, `probe-94f3a33/process.json`). Это staged
+  evidence, не production activation. Runtime остаётся `3853e0a`; новый approval
+  на исправленный кандидат ещё не получен.
+- `claude-native-live-result.json` подтверждает реальный native CLI host file-tool
+  и продолжение той же сессии: **2/2**, полный выход дерева процессов, **11690**
+  наблюдённых токенов. Это source-level harness. Compiled Task Chat native lane
+  и полная fresh-instance browser-sign-in приёмка остаются отдельными gates;
+  прежние записи `pending-auth` описывают историческое состояние.
+- Brief Desk установлен через canonical import, без autostart и наследования
+  credentials. Реальный foreground demo, редактирование, повтор demo и reimport
+  прошли с сохранением project/settings/history hashes; временный сервер закрыт.
+  Private `brief-desk-live-result.json`: pass, **0 provider requests**, **0 Telegram
+  messages**. Targeted import/example tests **20/20**. Исправленная manual-инструкция
+  согласована с реальными CLI, CSRF и UI. Это техническая offline-приёмка, а не
+  работа с live keys/Telegram или итоговое принятие продукта пользователем.
+- Пользователь отдельно одобрил Contract и Outcome Spec line-counter пилота,
+  включая лимит **40000 токенов / 3 итерации / 30 минут**. Original reviewed copies
+  и ответы сохранены в `child-pilot/operator-approvals.json`. После canonical
+  approval/rebinding заново связаны research evidence и locks, без изменения
+  согласованного результата и protected verifier. Создан настоящий scaffold;
+  его smoke/health прошли, verifier установлен неизменённым.
+- Delivery run `line-counter-claude-20261102` завершился blocked на
+  `build_runtime_unavailable` / `provider_pending_auth` **до первого inference**:
+  ledger **0/40000 токенов, 1/3 итераций**, живого model process нет. Metadata
+  ожидаемого Keychain item существует; свежая metadata-проверка показывает
+  default Keychain unlocked/readable/writable. Штатный credential reader всё же
+  не получает значение, причина пока неизвестна. Нельзя объявлять ключ
+  отсутствующим или Keychain заблокированным по этому результату. Evidence:
+  `child-pilot/delivery-process-result.json` и
+  `child-pilot/credential-metadata-diagnostic.json`. Следующий шаг после
+  восстановления readiness — продолжить тот же bounded run, затем independent
+  Trials и операторская приёмка; scaffold не является готовым продуктом.
+- SDK live single-turn остаётся pending; подготовленный dry-run не считается
+  реальным вызовом SDK. Local unknown coverage receipt сохранён, host reboot
+  ещё не одобрен. Требуются compiled provider checks, настоящий voice-origin
+  external-provider factory, remaining voice/composer/manual matrix и финальная
+  приёмка. OpenRouter live отложен явно. R12 и goal не закрыты; GitHub и MacBook
+  не изменялись. Частные пути, endpoints, credentials и raw transcripts в этот
+  tracked checkpoint не перенесены.
+
+### Checkpoint 46 — явный вход фабрики и корректная диагностика credentials
+
+- Повторная operational-проверка работающей `3853e0a` после согласованного
+  scaffold прошла (`current-operational-health-94-preparation.json`). Это новое
+  наблюдение; отрицательные operational receipts попытки `0bcf566` и её отката
+  сохранены. Новой активации после отката не было.
+- `d14e126` различает отсутствие Keychain item, отказ доступа, timeout и прочие
+  ошибки чтения credentials. Пользователю передаются только authored сообщения
+  и allowlisted коды; raw stderr, пути и значения ключей не выводятся. Claude,
+  NeuralDeep и OpenRouter прекращают подготовку до сети при ошибке чтения.
+  Общий delivery blocker больше не предлагает исправлять Codex для другого
+  исполнителя. Это улучшает диагностику, но не чинит текущий Keychain доступ.
+- Для этого исправления прошли **67 уникальных targeted tests**, в том числе
+  14 новых регрессий. Exact `d14e126` production build, typecheck и isolated
+  strict probe **5 страниц / 12 JS chunks** прошли с полным выходом owned tree.
+  Build ID: `SZsUaCSftlnOdGB45rZbx`. Единственный full self-test завершился
+  **1484/1485**, **6/7 групп**: один старый healthcheck test полагался на SQLite
+  внутри checkout. Этот результат сохранён как failure, а не pass.
+- Исправление `7522459` делает healthcheck fixture изолированным: временный
+  state/HOME, синтетическая SQLite из tracked schema, очищаемые данные.
+  Точечный тест **1/1 pass** без готового индекса в исходном checkout.
+  Каноническая БД не копировалась. Полный combined gate ещё предстоит.
+- Аудит исходного B §5.4 уточнил прежнюю запись «R8 закрыт на уровне UI»:
+  Subject/Phase сохраняли контекст, но обычный external Task Chat не получал
+  canonical factory capability. Это реальный оставшийся пробел исходного scope.
+  `b7c2e18` добавляет отдельный **Create new agent** и `factoryIntent` со slug.
+  Сервер определяет target и private state; parent остаётся read-only.
+  Subject/Phase сами по себе не дают factory authority. Native Codex сохраняет
+  прежний workflow. Existing project adoption через этот вход запрещён.
+- Typed и voice entry используют общий host binding и прежний worker. Отдельные
+  hash-bound Contract/Outcome approvals, research, budgets, immutable Trials,
+  process ownership и финальное user acceptance сохранены. Replay после потери
+  ответа/перезапуска возвращает исходный chat, даже если scaffold уже появился;
+  подмена intent/model/workspace конфликтует. Изменение доступности provider
+  позволяет снять Create new agent и явно объясняет недоступность.
+- Для typed entry прошли **88 уникальных targeted tests**, typecheck и diff check.
+  Два исходных failures при ограниченном socket-доступе сохранены отдельно;
+  соответствующие тесты прошли при корректных правах. Добавлены три browser
+  cases (1440/390 px, exact retry после reload, capability loss/Codex switch),
+  они ожидают общую production build. Реальный UI/voice factory lifecycle не
+  объявлен пройденным по synthetic worker tests или CLI pilot.
+- SDK dry validation обновлена для `d14e126`: **10/10**, без credentials, сети
+  и model calls. Native compiled harness и SDK live остаются pending.
+  Штатное пересохранение Claude API/NeuralDeep в Settings запрошено у оператора;
+  новые Keychain prompts/ACL изменения или обходы доступа не выполнялись.
+- Line-counter run сохраняет **0/40000 токенов, 1/3 итераций**. Его elapsed window
+  началось `2026-11-02T06:41:37Z` и заканчивается `2026-11-02T07:11:37Z` даже при
+  ожидании credentials. После срока требуется явное budget amendment;
+  повторный run, сброс clock или возврат итерации не подменяют одобрение.
+- Следующий combined gate: один self-test плюс отдельная недостающая
+  Agents Mother self-inspection, production build, typecheck, новые/прежние
+  targeted browser cases и strict health. Новая активация требует отдельного
+  непосредственного approval для exact combined candidate. Local reboot,
+  оставшиеся реальные voice/onboarding/factory checks и финальная приёмка ещё
+  открыты. OpenRouter live отложен пользователем; GitHub/MacBook не изменялись.
 
 ## 7. Полные исходные материалы
 

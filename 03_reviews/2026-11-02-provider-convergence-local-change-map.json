@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-01T22:47:47.718608+00:00",
+  "createdAt": "2026-11-02T07:12:31.498911+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -14,8 +14,8 @@
   ],
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
-  "fileCount": 571,
-  "filesSha256": "f7482d439bb74b6737fc52a0af6564666f7a0de15336bb2909e1b929aca88b8b",
+  "fileCount": 574,
+  "filesSha256": "d8a2252988dbdf0eca28c8ae53d1d02924c09aacb7e48c9f5039f2075b72f2b7",
   "files": [
     {
       "path": ".env.example",
@@ -49,8 +49,8 @@
       "path": "03_reviews/2026-11-01-brief-desk-adoption.json",
       "status": "A",
       "kind": "file",
-      "bytes": 9190,
-      "sha256": "65d600f5164006bf40c5f61c1a765b5d98a7a42ebd7d1534084d92a1b48e28c5"
+      "bytes": 9354,
+      "sha256": "ccf374241ecdcf5795d4c106ec43f7cd3dffacaabac89fcf7c24c0fd6f54bfa5"
     },
     {
       "path": "03_reviews/2026-11-01-compatible-provider-evidence.json",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 292514,
-      "sha256": "6ac536dc91a5b39efd86511141db3c0989124c0538de94352774ae2aba0c5097"
+      "bytes": 308114,
+      "sha256": "6f357a1d8399da8bca1dd6af048ad9131eb072b4f65bace14bb59fb83d6a50d3"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -196,8 +196,8 @@
       "path": "11_agents/reports/2026-11-01-pritha-provider-convergence-deployment-report.md",
       "status": "A",
       "kind": "file",
-      "bytes": 23332,
-      "sha256": "2ae28cc85597c68543f4384b0db75659bbc6e2fc3c3d8cfcc1598c6c67a6c455"
+      "bytes": 31078,
+      "sha256": "6efb7fe1facb2428fd024888161ab1aac653811bd949c3124f6ebfcee2f3ff60"
     },
     {
       "path": "AGENTS.md",
@@ -364,8 +364,8 @@
       "path": "examples/brief-desk-nd/project/docs/e2e-manual-test.md",
       "status": "A",
       "kind": "file",
-      "bytes": 2306,
-      "sha256": "0fbd9fa0bcc7cca69b1dcfd536a81df190b2316f54fd12643af2d1bfdbee0763"
+      "bytes": 4049,
+      "sha256": "42ec0f6335e10d50839f28382735bc35b3de2f4bf56af371f76833130943182a"
     },
     {
       "path": "examples/brief-desk-nd/project/docs/handoff.md",
@@ -553,8 +553,8 @@
       "path": "interfaces/control-center/src/app/api/codex-chat/v1/threads/route.ts",
       "status": "M",
       "kind": "file",
-      "bytes": 3465,
-      "sha256": "89beb81421760af4d2e219499e915126882d9c7e350fb65c44ccd0d116260bca"
+      "bytes": 3564,
+      "sha256": "0a90261eb519e7b57f93b0ea159317473567874d4838108253c1833b2765d784"
     },
     {
       "path": "interfaces/control-center/src/app/api/codex-chat/v1/workspace/route.ts",
@@ -693,15 +693,15 @@
       "path": "interfaces/control-center/src/components/codex/CodexChatPage.tsx",
       "status": "M",
       "kind": "file",
-      "bytes": 107666,
-      "sha256": "17a409d732a60b0377378e4681699ea2c1d1e1a951dacb9b07d53c59f417b9f6"
+      "bytes": 109048,
+      "sha256": "19705d6477c6631b1f209b04f545de890f554d2a3a0bcd2af37ce203bdff86ef"
     },
     {
       "path": "interfaces/control-center/src/components/codex/FactoryChatSelector.tsx",
       "status": "A",
       "kind": "file",
-      "bytes": 1903,
-      "sha256": "c1d66a2825ea25e327b8bc4a27da8c68260d184eb655d0bf25637dfe4af0cbda"
+      "bytes": 3098,
+      "sha256": "545259db8a4b4d9e6f69ae3b81337d4176e05ad6197c6c18a65ef3ccf8f8f346"
     },
     {
       "path": "interfaces/control-center/src/components/codex/NewChatProviderSelector.tsx",
@@ -812,8 +812,8 @@
       "path": "interfaces/control-center/src/lib/codex-chat/draft-session.ts",
       "status": "M",
       "kind": "file",
-      "bytes": 4780,
-      "sha256": "94a4883ec45c3d349851068418b58ccd0be350f0662ce378f84bbff274b41596"
+      "bytes": 5353,
+      "sha256": "4b185bab80510712330548105c9a1a8deb06c9a38c524725ac25bfc702228166"
     },
     {
       "path": "interfaces/control-center/src/lib/codex-chat/driver-types.ts",
@@ -861,8 +861,8 @@
       "path": "interfaces/control-center/src/lib/codex-chat/gateway.ts",
       "status": "M",
       "kind": "file",
-      "bytes": 14701,
-      "sha256": "1a0bf94ccaf89c868ab42fbe1116ba1798da8f2e6ce904bf1c309806ea052286"
+      "bytes": 15684,
+      "sha256": "3c80d73d66004bbf1ccc8c31badfdb1955d80817f5f1a68abc6fd429d42cbb49"
     },
     {
       "path": "interfaces/control-center/src/lib/codex-chat/http.ts",
@@ -875,8 +875,8 @@
       "path": "interfaces/control-center/src/lib/codex-chat/native-gateway.ts",
       "status": "A",
       "kind": "file",
-      "bytes": 117492,
-      "sha256": "fcc7785ba723dc1887f6723a5c144c558d629336124a259a49c3d52f77e6548c"
+      "bytes": 117972,
+      "sha256": "f7be6de9ed96a83feb2e9f943da9e9151e67dadf83c78b9b5179ea027ea47b2c"
     },
     {
       "path": "interfaces/control-center/src/lib/codex-chat/native-turn-coordinator.ts",
@@ -1218,8 +1218,8 @@
       "path": "interfaces/control-center/tests/e2e/task-chat-provider-selector.spec.ts",
       "status": "A",
       "kind": "file",
-      "bytes": 15030,
-      "sha256": "ea9802b9602956f839ae266e43401cb983cfbff4b26f272983bf5eb10a5a0159"
+      "bytes": 18467,
+      "sha256": "40bfb71bfd9f4ac2dc59af9240534e8805db3ecbec5fbc4092e1efd7efb161ba"
     },
     {
       "path": "interfaces/control-center/tests/e2e/task-chat-steer-queue.spec.ts",
@@ -1330,8 +1330,8 @@
       "path": "scripts/agents-mother/delivery-loop.mjs",
       "status": "M",
       "kind": "file",
-      "bytes": 65207,
-      "sha256": "05a0decd001b837f6414c16bf2a23bb73d0eb1d790fbccee64245f1831e23b21"
+      "bytes": 65239,
+      "sha256": "945fe302c01df7e86be3717c4219cd7e267a277830595fc185284e6df64ef95d"
     },
     {
       "path": "scripts/agents-mother/delivery-reconcile.mjs",
@@ -1386,8 +1386,8 @@
       "path": "scripts/agents-mother/identity.mjs",
       "status": "M",
       "kind": "file",
-      "bytes": 23798,
-      "sha256": "6f7a8311534edab952d81214285f3cc47cb13ffe51ba5743d2ee3075a71ef8a1"
+      "bytes": 26017,
+      "sha256": "adfd077866375b5891f2b6b2d9d4f4dcb3ebd949b1290d99f2be73556c9db518"
     },
     {
       "path": "scripts/agents-mother/index.mjs",
@@ -1526,15 +1526,15 @@
       "path": "scripts/agents-mother/voice-factory-state.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 3705,
-      "sha256": "9235047edb1c88098dd52ab178d1a9d2d16a213bdbb26382b37ef44780cb30ee"
+      "bytes": 4740,
+      "sha256": "35d2d9aa5eb804cbd3b217c61733304ced213f5bc4ca213c4a7a1dfff0c5ed9d"
     },
     {
       "path": "scripts/agents-mother/voice-factory-worker.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 14344,
-      "sha256": "8275352a009984d6723de2479c54fbbd8d81e2397db2b31cfc56e7675036db99"
+      "bytes": 13919,
+      "sha256": "2713d0b559232f0538e112fb8ad18b12423d2d300afde9539673be24c405f398"
     },
     {
       "path": "scripts/audit-neuraldeep-runtime-network.mjs",
@@ -1638,8 +1638,8 @@
       "path": "scripts/claude/provider-service.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 7356,
-      "sha256": "27f4149e49aab883929ee4be61ce24d07057f6e2d897b0a66ad28ae85af278ef"
+      "bytes": 7400,
+      "sha256": "6c4cae97b3b4d7e1e7f00384994e4b2ec2d5d99e3ab80fd9786d4445ee4713f0"
     },
     {
       "path": "scripts/claude/request-budget.mjs",
@@ -1792,15 +1792,15 @@
       "path": "scripts/lib/chat-subject.d.mts",
       "status": "A",
       "kind": "file",
-      "bytes": 480,
-      "sha256": "05eef8c1a637e3afb2c0777070b5f228d1815367a576aaaaf32e7ef881540b37"
+      "bytes": 621,
+      "sha256": "fe2017de1372307ff82a4a169a87f4eecb900824fc839350e377dc8d5fbfad69"
     },
     {
       "path": "scripts/lib/chat-subject.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 3998,
-      "sha256": "c9256008f9d06ecc9875020028a7dd0d5df0c93d702a4f1cefd4bd09d7c04f47"
+      "bytes": 4544,
+      "sha256": "a68a6a37c0e9664444638ce83c8b3817503fec0761970e1ec0bfae54a886120c"
     },
     {
       "path": "scripts/lib/child-model-client.mjs",
@@ -1967,15 +1967,15 @@
       "path": "scripts/lib/provider-credential.d.mts",
       "status": "A",
       "kind": "file",
-      "bytes": 720,
-      "sha256": "08b2ce6a702841ab478aa1460505acf4d74caf08d5d3a0b6f05124e339d02dea"
+      "bytes": 841,
+      "sha256": "d2a108b3c2657bc2ccfab23b9319f35eebaf24be7fb466d587149cd9d4504468"
     },
     {
       "path": "scripts/lib/provider-credential.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 4447,
-      "sha256": "162ae12f0693930387e493c5183f83b1889f1e83a21043f87828980f5a422ed1"
+      "bytes": 6488,
+      "sha256": "4eef2d908aec68e8189301590b4632c0cc6bbd3360636cf67820f21d3b0fae1c"
     },
     {
       "path": "scripts/lib/provider-factory-tools.mjs",
@@ -2086,8 +2086,8 @@
       "path": "scripts/lib/provider-task-runtime.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 39407,
-      "sha256": "81987476626fd4324a9432f8c02e776be5c2e278c7610ad371cfcc2c1b3c5740"
+      "bytes": 40502,
+      "sha256": "5d1b005af0e4d105a30637e7242eba0f50928c89ec31cbcf5ed4f5669d8ce807"
     },
     {
       "path": "scripts/lib/provider-thread-routing.d.mts",
@@ -2520,8 +2520,8 @@
       "path": "scripts/neuraldeep/provider-service.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 9632,
-      "sha256": "e5e107b80fbbf2cc38cb09c78a8ea8df20f08fbf6b295a215fe17950cdc42da6"
+      "bytes": 9759,
+      "sha256": "26ec0bea4ea66b22b945e2143bbf97cac8873f6ad998e25235d6e6a37b8d48a4"
     },
     {
       "path": "scripts/neuraldeep/responses-adapter.mjs",
@@ -2709,8 +2709,8 @@
       "path": "scripts/openai-compatible/provider-service.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 10649,
-      "sha256": "64553c0923340b168adcf14f270914e0b62c8a1322645995d3f07ccca9ed80fc"
+      "bytes": 10796,
+      "sha256": "015419e926425e605d89aad27337cfb817e791a0c6323a7c8a093270e13c8385"
     },
     {
       "path": "scripts/openai-compatible/responses-adapter.mjs",
@@ -3185,8 +3185,8 @@
       "path": "tests/agents-mother-delivery-loop.test.mjs",
       "status": "M",
       "kind": "file",
-      "bytes": 33009,
-      "sha256": "f3b17fb0ac4b06e21d9a9e90ba5f114e753d2b32e21dd7244f638a173f9d1dad"
+      "bytes": 34399,
+      "sha256": "d460964eb1bd331ca4693f1a154d211775f8d6ad623f5939c1ce6324b12bb31d"
     },
     {
       "path": "tests/agents-mother-evidence-input.test.mjs",
@@ -3220,8 +3220,8 @@
       "path": "tests/agents-mother-identity.test.mjs",
       "status": "M",
       "kind": "file",
-      "bytes": 17607,
-      "sha256": "9a651c796fb01ef0a65d02e9f39cbcc79ba207321b49911600a553e02dac3c17"
+      "bytes": 23708,
+      "sha256": "a2ad091655b84b49d27fe99e498320b31ac1a6b16be14692970679e7beb3a3a9"
     },
     {
       "path": "tests/agents-mother-init-brief.test.mjs",
@@ -3483,6 +3483,13 @@
       "sha256": "f716832fc7ec395fce5a85642ee31bd4b745b02c914d5a79be69076ef25798df"
     },
     {
+      "path": "tests/healthcheck.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 2105,
+      "sha256": "9b6f2289ed7a1056bc7d0ef5be1f2aa8afbdf543e72d74b74a7e0208bf03ee64"
+    },
+    {
       "path": "tests/helpers/control-center-ts.mjs",
       "status": "M",
       "kind": "file",
@@ -3514,8 +3521,8 @@
       "path": "tests/native-chat-subject.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 4043,
-      "sha256": "91c51b07434ca0a7c59fa75dc6208f83154a7dd08c2a2eeb2fad6f1257465d61"
+      "bytes": 4529,
+      "sha256": "63e3cb2225d6fb51580e3f946bede70eb56678ac91cc470a5144809987e347cb"
     },
     {
       "path": "tests/neuraldeep-chat-attachments.test.mjs",
@@ -3749,6 +3756,13 @@
       "sha256": "bc2705f3a0977803ea54cf637d2dd757263d343673f5f5113d04f0be1c438802"
     },
     {
+      "path": "tests/provider-credential-diagnostics.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 6994,
+      "sha256": "078c2e368b8d19cd01b028d0d5bca40059453cf7634a872561d70091bf7d8733"
+    },
+    {
       "path": "tests/provider-credentials.test.mjs",
       "status": "A",
       "kind": "file",
@@ -3759,8 +3773,8 @@
       "path": "tests/provider-draft-session.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 3885,
-      "sha256": "74eed541d1f1cce16a3472f9463cd3ab6cd51512a91f36265ceebd1b787ebc09"
+      "bytes": 5396,
+      "sha256": "b8eac79a0cb1258a3838008e4fba6ee17479aa05df1137f9dcbb13f1e1222b95"
     },
     {
       "path": "tests/provider-external-gateway.test.mjs",
@@ -3794,8 +3808,8 @@
       "path": "tests/provider-runtime-driver.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 12130,
-      "sha256": "950ac0c43f93ce2b1a37b91a94212a0b32d3ca59d38e8e118ef7b588e9f43da5"
+      "bytes": 14678,
+      "sha256": "69741dbbd886df661af4ce16197518295090fad2f6c9b6481580eed7b1b1797b"
     },
     {
       "path": "tests/provider-sandbox.test.mjs",
@@ -3845,6 +3859,13 @@
       "kind": "file",
       "bytes": 1771,
       "sha256": "8df92a2cc823e31e2474166f9cd29a573c7a29821ba277c4b34f069695dfbf20"
+    },
+    {
+      "path": "tests/provider-typed-factory.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 9902,
+      "sha256": "348b14f5844d87adac3cae1edfc84c8f06d6008a8a8485636244b64d59bcdab0"
     },
     {
       "path": "tests/provider-voice-factory.test.mjs",

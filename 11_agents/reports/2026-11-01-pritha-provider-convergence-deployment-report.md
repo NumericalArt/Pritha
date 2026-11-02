@@ -26,12 +26,126 @@ confidence: medium
 
 This report covers only the canonical Mac mini instance. GitHub and both
 MacBook instances remain outside the transaction. The operator explicitly
-approved activation of `15a17c1`, then the tested update `3853e0a`; both managed transactions are complete and
-operational health passes. Final operator acceptance remains pending.
-Exact machine paths, endpoints, build IDs and recovery
-receipts are private under the instance state root.
+approved activation of `15a17c1`, then the tested update `3853e0a`; both initial
+managed transactions completed and passed operational health at that time.
+A later approved activation of `0bcf566` was rolled back after the operational
+catalog gate failed. Runtime is `3853e0a`; candidate `94f3a33` is staged while the combined
+credential-diagnostic and typed-factory follow-up is being verified.
+Final operator acceptance remains pending. Exact machine paths, endpoints and
+recovery receipts remain private under the instance state root; non-secret
+release identities are recorded below.
 
-## Current update — 2026-11-02, Europe/Moscow
+## Current checkpoint — diagnostic and typed-factory follow-up
+
+A fresh operational check of running `3853e0a` passes after the approved child
+scaffold (`current-operational-health-94-preparation.json`). Earlier failed
+activation/rollback operational receipts remain historical failures. No further
+service transaction has occurred.
+
+`d14e126` reports credential access failures accurately without exposing secrets
+or raw process output. It does not repair the current Keychain access issue.
+Its 67 targeted checks, production build, typecheck and isolated five-page /
+twelve-chunk probe pass; owned processes exited. Its single full self-test is
+**1484/1485, six of seven groups**, not pass: the old healthcheck fixture depended
+on a pre-existing checkout SQLite. Test-only `7522459` isolates a synthetic
+schema/state/HOME; the corrected test passes without that database. The final
+combined full gate is still pending.
+
+`b7c2e18` closes a remaining original B §5.4 gap: ordinary external Task Chat now
+has an explicit **Create new agent** action. Subject/Phase remains context only.
+Host-derived targets, read-only parent workspace, separate hash-bound Contract
+and Outcome approvals, research, budgets, protected Trials and operator acceptance
+remain enforced. Existing projects cannot be adopted through this new entry.
+The implementation has **88 unique targeted tests passing**, typecheck and an
+independent boundary review. Three added browser cases await the production
+build. Synthetic worker evidence and the CLI pilot do not prove the real browser
+or voice-origin full factory lifecycle.
+
+The Claude API / NeuralDeep credential access repair is waiting for the operator's
+normal Settings action. Metadata presence and an unlocked Keychain do not prove
+that the application can read its credential. SDK dry checks are **10/10** with no
+credential, network or model access; SDK live and compiled native acceptance
+remain open. The existing child run uses zero tokens and one iteration; its
+thirty-minute elapsed window starts at `2026-11-02T06:41:37Z`. Continuing after
+`2026-11-02T07:11:37Z` requires an explicit amendment, not a new run or clock reset.
+
+Remaining manual work is bounded: fresh Claude onboarding; compiled provider
+continuation; Local recovery after separately approved reboot; representative
+voice tools, music/reconnect/persistent topic and explicit voice engines; one
+voice-to-Task-Chat full factory lifecycle; final operator acceptance. Existing
+native Queue/Edit/Cancel/Steer/Stop technical evidence and the user's audible
+response/interruption acceptance need not be repeated wholesale. OpenRouter
+live remains deferred. Full automated verification, new browser coverage and
+immediate approval precede activation of the combined candidate.
+
+## Previous checkpoint — 2026-11-02 06:45 UTC
+
+The approved `0bcf566` transaction passed exact identity, all five pages and twelve
+JavaScript chunks, and restored admission. The subsequent operational check found
+an agent-catalog conflict for an unscaffolded draft. Managed rollback restored
+`3853e0a`, strict health and admission; the same catalog conflict was observed on
+the restored build. Therefore neither the attempted update nor the rollback is
+claimed to have passed that operational gate. Private evidence includes
+`activation-operational-health.json`, `activation-failure.json`,
+`rollback-strict-health.json`, `rollback-operational-health.json` and
+`rollback-receipt.json`. Recovery source, matching dependencies and builds remain
+retained. No further state-name migration was needed.
+
+Candidate `94f3a33` corrects the draft identity case: a consistent draft
+Contract/Outcome with a safely absent planned target receives
+`project-planned-not-created` and `projectPath: null`. It does not authorize
+execution. Missing accepted/scaffolded projects, unsafe paths and identity
+conflicts remain blocked. Identity/readiness/scaffold checks pass **54/54**;
+the public-name guard passes with **126 references** and no expanded allowlist.
+
+The full candidate gate in `quality-94f3a33.json` passes **1471/1471 tests**, **zero
+skips**, and all **eight groups**. The existing warning about four historical
+commit-message prefixes remains; this is not a warning-free gate. Typecheck and
+production staging pass. Build **`Zu0payZPo2t-vkJUCB2Ra`** passes isolated strict
+health for **five pages and twelve JavaScript chunks**, exact source/build identity,
+and full owned process-tree exit, recorded in `probe-94f3a33/health.json` and
+`probe-94f3a33/process.json`. The candidate is not activated. A fresh immediate
+approval is required for its managed lifecycle transaction; the earlier approval
+was for `0bcf566`.
+
+Native Claude CLI now has real source-level evidence: host file access and
+same-session continuation **2/2**, **11690 observed tokens**, with complete process
+exit (`claude-native-live-result.json`). This supersedes the historical native-auth
+blocker below. It does not establish compiled Task Chat acceptance or the full
+fresh-instance browser-sign-in journey. SDK live single-turn acceptance also
+remains pending; dry validation is not provider inference.
+
+Brief Desk was actually imported and exercised with its own empty credentials:
+offline demo, edit, repeat demo and repeated import preserved project/settings/
+history hashes. Its temporary foreground server closed. Private
+`brief-desk-live-result.json` records pass, **zero provider requests** and **zero
+Telegram messages**; import/example tests pass **20/20**. Manual instructions now
+match the real CLI, CSRF and UI. No live-key/Telegram or final operator acceptance
+is inferred from this technical offline check.
+
+The operator separately approved the line-counter Contract and Outcome Spec and
+the **40000-token / three-iteration / thirty-minute** budget. Approval answers and
+immutable reviewed copies are private in `child-pilot/operator-approvals.json`.
+Canonical approval/rebinding retained the requested product and protected verifier;
+research evidence was rebound, and the real scaffold passed smoke/health. Delivery
+run `line-counter-claude-20261102` stopped before inference with
+`build_runtime_unavailable` / `provider_pending_auth`: **0/40000 tokens, 1/3
+iterations**, no live model process. Credential metadata exists and the default
+Keychain is unlocked/readable/writable, but the ordinary credential reader fails
+for an unresolved reason. The evidence does not prove a missing key or a locked
+Keychain (`child-pilot/credential-metadata-diagnostic.json`). Resume that bounded
+run only after readiness is restored, then perform independent Trials and operator
+acceptance. A scaffold is not a delivered product.
+
+Local recovery still needs separately approved host reboot and the retained
+receipt/hash checks; no reboot approval has been given. OpenRouter live remains
+explicitly deferred. Compiled provider checks, fresh onboarding, voice-origin
+external-provider factory, remaining voice/composer scenarios and final operator
+acceptance remain open. R12 and the overall goal are not complete. Documentation
+Good State Alignment reviewed the latest reliable-runtime and voice baselines:
+this evidence update is aligned and changes no accepted behavior or guardrail.
+
+## Historical update before the 0bcf566 attempt — 2026-11-02, Europe/Moscow
 
 `3853e0a` is active. Its source/build identity, five pages, twelve JavaScript
 chunks, admission and operational health passed. Post-activation self-test
@@ -210,7 +324,7 @@ Read-only inspection found the installed service loaded but stopped, with
 `circuit_open` and no listener. Logs show automatic wrapper starts followed by
 `ENOENT .next/server/preview-props.json`; the old retained build was produced
 with Next 16.2.11 while installed dependencies are now Next 16.4.3. This supports
-a build/dependency mismatch after automatic restart. No operator stop/start was
+a build/dependency mismatch after automatic restart. At that initial preflight no operator stop/start had yet been
 performed by this task; the reason for the initial automatic restart is unproven.
 
 The new matched build/dependency pair passed isolated strict health. Activation
@@ -232,8 +346,8 @@ must preserve a runnable current pair until the managed activation transaction.
 4. Obtain immediate approval for this concrete managed stop / migration / build
    swap / managed start transaction. AGENTS.md requires separate lifecycle approval.
 5. Stop only through `control-center-runtime.mjs stop --yes`. Verify owned
-   processes stopped. Re-plan state-name migration while offline; apply only
-   that current verified plan. Current preflight proposes SQLite filename only.
+   processes stopped. The SQLite name migration already completed in the first
+   transaction; do not repeat it during subsequent build updates.
 6. Preserve the current `.next`; atomically move the tested staging artifact
    into place. Start only through `control-center-runtime.mjs start --yes`.
 7. Require strict health with exact instance/source/state, commit and build ID;
@@ -274,7 +388,7 @@ provider billing, local model compatibility or user acceptance.
 | 5. NeuralDeep task and resume | Own key, selected model, limits/wallet display, text/file/verified PNG and host tools work | One bounded live task, usage/receipt, approval result |
 | 6. Claude API task and resume | Own API key, exact model, guarded tools, stop/queue, billing/cache usage | No extraction of native CLI OAuth or inherited credentials |
 | 6a. Claude native CLI session | Explicit sign-in through the unmodified CLI; native task/resume and guarded tools | Separate instance account, no API fallback or OAuth extraction; factory API requirement remains explicit |
-| 7. OpenRouter task and resume | Own key and exact model; tool approvals and usage correct | No silent model routing or fallback |
+| 7. OpenRouter task and resume — deferred by operator | Own key and exact model; tool approvals and usage correct when resumed | No silent model routing or fallback; no live pass claimed |
 | 8. Owned Local model | Configured command/model starts as owned process; real answer/file access succeeds offline | Remote and foreign loopback denied; process tree exits; no cloud key reads |
 | 9. Agent pilot | Interview, separate contract/outcome reviews, research, scaffold, delivery and protected Trials | Selected backend, budget/cache/turns, real output and isolation; no mocked claim |
 | 10. Realtime 2 | Default engine, nine tools, private Good State capture, memory and task handoff | Actual mic/speaker interaction; no spurious task for a Good State signal |
@@ -309,7 +423,8 @@ provider billing, local model compatibility or user acceptance.
   establish integration, not general coding quality of the compact model.
 - Unsupported image formats/providers remain visibly gated, rather than silently
   dropping attachments. The verified PNG path is NeuralDeep with the pinned CLI.
-- Further voice-engine/handoff checks, native Claude auth, the real child pilot
-  and final operator acceptance are pending. Audible Voice response and
+- Further voice-engine/handoff checks, compiled native Claude and fresh-instance
+  onboarding, the real child pilot and final operator acceptance are pending.
+  Native source-level auth/file/resume evidence is recorded above. Audible Voice response and
   interruption are already accepted. No Git/tag Good State baseline or
   publication has been performed.
