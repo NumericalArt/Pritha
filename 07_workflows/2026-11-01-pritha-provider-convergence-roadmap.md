@@ -2580,6 +2580,47 @@ unit child environment отдельно и изолировать оба aliases
   оставшиеся реальные voice/onboarding/factory checks и финальная приёмка ещё
   открыты. OpenRouter live отложен пользователем; GitHub/MacBook не изменялись.
 
+### Checkpoint 47 — общий автоматический gate перед активацией
+
+- На frozen `2eec60d` выполнен один полный self-test: **1495/1495 tests**,
+  **0 skipped**, семь групп pass, без self-test regressions и top-level warnings.
+  Отдельная Agents Mother self-inspection завершилась `complete`, exit 0:
+  совокупно **8/8 quality groups** без повторения полного unit suite.
+  Вложенный quality payload сохраняет одно прежнее предупреждение о префиксах
+  четырёх исторических commits. Оба owned process trees завершились, timeout нет.
+- Изолированный индекс содержит **771 docs / 7275 chunks / 7054 embeddings**.
+  Это не размер канонической пользовательской памяти. Read-only сравнение
+  показало в canonical snapshot **1005 docs / 11253 chunks**: там дополнительно
+  281 instance-agent-state документ и 15 локальных Markdown (6 ignored,
+  9 untracked); в чистой копии вместо private overrides используются 62 tracked
+  reference artifacts. **Ни один tracked curated path не потерян.** Wiki в обеих
+  копиях совпадает: 112 docs / 694 chunks. Shared content различается только
+  двумя обновлёнными roadmap/report (+4 chunks). Canonical index не менялся.
+- Production build `2eec60d` — `7t1K3LJfnrZIXVGLOi4-M`; typecheck, exact-source
+  isolated health **5 pages / 12 JS chunks** и полный выход owned tree прошли.
+- Пять targeted browser suites дали **29 уникальных успешных сценариев**.
+  Исходный прогон: 28/29; новый capability-loss тест неверно ожидал состояние
+  checkbox после его удаления из DOM. Snapshot/trace подтвердили корректный UI.
+  Test-only `b27bf2d` проверяет click, исчезновение control, сохранённый draft,
+  Subject и доступный Send; точечный повтор **1/1 pass**. Production UI не менялся,
+  исходный failure и trace сохранены. Все три новых factory cases прошли.
+  Ошибка имени лога в private retry wrapper сохранена отдельно; owned test tree
+  закрыт до повторного запуска, прежние receipts не подменены.
+- Чистый tracked source archive с отдельными state/HOME подготовлен для первого
+  входа Claude. Пять preparation checks прошли: начальный `not-configured`,
+  готовая команда с обоими root aliases и state, запуск plan из другого cwd,
+  без auth process и без создания credential state. Использована независимая
+  копия locked dependencies; download/bootstrap и browser sign-in этим не
+  проверялись. Live first-run acceptance остаётся за пользователем.
+- Native compiled dry **11/11** и SDK dry **10/10** не делали provider/model calls.
+  Их live attempts ещё не запускались. После финальной фиксации документов и
+  test-only correction последуют проверка doc/source-map delta и build identity;
+  изменённого runtime-кода после полного gate нет.
+- Production по-прежнему `3853e0a`. Новый exact candidate, managed activation,
+  восстановление API credential access, явное продление elapsed window того же
+  line-counter run, Local reboot и remaining voice/onboarding/factory/manual
+  acceptance остаются открыты. Goal не завершён; GitHub и MacBook не затронуты.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

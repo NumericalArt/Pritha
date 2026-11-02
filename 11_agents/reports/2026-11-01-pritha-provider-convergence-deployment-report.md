@@ -48,8 +48,12 @@ Its 67 targeted checks, production build, typecheck and isolated five-page /
 twelve-chunk probe pass; owned processes exited. Its single full self-test is
 **1484/1485, six of seven groups**, not pass: the old healthcheck fixture depended
 on a pre-existing checkout SQLite. Test-only `7522459` isolates a synthetic
-schema/state/HOME; the corrected test passes without that database. The final
-combined full gate is still pending.
+schema/state/HOME; the corrected test passes without that database. The combined
+`2eec60d` self-test now passes **1495/1495 tests**, seven groups, zero skipped,
+no regressions or top-level self-test warnings. Separate Agents Mother
+self-inspection completes the **eight of eight quality groups**. One nested
+quality warning about four historical commit prefixes remains. Full owned
+process exit is confirmed; the unit suite was not repeated.
 
 `b7c2e18` closes a remaining original B §5.4 gap: ordinary external Task Chat now
 has an explicit **Create new agent** action. Subject/Phase remains context only.
@@ -57,9 +61,26 @@ Host-derived targets, read-only parent workspace, separate hash-bound Contract
 and Outcome approvals, research, budgets, protected Trials and operator acceptance
 remain enforced. Existing projects cannot be adopted through this new entry.
 The implementation has **88 unique targeted tests passing**, typecheck and an
-independent boundary review. Three added browser cases await the production
-build. Synthetic worker evidence and the CLI pilot do not prove the real browser
-or voice-origin full factory lifecycle.
+independent boundary review. Production build `7t1K3LJfnrZIXVGLOi4-M` on `2eec60d`
+passes exact-source health for five pages and twelve chunks. Browser coverage is
+**29 unique cases passing**, including all three added factory cases. Initial
+28/29 evidence is retained: test-only `b27bf2d` corrects an assertion on a checkbox
+that correctly disappears; only that case was rerun, passing 1/1. Runtime source
+is unchanged. Synthetic worker evidence and the CLI pilot do not prove the real
+browser or voice-origin full factory lifecycle.
+
+The isolated corpus (771 documents, 7275 chunks, 7054 embeddings) is distinct
+from the canonical snapshot (1005 documents, 11253 chunks). A read-only audit
+accounts for instance-agent state, local ignored/untracked documents and tracked
+fallbacks; no indexed tracked curated path is missing. Wiki content is unchanged.
+Only the two updated roadmap/report documents differ in the shared authored set.
+The canonical index was not rebuilt by this isolated gate.
+
+A clean source archive with separate state/HOME is ready for first-run acceptance.
+Five preparation checks pass without credentials or an auth process. Its generated
+sign-in command pins both root aliases and state even from another working
+directory. Locked packages were reused independently; this is not proof of a fresh
+dependency download, browser sign-in or first live task.
 
 The Claude API / NeuralDeep credential access repair is waiting for the operator's
 normal Settings action. Metadata presence and an unlocked Keychain do not prove
@@ -75,8 +96,10 @@ voice tools, music/reconnect/persistent topic and explicit voice engines; one
 voice-to-Task-Chat full factory lifecycle; final operator acceptance. Existing
 native Queue/Edit/Cancel/Steer/Stop technical evidence and the user's audible
 response/interruption acceptance need not be repeated wholesale. OpenRouter
-live remains deferred. Full automated verification, new browser coverage and
-immediate approval precede activation of the combined candidate.
+live remains deferred. The remaining source delta after `2eec60d` consists only of a browser test and
+these documents/source map. Final identity build and immediate approval precede
+activation of the combined candidate; the full runtime suite is not repeated
+without another runtime change.
 
 ## Previous checkpoint — 2026-11-02 06:45 UTC
 
