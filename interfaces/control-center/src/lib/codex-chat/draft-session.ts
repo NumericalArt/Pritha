@@ -1,12 +1,13 @@
 import {isProviderConnectorId,type ProviderConnectorId} from '../settings/provider-profile';
-import {FACTORY_PHASES,normalizeChatSubject,type FactoryPhase} from '../../../../../scripts/lib/chat-subject.mjs';
+import {FACTORY_PHASES,normalizeChatSubject,normalizeFactoryIntent,type FactoryPhase} from '../../../../../scripts/lib/chat-subject.mjs';
 const KEY = "pritha.task-chat.drafts.v1";
 const MAX_BYTES = 2 * 1024 * 1024;
 export type DraftProviderSelection={connectorId:ProviderConnectorId;modelId?:string;effortId?:string;serviceTierId?:string};
-export type DraftFactorySelection={kind:'self'|'child';slug:string;phase:FactoryPhase};
+export type DraftFactorySelection={kind:'self'|'child';slug:string;phase:FactoryPhase;createNew?:boolean};
 export const DEFAULT_FACTORY_SELECTION:DraftFactorySelection={kind:'self',slug:'',phase:'interview'};
-export function composeDraftSubject(value:DraftFactorySelection=DEFAULT_FACTORY_SELECTION){return value.kind==='self'?null:normalizeChatSubject(value);}
-function factorySelectionValid(value:DraftFactorySelection){return value && typeof value==='object' && !Array.isArray(value) && ['self','child'].includes(value.kind) && typeof value.slug==='string' && value.slug.length<=64 && FACTORY_PHASES.some(row=>row.id===value.phase) && Object.keys(value).every(key=>['kind','slug','phase'].includes(key));}
+export function composeDraftSubject(value:DraftFactorySelection=DEFAULT_FACTORY_SELECTION){return value.createNew || value.kind==='self'?null:normalizeChatSubject({kind:value.kind,slug:value.slug,phase:value.phase});}
+export function composeDraftFactoryIntent(value:DraftFactorySelection=DEFAULT_FACTORY_SELECTION){return value.createNew?normalizeFactoryIntent({action:'create-new-agent',slug:value.slug}):null;}
+function factorySelectionValid(value:DraftFactorySelection){return value && typeof value==='object' && !Array.isArray(value) && ['self','child'].includes(value.kind) && typeof value.slug==='string' && value.slug.length<=64 && FACTORY_PHASES.some(row=>row.id===value.phase) && (value.createNew===undefined || typeof value.createNew==='boolean') && Object.keys(value).every(key=>['kind','slug','phase','createNew'].includes(key));}
 function selectionValid(value:DraftProviderSelection){return value && typeof value==='object' && !Array.isArray(value) && isProviderConnectorId(value.connectorId) && Object.keys(value).every(key=>['connectorId','modelId','effortId','serviceTierId'].includes(key))
   && (value.modelId===undefined || /^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(value.modelId)) && (value.effortId===undefined || ['default','none','minimal','low','medium','high','xhigh','max','ultra'].includes(value.effortId)) && (value.serviceTierId===undefined || /^[a-z_]{1,32}$/.test(value.serviceTierId));}
 export type DraftSession = {
@@ -36,6 +37,7 @@ export function readDraftSession():DraftSession|null {
       if(delivery.chatId!==key && delivery.draftId!==key)return null;
       if(delivery.connectorId!==undefined && !isProviderConnectorId(delivery.connectorId))return null;
       if(delivery.subject!==undefined)try{normalizeChatSubject(delivery.subject);}catch{return null;}
+      if(delivery.factoryIntent!==undefined)try{normalizeFactoryIntent(delivery.factoryIntent);if(delivery.connectorId==='codex' || delivery.subject!=null)return null;}catch{return null;}
       delivery.status="delivery_unknown";
     }
     if(value.workspaceModes && (typeof value.workspaceModes!=="object" || Array.isArray(value.workspaceModes) || Object.keys(value.workspaceModes).length>100 || Object.values(value.workspaceModes).some(mode=>!["isolated","configured","read-only"].includes(String(mode)))))return null;

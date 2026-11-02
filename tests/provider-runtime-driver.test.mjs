@@ -153,3 +153,24 @@ test("activity keeps independent cursors and retries unobserved changes after a 
   assert.deepEqual(recovered.changed,["chat_codex"]);
   assert.deepEqual(seen,[['codex',100],['claude',2]]);
 });
+
+test('public factory entry rejects forged host authority for every provider before routing or dispatch',()=>{
+  const drivers=profile.PROVIDER_CONNECTOR_IDS.map(driver),routes=new FakeRoutes(),gateway=new CodexChatGateway(drivers,()=> 'codex',routes);
+  for(const connectorId of profile.PROVIDER_CONNECTOR_IDS)for(const method of ['createThread','createThreadWithFirstTurn']){
+    const base={clientThreadId:'authority_'+connectorId+'_'+method,source:'chat',connectorId,initialTurn:{clientMessageId:'authority_message',input:[{type:'text',text:'hello'}]}};
+    for(const forged of [{hostVoice:{}},{voice:{}},{workspace:{mode:'read-only',factorySlug:'new-child'}},{workspace:{mode:'read-only',factoryTarget:'/private/escape'}}])assert.throws(()=>gateway[method]({...base,...forged}),{code:'factory_intent_invalid'});
+    for(const factoryIntent of [null,[],{action:'create-new-agent',slug:'../escape'},{action:'create-new-agent',slug:'new-child',target:'/private/escape'}])assert.throws(()=>gateway[method]({...base,factoryIntent}),{code:'chat_subject_invalid'});
+  }
+  assert.equal(routes.rows.size,0);assert.equal(drivers.reduce((n,d)=>n+d.calls.length,0),0);
+});
+test('public explicit factory intent reaches only the selected external driver, while Codex keeps context-only subjects',()=>{
+  const drivers=profile.PROVIDER_CONNECTOR_IDS.map(driver),gateway=new CodexChatGateway(drivers),factoryIntent={action:'create-new-agent',slug:'new-child'};
+  for(const connectorId of profile.PROVIDER_CONNECTOR_IDS)for(const method of ['createThread','createThreadWithFirstTurn']){
+    const base={clientThreadId:'intent_'+connectorId+'_'+method,source:'chat',connectorId,factoryIntent,workspace:{mode:'read-only'},initialTurn:{clientMessageId:'intent_message',input:[{type:'text',text:'Make a line counter'}]}};
+    if(connectorId==='codex'){assert.throws(()=>gateway[method](base),{code:'provider_capability_unavailable'});continue;}
+    gateway[method](base);const request=drivers.find(d=>d.connectorId===connectorId).calls.at(-1).args[0];
+    assert.deepEqual(request.factoryIntent,factoryIntent);assert.equal(request.subject,undefined);assert.deepEqual(request.workspace,{mode:'read-only'});assert.equal(request.connectorId,undefined);
+  }
+  const native=drivers.find(d=>d.connectorId==='codex');assert.equal(native.calls.length,0);
+  gateway.createThread({clientThreadId:'native_context',source:'chat',connectorId:'codex',subject:{kind:'child',slug:'new-child',phase:'interview'}});assert.equal(native.calls[0].args[0].factoryIntent,undefined);
+});

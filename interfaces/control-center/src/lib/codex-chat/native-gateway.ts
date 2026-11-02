@@ -50,6 +50,7 @@ import type {
 } from "./types";
 
 export type CreateThreadInput = {
+  factoryIntent?:import('../../../../../scripts/lib/chat-subject.mjs').FactoryIntent;
   subject?:ChatSubject|null;
   clientThreadId: string;
   title?: string;
@@ -268,6 +269,7 @@ export class CodexChatGateway {
   }
 
   async enqueueMessage(chatId: string, input: StartTurnInput) {
+    if(Object.hasOwn(input,'factoryIntent'))throw new CodexChatGatewayError('runtime_identity_mismatch','Agent creation can only be selected for a new chat.',409);
     return this.store.execution.withMutation(`queue-admission:${chatId}`,()=>this.enqueueMessageOwned(chatId,input));
   }
   private async enqueueMessageOwned(chatId: string, input: StartTurnInput) {
@@ -422,6 +424,7 @@ export class CodexChatGateway {
   }
 
   async createThread(input: CreateThreadInput) {
+    if(input.factoryIntent!==undefined || input.workspace?.factorySlug!==undefined)throw new CodexChatGatewayError('provider_capability_unavailable','Use the existing native agent workflow.',422);
     if(input.workspace?.agentId!==undefined)throw new CodexChatGatewayError('native_agent_workspace_route_required','Use the existing native child task route for this workspace.',409);
     const subject=normalizeChatSubject(input.subject);
     if (!validClientId(input.clientThreadId) || input.source !== "chat") {
@@ -1155,7 +1158,7 @@ export class CodexChatGateway {
   }
 
   async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean; fromQueue?: string } = {}): Promise<{ accepted: AcceptedTurn; replayed: boolean }> {
-    if(Object.hasOwn(input,'subject'))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
+    if(['subject','factoryIntent'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
     let binding = await this.requireBinding(chatId);
     if (binding.modelId && input.settings?.modelId && binding.modelId !== input.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "This thread keeps its original model. Create a new chat to use a different model.", 409);
     if (binding.archived) throw new CodexChatGatewayError("chat_archived", "Restore this chat from archive before sending a message.", 409);

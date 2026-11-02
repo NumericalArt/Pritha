@@ -20,6 +20,14 @@ export function normalizeChatSubject(value){
     || !FACTORY_PHASES.some(phase=>phase.id===value.phase))throw new ChatSubjectError();
   return {kind:'child',slug:value.slug,phase:value.phase};
 }
+/** A separate operator action, never an approval or a browser-selected path. */
+export function normalizeFactoryIntent(value){
+  if(value===undefined)return null;
+  if(!value || typeof value!=='object' || Array.isArray(value) || Object.keys(value).length!==2
+      || value.action!=='create-new-agent' || !Object.keys(value).every(key=>['action','slug'].includes(key)))throw new ChatSubjectError();
+  const subject=normalizeChatSubject({kind:'child',slug:value.slug,phase:'interview'});
+  return {action:'create-new-agent',slug:subject.slug};
+}
 export function factorySubjectInstructions(value){
   const subject=normalizeChatSubject(value);if(!subject)return '';
   return [

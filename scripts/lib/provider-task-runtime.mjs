@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, closeSync, constants, openSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { ProviderChatRegistry } from './provider-chat-registry.mjs';
-import {normalizeChatSubject} from './chat-subject.mjs';
+import {normalizeChatSubject,normalizeFactoryIntent} from './chat-subject.mjs';
 import { ExecutionCoordinator } from './execution-coordinator.mjs';
 import { callExecutionChannel, executionChannelView, registerExecutionChannel } from './execution-channel.mjs';
 import { inspectTaskWorkspace, prepareTaskWorkspace, taskWorkspaceResources, verifyTaskWorkspace } from './task-workspace.mjs';
@@ -12,7 +12,7 @@ import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,ex
 import { normalizeProviderPreset } from './provider-profile.mjs';
 import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
 import {resolveProviderAgentWorkspace} from './provider-agent-workspace.mjs';
-import {voiceFactoryPaths} from '../agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,prepareFactoryBinding} from '../agents-mother/voice-factory-state.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -85,10 +85,13 @@ export class ProviderTaskRuntime {
   activeIntent(chat){return this.execution.listIntents({kind:'turn',states:activeStates,limit:1000}).find(row=>row.chatId===chat) || null;}
   async workspacePreview(){return inspectTaskWorkspace(this.root);}
   async create(input,{voice}={}){
-    const subject=normalizeChatSubject(input?.subject);
+    const intent=normalizeFactoryIntent(input?.factoryIntent);
+    if(intent && (Object.keys(input).some(key=>!['factoryIntent','clientThreadId','source','title','settings','workspace','subject','initialTurn'].includes(key)) || voice || input.subject!=null || input.workspace && (Object.keys(input.workspace).some(key=>key!=='mode') || input.workspace.mode!=='read-only')))
+      throw failure('factory_intent_invalid','Create a new agent separately from subject context and workspace settings.',400);
+    const subject=intent?normalizeChatSubject({kind:'child',slug:intent.slug,phase:'interview'}):normalizeChatSubject(input?.subject);
     const factorySlug=input?.workspace?.factorySlug;
     if(factorySlug!==undefined && (!voice || subject?.slug!==factorySlug || subject.phase!=='interview' || input.workspace.mode!=='read-only' || input.workspace.agentId || input.workspace.baseRevision))throw failure('voice_factory_subject_binding_required');
-    const factory=factorySlug?voiceFactoryPaths({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug:factorySlug}):null;
+    const requestedFactorySlug=intent?.slug || factorySlug;
     const child=input?.workspace?.agentId===undefined?null:resolveProviderAgentWorkspace({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent},input.workspace.agentId);
     if(child && child.agentId!==input.workspace.agentId)throw failure('provider_agent_workspace_identity');
     if(!validClient(input?.clientThreadId) || input.source!=='chat' || (input.workspace?.mode!==undefined && !['isolated','configured','read-only'].includes(input.workspace.mode)))throw failure('invalid_request','A valid chat request is required.',400);
@@ -102,10 +105,11 @@ export class ProviderTaskRuntime {
     return this.execution.withMutation('provider-create:'+this.connectorId+':'+input.clientThreadId,async()=>{
       const raced=this.registry.findByClient(input.clientThreadId);
       if(raced){if(raced.createHash!==hash(request))throw failure('idempotency_conflict');return {binding:raced,replayed:true};}
+      const factory=requestedFactorySlug?prepareFactoryBinding({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug:requestedFactorySlug}):null;
       const current=this.options.configuration(),config=voicePreset?{...voicePreset,sandbox:current.sandbox}:current;
       if(voice && input.workspace?.mode==='isolated' && config.sandbox!=='workspace-write')throw failure('voice_workspace_write_unavailable');
       const modelId=input.settings?.modelId || config.modelId;
-      const sandbox=input.workspace?.mode==='read-only' ? 'read-only' : config.sandbox || 'read-only';
+      const sandbox=factory || input.workspace?.mode==='read-only' ? 'read-only' : config.sandbox || 'read-only';
       if(!['read-only','workspace-write'].includes(sandbox))throw failure('provider_sandbox_invalid','This provider requires a bounded workspace sandbox.');
       let executionConfig={...config,modelId,sandbox,reasoningEffort:input.settings?.effortId || config.reasoningEffort};
       if(this.options.resolveConfiguration)executionConfig=await this.options.resolveConfiguration(executionConfig);
@@ -151,7 +155,7 @@ export class ProviderTaskRuntime {
     return {...common,kind:'queue',queueId:queued.id,revision:queued.revision,status:queued.state,reason:queued.reason || null};
   }
   validateTurn(binding,input){
-    if(input && Object.hasOwn(input,'subject'))throw failure('runtime_identity_mismatch','This chat retains its original subject and factory phase.');
+    if(input && ['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw failure('runtime_identity_mismatch','This chat retains its original subject and factory phase.');
     const text=providerTurnText(input);
     if(binding.archived)throw failure('chat_archived','Restore this chat before sending a message.');
     if(input.settings?.modelId && input.settings.modelId!==binding.modelId || input.settings?.effortId && input.settings.effortId!==binding.effortId || input.settings?.serviceTierId)throw failure('runtime_identity_mismatch','This chat retains its original provider, model and execution settings.');
@@ -242,7 +246,7 @@ export class ProviderTaskRuntime {
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
-        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:delivery.prompt?[text,delivery.prompt].filter(Boolean).join('\n\n'):text,searchUserText:binding.origin==='voice'?'':text,
+        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact new child. Begin with a complete brief and an explicit build token budget. Obtain separate Contract and Outcome approvals, complete canonical research, then scaffold, deliver and verify. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),searchUserText:binding.origin==='voice'?'':text,
         ...(binding.subject?{factorySubject:binding.subject}:{}),
         images:delivery.images || [],...(delivery.attachmentManifest?{attachmentManifest:delivery.attachmentManifest}:{}),signal:active.controller.signal,
         ...(delivery.hostAttachments?{hostAttachments:delivery.hostAttachments}:{}),

@@ -27,3 +27,11 @@ test('each draft and unknown first send preserve their separate factory subject 
   assert.deepEqual(f.composeDraftSubject(subject),subject);assert.equal(f.composeDraftSubject({kind:'self',slug:'kept-draft',phase:'outcome'}),null);assert.throws(()=>f.composeDraftSubject(restored.factorySelections.draft_two),{code:'chat_subject_invalid'});
   value.pendingNew.draft_one.subject.approved=true;f.writeDraftSession(value);assert.equal(f.readDraftSession(),null);
 });
+
+test('explicit creation intent survives uncertain delivery without becoming subject metadata or host authority',()=>{
+  const f=fixture(),value=initial(),intent={action:'create-new-agent',slug:'new-child'};
+  value.factorySelections={draft_one:{kind:'child',slug:'new-child',phase:'outcome',createNew:true}};value.pendingNew.draft_one.factoryIntent=intent;value.pendingNew.draft_one.workspace={mode:'read-only'};
+  f.writeDraftSession(value);const restored=f.readDraftSession();assert.deepEqual(restored.pendingNew.draft_one.factoryIntent,intent);assert.equal(restored.creationIds.draft_one,value.creationIds.draft_one);assert.equal(restored.pendingNew.draft_one.clientThreadId,value.pendingNew.draft_one.clientThreadId);assert.equal(restored.pendingNew.draft_one.clientMessageId,value.pendingNew.draft_one.clientMessageId);assert.equal(restored.pendingNew.draft_one.status,'delivery_unknown');assert.equal(f.composeDraftSubject(restored.factorySelections.draft_one),null);assert.deepEqual(f.composeDraftFactoryIntent(restored.factorySelections.draft_one),intent);
+  assert.deepEqual(f.composeDraftSubject({...restored.factorySelections.draft_one,createNew:false}),{kind:'child',slug:'new-child',phase:'outcome'});
+  for(const extra of [{factoryIntent:{...intent,target:'/escape'}},{connectorId:'codex'},{subject:{kind:'child',slug:'new-child',phase:'interview'}}]){value.pendingNew.draft_one={...restored.pendingNew.draft_one,...extra};f.writeDraftSession(value);assert.equal(f.readDraftSession(),null);}
+});

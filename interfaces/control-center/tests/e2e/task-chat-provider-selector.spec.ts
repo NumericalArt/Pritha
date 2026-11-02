@@ -1,7 +1,7 @@
 import {test,expect,type Page,type Route} from '@playwright/test';
 
 async function fixture(page:Page){
-  const now=new Date().toISOString(),requests:Array<{route:Route;body:any;chatId?:string}>=[],previews:Array<{route:Route;url:URL}>=[];let holdPreview=false,defaultProvider='codex',settingsWrites=0;
+  const now=new Date().toISOString(),requests:Array<{route:Route;body:any;chatId?:string}>=[],previews:Array<{route:Route;url:URL}>=[];let holdPreview=false,defaultProvider='codex',settingsWrites=0,approvalReady=true;
   const presets={codex:{modelId:'native-model',reasoningEffort:'medium',timeoutMs:30000},openrouter:{modelId:'vendor/alpha',reasoningEffort:'default',timeoutMs:30000},claude:{modelId:'claude-fixture',reasoningEffort:'high',timeoutMs:30000},neuraldeep:{modelId:'nd-fixture',reasoningEffort:'xhigh',timeoutMs:30000},local:{modelId:'local-fixture',reasoningEffort:'default',timeoutMs:30000}};
   const row=(chatId:string,connectorId='codex',modelId='native-model',effortId='medium')=>({chatId,title:chatId==='chat_native_saved'?'Native saved':`${connectorId} saved`,preview:'',group:'my_chats',origin:'chat',status:'idle',activeFlags:[],taskLinks:[],archived:false,historyKind:connectorId==='codex'?'native':'mirrored',createdAt:now,updatedAt:now,runtime:{connectorId,modelId,providerId:connectorId==='codex'?'desktop_bundled':connectorId+'_runtime',compatibility:'bound'},continuationState:'continuation_enabled',effortId});
   const rows=[row('chat_native_saved')];
@@ -10,7 +10,7 @@ async function fixture(page:Page){
     const saved=rows.find(row=>row.chatId===url.searchParams.get('chatId')),connectorId=(saved?.runtime.connectorId || url.searchParams.get('connectorId') || defaultProvider) as keyof typeof presets,preset=presets[connectorId];
     const modelId=saved?.runtime.modelId || url.searchParams.get('modelId') || preset.modelId,effortId=saved?.effortId || url.searchParams.get('effortId') || preset.reasoningEffort,providerId=connectorId==='codex'?'desktop_bundled':connectorId+'_runtime';
     const models=(connectorId==='openrouter'?['vendor/alpha','vendor/beta']:[preset.modelId]).map(id=>({id,label:id,effortIds:connectorId==='openrouter'?['default','high']:['medium','high'],defaultEffortId:preset.reasoningEffort,serviceTierIds:connectorId==='codex'?['standard','fast']:[],inputModalities:['text']}));
-    return {connectorId,availability:'ready',preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:connectorId==='codex'?'app_server':'exec_resume',fallbackEnabled:false,probedAt:now,models,selected:{modelId,effortId,serviceTierId:connectorId==='codex'?url.searchParams.get('serviceTierId') || 'standard':null,sandboxMode:'read_only',approvalMode:'on_request'},providers:[{providerId,label:connectorId,locationLabel:connectorId,protocol:'app_server',availability:'ready',capabilities:{fullChat:true,fileMetadata:connectorId==='codex',imageInput:false,steerTurn:false,interruptTurn:true}}]};
+    return {connectorId,availability:'ready',preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:connectorId==='codex'?'app_server':'exec_resume',fallbackEnabled:false,probedAt:now,models,selected:{modelId,effortId,serviceTierId:connectorId==='codex'?url.searchParams.get('serviceTierId') || 'standard':null,sandboxMode:'read_only',approvalMode:'on_request'},providers:[{providerId,label:connectorId,locationLabel:connectorId,protocol:'app_server',availability:'ready',capabilities:{fullChat:true,commandApprovals:approvalReady,fileMetadata:connectorId==='codex',imageInput:false,steerTurn:false,interruptTurn:true}}]};
   };
   const envelope=(data:any)=>({apiVersion:'1',requestId:'fixture',data});
   await page.route('**/api/task-runtime/settings',route=>{if(route.request().method()==='POST')settingsWrites++;return route.fulfill({json:{ok:true,settings:{version:1,revision:0,activeConnectorId:defaultProvider,providerPresets:presets}}});});
@@ -28,7 +28,7 @@ async function fixture(page:Page){
     const turn={turnId:'turn_'+index,clientMessageId:input.clientMessageId,status:'completed',userMessage:{id:'message_'+index,role:'user',markdown:input.input[0].text,status:'completed',createdAt:now},items:[],pendingRequestIds:[],startedAt:now,error:null},accepted={turn,streamUrl:`/api/codex-chat/v1/threads/${chatId}/events`};
     await pending.route.fulfill({status:202,json:envelope(pending.body.initialTurn?{detail:detail(chatId),accepted}:accepted)});
   }
-  return {requests,previews,finish,hold(){holdPreview=true;},async release(index:number){const entry=previews[index];await entry.route.fulfill({json:envelope(runtime(entry.url))});},changeDefault(id:string){defaultProvider=id;},writes:()=>settingsWrites};
+  return {requests,previews,finish,setApprovalReady(value:boolean){approvalReady=value;},hold(){holdPreview=true;},async release(index:number){const entry=previews[index];await entry.route.fulfill({json:envelope(runtime(entry.url))});},changeDefault(id:string){defaultProvider=id;},writes:()=>settingsWrites};
 }
 async function newDraft(page:Page,width=1440){
   await expect(page.locator('.codex-composer textarea')).toBeEnabled();
@@ -86,4 +86,26 @@ test('parallel new drafts keep independent factory subjects while a late first c
   await newDraft(page);await expect(page.getByLabel('Chat subject',{exact:true})).toHaveValue('self');await page.getByLabel('Chat subject',{exact:true}).selectOption('child');await page.getByLabel('Child agent slug').fill('second-child');await page.getByLabel('Factory phase').selectOption('interview');await composer.fill('Second child interview');await page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(2);
   expect(f.requests.map(entry=>entry.body.subject)).toEqual([{kind:'child',slug:'first-child',phase:'contract'},{kind:'child',slug:'second-child',phase:'interview'}]);
   await f.finish(1,'chat_codex_second_child');await f.finish(0,'chat_codex_first_child');await expect(page).toHaveURL(/chat_codex_second_child/);await expect(page.getByLabel('Factory task context')).toContainText('second-child · Interview');
+});
+
+for(const width of [1440,390])test(`explicit Create new agent sends only its intent and replays unchanged at ${width}px`,async({page})=>{
+  const f=await fixture(page);await page.setViewportSize({width,height:960});await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page,width);
+  await expect(page.getByLabel('Create new agent',{exact:true})).toHaveCount(0);
+  await page.getByLabel('New chat provider',{exact:true}).selectOption('claude');await page.getByLabel('Create new agent',{exact:true}).check();
+  await expect(page.getByLabel('Chat subject',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New chat workspace',{exact:true})).toHaveCount(0);
+  await page.locator('.codex-composer textarea').fill('Create a local line counter.');await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();
+  await page.getByLabel('New agent slug').fill('typed-counter');await page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(1);
+  const original=f.requests[0].body;expect(original.factoryIntent).toEqual({action:'create-new-agent',slug:'typed-counter'});expect(original.subject).toBeUndefined();expect(original.workspace).toEqual({mode:'read-only'});
+  f.changeDefault('codex');await page.reload();await expect(page.getByLabel('Create new agent',{exact:true})).toBeChecked();await expect(page.getByLabel('Create new agent',{exact:true})).toBeDisabled();await expect(page.getByLabel('New agent slug')).toHaveValue('typed-counter');
+  await page.getByRole('button',{name:'Check and retry same message',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(2);expect(f.requests[1].body).toEqual(original);await f.finish(1,'chat_claude_typed_factory');
+});
+
+test('factory mode can be disabled after capabilities change and switching to Codex clears creation intent',async({page})=>{
+  const f=await fixture(page);await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page);
+  const provider=page.getByLabel('New chat provider',{exact:true}),create=page.getByLabel('Create new agent',{exact:true}),send=page.getByRole('button',{name:'Send',exact:true});
+  await provider.selectOption('claude');await create.check();await page.getByLabel('New agent slug').fill('typed-counter');await page.locator('.codex-composer textarea').fill('Keep my draft.');
+  f.setApprovalReady(false);await page.reload();await expect(create).toBeChecked();await expect(create).toBeEnabled();await expect(send).toBeDisabled();await expect(page.getByRole('alert').filter({hasText:'Agent creation is unavailable'})).toBeVisible();
+  await create.uncheck();await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await expect(send).toBeEnabled();expect(f.requests).toHaveLength(0);
+  f.setApprovalReady(true);await page.reload();await create.check();await expect(page.getByLabel('New agent slug')).toHaveValue('typed-counter');await provider.selectOption('codex');
+  await expect(create).toHaveCount(0);await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await send.click();await expect.poll(()=>f.requests.length).toBe(1);expect(f.requests[0].body.connectorId).toBe('codex');expect(f.requests[0].body.factoryIntent).toBeUndefined();await f.finish(0,'chat_codex_regular');
 });

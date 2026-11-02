@@ -44,6 +44,7 @@ export async function POST(request: Request) {
       source: "chat";
       connectorId?:ProviderConnectorId;
       subject?:ChatSubject|null;
+      factoryIntent?:import('../../../../../../../../scripts/lib/chat-subject.mjs').FactoryIntent;
       workspace?: {baseRevision?:string;mode?:"isolated"|"configured"|"read-only"};
       settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
       initialTurn?: {

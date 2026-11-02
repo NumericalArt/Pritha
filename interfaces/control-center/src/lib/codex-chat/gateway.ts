@@ -1,5 +1,5 @@
 import { CodexAppServerDriver } from "./drivers/codex-app-server-driver";
-import {normalizeChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
+import {normalizeChatSubject,normalizeFactoryIntent} from '../../../../../scripts/lib/chat-subject.mjs';
 import { NeuralDeepDriver } from "./drivers/neuraldeep-driver";
 import { ClaudeDriver } from "./drivers/claude-driver";
 import { CompatibleDriver } from "./drivers/compatible-driver";
@@ -104,9 +104,16 @@ export class CodexChatGateway {
       throw error;
     }
   }
+  private validatePublicFactoryRequest(input:Create) {
+    if(['voice','hostVoice'].some(key=>Object.hasOwn(input,key)) || input.workspace && ['factorySlug','factoryTarget'].some(key=>Object.hasOwn(input.workspace!,key)))
+      throw new CodexChatGatewayError('factory_intent_invalid','Use Create new agent instead of supplying host workspace bindings.',400);
+    return normalizeFactoryIntent(input.factoryIntent);
+  }
   createThread(input: Create) {
     normalizeChatSubject(input.subject);
+    const intent=this.validatePublicFactoryRequest(input);
     const route = this.creationRoute(input), { connectorId: _connectorId, ...request } = input;
+    if(intent && route.connectorId==='codex')throw new CodexChatGatewayError('provider_capability_unavailable','Use the existing native agent workflow or select an external provider for Create new agent.',422);
     return this.driver(route.connectorId).backend.createThread({ ...request, settings: { ...request.settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
   }
   createThreadWithFirstTurn(input: CreateWithTurn) {
@@ -114,7 +121,9 @@ export class CodexChatGateway {
     if (input.settings?.modelId && input.initialTurn.settings?.modelId && input.settings.modelId !== input.initialTurn.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "The first turn must use the chat's model.", 409);
     for(const field of ['effortId','serviceTierId'] as const)if(input.settings?.[field] && input.initialTurn.settings?.[field] && input.settings[field]!==input.initialTurn.settings[field])throw new CodexChatGatewayError('runtime_identity_mismatch','The first turn must use the chat’s execution settings.',409);
     const settings={...input.initialTurn.settings,...input.settings};
+    const intent=this.validatePublicFactoryRequest(input);
     const route = this.creationRoute({ ...input, settings }), { connectorId: _connectorId, ...request } = input;
+    if(intent && route.connectorId==='codex')throw new CodexChatGatewayError('provider_capability_unavailable','Use the existing native agent workflow or select an external provider for Create new agent.',422);
     return this.driver(route.connectorId).backend.createThreadWithFirstTurn({ ...request, settings: { ...settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
   }
   activity(after = 0) { return this.drivers.size === 1 ? this.driver("codex").backend.activity(after) : this.activityMux.read(after); }

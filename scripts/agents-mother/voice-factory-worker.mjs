@@ -7,7 +7,7 @@ import {parseFrontmatterData} from '../lib/frontmatter.mjs';
 import {redactSensitiveText} from '../lib/redaction.mjs';
 import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals} from './voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable} from './voice-factory-state.mjs';
 
 const executors={neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
 function draftMetadata(text,previous){
@@ -53,12 +53,8 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       const brief=normalizeInterviewBrief(input.brief);if(brief.identity.slug && brief.identity.slug!==p.slug)throw factoryFail('factory_subject_changed');
       brief.identity.slug=p.slug;brief.technical.targetFolder=p.target;
       const issues=validateInterviewBrief(brief,{requireComplete:true});if(issues.length)throw validationFailure(issues);
-      // Refuse to adopt or overwrite any pre-existing target contract.
-      const directory=path.join(p.memory,'contracts');
-      if(fs.existsSync(directory))for(const name of fs.readdirSync(directory).filter(name=>name.endsWith('.md')).slice(0,10000)){
-        const file=path.join(directory,name),fm=parseFrontmatterData(factoryRead(file,directory));
-        if(fm?.type==='agent-contract'){const data=contractData(file,{root:p.root});if(data.technicalSlug===p.slug || path.resolve(p.root,data.targetFolder)===p.target)throw factoryFail('factory_target_exists');}
-      }
+      // Recheck at the effect boundary; chat creation alone cannot reserve a path.
+      assertFactoryTargetAvailable(p);
       const briefFile=path.join(p.directory,'brief.json');atomicWriteFile(briefFile,JSON.stringify(brief));
       const result=await interview({'from-brief':briefFile,'contract-only':true,'no-input':true,'build-executor':executor,'build-token-budget':String(input.build_token_budget),'build-git-mode':'disposable-worktree',autostart:'disabled','target-folder':p.target,slug:p.slug});
       state.contract=result.contractPath;const data=contractData(state.contract,{root:p.root});state.agentId=data.agentId;state.agentName=data.agentName;state.phase='contract-draft';

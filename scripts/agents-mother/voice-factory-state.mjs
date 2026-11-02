@@ -6,6 +6,7 @@ import {resolvePrithaAgentMemoryRoot,resolvePrithaAgentParent} from '../lib/path
 import {scopedAgentWorkspace} from '../lib/task-workspace.mjs';
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {parseFrontmatterData} from '../lib/frontmatter.mjs';
+import {contractData} from './contract.mjs';
 
 export const factoryHash=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 export const factoryFail=code=>Object.assign(new Error('Review the bound factory step and its saved evidence.'),{code});
@@ -16,6 +17,25 @@ export function voiceFactoryPaths(options){
   if(target===root || target.startsWith(root+path.sep) || target===stateRoot || target.startsWith(stateRoot+path.sep))throw factoryFail('factory_target_invalid');
   const directory=path.join(memory,'voice-factory',subject.slug),file=path.join(directory,'session.json');
   return {root,stateRoot,parent,target,memory,directory,file,slug:subject.slug};
+}
+/** Both typed and voice creation derive the same host-owned target. Replays
+ * must resolve their saved chat before calling this new-session check. */
+export function prepareFactoryBinding(options){
+  const p=voiceFactoryPaths(options);
+  assertFactoryTargetAvailable(p);
+  if(fs.existsSync(p.file))throw factoryFail('factory_target_exists');
+  return p;
+}
+export function assertFactoryTargetAvailable(p){
+  if(fs.existsSync(p.target))throw factoryFail('factory_target_exists');
+  const directory=path.join(p.memory,'contracts');
+  if(!fs.existsSync(directory))return;
+  for(const name of fs.readdirSync(directory).filter(name=>name.endsWith('.md'))){
+    const file=path.join(directory,name),text=factoryRead(file,directory),fm=parseFrontmatterData(text);
+    if(fm?.type!=='agent-contract')continue;
+    const data=contractData(file,{root:p.root});
+    if(data.technicalSlug===p.slug || path.resolve(p.root,data.targetFolder)===p.target)throw factoryFail('factory_target_exists');
+  }
 }
 export function factoryRead(file,allowedRoot,maxBytes=100000){
   const stat=fs.lstatSync(file);

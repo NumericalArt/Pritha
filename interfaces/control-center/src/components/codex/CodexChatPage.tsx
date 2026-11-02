@@ -17,8 +17,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import dynamic from "next/dynamic";
 import { useChatAttachments } from "./useChatAttachments";
-import { readDraftSession, writeDraftSession,composeDraftSubject,type DraftFactorySelection,type DraftProviderSelection } from "@/lib/codex-chat/draft-session";
-import {FACTORY_PHASES,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
+import { readDraftSession, writeDraftSession,composeDraftSubject,composeDraftFactoryIntent,type DraftFactorySelection,type DraftProviderSelection } from "@/lib/codex-chat/draft-session";
+import {FACTORY_PHASES,type ChatSubject,type FactoryIntent} from '../../../../../scripts/lib/chat-subject.mjs';
 import {FactoryChatSelector} from './FactoryChatSelector';
 import {PROVIDER_LABELS,type ProviderConnectorId} from '@/lib/settings/provider-profile';
 import {NewChatProviderSelector} from './NewChatProviderSelector';
@@ -100,6 +100,7 @@ type PendingDelivery = {
 };
 
 type PendingNewChatDelivery = {
+  factoryIntent?:FactoryIntent;
   subject?:ChatSubject;
   connectorId?:ProviderConnectorId;
   draftId: string;
@@ -305,7 +306,7 @@ export function CodexChatPage() {
   const workspaceModesRef=useRef(workspaceModes);workspaceModesRef.current=workspaceModes;
   const [factorySelections,setFactorySelections]=useState<Record<string,DraftFactorySelection>>({});
   const factorySelectionsRef=useRef(factorySelections);factorySelectionsRef.current=factorySelections;
-  let factoryInvalid=false;try{composeDraftSubject(factorySelections[newDraftId]);}catch{factoryInvalid=true;}
+  let factoryInvalid=false;try{composeDraftSubject(factorySelections[newDraftId]);composeDraftFactoryIntent(factorySelections[newDraftId]);}catch{factoryInvalid=true;}
   const [providerSelections,setProviderSelections]=useState<Record<string,DraftProviderSelection>>({});
   const providerSelectionsRef=useRef(providerSelections);providerSelectionsRef.current=providerSelections;
   const runtimeRequest=useRef(0);
@@ -1033,6 +1034,8 @@ export function CodexChatPage() {
     : displayedTurns.some(turn => turn.status === "queued") ? "In queue" : null;
   const displayedThread = displayedDetail?.thread || selectedSummary;
   const effectiveProvider = runtime?.providers.find((provider) => provider.providerId === (displayedThread?.runtime.providerId || runtime.effectiveProvider));
+  const factoryCreationAvailable=Boolean(runtime?.connectorId && runtime.connectorId!=='codex' && effectiveProvider?.capabilities.commandApprovals===true);
+  const factoryCreationUnavailable=Boolean(!selectedChatId && factorySelections[newDraftId]?.createNew && !factoryCreationAvailable);
   const visibleError = error && (error.chatId == null || error.chatId === selectedChatId) ? error : null;
   const backendOffline = visibleError?.kind === "backend_offline";
   const threadUnavailable = Boolean(historyIssue && !historyIssue.retryable);
@@ -1254,6 +1257,7 @@ export function CodexChatPage() {
           source: "chat",
           ...(delivery.connectorId?{connectorId:delivery.connectorId}:{}),
           ...(delivery.subject?{subject:delivery.subject}:{}),
+          ...(delivery.factoryIntent?{factoryIntent:delivery.factoryIntent}:{}),
           ...(delivery.workspace ? {workspace:delivery.workspace} : {}),
           initialTurn: {
             clientMessageId: delivery.clientMessageId,
@@ -1311,13 +1315,14 @@ export function CodexChatPage() {
     setBudgetNotice(null);
     if (!chatId) {
       const draftId = newDraftIdRef.current;
-      let subject:ChatSubject|null;try{subject=composeDraftSubject(factorySelectionsRef.current[draftId]);}catch{return;}
+      let subject:ChatSubject|null,factoryIntent:FactoryIntent|null;try{subject=composeDraftSubject(factorySelectionsRef.current[draftId]);factoryIntent=composeDraftFactoryIntent(factorySelectionsRef.current[draftId]);}catch{return;}
       const requestedSelection=providerSelectionsRef.current[draftId],connectorId=runtime.connectorId || 'codex';
       if(requestedSelection && requestedSelection.connectorId!==connectorId)return;
+      if(factoryIntent && !factoryCreationAvailable){setError({message:'Agent creation is unavailable for this provider. Select a ready provider with command approvals, or turn off Create new agent.',source:'mutation',kind:'request_failed',chatId:null,retryable:false});return;}
       const selectionFingerprint=JSON.stringify([requestedSelection,factorySelectionsRef.current[draftId],workspaceModesRef.current[draftId]]);
       if (workspacePreflights.current.has(draftId)) return;
       const snapshot = {draftId,draftRevision:draftRevisionsRef.current[draftId] || 0,navigationEpoch:navigationEpochRef.current};
-      if (workspaceMode !== "read-only" && runtime?.selected.sandboxMode !== "read_only" && (workspaceMode === "isolated" || runtime?.selected.sandboxMode === "workspace_write") && !workspaceBase) {
+      if (!factoryIntent && workspaceMode !== "read-only" && runtime?.selected.sandboxMode !== "read_only" && (workspaceMode === "isolated" || runtime?.selected.sandboxMode === "workspace_write") && !workspaceBase) {
         workspacePreflights.current.add(draftId);
         try {
           const preview=(await api<{git:boolean;dirty:boolean;baseRevision:string|null}>(`/api/codex-chat/v1/workspace?connectorId=${encodeURIComponent(connectorId)}`)).data;
@@ -1335,7 +1340,7 @@ export function CodexChatPage() {
         ...snapshot,
         connectorId,
         ...(subject?{subject}:{}),
-        workspace:{mode:workspaceMode,...(workspaceBase ? {baseRevision:workspaceBase} : {})},
+        ...(factoryIntent?{factoryIntent,workspace:{mode:'read-only' as const}}:{workspace:{mode:workspaceMode,...(workspaceBase ? {baseRevision:workspaceBase} : {})}}),
         clientThreadId: creationIdsRef.current[draftId] ||= crypto.randomUUID(),
         clientMessageId: crypto.randomUUID(),
         text,
@@ -1570,15 +1575,16 @@ export function CodexChatPage() {
         {!selectedChatId?<NewChatProviderSelector value={providerSelections[newDraftId]} runtime={runtime} disabled={Boolean(pendingNewChatDelivery)} onChange={selection=>{
           const id=newDraftIdRef.current;if(selectedChatIdRef.current || pendingNewChatDeliveriesRef.current[id])return;
           if(JSON.stringify(providerSelectionsRef.current[id])===JSON.stringify(selection))return;
+          if(selection.connectorId==='codex' && factorySelectionsRef.current[id]?.createNew){const nextFactory={...factorySelectionsRef.current,[id]:{...factorySelectionsRef.current[id],createNew:false}};factorySelectionsRef.current=nextFactory;setFactorySelections(nextFactory);}
           const next={...providerSelectionsRef.current,[id]:selection};providerSelectionsRef.current=next;setProviderSelections(next);delete creationIdsRef.current[id];
           setRuntime(current=>current && (current.connectorId || 'codex')===selection.connectorId?{...current,availability:'degraded'}:null);setError(null);setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
         }}/>:null}
-        {!selectedChatId?<FactoryChatSelector value={factorySelections[newDraftId]} disabled={Boolean(pendingNewChatDelivery)} onChange={selection=>{
+        {!selectedChatId?<FactoryChatSelector canCreate={factoryCreationAvailable} value={factorySelections[newDraftId]} disabled={Boolean(pendingNewChatDelivery)} onChange={selection=>{
           const id=newDraftIdRef.current;if(selectedChatIdRef.current || pendingNewChatDeliveriesRef.current[id])return;
           const next={...factorySelectionsRef.current,[id]:selection};factorySelectionsRef.current=next;setFactorySelections(next);delete creationIdsRef.current[id];setError(null);
           setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
         }}/>:displayedThread?.subject?<div className="codex-factory-context" aria-label="Factory task context"><strong>Child: {displayedThread.subject.slug} · {FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.label}</strong><span>{FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.goal}</span></div>:null}
-        {!selectedChatId ? <label className="codex-runtime-warning codex-workspace-choice">Workspace
+        {!selectedChatId && !factorySelections[newDraftId]?.createNew ? <label className="codex-runtime-warning codex-workspace-choice">Workspace
           <select aria-label="New chat workspace" value={workspaceMode} disabled={Boolean(pendingNewChatDelivery)} onChange={event=>setWorkspaceModes(current=>({...current,[newDraftId]:event.target.value as "isolated"|"configured"|"read-only"}))}>
             <option value="isolated">Isolated workspace · parallel tasks</option>
             <option value="read-only">Read only</option>
@@ -1783,7 +1789,7 @@ export function CodexChatPage() {
                 </button>
                 {hasActiveTurn && displayedDetail?.controls?.steer && <button className="codex-text-action" type="button" disabled={!draft.trim() || attachmentDraft.items.length > 0 || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || Boolean(pendingDelivery) || backendOffline || historyState !== "ready"} title={attachmentDraft.items.length ? "Attachments can only be queued for the next turn" : "Inject this instruction immediately into the running reasoning turn (⌘/Ctrl+Enter)"} onClick={() => void composerControlRef.current?.send("steer")}>⚡ Steer now</button>}
                 {hasActiveTurn && displayedDetail?.controls?.interrupt && !displayedDetail.voiceWorkflow && <button className="codex-text-action" type="button" onClick={() => void composerControlRef.current?.send("interrupt")}>■ Stop</button>}
-                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || (!selectedChatId && factoryInvalid) || attachmentsIncomplete || imageCapabilityMissing || fileCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
+                <button className="codex-send" type="button" onClick={() => void sendMessage()} disabled={(!draft.trim() && !attachmentIds.length) || (!selectedChatId && factoryInvalid) || factoryCreationUnavailable || attachmentsIncomplete || imageCapabilityMissing || fileCapabilityMissing || annotationBusy || Boolean(draftSubmissionLocks[draftKey]) || sending || Boolean(pendingDelivery) || Boolean(selectedChatId && historyState !== "ready") || backendOffline || runtime?.availability !== "ready"}>
                   {sending ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} {hasActiveTurn ? "Queue" : "Send"}
                 </button>
               </div>
