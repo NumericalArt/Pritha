@@ -186,6 +186,29 @@ function draftProposal(f, target, { extra = "", body = "", status = "draft" } = 
   return contract;
 }
 
+for (const name of ["pritha-line-counter-acceptance", "Techscope-tools"]) test(`an existing ${name} child requires its accepted instance-local contract`, t => {
+  const f = fixture(t), project = f.folder(name), id = "prefixed-child";
+  assert.throws(() => resolveProviderAgentWorkspace(f.options, name), { code: "provider_agent_workspace_unavailable" });
+  const contract = status => f.write("contracts/prefixed.md", "agent-contract", id,
+    `- Agent name: ${name}\n- Target folder: ${project}`, `status: ${status}\nproject_path: ${project}\n`);
+  contract("draft");
+  let agent = findCatalogAgent(f.catalog(), id);
+  assert.throws(() => resolveProviderAgentWorkspace(f.options, agent.id), { code: "provider_agent_workspace_unavailable" });
+  contract("accepted");
+  agent = findCatalogAgent(f.catalog(), id);
+  assert.deepEqual(resolveProviderAgentWorkspace(f.options, agent.id), { agentId: agent.id, source: project });
+  f.write("contracts/prefixed.md", "agent-contract", id, `- Agent name: ${name}\n- Target folder: ${project}`,
+    `status: accepted\nproject_path: ${project}\ninstance_key: another-instance\n`);
+  assert.throws(() => resolveProviderAgentWorkspace(f.options, agent.id), { code: "provider_agent_workspace_unavailable" });
+  contract("accepted");
+  writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "pritha" }));
+  assert.throws(() => resolveProviderAgentWorkspace(f.options, agent.id), { code: "provider_agent_workspace_unavailable" });
+  writeFileSync(path.join(project, "package.json"), JSON.stringify({ name }));
+  mkdirSync(path.join(project, "11_agents")); mkdirSync(path.join(project, "scripts"));
+  writeFileSync(path.join(project, "scripts", "pritha.mjs"), ""); mkdirSync(path.join(project, "interfaces", "control-center"), { recursive: true });
+  assert.throws(() => resolveProviderAgentWorkspace(f.options, agent.id), { code: "provider_agent_workspace_unavailable" });
+});
+
 test("a draft destination stays visible without binding or creating an executable workspace", t => {
   const f = fixture(t), target = path.join(f.agentParent, "future project", "child");
   draftProposal(f, target);

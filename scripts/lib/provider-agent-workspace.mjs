@@ -12,7 +12,10 @@ export function resolveProviderAgentWorkspace(options,target){
   try{
     const agentParent=resolvePrithaAgentParent(options),catalog=readAgentCatalog({...options,agentParent,fresh:true}),agent=findCatalogAgent(catalog,target);
     if(!agent || agent.instanceKey!==agentInstanceKey(options.stateRoot) || agent.identityStatus==='conflict' || !agent.projectPath)fail();
-    const source=scopedAgentWorkspace(agentParent,path.basename(agent.projectPath));
+    // An accepted, instance-local child may carry the product's name. Folder
+    // discovery alone never grants this exception to the reserved clone prefix.
+    const acceptedExistingChild=agent.identityStatus==='identified' && agent.artifacts.some(item=>item.type==='agent-contract' && item.fm.status==='accepted' && item.agentId===agent.agentId && !item.issue);
+    const source=scopedAgentWorkspace(agentParent,path.basename(agent.projectPath),{acceptedExistingChild});
     if(source!==realpathSync(agent.projectPath) || source===realpathSync(options.root))fail();
     const instructions=lstatSync(path.join(source,'AGENTS.md'));if(!instructions.isFile() || instructions.isSymbolicLink() || instructions.nlink!==1)fail();
     return {agentId:agent.id,source};

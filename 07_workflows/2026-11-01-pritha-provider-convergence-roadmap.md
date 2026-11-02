@@ -2741,6 +2741,33 @@ unit child environment отдельно и изолировать оба aliases
 - Оставшиеся gates R12 не сокращены. GitHub, MacBook, secrets и служба не
   изменялись. Все три исходных приложения сохранены дословно.
 
+### Checkpoint 51 — общий gate и выбор существующего child workspace
+
+- Совокупный source `f8f006b` прошёл **1502/1502** unit tests, self-test
+  и отдельный Agents Mother check: все восемь quality groups успешны,
+  supervising receipts подтверждают завершение деревьев процессов. Этот gate
+  относится к исправлениям бюджетного отказа и передачи guidance, не к
+  последующему изменению выбора workspace.
+- Проверка реального каталога обнаружила, что существующий пилот с именем
+  `pritha-line-counter-acceptance` отсекается общей защитой префиксов Pritha.
+  Для существующего child теперь допускается такой префикс только после
+  свежей проверки единственной identity, текущего instance, accepted Contract
+  с тем же agent ID и точного sibling project. Bare `Pritha` / `Techscope`,
+  неподтверждённые и foreign contracts, symlinks, canonical package names и
+  checkout структуры по-прежнему отклоняются. Создание нового target не
+  получает это исключение.
+- Обе регрессии сначала воспроизведены на старом коде; **106/106** проверок
+  identity/workspace/provider runtime/voice routing прошли после исправления.
+  Дополнительные assertions отклоняют accepted Contract другого instance и
+  подтверждены отдельно. Финальный общий gate и build нового source впереди.
+- Дополнительный Local compiled trial подготовлен для существующего небольшого
+  child project с проверкой instance catalog и read-only SQLite binding.
+  Он сохраняет все инструкции, sandbox, offline engine, файл с nonce и resume.
+  Этот сценарий не заменяет незавершённую проверку большого контекста Pritha;
+  операторская приёмка и общий performance pass не заявляются.
+- Good State alignment с Reliable Control Center и Voice Ducking — **aligned**.
+  Production остаётся на принятой сборке; остальные gates R12 остаются открыты.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

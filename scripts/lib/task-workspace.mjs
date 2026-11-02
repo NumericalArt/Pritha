@@ -4,14 +4,16 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'no
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { ExecutionConflict } from './execution-coordinator.mjs';
+import { isPrithaCodeCheckout } from './paths.mjs';
 
 const execute = promisify(execFile);
 const digest = value => createHash('sha256').update(value).digest('hex');
 const canonical = value => realpathSync(path.resolve(value));
-export function scopedAgentWorkspace(parent,name) {
-  if(typeof name!=='string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(name) || /^(?:pritha|techscope)(?:$|[-_])/i.test(name))throw new ExecutionConflict('agent_workspace_target_required');
+export function scopedAgentWorkspace(parent,name,{acceptedExistingChild=false}={}) {
+  if(typeof name!=='string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(name) || /^(?:pritha|techscope)$/i.test(name) || (!acceptedExistingChild && /^(?:pritha|techscope)[-_]/i.test(name)))throw new ExecutionConflict('agent_workspace_target_required');
   const root=canonical(parent),target=path.join(root,name);
   if(existsSync(target) && (lstatSync(target).isSymbolicLink() || canonical(target)!==target || !lstatSync(target).isDirectory()))throw new ExecutionConflict('agent_workspace_target_invalid');
+  if(isPrithaCodeCheckout(target))throw new ExecutionConflict('agent_workspace_target_invalid');
   if(existsSync(path.join(target,'package.json'))) {
     let name;try{name=JSON.parse(readFileSync(path.join(target,'package.json'),'utf8')).name;}catch{}
     if(name==='techscope' || name==='pritha')throw new ExecutionConflict('agent_workspace_target_invalid');

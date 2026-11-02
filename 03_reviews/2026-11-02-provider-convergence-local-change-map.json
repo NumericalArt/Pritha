@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-02T10:45:37.404262+00:00",
+  "createdAt": "2026-11-02T11:05:42.606680+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -15,7 +15,7 @@
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
   "fileCount": 574,
-  "filesSha256": "d8324c6ec4281add529fdbb00818c8c01c4d4148e9ebea78e6e4311757cfbfe2",
+  "filesSha256": "828cf2bdedceeb8f18450b7f1a7f3ff28373bb3ec4baf7f76f1739bd7e3df64f",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 326032,
-      "sha256": "99892fb0ef4be60ad40ef8a3336cf37ce3568c14fd0451e56164a241b506cc37"
+      "bytes": 328693,
+      "sha256": "6ba6c926c415655415c17c7d81561df30a0bebee204f47abed525485aa1d88bf"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -1918,8 +1918,8 @@
       "path": "scripts/lib/provider-agent-workspace.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 1474,
-      "sha256": "84089dd8be30bc8049be5ed1f27b72e92ca12721d036b28369efce2051d03064"
+      "bytes": 1864,
+      "sha256": "83bca11314858942a1988f041ba8a56edca20ec63e1de2611a90321d6ee116c0"
     },
     {
       "path": "scripts/lib/provider-approvals.mjs",
@@ -2205,8 +2205,8 @@
       "path": "scripts/lib/task-workspace.d.mts",
       "status": "M",
       "kind": "file",
-      "bytes": 1522,
-      "sha256": "171ec326447bb5963cd0dbecfcb0e31f6d5377eb855f463eecb99742048eb00a"
+      "bytes": 1564,
+      "sha256": "e8c1331c4a513ee4384c3d34b981a6f25ac981a11c6488a05e1003691d38cdd2"
     },
     {
       "path": "scripts/lib/voice-intake-receipts.d.mts",
@@ -3220,8 +3220,8 @@
       "path": "tests/agents-mother-identity.test.mjs",
       "status": "M",
       "kind": "file",
-      "bytes": 23708,
-      "sha256": "a2ad091655b84b49d27fe99e498320b31ac1a6b16be14692970679e7beb3a3a9"
+      "bytes": 25637,
+      "sha256": "a53239df75714f36bb2de36081e3d7997a6da39ea2c47a8d151998707ea1c28b"
     },
     {
       "path": "tests/agents-mother-init-brief.test.mjs",
