@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-02T11:17:41.201162+00:00",
+  "createdAt": "2026-11-02T11:49:12.248632+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -15,7 +15,7 @@
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
   "fileCount": 574,
-  "filesSha256": "b83a7ddc1bda45fc6c2ebbddb203d47d98cb388768ed5e7bac12093c50e3c535",
+  "filesSha256": "5f9231814e5dad0aeb5c791a28a6ab8101076e77dfad440ad96d8abab2901588",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 331795,
-      "sha256": "10efa433e933e6bfdaba4f78df2869983913c21244a7c71faa4473e458e885b2"
+      "bytes": 335350,
+      "sha256": "42f562df0fbc751e566cd388834b5e200e612a65b148fb2ee2c76abe753af215"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -2695,8 +2695,8 @@
       "path": "scripts/openai-compatible/owned-local-server.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 12438,
-      "sha256": "883b658cc88c8604181ed67d20feba0315ae08498c2a2cbf550911f6369b240e"
+      "bytes": 12845,
+      "sha256": "0b5e05806344fa86a7c44d38fb3d07a10421bfd7e5e0c1ac96822aae26411a03"
     },
     {
       "path": "scripts/openai-compatible/provider-service.d.mts",
@@ -3647,8 +3647,8 @@
       "path": "tests/owned-local-server.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 8882,
-      "sha256": "2d9bed495567dc06c95b5bffc5af3c910ecc2a6ae807823534b44bd6596fed88"
+      "bytes": 10008,
+      "sha256": "142baecad09f608db277e7ae2fa554ef21856e622f06b0f2c78ebe097ae22c51"
     },
     {
       "path": "tests/paths.test.mjs",

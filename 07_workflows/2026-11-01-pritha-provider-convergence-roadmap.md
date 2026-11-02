@@ -647,7 +647,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный прогон с лимитом 550 секунд также interrupted без готового ответа. Child pilot завершён: после отдельно разрешённых 90000 tokens / 5 iterations Claude исправил CLI; общий расход 83335, неизменённые независимые Trials прошли, пользователь принял результат и разрешил применение README/CLI. Основной child checkout обновлён до 98c3805; Trials и smoke повторно прошли там. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory, fresh onboarding и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
+**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный прогон с лимитом 550 секунд также interrupted без готового ответа. Child pilot завершён: после отдельно разрешённых 90000 tokens / 5 iterations Claude исправил CLI; общий расход 83335, неизменённые независимые Trials прошли, пользователь принял результат и разрешил применение README/CLI. Основной child checkout обновлён до 98c3805; Trials и smoke повторно прошли там. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
 
 Исторический статус до последней попытки обновления:
 
@@ -685,7 +685,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
   Realtime 2 nine tools/music; explicit Live; ND voice; voice→active tasks.
 - [x] Пользователь подтвердил слышимый Voice ответ и прерывание без потери связи
   на активной сборке. Это acceptance только этих двух голосовых сценариев.
-- [ ] Claude onboarding из чистого экземпляра: одна копируемая команда с
+- [x] Claude onboarding из чистого экземпляра: одна копируемая команда с
   привязанными root/state, запуск из произвольного cwd, независимость от другого
   экземпляра и ambient credentials, browser sign-in, persisted auth check,
   первый реальный task и resume. Проверить понятное действие при locked Keychain;
@@ -2795,6 +2795,43 @@ unit child environment отдельно и изолировать оба aliases
   inference; настройка production-службы не менялась.
 - Исходные материалы сохранены целиком; R12 не закрыт. MacBook и GitHub не
   изменялись. Публикация и полный Git/tag baseline отдельно не разрешались.
+
+### Checkpoint 53 — Claude onboarding и ресурсная политика Local
+
+- Source `d619a5e` прошёл полный повторный **1504/1504** unit gate, self-test и
+  отдельную Agents Mother проверку: восемь успешных quality groups, supervising
+  receipts подтверждают полный exit. Предыдущий naming failure сохранён.
+- Пользователь выполнил одну подготовленную команду входа в чистом экземпляре.
+  Tracked source archive, независимые зависимости и пустой state не получали
+  скопированных credentials. Проверены foreign-cwd entrypoint, persisted auth,
+  первый реальный native file tool и resume той же native session — **2/2**.
+  Исходный AGENTS сохранён побайтово, оба process tree завершены. Вход и первые
+  задачи не требовали API key или ручного исправления путей.
+- Измерение Local с исходными CPU settings показало около **13 tokens/s** при
+  prefill. Снятие background flag у уже запущенного PID и увеличение batching /
+  threads проблему не решили. Изолированный запуск с application resource
+  policy обработал **4719 input tokens за 64618 ms** и вернул точный ответ.
+  Это component evidence, не готовая compiled Task Chat приёмка.
+- Local launcher на macOS теперь запускает точный прежний sandbox plan через
+  системный `taskpolicy -a` до старта engine workers. Pinned engine/config,
+  минимальный environment, network/file sandbox и supervisor proof сохранены.
+  Linux оставляет прежний launch plan. Actual sandbox canary по-прежнему
+  отклоняет foreign loopback, внешний адрес и приватный файл и не получает
+  parent credentials. **8/8** Local и **5/5** compatible-runner checks прошли.
+  Darwin regression сначала воспроизведена на старом коде.
+- Дополнительная проверка нового launcher с настоящим background parent
+  выполняется отдельно. Runtime service и канонический Local config не менялись;
+  полный gate/build нового source и live compiled file/resume ещё впереди.
+- В рамках разрешённой компактной Local подготовки дополнительно загружен
+  официальный `Qwen/Qwen3-1.7B-GGUF` Q8_0, pin
+  `90862c4b9d2787eaed51d12237eafdfe7c5f6077`, SHA-256
+  `061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a`.
+  Файл проверен, но модель не выбрана и service не установлен. Источник:
+  [официальная model card](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF), проверена
+  2026-11-02. Смена модели не считается исправлением без прежних Trials.
+- Good State alignment — **aligned**: Local scheduling не меняет принятую
+  изоляцию, ownership и recovery. Voice factory и остальные manual gates R12
+  сохранены; GitHub и MacBook не изменялись.
 
 ## 7. Полные исходные материалы
 

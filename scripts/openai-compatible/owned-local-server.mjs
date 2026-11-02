@@ -97,7 +97,11 @@ export async function startOwnedLocalServer(options,config,dependencies={}){
       readRoots:config.readRoots,readOnlyRoots:config.readRoots,loopbackPorts:[port]});
     const env={PATH:'/usr/bin:/bin:/usr/sbin:/sbin',HOME:temporary,TMPDIR:temporary,LANG:'en_US.UTF-8',LC_ALL:'en_US.UTF-8',
       ...config.environment,OLLAMA_HOST:`127.0.0.1:${port}`,OLLAMA_NO_CLOUD:'1',OLLAMA_KEEP_ALIVE:'0',HF_HUB_OFFLINE:'1',TRANSFORMERS_OFFLINE:'1',HF_DATASETS_OFFLINE:'1',DO_NOT_TRACK:'1'};
-    owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(plan.command,plan.args,{cwd:temporary,env,
+    // Interactive inference must not inherit launchd's background resource
+    // policy. Select application resource policy before its workers start,
+    // preserving the exact sandbox plan and the supervisor's ownership proof.
+    const applicationPolicy=(dependencies.platform || process.platform)==='darwin';
+    owned=await (dependencies.spawnSupervised || spawnSupervisedCli)(applicationPolicy?'/usr/sbin/taskpolicy':plan.command,applicationPolicy?['-a',plan.command,...plan.args]:plan.args,{cwd:temporary,env,
       beforeStart:async proof=>{evidence=proof;Object.assign(record,{port,evidence});journal();await options.beforeStart?.(proof);},onEvidence:proof=>{evidence=proof;record.evidence=proof;journal();options.onEvidence?.(proof);}});
     owned.completion.then(()=>{processFinished=true;});
     for(const stream of [owned.child.stdout,owned.child.stderr])stream.on('data',chunk=>{outputBytes+=chunk.length;if(outputBytes>4*1024*1024)stop();else options.onDiagnosticChunk?.(chunk);});

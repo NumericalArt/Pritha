@@ -58,6 +58,20 @@ test('an unconfirmed supervisor start retains its receipt and never reports a co
   await assert.rejects(startOwnedLocalServer(f.options,config),{code:'provider_local_process_unverified'});
 });
 
+for(const platform of ['darwin','linux'])test(`${platform}: Local inference preserves the exact sandbox and uses application scheduling only on macOS`,async t=>{
+  const f=fixture(t);writeFileSync(f.value.args[0],'// fixture');f.save();const config=f.read();
+  const plan={command:'/fixture/sandbox',args:['--policy','opaque-policy','--',config.command,...config.args]},launches=[];
+  await assert.rejects(startOwnedLocalServer(f.options,config,{platform,prepareSandbox:()=>plan,spawnSupervised:async(command,args,options)=>{
+    launches.push({command,args,options});throw Object.assign(new Error('fixture-launch-intercepted'),{processTreeExited:true});
+  }}),/fixture-launch-intercepted/);
+  assert.equal(launches.length,1);
+  assert.equal(launches[0].command,platform==='darwin'?'/usr/sbin/taskpolicy':plan.command);
+  assert.deepEqual(launches[0].args,platform==='darwin'?['-a',plan.command,...plan.args]:plan.args);
+  assert.equal(launches[0].options.env.HF_HUB_OFFLINE,'1');
+  assert.equal(launches[0].options.env.HOME,launches[0].options.cwd);
+  assert.equal(await inspectOwnedLocalServer(f.options,config),null);
+});
+
 function delayedModel(f,delay){
   writeFileSync(f.value.args[0],`import {createServer} from 'node:http';
 const readyAt=Date.now()+${delay};
