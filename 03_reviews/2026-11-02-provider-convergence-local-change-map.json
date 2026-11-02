@@ -1,6 +1,6 @@
 {
   "schema": "pritha-local-source-review-v1",
-  "createdAt": "2026-11-02T13:18:29.300614+00:00",
+  "createdAt": "2026-11-02T13:29:59.538800+00:00",
   "canonicalBase": "e1c00eb007103c13f57b8139c1c462f18cb2d87a",
   "priorLocalCommit": "3853e0a03e61ba348b0499ca5b2d36f7b7fa1d53",
   "snapshot": "working-tree-before-candidate-commit",
@@ -14,8 +14,8 @@
   ],
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
-  "fileCount": 575,
-  "filesSha256": "3b50dbc67b6231098979f277cdb7bb0bbb7eba257c3ee5f892bc01553305307e",
+  "fileCount": 579,
+  "filesSha256": "7d0d12c0ec85124cf02e659494da941562374eb751d71ada81bb703329cc5dcf",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 341811,
-      "sha256": "91d12d99c03f5f39d7d7daf8725315c01cc2d32157a1ea5733541f9472c87f91"
+      "bytes": 344374,
+      "sha256": "fe5d6fa834bb7ef433773d19a5eb225563f6d91dcba354af2a64cd58d894dddf"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -149,6 +149,13 @@
       "kind": "file",
       "bytes": 5298,
       "sha256": "a7e8c4fc6f9b359bdfeaf6cfb7ba6d11ffc49582564a75bb444e96ceeeec15ca"
+    },
+    {
+      "path": "07_workflows/control-center-staged-release.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 10748,
+      "sha256": "85c58b0ec9e25f456fbb29bd80f8495812ca1e59acdbcd7471673c51e38df13e"
     },
     {
       "path": "07_workflows/delivery-usage-accounting.md",
@@ -1271,6 +1278,13 @@
       "sha256": "224fabf153e4f3583cc5ab3ebcad6702e8076ed358248c67944df5b753df5a63"
     },
     {
+      "path": "launchd/com.numericalart.pritha.control-center.instance.plist.template",
+      "status": "M",
+      "kind": "file",
+      "bytes": 959,
+      "sha256": "aa5f148e456c8a3d2e5399c5dfdd0ee728a1f85aa1006ac2530972ec8dc1f7ae"
+    },
+    {
       "path": "memory/manifest.json",
       "status": "M",
       "kind": "file",
@@ -2214,6 +2228,13 @@
       "kind": "file",
       "bytes": 1564,
       "sha256": "e8c1331c4a513ee4384c3d34b981a6f25ac981a11c6488a05e1003691d38cdd2"
+    },
+    {
+      "path": "scripts/lib/task-workspace.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 13860,
+      "sha256": "61879317f915668e09d420468718f7e269cf11d44e6cb942afb02dee2e47fac3"
     },
     {
       "path": "scripts/lib/voice-intake-receipts.d.mts",
@@ -3460,6 +3481,13 @@
       "kind": "file",
       "bytes": 21542,
       "sha256": "cec8a9a496907450838e8462e840ec3118fdb3225c45c165a39ab7ecfee54be6"
+    },
+    {
+      "path": "tests/control-center-runtime.test.mjs",
+      "status": "M",
+      "kind": "file",
+      "bytes": 14531,
+      "sha256": "74ed7c72498c1f22efdd04bbc3c086295a4180aef7c088cc1ee2714d6759caf9"
     },
     {
       "path": "tests/control-center-voice-settings.test.mjs",

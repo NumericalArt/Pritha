@@ -647,7 +647,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активен b404a6d. После перезагрузки Mac mini доступ к Keychain восстановлен: NeuralDeep ready; новый Claude API key принят; native Claude прошёл compiled file-tool + same-chat resume (2/2), SDK — реальный MCP tool и точный результат за 1404 наблюдаемых токена. Local readiness passed; полный Task Chat с CPU-моделью пока не завершил файловый сценарий в 270 секунд, корректно прерван; дополнительный прогон с лимитом 550 секунд также interrupted без готового ответа. Child pilot завершён: после отдельно разрешённых 90000 tokens / 5 iterations Claude исправил CLI; общий расход 83335, неизменённые независимые Trials прошли, пользователь принял результат и разрешил применение README/CLI. Основной child checkout обновлён до 98c3805; Trials и smoke повторно прошли там. Исправлена причина ложного runtime_identity_mismatch при отказе Claude по бюджету; новый fix ещё не активирован. 354f53b также ожидает отдельного разрешения на managed activation. Voice factory и final acceptance остаются открыты; OpenRouter live deferred by user.** Зависимости все выше.
+**Статус: in-progress; активен b404a6d. R12 находится на финальной консолидации исправлений и живой приёмке. Claude API, NeuralDeep, native Claude file-tool/resume и SDK MCP проверены. Пользователь завершил вход в чистом экземпляре; его первый реальный file-tool и продолжение диалога прошли 2/2. Пилот счётчика строк принят и применён в основном child checkout 98c3805: 83335/90000 tokens, 5/5 итераций, неизменённые независимые Trials и smoke прошли. Новый кандидат исправляет классификацию бюджетного отказа, передачу guidance, привязку accepted child workspace и диагностику сохранения ключей. Полный gate на 8ebcf405: 1504/1504, все восемь групп pass, без skips; self-test без warnings/regressions. Для Local сохранены прежние 4B-модель и настройки: после сокращения обязательного индекса правил с сохранением полного текста побайтно source-level file-tool/resume прошёл 2/2. Установленная служба ещё имеет профиль Background; новый Interactive подготовлен, но не применён. Сборка, проверки браузера, отдельное точное разрешение на stop/swap/install с откатом, compiled Local и оставшаяся операторская Voice/factory/final acceptance ещё обязательны. OpenRouter live отложен пользователем.** Зависимости все выше.
 
 Исторический статус до последней попытки обновления:
 
@@ -2899,6 +2899,29 @@ unit child environment отдельно и изолировать оба aliases
 - Full candidate gate/build/browser/rollback preparation выполняются следующим
   шагом. Local compiled и оставшаяся manual Voice/factory приёмка остаются открыты.
   Good State alignment — **aligned**; MacBook и GitHub не изменялись.
+
+### Checkpoint 56 — полный gate и завершение описи релиза
+
+- Кандидат 8ebcf405 прошёл self-test: **1504/1504**, без fail/cancel/skip;
+  семь групп self-test и отдельная agents-mother группа pass. Self-test не
+  содержит warnings или regressions. Оба supervised process tree завершились.
+- Первая попытка нового harness не запустила тесты: её локальный PATH не
+  содержал фактический Node. Причина исправлена только в private окружении;
+  ранняя ошибка и новый полный успешный прогон сохранены отдельно.
+- Сравнение всей описи с Git delta обнаружило четыре уже tracked файла,
+  отсутствовавших в прежнем списке. Опись дополнена до **579 файлов** плюс
+  сам manifest; каждый размер/хеш и полнота относительно исходного base
+  проверены. Исходные три вложения остаются в этом roadmap без сокращения.
+- Этот финальный commit меняет только roadmap и manifest. Исполняемые,
+  интерфейсные и policy inputs остаются теми же, что прошли gate 8ebcf405.
+  Production build/typecheck и изолированный same-build browser/strict probe
+  выполняются на окончательном commit перед запросом lifecycle approval.
+- Существующая рабочая b404a6d отдельно проверена в изолированном rollback
+  probe: **5 страниц, 12 JS chunks**, exact build identity, tree exit confirmed.
+  Оригинальные installed/generated Background profiles сохранены с хешами;
+  прежний manager/template воспроизводит их побайтно для approved rollback.
+- Никаких production lifecycle действий, замены модели, GitHub или MacBook
+  изменений на этом checkpoint не выполнялось.
 
 ## 7. Полные исходные материалы
 
