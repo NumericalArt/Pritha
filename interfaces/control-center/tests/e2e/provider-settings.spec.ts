@@ -57,6 +57,9 @@ test.beforeEach(async({page,request})=>{
     expect(response.ok()).toBe(true);settings=(await response.json()).settings;
   }
 });
+// Settings refreshes may still be in flight after the last assertion. Remove
+// fixture handlers before closing the page rather than failing during teardown.
+test.afterEach(async({page})=>{await page.unrouteAll({behavior:'ignoreErrors'});});
 for(const width of [390,1440])test(`Claude native session keeps API keys separate and offers only the explicit terminal sign-in at ${width}px`,async({page,request})=>{
   let credentialWrites=0;
   await page.route('**/api/task-runtime/providers/claude',async route=>{
