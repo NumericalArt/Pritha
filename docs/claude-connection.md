@@ -54,7 +54,7 @@ Account eligibility is defined by
 3. Complete the browser sign-in. If Claude asks for a browser code, paste it
    into that terminal prompt. Wait for the command to finish with
    `"authenticated":true`.
-4. Refresh the provider status in Settings, choose **Use for new chats**, and
+4. Refresh the provider status in Settings, choose **Set default for tasks + Voice**, and
    send a short task in a new Task Chat. The first successful task also confirms
    that this account can use the selected model.
 
@@ -73,7 +73,7 @@ standalone Claude session are not automatically imported.
 
 Select **API key**, enter the key in the provider password field and save it.
 Choose a model from the available catalog, save the preset and refresh status.
-Then select **Use for new chats** and send a short task. This mode uses API
+Then select **Set default for tasks + Voice** and send a short task. This mode uses API
 billing. Never put a key into a chat message or a tracked repository file.
 
 ## If sign-in does not finish

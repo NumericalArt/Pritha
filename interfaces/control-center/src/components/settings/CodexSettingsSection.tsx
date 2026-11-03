@@ -65,8 +65,9 @@ const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   updatedAt: "",
 };
 
-export function CodexSettingsSection({onSaved}:{onSaved?:()=>void}={}) {
+export function CodexSettingsSection({onSaved,onPendingChange}:{onSaved?:()=>void;onPendingChange?:(id:'codex',pending:boolean)=>void}={}) {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(DEFAULT_RUNTIME_SETTINGS);
+  const [savedRuntimeSettings,setSavedRuntimeSettings]=useState<RuntimeSettings|null>(null);
   const [modelCatalog, setModelCatalog] = useState<CodexModelCatalog>(() => fallbackCodexModelCatalog(new Date(0)));
   const [runtimeSettingsLoaded, setRuntimeSettingsLoaded] = useState(false);
   const [transportStatus, setTransportStatus] = useState<TransportStatus>({});
@@ -75,6 +76,10 @@ export function CodexSettingsSection({onSaved}:{onSaved?:()=>void}={}) {
   const [timeoutUnit, setTimeoutUnit] = useState<TimeoutUnit>("seconds");
   const [numberDrafts, setNumberDrafts] = useState(() => runtimeNumberDrafts(DEFAULT_RUNTIME_SETTINGS, "seconds"));
   const [selectionNotice, setSelectionNotice] = useState("");
+  const parsedDraft=parseRuntimeNumberDrafts(numberDrafts,timeoutUnit);
+  const pending=!runtimeSettingsLoaded || saving || !savedRuntimeSettings || !parsedDraft.values || JSON.stringify({...runtimeSettings,...parsedDraft.values})!==JSON.stringify(savedRuntimeSettings);
+  useEffect(()=>{onPendingChange?.('codex',pending);},[pending,onPendingChange]);
+  useEffect(()=>()=>onPendingChange?.('codex',false),[onPendingChange]);
 
   useEffect(() => {
     void loadRuntimeSettings();
@@ -111,6 +116,7 @@ export function CodexSettingsSection({onSaved}:{onSaved?:()=>void}={}) {
     const forcedInline = loadedSettings.codexReasoningEffort === "ultra" && loadedSettings.codexExecutionMode !== "inline_only";
     const nextSettings = forcedInline ? { ...loadedSettings, codexExecutionMode: "inline_only" as const } : loadedSettings;
     setRuntimeSettings(nextSettings);
+    setSavedRuntimeSettings(loadedSettings);
     setNumberDrafts(runtimeNumberDrafts(nextSettings, timeoutUnit));
     setTransportStatus(payload.transports || {});
     setRuntimeSettingsLoaded(true);
@@ -158,6 +164,7 @@ export function CodexSettingsSection({onSaved}:{onSaved?:()=>void}={}) {
     }
     const nextSettings = { ...DEFAULT_RUNTIME_SETTINGS, ...payload.settings };
     setRuntimeSettings(nextSettings);
+    setSavedRuntimeSettings(nextSettings);
     setNumberDrafts(runtimeNumberDrafts(nextSettings, timeoutUnit));
     setTransportStatus(payload.transports || {});
     setRuntimeStatus("Codex runtime settings saved");

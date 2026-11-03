@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     }
 
     const context = requestVoiceSessionContext(request, contextId);
-    const result = await createPrithaVoiceIntakeCodexTask({ text, files, sessionId, confirmation }, {taskSelection:voiceTaskSelection(context),check:()=>{
+    const result = await createPrithaVoiceIntakeCodexTask({ text, files, sessionId, confirmation }, {taskSelection:voiceTaskSelection(context,true),check:()=>{
       if(request.signal.aborted)throw new IntakePayloadError('intake_interrupted',408);
       requestVoiceSessionContext(request,contextId);
     }});

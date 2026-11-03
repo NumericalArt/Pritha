@@ -53,7 +53,16 @@ export function closeRequestVoiceSessionContext(request: Request, id: unknown) {
   if (typeof id !== 'string') throw new VoiceContextError('voice_context_unavailable');
   return store().close(id, voiceContextOwner(request).owner);
 }
-export function voiceTaskSelection(context: VoiceContext): VoiceTaskSelection {
+export function voiceTaskSelection(context: VoiceContext, forNewTask = false): VoiceTaskSelection {
+  if (forNewTask) {
+    const settings = getProviderSettings(), native = getPrithaRuntimeSettings();
+    if (process.env.PRITHA_VOICE_OFFLINE === '1' || settings.activeConnectorId === 'local') throw new VoiceEngineError('voice_offline', 'Cloud voice is disabled.');
+    // Audio/search retain the immutable session configuration. A newly created
+    // task takes the explicitly committed common default once at host dispatch;
+    // continuations and retries are subsequently governed by their saved task.
+    return {contextId: context.id, connectorId: settings.activeConnectorId,
+      preset: {...settings.providerPresets[settings.activeConnectorId]}, serviceTier: native.codexServiceTier};
+  }
   return { contextId: context.id, connectorId: context.connectorId, preset: { ...context.preset }, serviceTier: context.serviceTier };
 }
 export function voiceContextView(context: VoiceContext) {

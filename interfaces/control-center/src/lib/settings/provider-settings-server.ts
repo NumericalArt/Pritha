@@ -1,6 +1,6 @@
 import path from "node:path";
 import { RuntimeSettingsStore, providerSettingsSnapshot, updateStoredProviderSettings, type ProviderSettingsPatch } from "../../../../../scripts/lib/runtime-settings-store.mjs";
-import { ProviderConfigurationError, resolveProviderSelection } from "./provider-profile";
+import { ProviderConfigurationError, isProviderConnectorId, resolveProviderSelection } from "./provider-profile";
 import { PrithaStateFileError, resolvePrithaSetupFile, resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "../pritha-paths";
 import { getPrithaRuntimeSettings } from "../realtime/pritha-runtime";
 import { getCodexModelCatalog } from "./codex-model-catalog-server";
@@ -18,6 +18,24 @@ function options() {
 export function getProviderSettingsDocument() { const document=providerSettingsStore().read();return {settings:providerSettingsSnapshot(document,options()),document}; }
 export function getProviderSettings() { return getProviderSettingsDocument().settings; }
 export async function updateProviderSettings(patch: ProviderSettingsPatch) {
+  if (patch?.activeConnectorId !== undefined) {
+    if (!isProviderConnectorId(patch.activeConnectorId)) throw new ProviderConfigurationError("provider_profile_invalid", "Choose an available task provider.");
+    if (patch.preset !== undefined || patch.connectorId !== undefined) throw new ProviderConfigurationError("provider_default_requires_saved_preset", "Save the provider preset first, then set it as the default for new tasks and Voice Control.");
+    const saved = getProviderSettings();
+    if (patch.expectedRevision !== saved.revision) throw new ProviderConfigurationError("provider_settings_revision_conflict", "Settings changed in another window. Reload before saving.");
+    let ready = false;
+    if (saved.providerPresets[patch.activeConnectorId].modelId) {
+      try {
+        const { getCodexChatGateway } = await import("../codex-chat/gateway");
+        const health = await getCodexChatGateway().providerSettingsSnapshot(patch.activeConnectorId);
+        ready = health.connectorId === patch.activeConnectorId && health.status === "ready";
+      } catch { /* Failed probes never authorize activation or expose diagnostics. */ }
+    }
+    if (!ready)
+      throw new ProviderConfigurationError("provider_default_not_ready", "Finish configuring this provider, save its preset and wait for Ready before setting it as the default. The previous default is preserved.");
+    // The shared store rechecks expectedRevision under its write lock after the
+    // asynchronous readiness probe, so a concurrent preset edit cannot slip in.
+  }
   // Native settings keep their existing catalog/effort constraints through the new API too.
   if (patch?.connectorId === "codex" && patch.preset) {
     const current = getPrithaRuntimeSettings();

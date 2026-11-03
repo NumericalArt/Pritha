@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const turn=payload.searchTurn;
     if(turn && (!/^[A-Za-z0-9_-]{1,100}$/.test(turn.id||'') || typeof turn.text!=='string' || turn.text.length>16000))return NextResponse.json({ok:false,error:'voice_search_turn_invalid'},{status:400});
     const intent=searchIntent(turn?.text || '');
-    const output = await handlePrithaRealtimeTool(name, payload.arguments || {}, context ? {taskSelection:voiceTaskSelection(context),searchTurnId:turn?.id,explicitSearch:intent.explicit,searchDenied:intent.denied,signal:request.signal} : {});
+    const output = await handlePrithaRealtimeTool(name, payload.arguments || {}, context ? {taskSelection:voiceTaskSelection(context,name === 'run_codex_task'),searchTurnId:turn?.id,explicitSearch:intent.explicit,searchDenied:intent.denied,signal:request.signal} : {});
     return NextResponse.json(output);
   } catch (error) {
     if (error instanceof VoiceContextError || error instanceof VoiceEngineError) return NextResponse.json({ok:false,error:error.code}, {status:error.status});

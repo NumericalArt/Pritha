@@ -60,14 +60,14 @@ function fixture(t){
   const intakeRequest=(contextId,cookie,form=new FormData())=>new Request('http://fixture.invalid/api/realtime/intake',{method:'POST',headers:{cookie,'X-Pritha-Voice-Context':contextId},body:form});
   return {api,routes,settings,native,environment,calls,request,intakeRequest};
 }
-test('native session captures protocol and task selection before asynchronous provider setup',async t=>{
+test('native audio keeps its captured protocol while a new task uses the committed default',async t=>{
   const f=fixture(t),response=await f.routes.session.POST(f.request({musicControlEnabled:false})),body=await response.json();
   assert.equal(response.status,200);assert.equal(body.voice_api,'realtime');assert.equal(body.model,'gpt-realtime-2');assert.equal(body.voiceContext.taskConnectorId,'codex');
   const cookie=response.headers.get('set-cookie').split(';')[0];assert.match(response.headers.get('set-cookie'),/HttpOnly/);
   const call=await f.routes.call.POST(f.request({contextId:body.voiceContext.id,voiceApi:'realtime',offerSdp:'fixture',ephemeralKey:'synthetic'},cookie));
   assert.equal(call.status,200);assert.equal(f.calls.at(-1)[0],'call');
   const tool=await f.routes.tool.POST(f.request({contextId:body.voiceContext.id,name:'run_codex_task',arguments:{task:'fixture'}},cookie));
-  assert.deepEqual(await tool.json(),{ok:true,connector:'codex',model:'codex-fixture'});
+  assert.deepEqual(await tool.json(),{ok:true,connector:'claude',model:'claude-fixture'});
   assert.equal(f.settings.activeConnectorId,'claude');assert.equal(f.native.voiceModel,'gpt-live-1');
   const publicContext=JSON.stringify(body.voiceContext);assert.doesNotMatch(publicContext,/owner|instance|expires|private|cookie/);
   const closed=await f.routes.session.DELETE(f.request({contextId:body.voiceContext.id},cookie,'DELETE'));assert.equal(closed.status,200);
@@ -92,6 +92,7 @@ test('every task connector retains its session snapshot while hard offline polic
     f.settings.activeConnectorId='codex';f.settings.voiceEngine='openai';
     const restored=f.api.getVoiceSessionContext(saved.id,owner,'neuraldeep');assert.equal(restored.connectorId,connector);
     assert.equal(f.api.voiceTaskSelection(restored).preset.modelId,connector+'-fixture');
+    assert.equal(f.api.voiceTaskSelection(restored,true).preset.modelId,'codex-fixture');
     assert.throws(()=>f.api.getVoiceSessionContext(saved.id,owner,'openai'),{code:'voice_context_engine_mismatch'});
     assert.throws(()=>f.api.assertVoiceContextAllowed({...saved,engine:'openai'},'openai'),{code:'voice_context_engine_mismatch'});
   }
@@ -110,7 +111,7 @@ test('Live startup uses its captured model and rejects a protocol mismatch befor
   assert.equal(valid.status,200);assert.equal(f.calls[0][0],'live');assert.equal(f.calls[0][1].voiceModel,'gpt-live-1');
 });
 
-for(const voice of ['openai','neuraldeep'])test(`${voice} intake uses its host context across all task connectors and default changes`,async t=>{
+for(const voice of ['openai','neuraldeep'])test(`${voice} intake uses the new common default while preserving its owned audio context`,async t=>{
   const f=fixture(t);
   for(const connector of policy.PROVIDER_CONNECTOR_IDS){
     f.settings.activeConnectorId=connector;f.settings.voiceEngine=voice;
@@ -122,8 +123,27 @@ for(const voice of ['openai','neuraldeep'])test(`${voice} intake uses its host c
     f.settings.activeConnectorId='openrouter';f.settings.voiceEngine='openai';
     const form=new FormData();form.set('text','https://example.test/source');form.set('confirmed_instruction','Summarize source');form.set('connectorId','untrusted-form-value');
     const output=await f.routes.intake.POST(f.intakeRequest(body.voiceContext.id,cookie,form));
-    assert.equal(output.status,200);assert.deepEqual(await output.json(),{ok:true,connector,model:connector+'-fixture'});
+    assert.equal(output.status,200);assert.deepEqual(await output.json(),{ok:true,connector:'openrouter',model:'openrouter-fixture'});
     const call=f.calls.at(-1);assert.equal(call[0],'intake');assert.equal(call[1].files.length,0);assert.equal(call[2].taskSelection.contextId,body.voiceContext.id);
+  }
+});
+
+test('new tasks take the latest saved preset and never mutate the audio snapshot',t=>{
+  const f=fixture(t),owner='b'.repeat(64),context=f.api.openVoiceSessionContext(owner,'openai');
+  f.settings.activeConnectorId='claude';f.settings.providerPresets.claude={modelId:'claude-next',reasoningEffort:'high',timeoutMs:45000,authMode:'local-cli-session'};f.native.codexServiceTier='fast';
+  const selected=f.api.voiceTaskSelection(context,true);
+  assert.equal(selected.connectorId,'claude');assert.equal(selected.preset.modelId,'claude-next');assert.equal(selected.preset.authMode,'local-cli-session');assert.equal(selected.serviceTier,'fast');
+  selected.preset.modelId='caller-mutation';assert.equal(f.settings.providerPresets.claude.modelId,'claude-next');
+  assert.equal(f.api.voiceTaskSelection(context).connectorId,'codex');assert.equal(context.voiceApi,'realtime');
+});
+
+test('selecting Local or hard offline blocks new cloud-voice task dispatch in an open session',async t=>{
+  const f=fixture(t),created=await f.routes.session.POST(f.request({})),body=await created.json(),cookie=created.headers.getSetCookie()[0].split(';')[0];
+  for(const hardOffline of [false,true]){
+    f.settings.activeConnectorId=hardOffline?'claude':'local';f.environment.env.PRITHA_VOICE_OFFLINE=hardOffline?'1':'0';
+    const count=f.calls.length;
+    const output=await f.routes.tool.POST(f.request({contextId:body.voiceContext.id,name:'run_codex_task',arguments:{task:'fixture'}},cookie));
+    assert.equal(output.status,409);assert.equal((await output.json()).error,'voice_offline');assert.equal(f.calls.length,count);
   }
 });
 

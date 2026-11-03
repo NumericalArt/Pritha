@@ -473,7 +473,7 @@ async function runVoiceTurn(
                 researchExplicit: !input.hostNotification && searchIntent(text).researchExplicit,
                 signal,
                 model: getPrithaRuntimeSettings().codexModel,
-                taskSelection:voiceTaskSelection(s.hostContext),
+                taskSelection:voiceTaskSelection(s.hostContext,call.function.name === 'run_codex_task'),
               });
         // An uncertain effect cannot become a model-driven retry or new approval.
         if (output.ok === false) forceFinal = true;

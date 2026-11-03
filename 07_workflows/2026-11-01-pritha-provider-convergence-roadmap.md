@@ -3,7 +3,7 @@ id: pritha-provider-convergence-roadmap-2026-11-01
 type: workflow
 status: in-progress
 created: 2026-11-01
-updated: 2026-11-02
+updated: 2026-11-03
 topics:
   - provider-convergence
   - task-chat
@@ -3068,6 +3068,41 @@ unit child environment отдельно и изолировать оба aliases
 - Непосредственно перед установкой запрос на ff33d8f отозван как предварительный.
   Canonical 5f38f37 продолжает работать. Исправленный кандидат должен пройти
   соответствующие общий gate, build/strict/browser и отдельное разрешение.
+
+### Checkpoint 60 — установленный 73aafb5 и общий default Task Chat / Voice
+
+- По отдельному подтверждению пользователя установлена `73aafb5`, build
+  `q6BhRZGywaiSeiVjqaTJX`. Managed transaction, admission, operational health,
+  пять страниц и 12 JS chunks прошли; Interactive сохранён. Девять посторонних
+  untracked файлов сохранены по хэшам. GitHub и MacBook не менялись.
+- Полный gate этой установленной ревизии: 1515/1515; 33 fixture и два сценария
+  с реальным Claude catalog/attachment API. Native Claude image initial/resume
+  после обычного входа: 2/2, 18 926 observed tokens, оригинал неизменён.
+- Canonical memory после установки: frozen fixture прежний, регрессий/утечек 0.
+  HTTPS с самого Mac mini: пять страниц / 12 chunks; это не новая peer-приёмка.
+- Brief Desk прошёл фактический offline UI: демо, правка, reload, повторное демо,
+  повторный импорт с сохранением 27 файлов. Desktop/mobile визуально проверены;
+  конечный тестовый сервер остановлен. Провайдер и Telegram не использовались.
+- Новое уточнение пользователя: выбранного и настроенного провайдера нужно явно
+  зафиксировать как единый default новых Task Chat и задач Voice Control. При
+  незаконченной настройке такая фиксация недоступна. Панель настройки и уже
+  зафиксированный default должны различаться визуально.
+
+Порядок доработки этого уточнения:
+
+1. [x] Сверить Good State; сохранить существующие задачи, историю и audio context.
+2. [x] Общая заметная кнопка фиксации и отметка default на карточке; несохранённый
+   preset, ключ/native configuration и неоконченная readiness-проверка блокируют её.
+3. [x] Серверный ready-only gate перед фиксацией с проверкой ревизии под lock.
+   Старый default сохраняется при отказе; сохранение preset и активация разделены.
+4. [x] Новые Voice task/intake берут зафиксированный default в момент dispatch;
+   старые task bindings и аудиопротокол сохраняются. Local offline не ослабляется.
+5. [ ] Отрицательные и конкурентные regression-тесты, browser desktop/mobile,
+   проверка самостоятельного Task Chat override; затем общий gate/build/typecheck.
+6. [ ] Подготовить exact candidate и откат к 73aafb5. Только после отдельного
+   непосредственного approval — managed update и strict pages/chunks/admission.
+7. [ ] Вернуться к реальному Voice → Claude UI factory пилоту с отдельными
+   Contract/Outcome/budget approvals и завершить оставшуюся ручную приёмку.
 
 ## 7. Полные исходные материалы
 

@@ -20,6 +20,27 @@ for(const width of [390,1280])test(`NeuralDeep Search mode persists and rejects 
   }finally{const saved=(await(await request.get(endpoint)).json()).settings;expect((await request.post(endpoint,{data:{mode:original.mode,expectedRevision:saved.revision}})).ok()).toBe(true);}
 });
 async function fixtures(page:Page){
+  // Readiness and activation are synthetic UI fixtures here. The real server's
+  // refusal/atomic commit boundary is exercised by provider-default-activation
+  // and task-provider-settings-api; no production readiness bypass is installed.
+  let activeConnectorId='codex';
+  await page.route('**/api/task-runtime/settings',async route=>{
+    if(route.request().method()==='POST'){
+      const patch=route.request().postDataJSON();
+      if(patch.activeConnectorId===undefined)return route.continue();
+      const response=await page.request.post('/api/task-runtime/settings',{data:{expectedRevision:patch.expectedRevision}});
+      const payload=await response.json();if(response.ok()){activeConnectorId=patch.activeConnectorId;payload.settings.activeConnectorId=activeConnectorId;}
+      return route.fulfill({status:response.status(),json:payload});
+    }
+    const response=await route.fetch(),payload=await response.json();if(payload.settings)payload.settings.activeConnectorId=activeConnectorId;
+    return route.fulfill({response,json:payload});
+  });
+  await page.route('**/api/realtime/engine',async route=>{
+    if(route.request().method()!=='GET')return route.continue();
+    const response=await route.fetch(),payload=await response.json();
+    if(payload.voice){payload.voice.connectorId=activeConnectorId;if(payload.voice.preference==='auto')payload.voice.engine=activeConnectorId==='neuraldeep'?'neuraldeep':'openai';}
+    return route.fulfill({response,json:payload});
+  });
   await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:ids.map(health)}}));
   await page.route(/\/api\/task-runtime\/providers\/[^/?]+$/,async route=>{
     const id=new URL(route.request().url()).pathname.split('/').at(-1)!;
@@ -32,7 +53,7 @@ test.beforeEach(async({page,request})=>{
   expect(process.env.PRITHA_E2E_ISOLATED_STATE).toBe('1');await fixtures(page);
   let settings=(await(await request.get('/api/task-runtime/settings')).json()).settings;
   for(const connectorId of ['openrouter','claude']){
-    const response=await request.post('/api/task-runtime/settings',{data:{expectedRevision:settings.revision,activeConnectorId:'codex',connectorId,preset:{modelId:connectorId==='claude'?'sonnet':'',reasoningEffort:connectorId==='claude'?'medium':'default',timeoutMs:1800000,thinkingBudget:null,...(connectorId==='claude'?{authMode:'api-key'}:{})}}});
+    const response=await request.post('/api/task-runtime/settings',{data:{expectedRevision:settings.revision,connectorId,preset:{modelId:connectorId==='claude'?'sonnet':'',reasoningEffort:connectorId==='claude'?'medium':'default',timeoutMs:1800000,thinkingBudget:null,...(connectorId==='claude'?{authMode:'api-key'}:{})}}});
     expect(response.ok()).toBe(true);settings=(await response.json()).settings;
   }
 });
@@ -66,7 +87,7 @@ for(const width of [1440,390])test(`five provider panels preserve independent dr
   const submitted=page.waitForRequest(request=>request.method()==='POST' && request.url().endsWith('/providers/openrouter'));
   await surface.getByRole('button',{name:'Save key',exact:true}).click();expect((await submitted).postDataJSON()).toEqual({value:'PRIVATE_BROWSER_KEY_CANARY',confirmation:'save-openrouter-key'});await expect(surface.getByLabel('OpenRouter API key',{exact:true})).toHaveValue('');
   expect(await page.evaluate(()=>JSON.stringify([Object.entries(localStorage),Object.entries(sessionStorage)]))).not.toContain('PRIVATE_BROWSER_KEY_CANARY');await expect(surface).not.toContainText('PRIVATE_BROWSER_KEY_CANARY');
-  await select(page,'local');await expect(surface.getByRole('button',{name:'Use for new chats'})).toBeDisabled();await expect(surface.locator('input[type=password]')).toHaveCount(0);
+  await select(page,'local');await expect(surface.getByRole('button',{name:'Set default for tasks + Voice'})).toBeDisabled();await expect(surface.locator('input[type=password]')).toHaveCount(0);
   await select(page,'codex');await surface.getByRole('tab',{name:/^Codex/}).focus();await page.keyboard.press('End');await expect(surface.getByRole('tab',{name:/^Local/})).toBeFocused();await expect(surface.getByRole('tab',{name:/^Local/})).toHaveAttribute('aria-selected','true');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await select(page,'openrouter');await surface.screenshot({path:`test-results/provider-settings-${width}.png`});
@@ -82,6 +103,58 @@ test('a stale browser save cannot overwrite a newer preset, and an invalid numbe
   const timeout=surface.getByLabel('OpenRouter timeout seconds');await timeout.fill('');await timeout.blur();await surface.getByRole('button',{name:'Save preset',exact:true}).click();await expect(surface).toContainText('Enter a timeout from 10 to 3600');await expect(timeout).toHaveValue('');
 });
 
+for(const width of [390,1440])test(`setup selection is distinct from the committed Task Chat and Voice default at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:1000});await page.goto('/settings');const surface=panel(page);
+  const button=surface.getByRole('button',{name:'Set default for tasks + Voice',exact:true});
+  await select(page,'openrouter');await expect(surface).toContainText('OpenRouter is selected for setup');await expect(button).toBeDisabled();
+  await surface.getByLabel('OpenRouter model',{exact:true}).fill('vendor/alpha');await expect(button).toBeDisabled();
+  await surface.getByRole('button',{name:'Save preset',exact:true}).click();await expect(surface).toContainText('Preset saved.');await expect(button).toBeEnabled();
+  await expect(surface.getByRole('tab',{name:/^Codex/})).toContainText('Default for tasks + Voice');
+  await button.click();await expect(surface).toContainText('OpenRouter is the default for new tasks and Voice Control.');
+  await expect(surface.getByRole('tab',{name:/^OpenRouter/})).toContainText('Default for tasks + Voice');
+  await select(page,'claude');await expect(surface).toContainText('Claude Code is selected for setup');
+  await expect(surface.getByRole('tab',{name:/^OpenRouter/})).toContainText('Default for tasks + Voice');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await surface.screenshot({path:`test-results/common-provider-default-${width}.png`});
+});
+
+test('an old Ready status cannot enable default activation while the saved preset is being rechecked',async({page})=>{
+  let hold=false,release=()=>{};const gate=new Promise<void>(resolve=>release=resolve);
+  await page.route('**/api/task-runtime/providers/claude',async route=>{if(hold && route.request().method()==='GET')await gate;return route.fallback();});
+  await page.goto('/settings');await select(page,'claude');const surface=panel(page),button=surface.getByRole('button',{name:'Set default for tasks + Voice',exact:true});
+  await expect(button).toBeEnabled();hold=true;
+  await surface.getByLabel('Claude Code timeout seconds').fill('45');await surface.getByRole('button',{name:'Save preset',exact:true}).click();
+  await expect(surface).toContainText('Preset saved.');await expect(button).toBeDisabled();
+  release();await expect(button).toBeEnabled();
+});
+
+test('an unsaved credential blocks default activation and is cleared on panel switch',async({page})=>{
+  await page.goto('/settings');await select(page,'claude');const surface=panel(page),button=surface.getByRole('button',{name:'Set default for tasks + Voice',exact:true});
+  await expect(button).toBeEnabled();await surface.getByLabel('Claude Code API key',{exact:true}).fill('UNSAVED_KEY_CANARY');
+  await expect(button).toBeDisabled();await expect(surface).toContainText('Finish and save your configuration first.');
+  await select(page,'openrouter');await select(page,'claude');await expect(surface.getByLabel('Claude Code API key',{exact:true})).toHaveValue('');await expect(button).toBeEnabled();
+});
+
+test('unfinished native transport settings block choosing Codex as the new default',async({page})=>{
+  await page.goto('/settings');await select(page,'openrouter');const surface=panel(page),button=surface.getByRole('button',{name:'Set default for tasks + Voice',exact:true});
+  await surface.getByLabel('OpenRouter model',{exact:true}).fill('vendor/alpha');await surface.getByRole('button',{name:'Save preset',exact:true}).click();await expect(button).toBeEnabled();await button.click();
+  await expect(surface).toContainText('OpenRouter is the default for new tasks and Voice Control.');await select(page,'codex');await expect(button).toBeEnabled();
+  const transport=surface.getByLabel('Deep task primary transport',{exact:true}),saved=await transport.inputValue();
+  await transport.selectOption(saved==='codex-app'?'codex-cli':'codex-app');await expect(button).toBeDisabled();
+  await transport.selectOption(saved);await expect(button).toBeEnabled();
+});
+
+test('a server readiness refusal preserves the previous default and the configured draft',async({page})=>{
+  await page.route('**/api/task-runtime/settings',async route=>{
+    if(route.request().method()==='POST' && route.request().postDataJSON().activeConnectorId!==undefined)return route.fulfill({status:400,json:{ok:false,error:'provider_default_not_ready',message:'Finish configuring this provider. The previous default is preserved.'}});
+    return route.fallback();
+  });
+  await page.goto('/settings');await select(page,'claude');const surface=panel(page);
+  await surface.getByRole('button',{name:'Set default for tasks + Voice',exact:true}).click();
+  await expect(surface).toContainText('The previous default is preserved.');await expect(surface.getByLabel('Claude Code model',{exact:true})).toHaveValue('sonnet');
+  await expect(surface.getByRole('tab',{name:/^Codex/})).toContainText('Default for tasks + Voice');
+});
+
 test('provider changes refresh Auto voice and retain an unsaved voice draft with a current save revision',async({page,request})=>{
   const original=(await(await request.get('/api/realtime/engine')).json()).voice;
   const saveVoice=async(voiceEngine:string,chained=original.chained)=>{
@@ -95,7 +168,7 @@ test('provider changes refresh Auto voice and retain an unsaved voice draft with
     const timbre=page.getByLabel('NeuralDeep voice',{exact:true}).filter({visible:true});await timbre.selectOption('vivian');
     await select(page,'openrouter');await surface.getByLabel('OpenRouter model',{exact:true}).fill('vendor/alpha');
     await surface.getByRole('button',{name:'Save preset',exact:true}).click();await expect(surface).toContainText('Preset saved.');
-    await surface.getByRole('button',{name:'Use for new chats'}).click();await expect(surface).toContainText('OpenRouter selected for new chats.');
+    await surface.getByRole('button',{name:'Set default for tasks + Voice'}).click();await expect(surface).toContainText('OpenRouter is the default for new tasks and Voice Control.');
     await expect(page.getByText('Task provider updated. Your voice edits are retained.',{exact:true}).filter({visible:true})).toBeVisible();
     await expect(voice).toHaveValue('neuraldeep');await expect(timbre).toHaveValue('vivian');
     const save=page.getByRole('button',{name:'Save Voice Engine',exact:true}).filter({visible:true});
@@ -105,13 +178,13 @@ test('provider changes refresh Auto voice and retain an unsaved voice draft with
     // Reloading provider presets is explicit here because the voice save also
     // advances the shared document revision.
     await surface.getByRole('button',{name:'Reload saved presets'}).click();await select(page,'neuraldeep');
-    await surface.getByRole('button',{name:'Use for new chats'}).click();await expect(surface).toContainText('NeuralDeep selected for new chats.');
+    await surface.getByRole('button',{name:'Set default for tasks + Voice'}).click();await expect(surface).toContainText('NeuralDeep is the default for new tasks and Voice Control.');
     await expect(voice).toHaveValue('auto');await expect(timbre).toHaveValue('vivian');
     await expect(page.getByLabel('Voice model',{exact:true}).filter({visible:true})).toHaveCount(0);
   }finally{
     await saveVoice(original.preference);
     const current=(await(await request.get('/api/task-runtime/settings')).json()).settings;
-    expect((await request.post('/api/task-runtime/settings',{data:{expectedRevision:current.revision,activeConnectorId:'codex'}})).ok()).toBe(true);
+    expect((await request.post('/api/task-runtime/settings',{data:{expectedRevision:current.revision}})).ok()).toBe(true);
   }
 });
 

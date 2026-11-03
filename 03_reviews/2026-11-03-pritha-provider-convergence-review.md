@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
 source_updated: 2026-11-03
-source_version: executable ff33d8fec1bbf11b7c23e7e9857ac36dbbca0636; installed 5f38f3748cf7ad3c71360d10a23fd21fbebb76ed
+source_version: installed 73aafb535a8a2503a258016edef86700464a6d1b; shared-default follow-up in preparation
 retrieved: 2026-11-03
 verified: 2026-11-03
 valid_for: the local executable candidate and recorded operator acceptance only
@@ -53,15 +53,16 @@ confidence: high
 
 The canonical Mac mini implementation now supports five task connectors while
 preserving native Codex history, the October curated knowledge and the existing
-Voice tools. The current installed release is `5f38f37`, build
-`V5p7AZTJkbUdBaHtxbCDt`, with the approved Interactive managed-service profile.
-The initial image/microphone follow-up `ff33d8f`, build `7ZnIMkw-N89a8keb4G7We`,
-passed preparation, then was withdrawn before installation when the completion
-audit reproduced a new-chat model-alias image blocker. Its successor resolves
-the alias in both backend preview and the model/reasoning selector; consolidated
-verification and immediate lifecycle approval for that successor remain required. A prepared candidate is not an
-installed release. The overall goal remains incomplete until the gates below
-are demonstrated and accepted.
+Voice tools. The current installed release is `73aafb5`, build
+`q6BhRZGywaiSeiVjqaTJX`, with the approved Interactive managed-service profile.
+Its exact approved transaction and post-activation memory/HTTPS checks passed.
+The full gate was 1515/1515 with 33 fixture browser cases and two additional
+actual-catalog Claude composer cases. Native Claude image initial/resume also
+passed after normal sign-in. The earlier ff33d8f was withdrawn and never installed.
+A further operator-requested shared Task Chat / Voice default refinement is in
+preparation; it is not installed and needs its own consolidated checks and
+immediate lifecycle approval. The overall goal remains incomplete until the
+remaining user journeys and final acceptance below are demonstrated.
 
 All three supplied technical specifications remain verbatim in the roadmap.
 Their architecture was reviewed before execution: work targets canonical Pritha,
@@ -105,7 +106,7 @@ to the actual shared modules and tests below.
 | C §4 Steer, Edit, Cancel, Stop | `task-chat-steer-queue.spec.ts`, native control and ownership tests | Steer uses exact turn; attachments retained; occupied draft not overwritten |
 | C §5 combined acceptance | Unit/browser/provider tests and remaining manual script | Automated gate passes; not a substitute for operator acceptance |
 | D Pritha naming migration | Root/state/memory/setup helpers, migration and compatibility tests | Primary Pritha names; tested legacy readers and conflict rejection retained |
-| Later Claude image report | Chat-bound immutable MCP images and API original-byte restoration | Actual API initial/resume pass; native vision awaits renewed sign-in |
+| Later Claude image report | Chat-bound immutable MCP images and API original-byte restoration | Actual API and native image initial/resume pass |
 | Later NeuralDeep microphone meter | Exact GitHub Voice page/hook blobs and shared existing-stream meter | RMS/mute/stop/reconnect browser checks pass; no second microphone request |
 
 ## Proposed names and actual modules
@@ -173,9 +174,9 @@ already match. No executable source was changed to obtain that result.
   paid inference. CLI resizing is repaired only for this chat's verified
   `read_file` attachment URI, before token counting or budget reservation.
 - Native Claude: real file/continuation and fresh-instance sign-in already passed.
-  The later image attempt was rejected by Anthropic for an expired OAuth session
-  before a tool call, with zero observed tokens. The normal copied instance-login
-  command has been requested; native image acceptance remains pending.
+  A later image attempt first failed for an expired OAuth session with zero
+  observed tokens. After normal sign-in, actual image/read_file and same-session
+  resume passed 2/2 with 18,926 observed tokens and complete owned process exit.
 - NeuralDeep: actual file tool and continuation passed with exact model identity.
   Model prelude quarantine and measured accounting remain in place. Browser VAD,
   host receipts and engine selection are tested. A later finite real component
@@ -225,12 +226,14 @@ connector contract; this review does not recommend an untested model.
 
 ## Required steps before final handoff
 
-1. Finish consolidated verification and receive immediate approval for the
-   corrected alias/image candidate transaction, then run managed
-   stop → source/build swap → start, then check exact release, chunks, admission
-   and operational health. Roll back through the prepared managed path on failure.
-2. Complete ordinary native Claude sign-in and synthetic image initial/resume.
-   Keep the already successful API checks; do not repeat them just to refresh a date.
+1. Verify the new common-default follow-up: setup selection differs from the
+   committed default; incomplete/dirty settings cannot activate it; the server
+   rechecks readiness and revision. New Voice tasks read that default at dispatch,
+   while existing tasks and audio/search context preserve their bindings.
+2. Prepare its exact source/build and rollback to installed 73aafb5, obtain
+   immediate lifecycle approval, then perform managed activation and strict
+   pages/chunks/admission/operational checks. Earlier native/API image checks
+   remain valid; repeat only if relevant executable changes justify it.
 3. Complete the real Voice → Claude UI factory lifecycle with separate authored
    Contract and Outcome approvals, an explicitly approved build budget, independent
    protected Trials, operator acceptance and separate application approval.
