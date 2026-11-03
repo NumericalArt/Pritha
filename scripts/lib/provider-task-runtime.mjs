@@ -315,7 +315,7 @@ export class ProviderTaskRuntime {
     const exited=result.processTreeExited===true;
     const status=!exited?'failed':active.stopping || result.errorCode==='operator_cancel'?'interrupted':result.ok?'completed':'failed';
     const code=exited ? result.errorCode || 'provider_runtime_failed' : 'provider_process_exit_unconfirmed';
-    const error=status==='failed'?{code,message:exited?'The provider task stopped with an error. Its history has been saved.':'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
+    const error=status==='failed'?{code,message:exited?(code==='provider_native_login_required'?'Claude Code needs you to sign in again. Open Settings → Providers → Claude Code → Local CLI session, complete sign-in, then continue this chat.':'The provider task stopped with an error. Its history has been saved.'):'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
     this.registry.updateTurn(active.chat,active.turnId,row=>({...row,status,error,completedAt:stamp(),usage:result.usage || null}));
     this.registry.mutate(active.chat,row=>({...row,lastStatus:exited?'idle':'system_error',updatedAt:stamp()}));
     this.execution.updateIntent(active.key,{state:exited?status:'unknown',exitConfirmed:exited,errorCode:error?.code || null});

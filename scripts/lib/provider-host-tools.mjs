@@ -67,6 +67,7 @@ export class ProviderHostTools {
       if(typeof input.path==='string' && input.path.startsWith('attachment:')){
         this.window('',input);if(!this.options.attachments)throw fail('attachment_not_in_chat');
         const {bytes,attachment}=await this.options.attachments.read(input.path);this.check();let value=null;
+        if(this.options.connectorId==='claude' && attachment.kind==='image' && typeof this.options.attachments.imageContent==='function')return this.options.attachments.imageContent({bytes,attachment});
         if(bytes)try{value=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{/* Binary files remain exact bytes; no automatic extraction or conversion. */}
         return text({attachment,sha256:attachment.sha256,...(value===null?{text:'Binary or large attachment. Use its readOnlyPath with an explicitly approved run_command if this task requires processing it.',binary:true}:this.window(value,input))});
       }

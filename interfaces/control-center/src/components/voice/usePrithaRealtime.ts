@@ -153,6 +153,7 @@ export type MicGainRuntimeState = {
   active: boolean;
   fallbackReason?: string;
   audioContextState?: string;
+  capture?: import('./microphone-meter').MicrophoneSignal;
 };
 
 export type PrithaRealtimeStatus = {
@@ -733,6 +734,7 @@ function usePrithaRealtimeController() {
   const localTrackRef = useRef<MediaStreamTrack | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const stopMicrophoneMeterRef = useRef<(() => void) | null>(null);
   const micInputLevelRef = useRef(micInputLevel);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
@@ -969,6 +971,8 @@ function usePrithaRealtimeController() {
   const closeConnection = useCallback(() => {
     searchTurnRef.current=null;
     connectionGenerationRef.current++;
+    stopMicrophoneMeterRef.current?.();
+    stopMicrophoneMeterRef.current=null;
     if (pendingVoiceIntakeRef.current?.promptSent) {
       pendingVoiceIntakeRef.current.handlers.status?.('failed');
       pendingVoiceIntakeRef.current = null;
@@ -1008,6 +1012,7 @@ function usePrithaRealtimeController() {
     setMicGainRuntime((current) => ({
       ...current,
       active: false,
+      capture: undefined,
       audioContextState: current.available ? "closed" : current.audioContextState,
     }));
     if (eventsChannelRef.current) {
@@ -2343,6 +2348,15 @@ function usePrithaRealtimeController() {
       localTrackRef.current = track;
 
       if (generation !== connectionGenerationRef.current) return;
+      if(!chained && audioContextRef.current){
+        try{
+          const {startMicrophoneMeter}=await import('./microphone-meter');
+          if(generation!==connectionGenerationRef.current)return;
+          stopMicrophoneMeterRef.current=startMicrophoneMeter(audioContextRef.current!,streamForPeer,
+            ()=>localTrackRef.current?.enabled!==true,
+            capture=>{if(generation===connectionGenerationRef.current)setMicGainRuntime(current=>({...current,capture}));});
+        }catch{/* Meter availability must not interrupt an otherwise working voice connection. */}
+      }
       if (chained) {
         if (!audioContextRef.current || !sessionData.sessionId) throw new Error("NeuralDeep Voice requires Web Audio support.");
         const {NeuralDeepVoiceTransport} = await import("./NeuralDeepVoiceTransport");
@@ -2355,6 +2369,7 @@ function usePrithaRealtimeController() {
           onAssistantStream:remoteStream=>{if(generation!==connectionGenerationRef.current)return;remoteStreamRef.current=remoteStream;if(musicControlEnabledRef.current)void music.attachAssistantStream(remoteStream);setRemoteAudioReady(true);},
           onLatency:value=>{if(generation===connectionGenerationRef.current)setLastLatencyMs(value);},
           onMuted:value=>{if(generation===connectionGenerationRef.current)setIsMuted(value);},
+          onCapture:capture=>{if(generation===connectionGenerationRef.current)setMicGainRuntime(current=>({...current,capture}));},
           onDisconnected:()=>{if(generation===connectionGenerationRef.current){closeConnection();setPhase("error");setError("Voice connection lost. Reconnect to continue.");}},
         });
         if (generation !== connectionGenerationRef.current) {transport.close();return;}
@@ -2574,6 +2589,7 @@ function usePrithaRealtimeController() {
     if (!localTrackRef.current) return;
     const nextMuted = !isMuted;
     localTrackRef.current.enabled = !nextMuted;
+    setMicGainRuntime(current=>({...current,capture:current.capture?{...current.capture,paused:nextMuted,rms:0}:undefined}));
     void neuralDeepTransportRef.current?.setMuted(nextMuted);
     setIsMuted(nextMuted);
   }, [isMuted]);

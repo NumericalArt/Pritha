@@ -2923,6 +2923,82 @@ unit child environment отдельно и изолировать оба aliases
 - Никаких production lifecycle действий, замены модели, GitHub или MacBook
   изменений на этом checkpoint не выполнялось.
 
+### Checkpoint 57 — установленный 5f38f37 и операторская Voice-приёмка
+
+- Разрешённая managed активация 5f38f37 и Interactive profile завершена.
+  Strict/operational health: 5 страниц и 12 JS chunks, admission включён.
+- Память rebuilt/embedded; frozen FTS 45/48 @5, 46/48 @10, holdout 23/24,
+  без регрессий и private leaks. Исходная фикстура не менялась.
+- Compiled Local: первый общий запрос завершился без timeout, но 4B-модель
+  вернула tool-shaped JSON вместо ответа. Отдельный тест с пояснением inline
+  text field прошёл 2/2; original fail сохранён. Оба process sets проверены.
+- Пользователь подтвердил GPT Realtime 2, memory/README, прерывание,
+  продолжение темы после reconnect и плавную работу музыки. Это принятый scope,
+  который сохраняется при следующих изменениях; Live 1/ND/factory не подменяются.
+- После сообщения о загрузке через Tailscale backend/API/chunks и чистые
+  Chromium/WebKit/настоящий Safari загрузились. Пользователь продолжил работу
+  с Voice и Task Chat; точная причина прежней зависшей вкладки не установлена.
+
+### R12 follow-up — картинки Claude и индикатор микрофона
+
+Причина блока картинок подтверждена в коде: Claude adapter объявляет images=false
+и использует file-only transport. Поддержка модели и поддержка runtime — разные
+проверки. Новый scope реализуется в изолированном checkout; live 5f38f37 сохраняется.
+
+1. [x] Перед изменениями сохранить private accepted Voice state и выполнить
+   пропорциональную Good State Alignment.
+2. [x] Добавить Claude image transport: immutable/chat-bound originals, MIME/size
+   bounds, разрешённые модели и exact CLI versions; реальные MCP image blocks,
+   без превращения изображения в текстовый путь или чтения чужого файла.
+3. [x] Сохранить API-key/native separation, opaque native auth, protected paths,
+   отсутствие чужих credentials, token accounting и no-replay guarantees.
+4. [x] Проверить stock CLI initial/resume с синтетическим upstream без платных
+   вызовов: SHA оригинальных PNG/JPEG/GIF/WebP, недопустимые MIME/URL/foreign IDs,
+   отказ при повреждении snapshot и неподтверждённой CLI/model capability.
+5. [ ] Выполнить отдельную живую vision-проверку на синтетическом изображении;
+   пользовательские скриншоты не отправлять сторонним моделям для тестирования.
+6. [x] Восстановить microphone signal meter по GitHub NeuralDeep на pin
+   2ab22aeff5f1c167c86e925ec30311942b76023b; исходный meter находится в
+   VoiceControlPage.tsx. Использовать существующий microphone stream, не
+   запрашивать второй microphone access, не менять gain/ducking/audio route.
+7. [x] Проверить живой RMS/idle/mute/stop cleanup, оба voice engines, desktop/mobile
+   и отсутствие audio/model calls до Start Listening.
+8. [x] Дополнить документацию маршрутизации: Settings задаёт default, выбор
+   Task Chat закрепляется за чатом, Voice фиксирует default/preset на старте
+   сессии; продолжение существующей темы сохраняет её binding.
+9. [ ] Focused suites → общий gate → production build/typecheck → browser/strict
+   candidate checks → rollback package → точное lifecycle approval → live smoke.
+10. [ ] Завершить оставшуюся операторскую приёмку и единый реальный Voice/Claude UI
+    factory pilot с отдельными Contract/Outcome и новым утверждённым бюджетом.
+
+### Checkpoint 58 — картинки Claude и возвращённый RMS-индикатор
+
+- В кандидате Claude получает реальные MCP image blocks из immutable/chat-bound
+  оригиналов. Модели требуют положительный imageInput и exact CLI 2.1.296;
+  MIME PNG/JPEG/GIF/WebP, 5 MiB/image, 15 MiB/request, 32 MiB encoded request.
+- Настоящая stock CLI с синтетическим upstream прошла initial/resume для всех
+  четырёх форматов и PNG 2400×1400. CLI уменьшает крупные MCP-картинки;
+  API proxy восстанавливает только оригинал точного read_file attachment URI
+  этого чата перед count_tokens, reservation и dispatch. Foreign/URL/tampered
+  inputs отклоняются; originals и recovery receipts сохраняются.
+- Живая API-проверка: код с синтетического PNG 2400×1400 прочитан через read_file,
+  продолжение той же session вернуло код без tools. Обе process trees завершены;
+  observed usage 9491 + 7339 токенов. Пользовательские изображения не отправлялись.
+- Native CLI вернула authentication_failed/expired OAuth до первого read_file;
+  observed usage 0. Это отдельная незавершённая приёмка, а не vision pass.
+  Пользователю передана обычная instance sign-in команда. Диагностика кандидата
+  сохраняет typed sign-in-required вместо generic runtime failure; raw OAuth
+  diagnostics и credentials не публикуются.
+- Meter восстановлен из GitHub NeuralDeep pin: существующий onCapture callback
+  и прежний маленький meter рядом с усилением. OpenAI Realtime/Live используют
+  отдельный analyser существующего обработанного stream, без второго microphone
+  запроса или audio destination. Mute/stop/ended/suspended и reconnect проверены.
+- Typecheck, focused suites и 12 Chromium browser scenarios прошли, включая
+  Realtime/Live/NeuralDeep на desktop/mobile. Полный gate, финальный build,
+  exact candidate/rollback и managed deployment остаются следующими шагами.
+- Установленная 5f38f37, MacBook и GitHub не изменялись. Принятая пользователем
+  Realtime 2/music-приёмка сохранена; прочие ручные gates не объявлены пройденными.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

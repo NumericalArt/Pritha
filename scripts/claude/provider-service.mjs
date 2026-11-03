@@ -6,6 +6,7 @@ import { resolveClaudeBinary } from '../claude-code-runner.mjs';
 import { probeClaudeCli } from './cli-probe.mjs';
 import { listClaudeModels,resolveClaudeModel } from './messages-client.mjs';
 import {hostFileAttachmentVerified} from '../lib/provider-file-attachments.mjs';
+import {claudeImageAttachmentsVerified} from './image-attachments.mjs';
 import {probeClaudeNativeAuth,nativeClaudeLoginPlan,CLAUDE_NATIVE_MODELS,resolveNativeClaudeModel} from './native-auth.mjs';
 
 const capabilities=()=>({steer:false,interrupt:true,approvals:true,tools:true,attachments:{files:false,images:false},usage:'observed',resume:true,sandbox:'host-enforced',offline:false});
@@ -39,7 +40,7 @@ export class ClaudeProviderService {
         const model=resolveNativeClaudeModel(preset.modelId);extra.model=model;
         if(!auth.authenticated)return this.result(auth.status==='not-configured'?'not-configured':'pending-auth',auth.code || 'provider_native_login_required',extra);
         if(preset.reasoningEffort && !model.efforts.includes(preset.reasoningEffort))return this.result('configured','provider_effort_unavailable',extra);
-        return this.result('ready',null,{...extra,capabilities:{...capabilities(),attachments:{files:hostFileAttachmentVerified('claude',cli.version),images:false},outputTokens:8192}});
+        return this.result('ready',null,{...extra,capabilities:{...capabilities(),attachments:{files:hostFileAttachmentVerified('claude',cli.version),images:claudeImageAttachmentsVerified(cli.version,model)},outputTokens:8192}});
       }catch(error){return this.result('unavailable',Object.hasOwn(messages,error.code)?error.code:'provider_native_auth_unavailable',extra);}
     })().finally(()=>this.pending.delete(key));this.pending.set(key,operation);return operation;
   }
@@ -52,7 +53,7 @@ export class ClaudeProviderService {
       models=await (this.options.listModels || listClaudeModels)({apiKey:key,fetchImpl:this.options.fetchImpl});
       const model=resolveClaudeModel(preset.modelId,models);
       if(preset.reasoningEffort && !model.efforts.includes(preset.reasoningEffort))return this.result('configured','provider_effort_unavailable',{version,models,model});
-      return this.result('ready',null,{version,models,model,capabilities:{...capabilities(),attachments:{files:hostFileAttachmentVerified('claude',version),images:false},outputTokens:model.maxOutputTokens?Math.min(8192,model.maxOutputTokens):8192}});
+      return this.result('ready',null,{version,models,model,capabilities:{...capabilities(),attachments:{files:hostFileAttachmentVerified('claude',version),images:claudeImageAttachmentsVerified(version,model)},outputTokens:model.maxOutputTokens?Math.min(8192,model.maxOutputTokens):8192}});
     }catch(error){const code=Object.hasOwn(messages,error.code)?error.code:'provider_unavailable';return this.result(code==='provider_pending_auth'?'pending-auth':code==='provider_model_unavailable'?'configured':code==='provider_rate_limited'?'rate-limited':code==='provider_billing_required'?'billing-required':code.startsWith('provider_runtime') || code==='provider_sandbox_unavailable'?'unavailable':'error',code,{version,models});}
   }
   async require(preset){const snapshot=await this.snapshot(preset);if(snapshot.status!=='ready')throw new ProviderTaskError(snapshot.error.code,snapshot.error.message,snapshot.status==='rate-limited'?429:snapshot.status==='billing-required'?402:503);return snapshot;}

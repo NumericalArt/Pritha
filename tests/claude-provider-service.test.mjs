@@ -17,6 +17,11 @@ test('a new supported Claude CLI retains text execution but needs file transport
   const value=await fixture({probeCli:async()=>({available:true,version:'2.1.297'})}).snapshot(preset);
   assert.equal(value.status,'ready');assert.deepEqual(value.capabilities.attachments,{files:false,images:false});
 });
+test('Claude images require affirmative model metadata and the verified CLI',async()=>{
+  const supported=models.map(model=>({...model,imageInput:true}));
+  assert.equal((await fixture({listModels:async()=>supported}).snapshot(preset)).capabilities.attachments.images,true);
+  assert.equal((await fixture({listModels:async()=>supported,probeCli:async()=>({available:true,version:'2.1.297'})}).snapshot(preset)).capabilities.attachments.images,false);
+});
 test('unavailable auth, CLI and sandbox cannot look ready or trigger inference',async()=>{
   const missing=fixture({readCredential:()=>null,listModels:async()=>assert.fail('No key must not invoke a catalog')});assert.equal((await missing.snapshot(preset)).status,'not-configured');
   assert.equal((await missing.snapshot({...preset,authMode:'unknown'})).error.code,'provider_auth_mode_unverified');

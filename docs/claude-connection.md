@@ -3,19 +3,21 @@ id: pritha-claude-connection
 type: workflow
 status: active
 created: 2026-11-02
-updated: 2026-11-02
+updated: 2026-11-03
 topics: [pritha, onboarding, claude, authentication]
 tools: [Pritha, Claude Code, macOS Keychain]
 sources:
   - https://code.claude.com/docs/en/setup
   - https://code.claude.com/docs/en/authentication
+  - https://platform.claude.com/docs/en/build-with-claude/vision
+  - https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls
 related:
   workflows: [START_HERE.md, 07_workflows/first-run-setup.md, 07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md]
 supersedes: []
 superseded_by: []
 source_version: Claude Code 2.1.296; Pritha provider convergence
 retrieved: 2026-11-02
-verified: 2026-11-02
+verified: 2026-11-03
 subject: {kind: pritha, id: pritha}
 privacy: public
 retention: durable
@@ -85,6 +87,7 @@ billing. Never put a key into a chat message or a tracked repository file.
 | The key is saved, but the connection is not ready | Refresh provider status and address its reported authentication, model or runtime issue. Do not resave the key just because readiness failed. |
 | Browser sign-in finished, but `authenticated` is false | Use this instance's complete copied command and finish its terminal prompt. A browser page alone does not confirm that credentials were saved. |
 | Sign-in is ready, but the first task reports model access or billing failure | Check that the selected account and model are available in the chosen connection mode. |
+| Claude Code asks you to sign in again, or Anthropic reports an expired OAuth session | Repeat the instance's copied sign-in command, then continue the chat. A local `authenticated` status confirms stored sign-in, while the first task checks whether Anthropic still accepts it. |
 | Native session cannot be verified after an interrupted command | Preserve the private state and report the diagnostic code. Do not delete locks or credentials to force another run. |
 
 Keys, browser login URLs, authorization codes and Keychain contents should never
@@ -94,3 +97,20 @@ CLI version are enough to begin troubleshooting.
 The release roadmap records automated checks separately from real account,
 fresh-installation and first-task acceptance. Installation instructions alone
 do not constitute a completed live acceptance test.
+
+## Pictures in Task Chat
+
+The verified Claude Code 2.1.296 transport supports PNG, JPEG, GIF and WebP when
+the selected model supports images. Pritha currently permits 5 MiB per image
+and 15 MiB of images in a request; its original attachments stay unchanged.
+The model reads an attached picture through the chat's `read_file` capability.
+An attachment from another chat cannot be read by its ID or filesystem path.
+Earlier pictures remain available when the conversation continues.
+
+Claude Code can downscale an image internally. In API-key mode Pritha restores
+the verified original before request token counting and dispatch, including
+on resume. The local CLI session uses the official CLI's own image handling
+over opaque TLS; Pritha does not inspect that connection or extract OAuth.
+An unsupported CLI or a model without confirmed image input keeps the image
+blocker and preserves the draft. Model or sign-in failures do not select a
+different provider automatically.

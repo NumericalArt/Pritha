@@ -45,8 +45,9 @@ for (const width of [1280,390]) {
   });
 }
 
-for (const api of ['live','realtime']) {
-  test(`Voice ${api} negotiates the correct protocol and handles speech and disconnect`,async({page})=>{
+for (const [api,width] of [['live',1280],['realtime',1280],['live',390],['realtime',390]] as const) {
+  test(`Voice ${api} negotiates the correct protocol and handles speech and disconnect at ${width}px`,async({page})=>{
+    await page.setViewportSize({width,height:900});
     expect(process.env.PRITHA_E2E_ISOLATED_STATE).toBe('1');
     await page.addInitScript(({api})=>{
       (window as any).__voiceSent=[];
@@ -67,7 +68,8 @@ for (const api of ['live','realtime']) {
         close(){this.connectionState='closed';}
       }
       Object.defineProperty(window,'RTCPeerConnection',{value:Peer});
-      Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{const ctx=new AudioContext();const dest=ctx.createMediaStreamDestination();return dest.stream;}});
+      (window as any).__microphoneRequests=0;
+      Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{(window as any).__microphoneRequests++;const ctx=new AudioContext();const dest=ctx.createMediaStreamDestination();const oscillator=ctx.createOscillator(),gain=ctx.createGain();gain.gain.value=0.03;oscillator.connect(gain);gain.connect(dest);oscillator.start();(window as any).__fixtureMicContext=ctx;return dest.stream;}});
     },{api});
     await page.route('**/api/realtime/status',route=>route.fulfill({json:{ok:true,model:api==='live'?'gpt-live-1':'gpt-realtime-2',voice:'marin',tools:[],openai_key_configured:true,memory:{sqlite:true,sqlite_cli:true,stats:[]},codex:{available:true,mode:'codex-app',write_enabled:true},transcription_model:'fixture'}}));
     let closedContext:string|undefined,sessionCount=0;
@@ -83,6 +85,12 @@ for (const api of ['live','realtime']) {
     await expect.poll(()=>call?.voiceApi).toBe(api);
     expect(call.ephemeralKey).toBe(api==='realtime'?'fixture-ephemeral':undefined);
     expect(call.contextId).toBe('vctx_fixture_1');
+    const meter=page.getByLabel('Microphone signal',{exact:true}).filter({visible:true});
+    await expect(meter).toBeVisible();await expect.poll(()=>meter.evaluate(element=>(element as HTMLMeterElement).value)).toBeGreaterThan(0.01);
+    expect(await page.evaluate(()=>(window as any).__microphoneRequests)).toBe(1);
+    await page.getByRole('button',{name:'Mute',exact:true}).filter({visible:true}).click();await expect(meter).toHaveAttribute('value','0');
+    await expect(page.getByText('Microphone paused',{exact:true}).filter({visible:true})).toBeVisible();
+    await page.getByRole('button',{name:'Unmute',exact:true}).filter({visible:true}).click();await expect.poll(()=>meter.evaluate(element=>(element as HTMLMeterElement).value)).toBeGreaterThan(0.01);
     await page.evaluate(({api})=>{
       const channel=(window as any).__voiceChannel;
       if(api==='live'){
@@ -117,6 +125,7 @@ for (const api of ['live','realtime']) {
     await page.getByRole('button',{name:/stop|disconnect|end/i}).first().click();
     if(api==='live')await expect.poll(()=>page.evaluate(()=>(window as any).__voiceSent.some((e:any)=>e.type==='session.close'))).toBe(true);
     await expect.poll(()=>closedContext).toBe('vctx_fixture_1');
+    await expect(meter).toHaveCount(0);
     if(api==='realtime'){
       await page.getByRole('button',{name:'Start Listening',exact:true}).filter({visible:true}).click();
       await expect.poll(()=>call.contextId).toBe('vctx_fixture_2');

@@ -10,7 +10,7 @@ import {atomicWriteFile} from '../lib/atomic-file.mjs';
 import {prithaRootEnvironment} from '../lib/paths.mjs';
 
 const fail=code=>Object.assign(new Error('Review the native Claude session for this Pritha instance.'),{code});
-export const CLAUDE_NATIVE_MODELS=Object.freeze(['sonnet','opus','haiku'].map(line=>Object.freeze({id:`claude-${line}-5-5`,label:`Claude ${line[0].toUpperCase()+line.slice(1)} 5.5`,line,lifecycle:'active',efforts:['low','medium','high'],maxOutputTokens:128000,contextTokens:1000000,source:'reviewed-native-cli-catalog-2026-11-01'})));
+export const CLAUDE_NATIVE_MODELS=Object.freeze(['sonnet','opus','haiku'].map(line=>Object.freeze({id:`claude-${line}-5-5`,label:`Claude ${line[0].toUpperCase()+line.slice(1)} 5.5`,line,lifecycle:'active',efforts:['low','medium','high'],maxOutputTokens:128000,contextTokens:1000000,imageInput:true,source:'reviewed-native-cli-catalog-2026-11-01'})));
 export function resolveNativeClaudeModel(requested){
   const model=CLAUDE_NATIVE_MODELS.find(row=>row.id===requested || row.line===requested);
   if(!model)throw fail('provider_model_unavailable');return {...model,efforts:[...model.efforts]};

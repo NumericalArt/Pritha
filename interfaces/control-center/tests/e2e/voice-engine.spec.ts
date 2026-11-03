@@ -45,7 +45,8 @@ for(const reason of ['offline','pending-auth'])test(`Voice ${reason} fails befor
   expect(starts).toBe(0);expect(await page.evaluate(()=>(window as any).__micCalls)).toBe(0);
 });
 
-test('NeuralDeep voice starts without an OpenAI key, loads local VAD and consumes each host tool receipt once',async({page})=>{
+for(const width of [1280,390])test(`NeuralDeep voice starts without an OpenAI key, loads local VAD and consumes each host tool receipt once at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:900});
   await page.addInitScript(()=>{
     class Events {
       readyState=1;onopen:any;onmessage:any;onerror:any;static CLOSED=2;
@@ -68,6 +69,11 @@ test('NeuralDeep voice starts without an OpenAI key, loads local VAD and consume
   await page.route('**/api/voice/sessions/voice-fixture/browser-results',route=>route.fulfill({json:{ok:true}}));
   await page.goto('/voice');await page.getByRole('button',{name:'Start Listening',exact:true}).filter({visible:true}).click();
   await expect(page.getByRole('button',{name:'Stop Listening',exact:true}).filter({visible:true})).toBeVisible({timeout:30000});
+  const meter=page.getByLabel('Microphone signal',{exact:true}).filter({visible:true});
+  await expect(meter).toBeVisible();await expect(meter).toHaveAttribute('value','0');
+  await page.getByRole('button',{name:'Mute',exact:true}).filter({visible:true}).click();
+  await expect(page.getByText('Microphone paused',{exact:true}).filter({visible:true})).toBeVisible();await expect(meter).toHaveAttribute('value','0');
+  await page.getByRole('button',{name:'Unmute',exact:true}).filter({visible:true}).click();
   await page.getByRole('button',{name:'Music',exact:true}).filter({visible:true}).click();
   await expect.poll(()=>musicUpdates).toEqual([true]);
   await page.getByRole('button',{name:'Music',exact:true}).filter({visible:true}).click();
@@ -93,6 +99,7 @@ test('NeuralDeep voice starts without an OpenAI key, loads local VAD and consume
   expect(openaiCalls).toBe(0);expect(toolDispatches).toBe(0);
   await page.getByRole('button',{name:'Stop Listening',exact:true}).filter({visible:true}).click();
   await expect.poll(()=>closed).toBeGreaterThan(0);
+  await expect(meter).toHaveCount(0);
   await expect(paste).toHaveValue('https://example.test/keep-draft');await expect(paste).toBeEnabled();
   await page.evaluate(()=>{(window as any).__ndEvents.onmessage({data:JSON.stringify({id:7,type:'tool.browser_request',turnId:'late-turn',operationId:'late-confirm',name:'confirm_voice_intake',arguments:{action:'submit',operator_instruction:'Late fixture',intent:'summarize'}})});});
   await page.waitForTimeout(150);expect(intakeContexts).toEqual(['vctx_nd_fixture']);

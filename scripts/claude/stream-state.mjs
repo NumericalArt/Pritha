@@ -27,9 +27,9 @@ export function claudeUsage(value){
 /** Only explicit public text and observed tool activity cross the UI boundary.
  * Partial token events and private thinking/signatures are intentionally not copied. */
 export class ClaudeStreamState {
-  constructor({model,sessionId,onEvent=()=>{}}){
+  constructor({model,sessionId,authMode='api-key',onEvent=()=>{}}){
     if(!CLAUDE_MODEL_ID.test(model || '') || !CLAUDE_SESSION_ID.test(sessionId || ''))fail('runtime_identity_mismatch');
-    this.model=model;this.expectedSession=sessionId;this.onEvent=onEvent;
+    this.model=model;this.expectedSession=sessionId;this.onEvent=onEvent;this.authMode=authMode;
     this.sessionId=null;this.messages=new Map();this.tools=new Map();this.results=new Map();
     this.result=null;this.errorCode=null;this.records=0;this.finished=false;
   }
@@ -59,7 +59,7 @@ export class ClaudeStreamState {
       if(event.modelUsage && Object.keys(event.modelUsage).some(model=>model!==this.model))fail('runtime_identity_mismatch');
       this.result={usage:claudeUsage(event.usage),costUsd:typeof event.total_cost_usd==='number' && Number.isFinite(event.total_cost_usd) && event.total_cost_usd>=0?event.total_cost_usd:null,
         success:event.subtype==='success' && event.is_error!==true,subtype:event.subtype};
-      if(!this.result.success)this.errorCode=event.subtype==='error_max_turns'?'provider_max_turns':event.subtype==='error_max_budget_usd'?'provider_budget_exhausted':'provider_runtime_failed';
+      if(!this.result.success && !['provider_native_login_required','provider_native_auth_unsupported'].includes(this.errorCode))this.errorCode=event.subtype==='error_max_turns'?'provider_max_turns':event.subtype==='error_max_budget_usd'?'provider_budget_exhausted':'provider_runtime_failed';
       if(Array.isArray(event.permission_denials) && event.permission_denials.length)this.errorCode='provider_permission_denied';
       return;
     }
@@ -74,7 +74,7 @@ export class ClaudeStreamState {
       // precise cause when a request was refused before upstream dispatch.
       if(cliApiErrors.has(event.error) && message.model==='<synthetic>' && id(message.id)
           && message.content.length>0 && message.content.every(block=>block?.type==='text' && typeof block.text==='string')){
-        this.errorCode='provider_runtime_failed';return;
+        this.errorCode=this.authMode==='local-cli-session' && event.error==='authentication_failed'?'provider_native_login_required':this.authMode==='local-cli-session' && event.error==='oauth_org_not_allowed'?'provider_native_auth_unsupported':'provider_runtime_failed';return;
       }
       if(message.model!==this.model || !id(message.id))fail('runtime_identity_mismatch');
       const usage=claudeUsage(message.usage),prior=this.messages.get(message.id) || {usage:null,text:null};

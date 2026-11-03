@@ -14,8 +14,8 @@
   ],
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
-  "fileCount": 579,
-  "filesSha256": "7d0d12c0ec85124cf02e659494da941562374eb751d71ada81bb703329cc5dcf",
+  "fileCount": 586,
+  "filesSha256": "4054ed561ba543903c48af6d5283a0f55316deca7176d968d91f4f2073638ee5",
   "files": [
     {
       "path": ".env.example",
@@ -126,8 +126,8 @@
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 344374,
-      "sha256": "fe5d6fa834bb7ef433773d19a5eb225563f6d91dcba354af2a64cd58d894dddf"
+      "bytes": 351811,
+      "sha256": "ded0a158c7ba651e0add5f5034972b38ae717fe3c4f87da96a3d9889d5e831cd"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -259,8 +259,8 @@
       "path": "docs/claude-connection.md",
       "status": "A",
       "kind": "file",
-      "bytes": 5532,
-      "sha256": "06866de1f562588960e0b8b35b2b6a305b130f69389e190babfd2e6438244599"
+      "bytes": 6938,
+      "sha256": "f6e296b6bb04c6e23fbc4df5a0c243fc069069aab9b95f5eaae4b5a4bba9541a"
     },
     {
       "path": "docs/getting-started.md",
@@ -303,6 +303,13 @@
       "kind": "file",
       "bytes": 11257,
       "sha256": "2d758503ddbbdb7f54d0e516560861f242427f94f0d76025430154ec59774f56"
+    },
+    {
+      "path": "docs/task-chat-concurrency-operations.md",
+      "status": "M",
+      "kind": "file",
+      "bytes": 11207,
+      "sha256": "7bd1336871d24e123254c2e2906dd5187088b7d6ef77cd6decf71b741fae839a"
     },
     {
       "path": "docs/troubleshooting.md",
@@ -798,15 +805,22 @@
       "path": "interfaces/control-center/src/components/voice/VoiceControlPage.tsx",
       "status": "M",
       "kind": "file",
-      "bytes": 67803,
-      "sha256": "21d3b92fa965b18d14ed1c342b4265a4456296ebd604a0673d15ad9fd6066630"
+      "bytes": 68156,
+      "sha256": "4d9ee49dc64f8f49b6bb83c93caee88c8e02963e2a3411989ce482c417b6b7ba"
+    },
+    {
+      "path": "interfaces/control-center/src/components/voice/microphone-meter.ts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1306,
+      "sha256": "7e6c72bec975a92812cbe0ef2369f34517b440cfee2b9a0a1b3e20bb78624794"
     },
     {
       "path": "interfaces/control-center/src/components/voice/usePrithaRealtime.ts",
       "status": "M",
       "kind": "file",
-      "bytes": 118062,
-      "sha256": "32572a68d9c7bc3cb166ca292dca752a2cff6b3f8cc4b3cd231c9df9341127c7"
+      "bytes": 119144,
+      "sha256": "7ec6380df1444a0166c6f11ccfd82438617ec8e478ac9781ab2d86bd8c062722"
     },
     {
       "path": "interfaces/control-center/src/lib/codex-chat/app-server.ts",
@@ -840,8 +854,8 @@
       "path": "interfaces/control-center/src/lib/codex-chat/drivers/claude-driver.ts",
       "status": "A",
       "kind": "file",
-      "bytes": 3998,
-      "sha256": "736d1ee323d7f247b060a0f8941e561bb737d4bb749b921df1dd04978dfd0f23"
+      "bytes": 3989,
+      "sha256": "9715c08da82e9c24bf4ee646fdba708507dc7554397d2e1c9daca803d77f7fff"
     },
     {
       "path": "interfaces/control-center/src/lib/codex-chat/drivers/codex-app-server-driver.ts",
@@ -1169,8 +1183,8 @@
       "path": "interfaces/control-center/src/styles/globals.css",
       "status": "M",
       "kind": "file",
-      "bytes": 153906,
-      "sha256": "fbd7c966d309ecb74a70da5a75c1ae26ebe68025603327d823bff57e2f2c2ba5"
+      "bytes": 154043,
+      "sha256": "72f294b6d2ef88145e298db8ece126aa4b4ef05415add79c1b4621f11fdfbb12"
     },
     {
       "path": "interfaces/control-center/tests/e2e/agent-nested-credentials.spec.ts",
@@ -1253,15 +1267,15 @@
       "path": "interfaces/control-center/tests/e2e/voice-engine.spec.ts",
       "status": "A",
       "kind": "file",
-      "bytes": 9534,
-      "sha256": "beddf40770e699373444e0f75c214a83c200f89ce774afd9f5760ecf9a78224c"
+      "bytes": 10174,
+      "sha256": "2810a9cae3b6b5a1eac5e9ac5f17e0980e1c22bba80c6173b1e605e2dd3a6e37"
     },
     {
       "path": "interfaces/control-center/tests/e2e/voice-models.spec.ts",
       "status": "M",
       "kind": "file",
-      "bytes": 10021,
-      "sha256": "22ff7d62c1c0174063a6e2f24d15dee147df69f7634f4d5afd97aae65ba09bd4"
+      "bytes": 11223,
+      "sha256": "00d15dc6b9f0147be8e19db243dd4faaf2e66085e34f44c1a9eb8c0e85906f6e"
     },
     {
       "path": "interfaces/control-center/tests/e2e/voice-task-provider.spec.ts",
@@ -1610,15 +1624,15 @@
       "path": "scripts/claude-code-runner.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 16221,
-      "sha256": "6b046f545488eed10b40238026017136045830d4edf5ea62a8b264fa06381408"
+      "bytes": 16679,
+      "sha256": "892537cf1c4f90c62249a95146fb87a8a3765ad0f48260d7fa51cad2d69927b4"
     },
     {
       "path": "scripts/claude/api-proxy.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 6039,
-      "sha256": "fbb6c0068b29b12f1967264d557b2f12e069cc6c5e11c0edf8ad50b9bfb1d45d"
+      "bytes": 6411,
+      "sha256": "1d57b2b4c3aa2173a40dff6c057f01a482a83c621005946c41a8b337967488b9"
     },
     {
       "path": "scripts/claude/cli-probe.mjs",
@@ -1626,6 +1640,20 @@
       "kind": "file",
       "bytes": 1682,
       "sha256": "27d55c71d6e6be3b8eaadaa034565c35aaee544fb8fc3eb91435eaa0c938a489"
+    },
+    {
+      "path": "scripts/claude/image-attachments.d.mts",
+      "status": "A",
+      "kind": "file",
+      "bytes": 1403,
+      "sha256": "b10cecd98016123e8ccbfcf135870de37e83be76baf1dffb7a889b756e972053"
+    },
+    {
+      "path": "scripts/claude/image-attachments.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8702,
+      "sha256": "de019b71d43f66d3b86d20ee3cd235fce3305c915796eebba9aea9141172b008"
     },
     {
       "path": "scripts/claude/messages-client.mjs",
@@ -1638,8 +1666,8 @@
       "path": "scripts/claude/native-auth.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 9128,
-      "sha256": "37ce0d42c9d173738923635d2bc06641d33fe2816635a066020d40053de88d30"
+      "bytes": 9144,
+      "sha256": "bbf0852161e8b7b2e24a53aa4541b94cef6e76b7add806f4baf2e23533a87def"
     },
     {
       "path": "scripts/claude/native-tunnel.mjs",
@@ -1659,8 +1687,8 @@
       "path": "scripts/claude/provider-service.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 7400,
-      "sha256": "6c4cae97b3b4d7e1e7f00384994e4b2ec2d5d99e3ab80fd9786d4445ee4713f0"
+      "bytes": 7556,
+      "sha256": "0c10ca181c5c33be7968b68d5325bfd55f5113231748407ab5c28b3cae89db12"
     },
     {
       "path": "scripts/claude/request-budget.mjs",
@@ -1673,8 +1701,8 @@
       "path": "scripts/claude/stream-state.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 9245,
-      "sha256": "13e5e8b3f07b845e7793b52241841815486f8adc09ecbce45e35a8001662d929"
+      "bytes": 9608,
+      "sha256": "34855d7bf4da209a170154a1b859d66bd3baad586d2509590a614abf1076ea9b"
     },
     {
       "path": "scripts/control-center-runtime.mjs",
@@ -2023,8 +2051,8 @@
       "path": "scripts/lib/provider-host-tools.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 19864,
-      "sha256": "d013f295299f19880fe421f486b54a3c46f5608d7753b460c118725db47415e0"
+      "bytes": 20067,
+      "sha256": "71430da0263ffaea3f88aee529929586110bab3feb7ba06270cd966790fab6d1"
     },
     {
       "path": "scripts/lib/provider-http.mjs",
@@ -2107,8 +2135,8 @@
       "path": "scripts/lib/provider-task-runtime.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 40502,
-      "sha256": "5d1b005af0e4d105a30637e7242eba0f50928c89ec31cbcf5ed4f5669d8ce807"
+      "bytes": 40696,
+      "sha256": "2f3827bbd4cac8fd3e345fb1eeb366e23310fac20965b793ea4b6f5411643d83"
     },
     {
       "path": "scripts/lib/provider-thread-routing.d.mts",
@@ -3126,6 +3154,13 @@
       "sha256": "c1e54119bf6e40625f419ae652c45f5394033bed5c942f548dc0e57779cf68a6"
     },
     {
+      "path": "tests/acceptance/claude-image-attachments.fixture.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 8075,
+      "sha256": "a47d5023d3a7af70dfbaaa66c6fc79d82968433582b191f0c8237b383c86da17"
+    },
+    {
       "path": "tests/acceptance/claude-stock-cli.fixture.mjs",
       "status": "A",
       "kind": "file",
@@ -3325,8 +3360,8 @@
       "path": "tests/claude-api-proxy.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 2621,
-      "sha256": "dc0dfd97baf840198cc7eadbb5e53697103349ff745a0ce7c14811dbbd62a60b"
+      "bytes": 3789,
+      "sha256": "de70388474475bbb0c81b685684954ad1703c8f093f00fbd09b60b55a0a2a2a8"
     },
     {
       "path": "tests/claude-build-executor.test.mjs",
@@ -3334,6 +3369,13 @@
       "kind": "file",
       "bytes": 12466,
       "sha256": "2f06c91da44fce313d90bd11080b93c811572516d7ba746f3b19f3313c33ad7e"
+    },
+    {
+      "path": "tests/claude-image-attachments.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 7751,
+      "sha256": "c7359011f8784e67f0da3aec19d042dd0bbc5cdde0c7533e0e9ba05b6a7d31c5"
     },
     {
       "path": "tests/claude-messages-client.test.mjs",
@@ -3367,8 +3409,8 @@
       "path": "tests/claude-provider-service.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 4263,
-      "sha256": "095907e0dcd4f817a2bd6f093ebff2e90fe712c4cb04b1b5524ce5b47d5edab9"
+      "bytes": 4718,
+      "sha256": "26bd8a86e89305c269c4ca697d9b7d294fadb80b60003fb7cf30006292904915"
     },
     {
       "path": "tests/claude-request-budget.test.mjs",
@@ -3381,8 +3423,8 @@
       "path": "tests/claude-stream-state.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 7602,
-      "sha256": "4148fd0b2c7c3f362c98d638c3a0bbbc64a93ee1d2a4618e03547d119d427a69"
+      "bytes": 8404,
+      "sha256": "25cb83abc9b809c774683eb7a9f60c1574cb5b1b00a35a9b7c86180db248e1a9"
     },
     {
       "path": "tests/compatible-owned-runner.test.mjs",
@@ -3551,6 +3593,13 @@
       "kind": "file",
       "bytes": 3293,
       "sha256": "a7d267ddd145349f4f77c5d061c5d0e985fc9538da1c574d5a5475f185e01b72"
+    },
+    {
+      "path": "tests/microphone-meter.test.mjs",
+      "status": "A",
+      "kind": "file",
+      "bytes": 2386,
+      "sha256": "4bf5a79d97c33bc274ab7f5770aab09409d3b5b512f3c2aa5edfb66e3ee48db0"
     },
     {
       "path": "tests/native-chat-subject.test.mjs",

@@ -2,12 +2,13 @@ import { createServer } from 'node:http';
 import { createHash,timingSafeEqual } from 'node:crypto';
 import { once } from 'node:events';
 import { ClaudeResponseUsage } from './request-budget.mjs';
+import {assertNoClaudeImageInputs,CLAUDE_IMAGE_LIMITS} from './image-attachments.mjs';
 
 const equal=(a,b)=>typeof a==='string' && Buffer.byteLength(a)===Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a),Buffer.from(b));
 const error=(res,status,code)=>{if(res.destroyed)return;if(res.headersSent){res.destroy();return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({type:'error',error:{type:code,message:'The provider request could not be completed.'}}));};
 
 /** A request-owned local capability. The stock CLI receives no account key. */
-export async function listenClaudeApiProxy({localToken,apiKey,model,timeoutMs,maxOutputTokens=8192,allowedTools=[],beforeRequest,budget,fetchImpl=globalThis.fetch}){
+export async function listenClaudeApiProxy({localToken,apiKey,model,timeoutMs,maxOutputTokens=8192,allowedTools=[],beforeRequest,budget,validateImages=assertNoClaudeImageInputs,fetchImpl=globalThis.fetch}){
   if(typeof localToken!=='string' || localToken.length<32 || typeof apiKey!=='string' || !apiKey || !Number.isSafeInteger(timeoutMs) || timeoutMs<1 || timeoutMs>3600000
       || !Number.isSafeInteger(maxOutputTokens) || maxOutputTokens<1 || maxOutputTokens>128000 || allowedTools.length>64)throw new Error('provider_proxy_configuration_invalid');
   const controllers=new Set(),tools=new Set(allowedTools),requests=new Set();let fenced=false,messageGate=Promise.resolve();
@@ -19,9 +20,11 @@ export async function listenClaudeApiProxy({localToken,apiKey,model,timeoutMs,ma
       if(req.headers.origin || req.headers.host!==`127.0.0.1:${server.address().port}` || !equal(req.headers['x-api-key'] || req.headers.authorization,req.headers['x-api-key']?localToken:'Bearer '+localToken))return error(res,401,'authentication_error');
       if(req.method!=='POST' || !/^\/v1\/messages(?:\/count_tokens)?(?:\?beta=true)?$/.test(req.url || ''))return error(res,404,'not_found_error');
       const chunks=[];let bytes=0;
-      for await(const chunk of req){bytes+=chunk.length;if(bytes>4*1024*1024)return error(res,413,'request_too_large');chunks.push(chunk);}
+      for await(const chunk of req){bytes+=chunk.length;if(bytes>CLAUDE_IMAGE_LIMITS.requestBytes)return error(res,413,'request_too_large');chunks.push(chunk);}
       let payload;try{payload=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks,bytes)));}catch{return error(res,400,'invalid_request_error');}
       if(!payload || payload.model!==model || payload.mcp_servers || payload.tools && (!Array.isArray(payload.tools) || payload.tools.some(tool=>!tools.has(tool.name) || tool.type && tool.type!=='custom')))return error(res,400,'invalid_request_error');
+      try{await validateImages(payload);}catch{return error(res,400,'invalid_request_error');}
+      if(Buffer.byteLength(JSON.stringify(payload))>CLAUDE_IMAGE_LIMITS.requestBytes)return error(res,413,'request_too_large');
       const isMessage=!req.url.includes('/count_tokens');
       if(isMessage){const prior=messageGate;messageGate=new Promise(resolve=>{release=resolve;});await prior;}
       if(fenced)return error(res,409,'request_unconfirmed');

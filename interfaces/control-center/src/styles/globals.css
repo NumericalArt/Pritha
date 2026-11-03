@@ -2606,6 +2606,8 @@ button[aria-disabled="true"] {
   text-align: right;
 }
 
+.mic-gain-control meter { width:80px; margin-inline-start:8px; vertical-align:middle; accent-color:var(--theme-detail-rose, #a78bfa); }
+
 .mic-gain-control small {
   grid-column: 1 / -1;
   color: var(--text-muted);

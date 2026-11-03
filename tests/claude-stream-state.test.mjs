@@ -81,3 +81,9 @@ test('stock CLI synthetic API errors stay failures without impersonating a model
     await assert.rejects(invalid.accept(changed),{code:'runtime_identity_mismatch'});
   }
 });
+test('native authentication rejection remains a sign-in request through the final CLI error record',async()=>{
+  const emitted=[],state=new ClaudeStreamState({model,sessionId:session,authMode:'local-cli-session',onEvent:event=>emitted.push(event)});await state.accept(init);
+  await state.accept({type:'assistant',session_id:session,error:'authentication_failed',message:{id:'native_auth_failed',model:'<synthetic>',content:[{type:'text',text:'PRIVATE_EXPIRED_TOKEN_DIAGNOSTIC'}]}});
+  await state.accept(result({subtype:'error_during_execution',is_error:true,usage:usage(0,0,0,0)}));const final=await state.finish();
+  assert.equal(final.errorCode,'provider_native_login_required');assert.equal(final.ok,false);assert.doesNotMatch(JSON.stringify(emitted)+JSON.stringify(final),/PRIVATE_EXPIRED/);
+});

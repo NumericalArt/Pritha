@@ -21,3 +21,11 @@ test('the same accepted prompt cannot be retransmitted as a non-streaming fallba
   let calls=0;const server=await listenClaudeApiProxy({localToken:token,apiKey:'key',model,timeoutMs:5000,fetchImpl:async()=>{calls++;return Response.json({ok:true});}});t.after(()=>server.close());
   assert.equal((await send(server)).status,200);assert.equal((await send(server,{...body,stream:true})).status,409);assert.equal(calls,1);
 });
+test('image rejection precedes upstream counting and dispatch, while verified image bytes reach both endpoints',async t=>{
+  const image={type:'image',source:{type:'base64',media_type:'image/png',data:'AA=='}},input={...body,messages:[{role:'user',content:[image]}]};let calls=0;
+  const blocked=await listenClaudeApiProxy({localToken:token,apiKey:'key',model,timeoutMs:5000,fetchImpl:async()=>{calls++;return Response.json({});}});t.after(()=>blocked.close());
+  assert.equal((await send(blocked,input)).status,400);
+  assert.equal((await fetch(blocked.baseUrl+'/v1/messages/count_tokens',{method:'POST',headers:{'x-api-key':token,'anthropic-version':'2023-06-01'},body:JSON.stringify(input)})).status,400);assert.equal(calls,0);
+  const verified=await listenClaudeApiProxy({localToken:token,apiKey:'key',model,timeoutMs:5000,validateImages:payload=>{payload.messages[0].content[0].source.data='AQ==';},fetchImpl:async(_url,request)=>{calls++;assert.equal(JSON.parse(request.body).messages[0].content[0].source.data,'AQ==');return Response.json({});}});t.after(()=>verified.close());
+  assert.equal((await send(verified,input)).status,200);assert.equal(calls,1);
+});

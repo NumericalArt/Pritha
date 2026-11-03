@@ -17,6 +17,7 @@ import {factorySubjectInstructions} from './lib/chat-subject.mjs';
 import { listenProviderToolServer } from './lib/provider-tool-server.mjs';
 import { ClaudeRequestBudget } from './claude/request-budget.mjs';
 import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
+import {ClaudeImageAttachments,assertNoClaudeImageInputs,CLAUDE_IMAGE_LIMITS} from './claude/image-attachments.mjs';
 import {nativeClaudeAuthPaths,probeClaudeNativeAuth,nativeClaudeEnvironment,nativeClaudeSandboxRoots} from './claude/native-auth.mjs';
 import {listenClaudeNativeTunnel} from './claude/native-tunnel.mjs';
 
@@ -63,6 +64,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
   const nativeAuth=native?await (dependencies.probeNativeAuth || probeClaudeNativeAuth)({binary,root,stateRoot,env:options.env || process.env}):null;
   if(native && (!nativeAuth?.authenticated || !/^[a-f0-9]{64}$/.test(nativeAuth.identity || '')))throw fail(nativeAuth?.code || 'provider_native_login_required');
   if(options.hostAttachments && !hostFileAttachmentVerified('claude',cli.version))throw fail('provider_attachments_unverified');
+  if(options.hostAttachments instanceof ClaudeImageAttachments)await options.hostAttachments.assertReady(cli.version);
   const profile=privateStateDirectory(stateRoot,path.join(privateRoot,'profiles',hash([cwd,options.model,authMode])));
   const nativePaths=native?nativeClaudeAuthPaths({stateRoot}):null;
   if(native && !nativePaths.available)throw fail('provider_native_login_required');
@@ -83,7 +85,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
   const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
   const stop=reason=>{stopReason ||= reason;controller.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
   const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
-  const events=new ClaudeStreamState({model:options.model,sessionId,onEvent:async event=>{
+  const events=new ClaudeStreamState({model:options.model,sessionId,authMode,onEvent:async event=>{
     if(event.type==='thread.started')atomicWriteFile(proofFile,JSON.stringify({version:1,identity,sessionId,model:options.model,cliVersion:cli.version,observedInit:true})+'\n');
     // The journal holds the same visible records as the UI, not private thinking.
     await options.onRawChunk?.(Buffer.from(JSON.stringify(event)+'\n'));await options.onEvent?.(event);
@@ -106,7 +108,8 @@ export async function startClaudeCodeRun(options,dependencies={}){
       allowedTools=hostTools.definitions.map(tool=>'mcp__pritha__'+tool.name);
     }
     proxy=native?await (dependencies.listenNativeTunnel || listenClaudeNativeTunnel)({signal:controller.signal}):await (dependencies.listenProxy || listenClaudeApiProxy)({localToken,apiKey:key,model:options.model,timeoutMs:options.timeoutMs,maxOutputTokens:options.maxOutputTokens || 8192,
-      allowedTools,beforeRequest:options.beforeRequest,budget,fetchImpl:dependencies.fetchImpl});
+      allowedTools,beforeRequest:options.beforeRequest,budget,fetchImpl:dependencies.fetchImpl,
+      validateImages:payload=>options.hostAttachments instanceof ClaudeImageAttachments?options.hostAttachments.validateInputs(payload):assertNoClaudeImageInputs(payload)});
     const args=buildClaudeExecArgs({...options,sessionId,mcpConfigPath,allowedTools});
     const env=native?nativeClaudeEnvironment({...options,root,stateRoot},nativePaths,temporary):providerProcessEnvironment({provider:'claude',root,stateRoot,claudeConfigDir:config,temporary,env:options.env || process.env});
     if(!native)Object.assign(env,{ANTHROPIC_API_KEY:localToken,ANTHROPIC_BASE_URL:proxy.baseUrl,CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST:'1'});
@@ -123,7 +126,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
     let parseError=null;
     const consume=(async()=>{
       let bytes=0;
-      for await(const line of readJsonlLines(owned.child.stdout,{maximumLineBytes:16*1024*1024,onChunk:chunk=>{bytes+=chunk.length;if(bytes>128*1024*1024)throw fail('provider_output_limit');}})){
+      for await(const line of readJsonlLines(owned.child.stdout,{maximumLineBytes:CLAUDE_IMAGE_LIMITS.requestBytes,onChunk:chunk=>{bytes+=chunk.length;if(bytes>128*1024*1024)throw fail('provider_output_limit');}})){
         if(!line.trim())continue;let event;try{event=JSON.parse(line);}catch{throw fail('provider_stream_malformed');}await events.accept(event);
       }
     })().catch(error=>{parseError=/^(runtime_identity_mismatch|provider_[a-z_]+|cli_record_too_large)$/.test(error.code || '')?error.code:'provider_stream_failed';stop(parseError);});
@@ -133,7 +136,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
       try{
         const [exit]=await Promise.all([owned.completion,consume,diagnostic]);const toolsExited=await closeTools();verifiedExit=exit.processTreeExited===true && toolsExited;
         const accounting=budget?.snapshot();
-        const result=await events.finish(stopReason || accounting?.errorCode || parseError || (!verifiedExit?'provider_process_exit_unconfirmed':exit.code!==0?'provider_runtime_failed':null));
+        const result=await events.finish(stopReason || accounting?.errorCode || parseError || (!verifiedExit?'provider_process_exit_unconfirmed':exit.code!==0 && !events.errorCode?'provider_runtime_failed':null));
         return {...result,identity,cliVersion:cli.version,processTreeExited:verifiedExit,exitCode:exit.code,...(budget?{budgetId,budget:accounting}:{})};
       }finally{closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);await proxy?.close();if(verifiedExit){rmSync(temporary,{recursive:true,force:true});if(sandboxPlan?.planPath)rmSync(sandboxPlan.planPath,{force:true});}}
     })();

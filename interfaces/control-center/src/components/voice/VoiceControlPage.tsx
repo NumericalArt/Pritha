@@ -1232,7 +1232,10 @@ function MicInputLevelControl({
     onChange(Number(event.currentTarget.value));
   }
 
-  const statusText = !runtime.available
+  const capture=active?runtime.capture:undefined;
+  const statusText = capture
+    ? capture.paused?"Microphone paused":capture.stalled || capture.audioContextState!=="running"?"Audio capture stalled — reconnect":"Listening for speech"
+    : !runtime.available
     ? "Unavailable on this device"
     : active && runtime.active
       ? "Live attenuation"
@@ -1252,7 +1255,7 @@ function MicInputLevelControl({
         onChange={updateValue}
       />
       <strong>{Math.round(value)}%</strong>
-      <small>{statusText}</small>
+      <small>{statusText}{capture?<meter aria-label="Microphone signal" min="0" max="0.05" value={capture.paused || capture.stalled?0:capture.rms} />:null}</small>
     </label>
   );
 }
