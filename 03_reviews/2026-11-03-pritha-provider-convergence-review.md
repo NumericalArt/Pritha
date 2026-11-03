@@ -55,8 +55,11 @@ The canonical Mac mini implementation now supports five task connectors while
 preserving native Codex history, the October curated knowledge and the existing
 Voice tools. The current installed release is `5f38f37`, build
 `V5p7AZTJkbUdBaHtxbCDt`, with the approved Interactive managed-service profile.
-The image/microphone follow-up `ff33d8f`, build `7ZnIMkw-N89a8keb4G7We`, is prepared
-and awaits its own immediate lifecycle approval. A prepared candidate is not an
+The initial image/microphone follow-up `ff33d8f`, build `7ZnIMkw-N89a8keb4G7We`,
+passed preparation, then was withdrawn before installation when the completion
+audit reproduced a new-chat model-alias image blocker. Its successor resolves
+the alias in both backend preview and the model/reasoning selector; consolidated
+verification and immediate lifecycle approval for that successor remain required. A prepared candidate is not an
 installed release. The overall goal remains incomplete until the gates below
 are demonstrated and accepted.
 
@@ -123,9 +126,11 @@ the tests and live/manual evidence listed above.
 | `tests/claude-code-runner.test.mjs` | `claude-stream-state.test.mjs`, `claude-owned-runner.test.mjs`, native/proxy tests | Protocol, ownership, credentials and permissions have separate fixtures |
 | `tests/task-chat-steer-and-queue.test.mjs` | `provider-task-runtime.test.mjs`, `task-chat-steer-queue.spec.ts` | Durable backend and rendered composer verified at their own boundaries |
 
-## Verified executable candidate
+## Verified executable base and subsequent alias correction
 
-On exact executable `ff33d8fec1bbf11b7c23e7e9857ac36dbbca0636`:
+The following results belong to the preliminary executable base
+`ff33d8fec1bbf11b7c23e7e9857ac36dbbca0636`. Its replacement must carry its own
+consolidated verification receipt before activation:
 
 - Full quality gate: **1514/1514** tests, all eight groups pass, zero skipped,
   cancelled or failed. This includes memory validation/rebuild, strict privacy,
@@ -220,7 +225,8 @@ connector contract; this review does not recommend an untested model.
 
 ## Required steps before final handoff
 
-1. Receive immediate approval for the prepared `ff33d8f` transaction, run managed
+1. Finish consolidated verification and receive immediate approval for the
+   corrected alias/image candidate transaction, then run managed
    stop → source/build swap → start, then check exact release, chunks, admission
    and operational health. Roll back through the prepared managed path on failure.
 2. Complete ordinary native Claude sign-in and synthetic image initial/resume.
@@ -235,5 +241,8 @@ connector contract; this review does not recommend an untested model.
    handoff report. Final acceptance is distinct from implemented, tested, ready,
    installed and technically verified. The complete goal is not achieved yet.
 
-This documentation branch prepares the final handoff wording without changing the
-already prepared executable candidate or authorizing its service transaction.
+This review records verified evidence without authorizing any service transaction.
+The alias correction adds a regression test that fails before the fix and passes
+after it; twelve provider-selector browser cases pass, including first-message
+images on desktop/mobile. The immutable existing thread binding remains first
+priority, and a read-only preview does not rewrite the saved alias preset.

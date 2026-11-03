@@ -6,7 +6,7 @@ import type { ThreadSummary, RuntimeStatus, ThreadGroup } from './types';
 import { CodexChatGatewayError } from './native-gateway';
 import type {ProviderPreset} from '../settings/provider-profile';
 import { providerVoiceTaskBackend } from '../../../../../scripts/lib/provider-voice-task-backend.mjs';
-type CatalogHealth=TaskProviderHealth & {models?:Array<{id:string;efforts?:string[];tools?:boolean;responses?:boolean;available?:boolean|null}>};
+type CatalogHealth=TaskProviderHealth & {model?:{id:string}|null;models?:Array<{id:string;efforts?:string[];tools?:boolean;responses?:boolean;available?:boolean|null}>};
 
 /** UI protocol adapter for private provider history. Native history is never mirrored here. */
 export class ExternalChatGateway implements TaskChatBackend {
@@ -27,11 +27,12 @@ export class ExternalChatGateway implements TaskChatBackend {
     const binding=chatId?this.core.require(chatId):null,selected=binding?.executionConfig || {...this.options.configuration(),...preset},status=await this.health(binding?.modelId || selected.modelId,selected);
     const providerId=(this.options.connectorId+'_runtime') as NonNullable<RuntimeStatus['effectiveProvider']> & `${string}_runtime`;
     const c=status.capabilities,availability=status.status==='ready'?'ready':status.status==='not-configured' || status.status==='unavailable'?'unavailable':'degraded';
+    const selectedModelId=binding?.modelId || (status.status==='ready'?status.model?.id:null) || selected.modelId;
     return {connectorId:this.options.connectorId,preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:'exec_resume',availability,fallbackEnabled:false,
       providers:[{providerId,label:this.options.connectorId,availability,version:status.version,protocol:'exec_resume',locationLabel:this.options.connectorId==='local'?'Local model':this.options.connectorId,stateIdentityHash:binding?.stateIdentityHash || null,warning:status.error?.message || null,
         capabilities:{fullChat:status.status==='ready',nativeHistory:false,listThreads:true,readThread:true,forkThread:false,archiveThread:true,unarchiveThread:true,renameThread:false,pinThread:false,steerTurn:c.steer,interruptTurn:c.interrupt,commandApprovals:c.approvals,fileChangeApprovals:c.approvals,permissionApprovals:c.approvals,requestUserInput:c.approvals,historyPagination:true,audioInput:false,imageInput:c.attachments.images,fileMetadata:c.attachments.files,goalControl:false}}],
-      models:(binding || !status.models?.length?[{id:binding?.modelId || selected.modelId,efforts:selected.reasoningEffort?[selected.reasoningEffort]:[]}]:status.models.filter(row=>row.tools!==false && row.responses!==false && row.available!==false)).map(row=>({id:row.id,label:row.id,effortIds:row.efforts || (selected.reasoningEffort?[selected.reasoningEffort]:[]),serviceTierIds:[],defaultEffortId:selected.reasoningEffort || null,inputModalities:c.attachments.images?['text','image']:['text']})),
-      selected:{modelId:binding?.modelId || selected.modelId,effortId:binding?.effortId || selected.reasoningEffort || null,serviceTierId:null,sandboxMode:selected.sandbox==='workspace-write'?'workspace_write':'read_only',approvalMode:c.approvals?'on_request':'never'},probedAt:status.checkedAt};
+      models:(binding || !status.models?.length?[{id:selectedModelId,efforts:selected.reasoningEffort?[selected.reasoningEffort]:[]}]:status.models.filter(row=>row.tools!==false && row.responses!==false && row.available!==false)).map(row=>({id:row.id,label:row.id,effortIds:row.efforts || (selected.reasoningEffort?[selected.reasoningEffort]:[]),serviceTierIds:[],defaultEffortId:selected.reasoningEffort || null,inputModalities:c.attachments.images?['text','image']:['text']})),
+      selected:{modelId:selectedModelId,effortId:binding?.effortId || selected.reasoningEffort || null,serviceTierId:null,sandboxMode:selected.sandbox==='workspace-write'?'workspace_write':'read_only',approvalMode:c.approvals?'on_request':'never'},probedAt:status.checkedAt};
   }
   listThreads:TaskChatBackend['listThreads']=async(input={})=>{
     if(input.group && !['all','my_chats','voice_work','other_sessions'].includes(input.group))throw new CodexChatGatewayError('invalid_request','Unknown chat group.',400);

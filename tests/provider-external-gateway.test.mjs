@@ -19,6 +19,19 @@ const module={exports:{}};
 new Function('require','module','exports',output)(id=>id.endsWith('/provider-task-runtime.mjs')?core:id.endsWith('/execution-channel.mjs')?channel:id.endsWith('/provider-voice-task-backend.mjs')?voiceBackend:id==='./native-gateway'?{CodexChatGatewayError:GatewayError}:require(id),module,module.exports);
 const {ExternalChatGateway}=module.exports;
 
+test('a Claude alias preview selects its resolved catalog row so image admission matches the selected model',async t=>{
+  const dir=mkdtempSync(path.join(os.tmpdir(),'pritha-provider-alias-')),root=path.join(dir,'code'),stateRoot=path.join(dir,'state');mkdirSync(root);mkdirSync(stateRoot);
+  const attachments=new ImmutableAttachmentStore({stateRoot,privateRoot:path.join(stateRoot,'private','task-chat')});
+  const preset={modelId:'sonnet',reasoningEffort:'medium',timeoutMs:30000,sandbox:'read-only'},model='claude-sonnet-5-5';
+  const backend=new ExternalChatGateway(attachments,{connectorId:'claude',root,stateRoot,privateRoot:path.join(stateRoot,'private','task-chat'),executionDirectory:path.join(stateRoot,'execution'),configuration:()=>preset,preflight:async()=>({}),launch:async()=>assert.fail('Preview must not launch inference')},async()=>({connectorId:'claude',status:'ready',version:'2.1.296',checkedAt:new Date().toISOString(),error:null,model:{id:model},models:[{id:model,efforts:['low','medium','high']}],capabilities:{steer:false,interrupt:true,approvals:true,tools:true,attachments:{files:true,images:true},usage:'observed',resume:true,sandbox:'host-enforced',offline:false}}));
+  t.after(async()=>{await backend.dispose();await attachments.close();rmSync(dir,{recursive:true,force:true});});
+  const runtime=await backend.previewRuntime(preset);
+  assert.equal(runtime.selected.modelId,model);
+  assert.ok(runtime.models.find(row=>row.id===runtime.selected.modelId)?.inputModalities.includes('image'),'The actual composer lookup must find the selected model image capability.');
+  assert.equal(preset.modelId,'sonnet','A read-only preview must not rewrite the saved preset.');
+  assert.equal((await backend.listThreads()).data.length,0);
+});
+
 test('external gateway preserves the existing HTTP/SSE envelope and probes the pinned model after defaults change',async t=>{
   const dir=mkdtempSync(path.join(os.tmpdir(),'pritha-provider-api-')),root=path.join(dir,'code'),stateRoot=path.join(dir,'state');mkdirSync(root);mkdirSync(stateRoot);
   let finish,defaultModel='original-model';const probed=[];

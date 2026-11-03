@@ -17,8 +17,12 @@ export function NewChatProviderSelector({value,runtime,disabled,onChange}:{value
   }catch{if(!signal.aborted){setReady([]);setParallelLimits({});setChecked(true);}}},[]);
   useEffect(()=>{let controller=new AbortController();void load(controller.signal);const focus=()=>{controller.abort();controller=new AbortController();void load(controller.signal);};window.addEventListener('focus',focus);return()=>{controller.abort();window.removeEventListener('focus',focus);};},[load]);
   const connectorId=value?.connectorId || runtime?.connectorId || settings?.activeConnectorId || 'codex';
-  const selection:DraftProviderSelection={connectorId,...(runtime?.selected?.modelId?{modelId:runtime.selected.modelId}:{}),...(runtime?.selected?.effortId?{effortId:runtime.selected.effortId}:{}),...(connectorId==='codex' && runtime?.selected?.serviceTierId?{serviceTierId:runtime.selected.serviceTierId}:{}),...value};
-  const models=Array.isArray(runtime?.models)?runtime.models.filter(row=>row.id):[],model=models.find(row=>row.id===selection.modelId);
+  const requestedSelection:DraftProviderSelection={connectorId,...(runtime?.selected?.modelId?{modelId:runtime.selected.modelId}:{}),...(runtime?.selected?.effortId?{effortId:runtime.selected.effortId}:{}),...(connectorId==='codex' && runtime?.selected?.serviceTierId?{serviceTierId:runtime.selected.serviceTierId}:{}),...value};
+  const models=Array.isArray(runtime?.models)?runtime.models.filter(row=>row.id):[];
+  // A ready preview belongs to this draft selection (the parent rejects stale
+  // responses). Its canonical model can resolve a saved alias such as sonnet.
+  const model=models.find(row=>row.id===requestedSelection.modelId) || (runtime?.availability==='ready' && runtime.connectorId===connectorId?models.find(row=>row.id===runtime.selected.modelId):undefined);
+  const selection=model?{...requestedSelection,modelId:model.id}:requestedSelection;
   // Older catalogs can omit optional capability arrays. Missing metadata must
   // hide unsupported controls, not crash when returning to the new-chat draft.
   const effortIds=Array.isArray(model?.effortIds)?model.effortIds:[], serviceTierIds=Array.isArray(model?.serviceTierIds)?model.serviceTierIds:[];

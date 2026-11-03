@@ -15,7 +15,7 @@
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
   "fileCount": 587,
-  "filesSha256": "0e237b898c73aed1331938a83d11fd4f1f7ff34c8f367e3df19e51b3c6140f2d",
+  "filesSha256": "eb2ba02748e1f01a70d15887b346bb18d66c88d334e4b80e52fb1dc463464b66",
   "files": [
     {
       "path": ".env.example",
@@ -126,15 +126,15 @@
       "path": "03_reviews/2026-11-03-pritha-provider-convergence-review.md",
       "status": "A",
       "kind": "file",
-      "bytes": 18982,
-      "sha256": "6b257bea37af323d62f31d5f4b01668980061de86a7656c822515847627e3c09"
+      "bytes": 19702,
+      "sha256": "e5e843ccdf246b24bcf329078512f3531465729b3aacd5ad69e6f80526ed0785"
     },
     {
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 355474,
-      "sha256": "289cc636b9803f084a1ba06858b4704c5462ae083a2f47cd9535590513bef215"
+      "bytes": 358953,
+      "sha256": "038d7e9efd5f421ed8fff35b3f0e57b504f48c9200cf4a15d82f0d29dab38b1a"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -210,8 +210,8 @@
       "path": "11_agents/reports/2026-11-01-pritha-provider-convergence-deployment-report.md",
       "status": "A",
       "kind": "file",
-      "bytes": 37621,
-      "sha256": "3575b592aa9940062438f6a4eb00e91b709c60ceaada03caf7fed7cc8722f4f6"
+      "bytes": 37746,
+      "sha256": "5bf16012f7f717be0ef48a608255f0fe51accd927e00ba16211ef8c75d6cc8a5"
     },
     {
       "path": "AGENTS.md",
@@ -735,8 +735,8 @@
       "path": "interfaces/control-center/src/components/codex/NewChatProviderSelector.tsx",
       "status": "A",
       "kind": "file",
-      "bytes": 5657,
-      "sha256": "695272aab12c13a2f0f3fa887b4fcab213929dd5614c376c19b72b3307dedde9"
+      "bytes": 6063,
+      "sha256": "6e2ec6d52989f9afb7f6b5d4b8407f52b16159a14e4db88cd2566b9b3fc4c1a2"
     },
     {
       "path": "interfaces/control-center/src/components/codex/TaskChatControls.tsx",
@@ -889,8 +889,8 @@
       "path": "interfaces/control-center/src/lib/codex-chat/external-gateway.ts",
       "status": "A",
       "kind": "file",
-      "bytes": 12263,
-      "sha256": "a095a495bee6f77b1d921cea401a810728a57b7ef431409675d1672febd9b0b7"
+      "bytes": 12360,
+      "sha256": "ee53f1c790619862025c4b7bc2ae9e1be9d86c49f02b0e5e8bddb25581f1c328"
     },
     {
       "path": "interfaces/control-center/src/lib/codex-chat/gateway.ts",
@@ -1253,8 +1253,8 @@
       "path": "interfaces/control-center/tests/e2e/task-chat-provider-selector.spec.ts",
       "status": "A",
       "kind": "file",
-      "bytes": 18501,
-      "sha256": "c8152116f48382cf64e2336dfeef5b936234c95b8d4c72a1c2aaddfafc6d41a8"
+      "bytes": 20614,
+      "sha256": "4a5ab60e1862fda3a46f1533b005c68f04f2b049116abc4c23a8bc56ebd36823"
     },
     {
       "path": "interfaces/control-center/tests/e2e/task-chat-steer-queue.spec.ts",
@@ -3871,8 +3871,8 @@
       "path": "tests/provider-external-gateway.test.mjs",
       "status": "A",
       "kind": "file",
-      "bytes": 6035,
-      "sha256": "aa45e35f6d645ef4eaac4f564f480a763706b95f531e659ec8210700b47d231b"
+      "bytes": 7798,
+      "sha256": "d354b6566bba51b32235ff13d5115ef27da639d0363c6ba1ee635ae7963d2035"
     },
     {
       "path": "tests/provider-file-attachments.test.mjs",

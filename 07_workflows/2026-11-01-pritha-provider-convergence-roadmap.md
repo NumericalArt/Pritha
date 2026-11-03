@@ -190,7 +190,9 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 Текущий проверенный срез на 2026-11-03: установленная canonical Pritha —
 `5f38f3748cf7ad3c71360d10a23fd21fbebb76ed`, build `V5p7AZTJkbUdBaHtxbCDt`,
 профиль службы Interactive. Новое обновление `ff33d8fec1bbf11b7c23e7e9857ac36dbbca0636`,
-build `7ZnIMkw-N89a8keb4G7We`, подготовлено и ожидает отдельного lifecycle approval.
+build `7ZnIMkw-N89a8keb4G7We`, прошло подготовку, затем было отозвано до установки:
+сверка выявила дополнительную ошибку alias-модели в новом Claude-чате.
+Исправленный преемник проверяется перед новым точным lifecycle approval.
 Полный gate: **1514/1514**, восемь групп pass, 0 fail/skip/cancel; production
 build/typecheck, same-build browser **21/21**, strict **5 страниц / 12 JS chunks**.
 Откат к установленной 5f38f37 проверен в отдельном loopback-процессе.
@@ -672,11 +674,12 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 5f38f37 / Interactive. Кандидат ff33d8f подготовлен:
+**Статус: in-progress; активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
+до установки после воспроизведения alias-проблемы нового чата. Его gate:
 1514/1514 тестов, восемь групп, 21 same-build browser case, build/typecheck,
 5 страниц / 12 JS chunks, проверенный rollback к 5f38f37 и frozen retrieval без
-регрессий/утечек. Ожидаются точное managed lifecycle approval и активация с live
-smoke. Native Claude vision ждёт обычного повторного входа после ответа Anthropic
+регрессий/утечек. Новый кандидат исправляет alias → exact model ID в preview и селекторе;
+его итоговые gate/build/browser и точное lifecycle approval ещё нужны. Native Claude vision ждёт обычного повторного входа после ответа Anthropic
 об истёкшей OAuth-сессии. Отдельный реальный Voice/Claude UI factory pilot и
 оставшиеся operator/manual gates ещё не пройдены. OpenRouter live отложен.**
 
@@ -3038,6 +3041,33 @@ unit child environment отдельно и изолировать оба aliases
   exact candidate/rollback и managed deployment остаются следующими шагами.
 - Установленная 5f38f37, MacBook и GitHub не изменялись. Принятая пользователем
   Realtime 2/music-приёмка сохранена; прочие ручные gates не объявлены пройденными.
+
+### Checkpoint 59 — completion audit, Voice Speech и alias нового Claude-чата
+
+- Три исходных ТЗ снова сверены побайтно с приложениями. Учтены все 61 уникальная
+  ссылка на файлы/globs: 53 существуют буквально, 8 имеют reviewed equivalents,
+  перечисленные в общем convergence review. Это проверка трассировки, а не
+  автоматическое признание всех функций принятыми пользователем.
+- Устаревшие верхние статусы roadmap/deployment report исправлены с сохранением
+  исторических срезов. CLI child pilot отделён от незавершённого B §5.4 UI journey.
+  Добавлен общий review всех A/B/C/D, фактических модулей, доказательств и ограничений.
+- Отдельные boundary audit CLI на ff33d8f: secrets 26/26, network 87/87 для всех
+  внешних connector IDs. Synthetic/offline scope указан явно; live key scan не заявлен.
+- NeuralDeep Speech проверен настоящими конечными HTTP-вызовами: Serena синтезирует
+  синтетическую русскую фразу, Whisper распознаёт её дословно; модель голосового
+  диалога отвечает с exact qwen3.6-35b-a3b-noreason, 45 observed tokens. Browser,
+  session/tool routing и операторский звук этим не подменяются; настройки не менялись.
+- Проверка нового Claude-чата выявила дополнительный баг: alias sonnet не совпадал
+  с exact catalog ID, поэтому image capability lookup не находил модель. Новый
+  regression test воспроизвёл отказ до исправления. Ready preview теперь выбирает
+  resolved ID, selector показывает эту модель и reasoning, сохранённый preset
+  не перезаписывается. Existing thread binding имеет приоритет.
+- Focused gateway tests 2/2, TypeScript и 12 provider-selector browser cases прошли,
+  включая первое изображение в новом Claude-чате на desktop/mobile. Реальные
+  уже успешные платные Claude vision-тесты не повторялись.
+- Непосредственно перед установкой запрос на ff33d8f отозван как предварительный.
+  Canonical 5f38f37 продолжает работать. Исправленный кандидат должен пройти
+  соответствующие общий gate, build/strict/browser и отдельное разрешение.
 
 ## 7. Полные исходные материалы
 

@@ -26,8 +26,9 @@ confidence: medium
 
 This report covers the canonical Mac mini instance. Current verified checkpoint
 on 2026-11-03: installed `5f38f37`, build `V5p7AZTJkbUdBaHtxbCDt`, approved
-Interactive profile. The later `ff33d8f` image/microphone update is prepared and
-awaits separate immediate lifecycle approval. The complete
+Interactive profile. The preliminary `ff33d8f` image/microphone update passed preparation but was
+withdrawn before installation after a new-chat alias blocker was reproduced.
+The corrected successor is being verified before its own lifecycle approval. The complete
 [convergence review](../../03_reviews/2026-11-03-pritha-provider-convergence-review.md)
 records the current requirement map and remaining acceptance.
 

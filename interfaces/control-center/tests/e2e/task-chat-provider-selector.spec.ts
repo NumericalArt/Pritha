@@ -1,22 +1,24 @@
 import {test,expect,type Page,type Route} from '@playwright/test';
 
-async function fixture(page:Page){
+async function fixture(page:Page,claudeAlias=false){
   const now=new Date().toISOString(),requests:Array<{route:Route;body:any;chatId?:string}>=[],previews:Array<{route:Route;url:URL}>=[];let holdPreview=false,defaultProvider='codex',settingsWrites=0,approvalReady=true;
   const presets={codex:{modelId:'native-model',reasoningEffort:'medium',timeoutMs:30000},openrouter:{modelId:'vendor/alpha',reasoningEffort:'default',timeoutMs:30000},claude:{modelId:'claude-fixture',reasoningEffort:'high',timeoutMs:30000},neuraldeep:{modelId:'nd-fixture',reasoningEffort:'xhigh',timeoutMs:30000},local:{modelId:'local-fixture',reasoningEffort:'default',timeoutMs:30000}};
+  if(claudeAlias)presets.claude.modelId='sonnet';
   const row=(chatId:string,connectorId='codex',modelId='native-model',effortId='medium')=>({chatId,title:chatId==='chat_native_saved'?'Native saved':`${connectorId} saved`,preview:'',group:'my_chats',origin:'chat',status:'idle',activeFlags:[],taskLinks:[],archived:false,historyKind:connectorId==='codex'?'native':'mirrored',createdAt:now,updatedAt:now,runtime:{connectorId,modelId,providerId:connectorId==='codex'?'desktop_bundled':connectorId+'_runtime',compatibility:'bound'},continuationState:'continuation_enabled',effortId});
   const rows=[row('chat_native_saved')];
   const detail=(chatId:string)=>({thread:rows.find(row=>row.chatId===chatId) || row(chatId),continuationState:'continuation_enabled',pendingRequests:[],queued:[],activeTurnId:null,history:{state:'available'},streamUrl:`/api/codex-chat/v1/threads/${chatId}/events`});
   const runtime=(url:URL)=>{
     const saved=rows.find(row=>row.chatId===url.searchParams.get('chatId')),connectorId=(saved?.runtime.connectorId || url.searchParams.get('connectorId') || defaultProvider) as keyof typeof presets,preset=presets[connectorId];
-    const modelId=saved?.runtime.modelId || url.searchParams.get('modelId') || preset.modelId,effortId=saved?.effortId || url.searchParams.get('effortId') || preset.reasoningEffort,providerId=connectorId==='codex'?'desktop_bundled':connectorId+'_runtime';
-    const models=(connectorId==='openrouter'?['vendor/alpha','vendor/beta']:[preset.modelId]).map(id=>({id,label:id,effortIds:connectorId==='openrouter'?['default','high']:['medium','high'],defaultEffortId:preset.reasoningEffort,serviceTierIds:connectorId==='codex'?['standard','fast']:[],inputModalities:['text']}));
-    return {connectorId,availability:'ready',preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:connectorId==='codex'?'app_server':'exec_resume',fallbackEnabled:false,probedAt:now,models,selected:{modelId,effortId,serviceTierId:connectorId==='codex'?url.searchParams.get('serviceTierId') || 'standard':null,sandboxMode:'read_only',approvalMode:'on_request'},providers:[{providerId,label:connectorId,locationLabel:connectorId,protocol:'app_server',availability:'ready',capabilities:{fullChat:true,commandApprovals:approvalReady,fileMetadata:connectorId==='codex',imageInput:false,steerTurn:false,interruptTurn:true}}]};
+    const requestedModelId=saved?.runtime.modelId || url.searchParams.get('modelId') || preset.modelId,images=claudeAlias && connectorId==='claude',modelId=images && requestedModelId==='sonnet'?'claude-sonnet-5-5':requestedModelId,effortId=saved?.effortId || url.searchParams.get('effortId') || preset.reasoningEffort,providerId=connectorId==='codex'?'desktop_bundled':connectorId+'_runtime';
+    const models=(connectorId==='openrouter'?['vendor/alpha','vendor/beta']:[images?'claude-sonnet-5-5':preset.modelId]).map(id=>({id,label:id,effortIds:connectorId==='openrouter'?['default','high']:['medium','high'],defaultEffortId:preset.reasoningEffort,serviceTierIds:connectorId==='codex'?['standard','fast']:[],inputModalities:images?['text','image']:['text']}));
+    return {connectorId,availability:'ready',preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:connectorId==='codex'?'app_server':'exec_resume',fallbackEnabled:false,probedAt:now,models,selected:{modelId,effortId,serviceTierId:connectorId==='codex'?url.searchParams.get('serviceTierId') || 'standard':null,sandboxMode:'read_only',approvalMode:'on_request'},providers:[{providerId,label:connectorId,locationLabel:connectorId,protocol:'app_server',availability:'ready',capabilities:{fullChat:true,commandApprovals:approvalReady,fileMetadata:connectorId==='codex' || images,imageInput:images,steerTurn:false,interruptTurn:true}}]};
   };
   const envelope=(data:any)=>({apiVersion:'1',requestId:'fixture',data});
   await page.route('**/api/task-runtime/settings',route=>{if(route.request().method()==='POST')settingsWrites++;return route.fulfill({json:{ok:true,settings:{version:1,revision:0,activeConnectorId:defaultProvider,providerPresets:presets}}});});
   await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:Object.keys(presets).map(connectorId=>({connectorId,status:['codex','claude','openrouter'].includes(connectorId)?'ready':'configured',capabilities:connectorId==='openrouter'?{parallelLimit:2}:{}}))}}));
   await page.route('**/api/codex-chat/v1/**',async route=>{
     const request=route.request(),url=new URL(request.url()),parts=url.pathname.split('/'),chatId=parts[5];
+    if(url.pathname.includes('/attachments/'))return route.fallback();
     if(request.method()==='POST' && (url.pathname.endsWith('/threads') || url.pathname.endsWith('/turns'))){requests.push({route,body:request.postDataJSON(),chatId});return;}
     if(url.pathname.endsWith('/runtime')){if(holdPreview && url.searchParams.has('connectorId') && !previews.some(entry=>entry.url.searchParams.get('connectorId')===url.searchParams.get('connectorId'))){previews.push({route,url});return;}return route.fulfill({json:envelope(runtime(url))});}
     if(url.pathname.endsWith('/events'))return route.fulfill({contentType:'text/event-stream',body:': ready\n\n'});
@@ -44,6 +46,21 @@ for(const width of [1440,390])test(`new-chat provider/model/effort is explicit a
   expect(f.requests[0].body).toMatchObject({connectorId:'openrouter',initialTurn:{settings:{modelId:'vendor/beta',effortId:'high'}}});expect(f.requests[0].body.initialTurn.settings.serviceTierId).toBeUndefined();expect(f.writes()).toBe(0);
   await f.finish(0,'chat_openrouter_saved');await expect(page).toHaveURL(/chat_openrouter_saved/);await expect(page.getByLabel('New chat provider',{exact:true})).toHaveCount(0);await expect(page.locator('.codex-conversation-heading')).toContainText('OpenRouter');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+for(const width of [1440,390])test(`a Claude alias permits an image in the first message without hiding model or reasoning at ${width}px`,async({page})=>{
+  const f=await fixture(page,true);await page.setViewportSize({width,height:960});await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page,width);
+  await page.getByLabel('New chat provider',{exact:true}).selectOption('claude');
+  await expect(page.getByLabel('New chat model',{exact:true})).toHaveValue('claude-sonnet-5-5');
+  await expect(page.getByLabel('New chat reasoning',{exact:true})).toHaveValue('high');
+  const bytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2qYIAAAAASUVORK5CYII=','base64');
+  await page.locator('input[type="file"]').setInputFiles({name:'alias-image.png',mimeType:'image/png',buffer:bytes});
+  await expect(page.getByLabel('Draft attachments').getByText('Ready',{exact:true})).toBeVisible();
+  await expect(page.getByText('Image support for the selected model is unavailable or unverified.',{exact:false})).toHaveCount(0);
+  await page.locator('.codex-composer textarea').fill('Inspect the synthetic picture.');
+  const send=page.getByRole('button',{name:'Send',exact:true});await expect(send).toBeEnabled();await send.click();await expect.poll(()=>f.requests.length).toBe(1);
+  const request=f.requests[0].body;expect(request.connectorId).toBe('claude');expect(request.initialTurn.settings.modelId).toBe('claude-sonnet-5-5');expect(request.initialTurn.attachments).toHaveLength(1);expect(f.writes()).toBe(0);
+  const original=await page.request.get('/api/codex-chat/v1/attachments/'+request.initialTurn.attachments[0]);expect(await original.body()).toEqual(bytes);
+  await f.finish(0,'chat_claude_alias_image');
 });
 test('uncertain first delivery keeps the exact provider across reload and a changed default',async({page})=>{
   const f=await fixture(page);await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page);
