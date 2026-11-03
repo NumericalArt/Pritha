@@ -187,7 +187,32 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
-Текущий срез на 2026-11-02 06:45 UTC: продолжается R12. После разрешённой
+Текущий проверенный срез на 2026-11-03: установленная canonical Pritha —
+`5f38f3748cf7ad3c71360d10a23fd21fbebb76ed`, build `V5p7AZTJkbUdBaHtxbCDt`,
+профиль службы Interactive. Новое обновление `ff33d8fec1bbf11b7c23e7e9857ac36dbbca0636`,
+build `7ZnIMkw-N89a8keb4G7We`, подготовлено и ожидает отдельного lifecycle approval.
+Полный gate: **1514/1514**, восемь групп pass, 0 fail/skip/cancel; production
+build/typecheck, same-build browser **21/21**, strict **5 страниц / 12 JS chunks**.
+Откат к установленной 5f38f37 проверен в отдельном loopback-процессе.
+
+Приняты пользователем Realtime 2 memory/README, прерывание, продолжение темы
+после reconnect и плавная работа музыки. Реальная Local 4B прошла file/resume
+с явным пояснением inline text; первый общий запрос дал неверный ответ, этот
+fail сохранён. Native Claude onboarding/file/resume и SDK уже проходили;
+новая vision-проверка native CLI остановилась на истёкшем OAuth до tools.
+Живая Claude API vision-проверка прошла initial/resume. Пилот счётчика строк
+принят и применён (83335/90000 токенов, 5 итераций), но его CLI-путь не закрывает
+отдельный end-to-end Voice → Claude UI factory journey. Этот путь, остальные
+ручные gates и финальная приёмка остаются обязательными. OpenRouter live явно
+отложен пользователем. Актуальный общий обзор и ограничения:
+[convergence review](../03_reviews/2026-11-03-pritha-provider-convergence-review.md).
+
+Все срезы ниже являются историей исполнения. Их слова «текущий», ожидаемые
+входы, бюджеты и активные версии относятся к указанному моменту.
+
+Исторический срез на 2026-11-02 06:45 UTC:
+
+ продолжается R12. После разрешённой
 попытки активировать `0bcf566` выполнен управляемый откат на `3853e0a`:
 страницы и JS прошли, но operational agent-catalog выявил ошибку обработки
 ещё не созданного draft-проекта. Исправленный кандидат `94f3a33` подготовлен,
@@ -647,6 +672,16 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
+**Статус: in-progress; активна 5f38f37 / Interactive. Кандидат ff33d8f подготовлен:
+1514/1514 тестов, восемь групп, 21 same-build browser case, build/typecheck,
+5 страниц / 12 JS chunks, проверенный rollback к 5f38f37 и frozen retrieval без
+регрессий/утечек. Ожидаются точное managed lifecycle approval и активация с live
+smoke. Native Claude vision ждёт обычного повторного входа после ответа Anthropic
+об истёкшей OAuth-сессии. Отдельный реальный Voice/Claude UI factory pilot и
+оставшиеся operator/manual gates ещё не пройдены. OpenRouter live отложен.**
+
+Исторический статус перед 5f38f37:
+
 **Статус: in-progress; активен b404a6d. R12 находится на финальной консолидации исправлений и живой приёмке. Claude API, NeuralDeep, native Claude file-tool/resume и SDK MCP проверены. Пользователь завершил вход в чистом экземпляре; его первый реальный file-tool и продолжение диалога прошли 2/2. Пилот счётчика строк принят и применён в основном child checkout 98c3805: 83335/90000 tokens, 5/5 итераций, неизменённые независимые Trials и smoke прошли. Новый кандидат исправляет классификацию бюджетного отказа, передачу guidance, привязку accepted child workspace и диагностику сохранения ключей. Полный gate на 8ebcf405: 1504/1504, все восемь групп pass, без skips; self-test без warnings/regressions. Для Local сохранены прежние 4B-модель и настройки: после сокращения обязательного индекса правил с сохранением полного текста побайтно source-level file-tool/resume прошёл 2/2. Установленная служба ещё имеет профиль Background; новый Interactive подготовлен, но не применён. Сборка, проверки браузера, отдельное точное разрешение на stop/swap/install с откатом, compiled Local и оставшаяся операторская Voice/factory/final acceptance ещё обязательны. OpenRouter live отложен пользователем.** Зависимости все выше.
 
 Исторический статус до последней попытки обновления:
@@ -683,16 +718,21 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
   Steer точного turn; переключение presets; ND key/limits/wallet; Claude auth/
   guarded child creation; OpenRouter key/model/child preset; Local без сети;
   Realtime 2 nine tools/music; explicit Live; ND voice; voice→active tasks.
-- [x] Пользователь подтвердил слышимый Voice ответ и прерывание без потери связи
-  на активной сборке. Это acceptance только этих двух голосовых сценариев.
+- [x] Пользователь подтвердил на 5f38f37: Realtime 2, факт из памяти и README,
+  прерывание, reconnect с продолжением темы, music duck и возврат громкости.
+  Эта приёмка не переносится автоматически на explicit Live, ND и фабрику.
 - [x] Claude onboarding из чистого экземпляра: одна копируемая команда с
   привязанными root/state, запуск из произвольного cwd, независимость от другого
   экземпляра и ambient credentials, browser sign-in, persisted auth check,
   первый реальный task и resume. Проверить понятное действие при locked Keychain;
   никаких ручных правок путей, копирования OAuth или отключения защиты.
-- [x] Child pilot interview→contract→outcome→scaffold→deliver/implement в
-  изолированном parent/state с раздельными approvals, измерением turns/cache tokens
-  и protection gates. Не выдавать mocked pilot за боевой.
+- [x] Реальный Claude CLI child pilot: отдельные Contract/Outcome approvals,
+  research→scaffold→deliver→независимые Trials→operator acceptance→отдельное
+  применение результата. Измерены 83335 токенов/5 итераций; verifier сохранён.
+- [ ] Отдельный end-to-end Voice → Claude Task Chat UI factory pilot по B §5.4:
+  interview→contract→outcome→scaffold→deliver/implement, два отдельных approvals,
+  утверждённые бюджеты, реальный child и его приёмка. Подготовленные UI-тесты и
+  принятый CLI-пилот не доказывают этот пользовательский journey.
 - [ ] Зафиксировать операторскую ручную приёмку и оставшиеся внешние ограничения.
   Не закрывать goal пока требуемая работа не завершена; `awaiting_acceptance`
   не равно accepted.

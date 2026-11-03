@@ -14,8 +14,8 @@
   ],
   "manifestSelfExcluded": "03_reviews/2026-11-02-provider-convergence-local-change-map.json",
   "unrelatedUntrackedFilesExcluded": 9,
-  "fileCount": 586,
-  "filesSha256": "4054ed561ba543903c48af6d5283a0f55316deca7176d968d91f4f2073638ee5",
+  "fileCount": 587,
+  "filesSha256": "0e237b898c73aed1331938a83d11fd4f1f7ff34c8f367e3df19e51b3c6140f2d",
   "files": [
     {
       "path": ".env.example",
@@ -123,11 +123,18 @@
       "sha256": "965254b6fe34ab82df111b9f3bb7470d363453914477d21431134443620b30c5"
     },
     {
+      "path": "03_reviews/2026-11-03-pritha-provider-convergence-review.md",
+      "status": "A",
+      "kind": "file",
+      "bytes": 18982,
+      "sha256": "6b257bea37af323d62f31d5f4b01668980061de86a7656c822515847627e3c09"
+    },
+    {
       "path": "07_workflows/2026-11-01-pritha-provider-convergence-roadmap.md",
       "status": "A",
       "kind": "file",
-      "bytes": 351811,
-      "sha256": "ded0a158c7ba651e0add5f5034972b38ae717fe3c4f87da96a3d9889d5e831cd"
+      "bytes": 355474,
+      "sha256": "289cc636b9803f084a1ba06858b4704c5462ae083a2f47cd9535590513bef215"
     },
     {
       "path": "07_workflows/agents-mother-host-research.md",
@@ -203,8 +210,8 @@
       "path": "11_agents/reports/2026-11-01-pritha-provider-convergence-deployment-report.md",
       "status": "A",
       "kind": "file",
-      "bytes": 36957,
-      "sha256": "a2c798dbeafb27d04474906aec80d1f7728c839eb1d8c67f4a2d1351cf15dff7"
+      "bytes": 37621,
+      "sha256": "3575b592aa9940062438f6a4eb00e91b709c60ceaada03caf7fed7cc8722f4f6"
     },
     {
       "path": "AGENTS.md",

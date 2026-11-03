@@ -3,7 +3,7 @@ id: pritha-provider-convergence-deployment-2026-11-01
 type: agent-deployment-report
 status: activated-awaiting-acceptance
 created: 2026-11-01
-updated: 2026-11-02
+updated: 2026-11-03
 topics: [provider-convergence, staged-release, manual-acceptance, recovery]
 tools: [Pritha, Node.js, Next.js, Playwright, SQLite]
 sources: [operator-request-2026-11-01, NumericalArt/Pritha-NeuralDeep@2ab22aeff5f1c167c86e925ec30311942b76023b]
@@ -24,19 +24,30 @@ confidence: medium
 
 # Canonical Pritha: local activation and acceptance
 
-This report covers only the canonical Mac mini instance. GitHub and both
-MacBook instances remain outside the transaction. The operator explicitly
-approved activation of `15a17c1`, then the tested update `3853e0a`; both initial
-managed transactions completed and passed operational health at that time.
-A later approved activation of `0bcf566` was rolled back after the operational
-catalog gate failed. The subsequently approved combined update `b404a6d` is now
-active and passed strict and operational health. The follow-up credential-save
-diagnostic fix `bcb7c3b` remains isolated and is not deployed.
-Final operator acceptance remains pending. Exact machine paths, endpoints and
-recovery receipts remain private under the instance state root; non-secret
-release identities are recorded below.
+This report covers the canonical Mac mini instance. Current verified checkpoint
+on 2026-11-03: installed `5f38f37`, build `V5p7AZTJkbUdBaHtxbCDt`, approved
+Interactive profile. The later `ff33d8f` image/microphone update is prepared and
+awaits separate immediate lifecycle approval. The complete
+[convergence review](../../03_reviews/2026-11-03-pritha-provider-convergence-review.md)
+records the current requirement map and remaining acceptance.
 
-## Current checkpoint — b404a6d active; Keychain recovery pending
+The prepared executable has 1514/1514 tests, eight quality groups, production
+build/typecheck, 21 same-build browser cases, five strict pages and twelve JS
+chunks. Candidate memory and exact installed-build rollback are verified.
+Operator Realtime 2 memory/README, interruption/reconnect and music acceptance
+is recorded. Native Claude vision awaits ordinary renewed sign-in; its earlier
+file/resume/fresh-onboarding success is retained. The accepted/applied CLI child
+pilot is complete (83335 tokens, five iterations), while the separate real
+Voice → Claude UI factory journey remains open. OpenRouter live is deferred.
+
+Exact private paths and recovery receipts remain outside tracked Markdown.
+The source/build approvals and nine unrelated files remain protected. Overall
+operator acceptance is pending; no GitHub or MacBook rollout occurred.
+
+All remaining sections below are historical checkpoints. Their words “current”,
+“now”, active releases and pending actions refer to their recorded date.
+
+## Historical checkpoint — b404a6d active; Keychain recovery pending
 
 The approved managed transaction completed on 2026-11-02 at 10:47 Europe/Moscow.
 Build `jL62rGMtb_W3itHa0cD3z` matches `b404a6d`; exact identity, five pages,
