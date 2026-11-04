@@ -13,7 +13,7 @@ import {VoiceIntakeReceipts,voiceIntakeAttachmentIds} from '../scripts/lib/voice
 import {normalizeChatSubject} from '../scripts/lib/chat-subject.mjs';
 
 const file = ts.createSourceFile('runtime.ts', readFileSync('interfaces/control-center/src/lib/realtime/pritha-runtime.ts', 'utf8'), ts.ScriptTarget.Latest, true);
-const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'abortPrithaCodexTask', 'runtimeSettingsForVoiceTask', 'createPrithaVoiceIntakeCodexTask'];
+const names = ['prepareProviderVoiceTask', 'startProviderVoiceTask', 'runCodexTask', 'voiceFactoryRouteClarification', 'abortPrithaCodexTask', 'runtimeSettingsForVoiceTask', 'createPrithaVoiceIntakeCodexTask'];
 const source = file.statements.filter(node => ts.isFunctionDeclaration(node) && names.includes(node.name?.text)).map(node => node.getText(file)).join('\n') + '\nexport {runCodexTask,runtimeSettingsForVoiceTask};';
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 
@@ -98,6 +98,15 @@ test('Voice pins original task search permission outside the assembled executor 
     const stored=await f.json(path.join(f.privateRoot,'codex-tasks',result.task_id,'request.json'));
     assert.equal(stored.task_chat_request.turn.voiceSearchText,(requires_internet?'Search public sources for this operator task:\n':'Do not browse.\n')+'Find the weather for Berlin.');
   }
+});
+test('a new CLI Contract/Outcome brief cannot silently become an edit to its parent project',async t=>{
+  const f=fixture(t,{connector:'claude'}),args={task:'Создать локальный CLI для подсчёта слов. Сначала подготовить черновики Contract и Outcome Spec. Без реализации до отдельных одобрений.',task_type:'implementation',write_mode:'workspace_write',subject_kind:'task',subject_id:'word-counter',operator_confirmation:'Confirmed: a separate new agent; drafts only.'};
+  const blocked=await f.run(args,{reservedTaskId:'factory-classification'});
+  assert.equal(blocked.error,'factory_route_required');assert.deepEqual(f.calls,[]);assert.equal(f.reservations.length,0);assert.equal(existsSync(path.join(f.privateRoot,'codex-tasks')),false);
+  const corrected=await f.run({...args,task_type:'agent_creation',subject_kind:'agent'},{reservedTaskId:'factory-classification'});
+  assert.equal(corrected.ok,true);assert.deepEqual(f.calls,['provider-start']);assert.deepEqual(f.reservations[0].workspace,{mode:'read-only',factorySlug:'word-counter'});
+  const stored=await f.json(path.join(f.privateRoot,'codex-tasks',corrected.task_id,'request.json'));
+  assert.equal(stored.task,args.task);assert.equal(stored.task_type,'agent_creation');
 });
 test('handoff and preparation failures make no task directory and never start a native fallback', async t => {
   for (const options of [{ handoff: { ok: false, error: 'confirmation_required' } }, { preparationError: 'provider_model_invalid' }]) {

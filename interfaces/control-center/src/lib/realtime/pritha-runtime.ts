@@ -6450,10 +6450,22 @@ async function startProviderVoiceTask(task: Record<string, unknown>, paths: Code
   return { transport: 'task-chat', ...status };
 }
 
+function voiceFactoryRouteClarification(args: CodexTaskArgs) {
+  if (args.task_type !== 'implementation' || args.write_mode !== 'workspace_write' || args.continue_task_id
+      || args.subject_kind && args.subject_kind !== 'task') return null;
+  const text = compactText(args.task, 8000);
+  if (!/(?:\bcontract\b|контракт)/iu.test(text) || !/outcome[\s_-]*spec/iu.test(text)
+      || !/(?:\bcreat(?:e|ing)\b|созда[йт]|нов(?:ый|ого)\s+агент)/iu.test(text)) return null;
+  return {ok:false,error:'factory_route_required',instructions:
+    'The brief asks for Contract and Outcome Spec but is classified as an implementation edit to the current project. Do not create an implementation card or bypass workspace safety. If the operator already explicitly requested a separate new agent/project and confirmed this brief, call run_codex_task with task_type=agent_creation, write_mode=workspace_write, subject_kind=agent and the exact new folder slug. Preserve the confirmed brief and all approval/budget boundaries; no repeated launch confirmation is needed just to correct this classification. If the intended existing project is unclear, ask one concise clarification. Draft preparation never approves either artifact or starts a build.'};
+}
+
 async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: string; taskSelection?:VoiceTaskSelection } = {}) {
   const root = resolvePrithaRoot();
   const taskText = String(args.task || "").trim();
   if (!taskText) return { ok: false, error: "missing_task" };
+  const factoryClarification = voiceFactoryRouteClarification(args);
+  if (factoryClarification) return factoryClarification;
 
   const now = new Date();
   if (host.reservedTaskId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(host.reservedTaskId)) return {ok:false,error:"voice_task_identity_invalid"};

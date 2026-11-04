@@ -3114,6 +3114,12 @@ unit child environment отдельно и изолировать оба aliases
   попал в `implementation` исходного проекта вместо `agent_creation` отдельного
   агента. Dirty-workspace gate остановил его до создания чата и model turn.
   Это не отказ Claude и не повод коммитить либо удалять посторонние файлы.
+- Повторная операторская попытка на прежней установленной версии воспроизвела
+  тот же неверный route. В новом runtime неоднозначный implementation brief с
+  созданием Contract/Outcome отклоняется до reservation/probe. Voice получает
+  typed correction: подтвердить уже явно заданный new-agent intent в параметрах
+  tool, либо уточнить существующий проект. Это не автоматическое повышение прав
+  по свободному тексту и не повторный запуск сохранённой карточки.
 - Маршрутизация нового агента явно описана в Voice tool schema и instructions:
   `agent_creation` + `subject_kind=agent` + exact slug. Подтверждение brief
   разрешает подготовить drafts, но не заменяет отдельные Contract, Outcome Spec
