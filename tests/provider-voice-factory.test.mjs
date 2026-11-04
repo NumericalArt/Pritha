@@ -41,6 +41,10 @@ test('the actual MCP brief schema rejects a design array before approval and a c
     assert.equal(invalid.isError,true);assert.equal(f.state(),null);assert.equal(f.approvals.length,0);
   }
   assert.ok(schema.properties.technical.properties.runtimeFamily.enum.includes('cli'));assert.ok(!schema.properties.technical.properties.runtimeFamily.enum.includes('node'));
+  assert.deepEqual(schema.properties.technical.properties.preset.enum,['generic','local-feed','llm-app']);
+  const incomplete=await post('tools/call',{name:'factory_step',arguments:{operation_id:'init-invalid-preset',action:'init',brief:{...brief,technical:{...brief.technical,preset:'PRIVATE_INVALID_PRESET'}},build_token_budget:40000}});
+  assert.deepEqual(JSON.parse(incomplete.content[0].text),{error:'factory_brief_incomplete',issues:['Interview brief preset must be generic, local-feed, or llm-app']});
+  assert.equal(f.state(),null);assert.equal(f.approvals.length,0);
   const input={operation_id:'init-design-retry',action:'init',brief:{...structuredClone(brief),design:{inputDataTypes:['UTF-8 text file']}},build_token_budget:40000,build_iteration_budget:2,build_elapsed_budget_ms:1800000};
   const rejected=await post('tools/call',{name:'factory_step',arguments:input});assert.equal(rejected.isError,true);
   assert.deepEqual(JSON.parse(rejected.content[0].text),{error:'factory_brief_text_required',field:'brief.design.inputDataTypes',expected:'string'});

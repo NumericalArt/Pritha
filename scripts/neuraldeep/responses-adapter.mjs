@@ -22,7 +22,7 @@ const DEFAULT_RESPONSE_LIMIT = 32 * 1024 * 1024;
 // this model's publisher-qualified ID. This is an explicit equivalence, not
 // generic prefix stripping or permission to accept a different model family.
 const responseModelMatches=(requested,returned)=>returned===requested
-  || requested==='gpt-oss-20b' && returned==='openai/gpt-oss-20b';
+  || ['gpt-oss-20b','gpt-oss-120b'].includes(requested) && returned==='openai/'+requested;
 // NeuralDeep advertises a 900-second gateway deadline; allow its terminal response to arrive.
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 930_000;
 const upstreamDispatchers = new WeakMap();

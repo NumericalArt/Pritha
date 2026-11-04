@@ -466,7 +466,7 @@ export class CodexRuntimeManager {
             id: settings.codexModel,
             label: settings.codexModel,
             effortIds: [settings.codexReasoningEffort],
-            serviceTierIds: [settings.codexServiceTier],
+            serviceTierIds: [turnSettings.serviceTier],
             defaultEffortId: settings.codexReasoningEffort,
             inputModalities: modalities,
           }]

@@ -65,14 +65,18 @@ function pushTopic(topics, id, topic, query, reason, extra = {}) {
   });
 }
 
-function addPatternDerivedTopics(topics, patternPack, { hybridEditor = false } = {}) {
+function addPatternDerivedTopics(topics, patternPack, { hybridEditor = false, headlessCli = false, contractText = '' } = {}) {
+  const selectedSeeds=new Set(contractText.split(/[\n;]+/).map(canonicalPatternResearchSeed).filter(Boolean));
   const seeds = parsePatternPackSeeds(patternPack)
     .map((seed) => canonicalPatternResearchSeed(compact(seed)))
     .filter(Boolean)
+    // A retrieved pattern is advisory, not permission to add an unselected
+    // interface, service or dependency to a deterministic CLI contract.
+    .filter(seed=>!headlessCli || selectedSeeds.has(seed))
     // Retrieval matches are advisory. The narrow editor adapter cannot acquire
     // technologies that its reviewed capability boundary explicitly excludes.
     .filter((seed) => !hybridEditor || (/\b(codex cli|telegram|bot api|tailscale|sandbox|browser|node|eval|evaluation)\b/i.test(seed) && !/\b(realtime|webrtc|voice|speech|mcp|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron)\b/i.test(seed)))
-    .filter((seed) => /\b(openai|realtime|webrtc|voice|speech|telegram|bot api|mcp|connector|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron|tailscale|oauth|webhook|browser|sandbox|codex app|codex cli|agents sdk|github|repository|skill|eval|evaluation|open-source|api)\b/i.test(seed))
+    .filter((seed) => /\b(openai|realtime|webrtc|voice|speech|telegram|bot api|mcp|connector|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron|tailscale|oauth|webhook|browser|sandbox|codex|agents sdk|github|repository|skills?|evals?|evaluation|open-source|api)\b/i.test(seed))
     .slice(0, 5);
 
   for (const seed of seeds) {
@@ -257,7 +261,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  addPatternDerivedTopics(topics, options.patternPack || options.patternPackText, { hybridEditor });
+  addPatternDerivedTopics(topics, options.patternPack || options.patternPackText, { hybridEditor, headlessCli:scaffoldCapability(data).adapter==='headless-cli-v1',contractText:text });
 
   return topics;
 }

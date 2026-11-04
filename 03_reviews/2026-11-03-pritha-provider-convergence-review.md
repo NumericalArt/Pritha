@@ -242,25 +242,46 @@ Its reasoning quality and latency remain different from the configured frontier
 provider. Users can select another compatible local model without changing the
 connector contract; this review does not recommend an untested model.
 
+## Current factory recovery evidence (2026-11-04)
+
+Installed 27890e2 passes managed activation, strict pages/chunks, operational
+health, task admission and full self-test. Its release checks passed 1572 unit
+tests and 68 browser scenarios. Both previously approved Claude pilot documents
+are now accepted through the ordinary factory and product approval API, preserving
+exact reviewed content and the original 40000-token/two-iteration/30-minute build
+limits. No build has started and no factory state was repaired by hand.
+
+Real research exposed irrelevant advisory patterns becoming mandatory headless
+CLI dependencies and missing authorities for canonical pattern topics. The next
+candidate narrows CLI research to selected requirements and supplies bounded
+primary-source mappings, without accepting unknown sources. Native Codex created
+and reviewed a real draft through the shared factory. Its runtime service-tier
+preview and actionable brief validation are corrected in the candidate.
+
+NeuralDeep returned a different terminal model for the configured Qwen request;
+that mismatch remains blocked. A separate real candidate transport probe of
+GPT OSS 120B passes after recognizing its exact publisher-qualified terminal ID.
+This is not evidence that an arbitrary model alias is interchangeable, and the
+saved user default remains unchanged. The UI now explains model mismatch instead
+of reporting only a generic provider error.
+
 ## Required steps before final handoff
 
-1. Verify the new common-default follow-up: setup selection differs from the
-   committed default; incomplete/dirty settings cannot activate it; the server
-   rechecks readiness and revision. New Voice tasks read that default at dispatch,
-   while existing tasks and audio/search context preserve their bindings.
-2. Prepare its exact source/build and rollback to installed 73aafb5, obtain
-   immediate lifecycle approval, then perform managed activation and strict
-   pages/chunks/admission/operational checks. Earlier native/API image checks
-   remain valid; repeat only if relevant executable changes justify it.
-3. Complete the real Voice → Claude UI factory lifecycle with separate authored
-   Contract and Outcome approvals, an explicitly approved build budget, independent
-   protected Trials, operator acceptance and separate application approval.
-4. Record remaining operator composer controls, explicit Live, NeuralDeep audio,
-   Brief Desk and active-provider Voice task acceptance. Keep OpenRouter's explicit
-   live-test deferral visible.
-5. Reconcile all final statuses, source hashes, deployment/memory receipts and the
-   handoff report. Final acceptance is distinct from implemented, tested, ready,
-   installed and technically verified. The complete goal is not achieved yet.
+1. Verify and install the consolidated follow-up through the managed workflow,
+   with rollback to installed 27890e2 and exact immediate lifecycle approval.
+2. Continue the existing approved Claude factory through corrected research,
+   scaffold, measured delivery and independent protected Trials. Preserve its
+   identity, accepted documents and original build limits.
+3. Complete real Codex and NeuralDeep factory delivery and the Voice/Task Chat
+   continuation matrix. New contracts/outcomes need initial separate approvals;
+   accepted documents must not ask again. No internal-state repair counts as a
+   passing product journey.
+4. Complete operator acceptance and separate application of verified child files;
+   record remaining composer controls, explicit Live, NeuralDeep audio and Brief
+   Desk acceptance. OpenRouter remains explicitly deferred.
+5. Reconcile source/build/deployment and memory receipts with the roadmap. Working
+   drafts, passing transport probes and automated tests do not establish finished
+   agents or final user acceptance. The complete goal is not achieved yet.
 
 This review records verified evidence without authorizing any service transaction.
 The alias correction adds a regression test that fails before the fix and passes

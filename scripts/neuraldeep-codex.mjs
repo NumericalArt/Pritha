@@ -176,7 +176,7 @@ export async function startNeuralDeepRun(options,dependencies={}){
       try{
         const [result]=await Promise.all([owned.completion,consume,stderr]);
         const toolsExited=await closeTools();verifiedExit=result.processTreeExited===true && toolsExited;
-        const errorCode=budget?.budget.errorCode || state.errorCode || stopReason || (providerError?'provider_'+providerError.class:null) || (!verifiedExit?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
+        const errorCode=budget?.budget.errorCode || state.errorCode || stopReason || (providerError?.code==='neuraldeep_model_identity_mismatch'?providerError.code:providerError?'provider_'+providerError.class:null) || (!verifiedExit?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
         return {ok:!errorCode,sessionId:state.sessionId,model:options.model,identity,cliVersion:cli.version,usage:state.usage,providerError,errorCode,processTreeExited:verifiedExit,exitCode:result.code,...(budget?{budgetId:budget.budgetId,budget:budget.snapshot()}:{})};
       }finally{
         closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);

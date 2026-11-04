@@ -18,7 +18,12 @@ const briefTextPaths=new Set(textFields.flatMap(([group,keys])=>keys.map(key=>gr
 class FactoryBriefInputError extends Error {
   constructor(field){super('A factory brief field must be text.');this.code='factory_brief_text_required';this.field=field;}
 }
+class FactoryBriefValidationError extends Error {
+  constructor(issues){super('The factory brief needs correction.');this.code='factory_brief_incomplete';this.issues=issues;}
+}
 export function factoryBriefErrorDetail(error){
+  // These messages come only from the host validator, never from provider text.
+  if(error instanceof FactoryBriefValidationError)return {error:error.code,issues:error.issues};
   return error instanceof FactoryBriefInputError && briefTextPaths.has(error.field)
     ? {error:error.code,field:'brief.'+error.field,expected:'string'} : null;
 }
@@ -38,6 +43,8 @@ const briefSchema={type:'object',properties:{
 },required:['identity','goal','user','successCriteria'],additionalProperties:false};
 briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMILIES];
 briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
+briefSchema.properties.technical.properties.preset.enum=['generic','local-feed','llm-app'];
+briefSchema.properties.technical.properties.sourceFormat.enum=['json','rss','atom','mixed'];
 export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound child. ALWAYS read status first and continue its saved phase; never restart an existing factory. Prepare private drafts within the requested workflow, then request TWO separate approvals: approve_contract and approve_outcome. After approval, continue research, scaffold, bounded delivery and protected Trials without asking again for technical steps. Accepted documents and budgets stay pinned. No push, deploy, services, credential provisioning or final user acceptance. Never infer document approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
 const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources','retry_failed'],research_apply:['selection'],delivery_resume:['answer']};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
@@ -97,7 +104,8 @@ export class ProviderFactoryTools {
       if(brief.technical.runtimeFamily!==undefined && !RUNTIME_FAMILIES.has(brief.technical.runtimeFamily))throw factoryFail('factory_runtime_family_invalid');
       if(brief.technical.serviceMode!==undefined && !SERVICE_MODES.has(brief.technical.serviceMode))throw factoryFail('factory_service_mode_invalid');
       if(brief.identity.slug && brief.identity.slug!==p.slug)throw factoryFail('factory_subject_changed');
-      if(validateInterviewBrief(brief,{requireComplete:true}).length)throw factoryFail('factory_brief_incomplete');
+      const issues=validateInterviewBrief(brief,{requireComplete:true});
+      if(issues.length)throw new FactoryBriefValidationError(issues);
     }
     if(['approve_contract','approve_outcome','write_draft'].includes(input.action)){
       const kind=input.action==='write_draft'?input.artifact:input.action==='approve_contract'?'contract':'outcome';

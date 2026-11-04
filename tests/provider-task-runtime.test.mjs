@@ -48,6 +48,17 @@ test('compatible metadata preflight accepts the real host execution binding and 
   await f.runs[0].input.beforeRequest();assert.equal(f.runs[0].input.effort,'default');assert.equal(f.runs[0].input.maxOutputTokens,4096);assert(f.runs[0].input.hostExecutionContext);
 });
 
+test('a provider model substitution gives an actionable error without changing the pinned chat or defaults',async t=>{
+  const f=fixture(t),runtime=f.make(),binding=(await runtime.create(create('model_drift_thread'))).binding;
+  const started=await runtime.start(binding.chatId,message('model_drift_message'));
+  await until(()=>f.runs.length===1);
+  f.runs[0].resolve({ok:false,errorCode:'neuraldeep_model_identity_mismatch',processTreeExited:true});
+  await until(()=>runtime.registry.turn(binding.chatId,started.accepted.turn.turnId).status==='failed');
+  const turn=runtime.registry.turn(binding.chatId,started.accepted.turn.turnId);
+  assert.equal(turn.error.code,'neuraldeep_model_identity_mismatch');assert.match(turn.error.message,/different model/);
+  assert.match(turn.error.message,/new chat/);assert.equal(runtime.require(binding.chatId).modelId,'test-model');assert.equal(f.settings.modelId,'test-model');
+});
+
 test('external turns retain exact creation/model/session and replay the accepted receipt across workers',async t=>{
   const f=fixture(t),a=f.make(),b=f.make();
   const {binding}=await a.create(create()),chat=binding.chatId;

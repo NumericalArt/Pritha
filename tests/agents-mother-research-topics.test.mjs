@@ -148,3 +148,11 @@ test("pattern pack seeds derive additional current-source research topics", () =
   assert.ok(topics.some((topic) => topic.id === "pattern-mcp-connector-permissions"));
   assert.ok(!topics.some((topic) => topic.id === "pattern-generic-agent-workflow"));
 });
+
+test('headless CLI memory matches cannot introduce unselected Voice, web or service dependencies',()=>{
+ const data={agentName:'Voice Word Counter Acceptance',runtimeFamily:'cli',primaryInterface:'CLI',telegramMode:'none',serviceMode:'none',autostart:'disabled',proactiveMode:'none',memoryModel:'none',dependencies:'Node.js built-in fs and TextDecoder',primaryMission:'Count words in a UTF-8 file',coreFunctions:['Read UTF-8 and emit JSON']};
+ const patternPack={externalResearchSeeds:['voice speech','api','tailscale','github repository','realtime webrtc','browser sandbox']};
+ assert.deepEqual(deriveExternalResearchTopics(data,{patternPack}).map(t=>t.id),['declared-dependencies']);
+ const sqlite=deriveExternalResearchTopics({...data,memoryModel:'SQLite'},{patternPack:{externalResearchSeeds:['sqlite','voice speech']}});
+ assert.ok(sqlite.some(t=>t.id==='pattern-sqlite'));assert.ok(!sqlite.some(t=>t.id==='pattern-voice-speech'));
+});

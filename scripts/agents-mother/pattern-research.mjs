@@ -9,6 +9,7 @@ import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { markdownBodyText, markdownDocumentLock } from "../lib/markdown-content-lock.mjs";
 import {privateAgentArtifactReference} from '../lib/authored-agent-memory.mjs';
+import {scaffoldCapability} from './scaffold/capabilities.mjs';
 
 export const SEMANTIC_FAILURE_LOG_REL = ".private/agents-mother/semantic-memory-failures.jsonl";
 const ISOLATED_SEMANTIC_FAILURE_LOG_REL = "private/agents-mother/semantic-memory-failures.jsonl";
@@ -126,10 +127,10 @@ const CANONICAL_EXTERNAL_SEEDS = Object.freeze([
   [/\btailscale\b/i, "tailscale"],
   [/\b(?:oauth|webhook)\b/i, "oauth webhook"],
   [/\b(?:browser|sandbox)\b/i, "browser sandbox"],
-  [/\b(?:codex app|codex cli)\b/i, "codex"],
+  [/\bcodex(?: app| cli)?\b/i, "codex"],
   [/\bagents sdk\b/i, "agents sdk"],
   [/\b(?:github|repository|open-source)\b/i, "github repository"],
-  [/\b(?:skill|eval|evaluation)\b/i, "agent skills evals"],
+  [/\b(?:skills?|evals?|evaluation)\b/i, "agent skills evals"],
   [/\bapi\b/i, "api"],
 ]);
 
@@ -182,7 +183,7 @@ function domainLabel(key) {
 
 export function buildAgentDevelopmentQuery(data = {}) {
   return [
-    data.agentName,
+    scaffoldCapability(data).adapter==='headless-cli-v1' ? '' : data.agentName,
     data.primaryMission,
     data.runtimeFamily,
     data.runtimePlacementProfile,

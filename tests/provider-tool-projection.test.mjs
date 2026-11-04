@@ -138,11 +138,11 @@ test('a model mismatch in nonempty, terminal or already-published metadata is ne
 });
 
 test('only the verified publisher-qualified model ID is equivalent; another publisher or model remains blocked',async t=>{
-  for(const returned of ['openai/gpt-oss-20b','other/gpt-oss-20b','openai/gpt-oss-120b','openai/openai/gpt-oss-20b']){
-    const prelude={type:'response.created',response:{id:'response_fixture',model:'openai/openai/gpt-oss-20b',status:'in_progress',output:[]}};
+  for(const requested of ['gpt-oss-20b','gpt-oss-120b'])for(const returned of ['openai/'+requested,'other/'+requested,'openai/'+(requested==='gpt-oss-20b'?'gpt-oss-120b':'gpt-oss-20b'),'openai/openai/'+requested]){
+    const prelude={type:'response.created',response:{id:'response_fixture',model:'openai/openai/'+requested,status:'in_progress',output:[]}};
     const post=await fixture(t,{fetchImpl:async()=>new Response(sse(prelude)+sse({type:'response.completed',response:terminal([call(allowedTools[0])],{model:returned})})+'data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}})});
-    const result=await post({model:'gpt-oss-20b'}),body=await result.text();
-    if(returned==='openai/gpt-oss-20b'){assert.equal(result.status,200);assert.match(body,/"name":"read_file"/);assert.match(body,/"model":"openai\/gpt-oss-20b"/);}
+    const result=await post({model:requested}),body=await result.text();
+    if(returned==='openai/'+requested){assert.equal(result.status,200);assert.match(body,/"name":"read_file"/);assert.ok(body.includes('"model":"'+returned+'"'));}
     else{assert.equal(result.status,502);assert.match(body,/neuraldeep_model_identity_mismatch/);assert.doesNotMatch(body,/"type":"function_call"/);}
   }
 });

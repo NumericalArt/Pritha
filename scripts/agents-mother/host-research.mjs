@@ -62,6 +62,7 @@ export class HostResearch {
   async collect({retryFailed=false,sourceUrls={}}={}){
     this.assertAllowed();
     if(!sourceUrls || typeof sourceUrls!=='object' || Array.isArray(sourceUrls) || Object.keys(sourceUrls).some(id=>!this.topics.some(topic=>topic.id===id)))fail('research_sources_input_invalid');
+    if(this.topics.some(topic=>!topic.primaryDomains.length))fail('research_source_authority_required');
     for(const [id,url] of Object.entries(sourceUrls))if(typeof url!=='string' || !allowed(url,this.topics.find(topic=>topic.id===id).primaryDomains))fail('research_primary_url_invalid');
     return withFileLock(this.file,async()=>{
       const state=this.load() || {schema:'pritha-host-research-v1',binding:this.binding,reportHash:hash(this.report.text),deadlineAt:Date.now()+this.totalMs,topics:{},sources:[]};

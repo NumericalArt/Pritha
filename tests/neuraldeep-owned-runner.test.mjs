@@ -48,7 +48,7 @@ test('wrong session and provider-side model drift fail without changing provider
     const options=fixture(t),capture={};let calls=0;
     const run=await startNeuralDeepRun({...options,resume:session},{...boundary,inspectSession:()=>({available:true}),readCredential:()=> 'KEY_CANARY',fetchImpl:async()=>{calls++;return providerResponse();},spawnSupervised:fakeSupervisor(capture,{resumeId:mode==='session'?'87654321-4321-4321-4321-210987654321':session,wrongModel:mode==='model'})});
     const result=await run.completion;assert.equal(result.ok,false);
-    if(mode==='session')assert.equal(result.errorCode,'runtime_identity_mismatch');else{assert.equal(calls,0);assert.equal(result.providerError.code,'neuraldeep_model_identity_mismatch');}
+    if(mode==='session')assert.equal(result.errorCode,'runtime_identity_mismatch');else{assert.equal(calls,0);assert.equal(result.providerError.code,'neuraldeep_model_identity_mismatch');assert.equal(result.errorCode,'neuraldeep_model_identity_mismatch');}
   }
 });
 

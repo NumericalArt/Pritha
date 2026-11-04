@@ -1,4 +1,6 @@
-// Reviewed primary-source policy from the pinned NeuralDeep repository.
+// Reviewed primary-source policy, initially adopted from the pinned NeuralDeep
+// repository. Canonical memory-topic aliases use the same bounded authorities;
+// a model-supplied URL never expands this allowlist.
 const authority={
  'anthropic-messages-api':['platform.claude.com','docs.anthropic.com'], 'openrouter-model-api':['openrouter.ai'],
  'node-http-runtime':['nodejs.org'], 'neuraldeep-model-api':['neuraldeep.ru','docs.neuraldeep.ru'],
@@ -12,6 +14,34 @@ const authority={
  'declared-dependencies':['nodejs.org','npmjs.com','docs.npmjs.com','nextjs.org','react.dev','sqlite.org'],
  'github-repository-review':['github.com'], 'local-inference-runtime':['docs.ollama.com','docs.vllm.ai','lmstudio.ai'],
  'memory-rag-storage':['qdrant.tech','docs.lancedb.com','neo4j.com'],
+ 'codex-editor-isolation':['developers.openai.com','openai.com'],
+ 'platform-runtime-compatibility':['nodejs.org','docs.python.org','developer.apple.com','learn.microsoft.com'],
+ 'tailscale':['tailscale.com'],
+ 'web-ui':['nextjs.org','react.dev','developer.mozilla.org'],
+ 'oauth-webhook':['oauth.net','datatracker.ietf.org','developer.mozilla.org'],
+ 'agent-skills-evals':['developers.openai.com','platform.openai.com','platform.claude.com','docs.anthropic.com'],
+};
+const aliases={
+ 'mcp-provider':['mcp-connectors'],
+ 'pattern-openai-realtime-webrtc':['openai-realtime','voice-transport'],
+ 'pattern-openai':['openai-agents-sdk'],
+ 'pattern-realtime-webrtc':['openai-realtime','voice-transport'],
+ 'pattern-voice-speech':['voice-transport','openai-realtime'],
+ 'pattern-telegram-bot-api':['telegram-bot-api'],
+ 'pattern-mcp-connector-permissions':['mcp-connectors'],
+ 'pattern-mcp-connector':['mcp-connectors'],
+ 'pattern-semantic-embeddings-rag':['memory-rag-storage'],
+ 'pattern-sqlite':['sqlite-storage'],
+ 'pattern-nextjs-react':['web-ui'],
+ 'pattern-launchd-cron':['operations-deployment'],
+ 'pattern-tailscale':['tailscale'],
+ 'pattern-oauth-webhook':['oauth-webhook'],
+ 'pattern-browser-sandbox':['interface-runtime-security','codex-editor-isolation'],
+ 'pattern-codex':['codex-editor-isolation'],
+ 'pattern-agents-sdk':['openai-agents-sdk'],
+ 'pattern-github-repository':['github-repository-review'],
+ 'pattern-agent-skills-evals':['agent-skills-evals'],
+ 'pattern-api':['interface-runtime-security'],
 };
 // Curated public entry points, never URLs copied from operator text or a search snippet.
 const primaryUrls={
@@ -26,6 +56,11 @@ const primaryUrls={
 };
 
 export function sourceAuthority(topics) {
- return topics.filter(topic=>topic.required!==false).map(topic=>({...topic,
-  primaryDomains:authority[topic.id] || [],primaryUrls:primaryUrls[topic.id] || []}));
+ return topics.filter(topic=>topic.required!==false).map(topic=>{
+  const ids=aliases[topic.id] || [topic.id];
+  return {...topic,primaryDomains:[...new Set(ids.flatMap(id=>authority[id] || []))],
+   // Broad pattern aliases need a deliberately selected source, not the
+   // first unrelated entry point of one of their possible technologies.
+   primaryUrls:primaryUrls[topic.id] || []};
+ });
 }

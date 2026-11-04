@@ -68,3 +68,21 @@ test("runtime, API, and App transport consume the shared catalog-backed contract
   assert.match(appSource, /const turnSettings = codexAppTurnSettings/);
   assert.match(appSource, /serviceTier: turnSettings\.serviceTier/);
 });
+
+test('native runtime advertises the selected wire tier so configured Codex remains selectable',async()=>{
+ const loaded=await loadCatalogModule();
+ try {
+  const source=readFileSync('interfaces/control-center/src/lib/codex-chat/app-server.ts','utf8');
+  const ast=ts.createSourceFile('app-server.ts',source,ts.ScriptTarget.Latest,true);
+  const klass=ast.statements.find(n=>ts.isClassDeclaration(n)&&n.name?.text==='CodexRuntimeManager');
+  const method=klass.members.find(n=>ts.isMethodDeclaration(n)&&n.name.getText(ast)==='status');
+  const body=ts.transpileModule('async function readStatus() '+method.body.getText(ast),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+  for(const [setting,wire] of [['standard','default'],['fast','priority']]){
+   const read=new Function('getPrithaRuntimeSettings','codexAppTurnSettings','sandboxModeForView',body+';return readStatus;')(
+    ()=>({codexModel:'gpt-6-astra',codexReasoningEffort:'high',codexServiceTier:setting,codexSandbox:'read-only'}),loaded.module.codexAppTurnSettings,()=> 'read_only');
+   const status=await read.call({preferredProvider:()=> 'desktop_bundled',probe:async providerId=>({view:{providerId,availability:'ready',protocol:'app-server'}}),modelInputModalities:async()=>['text','image']});
+   assert.equal(status.availability,'ready');assert.equal(status.selected.serviceTierId,wire);
+   assert.ok(status.models[0].serviceTierIds.includes(status.selected.serviceTierId));
+  }
+ }finally{loaded.cleanup();}
+});
