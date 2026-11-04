@@ -3,6 +3,7 @@ import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
+import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStateRoot, resolvePrithaRoot, isPrithaCodeCheckout } from "../lib/paths.mjs";
 import { CHILD_AGENT_TYPES } from "../lib/child-agent-artifacts.mjs";
 import { readAgentKind, operationsApplicability } from "./agent-kind.mjs";
@@ -172,6 +173,36 @@ function isUncreatedDraft(group, context) {
   return targets.length > 0 && targets.every(Boolean) && new Set(targets).size === 1;
 }
 
+function isUncreatedFactory(group, context) {
+  // Accepted contracts normally require their existing project. A bound host
+  // factory explicitly records the narrower interval before scaffold. This
+  // explains attribution only: projectPath remains null and grants no access.
+  const contracts = group.artifacts.filter(item => item.type === "agent-contract");
+  if (!group.agentId || contracts.length !== 1) return false;
+  const contract = contracts[0];
+  if (contract.fm.status !== "accepted" || value(contract.fm.project_path) || bodyValue(safeText(contract.path, context.memoryRoot), "Project path")) return false;
+  const target = missingPlannedProject(contract.projectRef, context);
+  const slug = bodyValue(safeText(contract.path, context.memoryRoot), "Technical slug");
+  if (!target || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) return false;
+  let state;
+  try {
+    state = parseBoundedJson(safeText(path.join(context.memoryRoot, "voice-factory", slug, "session.json"), context.memoryRoot, 65536),
+      {maxBytes:65536,maxDepth:12,maxNodes:512});
+  } catch { return false; }
+  if (!state || typeof state !== "object" || Array.isArray(state) || typeof state.stateRoot !== "string" || !state.stateRoot) return false;
+  if (state.schema !== "pritha-voice-factory-v1" || state.slug !== slug || state.agentId !== group.agentId
+      || state.agentName !== contract.name || state.contract !== contract.path || state.target !== target
+      || canonical(state.stateRoot || "") !== canonical(context.stateRoot)
+      || !Number.isSafeInteger(state.revision) || state.revision < 1
+      || !/^chat_[A-Za-z0-9_]+$/.test(state.chatId || "") || !["claude","neuraldeep","openrouter","local"].includes(state.connectorId)
+      || !["contract-approved","outcome-draft","outcome-approved","research"].includes(state.phase)
+      || state.running || state.runId || state.scaffoldRevision
+      || state.contractApproval?.sha256 !== createHash("sha256").update(safeText(contract.path, context.memoryRoot)).digest("hex")) return false;
+  return group.artifacts.every(item => item.agentId === group.agentId && (item === contract
+    || item.type === "agent-outcome-spec" && item.contractPath === contract.path && item.path === state.outcome
+      && !item.projectRef && ["draft","approved"].includes(item.fm.status)));
+}
+
 function assemble(artifacts, folders, rows, context, diagnostics) {
   const groups = new Map();
   const contractGroups = new Map();
@@ -249,7 +280,7 @@ function assemble(artifacts, folders, rows, context, diagnostics) {
     if (paths.length > 1) group.diagnostics.push("conflicting-project-paths");
     else if (paths.length === 1) group.projectPath = paths[0];
     else if (selected.some(({ item }) => !logicalProjectRef(item.projectRef))) {
-      group.diagnostics.push(isUncreatedDraft(group, context) ? "project-planned-not-created" : "project-path-outside-or-missing");
+      group.diagnostics.push(isUncreatedDraft(group, context) || isUncreatedFactory(group, context) ? "project-planned-not-created" : "project-path-outside-or-missing");
     } else {
       const matching = folders.filter((folder) => group.aliases.includes(agentAlias(folder.name)));
       if (matching.length === 1) { group.projectPath = matching[0].path; group.diagnostics.push("legacy-folder-attribution"); }

@@ -3215,6 +3215,30 @@ unit child environment отдельно и изолировать оба aliases
   browser/rollback выполняются по неизменному кандидату перед lifecycle approval.
   Canonical instance пока остаётся на отдельно одобренной ee5987b.
 
+### Checkpoint 64 — planned identity после принятия factory Contract
+
+- Перед активацией preliminary candidate прошли 1553/1553 tests, 52 browser
+  cases, build и strict pages/chunks. Текущий operational check выявил ранее
+  не покрытый переход: принятый factory Contract без созданной target folder
+  превращался в identity conflict и делал agent-catalog check неуспешным.
+- Каталог распознаёт ограниченную стадию до scaffold только при host-bound
+  factory session: совпадают instance state, slug, agent identity, target,
+  Contract path и approved content hash. Нужны pre-scaffold phase и отсутствие
+  незавершённого effect, delivery run или scaffold revision. Project path
+  остаётся null; исполняемая workspace binding не предоставляется.
+- Accepted missing project без такого свидетельства, foreign/stale state,
+  unsafe target, symlink, scaffold/profile evidence и уже начатая delivery
+  сохраняют прежний conflict. Отдельные Contract/Outcome approvals не меняются.
+- Целевой identity suite: 48/48. Read-only сравнение с реальным main state
+  подтвердило тот же stable ID, planned-not-created для нового factory child
+  и побайтово те же catalog records остальных 22 агентов; каталог не создаёт
+  папку. Полный final gate и build повторяются для нового неизменного commit.
+- До установки исправления canonical ee5987b сохраняет этот известный
+  agent-catalog diagnostic. Пять страниц, chunks и task runtime отвечают.
+  Rollback сохраняет принятые документы и возвращает предыдущий код/сборку;
+  прежний diagnostic нельзя выдавать за operational pass. MacBook/GitHub
+  остаются нетронутыми. Good State: aligned.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

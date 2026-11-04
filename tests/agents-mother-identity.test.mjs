@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpath
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { agentInstanceKey, authoredAgentId, currentAgentMission, findCatalogAgent, readAgentCatalog } from "../scripts/agents-mother/identity.mjs";
 import { parseFrontmatterData } from "../scripts/lib/frontmatter.mjs";
@@ -185,6 +186,51 @@ function draftProposal(f, target, { extra = "", body = "", status = "draft" } = 
     `status: draft\ncontract_path: ${contract}\n`);
   return contract;
 }
+
+function boundFactoryProposal(f) {
+  const target=path.join(f.agentParent,"planned-factory"),slug="planned-factory",id="factory-identity";
+  const contract=f.write("contracts/factory.md","agent-contract",id,
+    "- Agent name: Planned Factory\n- Technical slug: "+slug+"\n- Primary mission: Count words\n- Target folder: "+target,"status: accepted\n");
+  const file=path.join(f.memoryRoot,"voice-factory",slug,"session.json");mkdirSync(path.dirname(file),{recursive:true});
+  const state={schema:"pritha-voice-factory-v1",slug,agentId:id,agentName:"Planned Factory",chatId:"chat_claude_fixture",connectorId:"claude",stateRoot:f.stateRoot,target,contract,phase:"contract-approved",revision:1,
+    contractApproval:{sha256:createHash("sha256").update(readFileSync(contract)).digest("hex"),operationId:"approved-contract",approvedAt:"2026-11-04T00:00:00Z"}};
+  writeFileSync(file,JSON.stringify(state));return {target,slug,id,contract,file,state};
+}
+
+test("a host-bound factory remains planned after Contract and Outcome approval without granting a workspace",t=>{
+  const f=fixture(t),p=boundFactoryProposal(f);
+  const initial=findCatalogAgent(f.catalog(),p.id);
+  assert.equal(initial.identityStatus,"identified");assert.equal(initial.projectPath,null);assert.deepEqual(initial.diagnostics,["project-planned-not-created"]);
+  assert.throws(()=>resolveProviderAgentWorkspace(f.options,initial.id),{code:"provider_agent_workspace_unavailable"});
+  const outcome=f.write("contracts/factory-outcome.md","agent-outcome-spec",p.id,"","status: draft\ncontract_path: "+p.contract+"\n");
+  for(const phase of ["outcome-draft","outcome-approved","research"]){
+    if(phase!=="outcome-draft")writeFileSync(outcome,readFileSync(outcome,"utf8").replace("status: draft","status: approved"));
+    writeFileSync(p.file,JSON.stringify({...p.state,outcome,phase,revision:2}));
+    const agent=findCatalogAgent(f.catalog(),p.id);assert.equal(agent.id,initial.id);assert.equal(agent.identityStatus,"identified");assert.equal(agent.projectPath,null);
+    assert.throws(()=>resolveProviderAgentWorkspace(f.options,agent.id),{code:"provider_agent_workspace_unavailable"});
+  }
+  assert.equal(existsSync(p.target),false);
+});
+
+test("missing-project conflicts survive stale, foreign, uncertain or completed factory evidence",t=>{
+  const f=fixture(t),p=boundFactoryProposal(f);
+  for(const change of [
+    {contractApproval:{sha256:"0".repeat(64)}},{stateRoot:path.dirname(f.stateRoot)},{stateRoot:7},
+    {phase:"scaffolded"},{scaffoldRevision:"scaffold-created"},{runId:"existing-build"},
+    {running:{action:"scaffold"}},{contract:p.contract+"-different"},{target:path.dirname(p.target)},
+  ]){
+    writeFileSync(p.file,JSON.stringify({...p.state,...change}));
+    const agent=findCatalogAgent(f.catalog(),p.id);assert.equal(agent.identityStatus,"conflict",JSON.stringify(change));assert.equal(agent.projectPath,null);
+  }
+  for(const invalid of ["null","[]","{"]){
+    writeFileSync(p.file,invalid);assert.equal(findCatalogAgent(f.catalog(),p.id).identityStatus,"conflict");
+  }
+  const regular=path.join(path.dirname(p.file),"regular.json");writeFileSync(regular,JSON.stringify(p.state));rmSync(p.file);symlinkSync(regular,p.file);
+  assert.equal(findCatalogAgent(f.catalog(),p.id).identityStatus,"conflict");
+  rmSync(p.file);writeFileSync(p.file,JSON.stringify(p.state));
+  f.write("reports/factory-scaffold.md","scaffold-report",p.id,"","status: created\n");
+  assert.equal(findCatalogAgent(f.catalog(),p.id).identityStatus,"conflict");
+});
 
 for (const name of ["pritha-line-counter-acceptance", "Techscope-tools"]) test(`an existing ${name} child requires its accepted instance-local contract`, t => {
   const f = fixture(t), project = f.folder(name), id = "prefixed-child";
