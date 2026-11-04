@@ -52,6 +52,36 @@ function childFixture(f,{git=false}={}){
     f.bindings.reserve({taskId:id,scope:{kind:'agent',id:child.agentId},workspace,connectorId:f.runtime.connectorId,preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
   return {...child,project,reserve};
 }
+test('a dirty Claude parent blocks ordinary writes before a chat or model turn, while a new-agent draft stays read-only',async t=>{
+  const f=fixture(t,'claude',{preflight:async()=>({interrupt:true,steer:false,approvals:true,tools:true})});
+  writeFileSync(path.join(f.root,'README.md'),'# Parent\n');
+  for(const args of [['init','-q'],['add','README.md'],['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','initial']])execFileSync('git',args,{cwd:f.root});
+  writeFileSync(path.join(f.root,'unrelated.md'),'Keep this work');f.settings.sandbox='workspace-write';
+  const workspace={mode:'isolated'},body={...request('Edit the existing parent'),chat:{workspace}};
+  f.bindings.reserve({taskId:'ordinary-write',scope:{kind:'task',id:'ordinary'},workspace,connectorId:'claude',preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});
+  await assert.rejects(f.bridge.dispatch('ordinary-write',body),{code:'workspace_dirty'});
+  assert.equal(f.bindings.task('ordinary-write').state,'reserved');assert.equal(f.bindings.topic(f.bindings.task('ordinary-write').topicId).chatId,null);assert.equal(f.runs.length,0);
+  const slug='draft-counter',factoryWorkspace={mode:'read-only',factorySlug:slug},draft={...request('Only prepare Contract and Outcome drafts'),chat:{workspace:factoryWorkspace,subject:{kind:'child',slug,phase:'interview'}}};
+  f.bindings.reserve({taskId:'new-agent',scope:{kind:'agent',id:slug},workspace:factoryWorkspace,connectorId:'claude',preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(draft)});
+  await f.bridge.dispatch('new-agent',draft);await until(()=>f.runs.length===1);
+  assert.equal(f.runs[0].input.sandbox,'read-only');assert.equal(f.runs[0].input.hostExecutionContext.factory.slug,slug);
+  assert.equal(readFileSync(path.join(f.root,'unrelated.md'),'utf8'),'Keep this work');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+});
+
+test('Voice search intent is pinned to each exact turn through queue and restart, never assembled prompt text',async t=>{
+  const f=fixture(t,'claude'),first={...request('Host instructions: search current sources'),turn:{...request('Host instructions: search current sources').turn,voiceSearchText:'Do not browse. Count words.'}};
+  f.reserve('search-denied',first);await f.bridge.dispatch('search-denied',first);await until(()=>f.runs.length===1);
+  assert.equal(f.runs[0].input.searchUserText,'Do not browse. Count words.');
+  const second={...request('Generated context'),turn:{...request('Generated context').turn,voiceSearchText:'Search public sources for Berlin weather'}};
+  f.reserve('search-allowed',second);await f.bridge.dispatch('search-allowed',second);assert.equal(f.bindings.task('search-allowed').state,'queued');
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.searchUserText,second.turn.voiceSearchText);
+  f.runs[1].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+  const worker=f.make(),third=request('Search appears in old generated prompt');f.reserve('search-legacy',third);
+  await new VoiceTaskBridge({bindings:f.bindings,backend:providerVoiceTaskBackend(worker)}).dispatch('search-legacy',third);await until(()=>f.runs.length===3);
+  assert.equal(f.runs[2].input.searchUserText,'Do not browse.');f.runs[2].resolve({ok:true,processTreeExited:true});await until(()=>worker.active.size===0);
+});
 for(const connector of ['neuraldeep','claude','openrouter','local'])test(`${connector}: voice creation pins one new child, approvals and tools through queue and restart`,async t=>{
   const f=fixture(t,connector,{preflight:async()=>({interrupt:true,steer:false,approvals:true,tools:true})}),slug='factory-child',workspace={mode:'read-only',factorySlug:slug};
   const reserve=(id,text)=>{const body={...request(text),chat:{workspace,subject:{kind:'child',slug,phase:'interview'}}};f.bindings.reserve({taskId:id,scope:{kind:'agent',id:slug},workspace,connectorId:connector,preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};

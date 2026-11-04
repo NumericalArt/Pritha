@@ -370,6 +370,7 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
           task_type: {
             type: "string",
             enum: ["analysis", "research", "implementation", "review", "agent_creation", "system_change"],
+            description: "Use agent_creation for an explicitly requested new standalone agent/project, including a headless CLI with Contract and Outcome Spec; pair with subject_kind=agent and its exact folder slug. implementation edits an existing project. Preparing draft artifacts does not approve them or authorize a build.",
           },
           write_mode: {
             type: "string",
@@ -388,7 +389,7 @@ export function buildPrithaRealtimeTools(options: RealtimeSessionBuildOptions = 
           subject_kind: {
             type: "string",
             enum: ["agent", "pritha", "task", "control"],
-            description: "Stable Codex App thread subject kind. Use agent when the task is about a child agent, pritha for Pritha subsystem work, task for one-off work.",
+            description: "Stable task subject kind. Use agent for a new or existing child agent (including headless CLI projects), pritha for Pritha subsystem work, task for one-off work. A new agent also requires task_type=agent_creation; subject context alone grants no factory authority.",
           },
           subject_id: {
             type: "string",

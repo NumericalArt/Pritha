@@ -20,6 +20,7 @@ import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
 import {ClaudeImageAttachments,assertNoClaudeImageInputs,CLAUDE_IMAGE_LIMITS} from './claude/image-attachments.mjs';
 import {nativeClaudeAuthPaths,probeClaudeNativeAuth,nativeClaudeEnvironment,nativeClaudeSandboxRoots} from './claude/native-auth.mjs';
 import {listenClaudeNativeTunnel} from './claude/native-tunnel.mjs';
+import {createSearchHost} from './search/host.mjs';
 
 const fail=code=>Object.assign(new Error('The configured Claude runtime could not complete this task safely.'),{code});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -79,12 +80,12 @@ export async function startClaudeCodeRun(options,dependencies={}){
   const localToken=randomBytes(32).toString('base64url');
   const budgetId=options.budgetId || randomUUID();
   if(options.tokenBudget!==undefined && !CLAUDE_SESSION_ID.test(budgetId))throw fail('provider_budget_invalid');
-  let proxy,owned,timer,verifiedExit=false,closed=false,stopReason=null,sandboxPlan,hostTools,toolServer,budget=null;
+  let proxy,owned,timer,verifiedExit=false,closed=false,stopReason=null,sandboxPlan,hostTools,toolServer,searchHost,budget=null;
   const controller=new AbortController(),trees=new Map();
   const proof=()=>({kind:'provider-process-set',version:1,trees:[...trees].map(([id,evidence])=>({id,evidence}))});
   const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
   const stop=reason=>{stopReason ||= reason;controller.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
-  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();return result?.processTreeExited!==false;};
+  const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();await searchHost?.close();return result?.processTreeExited!==false;};
   const events=new ClaudeStreamState({model:options.model,sessionId,authMode,onEvent:async event=>{
     if(event.type==='thread.started')atomicWriteFile(proofFile,JSON.stringify({version:1,identity,sessionId,model:options.model,cliVersion:cli.version,observedInit:true})+'\n');
     // The journal holds the same visible records as the UI, not private thinking.
@@ -101,7 +102,8 @@ export async function startClaudeCodeRun(options,dependencies={}){
     }
     let mcpConfigPath,allowedTools=[];
     if(options.hostExecutionContext){
-      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'claude',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments});
+      searchHost=options.allowSearch===false?undefined:createSearchHost({root,stateRoot,connectorId:'claude',chatId:options.hostExecutionContext.chatId,turnId:options.hostExecutionContext.turnId,signal:controller.signal,text:options.searchUserText || '',environment:options.env || process.env,check:()=>options.hostExecutionContext.lease.assertOwned(),service:dependencies.searchService});
+      hostTools=new ProviderHostTools({...options.hostExecutionContext,root,cwd,stateRoot,privateRoot,connectorId:'claude',sandbox:options.sandbox,signal:controller.signal,approve:options.approve,onProcessEvidence:recordTree,attachments:options.hostAttachments,search:searchHost});
       toolServer=await listenProviderToolServer({hostTools});
       mcpConfigPath=path.join(temporary,'mcp.json');
       atomicWriteFile(mcpConfigPath,JSON.stringify({mcpServers:{pritha:{type:'http',url:toolServer.url,headers:{Authorization:'Bearer '+toolServer.token}}}})+'\n');

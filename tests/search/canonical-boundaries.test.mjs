@@ -25,19 +25,21 @@ test('private queries, offline contexts and original user denials fail before an
   assert.equal(f.calls(),0);
   const voice=fixture(t,{PRITHA_VOICE_OFFLINE:'1'});assert.equal((await voice.service.search({query:'x'},{...context,surface:'voice'})).error.code,'search_offline');assert.equal(voice.calls(),0);
 });
-test('host Requested mode trusts original user intent and never model arguments',async t=>{
+for(const connectorId of ['neuraldeep','claude'])test(`${connectorId}: host Requested mode trusts original user intent and never model arguments`,async t=>{
   const f=fixture(t);f.service.configure({mode:'requested'},1);
-  const host=createSearchHost({connectorId:'neuraldeep',chatId:'chat1',turnId:'turn1',text:'Explain this',service:f.service});
+  const host=createSearchHost({connectorId,chatId:'chat1',turnId:'turn1',text:'Explain this',service:f.service});
   assert.equal((await host.call('web_search',{query:'public',explicit:true})).isError,true);
   assert.equal(f.calls(),0);await host.close();
-  const explicit=createSearchHost({connectorId:'neuraldeep',chatId:'chat1',turnId:'turn2',text:'Найди актуальную документацию',service:f.service});
+  const explicit=createSearchHost({connectorId,chatId:'chat1',turnId:'turn2',text:'Найди актуальную документацию',service:f.service});
   assert.equal((await explicit.call('web_search',{query:'public'})).isError,false);await explicit.close();
   assert.throws(()=>createSearchHost({connectorId:'openrouter'}),{code:'search_provider_mismatch'});
+  const denied=createSearchHost({connectorId,chatId:'chat1',turnId:'turn3',text:'Do not browse. Search public sources.',service:f.service});
+  assert.equal((await denied.call('web_search',{query:'public'})).isError,true);assert.equal(f.calls(),1);await denied.close();
 });
-test('closing a task aborts an uncooperative search and cannot publish a late result',async t=>{
+for(const connectorId of ['neuraldeep','claude'])test(`${connectorId}: closing a task aborts an uncooperative search and cannot publish a late result`,async t=>{
   const f=fixture(t);let release,started;const ready=new Promise(resolve=>started=resolve);
   f.provider.search=()=>new Promise(resolve=>{release=resolve;started();});
-  const host=createSearchHost({connectorId:'neuraldeep',chatId:'chat1',turnId:'turn1',service:f.service});
+  const host=createSearchHost({connectorId,chatId:'chat1',turnId:'turn1',service:f.service});
   const pending=host.call('web_search',{query:'public'});const rejected=assert.rejects(pending,{code:'operator_cancel'});
   await ready;await host.close();await rejected;release({items:[{url:'https://example.com',content:'LATE_SECRET_CANARY'}]});
   assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM sources').get().n,0);

@@ -246,7 +246,10 @@ export class ProviderTaskRuntime {
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
-        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact new child. Begin with a complete brief and an explicit build token budget. Obtain separate Contract and Outcome approvals, complete canonical research, then scaffold, deliver and verify. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),searchUserText:binding.origin==='voice'?'':text,
+        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact new child. Begin with a complete brief and an explicit build token budget. Obtain separate Contract and Outcome approvals, complete canonical research, then scaffold, deliver and verify. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
+        // The host pins the Voice search intent in this turn's hashed request,
+        // including queued/resumed delivery. Never infer it from an assembled prompt.
+        searchUserText:binding.origin==='voice'?(typeof attachments.input.voiceSearchText==='string'?attachments.input.voiceSearchText.slice(0,16000):'Do not browse.'):text,
         ...(binding.subject?{factorySubject:binding.subject}:{}),
         images:delivery.images || [],...(delivery.attachmentManifest?{attachmentManifest:delivery.attachmentManifest}:{}),signal:active.controller.signal,
         ...(delivery.hostAttachments?{hostAttachments:delivery.hostAttachments}:{}),

@@ -7,6 +7,9 @@ import path from 'node:path';
 import { startClaudeCodeRun,buildClaudeExecArgs } from '../scripts/claude-code-runner.mjs';
 import { probeClaudeCli } from '../scripts/claude/cli-probe.mjs';
 import {nativeClaudeAuthPaths} from '../scripts/claude/native-auth.mjs';
+import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
+import {SearchService} from '../scripts/search/service.mjs';
+import {SearchStore} from '../scripts/search/store.mjs';
 const model='claude-sonnet-5-5';
 function fixture(t){const root=mkdtempSync(path.join(os.tmpdir(),'pritha-claude-run-'));for(const name of ['code','state'])mkdirSync(path.join(root,name));t.after(()=>rmSync(root,{recursive:true,force:true}));return {root:path.join(root,'code'),cwd:path.join(root,'code'),stateRoot:path.join(root,'state'),privateRoot:path.join(root,'state','private','claude'),model,prompt:'Fixture prompt',timeoutMs:10000,claudeBin:process.execPath};}
 function dependencies(capture,{wait=false,exited=true,wrongModel=false}={}){
@@ -63,6 +66,38 @@ test('file dispatch rechecks the installed Claude version after a cached capabil
   const options=fixture(t),capture={};
   await assert.rejects(startClaudeCodeRun({...options,hostAttachments:{},hostExecutionContext:{}},{...dependencies(capture),probeCli:async()=>({available:true,version:'2.1.297'})}),{code:'provider_attachments_unverified'});
   assert.equal(capture.command,undefined);assert.equal(existsSync(path.join(options.privateRoot,'profiles')),false);
+});
+
+for(const [label,text,allowSearch,expectedCalls] of [['requested','Search public sources',true,1],['denied','Do not browse. Search public sources.',true,0],['disabled','Search public sources',false,0]])test(`Claude MCP search: ${label} intent uses bounded host tools without command network or credentials`,async t=>{
+  const options=fixture(t),capture={},coordinator=new ExecutionCoordinator({stateRoot:options.stateRoot}),lease=coordinator.claim(['fixture'],'search-fixture',{kind:'turn',detail:{chatId:'chat_search',connectorId:'claude'}});
+  const store=new SearchStore({databasePath:':memory:'});let calls=0;
+  const service=new SearchService({store,environment:{},providers:{neuraldeep:{search:async()=>{calls++;return {items:[{url:'https://example.com/source',title:'Public source',content:'Bounded evidence'}]};}}},verifyUrl:async value=>value});
+  service.configure({mode:'requested'},1);
+  t.after(()=>{lease.release();coordinator.close();store.close();});
+  const deps={...dependencies(capture),searchService:service},spawn=deps.spawnSupervised;
+  let endpoint,headers;
+  deps.spawnSupervised=async(command,args,spawnOptions)=>{
+    const config=JSON.parse(readFileSync(args[args.indexOf('--mcp-config')+1],'utf8')).mcpServers.pritha;
+    endpoint=config.url;headers={...config.headers,'Content-Type':'application/json'};
+    const post=async(id,method,params)=>(await fetch(endpoint,{method:'POST',headers,body:JSON.stringify({jsonrpc:'2.0',id,method,params})})).json();
+    const listing=await post(1,'tools/list');
+    assert.equal(listing.result.tools.some(row=>row.name==='web_search'),allowSearch);
+    assert.equal(listing.result.tools.some(row=>row.name==='read_page'),allowSearch);
+    assert.match(listing.result.tools.find(row=>row.name==='run_command').description,/no network/);
+    assert.doesNotMatch(JSON.stringify(listing),/REAL_KEY_CANARY/);
+    const response=await post(2,'tools/call',{name:'web_search',arguments:{query:'public documentation'}});
+    if(!allowSearch)assert.equal(response.error.code,-32602);
+    else assert.equal(response.result.isError,expectedCalls===0);
+    if(expectedCalls){
+      const result=JSON.parse(response.result.content[0].text);assert.equal(result.ok,true);assert.equal(result.sources[0].url,'https://example.com/source');
+      const privateQuery=await post(3,'tools/call',{name:'web_search',arguments:{query:'inspect /Users/fixture/private'}});
+      assert.equal(privateQuery.result.isError,true);
+    }
+    return spawn(command,args,spawnOptions);
+  };
+  const result=await(await startClaudeCodeRun({...options,allowSearch,searchUserText:text,hostExecutionContext:{coordinator,lease,chatId:'chat_search',turnId:'turn_search'},sandbox:'read-only'},deps)).completion;
+  assert.equal(result.ok,true);assert.equal(calls,expectedCalls);
+  await assert.rejects(fetch(endpoint,{method:'POST',headers,body:'{}'}));
 });
 
 test('budget refusal survives a stock CLI synthetic error and persists measured usage without another model request',async t=>{

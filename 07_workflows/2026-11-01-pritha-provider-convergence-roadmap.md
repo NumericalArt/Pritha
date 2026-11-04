@@ -3,7 +3,7 @@ id: pritha-provider-convergence-roadmap-2026-11-01
 type: workflow
 status: in-progress
 created: 2026-11-01
-updated: 2026-11-03
+updated: 2026-11-04
 topics:
   - provider-convergence
   - task-chat
@@ -3097,12 +3097,47 @@ unit child environment отдельно и изолировать оба aliases
    Старый default сохраняется при отказе; сохранение preset и активация разделены.
 4. [x] Новые Voice task/intake берут зафиксированный default в момент dispatch;
    старые task bindings и аудиопротокол сохраняются. Local offline не ослабляется.
-5. [ ] Отрицательные и конкурентные regression-тесты, browser desktop/mobile,
+5. [x] Отрицательные и конкурентные regression-тесты, browser desktop/mobile,
    проверка самостоятельного Task Chat override; затем общий gate/build/typecheck.
-6. [ ] Подготовить exact candidate и откат к 73aafb5. Только после отдельного
+6. [x] Подготовить exact candidate и откат к 73aafb5. Только после отдельного
    непосредственного approval — managed update и strict pages/chunks/admission.
 7. [ ] Вернуться к реальному Voice → Claude UI factory пилоту с отдельными
    Contract/Outcome/budget approvals и завершить оставшуюся ручную приёмку.
+
+### Checkpoint 61 — установленный общий default и диагностика Voice → Claude
+
+- По отдельному указанию пользователя установлен `f9e92ed`; managed transaction,
+  strict/operational health, task admission, пять страниц и 12 JS chunks прошли.
+  Предыдущая `73aafb5` сохранена для отката; девять посторонних файлов не менялись.
+  Memory retrieval прошёл без регрессий и private leaks. GitHub и MacBook не менялись.
+- Живая попытка Voice → Claude выявила неверный тип handoff: новый headless CLI
+  попал в `implementation` исходного проекта вместо `agent_creation` отдельного
+  агента. Dirty-workspace gate остановил его до создания чата и model turn.
+  Это не отказ Claude и не повод коммитить либо удалять посторонние файлы.
+- Маршрутизация нового агента явно описана в Voice tool schema и instructions:
+  `agent_creation` + `subject_kind=agent` + exact slug. Подтверждение brief
+  разрешает подготовить drafts, но не заменяет отдельные Contract, Outcome Spec
+  и budget approvals. Существующая read-only parent boundary и factory tools
+  сохранены; свободный текст сам по себе не повышает права.
+- Диагностика сохраняет typed pre-dispatch error и показывает причину остановки
+  вместе с 0% до dispatch. Старая карточка не переписывается в другую задачу и
+  не запускается повторно при polling. Native full-access policy больше не
+  описывает bounded external execution; write/consequential-action gates остаются.
+- Claude не имел host `web_search`/`read_page`, поэтому ответ об отсутствии
+  погодных данных не был web acceptance. Инструменты подключены к существующему
+  SearchService: выбранный search backend, budgets, Requested/Off, privacy/SSRF,
+  cancellation и запрет сети у `run_command` сохраняются. У каждой Voice-задачи
+  отдельное закреплённое разрешение поиска; отсутствие `requires_internet=true`
+  и явное «без сети» запрещают поиск. Local/OpenRouter не получают новых tools.
+- Regression-проверки воспроизводят dirty-parent failure и успешный read-only
+  factory draft, проверяют отдельные approvals, нулевой pre-dispatch progress,
+  MCP search, отрицательные privacy/offline cases, queue и restart. Полный gate,
+  staged build/browser/rollback и отдельное lifecycle approval относятся к
+  следующему кандидату; его установка и живая web-приёмка пока не заявлены.
+- Реальный Voice → Claude factory pilot, separate artifact/budget approvals,
+  независимые Trials и оставшаяся операторская audio-приёмка остаются открыты.
+  Старый принятый Line Counter pilot не подменяет этот UI journey. Good State:
+  **aligned** — сохранены история, pinning, границы записи и release workflow.
 
 ## 7. Полные исходные материалы
 

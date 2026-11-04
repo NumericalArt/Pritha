@@ -91,6 +91,14 @@ test('a write task retains the existing UI approval gate and does not dispatch a
   assert.equal(result.status, 'decision_required'); assert.equal(result.mode, 'approval'); assert.deepEqual(f.calls, []);
   assert.deepEqual(f.reservations[0].workspace, { mode: 'isolated' });
 });
+test('Voice pins original task search permission outside the assembled executor prompt',async t=>{
+  for(const requires_internet of [true,false]){
+    const f=fixture(t,{connector:'claude'}),result=await f.run({task:'Find the weather for Berlin.',task_type:'research',requires_internet});
+    assert.equal(result.ok,true);
+    const stored=await f.json(path.join(f.privateRoot,'codex-tasks',result.task_id,'request.json'));
+    assert.equal(stored.task_chat_request.turn.voiceSearchText,(requires_internet?'Search public sources for this operator task:\n':'Do not browse.\n')+'Find the weather for Berlin.');
+  }
+});
 test('handoff and preparation failures make no task directory and never start a native fallback', async t => {
   for (const options of [{ handoff: { ok: false, error: 'confirmation_required' } }, { preparationError: 'provider_model_invalid' }]) {
     const f = fixture(t, options), result = await f.run({ task: 'Inspect fixture' });

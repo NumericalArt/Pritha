@@ -10,7 +10,7 @@ export const SEARCH_HOST_TOOL_DEFINITIONS=[
 /** A task owns its fixed surface, original intent, budget and cancellation.
  * Model arguments cannot choose another owner, credential or privacy mode. */
 export function createSearchHost({root,stateRoot,connectorId,chatId,turnId,signal,text='',environment=process.env,check=()=>{},service:provided}){
-  if(connectorId!=='neuraldeep')throw Object.assign(new Error('Search provider is unavailable for this task.'),{code:'search_provider_mismatch'});
+  if(!['neuraldeep','claude'].includes(connectorId))throw Object.assign(new Error('Search provider is unavailable for this task.'),{code:'search_provider_mismatch'});
   const service=provided || new SearchService({codeRoot:root,stateRoot,environment});
   const controller=new AbortController(),combined=signal?AbortSignal.any([signal,controller.signal]):controller.signal;
   const context={surface:'task_chat',owner:chatId,turn:turnId,connectorId,signal:combined,...searchIntent(text)};
