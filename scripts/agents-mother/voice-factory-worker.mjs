@@ -7,7 +7,7 @@ import {parseFrontmatterData} from '../lib/frontmatter.mjs';
 import {redactSensitiveText} from '../lib/redaction.mjs';
 import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable} from './voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal} from './voice-factory-state.mjs';
 
 const executors={neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
 function draftMetadata(text,previous){
@@ -49,14 +49,17 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
   switch(input.action){
     case 'init':{
       if(state.contract || fs.existsSync(p.target))throw factoryFail('factory_target_exists');
-      if(!Number.isSafeInteger(input.build_token_budget) || input.build_token_budget<1 || input.build_token_budget>10000000)throw factoryFail('factory_budget_required');
+      validateFactoryBudgetProposal(input);
       const brief=normalizeInterviewBrief(input.brief);if(brief.identity.slug && brief.identity.slug!==p.slug)throw factoryFail('factory_subject_changed');
       brief.identity.slug=p.slug;brief.technical.targetFolder=p.target;
       const issues=validateInterviewBrief(brief,{requireComplete:true});if(issues.length)throw validationFailure(issues);
       // Recheck at the effect boundary; chat creation alone cannot reserve a path.
       assertFactoryTargetAvailable(p);
       const briefFile=path.join(p.directory,'brief.json');atomicWriteFile(briefFile,JSON.stringify(brief));
-      const result=await interview({'from-brief':briefFile,'contract-only':true,'no-input':true,'build-executor':executor,'build-token-budget':String(input.build_token_budget),'build-git-mode':'disposable-worktree',autostart:'disabled','target-folder':p.target,slug:p.slug});
+      const result=await interview({'from-brief':briefFile,'contract-only':true,'no-input':true,'build-executor':executor,'build-token-budget':String(input.build_token_budget),
+        ...(input.build_iteration_budget!==undefined?{'build-iterations':String(input.build_iteration_budget),'repeated-failure-threshold':String(Math.max(2,Math.min(3,input.build_iteration_budget)))}:{}),
+        ...(input.build_elapsed_budget_ms!==undefined?{'build-elapsed-ms':String(input.build_elapsed_budget_ms)}:{}),
+        'build-git-mode':'disposable-worktree',autostart:'disabled','target-folder':p.target,slug:p.slug});
       state.contract=result.contractPath;const data=contractData(state.contract,{root:p.root});state.agentId=data.agentId;state.agentName=data.agentName;state.phase='contract-draft';
       value={artifact:'contract',sha256:factoryArtifact(p,state,'contract').sha256,next:'Read and refine the contract; request separate approve_contract with its exact hash.'};break;
     }

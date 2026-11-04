@@ -8,7 +8,7 @@ import {resolvePrithaPython} from './python-runtime.mjs';
 import {spawnSupervisedCli} from '../neuraldeep/process-supervisor.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief,INTERVIEW_BRIEF_TEXT_FIELDS} from '../agents-mother/interview-brief.mjs';
 import {RUNTIME_FAMILIES,SERVICE_MODES} from '../agents-mother/contract.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals} from '../agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal} from '../agents-mother/voice-factory-state.mjs';
 
 const actions=['status','read_artifact','init','write_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_apply','scaffold_plan','scaffold','deliver','delivery_status','delivery_resume','verify','finish'];
 const readonly=new Set(['status','read_artifact']);
@@ -38,8 +38,12 @@ const briefSchema={type:'object',properties:{
 briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMILIES];
 briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
 export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound new child. Start with init and a complete product brief. Read and revise private draft contract/outcome artifacts, then request their TWO separate approvals. Research and scaffold use canonical gates; deliver/verify use the pinned provider and protected Trials. No push, deploy, services, credential provisioning or final user acceptance. status/read_artifact are read-only. Every other step requires an exact host approval. Never infer approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
-const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources'],research_apply:['selection'],delivery_resume:['answer']};
+const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources'],research_apply:['selection'],delivery_resume:['answer']};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
+Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
+  build_iteration_budget:{type:'integer',minimum:1,maximum:100,description:'Proposed build iterations from the operator brief; init does not approve this budget.'},
+  build_elapsed_budget_ms:{type:'integer',minimum:60000,maximum:86400000,description:'Proposed build time from delivery start, excluding interview/approval waiting. init does not approve this budget.'},
+});
 export class ProviderFactoryTools {
   constructor(host){this.host=host;this.options=host.options;this.paths=voiceFactoryPaths({...this.options,...this.options.factory});if(this.options.factory.target!==this.paths.target)throw factoryFail('factory_binding_changed');}
   state(){return loadVoiceFactory(this.paths,this.options);}
@@ -61,7 +65,7 @@ export class ProviderFactoryTools {
     if(state?.running)throw factoryFail('factory_step_unconfirmed');
     if(input.action==='init' ? Boolean(state?.contract) || fs.existsSync(p.target) : !state)throw factoryFail(input.action==='init'?'factory_target_exists':'factory_not_started');
     if(input.action==='init'){
-      if(!Number.isSafeInteger(input.build_token_budget) || input.build_token_budget<1 || input.build_token_budget>10000000)throw factoryFail('factory_budget_required');
+      validateFactoryBudgetProposal(input);
       const brief=normalizeFactoryBrief(input.brief);
       if(brief.technical.runtimeFamily!==undefined && !RUNTIME_FAMILIES.has(brief.technical.runtimeFamily))throw factoryFail('factory_runtime_family_invalid');
       if(brief.technical.serviceMode!==undefined && !SERVICE_MODES.has(brief.technical.serviceMode))throw factoryFail('factory_service_mode_invalid');
@@ -80,7 +84,7 @@ export class ProviderFactoryTools {
     const review=reviewKind?factoryArtifact(p,state,reviewKind):null;
     const presentation=review?{path:reviewKind+' · '+p.slug,beforeSha256:review.sha256,proposedContent:review.text,approvalScope:reviewKind+' only'}
       :{command:['Pritha factory',input.action,p.slug],cwdLabel:'Bound child and instance-private factory artifacts',provider:this.options.connectorId,model:this.options.factory.model,...(this.options.connectorId==='claude' && input.action.startsWith('deliver')?{buildAuthentication:'separate Anthropic API key; host-reserved budget'}:{}),network:['research','research_collect'].includes(input.action)?this.options.connectorId==='local'?'disabled':'bounded primary-source research':input.action.startsWith('deliver')?'pinned build provider only':'disabled',
-        ...(input.action==='init'?{brief:input.brief,proposedBuildTokenBudget:input.build_token_budget}:{}),...(input.action==='write_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,proposedContent:input.content}:{}),...(input.sources?{sources:input.sources}:{}),...(input.selection?{selection:input.selection}:{}),...(input.answer?{answer:input.answer}:{})};
+        ...(input.action==='init'?{brief:input.brief,proposedBuildTokenBudget:input.build_token_budget,...(input.build_iteration_budget!==undefined?{proposedBuildIterationBudget:input.build_iteration_budget}:{}),...(input.build_elapsed_budget_ms!==undefined?{proposedBuildElapsedBudgetMs:input.build_elapsed_budget_ms}:{})}:{}),...(input.action==='write_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,proposedContent:input.content}:{}),...(input.sources?{sources:input.sources}:{}),...(input.selection?{selection:input.selection}:{}),...(input.answer?{answer:input.answer}:{})};
     if(Buffer.byteLength(JSON.stringify(presentation))>60000)throw factoryFail('factory_review_too_large');
     return {kind:review?'file_change_approval':'command_approval',presentation,perform:()=>this.execute(input,state)};
   }

@@ -10,6 +10,12 @@ import {contractData} from './contract.mjs';
 
 export const factoryHash=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 export const factoryFail=code=>Object.assign(new Error('Review the bound factory step and its saved evidence.'),{code});
+export function validateFactoryBudgetProposal(input){
+  if(!Number.isSafeInteger(input.build_token_budget) || input.build_token_budget<1 || input.build_token_budget>10000000)throw factoryFail('factory_budget_required');
+  for(const [field,min,max] of [['build_iteration_budget',1,100],['build_elapsed_budget_ms',60000,86400000]]){
+    if(input[field]!==undefined && (!Number.isSafeInteger(input[field]) || input[field]<min || input[field]>max))throw factoryFail('factory_budget_invalid');
+  }
+}
 export function voiceFactoryPaths(options){
   const subject=normalizeChatSubject({kind:'child',slug:options.slug,phase:'interview'});
   const root=fs.realpathSync(options.root),stateRoot=fs.realpathSync(options.stateRoot),parent=fs.realpathSync(resolvePrithaAgentParent({...options,root}));
