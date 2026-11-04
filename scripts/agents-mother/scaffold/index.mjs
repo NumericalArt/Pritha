@@ -16,7 +16,8 @@ import { verifyRepositoryResearchIntegrity } from "../github-research.mjs";
 import { selectSkillsForContract, skillPolicyFor, skillRowForManifest } from "../skills.mjs";
 import { newestArtifactPathsFirst } from "../artifact-selection.mjs";
 import { writeLifecycleReport } from "../lifecycle-report.mjs";
-import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "../outcome-spec.mjs";
+import { latestOutcomeSpecForContract, verifyOutcomeApproval, outcomeSpecFile } from "../outcome-spec.mjs";
+import { preparedTrialInputFiles } from "../prepared-trial-inputs.mjs";
 import { assertScaffoldCapability, scaffoldCapability } from "./capabilities.mjs";
 import { withChildTests } from "./tests.mjs";
 import { selectedScaffoldModules } from "./modules.mjs";
@@ -1569,6 +1570,13 @@ export function scaffoldContract(contractPath, options = {}) {
     ...(research.status !== "found" && options["allow-missing-research"] ? ["allow-missing-research"] : []),
     ...(!researchGate.ok && options["allow-pending-external-verification"] ? ["allow-pending-external-verification"] : []),
   ];
+  let preparedInputs = [];
+  if (options.preparedTrialInputRoot) {
+    if (!outcome?.approvalValid) throw new Error("Prepared Trial inputs require the independently approved Outcome Spec");
+    const checked = outcomeSpecFile(outcome.path, { root: ROOT });
+    if (!checked.ok) throw new Error("Prepared Trial inputs require a valid Outcome Spec");
+    preparedInputs = preparedTrialInputFiles({ trials: checked.parsed.trials }, options.preparedTrialInputRoot);
+  }
   const requestedTargetPath = resolveTargetPath(data, options);
   const targetPath = ensureWritableTarget(requestedTargetPath);
   ensureDirs();
@@ -1579,12 +1587,13 @@ export function scaffoldContract(contractPath, options = {}) {
     : (path.relative(ROOT, targetPath) || ".");
 
   const createdFiles = [];
-  for (const file of generatedAgentFiles(data, {
+  const files = generatedAgentFiles(data, {
     research,
     experimental: experimentalOverrides.length > 0,
     voiceCopyTarget,
     outcome,
-  })) {
+  });
+  for (const file of [...files, ...preparedInputs]) {
     createdFiles.push(writeProjectFile(targetPath, file.path, file.content));
   }
 

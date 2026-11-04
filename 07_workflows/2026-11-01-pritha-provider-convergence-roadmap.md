@@ -3178,11 +3178,42 @@ unit child environment отдельно и изолировать оба aliases
   init: через тот же Claude-чат и обычный host approval создан только private
   draft Contract. Identity и отдельные approvals сохранены; target project, код
   и службы не создавались. Это assisted recovery, а не доказательство полного
-  успешного Voice journey. Contract уточнён в отдельной review proposal; его
-  принятие, Outcome Spec и build budget ещё требуют согласования.
+  успешного Voice journey. Уточнённая редакция Contract отдельно одобрена
+  оператором и применена через тот же Claude-чат: 40000 build tokens, 2 итерации
+  и 30 минут от delivery start. Outcome Spec имеет собственное согласование;
+  принятие Contract не подменяет его и не запускает scaffold.
 - Полный gate и staged verification нового кандидата выполняются перед отдельным
   lifecycle approval. Изменения остаются в изолированном checkout; GitHub и MacBook
   не менялись. Good State alignment: **aligned**.
+
+### Checkpoint 63 — редактирование Outcome и подготовленные независимые Trials
+
+- Проверка следующего перехода выявила две самостоятельные ошибки: scanner
+  принимал канонические Then exit code, Session и разделители verifier
+  declaration за чувствительные значения; approval независимых Trial inputs
+  требовал ещё не созданный target, тогда как factory scaffold ждал Outcome.
+- Factory scan нормализует только ограниченную каноническую grammar на время
+  проверки; значения и остальные поля продолжают проходить общий redaction.
+  Проверки с credential assignment и нечисловым exit code остаются закрыты.
+- Host может подготовить только reviewed verification/ inputs в приватном
+  factory state. Outcome проверяет их до создания child; scaffold повторно
+  проверяет declared hashes, запрещает symlinks и включает только эти файлы
+  в первый чистый Git baseline. Редактирование verifier build-исполнителем
+  по-прежнему запрещено, approval не создаётся при отсутствующих inputs.
+- Реальные MCP/worker и scaffold/Git tests покрывают этот порядок, неизменность
+  принятых артефактов, отказ на изменённом hash и symlink. Research gates
+  production не ослаблены; test-only research overrides остаются явными.
+- Для Word Counter подготовлены исходные 24 независимых case и 7 дополнительных:
+  UTF-8 errors, имена с пробелами, inert input, большой streaming input,
+  dependency-free deliverables. Verifier calibration с отдельным синтетическим
+  reference принимает правильный результат и отвергает constant-zero и
+  молчаливую замену malformed UTF-8. Это подготовка критерия, не реализация
+  пилота и не пользовательская приёмка.
+- Полный прогон preliminary candidate прерван после зависания IPC fixture:
+  слишком длинный TMPDIR из private test harness. Owned process tree завершён;
+  короткий TMPDIR прошёл целевой control-channel suite. Финальный gate/build/
+  browser/rollback выполняются по неизменному кандидату перед lifecycle approval.
+  Canonical instance пока остаётся на отдельно одобренной ee5987b.
 
 ## 7. Полные исходные материалы
 

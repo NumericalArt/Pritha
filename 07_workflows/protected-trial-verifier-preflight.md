@@ -92,6 +92,15 @@ declarations остаются project-relative. Пределы: 64 declarations 
 argv entrypoints и fixture остаются защищёнными, пока новая approved revision
 явно не разделит их назначение.
 
+Provider factory может подготовить inputs до создания child: host кладёт
+reviewed файлы в {state-root}/agents/voice-factory/{slug}/trial-inputs/verification/.
+Этот путь задаёт host, модель не выбирает исходную директорию. Отдельный Outcome
+approval проверяет declarations и hashes в этом приватном каталоге. После
+обычных Contract/Outcome/research gates scaffold повторяет проверку и включает
+только явно хешированные файлы verification/ в первый чистый Git baseline.
+Наличие подготовленного каталога само по себе не разрешает scaffold, запуск
+verifier, сборку, изменение budgets или принятие результата.
+
 ## Исключение для ручной оценки
 
 Используется существующее поле `automated_trial_waiver`, без второго policy:

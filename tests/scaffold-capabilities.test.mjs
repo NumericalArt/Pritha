@@ -93,3 +93,38 @@ test("CLI scaffold completes structural checks and a local Git baseline without 
   assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: f.target, encoding: "utf8" }), "");
   assert.match(execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.target, encoding: "utf8" }), /^[a-f0-9]{40}/);
 });
+
+test("reviewed Trial inputs enter the first scaffold baseline; changed inputs fail before child creation", t => {
+  const scaffoldModule = new URL("../scripts/agents-mother/scaffold/index.mjs", import.meta.url).href;
+  const outcomeModule = new URL("../scripts/agents-mother/outcome-spec.mjs", import.meta.url).href;
+  const content = "import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';const r=spawnSync(process.execPath,['scripts/agent-cli.mjs','--help'],{encoding:'utf8'});assert.equal(r.status,0);assert.match(r.stdout,/count/);\n";
+  for (const changed of [false, true]) {
+    const f = fixture(t), prepared = path.join(f.stateRoot, "prepared-inputs");
+    mkdirSync(path.join(prepared, "verification"), {recursive:true});
+    writeFileSync(path.join(prepared, "verification/check-result.mjs"), content);
+    const code = [
+      "import fs from 'node:fs';import {createHash} from 'node:crypto';",
+      "import {createOutcomeSpec,validateOutcomeSpecText,approveOutcomeSpec} from "+JSON.stringify(outcomeModule)+";",
+      "import {scaffoldContract} from "+JSON.stringify(scaffoldModule)+";",
+      "const [contract,prepared,changed]=process.argv.slice(1),file=prepared+'/verification/check-result.mjs';",
+      "const outcome=createOutcomeSpec(contract).path,draft=fs.readFileSync(outcome,'utf8');",
+      "const coverage=validateOutcomeSpecText(draft,{root:process.env.PRITHA_ROOT}).coverage.map(row=>'- Covers: '+row.id).join('\\n');",
+      "const hash='sha256:'+createHash('sha256').update(fs.readFileSync(file)).digest('hex');",
+      "const trial='## Trials\\n\\n### Trial: independent-result\\n\\n- Statement: The host verifier checks CLI output.\\n- Kind: automated\\n'+coverage+'\\n- Isolation: none\\n- When argv: [\"node\", \"verification/check-result.mjs\"]\\n- When cwd: .\\n- Then exit code: 0\\n- Product target: scripts/agent-cli.mjs\\n- Verifier input: verification/check-result.mjs :: '+hash+' :: host-reviewed:factory-result-v1\\n- Timeout ms: 10000\\n\\n';",
+      "fs.writeFileSync(outcome,draft.replace(/## Trials\\n[\\s\\S]*?(?=## Demo script)/,trial));",
+      "approveOutcomeSpec(outcome,{approvedBy:'user',projectPath:prepared});",
+      "if(changed==='true')fs.appendFileSync(file,'// changed\\n');",
+      "scaffoldContract(contract,{'allow-missing-research':true,'allow-pending-external-verification':true,preparedTrialInputRoot:prepared});",
+    ].join("\n");
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", code, f.file, prepared, String(changed)], {env:{...f.env,PRITHA_ROOT:f.root}, encoding:"utf8", timeout:30000});
+    if (changed) {
+      assert.notEqual(result.status, 0); assert.match(result.stderr, /differs from its reviewed hash/);
+      assert.equal(existsSync(f.target), false);
+    } else {
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.equal(readFileSync(path.join(f.target, "verification/check-result.mjs"), "utf8"), content);
+      assert.equal(execFileSync("git", ["status", "--porcelain"], {cwd:f.target, encoding:"utf8"}), "");
+      assert.equal(execFileSync("git", ["show", "HEAD:verification/check-result.mjs"], {cwd:f.target, encoding:"utf8"}), content);
+    }
+  }
+});

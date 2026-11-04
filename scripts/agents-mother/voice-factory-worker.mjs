@@ -10,6 +10,16 @@ import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal} from './voice-factory-state.mjs';
 
 const executors={neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
+function draftHasSensitiveText(text,kind){
+  // These are canonical Outcome grammar, not credential assignments. Scan
+  // their values and every other byte normally; never exempt arbitrary fields.
+  const scanned=kind==='outcome'?text
+    .replace(/^(- Then exit code):[ \t]*([0-9]{1,3})[ \t]*$/gm,'$1 $2')
+    .replace(/^(#### Session):[ \t]+([a-z0-9][a-z0-9-]{0,79})[ \t]*$/gm,'$1 $2')
+    // A valid declaration's separators are not IPv6 unspecified addresses.
+    .replace(/^(- Verifier input: [A-Za-z0-9._/-]+) :: (sha256:[a-f0-9]{64}) :: ((?:host-reviewed|host-template):[a-z0-9][a-z0-9._/@ -]{2,511})$/gm,'$1 | $2 | $3'):text;
+  return redactSensitiveText(scanned)!==scanned;
+}
 function draftMetadata(text,previous){
   const fm=parseFrontmatterData(text),keys=text.startsWith('---\n')?text.slice(4,text.indexOf('\n---\n',4)).split('\n').map(line=>/^([A-Za-z0-9_-]+):/.exec(line)?.[1]).filter(Boolean):[];
   if(!fm || new Set(keys).size!==keys.length || fm.status!=='draft' || fm.type!==previous.type || fm.id!==previous.id
@@ -66,7 +76,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     case 'write_draft':{
       const row=factoryArtifact(p,state,input.artifact);if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
       const text=String(input.content),fm=draftMetadata(text,row.frontmatter);
-      if(Buffer.byteLength(text)>48000 || redactSensitiveText(text)!==text)throw factoryFail('factory_draft_unsafe');
+      if(Buffer.byteLength(text)>48000 || draftHasSensitiveText(text,input.artifact))throw factoryFail('factory_draft_unsafe');
       if(input.artifact==='contract'){
         if(state.outcome)throw factoryFail('factory_contract_revision_required');
         const candidate=path.join(p.directory,'candidate.md');atomicWriteFile(candidate,text);
@@ -92,7 +102,8 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       requireFactoryApprovals(p,state,{outcome:false});contract();const row=factoryArtifact(p,state,'outcome');
       if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
       const checked=outcomeSpecFile(state.outcome,options),blocking=checked.issues.filter(issue=>!['OS015','OS016'].includes(issue.code));if(blocking.length)throw validationFailure(blocking);
-      approveOutcomeSpec(state.outcome,{...options,approvedBy:'user',projectPath:p.target});state.outcomeApproval={sha256:factoryArtifact(p,state,'outcome').sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
+      const inputRoot=path.join(p.directory,'trial-inputs');
+      approveOutcomeSpec(state.outcome,{...options,approvedBy:'user',projectPath:fs.existsSync(p.target)?p.target:inputRoot});state.outcomeApproval={sha256:factoryArtifact(p,state,'outcome').sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
     }
     case 'research':{
       approved();const result=await researchContract(state.contract,{'github-mode':request.connectorId==='local'?'registry-only':'auto'});
@@ -107,7 +118,8 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     case 'scaffold_plan':approved();value=planScaffoldContract(state.contract);break;
     case 'scaffold':{
       approved();if(fs.existsSync(p.target))throw factoryFail('factory_target_exists');
-      const result=scaffoldContract(state.contract,{output:p.target});
+      const inputRoot=path.join(p.directory,'trial-inputs');
+      const result=scaffoldContract(state.contract,{output:p.target,...(fs.existsSync(inputRoot)?{preparedTrialInputRoot:inputRoot}:{})});
       if(!result.smokeResult.ok || !result.healthResult.ok || !result.deliveryGit.ok)throw factoryFail('factory_scaffold_failed');
       state.phase='scaffolded';state.scaffoldRevision=result.deliveryGit.revision;value={scaffolded:true,target:p.target,next:'deliver'};break;
     }

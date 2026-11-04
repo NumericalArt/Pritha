@@ -12,6 +12,8 @@ import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-wo
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
 import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs';
 import {contractData} from '../scripts/agents-mother/contract.mjs';
+import {validateOutcomeSpecText} from '../scripts/agents-mother/outcome-spec.mjs';
+import {preparedTrialInputFiles} from '../scripts/agents-mother/prepared-trial-inputs.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const brief={identity:{name:'Voice Built',slug:'voice-built'},goal:'Read a supplied text file and count its lines.',user:'The local operator',successCriteria:['The CLI returns the exact line count and handles a missing file with an error.'],coreFunctions:['Count lines in a supplied local file'],workflows:['Choose a file; run the CLI; inspect its count'],nonGoals:['No network, deployment or automatic services'],permissions:{network:['none'],filesystem:['Only the operator-selected file and child workspace']},technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'A deterministic local line counter needs no third-party repository.'}};
@@ -69,6 +71,26 @@ test('real factory worker writes only private drafts, keeps two approvals separa
   const gate=await f.call('scaffold');assert.equal(gate.status,'failed');assert.equal(fs.existsSync(f.p.target),false);
   const memory=path.join(f.p.stateRoot,'memory');fs.mkdirSync(memory,{recursive:true});execFileSync('sqlite3',[path.join(memory,'pritha.sqlite')],{input:fs.readFileSync(path.join(root,'.memory/schema.sql'),'utf8')});
   await f.ok('research');assert.ok(f.artifact('research').sha256);assert.ok(f.artifact('pattern').sha256);assert.equal((await f.ok('research_status')).ok,true);
+});
+test('factory approves prepared Trial inputs before a child exists and refuses changed or symlinked inputs',{timeout:60000},async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');
+  const outcome=f.artifact('outcome'),coverage=validateOutcomeSpecText(outcome.text,{root}).coverage.map(row=>'- Covers: '+row.id).join('\n');
+  const inputRoot=path.join(f.p.directory,'trial-inputs'),file='verification/check-result.mjs',content="import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';const r=spawnSync(process.execPath,['scripts/agent-cli.mjs','--help'],{encoding:'utf8'});assert.equal(r.status,0);assert.match(r.stdout,/count/);\n";
+  const hash='sha256:'+factoryHash(content),trial='## Trials\n\n### Trial: independent-result\n\n- Statement: The independent verifier checks the CLI result.\n- Kind: automated\n'+coverage+'\n- Isolation: none\n- When argv: ["node", "verification/check-result.mjs"]\n- When cwd: .\n- Then exit code: 0\n- Product target: scripts/agent-cli.mjs\n- Verifier input: '+file+' :: '+hash+' :: host-reviewed:factory-result-v1\n- Timeout ms: 10000\n\n';
+  for(const unsafe of [outcome.text+'\npassword: synthetic-private-value\n',outcome.text.replace('- Then exit code: 0','- Then exit code: synthetic-private-value')]){
+    assert.equal(JSON.parse((await f.call('write_draft',{artifact:'outcome',expected_sha256:outcome.sha256,content:unsafe})).text).error,'factory_draft_unsafe');
+    assert.equal(f.artifact('outcome').sha256,outcome.sha256);
+  }
+  await f.ok('write_draft',{artifact:'outcome',expected_sha256:outcome.sha256,content:outcome.text.replace(/## Trials\n[\s\S]*?(?=## Demo script)/,trial)});
+  const draft=f.artifact('outcome');
+  assert.equal((await f.call('approve_outcome',{expected_sha256:draft.sha256})).status,'failed');assert.equal(f.state().outcomeApproval,undefined);assert.equal(fs.existsSync(f.p.target),false);
+  fs.mkdirSync(path.dirname(path.join(inputRoot,file)),{recursive:true});fs.writeFileSync(path.join(inputRoot,file),content);
+  await f.ok('approve_outcome',{expected_sha256:draft.sha256});assert.equal(f.state().phase,'outcome-approved');assert.equal(fs.existsSync(f.p.target),false);
+  const plan={trials:validateOutcomeSpecText(f.artifact('outcome').text,{root}).parsed.trials};
+  assert.equal(preparedTrialInputFiles(plan,inputRoot)[0].content.toString(),content);
+  fs.writeFileSync(path.join(inputRoot,file),content+'// changed\n');assert.throws(()=>preparedTrialInputFiles(plan,inputRoot),{code:'trial_input_provenance_mismatch'});
+  fs.unlinkSync(path.join(inputRoot,file));const other=path.join(f.p.directory,'other.mjs');fs.writeFileSync(other,content);fs.symlinkSync(other,path.join(inputRoot,file));
+  assert.throws(()=>preparedTrialInputFiles(plan,inputRoot),{code:'trial_input_invalid'});
 });
 test('Stop during owned factory startup proves exit and preserves the uncertain step fence',{timeout:20000},async t=>{
   const f=fixture(t);f.options.onProcessEvidence=()=>f.controller.abort();const result=await f.call('init',{brief,build_token_budget:10000});
