@@ -32,6 +32,13 @@ test('confirmed dispatch, real questions and terminal results replace stale pref
   assert.equal(api.providerVoiceTaskFeedback('fixture',{task_chat_connector:'claude'},{...status,status:'aborted'}),null);
   assert.equal(api.mergeProviderVoiceTaskStatus(old,null).dispatch_state,undefined);
 });
+test('a finished model answer with no factory draft is reported as failed work with zero product progress',()=>{
+  const status={status:'failed',phase:'factory_draft_failed',factory_draft_failed:true,error_code:'factory_not_started'};
+  const feedback=api.providerVoiceTaskFeedback('fixture',{task_chat_connector:'claude'},status);
+  assert.match(feedback.voice_text,/не подтверждено/);assert.equal(feedback.requires_response,false);
+  const progress=api.codexTaskProgressMetrics({statusValue:'failed',complete:true,waitingForOperator:false,progress:[],factoryDraftFailed:true});
+  assert.equal(progress.percent,0);assert.equal(progress.detail.source,'factory_draft_missing');
+});
 test('external tasks retain write and consequential-action gates without inheriting native full-access claims',()=>{
   const external={task_chat_connector:'claude',task_type:'agent_creation',write_mode:'workspace_write',task:'Create an offline word counter'};
   assert.deepEqual(api.codexTaskApprovalReasons(external),['workspace_write_requested']);

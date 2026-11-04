@@ -3,7 +3,7 @@ import type { StartTurnInput, CreateThreadInput } from '../../interfaces/control
 import type { PendingRequestView, TurnView } from '../../interfaces/control-center/src/lib/codex-chat/types';
 export type VoiceDispatchRequest = { chat: Omit<CreateThreadInput, 'clientThreadId' | 'source'>; turn: Omit<StartTurnInput, 'clientMessageId'> & {voiceSearchText?: string} };
 export type VoiceBackendReceipt = { chatId: string; clientMessageId: string; sessionId?: string | null } & (
-  { kind: 'turn'; turnId: string; turn: TurnView; resultText?:string; resultTruncated?:boolean } | { kind: 'queue'; queueId: string; revision: number; status?:string; reason?:string|null } | { kind: 'cancelled'; queueId: string }
+  { kind: 'turn'; turnId: string; turn: TurnView; resultText?:string; resultTruncated?:boolean;factoryDraftReceipt?:{draftCreated:boolean;errorCode:string|null} } | { kind: 'queue'; queueId: string; revision: number; status?:string; reason?:string|null } | { kind: 'cancelled'; queueId: string }
 );
 export type VoiceTaskView = { task: VoiceTaskBinding; topic: VoiceTopicBinding; receipt: VoiceBackendReceipt | null; stop?: unknown };
 export type VoiceTaskBackend = {

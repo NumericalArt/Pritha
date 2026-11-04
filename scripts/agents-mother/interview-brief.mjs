@@ -7,6 +7,7 @@ export const INTERVIEW_BRIEF_SCHEMA_VERSION = 1;
 export const INTERVIEW_PRESETS = new Set(["generic", "local-feed", "llm-app"]);
 const technicalKeys = ["preset", "sourceFormat", "runtimeFamily", "serviceMode", "primaryInterface", "runtimePlacementProfile", "repositoryResearchPolicy", "repositoryAdoptionMode", "repositoryResearchWaiverReason", "repositoryResearchTopics", "targetFolder", "port", "portVariable"];
 const designKeys = ["memoryModel", "storedData", "inputDataTypes", "sensitiveData", "riskNotes"];
+export const INTERVIEW_BRIEF_TEXT_FIELDS = Object.freeze({technical: Object.freeze(technicalKeys), design: Object.freeze(designKeys)});
 const clean = (value) => typeof value === "string" ? value.trim().replace(/\r\n?/g, "\n") : "";
 const items = (value) => Array.isArray(value) ? value.map(clean).filter(Boolean) : clean(value).split(/\n|;/).map((item) => item.replace(/^\s*(?:[-*]|\d+\.)\s+/, "").trim()).filter(Boolean);
 

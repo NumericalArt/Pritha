@@ -12,7 +12,7 @@ import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,ex
 import { normalizeProviderPreset } from './provider-profile.mjs';
 import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
 import {resolveProviderAgentWorkspace} from './provider-agent-workspace.mjs';
-import {voiceFactoryPaths,prepareFactoryBinding} from '../agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,prepareFactoryBinding,factoryDraftReceipt} from '../agents-mother/voice-factory-state.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -145,7 +145,9 @@ export class ProviderTaskRuntime {
         resultTruncated=true;
       }
       resultTruncated ||= resultText.length>16000;
-      return {...common,kind:'turn',turnId:turn.turnId,turn:providerTurnView(turn),resultText:resultText.slice(0,16000),resultTruncated};
+      const factory=binding.workspace.factorySlug && turn.status==='completed'
+        ? turn.factoryDraftReceipt || {draftCreated:false,errorCode:'factory_draft_evidence_missing'} : undefined;
+      return {...common,kind:'turn',turnId:turn.turnId,turn:providerTurnView(turn),resultText:resultText.slice(0,16000),resultTruncated,...(factory?{factoryDraftReceipt:factory}:{})};
     }
     const queued=this.execution.getIntent(queueKey(chat,clientMessageId));
     if(!queued)return null;
@@ -319,7 +321,10 @@ export class ProviderTaskRuntime {
     const status=!exited?'failed':active.stopping || result.errorCode==='operator_cancel'?'interrupted':result.ok?'completed':'failed';
     const code=exited ? result.errorCode || 'provider_runtime_failed' : 'provider_process_exit_unconfirmed';
     const error=status==='failed'?{code,message:exited?(code==='provider_native_login_required'?'Claude Code needs you to sign in again. Open Settings → Providers → Claude Code → Local CLI session, complete sign-in, then continue this chat.':'The provider task stopped with an error. Its history has been saved.'):'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
-    this.registry.updateTurn(active.chat,active.turnId,row=>({...row,status,error,completedAt:stamp(),usage:result.usage || null}));
+    const binding=this.require(active.chat);
+    const factory=status==='completed' && binding.workspace.factorySlug
+      ? factoryDraftReceipt({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug:binding.workspace.factorySlug,chatId:binding.chatId,connectorId:this.connectorId}) : undefined;
+    this.registry.updateTurn(active.chat,active.turnId,row=>({...row,status,error,completedAt:stamp(),usage:result.usage || null,...(factory?{factoryDraftReceipt:factory}:{})}));
     this.registry.mutate(active.chat,row=>({...row,lastStatus:exited?'idle':'system_error',updatedAt:stamp()}));
     this.execution.updateIntent(active.key,{state:exited?status:'unknown',exitConfirmed:exited,errorCode:error?.code || null});
     active.approvals?.close();active.cleanup?.();this.active.delete(active.chat);

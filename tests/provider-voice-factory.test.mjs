@@ -10,6 +10,7 @@ import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
+import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const brief={identity:{name:'Voice Built',slug:'voice-built'},goal:'Read a supplied text file and count its lines.',user:'The local operator',successCriteria:['The CLI returns the exact line count and handles a missing file with an error.'],coreFunctions:['Count lines in a supplied local file'],workflows:['Choose a file; run the CLI; inspect its count'],nonGoals:['No network, deployment or automatic services'],permissions:{network:['none'],filesystem:['Only the operator-selected file and child workspace']},technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'A deterministic local line counter needs no third-party repository.'}};
@@ -24,6 +25,23 @@ function fixture(t){
   t.after(async()=>{controller.abort();await tools.close();lease.release();coordinator.close();fs.rmSync(directory,{recursive:true,force:true});});
   return {tools,options,p,coordinator,lease,controller,approvals,proofs,call,ok,state:()=>loadVoiceFactory(p,options),artifact:kind=>factoryArtifact(p,loadVoiceFactory(p,options),kind)};
 }
+test('the actual MCP brief schema rejects a design array before approval and a corrected retry creates only a private draft',{timeout:60000},async t=>{
+  const f=fixture(t),server=await listenProviderToolServer({hostTools:f.tools});t.after(()=>server.close());
+  let id=0;const post=async(method,params)=>(await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:++id,method,params})})).json()).result;
+  const schema=(await post('tools/list')).tools.find(row=>row.name==='factory_step').inputSchema.properties.brief;
+  assert.equal(schema.properties.design.properties.inputDataTypes.type,'string');
+  assert.ok(schema.properties.technical.properties.runtimeFamily.enum.includes('cli'));assert.ok(!schema.properties.technical.properties.runtimeFamily.enum.includes('node'));
+  const input={operation_id:'init-design-retry',action:'init',brief:{...structuredClone(brief),design:{inputDataTypes:['UTF-8 text file']}},build_token_budget:40000};
+  const rejected=await post('tools/call',{name:'factory_step',arguments:input});assert.equal(rejected.isError,true);
+  assert.deepEqual(JSON.parse(rejected.content[0].text),{error:'factory_brief_text_required',field:'brief.design.inputDataTypes',expected:'string'});
+  assert.equal(f.approvals.length,0);assert.equal(f.state(),null);assert.equal(f.coordinator.getIntent('provider-tool:turn_factory:init-design-retry'),null);
+  input.brief.design.inputDataTypes='UTF-8 text file';
+  const invalidRuntime=await post('tools/call',{name:'factory_step',arguments:{...input,brief:{...input.brief,technical:{...input.brief.technical,runtimeFamily:'node'}}}});
+  assert.equal(invalidRuntime.content[0].text,'factory_runtime_family_invalid');assert.equal(f.approvals.length,0);assert.equal(f.state(),null);
+  const corrected=await post('tools/call',{name:'factory_step',arguments:input});assert.equal(corrected.isError,false);
+  const receipt=JSON.parse(corrected.content[0].text);assert.equal(receipt.status,'completed');assert.equal(JSON.parse(receipt.text).phase,'contract-draft');
+  assert.equal(f.approvals.length,1);assert.equal(f.artifact('contract').frontmatter.status,'draft');assert.equal(fs.existsSync(f.p.target),false);assert.equal(f.state().contractApproval,undefined);assert.equal(f.state().outcomeApproval,undefined);
+});
 test('real factory worker writes only private drafts, keeps two approvals separate and detects stale review',{timeout:60000},async t=>{
   const f=fixture(t);assert.equal((await f.call('status')).phase,'not-started');
   await assert.rejects(f.call('init',{brief,build_token_budget:0}),{code:'factory_budget_required'});await assert.rejects(f.call('init',{brief:{},build_token_budget:10000}),{code:'factory_brief_incomplete'});assert.equal(f.state(),null);

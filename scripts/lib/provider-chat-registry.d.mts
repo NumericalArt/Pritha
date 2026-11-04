@@ -10,7 +10,7 @@ export type ProviderChatBinding = {
   title:string;preview:string;createdAt:string;updatedAt:string;group:ThreadGroup;origin:ThreadOrigin;continuationEnabled:boolean;pinned:boolean;archived:boolean;lastStatus:ThreadStatus;taskLinks:TaskLinkView[];
   capabilitySnapshot:Record<string,unknown>|null;executionConfig:ProviderPreset & {sandbox:string};messageReceipts:Record<string,unknown>;turns:TurnView[];
 };
-export type StoredProviderTurn = Omit<TurnView,'history'> & {history?:{activityState:string;itemCount:number;itemsCursor:string|null}};
+export type StoredProviderTurn = Omit<TurnView,'history'> & {history?:{activityState:string;itemCount:number;itemsCursor:string|null};factoryDraftReceipt?:{draftCreated:boolean;errorCode:string|null}};
 export class ProviderChatRegistry {
   readonly scope:string;
   constructor(options:{stateRoot:string;privateRoot:string;connectorId:Exclude<ProviderConnectorId,'codex'>});

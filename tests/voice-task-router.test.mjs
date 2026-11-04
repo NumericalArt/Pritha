@@ -68,6 +68,14 @@ test('server projection preserves real execution status, exact provider and boun
   assert.match(completed.status.task_chat_href, /^\/task-chat\?group=voice_work&chat=chat_neuraldeep_/);
   assert.equal(completed.status.topic_generation, 1); assert.equal(f.calls.filter(row => row[0] === 'start').length, 1);
 });
+test('a completed provider answer cannot turn a missing factory draft into a successful Voice task',async t=>{
+  const f=fixture(t);await f.api.dispatchProviderVoiceTask('task-one',f.request);
+  const receipt=f.receipts.get(f.reservation.task.clientMessageId);receipt.turn.status='completed';receipt.resultText='The model finished its answer.';
+  receipt.factoryDraftReceipt={draftCreated:false,errorCode:'factory_not_started'};
+  const failed=await f.api.providerVoiceTaskProjection('task-one');
+  assert.equal(failed.status.status,'failed');assert.equal(failed.status.phase,'factory_draft_failed');assert.equal(failed.status.error_code,'factory_not_started');assert.equal(failed.status.factory_draft_failed,true);
+  assert.equal(f.calls.filter(row=>row[0]==='start').length,1);
+});
 test('server answer maps one exact question and replays a lost acknowledgement through its saved descriptor', async t => {
   const f = fixture(t); await f.api.dispatchProviderVoiceTask('task-one', f.request);
   f.detail.pendingRequests = [{ requestId: 'request-one', turnId: 'turn-one', kind: 'user_input', presentation: { revision: 3, questions: [{ id: 'choice_001', question: 'Which fixture?' }] } }];

@@ -3405,8 +3405,12 @@ function codexTaskProgressMetrics(params: {
   plan: unknown;
   progress: PrithaCodexTaskProgressEvent[];
   notDispatched?: boolean;
+  factoryDraftFailed?: boolean;
 }) {
   const steps = codexTaskPlanSteps(params.plan);
+  if (params.factoryDraftFailed) {
+    return { percent: 0, detail: { source: "factory_draft_missing", total_steps: steps.length, completed_steps: 0 } };
+  }
   if (params.notDispatched && !params.complete) {
     return { percent: 0, detail: { source: "before_dispatch", total_steps: steps.length, completed_steps: 0 } };
   }
@@ -7051,15 +7055,17 @@ function providerVoiceTaskFields(request: Record<string, unknown> | null, status
   return { connector_id: request?.task_chat_connector || 'codex', task_chat_href: status?.task_chat_href,
     topic_generation: status?.topic_generation, task_revision: status?.task_revision,
     error_code: status?.error_code, dispatch_state: status?.dispatch_state,
+    factory_draft_failed: status?.factory_draft_failed,
     requires_operator_response: status?.requires_operator_response,
     operator_request: status?.operator_request, question: status?.question,
     approval_in_task_chat: status?.approval_in_task_chat };
 }
 function providerVoiceTaskFeedback(id: string, request: Record<string, unknown> | null, status: Record<string, unknown> | null): CodexTaskVoiceFeedbackEvent | null {
-  if (!request?.task_chat_connector || status?.status !== 'waiting_for_operator') return null;
+  if (!request?.task_chat_connector || !status || status.status !== 'waiting_for_operator' && !status.factory_draft_failed) return null;
   const question = compactText(status.question, 2000);
   const workspaceBlocked = status.dispatch_state === 'reserved' && status.error_code === 'workspace_dirty';
-  const reason = workspaceBlocked ? 'Задача ещё не запущена: в исходном проекте есть незакоммиченные изменения. Для правки проекта создайте задачу в Task Chat и подтвердите коммит-основу рабочей копии. Если нужен новый агент, отмените эту карточку и попросите «создать отдельного нового агента»: сначала только Contract и отдельный Outcome Spec, без реализации до их одобрения.' : '';
+  const reason = status.factory_draft_failed ? 'Ответ модели завершён, но создание черновика агента не подтверждено. Это не успешное создание агента. Откройте связанный Task Chat для причины и продолжения; Contract, Outcome Spec и бюджет всё ещё требуют отдельных одобрений.'
+    : workspaceBlocked ? 'Задача ещё не запущена: в исходном проекте есть незакоммиченные изменения. Для правки проекта создайте задачу в Task Chat и подтвердите коммит-основу рабочей копии. Если нужен новый агент, отмените эту карточку и попросите «создать отдельного нового агента»: сначала только Contract и отдельный Outcome Spec, без реализации до их одобрения.' : '';
   const text = question || reason || (status.approval_in_task_chat ? 'Задача ожидает подтверждения действия в Task Chat. Откройте её карточку.'
     : 'Задача не продолжилась автоматически. Откройте её карточку, чтобы проверить причину.');
   return {task_id:id,timestamp:String(status.updated_at || request.created_at || ''),phase:question?'operator_question':'provider_attention',
@@ -7107,6 +7113,7 @@ async function codexTaskSummary(id: string) {
     plan,
     progress: progressForMetrics,
     notDispatched: Boolean(request?.task_chat_connector && status?.dispatch_state === 'reserved'),
+    factoryDraftFailed: status?.factory_draft_failed === true,
   });
   const statusRecord = status as Record<string, unknown> | null | undefined;
   const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
@@ -7149,7 +7156,7 @@ async function codexTaskSummary(id: string) {
     last_activity_at: activity.lastActivityAt,
     last_activity: activity.lastActivity,
     stale: activity.stale,
-    operator_brief: status?.dispatch_state === 'reserved' && latestVoiceFeedback ? latestVoiceFeedback.voice_text : operatorBrief,
+    operator_brief: (status?.dispatch_state === 'reserved' || status?.factory_draft_failed === true) && latestVoiceFeedback ? latestVoiceFeedback.voice_text : operatorBrief,
     voice_handoff_required: (complete || statusValue === "decision_required" || statusValue === "waiting_for_operator" || activity.stale || Boolean(latestVoiceFeedback)) && handoffStatus === "pending",
     created_at: String(request?.created_at || stat.birthtime.toISOString()),
     updated_at: String(status?.updated_at || stat.mtime.toISOString()),
@@ -7289,6 +7296,7 @@ export async function getPrithaCodexTask(taskId: string) {
     plan,
     progress: progressForMetrics,
     notDispatched: Boolean(request?.task_chat_connector && status?.dispatch_state === 'reserved'),
+    factoryDraftFailed: status?.factory_draft_failed === true,
   });
   const statusRecord = status as Record<string, unknown> | null | undefined;
   const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
@@ -7346,7 +7354,7 @@ export async function getPrithaCodexTask(taskId: string) {
     last_activity_at: activity.lastActivityAt,
     last_activity: activity.lastActivity,
     stale: activity.stale,
-    operator_brief: status?.dispatch_state === 'reserved' && latestVoiceFeedback ? latestVoiceFeedback.voice_text : operatorBrief,
+    operator_brief: (status?.dispatch_state === 'reserved' || status?.factory_draft_failed === true) && latestVoiceFeedback ? latestVoiceFeedback.voice_text : operatorBrief,
     voice_handoff_required: (complete || statusValue === "decision_required" || statusValue === "waiting_for_operator" || activity.stale || Boolean(latestVoiceFeedback)) && handoffStatus === "pending",
     request,
     status_detail: status,

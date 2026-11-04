@@ -6,19 +6,37 @@ import {atomicWriteFile} from './atomic-file.mjs';
 import {providerProcessEnvironment,createProviderTemporaryDirectory} from './provider-process-environment.mjs';
 import {resolvePrithaPython} from './python-runtime.mjs';
 import {spawnSupervisedCli} from '../neuraldeep/process-supervisor.mjs';
-import {normalizeInterviewBrief,validateInterviewBrief} from '../agents-mother/interview-brief.mjs';
+import {normalizeInterviewBrief,validateInterviewBrief,INTERVIEW_BRIEF_TEXT_FIELDS} from '../agents-mother/interview-brief.mjs';
+import {RUNTIME_FAMILIES,SERVICE_MODES} from '../agents-mother/contract.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals} from '../agents-mother/voice-factory-state.mjs';
 
 const actions=['status','read_artifact','init','write_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_apply','scaffold_plan','scaffold','deliver','delivery_status','delivery_resume','verify','finish'];
 const readonly=new Set(['status','read_artifact']);
+const textFields=Object.entries(INTERVIEW_BRIEF_TEXT_FIELDS);
+const briefTextPaths=new Set(textFields.flatMap(([group,keys])=>keys.map(key=>group+'.'+key)));
+class FactoryBriefInputError extends Error {
+  constructor(field){super('A factory brief field must be text.');this.code='factory_brief_text_required';this.field=field;}
+}
+export function factoryBriefErrorDetail(error){
+  return error instanceof FactoryBriefInputError && briefTextPaths.has(error.field)
+    ? {error:error.code,field:'brief.'+error.field,expected:'string'} : null;
+}
+function normalizeFactoryBrief(value){
+  for(const [group,keys] of textFields)for(const key of keys){
+    if(value?.[group]?.[key]!==undefined && typeof value[group][key]!=='string')throw new FactoryBriefInputError(group+'.'+key);
+  }
+  try{return normalizeInterviewBrief(value);}catch{throw factoryFail('factory_brief_invalid');}
+}
 const briefSchema={type:'object',properties:{
   identity:{type:'object',properties:{name:{type:'string'},slug:{type:'string'}},required:['name'],additionalProperties:false},
   goal:{type:'string'},user:{type:'string'},
   ...Object.fromEntries(['successCriteria','coreFunctions','workflows','sources','constraints','nonGoals'].map(key=>[key,{type:'array',items:{type:'string'}}])),
   permissions:{type:'object',properties:{network:{type:'array',items:{type:'string'}},filesystem:{type:'array',items:{type:'string'}},authorization:{type:'string'}},additionalProperties:false},
-  technical:{type:'object',description:'Optional proposed preset, runtimeFamily, primaryInterface, serviceMode, runtimePlacementProfile and repository research policy. The host fixes the target, executor, Git isolation and autostart.'},
-  design:{type:'object',description:'Optional memoryModel, storedData, inputDataTypes, sensitiveData and riskNotes.'},
+  technical:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.technical.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'Optional text settings. Use runtimeFamily=cli for a deterministic Node.js command; node is a language, not a runtime family. The host fixes the target, executor, Git isolation and autostart.'},
+  design:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.design.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'Optional text settings. inputDataTypes is text, e.g. UTF-8 text file, not an array.'},
 },required:['identity','goal','user','successCriteria'],additionalProperties:false};
+briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMILIES];
+briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
 export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound new child. Start with init and a complete product brief. Read and revise private draft contract/outcome artifacts, then request their TWO separate approvals. Research and scaffold use canonical gates; deliver/verify use the pinned provider and protected Trials. No push, deploy, services, credential provisioning or final user acceptance. status/read_artifact are read-only. Every other step requires an exact host approval. Never infer approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
 const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources'],research_apply:['selection'],delivery_resume:['answer']};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
@@ -44,7 +62,9 @@ export class ProviderFactoryTools {
     if(input.action==='init' ? Boolean(state?.contract) || fs.existsSync(p.target) : !state)throw factoryFail(input.action==='init'?'factory_target_exists':'factory_not_started');
     if(input.action==='init'){
       if(!Number.isSafeInteger(input.build_token_budget) || input.build_token_budget<1 || input.build_token_budget>10000000)throw factoryFail('factory_budget_required');
-      const brief=normalizeInterviewBrief(input.brief);
+      const brief=normalizeFactoryBrief(input.brief);
+      if(brief.technical.runtimeFamily!==undefined && !RUNTIME_FAMILIES.has(brief.technical.runtimeFamily))throw factoryFail('factory_runtime_family_invalid');
+      if(brief.technical.serviceMode!==undefined && !SERVICE_MODES.has(brief.technical.serviceMode))throw factoryFail('factory_service_mode_invalid');
       if(brief.identity.slug && brief.identity.slug!==p.slug)throw factoryFail('factory_subject_changed');
       if(validateInterviewBrief(brief,{requireComplete:true}).length)throw factoryFail('factory_brief_incomplete');
     }

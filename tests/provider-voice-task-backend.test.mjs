@@ -13,6 +13,7 @@ import {ImmutableAttachmentStore} from '../scripts/lib/chat-attachment-store.mjs
 import {hostFileAttachmentTransport} from '../scripts/lib/provider-file-attachments.mjs';
 import {randomUUID} from 'node:crypto';
 import {resolveProviderAgentWorkspace} from '../scripts/lib/provider-agent-workspace.mjs';
+import {voiceFactoryPaths} from '../scripts/agents-mother/voice-factory-state.mjs';
 
 async function until(predicate) { for (let i = 0; i < 200; i++) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 10)); } assert.fail('Fixture did not settle'); }
 const request = text => ({ chat: { title: 'Voice fixture', workspace: { mode: 'read-only' } }, turn: { input: [{ type: 'text', text }] } });
@@ -52,6 +53,26 @@ function childFixture(f,{git=false}={}){
     f.bindings.reserve({taskId:id,scope:{kind:'agent',id:child.agentId},workspace,connectorId:f.runtime.connectorId,preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
   return {...child,project,reserve};
 }
+test('factory draft evidence belongs to the completed turn and survives a later successful retry and restart',async t=>{
+  const f=fixture(t,'claude',{preflight:async()=>({interrupt:true,steer:false,approvals:true,tools:true})}),slug='snapshot-child',workspace={mode:'read-only',factorySlug:slug};
+  const reserve=id=>{const body={...request('Prepare only a draft'),chat:{workspace,subject:{kind:'child',slug,phase:'interview'}}};
+    f.bindings.reserve({taskId:id,scope:{kind:'agent',id:slug},workspace,connectorId:'claude',preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
+  const first=await f.bridge.dispatch('snapshot-first',reserve('snapshot-first'));await until(()=>f.runs.length===1);
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+  const client=f.bindings.task('snapshot-first').clientMessageId;
+  const receipt=f.runtime.voiceReceipt(first.topic.chatId,client);
+  assert.equal(receipt.turn.status,'completed');assert.deepEqual(receipt.factoryDraftReceipt,{draftCreated:false,errorCode:'factory_not_started'});
+  const p=voiceFactoryPaths({root:f.root,stateRoot:f.stateRoot,agentParent:f.agentParent,slug});mkdirSync(path.join(p.memory,'contracts'),{recursive:true});mkdirSync(p.directory,{recursive:true});
+  const contract=path.join(p.memory,'contracts','snapshot-draft.md');writeFileSync(contract,'---\nid: snapshot-draft\ntype: agent-contract\nstatus: draft\n---\n# Draft\n');
+  writeFileSync(p.file,JSON.stringify({schema:'pritha-voice-factory-v1',slug,chatId:first.topic.chatId,connectorId:'claude',stateRoot:p.stateRoot,target:p.target,phase:'contract-draft',revision:1,running:null,contract}));
+  const worker=f.make();assert.deepEqual(worker.voiceReceipt(first.topic.chatId,client).factoryDraftReceipt,receipt.factoryDraftReceipt);
+  const second=await new VoiceTaskBridge({bindings:f.bindings,backend:providerVoiceTaskBackend(worker)}).dispatch('snapshot-second',reserve('snapshot-second'));await until(()=>f.runs.length===2);
+  f.runs[1].resolve({ok:true,processTreeExited:true});await until(()=>worker.active.size===0);
+  assert.deepEqual(worker.voiceReceipt(first.topic.chatId,f.bindings.task('snapshot-second').clientMessageId).factoryDraftReceipt,{draftCreated:true,errorCode:null});
+  assert.deepEqual(worker.voiceReceipt(first.topic.chatId,client).factoryDraftReceipt,receipt.factoryDraftReceipt);
+  worker.registry.updateTurn(first.topic.chatId,receipt.turnId,row=>{delete row.factoryDraftReceipt;return row;});
+  assert.equal(worker.voiceReceipt(first.topic.chatId,client).factoryDraftReceipt.errorCode,'factory_draft_evidence_missing');
+});
 test('a dirty Claude parent blocks ordinary writes before a chat or model turn, while a new-agent draft stays read-only',async t=>{
   const f=fixture(t,'claude',{preflight:async()=>({interrupt:true,steer:false,approvals:true,tools:true})});
   writeFileSync(path.join(f.root,'README.md'),'# Parent\n');

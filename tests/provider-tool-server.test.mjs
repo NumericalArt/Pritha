@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { listenProviderToolServer } from '../scripts/lib/provider-tool-server.mjs';
 
+test('MCP error hints cannot echo arbitrary exception data or forged field details',async t=>{
+  const server=await listenProviderToolServer({hostTools:{call:async()=>{throw Object.assign(new Error('PRIVATE_ERROR_CANARY'),{code:'factory_brief_text_required',field:'design.PRIVATE_FIELD_CANARY'});}}});t.after(()=>server.close());
+  const result=await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'read_file',arguments:{path:'README.md'}}})})).json();
+  assert.equal(result.result.isError,true);assert.equal(result.result.content[0].text,'factory_brief_text_required');assert.doesNotMatch(JSON.stringify(result),/PRIVATE_/);
+});
+
 test('MCP serves fixed host tools with capability auth and bounded transport, not a network proxy',async t=>{
   const calls=[],server=await listenProviderToolServer({hostTools:{call:async(name,args)=>{calls.push({name,args});return {content:[{type:'text',text:'fixture'}]};}}});t.after(()=>server.close());
   const headers={'Content-Type':'application/json',Authorization:'Bearer '+server.token};

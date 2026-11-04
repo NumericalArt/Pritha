@@ -59,6 +59,18 @@ export function factoryArtifact(paths,state,kind){
   if(path.dirname(file)!==expected || !file.endsWith('.md'))throw factoryFail('factory_artifact_boundary');
   const text=factoryRead(file,expected,100000);return {file,text,sha256:factoryHash(text),frontmatter:parseFrontmatterData(text) || {}};
 }
+/** Capture at turn settlement, not on polling: a later successful retry must
+ * never change the outcome of an earlier attempt with no draft. */
+export function factoryDraftReceipt(options){
+  try{
+    const p=voiceFactoryPaths(options),state=loadVoiceFactory(p,options);
+    if(!state)return {draftCreated:false,errorCode:'factory_not_started'};
+    if(state.running)return {draftCreated:false,errorCode:'factory_step_unconfirmed'};
+    const artifact=factoryArtifact(p,state,'contract');
+    if(artifact.frontmatter.type!=='agent-contract' || !['draft','accepted'].includes(artifact.frontmatter.status))throw factoryFail('factory_artifact_invalid');
+    return {draftCreated:true,errorCode:null};
+  }catch{return {draftCreated:false,errorCode:'factory_draft_evidence_unavailable'};}
+}
 export function requireFactoryApprovals(paths,state,{outcome=true}={}){
   const contract=factoryArtifact(paths,state,'contract');
   if(contract.frontmatter.status!=='accepted' || contract.sha256!==state.contractApproval?.sha256)throw factoryFail('factory_contract_approval_required');
