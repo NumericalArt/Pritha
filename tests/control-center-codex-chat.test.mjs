@@ -84,7 +84,7 @@ test("Codex Chat runtime uses a persistent App Server handshake for both install
   assert.match(codexBinariesSource, /ChatGPT\.app\/Contents\/Resources\/codex/);
   assert.match(codexBinariesSource, /Codex\.app\/Contents\/Resources\/codex/);
   assert.match(appServerSource, /\["app-server", "--listen", "stdio:\/\/"\]/);
-  assert.match(appServerSource, /\["app-server", "generate-json-schema", "--out", schemaRoot\]/);
+  assert.match(appServerSource, /\["app-server", "generate-json-schema", "--experimental", "--out", schemaRoot\]/);
 
   const initializeIndex = appServerSource.indexOf('"initialize"');
   const initializedIndex = appServerSource.indexOf('this.notify("initialized", {})');

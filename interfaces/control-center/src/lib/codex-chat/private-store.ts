@@ -29,6 +29,10 @@ export type ChatBinding = {
   modelId?: string;
   workspace?: TaskWorkspace;
   sandbox?: string;
+  factoryEffortId?: string;
+  factoryTurnReceipts?: Record<string,{draftCreated:boolean;errorCode:string|null}>;
+  voiceTopicId?: string;
+  voiceTopicGeneration?: number;
   stateIdentityHash: string | null;
   group: ThreadGroup;
   origin: ThreadOrigin;
@@ -96,6 +100,9 @@ function normalizeBinding(value: unknown): ChatBinding | null {
     ...(row.modelId ? { modelId: row.modelId } : {}),
     ...(row.workspace && typeof row.workspace === "object" ? {workspace:row.workspace} : {}),
     ...(typeof row.sandbox === "string" ? {sandbox:row.sandbox} : {}),
+    ...(typeof row.factoryEffortId === 'string'?{factoryEffortId:row.factoryEffortId}:{}),
+    ...(row.factoryTurnReceipts && typeof row.factoryTurnReceipts==='object'?{factoryTurnReceipts:row.factoryTurnReceipts}:{}),
+    ...(typeof row.voiceTopicId==='string'?{voiceTopicId:row.voiceTopicId,voiceTopicGeneration:row.voiceTopicGeneration}:{}),
     stateIdentityHash: typeof row.stateIdentityHash === "string" ? row.stateIdentityHash : null,
     group: row.group === "voice_work" || row.group === "other_sessions" ? row.group : "my_chats",
     origin: row.origin === "voice" || row.origin === "external" || row.origin === "exec_fallback" ? row.origin : "chat",

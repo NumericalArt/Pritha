@@ -58,14 +58,12 @@ test('malformed intent, authority fields, existing targets and missing capabilit
     const missing=fixture(t,'claude',capabilities),r=missing.make();await assert.rejects(r.create(base),{code:'voice_factory_tools_unavailable'});assert.equal(r.registry.list().data.length,0);assert.equal(fs.existsSync(path.join(missing.stateRoot,'agents','voice-factory')),false);
   }
 });
-test('typed entry reaches the actual worker only after exact UI approval and cannot adopt its draft in another chat',{timeout:60000},async t=>{
+test('typed entry prepares private drafts without a redundant approval and cannot adopt its draft in another chat',{timeout:60000},async t=>{
   const f=fixture(t),runtime=f.make(),binding=(await runtime.create(create())).binding;
   await runtime.start(binding.chatId,message('typed_worker_turn'));await until(()=>f.runs.length===1);const run=f.runs[0];
   const brief={identity:{name:'Typed Child',slug:'typed-child'},goal:'Count lines in a local text file.',user:'Local operator',successCriteria:['Returns the exact JSON line count.'],coreFunctions:['Count a selected file'],nonGoals:['No network or services'],technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'A deterministic line counter needs no third-party repository.'}};
   const call=run.host.call('factory_step',{operation_id:'typed_factory_init',action:'init',brief,build_token_budget:10000});
-  await until(()=>runtime.pendingRequests(binding.chatId).length===1);
-  const request=runtime.pendingRequests(binding.chatId)[0];assert.equal(request.kind,'command_approval');assert.equal(fs.existsSync(path.join(f.stateRoot,'agents','contracts')),false);
-  await runtime.answerRequest(binding.chatId,{requestId:request.requestId,decision:'accept',clientMessageId:'typed_factory_approval',revision:request.presentation.revision});
+  assert.equal(runtime.pendingRequests(binding.chatId).length,0);
   const result=JSON.parse((await call).content[0].text);assert.equal(result.status,'completed',result.text);
   const p=voiceFactoryPaths({root,stateRoot:f.stateRoot,agentParent:f.agentParent,slug:'typed-child'}),state=loadVoiceFactory(p,{chatId:binding.chatId,connectorId:'claude'});
   assert.equal(state.phase,'contract-draft');assert.equal(factoryArtifact(p,state,'contract').frontmatter.status,'draft');assert.equal(state.contractApproval,undefined);assert.equal(state.outcomeApproval,undefined);assert.equal(fs.existsSync(p.target),false);

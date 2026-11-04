@@ -17,7 +17,7 @@ export async function fixtureModules() {
   writeFileSync(path.join(tmp, "paths.mjs"), `export const resolvePrithaRoot=()=>${JSON.stringify(root)}; export const resolvePrithaStateRoot=()=>${JSON.stringify(state)};`);
   writeFileSync(path.join(tmp, "app-server.mjs"), "export class AppServerConnection {} export class CodexRuntimeManager {}");
   writeFileSync(path.join(tmp, "voice-links.mjs"), "export const queueVoiceTaskChatIndexRefresh=()=>{}; export const reconcileVoiceTaskChatLink=async()=>{}; export const voiceTaskChatIndexStatus=()=>({state:'ready'});");
-  for (const name of ["history-reader", "attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "native-control", "native-requests", "private-store", "goal-control", "budget-intent", "operation-runtime", "gateway", "../private-json"]) {
+  for (const name of ["history-reader", "attachment-policy", "attachment-store", "copy-response", "storage-identity", "native-thread-errors", "normalize", "native-turn-coordinator", "native-control", "native-requests", "private-store", "goal-control", "budget-intent", "operation-runtime", "native-factory", "native-voice-backend", "gateway", "../private-json"]) {
     const source = readFileSync(`interfaces/control-center/src/lib/codex-chat/${name === "gateway" ? "native-gateway" : name}.ts`, "utf8");
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText
       .replaceAll('"@/lib/pritha-paths"', '"./paths.mjs"')
@@ -31,11 +31,56 @@ export async function fixtureModules() {
       .replaceAll('"../../../../../scripts/agents-mother/phase-usage.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/phase-usage.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/operation-decisions.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/operation-decisions.mjs")).href))
       .replaceAll('"../../../../../scripts/agents-mother/execution-backends.mjs"', JSON.stringify(pathToFileURL(path.resolve("scripts/agents-mother/execution-backends.mjs")).href))
-      .replace(/from "\.\/(.*?)"/g, (_, file) => `from "./${file.endsWith('.mjs') ? file : file + '.mjs'}"`);
+      .replace(/["']\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/(scripts\/[^"']+\.mjs)["']/g,(_,file)=>JSON.stringify(pathToFileURL(path.resolve(file)).href))
+      .replace(/from ["']\.\/(.*?)["']/g, (_, file) => `from "./${file.endsWith('.mjs') ? file : file + '.mjs'}"`);
     writeFileSync(path.join(tmp, `${path.basename(name)}.mjs`), output);
   }
   return { tmp, root, state, load: (name) => import(pathToFileURL(path.join(tmp, `${name}.mjs`)).href), cleanup: () => rmSync(tmp, { recursive: true, force: true }) };
 }
+
+test('native creation pins a real factory target and persists its dynamic tool across empty-thread recovery',async()=>{
+  const f=await fixtureModules();
+  try{
+    const {CodexChatGateway}=await f.load('gateway'),gateway=new CodexChatGateway(),calls=[];
+    const provider={providerId:'desktop_bundled',view:{stateIdentityHash:'storage-v2:factory',availability:'ready',capabilities:{factoryTools:true}}};
+    const connection={request:async(method,params)=>{calls.push({method,params});return {thread:{id:'native_factory_'+calls.length},model:'pinned-model'};},markThreadLoaded(){}};
+    gateway.runtime={effectiveProvider:async()=>provider,provider:async()=>provider,connection:async()=>connection,threadDefaults:()=>({cwd:f.root,sandbox:'danger-full-access',model:'changed-default'})};
+    gateway.threadDetail=async id=>({thread:await gateway.store.get(id)});gateway.emit=()=>{};
+    const request={clientThreadId:'native_factory_creation',source:'chat',factoryIntent:{action:'create-new-agent',slug:'native-counter'},settings:{modelId:'pinned-model',effortId:'low'}};
+    const first=await gateway.createThread(request),binding=first.detail.thread;
+    assert.equal(binding.subject.slug,'native-counter');assert.equal(binding.workspace.factorySlug,'native-counter');assert.equal(binding.sandbox,'read-only');
+    assert.equal(calls[0].params.approvalPolicy,'never');assert.equal(calls[0].params.dynamicTools[0].name,'factory_step');assert.match(calls[0].params.developerInstructions,/resume its saved phase/);
+    assert.equal((await gateway.createThread(request)).detail.thread.chatId,binding.chatId);assert.equal(calls.length,1);
+    const replaced=await gateway.replaceEmptyDirectThread(binding,request);assert.notEqual(replaced.nativeThreadId,binding.nativeThreadId);
+    assert.deepEqual(calls[1].params.dynamicTools,calls[0].params.dynamicTools);assert.equal(calls[1].params.developerInstructions,calls[0].params.developerInstructions);
+    assert.equal(replaced.workspace.factoryTarget,binding.workspace.factoryTarget);assert.equal(replaced.factoryEffortId,'low');
+    await assert.rejects(gateway.startTurn(binding.chatId,{clientMessageId:'alter_factory_settings',input:[{type:'text',text:'Continue'}],settings:{effortId:'high'}}),{code:'runtime_identity_mismatch'});
+    provider.view.capabilities.factoryTools=false;
+    await assert.rejects(gateway.createThread({...request,clientThreadId:'native_factory_unsupported',factoryIntent:{action:'create-new-agent',slug:'unsupported-counter'}}),{code:'provider_capability_unavailable'});
+    assert.equal(calls.length,2);
+  }finally{f.cleanup();}
+});
+
+test('Voice Codex uses the same native factory creation and keeps its topic, model and exact target',async()=>{
+  const f=await fixtureModules();
+  try{
+    const {CodexChatGateway}=await f.load('gateway'),gateway=new CodexChatGateway(),calls=[];
+    const provider={providerId:'desktop_bundled',view:{stateIdentityHash:'storage-v2:factory',availability:'ready',capabilities:{factoryTools:true}}};
+    const connection={request:async(method,params)=>{calls.push({method,params});return {thread:{id:'native_voice_factory'},model:'pinned-model'};},markThreadLoaded(){}};
+    gateway.runtime={effectiveProvider:async()=>provider,connection:async()=>connection,threadDefaults:()=>({cwd:f.root,sandbox:'danger-full-access',model:'wrong-default'})};
+    gateway.threadDetail=async id=>({thread:await gateway.store.get(id),activeTurnId:null,pendingRequests:[],queued:[]});gateway.emit=()=>{};
+    const backend=gateway.voiceTaskBackend(),topic={connectorId:'codex',topicId:'topic_'+'a'.repeat(40),clientThreadId:'voice_factory_native',scope:{kind:'agent',id:'voice-native-counter',generation:1},preset:{modelId:'pinned-model',reasoningEffort:'low',timeoutMs:30000},workspace:{mode:'read-only',factorySlug:'voice-native-counter'}};
+    const request={chat:{workspace:topic.workspace,subject:{kind:'child',slug:'voice-native-counter',phase:'interview'}},turn:{input:[{type:'text',text:'Create the counter'}]}};
+    const created=await backend.create(topic,request),bound={...topic,chatId:created.chatId,resolvedModelId:created.modelId};
+    assert.equal((await backend.create(topic,request)).chatId,created.chatId);assert.equal(calls.filter(row=>row.method==='thread/start').length,1);
+    const binding=await gateway.store.get(created.chatId);assert.equal(binding.origin,'voice');assert.equal(binding.group,'voice_work');assert.equal(binding.voiceTopicId,topic.topicId);
+    assert.equal(binding.workspace.factorySlug,topic.scope.id);assert.equal(binding.sandbox,'read-only');assert.equal(calls[0].params.dynamicTools[0].name,'factory_step');
+    assert.deepEqual((await backend.detail(bound)).pendingRequests,[]);
+    for(const change of [{connectorId:'claude'},{preset:{...topic.preset,reasoningEffort:'high'}},{scope:{...topic.scope,generation:2}},{sessionId:'another-session'},{workspace:{...topic.workspace,factorySlug:'neighbor'}}])await assert.rejects(backend.detail({...bound,...change}));
+    await assert.rejects(backend.create({...topic,scope:{...topic.scope,id:'neighbor'}},request),{code:'voice_topic_workspace_mismatch'});
+    assert.equal(calls.filter(row=>row.method==='thread/start').length,1);
+  }finally{f.cleanup();}
+});
 
 test("storage identity survives version/provider changes and canonicalizes symlinks", async () => {
   const f = await fixtureModules();
@@ -735,4 +780,32 @@ test('separate paginated history cannot interrupt a live turn or release its res
   native.turns[0].status='completed';native.status='idle';await gateway.reconcileExecutions(binding,native);
   assert.equal(gateway.store.execution.claims().filter(row=>row.kind!=='metadata').length,0);
  }finally{if(gateway){gateway.queueStopped=true;clearTimeout(gateway.queueTimer);for(const id of gateway.activeTurns.keys())gateway.releaseActiveTurn(id);}f.cleanup();}
+});
+
+test('native factory restart releases its slot only after host-worker exit is proven',async()=>{
+ const f=await fixtureModules();let gateway;
+ try {
+  const native={id:'factory-recovery-native',cwd:f.root,status:'idle',turns:[]};
+  const connection={generation:'fixture',markThreadLoaded(){},ensureThreadLoaded:async()=>{},request:async(method,params)=>{
+   if(method==='thread/start')return {thread:native};
+   if(method==='turn/start'){const turn={id:'factory-recovery-turn',status:'inProgress',items:[{id:'user',type:'userMessage',clientId:params.clientUserMessageId,content:params.input}]};native.turns=[turn];native.status='active';return {turn};}return {};
+  }};
+  gateway=await coordinatedGateway(f,connection,native);
+  const clientMessageId=randomUUID(),created=await gateway.createThreadWithFirstTurn({clientThreadId:randomUUID(),source:'chat',initialTurn:{clientMessageId,input:[{type:'text',text:'continue factory'}]}});
+  const chatId=created.data.detail.thread.chatId,active=gateway.activeTurns.get(chatId);
+  await gateway.store.patch(chatId,{workspace:{...(await gateway.store.get(chatId)).workspace,factorySlug:'recovery-counter'}});
+  const binding=await gateway.store.get(chatId),toolKey='provider-tool:'+active.turnId+':recovery';
+  gateway.store.execution.reserveIntent(toolKey,'recovery-hash',{kind:'provider-tool',chatId,turnId:active.turnId,owner:'fixture'});
+  gateway.store.execution.updateIntent(toolKey,{state:'running',exitConfirmed:false});
+  // Simulate owner loss without pretending to release its durable claims.
+  gateway.activeTurns.clear();gateway.activeTurnLeases.clear();
+  native.turns[0].status='completed';native.status='idle';
+  await gateway.reconcileExecutions(binding,native);
+  assert.ok(gateway.store.execution.claims().some(row=>row.kind!=='metadata'));
+  assert.notEqual(gateway.store.execution.getIntent('turn:'+chatId+':'+clientMessageId).state,'completed');
+  gateway.store.execution.updateIntent(toolKey,{state:'failed',exitConfirmed:true});
+  await gateway.reconcileExecutions(binding,native);
+  assert.equal(gateway.store.execution.claims().filter(row=>row.kind!=='metadata').length,0);
+  assert.equal(gateway.store.execution.getIntent('turn:'+chatId+':'+clientMessageId).state,'completed');
+ }finally{if(gateway){gateway.queueStopped=true;clearTimeout(gateway.queueTimer);}f.cleanup();}
 });

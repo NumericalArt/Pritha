@@ -1,0 +1,74 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import ts from '../interfaces/control-center/node_modules/typescript/lib/typescript.js';
+import * as host from '../scripts/lib/provider-host-tools.mjs';
+import * as factory from '../scripts/lib/provider-factory-tools.mjs';
+import * as approvals from '../scripts/lib/provider-approvals.mjs';
+import * as snapshot from '../scripts/neuraldeep/process-snapshot.mjs';
+import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact} from '../scripts/agents-mother/voice-factory-state.mjs';
+import {contractData} from '../scripts/agents-mother/contract.mjs';
+const require=createRequire(import.meta.url),module={exports:{}};
+const dependencies={'../../../../../scripts/lib/provider-host-tools.mjs':host,'../../../../../scripts/lib/provider-factory-tools.mjs':factory,'../../../../../scripts/lib/provider-approvals.mjs':approvals,'../../../../../scripts/neuraldeep/process-snapshot.mjs':snapshot};
+const source=fs.readFileSync('interfaces/control-center/src/lib/codex-chat/native-factory.ts','utf8');
+new Function('require','module','exports',ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(id=>id.startsWith('node:')?require(id):dependencies[id],module,module.exports);
+const {NativeFactoryTurn,nativeFactoryTools,nativeFactoryProcessesExited}=module.exports;
+const root=process.cwd();
+const brief={identity:{name:'Native Counter',slug:'native-counter'},goal:'Count words in a local UTF-8 text file.',user:'Local operator',successCriteria:['Returns a JSON word count.'],coreFunctions:['Count words'],nonGoals:['No network or services'],technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'No third-party repository is needed.'}};
+async function until(fn){for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('Expected host event did not arrive');}
+function fixture(t){
+  const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'pritha-native-factory-'))),stateRoot=path.join(directory,'state'),agentParent=path.join(directory,'children');fs.mkdirSync(stateRoot);fs.mkdirSync(agentParent);
+  const coordinator=new ExecutionCoordinator({stateRoot}),lease=coordinator.claim(['native-test'],'native-owner',{kind:'turn',detail:{chatId:'chat_native',connectorId:'codex'}});
+  const paths=voiceFactoryPaths({root,stateRoot,agentParent,slug:'native-counter'});coordinator.extend(lease.owner,lease.generation,['workspace:'+paths.target]);
+  const turns=[],options={root,cwd:root,stateRoot,agentParent,privateRoot:path.join(stateRoot,'codex-chat'),chatId:'chat_native',turnId:'turn_first',threadId:'thread_native',nativeTurnId:()=> 'native_turn',lease,coordinator,slug:paths.slug,target:paths.target,model:'test-native-model',effort:'low',emit(){}};
+  const make=(turnId)=>{const turn=new NativeFactoryTurn({...options,turnId:turnId || options.turnId});turns.push(turn);return turn;},turn=make();let sequence=0;
+  const call=(input,target=turn)=>target.call({threadId:'thread_native',turnId:'native_turn',callId:'call_'+(++sequence),tool:'factory_step',arguments:{operation_id:'native_op_'+sequence,...input}});
+  const state=()=>loadVoiceFactory(paths,{chatId:'chat_native',connectorId:'codex'});
+  t.after(async()=>{for(const t of turns)await t.close();lease.release();coordinator.close();fs.rmSync(directory,{recursive:true,force:true});});
+  return {turn,make,call,state,coordinator,paths,options};
+}
+test('native tool protocol reaches the actual factory and retains two exact approvals across turns',{timeout:30000},async t=>{
+  const f=fixture(t);assert.equal(nativeFactoryTools()[0].type,'function');
+  const initialized=await f.call({action:'init',brief,build_token_budget:10000});assert.equal(initialized.success,true,JSON.stringify(initialized));
+  assert.equal(f.state().phase,'contract-draft');assert.equal(approvals.pendingProviderRequests(f.coordinator,'chat_native').length,0);
+  assert.equal(contractData(f.state().contract,{root}).buildExecutor,'codex-app-server');assert.equal(fs.existsSync(f.paths.target),false);
+  const toolKey='provider-tool:turn_first:native_op_1',proof=f.coordinator.getIntent(toolKey).processProof;
+  assert.ok(proof);assert.equal(nativeFactoryProcessesExited(f.coordinator,'chat_native','turn_first'),true);
+  f.coordinator.updateIntent(toolKey,{processProof:{...proof,coverage:'unknown'}});
+  assert.equal(nativeFactoryProcessesExited(f.coordinator,'chat_native','turn_first'),false);
+  f.coordinator.updateIntent(toolKey,{processProof:proof});
+  const contract=factoryArtifact(f.paths,f.state(),'contract');
+  const approving=f.call({action:'approve_contract',expected_sha256:contract.sha256});
+  await until(()=>approvals.pendingProviderRequests(f.coordinator,'chat_native').length===1);
+  const request=approvals.pendingProviderRequests(f.coordinator,'chat_native')[0];assert.equal(request.kind,'file_change_approval');assert.equal(f.state().contractApproval,undefined);
+  await approvals.answerProviderRequest(f.coordinator,'chat_native',{requestId:request.requestId,revision:request.presentation.revision,clientMessageId:'native_contract_answer',decision:'accept'});
+  assert.equal((await approving).success,true);assert.equal(f.state().outcomeApproval,undefined);
+  const revision=f.state().revision;await f.turn.close();const resumed=f.make('turn_resumed');
+  assert.equal((await f.call({action:'approve_contract',expected_sha256:contract.sha256},resumed)).success,true);
+  assert.equal(f.state().revision,revision);assert.equal(approvals.pendingProviderRequests(f.coordinator,'chat_native').length,0);
+  assert.equal((await f.call({action:'create_outcome'},resumed)).success,true);
+  const blocked=await f.call({action:'scaffold'},resumed);assert.equal(blocked.success,false);assert.match(blocked.contentItems[0].text,/factory_outcome_approval_required/);
+  const outcome=factoryArtifact(f.paths,f.state(),'outcome'),accepting=f.call({action:'approve_outcome',expected_sha256:outcome.sha256},resumed);
+  await until(()=>approvals.pendingProviderRequests(f.coordinator,'chat_native').length===1);
+  const second=approvals.pendingProviderRequests(f.coordinator,'chat_native')[0];assert.notEqual(second.requestId,request.requestId);
+  await approvals.answerProviderRequest(f.coordinator,'chat_native',{requestId:second.requestId,revision:second.presentation.revision,clientMessageId:'native_outcome_answer',decision:'accept'});
+  assert.equal((await accepting).success,true);assert.equal((await f.call({action:'approve_outcome',expected_sha256:outcome.sha256},resumed)).success,true);
+  assert.equal(approvals.pendingProviderRequests(f.coordinator,'chat_native').length,0);assert.equal(f.state().phase,'outcome-approved');assert.equal(fs.existsSync(f.paths.target),false);
+});
+test('native factory refuses foreign threads, turns, namespaces and tools before touching state',async t=>{
+  const f=fixture(t),base={threadId:'thread_native',turnId:'native_turn',callId:'call_fixture',tool:'factory_step',arguments:{operation_id:'native_foreign_test',action:'status'}};
+  for(const extra of [{threadId:'foreign'},{turnId:'foreign'},{namespace:'foreign'},{tool:'run_command'}])await assert.rejects(f.turn.call({...base,...extra}),/factory_binding_changed/);
+  assert.equal(f.state(),null);
+  const invalid=await f.call({action:'init',brief:{...brief,design:{inputDataTypes:['UTF-8']}},build_token_budget:10000});assert.equal(invalid.success,false);assert.match(invalid.contentItems[0].text,/brief.design.inputDataTypes/);assert.equal(f.state(),null);
+});
+test('closing a native turn cancels its pending approval without accepting the document',{timeout:10000},async t=>{
+  const f=fixture(t);await f.call({action:'init',brief,build_token_budget:10000});
+  const pending=f.call({action:'approve_contract',expected_sha256:factoryArtifact(f.paths,f.state(),'contract').sha256});
+  await until(()=>approvals.pendingProviderRequests(f.coordinator,'chat_native').length===1);
+  assert.equal((await f.turn.close()).processTreeExited,true);assert.equal((await pending).success,false);
+  assert.equal(f.state().contractApproval,undefined);assert.equal(approvals.pendingProviderRequests(f.coordinator,'chat_native').length,0);
+});

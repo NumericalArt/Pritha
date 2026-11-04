@@ -163,14 +163,13 @@ test('public factory entry rejects forged host authority for every provider befo
   }
   assert.equal(routes.rows.size,0);assert.equal(drivers.reduce((n,d)=>n+d.calls.length,0),0);
 });
-test('public explicit factory intent reaches only the selected external driver, while Codex keeps context-only subjects',()=>{
+test('public explicit factory intent reaches each selected driver without changing ordinary context-only subjects',()=>{
   const drivers=profile.PROVIDER_CONNECTOR_IDS.map(driver),gateway=new CodexChatGateway(drivers),factoryIntent={action:'create-new-agent',slug:'new-child'};
   for(const connectorId of profile.PROVIDER_CONNECTOR_IDS)for(const method of ['createThread','createThreadWithFirstTurn']){
     const base={clientThreadId:'intent_'+connectorId+'_'+method,source:'chat',connectorId,factoryIntent,workspace:{mode:'read-only'},initialTurn:{clientMessageId:'intent_message',input:[{type:'text',text:'Make a line counter'}]}};
-    if(connectorId==='codex'){assert.throws(()=>gateway[method](base),{code:'provider_capability_unavailable'});continue;}
     gateway[method](base);const request=drivers.find(d=>d.connectorId===connectorId).calls.at(-1).args[0];
     assert.deepEqual(request.factoryIntent,factoryIntent);assert.equal(request.subject,undefined);assert.deepEqual(request.workspace,{mode:'read-only'});assert.equal(request.connectorId,undefined);
   }
-  const native=drivers.find(d=>d.connectorId==='codex');assert.equal(native.calls.length,0);
-  gateway.createThread({clientThreadId:'native_context',source:'chat',connectorId:'codex',subject:{kind:'child',slug:'new-child',phase:'interview'}});assert.equal(native.calls[0].args[0].factoryIntent,undefined);
+  const native=drivers.find(d=>d.connectorId==='codex');assert.equal(native.calls.length,2);
+  gateway.createThread({clientThreadId:'native_context',source:'chat',connectorId:'codex',subject:{kind:'child',slug:'new-child',phase:'interview'}});assert.equal(native.calls.at(-1).args[0].factoryIntent,undefined);
 });

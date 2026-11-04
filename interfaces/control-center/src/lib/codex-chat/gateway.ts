@@ -111,9 +111,8 @@ export class CodexChatGateway {
   }
   createThread(input: Create) {
     normalizeChatSubject(input.subject);
-    const intent=this.validatePublicFactoryRequest(input);
+    this.validatePublicFactoryRequest(input);
     const route = this.creationRoute(input), { connectorId: _connectorId, ...request } = input;
-    if(intent && route.connectorId==='codex')throw new CodexChatGatewayError('provider_capability_unavailable','Use the existing native agent workflow or select an external provider for Create new agent.',422);
     return this.driver(route.connectorId).backend.createThread({ ...request, settings: { ...request.settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
   }
   createThreadWithFirstTurn(input: CreateWithTurn) {
@@ -121,9 +120,8 @@ export class CodexChatGateway {
     if (input.settings?.modelId && input.initialTurn.settings?.modelId && input.settings.modelId !== input.initialTurn.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "The first turn must use the chat's model.", 409);
     for(const field of ['effortId','serviceTierId'] as const)if(input.settings?.[field] && input.initialTurn.settings?.[field] && input.settings[field]!==input.initialTurn.settings[field])throw new CodexChatGatewayError('runtime_identity_mismatch','The first turn must use the chat’s execution settings.',409);
     const settings={...input.initialTurn.settings,...input.settings};
-    const intent=this.validatePublicFactoryRequest(input);
+    this.validatePublicFactoryRequest(input);
     const route = this.creationRoute({ ...input, settings }), { connectorId: _connectorId, ...request } = input;
-    if(intent && route.connectorId==='codex')throw new CodexChatGatewayError('provider_capability_unavailable','Use the existing native agent workflow or select an external provider for Create new agent.',422);
     return this.driver(route.connectorId).backend.createThreadWithFirstTurn({ ...request, settings: { ...settings, ...(route.modelId ? { modelId: route.modelId } : {}) } });
   }
   activity(after = 0) { return this.drivers.size === 1 ? this.driver("codex").backend.activity(after) : this.activityMux.read(after); }

@@ -56,6 +56,12 @@ test("realtime voice contract derives OpenAI Realtime research topic", () => {
   assert.equal(externalResearchRequired({ primaryInterface: "web realtime voice" }), true);
 });
 
+test('a child name does not invent runtime dependencies',()=>{
+  const data={agentName:'Voice Word Counter Acceptance',runtimeFamily:'cli',primaryInterface:'CLI',dependencies:'Node.js built-in fs and TextDecoder',coreFunctions:['Count whitespace-delimited words in a UTF-8 file']};
+  assert.ok(!ids(data).includes('openai-realtime'));assert.ok(ids(data).includes('declared-dependencies'));
+  assert.ok(ids({...data,primaryInterface:'Voice with WebRTC'}).includes('openai-realtime'));
+});
+
 test("Telegram contract derives Bot API and untrusted input topics", () => {
   const topics = ids({
     runtimeFamily: "codex-native",

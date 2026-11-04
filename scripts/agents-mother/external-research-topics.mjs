@@ -23,7 +23,6 @@ function slug(value, fallback = "pattern") {
 
 function combinedContractText(data = {}) {
   return [
-    data.agentName,
     data.primaryMission,
     data.runtimeFamily,
     data.runtimePlacementProfile,

@@ -97,9 +97,9 @@ export class ProviderHostTools {
     const prior=coordinator.getIntent(key);
     if(prior?.state==='completed' || prior?.state==='declined'){const saved=this.saved(input.operation_id);return {...text({...this.window(saved.output,{}),status:saved.status,exitCode:saved.exitCode ?? null,operationId:input.operation_id}),isError:saved.status!=='completed'};}
     if(prior)throw fail('provider_tool_execution_unconfirmed');
-    let presentation,kind,perform;
+    let presentation,kind,perform,alreadyApproved=false;
     if(name==='factory_step'){
-      ({kind,presentation,perform}=this.factory.prepare(input));
+      ({kind,presentation,perform,alreadyApproved=false}=this.factory.prepare(input));
     }else if(name==='write_file' || name==='edit_file'){
       fields(input,name==='write_file'?['operation_id','path','content','expected_sha256']:['operation_id','path','old_text','new_text','expected_sha256']);
       if(this.options.sandbox!=='workspace-write' || input.expected_sha256!==null && !/^[a-f0-9]{64}$/.test(input.expected_sha256 || ''))throw fail('provider_tool_write_denied');
@@ -141,10 +141,11 @@ export class ProviderHostTools {
     coordinator.updateIntent(key,{state:'approval_pending'});
     let result;
     try{
-      const response=await this.options.approve({operationId:input.operation_id,kind,presentation,reason:name==='ask_user'?'The task needs your answer.':name==='factory_step'?'Review this exact factory step. Contract approval, Outcome approval and final acceptance are separate decisions.':'Review the exact action before it runs in the task workspace.'});
+      const workflowAuthorized=name==='factory_step' && (alreadyApproved || this.factory.workflowAuthorized(input));
+      const response=workflowAuthorized?{decision:'accept'}:await this.options.approve({operationId:input.operation_id,kind,presentation,reason:name==='ask_user'?'The task needs your answer.':name==='factory_step'?'Review this document and its limits. Contract approval, Outcome approval and final acceptance are separate decisions.':'Review the exact action before it runs in the task workspace.'});
       this.check();
       if(kind!=='user_input' && response.decision!=='accept')result={status:'declined',output:'The operator declined this action.'};
-      else{coordinator.updateIntent(key,{state:'running'});result=await perform(response);}
+      else{coordinator.updateIntent(key,{state:'running',...(workflowAuthorized?{authorization:alreadyApproved?'existing-document-approval':'bound-creation-workflow'}:{})});result=await perform(response);}
     }catch(error){result={status:'failed',output:/^[a-z_]{1,80}$/.test(error.code || '')?error.code:'provider_tool_failed'};}
     const file=this.resultPath(input.operation_id),fd=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
     try{writeFileSync(fd,JSON.stringify(result));fsyncSync(fd);}finally{closeSync(fd);}

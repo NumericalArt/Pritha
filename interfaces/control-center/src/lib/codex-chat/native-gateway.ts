@@ -2,7 +2,12 @@ import { HistoryReader, HistoryError, HISTORY_READ_MS, type HistoryContext } fro
 import { planOperationDecision, resolveOperationDecision, type OperationAction, type OperationRequest } from "../../../../../scripts/agents-mother/operation-decisions.mjs";
 import { operationRuntime } from "./operation-runtime";
 import { createHash, randomUUID } from "node:crypto";
-import {normalizeChatSubject,factorySubjectInstructions,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
+import {normalizeChatSubject,normalizeFactoryIntent,factorySubjectInstructions,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
+import {prepareFactoryBinding,factoryDraftReceipt} from '../../../../../scripts/agents-mother/voice-factory-state.mjs';
+import {pendingProviderRequests,answerProviderRequest} from '../../../../../scripts/lib/provider-approvals.mjs';
+import {NativeFactoryTurn,nativeFactoryTools,nativeFactoryInstructions,nativeFactoryProcessesExited} from './native-factory';
+import {nativeVoiceTaskBackend} from './native-voice-backend';
+import type {VoiceTaskBackend} from '../../../../../scripts/lib/voice-task-bridge.mjs';
 import path from "node:path";
 import { prepareTaskWorkspace, inspectTaskWorkspace, taskWorkspaceResources, verifyTaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
 import { resolvePrithaRoot } from "@/lib/pritha-paths";
@@ -76,6 +81,7 @@ type ActiveAttempt = ActiveAttemptSnapshot & {
   acknowledged: boolean;
   intentKey?: string;
   controlCleanup?: () => void;
+  factory?: NativeFactoryTurn;
 };
 
 type EventSubscriber = { send: (event: ChatEventRecord) => void; close: (() => void) | null };
@@ -193,7 +199,13 @@ export class CodexChatGateway {
   private readonly store = new CodexChatPrivateStore();
   readonly attachments = new ChatAttachmentStore(this.store.stateRoot, this.store.root);
   private readonly root = resolvePrithaRoot();
-  private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message, origin) => this.handleNotification(providerId, message, origin), this.root);
+  private readonly runtime = new CodexRuntimeManager(this.store, (providerId, message, origin) => this.handleNotification(providerId, message, origin), this.root,
+    async (providerId,message) => {
+      const binding=await this.store.findByNative(providerId,String(message.params?.threadId || ''));
+      const factory=binding && this.activeTurns.get(binding.chatId)?.factory;
+      if(!factory)throw new Error('factory_binding_unavailable');
+      return factory.call(message.params || {});
+    });
   private readonly activeTurns = new Map<string, ActiveAttempt>();
   private readonly activeTurnLeases = new Map<string, () => void>();
   private readonly events = new Map<string, ChatEventRecord[]>();
@@ -205,6 +217,34 @@ export class CodexChatGateway {
   private queueStopped = false;
   private refreshOffset = 0;
   private queueOffset = 0;
+
+  voiceTaskBackend=():VoiceTaskBackend=>nativeVoiceTaskBackend({gateway:this,execution:this.store.execution,binding:id=>this.requireBinding(id),
+    create:async(input,topic)=>{
+      const result=await this.createThread(input),binding=await this.requireBinding(result.detail.thread.chatId);
+      if(binding.voiceTopicId && (binding.voiceTopicId!==topic.topicId || binding.voiceTopicGeneration!==topic.scope.generation))throw new CodexChatGatewayError('voice_topic_chat_mismatch','This chat belongs to another Voice topic.',409);
+      if(!binding.voiceTopicId){
+        if(Object.keys(binding.messageReceipts).length)throw new CodexChatGatewayError('voice_topic_chat_mismatch','The original conversation already has messages.',409);
+        await this.store.patch(binding.chatId,{voiceTopicId:topic.topicId,voiceTopicGeneration:topic.scope.generation,origin:'voice',group:'voice_work'});
+      }
+      return this.requireBinding(binding.chatId);
+    },receipt:async(topic,id)=>{
+      const binding=await this.requireBinding(topic.chatId!),common={chatId:binding.chatId,clientMessageId:id,sessionId:binding.nativeThreadId};
+      const receipt=binding.messageReceipts[id];
+      if(receipt){
+        const native=await this.readNativeThread(binding,true);
+        const raw=(Array.isArray(native.turns)?native.turns:[]).find(value=>asObject(value)?.id===receipt.nativeTurnId);
+        const turn:TurnView|null=raw ? normalizeNativeTurn(binding,raw,this.root,this.activeTurns.get(binding.chatId) || null):null;
+        if(!turn)throw new CodexChatGatewayError('history_receipt_incomplete','The native turn receipt is not available yet.',409,true);
+        const resultText=turn.items.filter(item=>item.kind==='assistant_message').map(item=>item.kind==='assistant_message'?item.message.markdown:'').join('\n\n');
+        const latest=await this.requireBinding(binding.chatId);
+        return {...common,kind:'turn',turnId:turn.turnId,turn,resultText:resultText.slice(0,16000),resultTruncated:resultText.length>16000,
+          ...(turn.status==='completed'?{factoryDraftReceipt:latest.factoryTurnReceipts?.[turn.turnId] || {draftCreated:false,errorCode:'factory_draft_evidence_missing'}}:{})};
+      }
+      const queued=this.store.execution.getIntent(`queued:${binding.chatId}:${id}`);
+      if(!queued)return null;
+      if(queued.state==='cancelled')return {...common,kind:'cancelled',queueId:queued.id};
+      return {...common,kind:'queue',queueId:queued.id,revision:queued.revision,status:queued.state,reason:queued.reason || null};
+    }});
 
   private scheduleQueues() {
     if (this.queueTimer || this.queueStopped) return;
@@ -269,11 +309,12 @@ export class CodexChatGateway {
   }
 
   async enqueueMessage(chatId: string, input: StartTurnInput) {
-    if(Object.hasOwn(input,'factoryIntent'))throw new CodexChatGatewayError('runtime_identity_mismatch','Agent creation can only be selected for a new chat.',409);
+    if(['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
     return this.store.execution.withMutation(`queue-admission:${chatId}`,()=>this.enqueueMessageOwned(chatId,input));
   }
   private async enqueueMessageOwned(chatId: string, input: StartTurnInput) {
     const binding=await this.requireBinding(chatId), text=validatedTurnText(input);
+    if(binding.workspace?.factorySlug && (input.settings?.effortId && input.settings.effortId!==binding.factoryEffortId || input.settings?.modelId && input.settings.modelId!==binding.modelId))throw new CodexChatGatewayError('runtime_identity_mismatch','This factory keeps its original model and reasoning settings.',409);
     if (binding.archived) throw new CodexChatGatewayError("chat_archived","Restore this chat before queuing a message.",409);
     if (parseBudgetIntent(text).kind !== "none") throw new CodexChatGatewayError("budget_control_required","Use the task budget control for budget changes.",422);
     const provider=(await this.runtime.provider(binding.providerId)).view;
@@ -339,10 +380,11 @@ export class CodexChatGateway {
     const binding = await this.requireBinding(chatId);
     const bound = (await this.runtime.provider(binding.providerId)).view;
     const modelId = binding.modelId || status.selected.modelId;
+    const effortId=binding.workspace?.factorySlug ? binding.factoryEffortId || null : status.selected.effortId;
     const modalities = modelId ? await this.runtime.modelInputModalities(binding.providerId, modelId) : null;
     return { ...status, effectiveProvider: binding.providerId, availability: bound.availability, fallbackEnabled: false,
-      selected: { ...status.selected, modelId },
-      models: modelId ? [{ id: modelId, label: modelId, inputModalities: modalities, effortIds: [status.selected.effortId || "medium"], serviceTierIds: [status.selected.serviceTierId || "standard"], defaultEffortId: status.selected.effortId }] : [],
+      selected: { ...status.selected, modelId,effortId,...(binding.workspace?.factorySlug?{sandboxMode:'read_only' as const}: {}) },
+      models: modelId ? [{ id: modelId, label: modelId, inputModalities: modalities, effortIds: [effortId || "medium"], serviceTierIds: [status.selected.serviceTierId || "standard"], defaultEffortId: effortId }] : [],
     };
   }
 
@@ -424,14 +466,16 @@ export class CodexChatGateway {
   }
 
   async createThread(input: CreateThreadInput) {
-    if(input.factoryIntent!==undefined || input.workspace?.factorySlug!==undefined)throw new CodexChatGatewayError('provider_capability_unavailable','Use the existing native agent workflow.',422);
+    const factoryIntent=normalizeFactoryIntent(input.factoryIntent);
+    if(input.workspace?.factorySlug!==undefined)throw new CodexChatGatewayError('factory_intent_invalid','Use the new agent action with an exact child name.',422);
+    if(factoryIntent && (input.subject!=null || input.workspace && (Object.keys(input.workspace).some(key=>key!=='mode') || input.workspace.mode!=='read-only')))throw new CodexChatGatewayError('factory_intent_invalid','Create an agent separately from subject and workspace settings.',400);
     if(input.workspace?.agentId!==undefined)throw new CodexChatGatewayError('native_agent_workspace_route_required','Use the existing native child task route for this workspace.',409);
-    const subject=normalizeChatSubject(input.subject);
+    const subject=factoryIntent?normalizeChatSubject({kind:'child',slug:factoryIntent.slug,phase:'interview'}):normalizeChatSubject(input.subject);
     if (!validClientId(input.clientThreadId) || input.source !== "chat") {
       throw new CodexChatGatewayError("invalid_request", "A valid clientThreadId and source=chat are required.", 400);
     }
     if(input.workspace?.mode!==undefined && !["isolated","configured","read-only"].includes(input.workspace.mode))throw new CodexChatGatewayError("invalid_request","Unknown workspace mode.",400);
-    const createHash = hash({ clientThreadId: input.clientThreadId, source: input.source, title: input.title, settings: input.settings, ...(input.workspace ? {workspace:input.workspace} : {}),...(subject?{subject}:{}) });
+    const createHash = hash({ clientThreadId: input.clientThreadId, source: input.source, title: input.title, settings: input.settings, ...(input.workspace ? {workspace:input.workspace} : {}),...(subject?{subject}:{}),...(factoryIntent?{factoryIntent}:{}) });
     const existing = await this.store.findByClientThreadId(input.clientThreadId);
     if (existing) {
       if (existing.createHash !== createHash && existing.createHash !== hash(input)) throw new CodexChatGatewayError("idempotency_conflict", "This clientThreadId was already used with different values.", 409);
@@ -455,14 +499,17 @@ export class CodexChatGateway {
     try {
       const provider = await this.runtime.effectiveProvider();
       if (!provider) throw new CodexChatGatewayError("runtime_unavailable", "No compatible Codex runtime is available.", 503, true);
+      if(factoryIntent && !provider.view.capabilities.factoryTools)throw new CodexChatGatewayError('provider_capability_unavailable','This Codex runtime does not expose the factory tool protocol.',422);
       const connection = await this.runtime.connection(provider.providerId);
       const requestedTitle = titleText(input.title);
       const defaults = this.runtime.threadDefaults();
-      const mode=input.workspace?.mode || "configured";
+      const factory=factoryIntent?prepareFactoryBinding({root:this.root,stateRoot:this.store.stateRoot,slug:factoryIntent.slug}):null;
+      const mode=factory ? 'read-only' : input.workspace?.mode || "configured";
       const configured=defaults.sandbox || "read-only";
       const sandbox=mode === "read-only" ? "read-only" : mode === "isolated" && configured !== "read-only" ? "workspace-write" : configured;
       const workspace = await prepareTaskWorkspace({coordinator:this.store.execution,source:this.root,directory:path.join(this.store.root,"workspaces"),id:input.clientThreadId,
         mode:sandbox === "read-only" ? "read-only" : sandbox === "workspace-write" ? "worktree" : "serialized",baseRevision:input.workspace?.baseRevision});
+      if(factory){workspace.factorySlug=factory.slug;workspace.factoryTarget=factory.target;}
       creationLease.assertOwned();
       this.store.execution.updateIntent(intentKey, { state: "dispatching", providerId: provider.providerId, stateIdentityHash: provider.view.stateIdentityHash });
       dispatched = true;
@@ -471,7 +518,8 @@ export class CodexChatGateway {
         cwd: workspace.cwd,
         sandbox,
         model: input.settings?.modelId || defaults.model,
-        ...(subject?{developerInstructions:factorySubjectInstructions(subject)}:{}),
+        ...(subject?{developerInstructions:[factorySubjectInstructions(subject),factory?nativeFactoryInstructions:''].filter(Boolean).join('\n\n')}:{}),
+        ...(factory?{dynamicTools:nativeFactoryTools(),approvalPolicy:'never'}:{}),
         ephemeral: false,
       }));
       const nativeThread = asObject(response?.thread);
@@ -489,6 +537,7 @@ export class CodexChatGateway {
         connectorId: "codex",
         ...(subject?{subject}:{}),
         ...(modelId ? { modelId } : {}),
+        ...(factory?{factoryEffortId:input.settings?.effortId || ''}:{}),
         workspace,
         sandbox,
         stateIdentityHash: provider.view.stateIdentityHash,
@@ -554,7 +603,7 @@ export class CodexChatGateway {
         if (canReplace) {
           const active = this.activeTurns.get(binding.chatId);
           if (active && (active.clientMessageId !== input.initialTurn.clientMessageId || active.acknowledged)) throw error;
-          if (active) this.releaseActiveTurn(binding.chatId);
+          if (active) await this.releaseActiveTurn(binding.chatId);
           binding = await this.replaceEmptyDirectThread(binding, input);
           freshlyCreatedNativeThread = true;
           continue;
@@ -592,7 +641,7 @@ export class CodexChatGateway {
         if(current.workspace)await verifyTaskWorkspace(current.workspace);
         this.store.execution.updateIntent(key,{state:"dispatching",owner:lease.owner,generation:lease.generation},intent.revision);
         dispatched=true;
-        const response=asObject(await connection.request("thread/start",{...defaults,cwd:current.workspace?.cwd || defaults.cwd,sandbox:current.sandbox || defaults.sandbox,model:current.modelId || input.settings?.modelId || defaults.model,...(current.subject?{developerInstructions:factorySubjectInstructions(current.subject)}:{}),ephemeral:false}));
+        const response=asObject(await connection.request("thread/start",{...defaults,cwd:current.workspace?.cwd || defaults.cwd,sandbox:current.sandbox || defaults.sandbox,model:current.modelId || input.settings?.modelId || defaults.model,...(current.subject?{developerInstructions:[factorySubjectInstructions(current.subject),current.workspace?.factorySlug?nativeFactoryInstructions:''].filter(Boolean).join('\n\n')}:{}),...(current.workspace?.factorySlug?{dynamicTools:nativeFactoryTools(),approvalPolicy:'never'}:{}),ephemeral:false}));
         const nativeThreadId=String(asObject(response?.thread)?.id || "");
         if(!nativeThreadId)throw new Error("missing_thread_id");
         connection.markThreadLoaded(nativeThreadId, current.modelId);
@@ -638,10 +687,10 @@ export class CodexChatGateway {
       queued: await this.queuedMessages(chatId),
       controls: control && controlTurnId ? {turnId:controlTurnId,steer:control.steer && provider.capabilities.steerTurn,interrupt:provider.capabilities.interruptTurn} : null,
       activeTurnId: this.activeTurns.get(chatId)?.turnId || null,
-      pendingRequests: pendingNativeRequests(binding.stateIdentityHash!,binding.nativeThreadId).map(request=>({
+      pendingRequests: [...pendingProviderRequests(this.store.execution,chatId),...pendingNativeRequests(binding.stateIdentityHash!,binding.nativeThreadId).map(request=>({
         requestId:request.id,chatId,turnId:controlTurnId || "",itemId:null,kind:request.kind,title:request.kind === "user_input" ? "Input needed" : "Approval needed",reason:typeof request.params.reason === "string" ? request.params.reason : null,expiresAt:null,resolved:false,
         presentation:{...Object.fromEntries(Object.entries(request.params).filter(([key])=>!["threadId","turnId","itemId"].includes(key))),revision:request.revision,state:request.state},
-      })),
+      }))],
       streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events`,
       continuationState: summary.continuationState,
       history,
@@ -683,6 +732,8 @@ export class CodexChatGateway {
   async answerRequest(chatId:string,input:Parameters<typeof answerNativeRequest>[2]) {
     if(!validClientId(input.clientMessageId))throw new CodexChatGatewayError("invalid_request","A stable answer identifier is required.",400);
     const binding=await this.requireBinding(chatId);
+    const hostRequest=this.store.execution.getIntentById(input.requestId);
+    if(hostRequest?.kind==='provider-request' && binding.workspace?.factorySlug)return answerProviderRequest(this.store.execution,chatId,input);
     const provider=(await this.runtime.provider(binding.providerId)).view;
     if(provider.stateIdentityHash!==binding.stateIdentityHash)throw new CodexChatGatewayError("runtime_identity_mismatch","The original request storage is unavailable.",409);
     return answerNativeRequest(binding.stateIdentityHash!,binding.nativeThreadId,input);
@@ -1120,7 +1171,7 @@ export class CodexChatGateway {
 
     const recoveredActive = active && turns.find((turn) => turn.turnId === active.turnId);
     if (recoveredActive && ["completed", "interrupted", "failed"].includes(recoveredActive.status)) {
-      this.releaseActiveTurn(chatId);
+      await this.releaseActiveTurn(chatId,recoveredActive.status==='completed');
     }
     const stillActive = Boolean(this.activeTurns.get(chatId)) || turns.some((turn) =>
       turn.status === "queued"
@@ -1158,8 +1209,9 @@ export class CodexChatGateway {
   }
 
   async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean; fromQueue?: string } = {}): Promise<{ accepted: AcceptedTurn; replayed: boolean }> {
-    if(['subject','factoryIntent'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
+    if(['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
     let binding = await this.requireBinding(chatId);
+    if(binding.workspace?.factorySlug && input.settings?.effortId && input.settings.effortId!==binding.factoryEffortId)throw new CodexChatGatewayError('runtime_identity_mismatch','This factory keeps its original reasoning settings.',409);
     if (binding.modelId && input.settings?.modelId && binding.modelId !== input.settings.modelId) throw new CodexChatGatewayError("runtime_identity_mismatch", "This thread keeps its original model. Create a new chat to use a different model.", 409);
     if (binding.archived) throw new CodexChatGatewayError("chat_archived", "Restore this chat from archive before sending a message.", 409);
     if (binding.origin === "voice" && !binding.continuationEnabled) {
@@ -1257,13 +1309,14 @@ export class CodexChatGateway {
     const releaseLease = tryAcquireNativeThreadTurn(
       nativeThreadLeaseKey(binding.stateIdentityHash || binding.providerId, binding.nativeThreadId),
       `task-chat:${chatId}:${input.clientMessageId}`,
-      { coordinator: this.store.execution, kind: "turn", capacity: this.store.execution.admission().capacity, resources:[`chat-binding:${chatId}`], detail: { chatId, intentKey } },
+      { coordinator: this.store.execution, kind: "turn", capacity: this.store.execution.admission().capacity, resources:[`chat-binding:${chatId}`], detail: { chatId, intentKey, connectorId:'codex' } },
     );
     if (!releaseLease) throw new CodexChatGatewayError("turn_active", "This task thread already has an active turn.", 409, true);
     try {
       if(binding.workspace)await verifyTaskWorkspace(binding.workspace);
       const workspace = binding.workspace || {cwd:typeof native.cwd === "string" ? native.cwd : this.root};
       const policy=taskWorkspaceResources(workspace,binding.sandbox || "workspace-write");
+      if(binding.workspace?.factorySlug && (!binding.workspace.factoryTarget || !this.store.execution.extend(releaseLease.owner,releaseLease.generation,[`workspace:${binding.workspace.factoryTarget}`],{mode:'write'})))throw new CodexChatGatewayError('factory_target_busy','Another task owns this child workflow.',409,true);
       if(!this.store.execution.extend(releaseLease.owner,releaseLease.generation,policy.resources,{mode:policy.mode}) ||
         !this.store.execution.extend(releaseLease.owner,releaseLease.generation,["execution-ambient-effects"],{mode:binding.sandbox === "danger-full-access" || !binding.sandbox ? "write" : "read"})) {
         throw new CodexChatGatewayError("workspace_busy","Another task owns this workspace or shared resources. Keep this draft or add it to the queue.",409,true);
@@ -1290,6 +1343,10 @@ export class CodexChatGateway {
     this.activeTurnLeases.set(chatId, releaseLease);
     let failureStage: "connection" | "resume" | "turn_start" = "connection";
     try {
+      if(binding.workspace?.factorySlug && binding.workspace.factoryTarget)active.factory=new NativeFactoryTurn({root:this.root,stateRoot:this.store.stateRoot,privateRoot:this.store.root,cwd:binding.workspace.cwd,
+        chatId,turnId:active.turnId,threadId:binding.nativeThreadId,nativeTurnId:()=>active.nativeTurnId,lease:releaseLease,coordinator:this.store.execution,
+        slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,model:binding.modelId || '',effort:binding.factoryEffortId,
+        emit:()=>this.emit(chatId,'history.changed',{})});
       const connection = await this.runtime.connection(binding.providerId);
       failureStage = "resume";
       const resumedModel = await connection.ensureThreadLoaded(binding.nativeThreadId);
@@ -1317,7 +1374,7 @@ export class CodexChatGateway {
         ...(binding.workspace ? {cwd:binding.workspace.cwd} : {}),
         ...(binding.sandbox ? {sandboxPolicy:binding.sandbox === "read-only" ? {type:"readOnly"} : binding.sandbox === "danger-full-access" ? {type:"dangerFullAccess"} : {type:"workspaceWrite",writableRoots:[binding.workspace?.cwd || this.root],networkAccess:false,excludeTmpdirEnvVar:true,excludeSlashTmp:true}} : {}),
         ...(binding.modelId || input.settings?.modelId ? { model: binding.modelId || input.settings?.modelId } : {}),
-        ...(input.settings?.effortId ? { effort: input.settings.effortId } : {}),
+        ...(binding.workspace?.factorySlug ? (binding.factoryEffortId?{effort:binding.factoryEffortId}:{}) : input.settings?.effortId ? { effort: input.settings.effortId } : {}),
         ...(input.settings?.serviceTierId ? { serviceTier: input.settings.serviceTierId } : {}),
       }));
       active.acknowledged = true;
@@ -1358,7 +1415,7 @@ export class CodexChatGateway {
       const deliveryUnknown = active.acknowledged || (failureStage === "turn_start" && uncertainTurnStartFailure(error));
       const failureReason = turnStartFailureReason(error, failureStage, active.acknowledged);
       this.store.execution.updateIntent(intentKey, { state: deliveryUnknown ? "unknown" : "not_dispatched" });
-      if (!deliveryUnknown) this.releaseActiveTurn(chatId);
+      if (!deliveryUnknown) await this.releaseActiveTurn(chatId);
       await this.store.patch(chatId, {
         lastStatus: deliveryUnknown ? "active" : "system_error",
         updatedAt: new Date().toISOString(),
@@ -1441,7 +1498,7 @@ export class CodexChatGateway {
     this.subscribers.clear();
     // Disconnecting the dispatcher is not proof that its native turns stopped.
     for (const active of this.activeTurns.values()) if (active.intentKey) this.store.execution.updateIntent(active.intentKey, { state: "unknown" });
-    for (const active of this.activeTurns.values()) active.controlCleanup?.();
+    for (const active of this.activeTurns.values()) {await active.factory?.close();active.controlCleanup?.();}
     this.activeTurns.clear();
     this.activeTurnLeases.clear();
     this.events.clear();
@@ -1536,14 +1593,24 @@ export class CodexChatGateway {
       const terminal = ["completed", "interrupted", "failed"].includes(turn.status);
       const receipt = intent.receipt || { clientMessageId: intent.clientMessageId, requestHash: intent.hash, turnId: turn.turnId, nativeTurnId: String(candidate.id), startedAt: turn.startedAt };
       await this.store.patch(binding.chatId, { messageReceipts: { [intent.clientMessageId]: receipt } });
+      if(terminal && binding.workspace?.factorySlug){
+        const active=this.activeTurns.get(binding.chatId);
+        const exited=active?.clientMessageId===intent.clientMessageId
+          ? await this.releaseActiveTurn(binding.chatId,turn.status==='completed')
+          : nativeFactoryProcessesExited(this.store.execution,binding.chatId,receipt.turnId);
+        if(!exited)continue; // Keep the recoverable intent and its claims until both sides are terminal.
+        if(turn.status==='completed' && !binding.factoryTurnReceipts?.[receipt.turnId])await this.store.patch(binding.chatId,{factoryTurnReceipts:{...binding.factoryTurnReceipts,
+          [receipt.turnId]:factoryDraftReceipt({root:this.root,stateRoot:this.store.stateRoot,slug:binding.workspace.factorySlug,chatId:binding.chatId,connectorId:'codex'})}});
+      }
       try { this.store.execution.updateIntent(key, { state: terminal ? "completed" : "running", nativeTurnId: candidate.id, receipt }, intent.revision); }
       catch (error) { if ((error as {code?:string}).code === "execution_revision_conflict") continue; throw error; }
       const queuedKey=`queued:${binding.chatId}:${intent.clientMessageId}`;
       const queued=this.store.execution.getIntent(queuedKey);
       if(queued && ["dispatching","unknown"].includes(queued.state))this.store.execution.updateIntent(queuedKey,{state:"delivered"});
       if (terminal && intent.owner && intent.generation) {
-        this.store.execution.reconcileRelease(intent.owner, intent.generation);
-        if (this.activeTurns.get(binding.chatId)?.clientMessageId === intent.clientMessageId) this.releaseActiveTurn(binding.chatId);
+        if (this.activeTurns.get(binding.chatId)?.clientMessageId === intent.clientMessageId) {
+          if(!await this.releaseActiveTurn(binding.chatId,turn.status==='completed'))continue;
+        } else this.store.execution.reconcileRelease(intent.owner, intent.generation);
         await this.store.patch(binding.chatId, {lastStatus:turn.status === "failed" ? "system_error" : "idle",updatedAt:new Date().toISOString()});
       }
     }
@@ -1568,11 +1635,22 @@ export class CodexChatGateway {
       deliveryBudgetRequests: Object.assign({}, ...matching.map(row => row.deliveryBudgetRequests || {}), binding.deliveryBudgetRequests || {}) };
   }
 
-  private releaseActiveTurn(chatId: string) {
-    this.activeTurns.get(chatId)?.controlCleanup?.();
+  private async releaseActiveTurn(chatId: string, completed=false) {
+    const active=this.activeTurns.get(chatId);
+    if(active?.factory){
+      const proof=await active.factory.close();
+      if(!proof.processTreeExited){if(active.intentKey)this.store.execution.updateIntent(active.intentKey,{state:'unknown'});return false;}
+      if(completed){
+        const binding=await this.requireBinding(chatId);
+        if(binding.workspace?.factorySlug && !binding.factoryTurnReceipts?.[active.turnId])await this.store.patch(chatId,{factoryTurnReceipts:{...binding.factoryTurnReceipts,
+          [active.turnId]:factoryDraftReceipt({root:this.root,stateRoot:this.store.stateRoot,slug:binding.workspace.factorySlug,chatId,connectorId:'codex'})}});
+      }
+    }
+    active?.controlCleanup?.();
     this.activeTurns.delete(chatId);
     this.activeTurnLeases.get(chatId)?.();
     this.activeTurnLeases.delete(chatId);
+    return true;
   }
 
   private emit(
@@ -1678,14 +1756,14 @@ export class CodexChatGateway {
 
       if (method === "turn/completed" && nativeTurn) {
         if (active && (!active.nativeTurnId || active.nativeTurnId !== nativeTurnId)) return;
-        if (active?.intentKey) this.store.execution.updateIntent(active.intentKey, { state: "completed", nativeTurnId });
         if (usageAttempt) this.recordUsage(binding, { attemptId: usageAttempt, turnId: nativeTurnId, turnStatus: String(nativeTurn.status || "unknown") }, origin || null);
         const turn = normalizeNativeTurn(binding, nativeTurn, this.root, active);
         if (!turn) return;
         const eventName = turn.status === "interrupted" ? "turn.interrupted" : turn.status === "failed" ? "turn.failed" : "turn.completed";
         const payload = eventName === "turn.failed" ? { turn, retryMode: "resume" } : { turn };
+        if(!await this.releaseActiveTurn(binding.chatId,turn.status==='completed'))return;
+        if(active?.intentKey)this.store.execution.updateIntent(active.intentKey,{state:'completed',nativeTurnId});
         this.emit(binding.chatId, eventName, payload, { turnId: turn.turnId });
-        this.releaseActiveTurn(binding.chatId);
         const next = await this.store.patch(binding.chatId, {
           lastStatus: turn.status === "failed" ? "system_error" : "idle",
           updatedAt: new Date().toISOString(),

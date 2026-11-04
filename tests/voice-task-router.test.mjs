@@ -76,6 +76,15 @@ test('a completed provider answer cannot turn a missing factory draft into a suc
   assert.equal(failed.status.status,'failed');assert.equal(failed.status.phase,'factory_draft_failed');assert.equal(failed.status.error_code,'factory_not_started');assert.equal(failed.status.factory_draft_failed,true);
   assert.equal(f.calls.filter(row=>row[0]==='start').length,1);
 });
+
+test('reconnecting Voice preserves the factory conversation and provider instead of resetting approved work',t=>{
+  const f=fixture(t),scope={kind:'agent',id:'same-counter'},workspace={mode:'read-only',factorySlug:'same-counter'};
+  const input={taskId:'factory-first',scope,workspace,connectorId:'neuraldeep',preset:{modelId:'original-model',reasoningEffort:'low',timeoutMs:30000},request:f.request};
+  const first=f.api.reserveProviderVoiceTask(input),next=f.api.reserveProviderVoiceTask({...input,taskId:'factory-reconnected',reset:true,preset:{...input.preset,modelId:'changed-default'}});
+  assert.equal(next.topic.topicId,first.topic.topicId);assert.equal(next.topic.scope.generation,1);assert.equal(next.topic.preset.modelId,'original-model');
+  assert.throws(()=>f.api.reserveProviderVoiceTask({...input,taskId:'factory-provider-switch',connectorId:'claude',reset:true}),{code:'voice_factory_provider_pinned'});
+  assert.equal(f.calls.length,0);
+});
 test('server answer maps one exact question and replays a lost acknowledgement through its saved descriptor', async t => {
   const f = fixture(t); await f.api.dispatchProviderVoiceTask('task-one', f.request);
   f.detail.pendingRequests = [{ requestId: 'request-one', turnId: 'turn-one', kind: 'user_input', presentation: { revision: 3, questions: [{ id: 'choice_001', question: 'Which fixture?' }] } }];

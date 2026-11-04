@@ -11,7 +11,7 @@ export class ExecutionCoordinator {
   getIntent(key: string): ExecutionIntent | null;
   getIntentById(id: string): ExecutionIntent | null;
   updateIntent(key: string, patch: Record<string, unknown>, expectedRevision?: number): ExecutionIntent;
-  listIntents(options?: {states?: string[]; kind?: string; limit?: number}): ExecutionIntent[];
+  listIntents(options?: {states?: string[]; kind?: string; chatId?: string; turnId?: string; limit?: number}): ExecutionIntent[];
   claim(resources: string[], owner: string, options?: {kind?: string; detail?: Record<string, unknown>; capacity?: number; mode?: "read" | "write"}): ExecutionLease | null;
   eventWindow(): {oldest:number;newest:number};
   claims(): Array<{resource: string; owner: string; generation: string; kind: string; mode: string; pid: number; process_stamp: string | null; detail: Record<string, any>}>;

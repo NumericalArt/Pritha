@@ -20,6 +20,7 @@ export type RuntimeCapabilityMap = {
   steerTurn: boolean;
   interruptTurn: boolean;
   commandApprovals: boolean;
+  factoryTools?: boolean;
   fileChangeApprovals: boolean;
   permissionApprovals: boolean;
   requestUserInput: boolean;

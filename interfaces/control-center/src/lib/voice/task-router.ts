@@ -38,7 +38,12 @@ export function reserveProviderVoiceTask(input: {
 }) {
   const previous = input.continueTaskId ? providerVoiceTaskBinding(input.continueTaskId) : null;
   if (input.continueTaskId && !previous) throw Object.assign(new Error('The original voice topic is unavailable.'), { code: 'voice_task_binding_missing' });
-  return router().bindings.reserve({ ...input, requestHash: voiceTaskRequestHash(input.request),
+  const factoryTopic=input.workspace.factorySlug ? previous?.topic || router().bindings.latest(input.scope) : null;
+  const sameFactory=factoryTopic?.workspace.factorySlug===input.workspace.factorySlug && Boolean(input.workspace.factorySlug);
+  if(sameFactory && factoryTopic!.connectorId!==input.connectorId)throw Object.assign(new Error('Continue this child with its saved provider.'),{code:'voice_factory_provider_pinned'});
+  // A new Voice card is a new request, not a new identity for the same child.
+  // Reuse its canonical conversation and approvals even after reconnect/reset.
+  return router().bindings.reserve({ ...input,...(sameFactory?{reset:false}:{}), requestHash: voiceTaskRequestHash(input.request),
     ...(previous ? { continueTopicId: previous.topic.topicId, expectedGeneration: previous.topic.scope.generation } : {}) });
 }
 export async function dispatchProviderVoiceTask(taskId: string, request: VoiceDispatchRequest) {

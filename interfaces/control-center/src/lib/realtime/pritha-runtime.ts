@@ -4647,6 +4647,12 @@ function normalizeCodexTaskApproval(value: Partial<CodexTaskApproval> | null, ta
 
 function codexTaskApprovalReasons(task: Record<string, unknown>) {
   const taskType = String(task.task_type || "analysis").toLowerCase();
+  // A bound factory starts with private drafts in a read-only parent. Contract
+  // and Outcome are approved by the host tool before any child is scaffolded.
+  // Words like "no deployment" in a brief do not authorize or require deployment.
+  const factoryWorkspace=(task.task_chat_request as VoiceDispatchRequest | undefined)?.chat?.workspace;
+  if(taskType==='agent_creation' && task.task_chat_connector && factoryWorkspace?.mode==='read-only'
+      && factoryWorkspace.factorySlug && task.subject_kind==='agent' && factoryWorkspace.factorySlug===task.subject_id)return [];
   const writeMode = String(task.write_mode || "read_only").toLowerCase();
   const taskText = [
     task.task,
@@ -4759,13 +4765,16 @@ function codexTaskHandoffConfirmationResult(args: CodexTaskArgs, task: Record<st
   };
 }
 
+function codexAgentDirectoryName(task: Record<string, unknown>) {
+  const scope=task.thread_scope as {kind?:string;id?:string}|undefined;
+  return task.execution_agent_directory_name ?? (task.subject_kind==="agent" ? task.subject_id : undefined) ?? (scope?.kind==="agent" ? scope.id : undefined);
+}
+
 function codexAdditionalWritableDirs(root: string, task: Record<string, unknown>, sandbox: string) {
   if (sandbox !== "workspace-write") return [];
   const taskType = String(task.task_type || "").toLowerCase();
   if (taskType.toLowerCase() !== "agent_creation") return [];
-  const scope=task.thread_scope as {kind?:string;id?:string}|undefined;
-  const name=task.execution_agent_directory_name || (task.subject_kind==="agent" ? task.subject_id : undefined) || (scope?.kind==="agent" ? scope.id : undefined);
-  return [scopedAgentWorkspace(resolvePrithaAgentParent(root),name)];
+  return [scopedAgentWorkspace(resolvePrithaAgentParent(root),codexAgentDirectoryName(task))];
 }
 
 function codexFactoryStateWritableDirs(root:string,task:Record<string,unknown>,sandbox:string) {
@@ -4814,6 +4823,8 @@ function codexEffectiveTimeoutMs(task?: Record<string, unknown>) {
 
 function buildCodexPrompt(task: Record<string, unknown>) {
   const root = (task.execution_workspace as TaskWorkspace | undefined)?.cwd || resolvePrithaRoot();
+  const childName = task.task_type === "agent_creation" ? codexAgentDirectoryName(task) : undefined;
+  const childTarget = childName === undefined ? null : scopedAgentWorkspace(resolvePrithaAgentParent(root), childName);
   const childAgentProjects = knownSiblingChildAgentProjects(root);
   const childAgentList = childAgentProjects
     .map((project) => rootRelative(root, project.directory))
@@ -4836,7 +4847,13 @@ function buildCodexPrompt(task: Record<string, unknown>) {
     "For task_type=agent_creation, use outcome-and-card completion: after delivery, rebuild the registry with `node scripts/pritha.mjs registry`, run `node scripts/pritha.mjs card-readiness <agent-slug>`, and do not report the creation task complete if outcome delivery lacks verified evidence or a typed blocker, or if the agent card is missing from the Pritha Agents registry/Control Center surface.",
     "A new child-agent card may show planned or blocked runtime controls; that is acceptable only when the card is visible and its blockers and next actions are explicit for the operator.",
     "For existing child-agent improvement, use `node scripts/pritha.mjs improve <project-path> --task <task>` or create an equivalent agent development task brief before implementation. The brief/pattern-pack must query Pritha memory, attempt semantic/embedding search, log semantic failures, derive external research seeds from selected patterns, and guide the smallest verified change.",
-    ...(task.task_type === "agent_creation" && task.write_mode !== "read_only" ? [`Child-agent directory: ${String(task.execution_agent_directory_name || (task.thread_scope as {kind?:string;id?:string}|undefined)?.id || "resolve the exact target before scaffold")}. Use only the exact authorized child path; the whole sibling parent is not writable.`] : []),
+    ...(task.task_type === "agent_creation" && task.write_mode !== "read_only" ? [childTarget
+      ? `Child-agent directory: ${path.basename(childTarget)}. Exact child target: ${childTarget}. Use only this authorized child path; the whole sibling parent is not writable. The task/thread identifier is conversation routing, not the child directory.`
+      : "Child-agent directory is unresolved. Obtain the exact child slug before creating files; a task or thread identifier does not authorize a child directory."] : []),
+    ...(task.task_type === "agent_creation" && !task.task_chat_connector ? [
+      "Native Codex agent creation uses the canonical `node scripts/pritha.mjs` interview, outcome, research, scaffold and delivery commands documented in 07_workflows/agents-mother.md. The `factory_step` tool belongs to external-provider Task Chat and is not supplied by this native transport. For a new native workflow, use the canonical commands instead of planning calls to an unavailable tool.",
+      "Before preparing documents, look for existing artifacts for this exact child and verify their approvals. Reuse valid approvals; do not repeat init or overwrite accepted documents. An existing external-provider factory remains bound to its saved chat/provider. Report that original continuation destination if it owns the child; do not change its session, executor or accepted budget through native CLI commands.",
+    ] : []),
     "Do not modify unrelated sibling projects in the sibling-agent parent. Use that parent only to create or update the child-agent project requested by the operator.",
     childAgentList
       ? `Existing sibling child-agent projects with AGENTS.md: ${childAgentList}. If the task explicitly asks to work on one of them, use that sibling project and keep edits inside it unless the operator separately asks for Pritha or Control Center changes.`
@@ -6485,7 +6502,7 @@ async function runCodexTask(args: CodexTaskArgs = {}, host: { reservedTaskId?: s
   const priorRequest = priorId ? await readJsonFile(path.join(privateRoot(), 'codex-tasks', priorId, 'request.json')) : null;
   const connectorId = priorRequest ? priorRequest.task_chat_connector || 'codex' : host.taskSelection?.connectorId || providerSettings.activeConnectorId;
   if (!isProviderConnectorId(connectorId)) return { ok: false, error: 'provider_profile_invalid' };
-  const external = connectorId !== 'codex';
+  const external = connectorId !== 'codex' || normalizeCodexTaskType(args.task_type)==='agent_creation' || Boolean(priorRequest?.task_chat_connector);
   const requestedMode = codexMode();
   const requestedTransport = settings.deepTaskPrimaryTransport;
   const cli = external ? { available: false, detail: 'Provider Task Chat owns this task.' } : await codexAvailable();

@@ -1034,7 +1034,7 @@ export function CodexChatPage() {
     : displayedTurns.some(turn => turn.status === "queued") ? "In queue" : null;
   const displayedThread = displayedDetail?.thread || selectedSummary;
   const effectiveProvider = runtime?.providers.find((provider) => provider.providerId === (displayedThread?.runtime.providerId || runtime.effectiveProvider));
-  const factoryCreationAvailable=Boolean(runtime?.connectorId && runtime.connectorId!=='codex' && effectiveProvider?.capabilities.commandApprovals===true);
+  const factoryCreationAvailable=Boolean(runtime?.connectorId && (runtime.connectorId==='codex' ? effectiveProvider?.capabilities.factoryTools===true : effectiveProvider?.capabilities.commandApprovals===true));
   const factoryCreationUnavailable=Boolean(!selectedChatId && factorySelections[newDraftId]?.createNew && !factoryCreationAvailable);
   const visibleError = error && (error.chatId == null || error.chatId === selectedChatId) ? error : null;
   const backendOffline = visibleError?.kind === "backend_offline";
@@ -1575,7 +1575,6 @@ export function CodexChatPage() {
         {!selectedChatId?<NewChatProviderSelector value={providerSelections[newDraftId]} runtime={runtime} disabled={Boolean(pendingNewChatDelivery)} onChange={selection=>{
           const id=newDraftIdRef.current;if(selectedChatIdRef.current || pendingNewChatDeliveriesRef.current[id])return;
           if(JSON.stringify(providerSelectionsRef.current[id])===JSON.stringify(selection))return;
-          if(selection.connectorId==='codex' && factorySelectionsRef.current[id]?.createNew){const nextFactory={...factorySelectionsRef.current,[id]:{...factorySelectionsRef.current[id],createNew:false}};factorySelectionsRef.current=nextFactory;setFactorySelections(nextFactory);}
           const next={...providerSelectionsRef.current,[id]:selection};providerSelectionsRef.current=next;setProviderSelections(next);delete creationIdsRef.current[id];
           setRuntime(current=>current && (current.connectorId || 'codex')===selection.connectorId?{...current,availability:'degraded'}:null);setError(null);setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
         }}/>:null}

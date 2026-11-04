@@ -12,6 +12,7 @@ import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,
 
 const actions=['status','read_artifact','init','write_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_apply','scaffold_plan','scaffold','deliver','delivery_status','delivery_resume','verify','finish'];
 const readonly=new Set(['status','read_artifact']);
+const workflowSteps=new Set(['init','write_draft','create_outcome','research','research_status','research_collect','research_apply','scaffold_plan','scaffold','deliver','delivery_status','verify','finish']);
 const textFields=Object.entries(INTERVIEW_BRIEF_TEXT_FIELDS);
 const briefTextPaths=new Set(textFields.flatMap(([group,keys])=>keys.map(key=>group+'.'+key)));
 class FactoryBriefInputError extends Error {
@@ -37,10 +38,20 @@ const briefSchema={type:'object',properties:{
 },required:['identity','goal','user','successCriteria'],additionalProperties:false};
 briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMILIES];
 briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
-export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound new child. Start with init and a complete product brief. Read and revise private draft contract/outcome artifacts, then request their TWO separate approvals. Research and scaffold use canonical gates; deliver/verify use the pinned provider and protected Trials. No push, deploy, services, credential provisioning or final user acceptance. status/read_artifact are read-only. Every other step requires an exact host approval. Never infer approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
-const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources'],research_apply:['selection'],delivery_resume:['answer']};
+export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound child. ALWAYS read status first and continue its saved phase; never restart an existing factory. Prepare private drafts within the requested workflow, then request TWO separate approvals: approve_contract and approve_outcome. After approval, continue research, scaffold, bounded delivery and protected Trials without asking again for technical steps. Accepted documents and budgets stay pinned. No push, deploy, services, credential provisioning or final user acceptance. Never infer document approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
+const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources','retry_failed'],research_apply:['selection'],delivery_resume:['answer']};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
 Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
+  retry_failed:{type:'boolean',description:'research_collect only: retry a confirmed failed source once within its original deadline. Never resets an uncertain operation or its limits.'},
+  sources:{type:'object',additionalProperties:{type:'string'},description:'research_collect only: map exact topic IDs from research_status to one HTTPS primary-source URL each (strings, not arrays).'},
+  selection:{type:'object',additionalProperties:false,required:['facts','synthesis'],properties:{
+    facts:{type:'array',maxItems:24,items:{type:'object',additionalProperties:false,required:['sourceId','topicId','passageId','versionContext','compatibility','compatibilityStatus'],properties:{
+      sourceId:{type:'string'},topicId:{type:'string'},passageId:{type:'string',description:'Exact passage ID from research_status; do not supply or invent a quote.'},
+      versionContext:{type:'string'},compatibility:{type:'string'},compatibilityStatus:{type:'string',enum:['compatible','incompatible','unknown']}}}},
+    synthesis:{type:'object',additionalProperties:false,required:['relationship','memory_comparison','summary','architecture_decision','alternatives','tradeoffs'],properties:{
+      relationship:{type:'string',enum:['confirms','refines','contradicts','makes-outdated']},memory_comparison:{type:'string',minLength:20},summary:{type:'string',minLength:20},architecture_decision:{type:'string',minLength:20},
+      alternatives:{type:'array',minItems:1,items:{type:'string'}},tradeoffs:{type:'array',minItems:1,items:{type:'string'}},repository_adoption_recommendation:{type:'string',enum:['proceed','hold','reject']}}},
+  },description:'research_apply only: select host-collected passages and explain their relationship to the saved research/pattern. Host computes and locks evidence hashes.'},
   build_iteration_budget:{type:'integer',minimum:1,maximum:100,description:'Proposed build iterations from the operator brief; init does not approve this budget.'},
   build_elapsed_budget_ms:{type:'integer',minimum:60000,maximum:86400000,description:'Proposed build time from delivery start, excluding interview/approval waiting. init does not approve this budget.'},
 });
@@ -49,6 +60,7 @@ export class ProviderFactoryTools {
   state(){return loadVoiceFactory(this.paths,this.options);}
   validate(input){
     if(!input || !actions.includes(input.action) || Object.keys(input).some(key=>!['operation_id','action',...(fields[input.action] || [])].includes(key)) || Buffer.byteLength(JSON.stringify(input))>60000)throw factoryFail('factory_input_invalid');
+    if(input.retry_failed!==undefined && typeof input.retry_failed!=='boolean')throw factoryFail('factory_input_invalid');
   }
   read(input){
     this.validate(input);const state=this.state();
@@ -60,9 +72,24 @@ export class ProviderFactoryTools {
     return {artifact:input.artifact,sha256:row.sha256,...this.host.window(row.text,{offset,length:24000})};
   }
   isRead(input){return readonly.has(input?.action);}
+  workflowAuthorized(input){
+    // The host-bound creation request authorizes private draft preparation.
+    // prepare/worker still enforce accepted document locks before execution,
+    // research gates, target ownership and measured build budgets. Arbitrary
+    // shell/file tools and operator answers receive no authority from this.
+    return workflowSteps.has(input.action) || input.action==='delivery_resume' && !input.answer;
+  }
   prepare(input){
     this.validate(input);const state=this.state(),p=this.paths;
     if(state?.running)throw factoryFail('factory_step_unconfirmed');
+    const acceptedKind=input.action==='approve_contract'?'contract':input.action==='approve_outcome'?'outcome':null;
+    if(acceptedKind && state?.[acceptedKind+'Approval']){
+      const approval=state[acceptedKind+'Approval'],row=factoryArtifact(p,state,acceptedKind);
+      if(row.sha256!==approval.sha256 || ![approval.sha256,approval.reviewedSha256].filter(Boolean).includes(input.expected_sha256))throw factoryFail('factory_draft_changed');
+      requireFactoryApprovals(p,state,{outcome:acceptedKind==='outcome'});
+      return {kind:'file_change_approval',presentation:{approvalScope:acceptedKind+' already accepted'},alreadyApproved:true,
+        perform:async()=>({status:'completed',output:JSON.stringify({ok:true,approved:acceptedKind,replayed:true,phase:state.phase})})};
+    }
     if(input.action==='init' ? Boolean(state?.contract) || fs.existsSync(p.target) : !state)throw factoryFail(input.action==='init'?'factory_target_exists':'factory_not_started');
     if(input.action==='init'){
       validateFactoryBudgetProposal(input);
@@ -104,9 +131,10 @@ export class ProviderFactoryTools {
     env.PRITHA_AGENT_PARENT=p.parent;env.PRITHA_PYTHON=resolvePrithaPython({root:p.root});
     let owned,timer,exited=false,reason=null;const buffers=[];let bytes=0;
     const stop=()=>{reason ||= 'operator_cancel';owned?.stop();};
+    const recordProof=evidence=>{o.coordinator.updateIntent('provider-tool:'+o.turnId+':'+input.operation_id,{processProof:evidence,factoryWorkDirectory:work});o.onProcessEvidence?.('factory-'+input.operation_id,evidence);};
     try{
       owned=await spawnSupervisedCli(process.execPath,[path.join(p.root,'scripts','agents-mother','voice-factory-worker.mjs'),requestFile],{cwd:p.root,env,
-        beforeStart:evidence=>{this.host.check();o.onProcessEvidence?.('factory-'+input.operation_id,evidence);},onEvidence:evidence=>o.onProcessEvidence?.('factory-'+input.operation_id,evidence)});
+        beforeStart:evidence=>{this.host.check();recordProof(evidence);},onEvidence:recordProof});
       this.host.commands.add(owned);o.signal?.addEventListener('abort',stop,{once:true});if(o.signal?.aborted)stop();
       timer=setTimeout(()=>{reason='factory_step_timeout';owned.stop();},['deliver','delivery_resume','verify'].includes(input.action)?3600000:600000);
       const drain=async stream=>{for await(const chunk of stream){bytes+=chunk.length;if(bytes>8*1024*1024){reason='factory_output_limit';owned.stop();break;}buffers.push(chunk);}};

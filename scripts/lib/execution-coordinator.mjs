@@ -190,10 +190,12 @@ export class ExecutionCoordinator {
     });
   }
 
-  listIntents({ states, kind, limit = 200 } = {}) {
+  listIntents({ states, kind, chatId, turnId, limit = 200 } = {}) {
     const clauses = [], parameters = [];
     if (states?.length) { clauses.push(`state IN (${states.map(() => "?").join(",")})`); parameters.push(...states); }
     if (kind) { clauses.push("kind=?"); parameters.push(kind); }
+    if (chatId) { clauses.push("json_extract(value, '$.chatId')=?"); parameters.push(chatId); }
+    if (turnId) { clauses.push("json_extract(value, '$.turnId')=?"); parameters.push(turnId); }
     return this.db.prepare(`SELECT value FROM execution_intents${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""} ORDER BY rowid LIMIT ?`)
       .all(...parameters, Math.max(1, Math.min(limit, 1000))).map(decoded);
   }

@@ -39,6 +39,7 @@ type ProviderProbe = {
 export type RuntimeNotificationOrigin = { stateIdentityHash: string; runtimeVersion: string | null };
 type NotificationHandler = (providerId: RuntimeProviderId, message: RpcMessage, origin: RuntimeNotificationOrigin) => void | Promise<void>;
 type ExitHandler = (providerId: RuntimeProviderId, exitCode: number | null, signal: NodeJS.Signals | null) => void | Promise<void>;
+export type RuntimeToolHandler = (providerId: RuntimeProviderId, message: RpcMessage, origin: RuntimeNotificationOrigin) => Promise<unknown>;
 
 const PROBE_TTL_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -203,6 +204,7 @@ export class AppServerConnection {
     notificationHandler: NotificationHandler,
     private readonly exitHandler?: ExitHandler,
     private readonly historyOnly = false,
+    private toolHandler?: RuntimeToolHandler,
   ) {
     this.notificationHandler = notificationHandler;
   }
@@ -210,6 +212,8 @@ export class AppServerConnection {
   setNotificationHandler(handler: NotificationHandler) {
     this.notificationHandler = handler;
   }
+
+  setToolHandler(handler?: RuntimeToolHandler) { this.toolHandler = handler; }
 
   notificationOrigin(): RuntimeNotificationOrigin {
     return { stateIdentityHash: this.stateIdentityHash, runtimeVersion: this.runtimeVersion };
@@ -352,7 +356,7 @@ export class AppServerConnection {
       {
         clientInfo: { name: "pritha_control_center", title: "Pritha Control Center", version: "0.1.0" },
         capabilities: {
-          experimentalApi: this.historyOnly,
+          experimentalApi: this.historyOnly || Boolean(this.toolHandler),
           requestAttestation: false,
           optOutNotificationMethods: ["item/reasoning/textDelta", "item/reasoning/summaryTextDelta"],
         },
@@ -399,6 +403,13 @@ export class AppServerConnection {
 
     if (message.id !== undefined && message.method) {
       const generation=this.generation;
+      if (!this.historyOnly && message.method === 'item/tool/call' && this.toolHandler) {
+        const respond=(result:unknown)=>{
+          if(this.generation===generation && this.child?.stdin.writable)this.child.stdin.write(`${JSON.stringify({id:message.id,result})}\n`);
+        };
+        void this.toolHandler(this.providerId,message,this.notificationOrigin()).then(respond,()=>respond({success:false,contentItems:[{type:'inputText',text:'The bound factory tool could not complete this step.'}]}));
+        return;
+      }
       try {
       if (!this.historyOnly && captureNativeRequest(message,this.stateIdentityHash,generation,result=>{
         if (this.generation!==generation || !this.child?.stdin.writable) throw new Error("native_request_connection_expired");
@@ -428,6 +439,7 @@ export class CodexRuntimeManager {
     private readonly store: CodexChatPrivateStore,
     private readonly onNotification: NotificationHandler,
     private readonly root = resolvePrithaRoot(),
+    private readonly onTool?: RuntimeToolHandler,
   ) {}
 
   async status(): Promise<RuntimeStatus> {
@@ -546,6 +558,7 @@ export class CodexRuntimeManager {
     }
     if (existing) {
       existing.setNotificationHandler(this.onNotification);
+      existing.setToolHandler(this.onTool);
       try {
         await existing.start();
         return existing;
@@ -564,6 +577,8 @@ export class CodexRuntimeManager {
         exitCode,
         signal,
       }),
+      false,
+      this.onTool,
     );
     this.connections.set(providerId, connection);
     try {
@@ -714,18 +729,18 @@ export class CodexRuntimeManager {
     let capabilities = emptyCapabilities();
     let warning: string | null = null;
     if (version) {
-      const key = createHash("sha256").update(`${providerId}:${version}:${binary}`).digest("hex").slice(0, 20);
+      const key = createHash("sha256").update(`factory-v1:${providerId}:${version}:${binary}`).digest("hex").slice(0, 20);
       const schemaRoot = path.join(this.store.capabilitiesRoot, key, "schemas");
       const markerPath = path.join(this.store.capabilitiesRoot, key, "capabilities.json");
       try {
         mkdirSync(schemaRoot, { recursive: true, mode: 0o700 });
         if (!existsSync(markerPath)) {
-          await runCommand(binary, ["app-server", "generate-json-schema", "--out", schemaRoot], {
+          await runCommand(binary, ["app-server", "generate-json-schema", "--experimental", "--out", schemaRoot], {
             cwd: this.root,
             env: childEnvironment(),
             encoding: "utf8",
             timeout: 30_000,
-          });
+          }).catch(()=>runCommand(binary,["app-server","generate-json-schema","--out",schemaRoot],{cwd:this.root,env:childEnvironment(),encoding:'utf8',timeout:30_000}));
           const probedCapabilities = capabilitiesFromSchema(fileNamesRecursively(schemaRoot));
           writeFileSync(markerPath, `${JSON.stringify({ version, capabilities: probedCapabilities }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
         }
@@ -735,6 +750,10 @@ export class CodexRuntimeManager {
         // the installed runtime's existing schema instead of a missing field.
         capabilities.goalControl = capabilitiesFromSchema(fileNamesRecursively(schemaRoot)).goalControl;
         capabilities.fileMetadata = has(fileNamesRecursively(schemaRoot), "FsGetMetadataParams");
+        try {
+          const schema=JSON.parse(readFileSync(path.join(schemaRoot,'v2','ThreadStartParams.json'),'utf8'));
+          capabilities.factoryTools=Boolean(schema.properties?.dynamicTools) && has(fileNamesRecursively(schemaRoot),'DynamicToolCallParams');
+        } catch {capabilities.factoryTools=false;}
         try {
           const schema = JSON.parse(readFileSync(path.join(schemaRoot, "v2", "TurnStartParams.json"), "utf8"));
           capabilities.imageInput = schema.definitions?.UserInput?.oneOf?.some((variant: { properties?: { type?: { enum?: string[] } } }) => variant.properties?.type?.enum?.includes("localImage")) === true;

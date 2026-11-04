@@ -29,7 +29,7 @@ test('native creation and empty-thread recovery preserve exact factory context w
   assert.equal((await gateway.createThread(input)).replayed,true);assert.equal(calls.length,1);
   await assert.rejects(gateway.createThread({...input,subject:{...subject,phase:'implement'}}),{code:'idempotency_conflict'});
   await assert.rejects(gateway.createThread({...input,clientThreadId:'native_invalid_subject',subject:{...subject,approved:true}}),{code:'chat_subject_invalid'});assert.equal(calls.length,1);
-  for(const extra of [{factoryIntent:{action:'create-new-agent',slug:'new-child'}},{workspace:{factorySlug:'new-child'}}])await assert.rejects(gateway.createThread({...input,clientThreadId:'native_factory_injection',...extra}),{code:'provider_capability_unavailable'});
+  for(const extra of [{factoryIntent:{action:'create-new-agent',slug:'new-child'}},{workspace:{factorySlug:'new-child'}}])await assert.rejects(gateway.createThread({...input,clientThreadId:'native_factory_injection',...extra}),{code:'factory_intent_invalid'});
   for(const method of ['startTurn','enqueueMessage'])await assert.rejects(gateway[method](first.detail.thread.chatId,{factoryIntent:{action:'create-new-agent',slug:'new-child'}}),{code:'runtime_identity_mismatch'});
   const replaced=await gateway.replaceEmptyDirectThread(first.detail.thread,input);assert.deepEqual(replaced.subject,subject);assert.equal(calls[1].params.developerInstructions,calls[0].params.developerInstructions);assert.equal(calls[1].method,'thread/start');
   await assert.rejects(gateway.startTurn(replaced.chatId,{subject:{...subject,phase:'finish'}}),{code:'runtime_identity_mismatch'});assert.equal(calls.length,2);

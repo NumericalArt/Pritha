@@ -1,6 +1,6 @@
 import {test,expect,type Page,type Route} from '@playwright/test';
 
-async function fixture(page:Page,claudeAlias=false){
+async function fixture(page:Page,claudeAlias=false,nativeFactoryReady=false,neuraldeepReady=false){
   const now=new Date().toISOString(),requests:Array<{route:Route;body:any;chatId?:string}>=[],previews:Array<{route:Route;url:URL}>=[];let holdPreview=false,defaultProvider='codex',settingsWrites=0,approvalReady=true;
   const presets={codex:{modelId:'native-model',reasoningEffort:'medium',timeoutMs:30000},openrouter:{modelId:'vendor/alpha',reasoningEffort:'default',timeoutMs:30000},claude:{modelId:'claude-fixture',reasoningEffort:'high',timeoutMs:30000},neuraldeep:{modelId:'nd-fixture',reasoningEffort:'xhigh',timeoutMs:30000},local:{modelId:'local-fixture',reasoningEffort:'default',timeoutMs:30000}};
   if(claudeAlias)presets.claude.modelId='sonnet';
@@ -11,11 +11,11 @@ async function fixture(page:Page,claudeAlias=false){
     const saved=rows.find(row=>row.chatId===url.searchParams.get('chatId')),connectorId=(saved?.runtime.connectorId || url.searchParams.get('connectorId') || defaultProvider) as keyof typeof presets,preset=presets[connectorId];
     const requestedModelId=saved?.runtime.modelId || url.searchParams.get('modelId') || preset.modelId,images=claudeAlias && connectorId==='claude',modelId=images && requestedModelId==='sonnet'?'claude-sonnet-5-5':requestedModelId,effortId=saved?.effortId || url.searchParams.get('effortId') || preset.reasoningEffort,providerId=connectorId==='codex'?'desktop_bundled':connectorId+'_runtime';
     const models=(connectorId==='openrouter'?['vendor/alpha','vendor/beta']:[images?'claude-sonnet-5-5':preset.modelId]).map(id=>({id,label:id,effortIds:connectorId==='openrouter'?['default','high']:['medium','high'],defaultEffortId:preset.reasoningEffort,serviceTierIds:connectorId==='codex'?['standard','fast']:[],inputModalities:images?['text','image']:['text']}));
-    return {connectorId,availability:'ready',preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:connectorId==='codex'?'app_server':'exec_resume',fallbackEnabled:false,probedAt:now,models,selected:{modelId,effortId,serviceTierId:connectorId==='codex'?url.searchParams.get('serviceTierId') || 'standard':null,sandboxMode:'read_only',approvalMode:'on_request'},providers:[{providerId,label:connectorId,locationLabel:connectorId,protocol:'app_server',availability:'ready',capabilities:{fullChat:true,commandApprovals:approvalReady,fileMetadata:connectorId==='codex' || images,imageInput:images,steerTurn:false,interruptTurn:true}}]};
+    return {connectorId,availability:'ready',preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:connectorId==='codex'?'app_server':'exec_resume',fallbackEnabled:false,probedAt:now,models,selected:{modelId,effortId,serviceTierId:connectorId==='codex'?url.searchParams.get('serviceTierId') || 'standard':null,sandboxMode:'read_only',approvalMode:'on_request'},providers:[{providerId,label:connectorId,locationLabel:connectorId,protocol:'app_server',availability:'ready',capabilities:{fullChat:true,factoryTools:connectorId==='codex' && nativeFactoryReady,commandApprovals:approvalReady,fileMetadata:connectorId==='codex' || images,imageInput:images,steerTurn:false,interruptTurn:true}}]};
   };
   const envelope=(data:any)=>({apiVersion:'1',requestId:'fixture',data});
   await page.route('**/api/task-runtime/settings',route=>{if(route.request().method()==='POST')settingsWrites++;return route.fulfill({json:{ok:true,settings:{version:1,revision:0,activeConnectorId:defaultProvider,providerPresets:presets}}});});
-  await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:Object.keys(presets).map(connectorId=>({connectorId,status:['codex','claude','openrouter'].includes(connectorId)?'ready':'configured',capabilities:connectorId==='openrouter'?{parallelLimit:2}:{}}))}}));
+  await page.route('**/api/task-runtime/providers',route=>route.fulfill({json:{ok:true,providers:Object.keys(presets).map(connectorId=>({connectorId,status:['codex','claude','openrouter',...(neuraldeepReady?['neuraldeep']:[])].includes(connectorId)?'ready':'configured',capabilities:connectorId==='openrouter'?{parallelLimit:2}:{}}))}}));
   await page.route('**/api/codex-chat/v1/**',async route=>{
     const request=route.request(),url=new URL(request.url()),parts=url.pathname.split('/'),chatId=parts[5];
     if(url.pathname.includes('/attachments/'))return route.fallback();
@@ -117,12 +117,22 @@ for(const width of [1440,390])test(`explicit Create new agent sends only its int
   await page.getByRole('button',{name:'Check and retry same message',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(2);expect(f.requests[1].body).toEqual(original);await f.finish(1,'chat_claude_typed_factory');
 });
 
-test('factory mode can be disabled after capabilities change and switching to Codex clears creation intent',async({page})=>{
+test('factory mode can be disabled after capabilities change and an unsupported provider preserves creation intent until explicitly unchecked',async({page})=>{
   const f=await fixture(page);await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page);
   const provider=page.getByLabel('New chat provider',{exact:true}),create=page.getByLabel('Create new agent',{exact:true}),send=page.getByRole('button',{name:'Send',exact:true});
   await provider.selectOption('claude');await create.check();await page.getByLabel('New agent slug').fill('typed-counter');await page.locator('.codex-composer textarea').fill('Keep my draft.');
   f.setApprovalReady(false);await page.reload();await expect(create).toBeChecked();await expect(create).toBeEnabled();await expect(send).toBeDisabled();await expect(page.getByRole('alert').filter({hasText:'Agent creation is unavailable'})).toBeVisible();
   await create.click();await expect(create).toHaveCount(0);await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await expect(send).toBeEnabled();expect(f.requests).toHaveLength(0);
   f.setApprovalReady(true);await page.reload();await create.check();await expect(page.getByLabel('New agent slug')).toHaveValue('typed-counter');await provider.selectOption('codex');
-  await expect(create).toHaveCount(0);await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await send.click();await expect.poll(()=>f.requests.length).toBe(1);expect(f.requests[0].body.connectorId).toBe('codex');expect(f.requests[0].body.factoryIntent).toBeUndefined();await f.finish(0,'chat_codex_regular');
+  await expect(create).toBeChecked();await expect(send).toBeDisabled();await create.click();await expect(create).toHaveCount(0);await expect(page.getByLabel('Chat subject',{exact:true})).toBeVisible();await send.click();await expect.poll(()=>f.requests.length).toBe(1);expect(f.requests[0].body.connectorId).toBe('codex');expect(f.requests[0].body.factoryIntent).toBeUndefined();await f.finish(0,'chat_codex_regular');
+});
+
+for(const connectorId of ['codex','neuraldeep'])test(`new agent intent survives provider selection for ${connectorId}`,async({page})=>{
+  const f=await fixture(page,false,true,true);await page.goto('/task-chat');await newDraft(page);
+  await page.getByLabel('New chat provider',{exact:true}).selectOption(connectorId);
+  await page.getByLabel('Create new agent',{exact:true}).check();await page.getByLabel('New agent slug').fill('provider-counter');
+  await page.locator('.codex-composer textarea').fill('Create a separate local counter agent.');await page.getByRole('button',{name:'Send',exact:true}).click();
+  await expect.poll(()=>f.requests.length).toBe(1);const body=f.requests[0].body;
+  expect(body.connectorId).toBe(connectorId);expect(body.factoryIntent).toEqual({action:'create-new-agent',slug:'provider-counter'});expect(body.workspace).toEqual({mode:'read-only'});
+  expect(body.subject).toBeUndefined();await f.finish(0,'chat_'+connectorId+'_factory');
 });

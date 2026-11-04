@@ -33,6 +33,13 @@ test('the actual MCP brief schema rejects a design array before approval and a c
   let id=0;const post=async(method,params)=>(await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:++id,method,params})})).json()).result;
   const schema=(await post('tools/list')).tools.find(row=>row.name==='factory_step').inputSchema.properties.brief;
   assert.equal(schema.properties.design.properties.inputDataTypes.type,'string');
+  const tool=(await post('tools/list')).tools.find(row=>row.name==='factory_step').inputSchema;
+  assert.equal(tool.properties.sources.additionalProperties.type,'string');
+  assert.equal(tool.properties.selection.properties.facts.items.properties.passageId.type,'string');
+  for(const malformed of [{retry_failed:'yes'},{sources:{'declared-dependencies':['https://nodejs.org/api/fs.html']}}]){
+    const invalid=await post('tools/call',{name:'factory_step',arguments:{operation_id:'invalid_research_shape',action:'research_collect',...malformed}});
+    assert.equal(invalid.isError,true);assert.equal(f.state(),null);assert.equal(f.approvals.length,0);
+  }
   assert.ok(schema.properties.technical.properties.runtimeFamily.enum.includes('cli'));assert.ok(!schema.properties.technical.properties.runtimeFamily.enum.includes('node'));
   const input={operation_id:'init-design-retry',action:'init',brief:{...structuredClone(brief),design:{inputDataTypes:['UTF-8 text file']}},build_token_budget:40000,build_iteration_budget:2,build_elapsed_budget_ms:1800000};
   const rejected=await post('tools/call',{name:'factory_step',arguments:input});assert.equal(rejected.isError,true);
@@ -46,7 +53,7 @@ test('the actual MCP brief schema rejects a design array before approval and a c
   }
   const corrected=await post('tools/call',{name:'factory_step',arguments:input});assert.equal(corrected.isError,false);
   const receipt=JSON.parse(corrected.content[0].text);assert.equal(receipt.status,'completed');assert.equal(JSON.parse(receipt.text).phase,'contract-draft');
-  assert.equal(f.approvals.length,1);assert.equal(f.artifact('contract').frontmatter.status,'draft');assert.equal(fs.existsSync(f.p.target),false);assert.equal(f.state().contractApproval,undefined);assert.equal(f.state().outcomeApproval,undefined);
+  assert.equal(f.approvals.length,0);assert.equal(f.artifact('contract').frontmatter.status,'draft');assert.equal(fs.existsSync(f.p.target),false);assert.equal(f.state().contractApproval,undefined);assert.equal(f.state().outcomeApproval,undefined);
   const data=contractData(f.artifact('contract').file,{root});assert.equal(data.buildIterationBudget,2);assert.equal(data.buildElapsedBudgetMs,1800000);assert.equal(data.buildTokenBudget,40000);assert.equal(data.repeatedFailureThreshold,2);assert.equal(data.buildTokenBudgetConfirmation,'pending');
 });
 test('real factory worker writes only private drafts, keeps two approvals separate and detects stale review',{timeout:60000},async t=>{
@@ -68,6 +75,15 @@ test('real factory worker writes only private drafts, keeps two approvals separa
   await f.ok('approve_outcome',{expected_sha256:outcome.sha256});assert.equal(f.artifact('outcome').frontmatter.status,'approved');
   assert.equal(f.approvals.filter(row=>row.kind==='file_change_approval').length,2);assert.notEqual(f.state().contractApproval.operationId,f.state().outcomeApproval.operationId);
   assert.equal(fs.existsSync(f.p.target),false);
+  const before=f.state().revision,approvedContract=f.artifact('contract'),approvedOutcome=f.artifact('outcome');
+  // Different operation IDs and a resumed turn must reuse exact accepted reviews.
+  f.options.approve=()=>{throw new Error('already-approved document was asked again');};
+  await f.ok('approve_contract',{expected_sha256:fresh.sha256});
+  await f.ok('approve_contract',{expected_sha256:approvedContract.sha256});
+  await f.ok('approve_outcome',{expected_sha256:outcome.sha256});
+  await f.ok('approve_outcome',{expected_sha256:approvedOutcome.sha256});
+  assert.equal(f.state().revision,before);assert.equal(f.approvals.length,2);
+  await assert.rejects(f.call('approve_contract',{expected_sha256:'0'.repeat(64)}),{code:'factory_draft_changed'});
   const gate=await f.call('scaffold');assert.equal(gate.status,'failed');assert.equal(fs.existsSync(f.p.target),false);
   const memory=path.join(f.p.stateRoot,'memory');fs.mkdirSync(memory,{recursive:true});execFileSync('sqlite3',[path.join(memory,'pritha.sqlite')],{input:fs.readFileSync(path.join(root,'.memory/schema.sql'),'utf8')});
   await f.ok('research');assert.ok(f.artifact('research').sha256);assert.ok(f.artifact('pattern').sha256);assert.equal((await f.ok('research_status')).ok,true);
@@ -99,7 +115,7 @@ test('Stop during owned factory startup proves exit and preserves the uncertain 
 test('factory refusal/replay, immutable identity, foreign artifacts and unknown steps never authorize another action',{timeout:60000},async t=>{
   const f=fixture(t),input={operation_id:'factory_init_once',action:'init',brief,build_token_budget:10000};
   const first=await f.tools.call('factory_step',input);assert.equal(JSON.parse(first.content[0].text).status,'completed');
-  await f.tools.call('factory_step',input);assert.equal(f.approvals.length,1);
+  await f.tools.call('factory_step',input);assert.equal(f.approvals.length,0);
   const contract=f.artifact('contract');
   const changed=contract.text.replace('- Build executor: claude-code','- Build executor: manual');
   assert.notEqual(changed,contract.text);assert.equal((await f.call('write_draft',{artifact:'contract',expected_sha256:contract.sha256,content:changed})).status,'failed');assert.equal(f.artifact('contract').sha256,contract.sha256);

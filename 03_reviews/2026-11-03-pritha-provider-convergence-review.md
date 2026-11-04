@@ -1,9 +1,9 @@
 ---
 id: pritha-provider-convergence-review-2026-11-03
 type: review
-status: verified-implementation-pending-acceptance
+status: blocked
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
 topics: [pritha, provider-convergence, curated-memory, task-chat, voice, agent-factory, rebranding]
 tools: [Codex, NeuralDeep, Claude Code, OpenRouter, llama.cpp, SQLite, Node.js, Next.js, Playwright]
 agent_platforms: [Pritha]
@@ -34,10 +34,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
-source_updated: 2026-11-03
-source_version: installed 73aafb535a8a2503a258016edef86700464a6d1b; shared-default follow-up in preparation
-retrieved: 2026-11-03
-verified: 2026-11-03
+source_updated: 2026-11-04
+source_version: installed ee5987b; unified factory implementation under verification
+retrieved: 2026-11-04
+verified: 2026-11-04
 valid_for: the local executable candidate and recorded operator acceptance only
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -45,11 +45,29 @@ memory_domains: [pritha-self, governance, agent-building-knowledge]
 subject: {kind: pritha, id: pritha}
 privacy: public
 retention: durable
-review_status: automated-and-live-components-verified-manual-gates-open
+review_status: agent-creation-user-acceptance-failed
 confidence: high
 ---
 
-# Provider convergence: verified implementation and remaining acceptance
+# Provider convergence: component evidence and failed agent-creation acceptance
+
+## Current acceptance status — 2026-11-04
+
+The operator rejected the agent-creation journey as unusable. Successful
+component checks and earlier Voice acceptance do not establish a working
+factory. The installed release is `ee5987b`; `aabdda1` is a prepared, uninstalled
+candidate. The actual Voice Word Counter pilot has an accepted Contract but no
+created project or completed build. Its separately approved Outcome has not yet
+been applied to factory state. The newest native Voice attempt started Codex
+but supplied a conflicting child path and requested an unavailable factory tool.
+
+Checkpoint 65 records the bounded native handoff correction and the remaining
+workflow gaps. These changes do not demonstrate full creation or recovery.
+Final acceptance requires the actual user journey without ad hoc operator
+repairs to internal state. Previous evidence below is historical and remains
+useful only for the components and versions it tested.
+
+## Component snapshot — 2026-11-03
 
 The canonical Mac mini implementation now supports five task connectors while
 preserving native Codex history, the October curated knowledge and the existing

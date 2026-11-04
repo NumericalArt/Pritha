@@ -9,7 +9,7 @@ import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal} from './voice-factory-state.mjs';
 
-const executors={neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
+const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
 function draftHasSensitiveText(text,kind){
   // These are canonical Outcome grammar, not credential assignments. Scan
   // their values and every other byte normally; never exempt arbitrary fields.
@@ -92,7 +92,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       const next=row.text.replace(/^status: draft$/m,'status: accepted').replace(/^- Build token budget confirmation: pending$/m,'- Build token budget confirmation: user');
       const candidate=path.join(p.directory,'candidate.md');atomicWriteFile(candidate,next);
       try{const issues=validateContract(candidate,{root:p.root,print:false});if(issues.length)throw validationFailure(issues);}finally{fs.rmSync(candidate,{force:true});}
-      atomicCompareAndSwapFile(row.file,row.text,next);state.contractApproval={sha256:factoryHash(next),operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='contract-approved';value={approved:'contract',next:'create_outcome'};break;
+      atomicCompareAndSwapFile(row.file,row.text,next);state.contractApproval={sha256:factoryHash(next),reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='contract-approved';value={approved:'contract',next:'create_outcome'};break;
     }
     case 'create_outcome':{
       requireFactoryApprovals(p,state,{outcome:false});contract();if(state.outcome)throw factoryFail('factory_artifact_exists');
@@ -103,7 +103,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
       const checked=outcomeSpecFile(state.outcome,options),blocking=checked.issues.filter(issue=>!['OS015','OS016'].includes(issue.code));if(blocking.length)throw validationFailure(blocking);
       const inputRoot=path.join(p.directory,'trial-inputs');
-      approveOutcomeSpec(state.outcome,{...options,approvedBy:'user',projectPath:fs.existsSync(p.target)?p.target:inputRoot});state.outcomeApproval={sha256:factoryArtifact(p,state,'outcome').sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
+      approveOutcomeSpec(state.outcome,{...options,approvedBy:'user',projectPath:fs.existsSync(p.target)?p.target:inputRoot});state.outcomeApproval={sha256:factoryArtifact(p,state,'outcome').sha256,reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
     }
     case 'research':{
       approved();const result=await researchContract(state.contract,{'github-mode':request.connectorId==='local'?'registry-only':'auto'});
@@ -111,6 +111,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     }
     case 'research_status':case 'research_collect':case 'research_apply':{
       approved();const phase=input.action.split('_')[1];const args={backend:'host',connector:request.connectorId,phase};
+      if(input.retry_failed===true)args['retry-failed']=true;
       if(input.sources){args.sources=path.join(p.directory,'sources.json');atomicWriteFile(args.sources,JSON.stringify(input.sources));}
       if(phase==='apply'){args.input=path.join(p.directory,'selection.json');atomicWriteFile(args.input,JSON.stringify(input.selection));}
       value=await externalResearchContract(state.contract,args);break;
