@@ -132,7 +132,7 @@ function usage() {
   ${CLI_COMMAND} research <contract-path> [--limit 12] [--github-mode auto|online|registry-only|skip] [--github-limit 5] [--github-timeout-ms 15000] [--github-fixture <json>]
   ${CLI_COMMAND} pattern-research <contract-path> [--limit 12] [--semantic-mode auto|skip]
   ${CLI_COMMAND} external-research <contract-path> [--backend status|manual|codex-web|last30days|host] [--input evidence.json]
-  ${CLI_COMMAND} external-research <contract-path> --backend host --connector <provider> [--phase collect|status|apply] [--sources urls.json] [--retry-failed] [--input selection.json]
+  ${CLI_COMMAND} external-research <contract-path> --backend host --connector <provider> [--phase collect|status|recover|apply] [--sources urls.json] [--retry-failed] [--input selection.json]
   ${CLI_COMMAND} scaffold <contract-path> [--output <folder>] [--allow-draft-scaffold] [--allow-missing-research] [--allow-pending-external-verification]
   ${CLI_COMMAND} scaffold-plan <contract-path>
   ${CLI_COMMAND} probe-plan <agent-id-or-project> [--purpose health|test] [--timeout-ms 5000]
@@ -1560,9 +1560,9 @@ export async function externalResearchContract(contractPath, options = {}) {
     const host=new HostResearch({root:ROOT,stateRoot:resolvePrithaStateRoot({root:ROOT}),data,report,patternLock:patternPack.lock,topics,connectorId:options.connector || 'codex'});
     const phase=options.phase || (hasInput?'apply':'collect');let result;
     if(phase==='status')result=host.status();
-    else if(phase==='collect')result=await host.collect({retryFailed:options['retry-failed']===true,sourceUrls:options.sources?readEvidenceInput(options.sources):{}});
+    else if(phase==='collect' || phase==='recover')result=await host.collect({retryFailed:options['retry-failed']===true,recoverFailed:phase==='recover',sourceUrls:options.sources?readEvidenceInput(options.sources):{}});
     else if(phase==='apply' && hasInput)result=await host.publish(readEvidenceInput(options.input),{evaluateOverallGate:text=>researchGateDecisionForReport(data,text)});
-    else throw new Error('Host research requires collect, status, or apply with a selection input.');
+    else throw new Error('Host research requires collect, status, recover with replacement sources, or apply with a selection input.');
     console.log(JSON.stringify(result,null,2));return result;
   }
 

@@ -81,3 +81,47 @@ test('future page timestamps and caller cancellation cannot produce usable evide
 test('no required external topics needs no network even in an offline local profile',async t=>{
   const f=fixture(t,{connectorId:'local',topics:[],environment:{PRITHA_SEARCH_OFFLINE:'1'}});assert.equal((await f.host.collect()).status,'collected');assert.deepEqual(f.counts(),{searchCalls:0,readCalls:0});
 });
+
+test('a different primary source recovers an exhausted deadline once, preserving counters and exact evidence',async t=>{
+  const f=fixture(t,{totalMs:1000}),original=f.service.readPage;
+  f.service.readPage=async()=>({ok:false,error:{code:'source_page_too_large'}});
+  await assert.rejects(f.host.collect(),{code:'source_page_too_large'});
+  await assert.rejects(f.host.collect({retryFailed:true}),{code:'source_page_too_large'});
+  const previous=f.host.status();await new Promise(resolve=>setTimeout(resolve,1010));
+  f.service.readPage=original;
+  const sourceUrls={[topic.id]:'https://platform.openai.com/docs/guides/realtime-conversations'};
+  const result=await new HostResearch(f.options).collect({recoverFailed:true,sourceUrls});
+  assert.equal(result.status,'collected');assert.equal(result.topics[0].checkpoint.attempts,3);
+  assert.equal(result.recovery.previousDeadlineAt,previous.deadlineAt);assert.equal(result.recovery.previousTopics[topic.id].attempts,2);
+  assert.equal(result.sources[0].url,sourceUrls[topic.id]);
+  const counts=f.counts(),deadline=result.deadlineAt;
+  assert.equal((await f.host.collect({recoverFailed:true,sourceUrls})).deadlineAt,deadline);assert.deepEqual(f.counts(),counts);
+  await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls:{[topic.id]:'https://platform.openai.com/docs/another'}}),{code:'research_recovery_limit'});
+  await f.host.publish(f.selection());assert.equal((await f.host.collect({recoverFailed:true,sourceUrls})).status,'completed');
+});
+
+test('recovery retains already collected topics and allows at most two extra attempts for failed topics',async t=>{
+  const second={id:'declared-dependencies',topic:'Node.js runtime',query:'Node.js file system documentation',required:true};
+  const f=fixture(t,{topics:[topic,second]}),original=f.service.readPage;
+  f.service.readPage=async input=>input.url.includes('nodejs.org')?{ok:false,error:{code:'provider_unavailable'}}:original(input);
+  await assert.rejects(f.host.collect({sourceUrls:{[second.id]:'https://nodejs.org/api/fs.html'}}),{code:'provider_unavailable'});
+  const saved=f.host.status().sources[0],sourceUrls={[second.id]:'https://nodejs.org/docs/latest-v24.x/api/fs.html'};
+  await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls}),{code:'provider_unavailable'});
+  assert.deepEqual(f.host.status().sources[0],saved);
+  const counts=f.counts();await f.host.collect({recoverFailed:true,sourceUrls});assert.deepEqual(f.counts(),counts);
+  await assert.rejects(new HostResearch(f.options).collect({retryFailed:true}),{code:'provider_unavailable'});
+  await assert.rejects(f.host.collect({retryFailed:true}),{code:'research_source_limit'});
+  assert.equal(f.host.status().topics[1].checkpoint.attempts,3);assert.deepEqual(f.host.status().sources[0],saved);
+});
+
+test('recovery cannot reset an uncertain attempt, use a foreign source, or renew the same failed URL',async t=>{
+  const f=fixture(t);f.service.readPage=async()=>({ok:false,error:{code:'provider_unavailable'}});
+  await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls:{[topic.id]:'https://platform.openai.com/docs/new'}}),{code:'research_checkpoint_missing'});
+  await assert.rejects(f.host.collect(),{code:'provider_unavailable'});
+  await assert.rejects(f.host.collect({recoverFailed:true}),{code:'research_recovery_unavailable'});
+  await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls:{[topic.id]:f.host.status().topics[0].checkpoint.url}}),{code:'research_replacement_required'});
+  await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls:{[topic.id]:'https://example.org/private'}}),{code:'research_primary_url_invalid'});
+  const state=JSON.parse(readFileSync(f.host.file,'utf8'));state.topics[topic.id].status='started';writeFileSync(f.host.file,JSON.stringify(state));
+  await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls:{[topic.id]:'https://platform.openai.com/docs/new'}}),{code:'research_source_unconfirmed'});
+  assert.equal(f.host.status().recovery,null);
+});

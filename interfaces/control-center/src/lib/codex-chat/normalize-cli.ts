@@ -16,5 +16,11 @@ export function cliItemOriginalText(raw:unknown,normalized:ChatItemView):string|
   if(normalized.kind==='command')return [Array.isArray(item.command)?item.command.map(String).join(' '):String(item.command ?? ''),item.aggregated_output ?? item.aggregatedOutput].filter(value=>value!=null).join('\n\n');
   if(normalized.kind==='file_change')return (Array.isArray(item.changes)?item.changes:[]).map(entry=>String(object(entry)?.diff ?? '')).filter(Boolean).join('\n');
   if(normalized.kind==='reasoning_summary')return Array.isArray(item.summary)?item.summary.map(String).join('\n\n'):undefined;
+  if(normalized.kind==='tool'){
+    const result=object(item.result),content=Array.isArray(result?.content)?result.content:[];
+    const text=content.map(entry=>object(entry)).filter(entry=>entry?.type==='text' && typeof entry.text==='string').map(entry=>String(entry!.text)).join('\n\n');
+    const error=typeof item.error==='string'?item.error:object(item.error)?.message;
+    return [text,typeof error==='string'?error:''].filter(Boolean).join('\n\n') || undefined;
+  }
   return undefined;
 }

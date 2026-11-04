@@ -1,9 +1,10 @@
 import https from "node:https";
 import { lookup } from "node:dns/promises";
 import { publicUrl, publicAddress } from "./policy.mjs";
-import { fail } from "./contracts.mjs";
+import { fail, SearchError } from "./contracts.mjs";
+export const CHILD_PAGE_MAX_BYTES = 2 * 1024 * 1024;
 /** Child-only reader preserves exact host allowlists and pins validated DNS on every redirect. */
-export async function readChildPage(value, hosts, signal, depth = 0) {
+export async function readChildPage(value, hosts, signal, depth = 0, dependencies = {}) {
   const url = publicUrl(value),
     u = new URL(url);
   if (
@@ -11,13 +12,13 @@ export async function readChildPage(value, hosts, signal, depth = 0) {
     !hosts.some((h) => u.hostname === h || u.hostname === `www.${h}`)
   )
     fail("url_blocked");
-  const addresses = await lookup(u.hostname, { all: true });
+  const addresses = await (dependencies.lookup || lookup)(u.hostname, { all: true });
   signal.throwIfAborted();
   if (!addresses.length || addresses.some((a) => !publicAddress(a.address)))
     fail("url_blocked");
   const chosen = addresses.find((a) => a.family === 4) || addresses[0];
   const r = await new Promise((resolve, reject) => {
-    const request = https.get(
+    const request = (dependencies.get || https.get)(
       u,
       {
         signal,
@@ -34,7 +35,7 @@ export async function readChildPage(value, hosts, signal, depth = 0) {
           try {
             resolve({ redirect: new URL(res.headers.location, u).href });
           } catch {
-            reject(Error("invalid_response"));
+            reject(new SearchError("invalid_response"));
           }
           return;
         }
@@ -45,14 +46,14 @@ export async function readChildPage(value, hosts, signal, depth = 0) {
           )
         ) {
           res.resume();
-          reject(Error("provider_unavailable"));
+          reject(new SearchError("provider_unavailable"));
           return;
         }
         let size = 0;
         const parts = [];
         res.on("data", (b) => {
           size += b.length;
-          if (size > 1000000) res.destroy(Error("invalid_response"));
+          if (size > CHILD_PAGE_MAX_BYTES) res.destroy(new SearchError("source_page_too_large"));
           else parts.push(b);
         });
         res.once("error", reject);
@@ -65,7 +66,7 @@ export async function readChildPage(value, hosts, signal, depth = 0) {
   });
   if (r.redirect) {
     if (depth >= 3) fail("url_blocked");
-    return readChildPage(r.redirect, hosts, signal, depth + 1);
+    return readChildPage(r.redirect, hosts, signal, depth + 1, dependencies);
   }
   const text = r.text
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")

@@ -83,6 +83,7 @@ export class ProviderHostTools {
       fields(input,['operation_id','offset','length']);const saved=this.saved(input.operation_id);return text({...this.window(saved.output,input),status:saved.status,exitCode:saved.exitCode ?? null});
     }
     if(!['write_file','edit_file','run_command','ask_user',...(this.factory?['factory_step']:[])].includes(name))throw fail('provider_tool_unknown');
+    if(name==='factory_step')this.factory.validate(input);
     if(!validId(input?.operation_id))throw fail('provider_tool_input_invalid');
     const key='provider-tool:'+this.options.turnId+':'+input.operation_id,requestHash=hash(JSON.stringify([name,input]));
     const existing=this.options.coordinator.getIntent(key);

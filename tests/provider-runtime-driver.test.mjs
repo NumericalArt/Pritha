@@ -23,6 +23,14 @@ function load(name, dependencies = {}) {
   return module.exports;
 }
 const pages=load("provider-thread-pages"),activity=load("provider-activity");
+const cli=load('normalize-cli',{'./normalize':load('normalize')});
+test('CLI tool Details retain the actual factory error and omit reasoning or non-text payloads',()=>{
+  const raw={id:'factory-failure',type:'mcp_tool_call',tool:'factory_step',status:'failed',result:{content:[{type:'text',text:'factory_input_invalid'},{type:'image',data:'not-tool-text'}]},reasoning:'not-a-tool-result'};
+  const item=cli.normalizeCliItem('chat_fixture',raw,'/project','2026-11-04T00:00:00Z');
+  assert.equal(item.kind,'tool');assert.equal(item.status,'failed');assert.equal(cli.cliItemOriginalText(raw,item),'factory_input_invalid');
+  assert.equal(cli.cliItemOriginalText({...raw,result:null,error:{message:'MCP connection closed'}},item),'MCP connection closed');
+  assert.equal(cli.cliItemOriginalText({...raw,result:null,error:null},item),undefined);
+});
 class FakeRoutes {
   constructor(){this.rows=new Map();}
   resolve(input,choose){if(!this.rows.has(input.clientThreadId))this.rows.set(input.clientThreadId,choose());return this.rows.get(input.clientThreadId);}

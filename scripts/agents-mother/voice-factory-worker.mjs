@@ -109,7 +109,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       approved();const result=await researchContract(state.contract,{'github-mode':request.connectorId==='local'?'registry-only':'auto'});
       state.research=result.reportPath;state.pattern=result.patternPath;state.phase='research';value={artifacts:['research','pattern'],next:'Read research and pattern, collect current sources, then publish locked synthesis.'};break;
     }
-    case 'research_status':case 'research_collect':case 'research_apply':{
+    case 'research_status':case 'research_collect':case 'research_recover':case 'research_apply':{
       approved();const phase=input.action.split('_')[1];const args={backend:'host',connector:request.connectorId,phase};
       if(input.retry_failed===true)args['retry-failed']=true;
       if(input.sources){args.sources=path.join(p.directory,'sources.json');atomicWriteFile(args.sources,JSON.stringify(input.sources));}

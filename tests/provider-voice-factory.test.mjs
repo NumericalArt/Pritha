@@ -34,6 +34,12 @@ test('the actual MCP brief schema rejects a design array before approval and a c
   const schema=(await post('tools/list')).tools.find(row=>row.name==='factory_step').inputSchema.properties.brief;
   assert.equal(schema.properties.design.properties.inputDataTypes.type,'string');
   const tool=(await post('tools/list')).tools.find(row=>row.name==='factory_step').inputSchema;
+  const status=JSON.parse((await post('tools/call',{name:'factory_step',arguments:{operation_id:'check-start-status',action:'status'}})).content[0].text);
+  assert.equal(status.nextStep.action,'init');assert.deepEqual(status.nextStep.requiredFields,['brief','build_token_budget']);
+  const wrongAction=await post('tools/call',{name:'factory_step',arguments:{operation_id:'incorrect-draft-call',action:'write_draft',sources:{brief:'synthetic'},selection:{}}});
+  const guidance=JSON.parse(wrongAction.content[0].text);assert.equal(guidance.error,'factory_input_invalid');assert.deepEqual(guidance.requiredFields,['operation_id','action','artifact','expected_sha256','content']);assert.match(guidance.hint,/init with brief/);
+  const shortId=await post('tools/call',{name:'factory_step',arguments:{operation_id:'draft1',action:'init',brief,build_token_budget:40000}});
+  assert.match(JSON.parse(shortId.content[0].text).hint,/8–128/);assert.equal(f.state(),null);assert.equal(f.approvals.length,0);
   assert.equal(tool.properties.sources.additionalProperties.type,'string');
   assert.equal(tool.properties.selection.properties.facts.items.properties.passageId.type,'string');
   for(const malformed of [{retry_failed:'yes'},{sources:{'declared-dependencies':['https://nodejs.org/api/fs.html']}}]){
@@ -91,6 +97,8 @@ test('real factory worker writes only private drafts, keeps two approvals separa
   const gate=await f.call('scaffold');assert.equal(gate.status,'failed');assert.equal(fs.existsSync(f.p.target),false);
   const memory=path.join(f.p.stateRoot,'memory');fs.mkdirSync(memory,{recursive:true});execFileSync('sqlite3',[path.join(memory,'pritha.sqlite')],{input:fs.readFileSync(path.join(root,'.memory/schema.sql'),'utf8')});
   await f.ok('research');assert.ok(f.artifact('research').sha256);assert.ok(f.artifact('pattern').sha256);assert.equal((await f.ok('research_status')).ok,true);
+  const recovery=await f.call('research_recover',{sources:{'declared-dependencies':'https://nodejs.org/docs/latest-v24.x/api/fs.html'}});
+  assert.equal(recovery.status,'failed');assert.equal(JSON.parse(recovery.text).error,'research_checkpoint_missing');assert.equal(f.approvals.length,2);
 });
 test('factory approves prepared Trial inputs before a child exists and refuses changed or symlinked inputs',{timeout:60000},async t=>{
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');

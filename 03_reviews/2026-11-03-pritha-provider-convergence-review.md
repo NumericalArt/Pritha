@@ -244,19 +244,26 @@ connector contract; this review does not recommend an untested model.
 
 ## Current factory recovery evidence (2026-11-04)
 
-Installed 27890e2 passes managed activation, strict pages/chunks, operational
-health, task admission and full self-test. Its release checks passed 1572 unit
+Installed e2d10ab passes managed activation, strict pages/chunks, operational
+health, task admission and full self-test. Its release checks passed 1577 unit
 tests and 68 browser scenarios. Both previously approved Claude pilot documents
 are now accepted through the ordinary factory and product approval API, preserving
 exact reviewed content and the original 40000-token/two-iteration/30-minute build
 limits. No build has started and no factory state was repaired by hand.
 
 Real research exposed irrelevant advisory patterns becoming mandatory headless
-CLI dependencies and missing authorities for canonical pattern topics. The next
-candidate narrows CLI research to selected requirements and supplies bounded
+CLI dependencies and missing authorities for canonical pattern topics. The installed
+release narrows CLI research to selected requirements and supplies bounded
 primary-source mappings, without accepting unknown sources. Native Codex created
 and reviewed a real draft through the shared factory. Its runtime service-tier
-preview and actionable brief validation are corrected in the candidate.
+preview and actionable brief validation are corrected in the installed release.
+
+The real Claude factory then hit the reader's page-size ceiling and exhausted
+both source attempts. The follow-up adds typed page-size errors and one explicit
+bounded recovery with different authorized source URLs. Original attempts,
+deadlines, evidence and document approvals remain recorded. An isolated check
+successfully recovered injected failures, read actual Node.js v24 documentation
+and published locked evidence. This does not yet establish a finished child.
 
 NeuralDeep returned a different terminal model for the configured Qwen request;
 that mismatch remains blocked. A separate real candidate transport probe of
@@ -265,10 +272,15 @@ This is not evidence that an arbitrary model alias is interchangeable, and the
 saved user default remains unchanged. The UI now explains model mismatch instead
 of reporting only a generic provider error.
 
+A real GPT OSS 120B draft attempt repeatedly selected write_draft before init
+with invalid fields. It was interrupted through product controls before any
+factory artifact or approval was created. The follow-up supplies the next action,
+action-specific field guidance and the actual tool error in history Details.
+
 ## Required steps before final handoff
 
 1. Verify and install the consolidated follow-up through the managed workflow,
-   with rollback to installed 27890e2 and exact immediate lifecycle approval.
+   with rollback to installed e2d10ab and exact immediate lifecycle approval.
 2. Continue the existing approved Claude factory through corrected research,
    scaffold, measured delivery and independent protected Trials. Preserve its
    identity, accepted documents and original build limits.

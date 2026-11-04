@@ -3,7 +3,7 @@ id: agents-mother-host-research
 type: workflow
 status: active
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-04
 topics: [agent-engineering, external-research, source-evidence, recovery]
 tools: [Pritha, NeuralDeep, Node.js]
 sources:
@@ -66,6 +66,21 @@ confidence: high
 не повторяется автоматически. Подтверждённый отказ допускает одну явную попытку
 с `--retry-failed`; deadline и счётчики не обнуляются после reload. Истёкший срок
 или неизвестный dispatch требуют проверки сохранённого checkpoint.
+
+Если источник подтвердил отказ, разрешена одна ограниченная замена источников:
+`--phase recover --sources urls.json` или `factory_step.research_recover`.
+Указать другой разрешённый HTTPS URL для каждой failed темы. Host сохраняет
+старый deadline, счётчики, причины отказов и уже собранные источники, выделяет
+одно дополнительное окно 5 минут и не более двух новых попыток для failed темы.
+Повтор идентичного recover только возвращает состояние; другое восстановление
+отклоняется. Неизвестный dispatch (`started`) нельзя повторять этим способом.
+Принятые Contract, Outcome и бюджет сборки не меняются и не требуют нового
+согласования. Обычный `--retry-failed` не продлевает ни одно окно.
+
+Прямой reader ограничивает страницу 2 MiB и возвращает
+`source_page_too_large` при превышении. Вместо многократного чтения слишком
+большой страницы выбрать соответствующую версии продукта страницу из того же
+первичного домена. DNS, redirects и прежние source/evidence gates сохраняются.
 
 Проверки: `node --test tests/agents-mother-host-research.test.mjs` покрывает
 replay, crash, timeout/cancel, source authority, exact passages, несовместимость,

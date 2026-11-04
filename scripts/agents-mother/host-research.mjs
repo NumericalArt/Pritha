@@ -57,15 +57,39 @@ export class HostResearch {
   assertAllowed(){if(this.topics.length && (this.connectorId==='local' || this.environment.PRITHA_SEARCH_OFFLINE==='1'))fail('research_offline');this.signal?.throwIfAborted();}
   status(){
     const state=this.load();if(!state)return {status:'not-started',topics:this.topics,sources:[]};
-    return {status:state.completed?'completed':state.sources.length===this.topics.length?'collected':'pending',deadlineAt:state.deadlineAt,topics:this.topics.map(topic=>({...topic,checkpoint:state.topics[topic.id] || null})),sources:state.sources.map(({text,query,...source})=>({...source,passages:passages({...source,text,query})}))};
+    return {status:state.completed?'completed':state.sources.length===this.topics.length?'collected':'pending',deadlineAt:state.deadlineAt,recovery:state.recovery || null,topics:this.topics.map(topic=>({...topic,checkpoint:state.topics[topic.id] || null})),sources:state.sources.map(({text,query,...source})=>({...source,passages:passages({...source,text,query})}))};
   }
-  async collect({retryFailed=false,sourceUrls={}}={}){
+  async collect({retryFailed=false,sourceUrls={},recoverFailed=false}={}){
     this.assertAllowed();
     if(!sourceUrls || typeof sourceUrls!=='object' || Array.isArray(sourceUrls) || Object.keys(sourceUrls).some(id=>!this.topics.some(topic=>topic.id===id)))fail('research_sources_input_invalid');
     if(this.topics.some(topic=>!topic.primaryDomains.length))fail('research_source_authority_required');
     for(const [id,url] of Object.entries(sourceUrls))if(typeof url!=='string' || !allowed(url,this.topics.find(topic=>topic.id===id).primaryDomains))fail('research_primary_url_invalid');
     return withFileLock(this.file,async()=>{
-      const state=this.load() || {schema:'pritha-host-research-v1',binding:this.binding,reportHash:hash(this.report.text),deadlineAt:Date.now()+this.totalMs,topics:{},sources:[]};
+      let state=this.load();
+      if(recoverFailed){
+        if(!state)fail('research_checkpoint_missing');
+        if(Object.values(state.topics).some(attempt=>attempt.status==='started'))fail('research_source_unconfirmed');
+        if(state.recovery){
+          // A replay observes the first recovery. It never renews its deadline
+          // or repeats a network effect, including after a lost response.
+          const same=Object.keys(sourceUrls).length===Object.keys(state.recovery.sources).length && Object.entries(sourceUrls).every(([id,url])=>state.recovery.sources[id]===publicUrl(url));
+          if(!same)fail('research_recovery_limit');
+          return this.status();
+        }
+        this.assertReport(state);
+        const failed=Object.entries(state.topics).filter(([,attempt])=>attempt.status==='failed');
+        if(state.publication || !failed.length || failed.length!==Object.keys(sourceUrls).length)fail('research_recovery_unavailable');
+        for(const [id,attempt] of failed){
+          if(!sourceUrls[id] || publicUrl(sourceUrls[id])===attempt.url)fail('research_replacement_required');
+        }
+        // One new bounded window, only for confirmed failures with different
+        // authorized sources. Keep the old deadline, attempts and evidence.
+        state.recovery={startedAt:new Date().toISOString(),previousDeadlineAt:state.deadlineAt,previousTopics:structuredClone(state.topics),sources:Object.fromEntries(Object.entries(sourceUrls).map(([id,url])=>[id,publicUrl(url)]))};
+        state.deadlineAt=Date.now()+this.totalMs;
+        retryFailed=true;
+        this.save(state);
+      }
+      state ||= {schema:'pritha-host-research-v1',binding:this.binding,reportHash:hash(this.report.text),deadlineAt:Date.now()+this.totalMs,topics:{},sources:[]};
       if(state.publication)return this.status();this.assertReport(state);this.save(state);
       let ownedService;
       try{
@@ -75,12 +99,13 @@ export class HostResearch {
           if(Date.now()>=state.deadlineAt)fail('research_deadline_exceeded');
           const prior=state.topics[topic.id];
           if(prior?.status==='started')fail('research_source_unconfirmed');
-          if(prior && (!retryFailed || prior.attempts>=2))fail(prior.attempts>=2?'research_source_limit':'research_retry_required');
+          const attemptLimit=state.recovery?.sources[topic.id]?(state.recovery.previousTopics[topic.id].attempts+2):2;
+          if(prior && (!retryFailed || prior.attempts>=attemptLimit))fail(prior.attempts>=attemptLimit?'research_source_limit':'research_retry_required');
           const attempt=state.topics[topic.id]={attempts:(prior?.attempts||0)+1,status:'started',stage:'select',history:prior?[...(prior.history||[]),prior.error]:[]};this.save(state);
           const controller=new AbortController(),timer=setTimeout(()=>controller.abort(Object.assign(new Error('Source deadline reached.'),{code:'research_source_timeout'})),Math.min(this.sourceMs,state.deadlineAt-Date.now()));
           const signal=this.signal?AbortSignal.any([this.signal,controller.signal]):controller.signal;
           try{
-            let url=sourceUrls[topic.id] || topic.primaryUrls[attempt.attempts-1] || topic.primaryUrls[0];
+            let url=sourceUrls[topic.id] || state.recovery?.sources[topic.id] || topic.primaryUrls[attempt.attempts-1] || topic.primaryUrls[0];
             let service=this.service;
             if(this.connectorId==='neuraldeep' && !service)service=ownedService ||=new SearchService({codeRoot:this.root,stateRoot:this.stateRoot,environment:this.environment});
             const context={owner:'research_'+this.data.fingerprint,turn:topic.id,surface:'research',connectorId:this.connectorId,explicit:true,signal};
