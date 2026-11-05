@@ -3710,6 +3710,12 @@ factory status обоих принятых агентов показывает a
   v24.15 process docs — совместимый version context. Это не подмена живого ND
   collection; он остаётся следующим шагом после проверенной установки.
 
+Первый полный прогон: 1604/1614, все десять отказов — прежние hash общего
+redaction-helper в generated scaffold snapshots. Проверено, что отличается
+только scripts/redaction.mjs; обновлены его bytes/hash в десяти profiles,
+остальные записи и provenance сохранены. Scoped scaffold suite: 13/13.
+Неуспешный полный receipt сохранён; для финального pin нужен новый полный gate.
+
 Далее: один консолидированный release gate и staged rollback; отдельное точное
 разрешение на update. Затем штатный bounded research_recover с другим подходящим
 первичным URL для failed темы, сохранением history/limits/locks и без нового

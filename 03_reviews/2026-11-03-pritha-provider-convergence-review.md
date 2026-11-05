@@ -77,6 +77,11 @@ chain, encoded and cross-block instructions, secret redaction, cache isolation
 and fully quarantined source refusal. Three real public pages also produce
 bounded safe passages through the candidate using synthetic provider transport
 and zero paid requests; this does not claim that live NeuralDeep recovery passed.
+The first complete run passed 1604/1614; all ten failures were the expected
+shared redaction-helper bytes/hash in generated scaffold snapshots. Only that
+file's entries were reviewed and updated across ten profiles; other entries and
+capture provenance remain unchanged. The scaffold suite then passed 13/13.
+The failed receipt remains preserved and the final pin requires a fresh gate.
 The consolidated release gate/approval, normal bounded recovery, real NeuralDeep
 build/Trials and remaining operator acceptance are still open. MacBook and
 GitHub remain unchanged. Accepted documents are never manually repaired.
