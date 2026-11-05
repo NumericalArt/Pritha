@@ -194,7 +194,7 @@ function isUncreatedFactory(group, context) {
       || state.agentName !== contract.name || state.contract !== contract.path || state.target !== target
       || canonical(state.stateRoot || "") !== canonical(context.stateRoot)
       || !Number.isSafeInteger(state.revision) || state.revision < 1
-      || !/^chat_[A-Za-z0-9_]+$/.test(state.chatId || "") || !["claude","neuraldeep","openrouter","local"].includes(state.connectorId)
+      || !/^chat_[A-Za-z0-9_]+$/.test(state.chatId || "") || !["codex","claude","neuraldeep","openrouter","local"].includes(state.connectorId)
       || !["contract-approved","outcome-draft","outcome-approved","research"].includes(state.phase)
       || state.running || state.runId || state.scaffoldRevision
       || state.contractApproval?.sha256 !== createHash("sha256").update(safeText(contract.path, context.memoryRoot)).digest("hex")) return false;

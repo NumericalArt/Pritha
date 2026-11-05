@@ -197,8 +197,9 @@ function boundFactoryProposal(f) {
   writeFileSync(file,JSON.stringify(state));return {target,slug,id,contract,file,state};
 }
 
-test("a host-bound factory remains planned after Contract and Outcome approval without granting a workspace",t=>{
+for(const connectorId of ['codex','claude','neuraldeep'])test(`a ${connectorId} factory remains planned after Contract and Outcome approval without granting a workspace`,t=>{
   const f=fixture(t),p=boundFactoryProposal(f);
+  p.state.connectorId=connectorId;p.state.chatId='chat_'+connectorId+'_fixture';writeFileSync(p.file,JSON.stringify(p.state));
   const initial=findCatalogAgent(f.catalog(),p.id);
   assert.equal(initial.identityStatus,"identified");assert.equal(initial.projectPath,null);assert.deepEqual(initial.diagnostics,["project-planned-not-created"]);
   assert.throws(()=>resolveProviderAgentWorkspace(f.options,initial.id),{code:"provider_agent_workspace_unavailable"});

@@ -302,6 +302,19 @@ from delivery budget blockers. Tests preserve counts for completed unsuccessful
 attempts, protected evidence bindings and existing approval semantics. No manual
 state repair or model-written verifier was used for these real pilots.
 
+The real primary-page probe also exposed whole-document quarantine caused by
+flattened HTML. The reader now retains content boundaries, and research scans
+blocks with overlapping context before selecting bounded substantive passages.
+A split instruction remains quarantined; actual OWASP and Node.js v24 process
+pages now supply bound evidence while preserving the prior failed attempt.
+
+Baseline operational health currently reports one catalog conflict for the
+accepted, not-yet-scaffolded Codex pilot. Its provider was omitted from the
+pending-factory attribution allowlist. The candidate fixes this and a read-only
+check on current canonical metadata resolves it as planned without granting
+workspace access. Existing runtime/pages remain healthy; rollback to fd96ab7
+retains this known catalog limitation until the pilot is scaffolded.
+
 ## Required steps before final handoff
 
 1. Verify and install the consolidated follow-up through the managed workflow,

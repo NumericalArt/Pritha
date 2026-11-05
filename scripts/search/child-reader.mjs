@@ -68,13 +68,23 @@ export async function readChildPage(value, hosts, signal, depth = 0, dependencie
     if (depth >= 3) fail("url_blocked");
     return readChildPage(r.redirect, hosts, signal, depth + 1, dependencies);
   }
-  const text = r.text
+  // Prefer the document body over site menus. Keep block boundaries so source
+  // selection and quarantine can distinguish an example from surrounding prose.
+  const document = r.text.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1]
+    || r.text.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1]
+    || r.text.match(/<div\b[^>]*\brole\s*=\s*["']main["'][^>]*>([\s\S]*)/i)?.[1]
+    || r.text;
+  const text = document
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<(nav|aside|header|footer)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<\/?(?:p|div|section|article|main|h[1-6]|pre|blockquote|ul|ol|li|tr|br|hr)\b[^>]*>/gi, "\n\n")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
   return {
     items: [{ url, content: text, title: "" }],
