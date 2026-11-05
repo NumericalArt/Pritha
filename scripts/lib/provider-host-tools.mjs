@@ -69,7 +69,7 @@ export class ProviderHostTools {
   async call(name,input){
     this.check();if(++this.calls>10000)throw fail('provider_tool_call_limit');
     if(this.factory)({name,input}=normalizeFactoryToolCall(name,input));
-    if(name==='factory_step' && this.factory?.isRead(input))return text(this.factory.read(input));
+    if(name==='factory_step' && this.factory?.isRead(input)){const value=await this.factory.read(input);this.check();return text(value);}
     if(['web_search','read_page'].includes(name)){
       if(!this.options.search)throw fail('provider_tool_unknown');
       const result=await this.options.search.call(name,input);this.check();return result;

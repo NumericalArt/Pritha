@@ -8,7 +8,7 @@ import {resolvePrithaPython} from './python-runtime.mjs';
 import {spawnSupervisedCli} from '../neuraldeep/process-supervisor.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief,INTERVIEW_BRIEF_TEXT_FIELDS} from '../agents-mother/interview-brief.mjs';
 import {RUNTIME_FAMILIES,SERVICE_MODES} from '../agents-mother/contract.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal} from '../agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal,validateFactoryDelivery} from '../agents-mother/voice-factory-state.mjs';
 
 const actions=['status','read_artifact','init','write_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','delivery_resume','verify','finish'];
 const readonly=new Set(['status','read_artifact']);
@@ -108,11 +108,22 @@ export class ProviderFactoryTools {
     if(!input || !actions.includes(input.action) || !/^[A-Za-z0-9_-]{8,128}$/.test(input.operation_id || '') || Object.keys(input).some(key=>!['operation_id','action',...(fields[input.action] || [])].includes(key)) || (requiredFields[input.action] || []).some(key=>input[key]===undefined) || Buffer.byteLength(JSON.stringify(input))>60000)throw new FactoryActionInputError(input?.action,input);
     if(input.retry_failed!==undefined && typeof input.retry_failed!=='boolean')throw factoryFail('factory_input_invalid');
   }
-  read(input){
+  async read(input){
     this.validate(input);const state=this.state();
-    if(input.action==='status')return {slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase:state?.phase || 'not-started',running:state?.running || null,
-      artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,manualAcceptance:'pending',
-      ...(!state?.contract?{nextStep:{action:'init',requiredFields:['brief','build_token_budget'],optionalFields:['build_iteration_budget','build_elapsed_budget_ms'],hint:'Use the structured brief from this task. This creates only a private draft; document and budget approvals remain separate.'}}:{})};
+    if(input.action==='status'){
+      let deliveryStatus=null;
+      if(state?.runId){
+        requireFactoryApprovals(this.paths,state);
+        let result;
+        try{const delivery=await import('../agents-mother/delivery-loop.mjs');result=delivery.deliveryStatus(state.runId,{root:this.paths.root,stateRoot:this.paths.stateRoot});}
+        catch{throw factoryFail('factory_delivery_evidence_unavailable');}
+        deliveryStatus=validateFactoryDelivery(this.paths,state,result).state.status;
+      }
+      const accepted=deliveryStatus==='accepted',phase=accepted && !state.running && ['awaiting-manual-acceptance','delivery-accepted'].includes(state.phase)?'accepted':state?.phase || 'not-started';
+      return {slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase,running:state?.running || null,
+        artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',
+        ...(!state?.contract?{nextStep:{action:'init',requiredFields:['brief','build_token_budget'],optionalFields:['build_iteration_budget','build_elapsed_budget_ms'],hint:'Use the structured brief from this task. This creates only a private draft; document and budget approvals remain separate.'}}:{})};
+    }
     if(input.action!=='read_artifact')throw factoryFail('factory_input_invalid');
     const row=factoryArtifact(this.paths,state,input.artifact),offset=input.offset ?? 0;
     if(!Number.isSafeInteger(offset) || offset<0)throw factoryFail('factory_input_invalid');
@@ -193,7 +204,7 @@ export class ProviderFactoryTools {
       if(result.version!==1 || result.operationId!==input.operation_id || !result.state || result.state.revision!==next.revision)throw factoryFail('factory_result_invalid');
       // The worker owns only this bound context; a lost result keeps running set.
       const saved=validateVoiceFactory(p,{...result.state,running:null},o);atomicWriteFile(p.file,JSON.stringify(saved));
-      return {status:result.ok?'completed':'failed',exitCode:done.code,output:JSON.stringify({ok:result.ok,...result.value,diagnostic:result.diagnostic || undefined,phase:saved.phase,manualAcceptance:'pending'})};
+      return {status:result.ok?'completed':'failed',exitCode:done.code,output:JSON.stringify({ok:result.ok,...result.value,diagnostic:result.diagnostic || undefined,phase:saved.phase,manualAcceptance:result.value?.manualAcceptance || 'pending'})};
     }catch(error){
       owned?.stop();if(owned)exited=(await owned.completion).processTreeExited===true;else exited=error.processTreeExited!==false;
       if(!exited)this.host.exitConfirmed=false;throw error;

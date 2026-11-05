@@ -8,7 +8,7 @@ import {redactSensitiveText,quarantineUntrustedInstructionText} from '../lib/red
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal} from './voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery} from './voice-factory-state.mjs';
 
 const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
 function draftHasSensitiveText(text,kind){
@@ -67,10 +67,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
   const approved=()=>{requireFactoryApprovals(p,state);contract();const valid=verifyOutcomeApproval(state.outcome,options);if(!valid.ok)throw factoryFail('factory_outcome_approval_required');};
   const observeDelivery=()=>{
     if(!state.runId)throw factoryFail('factory_delivery_missing');
-    const result=delivery.deliveryStatus(state.runId,options);
-    const spec=factoryArtifact(p,state,'outcome');
-    if(path.resolve(result.state.source_project)!==p.target || result.state.spec?.id!==spec.frontmatter.id || result.state.spec?.document_lock!==spec.frontmatter.outcome_document_lock)throw factoryFail('factory_delivery_identity_changed');
-    return result;
+    return validateFactoryDelivery(p,state,delivery.deliveryStatus(state.runId,options));
   };
   switch(input.action){
     case 'init':{
@@ -161,13 +158,14 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       // resume/deliver return an execution result without runRoot. Re-observe
       // the durable, identity-checked run before reading its Trial evidence.
       result=observeDelivery();
-      state.phase='delivery-'+result.state.status;value={runId:state.runId,status:result.state.status,phase:result.state.phase,blockers:result.state.blockers,iteration:result.state.iteration,budget:result.state.budget,worktree:result.worktree?.worktree || null,verification:deliveryVerification(result)};break;
+      state.phase='delivery-'+result.state.status;value={runId:state.runId,status:result.state.status,phase:result.state.phase,blockers:result.state.blockers,iteration:result.state.iteration,budget:result.state.budget,worktree:result.worktree?.worktree || null,verification:deliveryVerification(result),manualAcceptance:result.state.status==='accepted'?'accepted':'pending'};break;
     }
     case 'finish':{
       approved();const result=observeDelivery();if(!['verified','awaiting_acceptance','accepted'].includes(result.state.status))throw factoryFail('factory_delivery_not_verified');
       const {rebuildRegistry}=dependencies.registry || await import('./registry.mjs');const {checkCardReadiness}=dependencies.cards || await import('./card-readiness.mjs');rebuildRegistry();
       const card=await checkCardReadiness(state.agentId,{...options,baseUrl:false});
-      value={deliveryStatus:result.state.status,card,next:card.status==='ready'?'Manual demonstration, live card check and user acceptance; no automatic merge, deployment or publication.':'Resolve the reported card configuration blockers before manual acceptance.'};state.phase=card.status==='ready'?'awaiting-manual-acceptance':'card-blocked';break;
+      const accepted=result.state.status==='accepted';
+      value={deliveryStatus:result.state.status,manualAcceptance:accepted?'accepted':'pending',card,next:card.status!=='ready'?'Resolve the reported card configuration blockers.':accepted?'Result accepted. Application and publication retain their separate approval boundaries.':'Manual demonstration, live card check and user acceptance; no automatic merge, deployment or publication.'};state.phase=card.status==='ready'?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
     }
     default:throw factoryFail('factory_input_invalid');
   }

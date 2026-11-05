@@ -15,6 +15,7 @@ import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs'
 import {contractData} from '../scripts/agents-mother/contract.mjs';
 import {validateOutcomeSpecText} from '../scripts/agents-mother/outcome-spec.mjs';
 import {preparedTrialInputFiles} from '../scripts/agents-mother/prepared-trial-inputs.mjs';
+import {createDeliveryLedger,updateDeliveryLedger} from '../scripts/agents-mother/delivery-ledger.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const brief={identity:{name:'Voice Built',slug:'voice-built'},goal:'Read a supplied text file and count its lines.',user:'The local operator',successCriteria:['The CLI returns the exact line count and handles a missing file with an error.'],coreFunctions:['Count lines in a supplied local file'],workflows:['Choose a file; run the CLI; inspect its count'],nonGoals:['No network, deployment or automatic services'],permissions:{network:['none'],filesystem:['Only the operator-selected file and child workspace']},technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'A deterministic local line counter needs no third-party repository.'}};
@@ -169,7 +170,7 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),phase:'scaffolded'}));
   const spec=f.artifact('outcome').frontmatter,calls=[];let output={state:{source_project:f.p.target,spec:{id:spec.id,document_lock:spec.outcome_document_lock},status:'awaiting_acceptance',phase:'verify',blockers:[],iteration:1,budget:{remaining:5000}},worktree:{worktree:'/fixture/disposable-build'}},cardStatus='blocked',failAfterJournal=false;
   const executionResult=()=>{const {runRoot,...result}=output;return result;};
-  const dependencies={delivery:{deliverOutcome:async(outcome,target,options)=>{calls.push({outcome,target,options});assert.equal(f.state().runId,options.runId);if(failAfterJournal)throw Error('simulated disconnect');return executionResult();},deliveryStatus:(runId)=>{assert.equal(runId,f.state().runId);return output;},resumeDelivery:async(runId,options)=>{calls.push({runId,options});return executionResult();}},registry:{rebuildRegistry:()=>{}},cards:{checkCardReadiness:async(id,options)=>{assert.equal(id,f.state().agentId);assert.equal(options.baseUrl,false);return {status:cardStatus,controlCenterVisible:'unknown'};}}};
+  const dependencies={delivery:{deliverOutcome:async(outcome,target,options)=>{calls.push({outcome,target,options});assert.equal(f.state().runId,options.runId);if(failAfterJournal)throw Error('simulated disconnect');return executionResult();},deliveryStatus:(runId)=>{assert.equal(runId,f.state().runId);return {...output,state:{...output.state,run_id:runId}};},resumeDelivery:async(runId,options)=>{calls.push({runId,options});return executionResult();}},registry:{rebuildRegistry:()=>{}},cards:{checkCardReadiness:async(id,options)=>{assert.equal(id,f.state().agentId);assert.equal(options.baseUrl,false);return {status:cardStatus,controlCenterVisible:'unknown'};}}};
   let sequence=0;const step=async action=>{
     const operation_id='trusted_worker_'+(++sequence),state={...f.state(),revision:f.state().revision+1,running:{operationId:operation_id,action}};fs.writeFileSync(f.p.file,JSON.stringify(state));
     const result=await executeVoiceFactoryStep({version:1,root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'claude',model:'claude-sonnet-5-5',effort:'low',preset:{authMode:'local-cli-session'},factoryParent:{fixture:true},state,input:{operation_id,action}},dependencies);
@@ -191,8 +192,33 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   output={...output,state:{...output.state,last_trial_result:{...ref,path:'../../foreign.json'}}};assert.equal((await step('delivery_status')).value.verification.status,'evidence-unavailable');
   output=success;
   assert.equal((await step('finish')).state.phase,'card-blocked');cardStatus='ready';assert.equal((await step('finish')).state.phase,'awaiting-manual-acceptance');assert.equal(calls.length,4);
+  output={...output,state:{...output.state,status:'accepted'}};
+  const accepted=await step('finish');assert.equal(accepted.state.phase,'accepted');assert.equal(accepted.value.manualAcceptance,'accepted');assert.doesNotMatch(accepted.value.next,/manual|user acceptance/i);
+  assert.equal((await step('delivery_status')).value.manualAcceptance,'accepted');assert.equal(calls.length,4,'Observing acceptance must not start a builder');
   output={...output,state:{...output.state,source_project:'/different-child'}};await assert.rejects(step('delivery_status'),{code:'factory_delivery_identity_changed'});
   fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),running:null,runId:undefined,phase:'scaffolded'}));failAfterJournal=true;await assert.rejects(step('deliver'),/simulated disconnect/);assert.match(f.state().runId,/^voice-voice-built-/);assert.equal(f.state().running.action,'deliver');
+});
+
+test('factory status observes actual acceptance without rewriting state or borrowing another run',{timeout:60000},async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const spec=f.artifact('outcome').frontmatter,runId='run-factory-status',runRoot=path.join(f.p.stateRoot,'builds',f.p.slug,runId);
+  createDeliveryLedger(runRoot,{runId,agentSlug:f.p.slug,targetKey:'fixture-target',sourceProject:f.p.target,spec:{id:spec.id,semanticLock:spec.outcome_semantic_lock,documentLock:spec.outcome_document_lock,contractFingerprint:spec.contract_fingerprint,approvalId:spec.approval_id || 'fixture-approval'}});
+  fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),runId,phase:'awaiting-manual-acceptance'}));
+  const stateBytes=fs.readFileSync(f.p.file,'utf8'),approvalCount=f.approvals.length,ledgerFile=path.join(runRoot,'build-state.json');
+  for(const status of ['verified','awaiting_acceptance','accepted']){
+    updateDeliveryLedger(runRoot,current=>({...current,status,next_action:'',accepted_by:status==='accepted'?'user':null,accepted_at:status==='accepted'?'2026-11-05T00:00:00.000Z':null}));
+    const ledgerBytes=fs.readFileSync(ledgerFile,'utf8'),observed=await f.call('status');
+    assert.equal(observed.deliveryStatus,status);assert.equal(observed.manualAcceptance,status==='accepted'?'accepted':'pending');assert.equal(observed.phase,status==='accepted'?'accepted':'awaiting-manual-acceptance');
+    assert.equal(fs.readFileSync(f.p.file,'utf8'),stateBytes);assert.equal(fs.readFileSync(ledgerFile,'utf8'),ledgerBytes);assert.equal(f.approvals.length,approvalCount);
+  }
+  updateDeliveryLedger(runRoot,current=>({...current,source_project:path.join(f.p.parent,'foreign-child')}));
+  await assert.rejects(f.call('status'),{code:'factory_delivery_identity_changed'});
+  updateDeliveryLedger(runRoot,current=>({...current,source_project:f.p.target,spec:{...current.spec,document_lock:'sha256:foreign-outcome'}}));
+  await assert.rejects(f.call('status'),{code:'factory_delivery_identity_changed'});
+  const outcomeBytes=fs.readFileSync(f.state().outcome,'utf8');fs.appendFileSync(f.state().outcome,'\nUnapproved change.\n');
+  await assert.rejects(f.call('status'),{code:'factory_outcome_approval_required'});fs.writeFileSync(f.state().outcome,outcomeBytes);
+  fs.writeFileSync(ledgerFile,'{');await assert.rejects(f.call('status'),{code:'factory_delivery_evidence_unavailable'});
+  assert.equal(fs.readFileSync(f.p.file,'utf8'),stateBytes);assert.equal(f.approvals.length,approvalCount);
 });
 
 test('each factory action has an exact schema; narrow approvals keep two distinct decisions and canonical replay',{timeout:60000},async t=>{

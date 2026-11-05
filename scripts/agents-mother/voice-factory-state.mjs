@@ -76,6 +76,13 @@ export function factoryArtifact(paths,state,kind){
   if(path.dirname(file)!==expected || !file.endsWith('.md'))throw factoryFail('factory_artifact_boundary');
   const text=factoryRead(file,expected,100000);return {file,text,sha256:factoryHash(text),frontmatter:parseFrontmatterData(text) || {}};
 }
+/** A factory run must still belong to this exact project and approved Outcome.
+ * Both read-only status and worker actions use the same attribution check. */
+export function validateFactoryDelivery(paths,state,result){
+  const spec=factoryArtifact(paths,state,'outcome'),ledger=result?.state;
+  if(!ledger || ledger.run_id!==state.runId || typeof ledger.source_project!=='string' || path.resolve(ledger.source_project)!==paths.target || ledger.spec?.id!==spec.frontmatter.id || ledger.spec?.document_lock!==spec.frontmatter.outcome_document_lock)throw factoryFail('factory_delivery_identity_changed');
+  return result;
+}
 /** Capture at turn settlement, not on polling: a later successful retry must
  * never change the outcome of an earlier attempt with no draft. */
 export function factoryDraftReceipt(options){

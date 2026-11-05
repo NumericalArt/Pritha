@@ -693,12 +693,15 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 647505e / Interactive.** Release и post-activation
-self-test проходят; Claude/Codex достигли awaiting-manual-acceptance, NeuralDeep
-имеет первое user approval Contract, но host acceptance не выполнен из-за
-некорректных аргументов модели. Требуются живые продолжения Voice/Task Chat,
-отдельный Outcome NeuralDeep, build/Trials и итоговая пользовательская приёмка.
-См. checkpoint 73; OpenRouter live остаётся отложенным пользователем.
+**Статус: in-progress; активна 5fd4308 / Interactive.** Release и полный
+post-activation self-test проходят без warnings/regressions. Результаты Claude
+и Codex впервые приняты пользователем и применены в исходных child checkout;
+карточки ready/accepted, шесть проверок применённых CLI прошли. NeuralDeep через
+точные tools принял ранее одобренный Contract и создал отдельный Outcome draft.
+Первое Outcome approval, build/Trials NeuralDeep и оставшаяся ручная приёмка
+ещё нужны. В candidate исправляется устаревший pending в factory status уже
+принятого результата; live ledger принятия верен. См. checkpoint 74;
+OpenRouter live остаётся отложенным пользователем.
 
 **Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
@@ -3623,6 +3626,46 @@ bounded research/scaffold/build/Trials. Существующий Outcome preview
 9 требований и 20 CLI cases; это ещё не canonical artifact или user approval.
 Продолжить Voice/Task Chat continuity для Claude и NeuralDeep. После фактической
 демонстрации получить первое принятие результатов и отдельное применение.
+
+### Checkpoint 74 — 5fd4308 установлена, Claude и Codex приняты и применены
+
+Точное разрешение пользователя выполнено через managed stop → source/build swap
+→ start → strict/operational health → admission. Проверены пять страниц и
+12 JS chunks; полный post-activation self-test pass, warnings/regressions пусты.
+До установки: 1607 тестов, восемь gate groups, 68 browser cases, build/typecheck
+и rollback pass. Профиль Interactive и девять несвязанных файлов сохранены;
+MacBook и GitHub не менялись.
+
+- Пользователь отдельно принял оба результата и разрешил применение проверенных
+  файлов. Обычный delivery accept и точный fast-forward применили четыре файла
+  Claude и восемь Codex; исходные child checkout чисты. Независимые 24+7 и
+  20 CLI cases с artifact Trial сохранены, шесть проверок из применённых проектов
+  прошли. Card readiness ready, result acceptance accepted, blockers пусты.
+- Расход сохранён: Claude 311938 токенов / 4 итерации; Codex 40456 / 1.
+  Новых builder turns для приёмки или применения не было. Подготовлены private
+  post-creation reviews и пропорциональная фиксация принятого состояния;
+  Git/tag baseline и публикация не выполнялись.
+- NeuralDeep впервые корректно вызвал factory_approve_contract с точным hash.
+  Host request принят по прежнему разрешению пользователя, Contract и пределы
+  80000 / 2 / 900000ms с начала сборки повторно не согласовывались.
+  factory_create_outcome создал draft; до первого отдельного Outcome approval
+  research/scaffold/build не начинаются. Подготовленный headless Outcome имеет
+  20 независимых CLI cases, artifact Trial и отдельный manual review;
+  calibrated verifier сохранён по hash. Draft authoring идёт штатным tool,
+  внутренние session/ledger/approval файлы вручную не исправляются.
+- Найдена дополнительная рассинхронизация: factory status всегда возвращает
+  manualAcceptance pending даже после реального принятия в delivery ledger.
+  Исправление читает только привязанный run, проверяет project/Outcome/approval
+  locks и возвращает accepted без записи session, повторного approval или
+  builder turn. finish также сохраняет accepted. Проверка отрицательных случаев
+  не позволяет чужому run, изменённому Outcome или повреждённому ledger
+  объявить принятие. Эта правка готовится отдельно; установленная 5fd4308 пока
+  содержит прежний pending в инструменте фабрики, но не в карточке/ledger.
+
+Открыто: первое Outcome approval и реальный bounded build NeuralDeep, его
+Voice/Task Chat continuity, уже запрошенная microphone-проверка двух принятых
+агентов, оставшаяся manual matrix и общий финальный acceptance. Не подменять
+эти проверки успешным API status или количеством unit tests.
 
 ## 7. Полные исходные материалы
 
