@@ -3510,6 +3510,55 @@ fd96ab7 до ответа на ранее подготовленное обно�
 сделано в отдельном worktree и не меняет подготовленную сборку. Общая приёмка
 создания агентов через оба интерфейса пока не завершена.
 
+### Checkpoint 72 — установлена объединённая версия и воспроизведены оставшиеся дефекты
+
+По отдельному одобрению установлена 2d937b4. Managed stop/start, strict и
+operational health, admission и полный post-activation self-test прошли без
+предупреждений. До установки прошли 1600 тестов, 68 браузерных сценариев,
+сборка, 5 страниц и 12 JS chunks. MacBook и GitHub не изменялись.
+
+Реальный Claude написал CLI, README и smoke в прежнем disposable worktree.
+24 основных независимых проверки прошли; дополнительный verifier дошёл до
+проверки поставки после успешных поведенческих edge cases и остановился на
+неиспользуемых настройках в созданном Pritha `.env.example`. Модель не могла
+исправить этот публичный пример из-за общего запрета `.env.*`. Новых платных
+попыток нет: учтены 311938 из 320000 токенов и все 4 итерации. Contract,
+Outcome, protected verifiers и исходный проект сохранены. Это ещё не приёмка.
+
+У Codex прошли host research и scaffold. Реальный вход Task Chat → Voice
+выявил более раннюю ошибку: эвристика продолжения выбирала старую карточку
+без provider binding ещё до разрешения точной factory conversation. Build
+Codex пока не запущен. NeuralDeep продолжает подготовку первого draft через
+узкий factory_init; Contract/Outcome этого пилота ещё не одобрены.
+
+Следующий кандидат исправляет три подтверждённых дефекта:
+
+1. Фабрика читает результат Trials через свежий identity-checked deliveryStatus,
+   поскольку execution result resume/deliver не содержит runRoot. Проверять также
+   устаревшие locks, отказ чтения и redaction диагностик.
+2. Agent creation получает точный host-bound разговор вместо fuzzy legacy
+   continuation. Explicit task references сохраняют обычную проверку. Повторить
+   реальный вход через Voice без force_new и проверить тот же chat/approvals.
+3. Headless scaffold без выбранных интеграций получает comment-only env example.
+   Host file tools допускают только точное имя `.env.example`, regular file,
+   неизменённый SHA и содержимое без секретов. Реальные `.env`, другие варианты,
+   links и command sandbox остаются защищены.
+
+Для существующего build добавлен отдельный штатный scaffold_refresh /
+`delivery refresh-scaffold`: под delivery lease и accepted plan проверяется
+точный host-generated baseline, canonical Git worktree и protected inputs.
+Обновляется только неизменённый старый `.env.example`; custom/secret/provider
+configuration и verified checkpoint отклоняются. Prepared/completed receipt
+позволяет восстановить потерянный ответ; код, verifier и бюджет не меняются.
+Это maintenance шаблона хостом, а не помощь другого LLM в реализации CLI.
+
+Дальше: полный gate, production build, browser/page/chunk checks и rollback
+review; затем отдельное разрешение на конкретный service update. После установки
+продолжить тот же Claude через scaffold_refresh → verify → finish без нового
+model turn, реальный Codex через Voice и NeuralDeep через оба интерфейса.
+Новые документы согласовываются впервые и отдельно; принятые не согласовывать
+повторно. User acceptance и применение готовых файлов остаются отдельными.
+
 ## 7. Полные исходные материалы
 
 Ниже сохранены три пользовательских исходника и дополнение D целиком. Их первоначальные команды,

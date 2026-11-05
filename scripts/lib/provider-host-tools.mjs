@@ -7,12 +7,19 @@ import { providerProcessEnvironment,createProviderTemporaryDirectory } from './p
 import { spawnSupervisedCli } from '../neuraldeep/process-supervisor.mjs';
 import { resolvePrithaPython } from './python-runtime.mjs';
 import {ProviderFactoryTools,PROVIDER_FACTORY_TOOLS,normalizeFactoryToolCall} from './provider-factory-tools.mjs';
+import {redactSensitiveText} from './redaction.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const validId=value=>typeof value==='string' && /^[A-Za-z0-9_-]{8,128}$/.test(value);
 const object=value=>value!==null && typeof value==='object' && !Array.isArray(value);
 const fail=code=>Object.assign(new Error('The host tool could not perform this operation within the task permissions.'),{code});
-const denied=part=>/^(?:\.env(?:\..*)?|\.git|\.claude|\.codex|\.private|\.memory-private|\.queue|\.logs|\.ssh|\.aws|\.config|\.mcp\.json|\.?credentials\.json|id_rsa|id_ed25519)$/i.test(part);
+const publicExample=part=>part==='.env.example';
+const denied=part=>!publicExample(part) && /^(?:\.env(?:\..*)?|\.git|\.claude|\.codex|\.private|\.memory-private|\.queue|\.logs|\.ssh|\.aws|\.config|\.mcp\.json|\.?credentials\.json|id_rsa|id_ed25519)$/i.test(part);
+function checkPublicExample(file,bytes){
+  if(!publicExample(path.basename(file)))return;
+  let value;try{value=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{throw fail('provider_tool_path_denied');}
+  if(redactSensitiveText(value)!==value)throw fail('provider_tool_path_denied');
+}
 const fields=(input,allowed)=>{if(!object(input) || Object.keys(input).some(key=>!allowed.includes(key)))throw fail('provider_tool_input_invalid');};
 const text=value=>({content:[{type:'text',text:typeof value==='string'?value:JSON.stringify(value)}]});
 const schema=(properties,required)=>({type:'object',properties,required,additionalProperties:false});
@@ -42,7 +49,7 @@ export class ProviderHostTools {
   }
   check(){if(this.closed || this.options.signal?.aborted)throw fail('operator_cancel');this.options.lease.assertOwned();}
   target(relative,{directory=false,missing=false}={}){
-    if(typeof relative!=='string' || relative.length>2048 || relative.startsWith('attachment:') || path.isAbsolute(relative) || relative.includes('\0') || relative.split(/[\\/]/).some(part=>part==='..' || denied(part)))throw fail('provider_tool_path_denied');
+    if(typeof relative!=='string' || relative.length>2048 || relative.startsWith('attachment:') || path.isAbsolute(relative) || relative.includes('\0') || relative.split(/[\\/]/).some((part,i,parts)=>part==='..' || denied(part) || publicExample(part) && (directory || i!==parts.length-1)))throw fail('provider_tool_path_denied');
     const target=path.resolve(this.cwd,relative);if(target!==this.cwd && !target.startsWith(this.cwd+path.sep))throw fail('provider_tool_path_denied');
     let cursor=this.cwd;
     for(const part of path.relative(this.cwd,target).split(path.sep).filter(Boolean)){
@@ -54,7 +61,7 @@ export class ProviderHostTools {
   }
   read(file,max=2*1024*1024){
     const fd=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW);
-    try{const info=fstatSync(fd);if(!info.isFile() || info.nlink!==1 || info.size>max)throw fail('provider_tool_file_too_large');return readFileSync(fd);}finally{closeSync(fd);}
+    try{const info=fstatSync(fd);if(!info.isFile() || info.nlink!==1 || info.size>max)throw fail('provider_tool_file_too_large');const bytes=readFileSync(fd);checkPublicExample(file,bytes);return bytes;}finally{closeSync(fd);}
   }
   window(value,input){const offset=input.offset ?? 0,length=input.length ?? 16000;if(!Number.isSafeInteger(offset) || offset<0 || !Number.isSafeInteger(length) || length<1 || length>24000)throw fail('provider_tool_input_invalid');return {text:value.slice(offset,offset+length),offset,nextOffset:offset+length<value.length?offset+length:null,totalCharacters:value.length};}
   resultPath(operationId){if(!validId(operationId))throw fail('provider_operation_id_invalid');return privateStateFile(this.options.stateRoot,path.join(this.options.privateRoot,'tool-results',hash(this.options.turnId),operationId+'.json'));}
@@ -81,7 +88,7 @@ export class ProviderHostTools {
     }
     if(name==='list_files'){
       fields(input,['path']);const directory=opendirSync(this.target(input.path,{directory:true})),names=[];let row,scanned=0;
-      try{while((row=directory.readSync()) && ++scanned<=10000 && names.length<=500)if(!denied(row.name) && !row.isSymbolicLink())names.push(row);}finally{directory.closeSync();}
+      try{while((row=directory.readSync()) && ++scanned<=10000 && names.length<=500)if(!denied(row.name) && !row.isSymbolicLink() && (!publicExample(row.name) || row.isFile()))names.push(row);}finally{directory.closeSync();}
       return text({files:names.slice(0,500).sort((a,b)=>a.name.localeCompare(b.name)).map(row=>({name:row.name,directory:row.isDirectory()})),truncated:Boolean(row)});
     }
     if(name==='read_result'){
@@ -118,6 +125,7 @@ export class ProviderHostTools {
         const offset=original.indexOf(input.old_text);if(offset<0 || original.indexOf(input.old_text,offset+1)>=0)throw fail('provider_tool_edit_ambiguous');
         content=original.slice(0,offset)+input.new_text+original.slice(offset+input.old_text.length);if(Buffer.byteLength(content)>2*1024*1024)throw fail('provider_tool_file_too_large');
       }else if(typeof content!=='string' || Buffer.byteLength(content)>24000)throw fail('provider_tool_input_invalid');
+      checkPublicExample(target,Buffer.from(content));
       kind='file_change_approval';presentation={path:input.path,beforeSha256:before,afterSha256:hash(content),...(name==='edit_file'?{oldText:input.old_text,newText:input.new_text}:{proposedContent:content})};
       perform=async()=>{
         this.check();const checked=this.target(input.path,{missing:true});if(checked!==target || (existsSync(checked)?hash(this.read(checked)):null)!==before)throw fail('provider_tool_file_changed');

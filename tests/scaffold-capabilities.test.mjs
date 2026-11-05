@@ -50,6 +50,7 @@ test("headless files preserve runtime, selected modules and a command that canno
   assert.equal(new Set(names).size, names.length);
   assert.equal(names.some(name => name.startsWith("operations/") || /control-center|deploy-service|telegram|launchd/.test(name)), false);
   for (const required of ["AGENTS.md", "README.md", ".env.example", "memory/manifest.json", "skills/manifest.json", "tools/manifest.json", "delivery/outcome-lineage.json"]) assert.ok(names.includes(required), required);
+  assert.equal(files.find(file=>file.path==='.env.example').content.split('\n').every(line=>!line.trim() || line.startsWith('#')),true,'a CLI without integrations needs no environment configuration');
   mkdirSync(f.target);
   for (const file of files) { const target = path.join(f.target, file.path); mkdirSync(path.dirname(target), { recursive: true }); writeFileSync(target, file.content); }
   const run = args => spawnSync(process.execPath, args, { cwd: f.target, encoding: "utf8", timeout: 15_000 });

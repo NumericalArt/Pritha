@@ -187,6 +187,11 @@ export function resolveCodexTaskContinuation(
     };
   }
 
+  // Agent creation uses the exact host-owned child/conversation binding in
+  // the factory router. Fuzzy history may point to a legacy or foreign card.
+  // Explicit task references above remain subject to their usual validation.
+  if (request.taskType === 'agent_creation') return { action: 'new', confidence: 'none', reason: 'factory_subject_binding', candidates: [] };
+
   const scored = safeCandidates
     .map((candidate, index) => scoreCodexTaskContinuation(request, candidate, index))
     .filter((candidate) => candidate.score > 0)

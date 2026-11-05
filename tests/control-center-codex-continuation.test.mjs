@@ -186,3 +186,16 @@ test("Codex task continuation resolver creates a new task for unrelated requests
     loaded.cleanup();
   }
 });
+
+test('factory requests use the exact child binding instead of fuzzy legacy history; explicit references remain explicit', async () => {
+  const loaded=await loadContinuationModule();
+  try {
+    const candidate={taskId:'legacy-factory',status:'complete',taskType:'agent_creation',taskText:'Continue Greeting Acceptance',threadScope:{kind:'agent',id:'greeting-acceptance',label:'Greeting Acceptance'}};
+    const request={taskText:candidate.taskText,taskType:'agent_creation',threadScope:candidate.threadScope};
+    const resolve=loaded.module.resolveCodexTaskContinuation;
+    assert.equal(resolve(request,[candidate]).reason,'factory_subject_binding');
+    assert.equal(resolve({...request,explicitTaskId:candidate.taskId},[candidate]).action,'continue');
+    assert.equal(resolve({...request,explicitTaskId:'missing'},[candidate]).reason,'explicit_task_not_found');
+    assert.equal(resolve({...request,mode:'force_new'},[candidate]).reason,'force_new_requested');
+  } finally { loaded.cleanup(); }
+});

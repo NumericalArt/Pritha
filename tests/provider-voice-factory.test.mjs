@@ -167,7 +167,8 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
   fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),phase:'scaffolded'}));
   const spec=f.artifact('outcome').frontmatter,calls=[];let output={state:{source_project:f.p.target,spec:{id:spec.id,document_lock:spec.outcome_document_lock},status:'awaiting_acceptance',phase:'verify',blockers:[],iteration:1,budget:{remaining:5000}},worktree:{worktree:'/fixture/disposable-build'}},cardStatus='blocked',failAfterJournal=false;
-  const dependencies={delivery:{deliverOutcome:async(outcome,target,options)=>{calls.push({outcome,target,options});assert.equal(f.state().runId,options.runId);if(failAfterJournal)throw Error('simulated disconnect');return output;},deliveryStatus:(runId)=>{assert.equal(runId,f.state().runId);return output;},resumeDelivery:async(runId,options)=>{calls.push({runId,options});return output;}},registry:{rebuildRegistry:()=>{}},cards:{checkCardReadiness:async(id,options)=>{assert.equal(id,f.state().agentId);assert.equal(options.baseUrl,false);return {status:cardStatus,controlCenterVisible:'unknown'};}}};
+  const executionResult=()=>{const {runRoot,...result}=output;return result;};
+  const dependencies={delivery:{deliverOutcome:async(outcome,target,options)=>{calls.push({outcome,target,options});assert.equal(f.state().runId,options.runId);if(failAfterJournal)throw Error('simulated disconnect');return executionResult();},deliveryStatus:(runId)=>{assert.equal(runId,f.state().runId);return output;},resumeDelivery:async(runId,options)=>{calls.push({runId,options});return executionResult();}},registry:{rebuildRegistry:()=>{}},cards:{checkCardReadiness:async(id,options)=>{assert.equal(id,f.state().agentId);assert.equal(options.baseUrl,false);return {status:cardStatus,controlCenterVisible:'unknown'};}}};
   let sequence=0;const step=async action=>{
     const operation_id='trusted_worker_'+(++sequence),state={...f.state(),revision:f.state().revision+1,running:{operationId:operation_id,action}};fs.writeFileSync(f.p.file,JSON.stringify(state));
     const result=await executeVoiceFactoryStep({version:1,root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'claude',model:'claude-sonnet-5-5',effort:'low',preset:{authMode:'local-cli-session'},factoryParent:{fixture:true},state,input:{operation_id,action}},dependencies);
@@ -183,11 +184,12 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   const observed=(await step('delivery_status')).value;
   assert.equal(observed.status,'blocked');assert.equal(observed.verification.status,'failed');assert.equal(observed.verification.failedTrials[0].exitCode,64);assert.equal(observed.verification.failedTrials[0].diagnostics.untrusted,true);
   assert.match(observed.verification.failedTrials[0].diagnostics.stderr,/CLI command is missing/);assert.doesNotMatch(JSON.stringify(observed),/synthetic-sensitive-value/);
+  for(const action of ['verify','delivery_resume'])assert.equal((await step(action)).value.verification.status,'failed',action+' must use durable evidence even when the execution result has no runRoot');
   fs.writeFileSync(path.join(runRoot,ref.path),JSON.stringify({...trial,evidence_lock:'changed'}));
   assert.equal((await step('delivery_status')).value.verification.status,'evidence-unavailable');
   output={...output,state:{...output.state,last_trial_result:{...ref,path:'../../foreign.json'}}};assert.equal((await step('delivery_status')).value.verification.status,'evidence-unavailable');
   output=success;
-  assert.equal((await step('finish')).state.phase,'card-blocked');cardStatus='ready';assert.equal((await step('finish')).state.phase,'awaiting-manual-acceptance');assert.equal(calls.length,2);
+  assert.equal((await step('finish')).state.phase,'card-blocked');cardStatus='ready';assert.equal((await step('finish')).state.phase,'awaiting-manual-acceptance');assert.equal(calls.length,4);
   output={...output,state:{...output.state,source_project:'/different-child'}};await assert.rejects(step('delivery_status'),{code:'factory_delivery_identity_changed'});
   fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),running:null,runId:undefined,phase:'scaffolded'}));failAfterJournal=true;await assert.rejects(step('deliver'),/simulated disconnect/);assert.match(f.state().runId,/^voice-voice-built-/);assert.equal(f.state().running.action,'deliver');
 });

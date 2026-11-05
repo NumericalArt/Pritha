@@ -332,10 +332,38 @@ foreign-provider rejection. These are synthetic tests; real agent delivery and
 operator acceptance remain open. The prepared b4b2301 release and installed
 fd96ab7 are unchanged by this separate worktree.
 
+## Installed consolidated release and real factory findings
+
+2d937b4 is installed under the approved managed transaction. Strict/operational
+health, admission and the complete post-activation self-test pass; no rollback
+was needed. Its 1600 automated and 68 browser checks remain release evidence,
+not proof that all real factory journeys are complete.
+
+Claude implemented the existing Word Counter in its disposable worktree. The
+24 core cases pass; behavioral edge checks reached the artifact bundle, which
+rejects unused variables in the host-generated `.env.example`. The provider's
+blanket env-path deny prevented correcting even this public template. The model
+is stopped at 311938/320000 tokens and 4/4 iterations. No further model budget
+or implementation assistance is inferred.
+
+Codex research and scaffold passed, but an actual Voice continuation selected a
+legacy task without a provider binding. A follow-up routes agent creation by
+its exact factory identity, preserving explicit reference validation. Another
+fix reads durable Trial evidence after resume/deliver rather than assuming their
+execution result contains runRoot.
+
+Public env examples receive bounded secret-checked host-file access only;
+real env files and command isolation stay denied. Headless CLI templates omit
+unused settings. Existing untouched host templates can be refreshed through a
+separate product action, with exact baseline/worktree validation, protected
+input checks, an execution lease and a recoverable receipt. It changes neither
+builder code, accepted documents, verifiers nor measured budget. The new action
+and live follow-up still require verification; no final agent acceptance yet.
+
 ## Required steps before final handoff
 
 1. Verify and install the consolidated follow-up through the managed workflow,
-   with rollback to installed fd96ab7 and exact immediate lifecycle approval.
+   with rollback to installed 2d937b4 and exact immediate lifecycle approval.
 2. Continue the existing approved Claude factory through corrected research,
    scaffold, measured delivery and independent protected Trials. Preserve its
    identity, accepted documents, measured usage and explicitly amended build limits.

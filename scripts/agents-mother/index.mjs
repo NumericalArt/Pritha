@@ -82,6 +82,7 @@ import {
   cleanupStaleDeliveryRuns,
   deliverOutcome,
   deliveryStatus,
+  refreshDeliveryScaffold,
   resumeDelivery,
 } from "./delivery-loop.mjs";
 import { runTrialPlan } from "./trial-runner.mjs";
@@ -125,6 +126,7 @@ function usage() {
   ${CLI_COMMAND} delivery budget <run-id> --set-tokens <N> --request-id <id> --answered-by user
   ${CLI_COMMAND} delivery resume <run-id> --add-tokens <N> --request-id <id> --answered-by user
   ${CLI_COMMAND} delivery verify <run-id>
+  ${CLI_COMMAND} delivery refresh-scaffold <run-id>
   ${CLI_COMMAND} delivery reconcile <run-id> [--apply --plan-lock <reviewed-plan-lock>]
   ${CLI_COMMAND} delivery accept <run-id> --accepted-by user
   ${CLI_COMMAND} delivery cleanup <run-id> [--apply --yes]
@@ -2029,6 +2031,10 @@ async function main() {
       printDeliveryState(result.state, result.worktree);
       if (result.reportPath) console.log(`Delivery report: ${path.relative(ROOT, result.reportPath)}`);
       if (result.state.status === "blocked") process.exitCode = 2;
+      return;
+    }
+    if (subcommand === 'refresh-scaffold') {
+      console.log(JSON.stringify(await refreshDeliveryScaffold(runId,{root:ROOT}),null,2));
       return;
     }
     if (subcommand === "accept") {

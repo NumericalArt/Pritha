@@ -59,3 +59,25 @@ test('a composite process proof requires every tree and rejects missing CLI or u
   assert.equal(providerProcessTreesExited(proof,[]),true);assert.equal(providerProcessTreesExited(proof,[{session:6,state:'S'}]),false);
   assert.equal(providerProcessTreesExited({...proof,trees:proof.trees.slice(1)},[]),false);assert.equal(providerProcessTreesExited({...proof,trees:[{id:'cli',evidence:{...cli,coverage:'unknown'}}]},[]),false);
 });
+
+test('public env examples are editable with exact approval; actual credentials and example directories remain denied',async t=>{
+  let approvals=0;const f=fixture(t,{approve:async()=>{approvals++;return {decision:'accept'};}}),file=path.join(f.cwd,'.env.example'),before='AGENT_NAME=demo\nLOG_LEVEL=info\n';
+  writeFileSync(file,before);
+  assert.equal(result(await f.tools.call('read_file',{path:'.env.example'})).sha256,hash(before));
+  const edit={operation_id:'public_example_001',path:'.env.example',expected_sha256:hash(before),content:'# No configuration required.\n'};
+  assert.equal(result(await f.tools.call('write_file',edit)).status,'completed');assert.equal(approvals,1);
+  const secret='API_KEY=synthetic-private-value\n';writeFileSync(file,secret);
+  await assert.rejects(f.tools.call('read_file',{path:'.env.example'}),{code:'provider_tool_path_denied'});
+  await assert.rejects(f.tools.call('write_file',{...edit,operation_id:'public_example_002',expected_sha256:hash(secret)}),{code:'provider_tool_path_denied'});
+  writeFileSync(file,before);
+  await assert.rejects(f.tools.call('write_file',{...edit,operation_id:'public_example_003',content:secret}),{code:'provider_tool_path_denied'});
+  assert.equal(approvals,1);assert.equal(readFileSync(file,'utf8'),before);
+  for(const name of ['.env','.env.local','.env.example.bak','.ENV.EXAMPLE']){
+    writeFileSync(path.join(f.cwd,name),'private');await assert.rejects(f.tools.call('read_file',{path:name}),{code:'provider_tool_path_denied'});
+  }
+  rmSync(file);mkdirSync(file);writeFileSync(path.join(file,'nested'),'private');
+  for(const input of [{path:'.env.example/nested'},{path:'.env.example',length:10}])await assert.rejects(f.tools.call('read_file',input),{code:'provider_tool_path_denied'});
+  await assert.rejects(f.tools.call('list_files',{path:'.env.example'}),{code:'provider_tool_path_denied'});
+  rmSync(file,{recursive:true});symlinkSync(path.join(f.cwd,'.env.local'),file);
+  await assert.rejects(f.tools.call('read_file',{path:'.env.example'}),{code:'provider_tool_path_denied'});
+});

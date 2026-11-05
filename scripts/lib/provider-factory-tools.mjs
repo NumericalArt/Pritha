@@ -10,9 +10,9 @@ import {normalizeInterviewBrief,validateInterviewBrief,INTERVIEW_BRIEF_TEXT_FIEL
 import {RUNTIME_FAMILIES,SERVICE_MODES} from '../agents-mother/contract.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal} from '../agents-mother/voice-factory-state.mjs';
 
-const actions=['status','read_artifact','init','write_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','deliver','delivery_status','delivery_resume','verify','finish'];
+const actions=['status','read_artifact','init','write_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','delivery_resume','verify','finish'];
 const readonly=new Set(['status','read_artifact']);
-const workflowSteps=new Set(['init','write_draft','create_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','deliver','delivery_status','verify','finish']);
+const workflowSteps=new Set(['init','write_draft','create_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','verify','finish']);
 const textFields=Object.entries(INTERVIEW_BRIEF_TEXT_FIELDS);
 const briefTextPaths=new Set(textFields.flatMap(([group,keys])=>keys.map(key=>group+'.'+key)));
 class FactoryBriefInputError extends Error {
@@ -53,7 +53,7 @@ export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate onl
 const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources','retry_failed'],research_recover:['sources'],research_apply:['selection'],delivery_resume:['answer']};
 const requiredFields={read_artifact:['artifact'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_recover:['sources'],research_apply:['selection']};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.operation_id={type:'string',minLength:8,maxLength:128,pattern:'^[A-Za-z0-9_-]+$',description:'Stable ID of 8–128 letters, digits, _ or -, for example init-agent-01. Keep it for an identical retry; never repeat uncertain effects.'};
-PROVIDER_FACTORY_TOOL.inputSchema.properties.action.description='status returns the saved next step. init creates the first draft from brief and proposed budgets. read_artifact reads it. write_draft revises an existing artifact using artifact, expected_sha256 and complete content. Do not put brief/content inside sources or selection. Those fields belong only to research actions.';
+PROVIDER_FACTORY_TOOL.inputSchema.properties.action.description='status returns the saved next step. init creates the first draft from brief and proposed budgets. read_artifact reads it. write_draft revises an existing artifact using artifact, expected_sha256 and complete content. Do not put brief/content inside sources or selection. Those fields belong only to research actions. scaffold_refresh is optional host maintenance for an unchanged, host-generated CLI environment example in an idle existing build; it does not edit product code, approve documents or extend budgets. Use only when Trial diagnostics identify that template.';
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
 Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
   retry_failed:{type:'boolean',description:'research_collect only: retry a confirmed failed source once within its original deadline. Never resets an uncertain operation or its limits.'},
@@ -135,7 +135,7 @@ export class ProviderFactoryTools {
       if(input.action==='write_draft' && (typeof input.content!=='string' || Buffer.byteLength(input.content)>48000))throw factoryFail('factory_input_invalid');
     }
     if(input.action==='create_outcome' || input.action==='approve_outcome')requireFactoryApprovals(p,state,{outcome:false});
-    if(['research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','deliver','delivery_status','delivery_resume','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
+    if(['research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','delivery_resume','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
     const reviewKind=input.action==='approve_contract'?'contract':input.action==='approve_outcome'?'outcome':null;
     const review=reviewKind?factoryArtifact(p,state,reviewKind):null;
     const presentation=review?{path:reviewKind+' · '+p.slug,beforeSha256:review.sha256,proposedContent:review.text,approvalScope:reviewKind+' only'}

@@ -4,12 +4,13 @@ import { today } from "../../lib/date.mjs";
 
 const text = value => redactSensitiveText(String(value || "")).replace(/[\r\n]+/g, " ").slice(0, 2000);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
+export const HEADLESS_ENV_EXAMPLE = '# This CLI requires no environment configuration.\n';
 
 export function headlessCliFiles(baseFiles, data, capability, selected) {
   const agentName = text(data.agentName || "CLI Agent"), agentSlug = slug(agentName);
   const markdown = (id, content) => `---\nid: ${agentSlug}-${id}\ntype: workflow\nstatus: draft\ncreated: ${today()}\nupdated: ${today()}\ntopics: [agent, cli, outcome-delivery]\ntools: [Node.js]\nsources: [delivery/outcome-lineage.json]\nrelated:\n  workflows: []\nsupersedes: []\nsuperseded_by: []\n---\n\n${content}\n`;
   const common = baseFiles.filter(file => /^(memory|tools|skills|sources|delivery|data)\//.test(file.path)
-    || [".env.example", ".gitignore", "scripts/redaction.mjs", "scripts/memory-status.mjs", "scripts/tools-status.mjs", "scripts/skills-status.mjs"].includes(file.path));
+    || [".gitignore", "scripts/redaction.mjs", "scripts/memory-status.mjs", "scripts/tools-status.mjs", "scripts/skills-status.mjs"].includes(file.path));
   const manifest = { schema: "pritha-cli-interface-v1", version: 1, generated_by: "Pritha", agent: agentName,
     runtime_family: capability.runtime, primary_interface: text(data.primaryInterface), adapters: [{ name: "cli", enabled: true,
       status: "scaffold", command_argv: ["node", "scripts/agent-cli.mjs"], status_command: "node scripts/agent-cli.mjs status", required_secrets: [] }],
@@ -93,6 +94,7 @@ node scripts/agent-cli.mjs status
 Команда \`node scripts/agent-cli.mjs run\` пока возвращает exit 78 и implementation-required. Следующий шаг — реализовать одобренный input/output и примеры из Outcome Spec, затем выполнить его независимые Trials через Pritha. После реализации этот документ дополняется реальным первым сценарием, входными файлами/аргументами, выходом, exit codes и проверенной ревизией. Help или успешный structural smoke не означают готовность продукта и приёмку пользователем.
 `;
   return [...common,
+    { path: '.env.example', content: HEADLESS_ENV_EXAMPLE },
     { path: "AGENTS.md", content: markdown("instructions", instructions) },
     { path: "README.md", content: markdown("readme", `# ${agentName}\n\n${text(data.primaryMission)}\n\nRuntime: ${capability.runtime}. Interface: CLI.\n\nСначала выполните \`node scripts/smoke-test.mjs\` и \`node scripts/agent-cli.mjs help\`. Статус scaffold-only сохраняется до реализации Outcome и независимых Trials. Полный первый путь описан в docs/user-training-guide.md.\n\nМодули памяти, tools и skills содержат собственные manifests. Service/Control Center/scheduler не выбраны. Родительские approval/Trial/ledger остаются вне проекта; delivery/outcome-lineage.json — только ссылка, не разрешение менять их.`) },
     { path: "docs/user-training-guide.md", content: markdown("first-run", training) },

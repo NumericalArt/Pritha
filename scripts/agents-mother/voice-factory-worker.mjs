@@ -140,6 +140,10 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       if(!result.smokeResult.ok || !result.healthResult.ok || !result.deliveryGit.ok)throw factoryFail('factory_scaffold_failed');
       state.phase='scaffolded';state.scaffoldRevision=result.deliveryGit.revision;value={scaffolded:true,target:p.target,next:'deliver'};break;
     }
+    case 'scaffold_refresh':{
+      approved();observeDelivery();
+      value=await delivery.refreshDeliveryScaffold(state.runId,options);break;
+    }
     case 'deliver':case 'delivery_resume':case 'verify':case 'delivery_status':{
       approved();
       const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:request.model,effort:request.effort,preset:request.preset,factoryParent:request.factoryParent},trialBackend:'local'};
@@ -154,6 +158,9 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       }else{
         observeDelivery();result=input.action==='delivery_status'?observeDelivery():await delivery.resumeDelivery(state.runId,{...buildOptions,hostOnly:input.action==='verify',...(input.answer?{answer:input.answer,answeredBy:'user'}:{})});
       }
+      // resume/deliver return an execution result without runRoot. Re-observe
+      // the durable, identity-checked run before reading its Trial evidence.
+      result=observeDelivery();
       state.phase='delivery-'+result.state.status;value={runId:state.runId,status:result.state.status,phase:result.state.phase,blockers:result.state.blockers,iteration:result.state.iteration,budget:result.state.budget,worktree:result.worktree?.worktree || null,verification:deliveryVerification(result)};break;
     }
     case 'finish':{

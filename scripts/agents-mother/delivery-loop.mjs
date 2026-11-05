@@ -1062,6 +1062,18 @@ export async function withDeliveryHostControl(runId, options, work) {
   }));
 }
 
+export async function refreshDeliveryScaffold(runId, options = {}) {
+  const {runRoot}=deliveryStatus(runId,options);
+  return withDeliveryExecution(runRoot,async()=>{
+    const state=readDeliveryLedger(runRoot);
+    if(!canHostVerifyDelivery(state) || !hostVerificationAllowed(state.budget))throw new DeliveryLoopError('scaffold_template_refresh_denied','An idle, accounted build is required.');
+    const plan=JSON.parse(readBoundedRegularFile(path.join(runRoot,'trial-plan.json'),{allowedRoots:[runRoot],maxBytes:2*1024*1024}).text);
+    approvedPlanBinding(plan,options);
+    const {refreshHeadlessScaffoldTemplate}=await import('./delivery-template-refresh.mjs');
+    return refreshHeadlessScaffoldTemplate(runRoot);
+  });
+}
+
 // Budget control has a distinct capability: only its explicitly authorized
 // continuation may call the build loop. Host verification never receives it.
 export async function withDeliveryBudgetControl(runId, options, work) {
