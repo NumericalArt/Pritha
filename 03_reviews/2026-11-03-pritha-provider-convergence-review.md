@@ -35,9 +35,9 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
 source_updated: 2026-11-05
-source_version: installed fd96ab7; real factory tool recovery under verification
-retrieved: 2026-11-04
-verified: 2026-11-04
+source_version: installed fd96ab7; factory tool and interface continuation candidates under verification
+retrieved: 2026-11-05
+verified: 2026-11-05
 valid_for: the local executable candidate and recorded operator acceptance only
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -314,6 +314,23 @@ pending-factory attribution allowlist. The candidate fixes this and a read-only
 check on current canonical metadata resolves it as planned without granting
 workspace access. Existing runtime/pages remain healthy; rollback to fd96ab7
 retains this known catalog limitation until the pilot is scaffolded.
+
+## Reverse interface continuation (isolated verification)
+
+A Task Chat factory could not enter Voice because the backend attempted another
+chat creation and hit factory_target_exists. Four provider regression cases fail
+on the previous code and pass after resolving the existing host-owned factory
+conversation. Native Codex also retains its original App Server conversation.
+The host validates provider, selected state root, slug, target and registry
+binding; conversation origin, group and history are preserved. Only a first
+factory Voice bind may adopt the saved public preset. Rebinding or overriding
+an ordinary topic remains rejected.
+
+Ninety-six targeted checks pass, covering queue/restart continuity, unchanged
+approvals, pinned model/effort/timeout, exact history links, malformed state and
+foreign-provider rejection. These are synthetic tests; real agent delivery and
+operator acceptance remain open. The prepared b4b2301 release and installed
+fd96ab7 are unchanged by this separate worktree.
 
 ## Required steps before final handoff
 

@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {ProviderHostTools} from '../scripts/lib/provider-host-tools.mjs';
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash} from '../scripts/agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
 import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs';
@@ -28,6 +28,17 @@ function fixture(t){
   t.after(async()=>{controller.abort();await tools.close();lease.release();coordinator.close();fs.rmSync(directory,{recursive:true,force:true});});
   return {tools,options,p,coordinator,lease,controller,approvals,proofs,call,ok,state:()=>loadVoiceFactory(p,options),artifact:kind=>factoryArtifact(p,loadVoiceFactory(p,options),kind)};
 }
+test('factory conversation lookup reads the exact host binding and rejects damaged or foreign state',async t=>{
+  const f=fixture(t),options={root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug};
+  assert.equal(readFactoryConversation(options),null);await f.ok('init',{brief,build_token_budget:10000});
+  const original=fs.readFileSync(f.p.file,'utf8'),state=JSON.parse(original);
+  assert.equal(readFactoryConversation(options).chatId,f.options.chatId);assert.equal(fs.readFileSync(f.p.file,'utf8'),original);
+  for(const invalid of ['null','{',JSON.stringify({...state,stateRoot:path.dirname(f.p.stateRoot)}),JSON.stringify({...state,target:path.dirname(f.p.target)})]){
+    fs.writeFileSync(f.p.file,invalid);assert.throws(()=>readFactoryConversation(options),{code:'factory_binding_changed'});
+  }
+  fs.writeFileSync(f.p.file,original);const regular=path.join(f.p.directory,'regular-state.json');fs.renameSync(f.p.file,regular);fs.symlinkSync(regular,f.p.file);
+  assert.throws(()=>readFactoryConversation(options),{code:'factory_artifact_boundary'});assert.equal(fs.existsSync(f.p.target),false);
+});
 test('dedicated drafting tools require brief/content and retain the canonical operation and approval boundary',{timeout:60000},async t=>{
   const f=fixture(t),init=f.tools.definitions.find(t=>t.name==='factory_init'),write=f.tools.definitions.find(t=>t.name==='factory_write_draft');
   assert.deepEqual(init.inputSchema.required,['operation_id','brief','build_token_budget']);assert.equal(init.inputSchema.properties.sources,undefined);

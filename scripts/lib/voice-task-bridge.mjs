@@ -52,7 +52,7 @@ export class VoiceTaskBridge {
         // A creation response can be lost before bindChat. The canonical backend
         // deduplicates this same clientThreadId; creation cannot execute a turn.
         const created = await this.backend.create(topic, request);
-        topic = this.bindings.bindChat(topic.topicId, created.chatId, topic.revision, created.modelId);
+        topic = this.bindings.bindChat(topic.topicId, created.chatId, topic.revision, created.modelId,created.factoryPreset);
       }
       task = this.bindings.transition(taskId, task.revision, { state: 'dispatching' });
       try {

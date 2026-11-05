@@ -8,6 +8,7 @@ import test from "node:test";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import ts from "../interfaces/control-center/node_modules/typescript/lib/typescript.js";
+import {voiceFactoryPaths} from '../scripts/agents-mother/voice-factory-state.mjs';
 
 export async function fixtureModules() {
   const tmp = mkdtempSync(path.join(os.tmpdir(), "pritha-chat-evolution-"));
@@ -79,6 +80,31 @@ test('Voice Codex uses the same native factory creation and keeps its topic, mod
     for(const change of [{connectorId:'claude'},{preset:{...topic.preset,reasoningEffort:'high'}},{scope:{...topic.scope,generation:2}},{sessionId:'another-session'},{workspace:{...topic.workspace,factorySlug:'neighbor'}}])await assert.rejects(backend.detail({...bound,...change}));
     await assert.rejects(backend.create({...topic,scope:{...topic.scope,id:'neighbor'}},request),{code:'voice_topic_workspace_mismatch'});
     assert.equal(calls.filter(row=>row.method==='thread/start').length,1);
+  }finally{f.cleanup();}
+});
+
+test('a typed Codex factory enters Voice with the same native conversation and approved artifacts',async()=>{
+  const f=await fixtureModules();
+  try{
+    const {CodexChatGateway}=await f.load('gateway'),gateway=new CodexChatGateway(),calls=[];
+    const provider={providerId:'desktop_bundled',view:{stateIdentityHash:'storage-v2:factory',availability:'ready',capabilities:{factoryTools:true}}};
+    const connection={request:async(method,params)=>{calls.push({method,params});return {thread:{id:'native_typed_factory'},model:'saved-model'};},markThreadLoaded(){}};
+    gateway.runtime={effectiveProvider:async()=>provider,connection:async()=>connection,threadDefaults:()=>({cwd:f.root,sandbox:'danger-full-access',model:'changed-default'})};
+    gateway.threadDetail=async id=>({thread:await gateway.store.get(id),activeTurnId:null,pendingRequests:[],queued:[]});gateway.emit=()=>{};
+    const slug='typed-native-counter',created=await gateway.createThread({clientThreadId:'typed_native_factory',source:'chat',factoryIntent:{action:'create-new-agent',slug},settings:{modelId:'saved-model',effortId:'low'}}),binding=created.detail.thread;
+    const p=voiceFactoryPaths({root:f.root,stateRoot:f.state,slug}),contract=path.join(p.memory,'contracts','typed-native.md');mkdirSync(path.dirname(contract),{recursive:true});mkdirSync(p.directory,{recursive:true});
+    writeFileSync(contract,'---\nid: typed-native\ntype: agent-contract\nstatus: accepted\n---\n# Accepted contract\n');
+    const state={schema:'pritha-voice-factory-v1',slug,chatId:binding.chatId,connectorId:'codex',stateRoot:p.stateRoot,target:p.target,phase:'contract-approved',revision:2,running:null,contract,contractApproval:{sha256:createHash('sha256').update(readFileSync(contract)).digest('hex')}};
+    writeFileSync(p.file,JSON.stringify(state));const snapshot=readFileSync(p.file,'utf8');
+    const backend=gateway.voiceTaskBackend(),topic={connectorId:'codex',topicId:'topic_'+'b'.repeat(40),clientThreadId:'voice_enter_typed_factory',scope:{kind:'agent',id:slug,generation:1},preset:{modelId:'changed-default',reasoningEffort:'high',timeoutMs:30000},workspace:{mode:'read-only',factorySlug:slug}};
+    const request={chat:{workspace:topic.workspace,subject:{kind:'child',slug,phase:'interview'}},turn:{input:[{type:'text',text:'Continue the approved factory'}]}};
+    const resumed=await backend.create(topic,request),bound={...topic,chatId:resumed.chatId,resolvedModelId:resumed.modelId,preset:resumed.factoryPreset};
+    assert.equal(resumed.chatId,binding.chatId);assert.equal(resumed.factoryPreset.modelId,'saved-model');assert.equal(resumed.factoryPreset.reasoningEffort,'low');assert.equal(calls.length,1);
+    assert.equal((await backend.detail(bound)).threadGroup,'my_chats');assert.equal((await backend.create(topic,request)).chatId,binding.chatId);
+    const turns=[];gateway.startTurn=async(chatId,input)=>{turns.push({chatId,input});return {accepted:true};};
+    await backend.start(bound,{clientMessageId:'voice_continue_typed',input:[{type:'text',text:'Continue'}]});assert.equal(turns[0].chatId,binding.chatId);assert.deepEqual(turns[0].input.settings,{modelId:'saved-model',effortId:'low'});
+    const unchanged=await gateway.store.get(binding.chatId);assert.equal(unchanged.origin,'chat');assert.equal(unchanged.group,'my_chats');assert.equal(unchanged.voiceTopicId,undefined);assert.equal(readFileSync(p.file,'utf8'),snapshot);
+    writeFileSync(p.file,JSON.stringify({...state,connectorId:'claude'}));await assert.rejects(backend.detail(bound),{code:'voice_factory_provider_pinned'});assert.equal(turns.length,1);
   }finally{f.cleanup();}
 });
 

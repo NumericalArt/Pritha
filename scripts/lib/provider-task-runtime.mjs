@@ -12,7 +12,7 @@ import { ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests,ex
 import { normalizeProviderPreset } from './provider-profile.mjs';
 import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
 import {resolveProviderAgentWorkspace} from './provider-agent-workspace.mjs';
-import {voiceFactoryPaths,prepareFactoryBinding,factoryDraftReceipt} from '../agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,prepareFactoryBinding,factoryDraftReceipt,readFactoryConversation} from '../agents-mother/voice-factory-state.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -54,19 +54,30 @@ export class ProviderTaskRuntime {
   get registry(){return this._registry ||= new ProviderChatRegistry({stateRoot:this.stateRoot,privateRoot:this.privateRoot,connectorId:this.connectorId});}
   get execution(){return this._execution ||= new ExecutionCoordinator({stateRoot:this.stateRoot,directory:this.options.executionDirectory});}
   require(chat){return this.registry.require(chat);}
+  factoryConversation(slug){
+    const saved=readFactoryConversation({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug});
+    if(!saved)return null;
+    if(saved.connectorId!==this.connectorId)throw failure('voice_factory_provider_pinned');
+    const binding=this.require(saved.chatId);
+    if(binding.workspace.factorySlug!==slug || binding.workspace.factoryTarget!==saved.target || binding.subject?.slug!==slug || binding.subject.phase!=='interview' || binding.executionConfig.sandbox!=='read-only')throw failure('factory_binding_changed');
+    return binding;
+  }
+  isTypedFactory(binding){return Boolean(binding.origin==='chat' && binding.group==='my_chats' && binding.workspace.factorySlug && this.factoryConversation(binding.workspace.factorySlug)?.chatId===binding.chatId);}
   get voiceBindings(){return this._voiceBindings ||= new VoiceTopicBindings({coordinator:this.execution,stateRoot:this.stateRoot});}
   voiceTaskChat(taskId){
     const task=this.voiceBindings.task(taskId),topic=task && this.voiceBindings.topic(task.topicId);
     if(!topic?.chatId || topic.connectorId!==this.connectorId)return null;
     const binding=this.require(topic.chatId);
-    if(binding.voiceTopicId!==topic.topicId || binding.voiceTopicGeneration!==topic.scope.generation)throw failure('voice_topic_chat_mismatch');
+    if(!this.isTypedFactory(binding) && (binding.voiceTopicId!==topic.topicId || binding.voiceTopicGeneration!==topic.scope.generation))throw failure('voice_topic_chat_mismatch');
     return binding.chatId;
   }
   voiceTaskLinks(chat){
     const binding=this.require(chat);
-    if(binding.origin!=='voice')return binding.taskLinks;
-    const topic=this.voiceBindings.topic(binding.voiceTopicId);
-    if(!topic || topic.chatId!==chat || topic.connectorId!==this.connectorId || topic.scope.generation!==binding.voiceTopicGeneration)throw failure('voice_topic_chat_mismatch');
+    const typed=this.isTypedFactory(binding);
+    if(binding.origin!=='voice' && !typed)return binding.taskLinks;
+    const topic=typed?this.voiceBindings.latest({kind:'agent',id:binding.workspace.factorySlug}):this.voiceBindings.topic(binding.voiceTopicId);
+    if(typed && !topic?.chatId)return binding.taskLinks;
+    if(!topic || topic.chatId!==chat || topic.connectorId!==this.connectorId || !typed && topic.scope.generation!==binding.voiceTopicGeneration)throw failure('voice_topic_chat_mismatch');
     const pending=new Set(this.pendingRequests(chat).map(row=>row.turnId)),active=this.activeIntent(chat);
     const statuses={completed:'complete',failed:'failed',interrupted:'aborted',in_progress:'running',queued:'queued',waiting_for_input:'waiting_for_operator',waiting_for_approval:'waiting_for_operator',waiting_for_provider:'waiting_for_operator'};
     const links=this.voiceBindings.tasksForTopic(topic.topicId).map(task=>{
@@ -129,7 +140,7 @@ export class ProviderTaskRuntime {
   }
   voiceReceipt(chat,clientMessageId){
     const binding=this.require(chat);
-    if(binding.origin!=='voice' || !validClient(clientMessageId))throw failure('voice_topic_chat_mismatch');
+    if(binding.origin!=='voice' && !this.isTypedFactory(binding) || !validClient(clientMessageId))throw failure('voice_topic_chat_mismatch');
     const common={chatId:chat,clientMessageId,sessionId:binding.nativeThreadId || null};
     const receipt=this.registry.history.receipt(chat,clientMessageId);
     if(receipt?.kind==='message'){

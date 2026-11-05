@@ -136,19 +136,22 @@ export class VoiceTopicBindings {
       return { topic: copy(topic), task, replayed: false };
     });
   }
-  bindChat(topicId, chatId, expectedRevision, resolvedModelId) {
+  bindChat(topicId, chatId, expectedRevision, resolvedModelId, factoryPreset) {
     return this.coordinator.transaction(() => {
       const topic = this.topic(topicId);
       if (!topic) fail('voice_topic_missing');
       const modelId = resolvedModelId ?? topic.resolvedModelId ?? topic.preset.modelId;
+      if(factoryPreset && (!topic.workspace.factorySlug || topic.scope.kind!=='agent' || topic.scope.id!==topic.workspace.factorySlug))fail('voice_topic_workspace_mismatch');
+      const preset=factoryPreset?presetOf(topic.connectorId,factoryPreset):topic.preset;
+      if(factoryPreset && preset.modelId!==modelId)fail('voice_topic_model_mismatch');
       presetOf(topic.connectorId, { ...topic.preset, modelId });
       const validChat = topic.connectorId === 'codex' ? /^chat_[A-Za-z0-9_-]{1,160}$/ : new RegExp('^chat_' + topic.connectorId + '_[a-f0-9]{32}$');
       if (typeof chatId !== 'string' || !validChat.test(chatId)
           || topic.connectorId === 'codex' && /^chat_(neuraldeep|claude|openrouter|local)_/.test(chatId)) fail('voice_topic_chat_mismatch');
-      if (topic.chatId === chatId && topic.resolvedModelId === modelId) return topic;
+      if (topic.chatId === chatId && topic.resolvedModelId === modelId && (!factoryPreset || digest(topic.preset)===digest(preset))) return topic;
       if (topic.chatId) fail('voice_topic_chat_mismatch');
       if (topic.revision !== expectedRevision) fail('voice_topic_revision_conflict');
-      return this.writeTopic({ ...topic, chatId, resolvedModelId: modelId });
+      return this.writeTopic({ ...topic, chatId, resolvedModelId: modelId,preset });
     });
   }
   pinSession(topicId, sessionId, expectedRevision) {

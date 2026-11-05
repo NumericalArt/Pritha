@@ -24,7 +24,7 @@ export class VoiceTopicBindings {
   reserve(input: { taskId: string; scope: VoiceTopicScope; connectorId: ProviderConnectorId; preset: ProviderPreset;
     workspace?:VoiceTopicBinding['workspace'];requestHash: string; reset?: boolean; continueTopicId?: string; expectedGeneration?: number }):
     { task: VoiceTaskBinding; topic: VoiceTopicBinding; replayed: boolean };
-  bindChat(topicId: string, chatId: string, expectedRevision: number, resolvedModelId?: string): VoiceTopicBinding;
+  bindChat(topicId: string, chatId: string, expectedRevision: number, resolvedModelId?: string, factoryPreset?:ProviderPreset): VoiceTopicBinding;
   pinSession(topicId: string, sessionId: string, expectedRevision: number): VoiceTopicBinding;
   transition(taskId: string, expectedRevision: number, patch: { state: VoiceTaskBinding['state']; turnId?: string | null; queueId?: string | null; errorCode?: string | null }): VoiceTaskBinding;
 }

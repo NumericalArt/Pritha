@@ -76,6 +76,11 @@ test('a completed provider answer cannot turn a missing factory draft into a suc
   assert.equal(failed.status.status,'failed');assert.equal(failed.status.phase,'factory_draft_failed');assert.equal(failed.status.error_code,'factory_not_started');assert.equal(failed.status.factory_draft_failed,true);
   assert.equal(f.calls.filter(row=>row[0]==='start').length,1);
 });
+test('a Voice continuation links to the existing direct-chat group without moving its history',async t=>{
+  const f=fixture(t);f.detail.threadGroup='my_chats';
+  const view=await f.api.dispatchProviderVoiceTask('task-one',f.request);
+  assert.match(view.status.task_chat_href,/^\/task-chat\?group=my_chats&chat=/);assert.equal(f.calls.filter(row=>row[0]==='start').length,1);
+});
 
 test('reconnecting Voice preserves the factory conversation and provider instead of resetting approved work',t=>{
   const f=fixture(t),scope={kind:'agent',id:'same-counter'},workspace={mode:'read-only',factorySlug:'same-counter'};

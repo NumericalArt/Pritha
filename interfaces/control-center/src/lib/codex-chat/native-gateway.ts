@@ -3,7 +3,7 @@ import { planOperationDecision, resolveOperationDecision, type OperationAction, 
 import { operationRuntime } from "./operation-runtime";
 import { createHash, randomUUID } from "node:crypto";
 import {normalizeChatSubject,normalizeFactoryIntent,factorySubjectInstructions,type ChatSubject} from '../../../../../scripts/lib/chat-subject.mjs';
-import {prepareFactoryBinding,factoryDraftReceipt} from '../../../../../scripts/agents-mother/voice-factory-state.mjs';
+import {prepareFactoryBinding,factoryDraftReceipt,readFactoryConversation} from '../../../../../scripts/agents-mother/voice-factory-state.mjs';
 import {pendingProviderRequests,answerProviderRequest} from '../../../../../scripts/lib/provider-approvals.mjs';
 import {NativeFactoryTurn,nativeFactoryTools,nativeFactoryInstructions,nativeFactoryProcessesExited} from './native-factory';
 import {nativeVoiceTaskBackend} from './native-voice-backend';
@@ -219,6 +219,14 @@ export class CodexChatGateway {
   private queueOffset = 0;
 
   voiceTaskBackend=():VoiceTaskBackend=>nativeVoiceTaskBackend({gateway:this,execution:this.store.execution,binding:id=>this.requireBinding(id),
+    factory:async slug=>{
+      const saved=readFactoryConversation({root:this.root,stateRoot:this.store.stateRoot,slug});
+      if(!saved)return null;
+      if(saved.connectorId!=='codex')throw new CodexChatGatewayError('voice_factory_provider_pinned','Continue this child with its saved provider.',409);
+      const binding=await this.requireBinding(saved.chatId);
+      if(binding.workspace?.factorySlug!==slug || binding.workspace.factoryTarget!==saved.target || binding.subject?.slug!==slug || binding.subject.phase!=='interview' || binding.sandbox!=='read-only')throw new CodexChatGatewayError('factory_binding_changed','The saved factory conversation needs review.',409);
+      return binding;
+    },
     create:async(input,topic)=>{
       const result=await this.createThread(input),binding=await this.requireBinding(result.detail.thread.chatId);
       if(binding.voiceTopicId && (binding.voiceTopicId!==topic.topicId || binding.voiceTopicGeneration!==topic.scope.generation))throw new CodexChatGatewayError('voice_topic_chat_mismatch','This chat belongs to another Voice topic.',409);

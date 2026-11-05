@@ -49,6 +49,18 @@ test('same topic pins its preset; changing connector or explicit reset creates a
   assert.equal(fourth.topic.scope.generation, 3);
   assert.equal(bindings.topic(first.topic.topicId).connectorId, 'neuraldeep');
 });
+test('only the first host-bound factory continuation may adopt the original conversation preset',t=>{
+  const {bindings}=fixture(t),preset={...defaultProviderPreset('claude'),modelId:'original-model',reasoningEffort:'low',timeoutMs:90000};
+  const ordinary=bindings.reserve(input('ordinary','claude'));
+  assert.throws(()=>bindings.bindChat(ordinary.topic.topicId,chat('claude'),1,preset.modelId,preset),error('voice_topic_workspace_mismatch'));
+  const factory=bindings.reserve(input('factory','claude',{scope:{kind:'agent',id:'factory-child'},workspace:{mode:'read-only',factorySlug:'factory-child'}}));
+  assert.throws(()=>bindings.bindChat(factory.topic.topicId,chat('claude'),1,preset.modelId,{...preset,apiKey:'PRIVATE_UNACCEPTED_KEY'}),{code:'provider_preset_field_invalid'});
+  assert.equal(bindings.topic(factory.topic.topicId).chatId,null);
+  const bound=bindings.bindChat(factory.topic.topicId,chat('claude'),1,preset.modelId,preset);assert.deepEqual(bound.preset,preset);
+  assert.deepEqual(bindings.bindChat(factory.topic.topicId,chat('claude'),1,preset.modelId,preset),bound);
+  assert.throws(()=>bindings.bindChat(bound.topicId,chat('claude'),bound.revision,preset.modelId,{...preset,reasoningEffort:'high'}),error('voice_topic_chat_mismatch'));
+  assert.deepEqual(bindings.topic(bound.topicId).preset,preset);assert.doesNotMatch(JSON.stringify(bindings.topic(bound.topicId)),/PRIVATE_UNACCEPTED_KEY/);
+});
 test('explicit continuation requires exact original topic generation and cannot cross provider', t => {
   const { bindings } = fixture(t), first = bindings.reserve(input());
   bindings.reserve(input('task-two', 'claude'));

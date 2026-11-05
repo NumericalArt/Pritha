@@ -82,7 +82,7 @@ export async function providerVoiceTaskProjection(taskId: string) {
     status, phase: unknownExecution ? 'execution_unknown' : factoryFailed ? 'factory_draft_failed' : turn?.status || queue?.status || task.state, transport: 'task-chat', connector_id: topic.connectorId,
     model: topic.resolvedModelId || topic.preset.modelId, chat_id: topic.chatId, turn_id: task.turnId,
     topic_id: topic.topicId, topic_generation: topic.scope.generation, task_revision: task.revision,
-    task_chat_href: topic.chatId ? '/task-chat?group=voice_work&chat=' + encodeURIComponent(topic.chatId) : null,
+    task_chat_href: topic.chatId ? '/task-chat?group='+(detail?.threadGroup==='my_chats'?'my_chats':'voice_work')+'&chat=' + encodeURIComponent(topic.chatId) : null,
     updated_at: turn?.completedAt || turn?.startedAt || task.updatedAt, completed_at: turn?.completedAt || null,
     result_truncated: receipt?.kind === 'turn' && receipt.resultTruncated === true,
     error_code: unknownExecution ? 'fallback_confirmation_required' : factoryFailed ? factoryReceipt?.errorCode : turn?.error?.code || queue?.reason || task.errorCode,

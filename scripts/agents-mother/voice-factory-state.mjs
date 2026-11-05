@@ -53,6 +53,17 @@ export function loadVoiceFactory(paths,{chatId,connectorId}){
   const value=JSON.parse(factoryRead(paths.file,paths.directory));
   return validateVoiceFactory(paths,value,{chatId,connectorId});
 }
+/** Resolve an existing host-owned conversation before entering the same factory
+ * from another interface. This is attribution only; actions still check their
+ * ordinary workspace, approval, evidence and budget boundaries. */
+export function readFactoryConversation(options){
+  const p=voiceFactoryPaths(options);
+  if(!fs.existsSync(p.file))return null;
+  let value;
+  try{value=JSON.parse(factoryRead(p.file,p.directory));}catch(error){throw error.code==='factory_artifact_boundary'?error:factoryFail('factory_binding_changed');}
+  if(!/^chat_[A-Za-z0-9_-]{1,160}$/.test(value?.chatId || '') || !['codex','claude','neuraldeep','openrouter','local'].includes(value?.connectorId))throw factoryFail('factory_binding_changed');
+  return validateVoiceFactory(p,value,{chatId:value.chatId,connectorId:value.connectorId});
+}
 export function validateVoiceFactory(paths,value,{chatId,connectorId}){
   if(value.schema!=='pritha-voice-factory-v1' || value.chatId!==chatId || value.connectorId!==connectorId || value.slug!==paths.slug
       || value.target!==paths.target || value.stateRoot!==paths.stateRoot || !Number.isSafeInteger(value.revision))throw factoryFail('factory_binding_changed');

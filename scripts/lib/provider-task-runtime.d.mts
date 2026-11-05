@@ -36,6 +36,8 @@ export class ProviderTaskRuntime {
   constructor(options:ProviderTaskOptions);
   readonly registry:ProviderChatRegistry;readonly execution:ExecutionCoordinator;
   require(chatId:string):ProviderChatBinding;
+  factoryConversation(slug:string):ProviderChatBinding|null;
+  isTypedFactory(binding:ProviderChatBinding):boolean;
   voiceTaskChat(taskId:string):string|null;
   voiceTaskLinks(chatId:string):TaskLinkView[];
   activeIntent(chatId:string):ExecutionIntent|null;

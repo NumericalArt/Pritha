@@ -13,8 +13,8 @@ export function providerVoiceTaskBackend(runtime) {
   function check(topic) {
     if (topic.connectorId !== runtime.connectorId || !topic.chatId) throw new VoiceBindingError('voice_topic_provider_mismatch');
     const binding = runtime.require(topic.chatId);
-    if (binding.voiceTopicId !== topic.topicId || binding.voiceTopicGeneration !== topic.scope.generation
-        || binding.origin !== 'voice' || binding.group !== 'voice_work' || binding.modelId !== (topic.resolvedModelId || topic.preset.modelId)
+    if ((!runtime.isTypedFactory(binding) && (binding.voiceTopicId !== topic.topicId || binding.voiceTopicGeneration !== topic.scope.generation
+        || binding.origin !== 'voice' || binding.group !== 'voice_work')) || binding.modelId !== (topic.resolvedModelId || topic.preset.modelId)
         || binding.effortId !== topic.preset.reasoningEffort) throw new VoiceBindingError('voice_topic_chat_mismatch');
     if (topic.sessionId && binding.nativeThreadId !== topic.sessionId) throw new VoiceBindingError('voice_topic_session_mismatch');
     if(binding.workspace.agentId!==topic.workspace.agentId || topic.workspace.agentId && (topic.scope.kind!=='agent' || topic.scope.id!==topic.workspace.agentId))throw new VoiceBindingError('voice_topic_workspace_mismatch');
@@ -34,6 +34,13 @@ export function providerVoiceTaskBackend(runtime) {
       if(factory ? subject?.slug!==factory || subject.phase!=='interview' : subject)throw new VoiceBindingError('voice_factory_subject_binding_required');
       if (request.chat.workspace && (request.chat.workspace.mode !== topic.workspace.mode
           || request.chat.workspace.baseRevision !== topic.workspace.baseRevision || request.chat.workspace.agentId!==topic.workspace.agentId || request.chat.workspace.factorySlug!==factory)) throw new VoiceBindingError('voice_topic_workspace_mismatch');
+      const existing=factory?runtime.factoryConversation(factory):null;
+      if(existing && runtime.isTypedFactory(existing)){
+        const {sandbox,...savedPreset}=existing.executionConfig;
+        const preset={...savedPreset,modelId:existing.modelId,reasoningEffort:existing.effortId,timeoutMs:existing.timeoutMs};
+        check({...topic,chatId:existing.chatId,resolvedModelId:existing.modelId,preset});
+        return {chatId:existing.chatId,modelId:existing.modelId,factoryPreset:preset};
+      }
       const result = await runtime.create({ title: 'Voice · ' + (topic.scope.label || topic.scope.id).slice(0, 100), workspace: topic.workspace, clientThreadId: topic.clientThreadId, source: 'chat',
         settings: pinnedSettings(topic, request.chat.settings),...(subject?{subject}:{}) },
       { voice: { topicId: topic.topicId, generation: topic.scope.generation, preset: topic.preset } });
@@ -44,7 +51,7 @@ export function providerVoiceTaskBackend(runtime) {
     async detail(topic) {
       check(topic); await runtime.reconcile(topic.chatId);
       const active=runtime.activeIntent(topic.chatId);
-      return { activeTurnId: active?.turnId || null,executionState:active?.state || null,
+      return { activeTurnId: active?.turnId || null,executionState:active?.state || null,threadGroup:runtime.require(topic.chatId).group,
         queued: await runtime.queued(topic.chatId), pendingRequests: runtime.pendingRequests(topic.chatId) };
     },
     async start(topic, input) { check(topic); return runtime.start(topic.chatId, { ...input, settings: pinnedSettings(topic, input.settings) }); },

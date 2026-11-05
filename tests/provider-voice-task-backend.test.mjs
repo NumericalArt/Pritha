@@ -11,7 +11,7 @@ import { providerVoiceTaskBackend } from '../scripts/lib/provider-voice-task-bac
 import { executionChannelView } from '../scripts/lib/execution-channel.mjs';
 import {ImmutableAttachmentStore} from '../scripts/lib/chat-attachment-store.mjs';
 import {hostFileAttachmentTransport} from '../scripts/lib/provider-file-attachments.mjs';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {resolveProviderAgentWorkspace} from '../scripts/lib/provider-agent-workspace.mjs';
 import {voiceFactoryPaths} from '../scripts/agents-mother/voice-factory-state.mjs';
 
@@ -53,6 +53,31 @@ function childFixture(f,{git=false}={}){
     f.bindings.reserve({taskId:id,scope:{kind:'agent',id:child.agentId},workspace,connectorId:f.runtime.connectorId,preset:{modelId:'voice-pinned',reasoningEffort:'low',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
   return {...child,project,reserve};
 }
+for(const connector of ['claude','neuraldeep','openrouter','local'])test(`${connector}: a Task Chat factory continues through Voice without another chat or document approval`,async t=>{
+  const f=fixture(t,connector,{preflight:async()=>({interrupt:true,steer:false,approvals:true,tools:true})}),slug='typed-counter';
+  const created=await f.runtime.create({clientThreadId:'typed_factory_original',source:'chat',factoryIntent:{action:'create-new-agent',slug},settings:{modelId:'saved-model',effortId:'low'}}),chat=created.binding.chatId;
+  const direct=await f.runtime.start(chat,{clientMessageId:'typed_initial_message',input:[{type:'text',text:'Prepare this exact factory'}]});await until(()=>f.runs.length===1);
+  const p=voiceFactoryPaths({root:f.root,stateRoot:f.stateRoot,agentParent:f.agentParent,slug});mkdirSync(path.join(p.memory,'contracts'),{recursive:true});mkdirSync(p.directory,{recursive:true});
+  const contract=path.join(p.memory,'contracts','typed-contract.md'),outcome=path.join(p.memory,'contracts','typed-outcome.md');
+  writeFileSync(contract,'---\nid: typed-contract\ntype: agent-contract\nstatus: accepted\n---\n# Accepted contract\n');writeFileSync(outcome,'---\nid: typed-outcome\ntype: agent-outcome-spec\nstatus: approved\n---\n# Approved outcome\n');
+  const state={schema:'pritha-voice-factory-v1',slug,chatId:chat,connectorId:connector,stateRoot:p.stateRoot,target:p.target,phase:'outcome-approved',revision:4,running:null,contract,outcome,
+    contractApproval:{sha256:createHash('sha256').update(readFileSync(contract)).digest('hex')},outcomeApproval:{sha256:createHash('sha256').update(readFileSync(outcome)).digest('hex')}};
+  writeFileSync(p.file,JSON.stringify(state));const snapshot=readFileSync(p.file,'utf8');
+  const reserve=id=>{const workspace={mode:'read-only',factorySlug:slug},body={...request('Continue the accepted factory'),chat:{workspace,settings:{modelId:'changed-default',effortId:'high'},subject:{kind:'child',slug,phase:'interview'}}};
+    f.bindings.reserve({taskId:id,scope:{kind:'agent',id:slug},workspace,connectorId:connector,preset:{modelId:'changed-default',reasoningEffort:'high',timeoutMs:30000},requestHash:voiceTaskRequestHash(body)});return body;};
+  const queued=await f.bridge.dispatch('typed_voice_first',reserve('typed_voice_first'));assert.equal(queued.task.state,'queued');assert.equal(queued.topic.chatId,chat);
+  assert.equal(queued.topic.preset.modelId,'saved-model');assert.equal(queued.topic.preset.reasoningEffort,'low');assert.equal(queued.topic.preset.timeoutMs,90000);
+  assert.equal(f.runtime.registry.list({group:'all'}).data.length,1);assert.equal(f.runtime.require(chat).origin,'chat');assert.equal(f.runtime.require(chat).group,'my_chats');assert.equal(f.runtime.require(chat).voiceTopicId,undefined);
+  f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>f.runs.length===2);assert.equal(f.runs[1].input.model,'saved-model');assert.equal(f.runs[1].input.resume,'11111111-2222-4333-8444-555555555555');
+  f.runs[1].resolve({ok:true,processTreeExited:true});await until(()=>f.runtime.active.size===0);
+  const worker=f.make(),bridge=new VoiceTaskBridge({bindings:f.bindings,backend:providerVoiceTaskBackend(worker)});
+  const continued=await bridge.dispatch('typed_voice_restart',reserve('typed_voice_restart'));await until(()=>f.runs.length===3);assert.equal(continued.topic.chatId,chat);assert.equal(f.runs[2].input.hostExecutionContext.factory.slug,slug);
+  assert.equal((await providerVoiceTaskBackend(worker).detail(continued.topic)).threadGroup,'my_chats');assert.equal(worker.voiceTaskChat('typed_voice_restart'),chat);assert.equal(worker.voiceTaskLinks(chat).length,2);
+  f.runs[2].resolve({ok:true,processTreeExited:true});await until(()=>worker.active.size===0);
+  assert.equal(worker.registry.turnsPage(chat).data.length,3);assert.match(worker.registry.turn(chat,direct.accepted.turn.turnId).userMessage.markdown,/Prepare this exact factory/);
+  assert.equal(readFileSync(p.file,'utf8'),snapshot);assert.equal(worker.require(chat).origin,'chat');assert.equal(worker.require(chat).voiceTopicId,undefined);
+  writeFileSync(p.file,JSON.stringify({...state,connectorId:connector==='claude'?'neuraldeep':'claude'}));await assert.rejects(providerVoiceTaskBackend(worker).detail(continued.topic),{code:'voice_factory_provider_pinned'});assert.equal(f.runs.length,3);
+});
 test('factory draft evidence belongs to the completed turn and survives a later successful retry and restart',async t=>{
   const f=fixture(t,'claude',{preflight:async()=>({interrupt:true,steer:false,approvals:true,tools:true})}),slug='snapshot-child',workspace={mode:'read-only',factorySlug:slug};
   const reserve=id=>{const body={...request('Prepare only a draft'),chat:{workspace,subject:{kind:'child',slug,phase:'interview'}}};
