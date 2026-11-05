@@ -813,19 +813,6 @@ async function runDeliveryLoopLocked(input = {}) {
       const budget = budgetBlocker(state);
       if (budget) return blockDelivery(runRoot, plan, worktree, budget, input);
 
-      state = updateDeliveryLedger(runRoot, (current) => ({
-        ...current,
-        status: "building",
-        phase: "implementation",
-        iteration: current.iteration + 1,
-        next_action: "execute_build_iteration",
-        executor_preceding_trial_result: current.last_trial_result,
-        // A build may change the revision. Retain the old receipt in history,
-        // but require a new verification instead of reusing its former lock.
-        last_trial_result: null,
-        blockers: [],
-      }), { eventType: "build_iteration_started" }).state;
-
       let executorResult;
       try {
         if (!buildProbeCompleted) {
@@ -856,6 +843,20 @@ async function runDeliveryLoopLocked(input = {}) {
             throw new DeliveryLoopError("goal_api_unavailable", probe.error || "Codex Goal capability is unavailable");
           }
         }
+        // A failed runtime probe starts no implementation and consumes no
+        // iteration. Preserve all existing usage and elapsed-time limits.
+        state = updateDeliveryLedger(runRoot, (current) => ({
+          ...current,
+          status: "building",
+          phase: "implementation",
+          iteration: current.iteration + 1,
+          next_action: "execute_build_iteration",
+          executor_preceding_trial_result: current.last_trial_result,
+          // A build may change the revision. Retain the old receipt in history,
+          // but require a new verification instead of reusing its former lock.
+          last_trial_result: null,
+          blockers: [],
+        }), { eventType: "build_iteration_started" }).state;
         const executionState = readDeliveryLedger(runRoot);
         const preflight = deliveryTokenPreflight(executionState.budget);
         const remainingTokens = preflight.available;

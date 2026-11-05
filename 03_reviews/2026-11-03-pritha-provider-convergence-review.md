@@ -53,6 +53,26 @@ confidence: high
 
 ## Current acceptance status — 2026-11-05
 
+3c7c53b is installed and passes strict/operational health, admission and full
+post-activation self-test without warnings/regressions. Its release passed
+1614 tests and 68 browser cases. The same NeuralDeep factory completed bounded
+source recovery, exact host-passage publication and a clean scaffold without
+editing internal state or repeating accepted document approvals.
+
+The first real delivery then failed before a model request: the parent Task
+Chat sandbox was passed into provider-preset validation. Zero build tokens and
+the one iteration recorded by the old preflight order are preserved. A scoped
+candidate separates parent access from provider settings for Responses builds,
+retains strict rejection of unknown fields and unsafe access, and probes the
+runtime before starting a new implementation iteration. The 61 focused checks
+pass. A real readiness probe of the same NeuralDeep model and worktree passes
+with supported High, without build dispatch; unsupported xhigh remains rejected.
+Full release verification, exact installation approval, any genuinely needed
+elapsed-time amendment, actual implementation/Trials and manual acceptance
+remain open. Neither documents nor recorded usage may be reset to recover.
+
+### Earlier checkpoint before the 3c7c53b installation
+
 37f5cbb is installed with strict/operational health, admission and complete
 post-activation self-test passing without warnings or regressions. Its release
 passed 1610 tests, 68 browser cases, build/typecheck and rollback. Claude/Codex

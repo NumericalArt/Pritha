@@ -43,6 +43,27 @@ test('a measured Claude host budget refusal raises the delivery budget blocker a
   assert.equal((await f.executor.execute(f.input)).attempt_id,receipt.attempt_id);assert.equal(f.calls.length,1);
 });
 for(const connectorId of ['claude','neuraldeep','openrouter','local']){
+if(connectorId!=='claude'){
+test(connectorId+': a read-only factory chat can build only inside its isolated writable worktree',async t=>{
+  const f=fixture(t,{connectorId});
+  const saved={modelId:model,reasoningEffort:'medium',timeoutMs:1800000,sandbox:'read-only'};
+  f.executor.options.preset=saved;
+  const expected={modelId:model,reasoningEffort:'medium',timeoutMs:900000,...(connectorId==='local'?{baseUrl:'http://127.0.0.1:1234/v1'}:{})};
+  const require=f.service.require;
+  f.service.require=async preset=>{assert.deepEqual(preset,expected);return require(preset);};
+  assert.equal((await f.executor.probe(f.input)).available,true);
+  const result=await f.executor.execute(f.input);
+  assert.equal(result.status,'completed');assert.equal(result.tokens_used,120);
+  assert.equal(f.calls.length,1);assert.equal(f.calls[0].sandbox,'workspace-write');assert.equal(f.calls[0].cwd,realpathSync(f.input.worktree));
+  assert.deepEqual(f.calls[0].hostExecutionContext.protectedPaths,['verify.mjs']);
+  assert.deepEqual(saved,{modelId:model,reasoningEffort:'medium',timeoutMs:1800000,sandbox:'read-only'});
+  f.executor.options.preset={...saved,unexpected:true};
+  assert.equal((await f.executor.probe(f.input)).error,'provider_preset_field_invalid');
+  f.executor.options.preset={...saved,sandbox:'danger-full-access'};
+  assert.equal((await f.executor.probe(f.input)).error,'provider_sandbox_invalid');
+  assert.equal(f.calls.length,1);
+});
+}
 test(connectorId+': builds require isolated worktrees, pin model, account every request and replay without another launch',async t=>{
   const f=fixture(t,{connectorId});assert.ok(createBuildExecutor('claude-code') instanceof ClaudeCodeBuildExecutor);assert.equal((await f.executor.probe(f.input)).available,true);
   assert.equal((await f.executor.probe({...f.input,worktree:root})).available,false);

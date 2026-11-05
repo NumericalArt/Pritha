@@ -187,7 +187,17 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
-Текущий проверенный срез на 2026-11-05: на Mac mini установлена `647505e`,
+Текущий проверенный срез на 2026-11-05: установлена `3c7c53b`, профиль
+Interactive. Managed activation, strict/operational health, admission и полный
+post-activation self-test проходят без warnings/regressions. Release gate:
+1614/1614 тестов, 68 браузерных сценариев, build/typecheck, 5 страниц / 12 chunks
+и проверенный откат. Claude и Codex приняты и применены. NeuralDeep с прежними
+Contract/Outcome завершил host research и scaffold, затем до первого model
+request обнаружил несовместимость parent sandbox с provider preset. Исправление
+проверяется отдельно; подробности, сохранённые ограничения и следующие шаги —
+checkpoint 76. R12 и ручная приёмка не закрыты.
+
+Исторический проверенный срез на 2026-11-05: на Mac mini установлена `647505e`,
 build `IYmn5PyKqCNE72JiwWTNY`, профиль Interactive. Managed activation,
 strict/operational health, admission и post-activation self-test прошли без
 warnings/regressions. Release gate: 1605/1605 тестов, 68 браузерных сценариев,
@@ -693,15 +703,16 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 37f5cbb / Interactive.** Release и полный
+**Статус: in-progress; активна 3c7c53b / Interactive.** Release и полный
 post-activation self-test проходят без warnings/regressions. Claude и Codex
 приняты и применены; установленный factory status также возвращает accepted.
-NeuralDeep штатно применил точную правку draft, отдельно принял уже одобренный
-Outcome и прошёл memory research. Первый host Read OWASP выявил ранний карантин
-всей страницы; новая общая правка сохраняет только безопасные фрагменты и
-повторно проверяет весь итоговый текст прежним scanner. Research recovery,
-реальная сборка/Trials NeuralDeep и оставшаяся ручная приёмка ещё нужны.
-См. checkpoint 75; OpenRouter live отложен пользователем.
+NeuralDeep штатно принял точный Outcome, завершил memory/primary-source research
+и scaffold. Реальный deliver остановился на preflight до model request:
+parent Task Chat sandbox попал в provider preset. В текущей истории учтены
+0 build tokens и одна преждевременно начатая итерация; вручную их не сбрасывать.
+Изолированный кандидат разделяет эти настройки и не начинает новую итерацию
+при отказе runtime probe. Сборка/Trials NeuralDeep и ручная приёмка остаются.
+См. checkpoint 76; OpenRouter live отложен пользователем.
 
 **Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
@@ -3721,6 +3732,56 @@ redaction-helper в generated scaffold snapshots. Проверено, что о�
 первичным URL для failed темы, сохранением history/limits/locks и без нового
 одобрения документов. После допустимого research gate — scaffold, реальная ND
 сборка, независимые Trials, finish и первая приёмка результата.
+
+### Checkpoint 76 — 3c7c53b установлена, research и scaffold завершены, исправляется build preflight
+
+Оператор отдельно разрешил установку 3c7c53b и продолжение прежнего NeuralDeep
+пилота. Managed stop → source/build swap → start завершены; strict проверяет
+пять страниц и 12 JS chunks, operational/admission проходят. Полный self-test
+после установки: pass, warnings/regressions пусты, owned process tree завершён.
+Релизный gate 1614/1614 и 68 browser cases сохранён; профиль и несвязанные файлы
+не изменены, предыдущая сборка сохранена для управляемого отката.
+
+- В прежнем чате и factory identity выполнено одно штатное bounded recovery.
+  OWASP Injection Prevention теперь даёт проверяемые host passages. Node process
+  docs были обрезаны провайдером до содержательных релевантных выдержек; один
+  разрешённый обычный retry внутри того же окна получил официальные Modules
+  docs той же установленной Node v24.15.0. Успешный OWASP не перечитывался,
+  history, attempts и recovery deadline не сбрасывались. Ответ модели о новом
+  продлении deadline не подтверждён host checkpoint и не принят как evidence.
+- Три точные привязки passages опубликованы через factory_research_apply;
+  memory/external/synthesis и общий research gate complete. Сводка сохраняет
+  literal Unicode/whitespace, отделяет данные от интерпретатора и не добавляет
+  пакеты, сеть или службы. Дата публикации источников честно unknown; версия
+  Node проверена по version-pinned docs и установленному бинарнику.
+- Обычные scaffold_plan/scaffold успешны, создан чистый локальный Git baseline.
+  Contract/Outcome hashes и verifier сохранены; внутренних ручных правок нет.
+- Первый настоящий factory_deliver создал тот же bounded run и disposable
+  worktree, но runtime probe остановился до платного запроса: sandbox из
+  read-only родительского чата не является полем provider preset. История
+  сохраняет 0 build tokens и одну учтённую старым кодом итерацию. Это не успех
+  реализации и не основание сбросить расход, повторить документы или лимиты.
+- Изолированное исправление отделяет два допустимых parent access значения
+  от настроек NeuralDeep/OpenRouter/Local. Build по-прежнему получает только
+  собственный workspace-write, isolated worktree и protected Trial inputs;
+  неизвестные поля и danger-full-access отвергаются. Parent preset не меняется.
+- Runtime probe перенесён до начала implementation iteration. Новая проверка
+  восстанавливает runtime и проходит независимую проверку с одной разрешённой
+  итерацией без изменения лимитов. Старые ledgers автоматически не переписываются.
+- Новые проверки сначала воспроизвели отказ. После исправления build-executor
+  и delivery-loop suites: 61/61. Реальный read-only readiness probe того же
+  NeuralDeep model/worktree в изолированном кандидате проходит с High без
+  build dispatch и платных запросов. Неподдерживаемый xhigh честно отвергается;
+  следующий обычный turn должен выбрать поддерживаемый High, сохраняя модель.
+
+Далее: консолидированный gate/build/browser/rollback для нового pin, точное
+разрешение на установку. Для прежнего run сохранить расход и обе approvals;
+если wall-clock бюджет истёк во время ремонта, запросить только новое окно
+времени и применить его штатным budget amendment после явного ответа. Не
+выполнять новый model turn без допустимых пределов. Затем delivery_resume,
+независимые Trials, review/finish, первая приёмка и отдельное применение.
+Оставшаяся ручная матрица и исходные приложения A/B/C/D сохраняются полностью;
+GitHub и MacBook не изменяются.
 
 ## 7. Полные исходные материалы
 

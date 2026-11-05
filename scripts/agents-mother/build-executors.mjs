@@ -663,7 +663,13 @@ export class ResponsesBuildExecutor extends ClaudeCodeBuildExecutor {
     super(options);if(!['neuraldeep','openrouter','local'].includes(connectorId))throw new ExecutionBackendError('build_provider_invalid','Choose a registered build provider.');
     this.connectorId=connectorId;this.providerName=connectorId;this.name=connectorId+'-build';this.defaultLaunch=connectorId==='neuraldeep'?startNeuralDeepRun:startCompatibleRun;
   }
-  preset(){return normalizeProviderPreset(this.connectorId,{...defaultProviderPreset(this.connectorId),...(this.options.preset || {}),...(this.options.model?{modelId:this.options.model}:{}),...(this.options.effort?{reasoningEffort:this.options.effort}:{}),...(this.options.baseUrl?{baseUrl:this.options.baseUrl}:{}),timeoutMs:900000});}
+  preset(){
+    // Task Chat access belongs to the parent conversation, not provider settings.
+    // The isolated build always uses its own workspace-write host boundary.
+    const {sandbox,...providerPreset}=this.options.preset || {};
+    if(sandbox!==undefined && !['read-only','workspace-write'].includes(sandbox))throw new ExecutionBackendError('provider_sandbox_invalid','Review the parent task access setting.');
+    return normalizeProviderPreset(this.connectorId,{...defaultProviderPreset(this.connectorId),...providerPreset,...(this.options.model?{modelId:this.options.model}:{}),...(this.options.effort?{reasoningEffort:this.options.effort}:{}),...(this.options.baseUrl?{baseUrl:this.options.baseUrl}:{}),timeoutMs:900000});
+  }
   service(context){
     if(this.options.service)return this.options.service;
     if(this.connectorId!=='neuraldeep'){

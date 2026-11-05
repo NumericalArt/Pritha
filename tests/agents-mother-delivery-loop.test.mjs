@@ -722,8 +722,29 @@ test("unavailable provider build runtime preserves its retry action without reco
   };
   const result = await runDeliveryLoop({ plan: plan(), projectPath: project, runRoot, runId: "run-provider-runtime", buildExecutor: executor, trialBackend: "local", reportDir: false });
   assert.equal(result.state.status, "blocked");assert.equal(executions, 0);
+  assert.equal(result.state.iteration,0);assert.equal(result.state.budget.tokens_used,0);
   const blocker = result.state.blockers[0];assert.equal(blocker.code, "build_runtime_unavailable");
   assert.equal(blocker.summary, "provider_credential_access_denied");
   const retry = blocker.options.find(option => option.id === "retry-after-upgrade");
   assert.ok(retry);assert.match(retry.effect, /selected executor|provider connection/);assert.doesNotMatch(JSON.stringify(blocker), /Codex/);
+});
+
+test('repairing a failed runtime probe preserves the only approved implementation iteration',async()=>{
+  const project=repository(),stateRoot=mkdtempSync(path.join(os.tmpdir(),'pritha-runtime-repair-'));
+  const runId='run-runtime-repair',runRoot=path.join(stateRoot,'builds','fixture-agent',runId);
+  let ready=false,executions=0;
+  const executor=new FunctionBuildExecutor(async input=>{
+    executions++;writeFileSync(path.join(input.worktree,'implementation.txt'),'ready\n');
+    return {summary:'implemented',changed_files:['implementation.txt'],tokens_used:12,thread_id:'runtime-repair-thread',turn_id:'runtime-repair-turn'};
+  });
+  executor.probe=async()=>({backend:executor.name,available:ready,error:ready?null:'provider_unavailable'});
+  const initial=await runDeliveryLoop({plan:plan(),projectPath:project,runRoot,runId,budget:{maxIterations:1,maxTokens:100,maxElapsedMs:60000},buildExecutor:executor,trialBackend:'local',reportDir:false});
+  assert.equal(initial.state.blockers[0].code,'build_runtime_unavailable');
+  assert.equal(initial.state.iteration,0);assert.equal(executions,0);
+  ready=true;
+  const resumed=await resumeDelivery(runId,{root:project,stateRoot,allowDraft:true,answer:'retry-after-upgrade',buildExecutor:executor,trialBackend:'local',reportDir:false});
+  assert.equal(resumed.state.status,'verified',JSON.stringify(resumed.state.blockers));assert.equal(resumed.state.iteration,1);assert.equal(executions,1);
+  assert.equal(resumed.state.budget.tokens_used,12);assert.equal(resumed.state.budget.max_tokens,100);
+  assert.equal(resumed.state.budget.max_iterations,1);assert.equal(resumed.state.budget.max_elapsed_ms,60000);
+  assert.deepEqual(resumed.state.budget.amendments,[]);
 });
