@@ -187,7 +187,26 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
-Текущий проверенный срез на 2026-11-03: установленная canonical Pritha —
+Текущий проверенный срез на 2026-11-05: на Mac mini установлена `647505e`,
+build `IYmn5PyKqCNE72JiwWTNY`, профиль Interactive. Managed activation,
+strict/operational health, admission и post-activation self-test прошли без
+warnings/regressions. Release gate: 1605/1605 тестов, 68 браузерных сценариев,
+production build/typecheck, 5 страниц и 12 JS chunks; rollback сохранён.
+
+Claude Word Counter прошёл 24 основные и 7 дополнительных независимых проверок
+после штатного host-template refresh; 311938 токенов / 4 итерации сохранены.
+Codex Greeting прошёл 20 CLI cases и artifact Trial за 40456 токенов / 1 итерацию.
+Оба finish выполнены; пользовательская приёмка и применение файлов ещё нужны.
+Voice → Codex по дефолту дошёл в исходный Task Chat без legacy parent/force_new.
+
+Пользователь впервые одобрил Contract NeuralDeep и 80000 токенов / 2 итерации /
+15 минут с начала сборки. Metadata acceptance ещё не применён: текущая модель
+не заполняет обязательный expected_sha256 общего dispatcher, даже после точного
+уточнения. Подготовлены per-action schemas; детали и незакрытые gates — checkpoint
+73. Принятые документы Claude/Codex заново не согласуются. Матрица обоих
+интерфейсов для трёх провайдеров и оставшаяся ручная приёмка ещё не завершены.
+
+Исторический проверенный срез на 2026-11-03: установленная canonical Pritha —
 `5f38f3748cf7ad3c71360d10a23fd21fbebb76ed`, build `V5p7AZTJkbUdBaHtxbCDt`,
 профиль службы Interactive. Новое обновление `ff33d8fec1bbf11b7c23e7e9857ac36dbbca0636`,
 build `7ZnIMkw-N89a8keb4G7We`, прошло подготовку, затем было отозвано до установки:
@@ -674,7 +693,14 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
+**Статус: in-progress; активна 647505e / Interactive.** Release и post-activation
+self-test проходят; Claude/Codex достигли awaiting-manual-acceptance, NeuralDeep
+имеет первое user approval Contract, но host acceptance не выполнен из-за
+некорректных аргументов модели. Требуются живые продолжения Voice/Task Chat,
+отдельный Outcome NeuralDeep, build/Trials и итоговая пользовательская приёмка.
+См. checkpoint 73; OpenRouter live остаётся отложенным пользователем.
+
+**Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
 1514/1514 тестов, восемь групп, 21 same-build browser case, build/typecheck,
 5 страниц / 12 JS chunks, проверенный rollback к 5f38f37 и frozen retrieval без
@@ -3558,6 +3584,45 @@ review; затем отдельное разрешение на конкретн
 model turn, реальный Codex через Voice и NeuralDeep через оба интерфейса.
 Новые документы согласовываются впервые и отдельно; принятые не согласовывать
 повторно. User acceptance и применение готовых файлов остаются отдельными.
+
+### Checkpoint 73 — установлена 647505e, два реальных результата и общий дефект схем
+
+Отдельное одобрение 647505e применено через managed stop → source/build swap →
+start → strict/operational health → admission. Пять страниц, 12 chunks и полный
+post-activation self-test прошли; профиль Interactive и девять несвязанных файлов
+сохранены. MacBook, GitHub, service profile и секреты не менялись.
+
+В том же Claude-чате выполнены scaffold_refresh → verify → finish. Обновлён
+только точный неизменённый env template; independent Trials: 24 + 7 pass,
+0 fail. Новых builder turns нет: 311938/320000 токенов, 4/4 итерации. Codex
+завершил finish через delivery_status, живой каталог видит карточку; его прежние
+20 CLI cases + artifact Trial, 40456 токенов и одна итерация сохранены. Через
+обычный Voice route создана новая карточка, продолжившая исходный Codex Task
+Chat: тот же run, accepted Contract и approved Outcome, без force_new и без
+legacy parent. Это технический API journey; microphone acceptance не подменён.
+
+NeuralDeep получил первое явное одобрение существующего Contract и лимитов
+80000/2/900000ms. Общий factory_step объявляет expected_sha256 необязательным
+для всех действий, и модель многократно опускает его в approve_contract. Даже
+точный JSON не исправил вызов. Host сохраняет отказ до effects; ни документы,
+ни approvals вручную не редактируются. Нужна общая правка схем, а не очередное
+согласование того же документа.
+
+Кандидат добавляет точный factory_<action> tool для каждого действия с его
+required полями; старый dispatcher остаётся совместимым. Все имена нормализуются
+в одну canonical operation, worker, approval boundary и idempotency key.
+Contract/Outcome остаются двумя независимыми decisions. Ошибки называют missing
+fields и подходящий tool, не раскрывая неизвестные поля/значения. 20 targeted
+checks прошли. Установленная NeuralDeep CLI получила правильные required поля
+семи проверенных actions на fresh и resume; provider synthetic, paid requests 0.
+
+Следующие шаги: полный gate/build/browser/rollback review; отдельное immediate
+approval нового service update; принять ранее одобренный Contract NeuralDeep
+через точный tool, подготовить и впервые отдельно согласовать Outcome, затем
+bounded research/scaffold/build/Trials. Существующий Outcome preview покрывает
+9 требований и 20 CLI cases; это ещё не canonical artifact или user approval.
+Продолжить Voice/Task Chat continuity для Claude и NeuralDeep. После фактической
+демонстрации получить первое принятие результатов и отдельное применение.
 
 ## 7. Полные исходные материалы
 

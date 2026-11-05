@@ -22,11 +22,19 @@ class FactoryBriefValidationError extends Error {
   constructor(issues){super('The factory brief needs correction.');this.code='factory_brief_incomplete';this.issues=issues;}
 }
 class FactoryActionInputError extends Error {
-  constructor(action){super('Use the fields for this factory action.');this.code='factory_input_invalid';this.action=actions.includes(action)?action:'status';}
+  constructor(action,input){
+    super('Use the fields for this factory action.');this.code='factory_input_invalid';this.action=actions.includes(action)?action:'status';
+    if(input && typeof input==='object' && !Array.isArray(input)){
+      const allowed=['operation_id','action',...(fields[this.action] || [])];
+      this.correction={missingFields:['operation_id','action',...(requiredFields[this.action] || [])].filter(key=>input[key]===undefined),
+        unexpectedFieldCount:Object.keys(input).filter(key=>!allowed.includes(key)).length,
+        operationIdValid:/^[A-Za-z0-9_-]{8,128}$/.test(input.operation_id || '')};
+    }
+  }
 }
 export function factoryBriefErrorDetail(error){
   // These messages come only from the host validator, never from provider text.
-  if(error instanceof FactoryActionInputError)return {error:error.code,action:error.action,allowedFields:['operation_id','action',...(fields[error.action] || [])],requiredFields:['operation_id','action',...(requiredFields[error.action] || [])],hint:'operation_id: 8–128 letters, digits, _ or -. For not-started use init with brief and proposed build_token_budget. write_draft only revises an existing artifact using its expected_sha256 and complete content.'};
+  if(error instanceof FactoryActionInputError)return {error:error.code,action:error.action,allowedFields:['operation_id','action',...(fields[error.action] || [])],requiredFields:['operation_id','action',...(requiredFields[error.action] || [])],...(error.correction || {}),suggestedTool:'factory_'+error.action,hint:'Prefer the dedicated factory_'+error.action+' tool: its schema requires exactly the fields for this action. operation_id: 8–128 letters, digits, _ or -. For not-started use init with brief and proposed build_token_budget. write_draft only revises an existing artifact using its expected_sha256 and complete content.'};
   if(error instanceof FactoryBriefValidationError)return {error:error.code,issues:error.issues};
   return error instanceof FactoryBriefInputError && briefTextPaths.has(error.field)
     ? {error:error.code,field:'brief.'+error.field,expected:'string'} : null;
@@ -69,16 +77,27 @@ Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
   build_iteration_budget:{type:'integer',minimum:1,maximum:100,description:'Proposed build iterations from the operator brief; init does not approve this budget.'},
   build_elapsed_budget_ms:{type:'integer',minimum:60000,maximum:86400000,description:'Proposed build time from delivery start, excluding interview/approval waiting. init does not approve this budget.'},
 });
-// Narrow drafting tools make required fields visible to providers that struggle
-// with the optional fields of the compatibility dispatcher. Both routes retain
+// Per-action tools make required fields visible to providers that struggle
+// with the optional fields of the compatibility dispatcher. All routes retain
 // the same canonical operation identity, approvals and worker implementation.
-const draftingActions={factory_init:'init',factory_write_draft:'write_draft'};
-export const PROVIDER_FACTORY_TOOLS=[PROVIDER_FACTORY_TOOL,...Object.entries(draftingActions).map(([name,action])=>({
-  name,description:action==='init'?'Create the first private Contract draft for the bound child. Read factory_step status first. brief and proposed build_token_budget are REQUIRED; no document or budget is approved by this call.':'Revise an existing private draft using its exact SHA-256 and complete content. Accepted documents cannot be changed.',
-  inputSchema:{type:'object',properties:Object.fromEntries(['operation_id',...fields[action]].map(key=>[key,PROVIDER_FACTORY_TOOL.inputSchema.properties[key]])),required:['operation_id',...requiredFields[action]],additionalProperties:false},
+const actionTools=Object.fromEntries(actions.map(action=>['factory_'+action,action]));
+const actionDescriptions={
+  init:'Create the first private Contract draft for the bound child. brief and proposed build_token_budget are REQUIRED; this approves no document or budget.',
+  write_draft:'Revise an existing private draft using its exact SHA-256 and complete content. Accepted documents cannot be changed.',
+  approve_contract:'Request the separate operator approval for the exact current Contract hash. This accepts no Outcome.',
+  approve_outcome:'Request the separate operator approval for the exact current Outcome hash. Contract must already be accepted.',
+  create_outcome:'Create an unapproved Outcome draft after the accepted Contract; do not infer its approval.',
+  status:'Read the exact saved factory phase, identities and artifact statuses; continue existing work instead of restarting.',
+  read_artifact:'Read one host-bound artifact and its exact SHA-256. Use this hash for its draft revision or separate approval.',
+};
+PROVIDER_FACTORY_TOOL.description='Compatibility dispatcher. Prefer the dedicated factory_<action> tool so its required arguments are explicit. '+PROVIDER_FACTORY_TOOL.description;
+export const PROVIDER_FACTORY_TOOLS=[PROVIDER_FACTORY_TOOL,...Object.entries(actionTools).map(([name,action])=>({
+  name,description:actionDescriptions[action] || 'Perform '+action+' only for the bound child. Read factory_status first; existing approval, evidence, identity and measured-budget gates remain mandatory. No acceptance, merge, publication or deployment is implied.',
+  inputSchema:{type:'object',properties:Object.fromEntries(['operation_id',...(fields[action] || [])].map(key=>[key,PROVIDER_FACTORY_TOOL.inputSchema.properties[key]])),required:['operation_id',...(requiredFields[action] || [])],additionalProperties:false},
+  ...(readonly.has(action)?{annotations:{readOnlyHint:true}}:{}),
 }))];
 export function normalizeFactoryToolCall(name,input){
-  const action=draftingActions[name];if(!action)return {name,input};
+  const action=actionTools[name];if(!action)return {name,input};
   if(!input || typeof input!=='object' || Array.isArray(input) || Object.hasOwn(input,'action'))throw new FactoryActionInputError(action);
   return {name:'factory_step',input:{operation_id:input.operation_id,action,...input}};
 }
@@ -86,7 +105,7 @@ export class ProviderFactoryTools {
   constructor(host){this.host=host;this.options=host.options;this.paths=voiceFactoryPaths({...this.options,...this.options.factory});if(this.options.factory.target!==this.paths.target)throw factoryFail('factory_binding_changed');}
   state(){return loadVoiceFactory(this.paths,this.options);}
   validate(input){
-    if(!input || !actions.includes(input.action) || !/^[A-Za-z0-9_-]{8,128}$/.test(input.operation_id || '') || Object.keys(input).some(key=>!['operation_id','action',...(fields[input.action] || [])].includes(key)) || (requiredFields[input.action] || []).some(key=>input[key]===undefined) || Buffer.byteLength(JSON.stringify(input))>60000)throw new FactoryActionInputError(input?.action);
+    if(!input || !actions.includes(input.action) || !/^[A-Za-z0-9_-]{8,128}$/.test(input.operation_id || '') || Object.keys(input).some(key=>!['operation_id','action',...(fields[input.action] || [])].includes(key)) || (requiredFields[input.action] || []).some(key=>input[key]===undefined) || Buffer.byteLength(JSON.stringify(input))>60000)throw new FactoryActionInputError(input?.action,input);
     if(input.retry_failed!==undefined && typeof input.retry_failed!=='boolean')throw factoryFail('factory_input_invalid');
   }
   read(input){

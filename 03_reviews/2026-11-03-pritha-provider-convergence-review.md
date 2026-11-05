@@ -1,7 +1,7 @@
 ---
 id: pritha-provider-convergence-review-2026-11-03
 type: review
-status: blocked
+status: in-progress
 created: 2026-11-03
 updated: 2026-11-05
 topics: [pritha, provider-convergence, curated-memory, task-chat, voice, agent-factory, rebranding]
@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
 source_updated: 2026-11-05
-source_version: installed fd96ab7; factory tool and interface continuation candidates under verification
+source_version: installed 647505e; per-action factory tool schemas under verification
 retrieved: 2026-11-05
 verified: 2026-11-05
 valid_for: the local executable candidate and recorded operator acceptance only
@@ -45,13 +45,35 @@ memory_domains: [pritha-self, governance, agent-building-knowledge]
 subject: {kind: pritha, id: pritha}
 privacy: public
 retention: durable
-review_status: agent-creation-user-acceptance-failed
+review_status: agent-creation-acceptance-in-progress
 confidence: high
 ---
 
 # Provider convergence: component evidence and failed agent-creation acceptance
 
-## Current acceptance status — 2026-11-04
+## Current acceptance status — 2026-11-05
+
+647505e is installed with strict/operational health, admission and complete
+post-activation self-test passing. Its release evidence is 1605 tests, 68 browser
+scenarios, build/typecheck and five pages/twelve chunks. The prior build remains
+available for rollback; MacBook and GitHub are unchanged.
+
+Claude Word Counter now passes 24 core and 7 edge cases after an audited,
+normal host-template refresh, with no new build turn or budget reset. Codex
+Greeting passes 20 CLI cases and artifact checks in one iteration. Both reached
+manual acceptance; their implementation files have not been applied. Default
+Voice → Codex retained the original Task Chat/run/approvals without a legacy
+parent or force_new; this is an API transport check, not microphone acceptance.
+
+NeuralDeep's Contract and 80000/2/900000ms limits have their first explicit user
+approval. Its model omits expected_sha256 when invoking the generic approval
+dispatcher. Host rejection has no document effect. The next correction gives
+every factory action a dedicated exact schema and the same canonical approval,
+worker and idempotency. Twenty targeted tests and a synthetic installed-CLI
+fresh/resume schema probe pass; real acceptance and the full new release gate
+remain open. No repeated document approval is requested.
+
+## Historical acceptance rejection — 2026-11-04
 
 The operator rejected the agent-creation journey as unusable. Successful
 component checks and earlier Voice acceptance do not establish a working

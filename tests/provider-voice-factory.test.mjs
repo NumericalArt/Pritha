@@ -6,6 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {ProviderHostTools} from '../scripts/lib/provider-host-tools.mjs';
+import {factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs';
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
@@ -192,4 +193,36 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   assert.equal((await step('finish')).state.phase,'card-blocked');cardStatus='ready';assert.equal((await step('finish')).state.phase,'awaiting-manual-acceptance');assert.equal(calls.length,4);
   output={...output,state:{...output.state,source_project:'/different-child'}};await assert.rejects(step('delivery_status'),{code:'factory_delivery_identity_changed'});
   fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),running:null,runId:undefined,phase:'scaffolded'}));failAfterJournal=true;await assert.rejects(step('deliver'),/simulated disconnect/);assert.match(f.state().runId,/^voice-voice-built-/);assert.equal(f.state().running.action,'deliver');
+});
+
+test('each factory action has an exact schema; narrow approvals keep two distinct decisions and canonical replay',{timeout:60000},async t=>{
+  const f=fixture(t),dispatch=f.tools.definitions.find(tool=>tool.name==='factory_step');
+  for(const action of dispatch.inputSchema.properties.action.enum){
+    const tool=f.tools.definitions.find(tool=>tool.name==='factory_'+action);assert.ok(tool,action);
+    assert.equal(tool.inputSchema.properties.action,undefined);assert.equal(tool.inputSchema.additionalProperties,false);
+    assert.equal(tool.inputSchema.required.includes('operation_id'),true);
+  }
+  assert.deepEqual(f.tools.definitions.find(tool=>tool.name==='factory_approve_contract').inputSchema.required,['operation_id','expected_sha256']);
+  assert.deepEqual(f.tools.definitions.find(tool=>tool.name==='factory_approve_outcome').inputSchema.required,['operation_id','expected_sha256']);
+  assert.equal(f.tools.definitions.find(tool=>tool.name==='factory_status').annotations.readOnlyHint,true);
+  const server=await listenProviderToolServer({hostTools:f.tools});t.after(()=>server.close());let id=0;
+  const call=async(name,args)=>(await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:++id,method:'tools/call',params:{name,arguments:args}})})).json()).result;
+  const status=JSON.parse((await call('factory_status',{operation_id:'narrow-status-01'})).content[0].text);assert.equal(status.phase,'not-started');
+  await f.ok('init',{brief,build_token_budget:40000});const hash=f.artifact('contract').sha256;
+  const missing=await call('factory_approve_contract',{operation_id:'narrow-approve-01'});assert.equal(missing.isError,true);assert.equal(f.approvals.length,0);assert.equal(f.state().contractApproval,undefined);
+  await assert.rejects(f.tools.call('factory_approve_contract',{operation_id:'narrow-approve-01',action:'approve_outcome',expected_sha256:hash}),{code:'factory_input_invalid'});
+  const accepted=await call('factory_approve_contract',{operation_id:'narrow-approve-01',expected_sha256:hash});assert.equal(JSON.parse(accepted.content[0].text).status,'completed');assert.equal(f.approvals.length,1);
+  const revision=f.state().revision;
+  await f.tools.call('factory_step',{operation_id:'narrow-approve-01',action:'approve_contract',expected_sha256:hash});assert.equal(f.state().revision,revision);assert.equal(f.approvals.length,1);
+  assert.equal(JSON.parse((await call('factory_create_outcome',{operation_id:'narrow-outcome-01'})).content[0].text).status,'completed');assert.equal(f.approvals.length,1);assert.equal(f.state().outcomeApproval,undefined);
+  assert.equal(JSON.parse((await call('factory_approve_outcome',{operation_id:'narrow-outcome-approve',expected_sha256:f.artifact('outcome').sha256})).content[0].text).status,'completed');
+  assert.equal(f.approvals.length,2);assert.equal(fs.existsSync(f.p.target),false);
+});
+test('compatibility input corrections identify missing required fields without echoing unknown names or values',t=>{
+  const f=fixture(t);let detail;
+  assert.throws(()=>f.tools.factory.validate({operation_id:'valid-correction-01',action:'approve_contract','PRIVATE_UNKNOWN_FIELD':'private-value'}),error=>{
+    detail=factoryBriefErrorDetail(error);return error.code==='factory_input_invalid';
+  });
+  assert.deepEqual(detail.missingFields,['expected_sha256']);assert.equal(detail.unexpectedFieldCount,1);assert.equal(detail.operationIdValid,true);assert.equal(detail.suggestedTool,'factory_approve_contract');
+  assert.doesNotMatch(JSON.stringify(detail),/PRIVATE_UNKNOWN_FIELD|private-value/);assert.equal(f.approvals.length,0);assert.equal(f.state(),null);
 });
