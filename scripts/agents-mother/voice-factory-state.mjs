@@ -83,6 +83,20 @@ export function validateFactoryDelivery(paths,state,result){
   if(!ledger || ledger.run_id!==state.runId || typeof ledger.source_project!=='string' || path.resolve(ledger.source_project)!==paths.target || ledger.spec?.id!==spec.frontmatter.id || ledger.spec?.document_lock!==spec.frontmatter.outcome_document_lock)throw factoryFail('factory_delivery_identity_changed');
   return result;
 }
+/** Literal edits to an unapproved draft are exact, bounded and hash-checked.
+ * The caller still enforces artifact identity, draft status and content safety. */
+export function patchFactoryDraft(text,input){
+  if(!/^[a-f0-9]{64}$/.test(input.expected_result_sha256 || '') || !Array.isArray(input.edits) || input.edits.length<1 || input.edits.length>8)throw factoryFail('factory_patch_invalid');
+  for(const edit of input.edits){
+    if(!edit || typeof edit!=='object' || Object.keys(edit).length!==2 || typeof edit.from!=='string' || !edit.from || typeof edit.to!=='string')throw factoryFail('factory_patch_invalid');
+    const index=text.indexOf(edit.from);
+    if(index<0 || text.indexOf(edit.from,index+1)!==-1)throw factoryFail('factory_patch_not_unique');
+    text=text.slice(0,index)+edit.to+text.slice(index+edit.from.length);
+    if(Buffer.byteLength(text)>48000)throw factoryFail('factory_patch_invalid');
+  }
+  if(factoryHash(text)!==input.expected_result_sha256)throw factoryFail('factory_patch_hash_mismatch');
+  return text;
+}
 /** Capture at turn settlement, not on polling: a later successful retry must
  * never change the outcome of an earlier attempt with no draft. */
 export function factoryDraftReceipt(options){

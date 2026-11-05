@@ -77,6 +77,13 @@ pending while the authoritative ledger/card correctly show accepted. A candidate
 correction reads the bound run and preserves acceptance across status/finish,
 without rewriting internal state or repeating approval/build work. Its full
 verification and any later exact release approval remain separate.
+Actual NeuralDeep draft rewriting also paraphrased adjacent reviewed text and
+later claimed a target hash without the matching effect. The host rejected that
+claim by reading the real artifact. A bounded literal patch tool now avoids
+full-document copying, requires current and resulting hashes, reuses the same
+draft-only worker safety/CAS checks and cannot alter accepted documents.
+Equivalent JSON key order replays only for the new action; legacy receipt
+identities remain unchanged. Both corrections will be verified together.
 Microphone continuity for the two accepted agents is requested; real NeuralDeep
 build, Voice/Task Chat continuity and remaining final manual acceptance are open.
 

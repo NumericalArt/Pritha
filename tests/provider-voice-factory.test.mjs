@@ -8,7 +8,7 @@ import {execFileSync} from 'node:child_process';
 import {ProviderHostTools} from '../scripts/lib/provider-host-tools.mjs';
 import {factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs';
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation} from '../scripts/agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
 import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs';
@@ -219,6 +219,36 @@ test('factory status observes actual acceptance without rewriting state or borro
   await assert.rejects(f.call('status'),{code:'factory_outcome_approval_required'});fs.writeFileSync(f.state().outcome,outcomeBytes);
   fs.writeFileSync(ledgerFile,'{');await assert.rejects(f.call('status'),{code:'factory_delivery_evidence_unavailable'});
   assert.equal(fs.readFileSync(f.p.file,'utf8'),stateBytes);assert.equal(f.approvals.length,approvalCount);
+});
+
+test('literal draft corrections preserve Unicode and exact trailing bytes and reject ambiguous edits',()=>{
+  const text='А $1 .*\n\n',expected='Б $1 .*\n',input={edits:[{from:'А',to:'Б'},{from:'\n\n',to:'\n'}],expected_result_sha256:factoryHash(expected)};
+  assert.equal(patchFactoryDraft(text,input),expected);
+  for(const edits of [[],Array(9).fill({from:'А',to:'Б'}),[{from:'',to:'x'}],[{from:'absent',to:'x'}],[{from:'А',to:'x',path:'foreign'}],[{from:'А',to:'x'.repeat(48001)}]])assert.throws(()=>patchFactoryDraft(text,{...input,edits}));
+  assert.throws(()=>patchFactoryDraft('aaa',{edits:[{from:'aa',to:'x'}],expected_result_sha256:factoryHash('xa')}),{code:'factory_patch_not_unique'});
+  assert.throws(()=>patchFactoryDraft(text,{...input,expected_result_sha256:'0'.repeat(64)}),{code:'factory_patch_hash_mismatch'});
+  const correction=factoryBriefErrorDetail({code:'factory_patch_hash_mismatch',message:'do not echo synthetic-private-value'});assert.equal(correction.error,'factory_patch_hash_mismatch');assert.match(correction.hint,/No draft was written/);assert.doesNotMatch(JSON.stringify(correction),/synthetic-private-value/);
+});
+
+test('normal factory patch tool is exact, replayable and cannot edit accepted documents or bypass draft safety',{timeout:60000},async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');
+  const row=f.artifact('outcome'),from='## Demo script\n\n',to=from+'Review the exact CLI output before final acceptance.\n\n',content=row.text.replace(from,to);
+  assert.notEqual(content,row.text);
+  const input={operation_id:'patch-outcome-exact-01',artifact:'outcome',expected_sha256:row.sha256,edits:[{from,to}],expected_result_sha256:factoryHash(content)},before=f.state().revision;
+  const definition=f.tools.definitions.find(tool=>tool.name==='factory_patch_draft');assert.deepEqual(definition.inputSchema.required,['operation_id','artifact','expected_sha256','edits','expected_result_sha256']);assert.equal(definition.inputSchema.properties.content,undefined);
+  await assert.rejects(f.tools.call('factory_patch_draft',{...input,operation_id:'patch-outcome-wrong-hash',expected_result_sha256:'0'.repeat(64)}),{code:'factory_patch_hash_mismatch'});
+  assert.equal(f.state().revision,before);assert.equal(f.artifact('outcome').text,row.text);
+  const first=await f.tools.call('factory_patch_draft',input);assert.equal(JSON.parse(first.content[0].text).status,'completed');assert.equal(f.artifact('outcome').text,content);
+  const revised=f.state().revision;await f.tools.call('factory_step',{...input,edits:[{to,from}],action:'patch_draft'});assert.equal(f.state().revision,revised);assert.equal(f.approvals.length,1);
+  await assert.rejects(f.call('patch_draft',{artifact:'outcome',expected_sha256:row.sha256,edits:input.edits,expected_result_sha256:input.expected_result_sha256}),{code:'factory_draft_changed'});
+  const fresh=f.artifact('outcome'),unsafe=fresh.text+'\npassword: synthetic-private-value\n';
+  const failed=await f.call('patch_draft',{artifact:'outcome',expected_sha256:fresh.sha256,edits:[{from:fresh.text,to:unsafe}],expected_result_sha256:factoryHash(unsafe)});
+  assert.equal(failed.status,'failed');assert.equal(JSON.parse(failed.text).error,'factory_draft_unsafe');assert.equal(f.artifact('outcome').text,content);
+  await f.ok('approve_outcome',{expected_sha256:fresh.sha256});assert.equal(f.approvals.length,2);
+  for(const artifact of ['contract','outcome']){
+    const approved=f.artifact(artifact);await assert.rejects(f.call('patch_draft',{artifact,expected_sha256:approved.sha256,edits:[{from:approved.text,to:row.text}],expected_result_sha256:row.sha256}),{code:'factory_draft_changed'});assert.equal(f.artifact(artifact).sha256,approved.sha256);
+  }
+  assert.equal(fs.existsSync(f.p.target),false);assert.equal(f.state().runId,undefined);assert.equal(f.approvals.length,2);
 });
 
 test('each factory action has an exact schema; narrow approvals keep two distinct decisions and canonical replay',{timeout:60000},async t=>{

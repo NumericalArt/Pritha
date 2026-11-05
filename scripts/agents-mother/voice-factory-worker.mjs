@@ -8,7 +8,7 @@ import {redactSensitiveText,quarantineUntrustedInstructionText} from '../lib/red
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery} from './voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft} from './voice-factory-state.mjs';
 
 const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
 function draftHasSensitiveText(text,kind){
@@ -86,9 +86,10 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       state.contract=result.contractPath;const data=contractData(state.contract,{root:p.root});state.agentId=data.agentId;state.agentName=data.agentName;state.phase='contract-draft';
       value={artifact:'contract',sha256:factoryArtifact(p,state,'contract').sha256,next:'Read and refine the contract; request separate approve_contract with its exact hash.'};break;
     }
+    case 'patch_draft':
     case 'write_draft':{
       const row=factoryArtifact(p,state,input.artifact);if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
-      const text=String(input.content),fm=draftMetadata(text,row.frontmatter);
+      const text=input.action==='patch_draft'?patchFactoryDraft(row.text,input):String(input.content),fm=draftMetadata(text,row.frontmatter);
       if(Buffer.byteLength(text)>48000 || draftHasSensitiveText(text,input.artifact))throw factoryFail('factory_draft_unsafe');
       if(input.artifact==='contract'){
         if(state.outcome)throw factoryFail('factory_contract_revision_required');
