@@ -8,7 +8,7 @@ import {redactSensitiveText,quarantineUntrustedInstructionText} from '../lib/red
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft} from './voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,validateFactoryBuildEffort} from './voice-factory-state.mjs';
 
 const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
 function draftHasSensitiveText(text,kind){
@@ -64,7 +64,9 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
   const options={root:p.root,stateRoot:p.stateRoot};
   let value={};
   const contract=()=>{const row=factoryArtifact(p,state,'contract'),data=contractData(row.file,{root:p.root});contractIdentity(data,p,state,executor);return data;};
-  const approved=()=>{requireFactoryApprovals(p,state);contract();const valid=verifyOutcomeApproval(state.outcome,options);if(!valid.ok)throw factoryFail('factory_outcome_approval_required');};
+  const approved=()=>{requireFactoryApprovals(p,state);contract();const valid=verifyOutcomeApproval(state.outcome,options);if(!valid.ok)throw factoryFail('factory_outcome_approval_required');
+    if(state.buildConfiguration && (state.buildConfiguration.connectorId!==request.connectorId || state.buildConfiguration.modelId!==request.model))throw factoryFail('factory_build_configuration_changed');
+  };
   const observeDelivery=()=>{
     if(!state.runId)throw factoryFail('factory_delivery_missing');
     return validateFactoryDelivery(p,state,delivery.deliveryStatus(state.runId,options));
@@ -142,9 +144,18 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       approved();observeDelivery();
       value=await delivery.refreshDeliveryScaffold(state.runId,options);break;
     }
+    case 'configure_build':{
+      approved();validateFactoryBuildEffort(request.connectorId,request.model,input.effort);
+      if(state.runId){
+        const result=observeDelivery();
+        if(result.state.status!=='blocked' || !Array.isArray(result.state.budget?.unaccounted_attempts) || result.state.budget.unaccounted_attempts.length || result.state.budget.legacy_usage_unverified!==false)throw factoryFail('factory_build_configuration_locked');
+      }
+      state.buildConfiguration={connectorId:request.connectorId,modelId:request.model,effort:input.effort,operationId:input.operation_id,approvedBy:'user',approvedAt:new Date().toISOString()};
+      value={configured:true,buildConfiguration:state.buildConfiguration,runId:state.runId || null,modelRequests:0};break;
+    }
     case 'deliver':case 'delivery_resume':case 'verify':case 'delivery_status':{
       approved();
-      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:request.model,effort:request.effort,preset:request.preset,factoryParent:request.factoryParent},trialBackend:'local'};
+      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:request.model,effort:state.buildConfiguration?.effort ?? request.effort,preset:request.preset,factoryParent:request.factoryParent},trialBackend:'local'};
       let result;
       if(input.action==='deliver'){
         if(state.runId || state.phase!=='scaffolded')throw factoryFail('factory_delivery_already_started');

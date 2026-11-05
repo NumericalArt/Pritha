@@ -8,9 +8,10 @@ import {resolvePrithaPython} from './python-runtime.mjs';
 import {spawnSupervisedCli} from '../neuraldeep/process-supervisor.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief,INTERVIEW_BRIEF_TEXT_FIELDS} from '../agents-mother/interview-brief.mjs';
 import {RUNTIME_FAMILIES,SERVICE_MODES} from '../agents-mother/contract.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft} from '../agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,FACTORY_BUILD_EFFORTS,validateFactoryBuildEffort} from '../agents-mother/voice-factory-state.mjs';
+import {neuralDeepExecutionProfile} from '../neuraldeep/model-execution-profile.mjs';
 
-const actions=['status','read_artifact','init','write_draft','patch_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','delivery_resume','verify','finish'];
+const actions=['status','read_artifact','init','write_draft','patch_draft','approve_contract','create_outcome','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','deliver','delivery_status','delivery_resume','verify','finish'];
 const readonly=new Set(['status','read_artifact']);
 const workflowSteps=new Set(['init','write_draft','patch_draft','create_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','verify','finish']);
 const textFields=Object.entries(INTERVIEW_BRIEF_TEXT_FIELDS);
@@ -33,6 +34,7 @@ class FactoryActionInputError extends Error {
   }
 }
 export function factoryBriefErrorDetail(error){
+  if(error?.code==='factory_build_effort_unsupported')return {error:error.code,supportedEfforts:(error.supportedEfforts || []).filter(effort=>FACTORY_BUILD_EFFORTS.includes(effort)),hint:'Read factory_status.buildExecution and choose a supported effort with factory_configure_build. The provider, model, documents and budgets remain unchanged; operator approval is required.'};
   // These messages come only from the host validator, never from provider text.
   const patchHints={factory_patch_invalid:'Use 1–8 literal from/to edits and the exact resulting SHA-256. No draft was written.',factory_patch_not_unique:'Each from text must occur exactly once at its step; read the current draft and use a larger literal match. No draft was written.',factory_patch_hash_mismatch:'The edits do not produce the required complete document hash. No draft was written.'};
   if(Object.hasOwn(patchHints,error?.code))return {error:error.code,hint:patchHints[error.code]};
@@ -60,12 +62,13 @@ briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
 briefSchema.properties.technical.properties.preset.enum=['generic','local-feed','llm-app'];
 briefSchema.properties.technical.properties.sourceFormat.enum=['json','rss','atom','mixed'];
 export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound child. ALWAYS read status first and continue its saved phase; never restart an existing factory. Prepare private drafts within the requested workflow, then request TWO separate approvals: approve_contract and approve_outcome. After approval, continue research, scaffold, bounded delivery and protected Trials without asking again for technical steps. Accepted documents and budgets stay pinned. No push, deploy, services, credential provisioning or final user acceptance. Never infer document approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
-const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources','retry_failed'],research_recover:['sources'],research_apply:['selection'],delivery_resume:['answer']};
-const requiredFields={read_artifact:['artifact'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_recover:['sources'],research_apply:['selection']};
+const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources','retry_failed'],research_recover:['sources'],research_apply:['selection'],configure_build:['effort'],delivery_resume:['answer']};
+const requiredFields={read_artifact:['artifact'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_recover:['sources'],research_apply:['selection'],configure_build:['effort']};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.operation_id={type:'string',minLength:8,maxLength:128,pattern:'^[A-Za-z0-9_-]+$',description:'Stable ID of 8–128 letters, digits, _ or -, for example init-agent-01. Keep it for an identical retry; never repeat uncertain effects.'};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.action.description='status returns the saved next step. init creates the first draft from brief and proposed budgets. read_artifact reads it. write_draft revises an existing artifact using artifact, expected_sha256 and complete content. Do not put brief/content inside sources or selection. Those fields belong only to research actions. scaffold_refresh is optional host maintenance for an unchanged, host-generated CLI environment example in an idle existing build; it does not edit product code, approve documents or extend budgets. Use only when Trial diagnostics identify that template.';
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
 Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
+  effort:{type:'string',enum:FACTORY_BUILD_EFFORTS,description:'configure_build only: request a supported build effort for the unchanged bound provider/model. Requires explicit operator approval. Does not change this chat, documents, budgets or recorded usage.'},
   edits:{type:'array',minItems:1,maxItems:8,items:{type:'object',additionalProperties:false,required:['from','to'],properties:{from:{type:'string',minLength:1},to:{type:'string'}}},description:'patch_draft only: ordered literal replacements. Each from must occur exactly once at its step; no regex, paths or commands. Accepted artifacts cannot be edited.'},
   expected_result_sha256:{type:'string',pattern:'^[a-f0-9]{64}$',description:'patch_draft only: exact SHA-256 of the complete resulting UTF-8 draft. A mismatch performs no write.'},
   retry_failed:{type:'boolean',description:'research_collect only: retry a confirmed failed source once within its original deadline. Never resets an uncertain operation or its limits.'},
@@ -92,6 +95,7 @@ const actionDescriptions={
   approve_outcome:'Request the separate operator approval for the exact current Outcome hash. Contract must already be accepted.',
   create_outcome:'Create an unapproved Outcome draft after the accepted Contract; do not infer its approval.',
   patch_draft:'Make up to eight exact literal edits to a still-unapproved Contract or Outcome. Use this for a small correction instead of rewriting the whole document. Requires its current hash and exact resulting hash; ambiguous edits, hash mismatch and accepted artifacts are rejected without writing.',
+  configure_build:'Request explicit operator approval for a supported implementation effort on the SAME provider and model. Use this to repair an unsupported inherited effort without changing the immutable chat binding. No model request, document approval, budget extension or usage reset occurs. Saved uncertain or active builds must be resolved first.',
   status:'Read the exact saved factory phase, identities and artifact statuses; continue existing work instead of restarting.',
   read_artifact:'Read one host-bound artifact and its exact SHA-256. Use this hash for its draft revision or separate approval.',
 };
@@ -107,10 +111,10 @@ export function normalizeFactoryToolCall(name,input){
     if(!input || typeof input!=='object' || Array.isArray(input) || Object.hasOwn(input,'action'))throw new FactoryActionInputError(action);
     name='factory_step';input={operation_id:input.operation_id,action,...input};
   }
-  // This new action has no legacy receipts. Equivalent JSON key order must
-  // replay across its dedicated and compatibility names; edit order is semantic.
+  // These actions have no older receipts with serialized key-order identity.
+  // Replay across dedicated/compatibility names; draft edit order is semantic.
   // Keep existing actions' serialized identity unchanged for old saved intents.
-  if(name==='factory_step' && input?.action==='patch_draft'){
+  if(name==='factory_step' && ['patch_draft','configure_build'].includes(input?.action)){
     const ordered=value=>Object.fromEntries(Object.keys(value).sort().map(key=>[key,value[key]]));
     input=ordered(input);
     if(Array.isArray(input.edits))input.edits=input.edits.map(edit=>edit && typeof edit==='object' && !Array.isArray(edit)?ordered(edit):edit);
@@ -136,8 +140,10 @@ export class ProviderFactoryTools {
         deliveryStatus=validateFactoryDelivery(this.paths,state,result).state.status;
       }
       const accepted=deliveryStatus==='accepted',phase=accepted && !state.running && ['awaiting-manual-acceptance','delivery-accepted'].includes(state.phase)?'accepted':state?.phase || 'not-started';
+      const profile=this.options.connectorId==='neuraldeep'?neuralDeepExecutionProfile(this.options.factory.model):null;
       return {slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase,running:state?.running || null,
-        artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',
+        artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',buildConfiguration:state?.buildConfiguration || null,
+        buildExecution:{connectorId:this.options.connectorId,modelId:this.options.factory.model,requestedEffort:state?.buildConfiguration?.effort ?? this.options.factory.effort ?? null,effortControl:profile?.effortControl || 'runtime-defined',supportedEfforts:profile?.effortControl==='documented'?profile.supportedEfforts:null},
         ...(!state?.contract?{nextStep:{action:'init',requiredFields:['brief','build_token_budget'],optionalFields:['build_iteration_budget','build_elapsed_budget_ms'],hint:'Use the structured brief from this task. This creates only a private draft; document and budget approvals remain separate.'}}:{})};
     }
     if(input.action!=='read_artifact')throw factoryFail('factory_input_invalid');
@@ -182,12 +188,13 @@ export class ProviderFactoryTools {
       if(input.action==='patch_draft')patchFactoryDraft(row.text,input);
     }
     if(input.action==='create_outcome' || input.action==='approve_outcome')requireFactoryApprovals(p,state,{outcome:false});
-    if(['research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','delivery_resume','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
+    if(['research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','deliver','delivery_status','delivery_resume','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
+    if(input.action==='configure_build')validateFactoryBuildEffort(this.options.connectorId,this.options.factory.model,input.effort);
     const reviewKind=input.action==='approve_contract'?'contract':input.action==='approve_outcome'?'outcome':null;
     const review=reviewKind?factoryArtifact(p,state,reviewKind):null;
     const presentation=review?{path:reviewKind+' · '+p.slug,beforeSha256:review.sha256,proposedContent:review.text,approvalScope:reviewKind+' only'}
-      :{command:['Pritha factory',input.action,p.slug],cwdLabel:'Bound child and instance-private factory artifacts',provider:this.options.connectorId,model:this.options.factory.model,...(this.options.connectorId==='claude' && input.action.startsWith('deliver')?{buildAuthentication:'separate Anthropic API key; host-reserved budget'}:{}),network:['research','research_collect','research_recover'].includes(input.action)?this.options.connectorId==='local'?'disabled':'bounded primary-source research':input.action.startsWith('deliver')?'pinned build provider only':'disabled',
-        ...(input.action==='init'?{brief:input.brief,proposedBuildTokenBudget:input.build_token_budget,...(input.build_iteration_budget!==undefined?{proposedBuildIterationBudget:input.build_iteration_budget}:{}),...(input.build_elapsed_budget_ms!==undefined?{proposedBuildElapsedBudgetMs:input.build_elapsed_budget_ms}:{})}:{}),...(input.action==='write_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,proposedContent:input.content}:{}),...(input.action==='patch_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,expectedResultSha256:input.expected_result_sha256,edits:input.edits}:{}),...(input.sources?{sources:input.sources}:{}),...(input.selection?{selection:input.selection}:{}),...(input.answer?{answer:input.answer}:{})};
+      :{command:['Pritha factory',input.action,p.slug,...(input.action==='configure_build'?['--effort',input.effort]:[])],cwdLabel:'Bound child and instance-private factory artifacts',provider:this.options.connectorId,model:this.options.factory.model,...(this.options.connectorId==='claude' && input.action.startsWith('deliver')?{buildAuthentication:'separate Anthropic API key; host-reserved budget'}:{}),network:['research','research_collect','research_recover'].includes(input.action)?this.options.connectorId==='local'?'disabled':'bounded primary-source research':input.action.startsWith('deliver')?'pinned build provider only':'disabled',
+        ...(input.action==='init'?{brief:input.brief,proposedBuildTokenBudget:input.build_token_budget,...(input.build_iteration_budget!==undefined?{proposedBuildIterationBudget:input.build_iteration_budget}:{}),...(input.build_elapsed_budget_ms!==undefined?{proposedBuildElapsedBudgetMs:input.build_elapsed_budget_ms}:{})}:{}),...(input.action==='configure_build'?{previousBuildEffort:state.buildConfiguration?.effort || this.options.factory.effort || null,proposedBuildEffort:input.effort,approvalScope:'build effort only; same provider/model, documents and budgets'}:{}),...(input.action==='write_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,proposedContent:input.content}:{}),...(input.action==='patch_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,expectedResultSha256:input.expected_result_sha256,edits:input.edits}:{}),...(input.sources?{sources:input.sources}:{}),...(input.selection?{selection:input.selection}:{}),...(input.answer?{answer:input.answer}:{})};
     if(Buffer.byteLength(JSON.stringify(presentation))>60000)throw factoryFail('factory_review_too_large');
     return {kind:review?'file_change_approval':'command_approval',presentation,perform:()=>this.execute(input,state)};
   }

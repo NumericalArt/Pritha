@@ -156,7 +156,7 @@ export class ProviderHostTools {
     let result;
     try{
       const workflowAuthorized=name==='factory_step' && (alreadyApproved || this.factory.workflowAuthorized(input));
-      const response=workflowAuthorized?{decision:'accept'}:await this.options.approve({operationId:input.operation_id,kind,presentation,reason:name==='ask_user'?'The task needs your answer.':name==='factory_step'?'Review this document and its limits. Contract approval, Outcome approval and final acceptance are separate decisions.':'Review the exact action before it runs in the task workspace.'});
+      const response=workflowAuthorized?{decision:'accept'}:await this.options.approve({operationId:input.operation_id,kind,presentation,reason:name==='ask_user'?'The task needs your answer.':name==='factory_step' && input.action==='configure_build'?'Review the build effort for the same provider and model. Documents, budgets and recorded usage remain pinned.':name==='factory_step'?'Review this document and its limits. Contract approval, Outcome approval and final acceptance are separate decisions.':'Review the exact action before it runs in the task workspace.'});
       this.check();
       if(kind!=='user_input' && response.decision!=='accept')result={status:'declined',output:'The operator declined this action.'};
       else{coordinator.updateIntent(key,{state:'running',...(workflowAuthorized?{authorization:alreadyApproved?'existing-document-approval':'bound-creation-workflow'}:{})});result=await perform(response);}

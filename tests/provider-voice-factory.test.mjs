@@ -8,7 +8,7 @@ import {execFileSync} from 'node:child_process';
 import {ProviderHostTools} from '../scripts/lib/provider-host-tools.mjs';
 import {factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs';
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft} from '../scripts/agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft,validateFactoryBuildEffort} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
 import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs';
@@ -164,6 +164,50 @@ test('factory refusal/replay, immutable identity, foreign artifacts and unknown 
   const saved=f.state();fs.writeFileSync(f.p.file,JSON.stringify({...saved,contract:'/tmp/foreign.md'}));assert.throws(()=>f.state(),{code:'factory_artifact_boundary'});
   fs.writeFileSync(f.p.file,JSON.stringify({...saved,running:{operationId:'lost-operation',action:'init'}}));await assert.rejects(f.call('approve_contract',{expected_sha256:contract.sha256}),{code:'factory_step_unconfirmed'});
   fs.writeFileSync(f.p.file,JSON.stringify({...saved,chatId:'another-chat'}));assert.throws(()=>f.state(),{code:'factory_binding_changed'});
+});
+test('build effort repair requires its own operator decision and preserves the immutable chat and approved documents',{timeout:60000},async t=>{
+  const f=fixture(t);await assert.rejects(f.call('configure_build',{effort:'high'}),{code:'factory_not_started'});
+  await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const contract=f.artifact('contract').sha256,outcome=f.artifact('outcome').sha256,binding=JSON.stringify(f.options.factory),approve=f.options.approve;
+  let declined=0;f.options.approve=async request=>{declined++;assert.equal(request.kind,'command_approval');assert.equal(request.presentation.proposedBuildEffort,'high');return {decision:'decline'};};
+  assert.equal((await f.call('configure_build',{effort:'high'})).status,'declined');assert.equal(declined,1);assert.equal(f.state().buildConfiguration,undefined);
+  f.options.approve=approve;const approvals=f.approvals.length;
+  await f.ok('configure_build',{effort:'high'});assert.equal(f.approvals.length,approvals+1);
+  const config=f.state().buildConfiguration;assert.equal(config.effort,'high');assert.equal(config.modelId,f.options.factory.model);assert.equal(config.approvedBy,'user');
+  const observed=await f.call('status');assert.deepEqual(observed.buildConfiguration,config);assert.equal(observed.buildExecution.requestedEffort,'high');assert.equal(observed.buildExecution.modelId,f.options.factory.model);assert.equal(JSON.stringify(f.options.factory),binding);
+  const state=fs.readFileSync(f.p.file,'utf8');
+  await f.tools.call('factory_configure_build',{effort:'high',operation_id:config.operationId});
+  assert.equal(f.approvals.length,approvals+1);assert.equal(fs.readFileSync(f.p.file,'utf8'),state);
+  await assert.rejects(f.call('configure_build',{effort:'turbo'}),{code:'factory_input_invalid'});
+  await assert.rejects(f.call('configure_build',{effort:'high',model:'different-model'}),{code:'factory_input_invalid'});
+  assert.equal(f.artifact('contract').sha256,contract);assert.equal(f.artifact('outcome').sha256,outcome);
+});
+test('NeuralDeep build effort repair validates support before any provider request',()=>{
+  assert.doesNotThrow(()=>validateFactoryBuildEffort('neuraldeep','gpt-oss-120b','high'));
+  assert.throws(()=>validateFactoryBuildEffort('neuraldeep','gpt-oss-120b','xhigh'),error=>{assert.deepEqual(factoryBriefErrorDetail(error).supportedEfforts,['low','medium','high']);return error.code==='factory_build_effort_unsupported';});
+  assert.throws(()=>validateFactoryBuildEffort('neuraldeep','gpt-oss-120b',{}),{code:'factory_input_invalid'});
+});
+test('approved build effort persists into the same resumed run and cannot replace active or uncertain execution',{timeout:60000},async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const runId='voice-fixture-build-repair',spec=f.artifact('outcome').frontmatter,contract=f.artifact('contract').sha256,outcome=f.artifact('outcome').sha256;
+  fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),phase:'delivery-blocked',runId}));
+  const budget={max_tokens:10000,max_iterations:2,tokens_used:120,unaccounted_attempts:[],legacy_usage_unverified:false};
+  let status='blocked';const calls=[];
+  const output=()=>({state:{run_id:runId,source_project:f.p.target,spec:{id:spec.id,document_lock:spec.outcome_document_lock},status,phase:'implementation',blockers:[],iteration:1,budget},worktree:{worktree:'/fixture/build'}});
+  const dependencies={delivery:{deliveryStatus:()=>output(),resumeDelivery:async(id,options)=>{calls.push({id,options});return output();}}};
+  let sequence=0;const step=async(action,extra={})=>{
+    const operation_id='build_repair_'+(++sequence),state={...f.state(),revision:f.state().revision+1,running:{operationId:operation_id,action}};
+    fs.writeFileSync(f.p.file,JSON.stringify(state));
+    const result=await executeVoiceFactoryStep({version:1,root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'claude',model:f.options.factory.model,effort:'low',preset:f.options.factory.preset,state,input:{operation_id,action,...extra}},dependencies);
+    fs.writeFileSync(f.p.file,JSON.stringify({...result.state,running:null}));return result;
+  };
+  await step('configure_build',{effort:'high'});assert.equal(calls.length,0);
+  await step('delivery_resume',{answer:'retry-after-upgrade'});
+  assert.equal(calls.length,1);assert.equal(calls[0].id,runId);assert.equal(calls[0].options.buildExecutorOptions.effort,'high');assert.equal(calls[0].options.buildExecutorOptions.model,f.options.factory.model);
+  assert.equal(f.state().runId,runId);assert.equal(f.artifact('contract').sha256,contract);assert.equal(f.artifact('outcome').sha256,outcome);assert.equal(budget.tokens_used,120);assert.equal(budget.max_tokens,10000);assert.equal(budget.max_iterations,2);
+  for(const invalid of ['building','verified','accepted']){status=invalid;await assert.rejects(step('configure_build',{effort:'medium'}),{code:'factory_build_configuration_locked'});}
+  status='blocked';budget.unaccounted_attempts.push({reason:'usage_unavailable'});
+  await assert.rejects(step('configure_build',{effort:'medium'}),{code:'factory_build_configuration_locked'});
 });
 test('factory delivery binds executor, locked Outcome and durable run; verification never accepts or publishes',{timeout:60000},async t=>{
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});

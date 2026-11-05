@@ -71,6 +71,15 @@ Full release verification, exact installation approval, any genuinely needed
 elapsed-time amendment, actual implementation/Trials and manual acceptance
 remain open. Neither documents nor recorded usage may be reset to recover.
 
+The preliminary a18e145 passed its full gate (1618 checks), build, 68 browser
+cases and rollback but was withheld before any installation request: the
+immutable controller chat correctly rejects a turn-level effort change.
+The final candidate adds factory_configure_build as an explicit operator
+decision for only the implementation effort on the same model/provider. The
+host preserves it for the same delivery run, refuses active or uncertain
+execution and retains all document/budget locks. Controller settings remain
+unchanged. Final verification must cover this addition before an install request.
+
 ### Earlier checkpoint before the 3c7c53b installation
 
 37f5cbb is installed with strict/operational health, admission and complete

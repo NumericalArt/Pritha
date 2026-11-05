@@ -7,6 +7,8 @@ import {scopedAgentWorkspace} from '../lib/task-workspace.mjs';
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {parseFrontmatterData} from '../lib/frontmatter.mjs';
 import {contractData} from './contract.mjs';
+import {normalizeProviderPreset} from '../lib/provider-profile.mjs';
+import {neuralDeepExecutionProfile} from '../neuraldeep/model-execution-profile.mjs';
 
 export const factoryHash=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 export const factoryFail=code=>Object.assign(new Error('Review the bound factory step and its saved evidence.'),{code});
@@ -64,10 +66,23 @@ export function readFactoryConversation(options){
   if(!/^chat_[A-Za-z0-9_-]{1,160}$/.test(value?.chatId || '') || !['codex','claude','neuraldeep','openrouter','local'].includes(value?.connectorId))throw factoryFail('factory_binding_changed');
   return validateVoiceFactory(p,value,{chatId:value.chatId,connectorId:value.connectorId});
 }
+export const FACTORY_BUILD_EFFORTS=Object.freeze(['none','minimal','low','medium','high','xhigh','max','ultra','default']);
+export function validateFactoryBuildEffort(connectorId,modelId,effort){
+  if(!FACTORY_BUILD_EFFORTS.includes(effort))throw factoryFail('factory_input_invalid');
+  normalizeProviderPreset(connectorId,{modelId,reasoningEffort:effort});
+  if(connectorId==='neuraldeep'){
+    const profile=neuralDeepExecutionProfile(modelId);
+    if(profile.effortControl!=='ignored' && !profile.supportedEfforts.includes(effort))throw Object.assign(factoryFail('factory_build_effort_unsupported'),{supportedEfforts:profile.supportedEfforts});
+  }
+}
 export function validateVoiceFactory(paths,value,{chatId,connectorId}){
   if(value.schema!=='pritha-voice-factory-v1' || value.chatId!==chatId || value.connectorId!==connectorId || value.slug!==paths.slug
       || value.target!==paths.target || value.stateRoot!==paths.stateRoot || !Number.isSafeInteger(value.revision))throw factoryFail('factory_binding_changed');
   for(const field of ['contract','outcome','research','pattern'])if(value[field] && (path.dirname(value[field])!==path.join(paths.memory,['research','pattern'].includes(field)?'research':'contracts') || !value[field].endsWith('.md')))throw factoryFail('factory_artifact_boundary');
+  const config=value.buildConfiguration;
+  if(config!==undefined && (!config || Object.keys(config).some(key=>!['connectorId','modelId','effort','operationId','approvedBy','approvedAt'].includes(key))
+      || config.connectorId!==connectorId || typeof config.modelId!=='string' || !/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(config.modelId) || !FACTORY_BUILD_EFFORTS.includes(config.effort)
+      || typeof config.operationId!=='string' || !/^[A-Za-z0-9_-]{8,128}$/.test(config.operationId) || config.approvedBy!=='user' || typeof config.approvedAt!=='string' || !Number.isFinite(Date.parse(config.approvedAt))))throw factoryFail('factory_build_configuration_changed');
   return value;
 }
 export function factoryArtifact(paths,state,kind){
