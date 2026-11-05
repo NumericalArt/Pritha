@@ -6,7 +6,7 @@ import { prepareProviderSandbox } from './provider-sandbox.mjs';
 import { providerProcessEnvironment,createProviderTemporaryDirectory } from './provider-process-environment.mjs';
 import { spawnSupervisedCli } from '../neuraldeep/process-supervisor.mjs';
 import { resolvePrithaPython } from './python-runtime.mjs';
-import {ProviderFactoryTools,PROVIDER_FACTORY_TOOL} from './provider-factory-tools.mjs';
+import {ProviderFactoryTools,PROVIDER_FACTORY_TOOLS,normalizeFactoryToolCall} from './provider-factory-tools.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const validId=value=>typeof value==='string' && /^[A-Za-z0-9_-]{8,128}$/.test(value);
@@ -16,7 +16,11 @@ const denied=part=>/^(?:\.env(?:\..*)?|\.git|\.claude|\.codex|\.private|\.memory
 const fields=(input,allowed)=>{if(!object(input) || Object.keys(input).some(key=>!allowed.includes(key)))throw fail('provider_tool_input_invalid');};
 const text=value=>({content:[{type:'text',text:typeof value==='string'?value:JSON.stringify(value)}]});
 const schema=(properties,required)=>({type:'object',properties,required,additionalProperties:false});
-const string={type:'string'},operation={type:'string',description:'Stable operation ID; retain it when retrying the same action.'};
+const string={type:'string'},operation={type:'string',minLength:8,maxLength:128,pattern:'^[A-Za-z0-9_-]+$',description:'Stable ID of 8–128 letters, digits, _ or -, for example write-cli-01. Retain it for an identical retry.'};
+export function providerToolErrorDetail(error){
+  return error?.code==='provider_operation_id_invalid'
+    ? {error:error.code,field:'operation_id',minLength:8,maxLength:128,pattern:operation.pattern,hint:'Use a stable ID such as write-cli-01; keep it for an identical retry. This rejected call made no changes.'}:null;
+}
 export const PROVIDER_HOST_TOOL_DEFINITIONS=[
   {name:'read_file',description:'Read a bounded UTF-8 window inside this task workspace or an attachment:<id> URI from this exact chat. Attachments are read-only; binary or large inputs return a verified snapshot path for an approved command. Workspace reads return the whole-file SHA-256 needed for a later edit.',inputSchema:schema({path:string,offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:24000}},['path']),annotations:{readOnlyHint:true}},
   {name:'list_files',description:'List one workspace directory; secrets and runtime state are excluded.',inputSchema:schema({path:string},['path']),annotations:{readOnlyHint:true}},
@@ -32,7 +36,7 @@ export const PROVIDER_HOST_TOOL_DEFINITIONS=[
 export class ProviderHostTools {
   constructor(options){this.options=options;this.cwd=realpathSync(options.cwd);this.pending=new Map();this.commands=new Set();this.serial=Promise.resolve();this.closed=false;this.exitConfirmed=true;this.calls=0;this.commandCount=0;
     this.factory=options.factory?new ProviderFactoryTools(this):null;
-    this.definitions=[...PROVIDER_HOST_TOOL_DEFINITIONS,...(options.search?.definitions || []),...(this.factory?[PROVIDER_FACTORY_TOOL]:[])];
+    this.definitions=[...PROVIDER_HOST_TOOL_DEFINITIONS,...(options.search?.definitions || []),...(this.factory?PROVIDER_FACTORY_TOOLS:[])];
     if(options.protectedPaths!==undefined && (!Array.isArray(options.protectedPaths) || options.protectedPaths.length>256))throw fail('provider_tool_policy_invalid');
     this.protectedPaths=(options.protectedPaths || []).map(value=>this.target(value));
   }
@@ -53,10 +57,11 @@ export class ProviderHostTools {
     try{const info=fstatSync(fd);if(!info.isFile() || info.nlink!==1 || info.size>max)throw fail('provider_tool_file_too_large');return readFileSync(fd);}finally{closeSync(fd);}
   }
   window(value,input){const offset=input.offset ?? 0,length=input.length ?? 16000;if(!Number.isSafeInteger(offset) || offset<0 || !Number.isSafeInteger(length) || length<1 || length>24000)throw fail('provider_tool_input_invalid');return {text:value.slice(offset,offset+length),offset,nextOffset:offset+length<value.length?offset+length:null,totalCharacters:value.length};}
-  resultPath(operationId){if(!validId(operationId))throw fail('provider_tool_input_invalid');return privateStateFile(this.options.stateRoot,path.join(this.options.privateRoot,'tool-results',hash(this.options.turnId),operationId+'.json'));}
+  resultPath(operationId){if(!validId(operationId))throw fail('provider_operation_id_invalid');return privateStateFile(this.options.stateRoot,path.join(this.options.privateRoot,'tool-results',hash(this.options.turnId),operationId+'.json'));}
   saved(operationId){const file=this.resultPath(operationId);if(!existsSync(file))throw fail('provider_tool_result_missing');try{return JSON.parse(this.read(file,20*1024*1024).toString('utf8'));}catch(error){throw error.code?error:fail('provider_tool_result_invalid');}}
   async call(name,input){
     this.check();if(++this.calls>10000)throw fail('provider_tool_call_limit');
+    if(this.factory)({name,input}=normalizeFactoryToolCall(name,input));
     if(name==='factory_step' && this.factory?.isRead(input))return text(this.factory.read(input));
     if(['web_search','read_page'].includes(name)){
       if(!this.options.search)throw fail('provider_tool_unknown');
@@ -84,7 +89,7 @@ export class ProviderHostTools {
     }
     if(!['write_file','edit_file','run_command','ask_user',...(this.factory?['factory_step']:[])].includes(name))throw fail('provider_tool_unknown');
     if(name==='factory_step')this.factory.validate(input);
-    if(!validId(input?.operation_id))throw fail('provider_tool_input_invalid');
+    if(!validId(input?.operation_id))throw fail('provider_operation_id_invalid');
     const key='provider-tool:'+this.options.turnId+':'+input.operation_id,requestHash=hash(JSON.stringify([name,input]));
     const existing=this.options.coordinator.getIntent(key);
     if(existing && existing.hash!==requestHash)throw fail('idempotency_conflict');

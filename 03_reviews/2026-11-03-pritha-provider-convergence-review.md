@@ -3,7 +3,7 @@ id: pritha-provider-convergence-review-2026-11-03
 type: review
 status: blocked
 created: 2026-11-03
-updated: 2026-11-04
+updated: 2026-11-05
 topics: [pritha, provider-convergence, curated-memory, task-chat, voice, agent-factory, rebranding]
 tools: [Codex, NeuralDeep, Claude Code, OpenRouter, llama.cpp, SQLite, Node.js, Next.js, Playwright]
 agent_platforms: [Pritha]
@@ -34,8 +34,8 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
-source_updated: 2026-11-04
-source_version: installed ee5987b; unified factory implementation under verification
+source_updated: 2026-11-05
+source_version: installed fd96ab7; real factory tool recovery under verification
 retrieved: 2026-11-04
 verified: 2026-11-04
 valid_for: the local executable candidate and recorded operator acceptance only
@@ -277,13 +277,38 @@ with invalid fields. It was interrupted through product controls before any
 factory artifact or approval was created. The follow-up supplies the next action,
 action-specific field guidance and the actual tool error in history Details.
 
+## Live execution findings (2026-11-05)
+
+Installed fd96ab7 passed managed activation and full post-activation self-test.
+Claude research recovery and scaffold completed with its existing approvals.
+Both build attempts failed without implementing the product: short operation IDs
+were rejected by a host constraint missing from the advertised schema and error.
+The preserved ledger records 153667 tokens and both authorized iterations used.
+A targeted correction exposes the constraint, returns actionable redacted errors,
+and preserves prior implementation guidance. The installed CLI passed an offline
+synthetic tool sequence through the real adapter and MCP server: rejected short
+ID, corrected approved write, then private draft without document approval.
+
+Codex now has separately accepted Contract and Outcome, but its primary-source
+reader rejected an OWASP subdomain already admitted by the authority policy.
+The next candidate forwards that exact host to the DNS-pinned reader and retains
+unstarted source selections during bounded recovery. It does not broaden redirect
+or address policies. NeuralDeep draft creation still needs a successful live
+model trial; narrow required-field drafting tools passed the synthetic path only.
+
+Further corrections avoid counting the same unchanged scaffold as another failed
+repair after a budget interruption, and expose saved Trial failures separately
+from delivery budget blockers. Tests preserve counts for completed unsuccessful
+attempts, protected evidence bindings and existing approval semantics. No manual
+state repair or model-written verifier was used for these real pilots.
+
 ## Required steps before final handoff
 
 1. Verify and install the consolidated follow-up through the managed workflow,
-   with rollback to installed e2d10ab and exact immediate lifecycle approval.
+   with rollback to installed fd96ab7 and exact immediate lifecycle approval.
 2. Continue the existing approved Claude factory through corrected research,
    scaffold, measured delivery and independent protected Trials. Preserve its
-   identity, accepted documents and original build limits.
+   identity, accepted documents, measured usage and explicitly amended build limits.
 3. Complete real Codex and NeuralDeep factory delivery and the Voice/Task Chat
    continuation matrix. New contracts/outcomes need initial separate approvals;
    accepted documents must not ask again. No internal-state repair counts as a

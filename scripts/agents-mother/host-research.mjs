@@ -29,10 +29,10 @@ function passages(source){return rankedSourceQuotes(source.text,source.query).ma
 /** Private durable host operation. Provider/model messages never choose its identity,
  * source authorities, deadline, retry count or publication destination. */
 export class HostResearch {
-  constructor({root,stateRoot,data,report,patternLock,topics,connectorId='neuraldeep',service,environment=process.env,totalMs=300000,sourceMs=20000,signal}){
+  constructor({root,stateRoot,data,report,patternLock,topics,connectorId='neuraldeep',service,reader=readChildPage,environment=process.env,totalMs=300000,sourceMs=20000,signal}){
     if(!['codex','neuraldeep','claude','openrouter','local'].includes(connectorId))fail('research_provider_invalid');
     if(!Number.isSafeInteger(totalMs) || totalMs<100 || totalMs>900000 || !Number.isSafeInteger(sourceMs) || sourceMs<50 || sourceMs>30000)fail('research_deadline_invalid');
-    this.root=root;this.stateRoot=stateRoot;this.data=data;this.report=report;this.connectorId=connectorId;this.environment=environment;this.signal=signal;this.service=service;this.sourceMs=sourceMs;this.totalMs=totalMs;
+    this.root=root;this.stateRoot=stateRoot;this.data=data;this.report=report;this.connectorId=connectorId;this.environment=environment;this.signal=signal;this.service=service;this.reader=reader;this.sourceMs=sourceMs;this.totalMs=totalMs;
     this.artifactRoot=resolvePrithaAgentMemoryRoot({root,stateRoot});
     if(!path.resolve(report.fullPath).startsWith(path.resolve(this.artifactRoot)+path.sep))fail('research_report_boundary');
     privateStateFile(stateRoot,report.fullPath);
@@ -78,12 +78,14 @@ export class HostResearch {
         }
         this.assertReport(state);
         const failed=Object.entries(state.topics).filter(([,attempt])=>attempt.status==='failed');
-        if(state.publication || !failed.length || failed.length!==Object.keys(sourceUrls).length)fail('research_recovery_unavailable');
+        if(state.publication || !failed.length || Object.keys(sourceUrls).some(id=>state.topics[id] && state.topics[id].status!=='failed'))fail('research_recovery_unavailable');
+        if(!Object.keys(sourceUrls).length)fail('research_recovery_unavailable');
         for(const [id,attempt] of failed){
           if(!sourceUrls[id] || publicUrl(sourceUrls[id])===attempt.url)fail('research_replacement_required');
         }
-        // One new bounded window, only for confirmed failures with different
-        // authorized sources. Keep the old deadline, attempts and evidence.
+        // One new bounded window for confirmed failures with different sources.
+        // The caller may also select sources for topics not reached yet, without
+        // granting those topics extra retries or changing collected evidence.
         state.recovery={startedAt:new Date().toISOString(),previousDeadlineAt:state.deadlineAt,previousTopics:structuredClone(state.topics),sources:Object.fromEntries(Object.entries(sourceUrls).map(([id,url])=>[id,publicUrl(url)]))};
         state.deadlineAt=Date.now()+this.totalMs;
         retryFailed=true;
@@ -99,7 +101,8 @@ export class HostResearch {
           if(Date.now()>=state.deadlineAt)fail('research_deadline_exceeded');
           const prior=state.topics[topic.id];
           if(prior?.status==='started')fail('research_source_unconfirmed');
-          const attemptLimit=state.recovery?.sources[topic.id]?(state.recovery.previousTopics[topic.id].attempts+2):2;
+          const recovered=state.recovery?.previousTopics[topic.id];
+          const attemptLimit=recovered?.status==='failed'?recovered.attempts+2:2;
           if(prior && (!retryFailed || prior.attempts>=attemptLimit))fail(prior.attempts>=attemptLimit?'research_source_limit':'research_retry_required');
           const attempt=state.topics[topic.id]={attempts:(prior?.attempts||0)+1,status:'started',stage:'select',history:prior?[...(prior.history||[]),prior.error]:[]};this.save(state);
           const controller=new AbortController(),timer=setTimeout(()=>controller.abort(Object.assign(new Error('Source deadline reached.'),{code:'research_source_timeout'})),Math.min(this.sourceMs,state.deadlineAt-Date.now()));
@@ -119,7 +122,11 @@ export class HostResearch {
             }
             if(!url || !allowed(url,topic.primaryDomains))fail('research_primary_url_invalid');
             attempt.url=publicUrl(url);attempt.stage='read';this.save(state);
-            const page=service?await bounded(()=>service.readPage({url:attempt.url,max_chars:20000},context),signal):await bounded(()=>readChildPage(attempt.url,topic.primaryDomains,signal),signal);
+            // Authority admits reviewed domains and their subdomains. Give the
+            // exact admitted host to the stricter DNS-pinned reader; redirects
+            // still cannot introduce a different unlisted subdomain.
+            const readHosts=[...new Set([...topic.primaryDomains,new URL(attempt.url).hostname])];
+            const page=service?await bounded(()=>service.readPage({url:attempt.url,max_chars:20000},context),signal):await bounded(()=>this.reader(attempt.url,readHosts,signal),signal);
             signal.throwIfAborted();this.assertAllowed();this.assertReport(state);
             const item=service?page.sources?.find(source=>source.read===true && source.text && allowed(source.url,topic.primaryDomains)):page.items?.[0];
             if(service && !page.ok)fail(page.error?.code||'research_read_failed');

@@ -148,9 +148,9 @@ test("repeated non-progress becomes a typed blocker instead of hanging", async (
   assert.equal(stillStuck.state.budget.max_iterations, budgetBefore.max_iterations);
   const repaired = await resumeDelivery("run-stuck", {
     root: project, stateRoot, allowDraft: true, answer: "add-guidance",
-    guidance: "Write ready to implementation.txt.", trialBackend: "local", reportDir: false,
+    trialBackend: "local", reportDir: false,
     buildExecutor: new FunctionBuildExecutor(async ({ worktree, guidance }) => {
-      assert.equal(guidance, "Write ready to implementation.txt.");
+      assert.equal(guidance, "Repair implementation.txt using the unchanged evaluator.");
       writeFileSync(path.join(worktree, "implementation.txt"), "ready\n", "utf8");
       return { summary: "implemented" };
     }),
@@ -647,6 +647,20 @@ test(`a user budget extension preserves resume guidance and the approved plan ($
   assert.equal(readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8"), initialTrials);
 });
 }
+
+test('budget recovery does not count the unchanged scaffold as another failed repair',async()=>{
+  const project=repository(),stateRoot=mkdtempSync(path.join(os.tmpdir(),'pritha-loop-interrupted-')),runRoot=path.join(stateRoot,'builds','fixture-agent','run-interrupted');let calls=0;
+  const executor={name:'fixture-budget-interruption',async execute({worktree,runId}){
+    calls++;
+    if(calls===1)throw new ExecutionBackendError('token_budget_exhausted','request stopped before implementation',{executorResult:chargedResult({executor:this.name,run_id:runId,status:'failed',turn_status:'interrupted',process_exited:true,thread_id:'first-thread',tokens_used:100})});
+    writeFileSync(path.join(worktree,'implementation.txt'),'ready\n');return chargedResult({executor:this.name,run_id:runId,thread_id:'second-thread',tokens_used:80});
+  },close(){}};
+  const first=await runDeliveryLoop({plan:plan(),projectPath:project,runRoot,runId:'run-interrupted',buildExecutor:executor,trialBackend:'local',reportDir:false,budget:{maxTokens:120,maxIterations:2,repeatedFailureThreshold:2}});
+  assert.equal(first.state.blockers[0].code,'token_budget_exhausted');assert.equal(first.state.consecutive_failure_count,1);
+  await amendDeliveryBudget('run-interrupted',{root:project,stateRoot,allowDraft:true,answeredBy:'user',budgetRequestId:'budget-recovery-1',addTokens:200});
+  const second=await resumeDelivery('run-interrupted',{root:project,stateRoot,allowDraft:true,buildExecutor:executor,trialBackend:'local',reportDir:false});
+  assert.equal(second.state.status,'verified');assert.equal(calls,2);assert.equal(second.state.budget.tokens_used,180);assert.equal(second.state.budget.max_iterations,2);assert.equal(second.state.failure_history.length,1);
+});
 
 for (const turnStatus of ["completed", "unknown"]) {
   test(`host-only verification respects the ${turnStatus} execution state without a new model turn`, async () => {

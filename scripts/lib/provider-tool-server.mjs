@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { randomBytes,timingSafeEqual } from 'node:crypto';
-import { PROVIDER_HOST_TOOL_DEFINITIONS } from './provider-host-tools.mjs';
+import { PROVIDER_HOST_TOOL_DEFINITIONS,providerToolErrorDetail } from './provider-host-tools.mjs';
 import {factoryBriefErrorDetail} from './provider-factory-tools.mjs';
 
 const versions=new Set(['2025-11-25','2025-06-18','2025-03-26']);
@@ -41,7 +41,7 @@ export async function listenProviderToolServer({hostTools,token=randomBytes(32).
     if(value.method!=='tools/call')return error(-32601,'Method unavailable');
     if(!object(value.params) || !definitions.some(tool=>tool.name===value.params.name) || !object(value.params.arguments))return error(-32602,'Invalid tool request');
     try{answer(await hostTools.call(value.params.name,value.params.arguments));}
-    catch(failure){const detail=factoryBriefErrorDetail(failure);answer({isError:true,content:[{type:'text',text:detail?JSON.stringify(detail):safeCode(failure)}]});}
+    catch(failure){const detail=factoryBriefErrorDetail(failure) || providerToolErrorDetail(failure);answer({isError:true,content:[{type:'text',text:detail?JSON.stringify(detail):safeCode(failure)}]});}
   });
   server.headersTimeout=10000;server.requestTimeout=10000;server.maxHeadersCount=32;
   server.on('connect',(_req,socket)=>socket.destroy());server.on('upgrade',(_req,socket)=>socket.destroy());

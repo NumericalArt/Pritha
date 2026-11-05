@@ -4,7 +4,8 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {atomicWriteFile,atomicCompareAndSwapFile} from '../lib/atomic-file.mjs';
 import {parseFrontmatterData} from '../lib/frontmatter.mjs';
-import {redactSensitiveText} from '../lib/redaction.mjs';
+import {redactSensitiveText,quarantineUntrustedInstructionText} from '../lib/redaction.mjs';
+import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal} from './voice-factory-state.mjs';
@@ -32,6 +33,21 @@ function contractIdentity(data,p,state,executor){
       || !Number.isSafeInteger(data.buildTokenBudget) || data.buildTokenBudget<1 || data.buildTokenBudget>10000000)throw factoryFail('factory_contract_identity_invalid');
 }
 const validationFailure=issues=>Object.assign(factoryFail('factory_validation_failed'),{message:issues.map(row=>typeof row==='string'?row:row.code+' '+row.message).join('\n').slice(0,5000)});
+
+function deliveryVerification(result){
+  const ref=result.state.last_trial_result;
+  if(!ref)return null;
+  try{
+    if(!result.runRoot || !/^trial-results\/verification-\d+\.json$/.test(ref.path))throw Error('Invalid Trial reference');
+    const value=JSON.parse(readBoundedRegularFile(path.join(result.runRoot,ref.path),{allowedRoots:[result.runRoot],maxBytes:2*1024*1024}).text);
+    if(value.schema!=='pritha-trial-result-v1' || value.evidence_lock!==ref.evidence_lock || value.spec_id!==result.state.spec.id || value.document_lock!==result.state.spec.document_lock || !Array.isArray(value.trials))throw Error('Changed Trial evidence');
+    const safe=text=>quarantineUntrustedInstructionText(redactSensitiveText(String(text || ''))).slice(0,1600);
+    return {status:value.verification_status,evidenceLock:value.evidence_lock,counts:value.counts,recordedAt:value.finished_at,
+      failedTrials:value.trials.filter(row=>row.kind==='automated' && row.status!=='passed').slice(0,12).map(row=>({id:safe(row.id),status:safe(row.status),exitCode:row.execution?.exitCode ?? null,
+        assertions:(row.assertions || []).filter(check=>!check.passed).slice(0,8).map(check=>({type:safe(check.type),message:safe(check.message)})),
+        diagnostics:{untrusted:true,stdout:safe(row.execution?.stdout),stderr:safe(row.execution?.stderr)}}))};
+  }catch{return {status:'evidence-unavailable',hint:'Saved Trial evidence could not be read or matched; do not infer success.'};}
+}
 
 /** Trusted worker: action/paths come from the host, never an arbitrary shell or
  * model-selected program. The actual product executor still runs in its normal
@@ -138,7 +154,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       }else{
         observeDelivery();result=input.action==='delivery_status'?observeDelivery():await delivery.resumeDelivery(state.runId,{...buildOptions,hostOnly:input.action==='verify',...(input.answer?{answer:input.answer,answeredBy:'user'}:{})});
       }
-      state.phase='delivery-'+result.state.status;value={runId:state.runId,status:result.state.status,phase:result.state.phase,blockers:result.state.blockers,iteration:result.state.iteration,budget:result.state.budget,worktree:result.worktree?.worktree || null};break;
+      state.phase='delivery-'+result.state.status;value={runId:state.runId,status:result.state.status,phase:result.state.phase,blockers:result.state.blockers,iteration:result.state.iteration,budget:result.state.budget,worktree:result.worktree?.worktree || null,verification:deliveryVerification(result)};break;
     }
     case 'finish':{
       approved();const result=observeDelivery();if(!['verified','awaiting_acceptance','accepted'].includes(result.state.status))throw factoryFail('factory_delivery_not_verified');

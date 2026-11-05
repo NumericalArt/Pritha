@@ -125,3 +125,37 @@ test('recovery cannot reset an uncertain attempt, use a foreign source, or renew
   await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls:{[topic.id]:'https://platform.openai.com/docs/new'}}),{code:'research_source_unconfirmed'});
   assert.equal(f.host.status().recovery,null);
 });
+
+test('host reader receives the exact approved primary subdomain without allowing unrelated hosts',async t=>{
+  const security={id:'untrusted-input-security',topic:'Input validation',query:'Input validation documentation',required:true};
+  const calls=[],url='https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html';
+  const f=fixture(t,{topics:[security],connectorId:'codex',service:undefined,reader:async(...args)=>{calls.push(args);return {items:[{url,text:'Input validation checks untrusted input before it reaches a command or storage boundary. The documented validation rules preserve the selected type and reject malformed values.',title:'Input validation'}]};}});
+  await assert.rejects(f.host.collect({sourceUrls:{[security.id]:'https://owasp.org.evil.example/input'}}),{code:'research_primary_url_invalid'});
+  assert.equal(calls.length,0);
+  assert.equal((await f.host.collect({sourceUrls:{[security.id]:url}})).status,'collected');
+  assert.equal(calls.length,1);assert.equal(calls[0][0],url);
+  assert.ok(calls[0][1].includes('cheatsheetseries.owasp.org'));
+  assert.ok(calls[0][1].every(host=>host==='owasp.org' || host==='cheatsheetseries.owasp.org'));
+  assert.ok(calls[0][2] instanceof AbortSignal);
+});
+
+test('recovery carries source choices for unreached topics without granting them additional retries',async t=>{
+  const second={id:'declared-dependencies',topic:'Node.js runtime',query:'Node.js file system documentation',required:true};
+  let recovered=false,secondReads=0;
+  const f=fixture(t,{topics:[topic,second],connectorId:'codex',service:undefined,reader:async url=>{
+    if(!recovered)throw Object.assign(Error('first source failed'),{code:'source_unavailable'});
+    if(url.includes('nodejs.org')){secondReads++;throw Object.assign(Error('second source failed'),{code:'source_unavailable'});}
+    return {items:[{url,text:prose,title:'Primary documentation'}]};
+  }});
+  await assert.rejects(f.host.collect({sourceUrls:{[topic.id]:'https://platform.openai.com/docs/old'}}),{code:'source_unavailable'});
+  const sourceUrls={[topic.id]:'https://platform.openai.com/docs/replacement',[second.id]:'https://nodejs.org/docs/latest-v24.x/api/fs.html'};
+  recovered=true;
+  await assert.rejects(f.host.collect({recoverFailed:true,sourceUrls}),{code:'source_unavailable'});
+  assert.equal(secondReads,1);assert.equal(f.host.status().sources.length,1);
+  assert.equal(f.host.status().topics[1].checkpoint.url,sourceUrls[second.id]);
+  const deadline=f.host.status().deadlineAt;
+  await f.host.collect({recoverFailed:true,sourceUrls});assert.equal(secondReads,1);assert.equal(f.host.status().deadlineAt,deadline);
+  await assert.rejects(new HostResearch(f.options).collect({retryFailed:true}),{code:'source_unavailable'});
+  await assert.rejects(f.host.collect({retryFailed:true}),{code:'research_source_limit'});
+  assert.equal(secondReads,2);assert.equal(f.host.status().topics[0].checkpoint.attempts,2);
+});

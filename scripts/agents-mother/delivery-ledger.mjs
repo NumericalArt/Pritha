@@ -401,15 +401,18 @@ function failureSignature(failures) {
 
 export function recordDeliveryFailure(runRoot, failures, options = {}) {
   const signature = failureSignature(failures);
+  if(options.observationKey!==undefined && !/^sha256:[a-f0-9]{64}$/.test(options.observationKey))throw new Error('Invalid failure observation identity');
   return updateDeliveryLedger(runRoot, (current) => {
-    const count = current.consecutive_failure_signature === signature ? current.consecutive_failure_count + 1 : 1;
+    const same=current.consecutive_failure_signature===signature;
+    const repeatedObservation=same && options.observationKey && current.failure_history?.at(-1)?.observation_key===options.observationKey;
+    const count = same ? current.consecutive_failure_count + (repeatedObservation?0:1) : 1;
     const threshold = current.budget.repeated_failure_threshold;
-    const entry = { iteration: current.iteration, signature, trial_ids: (failures || []).map((failure) => failure.id).filter(Boolean).slice(0, 100) };
+    const entry = { iteration: current.iteration, signature, trial_ids: (failures || []).map((failure) => failure.id).filter(Boolean).slice(0, 100),...(options.observationKey?{observation_key:options.observationKey}:{}) };
     const base = {
       ...current,
       consecutive_failure_signature: signature,
       consecutive_failure_count: count,
-      failure_history: [...(current.failure_history || []), entry].slice(-20),
+      failure_history: repeatedObservation?current.failure_history:[...(current.failure_history || []), entry].slice(-20),
     };
     if (count < threshold) {
       return { ...base, status: "building", phase: "repair", next_action: "repair_latest_trial_failures", blockers: [] };

@@ -28,6 +28,20 @@ function fixture(t){
   t.after(async()=>{controller.abort();await tools.close();lease.release();coordinator.close();fs.rmSync(directory,{recursive:true,force:true});});
   return {tools,options,p,coordinator,lease,controller,approvals,proofs,call,ok,state:()=>loadVoiceFactory(p,options),artifact:kind=>factoryArtifact(p,loadVoiceFactory(p,options),kind)};
 }
+test('dedicated drafting tools require brief/content and retain the canonical operation and approval boundary',{timeout:60000},async t=>{
+  const f=fixture(t),init=f.tools.definitions.find(t=>t.name==='factory_init'),write=f.tools.definitions.find(t=>t.name==='factory_write_draft');
+  assert.deepEqual(init.inputSchema.required,['operation_id','brief','build_token_budget']);assert.equal(init.inputSchema.properties.sources,undefined);
+  assert.deepEqual(write.inputSchema.required,['operation_id','artifact','expected_sha256','content']);
+  await assert.rejects(f.tools.call('factory_init',{operation_id:'draft-init-01',action:'approve_contract',brief,build_token_budget:40000}),{code:'factory_input_invalid'});
+  assert.equal(f.state(),null);
+  const input={operation_id:'draft-init-01',brief,build_token_budget:40000};
+  const first=await f.tools.call('factory_init',input);assert.equal(JSON.parse(first.content[0].text).status,'completed');
+  const revision=f.state().revision;
+  await f.tools.call('factory_step',{operation_id:input.operation_id,action:'init',brief,build_token_budget:40000});
+  assert.equal(f.state().revision,revision);assert.equal(f.approvals.length,0);assert.equal(fs.existsSync(f.p.target),false);
+  const contract=f.artifact('contract');const changed=await f.tools.call('factory_write_draft',{operation_id:'draft-write-01',artifact:'contract',expected_sha256:contract.sha256,content:contract.text+'\nReviewed draft.\n'});
+  assert.equal(JSON.parse(changed.content[0].text).status,'completed');assert.equal(f.approvals.length,0);assert.equal(f.state().contractApproval,undefined);
+});
 test('the actual MCP brief schema rejects a design array before approval and a corrected retry creates only a private draft',{timeout:60000},async t=>{
   const f=fixture(t),server=await listenProviderToolServer({hostTools:f.tools});t.after(()=>server.close());
   let id=0;const post=async(method,params)=>(await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:++id,method,params})})).json()).result;
@@ -150,6 +164,18 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   };
   const delivered=await step('deliver');assert.equal(delivered.value.status,'awaiting_acceptance');assert.equal(calls[0].target,f.p.target);assert.equal(calls[0].outcome,f.state().outcome);assert.equal(calls[0].options.buildExecutor,'claude-code');assert.equal(calls[0].options.trialBackend,'local');assert.equal(calls[0].options.buildExecutorOptions.model,'claude-sonnet-5-5');
   await step('verify');assert.equal(calls[1].options.hostOnly,true);
+  const success=output,runRoot=path.join(f.p.stateRoot,'builds','fixture-run'),ref={path:'trial-results/verification-001.json',evidence_lock:'sha256:fixture-evidence'};
+  fs.mkdirSync(path.join(runRoot,'trial-results'),{recursive:true});
+  const trial={schema:'pritha-trial-result-v1',spec_id:spec.id,document_lock:spec.outcome_document_lock,evidence_lock:ref.evidence_lock,verification_status:'failed',counts:{failed:1},finished_at:'2026-11-01T00:00:00Z',trials:[{id:'cli-result',kind:'automated',status:'failed',assertions:[{type:'exit_code',passed:false,message:'received 64'}],execution:{exitCode:64,stdout:'',stderr:'CLI command is missing. api_key: synthetic-sensitive-value'}}]};
+  fs.writeFileSync(path.join(runRoot,ref.path),JSON.stringify(trial));
+  output={...output,runRoot,state:{...output.state,status:'blocked',last_trial_result:ref,blockers:[{code:'iteration_budget_exhausted'}]}};
+  const observed=(await step('delivery_status')).value;
+  assert.equal(observed.status,'blocked');assert.equal(observed.verification.status,'failed');assert.equal(observed.verification.failedTrials[0].exitCode,64);assert.equal(observed.verification.failedTrials[0].diagnostics.untrusted,true);
+  assert.match(observed.verification.failedTrials[0].diagnostics.stderr,/CLI command is missing/);assert.doesNotMatch(JSON.stringify(observed),/synthetic-sensitive-value/);
+  fs.writeFileSync(path.join(runRoot,ref.path),JSON.stringify({...trial,evidence_lock:'changed'}));
+  assert.equal((await step('delivery_status')).value.verification.status,'evidence-unavailable');
+  output={...output,state:{...output.state,last_trial_result:{...ref,path:'../../foreign.json'}}};assert.equal((await step('delivery_status')).value.verification.status,'evidence-unavailable');
+  output=success;
   assert.equal((await step('finish')).state.phase,'card-blocked');cardStatus='ready';assert.equal((await step('finish')).state.phase,'awaiting-manual-acceptance');assert.equal(calls.length,2);
   output={...output,state:{...output.state,source_project:'/different-child'}};await assert.rejects(step('delivery_status'),{code:'factory_delivery_identity_changed'});
   fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),running:null,runId:undefined,phase:'scaffolded'}));failAfterJournal=true;await assert.rejects(step('deliver'),/simulated disconnect/);assert.match(f.state().runId,/^voice-voice-built-/);assert.equal(f.state().running.action,'deliver');

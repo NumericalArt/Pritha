@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { listenProviderToolServer } from '../scripts/lib/provider-tool-server.mjs';
 
+test('MCP advertises operation ID bounds and returns an actionable redacted correction',async t=>{
+  const server=await listenProviderToolServer({hostTools:{call:async()=>{throw Object.assign(new Error('PRIVATE_ID_CANARY'),{code:'provider_operation_id_invalid',field:'PRIVATE_FIELD'});}}});t.after(()=>server.close());
+  const post=async(method,params)=>(await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})})).json()).result;
+  const definitions=(await post('tools/list')).tools;
+  for(const tool of definitions.filter(t=>t.inputSchema.properties.operation_id)){
+    const schema=tool.inputSchema.properties.operation_id;assert.equal(schema.minLength,8);assert.equal(schema.maxLength,128);assert.ok(new RegExp(schema.pattern).test('write-cli-01'));
+  }
+  const result=await post('tools/call',{name:'write_file',arguments:{operation_id:'cli1'}}),detail=JSON.parse(result.content[0].text);
+  assert.equal(result.isError,true);assert.equal(detail.field,'operation_id');assert.equal(detail.minLength,8);assert.match(detail.hint,/no changes/);assert.doesNotMatch(JSON.stringify(result),/PRIVATE_/);
+});
+
 test('MCP error hints cannot echo arbitrary exception data or forged field details',async t=>{
   const server=await listenProviderToolServer({hostTools:{call:async()=>{throw Object.assign(new Error('PRIVATE_ERROR_CANARY'),{code:'factory_brief_text_required',field:'design.PRIVATE_FIELD_CANARY'});}}});t.after(()=>server.close());
   const result=await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'read_file',arguments:{path:'README.md'}}})})).json();

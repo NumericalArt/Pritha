@@ -52,12 +52,12 @@ briefSchema.properties.technical.properties.sourceFormat.enum=['json','rss','ato
 export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound child. ALWAYS read status first and continue its saved phase; never restart an existing factory. Prepare private drafts within the requested workflow, then request TWO separate approvals: approve_contract and approve_outcome. After approval, continue research, scaffold, bounded delivery and protected Trials without asking again for technical steps. Accepted documents and budgets stay pinned. No push, deploy, services, credential provisioning or final user acceptance. Never infer document approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['operation_id','action'],additionalProperties:false}};
 const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_collect:['sources','retry_failed'],research_recover:['sources'],research_apply:['selection'],delivery_resume:['answer']};
 const requiredFields={read_artifact:['artifact'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_recover:['sources'],research_apply:['selection']};
-PROVIDER_FACTORY_TOOL.inputSchema.properties.operation_id={type:'string',minLength:8,maxLength:128,pattern:'^[A-Za-z0-9_-]+$',description:'Stable operation identifier. Keep it for an identical retry; never repeat uncertain effects.'};
+PROVIDER_FACTORY_TOOL.inputSchema.properties.operation_id={type:'string',minLength:8,maxLength:128,pattern:'^[A-Za-z0-9_-]+$',description:'Stable ID of 8–128 letters, digits, _ or -, for example init-agent-01. Keep it for an identical retry; never repeat uncertain effects.'};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.action.description='status returns the saved next step. init creates the first draft from brief and proposed budgets. read_artifact reads it. write_draft revises an existing artifact using artifact, expected_sha256 and complete content. Do not put brief/content inside sources or selection. Those fields belong only to research actions.';
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
 Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
   retry_failed:{type:'boolean',description:'research_collect only: retry a confirmed failed source once within its original deadline. Never resets an uncertain operation or its limits.'},
-  sources:{type:'object',additionalProperties:{type:'string'},description:'research_collect/research_recover: map exact topic IDs from research_status to HTTPS primary-source URLs (strings). research_recover requires a different allowed URL for every confirmed failed topic; once per research, with two bounded attempts and a fresh five-minute window. History, collected evidence and approvals remain pinned; uncertain dispatches cannot recover.'},
+  sources:{type:'object',additionalProperties:{type:'string'},description:'research_collect/research_recover: map exact topic IDs from research_status to HTTPS primary-source URLs (strings). research_recover requires a different allowed URL for every confirmed failed topic; source choices for not-started topics may also be included. Recovery is once per research, with two additional attempts only for failed topics and a fresh five-minute window. History, collected evidence and approvals remain pinned; uncertain dispatches cannot recover.'},
   selection:{type:'object',additionalProperties:false,required:['facts','synthesis'],properties:{
     facts:{type:'array',maxItems:24,items:{type:'object',additionalProperties:false,required:['sourceId','topicId','passageId','versionContext','compatibility','compatibilityStatus'],properties:{
       sourceId:{type:'string'},topicId:{type:'string'},passageId:{type:'string',description:'Exact passage ID from research_status; do not supply or invent a quote.'},
@@ -69,6 +69,19 @@ Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
   build_iteration_budget:{type:'integer',minimum:1,maximum:100,description:'Proposed build iterations from the operator brief; init does not approve this budget.'},
   build_elapsed_budget_ms:{type:'integer',minimum:60000,maximum:86400000,description:'Proposed build time from delivery start, excluding interview/approval waiting. init does not approve this budget.'},
 });
+// Narrow drafting tools make required fields visible to providers that struggle
+// with the optional fields of the compatibility dispatcher. Both routes retain
+// the same canonical operation identity, approvals and worker implementation.
+const draftingActions={factory_init:'init',factory_write_draft:'write_draft'};
+export const PROVIDER_FACTORY_TOOLS=[PROVIDER_FACTORY_TOOL,...Object.entries(draftingActions).map(([name,action])=>({
+  name,description:action==='init'?'Create the first private Contract draft for the bound child. Read factory_step status first. brief and proposed build_token_budget are REQUIRED; no document or budget is approved by this call.':'Revise an existing private draft using its exact SHA-256 and complete content. Accepted documents cannot be changed.',
+  inputSchema:{type:'object',properties:Object.fromEntries(['operation_id',...fields[action]].map(key=>[key,PROVIDER_FACTORY_TOOL.inputSchema.properties[key]])),required:['operation_id',...requiredFields[action]],additionalProperties:false},
+}))];
+export function normalizeFactoryToolCall(name,input){
+  const action=draftingActions[name];if(!action)return {name,input};
+  if(!input || typeof input!=='object' || Array.isArray(input) || Object.hasOwn(input,'action'))throw new FactoryActionInputError(action);
+  return {name:'factory_step',input:{operation_id:input.operation_id,action,...input}};
+}
 export class ProviderFactoryTools {
   constructor(host){this.host=host;this.options=host.options;this.paths=voiceFactoryPaths({...this.options,...this.options.factory});if(this.options.factory.target!==this.paths.target)throw factoryFail('factory_binding_changed');}
   state(){return loadVoiceFactory(this.paths,this.options);}

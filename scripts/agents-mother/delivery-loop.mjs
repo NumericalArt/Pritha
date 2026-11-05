@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import {createHash} from 'node:crypto';
 import path from "node:path";
 import { acquireFileLock, atomicWriteFile } from "../lib/atomic-file.mjs";
 import { today } from "../lib/date.mjs";
@@ -531,6 +532,20 @@ function storeExecutorResult(runRoot, result, iteration) {
   return relative.replaceAll(path.sep, "/");
 }
 
+function failureObservation(runRoot,state,result){
+  // Rechecking an unchanged candidate after an interrupted request is not
+  // another unsuccessful repair. Completed no-op builds still count, and any
+  // changed workspace or failure signature remains a new observation.
+  let completedIteration=0;
+  for(let iteration=state.iteration;iteration>0;iteration--){
+    const file=path.join(runRoot,'executor',`iteration-${String(iteration).padStart(3,'0')}.json`);
+    if(!existsSync(file))continue;
+    const receipt=JSON.parse(readBoundedRegularFile(file,{allowedRoots:[runRoot],maxBytes:2_000_000}).text);
+    if(receipt.turn_status==='completed' || !receipt.turn_status && receipt.status==='completed'){completedIteration=iteration;break;}
+  }
+  return 'sha256:'+createHash('sha256').update(JSON.stringify([result.workspace_after,completedIteration])).digest('hex');
+}
+
 function ensureRunPlan(runRoot, plan) {
   const planPath = path.join(runRoot, "trial-plan.json");
   if (existsSync(planPath)) {
@@ -789,7 +804,7 @@ async function runDeliveryLoopLocked(input = {}) {
       const beforeBuild = budgetBlocker(state);
       if (beforeBuild) return blockDelivery(runRoot, plan, worktree, beforeBuild, input);
       if (input.hostOnly) return blockDelivery(runRoot, plan, worktree, blockerForError(new DeliveryLoopError("verification_needs_implementation", "The approved checks found remaining work; the result and evidence are preserved.")), input);
-      const failureUpdate = recordDeliveryFailure(runRoot, failures, { eventType: "verification_failed" });
+      const failureUpdate = recordDeliveryFailure(runRoot, failures, { eventType: "verification_failed",observationKey:failureObservation(runRoot,state,result) });
       state = failureUpdate.state;
       if (state.status === "blocked") {
         const reportPath = emitDeliveryReport(state, plan, worktree, input);
@@ -983,7 +998,7 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
     return transitionDelivery(runRoot, "abandoned", { eventType: "delivery_abandoned_by_user" }).state;
   }
   if (selected === "revise-outcome") return transitionDelivery(runRoot, "abandoned", { eventType: "outcome_revision_requested" }).state;
-  const guidance = bounded(options.guidance || "Operator selected the recorded retry path.", 2_000);
+  const guidance = bounded(options.guidance || state.operator_guidance || "Operator selected the recorded retry path.", 2_000);
   if (["review-failures", "inspect-worktree", "implement-manually"].includes(selected)) {
     return updateDeliveryLedger(runRoot, (current) => ({
       ...current,
