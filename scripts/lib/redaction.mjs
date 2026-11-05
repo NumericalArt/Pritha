@@ -70,6 +70,26 @@ export function quarantineUntrustedInstructionText(value) {
     : redactSensitiveText(value);
 }
 
+/** Research may retain clean paragraphs around a quarantined example. Returned
+ * text still passes the existing whole-text scanner; no domain is exempted. */
+export function quarantineUntrustedSourcePassages(value) {
+  const source=String(value || ""),quarantined="[QUARANTINED_UNTRUSTED_INSTRUCTION]";
+  if(source.length>MAX_SECURITY_SCAN_CHARS)return quarantined;
+  // Redact before splitting so a long credential cannot leak across a cut.
+  const redacted=redactSensitiveText(source),unsafe=containsHighRiskInstruction(source);
+  if(!unsafe)return containsHighRiskInstruction(redacted)?quarantined:redacted;
+  if(!containsHighRiskInstruction(redacted))return quarantined;
+  const blocks=[];
+  for(const paragraph of redacted.split(/\n\s*\n/)){
+    let block="";
+    for(const character of paragraph){block+=character;if(block.length>=2000){blocks.push(block);block="";}}
+    if(block.trim())blocks.push(block);
+  }
+  const clean=blocks.map((block,index)=>containsHighRiskInstruction((blocks[index-1] || "").slice(-512)+"\n"+block+"\n"+(blocks[index+1] || "").slice(0,512))?quarantined:block).join("\n\n");
+  // Recheck the combined output too: selection must not assemble a directive.
+  return containsHighRiskInstruction(clean)?quarantined:clean;
+}
+
 function isPrivateIpv4(hostname) {
   const parts = hostname.split(".").map(Number);
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;

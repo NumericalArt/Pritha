@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
 source_updated: 2026-11-05
-source_version: installed 5fd4308; accepted factory status correction under verification
+source_version: installed 37f5cbb; safe research passage retention under verification
 retrieved: 2026-11-05
 verified: 2026-11-05
 valid_for: the local executable candidate and recorded operator acceptance only
@@ -53,39 +53,33 @@ confidence: high
 
 ## Current acceptance status — 2026-11-05
 
-5fd4308 is installed with strict/operational health, admission and complete
-post-activation self-test passing without warnings or regressions. Release gates:
-1607 tests, 68 browser scenarios, build/typecheck and five pages/twelve chunks.
-The managed rollback bundle remains available; MacBook and GitHub are unchanged.
+37f5cbb is installed with strict/operational health, admission and complete
+post-activation self-test passing without warnings or regressions. Its release
+passed 1610 tests, 68 browser cases, build/typecheck and rollback. Claude/Codex
+remain accepted and applied; installed factory status now reflects acceptance.
 
-The user accepted Claude Word Counter and Codex Greeting and separately allowed
-application of their exact verified files. Normal delivery acceptance and clean
-fast-forwards completed. Both live cards show ready/accepted without blockers;
-six applied CLI checks pass. Protected Trials and measured build usage remain
-unchanged: Claude 311938 tokens/four iterations, Codex 40456/one. No extra build
-was started for application. Private post-creation and accepted-state captures
-were authored without Git/tag publication.
+The user separately approved NeuralDeep's reviewed Outcome. One normal bounded
+patch produced its exact reviewed bytes, then the normal host request accepted
+it using that authorization. Contract/Outcome identities and build limits remain
+pinned. Memory research completed; the 80000/2/900000ms build has not started.
 
-Dedicated NeuralDeep approval/create tools now work on the actual provider.
-The previously authorized Contract and 80000/2/900000ms build limits are accepted
-without asking again. Its separate Outcome draft is being finalized for the
-first independent Outcome approval; research/scaffold/build remain gated.
-The prepared verifier covers 20 CLI cases and retains its checked calibration.
+Actual NeuralDeep page collection found a pipeline gap: SearchService replaced
+the entire official security page with a quarantine marker before HostResearch
+could select safe evidence. The confirmed failure and original deadline remain
+recorded. A candidate shares bounded passage quarantine with overlapping context,
+redacts credentials before splitting and applies the original whole-text scanner
+to the final output. Ordinary interactive read behavior is unchanged; no domain
+is exempted, and fully unsafe pages cannot satisfy evidence. A separate research
+cache semantic version prevents old whole-page quarantine cache reuse.
 
-A separate accepted-status defect was reproduced: the factory tool hardcodes
-pending while the authoritative ledger/card correctly show accepted. A candidate
-correction reads the bound run and preserves acceptance across status/finish,
-without rewriting internal state or repeating approval/build work. Its full
-verification and any later exact release approval remain separate.
-Actual NeuralDeep draft rewriting also paraphrased adjacent reviewed text and
-later claimed a target hash without the matching effect. The host rejected that
-claim by reading the real artifact. A bounded literal patch tool now avoids
-full-document copying, requires current and resulting hashes, reuses the same
-draft-only worker safety/CAS checks and cannot alter accepted documents.
-Equivalent JSON key order replays only for the new action; legacy receipt
-identities remain unchanged. Both corrections will be verified together.
-Microphone continuity for the two accepted agents is requested; real NeuralDeep
-build, Voice/Task Chat continuity and remaining final manual acceptance are open.
+Forty-five scoped checks pass, including the real SearchService/HostResearch
+chain, encoded and cross-block instructions, secret redaction, cache isolation
+and fully quarantined source refusal. Three real public pages also produce
+bounded safe passages through the candidate using synthetic provider transport
+and zero paid requests; this does not claim that live NeuralDeep recovery passed.
+The consolidated release gate/approval, normal bounded recovery, real NeuralDeep
+build/Trials and remaining operator acceptance are still open. MacBook and
+GitHub remain unchanged. Accepted documents are never manually repaired.
 
 ## Historical acceptance rejection — 2026-11-04
 

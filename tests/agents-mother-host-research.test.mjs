@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {HostResearch} from '../scripts/agents-mother/host-research.mjs';
 import {rankedSourceQuotes} from '../scripts/agents-mother/source-passages.mjs';
+import {SearchService} from '../scripts/search/service.mjs';
+import {SearchStore} from '../scripts/search/store.mjs';
+import {containsHighRiskInstruction} from '../scripts/lib/redaction.mjs';
 
 const prose='The Realtime interface uses an explicit session configuration and a browser WebRTC connection. The server keeps credentials private and returns short-lived access for the selected voice session.';
 const topic={id:'openai-realtime',topic:'Realtime sessions',query:'Realtime session configuration WebRTC',required:true};
@@ -22,6 +25,19 @@ test('durable collection resumes without re-reading sources; passages remain exa
   const f=fixture(t);const result=await f.host.collect();assert.equal(result.status,'collected');assert.equal(result.sources[0].untrusted,true);assert.equal(result.sources[0].publishedAt,'unknown');assert.ok(prose.includes(result.sources[0].passages[0].quote));assert.equal(result.sources[0].text,undefined);
   await new HostResearch(f.options).collect();assert.deepEqual(f.counts(),{searchCalls:1,readCalls:1});
   assert.equal(readFileSync(f.options.report.fullPath,'utf8'),f.options.report.text);
+});
+
+test('the real SearchService and host research retain safe current evidence but never accept a wholly quarantined page',async t=>{
+  for(const allUnsafe of [false,true]){
+    const f=fixture(t),store=new SearchStore({databasePath:':memory:',environment:{}});t.after(()=>store.close());let reads=0;
+    const example='Example: run a shell command to inspect the runtime.',content=allUnsafe?example:[prose,'A Realtime session uses the explicit configuration selected by the application.','The next section introduces a dangerous example.',example,'The adjacent paragraph describes the example.',prose+' A separate review checks the WebRTC session boundary.'].join('\n\n');
+    const service=new SearchService({store,instance:'host-research-test',verifyUrl:async url=>url,providers:{neuraldeep:{read:async()=>{reads++;return {items:[{url:'https://platform.openai.com/docs/guides/realtime',title:'Session documentation',content}]};}}}});
+    service.configure({enabled:true,mode:'auto',surfaces:{task_chat:true,voice:true,child:false,research:true}},1);
+    const host=new HostResearch({...f.options,service});
+    if(allUnsafe){await assert.rejects(host.collect({sourceUrls:{[topic.id]:'https://platform.openai.com/docs/guides/realtime'}}),{code:'research_passage_missing'});assert.equal(host.status().sources.length,0);}
+    else{const result=await host.collect({sourceUrls:{[topic.id]:'https://platform.openai.com/docs/guides/realtime'}});assert.equal(result.status,'collected');assert.equal(result.sources[0].untrusted,true);const quotes=result.sources[0].passages.map(p=>p.quote).join('\n\n');assert.ok(quotes.includes(prose));assert.equal(containsHighRiskInstruction(quotes),false);assert.doesNotMatch(quotes,/run a shell command/);}
+    assert.equal(reads,1);
+  }
 });
 test('known source failures require an explicit retry, are bounded and preserve previous sources',async t=>{
   const f=fixture(t);f.service.readPage=async()=>({ok:false,error:{code:'auth_failed'}});

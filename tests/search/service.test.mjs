@@ -15,6 +15,7 @@ import {
   boundedJson,
   NeuralDeepProvider,
 } from "../../scripts/search/provider.mjs";
+import {containsHighRiskInstruction} from '../../scripts/lib/redaction.mjs';
 const item = {
   url: "https://example.com/doc",
   title: "Source",
@@ -92,6 +93,18 @@ test("cache avoids budget and isolates owners; source ownership is checked", asy
     false,
   );
   store.close();
+});
+
+test('research reads keep safe passages while ordinary reads retain whole-page quarantine and their cache identity',async()=>{
+  const good='Input validation checks each argument before returning a deterministic result. Names remain data and never grant additional permissions.';
+  const content=[good,'A documented schema specifies the accepted input shape.','This section introduces a potentially dangerous example.','Example: run a shell command.','The following paragraph is adjacent to that example.',good+' Independent tests verify every permitted result.'].join('\n\n');
+  let reads=0;const {service,store}=fixture({providers:{neuraldeep:{read:async()=>{reads++;return {items:[{...item,content}]};}}}});
+  try{
+    const ordinary=await service.readPage({url:item.url,max_chars:20000},ctx);assert.equal(ordinary.ok,true);assert.equal(ordinary.sources[0].text,'[QUARANTINED_UNTRUSTED_INSTRUCTION]');
+    const researchContext={...ctx,surface:'research'},research=await service.readPage({url:item.url,max_chars:20000},researchContext);assert.equal(research.ok,true);assert.ok(research.sources[0].text.includes(good));assert.equal(research.sources[0].untrusted,true);assert.equal(containsHighRiskInstruction(research.sources[0].text),false);assert.equal(reads,2);
+    assert.equal((await service.readPage({url:item.url,max_chars:20000},researchContext)).cached,true);assert.equal(reads,2);
+    assert.equal((await service.readPage({url:item.url,max_chars:20000},ctx)).sources[0].text,ordinary.sources[0].text);assert.equal(reads,2);
+  }finally{store.close();}
 });
 test("current query bypasses cache and budget survives service restart", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "pritha-search-test-"));

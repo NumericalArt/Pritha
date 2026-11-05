@@ -4,7 +4,7 @@ import { NeuralDeepProvider, SearxngProvider } from "./provider.mjs";
 import { publicUrl, verifyPublicUrl, safeDate } from "./policy.mjs";
 import { readChildPage } from "./child-reader.mjs";
 import { randomUUID } from "node:crypto";
-import {redactFilesystemPaths,quarantineUntrustedInstructionText} from "../lib/redaction.mjs";
+import {redactFilesystemPaths,quarantineUntrustedInstructionText,quarantineUntrustedSourcePassages} from "../lib/redaction.mjs";
 const active = new Map();
 // Provider responses are untrusted. Persist only quota counters and reset dates.
 export function quotaSnapshot(value, depth=0) {
@@ -254,7 +254,7 @@ export class SearchService {
           controller.signal,
         );
       }
-      key = hash([this.instance, c.owner, provider, s.revision, kind, input]);
+      key = hash([this.instance, c.owner, provider, s.revision, kind, input,...(kind==="read" && c.surface==="research"?["research-source-passages-v1"]:[])]);
       const cached =
         kind === "search" && input.freshness !== "any"
           ? null
@@ -358,7 +358,7 @@ export class SearchService {
           url,
           title: typeof item.title === "string" ? quarantineUntrustedInstructionText(item.title.slice(0,500)) : "",
           snippet: kind === "search" ? quarantineUntrustedInstructionText(item.content.slice(0,max)) : null,
-          text: kind === "read" ? quarantineUntrustedInstructionText(item.content.slice(0,max)) : null,
+          text: kind === "read" ? (c.surface === "research" ? quarantineUntrustedSourcePassages : quarantineUntrustedInstructionText)(item.content.slice(0,max)) : null,
           published_at: safeDate(
             item.date || item.publishedDate || item.published_date,
           ),

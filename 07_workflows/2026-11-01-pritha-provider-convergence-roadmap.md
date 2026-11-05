@@ -693,15 +693,15 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 5fd4308 / Interactive.** Release и полный
-post-activation self-test проходят без warnings/regressions. Результаты Claude
-и Codex впервые приняты пользователем и применены в исходных child checkout;
-карточки ready/accepted, шесть проверок применённых CLI прошли. NeuralDeep через
-точные tools принял ранее одобренный Contract и создал отдельный Outcome draft.
-Первое Outcome approval, build/Trials NeuralDeep и оставшаяся ручная приёмка
-ещё нужны. В candidate исправляется устаревший pending в factory status уже
-принятого результата; live ledger принятия верен. См. checkpoint 74;
-OpenRouter live остаётся отложенным пользователем.
+**Статус: in-progress; активна 37f5cbb / Interactive.** Release и полный
+post-activation self-test проходят без warnings/regressions. Claude и Codex
+приняты и применены; установленный factory status также возвращает accepted.
+NeuralDeep штатно применил точную правку draft, отдельно принял уже одобренный
+Outcome и прошёл memory research. Первый host Read OWASP выявил ранний карантин
+всей страницы; новая общая правка сохраняет только безопасные фрагменты и
+повторно проверяет весь итоговый текст прежним scanner. Research recovery,
+реальная сборка/Trials NeuralDeep и оставшаяся ручная приёмка ещё нужны.
+См. checkpoint 75; OpenRouter live отложен пользователем.
 
 **Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
@@ -3676,6 +3676,45 @@ MacBook и GitHub не менялись.
 Voice/Task Chat continuity, уже запрошенная microphone-проверка двух принятых
 агентов, оставшаяся manual matrix и общий финальный acceptance. Не подменять
 эти проверки успешным API status или количеством unit tests.
+
+### Checkpoint 75 — 37f5cbb установлена, Outcome NeuralDeep принят, найден research blocker
+
+Оператор отдельно разрешил установку и первое принятие Outcome NeuralDeep.
+Managed stop → source/build swap → start, пять страниц / 12 chunks,
+operational/admission и полный post-activation self-test pass; warnings и
+regressions пусты. Профиль и девять несвязанных файлов сохранены. Установленный
+factory status обоих принятых агентов показывает accepted без записи session.
+
+- NeuralDeep одним штатным factory_patch_draft применил две точные замены:
+  весь draft побайтно совпал с reviewed Outcome. Первое host approve_outcome
+  принято по уже полученному разрешению, reviewed hash сохранён; повторных
+  вопросов о Contract/Outcome и ручных правок session/ledger не было.
+- Memory research завершён в прежнем чате и identity. Требуются два первичных
+  источника: untrusted-input-security и declared-dependencies. Сборка не начата;
+  лимиты остаются 80000 токенов / 2 итерации / 900000ms с её начала.
+- Первый NeuralDeep Read официальной OWASP Input Validation страницы вернул
+  только quarantine marker. SearchService стирал весь документ из-за примера
+  команды до того, как HostResearch мог выбрать чистые фрагменты. Исходный
+  failed acquisition сохранён; неизвестного dispatch или слепого retry нет.
+- Общая правка разделяет research-страницу на ограниченные фрагменты с
+  перекрытием, редактирует секреты до разбиения и повторно применяет прежний
+  whole-text scanner к итоговому тексту. Ни один домен не освобождается от
+  проверки. Обычный Task Chat/Voice read сохраняет прежний whole-page quarantine;
+  research cache имеет отдельную версию семантики. HostResearch использует тот
+  же helper. Полностью небезопасный документ по-прежнему не даёт evidence.
+- 45 scoped проверок проходят, включая настоящую цепочку SearchService →
+  HostResearch, encoded/cross-block input, credential boundary, cache isolation
+  и отказ полностью quarantined page. Три актуальные публичные страницы
+  проверены через candidate pipeline с synthetic provider transport, paid
+  requests 0: обе OWASP страницы дают пригодные безопасные выдержки, Node.js
+  v24.15 process docs — совместимый version context. Это не подмена живого ND
+  collection; он остаётся следующим шагом после проверенной установки.
+
+Далее: один консолидированный release gate и staged rollback; отдельное точное
+разрешение на update. Затем штатный bounded research_recover с другим подходящим
+первичным URL для failed темы, сохранением history/limits/locks и без нового
+одобрения документов. После допустимого research gate — scaffold, реальная ND
+сборка, независимые Trials, finish и первая приёмка результата.
 
 ## 7. Полные исходные материалы
 

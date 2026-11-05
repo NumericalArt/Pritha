@@ -4,7 +4,7 @@ import path from 'node:path';
 import {atomicWriteFile,atomicCompareAndSwapFile,withFileLock} from '../lib/atomic-file.mjs';
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {privateStateFile,privateStateDirectory} from '../lib/private-state-path.mjs';
-import {redactSensitiveText,quarantineUntrustedInstructionText,containsHighRiskInstruction} from '../lib/redaction.mjs';
+import {redactSensitiveText,quarantineUntrustedInstructionText,quarantineUntrustedSourcePassages} from '../lib/redaction.mjs';
 import {SearchService} from '../search/service.mjs';
 import {publicUrl,safeDate} from '../search/policy.mjs';
 import {readChildPage} from '../search/child-reader.mjs';
@@ -26,18 +26,7 @@ function primaryResult(sources,topic){
 async function bounded(work,signal){signal.throwIfAborted();let abort;try{return await Promise.race([Promise.resolve().then(()=>{signal.throwIfAborted();return work();}),new Promise((_,reject)=>{abort=()=>reject(signal.reason);signal.addEventListener('abort',abort,{once:true});})]);}finally{signal.removeEventListener('abort',abort);}}
 function passages(source){return rankedSourceQuotes(source.text,source.query).map(quote=>({id:hash([source.id,source.contentHash,quote]).slice(0,24),quote}));}
 function sourceText(value,query){
-  const blocks=[];
-  for(const paragraph of String(value || '').slice(0,2*1024*1024).split(/\n\s*\n/)){
-    let block='';
-    for(const character of paragraph){block+=character;if(block.length>=2000){blocks.push(block);block='';}}
-    if(block.trim())blocks.push(block);
-  }
-  // Scan overlapping context as well as each block, so splitting markup or a
-  // long paragraph cannot hide an instruction at a boundary. Keep only bounded
-  // relevant clean passages, never a navigation-heavy prefix of the whole page.
-  const clean=blocks.map((block,index)=>containsHighRiskInstruction((blocks[index-1] || '').slice(-512)+'\n'+block+'\n'+(blocks[index+1] || '').slice(0,512))
-    ? '[QUARANTINED_UNTRUSTED_INSTRUCTION]' : quarantineUntrustedInstructionText(block)).join('\n\n');
-  return rankedSourceQuotes(clean,query).join('\n\n');
+  return rankedSourceQuotes(quarantineUntrustedSourcePassages(String(value || '').slice(0,2*1024*1024)),query).join('\n\n');
 }
 
 /** Private durable host operation. Provider/model messages never choose its identity,
