@@ -343,8 +343,8 @@
     "cli": [
       {
         "path": ".env.example",
-        "bytes": 41,
-        "sha256": "bbe91dd99b15f513adaf786211ff4fcbe2e3e844268a271aee0007652091312f"
+        "bytes": 50,
+        "sha256": "6b58cb0bac809aeea4b1b224860fa21eef1bad2ec1b307ea8cc66eec8b764476"
       },
       {
         "path": ".gitignore",
