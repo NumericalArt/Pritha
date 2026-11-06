@@ -4,7 +4,7 @@ import { today } from "../../lib/date.mjs";
 
 const text = value => redactSensitiveText(String(value || "")).replace(/[\r\n]+/g, " ").slice(0, 2000);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
-function portConfiguration(data) {
+export function apiProcessPortConfiguration(data) {
   const declared = String(data.envExampleVariables || "").match(/\b([A-Z][A-Z0-9_]*_PORT)\s*=\s*(\d+)\b/);
   const port = declared ? Number(declared[2]) : 3000;
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("API process scaffold requires a valid declared port");
@@ -12,7 +12,7 @@ function portConfiguration(data) {
 }
 
 export function apiProcessManifest(data) {
-  const { port, variable } = portConfiguration(data);
+  const { port, variable } = apiProcessPortConfiguration(data);
   const command = action => ({ argv: ["node", "scripts/service-control.mjs", action], cwd: ".",
     control_center_managed: true, background: false, timeout_ms: 5000, success_exit_codes: [0],
     env_allowlist: [...new Set([variable, `${slug(data.agentName).toUpperCase().replaceAll("-", "_")}_REPO`, "PRITHA_ROOT", "TECHSCOPE_ROOT", "PRITHA_STATE_ROOT"])] });
@@ -32,14 +32,16 @@ export function apiProcessManifest(data) {
 }
 
 export function apiProcessFiles(baseFiles, data, capability, selected) {
-  const name = text(data.agentName), agentSlug = slug(name), { port, variable } = portConfiguration(data);
+  const name = text(data.agentName), agentSlug = slug(name), { port, variable } = apiProcessPortConfiguration(data);
   const common = baseFiles.filter(file => /^(memory|tools|skills|sources|delivery|data)\//.test(file.path)
     || [".gitignore", "scripts/redaction.mjs", "scripts/memory-status.mjs", "scripts/tools-status.mjs", "scripts/skills-status.mjs"].includes(file.path));
   const markdown = (id, body) => `---\nid: ${agentSlug}-${id}\ntype: workflow\nstatus: draft\ncreated: ${today()}\nupdated: ${today()}\ntopics: [agent, api, process-service]\ntools: [Node.js]\nsources: [delivery/outcome-lineage.json]\nrelated: {}\nsupersedes: []\nsuperseded_by: []\n---\n\n${body}\n`;
   const pending = 'console.error(JSON.stringify({status:"implementation-required",message:"Implement the approved Outcome before starting a service."}));\nprocess.exitCode=78;\n';
+  const cli = capability.interfaces.includes("cli");
+  const cliEntrypoint = data.cliEntrypoint || 'scripts/agent-cli.mjs';
   const smoke = `import assert from "node:assert/strict";
 import { lstatSync, readFileSync } from "node:fs";
-for (const file of ["AGENTS.md", "README.md", ".env.example", "package.json", "scripts/server.mjs", "scripts/service-control.mjs", "operations/manifest.json", "workflows/user-training.md"]) {
+for (const file of ["AGENTS.md", "README.md", ".env.example", "package.json", "scripts/server.mjs", "scripts/service-control.mjs", "operations/manifest.json", "workflows/user-training.md"${cli ? ', ' + JSON.stringify(cliEntrypoint) : ""}]) {
   const info = lstatSync(new URL("../" + file, import.meta.url));
   assert.ok(info.isFile() && !info.isSymbolicLink());
 }
@@ -55,11 +57,12 @@ console.log("API process scaffold structure: pass. Product and managed lifecycle
     { path: "README.md", content: markdown("readme", guide) },
     { path: "workflows/user-training.md", content: markdown("training", guide) },
     { path: ".env.example", content: `# Local nonsecret configuration; no credentials are copied.\n${variable}=${port}\n# Configure contract-selected source paths locally. Do not commit private paths.\n` },
-    { path: "package.json", content: json({ name: agentSlug, version: "0.1.0", private: true, type: "module", scripts: { start: "node scripts/server.mjs", smoke: "node scripts/smoke-test.mjs", check: "node scripts/healthcheck.mjs" } }) },
+    { path: "package.json", content: json({ name: agentSlug, version: "0.1.0", private: true, type: "module", scripts: { start: "node scripts/server.mjs", ...(cli ? { cli: 'node ' + cliEntrypoint } : {}), smoke: "node scripts/smoke-test.mjs", check: "node scripts/healthcheck.mjs" } }) },
     { path: "interfaces/manifest.json", content: json({ version: 1, agent: name, runtime_family: "api", primary_interface: text(data.primaryInterface), scaffold_adapter: capability.adapter,
       adapters: capability.interfaces.map(interfaceName => ({ name: interfaceName, enabled: true, status: "implementation-required", required_secrets: [] })), healthcheck_argv: ["node", "scripts/healthcheck.mjs"] }) },
     { path: "operations/manifest.json", content: json(apiProcessManifest(data)) },
     { path: "scripts/server.mjs", content: pending },
+    ...(cli ? [{ path: cliEntrypoint, content: pending }] : []),
     { path: "scripts/service-control.mjs", content: pending },
     { path: "scripts/smoke-test.mjs", content: smoke },
     { path: "scripts/healthcheck.mjs", content: '// Structural scaffold check only. Replace with product health during delivery.\nimport "./smoke-test.mjs";\n' },

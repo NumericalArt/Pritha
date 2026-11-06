@@ -1,0 +1,107 @@
+// Host-owned Outcome verifier. Product build executors must preserve this file.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import http from 'node:http';
+import net from 'node:net';
+import { once } from 'node:events';
+
+const timeoutMs = 10000;
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const children = new Set();
+
+function start(argv, env = process.env) {
+  const child = spawn(process.execPath, argv.slice(1), { cwd: process.cwd(), env, stdio: ['ignore', 'pipe', 'pipe'] });
+  children.add(child);
+  const output = { stdout: '', stderr: '' };
+  for (const name of ['stdout', 'stderr']) child[name].setEncoding('utf8').on('data', chunk => {
+    output[name] += chunk;
+    if (output[name].length > 65536) child.kill('SIGTERM');
+  });
+  const completion = new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (code, signal) => resolve({ code, signal }));
+  });
+  // Startup failure is observed by the same completion below, including HTTP.
+  completion.catch(() => {});
+  return { child, output, completion };
+}
+
+async function stop(run) {
+  if (run.child.exitCode === null && run.child.signalCode === null) {
+    run.child.kill('SIGTERM');
+    const timer = setTimeout(() => run.child.kill('SIGKILL'), 1000);
+    try { await run.completion; } finally { clearTimeout(timer); }
+  }
+  children.delete(run.child);
+}
+
+async function unusedPort() {
+  const server = net.createServer();
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const port = server.address().port;
+  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  return port;
+}
+
+async function ready(run, port) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    assert.equal(run.child.exitCode, null, 'HTTP product exited before listening. ' + run.output.stderr);
+    assert.equal(run.child.signalCode, null, 'HTTP product stopped before listening.');
+    const listening = await new Promise(resolve => {
+      const socket = net.connect({ host: '127.0.0.1', port });
+      socket.setTimeout(100);
+      socket.once('connect', () => { socket.destroy(); resolve(true); });
+      socket.once('error', () => { socket.destroy(); resolve(false); });
+      socket.once('timeout', () => { socket.destroy(); resolve(false); });
+    });
+    if (listening) return;
+    await sleep(25);
+  }
+  assert.fail('HTTP product did not become ready within the approved deadline.');
+}
+
+function request(port, check) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(check.input_json);
+    const req = http.request({ hostname: '127.0.0.1', port, path: check.path, method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, response => {
+      let text = '';
+      response.setEncoding('utf8').on('data', chunk => {
+        text += chunk;
+        if (text.length > 65536) req.destroy(new Error('HTTP product response exceeds the approved limit.'));
+      });
+      response.on('end', () => resolve({ status: response.statusCode, text }));
+      response.on('error', reject);
+    });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('HTTP product request timed out.')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+try {
+  if (checks.cli) {
+    const run = start(checks.cli.argv);
+    const timer = setTimeout(() => run.child.kill('SIGKILL'), timeoutMs);
+    try {
+      const result = await run.completion;
+      assert.equal(result.code, 0, 'CLI product failed. ' + run.output.stderr);
+      assert.deepEqual(JSON.parse(run.output.stdout), checks.cli.expected_json, 'CLI product JSON differs.');
+    } finally { clearTimeout(timer); await stop(run); }
+  }
+  if (checks.http) {
+    const port = await unusedPort();
+    const run = start(checks.http.argv, { ...process.env, [checks.http.port_variable]: String(port) });
+    try {
+      await ready(run, port);
+      const result = await request(port, checks.http);
+      assert.equal(result.status, 200, 'HTTP product status differs.');
+      assert.deepEqual(JSON.parse(result.text), checks.http.expected_json, 'HTTP product JSON differs.');
+    } finally { await stop(run); }
+  }
+  console.log('Approved HTTP/CLI product checks passed.');
+} finally {
+  for (const child of children) child.kill('SIGKILL');
+}

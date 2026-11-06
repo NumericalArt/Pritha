@@ -510,8 +510,8 @@
     "api": [
       {
         "path": ".env.example",
-        "bytes": 41,
-        "sha256": "bbe91dd99b15f513adaf786211ff4fcbe2e3e844268a271aee0007652091312f"
+        "bytes": 166,
+        "sha256": "c38587f93896474bb54f325fe4e5976d834de442b2ea105e1c30ca260ab12daa"
       },
       {
         "path": ".gitignore",
@@ -519,14 +519,9 @@
         "sha256": "8876cfb25a1e3353f4daae938de32f6eba01c7e3617da4e2dce5df5b811dd061"
       },
       {
-        "path": "07_workflows/agent-operating-workflow.md",
-        "bytes": 692,
-        "sha256": "e0cd03d8d073bf8bb79189aac6a0a6c6250481d81a12ebe4c9a50820e8e3d228"
-      },
-      {
         "path": "AGENTS.md",
-        "bytes": 4574,
-        "sha256": "7778e5158023d677d9360b42e274eda1824ad44afd96fee8fbe66f76fce289f0"
+        "bytes": 1544,
+        "sha256": "57a7087051887e71d1ddc25b938dcc442dadda2c0d0ef52babd706612194cde9"
       },
       {
         "path": "delivery/outcome-lineage.json",
@@ -539,34 +534,9 @@
         "sha256": "eebb830f81fcc72e3492e9f2727c30444898b9460e3b5a705e4087c9a1650bac"
       },
       {
-        "path": "docs/user-training-guide.md",
-        "bytes": 502,
-        "sha256": "759fe437ac45db2e0c9ea8ddaf209cccd52c1d3827dfed184e5eabaf2db94e18"
-      },
-      {
-        "path": "interfaces/cli/README.md",
-        "bytes": 179,
-        "sha256": "763f36cb970dfc802da7eb610d1f48e1a512ee4cfe5747b623f2337e6292ac0a"
-      },
-      {
         "path": "interfaces/manifest.json",
-        "bytes": 447,
-        "sha256": "086ecbe635f53842ad4fddaf8b460fc0e395acf0c66ad307e47b48a5f72997ce"
-      },
-      {
-        "path": "interfaces/README.md",
-        "bytes": 601,
-        "sha256": "37158d1fcde58dc728b44162f6141dbf8128212a58fcbd0289966e3e45b324be"
-      },
-      {
-        "path": "interfaces/web/README.md",
-        "bytes": 253,
-        "sha256": "7c9aeee462a6cf29b0579a514fbe5a9d5f7f6c865cb3dcc5daa642fec7215e79"
-      },
-      {
-        "path": "logs/.gitkeep",
-        "bytes": 0,
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "bytes": 494,
+        "sha256": "a756641cf8ed492bf261035662afed97d00f300123ce322dd66c20c7121a63f3"
       },
       {
         "path": "memory/decisions/.gitkeep",
@@ -590,53 +560,33 @@
       },
       {
         "path": "operations/manifest.json",
-        "bytes": 3410,
-        "sha256": "d72b543b64a1621416f19500c63e621fdcf6bc8c495b8caa659496fd795090a6"
-      },
-      {
-        "path": "operations/README.md",
-        "bytes": 1724,
-        "sha256": "6d259bf43fe82f9e0d011c861fa2c61b5051cb9e39fbdfbd3a110595f9c00f37"
+        "bytes": 2247,
+        "sha256": "74766d72fb2520cf5ade6d9cd12dc1d7a11615e3feee32d9074ce17b6f42bc6c"
       },
       {
         "path": "package.json",
-        "bytes": 1114,
-        "sha256": "9a4dee82641ad2300f5798c8b86560803016e0cad2ff59bd874a77ff826956e5"
+        "bytes": 356,
+        "sha256": "c72549ae42a88895f3bb88690b5f0466a58fc3ead8b2695110c5443a7bc83239"
       },
       {
         "path": "README.md",
-        "bytes": 2219,
-        "sha256": "6e3bc98c8b63e7e3698f5e8b9eadb639d20280cee26a215120c02769b94caf43"
+        "bytes": 1722,
+        "sha256": "401d056e6b071b107119b2543dd730b843b9109b25bb371ac7a96f057d156b85"
       },
       {
         "path": "scripts/agent-cli.mjs",
-        "bytes": 777,
-        "sha256": "d9c46cd82b1ddcafea5c96e2429fdabaa82f3afb8f083373ef473d5e768f9c0c"
-      },
-      {
-        "path": "scripts/control-center-agent-service.mjs",
-        "bytes": 3941,
-        "sha256": "d39d3a583c65f43a16eb10eb50673a5c34c225336c99f1062e67416fe38da72a"
-      },
-      {
-        "path": "scripts/control-center-runtime.mjs",
-        "bytes": 15672,
-        "sha256": "d20fdb21d230d8916c1c8b6300f74ee73dd01308ccc0b31cdf8817c7aa999450"
+        "bytes": 156,
+        "sha256": "c02289accab78e83ca8e5ffa5c80193de0fbe379dfa6a2406c71021f720380f1"
       },
       {
         "path": "scripts/deploy-service.mjs",
-        "bytes": 7842,
-        "sha256": "1822e9151a9368447f5b0ad37de11a2c5731da702d0abcc9fa17620b961c6a14"
+        "bytes": 304,
+        "sha256": "ecad4ede0cd764063ec4520f84ea3963fd98cac53daed51cb1096f0f22a784bb"
       },
       {
         "path": "scripts/healthcheck.mjs",
-        "bytes": 3440,
-        "sha256": "b8220636132b8cf3fac5a0ba4a6051b1319190f206114d37d45ebc0cd5a31ce7"
-      },
-      {
-        "path": "scripts/interface-status.mjs",
-        "bytes": 832,
-        "sha256": "d3e2f367cde4934a626eca4c43c9f848c11903a05b8ee6ae412198ade2a45c56"
+        "bytes": 107,
+        "sha256": "093d1a8ad2ff4ea1aa76f1c620c08696f17f3159cf4a59378fba44a68d84a40e"
       },
       {
         "path": "scripts/memory-status.mjs",
@@ -644,14 +594,19 @@
         "sha256": "a97157ad5f2aad1d5203a30619e02072321cd89e2cf814ee415e28767092e1ee"
       },
       {
-        "path": "scripts/operations-status.mjs",
-        "bytes": 2279,
-        "sha256": "82bf683b3bafea5d47c91a99b6a64b6574cab5cb52008703c1df53a7ac49922d"
-      },
-      {
         "path": "scripts/redaction.mjs",
         "bytes": 22797,
         "sha256": "e9c80f29db9d05ef26dc51e3b98b4ecf0730c95377276ffea0ac8878ace01c5c"
+      },
+      {
+        "path": "scripts/server.mjs",
+        "bytes": 156,
+        "sha256": "c02289accab78e83ca8e5ffa5c80193de0fbe379dfa6a2406c71021f720380f1"
+      },
+      {
+        "path": "scripts/service-control.mjs",
+        "bytes": 156,
+        "sha256": "c02289accab78e83ca8e5ffa5c80193de0fbe379dfa6a2406c71021f720380f1"
       },
       {
         "path": "scripts/skills-status.mjs",
@@ -660,8 +615,8 @@
       },
       {
         "path": "scripts/smoke-test.mjs",
-        "bytes": 2187,
-        "sha256": "aa20421ddb8cac47b949426f37f8caea9f6edbfcb8ffe681d7a8fb7c05a7c5ec"
+        "bytes": 1231,
+        "sha256": "1762ebf8a9ef566f8449ce6e8cbbf00c2bba6ca48bbdfc26c56daa88ef6e357e"
       },
       {
         "path": "scripts/tools-status.mjs",
@@ -689,9 +644,14 @@
         "sha256": "8e27b59005a622834153a4c66c5ac27935d04ee08e0b4a45a6d88c9a6a228ad1"
       },
       {
+        "path": "tests/service-lifecycle.test.mjs",
+        "bytes": 2814,
+        "sha256": "4789dafef7c6fc7845651052c3564cf1d5909e9b7cb2965b5db6b3c7a2dfd4b3"
+      },
+      {
         "path": "tests/structure.test.mjs",
-        "bytes": 1879,
-        "sha256": "8738d5eaee7be6c34d386cd2ae0ac9cdd17b10d3eeed848261f7670184c2558f"
+        "bytes": 1662,
+        "sha256": "664560c0d8c15855e4dc6305de866dd350af2a2b4041df17d077db5550ff8cbd"
       },
       {
         "path": "tools/browser-manual/README.md",
@@ -722,6 +682,11 @@
         "path": "tools/workflow/README.md",
         "bytes": 284,
         "sha256": "78aeaf89c63e25a3b0ecee9bdca5a4e24b41a7b6965c250d18ec2b5684cf02de"
+      },
+      {
+        "path": "workflows/user-training.md",
+        "bytes": 1417,
+        "sha256": "44169e40431ed808b3351a590a28d247cae9d1a473d9c23a5fa323d0ca49d8c4"
       }
     ],
     "markdown": [

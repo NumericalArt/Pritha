@@ -576,6 +576,7 @@ ${bulletList(data.criticalWorkflows)}
 - Child model ID: ${scalar(data.childModelId, "none")}
 - Primary interface: ${primaryInterface}
 - Secondary interfaces: ${scalar(data.secondaryInterfaces, "none")}
+${data.cliEntrypoint ? '- CLI entrypoint: ' + scalar(data.cliEntrypoint) + '\n' : ''}
 - Telegram mode: ${telegramMode}
 - Expected hosting: ${scalar(data.expectedHosting, "local Mac")}
 
@@ -763,6 +764,7 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   data.agentKind = options["agent-kind"];
   data.primaryInterface = data.primaryInterface || options.interface || "Codex project";
   data.secondaryInterfaces = options.secondary || "none";
+  data.cliEntrypoint = options['cli-entrypoint'];
   data.telegramMode = options.telegram || (String(data.primaryInterface).toLowerCase().includes("telegram") ? "primary-chat" : "none");
   data.expectedHosting = options.hosting || "local Mac";
   data.runtimePlacementProfile = options["runtime-placement"] || options.placement || "frontier-first";

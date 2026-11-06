@@ -453,6 +453,7 @@ export function contractData(contractPath, options = {}) {
     runtimePlacementProfile: bodyValue(text, "Runtime placement profile"),
     primaryInterface: bodyValue(text, "Primary interface"),
     secondaryInterfaces: bodyValue(text, "Secondary interfaces"),
+    cliEntrypoint: bodyValue(text, "CLI entrypoint"),
     telegramMode: bodyValue(text, "Telegram mode"),
     expectedHosting: bodyValue(text, "Expected hosting"),
     deploymentTarget: bodyValue(text, "Deployment target"),

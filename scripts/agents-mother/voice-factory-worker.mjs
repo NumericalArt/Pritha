@@ -8,6 +8,8 @@ import {redactSensitiveText,quarantineUntrustedInstructionText} from '../lib/red
 import {readBoundedRegularFile} from '../lib/safe-file-read.mjs';
 import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
+import {scaffoldCapability,assertScaffoldCapability} from './scaffold/capabilities.mjs';
+import {prepareProductTrial,reviewProductTrials} from './factory-product-trial.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,validateFactoryBuildEffort} from './voice-factory-state.mjs';
 
 const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
@@ -86,7 +88,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
         ...(input.build_elapsed_budget_ms!==undefined?{'build-elapsed-ms':String(input.build_elapsed_budget_ms)}:{}),
         'build-git-mode':'disposable-worktree',autostart:'disabled','target-folder':p.target,slug:p.slug});
       state.contract=result.contractPath;const data=contractData(state.contract,{root:p.root});state.agentId=data.agentId;state.agentName=data.agentName;state.phase='contract-draft';
-      value={artifact:'contract',sha256:factoryArtifact(p,state,'contract').sha256,next:'Read and refine the contract; request separate approve_contract with its exact hash.'};break;
+      value={artifact:'contract',sha256:factoryArtifact(p,state,'contract').sha256,scaffoldCapability:scaffoldCapability(data),next:'Read the contract and scaffold capability before requesting separate approve_contract with its exact hash.'};break;
     }
     case 'patch_draft':
     case 'write_draft':{
@@ -104,7 +106,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       atomicCompareAndSwapFile(row.file,row.text,text);value={artifact:input.artifact,sha256:factoryHash(text)};break;
     }
     case 'approve_contract':{
-      const row=factoryArtifact(p,state,'contract');if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');contract();
+      const row=factoryArtifact(p,state,'contract');if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');assertScaffoldCapability(contract());
       const next=row.text.replace(/^status: draft$/m,'status: accepted').replace(/^- Build token budget confirmation: pending$/m,'- Build token budget confirmation: user');
       const candidate=path.join(p.directory,'candidate.md');atomicWriteFile(candidate,next);
       try{const issues=validateContract(candidate,{root:p.root,print:false});if(issues.length)throw validationFailure(issues);}finally{fs.rmSync(candidate,{force:true});}
@@ -114,10 +116,16 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       requireFactoryApprovals(p,state,{outcome:false});contract();if(state.outcome)throw factoryFail('factory_artifact_exists');
       state.outcome=createOutcomeSpec(state.contract,options).path;state.phase='outcome-draft';value={artifact:'outcome',sha256:factoryArtifact(p,state,'outcome').sha256};break;
     }
+    case 'prepare_product_trial':{
+      requireFactoryApprovals(p,state,{outcome:false});const data=contract(),row=factoryArtifact(p,state,'outcome');
+      if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
+      value=prepareProductTrial(p,row,data,input.trial);break;
+    }
     case 'approve_outcome':{
       requireFactoryApprovals(p,state,{outcome:false});contract();const row=factoryArtifact(p,state,'outcome');
       if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
       const checked=outcomeSpecFile(state.outcome,options),blocking=checked.issues.filter(issue=>!['OS015','OS016'].includes(issue.code));if(blocking.length)throw validationFailure(blocking);
+      reviewProductTrials(p,row,contract());
       const inputRoot=path.join(p.directory,'trial-inputs');
       approveOutcomeSpec(state.outcome,{...options,approvedBy:'user',projectPath:fs.existsSync(p.target)?p.target:inputRoot});state.outcomeApproval={sha256:factoryArtifact(p,state,'outcome').sha256,reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
     }
@@ -132,7 +140,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       if(phase==='apply'){args.input=path.join(p.directory,'selection.json');atomicWriteFile(args.input,JSON.stringify(input.selection));}
       value=await externalResearchContract(state.contract,args);break;
     }
-    case 'scaffold_plan':approved();value=planScaffoldContract(state.contract);break;
+    case 'scaffold_plan':contract();value=planScaffoldContract(state.contract);break;
     case 'scaffold':{
       approved();if(fs.existsSync(p.target))throw factoryFail('factory_target_exists');
       const inputRoot=path.join(p.directory,'trial-inputs');
@@ -159,6 +167,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       let result;
       if(input.action==='deliver'){
         if(state.runId || state.phase!=='scaffolded')throw factoryFail('factory_delivery_already_started');
+        reviewProductTrials(p,factoryArtifact(p,state,'outcome'),contract(),{includeInputs:false});
         state.runId='voice-'+p.slug+'-'+randomUUID().slice(0,8);
         // Persist the exact run before the first request; a crash cannot invent
         // another delivery identity or repeat charged work.

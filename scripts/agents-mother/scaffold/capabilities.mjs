@@ -30,6 +30,9 @@ export function scaffoldCapability(data = {}) {
     primaryInterface: primary, interfaces, operationsSelected: !noManagedOperations, readinessScope: "scaffold-only" };
   const unsupported = (reason, nextAction) => ({ ...base, supported: false, adapter: null, reason, nextAction });
   if (!runtimeFamilies.has(runtime)) return unsupported("runtime-unknown", "Choose a supported runtime in a reviewed contract revision.");
+  if (data.cliEntrypoint && (runtime !== 'api' || data.serviceMode !== 'process' || !interfaces.includes('cli'))) {
+    return unsupported('cli-entrypoint-adapter-missing', 'A selected CLI entrypoint currently requires API process runtime and a declared secondary CLI interface.');
+  }
   if (runtime === "hybrid" && data.serviceMode === "process") {
     const kind = typeof data.agentKind === "string" ? data.agentKind : data.agentKind?.kind;
     if (kind !== "service" || primary !== "web"
@@ -58,11 +61,15 @@ export function scaffoldCapability(data = {}) {
     return { ...base, supported: true, adapter: "tool-server-stdio-v1", reason: "stdio-provider-with-optional-owner-ui", nextAction: "Implement the approved MCP tools and optional owner UI; independent Outcome Trials must verify each surface. Scaffold starts no process." };
   }
   if (runtime === "api" && data.serviceMode === "process") {
-    if (!interfaces.length || interfaces.some(name => !["web", "api"].includes(name))
+    if (interfaces.includes('cli') && data.cliEntrypoint && (!/^scripts\/[A-Za-z0-9][A-Za-z0-9._-]{0,95}\.mjs$/.test(data.cliEntrypoint)
+      || /^scripts\/(?:server|service-control|smoke-test|healthcheck|deploy-service|provider-pilot|redaction|memory-status|tools-status|skills-status)\.mjs$/.test(data.cliEntrypoint))) {
+      return unsupported('api-cli-entrypoint-invalid', 'Choose a separate scripts/*.mjs CLI entrypoint before Contract approval.');
+    }
+    if (!["web", "api"].includes(primary) || interfaces.some(name => !["web", "api", "cli"].includes(name))
       || (data.autostart && !["disabled", "optional"].includes(data.autostart))
       || (data.proactiveMode && data.proactiveMode !== "none")
       || (data.repositoryAdoptionMode && data.repositoryAdoptionMode !== "none")) {
-      return unsupported("api-process-combination-adapter-missing", "The API process adapter supports only web/API, no proactivity or repository adoption, and disabled/optional autostart.");
+      return unsupported("api-process-combination-adapter-missing", "The API process adapter requires primary web/API, optional secondary CLI, no proactivity or repository adoption, and disabled/optional autostart.");
     }
     return { ...base, supported: true, adapter: "api-process-v1", reason: "api-process-service-scaffold", nextAction: "Implement the approved HTTP service and managed lifecycle, then run independent Outcome Trials; no service starts during scaffold." };
   }

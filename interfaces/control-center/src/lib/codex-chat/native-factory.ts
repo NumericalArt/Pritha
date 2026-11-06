@@ -22,6 +22,7 @@ export function nativeFactoryTools() {
 export const nativeFactoryInstructions = [
   'This is a host-bound Pritha agent-creation workflow. Use factory_step for all factory actions; your ordinary workspace is read-only.',
   'First call status and resume its saved phase. Prepare drafts, request separate Contract and Outcome approvals, then proceed through research, scaffold, bounded delivery, Trials and finish.',
+  'Read scaffold_plan before Contract approval. For an API process product, use prepare_product_trial with the draft Outcome hash and exact HTTP/CLI JSON cases before Outcome approval. The host prepares its protected verifier before the child exists. Structural smoke alone cannot approve this product.',
   'Do not request approval again for accepted documents. Do not edit private factory state or use shell commands to bypass the host tools. Stop for a changed budget or user-judged acceptance; never publish, deploy, merge or enable services.',
 ].join('\n');
 

@@ -5,7 +5,7 @@ import { redactSensitiveText } from '../lib/redaction.mjs';
 
 export const INTERVIEW_BRIEF_SCHEMA_VERSION = 1;
 export const INTERVIEW_PRESETS = new Set(["generic", "local-feed", "llm-app"]);
-const technicalKeys = ["preset", "sourceFormat", "runtimeFamily", "serviceMode", "primaryInterface", "runtimePlacementProfile", "repositoryResearchPolicy", "repositoryAdoptionMode", "repositoryResearchWaiverReason", "repositoryResearchTopics", "targetFolder", "port", "portVariable"];
+const technicalKeys = ["preset", "sourceFormat", "runtimeFamily", "serviceMode", "primaryInterface", "secondaryInterfaces", "cliEntrypoint", "childModelProvider", "childModelId", "runtimePlacementProfile", "repositoryResearchPolicy", "repositoryAdoptionMode", "repositoryResearchWaiverReason", "repositoryResearchTopics", "targetFolder", "port", "portVariable"];
 const designKeys = ["memoryModel", "storedData", "inputDataTypes", "sensitiveData", "riskNotes"];
 export const INTERVIEW_BRIEF_TEXT_FIELDS = Object.freeze({technical: Object.freeze(technicalKeys), design: Object.freeze(designKeys)});
 const clean = (value) => typeof value === "string" ? value.trim().replace(/\r\n?/g, "\n") : "";
@@ -166,7 +166,10 @@ export function interviewBriefOptions(value) {
     sources: brief.sources.join("; "), constraints: brief.constraints.join("; "), "out-of-scope": brief.nonGoals.join("; "),
     "allowed-network": brief.permissions.network.join("; "), "allowed-filesystem": brief.permissions.filesystem.join("; "), "authorization": brief.permissions.authorization,
     preset: brief.technical.preset, "source-format": brief.technical.sourceFormat, runtime: brief.technical.runtimeFamily,
-    service: brief.technical.serviceMode, interface: brief.technical.primaryInterface, "runtime-placement": brief.technical.runtimePlacementProfile,
+    service: brief.technical.serviceMode, interface: brief.technical.primaryInterface, secondary: brief.technical.secondaryInterfaces,
+    "cli-entrypoint": brief.technical.cliEntrypoint,
+    "child-provider": brief.technical.childModelProvider, "child-model": brief.technical.childModelId,
+    "runtime-placement": brief.technical.runtimePlacementProfile,
     "repository-policy": brief.technical.repositoryResearchPolicy, "repository-adoption": brief.technical.repositoryAdoptionMode,
     "repository-waiver": brief.technical.repositoryResearchWaiverReason, "repository-topics": brief.technical.repositoryResearchTopics,
     "target-folder": brief.technical.targetFolder, port:brief.technical.port, "port-variable":brief.technical.portVariable,

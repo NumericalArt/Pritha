@@ -138,7 +138,7 @@ test('factory approves prepared Trial inputs before a child exists and refuses c
   }
   await f.ok('write_draft',{artifact:'outcome',expected_sha256:outcome.sha256,content:outcome.text.replace(/## Trials\n[\s\S]*?(?=## Demo script)/,trial)});
   const draft=f.artifact('outcome');
-  assert.equal((await f.call('approve_outcome',{expected_sha256:draft.sha256})).status,'failed');assert.equal(f.state().outcomeApproval,undefined);assert.equal(fs.existsSync(f.p.target),false);
+  await assert.rejects(f.call('approve_outcome',{expected_sha256:draft.sha256}),{code:'factory_trial_inputs_missing'});assert.equal(f.state().outcomeApproval,undefined);assert.equal(fs.existsSync(f.p.target),false);
   fs.mkdirSync(path.dirname(path.join(inputRoot,file)),{recursive:true});fs.writeFileSync(path.join(inputRoot,file),content);
   await f.ok('approve_outcome',{expected_sha256:draft.sha256});assert.equal(f.state().phase,'outcome-approved');assert.equal(fs.existsSync(f.p.target),false);
   const plan={trials:validateOutcomeSpecText(f.artifact('outcome').text,{root}).parsed.trials};

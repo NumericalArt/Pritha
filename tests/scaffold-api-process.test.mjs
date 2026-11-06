@@ -29,6 +29,11 @@ function fixture(t) {
 test("API process is explicit, validated and narrow; legacy adapters and unsupported combinations remain distinct", () => {
   assert.ok(SERVICE_MODES.has("process"));
   assert.equal(scaffoldCapability(selected).adapter, "api-process-v1");
+  assert.deepEqual(scaffoldCapability({ ...selected, secondaryInterfaces: 'CLI' }).interfaces, ['web', 'cli']);
+  assert.equal(scaffoldCapability({ ...selected, secondaryInterfaces: 'CLI' }).supported, true);
+  for (const cliEntrypoint of ['../escape.mjs', 'scripts/server.mjs', 'scripts/memory-status.mjs', 'scripts/provider-pilot.mjs']) {
+    assert.equal(scaffoldCapability({ ...selected, secondaryInterfaces: 'CLI', cliEntrypoint }).supported, false);
+  }
   for (const patch of [{ secondaryInterfaces: "Telegram" }, { primaryInterface: "CLI" }, { autostart: "launchd-on-approval" }, { proactiveMode: "heartbeat" }, { repositoryAdoptionMode: "selected-module" }])
     assert.equal(scaffoldCapability({ ...selected, ...patch }).supported, false);
   assert.equal(scaffoldCapability({ ...selected, serviceMode: "none" }).reason, "runtime-adapter-missing");
@@ -85,4 +90,24 @@ test("API scaffold CLI preserves acceptance/research gates then makes a clean ba
   assert.match(report, /Control Center runtime contract \| implementation-required/);
   assert.doesNotMatch(report, /scripts\/control-center-agent-service|scripts\/control-center-runtime/);
   assert.equal(readFileSync(f.file, "utf8"), f.source);
+});
+
+test('HTTP plus CLI scaffolding includes both declared entrypoints and both remain implementation-required', t => {
+  const f = fixture(t), data = { ...contractData(f.file), secondaryInterfaces: 'CLI' };
+  const files = generatedAgentFiles(data);
+  mkdirSync(f.target);
+  for (const file of files) {
+    const target = path.join(f.target, file.path);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, file.content);
+  }
+  const interfaces = JSON.parse(readFileSync(path.join(f.target, 'interfaces/manifest.json'), 'utf8'));
+  assert.deepEqual(interfaces.adapters.map(adapter => adapter.name), ['web', 'cli']);
+  for (const entrypoint of ['scripts/server.mjs', 'scripts/agent-cli.mjs']) {
+    const result = spawnSync(process.execPath, [entrypoint], { cwd: f.target, encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 78);
+    assert.match(result.stderr, /implementation-required/);
+  }
+  const smoke = spawnSync(process.execPath, ['scripts/smoke-test.mjs'], { cwd: f.target, encoding: 'utf8', timeout: 5000 });
+  assert.equal(smoke.status, 0, smoke.stderr);
 });

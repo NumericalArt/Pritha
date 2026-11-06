@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-11-01
+updated: 2026-11-06
 topics:
   - agent-engineering
   - agent-factory
@@ -155,12 +155,28 @@ runtime blockers, but creation is not complete while the agent is missing from
    are the same class of agent-development task and need the same quality of
    brief.
 3. Create an `agent-contract` from `08_templates/agent-project-contract.md`.
+   In Task Chat, inspect `factory_step` action `scaffold_plan` while the contract
+   is still a draft. The Contract approval card shows the scaffold capability,
+   build provider/model and separately selected child provider/model. Unsupported
+   runtime/interface combinations stop before the approval card. The API process
+   adapter supports primary web/API plus an optional secondary CLI. The structured
+   brief accepts `secondaryInterfaces`, `cliEntrypoint` (a separate `scripts/*.mjs`
+   entrypoint for this adapter), `childModelProvider` and `childModelId`.
 3a. Create an `agent-outcome-spec` from
     `08_templates/agent-outcome-spec.md`. It must describe the final experience,
     observable success, deliverables, non-goals and Trial blocks. Validate its
     coverage, approve it independently from the contract, record host-side
     approval evidence, lock its content and compile it to `trial-plan.json` in
     `PRITHA_STATE_ROOT`.
+   For an API process product, use `factory_step` action `prepare_product_trial`
+   with the current draft Outcome's `expected_sha256` and a `trial` object before
+   asking for Outcome approval. The HTTP case declares Node `argv`, the contract's
+   `port_variable`, POST `path`, `input_json` and `expected_json`. A selected CLI
+   also requires its exact `argv` and `expected_json`. The host prepares a bounded
+   verifier under private `trial-inputs/verification/`, updates the draft Trials
+   and includes the verifier's complete content and hash in the Outcome approval
+   card. Preparation executes no command. Scaffold includes only the approved
+   bytes in its Git baseline. Structural smoke alone cannot approve an API product.
 4. Create a reusable `agent-pattern-pack` in instance-local
    `<PRITHA_STATE_ROOT>/agents/research/`, or gitignored
    `.private/agents/research/` when no external state root is configured.
