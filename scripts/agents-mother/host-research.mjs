@@ -168,7 +168,15 @@ export class HostResearch {
         return {topic_id:source.topicId,source_url:source.url,source_title:source.title,source_type:'official-docs',source_published:source.publishedAt,retrieved_at:source.retrievedAt,claim:evidence,evidence_summary:evidence,confidence:'medium',version_context:fact.versionContext,temporal_compatibility:fact.compatibility,temporal_compatibility_status:fact.compatibilityStatus};
       });
       const updated=applyExternalResearchEvidence(current,this.data,{backend:'host-primary-pages',items,synthesis:selection.synthesis},{topics:this.topics,evaluateOverallGate});
-      if(updated.evidence.invalidCount || !updated.synthesis.complete || !updated.coverage.complete)fail('research_evidence_incomplete');
+      if(updated.evidence.invalidCount || !updated.synthesis.complete || !updated.coverage.complete){
+        const {evidence, synthesis, coverage} = updated;
+        const reasons = [];
+        if (coverage.missingTopicIds.length) reasons.push('Topics missing current evidence: '+coverage.missingTopicIds.join(', ')+'.');
+        if (coverage.staleTopicIds.length) reasons.push('Check the date or version and temporal compatibility for '+coverage.staleTopicIds.join(', ')+'. Record non-adoption separately in the synthesis.');
+        if (evidence.invalidCount) reasons.push('Invalid evidence items: '+evidence.invalidCount+'.');
+        if (!synthesis.complete) reasons.push('Synthesis: '+synthesis.errors.join(', ')+'.');
+        throw Object.assign(new Error('Research was not published. '+reasons.join(' ')),{code:'research_evidence_incomplete'});
+      }
       state.publication={selectionHash,text:updated.text,hash:hash(updated.text)};this.save(state);await afterPrepared?.();
       atomicCompareAndSwapFile(this.report.fullPath,current,updated.text);state.completed=true;this.save(state);return this.status();
     });

@@ -2,6 +2,30 @@ import {createHash} from 'node:crypto';
 import {deliveryUsageStatus} from './delivery-ledger.mjs';
 import {scaffoldCapability} from './scaffold/capabilities.mjs';
 
+// Start from an official page with relevant, readable passages. HostResearch
+// still checks each redirect, source authority, freshness and selected quote.
+const localApiPrimaryPages = {
+  'node-http-runtime': 'https://nodejs.org/api/http.md',
+  'interface-runtime-security': 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Type',
+  'operations-deployment': 'https://nodejs.org/api/process.md',
+  'declared-dependencies': 'https://nodejs.org/api/modules.md',
+  'pattern-api': 'https://nodejs.org/api/url.md',
+  'pattern-voice-speech': 'https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API',
+  'pattern-codex': 'https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex',
+  'pattern-github-repository': 'https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes',
+  'pattern-agent-skills-evals': 'https://developers.openai.com/api/docs/guides/evals',
+  'pattern-semantic-embeddings-rag': 'https://qdrant.tech/documentation/overview/',
+  'pattern-mcp-connector-permissions': 'https://modelcontextprotocol.io/docs/2025-11-25/tutorials/security/security_best_practices',
+  'pattern-browser-sandbox': 'https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy',
+  'pattern-openai': 'https://openai.github.io/openai-agents-js/',
+};
+
+export function localApiResearchSources(topics) {
+  return Object.fromEntries(topics
+    .filter(({id}) => Object.hasOwn(localApiPrimaryPages, id))
+    .map(({id}) => [id, localApiPrimaryPages[id]]));
+}
+
 export function supportsLocalApiContinuation(contract) {
   return contract.childModelProvider === 'none' && contract.childModelId === 'none'
     && contract.repositoryAdoptionMode === 'none' && contract.autostart === 'disabled'

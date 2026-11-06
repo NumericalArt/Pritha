@@ -4,6 +4,7 @@ import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync,symlinkSync} fro
 import os from 'node:os';
 import path from 'node:path';
 import {HostResearch} from '../scripts/agents-mother/host-research.mjs';
+import {localApiResearchSources} from '../scripts/agents-mother/factory-continuation.mjs';
 import {rankedSourceQuotes} from '../scripts/agents-mother/source-passages.mjs';
 import {SearchService} from '../scripts/search/service.mjs';
 import {SearchStore} from '../scripts/search/store.mjs';
@@ -21,6 +22,22 @@ function fixture(t,changes={}){
   const host=new HostResearch(options);
   return {host,options,service,counts:()=>({searchCalls,readCalls}),selection:()=>({facts:host.status().sources.map(source=>({topicId:source.topicId,sourceId:source.id,passageId:source.passages[0].id,versionContext:'Realtime session API documentation version fixture v1, verified during this collection.',compatibility:'The documented session configuration is compatible with the selected runtime contract.',compatibilityStatus:'compatible'})),synthesis})};
 }
+test('local API research can read every topic in the Headline and YesNo plans without a search provider', async t => {
+  const common = ['node-http-runtime', 'interface-runtime-security', 'operations-deployment',
+    'declared-dependencies', 'pattern-api', 'pattern-voice-speech', 'pattern-codex', 'pattern-github-repository'];
+  for (const [connectorId, extraTopic] of [['codex', 'pattern-mcp-connector-permissions'], ['claude', 'pattern-agent-skills-evals']]) {
+    const topics = [...common, extraTopic].map(id => ({id, query: id.replaceAll('-', ' '), required: true}));
+    const sourceUrls = localApiResearchSources(topics);
+    const labels = new Map(Object.entries(sourceUrls).map(([id, url]) => [url, id.replaceAll('-', ' ')]));
+    const reader = async url => ({items: [{url, content: 'This official reference describes '+labels.get(url)+' and its configuration and behavior in this isolated test.'}]});
+    const {host} = fixture(t, {connectorId, service: undefined, topics, reader});
+    const result = await host.collect({sourceUrls});
+    assert.equal(result.status, 'collected');
+    assert.deepEqual(result.sources.map(s => s.topicId), topics.map(t => t.id));
+    assert.ok(result.topics.every(t => t.checkpoint.attempts === 1));
+  }
+});
+
 test('durable collection resumes without re-reading sources; passages remain exact and untrusted',async t=>{
   const f=fixture(t);const result=await f.host.collect();assert.equal(result.status,'collected');assert.equal(result.sources[0].untrusted,true);assert.equal(result.sources[0].publishedAt,'unknown');assert.ok(prose.includes(result.sources[0].passages[0].quote));assert.equal(result.sources[0].text,undefined);
   await new HostResearch(f.options).collect();assert.deepEqual(f.counts(),{searchCalls:1,readCalls:1});
@@ -66,7 +83,8 @@ test('selection binds exact source and passage IDs; unknown compatibility cannot
   const f=fixture(t);await f.host.collect();const selection=f.selection();selection.facts[0].quote=prose;
   await assert.rejects(f.host.publish(selection),{code:'research_quote_unbound'});delete selection.facts[0].quote;
   selection.facts[0].passageId='invented';await assert.rejects(f.host.publish(selection),{code:'research_quote_unbound'});
-  const incompatible=f.selection();incompatible.facts[0].compatibilityStatus='unknown';await assert.rejects(f.host.publish(incompatible),{code:'research_evidence_incomplete'});
+  const incompatible=f.selection();incompatible.facts[0].compatibilityStatus='unknown';
+  await assert.rejects(f.host.publish(incompatible),{code:'research_evidence_incomplete',message:/Topics missing current evidence: openai-realtime.*temporal compatibility/});
 });
 test('publication recovers after journal-before-CAS interruption without another model or source call',async t=>{
   const f=fixture(t);await f.host.collect();const selection=f.selection();

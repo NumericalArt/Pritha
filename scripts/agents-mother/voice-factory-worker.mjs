@@ -1,5 +1,5 @@
 import {verifiedFirstUse} from './factory-first-use.mjs';
-import {researchPage,supportsLocalApiContinuation} from './factory-continuation.mjs';
+import {localApiResearchSources,researchPage,supportsLocalApiContinuation} from './factory-continuation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
@@ -146,8 +146,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       let sources=input.sources;
       if(phase==='collect' && state.continuationProfile==='api-local-v1' && !sources){
         const {topics}=await externalResearchContract(state.contract,{...args,phase:'status'});
-        const urls={'node-http-runtime':'https://nodejs.org/api/http.md','interface-runtime-security':'https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Type','operations-deployment':'https://nodejs.org/api/process.md','declared-dependencies':'https://nodejs.org/api/modules.md','pattern-semantic-embeddings-rag':'https://qdrant.tech/documentation/overview/','pattern-mcp-connector-permissions':'https://modelcontextprotocol.io/docs/2025-11-25/tutorials/security/security_best_practices','pattern-browser-sandbox':'https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy','pattern-api':'https://nodejs.org/api/url.md','pattern-openai':'https://openai.github.io/openai-agents-js/'};
-        sources=Object.fromEntries(topics.filter(t=>urls[t.id]).map(t=>[t.id,urls[t.id]]));
+        sources=localApiResearchSources(topics);
       }
       if(sources){args.sources=path.join(p.directory,'sources.json');atomicWriteFile(args.sources,JSON.stringify(sources));}
       if(phase==='apply'){args.input=path.join(p.directory,'selection.json');atomicWriteFile(args.input,JSON.stringify(input.selection));}

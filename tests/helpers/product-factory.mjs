@@ -140,9 +140,11 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
   function fixtureResearch(){
       const saved = state(), data = contractData(saved.contract, { root });
       const pattern = fs.readFileSync(saved.pattern, 'utf8');
-      const topics = deriveExternalResearchTopics(data, { patternPack: pattern });
+      const integrity = verifyPatternPackIntegrity(pattern, data.fingerprint);
+      assert.ok(integrity.ok);
+      const topics = deriveExternalResearchTopics(data, { patternPack: { externalResearchSeeds: integrity.payload.external_research_seeds } });
       return new HostResearch({ root, stateRoot, data, report: { fullPath: saved.research, text: fs.readFileSync(saved.research, 'utf8') },
-        patternLock: verifyPatternPackIntegrity(pattern, data.fingerprint).lock, topics, connectorId: scenario.connectorId,
+        patternLock: integrity.lock, topics, connectorId: scenario.connectorId,
         reader: async url => ({ items: [{ url, text: topics.map(topic => topic.query + '. Synthetic primary documentation fixture confirms bounded Node behavior, input validation and explicit application ownership for this isolated test.').join('\n\n') }] }),
       });
   }
@@ -159,7 +161,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
         const result = await executeVoiceFactoryStep({ root, stateRoot, agentParent, slug: paths.slug, chatId, connectorId: scenario.connectorId,
           model: scenario.model, effort: 'low', state: next, input }, { externalResearchContract:async(_contract,args)=>{
           const host=fixtureResearch();
-          return args.phase==='status'?host.status():host.collect({sourceUrls:Object.fromEntries(host.topics.map(t=>[t.id,'https://'+t.primaryDomains[0]+'/api/fixture']))});
+          return args.phase==='status'?host.status():host.collect({sourceUrls:args.sources?JSON.parse(fs.readFileSync(args.sources,'utf8')):{}});
         },delivery: { ...delivery,
           deliverOutcome: (spec, target, options) => delivery.deliverOutcome(spec, target, { ...options, buildExecutor: executor(options) }),
         } });
