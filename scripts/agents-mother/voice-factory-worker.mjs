@@ -165,7 +165,12 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
         atomicWriteFile(p.file,JSON.stringify(state));
         result=await delivery.deliverOutcome(state.outcome,p.target,{...buildOptions,runId:state.runId});
       }else{
-        observeDelivery();result=input.action==='delivery_status'?observeDelivery():await delivery.resumeDelivery(state.runId,{...buildOptions,hostOnly:input.action==='verify',...(input.answer?{answer:input.answer,answeredBy:'user'}:{})});
+        const current=observeDelivery();
+        if(input.action==='delivery_resume' && current.state.status==='blocked' && !(typeof input.answer==='string' && input.answer.trim())){
+          const choices=(current.state.blockers?.[0]?.options || []).map(option=>option.id).filter(id=>/^[a-z][a-z0-9-]{0,79}$/.test(id)).slice(0,8);
+          throw Object.assign(factoryFail('factory_delivery_answer_required'),{message:'Delivery is blocked. Call factory_delivery_resume with the required answer parameter from the saved blocker options'+(choices.length?': '+choices.join(', '):'')+'. No runtime probe or build request was started.'});
+        }
+        result=input.action==='delivery_status'?current:await delivery.resumeDelivery(state.runId,{...buildOptions,hostOnly:input.action==='verify',...(input.answer?{answer:input.answer,answeredBy:'user'}:{})});
       }
       // resume/deliver return an execution result without runRoot. Re-observe
       // the durable, identity-checked run before reading its Trial evidence.

@@ -66,6 +66,7 @@ const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build
 const requiredFields={read_artifact:['artifact'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],approve_outcome:['expected_sha256'],research_recover:['sources'],research_apply:['selection'],configure_build:['effort']};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.operation_id={type:'string',minLength:8,maxLength:128,pattern:'^[A-Za-z0-9_-]+$',description:'Stable ID of 8–128 letters, digits, _ or -, for example init-agent-01. Keep it for an identical retry; never repeat uncertain effects.'};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.action.description='status returns the saved next step. init creates the first draft from brief and proposed budgets. read_artifact reads it. write_draft revises an existing artifact using artifact, expected_sha256 and complete content. Do not put brief/content inside sources or selection. Those fields belong only to research actions. scaffold_refresh is optional host maintenance for an unchanged, host-generated CLI environment example in an idle existing build; it does not edit product code, approve documents or extend budgets. Use only when Trial diagnostics identify that template.';
+PROVIDER_FACTORY_TOOL.inputSchema.properties.answer.description='delivery_resume only: exact operator-selected blocker option ID. A blocked run requires this answer; omitting it cannot resume execution. Leave it absent only for an already-unblocked compatibility continuation.';
 PROVIDER_FACTORY_TOOL.inputSchema.properties.brief=briefSchema;
 Object.assign(PROVIDER_FACTORY_TOOL.inputSchema.properties,{
   effort:{type:'string',enum:FACTORY_BUILD_EFFORTS,description:'configure_build only: request a supported build effort for the unchanged bound provider/model. Requires explicit operator approval. Does not change this chat, documents, budgets or recorded usage.'},
@@ -96,13 +97,14 @@ const actionDescriptions={
   create_outcome:'Create an unapproved Outcome draft after the accepted Contract; do not infer its approval.',
   patch_draft:'Make up to eight exact literal edits to a still-unapproved Contract or Outcome. Use this for a small correction instead of rewriting the whole document. Requires its current hash and exact resulting hash; ambiguous edits, hash mismatch and accepted artifacts are rejected without writing.',
   configure_build:'Request explicit operator approval for a supported implementation effort on the SAME provider and model. Use this to repair an unsupported inherited effort without changing the immutable chat binding. No model request, document approval, budget extension or usage reset occurs. Saved uncertain or active builds must be resolved first.',
+  delivery_resume:'Resolve the saved delivery blocker and continue the SAME run. answer is REQUIRED: send exactly the operator-selected blocker option ID, such as retry-after-upgrade after runtime repair. Missing or empty answers cannot resolve a blocked run. For an already-unblocked continuation, use compatibility factory_step with action delivery_resume and no answer. Documents and measured budgets remain pinned.',
   status:'Read the exact saved factory phase, identities and artifact statuses; continue existing work instead of restarting.',
   read_artifact:'Read one host-bound artifact and its exact SHA-256. Use this hash for its draft revision or separate approval.',
 };
 PROVIDER_FACTORY_TOOL.description='Compatibility dispatcher. Prefer the dedicated factory_<action> tool so its required arguments are explicit. '+PROVIDER_FACTORY_TOOL.description;
 export const PROVIDER_FACTORY_TOOLS=[PROVIDER_FACTORY_TOOL,...Object.entries(actionTools).map(([name,action])=>({
   name,description:actionDescriptions[action] || 'Perform '+action+' only for the bound child. Read factory_status first; existing approval, evidence, identity and measured-budget gates remain mandatory. No acceptance, merge, publication or deployment is implied.',
-  inputSchema:{type:'object',properties:Object.fromEntries(['operation_id',...(fields[action] || [])].map(key=>[key,PROVIDER_FACTORY_TOOL.inputSchema.properties[key]])),required:['operation_id',...(requiredFields[action] || [])],additionalProperties:false},
+  inputSchema:{type:'object',properties:Object.fromEntries(['operation_id',...(fields[action] || [])].map(key=>[key,action==='delivery_resume' && key==='answer'?{...PROVIDER_FACTORY_TOOL.inputSchema.properties[key],minLength:1,description:'Exact operator-selected blocker option ID. Required to resolve the saved blocker; do not omit or send an empty string.'}:PROVIDER_FACTORY_TOOL.inputSchema.properties[key]])),required:['operation_id',...(action==='delivery_resume'?['answer']:requiredFields[action] || [])],additionalProperties:false},
   ...(readonly.has(action)?{annotations:{readOnlyHint:true}}:{}),
 }))];
 export function normalizeFactoryToolCall(name,input){
@@ -127,6 +129,7 @@ export class ProviderFactoryTools {
   validate(input){
     if(!input || !actions.includes(input.action) || !/^[A-Za-z0-9_-]{8,128}$/.test(input.operation_id || '') || Object.keys(input).some(key=>!['operation_id','action',...(fields[input.action] || [])].includes(key)) || (requiredFields[input.action] || []).some(key=>input[key]===undefined) || Buffer.byteLength(JSON.stringify(input))>60000)throw new FactoryActionInputError(input?.action,input);
     if(input.retry_failed!==undefined && typeof input.retry_failed!=='boolean')throw factoryFail('factory_input_invalid');
+    if(input.answer!==undefined && typeof input.answer!=='string')throw factoryFail('factory_input_invalid');
   }
   async read(input){
     this.validate(input);const state=this.state();

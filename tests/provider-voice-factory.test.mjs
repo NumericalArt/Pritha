@@ -215,9 +215,9 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   const spec=f.artifact('outcome').frontmatter,calls=[];let output={state:{source_project:f.p.target,spec:{id:spec.id,document_lock:spec.outcome_document_lock},status:'awaiting_acceptance',phase:'verify',blockers:[],iteration:1,budget:{remaining:5000}},worktree:{worktree:'/fixture/disposable-build'}},cardStatus='blocked',failAfterJournal=false;
   const executionResult=()=>{const {runRoot,...result}=output;return result;};
   const dependencies={delivery:{deliverOutcome:async(outcome,target,options)=>{calls.push({outcome,target,options});assert.equal(f.state().runId,options.runId);if(failAfterJournal)throw Error('simulated disconnect');return executionResult();},deliveryStatus:(runId)=>{assert.equal(runId,f.state().runId);return {...output,state:{...output.state,run_id:runId}};},resumeDelivery:async(runId,options)=>{calls.push({runId,options});return executionResult();}},registry:{rebuildRegistry:()=>{}},cards:{checkCardReadiness:async(id,options)=>{assert.equal(id,f.state().agentId);assert.equal(options.baseUrl,false);return {status:cardStatus,controlCenterVisible:'unknown'};}}};
-  let sequence=0;const step=async action=>{
+  let sequence=0;const step=async(action,extra={})=>{
     const operation_id='trusted_worker_'+(++sequence),state={...f.state(),revision:f.state().revision+1,running:{operationId:operation_id,action}};fs.writeFileSync(f.p.file,JSON.stringify(state));
-    const result=await executeVoiceFactoryStep({version:1,root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'claude',model:'claude-sonnet-5-5',effort:'low',preset:{authMode:'local-cli-session'},factoryParent:{fixture:true},state,input:{operation_id,action}},dependencies);
+    const result=await executeVoiceFactoryStep({version:1,root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'claude',model:'claude-sonnet-5-5',effort:'low',preset:{authMode:'local-cli-session'},factoryParent:{fixture:true},state,input:{operation_id,action,...extra}},dependencies);
     fs.writeFileSync(f.p.file,JSON.stringify({...result.state,running:null}));return result;
   };
   const delivered=await step('deliver');assert.equal(delivered.value.status,'awaiting_acceptance');assert.equal(calls[0].target,f.p.target);assert.equal(calls[0].outcome,f.state().outcome);assert.equal(calls[0].options.buildExecutor,'claude-code');assert.equal(calls[0].options.trialBackend,'local');assert.equal(calls[0].options.buildExecutorOptions.model,'claude-sonnet-5-5');
@@ -230,7 +230,11 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   const observed=(await step('delivery_status')).value;
   assert.equal(observed.status,'blocked');assert.equal(observed.verification.status,'failed');assert.equal(observed.verification.failedTrials[0].exitCode,64);assert.equal(observed.verification.failedTrials[0].diagnostics.untrusted,true);
   assert.match(observed.verification.failedTrials[0].diagnostics.stderr,/CLI command is missing/);assert.doesNotMatch(JSON.stringify(observed),/synthetic-sensitive-value/);
-  for(const action of ['verify','delivery_resume'])assert.equal((await step(action)).value.verification.status,'failed',action+' must use durable evidence even when the execution result has no runRoot');
+  const callsBeforeMissingAnswer=calls.length;
+  for(const answer of [undefined,'','  '])await assert.rejects(step('delivery_resume',{answer}),{code:'factory_delivery_answer_required'});
+  assert.equal(calls.length,callsBeforeMissingAnswer,'Missing blocker choices must not probe or dispatch a model');
+  for(const action of ['verify','delivery_resume'])assert.equal((await step(action,action==='delivery_resume'?{answer:'retry-after-upgrade'}:{})).value.verification.status,'failed',action+' must use durable evidence even when the execution result has no runRoot');
+  assert.equal(calls.at(-1).options.answer,'retry-after-upgrade');assert.equal(calls.at(-1).options.answeredBy,'user');
   fs.writeFileSync(path.join(runRoot,ref.path),JSON.stringify({...trial,evidence_lock:'changed'}));
   assert.equal((await step('delivery_status')).value.verification.status,'evidence-unavailable');
   output={...output,state:{...output.state,last_trial_result:{...ref,path:'../../foreign.json'}}};assert.equal((await step('delivery_status')).value.verification.status,'evidence-unavailable');

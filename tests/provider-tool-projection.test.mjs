@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {projectProviderToolRequest,wireCall} from '../scripts/lib/provider-tool-projection.mjs';
 import {listenNeuralDeepAdapter,closeNeuralDeepAdapter} from '../scripts/neuraldeep/responses-adapter.mjs';
+import {PROVIDER_FACTORY_TOOLS} from '../scripts/lib/provider-factory-tools.mjs';
 
 const model='qwen3.8-27b',token='t'.repeat(48),allowedTools=['mcp__pritha__read_file','mcp__pritha__list_files'];
 const namespace=name=>({type:'namespace',name:'mcp__pritha',tools:[{type:'function',name,parameters:{type:'object'}}]});
@@ -26,6 +27,22 @@ test('only approved host tools are projected; invalid historic calls preserve th
   const legacy={...input,input:[{type:'function_call',namespace:'legacy',name:'shell',arguments:'private historical input'}]};
   const saved=structuredClone(legacy);assert.throws(()=>projectProviderToolRequest(legacy,allowedTools),{code:'provider_tool_identity_mismatch'});
   assert.deepEqual(legacy,saved);assert.equal(projectProviderToolRequest({tools:input.tools},[]).payload.tool_choice,'none');
+});
+
+test('NeuralDeep receives a required delivery blocker answer and returns it intact through the MCP projection',async t=>{
+  const tool=PROVIDER_FACTORY_TOOLS.find(row=>row.name==='factory_delivery_resume');
+  for(const format of ['json','sse']){
+    const name='mcp__pritha__factory_delivery_resume',args={operation_id:'resume-reviewed-blocker',answer:'retry-after-upgrade'};
+    const post=await fixture(t,{allowedTools:[name],fetchImpl:async(_url,request)=>{
+      const payload=JSON.parse(request.body),parameters=payload.tools[0].parameters;
+      assert.ok(parameters.required.includes('answer'));assert.equal(parameters.properties.answer.type,'string');assert.equal(parameters.properties.answer.minLength,1);
+      return response(terminal([{...call(name),arguments:JSON.stringify(args)}]),format);
+    }});
+    const result=await post({tools:[{type:'namespace',name:'mcp__pritha',tools:[{type:'function',name:tool.name,description:tool.description,parameters:tool.inputSchema}]}]});
+    assert.equal(result.status,200);const body=await result.text();
+    const value=format==='json'?JSON.parse(body):body.split('\n').filter(line=>line.startsWith('data: ') && line!=='data: [DONE]').map(line=>JSON.parse(line.slice(6))).find(event=>event.type==='response.completed').response;
+    assert.equal(value.output[0].namespace,'mcp__pritha');assert.equal(value.output[0].name,tool.name);assert.deepEqual(JSON.parse(value.output[0].arguments),args);
+  }
 });
 
 test('NeuralDeep projects initial and resumed calls without exposing builtin tools in JSON and SSE',async t=>{

@@ -53,6 +53,26 @@ confidence: high
 
 ## Current acceptance status — 2026-11-05
 
+### Update — 2026-11-06
+
+a1dcbbc is installed and passes strict/operational/admission and full
+post-activation self-test without warnings/regressions. The same Task Chat
+requested the separately authorized High build configuration; the host applied
+that exact decision. A normal CLI elapsed-budget amendment preserves both
+document approvals, the run, 0 build tokens and one historical preflight
+iteration. No implementation request has been dispatched yet.
+
+Live controller calls omitted answer on blocked delivery_resume and received
+the previous blocker without a new runtime probe. The next scoped correction
+makes the dedicated answer required/nonempty and adds a canonical worker guard
+which reports the missing choice before probe/dispatch. Optional unblocked
+compatibility calls and old replay receipts remain intact. A real adapter test
+checks JSON/SSE schema and exact argument projection; the 27 focused checks pass.
+Final release verification and the actual implementation/Trials/manual matrix
+remain open; no elapsed grant may be silently renewed or documents reapproved.
+
+### Earlier checkpoint before the a1dcbbc installation
+
 3c7c53b is installed and passes strict/operational health, admission and full
 post-activation self-test without warnings/regressions. Its release passed
 1614 tests and 68 browser cases. The same NeuralDeep factory completed bounded

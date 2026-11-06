@@ -187,7 +187,17 @@ Skipped не равен pass. Ошибку исправлять в текуще�
 
 ## 4. Пошаговый roadmap
 
-Текущий проверенный срез на 2026-11-05: установлена `3c7c53b`, профиль
+Текущий проверенный срез на 2026-11-06: установлена `a1dcbbc`, профиль
+Interactive. Managed activation, strict/operational health, admission и полный
+post-activation self-test проходят без warnings/regressions. Gate: 1621/1621,
+68 browser cases, build/typecheck, пять страниц / 12 chunks и проверенный откат.
+High для прежнего NeuralDeep builder подтверждён штатным configure_build;
+продление времени применено отдельно, обе approvals и исходный run сохранены.
+Перед первым build request найден следующий узкий дефект: blocked resume без
+обязательного answer возвращал прежний статус. Новый schema/worker guard
+проверяется отдельно; подробности и оставшиеся условия — checkpoint 77.
+
+Исторический проверенный срез на 2026-11-05: установлена `3c7c53b`, профиль
 Interactive. Managed activation, strict/operational health, admission и полный
 post-activation self-test проходят без warnings/regressions. Release gate:
 1614/1614 тестов, 68 браузерных сценариев, build/typecheck, 5 страниц / 12 chunks
@@ -703,16 +713,19 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 3c7c53b / Interactive.** Release и полный
+**Статус: in-progress; активна a1dcbbc / Interactive.** Release и полный
 post-activation self-test проходят без warnings/regressions. Claude и Codex
 приняты и применены; установленный factory status также возвращает accepted.
 NeuralDeep штатно принял точный Outcome, завершил memory/primary-source research
 и scaffold. Реальный deliver остановился на preflight до model request:
 parent Task Chat sandbox попал в provider preset. В текущей истории учтены
 0 build tokens и одна преждевременно начатая итерация; вручную их не сбрасывать.
-Изолированный кандидат разделяет эти настройки и не начинает новую итерацию
-при отказе runtime probe. Сборка/Trials NeuralDeep и ручная приёмка остаются.
-См. checkpoint 76; OpenRouter live отложен пользователем.
+Установленный кандидат разделяет эти настройки и не начинает новую итерацию
+при отказе runtime probe. High подтверждён отдельно через обычный Task Chat,
+прежние документы и runtime readiness сохранены. Текущий controller пропустил
+необязательный answer у blocked resume; schema/worker guard исправляет этот
+случай без повторной document approval. Реальная сборка/Trials NeuralDeep и
+ручная приёмка остаются. См. checkpoint 77; OpenRouter live отложен пользователем.
 
 **Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
@@ -3793,6 +3806,51 @@ redaction-helper в generated scaffold snapshots. Проверено, что о�
 независимые Trials, review/finish, первая приёмка и отдельное применение.
 Оставшаяся ручная матрица и исходные приложения A/B/C/D сохраняются полностью;
 GitHub и MacBook не изменяются.
+
+### Checkpoint 77 — a1dcbbc установлена, High принят, blocked resume требует явного answer
+
+На 2026-11-06 оператор отдельно разрешил a1dcbbc, High для прежней модели и
+новые 15 минут с возобновления. Управляемая установка завершена, профиль и
+несвязанные файлы сохранены. Пять страниц / 12 chunks, operational/admission
+и полный post-activation self-test проходят; warnings/regressions пусты,
+owned process tree завершён. Прежняя сборка сохранена для rollback.
+
+- Обычный Task Chat запросил factory_configure_build High. Хост сопоставил
+  точное действие, provider/model и scope с уже полученным ответом оператора;
+  подтвердил именно его без повторного вопроса. Выбор сохранён штатным worker,
+  controller chat не перепривязан. Contract/Outcome hashes не изменились.
+- Через обычный Pritha delivery budget применено разрешённое новое окно:
+  запись с отдельным request ID сохраняет created_at, прежний расход и лимиты
+  80000 / 2. Учтены 0 build tokens и одна старая preflight-итерация; новая
+  implementation iteration не началась. Счётчики и старые approvals не сбрасывались.
+- Реальный controller несколько раз прислал delivery_resume без answer;
+  один follow-up выполнил только status. Прежний API законно вернул старый
+  blocker, но ответ модели ошибочно выглядел как повторный отказ runtime.
+  Хостовые requests/intents подтвердили отсутствие выбора оператора и новых
+  build requests. Это не доказательство отказа исправленного High executor.
+- Dedicated factory_delivery_resume теперь требует непустой answer в schema,
+  с описанием точного blocker option ID. Compatibility dispatcher сохраняет
+  прежний optional shape для уже unblocked continuation; старые receipts,
+  их hashes и replay не меняются. Нетронуты выбор модели, grants и документы.
+- Worker независимо проверяет фактический canonical delivery status. При
+  blocked состоянии и отсутствующем/пустом answer возвращает typed
+  factory_delivery_answer_required с разрешёнными вариантами до runtime probe
+  или model dispatch. Наличие правильного выбора по-прежнему требует обычного
+  host decision и проверки canonical blocker; guard не выбирает ответ сам.
+- Новая проверка настоящего NeuralDeep adapter до исправления воспроизвела
+  отсутствие required answer. Теперь JSON/SSE передают обязательную schema
+  и точные arguments через MCP namespace projection. Отдельная worker проверка
+  исключает probe/dispatch без выбора. Targeted suites: 27/27, включая сохранение
+  approval, usage, защищённых verifiers и корректного continuation.
+
+Далее: один окончательный gate/build/browser/rollback нового pin и отдельное
+разрешение на его установку. High повторно не согласовывается и не переписывается.
+Если истекло разрешённое окно, не продлевать его молча: требуется только новый
+explicit elapsed-time grant для того же run, без роста token/iteration totals.
+После установки и post-check — один нормальный blocked resume с обязательным
+answer, реальная NeuralDeep implementation, независимые Trials, review/finish,
+первая приёмка результата и отдельное применение. Остальная manual matrix и
+исходные приложения A/B/C/D сохранены; MacBook и GitHub не изменяются.
 
 ## 7. Полные исходные материалы
 
