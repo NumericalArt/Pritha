@@ -1,4 +1,4 @@
-import {nextFactoryAction,factoryOperationId} from '../agents-mother/factory-continuation.mjs';
+import {nextFactoryAction,factoryOperationId,supportsLocalApiContinuation} from '../agents-mother/factory-continuation.mjs';
 import {deliveryExplanation} from '../agents-mother/delivery-explanation.mjs';
 import {validateOutcomeSpecText} from '../agents-mother/outcome-spec.mjs';
 import fs from 'node:fs';
@@ -62,7 +62,7 @@ const briefSchema={type:'object',properties:{
   goal:{type:'string'},user:{type:'string'},
   ...Object.fromEntries(['successCriteria','coreFunctions','workflows','sources','constraints','nonGoals'].map(key=>[key,{type:'array',items:{type:'string'}}])),
   permissions:{type:'object',properties:{network:{type:'array',items:{type:'string'}},filesystem:{type:'array',items:{type:'string'}},authorization:{type:'string'}},additionalProperties:false},
-  technical:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.technical.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'Optional text settings. Use runtimeFamily=cli for a deterministic Node.js command; node is a language, not a runtime family. The host fixes the target, executor, Git isolation and autostart.'},
+  technical:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.technical.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'For a local HTTP server with a CLI, use runtimeFamily=api, serviceMode=process, primaryInterface=api, secondaryInterfaces=CLI and the requested cliEntrypoint. A manually started HTTP server still uses process mode. For a standalone command use runtimeFamily=cli. Set childModelProvider and childModelId to none for deterministic code. The host fixes the target, executor, Git isolation and autostart.'},
   design:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.design.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'Optional text settings. inputDataTypes is text, e.g. UTF-8 text file, not an array.'},
 },required:['identity','goal','user','successCriteria'],additionalProperties:false};
 briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMILIES];
@@ -182,7 +182,7 @@ export class ProviderFactoryTools {
     const s=this.state();
     if(!s?.contract || (!shadow && s.continuationProfile!=='api-local-v1'))return null;
     const data=contractData(s.contract,{root:this.paths.root});
-    if(data.runtimeFamily!=='api' || data.serviceMode!=='process' || data.childModelProvider!=='none' || data.childModelId!=='none' || data.repositoryAdoptionMode!=='none' || data.autostart!=='disabled')return null;
+    if(!supportsLocalApiContinuation(data))return null;
     if(s.contractApproval){
       requireFactoryApprovals(this.paths,s,{outcome:Boolean(s.outcomeApproval)});
     }
@@ -255,7 +255,9 @@ export class ProviderFactoryTools {
     }
     const reviewKind=input.action==='approve_contract'?'contract':input.action==='approve_outcome'?'outcome':null;
     const review=reviewKind?factoryArtifact(p,state,reviewKind):null;
+    const automaticContinuation=reviewKind==='contract' && this.host.driveEnabled() && supportsLocalApiContinuation(data);
     const presentation=review?{path:reviewKind+' · '+p.slug,approvalScope:reviewKind+' only',
+      ...(automaticContinuation?{automaticContinuation:true}:{}),
       overview:reviewKind==='contract'?{name:data.agentName,mission:data.primaryMission,interfaces:scaffoldCapability(data).interfaces,scope:data.targetFolder,
         budgetMode:this.options.connectorId==='codex'?'native-goal':'request-reservation',permissions:data.userAuthorizationModel || '',secrets:data.secretsRequired || '',tokens:data.buildTokenBudget,iterations:data.buildIterationBudget,elapsedMs:data.buildElapsedBudgetMs}
         :{name:data.agentName,criteria:data.successCriteria,examples:trialInputs?.[0]?.path==='verification/product.mjs'?productExamples(trialInputs[0].content):[]},
@@ -267,21 +269,21 @@ export class ProviderFactoryTools {
       :{command:['Pritha factory',input.action,p.slug,...(input.action==='configure_build'?['--effort',input.effort]:[])],cwdLabel:'Bound child and instance-private factory artifacts',provider:this.options.connectorId,model:this.options.factory.model,...(this.options.connectorId==='claude' && input.action.startsWith('deliver')?{buildAuthentication:'separate Anthropic API key; host-reserved budget'}:{}),network:input.action==='configure_build_model'?'provider model metadata only; no model inference':['research','research_collect','research_recover'].includes(input.action)?this.options.connectorId==='local'?'disabled':'bounded primary-source research':input.action.startsWith('deliver')?'pinned build provider only':'disabled',
         ...(input.action==='configure_build_model'?{previousBuildModel:state.buildConfiguration?.modelId || this.options.factory.model,proposedBuildModel:input.model,proposedBuildEffort:input.effort,approvalScope:'builder model and effort only; same provider, parent chat, documents and budgets'}:{}),...(budgetReview?{budgetReview}:{}),...(input.action==='init'?{brief:input.brief,proposedBuildTokenBudget:input.build_token_budget,...(input.build_iteration_budget!==undefined?{proposedBuildIterationBudget:input.build_iteration_budget}:{}),...(input.build_elapsed_budget_ms!==undefined?{proposedBuildElapsedBudgetMs:input.build_elapsed_budget_ms}:{})}:{}),...(input.action==='configure_build'?{previousBuildEffort:state.buildConfiguration?.effort || this.options.factory.effort || null,proposedBuildEffort:input.effort,approvalScope:'build effort only; same provider/model, documents and budgets'}:{}),...(input.action==='write_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,proposedContent:input.content}:{}),...(input.action==='patch_draft'?{artifact:input.artifact,beforeSha256:input.expected_sha256,expectedResultSha256:input.expected_result_sha256,edits:input.edits}:{}),...(input.sources?{sources:input.sources}:{}),...(input.selection?{selection:input.selection}:{}),...(input.answer?{answer:input.answer}:{})};
     if(Buffer.byteLength(JSON.stringify(presentation))>60000)throw factoryFail('factory_review_too_large');
-    return {kind:review?'file_change_approval':'command_approval',presentation,perform:()=>this.execute(input,state)};
+    return {kind:review?'file_change_approval':'command_approval',presentation,perform:()=>this.execute(input,state,automaticContinuation)};
   }
-  async execute(input,expected){
+  async execute(input,expected,automaticContinuation=false){
     this.host.check();const p=this.paths,o=this.options;
     // A decision is tied to the same complete context, not merely its slug.
     this.prepare(input);if(factoryHash(this.state())!==factoryHash(expected))throw factoryFail('factory_context_changed');
     privateStateDirectory(p.stateRoot,p.directory);
-    const state=expected || {schema:'pritha-voice-factory-v1',slug:p.slug,chatId:o.chatId,connectorId:o.connectorId,stateRoot:p.stateRoot,target:p.target,phase:'draft',revision:0,...(this.host.driveEnabled() && input.brief?.technical?.runtimeFamily==='api' && input.brief.technical.serviceMode==='process' && input.brief.technical.childModelProvider==='none' && input.brief.technical.childModelId==='none' && input.brief.technical.repositoryAdoptionMode==='none'?{continuationProfile:'api-local-v1'}:{})};
+    const state=expected || {schema:'pritha-voice-factory-v1',slug:p.slug,chatId:o.chatId,connectorId:o.connectorId,stateRoot:p.stateRoot,target:p.target,phase:'draft',revision:0};
     const work=privateStateDirectory(p.stateRoot,path.join(p.directory,'operations',randomUUID()));
     const requestFile=privateStateFile(p.stateRoot,path.join(work,'request.json')),resultFile=path.join(work,'result.json');
     const previous=fs.existsSync(p.file)?factoryRead(p.file,p.directory):null;
     if(factoryHash(previous?JSON.parse(previous):null)!==factoryHash(expected))throw factoryFail('factory_context_changed');
     const next={...state,revision:state.revision+1,running:{operationId:input.operation_id,action:input.action,turnId:o.turnId}};
     atomicCompareAndSwapFile(p.file,previous,JSON.stringify(next));
-    atomicWriteFile(requestFile,JSON.stringify({version:1,root:p.root,stateRoot:p.stateRoot,agentParent:p.parent,slug:p.slug,chatId:o.chatId,connectorId:o.connectorId,model:o.factory.model,effort:o.factory.effort,preset:o.factory.preset,factoryParent:{owner:o.lease.owner,generation:o.lease.generation,chatId:o.chatId,turnId:o.turnId,operationId:input.operation_id,target:p.target},state:next,input,resultFile}));
+    atomicWriteFile(requestFile,JSON.stringify({version:1,root:p.root,stateRoot:p.stateRoot,agentParent:p.parent,slug:p.slug,chatId:o.chatId,connectorId:o.connectorId,model:o.factory.model,effort:o.factory.effort,preset:o.factory.preset,factoryParent:{owner:o.lease.owner,generation:o.lease.generation,chatId:o.chatId,turnId:o.turnId,operationId:input.operation_id,target:p.target},state:next,input,resultFile,...(automaticContinuation?{automaticContinuation:true}:{})}));
     const temporary=createProviderTemporaryDirectory({provider:o.connectorId,stateRoot:p.stateRoot});
     const env=providerProcessEnvironment({provider:o.connectorId,root:p.root,stateRoot:p.stateRoot,temporary,env:process.env});
     env.PRITHA_AGENT_PARENT=p.parent;env.PRITHA_PYTHON=resolvePrithaPython({root:p.root});

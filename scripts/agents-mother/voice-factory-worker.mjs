@@ -1,5 +1,5 @@
 import {verifiedFirstUse} from './factory-first-use.mjs';
-import {researchPage} from './factory-continuation.mjs';
+import {researchPage,supportsLocalApiContinuation} from './factory-continuation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
@@ -109,11 +109,15 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       atomicCompareAndSwapFile(row.file,row.text,text);value={artifact:input.artifact,sha256:factoryHash(text)};break;
     }
     case 'approve_contract':{
-      const row=factoryArtifact(p,state,'contract');if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');assertScaffoldCapability(contract());
+      const row=factoryArtifact(p,state,'contract');if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
+      const reviewed=contract();assertScaffoldCapability(reviewed);
       const next=row.text.replace(/^status: draft$/m,'status: accepted').replace(/^- Build token budget confirmation: pending$/m,'- Build token budget confirmation: user');
       const candidate=path.join(p.directory,'candidate.md');atomicWriteFile(candidate,next);
       try{const issues=validateContract(candidate,{root:p.root,print:false});if(issues.length)throw validationFailure(issues);}finally{fs.rmSync(candidate,{force:true});}
-      atomicCompareAndSwapFile(row.file,row.text,next);state.contractApproval={sha256:factoryHash(next),reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='contract-approved';value={approved:'contract',next:'create_outcome'};break;
+      atomicCompareAndSwapFile(row.file,row.text,next);
+      if(request.automaticContinuation===true && supportsLocalApiContinuation(reviewed))state.continuationProfile='api-local-v1';
+      else delete state.continuationProfile;
+      state.contractApproval={sha256:factoryHash(next),reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='contract-approved';value={approved:'contract',next:'create_outcome'};break;
     }
     case 'create_outcome':{
       requireFactoryApprovals(p,state,{outcome:false});contract();if(state.outcome)throw factoryFail('factory_artifact_exists');

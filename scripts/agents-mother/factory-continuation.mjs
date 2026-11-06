@@ -1,5 +1,12 @@
 import {createHash} from 'node:crypto';
 import {deliveryUsageStatus} from './delivery-ledger.mjs';
+import {scaffoldCapability} from './scaffold/capabilities.mjs';
+
+export function supportsLocalApiContinuation(contract) {
+  return contract.childModelProvider === 'none' && contract.childModelId === 'none'
+    && contract.repositoryAdoptionMode === 'none' && contract.autostart === 'disabled'
+    && scaffoldCapability(contract).adapter === 'api-process-v1';
+}
 
 // A plan is not authority. The tool host checks the lease, approvals, locks
 // and current revision again when it claims each ordinary worker operation.

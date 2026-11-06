@@ -152,6 +152,7 @@ function NativeQuestion({chatId,request,refresh}:{chatId:string;request:PendingR
     {doc&&spec?<div><strong>{spec.name}</strong><p>{spec.mission || spec.criteria}</p>
       {doc==="Contract"?<><p>Интерфейсы: {spec.interfaces?.join(" + ")} · Каталог: {spec.scope}</p>
         <p>Сборщик: {String(request.presentation.buildProvider)} / {String(request.presentation.buildModel)}. Модель готового агента: {String(request.presentation.childModelId || "не требуется")}.</p>
+        {request.presentation.automaticContinuation===true?<p>После отдельного одобрения Outcome фабрика проверит заготовку. Если продуктовый тест выявит исправимую ошибку, фабрика сама запустит сборщика в указанных пределах.</p>:null}
         <p>Права: {spec.permissions || "см. документ"}. Секреты: {spec.secrets || "см. документ"}.</p>
         <p>Лимиты сборки: {spec.tokens} токенов, {spec.iterations} попыток, {Math.ceil((spec.elapsedMs || 0)/60000)} мин.</p>{spec.budgetMode==="native-goal"?<p>Codex учитывает токены по завершении запроса: последний запрос может превысить лимит. Новая попытка сверх него не начнётся.</p>:null}</>:
         spec.examples?.map((e,i)=><p key={i}><strong>{e.interface.toUpperCase()}:</strong> <code>{JSON.stringify(e.input)} → {JSON.stringify(e.expected)}</code></p>)}

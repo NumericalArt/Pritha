@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -34,9 +35,26 @@ test('planner stops at authority and uncertainty boundaries without an effect',(
 for(const scenario of scenarios)test(scenario.connectorId+': host continues after two decisions and hands off observed output from the exact revision',{timeout:120000},async t=>{
  const f=await productFactoryFixture(scenario,()=>{},{automate:true});t.after(()=>f.close());
  const call=async(a,args)=>{const v=await f.call(a,args);assert.equal(v.error,undefined,JSON.stringify(v));assert.notEqual(v.ok,false,JSON.stringify(v));assert.notEqual(v.continuationFailed,true,JSON.stringify(v));return v;};
- await call('init',{brief:f.brief,build_token_budget:10000,build_iteration_budget:2});
- const approve=async kind=>{const pending=call('approve_'+kind,{expected_sha256:f.artifact(kind).sha256});await until(()=>f.pending().length===1);await f.answer();return pending;};
+ const brief=f.brief;
+ brief.technical.preset='generic';
+ brief.technical.serviceMode='none';
+ await call('init',{brief,build_token_budget:10000,build_iteration_budget:2});
+ const draft=f.artifact('contract');
+ assert.equal((await f.call('approve_contract',{expected_sha256:draft.sha256})).error,'scaffold_adapter_unavailable');
+ assert.equal(f.pending().length,0);
+ const edits=[{from:'- Service mode: none',to:'- Service mode: process'}];
+ const declaredPort=draft.text.match(/^- `\.env\.example` variables:.*$/m)[0];
+ const localPort='- `.env.example` variables: '+scenario.portVariable+'=3021';
+ if(declaredPort!==localPort)edits.push({from:declaredPort,to:localPort});
+ const revised=edits.reduce((body,edit)=>body.replace(edit.from,edit.to),draft.text);
+ assert.notEqual(revised,draft.text);
+ await call('patch_draft',{artifact:'contract',expected_sha256:draft.sha256,edits,expected_result_sha256:createHash('sha256').update(revised).digest('hex')});
+ assert.equal(f.state().continuationProfile,undefined);
+ const approve=async kind=>{const pending=call('approve_'+kind,{expected_sha256:f.artifact(kind).sha256});await until(()=>f.pending().length===1);
+   assert.equal(f.pending()[0].presentation.automaticContinuation,kind==='contract'?true:undefined);
+   await f.answer();return pending;};
  assert.deepEqual((await approve('contract')).continued,['create_outcome']);
+ assert.equal(f.state().continuationProfile,'api-local-v1');
  await call('prepare_product_trial',{expected_sha256:f.artifact('outcome').sha256,trial:f.trial});
  assert.deepEqual((await approve('outcome')).continued,['research','research_collect']);
  const page=await call('research_status',{offset:1});assert.equal(page.offset,1);assert.ok(page.sources[0].passages.length);

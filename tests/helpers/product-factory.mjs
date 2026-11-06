@@ -150,8 +150,8 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
     constructor(options) {
       super({...options,factoryContinuation:automate?'execute':'shadow'}); hosts.push(this);
       const execute = this.factory.execute.bind(this.factory);
-      this.factory.execute = async (input, expected) => {
-        if (!['deliver','research_collect'].includes(input.action)) return execute(input, expected);
+      this.factory.execute = async (input, expected, automaticContinuation) => {
+        if (!['deliver','research_collect'].includes(input.action)) return execute(input, expected, automaticContinuation);
         // Substitute provider IO in the same trusted worker. The real delivery
         // loop chooses whether to call the real Codex/Claude executor class.
         const next = { ...expected, revision: expected.revision + 1, running: { operationId: input.operation_id, action: input.action } };

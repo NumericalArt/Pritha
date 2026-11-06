@@ -879,11 +879,14 @@ health, a constant response, and scaffold creation do not demonstrate delivery.
 Changing the Outcome or its protected verifier invalidates that review.
 Previously approved documents keep their original locks and limitations.
 
-The planner normally only reports its next step. In an explicitly enabled
-test instance (`PRITHA_FACTORY_CONTINUATION=execute`), a newly bound local
-API child with no child model, repository adoption, or autostart can continue
-inside its existing execution owner. Contract and Outcome are still two actual
-operator decisions. The host can collect approved primary sources, request
+The planner normally only reports its next step. When the operator enables
+`PRITHA_FACTORY_CONTINUATION=execute` on the selected instance, the Contract
+card identifies eligible local API children and explains the automatic build.
+The host checks the reviewed Contract, including any draft corrections.
+Approval records the profile for a supported API process with no child model,
+repository adoption, or autostart. Existing approvals retain their recorded
+scope. Contract and Outcome are two separate operator decisions. Inside the
+same execution owner, the host can collect approved primary sources, request
 source-based synthesis, scaffold, run the approved Trials, commission the
 pinned builder on a repairable failure, and prepare the verified first use.
 One foreground session owns the work. Reading progress never resumes it.

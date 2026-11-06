@@ -36,8 +36,10 @@ for (const scenario of scenarios) test(`${scenario.name} via ${scenario.connecto
   assert.deepEqual(f.pending()[0].presentation.scaffoldCapability.interfaces, ['web', 'cli']);
   assert.equal(f.pending()[0].presentation.buildProvider, scenario.connectorId);
   assert.equal(f.pending()[0].presentation.buildModel, scenario.model);
+  assert.equal(f.pending()[0].presentation.automaticContinuation, undefined);
   await f.answer();
   ok(await approvingContract);
+  assert.equal(f.state().continuationProfile, undefined);
   assert.equal(f.shadow('approve_contract')?.action,'create_outcome');assert.equal(f.state().outcome,undefined,'Shadow saves a suggestion and does not create an Outcome.');
   ok(await f.call('create_outcome'));
 
