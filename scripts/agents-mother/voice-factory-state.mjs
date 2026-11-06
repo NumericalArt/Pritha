@@ -80,7 +80,8 @@ export function validateVoiceFactory(paths,value,{chatId,connectorId}){
       || value.target!==paths.target || value.stateRoot!==paths.stateRoot || !Number.isSafeInteger(value.revision))throw factoryFail('factory_binding_changed');
   for(const field of ['contract','outcome','research','pattern'])if(value[field] && (path.dirname(value[field])!==path.join(paths.memory,['research','pattern'].includes(field)?'research':'contracts') || !value[field].endsWith('.md')))throw factoryFail('factory_artifact_boundary');
   const config=value.buildConfiguration;
-  if(config!==undefined && (!config || Object.keys(config).some(key=>!['connectorId','modelId','effort','operationId','approvedBy','approvedAt'].includes(key))
+  if(config!==undefined && (!config || Object.keys(config).some(key=>!['connectorId','modelId','parentModelId','effort','operationId','approvedBy','approvedAt'].includes(key))
+      || config.parentModelId!==undefined && (typeof config.parentModelId!=='string' || !/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(config.parentModelId))
       || config.connectorId!==connectorId || typeof config.modelId!=='string' || !/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(config.modelId) || !FACTORY_BUILD_EFFORTS.includes(config.effort)
       || typeof config.operationId!=='string' || !/^[A-Za-z0-9_-]{8,128}$/.test(config.operationId) || config.approvedBy!=='user' || typeof config.approvedAt!=='string' || !Number.isFinite(Date.parse(config.approvedAt))))throw factoryFail('factory_build_configuration_changed');
   return value;

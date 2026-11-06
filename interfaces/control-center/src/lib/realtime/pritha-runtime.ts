@@ -1,3 +1,5 @@
+import {factoryVoiceDisplay} from '../../../../../scripts/agents-mother/factory-progress.mjs';
+import type {FactoryMilestone as VoiceFactoryMilestone} from '../codex-chat/types';
 import { dispatchVoiceTool, type VoiceToolHandlers } from "./core/voice-tools-dispatcher";
 import type { VoiceDispatchRequest } from '../../../../../scripts/lib/voice-task-bridge.mjs';
 import type { ProviderConnectorId, ProviderPreset } from '../settings/provider-profile';
@@ -7072,7 +7074,7 @@ function providerVoiceTaskFields(request: Record<string, unknown> | null, status
   return { connector_id: request?.task_chat_connector || 'codex', task_chat_href: status?.task_chat_href,
     topic_generation: status?.topic_generation, task_revision: status?.task_revision,
     error_code: status?.error_code, dispatch_state: status?.dispatch_state,
-    factory_draft_failed: status?.factory_draft_failed,
+    factory_draft_failed: status?.factory_draft_failed, factory_product: status?.factory_product,
     requires_operator_response: status?.requires_operator_response,
     operator_request: status?.operator_request, question: status?.question,
     approval_in_task_chat: status?.approval_in_task_chat };
@@ -7107,7 +7109,8 @@ async function codexTaskSummary(id: string) {
   const resultText = repaired.resultText;
   const statusValue = String(status?.status || request?.status || "unknown");
   const stat = statSync(taskDir);
-  const complete = TERMINAL_CODEX_TASK_STATUSES.has(statusValue);
+  const product = status?.factory_product as VoiceFactoryMilestone | undefined;
+  const productDisplay = factoryVoiceDisplay(statusValue,TERMINAL_CODEX_TASK_STATUSES.has(statusValue),product), complete = productDisplay.complete;
   const telemetry = taskTelemetryFromEvents(id);
   const progressForMetrics = readCodexTaskProgress(progressPath, 400);
   const progress = progressForMetrics.slice(-12);
@@ -7120,7 +7123,7 @@ async function codexTaskSummary(id: string) {
   const handoffStatus = handoffSent ? "sent" : handoffSkipped ? "skipped" : "pending";
   const handoffReason = handoffSkipped ? String(handoffSkipped.reason || "unknown") : undefined;
   const approval = request?.approval || (status && "approval" in status ? status.approval : null);
-  const progressMetrics = codexTaskProgressMetrics({
+  const turnProgress = codexTaskProgressMetrics({
     statusValue,
     complete,
     waitingForOperator: statusValue === "waiting_for_operator",
@@ -7132,6 +7135,7 @@ async function codexTaskSummary(id: string) {
     notDispatched: Boolean(request?.task_chat_connector && status?.dispatch_state === 'reserved'),
     factoryDraftFailed: status?.factory_draft_failed === true,
   });
+  const progressMetrics={...turnProgress,percent:Math.min(turnProgress.percent,productDisplay.ceiling)};
   const statusRecord = status as Record<string, unknown> | null | undefined;
   const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
   const threadRoutingMode = String(statusRecord?.codex_app_thread_routing_mode || request?.codex_app_thread_routing_mode || "");
@@ -7166,14 +7170,14 @@ async function codexTaskSummary(id: string) {
     task_id: id,
     short_id: shortId,
     ...providerVoiceTaskFields(request, status),
-    status: statusValue,
+    status: productDisplay.status,
     complete,
     phase: activity.phase,
     elapsed_ms: activity.elapsedMs,
     last_activity_at: activity.lastActivityAt,
     last_activity: activity.lastActivity,
     stale: activity.stale,
-    operator_brief: (status?.dispatch_state === 'reserved' || status?.factory_draft_failed === true) && latestVoiceFeedback ? latestVoiceFeedback.voice_text : operatorBrief,
+    operator_brief: (status?.dispatch_state === 'reserved' || status?.factory_draft_failed === true || status?.requires_operator_response) && latestVoiceFeedback ? latestVoiceFeedback.voice_text : product?.summary || operatorBrief,
     voice_handoff_required: (complete || statusValue === "decision_required" || statusValue === "waiting_for_operator" || activity.stale || Boolean(latestVoiceFeedback)) && handoffStatus === "pending",
     created_at: String(request?.created_at || stat.birthtime.toISOString()),
     updated_at: String(status?.updated_at || stat.mtime.toISOString()),
@@ -7294,7 +7298,8 @@ export async function getPrithaCodexTask(taskId: string) {
   const stdoutText = await readFile(stdoutPath, "utf8").catch(() => "");
   const stderrText = await readFile(stderrPath, "utf8").catch(() => "");
   const statusValue = String(status?.status || request?.status || "unknown");
-  const complete = TERMINAL_CODEX_TASK_STATUSES.has(statusValue);
+  const product = status?.factory_product as VoiceFactoryMilestone | undefined;
+  const productDisplay = factoryVoiceDisplay(statusValue,TERMINAL_CODEX_TASK_STATUSES.has(statusValue),product), complete = productDisplay.complete;
   const resultAvailable = Boolean(resultText.trim());
   const telemetry = taskTelemetryFromEvents(id);
   const progressForMetrics = readCodexTaskProgress(progressPath, 400);
@@ -7303,7 +7308,7 @@ export async function getPrithaCodexTask(taskId: string) {
   const voiceFeedback = readCodexVoiceFeedback(voiceFeedbackPath, 20);
   const latestVoiceFeedback = providerVoiceTaskFeedback(id, request, status) || latestSpeakableFeedback(voiceFeedback);
   const approval = request?.approval || (status && "approval" in status ? status.approval : null);
-  const progressMetrics = codexTaskProgressMetrics({
+  const turnProgress = codexTaskProgressMetrics({
     statusValue,
     complete,
     waitingForOperator: statusValue === "waiting_for_operator",
@@ -7315,6 +7320,7 @@ export async function getPrithaCodexTask(taskId: string) {
     notDispatched: Boolean(request?.task_chat_connector && status?.dispatch_state === 'reserved'),
     factoryDraftFailed: status?.factory_draft_failed === true,
   });
+  const progressMetrics={...turnProgress,percent:Math.min(turnProgress.percent,productDisplay.ceiling)};
   const statusRecord = status as Record<string, unknown> | null | undefined;
   const threadScope = request?.thread_scope || statusRecord?.thread_scope || null;
   const threadRoutingMode = String(statusRecord?.codex_app_thread_routing_mode || request?.codex_app_thread_routing_mode || "");
@@ -7364,14 +7370,14 @@ export async function getPrithaCodexTask(taskId: string) {
 	    task_id: id,
 	    short_id: shortId,
     ...providerVoiceTaskFields(request, status),
-	    status: statusValue,
+	    status: productDisplay.status,
     complete,
     phase: activity.phase,
     elapsed_ms: activity.elapsedMs,
     last_activity_at: activity.lastActivityAt,
     last_activity: activity.lastActivity,
     stale: activity.stale,
-    operator_brief: (status?.dispatch_state === 'reserved' || status?.factory_draft_failed === true) && latestVoiceFeedback ? latestVoiceFeedback.voice_text : operatorBrief,
+    operator_brief: (status?.dispatch_state === 'reserved' || status?.factory_draft_failed === true || status?.requires_operator_response) && latestVoiceFeedback ? latestVoiceFeedback.voice_text : product?.summary || operatorBrief,
     voice_handoff_required: (complete || statusValue === "decision_required" || statusValue === "waiting_for_operator" || activity.stale || Boolean(latestVoiceFeedback)) && handoffStatus === "pending",
     request,
     status_detail: status,

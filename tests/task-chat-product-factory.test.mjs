@@ -38,6 +38,7 @@ for (const scenario of scenarios) test(`${scenario.name} via ${scenario.connecto
   assert.equal(f.pending()[0].presentation.buildModel, scenario.model);
   await f.answer();
   ok(await approvingContract);
+  assert.equal(f.shadow('approve_contract')?.action,'create_outcome');assert.equal(f.state().outcome,undefined,'Shadow saves a suggestion and does not create an Outcome.');
   ok(await f.call('create_outcome'));
 
   assert.equal((await f.call('approve_outcome', { expected_sha256: f.artifact('outcome').sha256 })).error, 'factory_product_trial_required');
@@ -80,7 +81,7 @@ for (const scenario of scenarios) test(`${scenario.name} via ${scenario.connecto
   // A constant/wrong CLI answer must still fail the unchanged reviewed verifier.
   const entry = path.join(delivered.worktree, scenario.entrypoint);
   const implementation = fs.readFileSync(entry, 'utf8');
-  fs.writeFileSync(entry, 'console.log(JSON.stringify({wrong:true}));\n');
+  fs.writeFileSync(entry,'console.log('+JSON.stringify(JSON.stringify(f.trial.cli[0].expected_json))+');\n');
   const trialPlan = JSON.parse(fs.readFileSync(path.join(runRoot, 'trial-plan.json'), 'utf8'));
   const wrong = await runTrialPlan(trialPlan, { root: f.root, stateRoot: f.stateRoot, projectPath: delivered.worktree, backend: 'local', write: false });
   assert.equal(wrong.result.verification_status, 'failed');
@@ -92,6 +93,13 @@ for (const scenario of scenarios) test(`${scenario.name} via ${scenario.connecto
   assert.equal(wrongHttp.result.verification_status, 'failed');
   assert.match(wrongHttp.result.trials[0].execution.stderr, /HTTP product JSON differs/);
   fs.writeFileSync(server, serverImplementation);
+  const readme=path.join(delivered.worktree,'README.md');
+  const guide=fs.readFileSync(readme,'utf8');
+  fs.writeFileSync(readme,'Run node scripts/does-not-exist.mjs');
+  const missingGuide=await runTrialPlan(trialPlan,{root:f.root,stateRoot:f.stateRoot,projectPath:delivered.worktree,backend:'local',write:false});
+  assert.equal(missingGuide.result.verification_status,'failed');
+  assert.match(missingGuide.result.trials[0].execution.stderr,/Document the verified first-use command/);
+  fs.writeFileSync(readme,guide);
   assert.equal(f.builds.length, 1);
 });
 
@@ -103,7 +111,7 @@ test('product Trial rejects undeclared interfaces, unsafe commands and stale dra
   await until(() => f.pending().length === 1); await f.answer(); ok(await approving);
   ok(await f.call('create_outcome'));
   const expected_sha256 = f.artifact('outcome').sha256;
-  for (const trial of [{ http: f.trial.http }, { ...f.trial, cli: { ...f.trial.cli, argv: ['node', '../escape.mjs'] } }, { ...f.trial, injected: 'unknown' }]) {
+  for (const trial of [{ http: f.trial.http }, { ...f.trial, cli: { ...f.trial.cli[0], argv: ['node', '../escape.mjs'] } }, { ...f.trial, injected: 'unknown' }]) {
     assert.match((await f.call('prepare_product_trial', { expected_sha256, trial })).error, /^factory_product_trial_/);
     assert.equal(f.artifact('outcome').sha256, expected_sha256);
   }

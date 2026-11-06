@@ -1,3 +1,4 @@
+import {readFactoryConversation} from './voice-factory-state.mjs';
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
@@ -9,6 +10,8 @@ import { canHostVerifyDelivery, defaultDeliveryTrialBackend, withDeliveryBudgetC
 import { approvalEvidencePath, verifyCompiledTrialPlan } from "./outcome-spec.mjs";
 import { verifyTrialResultFreshness } from "./trial-runner.mjs";
 import { readDeliveryUsage } from "./phase-usage.mjs";
+
+import {deliveryExplanation} from "./delivery-explanation.mjs";
 
 const SCHEMA = "pritha-task-delivery-control-v1";
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -113,7 +116,17 @@ function targetFor(runId, task, options) {
   };
   const control = readControl(runRoot, options);
   if (control && hash(control.binding.target) !== hash(identity)) fail("delivery_binding_stale", "The linked run changed its identity or approved plan. Its original binding was preserved.");
-  const bindingStatus = !control ? "unbound" : taskKey(control.binding.task) === taskKey(task) ? "bound" : "other_task";
+  const bindingStatus = !control ? "unbound" : control.binding.task.chatId === task.chatId && taskKey(control.binding.task) === taskKey(task) ? "bound" : "other_task";
+  if(bindingStatus==="other_task")fail("delivery_task_mismatch","This delivery is linked to another task.");
+  // A factory run already has a host owner even before any legacy manual bind.
+  if(runId.startsWith("voice-")){
+    const technicalSlug=path.basename(agent.projectPath);
+    if(runId.startsWith("voice-"+technicalSlug+"-")){
+      const owner=readFactoryConversation({...options,slug:technicalSlug});
+      if(owner?.runId===runId && (owner.chatId!==task.chatId || owner.connectorId!=="codex" || owner.target!==identity.sourceProject))
+        fail("delivery_task_mismatch","This delivery belongs to a different factory conversation.");
+    }
+  }
   const revision = hash([identity, state.version, control?.bindingHash || null]);
   return { options, runRoot, state, plan, specPath, agent, identity, control, bindingStatus, revision, worktree };
 }
@@ -134,7 +147,7 @@ function view(target) {
   const { state, control, plan } = target;
   let preparation = null;
   const preparationFile = path.join(target.runRoot, "handoff-preparation.json");
-  if (control && existsSync(preparationFile)) {
+  if (target.bindingStatus === "bound" && existsSync(preparationFile)) {
     const saved = json(preparationFile, target.options.stateRoot, 128_000);
     if (saved.bindingHash === control.bindingHash && saved.evidenceLock === state.last_trial_result?.evidence_lock) {
       preparation = { preparedAt: saved.preparedAt, demo: saved.demo, head: saved.workspace?.head || null, verification: saved.verification, acceptance: saved.acceptance };
@@ -142,12 +155,13 @@ function view(target) {
   }
   return {
     runId: state.run_id, agentId: target.agent.id, agentName: target.agent.name,
+    explanation: target.bindingStatus === "bound" ? deliveryExplanation(state) : null,
     status: state.status, bindingStatus: target.bindingStatus, revision: target.revision,
     specId: plan.spec_id, budget: { tokensUsed: state.budget.tokens_used, maxTokens: state.budget.max_tokens, scope: "build-executor", usageStatus: deliveryUsageStatus(state.budget),
       iterations: state.iteration, maxIterations: state.budget.max_iterations, elapsedMs: Math.max(0, Date.now() - Date.parse(state.created_at)), maxElapsedMs: state.budget.max_elapsed_ms },
     actions: { verify: canHostVerifyDelivery(state), prepareHandoff: finished.has(state.status), budget: DELIVERY_ACTIVE_STATUSES.has(state.status) },
     plan: actionPlan(target),
-    receipts: Object.entries(control?.requests || {}).slice(-10).map(([requestId, receipt]) => ({ requestId, action: receipt.action, status: receipt.status, request: receipt.request || null, result: receipt.result || null })),
+    receipts: Object.entries(target.bindingStatus === "bound" ? control.requests : {}).slice(-10).map(([requestId, receipt]) => ({ requestId, action: receipt.action, status: receipt.status, request: receipt.request || null, result: receipt.result || null })),
     acceptance: state.accepted_by === "user" ? "accepted_by_user" : "not_accepted",
     preparation,
     usage: readDeliveryUsage(target.runRoot, state, target.bindingStatus === "bound" ? control.binding.task : null, target.options),
@@ -163,7 +177,7 @@ export function listTaskDeliveries(taskInput, options = {}) {
     if (!existsSync(path.join(runRoot, "build-state.json"))) continue;
     try {
       const control = readControl(runRoot, context);
-      if (!control || taskKey(control.binding.task) !== taskKey(task)) continue;
+      if (!control || control.binding.task.chatId !== task.chatId || taskKey(control.binding.task) !== taskKey(task)) continue;
       const state = json(path.join(runRoot, "build-state.json"), context.stateRoot);
       rows.push({ runId: path.basename(runRoot), status: String(state.status || "unknown") });
     } catch { /* A damaged run never becomes authorization through discovery. */ }

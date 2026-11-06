@@ -6,6 +6,7 @@ import type { ThreadSummary, RuntimeStatus, ThreadGroup } from './types';
 import { CodexChatGatewayError } from './native-gateway';
 import type {ProviderPreset} from '../settings/provider-profile';
 import { providerVoiceTaskBackend } from '../../../../../scripts/lib/provider-voice-task-backend.mjs';
+import {factoryControlView} from '../../../../../scripts/lib/provider-factory-control.mjs';
 type CatalogHealth=TaskProviderHealth & {model?:{id:string}|null;models?:Array<{id:string;efforts?:string[];tools?:boolean;responses?:boolean;available?:boolean|null}>};
 
 /** UI protocol adapter for private provider history. Native history is never mirrored here. */
@@ -49,7 +50,7 @@ export class ExternalChatGateway implements TaskChatBackend {
   };
   threadDetail:TaskChatBackend['threadDetail']=async chat=>{
     await this.core.reconcile(chat);const binding=this.core.require(chat),thread=this.summary(binding),active=this.core.activeIntent(chat),control=executionChannelView(this.core.execution,'provider-control:'+chat);
-    return {thread,activeTurnId:active?.turnId || null,controls:control?{turnId:String(control.turnId),steer:control.steer===true,interrupt:control.interrupt===true}:null,pendingRequests:this.core.pendingRequests(chat),queued:await this.core.queued(chat),streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events',continuationState:thread.continuationState,history:{state:'available',code:null,recoverable:false}};
+    return {thread,factoryControl:factoryControlView(this.core,binding),activeTurnId:active?.turnId || null,controls:control?{turnId:String(control.turnId),steer:control.steer===true,interrupt:control.interrupt===true}:null,pendingRequests:this.core.pendingRequests(chat),queued:await this.core.queued(chat),streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events',continuationState:thread.continuationState,history:{state:'available',code:null,recoverable:false}};
   };
   startTurn:TaskChatBackend['startTurn']=(chat,input,options)=>this.core.start(chat,input,options);
   queuedMessages:TaskChatBackend['queuedMessages']=async chat=>this.core.queued(chat);
@@ -86,7 +87,11 @@ export class ExternalChatGateway implements TaskChatBackend {
   voiceControl:TaskChatBackend['voiceControl']=async()=>this.unsupported();
   answerRequest:TaskChatBackend['answerRequest']=(...args)=>this.core.answerRequest(...args);
   operationDecision:TaskChatBackend['operationDecision']=async()=>this.unsupported();
-  taskDeliveries:TaskChatBackend['taskDeliveries']=async()=>this.unsupported();
+  taskDeliveries:TaskChatBackend['taskDeliveries']=async(chat,runId)=>{
+    const binding=this.core.require(chat);
+    if(runId || !binding.workspace.factorySlug)return this.unsupported();
+    return {runs:[],factory:factoryControlView(this.core,binding)};
+  };
   deliveryAction:TaskChatBackend['deliveryAction']=async()=>this.unsupported();
   createTaskLink:TaskChatBackend['createTaskLink']=async()=>this.unsupported();
   taskChatLinkForTask:TaskChatBackend['taskChatLinkForTask']=async taskId=>{const chat=this.core.voiceTaskChat(taskId) || this.core.registry.history.chatForTask(taskId);return chat?{chatId:chat,href:'/task-chat?group=voice_work&chat='+encodeURIComponent(chat),historyAvailable:true,continuationState:this.summary(this.core.require(chat)).continuationState}:null;};

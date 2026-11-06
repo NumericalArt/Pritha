@@ -13,6 +13,7 @@ import { normalizeProviderPreset } from './provider-profile.mjs';
 import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
 import {resolveProviderAgentWorkspace} from './provider-agent-workspace.mjs';
 import {voiceFactoryPaths,prepareFactoryBinding,factoryDraftReceipt,readFactoryConversation} from '../agents-mother/voice-factory-state.mjs';
+import {factoryControlInput,runFactoryControl} from './provider-factory-control.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -170,6 +171,7 @@ export class ProviderTaskRuntime {
   validateTurn(binding,input){
     if(input && ['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw failure('runtime_identity_mismatch','This chat retains its original subject and factory phase.');
     const text=providerTurnText(input);
+    factoryControlInput(binding,input);
     if(binding.archived)throw failure('chat_archived','Restore this chat before sending a message.');
     if(input.settings?.modelId && input.settings.modelId!==binding.modelId || input.settings?.effortId && input.settings.effortId!==binding.effortId || input.settings?.serviceTierId)throw failure('runtime_identity_mismatch','This chat retains its original provider, model and execution settings.');
     this.options.validateText?.(text);
@@ -239,7 +241,7 @@ export class ProviderTaskRuntime {
         this.registry.mutate(chat,row=>({...row,lastStatus:'active',updatedAt:stamp()}));
         this.emit(chat,'turn.started',{turn:providerTurnView(this.registry.turn(chat,turn.turnId))},{turnId:turn.turnId});
         accepted=true;
-        active.completion=this.launch(binding,active,text,{...attachments,input}).catch(()=>{/* State is fenced; a storage failure never releases its claim. */});
+        active.completion=(input.factoryAction?runFactoryControl(this,binding,active,input):this.launch(binding,active,text,{...attachments,input})).catch(()=>{/* State is fenced; a storage failure never releases its claim. */});
         return {accepted:{turn:providerTurnView(this.registry.turn(chat,turn.turnId)),streamUrl:streamUrl(chat)},replayed:false};
       }finally{if(!accepted)lease.release();}
     });
@@ -259,7 +261,7 @@ export class ProviderTaskRuntime {
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
-        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact child. Read status first and resume the saved phase; never restart or ask again to approve an accepted document. For a new workflow prepare a complete brief and proposed build budget, obtain separate Contract and Outcome approvals, then continue canonical research, scaffold, bounded delivery and verification. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
+        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact child. Read status first and resume the saved phase; never restart or ask again to approve an accepted document. For a new workflow prepare a complete brief and proposed build budget, obtain separate Contract and Outcome approvals, then continue canonical research, scaffold, bounded delivery and verification. For a deterministic local HTTP/CLI product set childModelProvider and childModelId to none with no repository adoption. The host supplies operation IDs. Consult continued results before selecting the next step. Read each research_status page with offset until nextOffset is null; select actual passages and publish your synthesis. Give the verified directory, first-use command and observed output. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
         // The host pins the Voice search intent in this turn's hashed request,
         // including queued/resumed delivery. Never infer it from an assembled prompt.
         searchUserText:binding.origin==='voice'?(typeof attachments.input.voiceSearchText==='string'?attachments.input.voiceSearchText.slice(0,16000):'Do not browse.'):text,
@@ -402,6 +404,7 @@ export class ProviderTaskRuntime {
     }));
   }
   async enqueue(chat,input){
+    if(Object.hasOwn(input || {},'factoryAction'))throw failure('factory_control_queue_denied','Run an agent action after the current turn completes.',400);
     return this.execution.withMutation('provider-admission:'+chat,async()=>{
       const binding=this.require(chat);this.validateTurn(binding,input);
       const key=queueKey(chat,input.clientMessageId),prior=this.execution.getIntent(key);

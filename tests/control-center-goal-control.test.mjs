@@ -43,6 +43,7 @@ const { CodexChatGateway } = load("codex-chat/gateway", {
   "../../../../../scripts/lib/provider-approvals.mjs": noop,
   "../../../../../scripts/lib/task-workspace.mjs": noop,
   "../../../../../scripts/agents-mother/task-delivery.mjs": noop,
+  "../../../../../scripts/agents-mother/factory-progress.mjs": {readBoundFactoryProgress:()=>assert.fail('Goal controls must not read another factory')},
   "../../../../../scripts/agents-mother/phase-usage.mjs": noop,
   "@/lib/pritha-paths": noop, "./app-server": noop, "./storage-identity": noop,
   "./attachment-store": noop, "./attachment-policy": noop, "./native-thread-errors": noop,

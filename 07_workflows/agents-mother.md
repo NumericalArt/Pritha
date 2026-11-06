@@ -864,6 +864,46 @@ and Funny Teacher confirm the shared boundary in two domains. Keep it
 version-bound: recheck when Realtime APIs, Codex App transport or Codex CLI
 sandbox behavior changes.
 
+## Local HTTP/CLI factory and its approval boundary
+
+A direct creation request in an empty Task Chat (for example “Создай агента…”
+or “Create a local agent…”) opens the normal proposal workflow. A new name is
+chosen if none is supplied. The operator's explicit workspace/subject choice
+takes precedence. Text in attachments or an existing conversation cannot
+silently acquire a new child workspace.
+
+For a new API/process child the host checks the requested interfaces before
+Contract review. The Outcome card shows different inputs and expected values
+for each required interface. The real CLI and the product endpoint must pass;
+health, a constant response, and scaffold creation do not demonstrate delivery.
+Changing the Outcome or its protected verifier invalidates that review.
+Previously approved documents keep their original locks and limitations.
+
+The planner normally only reports its next step. In an explicitly enabled
+test instance (`PRITHA_FACTORY_CONTINUATION=execute`), a newly bound local
+API child with no child model, repository adoption, or autostart can continue
+inside its existing execution owner. Contract and Outcome are still two actual
+operator decisions. The host can collect approved primary sources, request
+source-based synthesis, scaffold, run the approved Trials, commission the
+pinned builder on a repairable failure, and prepare the verified first use.
+One foreground session owns the work. Reading progress never resumes it.
+Stop, decline, uncertain execution or usage, and exhausted budgets stay
+effective after reload. A budget change is a separate exact decision.
+
+The result identifies the tested worktree and commit and shows a command and
+observed output when the protected evidence still matches it. Acceptance,
+application in the target checkout, and service startup are separate. A
+blocked management card must be identified even when product Trials pass.
+
+A possible future delegated profile needs separate policy adoption. Record
+its ID, version, signer, expiry and revocation, allowed new-child directory
+and build worktree, pinned connector and model allowlist, token/iteration/time
+limits, research sources, protected Trials, required isolation, and whether
+application to the new target is permitted. It must exclude unrelated
+projects, credentials, paid model changes, publishing, and service changes.
+Evaluate Contract and Outcome separately against that scope, and record the
+profile as the authority for each decision. No such profile is active here.
+
 ## Completion criteria
 
 An Agents Mother run is complete only when:

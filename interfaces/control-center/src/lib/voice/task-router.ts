@@ -77,6 +77,10 @@ export async function providerVoiceTaskProjection(taskId: string) {
   const status = turn ? pending.length || unknownExecution ? 'waiting_for_operator' : factoryFailed ? 'failed' : statusMap[turn.status] || 'waiting_for_operator'
     : task.state === 'queued' && (!queue?.status || queue.status === 'queued') ? 'queued' : task.state === 'cancelled' ? 'aborted' : 'waiting_for_operator';
   const questions = question?.presentation && Array.isArray(question.presentation.questions) ? question.presentation.questions as Array<{id:string;question:string}> : [];
+  const boundProduct = topic.workspace.factorySlug && topic.chatId
+    ? await getCodexChatGateway().taskDeliveries(topic.chatId).then(v => 'factory' in v ? v.factory : null).catch(()=>null) : null;
+  const product = boundProduct?.available && boundProduct.slug===topic.workspace.factorySlug ? boundProduct.milestone
+    : topic.workspace.factorySlug ? {kind:'reconcile',label:'Проверяю состояние',summary:'Проверяю сохранённое состояние создания агента. Повторный запуск не нужен.'} : null;
   const resultText = receipt?.kind === 'turn' ? receipt.resultText || '' : '';
   return { task, topic, resultText, status: {
     status, phase: unknownExecution ? 'execution_unknown' : factoryFailed ? 'factory_draft_failed' : turn?.status || queue?.status || task.state, transport: 'task-chat', connector_id: topic.connectorId,
@@ -86,7 +90,8 @@ export async function providerVoiceTaskProjection(taskId: string) {
     updated_at: turn?.completedAt || turn?.startedAt || task.updatedAt, completed_at: turn?.completedAt || null,
     result_truncated: receipt?.kind === 'turn' && receipt.resultTruncated === true,
     error_code: unknownExecution ? 'fallback_confirmation_required' : factoryFailed ? factoryReceipt?.errorCode : turn?.error?.code || queue?.reason || task.errorCode,
-    factory_draft_failed: Boolean(factoryFailed),
+    factory_draft_failed: Boolean(factoryFailed), factory_product: factoryFailed ? null : product,
+    controller_status: status,
     question: questions.map(row => row.question).join('\n').slice(0, 2000),
     requires_operator_response: Boolean(question),
     operator_request: question ? { request_id: question.requestId, revision: question.presentation?.revision,

@@ -45,3 +45,12 @@ test('reconciliation expires only the ended owner turn without confusing hashed 
   expireProviderRequests(f.b,chat,turn);assert.equal(pendingProviderRequests(f.b,chat).length,0);
   await assert.rejects(answerProviderRequest(f.b,chat,answer(row)),{code:'native_request_changed'});f.broker.close();await expired;
 });
+test('a card appears only after its private socket opens; double click and lost acknowledgement reconcile one answer',async t=>{
+  const f=fixture(t),pending=f.broker.ask(request);
+  assert.equal(pendingProviderRequests(f.b,chat).length,0);
+  const row=await ready(f.b),input=answer(row);
+  const responses=await Promise.all([answerProviderRequest(f.a,chat,input),answerProviderRequest(f.b,chat,input)]);
+  assert.equal(responses.filter(r=>!r.replayed).length,1);assert.deepEqual(await pending,{decision:'accept'});
+  assert.equal((await answerProviderRequest(f.b,chat,input)).replayed,true);
+  await assert.rejects(answerProviderRequest(f.b,chat,{...input,revision:input.revision-1}),{code:'native_request_changed'});
+});

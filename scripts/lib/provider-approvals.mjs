@@ -22,18 +22,30 @@ function scoped(coordinator,chatId,input){
 }
 export async function answerProviderRequest(coordinator,chatId,input){
   const row=scoped(coordinator,chatId,input),response=responseFor(row,input);
-  if(row.state==='answered' && row.responseHash===hash(response))return {submitted:true,replayed:true};
+  const recorded=current=>current?.state==='answered' && current.revision-1===input.revision && current.responseHash===hash(response);
+  if(recorded(row))return {submitted:true,replayed:true};
   if(row.state!=='pending' || row.revision!==input.revision)throw failure('native_request_changed');
   const channel=executionChannelView(coordinator,'provider-answer:'+row.id);
-  if(!channel || channel.turnId!==row.turnId || channel.owner!==row.owner || channel.generation!==row.generation)throw failure('control_connection_expired');
-  return callExecutionChannel(coordinator,'provider-answer:'+row.id,input);
+  try {
+    if(!channel || channel.chatId!==chatId || channel.turnId!==row.turnId || channel.owner!==row.owner || channel.generation!==row.generation)throw failure('control_connection_expired');
+    return await callExecutionChannel(coordinator,'provider-answer:'+row.id,input);
+  } catch(error) {
+    // A second tab, or an acknowledgement lost after the CAS, can race close.
+    // Reconcile the recorded answer; never send it again from this catch.
+    if(recorded(scoped(coordinator,chatId,input)))return {submitted:true,replayed:true};
+    throw error;
+  }
 }
 export function pendingProviderRequests(coordinator,chatId){
-  return coordinator.listIntents({kind:'provider-request',states:['pending'],limit:200}).filter(row=>row.chatId===chatId).map(row=>({requestId:row.id,chatId,turnId:row.turnId,itemId:null,kind:row.requestKind,
-    title:row.requestKind==='user_input'?'Input needed':'Approval needed',reason:row.reason || null,expiresAt:row.expiresAt,resolved:false,presentation:{...row.presentation,revision:row.revision,state:row.state}}));
+  return coordinator.listIntents({kind:'provider-request',chatId,states:['pending','channel_unavailable'],limit:200}).map(row=>{
+    const endpoint=executionChannelView(coordinator,'provider-answer:'+row.id);
+    const ready=row.state==='pending' && endpoint?.chatId===chatId && endpoint.turnId===row.turnId && endpoint.owner===row.owner && endpoint.generation===row.generation;
+    return {requestId:row.id,chatId,turnId:row.turnId,itemId:null,kind:row.requestKind,
+      title:row.requestKind==='user_input'?'Input needed':'Approval needed',reason:row.reason || null,expiresAt:row.expiresAt,resolved:false,presentation:{...row.presentation,revision:row.revision,state:ready?'pending':'channel_unavailable'}};
+  });
 }
 export function expireProviderRequests(coordinator,chatId,turnId){
-  for(const row of coordinator.listIntents({kind:'provider-request',states:['pending'],limit:1000}))if(row.chatId===chatId && row.turnId===turnId && validId(row.operationId))coordinator.updateIntent('provider-request:'+chatId+':'+turnId+':'+row.operationId,{state:'expired'},row.revision);
+  for(const row of coordinator.listIntents({kind:'provider-request',chatId,turnId,states:['connecting','pending','channel_unavailable'],limit:1000}))if(validId(row.operationId))coordinator.updateIntent('provider-request:'+chatId+':'+turnId+':'+row.operationId,{state:'expired'},row.revision);
 }
 
 /** Permission answers authorize one exact host action. They do not execute it,
@@ -48,31 +60,39 @@ export class ProviderApprovalBroker {
         || presentation.questions.some(q=>!validId(q.id) || typeof q.question!=='string' || !q.question.trim() || q.question.length>2000 || q.isSecret===true)))throw failure('native_answer_invalid');
     const key='provider-request:'+this.chatId+':'+this.turnId+':'+operationId;
     const reserved=this.coordinator.reserveIntent(key,hash({kind,presentation,reason}),{kind:'provider-request',chatId:this.chatId,turnId:this.turnId,operationId,owner:this.lease.owner,generation:this.lease.generation,requestKind:kind,presentation,reason,
-      expiresAt:new Date(Date.now()+timeoutMs).toISOString()},{limit:{max:128,states:['pending']}});
+      expiresAt:new Date(Date.now()+timeoutMs).toISOString()},{limit:{max:128,states:['pending','connecting']}});
     if(reserved.intent.state==='answered')return reserved.intent.response;
     if(this.waiters.has(key))return this.waiters.get(key).promise;
     if(!reserved.created)throw failure('provider_request_expired');
-    const row=this.coordinator.updateIntent(key,{state:'pending'},reserved.intent.revision);
+    const row=this.coordinator.updateIntent(key,{state:'connecting'},reserved.intent.revision);
     let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});
     const waiter={promise,resolve,reject,cleanup:null};this.waiters.set(key,waiter);
-    const expire=()=>{
-      const current=this.coordinator.getIntent(key);if(current?.state==='pending')this.coordinator.updateIntent(key,{state:'expired'},current.revision);
-      waiter.cleanup?.();this.waiters.delete(key);this.emit();reject(failure('provider_request_expired'));
+    const expire=(unavailable=false)=>{
+      if(this.waiters.get(key)!==waiter)return;
+      const current=this.coordinator.getIntent(key);if(['connecting','pending'].includes(current?.state))this.coordinator.updateIntent(key,{state:unavailable===true?'channel_unavailable':'expired'},current.revision);
+      waiter.cleanup?.();this.waiters.delete(key);this.emit();reject(failure(unavailable===true?'control_channel_unavailable':'provider_request_expired'));
     };
     const timer=setTimeout(expire,timeoutMs);this.signal?.addEventListener('abort',expire,{once:true});
-    const close=registerExecutionChannel(this.coordinator,'provider-answer:'+row.id,{
-      view:()=>this.closed || !this.waiters.has(key)?null:{turnId:this.turnId,owner:this.lease.owner,generation:this.lease.generation},
+    let close;
+    waiter.cleanup=()=>{clearTimeout(timer);close?.();this.signal?.removeEventListener('abort',expire);};waiter.expire=expire;
+    try {close=registerExecutionChannel(this.coordinator,'provider-answer:'+row.id,{
+      view:()=>this.closed || !this.waiters.has(key)?null:{chatId:this.chatId,turnId:this.turnId,owner:this.lease.owner,generation:this.lease.generation},
       call:input=>this.coordinator.withMutation('provider-answer:'+row.id,async()=>{
         this.lease.assertOwned();const current=scoped(this.coordinator,this.chatId,input),response=responseFor(current,input),responseHash=hash(response);
         if(current.id!==row.id || current.turnId!==this.turnId || current.owner!==this.lease.owner || current.generation!==this.lease.generation)throw failure('native_request_not_found');
-        if(current.state==='answered' && current.responseHash===responseHash)return {submitted:true,replayed:true};
+        if(current.state==='answered' && current.revision-1===input.revision && current.responseHash===responseHash)return {submitted:true,replayed:true};
         if(this.closed || this.signal?.aborted || current.state!=='pending' || current.revision!==input.revision || Date.now()>=Date.parse(current.expiresAt))throw failure('native_request_changed');
         this.coordinator.updateIntent(key,{state:'answered',responseHash,response,clientMessageId:input.clientMessageId},current.revision);
         waiter.cleanup?.();this.waiters.delete(key);this.emit();resolve(response);return {submitted:true,replayed:false};
       }),
-    });
-    waiter.cleanup=()=>{clearTimeout(timer);close();this.signal?.removeEventListener('abort',expire);};waiter.expire=expire;
-    if(this.signal?.aborted)expire();else this.emit();return promise;
+    });}catch{expire(true);return promise;}
+    void close.ready.then(()=>{
+      if(!this.waiters.has(key))return;
+      this.lease.assertOwned();
+      this.coordinator.updateIntent(key,{state:'pending'},row.revision);
+      this.emit();
+    }).catch(()=>expire(true));
+    if(this.signal?.aborted)expire();return promise;
   }
   close(){this.closed=true;for(const waiter of [...this.waiters.values()])waiter.expire();}
 }

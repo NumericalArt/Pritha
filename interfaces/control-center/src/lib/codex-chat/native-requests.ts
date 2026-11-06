@@ -34,7 +34,8 @@ export function captureNativeRequest(message:{id?:string|number;method?:string;p
 export function pendingNativeRequests(storage:string,nativeThreadId:string) {
   return nativeExecutionCoordinator().listIntents({kind:"native-request",states:["pending","answering","unknown"],limit:200})
     .filter(row=>row.storage===storage && row.nativeThreadId===nativeThreadId)
-    .map(row=>({id:row.id,revision:row.revision,kind:row.requestKind,params:row.params,state:row.state}));
+    .map(row=>({id:row.id,revision:row.revision,kind:row.requestKind,params:row.params,
+      state:row.state==="pending" && executionChannelView(nativeExecutionCoordinator(),"native-answer:"+row.id)?.generation!==row.generation?"channel_unavailable":row.state}));
 }
 
 export function expireNativeRequests(generation:string) {

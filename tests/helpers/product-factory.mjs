@@ -1,3 +1,4 @@
+import {readBoundFactoryProgress} from '../../scripts/agents-mother/factory-progress.mjs';
 // Isolated Task Chat fixture. Factory workers, approvals, research gates,
 // scaffold, provider build executors and Trials are real. Provider responses
 // and primary-source page contents are synthetic and make no paid requests.
@@ -17,6 +18,8 @@ import { ExecutionCoordinator } from '../../scripts/lib/execution-coordinator.mj
 import { atomicWriteFile } from '../../scripts/lib/atomic-file.mjs';
 import { voiceFactoryPaths, loadVoiceFactory, factoryArtifact } from '../../scripts/agents-mother/voice-factory-state.mjs';
 import { executeVoiceFactoryStep } from '../../scripts/agents-mother/voice-factory-worker.mjs';
+import {firstUseExamples} from '../../scripts/agents-mother/factory-product-trial.mjs';
+import {validateOutcomeSpecText} from '../../scripts/agents-mother/outcome-spec.mjs';
 import { contractData } from '../../scripts/agents-mother/contract.mjs';
 import { HostResearch } from '../../scripts/agents-mother/host-research.mjs';
 import { deriveExternalResearchTopics } from '../../scripts/agents-mother/external-research-topics.mjs';
@@ -81,7 +84,7 @@ class BuildConnection {
   async waitForNotification() { return { method: 'turn/completed', params: { threadId: this.current.id, turn: this.current.turns[0] } }; }
 }
 
-export async function productFactoryFixture(scenario, emit = () => {}) {
+export async function productFactoryFixture(scenario, emit = () => {}, {automate=false}={}) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pritha-product-factory-')));
   const stateRoot = path.join(directory, 'state'), agentParent = path.join(directory, 'children');
   fs.mkdirSync(stateRoot); fs.mkdirSync(agentParent);
@@ -92,10 +95,22 @@ export async function productFactoryFixture(scenario, emit = () => {}) {
   const state = () => loadVoiceFactory(paths, { chatId, connectorId: scenario.connectorId });
   const artifact = kind => factoryArtifact(paths, state(), kind);
 
+  function initMemory(){const memory=path.join(stateRoot,'memory');fs.mkdirSync(memory,{recursive:true});execFileSync('sqlite3',[path.join(memory,'pritha.sqlite')],{input:fs.readFileSync(path.join(root,'.memory/schema.sql'))});}
+  if(automate)initMemory();
+  function productTrial() {
+    const coverage=validateOutcomeSpecText(artifact('outcome').text,{root}).coverage;
+    const covers=coverage.filter(row=>row.statement==='Return the approved product JSON' || row.statement.replace(/\.$/,'')==='Working implementation of the approved V1 core functions').map(r=>r.id);
+    const inputs=scenario.connectorId==='codex'?['  '+scenario.cliInput+'  ','  '+scenario.httpInput+'  ']:[scenario.cliInput,scenario.httpInput,'yes definitely?','  YES definitely?'];
+    return {
+      cli:inputs.map(value=>({argv:['node',scenario.entrypoint,scenario.flag,value],expected_json:scenario.result(value),covers})),
+      http:inputs.slice().reverse().map(value=>({argv:['node','scripts/server.mjs'],port_variable:scenario.portVariable,path:scenario.route,input_json:{[scenario.field]:value},expected_json:scenario.result(value),covers}))
+    };
+  }
   function implement(worktree) {
     assert.notEqual(worktree, paths.target);
     assert.match(worktree, /worktree$/);
     builds.push({ connectorId: scenario.connectorId, worktree });
+    fs.appendFileSync(path.join(worktree,'README.md'),'\n'+Object.values(firstUseExamples(productTrial(),contractData(state().contract,{root}))).join('\n')+'\n');
     const operation = scenario.slug === 'headline-distiller'
       ? 'value => ({ headline: value.trim() })'
       : "value => ({ answer: value.startsWith('YES') ? 'YES' : 'NO', reason: value })";
@@ -122,18 +137,30 @@ export async function productFactoryFixture(scenario, emit = () => {}) {
     });
   }
 
+  function fixtureResearch(){
+      const saved = state(), data = contractData(saved.contract, { root });
+      const pattern = fs.readFileSync(saved.pattern, 'utf8');
+      const topics = deriveExternalResearchTopics(data, { patternPack: pattern });
+      return new HostResearch({ root, stateRoot, data, report: { fullPath: saved.research, text: fs.readFileSync(saved.research, 'utf8') },
+        patternLock: verifyPatternPackIntegrity(pattern, data.fingerprint).lock, topics, connectorId: scenario.connectorId,
+        reader: async url => ({ items: [{ url, text: topics.map(topic => topic.query + '. Synthetic primary documentation fixture confirms bounded Node behavior, input validation and explicit application ownership for this isolated test.').join('\n\n') }] }),
+      });
+  }
   class FixtureHost extends hostTools.ProviderHostTools {
     constructor(options) {
-      super(options); hosts.push(this);
+      super({...options,factoryContinuation:automate?'execute':'shadow'}); hosts.push(this);
       const execute = this.factory.execute.bind(this.factory);
       this.factory.execute = async (input, expected) => {
-        if (input.action !== 'deliver') return execute(input, expected);
+        if (!['deliver','research_collect'].includes(input.action)) return execute(input, expected);
         // Substitute provider IO in the same trusted worker. The real delivery
         // loop chooses whether to call the real Codex/Claude executor class.
         const next = { ...expected, revision: expected.revision + 1, running: { operationId: input.operation_id, action: input.action } };
         atomicWriteFile(paths.file, JSON.stringify(next));
         const result = await executeVoiceFactoryStep({ root, stateRoot, agentParent, slug: paths.slug, chatId, connectorId: scenario.connectorId,
-          model: scenario.model, effort: 'low', state: next, input }, { delivery: { ...delivery,
+          model: scenario.model, effort: 'low', state: next, input }, { externalResearchContract:async(_contract,args)=>{
+          const host=fixtureResearch();
+          return args.phase==='status'?host.status():host.collect({sourceUrls:Object.fromEntries(host.topics.map(t=>[t.id,'https://'+t.primaryDomains[0]+'/api/fixture']))});
+        },delivery: { ...delivery,
           deliverOutcome: (spec, target, options) => delivery.deliverOutcome(spec, target, { ...options, buildExecutor: executor(options) }),
         } });
         atomicWriteFile(paths.file, JSON.stringify({ ...result.state, running: null }));
@@ -191,19 +218,20 @@ export async function productFactoryFixture(scenario, emit = () => {}) {
       const text = result.contentItems?.[0]?.text || result.content?.[0]?.text;
       const outer = JSON.parse(text);
       value = outer.text ? JSON.parse(outer.text) : outer;
+      if(outer.continued){value.continued=outer.continued;value.continuationResult=JSON.parse(outer.continuationResult.text);value.continuationFailed=outer.continuationFailed;}
     } catch (error) { value = factoryTools.factoryBriefErrorDetail(error) || { error: error.code || error.message }; }
     emit();
     return value;
   };
   return { root, directory, stateRoot, paths, scenario, chatId, builds, reviews, call, pending, state, artifact,
+    shadow:action=>coordinator.listIntents({kind:'provider-tool',chatId}).find(row=>row.factoryAction===action)?.factoryShadow,
+    progress:()=>readBoundFactoryProgress({root,stateRoot,agentParent,slug:scenario.slug,target:paths.target,chatId,connectorId:scenario.connectorId,model:scenario.model}),
     brief: { identity: { name: scenario.name, slug: scenario.slug }, goal: 'Return the requested JSON through HTTP and CLI.', user: 'Local operator',
       successCriteria: ['HTTP and CLI return the approved JSON for the supplied input.'], coreFunctions: ['Return the approved product JSON'],
-      technical: { preset: 'llm-app', runtimeFamily: 'api', serviceMode: 'process', primaryInterface: 'web', secondaryInterfaces: 'CLI',
+      technical: { childModelProvider:'none',childModelId:'none',preset: 'llm-app', runtimeFamily: 'api', serviceMode: 'process', primaryInterface: 'web', secondaryInterfaces: 'CLI',
         cliEntrypoint: scenario.entrypoint, port: '3021', portVariable: scenario.portVariable,
         repositoryResearchPolicy: 'not-applicable', repositoryAdoptionMode: 'none', repositoryResearchTopics: 'none', repositoryResearchWaiverReason: 'Synthetic product test uses only built-in Node modules.' } },
-    trial: { cli: { argv: ['node', scenario.entrypoint, scenario.flag, scenario.cliInput], expected_json: scenario.result(scenario.cliInput) },
-      http: { argv: ['node', 'scripts/server.mjs'], port_variable: scenario.portVariable, path: scenario.route,
-        input_json: { [scenario.field]: scenario.httpInput }, expected_json: scenario.result(scenario.httpInput) } },
+    get trial(){return productTrial();},
     async answer(request = pending()[0], input = {}) {
       reviews.push(request);
       const result = await approvals.answerProviderRequest(coordinator, chatId, { requestId: request.requestId, revision: request.presentation.revision,
@@ -212,17 +240,9 @@ export async function productFactoryFixture(scenario, emit = () => {}) {
       return result;
     },
     async research() {
-      const memory = path.join(stateRoot, 'memory'); fs.mkdirSync(memory);
-      execFileSync('sqlite3', [path.join(memory, 'pritha.sqlite')], { input: fs.readFileSync(path.join(root, '.memory/schema.sql')) });
-      const result = await call('research'); assert.equal(result.error, undefined, JSON.stringify(result));
-      const saved = state(), data = contractData(saved.contract, { root });
-      const pattern = fs.readFileSync(saved.pattern, 'utf8');
-      const topics = deriveExternalResearchTopics(data, { patternPack: pattern });
-      const host = new HostResearch({ root, stateRoot, data, report: { fullPath: saved.research, text: fs.readFileSync(saved.research, 'utf8') },
-        patternLock: verifyPatternPackIntegrity(pattern, data.fingerprint).lock, topics, connectorId: scenario.connectorId,
-        reader: async url => ({ items: [{ url, text: topics.map(topic => topic.query + '. Synthetic primary documentation fixture confirms bounded Node behavior, input validation and explicit application ownership for this isolated test.').join('\n\n') }] }),
-      });
-      const collected = await host.collect({ sourceUrls: Object.fromEntries(host.topics.map(topic => [topic.id, 'https://' + topic.primaryDomains[0] + '/api/fixture'])) });
+      if(!automate){initMemory();const result=await call('research');assert.equal(result.error,undefined,JSON.stringify(result));}
+      const host=fixtureResearch();
+      const collected = automate?host.status():await host.collect({ sourceUrls: Object.fromEntries(host.topics.map(topic => [topic.id, 'https://' + topic.primaryDomains[0] + '/api/fixture'])) });
       const selection = { facts: collected.sources.map(source => ({ sourceId: source.id, topicId: source.topicId, passageId: source.passages[0].id,
         versionContext: 'Synthetic Node fixture version', compatibility: 'This isolated fixture confirms the selected built-in Node behavior.', compatibilityStatus: 'compatible' })),
         synthesis: { relationship: 'confirms', memory_comparison: 'Synthetic evidence agrees with the selected local Node fixture.', summary: 'The isolated fixture can implement the approved HTTP and CLI behavior.',

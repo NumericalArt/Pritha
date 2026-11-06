@@ -17,8 +17,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import dynamic from "next/dynamic";
 import { useChatAttachments } from "./useChatAttachments";
-import { readDraftSession, writeDraftSession,composeDraftSubject,composeDraftFactoryIntent,type DraftFactorySelection,type DraftProviderSelection } from "@/lib/codex-chat/draft-session";
+import { readDraftSession, writeDraftSession,composeDraftSubject,composeDraftFactoryIntent,newAgentRequest,requestedFactoryIntent,type DraftFactorySelection,type DraftProviderSelection } from "@/lib/codex-chat/draft-session";
 import {FACTORY_PHASES,type ChatSubject,type FactoryIntent} from '../../../../../scripts/lib/chat-subject.mjs';
+import {FactoryProgress} from "./DeliveryPanel";
 import {FactoryChatSelector} from './FactoryChatSelector';
 import {PROVIDER_LABELS,type ProviderConnectorId} from '@/lib/settings/provider-profile';
 import {NewChatProviderSelector} from './NewChatProviderSelector';
@@ -1078,25 +1079,32 @@ export function CodexChatPage() {
   }, [loadThreadDetail, loadThreadHistory, refreshRuntime, refreshThreads]);
 
   const retryNow = useCallback(async () => {
-    const restartStream = Boolean(selectedChatIdRef.current && connection !== "ready");
+    const chatId = selectedChatIdRef.current, draftId = newDraftIdRef.current;
+    let epoch = navigationEpochRef.current;
+    const current = () => selectedChatIdRef.current === chatId && newDraftIdRef.current === draftId && navigationEpochRef.current === epoch;
+    const restartStream = Boolean(chatId && connection !== "ready");
     setRecovering(true);
     setError(null);
     if (restartStream) setConnection("connecting");
     try {
       await checkControlCenterHealth();
+      if (!current()) return;
       await refreshRuntime();
-      const chatId = selectedChatIdRef.current;
+      if (!current()) return;
       if (chatId) {
         const context = beginNavigation(chatId, "retry");
+        epoch = navigationEpochRef.current;
         const nextDetail = await loadThreadDetail(chatId);
+        if (!current()) return;
         await loadThreadHistory(chatId, nextDetail, context);
-        if (restartStream) setStreamRevision((current) => current + 1);
+        if (current() && restartStream) setStreamRevision((current) => current + 1);
       } else {
         await refreshThreads();
       }
     } catch (cause) {
-      setConnection(selectedChatIdRef.current ? "reconnecting" : "idle");
-      setError(failure(cause, "Task Chat could not reconnect.", "history"));
+      if (!current()) return;
+      setConnection(chatId ? "reconnecting" : "idle");
+      setError(failure(cause, "Task Chat could not reconnect.", "history", chatId));
     } finally {
       setRecovering(false);
     }
@@ -1316,6 +1324,8 @@ export function CodexChatPage() {
     if (!chatId) {
       const draftId = newDraftIdRef.current;
       let subject:ChatSubject|null,factoryIntent:FactoryIntent|null;try{subject=composeDraftSubject(factorySelectionsRef.current[draftId]);factoryIntent=composeDraftFactoryIntent(factorySelectionsRef.current[draftId]);}catch{return;}
+      const creationId=creationIdsRef.current[draftId] ||= crypto.randomUUID();
+      if(!factorySelectionsRef.current[draftId])factoryIntent=requestedFactoryIntent(text,creationId);
       const requestedSelection=providerSelectionsRef.current[draftId],connectorId=runtime.connectorId || 'codex';
       if(requestedSelection && requestedSelection.connectorId!==connectorId)return;
       if(factoryIntent && !factoryCreationAvailable){setError({message:'Agent creation is unavailable for this provider. Select a ready provider with command approvals, or turn off Create new agent.',source:'mutation',kind:'request_failed',chatId:null,retryable:false});return;}
@@ -1341,7 +1351,7 @@ export function CodexChatPage() {
         connectorId,
         ...(subject?{subject}:{}),
         ...(factoryIntent?{factoryIntent,workspace:{mode:'read-only' as const}}:{workspace:{mode:workspaceMode,...(workspaceBase ? {baseRevision:workspaceBase} : {})}}),
-        clientThreadId: creationIdsRef.current[draftId] ||= crypto.randomUUID(),
+        clientThreadId: creationId,
         clientMessageId: crypto.randomUUID(),
         text,
         attachments: attachmentIds,
@@ -1605,6 +1615,7 @@ export function CodexChatPage() {
           </div>
         ) : null}
 
+        {displayedDetail?.factoryControl?<FactoryProgress view={displayedDetail.factoryControl}/>:null}
         {displayedDetail ? <div className="codex-task-controls"><GoalBudgetPanel key={displayedDetail.thread.chatId} chatId={displayedDetail.thread.chatId} refreshKey={goalRevision}
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} />
@@ -1715,6 +1726,7 @@ export function CodexChatPage() {
               imageEditorRef.current = target; setImageEditor(target);
             }} restore={id => void attachmentDraft.restoreOriginal(draftKey, id)} />
             {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
+            {!selectedChatId && !factorySelections[newDraftId] && newAgentRequest(draft)?<span role="status">Подготовлю предложение нового агента. Возможности и критерии готовности согласуем отдельно до сборки.</span>:null}
             {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
             {fileCapabilityMissing?<span role="status" className="codex-attachment-notice">This provider does not support these attachments yet. Your files are preserved; choose a supported provider or remove the attachments.</span>:null}
             <div className="codex-composer-input">

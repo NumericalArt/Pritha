@@ -1,0 +1,58 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {execFileSync} from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import {nextFactoryAction,factoryOperationId} from '../scripts/agents-mother/factory-continuation.mjs';
+import {readBoundFactoryProgress,factoryMilestone,factoryVoiceDisplay} from '../scripts/agents-mother/factory-progress.mjs';
+import {scenarios,productFactoryFixture,until} from './helpers/product-factory.mjs';
+
+test('Voice and Task Chat cannot turn the end of a controller reply into a completed product',()=>{
+ const partial=factoryMilestone({phase:'card-blocked'},{status:'verified',blockers:[]},{commit:'tested'});
+ assert.equal(partial.kind,'partial');assert.equal(factoryVoiceDisplay('complete',true,partial).complete,false);
+ const blocked=factoryMilestone({}, {status:'blocked',blockers:[{code:'iteration_budget_exhausted',title:'Закончились попытки',question:'Продолжить?'}]},null);
+ assert.match(blocked.summary,/попытки/);assert.equal(factoryVoiceDisplay('complete',true,blocked).status,'waiting_for_operator');assert.ok(factoryVoiceDisplay('complete',true,blocked).ceiling<100);
+ assert.equal(factoryVoiceDisplay('aborted',true,blocked).complete,true);
+ const accepted=factoryMilestone({phase:'accepted'},{status:'accepted',blockers:[]},{commit:'tested'});
+ assert.equal(factoryVoiceDisplay('complete',true,accepted).complete,true);
+ assert.equal(factoryVoiceDisplay('complete',true).complete,true,'An unrelated ordinary task retains its terminal status');
+});
+test('planner stops at authority and uncertainty boundaries without an effect',()=>{
+ const s={phase:'research',research:'r',pattern:'p',contract:'c',contractApproval:{sha256:'c'},outcome:'o',outcomeApproval:{sha256:'o'},researchStage:'published'};
+ const plan=(patch,ledger)=>nextFactoryAction({...s,...patch},ledger);
+ assert.deepEqual(plan({}),{kind:'step',action:'scaffold'});
+ for(const p of [{contractApproval:null},{outcomeApproval:null},{running:{action:'deliver'}},{continuationPause:'scaffold'},{phase:'research',researchStage:'collected'},{runId:'bound'}])assert.equal(plan(p).kind,'wait');
+ const ledger={run_id:'bound',status:'blocked',iteration:1,budget:{legacy_usage_unverified:false,unaccounted_attempts:[],tokens_used:10,max_tokens:20},blockers:[{code:'token_budget_exhausted',options:[{id:'verify-only'}]}]};
+ assert.equal(plan({runId:'bound'},ledger).action,'verify');
+ for(const l of [{...ledger,run_id:'foreign'},{...ledger,budget:{...ledger.budget,tokens_used:21}},{...ledger,budget:{...ledger.budget,legacy_usage_unverified:true}}])assert.equal(plan({runId:'bound'},l).kind,'wait');
+ assert.equal(plan({runId:'bound',hostVerifiedIteration:1},ledger).kind,'wait');
+ assert.notEqual(factoryOperationId({...s,chatId:'a'},'deliver'),factoryOperationId({...s,chatId:'b'},'deliver'));
+});
+for(const scenario of scenarios)test(scenario.connectorId+': host continues after two decisions and hands off observed output from the exact revision',{timeout:120000},async t=>{
+ const f=await productFactoryFixture(scenario,()=>{},{automate:true});t.after(()=>f.close());
+ const call=async(a,args)=>{const v=await f.call(a,args);assert.equal(v.error,undefined,JSON.stringify(v));assert.notEqual(v.ok,false,JSON.stringify(v));assert.notEqual(v.continuationFailed,true,JSON.stringify(v));return v;};
+ await call('init',{brief:f.brief,build_token_budget:10000,build_iteration_budget:2});
+ const approve=async kind=>{const pending=call('approve_'+kind,{expected_sha256:f.artifact(kind).sha256});await until(()=>f.pending().length===1);await f.answer();return pending;};
+ assert.deepEqual((await approve('contract')).continued,['create_outcome']);
+ await call('prepare_product_trial',{expected_sha256:f.artifact('outcome').sha256,trial:f.trial});
+ assert.deepEqual((await approve('outcome')).continued,['research','research_collect']);
+ const page=await call('research_status',{offset:1});assert.equal(page.offset,1);assert.ok(page.sources[0].passages.length);
+ const publish=await f.research();
+ assert.equal(publish.continuationFailed,false,JSON.stringify(publish));assert.deepEqual(publish.continued,['scaffold','deliver','finish']);
+ assert.equal(f.reviews.length,2);assert.equal(f.builds.length,1);
+ const opts={root:f.root,stateRoot:f.stateRoot,agentParent:f.paths.parent,slug:f.paths.slug,target:f.paths.target,chatId:f.chatId,connectorId:scenario.connectorId,model:scenario.model};
+ const before=fs.readFileSync(f.paths.file);const view=readBoundFactoryProgress(opts);
+ assert.equal(view.delivery?.status,'verified',JSON.stringify(view));
+ assert.deepEqual(readBoundFactoryProgress(opts),view);
+ assert.equal(readBoundFactoryProgress({...opts,chatId:'chat_foreign'}).available,false);
+ assert.deepEqual(fs.readFileSync(f.paths.file),before);
+ assert.ok(view.firstUse,JSON.stringify(publish.continuationResult));
+ const portable=fs.mkdtempSync(path.join(os.tmpdir(),'pritha-clean-product-'));t.after(()=>fs.rmSync(portable,{force:true,recursive:true}));
+ execFileSync('git',['clone','--quiet','--no-local','--no-checkout',view.firstUse.directory,portable]);
+ execFileSync('git',['checkout','--quiet','--detach',view.firstUse.commit],{cwd:portable});
+ const result=execFileSync('/bin/sh',['-c',view.firstUse.commands.cli],{cwd:portable,env:{PATH:path.dirname(process.execPath)+':/usr/bin:/bin',HOME:portable},encoding:'utf8'});
+ assert.deepEqual(JSON.parse(result),view.firstUse.observed.cli);
+ fs.appendFileSync(path.join(view.firstUse.directory,scenario.entrypoint),'\n// changed\n');
+ assert.equal(readBoundFactoryProgress(opts).firstUse,null,'Old evidence cannot hand off a changed revision');
+});

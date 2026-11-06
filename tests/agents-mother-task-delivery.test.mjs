@@ -51,6 +51,10 @@ test("exact linking, budget-limited verification and handoff preparation preserv
   const linked = await f.bind();
   assert.equal(linked.run.bindingStatus, "bound");
   assert.equal(listTaskDeliveries(task, f.options).length, 1);
+  const snapshot=readFileSync(path.join(f.runRoot,"build-state.json"));
+  const detail=f.read().explanation;assert.deepEqual(detail,f.read().explanation);
+  assert.equal(detail.blockers[0].code,"token_budget_exhausted");assert.equal(detail.blockers[0].options.length,4);assert.equal(detail.budget.overrun,1);
+  assert.deepEqual(readFileSync(path.join(f.runRoot,"build-state.json")),snapshot);
   const input = f.action("verify");
   const result = await performTaskDeliveryAction(task, input, f.options);
   assert.equal(result.run.status, "awaiting_acceptance");
@@ -78,8 +82,8 @@ test("same names, other tasks, providers, instances and stale revisions cannot a
   const before = f.action("verify");
   await f.bind();
   for (const actor of [{ ...task, nativeThreadId: "different" }, { ...task, providerId: "standalone_cli" }, { ...task, stateIdentityHash: "storage-v2:other" }]) {
-    assert.equal(f.read(actor).bindingStatus, "other_task");
-    await assert.rejects(performTaskDeliveryAction(actor, f.action("verify", actor), f.options), { code: "delivery_task_mismatch" });
+    assert.throws(()=>f.read(actor),{code:"delivery_task_mismatch"});
+    await assert.rejects(performTaskDeliveryAction(actor, f.action("verify"), f.options), { code: "delivery_task_mismatch" });
   }
   await assert.rejects(performTaskDeliveryAction(task, before, f.options), { code: "delivery_changed" });
   writeFileSync(path.join(other.runRoot, "task-control.json"), readFileSync(path.join(f.runRoot, "task-control.json")));

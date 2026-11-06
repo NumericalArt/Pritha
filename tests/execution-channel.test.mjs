@@ -48,3 +48,14 @@ test('loss after IPC write is unknown and never reconnects or resends automatica
     rmSync(path.dirname(endpoint.socketPath),{recursive:true,force:true});
   } finally {await a.close();db.close();rmSync(root,{recursive:true,force:true});}
 });
+
+test('long multibyte TMPDIR never truncates the full private Unix socket pathname',async t=>{
+  const root=mkdtempSync(path.join(os.tmpdir(),'pritha-ipc-byte-test-')),db=new ExecutionCoordinator({stateRoot:root});
+  t.after(()=>{db.close();rmSync(root,{recursive:true,force:true});});
+  const {mkdirSync}=await import('node:fs'),long=path.join(root,'ю'.repeat(49));mkdirSync(long);
+  const old=process.env.TMPDIR;let a;
+  try{process.env.TMPDIR=long;a=await worker(root,'long-socket');}
+  finally{if(old===undefined)delete process.env.TMPDIR;else process.env.TMPDIR=old;}
+  try{const endpoint=executionChannelView(db,'long-socket');assert.ok(Buffer.byteLength(endpoint.socketPath)<=100);assert.equal((await callExecutionChannel(db,'long-socket',{text:'ok'})).text,'ok');}
+  finally{await a.close();}
+});

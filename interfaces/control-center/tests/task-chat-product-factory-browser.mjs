@@ -14,7 +14,7 @@ const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(path.join(appRoot, 'package.json'));
 const { webpack } = require('next/dist/compiled/webpack/webpack');
 const output = mkdtempSync(path.join(os.tmpdir(), 'pritha-product-factory-ui-'));
-const artifacts = path.resolve(appRoot, '../../.private/testing/product-factory');
+const artifacts = process.env.PRITHA_TEST_ARTIFACTS || path.resolve(appRoot, '../../.private/testing/product-factory');
 mkdirSync(artifacts, { recursive: true });
 const loader = path.join(output, 'typescript-loader.cjs');
 writeFileSync(loader, `const ts = require(${JSON.stringify(require.resolve('typescript'))}); module.exports = function(source) { return ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText; };`);
@@ -47,11 +47,11 @@ const results = [];
 const check = value => { assert.equal(value.error, undefined, JSON.stringify(value)); assert.notEqual(value.ok, false, JSON.stringify(value)); return value; };
 try {
   for (const scenario of scenarios) for (const width of [1280, 390]) {
-    const f = await productFactoryFixture(scenario);
+    const f = await productFactoryFixture(scenario,()=>{},{automate:true});
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    const message = 'Создай ' + scenario.name + ' с HTTP и CLI.';
+    const message = 'Создай агента «'+scenario.name+'», который '+(scenario.connectorId==='codex'?'убирает пробелы по краям текста и возвращает заголовок в JSON':'возвращает YES только для вопросов с префиксом YES, а иначе NO')+'. Хочу пользоваться им из CLI и по HTTP.';
     let story, storyError, finished = false, delivered, resultMessage;
     const now = new Date().toISOString();
     const thread = () => ({ chatId: f.chatId, title: scenario.name, preview: message, group: 'my_chats', origin: 'chat', status: finished ? 'completed' : story ? 'active' : 'idle',
@@ -68,17 +68,16 @@ try {
       assert.deepEqual(plan.capability.interfaces, ['web', 'cli']);
       assert.equal(plan.capability.supported, true);
       check(await f.call('approve_contract', { expected_sha256: f.artifact('contract').sha256 }));
-      check(await f.call('create_outcome'));
       assert.equal((await f.call('approve_outcome', { expected_sha256: f.artifact('outcome').sha256 })).error, 'factory_product_trial_required');
       const prepared = check(await f.call('prepare_product_trial', { expected_sha256: f.artifact('outcome').sha256, trial: f.trial }));
       check(await f.call('approve_outcome', { expected_sha256: prepared.sha256 }));
-      check(await f.research());
-      check(await f.call('scaffold'));
-      delivered = check(await f.call('deliver'));
-      assert.equal(delivered.status, 'verified', JSON.stringify(delivered));
-      assert.equal(delivered.iteration, 1);
-      assert.equal(f.builds.length, 1);
-      resultMessage = scenario.name + ' — продуктовый тест прошёл после одной итерации сборки.';
+      const synthesis=check(await f.research());
+      assert.deepEqual(synthesis.continued,['scaffold','deliver','finish']);
+      assert.equal(synthesis.continuationFailed,false);
+      const progress=f.progress();delivered=progress.delivery;
+      assert.equal(delivered.status,'verified');assert.equal(delivered.iteration,1);
+      assert.equal(f.builds.length,1);assert.ok(progress.firstUse);
+      resultMessage=scenario.name+' — продуктовый тест прошёл после одной итерации сборки.';
       finished = true;
     };
     await page.route(origin + '/**', async route => {
@@ -87,10 +86,15 @@ try {
       if (url.pathname === '/api/health') return route.fulfill({ json: { schema: 'pritha-control-center-health-v2', ok: true, service: 'pritha-control-center', status: 'ready', instance: { id: 'fixture', port: 3420 }, release: { commit: 'fixture', buildId: 'fixture' } } });
       if (url.pathname.endsWith('/events')) return route.continue();
       let data;
-      if (url.pathname.endsWith('/turns') && request.method() === 'POST') {
+      if (url.pathname.endsWith('/threads') && request.method() === 'POST') {
         assert.equal(story, undefined, 'One composer message starts one factory workflow.');
+        const body=request.postDataJSON();
+        assert.deepEqual(body.factoryIntent,{action:'create-new-agent',slug:scenario.slug});
+        assert.equal(body.connectorId,scenario.connectorId);assert.deepEqual(body.workspace,{mode:'read-only'});
+        assert.equal(body.initialTurn.input[0].text,message);
         story = workflow().catch(error => { storyError = error; });
-        data = { turn: turn(), streamUrl: '/api/codex-chat/v1/threads/' + f.chatId + '/events' };
+        const streamUrl='/api/codex-chat/v1/threads/'+f.chatId+'/events';
+        data = {detail:{thread:thread(),streamUrl,activeTurnId:'product_ui_turn',pendingRequests:[],continuationState:'continuation_enabled'},accepted:{turn:turn(),streamUrl}};
       } else if (url.pathname.endsWith('/requests') && request.method() === 'POST') {
         const input = request.postDataJSON(), pending = f.pending()[0];
         assert.equal(input.requestId, pending.requestId);
@@ -102,26 +106,27 @@ try {
             capabilities: { fullChat: true, factoryTools: true, permissionApprovals: true, commandApprovals: true, fileChangeApprovals: true, interruptTurn: true } }],
           models: [{ id: scenario.model, label: scenario.model, inputModalities: ['text'], effortIds: ['low'], serviceTierIds: [] }],
           selected: { modelId: scenario.model, effortId: 'low', sandboxMode: 'read_only', approvalMode: 'on_request' } };
-      } else if (url.pathname.endsWith('/threads')) data = { data: [thread()], nextCursor: null };
+      } else if (url.pathname.endsWith('/threads')) data = { data: story?[thread()]:[], nextCursor: null };
       else if (url.pathname.endsWith('/activity')) data = { cursor: 0, changed: [] };
       else if (url.pathname.endsWith('/ui-activity')) data = { ok: true };
       else if (url.pathname.endsWith('/delivery')) data = { runs: [] };
       else if (url.pathname.endsWith('/goal')) data = { availability: 'unavailable' };
       else if (url.pathname.endsWith('/turns') || url.pathname.endsWith('/history')) data = { data: story ? [turn()] : [], olderCursor: null, hasOlder: false };
-      else data = { thread: thread(), activeTurnId: story && !finished ? 'product_ui_turn' : null,
+      else data = { thread: thread(), factoryControl:f.progress(), activeTurnId: story && !finished ? 'product_ui_turn' : null,
         controls: story && !finished ? { turnId: 'product_ui_turn', steer: false, interrupt: false } : null,
         pendingRequests: f.pending(), queued: [], continuationState: 'continuation_enabled', history: { state: 'available' }, streamUrl: '/api/codex-chat/v1/threads/' + f.chatId + '/events' };
       return route.fulfill({ json: { apiVersion: '1', requestId: 'product_ui_response', data } });
     });
     try {
-      const url = origin + '/task-chat?group=my_chats&chat=' + f.chatId;
+      const url = origin + '/task-chat?group=my_chats';
       await page.goto(url);
       await page.locator('textarea').fill(message);
       await page.getByRole('button', { name: 'Send', exact: true }).click();
       await until(() => f.pending().length === 1 || storyError);
       if (storyError) throw storyError;
       await page.reload();
-      await expect(page.getByText('Approval needed', { exact: true })).toBeVisible();
+      await expect(page.getByText('1. Что создать и в каких пределах', { exact: true })).toBeVisible();
+      await page.getByText('Полный документ и условия проверки',{exact:true}).click();
       await expect(page.locator('fieldset pre')).toContainText('scaffoldCapability');
       await expect(page.locator('fieldset pre')).toContainText('"supported": true');
       await expect(page.locator('fieldset pre')).toContainText('"cli"');
@@ -130,6 +135,8 @@ try {
       await until(() => f.pending().length === 1 && f.pending()[0].presentation.approvalScope === 'outcome only' || storyError);
       if (storyError) throw storyError;
       await page.reload();
+      await expect(page.getByText('2. Как проверить результат',{exact:true})).toBeVisible();
+      await page.getByText('Полный документ и условия проверки',{exact:true}).click();
       await expect(page.locator('fieldset pre')).toContainText('trialInputs');
       await expect(page.locator('fieldset pre')).toContainText('verification/product.mjs');
       await page.getByRole('button', { name: 'Approve this request', exact: true }).click();
@@ -137,12 +144,15 @@ try {
       if (storyError) throw storyError;
       await page.reload();
       await expect(page.getByText(resultMessage, { exact: true }).last()).toBeVisible();
+      await expect(page.getByText('Попробовать проверенную версию',{exact:true})).toBeVisible();
+      await expect(page.locator('aside pre').first()).toContainText(scenario.entrypoint);
       assert.deepEqual(errors, []);
       assert.equal(f.reviews.length, 2);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       await page.screenshot({ path: path.join(artifacts, scenario.slug + '-' + width + '-result.png') });
       results.push({ scenario: scenario.name, connectorId: scenario.connectorId, width, approvals: f.reviews.length,
-        builds: f.builds.length, status: delivered.status, iteration: delivered.iteration, providerIO: 'synthetic' });
+        builds: f.builds.length, status: delivered.status, iteration: delivered.iteration, providerIO: 'synthetic',
+        brief:message,decisions:['contract','outcome'],firstUse:(()=>{const {commit,commands,observed}=f.progress().firstUse;return {commit,commands,observed,workspace:'disposable fixture; removed after test'};})() });
     } finally { await page.close(); await f.close(); }
   }
   writeFileSync(path.join(artifacts, 'results.json'), JSON.stringify(results, null, 2) + '\n');

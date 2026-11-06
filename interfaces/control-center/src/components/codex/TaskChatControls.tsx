@@ -140,9 +140,23 @@ function NativeQuestion({chatId,request,refresh}:{chatId:string;request:PendingR
     }catch(error){if(rejectedBeforeDelivery(error))key.current="";setNotice(error instanceof Error?error.message:"The answer is unconfirmed. Refresh this request.");}
     finally{setBusy(false);}
   };
+  if(request.presentation.state==="channel_unavailable")return <div role="status" className="codex-inline-notice warning">Канал ответа недоступен. Обновите состояние задачи: сохранённое решение не будет выполнено повторно.</div>;
+  const doc=request.presentation.approvalScope==="contract only"?"Contract":request.presentation.approvalScope==="outcome only"?"Outcome":null;
+  const grant=request.presentation.budgetReview as {tokensUsed:number;iterationsUsed:number;additions:{tokens:number;iterations:number;elapsed_ms:number};proposedLimits:{tokens:number;iterations:number}}|undefined;
+  const nextModel=request.presentation.proposedBuildModel;
+  const spec=request.presentation.overview as {name?:string;mission?:string;criteria?:string;interfaces?:string[];scope?:string;budgetMode?:string;permissions?:string;secrets?:string;tokens?:number;iterations?:number;elapsedMs?:number;examples?:Array<{interface:string;input:unknown;expected:unknown}>}|undefined;
   return <fieldset className="codex-inline-notice warning" disabled={busy || request.presentation.state!=="pending"}>
-    <legend>{request.title}</legend>{request.reason&&<p>{request.reason}</p>}
-    {request.kind==="user_input"?questions.map(q=><label key={q.id}>{q.question}<input type={q.isSecret?"password":"text"} autoComplete="off" value={answers[q.id]||""} onChange={e=>setAnswers(rows=>({...rows,[q.id]:e.target.value}))} />{q.options?.map(option=><button className="codex-text-action" type="button" key={option.label} onClick={()=>setAnswers(rows=>({...rows,[q.id]:option.label}))}>{option.label}</button>)}</label>):<pre>{JSON.stringify(request.presentation,null,2)}</pre>}
+    <legend>{doc==="Contract"?"1. Что создать и в каких пределах":doc==="Outcome"?"2. Как проверить результат":grant?"Увеличить лимит и продолжить сборку?":nextModel?"Сменить модель сборщика?":request.title}</legend>{!doc&&!grant&&!nextModel&&request.reason&&<p>{request.reason}</p>}
+    {grant?<p>Уже использовано: {grant.tokensUsed} токенов и {grant.iterationsUsed} попыток. Добавить: {grant.additions.tokens} токенов, {grant.additions.iterations} попыток{grant.additions.elapsed_ms?', время: '+Math.ceil(grant.additions.elapsed_ms/60000)+' мин':''}. Новые пределы: {grant.proposedLimits.tokens} токенов и {grant.proposedLimits.iterations} попыток. После одобрения продолжится эта же сборка.</p>:null}
+    {typeof nextModel==='string'?<p>Сборщик: {String(request.presentation.previousBuildModel)} → {nextModel}. Режим: {String(request.presentation.proposedBuildEffort)}. Модель чата и лимиты сохраняются.</p>:null}
+    {doc&&spec?<div><strong>{spec.name}</strong><p>{spec.mission || spec.criteria}</p>
+      {doc==="Contract"?<><p>Интерфейсы: {spec.interfaces?.join(" + ")} · Каталог: {spec.scope}</p>
+        <p>Сборщик: {String(request.presentation.buildProvider)} / {String(request.presentation.buildModel)}. Модель готового агента: {String(request.presentation.childModelId || "не требуется")}.</p>
+        <p>Права: {spec.permissions || "см. документ"}. Секреты: {spec.secrets || "см. документ"}.</p>
+        <p>Лимиты сборки: {spec.tokens} токенов, {spec.iterations} попыток, {Math.ceil((spec.elapsedMs || 0)/60000)} мин.</p>{spec.budgetMode==="native-goal"?<p>Codex учитывает токены по завершении запроса: последний запрос может превысить лимит. Новая попытка сверх него не начнётся.</p>:null}</>:
+        spec.examples?.map((e,i)=><p key={i}><strong>{e.interface.toUpperCase()}:</strong> <code>{JSON.stringify(e.input)} → {JSON.stringify(e.expected)}</code></p>)}
+    </div>:null}
+    {request.kind==="user_input"?questions.map(q=><label key={q.id}>{q.question}<input type={q.isSecret?"password":"text"} autoComplete="off" value={answers[q.id]||""} onChange={e=>setAnswers(rows=>({...rows,[q.id]:e.target.value}))} />{q.options?.map(option=><button className="codex-text-action" type="button" key={option.label} onClick={()=>setAnswers(rows=>({...rows,[q.id]:option.label}))}>{option.label}</button>)}</label>):doc?<details><summary>Полный документ и условия проверки</summary><pre>{JSON.stringify(request.presentation,null,2)}</pre></details>:<pre>{JSON.stringify(request.presentation,null,2)}</pre>}
     {request.kind==="user_input"?<button type="button" className="codex-text-action" disabled={questions.some(q=>!answers[q.id]?.trim())} onClick={()=>void submit()}>Submit answer</button>:<><button type="button" className="codex-text-action" onClick={()=>void submit("accept")}>Approve this request</button><button type="button" className="codex-text-action" onClick={()=>void submit("decline")}>Decline</button></>}
     {notice&&<p role="status">{notice}</p>}
   </fieldset>;

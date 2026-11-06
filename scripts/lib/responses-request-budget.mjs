@@ -8,6 +8,15 @@ import {neuralDeepUsageKnown,normalizeNeuralDeepUsage} from '../neuraldeep/usage
 const count=value=>Number.isSafeInteger(value) && value>=0;
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail=code=>Object.assign(new Error('The host could not authorize a request within its recorded budget.'),{code,statusCode:409});
+/** Whitelist counts and enums; provider text, identities and reasoning are never retained. */
+function responseDiagnostics(value){
+  if(value?.version!==1 || !['completed','incomplete','failed','cancelled'].includes(value.status))return null;
+  const number=n=>Number.isSafeInteger(n) && n>=0 && n<=Number.MAX_SAFE_INTEGER?n:null;
+  const outputItems=Object.fromEntries(['message','reasoning','function_call','custom_tool_call','local_shell_call','other'].map(key=>[key,number(value.outputItems?.[key])]));
+  return {version:1,status:value.status,outputItems,terminalPublicText:value.terminalPublicText===true,
+    incompleteReason:value.incompleteReason==null?null:['max_output_tokens','content_filter'].includes(value.incompleteReason)?value.incompleteReason:'other',
+    outputTokens:number(value.outputTokens),outputLimit:number(value.outputLimit),outputLimitReached:value.outputLimitReached===true,reasoningTokens:number(value.reasoningTokens)};
+}
 // Adapted from the pinned NeuralDeep provider-budget text-only admission policy.
 function assertText(payload){
   const reject=()=>{throw fail('provider_budget_input_unbounded');};
@@ -57,6 +66,7 @@ export class ResponsesRequestBudget {
     const row=this.current;if(event.requestHash!==row.requestHash)throw fail('provider_usage_conflict');
     const known=event.upstreamAttempted===false || neuralDeepUsageKnown(event.usage);
     Object.assign(row,{status:known?'measured':'unknown',usage:known?normalizeNeuralDeepUsage(event.upstreamAttempted===false?{input_tokens:0,output_tokens:0}:event.usage):null,upstreamAttempted:event.upstreamAttempted===true,finishedAt:new Date().toISOString()});
+    const diagnostics=responseDiagnostics(event.responseSummary);if(diagnostics)row.responseDiagnostics=diagnostics;
     if(!known)this.errorCode='provider_usage_unconfirmed';
     else if(row.usage.totalTokens>row.reservedTokens || this.snapshot().tokensUsed>this.tokenBudget)this.errorCode='provider_budget_overshoot';
     try{await this.checkpoint(this.snapshot());this.current=null;}catch{this.errorCode='provider_budget_checkpoint_failed';throw fail(this.errorCode);}

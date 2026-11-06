@@ -38,6 +38,14 @@ async function newDraft(page:Page,width=1440){
   await page.locator('button.codex-new-chat:visible',{hasText:'New chat'}).first().click();
   await expect(page.getByLabel('New chat provider',{exact:true})).toBeEnabled();
 }
+test('a direct request in a new draft starts a proposal with no manual slug or factory switch',async({page})=>{
+  const f=await fixture(page,false,true);await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page);
+  await page.locator('.codex-composer textarea').fill('Создай агента, который возвращает заголовок в JSON.');
+  await expect(page.getByText(/Подготовлю предложение нового агента/)).toBeVisible();
+  await page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(()=>f.requests.length).toBe(1);
+  const body=f.requests[0].body;expect(body.factoryIntent).toEqual({action:'create-new-agent',slug:'agent-'+body.clientThreadId.replaceAll('-','').slice(0,12)});
+  expect(body.workspace).toEqual({mode:'read-only'});expect(body.subject).toBeUndefined();await f.finish(0,'chat_requested_factory');
+});
 for(const width of [1440,390])test(`new-chat provider/model/effort is explicit and ready-only at ${width}px`,async({page})=>{
   const f=await fixture(page);await page.setViewportSize({width,height:960});await page.goto('/task-chat?group=my_chats&chat=chat_native_saved');await newDraft(page,width);
   const provider=page.getByLabel('New chat provider',{exact:true});expect(await provider.locator('option').evaluateAll(options=>options.map(option=>(option as HTMLOptionElement).value))).toEqual(['codex','claude','openrouter']);

@@ -11,7 +11,7 @@ export function factoryBuildDelegation(coordinator,parent,connectorId){
   const check=()=>{
     const row=coordinator.getIntent('provider-tool:'+parent.turnId+':'+parent.operationId);
     const claims=coordinator.claims().filter(row=>row.owner===parent.owner && row.generation===parent.generation);
-    if(!row || row.kind!=='provider-tool' || row.tool!=='factory_step' || row.state!=='running' || !['deliver','delivery_resume','verify'].includes(row.factoryAction)
+    if(!row || row.kind!=='provider-tool' || row.tool!=='factory_step' || row.state!=='running' || !['deliver','delivery_resume','delivery_extend','verify'].includes(row.factoryAction)
         || row.owner!==parent.owner || row.generation!==parent.generation || row.chatId!==parent.chatId || row.connectorId!==connectorId || row.factoryTarget!==parent.target
         || !claims.some(row=>row.kind==='turn' && row.detail.chatId===parent.chatId && row.detail.connectorId===connectorId)
         || !claims.some(row=>row.mode==='write' && row.detail.workspacePath===parent.target))throw factoryFail('factory_delegation_invalid');

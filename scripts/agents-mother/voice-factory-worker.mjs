@@ -1,3 +1,5 @@
+import {verifiedFirstUse} from './factory-first-use.mjs';
+import {researchPage} from './factory-continuation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
@@ -59,7 +61,8 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
   if(!executor || state.chatId!==request.chatId || state.connectorId!==request.connectorId || state.target!==p.target || state.running?.operationId!==input.operation_id)throw factoryFail('factory_binding_changed');
   const saved=loadVoiceFactory(p,request);if(factoryHash(saved)!==factoryHash(state))throw factoryFail('factory_context_changed');
   const {contractData,validateContract}=await import('./contract.mjs');
-  const {interview,researchContract,externalResearchContract}=await import('./index.mjs');
+  const {interview,researchContract,externalResearchContract:researchFromHost}=await import('./index.mjs');
+  const externalResearchContract=dependencies.externalResearchContract || researchFromHost;
   const {createOutcomeSpec,approveOutcomeSpec,outcomeSpecFile,verifyOutcomeApproval}=await import('./outcome-spec.mjs');
   const {planScaffoldContract,scaffoldContract}=await import('./scaffold/index.mjs');
   const delivery=dependencies.delivery || await import('./delivery-loop.mjs');
@@ -67,7 +70,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
   let value={};
   const contract=()=>{const row=factoryArtifact(p,state,'contract'),data=contractData(row.file,{root:p.root});contractIdentity(data,p,state,executor);return data;};
   const approved=()=>{requireFactoryApprovals(p,state);contract();const valid=verifyOutcomeApproval(state.outcome,options);if(!valid.ok)throw factoryFail('factory_outcome_approval_required');
-    if(state.buildConfiguration && (state.buildConfiguration.connectorId!==request.connectorId || state.buildConfiguration.modelId!==request.model))throw factoryFail('factory_build_configuration_changed');
+    if(state.buildConfiguration && (state.buildConfiguration.connectorId!==request.connectorId || state.buildConfiguration.modelId!==request.model && state.buildConfiguration.parentModelId!==request.model))throw factoryFail('factory_build_configuration_changed');
   };
   const observeDelivery=()=>{
     if(!state.runId)throw factoryFail('factory_delivery_missing');
@@ -130,15 +133,24 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       approveOutcomeSpec(state.outcome,{...options,approvedBy:'user',projectPath:fs.existsSync(p.target)?p.target:inputRoot});state.outcomeApproval={sha256:factoryArtifact(p,state,'outcome').sha256,reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
     }
     case 'research':{
-      approved();const result=await researchContract(state.contract,{'github-mode':request.connectorId==='local'?'registry-only':'auto'});
-      state.research=result.reportPath;state.pattern=result.patternPath;state.phase='research';value={artifacts:['research','pattern'],next:'Read research and pattern, collect current sources, then publish locked synthesis.'};break;
+      approved();if(state.research || state.pattern)throw factoryFail('factory_research_already_started');const result=await researchContract(state.contract,{'github-mode':request.connectorId==='local'?'registry-only':'auto'});
+      state.research=result.reportPath;state.pattern=result.patternPath;state.phase='research';state.researchStage='planned';value={artifacts:['research','pattern'],next:'Read research and pattern, collect current sources, then publish locked synthesis.'};break;
     }
     case 'research_status':case 'research_collect':case 'research_recover':case 'research_apply':{
       approved();const phase=input.action.split('_')[1];const args={backend:'host',connector:request.connectorId,phase};
       if(input.retry_failed===true)args['retry-failed']=true;
-      if(input.sources){args.sources=path.join(p.directory,'sources.json');atomicWriteFile(args.sources,JSON.stringify(input.sources));}
+      let sources=input.sources;
+      if(phase==='collect' && state.continuationProfile==='api-local-v1' && !sources){
+        const {topics}=await externalResearchContract(state.contract,{...args,phase:'status'});
+        const urls={'node-http-runtime':'https://nodejs.org/api/http.md','interface-runtime-security':'https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Type','operations-deployment':'https://nodejs.org/api/process.md','declared-dependencies':'https://nodejs.org/api/modules.md','pattern-semantic-embeddings-rag':'https://qdrant.tech/documentation/overview/','pattern-mcp-connector-permissions':'https://modelcontextprotocol.io/docs/2025-11-25/tutorials/security/security_best_practices','pattern-browser-sandbox':'https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy','pattern-api':'https://nodejs.org/api/url.md','pattern-openai':'https://openai.github.io/openai-agents-js/'};
+        sources=Object.fromEntries(topics.filter(t=>urls[t.id]).map(t=>[t.id,urls[t.id]]));
+      }
+      if(sources){args.sources=path.join(p.directory,'sources.json');atomicWriteFile(args.sources,JSON.stringify(sources));}
       if(phase==='apply'){args.input=path.join(p.directory,'selection.json');atomicWriteFile(args.input,JSON.stringify(input.selection));}
-      value=await externalResearchContract(state.contract,args);break;
+      const research=await externalResearchContract(state.contract,args);
+      if(research.status==='completed')state.researchStage='published';
+      else if(research.status==='collected')state.researchStage='collected';
+      value=researchPage(research,input.offset??0);break;
     }
     case 'scaffold_plan':contract();value=planScaffoldContract(state.contract);break;
     case 'scaffold':{
@@ -152,18 +164,26 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       approved();observeDelivery();
       value=await delivery.refreshDeliveryScaffold(state.runId,options);break;
     }
-    case 'configure_build':{
-      approved();validateFactoryBuildEffort(request.connectorId,request.model,input.effort);
+    case 'configure_build':case 'configure_build_model':{
+      approved();
+      const model=input.action==='configure_build_model'?input.model:state.buildConfiguration?.modelId || request.model;
+      if(input.action==='configure_build_model' && request.connectorId!=='neuraldeep')throw factoryFail('factory_build_model_unsupported');
+      validateFactoryBuildEffort(request.connectorId,model,input.effort);
       if(state.runId){
         const result=observeDelivery();
         if(result.state.status!=='blocked' || !Array.isArray(result.state.budget?.unaccounted_attempts) || result.state.budget.unaccounted_attempts.length || result.state.budget.legacy_usage_unverified!==false)throw factoryFail('factory_build_configuration_locked');
       }
-      state.buildConfiguration={connectorId:request.connectorId,modelId:request.model,effort:input.effort,operationId:input.operation_id,approvedBy:'user',approvedAt:new Date().toISOString()};
+      if(input.action==='configure_build_model'){
+        if(!state.runId)throw factoryFail('factory_build_configuration_locked');
+        const preflight=dependencies.buildModelPreflight || (async()=>{const {NeuralDeepProviderService}=await import('../neuraldeep/provider-service.mjs');return new NeuralDeepProviderService(options).require(model);});
+        const capabilities=await preflight(model);if(capabilities.tools!==true)throw factoryFail('factory_build_model_unsupported');
+      }
+      state.buildConfiguration={connectorId:request.connectorId,modelId:model,...(model!==request.model?{parentModelId:request.model}:{}),effort:input.effort,operationId:input.operation_id,approvedBy:'user',approvedAt:new Date().toISOString()};
       value={configured:true,buildConfiguration:state.buildConfiguration,runId:state.runId || null,modelRequests:0};break;
     }
-    case 'deliver':case 'delivery_resume':case 'verify':case 'delivery_status':{
+    case 'deliver':case 'delivery_resume':case 'delivery_extend':case 'verify':case 'delivery_status':{
       approved();
-      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:request.model,effort:state.buildConfiguration?.effort ?? request.effort,preset:request.preset,factoryParent:request.factoryParent},trialBackend:'local'};
+      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:state.buildConfiguration?.modelId || request.model,effort:state.buildConfiguration?.effort ?? request.effort,preset:request.preset,factoryParent:request.factoryParent}};
       let result;
       if(input.action==='deliver'){
         if(state.runId || state.phase!=='scaffolded')throw factoryFail('factory_delivery_already_started');
@@ -175,15 +195,19 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
         result=await delivery.deliverOutcome(state.outcome,p.target,{...buildOptions,runId:state.runId});
       }else{
         const current=observeDelivery();
+        if(input.action==='delivery_extend' && (current.state.version!==input.expected_version || current.state.status!=='blocked'
+          || current.state.blockers?.length!==1 || !['token_budget_exhausted','iteration_budget_exhausted','elapsed_budget_exhausted'].includes(current.state.blockers[0].code)
+          || current.state.budget.legacy_usage_unverified!==false || current.state.budget.unaccounted_attempts?.length!==0))throw factoryFail('factory_budget_context_changed');
         if(input.action==='delivery_resume' && current.state.status==='blocked' && !(typeof input.answer==='string' && input.answer.trim())){
           const choices=(current.state.blockers?.[0]?.options || []).map(option=>option.id).filter(id=>/^[a-z][a-z0-9-]{0,79}$/.test(id)).slice(0,8);
           throw Object.assign(factoryFail('factory_delivery_answer_required'),{message:'Delivery is blocked. Call factory_delivery_resume with the required answer parameter from the saved blocker options'+(choices.length?': '+choices.join(', '):'')+'. No runtime probe or build request was started.'});
         }
-        result=input.action==='delivery_status'?current:await delivery.resumeDelivery(state.runId,{...buildOptions,hostOnly:input.action==='verify',...(input.answer?{answer:input.answer,answeredBy:'user'}:{})});
+        result=input.action==='delivery_status'?current:await delivery.resumeDelivery(state.runId,{...buildOptions,hostOnly:input.action==='verify',...(input.answer?{answer:input.answer,answeredBy:'user'}:{}),...(input.action==='delivery_extend'?{answeredBy:'user',budgetRequestId:input.operation_id,expectedVersion:input.expected_version,addTokens:input.add_tokens || undefined,addIterations:input.add_iterations || undefined,addElapsedMs:input.add_elapsed_ms || undefined}:{})});
       }
       // resume/deliver return an execution result without runRoot. Re-observe
       // the durable, identity-checked run before reading its Trial evidence.
       result=observeDelivery();
+      if(input.action==='verify')state.hostVerifiedIteration=result.state.iteration;
       state.phase='delivery-'+result.state.status;value={runId:state.runId,status:result.state.status,phase:result.state.phase,blockers:result.state.blockers,iteration:result.state.iteration,budget:result.state.budget,worktree:result.worktree?.worktree || null,verification:deliveryVerification(result),manualAcceptance:result.state.status==='accepted'?'accepted':'pending'};break;
     }
     case 'finish':{
@@ -191,7 +215,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       const {rebuildRegistry}=dependencies.registry || await import('./registry.mjs');const {checkCardReadiness}=dependencies.cards || await import('./card-readiness.mjs');rebuildRegistry();
       const card=await checkCardReadiness(state.agentId,{...options,baseUrl:false});
       const accepted=result.state.status==='accepted';
-      value={deliveryStatus:result.state.status,manualAcceptance:accepted?'accepted':'pending',card,next:card.status!=='ready'?'Resolve the reported card configuration blockers.':accepted?'Result accepted. Application and publication retain their separate approval boundaries.':'Manual demonstration, live card check and user acceptance; no automatic merge, deployment or publication.'};state.phase=card.status==='ready'?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
+      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,manualAcceptance:accepted?'accepted':'pending',card,next:card.status!=='ready'?'Resolve the reported card configuration blockers.':accepted?'Result accepted. Application and publication retain their separate approval boundaries.':'Manual demonstration, live card check and user acceptance; no automatic merge, deployment or publication.'};state.phase=card.status==='ready'?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
     }
     default:throw factoryFail('factory_input_invalid');
   }

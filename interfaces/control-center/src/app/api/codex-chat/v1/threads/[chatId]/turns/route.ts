@@ -1,3 +1,4 @@
+import type {StartTurnInput} from '@/lib/codex-chat/gateway';
 import { apiError, apiSuccess, integerQuery, readJsonBody, requireIdempotencyKey } from "@/lib/codex-chat/http";
 import { CodexChatGatewayError, getCodexChatGateway } from "@/lib/codex-chat/gateway";
 
@@ -24,12 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ chatId
   try {
     const idempotencyKey = requireIdempotencyKey(request);
     const { chatId } = await context.params;
-    const body = await readJsonBody<{
-      clientMessageId: string;
-        attachments?: string[];
-      input: [{ type: "text"; text: string }];
-      settings?: { modelId?: string; effortId?: string; serviceTierId?: string };
-    }>(request);
+    const body = await readJsonBody<StartTurnInput>(request);
     if (idempotencyKey !== body.clientMessageId) {
       throw new CodexChatGatewayError("idempotency_conflict", "Idempotency-Key must match clientMessageId.", 409);
     }

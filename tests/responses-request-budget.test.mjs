@@ -61,3 +61,15 @@ test('a rejected overlapping request cannot settle a different reservation as ze
   for(const requestHash of [null,'second'])await assert.rejects(budget.record({requestHash,upstreamAttempted:false}),{code:'provider_usage_conflict'});
   assert.equal(budget.snapshot().requests[0].status,'reserved');await budget.record(event({requestHash:'first'}));assert.equal(budget.snapshot().tokensUsed,400);
 });
+
+
+test('durable response diagnostics retain only structural counts and preserve measured usage',async()=>{
+  const snapshots=[],budget=new ResponsesRequestBudget({tokenBudget:50000,checkpoint:async value=>snapshots.push(value)});
+  await budget.begin(payload(),{requestHash:'original'});
+  const secret='PRIVATE_PROVIDER_TEXT_MUST_NOT_PERSIST';
+  await budget.record(event({responseSummary:{version:1,status:'completed',outputItems:{message:0,reasoning:1,function_call:0,custom_tool_call:0,local_shell_call:0,other:0,private:secret},terminalPublicText:false,incompleteReason:null,outputTokens:55,outputLimit:16384,outputLimitReached:false,reasoningTokens:32,id:secret,text:secret,reasoning:secret}}));
+  const snapshot=budget.snapshot(),diagnostic=snapshot.requests[0].responseDiagnostics;
+  assert.equal(snapshot.tokensUsed,400);assert.equal(snapshot.usageKnown,true);
+  assert.equal(diagnostic.outputTokens,55);assert.equal(diagnostic.reasoningTokens,32);assert.equal(diagnostic.outputItems.reasoning,1);assert.equal(diagnostic.terminalPublicText,false);
+  assert(!JSON.stringify(snapshots).includes(secret));assert.equal(diagnostic.id,undefined);assert.equal(diagnostic.outputItems.private,undefined);
+});

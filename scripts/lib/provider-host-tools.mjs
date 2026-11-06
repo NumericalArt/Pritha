@@ -1,3 +1,4 @@
+import {reconcileFactoryReceipt} from '../agents-mother/factory-receipt-recovery.mjs';
 import { createHash,randomUUID } from 'node:crypto';
 import { closeSync,constants,existsSync,fstatSync,fsyncSync,lstatSync,openSync,opendirSync,readFileSync,realpathSync,renameSync,rmSync,writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -47,6 +48,28 @@ export class ProviderHostTools {
     if(options.protectedPaths!==undefined && (!Array.isArray(options.protectedPaths) || options.protectedPaths.length>256))throw fail('provider_tool_policy_invalid');
     this.protectedPaths=(options.protectedPaths || []).map(value=>this.target(value));
   }
+  driveEnabled(){return (this.options.factoryContinuation ?? process.env.PRITHA_FACTORY_CONTINUATION)==='execute';}
+  async runAndContinue(key,requestHash,name,input){
+    const result=await this.execute(key,requestHash,name,input);
+    if(!this.driveEnabled() || name!=='factory_step' || result.isError ||
+        !['approve_contract','approve_outcome','research','research_collect','research_apply','scaffold','deliver','verify','delivery_extend','delivery_resume'].includes(input.action))return result;
+    const steps=[];let last;
+    for(let n=0;n<8;n++){
+      this.check();
+      const next=this.factory.continuation();
+      if(!next)break;
+      if(!this.factory.workflowAuthorized(next))throw fail('factory_authority_required');
+      const nextKey='provider-tool:'+this.options.turnId+':'+next.operation_id;
+      last=await this.execute(nextKey,hash(JSON.stringify([name,next])),name,next);
+      steps.push(next.action);
+      if(last.isError)break;
+    }
+    if(!steps.length)return result;
+    const wrapped=JSON.parse(result.content[0].text);
+    // Preserve the original operation receipt. Supply the final technical
+    // result in the same tool response; no controller inference between steps.
+    return {...result,content:[{type:'text',text:JSON.stringify({...wrapped,continued:steps,continuationResult:JSON.parse(last.content[0].text),continuationFailed:last.isError===true})}]};
+  }
   check(){if(this.closed || this.options.signal?.aborted)throw fail('operator_cancel');this.options.lease.assertOwned();}
   target(relative,{directory=false,missing=false}={}){
     if(typeof relative!=='string' || relative.length>2048 || relative.startsWith('attachment:') || path.isAbsolute(relative) || relative.includes('\0') || relative.split(/[\\/]/).some((part,i,parts)=>part==='..' || denied(part) || publicExample(part) && (directory || i!==parts.length-1)))throw fail('provider_tool_path_denied');
@@ -68,7 +91,16 @@ export class ProviderHostTools {
   saved(operationId){const file=this.resultPath(operationId);if(!existsSync(file))throw fail('provider_tool_result_missing');try{return JSON.parse(this.read(file,20*1024*1024).toString('utf8'));}catch(error){throw error.code?error:fail('provider_tool_result_invalid');}}
   async call(name,input){
     this.check();if(++this.calls>10000)throw fail('provider_tool_call_limit');
-    if(this.factory)({name,input}=normalizeFactoryToolCall(name,input));
+    if(this.factory){
+      ({name,input}=normalizeFactoryToolCall(name,input));
+      if(name==='factory_step' && object(input) && input.operation_id===undefined){
+        // The host hashes the canonical parameters and fixed factory identity.
+        // Same-turn lost responses replay the receipt even after the state advanced.
+        const {operation_id:unused,...args}=input;
+        const stable=JSON.stringify(args,(_key,v)=>object(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+        input={...JSON.parse(stable),operation_id:'bound_'+hash(JSON.stringify([this.factory.paths.target,this.options.chatId,this.options.connectorId,stable])).slice(0,40)};
+      }
+    }
     if(name==='factory_step' && this.factory?.isRead(input)){const value=await this.factory.read(input);this.check();return text(value);}
     if(['web_search','read_page'].includes(name)){
       if(!this.options.search)throw fail('provider_tool_unknown');
@@ -101,7 +133,7 @@ export class ProviderHostTools {
     const existing=this.options.coordinator.getIntent(key);
     if(existing && existing.hash!==requestHash)throw fail('idempotency_conflict');
     if(this.pending.has(key))return this.pending.get(key);
-    const promise=this.serial.then(()=>this.execute(key,requestHash,name,input));
+    const promise=this.serial.then(()=>this.runAndContinue(key,requestHash,name,input));
     this.serial=promise.catch(()=>{});this.pending.set(key,promise);
     try{return await promise;}finally{this.pending.delete(key);}
   }
@@ -112,6 +144,17 @@ export class ProviderHostTools {
     if(prior)throw fail('provider_tool_execution_unconfirmed');
     let presentation,kind,perform,alreadyApproved=false;
     if(name==='factory_step'){
+      // Reconcile only on a separately admitted active turn, never on GET.
+      if(this.factory.state()?.running){
+        const recovered=reconcileFactoryReceipt(this.factory.paths,this.options);
+        if(recovered){
+          const parameters=({operation_id,...args})=>JSON.stringify(args,(_key,v)=>object(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+          if(parameters(recovered.input)===parameters(input)){
+            const r=recovered.result,saved=JSON.stringify({ok:r.ok,...r.value,phase:r.state.phase,reconciled:true});
+            return {...text({...this.window(saved,{}),status:r.ok?'completed':'failed',operationId:recovered.input.operation_id}),isError:!r.ok};
+          }
+        }
+      }
       ({kind,presentation,perform,alreadyApproved=false}=this.factory.prepare(input));
     }else if(name==='write_file' || name==='edit_file'){
       fields(input,name==='write_file'?['operation_id','path','content','expected_sha256']:['operation_id','path','old_text','new_text','expected_sha256']);
@@ -163,7 +206,11 @@ export class ProviderHostTools {
     }catch(error){result={status:'failed',output:/^[a-z_]{1,80}$/.test(error.code || '')?error.code:'provider_tool_failed'};}
     const file=this.resultPath(input.operation_id),fd=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
     try{writeFileSync(fd,JSON.stringify(result));fsyncSync(fd);}finally{closeSync(fd);}
-    coordinator.updateIntent(key,{state:result.status==='completed'?'completed':result.status==='declined'?'declined':'failed',resultFile:file,exitConfirmed:this.exitConfirmed});
+    let shadow;
+    if(name==='factory_step' && result.status==='completed' && !this.driveEnabled()){
+      try{shadow=this.factory.planContinuation({shadow:true});}catch{shadow={kind:'wait',reason:'reconcile'};}
+    }
+    coordinator.updateIntent(key,{state:result.status==='completed'?'completed':result.status==='declined'?'declined':'failed',resultFile:file,exitConfirmed:this.exitConfirmed,...(shadow?{factoryShadow:shadow}:{})});
     return {...text({...this.window(result.output,{}),status:result.status,exitCode:result.exitCode ?? null,operationId:input.operation_id}),isError:result.status!=='completed'};
   }
   async command(key,operationId,command,args,timeoutMs){

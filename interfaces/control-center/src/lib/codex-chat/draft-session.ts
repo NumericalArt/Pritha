@@ -7,6 +7,19 @@ export type DraftFactorySelection={kind:'self'|'child';slug:string;phase:Factory
 export const DEFAULT_FACTORY_SELECTION:DraftFactorySelection={kind:'self',slug:'',phase:'interview'};
 export function composeDraftSubject(value:DraftFactorySelection=DEFAULT_FACTORY_SELECTION){return value.createNew || value.kind==='self'?null:normalizeChatSubject({kind:value.kind,slug:value.slug,phase:value.phase});}
 export function composeDraftFactoryIntent(value:DraftFactorySelection=DEFAULT_FACTORY_SELECTION){return value.createNew?normalizeFactoryIntent({action:'create-new-agent',slug:value.slug}):null;}
+// Only a direct new-chat request can select the existing proposal workflow.
+// Attached documents, mentions in ordinary conversations and subject metadata
+// never select it. A manual choice in the draft takes precedence.
+export function newAgentRequest(text:string){
+  return /^(?:(?:пожалуйста,?\s+)?(?:создай|создайте|сделай|сделайте)\s+(?:мне\s+)?(?:(?:нового|локального|отдельного|дочернего)\s+){0,3}агента(?=[\s,.:!«"“]|$)|(?:please\s+)?(?:create|build|make)\s+(?:me\s+)?(?:an?\s+)(?:(?:new|local|child)\s+){0,3}agent\b)/iu.exec(text.trim());
+}
+export function requestedFactoryIntent(text:string,creationId:string) {
+  const prefix=newAgentRequest(text);
+  if(!prefix)return null;
+  const named=/^\s*(?:(?:named|called|по имени)\s+)?[«“"]([a-z][a-z0-9 -]{0,58})[»”"]/i.exec(text.trim().slice(prefix[0].length));
+  if(named)try{return normalizeFactoryIntent({action:'create-new-agent',slug:named[1].toLowerCase().trim().replace(/[ -]+/g,'-')});}catch{/* Reserved names get a fresh host-checked identity. */}
+  return normalizeFactoryIntent({action:'create-new-agent',slug:'agent-'+creationId.replace(/-/g,'').slice(0,12)});
+}
 function factorySelectionValid(value:DraftFactorySelection){return value && typeof value==='object' && !Array.isArray(value) && ['self','child'].includes(value.kind) && typeof value.slug==='string' && value.slug.length<=64 && FACTORY_PHASES.some(row=>row.id===value.phase) && (value.createNew===undefined || typeof value.createNew==='boolean') && Object.keys(value).every(key=>['kind','slug','phase','createNew'].includes(key));}
 function selectionValid(value:DraftProviderSelection){return value && typeof value==='object' && !Array.isArray(value) && isProviderConnectorId(value.connectorId) && Object.keys(value).every(key=>['connectorId','modelId','effortId','serviceTierId'].includes(key))
   && (value.modelId===undefined || /^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(value.modelId)) && (value.effortId===undefined || ['default','none','minimal','low','medium','high','xhigh','max','ultra'].includes(value.effortId)) && (value.serviceTierId===undefined || /^[a-z_]{1,32}$/.test(value.serviceTierId));}

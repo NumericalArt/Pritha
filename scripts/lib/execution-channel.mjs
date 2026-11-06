@@ -28,7 +28,12 @@ function readPacket(socket, consume) {
 function bridgeFor(coordinator) {
   let bridge=bridges.get(coordinator.file);
   if(bridge)return bridge;
-  const directory=mkdtempSync(path.join(os.tmpdir(),'pritha-ipc-'));
+  // sockaddr_un.sun_path on Darwin has 104 bytes including its NUL. A long
+  // TMPDIR may fail to bind, or Node may silently truncate it. /tmp is the
+  // system temp directory; mkdtemp creates a fresh, private child in either.
+  const suffix='pritha-ipc-XXXXXX/control.sock';
+  const parent=Buffer.byteLength(path.join(os.tmpdir(),suffix))<=100 ? os.tmpdir() : '/tmp';
+  const directory=mkdtempSync(path.join(parent,'pritha-ipc-'));
   chmodSync(directory,0o700);
   const socketPath=path.join(directory,'control.sock'),token=randomBytes(32).toString('hex');
   const handlers=new Map(),sockets=new Set();
@@ -52,7 +57,10 @@ function bridgeFor(coordinator) {
   });
   const ready=new Promise((resolve,reject)=>{
     server.once('error',reject);
-    server.listen(socketPath,()=>{chmodSync(socketPath,0o600);resolve();});
+    server.listen(socketPath,()=>{
+      try {chmodSync(socketPath,0o600);if(!privateEndpoint(socketPath))throw Error();resolve();}
+      catch {reject(new ExecutionConflict('control_channel_unavailable'));}
+    });
   });
   ready.catch(()=>{});server.unref();
   bridge={directory,socketPath,token,handlers,server,sockets,ready};
@@ -63,9 +71,9 @@ function bridgeFor(coordinator) {
 export function registerExecutionChannel(coordinator,key,{view,call}) {
   const bridge=bridgeFor(coordinator), handler={view,call};
   bridge.handlers.set(key,handler);
-  let stopped=false,previous='';
+  let stopped=false,listening=false,previous='';
   const publish=()=>{
-    if(stopped)return;
+    if(stopped || !listening)return;
     const detail=view();
     if(!detail)return;
     const value={...detail,socketPath:bridge.socketPath,token:bridge.token};
@@ -78,8 +86,9 @@ export function registerExecutionChannel(coordinator,key,{view,call}) {
   };
   const timer=setInterval(()=>{try{publish();}catch{/* Loss of coordination disables discovery. */}},100);
   timer.unref();
-  void bridge.ready.then(publish).catch(()=>{});
-  return ()=>{
+  const ready=bridge.ready.then(()=>{listening=true;publish();});
+  ready.catch(()=>{}); // Callers that offer an approval also await readiness.
+  const close=()=>{
     stopped=true;clearInterval(timer);
     if(bridge.handlers.get(key)!==handler)return;
     bridge.handlers.delete(key);
@@ -89,20 +98,22 @@ export function registerExecutionChannel(coordinator,key,{view,call}) {
     } catch {/* Original execution claims remain authoritative. */}
     if(!bridge.handlers.size){
       bridges.delete(coordinator.file);
-      bridge.server.close(()=>rmSync(bridge.directory,{recursive:true,force:true}));
+      void bridge.ready.catch(()=>{}).then(()=>bridge.server.close(()=>rmSync(bridge.directory,{recursive:true,force:true})));
     }
   };
+  return Object.assign(close,{ready});
 }
 
+function privateEndpoint(socketPath) {
+  try {
+    const directory=lstatSync(path.dirname(socketPath)),socket=lstatSync(socketPath);
+    return directory.isDirectory() && !(directory.mode&0o077) && socket.isSocket() && !(socket.mode&0o077)
+      && (!process.getuid || (socket.uid===process.getuid() && directory.uid===process.getuid()));
+  } catch {return false;}
+}
 export function executionChannelView(coordinator,key) {
   const row=coordinator.getIntent(recordKey(key));
-  if(row?.state!=='available')return null;
-  const channel=row.channel;
-  try {
-    const directory=lstatSync(path.dirname(channel.socketPath)),socket=lstatSync(channel.socketPath);
-    if(!directory.isDirectory() || directory.isSymbolicLink() || (directory.mode&0o077) || !socket.isSocket() || (socket.mode&0o077) || (process.getuid && (socket.uid!==process.getuid() || directory.uid!==process.getuid())))return null;
-  } catch {return null;}
-  return channel;
+  return row?.state==='available' && privateEndpoint(row.channel?.socketPath)?row.channel:null;
 }
 
 export async function callExecutionChannel(coordinator,key,input) {

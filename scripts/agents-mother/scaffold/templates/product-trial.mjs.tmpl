@@ -1,5 +1,6 @@
 // Host-owned Outcome verifier. Product build executors must preserve this file.
 import assert from 'node:assert/strict';
+import {readFileSync,openSync,closeSync,fstatSync,constants} from 'node:fs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import net from 'node:net';
@@ -14,8 +15,8 @@ function start(argv, env = process.env) {
   children.add(child);
   const output = { stdout: '', stderr: '' };
   for (const name of ['stdout', 'stderr']) child[name].setEncoding('utf8').on('data', chunk => {
+    if (Buffer.byteLength(output[name])+Buffer.byteLength(chunk)>65536) {child.kill('SIGKILL');return;}
     output[name] += chunk;
-    if (output[name].length > 65536) child.kill('SIGTERM');
   });
   const completion = new Promise((resolve, reject) => {
     child.once('error', reject);
@@ -82,26 +83,31 @@ function request(port, check) {
 }
 
 try {
-  if (checks.cli) {
-    const run = start(checks.cli.argv);
+  const demo={};
+  for (const check of checks.cli || []) {
+    const run = start(check.argv);
     const timer = setTimeout(() => run.child.kill('SIGKILL'), timeoutMs);
     try {
       const result = await run.completion;
-      assert.equal(result.code, 0, 'CLI product failed. ' + run.output.stderr);
-      assert.deepEqual(JSON.parse(run.output.stdout), checks.cli.expected_json, 'CLI product JSON differs.');
+      assert.equal(result.code, check.expected_exit??0, 'CLI product failed for '+JSON.stringify(check.argv.slice(2))+'. ' + run.output.stderr);
+      if(check.expected_json){const actual=JSON.parse(run.output.stdout);assert.deepEqual(actual,check.expected_json,'CLI product JSON differs for '+JSON.stringify(check.argv.slice(2)));if(result.code===0)demo.cli??=actual;}
     } finally { clearTimeout(timer); await stop(run); }
   }
-  if (checks.http) {
-    const port = await unusedPort();
-    const run = start(checks.http.argv, { ...process.env, [checks.http.port_variable]: String(port) });
-    try {
-      await ready(run, port);
-      const result = await request(port, checks.http);
-      assert.equal(result.status, 200, 'HTTP product status differs.');
-      assert.deepEqual(JSON.parse(result.text), checks.http.expected_json, 'HTTP product JSON differs.');
-    } finally { await stop(run); }
-  }
-  console.log('Approved HTTP/CLI product checks passed.');
+  const port = await unusedPort();
+  const first = checks.http[0];
+  const run = start(first.argv, { ...process.env, [first.port_variable]: String(port) });
+  try {
+    await ready(run, port);
+    for(const check of checks.http){
+      const result = await request(port, check);
+      assert.equal(result.status,check.expected_status??200,'HTTP product status differs for '+JSON.stringify(check.input_json));
+      if(check.expected_json){const actual=JSON.parse(result.text);assert.deepEqual(actual,check.expected_json,'HTTP product JSON differs for '+JSON.stringify(check.input_json));if(result.status===200)demo.http??=actual;}
+    }
+  } finally { await stop(run); }
+  const fd=openSync('README.md',constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+  let guide;try{const st=fstatSync(fd);assert.ok(st.isFile() && st.nlink===1 && st.size<=262144,'README.md must be a bounded project file');guide=readFileSync(fd,'utf8');}finally{closeSync(fd);}
+  for(const command of Object.values(firstUse))assert.ok(guide.includes(command),'Document the verified first-use command in README.md: '+command);
+  console.log(JSON.stringify({type:'pritha-product-demo-v2',commands:firstUse,observed:demo}));
 } finally {
   for (const child of children) child.kill('SIGKILL');
 }

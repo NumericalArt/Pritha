@@ -110,6 +110,10 @@ function extractAgentText(turn) {
   return values.join("\n").trim();
 }
 
+export function externalBuildPrompt(input,compact=false){
+  return buildPrompt(input,{compact})+'\n\nReturn the final report as a JSON object, without code fences, matching this host-validated schema. changed_files must contain only relative workspace paths.\n'+JSON.stringify(CLAUDE_BUILD_REPORT_SCHEMA);
+}
+
 function parseSummary(text) {
   const source = String(text || "").trim();
   if (!source) return { summary: "The build attempt has no textual summary.", changed_files: [], remaining_risks: [] };
@@ -602,7 +606,7 @@ export class ClaudeCodeBuildExecutor {
       await checkpoint();const began=Date.now(),controller=new AbortController(),abort=()=>controller.abort();input.signal?.addEventListener('abort',abort,{once:true});if(input.signal?.aborted)abort();
       control={stop:()=>{controller.abort();run?.stop();}};this.active.add(control);
       try{
-        const prompt=buildPrompt(input,{compact:this.connectorId==='neuraldeep'})+'\n\nReturn the final report as a JSON object, without code fences, matching this host-validated schema. changed_files must contain only relative workspace paths.\n'+JSON.stringify(CLAUDE_BUILD_REPORT_SCHEMA);
+        const prompt=externalBuildPrompt(input,this.connectorId==='neuraldeep');
         let finalText='';
         run=await (this.options.launch || this.defaultLaunch)({...context,cwd,connectorId:this.connectorId,codexBin:this.options.codexBin,claudeBin:this.options.claudeBin,...receipt.model_policy,allowSearch:false,model:receipt.model_pinned,effort:receipt.effort_requested,authMode:'api-key',sandbox:'workspace-write',prompt,
           timeoutMs:Number.isSafeInteger(input.timeoutMs)?Math.max(1000,Math.min(input.timeoutMs,3600000)):900000,maxTurns:Math.min(this.options.maxTurns || 32,128),tokenBudget,budgetId:receipt.budget_id,signal:controller.signal,
@@ -619,7 +623,8 @@ export class ClaudeCodeBuildExecutor {
         const report=this.report(finalText),ok=result.ok && report!==null,errorCode=result.errorCode || (!report?'build_summary_invalid':null);
         receipt={...receipt,...(report || {summary:'The build returned no valid structured summary.',changed_files:[],remaining_risks:['Review the recorded tool results and independent Trials.']}),status:exitConfirmed?(ok?'completed':'failed'):'uncertain',turn_status:exitConfirmed?(ok?'completed':'interrupted'):'unknown',process_exited:exitConfirmed,
           model_observed:result.sessionId?result.model || receipt.model_pinned:null,provider_observed:result.sessionId?this.providerName:null,thread_id:result.sessionId || receipt.thread_id,
-          thread_cleanup:exitConfirmed?'closed':'pending',tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':'unknown',duration_ms:Date.now()-began,error_code:errorCode};
+          thread_cleanup:exitConfirmed?'closed':'pending',tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':'unknown',duration_ms:Date.now()-began,error_code:errorCode,
+          provider_response_diagnostics:(accounting?.requests || []).map(row=>row.responseDiagnostics).filter(Boolean)};
         coordinator.updateIntent(key,{state:exitConfirmed?receipt.status:'unknown'});const stored=await checkpoint();
         if(!exitConfirmed || !measured)throw new ExecutionBackendError('goal_usage_unavailable','The previous build execution or its usage remains unconfirmed.',{executorResult:stored});
         if(!ok)throw new ExecutionBackendError(errorCode==='provider_budget_exhausted'?'token_budget_exhausted':errorCode || 'build_executor_failed','The bounded provider build stopped before completion.',{executorResult:stored});return stored;

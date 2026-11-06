@@ -14,6 +14,14 @@ test('per-draft provider selection and an uncertain first request survive reload
   const f=fixture(),value=initial();assert.equal(f.writeDraftSession(value),true);const loaded=f.readDraftSession();assert.deepEqual(loaded.providerSelections,value.providerSelections);assert.equal(loaded.pendingNew.draft_one.status,'delivery_unknown');assert.equal(loaded.pendingNew.draft_one.connectorId,'openrouter');assert.equal(loaded.creationIds.draft_one,'creation_exact_1');assert.equal(loaded.drafts.draft_one,'Later text');
   const legacy=initial();delete legacy.providerSelections;delete legacy.pendingNew.draft_one.connectorId;f.writeDraftSession(legacy);assert(f.readDraftSession());
 });
+test('an explicit request can start a fresh proposal; discussions, quoted commands and negations cannot',()=>{
+  const f=fixture(),id='cb4b6fa0-663d-41fb-9c59-42ce22e33427';
+  for(const text of ['Создай мне локального агента, который убирает пробелы.', 'Please create a local agent that counts words.']){
+    assert.deepEqual(f.requestedFactoryIntent(text,id),{action:'create-new-agent',slug:'agent-cb4b6fa0663d'});
+  }
+  assert.equal(f.requestedFactoryIntent('Создай агента «Headline Distiller» для заголовков.',id).slug,'headline-distiller');
+  for(const text of ['Как создать агента?', 'Объясни: «Создай агента…»', 'Не создавай агента.', 'Create an agentic workflow', 'Review the agent.',''])assert.equal(f.requestedFactoryIntent(text,id),null);
+});
 test('foreign providers and credential-bearing selection objects cannot enter a recovered draft',()=>{
   for(const selection of [{connectorId:'foreign',modelId:'vendor/model'},{connectorId:'openrouter',apiKey:'PRIVATE_CANARY'},{connectorId:'openrouter',modelId:'https://user:secret@host/escape'},{connectorId:'openrouter',effortId:'unverified'}]){
     const f=fixture(),value=initial();value.providerSelections.draft_one=selection;f.writeDraftSession(value);assert.equal(f.readDraftSession(),null);

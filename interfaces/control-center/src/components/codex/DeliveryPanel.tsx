@@ -6,6 +6,27 @@ import { controlCenterRequest, ControlCenterRequestError } from "@/lib/control-c
 import type { DeliveryBudgetChange, TaskDeliveryRequest, TaskDeliveryView } from "@/lib/codex-chat/delivery-types";
 
 const statusLabel: Record<string, string> = { created: "Создана", preparing: "Подготовка", building: "Создание агента", correcting: "Готова к продолжению", paused: "Приостановлена", blocked: "Нужен контроль", verifying: "Проверяем", verified: "Проверено", awaiting_acceptance: "Ожидает приёмки", accepted: "Принято", failed: "Нужен разбор", abandoned: "Завершена без результата", cancelled: "Отменена" };
+type Explanation = NonNullable<TaskDeliveryView["explanation"]>;
+function RunExplanation({run,showAcceptance=true}:{run:Explanation;showAcceptance?:boolean}) {
+  return <div aria-label="Состояние сборки">
+    {run.blockers.map(b=><div key={b.code}><strong>{b.title}</strong><p>{b.question}</p>
+      <ul>{b.options.map(o=><li key={o.id}>{o.label}: {o.effect}</li>)}</ul></div>)}
+    {showAcceptance && ["verified","awaiting_acceptance","accepted"].includes(run.status)?<p>{run.acceptance==="accepted"?"Результат принят пользователем.":"Автоматические проверки прошли. Ожидается ваша приёмка."}</p>:null}
+    <p>Сборка: {run.budget.tokensUsed} / {run.budget.maxTokens} токенов · {run.iteration} / {run.budget.maxIterations} попыток.</p>
+    {run.budget.usageStatus!=="complete"?<p>Часть расхода ещё не установлена.</p>:null}
+    {run.budget.overrun>0?<p>Исполнитель превысил согласованный лимит на {run.budget.overrun} токенов.</p>:null}
+  </div>;
+}
+export function FactoryProgress({view}:{view:NonNullable<import("@/lib/codex-chat/types").ThreadDetail["factoryControl"]>}) {
+  if(!view.available)return <aside role="status">Не удалось подтвердить состояние сборки. Существующая задача сохранена.</aside>;
+  const d=view.delivery;
+  return <aside className="codex-factory-context" aria-label="Создание агента"><strong>{view.milestone.label} · {view.slug}</strong><span>Сборщик: {view.builder.provider} / {view.builder.modelId}</span>
+    {d?.blockers.length?null:<p>{view.milestone.summary}</p>}{d?<RunExplanation run={d} showAcceptance={false}/>:null}
+    {view.firstUse?<div><strong>Попробовать проверенную версию</strong><p>Каталог сборки: <code>{view.firstUse.directory}</code> · версия <code>{view.firstUse.commit.slice(0,12)}</code>. Основной проект обновляется отдельно.</p>
+      {view.firstUse.commands.cli?<><pre>{view.firstUse.commands.cli}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.cli)}</code></p></>:null}
+      <details><summary>Проверить по HTTP</summary><p>В каталоге сборки запустите сервер. Во втором терминале выполните запрос. Для остановки нажмите Ctrl+C.</p><pre>{view.firstUse.commands.server}</pre><pre>{view.firstUse.commands.http}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.http)}</code></p></details></div>:null}
+    </aside>;
+}
 export function DeliveryPanel({ chatId, active, editable, refreshKey = 0, onSelectedRun, budgetResult }: { chatId: string; active: boolean; editable: boolean; refreshKey?: number; onSelectedRun?: (chatId: string, runId: string | null) => void; budgetResult?: TaskDeliveryView | null }) {
   const [runId, setRunId] = useState("");
   const [links, setLinks] = useState<Array<{ runId: string; status: string }>>([]);
@@ -97,6 +118,7 @@ export function DeliveryPanel({ chatId, active, editable, refreshKey = 0, onSele
         <button className="outline-button compact" disabled={!runId.trim() || busy || Boolean(pending)} type="submit">Показать сборку</button>
       </form>
       {run ? <>
+        {run.explanation?<RunExplanation run={run.explanation}/>:null}
         <p><strong>{run.agentName}</strong> · {run.runId}<br />Outcome Spec: {run.specId}</p>
         <p>Проверка: {statusLabel[run.status] || run.status}. Приёмка: {run.acceptance === "accepted_by_user" ? "подтверждена пользователем" : "ещё не подтверждена"}.</p>
         <p>Подтверждённый расход сборочного исполнителя: {run.budget.tokensUsed.toLocaleString("ru-RU")} / {run.budget.maxTokens.toLocaleString("ru-RU")} токенов. {run.budget.usageStatus !== "complete" ? "Часть расхода ещё не установлена. " : ""}Goal задачи и расход внутри проверок учитываются отдельно.</p>

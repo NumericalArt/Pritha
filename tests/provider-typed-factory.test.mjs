@@ -71,3 +71,28 @@ test('typed entry prepares private drafts without a redundant approval and canno
   await assert.rejects(runtime.create(create('another_factory_chat')),{code:'factory_target_exists'});
   await assert.rejects(run.host.call('factory_step',{operation_id:'outcome_without_approval',action:'create_outcome'}),{code:'factory_contract_approval_required'});
 });
+
+for(const provider of ['claude','neuraldeep'])test(`${provider}: explicit factory status retains the chat and replay receipt without a parent inference`,async t=>{
+  const f=fixture(t,provider),runtime=f.make(),binding=(await runtime.create(create('factory_control_create'))).binding;
+  const input={...message('factory_control_status'),factoryAction:{operation_id:'factory_control_status_01',action:'status'}};
+  const started=await runtime.start(binding.chatId,input);
+  await until(()=>runtime.active.size===0);
+  assert.equal(f.runs.length,0);
+  assert.equal(runtime.registry.turn(binding.chatId,started.accepted.turn.turnId).status,'completed');
+  assert.equal(runtime.require(binding.chatId).nativeThreadId,binding.nativeThreadId);
+  assert.equal(runtime.require(binding.chatId).modelId,'pinned-model');
+  const replay=await f.make().start(binding.chatId,input);
+  assert.equal(replay.replayed,true);assert.equal(replay.accepted.turn.turnId,started.accepted.turn.turnId);assert.equal(f.runs.length,0);
+  await assert.rejects(runtime.start(binding.chatId,{...input,factoryAction:{...input.factoryAction,action:'finish'}}),{code:'idempotency_conflict'});
+});
+
+test('explicit factory control rejects authority, retargeting, attachments and queueing before dispatch',async t=>{
+  const f=fixture(t),runtime=f.make(),binding=(await runtime.create(create('factory_control_guards'))).binding;
+  const input={...message('factory_control_invalid'),factoryAction:{operation_id:'factory_control_guard_01',action:'status'}};
+  for(const factoryAction of [null,[],{}, {...input.factoryAction,approved:true},{...input.factoryAction,root:'/other'}, {...input.factoryAction,action:'approve_contract'}, {...input.factoryAction,action:'init'}, {...input.factoryAction,operation_id:'../escape'},{...input.factoryAction,action:'delivery_resume',answer:42}])await assert.rejects(runtime.start(binding.chatId,{...input,factoryAction}),{code:'factory_control_invalid'});
+  await assert.rejects(runtime.start(binding.chatId,{...input,attachments:['image']}),{code:'factory_control_invalid'});
+  await assert.rejects(runtime.enqueue(binding.chatId,input),{code:'factory_control_queue_denied'});
+  assert.equal(f.runs.length,0);assert.equal(runtime.registry.turnsPage(binding.chatId).data.length,0);
+  const ordinary=(await runtime.create({clientThreadId:'ordinary_control_scope',source:'chat',workspace:{mode:'read-only'}})).binding;
+  await assert.rejects(runtime.start(ordinary.chatId,input),{code:'factory_control_invalid'});
+});

@@ -10,26 +10,47 @@ import {factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft,validateFactoryBuildEffort} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
+import {reconcileFactoryReceipt} from '../scripts/agents-mother/factory-receipt-recovery.mjs';
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
 import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs';
 import {contractData} from '../scripts/agents-mother/contract.mjs';
 import {validateOutcomeSpecText} from '../scripts/agents-mother/outcome-spec.mjs';
 import {preparedTrialInputFiles} from '../scripts/agents-mother/prepared-trial-inputs.mjs';
-import {createDeliveryLedger,updateDeliveryLedger} from '../scripts/agents-mother/delivery-ledger.mjs';
+import {createDeliveryLedger,updateDeliveryLedger,readDeliveryLedger,budgetBlocker,accountDeliveryExecutorResult} from '../scripts/agents-mother/delivery-ledger.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const brief={identity:{name:'Voice Built',slug:'voice-built'},goal:'Read a supplied text file and count its lines.',user:'The local operator',successCriteria:['The CLI returns the exact line count and handles a missing file with an error.'],coreFunctions:['Count lines in a supplied local file'],workflows:['Choose a file; run the CLI; inspect its count'],nonGoals:['No network, deployment or automatic services'],permissions:{network:['none'],filesystem:['Only the operator-selected file and child workspace']},technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'A deterministic local line counter needs no third-party repository.'}};
-function fixture(t){
+function fixture(t,connectorId='claude'){
   const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'pritha-voice-factory-'))),stateRoot=path.join(directory,'state'),agentParent=path.join(directory,'children');fs.mkdirSync(stateRoot);fs.mkdirSync(agentParent);
-  const coordinator=new ExecutionCoordinator({stateRoot,directory:path.join(stateRoot,'codex-chat','execution')}),lease=coordinator.claim(['fixture'],'factory-fixture',{kind:'turn',detail:{chatId:'chat_factory',connectorId:'claude'}}),controller=new AbortController(),approvals=[],proofs=[];
+  const coordinator=new ExecutionCoordinator({stateRoot,directory:path.join(stateRoot,'codex-chat','execution')}),lease=coordinator.claim(['fixture'],'factory-fixture',{kind:'turn',detail:{chatId:'chat_factory',connectorId}}),controller=new AbortController(),approvals=[],proofs=[];
   const p=voiceFactoryPaths({root,stateRoot,agentParent,slug:'voice-built'});coordinator.extend(lease.owner,lease.generation,['workspace:'+p.target]);
-  const options={root,cwd:root,stateRoot,privateRoot:path.join(stateRoot,'claude'),connectorId:'claude',coordinator,lease,chatId:'chat_factory',turnId:'turn_factory',signal:controller.signal,sandbox:'read-only',factory:{slug:p.slug,target:p.target,agentParent,model:'claude-sonnet-5-5',preset:{authMode:'api-key'}},approve:async value=>{approvals.push(value);return {decision:'accept'};},onProcessEvidence:(id,proof)=>proofs.push({id,proof})};
+  const options={root,cwd:root,stateRoot,privateRoot:path.join(stateRoot,connectorId),connectorId,coordinator,lease,chatId:'chat_factory',turnId:'turn_factory',signal:controller.signal,sandbox:'read-only',factory:{slug:p.slug,target:p.target,agentParent,model:connectorId==='neuraldeep'?'qwen3.8-27b':'claude-sonnet-5-5',preset:{authMode:'api-key'}},approve:async value=>{approvals.push(value);return {decision:'accept'};},onProcessEvidence:(id,proof)=>proofs.push({id,proof})};
   const tools=new ProviderHostTools(options);let sequence=0;
   const call=async(action,extra={})=>{const response=await tools.call('factory_step',{operation_id:'factory_step_'+String(++sequence).padStart(4,'0'),action,...extra});return JSON.parse(response.content[0].text);};
   const ok=async(action,extra={})=>{const row=await call(action,extra);assert.equal(row.status,'completed',row.text);return JSON.parse(row.text);};
   t.after(async()=>{controller.abort();await tools.close();lease.release();coordinator.close();fs.rmSync(directory,{recursive:true,force:true});});
   return {tools,options,p,coordinator,lease,controller,approvals,proofs,call,ok,state:()=>loadVoiceFactory(p,options),artifact:kind=>factoryArtifact(p,loadVoiceFactory(p,options),kind)};
 }
+test('a lost worker reply is recovered once from its receipt, only after its old lease and process are gone',async t=>{
+  const f=fixture(t),id='original_worker_receipt';
+  await f.ok('init',{operation_id:id,brief,build_token_budget:10000});
+  const row=f.coordinator.getIntent('provider-tool:turn_factory:'+id),dir=row.factoryWorkDirectory;
+  const request=JSON.parse(fs.readFileSync(path.join(dir,'request.json'))),file=path.join(dir,'result.json'),receipt=fs.readFileSync(file);
+  const completed=f.state();fs.writeFileSync(f.p.file,JSON.stringify(request.state)); // crash immediately before persisting the result
+  assert.equal(reconcileFactoryReceipt(f.p,f.options),false);
+  f.lease.release();
+  const lease=f.coordinator.claim(['fixture','workspace:'+f.p.target],'next-factory-owner',{kind:'turn'});
+  try {
+    const owner={...f.options,lease,turnId:'turn_after_crash'};
+    assert.equal(reconcileFactoryReceipt(f.p,owner,{proveExit:()=>false}),false);
+    fs.unlinkSync(file);assert.equal(reconcileFactoryReceipt(f.p,owner),false);
+    fs.writeFileSync(file,receipt);assert.equal(f.state().running.operationId,id);
+    const found=reconcileFactoryReceipt(f.p,owner);assert.equal(found.input.operation_id,id);
+    assert.equal(f.state().running,null);assert.equal(f.state().revision,completed.revision);
+    assert.equal(f.state().contract,completed.contract);assert.equal(reconcileFactoryReceipt(f.p,owner),false);
+    assert.equal(f.approvals.length,0);
+  } finally {lease.release();}
+});
 test('factory conversation lookup reads the exact host binding and rejects damaged or foreign state',async t=>{
   const f=fixture(t),options={root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug};
   assert.equal(readFactoryConversation(options),null);await f.ok('init',{brief,build_token_budget:10000});
@@ -43,8 +64,8 @@ test('factory conversation lookup reads the exact host binding and rejects damag
 });
 test('dedicated drafting tools require brief/content and retain the canonical operation and approval boundary',{timeout:60000},async t=>{
   const f=fixture(t),init=f.tools.definitions.find(t=>t.name==='factory_init'),write=f.tools.definitions.find(t=>t.name==='factory_write_draft');
-  assert.deepEqual(init.inputSchema.required,['operation_id','brief','build_token_budget']);assert.equal(init.inputSchema.properties.sources,undefined);
-  assert.deepEqual(write.inputSchema.required,['operation_id','artifact','expected_sha256','content']);
+  assert.deepEqual(init.inputSchema.required,['brief','build_token_budget']);assert.equal(init.inputSchema.properties.sources,undefined);
+  assert.deepEqual(write.inputSchema.required,['artifact','expected_sha256','content']);
   await assert.rejects(f.tools.call('factory_init',{operation_id:'draft-init-01',action:'approve_contract',brief,build_token_budget:40000}),{code:'factory_input_invalid'});
   assert.equal(f.state(),null);
   const input={operation_id:'draft-init-01',brief,build_token_budget:40000};
@@ -64,7 +85,7 @@ test('the actual MCP brief schema rejects a design array before approval and a c
   const status=JSON.parse((await post('tools/call',{name:'factory_step',arguments:{operation_id:'check-start-status',action:'status'}})).content[0].text);
   assert.equal(status.nextStep.action,'init');assert.deepEqual(status.nextStep.requiredFields,['brief','build_token_budget']);
   const wrongAction=await post('tools/call',{name:'factory_step',arguments:{operation_id:'incorrect-draft-call',action:'write_draft',sources:{brief:'synthetic'},selection:{}}});
-  const guidance=JSON.parse(wrongAction.content[0].text);assert.equal(guidance.error,'factory_input_invalid');assert.deepEqual(guidance.requiredFields,['operation_id','action','artifact','expected_sha256','content']);assert.match(guidance.hint,/init with brief/);
+  const guidance=JSON.parse(wrongAction.content[0].text);assert.equal(guidance.error,'factory_input_invalid');assert.deepEqual(guidance.requiredFields,['action','artifact','expected_sha256','content']);assert.match(guidance.hint,/init with brief/);
   const shortId=await post('tools/call',{name:'factory_step',arguments:{operation_id:'draft1',action:'init',brief,build_token_budget:40000}});
   assert.match(JSON.parse(shortId.content[0].text).hint,/8–128/);assert.equal(f.state(),null);assert.equal(f.approvals.length,0);
   assert.equal(tool.properties.sources.additionalProperties.type,'string');
@@ -220,7 +241,7 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
     const result=await executeVoiceFactoryStep({version:1,root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'claude',model:'claude-sonnet-5-5',effort:'low',preset:{authMode:'local-cli-session'},factoryParent:{fixture:true},state,input:{operation_id,action,...extra}},dependencies);
     fs.writeFileSync(f.p.file,JSON.stringify({...result.state,running:null}));return result;
   };
-  const delivered=await step('deliver');assert.equal(delivered.value.status,'awaiting_acceptance');assert.equal(calls[0].target,f.p.target);assert.equal(calls[0].outcome,f.state().outcome);assert.equal(calls[0].options.buildExecutor,'claude-code');assert.equal(calls[0].options.trialBackend,'local');assert.equal(calls[0].options.buildExecutorOptions.model,'claude-sonnet-5-5');
+  const delivered=await step('deliver');assert.equal(delivered.value.status,'awaiting_acceptance');assert.equal(calls[0].target,f.p.target);assert.equal(calls[0].outcome,f.state().outcome);assert.equal(calls[0].options.buildExecutor,'claude-code');assert.equal(calls[0].options.trialBackend,undefined,'The approved plan chooses the required Trial backend');assert.equal(calls[0].options.buildExecutorOptions.model,'claude-sonnet-5-5');
   await step('verify');assert.equal(calls[1].options.hostOnly,true);
   const success=output,runRoot=path.join(f.p.stateRoot,'builds','fixture-run'),ref={path:'trial-results/verification-001.json',evidence_lock:'sha256:fixture-evidence'};
   fs.mkdirSync(path.join(runRoot,'trial-results'),{recursive:true});
@@ -247,6 +268,45 @@ test('factory delivery binds executor, locked Outcome and durable run; verificat
   fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),running:null,runId:undefined,phase:'scaffolded'}));failAfterJournal=true;await assert.rejects(step('deliver'),/simulated disconnect/);assert.match(f.state().runId,/^voice-voice-built-/);assert.equal(f.state().running.action,'deliver');
 });
 
+test('changing only a paused NeuralDeep builder needs its own approval, tool support and known spend',async t=>{
+  const f=fixture(t,'neuraldeep');await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});
+  await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const runId='fixture-model-review',spec=f.artifact('outcome').frontmatter, before=f.state(),pinned={...before,runId,phase:'delivery-blocked'};
+  fs.writeFileSync(f.p.file,JSON.stringify(pinned));const input={action:'configure_build_model',operation_id:'new-builder-model',model:'gpt-oss-120b',effort:'high'};
+  let decisions=0;f.options.approve=async r=>{assert.equal(r.presentation.previousBuildModel,'qwen3.8-27b');assert.equal(r.presentation.proposedBuildModel,input.model);decisions++;return {decision:'decline'};};
+  assert.equal((await f.call(input.action,input)).status,'declined');assert.equal(decisions,1);assert.equal(f.state().buildConfiguration,undefined);
+  const state={...pinned,revision:pinned.revision+1,running:{operationId:input.operation_id,turnId:f.options.turnId,action:input.action}};fs.writeFileSync(f.p.file,JSON.stringify(state));
+  let known=false,tools=false,metadata=0;
+  const step=()=>executeVoiceFactoryStep({root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'neuraldeep',model:f.options.factory.model,state,input},
+    {delivery:{deliveryStatus:()=>({state:{run_id:runId,source_project:f.p.target,status:'blocked',spec:{id:spec.id,document_lock:spec.outcome_document_lock},budget:{legacy_usage_unverified:false,unaccounted_attempts:known?[]:[{}]}}})},
+     buildModelPreflight:async model=>{metadata++;assert.equal(model,input.model);return {tools};}});
+  await assert.rejects(step(),{code:'factory_build_configuration_locked'});assert.equal(metadata,0);
+  known=true;await assert.rejects(step(),{code:'factory_build_model_unsupported'});tools=true;
+  const res=await step();assert.equal(res.value.modelRequests,0);assert.equal(res.state.buildConfiguration.parentModelId,f.options.factory.model);
+  assert.equal(res.state.buildConfiguration.modelId,input.model);assert.equal(res.state.runId,runId);assert.deepEqual(res.state.outcomeApproval,before.outcomeApproval);
+});
+test('a budget review is tied to the paused run and rechecks its version after the operator answers',async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});
+  await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const spec=f.artifact('outcome').frontmatter,runId='fixture-budget-review',runRoot=path.join(f.p.stateRoot,'builds',f.p.slug,runId);
+  createDeliveryLedger(runRoot,{runId,agentSlug:f.p.slug,targetKey:'fixture-target',sourceProject:f.p.target,budget:{maxTokens:10000,maxIterations:1},spec:{id:spec.id,semanticLock:spec.outcome_semantic_lock,documentLock:spec.outcome_document_lock,contractFingerprint:spec.contract_fingerprint,approvalId:'fixture-approval'}});
+  accountDeliveryExecutorResult(runRoot,{schema:'pritha-build-executor-result-v2',executor:'claude-code',run_id:runId,thread_id:'thread-1',turn_id:'turn-1',tokens_used:120,usage_status:'measured',usage_source:'provider',usage_scope:'build-executor',goal_enforcement:'required'},'executor/iteration-001.json');
+  const blocked=updateDeliveryLedger(runRoot,current=>{const next={...current,iteration:1};return {...next,status:'blocked',next_action:'',blockers:[budgetBlocker(next)]};}).state;
+  fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),runId,phase:'delivery-blocked'}));
+  const arg={expected_version:blocked.version,add_iterations:1,add_elapsed_ms:60000},count=f.approvals.length;
+  await assert.rejects(f.call('delivery_extend',{...arg,add_iterations:0}),{code:'factory_budget_insufficient'});
+  assert.equal(f.approvals.length,count);
+  let changes=0;f.options.approve=async req=>{
+    assert.equal(req.presentation.budgetReview.expectedVersion,blocked.version);
+    assert.equal(req.presentation.budgetReview.tokensUsed,120);
+    const before=readDeliveryLedger(runRoot);assert.equal(before.budget.amendments.length,0);assert.equal(before.budget.max_iterations,1);
+    changes++;updateDeliveryLedger(runRoot,s=>({...s,blockers:s.blockers.map(b=>({...b,summary:'Revised evidence'}))}));
+    return {decision:'accept'};
+  };
+  const result=await f.call('delivery_extend',arg);assert.equal(result.status,'failed');assert.match(result.text,/factory_budget_context_changed/);
+  await assert.rejects(f.call('delivery_extend',arg),{code:'factory_budget_context_changed'});
+  const after=readDeliveryLedger(runRoot);assert.equal(changes,1);assert.deepEqual(after.budget,blocked.budget);assert.equal(after.run_id,runId);
+});
 test('factory status observes actual acceptance without rewriting state or borrowing another run',{timeout:60000},async t=>{
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
   const spec=f.artifact('outcome').frontmatter,runId='run-factory-status',runRoot=path.join(f.p.stateRoot,'builds',f.p.slug,runId);
@@ -283,7 +343,7 @@ test('normal factory patch tool is exact, replayable and cannot edit accepted do
   const row=f.artifact('outcome'),from='## Demo script\n\n',to=from+'Review the exact CLI output before final acceptance.\n\n',content=row.text.replace(from,to);
   assert.notEqual(content,row.text);
   const input={operation_id:'patch-outcome-exact-01',artifact:'outcome',expected_sha256:row.sha256,edits:[{from,to}],expected_result_sha256:factoryHash(content)},before=f.state().revision;
-  const definition=f.tools.definitions.find(tool=>tool.name==='factory_patch_draft');assert.deepEqual(definition.inputSchema.required,['operation_id','artifact','expected_sha256','edits','expected_result_sha256']);assert.equal(definition.inputSchema.properties.content,undefined);
+  const definition=f.tools.definitions.find(tool=>tool.name==='factory_patch_draft');assert.deepEqual(definition.inputSchema.required,['artifact','expected_sha256','edits','expected_result_sha256']);assert.equal(definition.inputSchema.properties.content,undefined);
   await assert.rejects(f.tools.call('factory_patch_draft',{...input,operation_id:'patch-outcome-wrong-hash',expected_result_sha256:'0'.repeat(64)}),{code:'factory_patch_hash_mismatch'});
   assert.equal(f.state().revision,before);assert.equal(f.artifact('outcome').text,row.text);
   const first=await f.tools.call('factory_patch_draft',input);assert.equal(JSON.parse(first.content[0].text).status,'completed');assert.equal(f.artifact('outcome').text,content);
@@ -304,10 +364,10 @@ test('each factory action has an exact schema; narrow approvals keep two distinc
   for(const action of dispatch.inputSchema.properties.action.enum){
     const tool=f.tools.definitions.find(tool=>tool.name==='factory_'+action);assert.ok(tool,action);
     assert.equal(tool.inputSchema.properties.action,undefined);assert.equal(tool.inputSchema.additionalProperties,false);
-    assert.equal(tool.inputSchema.required.includes('operation_id'),true);
+    assert.equal(tool.inputSchema.required.includes('operation_id'),false);
   }
-  assert.deepEqual(f.tools.definitions.find(tool=>tool.name==='factory_approve_contract').inputSchema.required,['operation_id','expected_sha256']);
-  assert.deepEqual(f.tools.definitions.find(tool=>tool.name==='factory_approve_outcome').inputSchema.required,['operation_id','expected_sha256']);
+  assert.deepEqual(f.tools.definitions.find(tool=>tool.name==='factory_approve_contract').inputSchema.required,['expected_sha256']);
+  assert.deepEqual(f.tools.definitions.find(tool=>tool.name==='factory_approve_outcome').inputSchema.required,['expected_sha256']);
   assert.equal(f.tools.definitions.find(tool=>tool.name==='factory_status').annotations.readOnlyHint,true);
   const server=await listenProviderToolServer({hostTools:f.tools});t.after(()=>server.close());let id=0;
   const call=async(name,args)=>(await(await fetch(server.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+server.token},body:JSON.stringify({jsonrpc:'2.0',id:++id,method:'tools/call',params:{name,arguments:args}})})).json()).result;

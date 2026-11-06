@@ -1,3 +1,4 @@
+import {readBoundFactoryProgress} from '../../../../../scripts/agents-mother/factory-progress.mjs';
 import { HistoryReader, HistoryError, HISTORY_READ_MS, type HistoryContext } from "./history-reader";
 import { planOperationDecision, resolveOperationDecision, type OperationAction, type OperationRequest } from "../../../../../scripts/agents-mother/operation-decisions.mjs";
 import { operationRuntime } from "./operation-runtime";
@@ -65,6 +66,7 @@ export type CreateThreadInput = {
 };
 
 export type StartTurnInput = {
+  factoryAction?:{operation_id:string;action:'status'|'delivery_status'|'delivery_resume'|'verify'|'finish'|'configure_build'|'configure_build_model'|'delivery_extend';answer?:string;effort?:string;model?:string;expected_version?:number;add_tokens?:number;add_iterations?:number;add_elapsed_ms?:number};
   attachments?: string[];
   clientMessageId: string;
   input: [{ type: "text"; text: string }];
@@ -317,6 +319,7 @@ export class CodexChatGateway {
   }
 
   async enqueueMessage(chatId: string, input: StartTurnInput) {
+    if(Object.hasOwn(input,'factoryAction'))throw new CodexChatGatewayError('factory_control_unsupported','This native runtime uses its existing factory tools.',422);
     if(['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
     return this.store.execution.withMutation(`queue-admission:${chatId}`,()=>this.enqueueMessageOwned(chatId,input));
   }
@@ -691,6 +694,7 @@ export class CodexChatGateway {
     const controlTurnId = control ? this.activeTurns.get(chatId)?.turnId || turnIdFor(chatId,control.nativeTurnId) : null;
     return {
       thread: summary,
+      ...(binding.workspace?.factorySlug?{factoryControl:readBoundFactoryProgress({root:this.root,stateRoot:this.store.stateRoot,slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,chatId,connectorId:'codex',model:binding.modelId,effort:binding.factoryEffortId})}:{}),
       voiceWorkflow:voice ? {taskId:voice.taskId,state:voice.state,revision:voice.revision,question:voice.question || null,questionId:voice.questionId || null} : null,
       queued: await this.queuedMessages(chatId),
       controls: control && controlTurnId ? {turnId:controlTurnId,steer:control.steer && provider.capabilities.steerTurn,interrupt:provider.capabilities.interruptTurn} : null,
@@ -847,6 +851,11 @@ export class CodexChatGateway {
   }
 
   async taskDeliveries(chatId: string, runId?: string) {
+    const saved = await this.requireBinding(chatId);
+    if (!runId && saved.workspace?.factorySlug) {
+      return {runs:[],factory:readBoundFactoryProgress({root:this.root,stateRoot:this.store.stateRoot,slug:saved.workspace.factorySlug,
+        target:saved.workspace.factoryTarget,chatId,connectorId:'codex',model:saved.modelId,effort:saved.factoryEffortId})};
+    }
     const binding = await this.deliveryContext(chatId, false);
     try {
       const options = { root: this.root, stateRoot: this.store.stateRoot };
@@ -1217,6 +1226,7 @@ export class CodexChatGateway {
   }
 
   async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean; fromQueue?: string } = {}): Promise<{ accepted: AcceptedTurn; replayed: boolean }> {
+    if(Object.hasOwn(input,'factoryAction'))throw new CodexChatGatewayError('factory_control_unsupported','This native runtime uses its existing factory tools.',422);
     if(['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
     let binding = await this.requireBinding(chatId);
     if(binding.workspace?.factorySlug && input.settings?.effortId && input.settings.effortId!==binding.factoryEffortId)throw new CodexChatGatewayError('runtime_identity_mismatch','This factory keeps its original reasoning settings.',409);
