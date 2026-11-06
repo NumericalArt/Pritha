@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {nextFactoryAction,factoryOperationId} from '../scripts/agents-mother/factory-continuation.mjs';
-import {readBoundFactoryProgress,factoryMilestone,factoryVoiceDisplay} from '../scripts/agents-mother/factory-progress.mjs';
+import {readBoundFactoryProgress} from '../scripts/agents-mother/factory-progress.mjs';
+import {factoryMilestone,factoryVoiceDisplay} from '../scripts/agents-mother/factory-milestone.mjs';
 import {scenarios,productFactoryFixture,until} from './helpers/product-factory.mjs';
 
 test('Voice and Task Chat cannot turn the end of a controller reply into a completed product',()=>{

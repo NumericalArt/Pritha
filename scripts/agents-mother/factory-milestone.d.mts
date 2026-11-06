@@ -1,0 +1,1 @@
+export function factoryVoiceDisplay(raw:string,turnComplete:boolean,product?:import('../../interfaces/control-center/src/lib/codex-chat/types').FactoryMilestone):{complete:boolean;status:string;ceiling:number};

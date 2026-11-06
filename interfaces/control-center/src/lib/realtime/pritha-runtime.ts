@@ -1,4 +1,4 @@
-import {factoryVoiceDisplay} from '../../../../../scripts/agents-mother/factory-progress.mjs';
+import {factoryVoiceDisplay} from '../../../../../scripts/agents-mother/factory-milestone.mjs';
 import type {FactoryMilestone as VoiceFactoryMilestone} from '../codex-chat/types';
 import { dispatchVoiceTool, type VoiceToolHandlers } from "./core/voice-tools-dispatcher";
 import type { VoiceDispatchRequest } from '../../../../../scripts/lib/voice-task-bridge.mjs';
