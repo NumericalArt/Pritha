@@ -15,7 +15,8 @@ test('Voice and Task Chat cannot turn the end of a controller reply into a compl
  const blocked=factoryMilestone({}, {status:'blocked',blockers:[{code:'iteration_budget_exhausted',title:'Закончились попытки',question:'Продолжить?'}]},null);
  assert.match(blocked.summary,/попытки/);assert.equal(factoryVoiceDisplay('complete',true,blocked).status,'waiting_for_operator');assert.ok(factoryVoiceDisplay('complete',true,blocked).ceiling<100);
  assert.equal(factoryVoiceDisplay('aborted',true,blocked).complete,true);
- const accepted=factoryMilestone({phase:'accepted'},{status:'accepted',blockers:[]},{commit:'tested'});
+ // Both older accepted pilots still have this pre-acceptance factory phase.
+ const accepted=factoryMilestone({phase:'awaiting-manual-acceptance'},{status:'accepted',acceptance:'accepted',blockers:[]},{commit:'tested'});
  assert.equal(factoryVoiceDisplay('complete',true,accepted).complete,true);
  assert.equal(factoryVoiceDisplay('complete',true).complete,true,'An unrelated ordinary task retains its terminal status');
 });

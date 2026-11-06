@@ -2,10 +2,10 @@
 // this presentation from the same bound evidence; neither infers it from text.
 export function factoryMilestone(state,delivery,firstUse) {
   const at=(kind,label,summary)=>({kind,label,summary});
+  if(delivery?.status==='accepted' && delivery.acceptance==='accepted')return at('accepted','Готово',state?.phase==='card-blocked'?'Агент уже принят. Карточка управления ещё не готова.':'Пользователь принял проверенную версию.');
   if(delivery?.blockers.length){const b=delivery.blockers[0];return at('decision','Нужно решение',b.title+'. '+b.question);}
   if(['cancelled','failed','abandoned','paused'].includes(delivery?.status))return at('stopped','Остановлено','Сборка остановлена. Уже созданные материалы сохранены.');
   if(state?.phase==='card-blocked')return at('partial','Карточка не готова',firstUse?'Интерфейсы агента проверены. Можно попробовать указанную сборку; карточка управления ещё не готова.':'Проверки сборки прошли; карточка управления ещё не готова.');
-  if(delivery?.status==='accepted' && state?.phase==='accepted')return at('accepted','Готово','Пользователь принял проверенную версию.');
   if(['verified','awaiting_acceptance','accepted'].includes(delivery?.status))return at('review','Проверено',firstUse?'Проверенная версия доступна для первого запуска. Приёмка — отдельное решение.':'Проверки записаны. Команда для текущей версии ещё не подтверждена.');
   if(delivery?.status==='verifying')return at('verifying','Проверяю','Выполняются проверки согласованного результата.');
   if(state?.continuationPause)return at('stopped','Остановлено','Шаг фабрики остановился. Результаты предыдущей операции сохранены.');
