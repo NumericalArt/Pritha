@@ -713,18 +713,19 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 1da0a47 / Interactive.** Release и полный
+**Статус: in-progress; активна e8fe728 / Interactive.** Release и полный
 post-activation self-test проходят без warnings/regressions. Claude и Codex
 приняты и применены. NeuralDeep завершил research/scaffold и штатно сохранил
-High для прежней модели, Contract/Outcome и verifier. Две реальные model-попытки
+High для прежней модели, Contract/Outcome и verifier. Реальные model-попытки
 остановились после list_files без изменения кода; последняя сохранила точный
-neuraldeep_empty_response. Учтены 36355 build tokens и3/3 итерации при cap160000,
+neuraldeep_empty_response. Четвёртая итерация также не реализовала child.
+Учтены 54686 build tokens и4/4 итерации при cap160000,
 включая исторический preflight. Счётчики и согласования не сбрасываются.
 Изолированный read-only опыт воспроизвёл отказ на массиве текстовых tool results
 и успешную цепочку на строке. Совместимость исправляется до hashing/budget
 admission; этот опыт не доказывает готовность child. Реализация, успешные
 protected Trials, user review/acceptance/apply и manual matrix остаются открыты.
-См. checkpoint79; OpenRouter live отложен пользователем.
+См. checkpoint80; OpenRouter live отложен пользователем.
 
 **Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
@@ -3928,6 +3929,54 @@ warnings/regressions. Прежние файлы, профиль, run, докум
 amendment при сохранении общего token cap160000 и уже учтённых 36355 токенов.
 Contract/Outcome/High и исходные verifiers не пересогласовываются. Реальный child,
 успешные protected Trials, user review/acceptance/apply и manual matrix открыты.
+
+### Checkpoint 80 — e8fe728 установлена; явное соответствие инструментов CLI и host
+
+На 2026-11-06 оператор разрешил e8fe728 и одну дополнительную итерацию, до4,
+с новым окном15 минут при неизменном cap160000. Установка, strict5 страниц /
+12 chunks, operational/admission и полный self-test прошли без warnings/regressions.
+Прежний чат создал правильный pending resume с первого запроса; только после его
+проверки штатно добавлены iteration/time, затем подтверждён этот же request.
+
+- Итерация4 потратила18331 токен, остановилась с neuraldeep_empty_response и не
+  изменила код. Всего54686 build tokens,4/4 итерации; процессы закрыты, protected
+  Trials остаются failed. Преобразование текстового результата было лишь частичным
+  исправлением; успешный read-only опыт не доказал рабочую сборку.
+- Capture настоящей CLI на синтетическом upstream подтвердил строковые tool
+  results в read-only и workspace-write. Новых платных запросов для этого нет.
+  В обоих режимах стандартные инструкции CLI упоминают apply_patch пять раз,
+  тогда как реальные upstream tools содержат только семь host MCP функций.
+- Отдельный ограниченный опыт с явным host-tool routing прочитал синтетический
+  файл, получил current SHA, изменил его через одобренный edit_file и завершился
+  DONE. GPT-OSS-120B и High сохранены;4 запроса,24297 diagnostic tokens, usage
+  измерен, процессы закрыты. Это component evidence, не создание агента и не
+  доказательство единственной причины всех предыдущих отказов.
+- Теперь NeuralDeep runner добавляет штатные developer instructions с именами
+  действительно объявленных host functions и маршрутом read/edit/write/command.
+  Factory subject instructions сохраняются; generic file tools не заменяют
+  factory gates. Guidance не даёт новых прав: sandbox, approvals, identity,
+  protected paths, budget и no-retry policy остаются прежними. Native Codex,
+  Claude, OpenRouter и Local runner не изменены этим уточнением.
+- Механизм developer instructions/function tools сверён с официальной OpenAI
+  Harmony documentation и фактической CLI0.153.0. Targeted24/24; изменённый owned
+  runner test отдельно8/8. Installed CLI/synthetic upstream4/4 подтверждает, что
+  guidance действительно приходит модели, а не остаётся лишь в argv.
+- Только для NeuralDeep build JSON payload отправляется без pretty-print
+  whitespace. Все Outcome/failure/protected-path/guidance поля и строковые байты
+  сохраняются; отдельная round-trip проверка это подтверждает. Остальные build
+  runners сохраняют прежнее форматирование. Это уменьшает служебный контекст
+  без ослабления консервативного budget admission.
+- Через обычную CLI supervisory agent также уточнил tool routing в прежнем
+  operator_guidance. Сохранены budget, iteration, approvals и verifier; эффект
+  проверен по canonical event, не по одному предположению об exit status.
+
+Отдельная диагностика теперь суммарно50870 токенов и не относится к build ledger;
+новой delivery implementation iteration после исчерпания4/4 не запускалось.
+Далее — итоговый gate нового pin, build/browser/rollback и конкретный install
+approval. Для следующей одной model-попытки нужен отдельный iteration/time
+amendment при сохранении cap160000 и всего учтённого расхода. Contract/Outcome,
+model/High и protected verifiers не пересогласовываются. Реальный child, успешные
+Trials и ручная acceptance/apply matrix остаются открытыми.
 
 ## 7. Полные исходные материалы
 

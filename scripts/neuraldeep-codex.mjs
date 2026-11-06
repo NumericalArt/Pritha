@@ -23,6 +23,7 @@ import {hostFileAttachmentVerified} from './lib/provider-file-attachments.mjs';
 import {validateResponsesInputs} from './neuraldeep/responses-input-policy.mjs';
 import {NeuralDeepImageAttachments} from './neuraldeep/attachment-transport.mjs';
 import {createSearchHost} from './search/host.mjs';
+import {providerToolInstructions} from './lib/provider-tool-instructions.mjs';
 
 const fail=(code,message='The selected NeuralDeep runtime could not complete this task.')=>Object.assign(new Error(message),{code});
 const modelPattern=/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/;
@@ -57,7 +58,9 @@ export function buildCodexExecArgs(options){
     'sandbox_workspace_write.writable_roots':roots,
   };
   const effort=effectiveNeuralDeepEffort(options.model,options.effort);
-  if(factoryInstructions)config.developer_instructions=factoryInstructions;
+  const hostInstructions=options.toolServer?providerToolInstructions(options.toolServer.definitions || PROVIDER_HOST_TOOL_DEFINITIONS):'';
+  const developerInstructions=[factoryInstructions,hostInstructions].filter(Boolean).join('\n\n');
+  if(developerInstructions)config.developer_instructions=developerInstructions;
   if(options.toolServer){
     config['mcp_servers.pritha.url']=options.toolServer.url;
     config['mcp_servers.pritha.bearer_token_env_var']='PRITHA_TOOL_CAPABILITY';

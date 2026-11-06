@@ -70,7 +70,7 @@ function outcomeProjection(plan) {
   };
 }
 
-function buildPrompt(input) {
+function buildPrompt(input, {compact=false}={}) {
   const protectedPaths = (input.protectedPaths || []).map((entry) => entry.path || entry).filter(Boolean);
   const payload = {
     run_id: input.runId,
@@ -92,7 +92,7 @@ function buildPrompt(input) {
     "A completion claim is not trusted; Pritha will independently run the approved Trials after this turn.",
     "",
     "Delivery payload:",
-    JSON.stringify(payload, null, 2),
+    JSON.stringify(payload,null,compact?0:2),
   ].join("\n");
 }
 
@@ -602,7 +602,7 @@ export class ClaudeCodeBuildExecutor {
       await checkpoint();const began=Date.now(),controller=new AbortController(),abort=()=>controller.abort();input.signal?.addEventListener('abort',abort,{once:true});if(input.signal?.aborted)abort();
       control={stop:()=>{controller.abort();run?.stop();}};this.active.add(control);
       try{
-        const prompt=buildPrompt(input)+'\n\nReturn the final report as a JSON object, without code fences, matching this host-validated schema. changed_files must contain only relative workspace paths.\n'+JSON.stringify(CLAUDE_BUILD_REPORT_SCHEMA);
+        const prompt=buildPrompt(input,{compact:this.connectorId==='neuraldeep'})+'\n\nReturn the final report as a JSON object, without code fences, matching this host-validated schema. changed_files must contain only relative workspace paths.\n'+JSON.stringify(CLAUDE_BUILD_REPORT_SCHEMA);
         let finalText='';
         run=await (this.options.launch || this.defaultLaunch)({...context,cwd,connectorId:this.connectorId,codexBin:this.options.codexBin,claudeBin:this.options.claudeBin,...receipt.model_policy,allowSearch:false,model:receipt.model_pinned,effort:receipt.effort_requested,authMode:'api-key',sandbox:'workspace-write',prompt,
           timeoutMs:Number.isSafeInteger(input.timeoutMs)?Math.max(1000,Math.min(input.timeoutMs,3600000)):900000,maxTurns:Math.min(this.options.maxTurns || 32,128),tokenBudget,budgetId:receipt.budget_id,signal:controller.signal,

@@ -53,6 +53,16 @@ test('a NeuralDeep input refusal preserves its exact error, measured charges and
   assert.equal(receipt.error_code,'neuraldeep_tool_arguments');assert.equal(receipt.process_exited,true);assert.equal(receipt.tokens_used,120);assert.equal(receipt.usage_status,'measured');
   const replay=await f.executor.execute(f.input);assert.equal(replay.error_code,receipt.error_code);assert.equal(replay.attempt_id,receipt.attempt_id);assert.equal(f.calls.length,1);
 });
+
+test('compact NeuralDeep build payload preserves approved data, failure bytes and protected paths',async t=>{
+  const f=fixture(t,{connectorId:'neuraldeep'});f.input.failures=[{id:'fixture_trial',stderr:'  exact spaces\nand Unicode \u0410\u043d\u043d\u0430  '}];f.input.guidance='Keep exact approved requirements.';
+  f.input.plan={spec_id:'fixture_spec',agent_slug:'fixture-child',contract_fingerprint:'fixture_fingerprint',semantic_lock:'fixture_lock',interaction_mode:'headless',trials:[{id:'fixture_trial',statement:'Preserve spaces and Unicode.',kind:'operator-judged',covers:['core:exact'],passCriteria:'Read the complete call graph.'}],demo:['First example','Second example']};
+  await f.executor.execute(f.input);
+  const text=f.calls[0].prompt,match=text.match(/Delivery payload:\n([^\n]+)\n\nReturn the final report/);assert.ok(match);
+  const data=JSON.parse(match[1]);assert.deepEqual(data.latest_trial_failures,f.input.failures);assert.deepEqual(data.protected_trial_inputs,['verify.mjs']);assert.equal(data.operator_guidance,f.input.guidance);
+  assert.equal(data.approved_outcome.spec_id,'fixture_spec');assert.equal(data.approved_outcome.trials[0].pass_criteria,'Read the complete call graph.');assert.deepEqual(data.approved_outcome.demo,f.input.plan.demo);
+  assert.equal(match[1],JSON.stringify(data));assert.ok(match[1].length<JSON.stringify(data,null,2).length);
+});
 for(const connectorId of ['claude','neuraldeep','openrouter','local']){
 if(connectorId!=='claude'){
 test(connectorId+': a read-only factory chat can build only inside its isolated writable worktree',async t=>{

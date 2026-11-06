@@ -5,6 +5,7 @@ import { PassThrough } from 'node:stream';
 import os from 'node:os';
 import path from 'node:path';
 import { startNeuralDeepRun,buildCodexExecArgs } from '../scripts/neuraldeep-codex.mjs';
+import {providerToolInstructions} from '../scripts/lib/provider-tool-instructions.mjs';
 
 const session='12345678-1234-1234-1234-123456789012';
 const boundary={probeCli:async()=>({available:true,version:'0.153.0'}),prepareSandbox:options=>({command:options.command,args:options.args})};
@@ -30,6 +31,17 @@ function fakeSupervisor(capture,{resumeId=session,wrongModel=false,wait=false,tr
     return {child,completion,stop:()=>{if(stopped)return false;stopped=true;close(1);return true;},evidence:{version:1,session:42,escaped:[]}};
   };
 }
+
+test('host developer instructions name only declared functions and preserve enforced access settings',t=>{
+  const options=fixture(t),definitions=[{name:'read_file'},{name:'edit_file'},{name:'run_command'},{name:'factory_status'}];
+  const args=buildCodexExecArgs({...options,factorySubject:{kind:'child',slug:'fixture-child',phase:'implement'},baseUrl:'http://127.0.0.1:17861/v1',toolServer:{url:'http://127.0.0.1:17862/mcp',definitions}});
+  const value=args.find(item=>item.startsWith('developer_instructions=')),instructions=JSON.parse(value.slice(value.indexOf('=')+1));
+  for(const name of definitions.map(tool=>tool.name))assert.ok(instructions.includes('mcp__pritha__'+name));
+  assert.match(instructions,/does not expose the built-in apply_patch/);assert.match(instructions,/saved workflow/);assert.match(instructions,/grants no write/);
+  assert.match(instructions,/Operator-selected subject: child agent fixture-child/);assert.match(instructions,/Preserve separate Contract and Outcome approvals/);
+  assert.doesNotMatch(instructions,/mcp__pritha__write_file/);assert.ok(args.includes('sandbox_mode="read-only"'));assert.ok(args.includes('approval_policy="never"'));
+  assert.equal(providerToolInstructions([]),'');assert.doesNotMatch(providerToolInstructions([{name:'bad; injected instruction'}]),/injected/);
+});
 
 test('owned runner pins model, isolates credentials, records request usage and preserves exact resume',async t=>{
   const options=fixture(t),capture={},events=[],requests=[];let authorized=false;

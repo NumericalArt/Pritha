@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
 source_updated: 2026-11-06
-source_version: installed 1da0a47; text tool-output compatibility under verification
+source_version: installed e8fe728; declared host-tool guidance under verification
 retrieved: 2026-11-06
 verified: 2026-11-06
 valid_for: the local executable candidate and recorded operator acceptance only
@@ -54,6 +54,45 @@ confidence: high
 ## Current acceptance status — 2026-11-05
 
 ### Update — 2026-11-06
+
+e8fe728 is installed, with strict/operational/admission and complete
+post-activation self-test passing without warnings/regressions. The correct
+same-chat pending resume was received on the first request; the authorized
+max4/fresh15-minute amendment was applied immediately before acceptance.
+Iteration4 used18331 tokens and again stopped with neuraldeep_empty_response,
+without code changes. Total pilot usage is54686 tokens and4/4 iterations under
+cap160000. Actual successful delivery/Trials remain unproven.
+
+A zero-paid installed-CLI capture confirms that text tool results are normalized
+in both access modes. It also shows five native apply_patch references although
+the upstream receives only seven host MCP functions. The scoped runner addition
+describes only the actual functions through developer instructions, preserving
+factory instructions, permissions, protected paths, model identity and budgets.
+Other runners are unchanged. Guidance does not grant new action authority.
+
+A bounded independent synthetic-file edit with explicit routing passed through
+read/current-SHA/approved edit/DONE using the unchanged GPT-OSS-120B/High: four
+requests,24297 measured diagnostic tokens, owned processes closed. Together with
+the previous read-only comparison,50870 diagnostic tokens are recorded outside
+the delivery ledger. No new delivery implementation iteration is claimed. This
+primitive test does not establish sole causation or successful child creation.
+
+The tool/developer-message mechanism is checked against [official Harmony
+function-calling guidance](https://developers.openai.com/cookbook/articles/openai-harmony#function-calling)
+and installed CLI0.153.0; [CLI configuration flags](https://learn.chatgpt.com/docs/developer-commands#global-flags)
+provide the existing invocation mechanism. Twenty-four targeted checks pass;
+the revised owned test passes8/8. Four installed-CLI/synthetic cases confirm
+the developer guidance actually reaches upstream. Final release checks, exact
+installation approval and one further iteration/time decision remain required.
+Accepted documents, selected model and High are not requested again.
+
+The NeuralDeep-only build payload additionally removes JSON indentation while
+preserving all parsed fields and exact string contents, including failure text,
+protected paths and operator guidance. A round-trip test verifies this bound;
+other build runners keep their previous formatting. Conservative budget
+reservation and all delivery approvals remain unchanged.
+
+### Earlier checkpoint before the e8fe728 installation
 
 1da0a47 is installed and passes strict/operational/admission and complete
 post-activation self-test without warnings/regressions. The user approved total
