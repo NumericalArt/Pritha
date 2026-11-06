@@ -42,6 +42,17 @@ test('a measured Claude host budget refusal raises the delivery budget blocker a
   assert.equal(receipt.usage_status,'measured');assert.equal(f.calls.length,1);
   assert.equal((await f.executor.execute(f.input)).attempt_id,receipt.attempt_id);assert.equal(f.calls.length,1);
 });
+
+test('a NeuralDeep input refusal preserves its exact error, measured charges and replay without another launch',async t=>{
+  const f=fixture(t,{connectorId:'neuraldeep'});f.executor.options.launch=async options=>{
+    const run=await f.launch(options);
+    return {...run,completion:run.completion.then(result=>({...result,ok:false,errorCode:'neuraldeep_tool_arguments'}))};
+  };
+  let receipt;
+  await assert.rejects(f.executor.execute(f.input),error=>{receipt=error.details.executorResult;return error.code==='neuraldeep_tool_arguments';});
+  assert.equal(receipt.error_code,'neuraldeep_tool_arguments');assert.equal(receipt.process_exited,true);assert.equal(receipt.tokens_used,120);assert.equal(receipt.usage_status,'measured');
+  const replay=await f.executor.execute(f.input);assert.equal(replay.error_code,receipt.error_code);assert.equal(replay.attempt_id,receipt.attempt_id);assert.equal(f.calls.length,1);
+});
 for(const connectorId of ['claude','neuraldeep','openrouter','local']){
 if(connectorId!=='claude'){
 test(connectorId+': a read-only factory chat can build only inside its isolated writable worktree',async t=>{

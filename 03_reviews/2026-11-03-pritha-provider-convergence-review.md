@@ -3,7 +3,7 @@ id: pritha-provider-convergence-review-2026-11-03
 type: review
 status: in-progress
 created: 2026-11-03
-updated: 2026-11-05
+updated: 2026-11-06
 topics: [pritha, provider-convergence, curated-memory, task-chat, voice, agent-factory, rebranding]
 tools: [Codex, NeuralDeep, Claude Code, OpenRouter, llama.cpp, SQLite, Node.js, Next.js, Playwright]
 agent_platforms: [Pritha]
@@ -34,10 +34,10 @@ supersedes: []
 superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
-source_updated: 2026-11-05
-source_version: installed 37f5cbb; safe research passage retention under verification
-retrieved: 2026-11-05
-verified: 2026-11-05
+source_updated: 2026-11-06
+source_version: installed 5ed052c; precise input diagnostics under verification
+retrieved: 2026-11-06
+verified: 2026-11-06
 valid_for: the local executable candidate and recorded operator acceptance only
 temporal_status: version-bound
 memory_domain: pritha-self
@@ -54,6 +54,31 @@ confidence: high
 ## Current acceptance status — 2026-11-05
 
 ### Update — 2026-11-06
+
+5ed052c is installed. Strict pages/chunks, operational health, admission and full
+post-activation self-test pass without warnings/regressions. The same chat sent
+the correct blocked-resume answer. The host verified its real pending request,
+applied the separately authorized elapsed grant, then approved that exact request.
+High, the run, documents, protected verifier and prior usage stayed unchanged.
+
+The first actual NeuralDeep implementation attempt made two measured provider
+requests, using 18009 tokens. It completed list_files but then stopped with
+provider_input, without changing the worktree. All processes closed; Trials still
+fail. The two-iteration ceiling is exhausted, including the historical preflight.
+No further model attempt or reset is authorized by that unchanged ceiling.
+
+A confirmed diagnostic defect collapses safe classified input errors before the
+build receipt is saved. The exact cause of this completed attempt was not
+retained and must not be inferred. The scoped correction preserves precise safe
+input codes while keeping budget/stop/unknown-usage precedence and tool gates.
+Forty-five targeted checks pass. Four installed-CLI/synthetic-upstream cases
+include empty-response and invalid-tool-arguments refusals, measured charges,
+process cleanup, unchanged files and replay without dispatch; real paid requests
+are zero. Final release checks, any new exact installation decision, an explicit
+iteration amendment, real successful implementation/Trials and manual acceptance
+remain open. Accepted Contract/Outcome and High are not requested again.
+
+### Earlier checkpoint before the 5ed052c installation
 
 a1dcbbc is installed and passes strict/operational/admission and full
 post-activation self-test without warnings/regressions. The same Task Chat

@@ -52,6 +52,17 @@ test('wrong session and provider-side model drift fail without changing provider
   }
 });
 
+test('a classified empty response keeps its exact input error and measured usage without retry',async t=>{
+  const options=fixture(t),capture={};let calls=0;
+  const run=await startNeuralDeepRun({...options,tokenBudget:50000},{...boundary,readCredential:()=> 'SYNTHETIC_KEY',spawnSupervised:fakeSupervisor(capture),fetchImpl:async()=>{
+    calls++;return new Response('data: '+JSON.stringify({type:'response.completed',response:{id:'empty_response',model:options.model,status:'completed',output:[{type:'reasoning',id:'reasoning_fixture',summary:[]}],usage:{input_tokens:4,output_tokens:2,total_tokens:6}}})+'\n\ndata: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});
+  }});
+  const result=await run.completion;
+  assert.equal(result.ok,false);assert.equal(result.errorCode,'neuraldeep_empty_response');assert.equal(result.providerError.class,'input');
+  assert.equal(result.budget.tokensUsed,6);assert.equal(result.budget.usageKnown,true);assert.equal(result.processTreeExited,true);assert.equal(calls,1);
+  assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC_KEY|provider_input/);
+});
+
 test('Stop controls only its owned run and unknown process exit preserves scratch for recovery',async t=>{
   const options=fixture(t),capture={};
   const run=await startNeuralDeepRun(options,{...boundary,readCredential:()=> 'KEY_CANARY',fetchImpl:async()=>providerResponse(),spawnSupervised:fakeSupervisor(capture,{wait:true,treeExited:false})});

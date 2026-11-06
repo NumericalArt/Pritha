@@ -713,7 +713,7 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна a1dcbbc / Interactive.** Release и полный
+**Статус: in-progress; активна 5ed052c / Interactive.** Release и полный
 post-activation self-test проходят без warnings/regressions. Claude и Codex
 приняты и применены; установленный factory status также возвращает accepted.
 NeuralDeep штатно принял точный Outcome, завершил memory/primary-source research
@@ -724,8 +724,12 @@ parent Task Chat sandbox попал в provider preset. В текущей ист
 при отказе runtime probe. High подтверждён отдельно через обычный Task Chat,
 прежние документы и runtime readiness сохранены. Текущий controller пропустил
 необязательный answer у blocked resume; schema/worker guard исправляет этот
-случай без повторной document approval. Реальная сборка/Trials NeuralDeep и
-ручная приёмка остаются. См. checkpoint 77; OpenRouter live отложен пользователем.
+случай без повторной document approval. Правильный resume и реальный build
+теперь выполнены; первая model-итерация остановилась с общим provider_input,
+не изменив код. Учтены 18009 токенов и обе итерации, включая старый preflight.
+Точная исходная input-причина не была сохранена; её нельзя угадывать по классу.
+Реализация/успешные Trials NeuralDeep и ручная приёмка остаются. См. checkpoint 78;
+OpenRouter live отложен пользователем.
 
 **Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
@@ -3851,6 +3855,41 @@ explicit elapsed-time grant для того же run, без роста token/it
 answer, реальная NeuralDeep implementation, независимые Trials, review/finish,
 первая приёмка результата и отдельное применение. Остальная manual matrix и
 исходные приложения A/B/C/D сохранены; MacBook и GitHub не изменяются.
+
+### Checkpoint 78 — 5ed052c установлена; реальная model-попытка и потеря точной диагностики
+
+На 2026-11-06 оператор отдельно разрешил 5ed052c и новые 15 минут в уточнённом
+порядке. Managed stop/swap/start, пять страниц / 12 JS chunks, operational health,
+приём задач и полный post-activation self-test прошли; warnings/regressions пусты.
+Профиль Interactive и несвязанные файлы сохранены, rollback bundle удерживается.
+
+- Прежний Task Chat запросил delivery_resume с точным answer retry-after-upgrade.
+  Хост проверил настоящий pending request, лишь затем штатно добавил разрешённое
+  окно и сразу подтвердил этот же запрос. Сохранены run, Contract, Outcome,
+  verifier, прежний расход, supported High и модель; повторных согласований нет.
+- Runtime probe прошёл. Первая реальная implementation iteration сделала два
+  измеренных обращения: всего 18009 токенов. Публично подтверждён list_files;
+  попытка затем завершилась provider_input, процессы закрыты, worktree не изменён.
+  Независимые Trials по-прежнему провалены. Учтены 2/2 итерации с историческим
+  preflight; сбрасывать их либо незаметно выдавать новую попытку нельзя.
+- Подтверждён дефект диагностики: owned runner сводит уже безопасно классифицированные
+  input-коды к одному provider_input до записи build receipt. Для завершённой
+  попытки точный первоначальный код утрачен; гипотезы empty response, аргументов
+  или identity mismatch не объявляются установленной причиной.
+- Исправление сохраняет исходный безопасный input-код. Приоритет остановки,
+  бюджетного отказа, неизвестного расхода и подтверждения выхода не меняется;
+  tool/model gates не ослабляются, дополнительный запрос не запускается.
+- Targeted checks: 45/45. Настоящая установленная CLI на синтетическом upstream
+  отдельно проверила empty response и невалидные tool arguments, точный durable
+  code, измеренный расход, закрытие процессов, неизменность worktree и replay
+  без повторной отправки; вместе с прежними проверками 4/4, платных запросов 0.
+
+Далее — итоговый gate нового pin, build/browser/rollback и конкретное разрешение
+на установку, если кандидат готов. Для новой model-попытки требуется отдельное
+расширение исчерпанного iteration limit, при необходимости времени/токенов.
+Принятые документы, High и прежний расход не пересогласовываются и не сбрасываются.
+Успешная реализация, protected Trials, ручной review и отдельные acceptance/apply
+остаются обязательными. Операторская матрица R12 не закрыта.
 
 ## 7. Полные исходные материалы
 
