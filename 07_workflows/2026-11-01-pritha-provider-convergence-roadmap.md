@@ -713,23 +713,18 @@ memory rebuild/query/embedding, instance migration и managed-runtime env. Эт�
 
 ### R12 — Полная верификация и локальная ручная приёмка
 
-**Статус: in-progress; активна 5ed052c / Interactive.** Release и полный
+**Статус: in-progress; активна 1da0a47 / Interactive.** Release и полный
 post-activation self-test проходят без warnings/regressions. Claude и Codex
-приняты и применены; установленный factory status также возвращает accepted.
-NeuralDeep штатно принял точный Outcome, завершил memory/primary-source research
-и scaffold. Реальный deliver остановился на preflight до model request:
-parent Task Chat sandbox попал в provider preset. В текущей истории учтены
-0 build tokens и одна преждевременно начатая итерация; вручную их не сбрасывать.
-Установленный кандидат разделяет эти настройки и не начинает новую итерацию
-при отказе runtime probe. High подтверждён отдельно через обычный Task Chat,
-прежние документы и runtime readiness сохранены. Текущий controller пропустил
-необязательный answer у blocked resume; schema/worker guard исправляет этот
-случай без повторной document approval. Правильный resume и реальный build
-теперь выполнены; первая model-итерация остановилась с общим provider_input,
-не изменив код. Учтены 18009 токенов и обе итерации, включая старый preflight.
-Точная исходная input-причина не была сохранена; её нельзя угадывать по классу.
-Реализация/успешные Trials NeuralDeep и ручная приёмка остаются. См. checkpoint 78;
-OpenRouter live отложен пользователем.
+приняты и применены. NeuralDeep завершил research/scaffold и штатно сохранил
+High для прежней модели, Contract/Outcome и verifier. Две реальные model-попытки
+остановились после list_files без изменения кода; последняя сохранила точный
+neuraldeep_empty_response. Учтены 36355 build tokens и3/3 итерации при cap160000,
+включая исторический preflight. Счётчики и согласования не сбрасываются.
+Изолированный read-only опыт воспроизвёл отказ на массиве текстовых tool results
+и успешную цепочку на строке. Совместимость исправляется до hashing/budget
+admission; этот опыт не доказывает готовность child. Реализация, успешные
+protected Trials, user review/acceptance/apply и manual matrix остаются открыты.
+См. checkpoint79; OpenRouter live отложен пользователем.
 
 **Исторический статус на 2026-11-03: активна 5f38f37 / Interactive. Предварительный ff33d8f отозван
 до установки после воспроизведения alias-проблемы нового чата. Его gate:
@@ -3890,6 +3885,49 @@ answer, реальная NeuralDeep implementation, независимые Trial
 Принятые документы, High и прежний расход не пересогласовываются и не сбрасываются.
 Успешная реализация, protected Trials, ручной review и отдельные acceptance/apply
 остаются обязательными. Операторская матрица R12 не закрыта.
+
+### Checkpoint 79 — точный empty response и совместимость текстовых tool results
+
+На 2026-11-06 оператор разрешил 1da0a47, общий предел 160000 токенов, 3 итерации
+и 15 минут непосредственно перед правильным pending resume. Установка, strict
+5 страниц / 12 chunks, operational/admission и полный self-test прошли без
+warnings/regressions. Прежние файлы, профиль, run, документы и High сохранены.
+
+- Через обычную CLI review-failures supervisory agent добавил только уточнение
+  реализации по принятому Outcome. Actor указан agent; состояние остаётся blocked,
+  CLI exit 1 здесь ожидаем. Ни budget, ни iteration, ни implementation не менялись.
+- Первый controller ход снова выполнил только status. После явного сообщения об
+  уже принятом разрешении прежний чат создал правильный pending extend-budget.
+  Только после его проверки применена штатная поправка 160000 / 3 / 15 минут,
+  затем подтверждён этот же запрос. Повторных document approvals и новых run нет.
+- Итерация 3 потратила 18346 токенов, выполнила list_files и остановилась с точным
+  neuraldeep_empty_response. Всего 36355 build tokens, 3/3 итерации; процессы
+  закрыты, worktree без изменений и независимые Trials по-прежнему провалены.
+- Отдельный ограниченный read-only протокольный опыт использовал только
+  синтетический fixture и прежние GPT-OSS-120B/High. Новый CLI отдаёт host tool
+  result как массив input_text. С этой формой опыт остановился после двух
+  запросов с empty response; замена текстовых блоков на одну строку дала
+  list_files → read_file → точный проверочный токен за три запроса. Файлы не
+  менялись, usage измерен, процессы закрыты. Это наблюдаемое сравнение, не
+  универсальная гарантия поведения модели. 26573 diagnostic tokens учитываются
+  отдельно от delivery ledger, реализации или новой build-попытки не было.
+- Adapter теперь переводит только непустые массивы чистых input_text блоков в
+  строку с LF между блоками. Содержание каждого блока и порядок сохраняются;
+  исходный локальный transcript не меняется. Images/mixed outputs, metadata,
+  custom outputs и неизвестные shapes остаются побайтно в исходной форме.
+- Преобразование выполняется внутри защищённого host boundary до request hash,
+  budget admission и upstream dispatch. Массив и эквивалентная строка имеют
+  один нормализованный hash. Namespace/model checks, protected tool policy,
+  отсутствие автоматического повторного запроса и строгий учёт usage сохранены.
+- Targeted: 30/30. Installed CLI с синтетическим upstream: 4/4, включая настоящие
+  native tool-result массивы и проверку строковой формы на стороне upstream;
+  новых платных запросов для проверки patch не сделано.
+
+Далее — полный gate/build/browser/rollback нового pin и конкретное разрешение
+на установку. Для ещё одной реальной build-попытки нужен отдельный iteration/time
+amendment при сохранении общего token cap160000 и уже учтённых 36355 токенов.
+Contract/Outcome/High и исходные verifiers не пересогласовываются. Реальный child,
+успешные protected Trials, user review/acceptance/apply и manual matrix открыты.
 
 ## 7. Полные исходные материалы
 

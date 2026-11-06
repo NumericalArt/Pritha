@@ -1,6 +1,22 @@
 import { createHash } from "node:crypto";
 const fail = (code, statusCode = 409) => { throw Object.assign(new Error(code), { code, statusCode }); };
 
+/** NeuralDeep's GPT-OSS Responses bridge accepts text tool results as a string.
+ * Newer Codex emits ordered input_text blocks. Preserve every block verbatim,
+ * separated by LF, without changing the local transcript or any non-text data. */
+export function normalizeTextToolOutputs(payload) {
+  if (!Array.isArray(payload.input)) return payload;
+  let changed = false;
+  const input = payload.input.map(item => {
+    if (item?.type !== 'function_call_output' || !Array.isArray(item.output)
+      || !item.output.length || !item.output.every(part => part?.type === 'input_text'
+        && typeof part.text === 'string' && Object.keys(part).every(key => ['type', 'text'].includes(key)))) return item;
+    changed = true;
+    return { ...item, output: item.output.map(part => part.text).join('\n') };
+  });
+  return changed ? { ...payload, input } : payload;
+}
+
 /** Validate the exact encoded request; never resize, convert or remove images. */
 export async function validateResponsesInputs(payload, { model, imagesAllowed = false, imageFormats = [], expectedImages = [], requireCurrentImages = false, hasHistoricalImage = () => false } = {}) {
   if (model && payload.model !== model) fail("neuraldeep_model_identity_mismatch");

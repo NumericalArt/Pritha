@@ -9,6 +9,7 @@ export { normalizeResponsesSse, responsesUsage } from "./responses-normalizer.mj
 import { requestDeadlineWindow } from './creation-execution-policy.mjs';
 import {normalizeModelExecutionRequest} from './model-execution-profile.mjs';
 import {projectProviderToolRequest,wireCall} from '../lib/provider-tool-projection.mjs';
+import {normalizeTextToolOutputs} from './responses-input-policy.mjs';
 
 function createDispatcher(options,timeout){
   if(options.createDispatcher)return options.createDispatcher(timeout);
@@ -263,6 +264,7 @@ export function createNeuralDeepAdapter(options = {}) {
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw Object.assign(new Error("Invalid Responses request."), { statusCode: 400 });
         await options.validateResponsesRequest?.(payload, body);
         if(options.allowedTools){const projection=projectProviderToolRequest(payload,options.allowedTools);payload=projection.payload;toolMapping=projection.map;}
+        if(protectedBoundary)payload=normalizeTextToolOutputs(payload);
         if (options.transformResponsesRequest) payload = options.transformResponsesRequest(payload);
         payload=normalizeModelExecutionRequest(payload);
         // Identity belongs to the caller's request. A shrinking host response

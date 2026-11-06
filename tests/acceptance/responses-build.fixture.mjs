@@ -22,6 +22,7 @@ for(const connectorId of ['neuraldeep','openrouter'])test(`${connectorId}: insta
     try{
       assert.ok(String(url).startsWith(connectorId==='neuraldeep'?'https://api.neuraldeep.ru/v1/responses':'https://openrouter.ai/api/v1/responses'));
       const payload=JSON.parse(init.body);requests++;assert.equal(payload.model,model);assert.equal(payload.tools.length,7);assert.ok(payload.max_output_tokens<=16384);
+      if(connectorId==='neuraldeep')for(const item of payload.input || [])if(item.type==='function_call_output')assert.equal(typeof item.output,'string','native CLI text blocks are normalized before upstream dispatch');
       const serialized=JSON.stringify(payload);if(requests===2)assert.match(serialized,/provider_protected_trial_input/);if(requests===3)assert.match(serialized,/completed/);
       const input=requests===1?{operation_id:'protected_trial_attempt',path:'verify.mjs',expected_sha256:createHash('sha256').update('immutable').digest('hex'),content:'weakened'}:requests===2?{operation_id:'product_write_attempt',path:'product.txt',expected_sha256:null,content:'implemented'}:null;
       const id='build_response_'+requests;assert.ok(requests<=3);

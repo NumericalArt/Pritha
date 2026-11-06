@@ -35,7 +35,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-11-01
 source_updated: 2026-11-06
-source_version: installed 5ed052c; precise input diagnostics under verification
+source_version: installed 1da0a47; text tool-output compatibility under verification
 retrieved: 2026-11-06
 verified: 2026-11-06
 valid_for: the local executable candidate and recorded operator acceptance only
@@ -54,6 +54,37 @@ confidence: high
 ## Current acceptance status — 2026-11-05
 
 ### Update — 2026-11-06
+
+1da0a47 is installed and passes strict/operational/admission and complete
+post-activation self-test without warnings/regressions. The user approved total
+160000 tokens / 3 iterations / a fresh15-minute window. The same chat produced
+the pending extend-budget request after one status-only response; the host
+applied that exact amendment immediately before accepting it. Supervisory
+guidance was recorded through normal CLI as actor agent, without inference.
+
+Iteration3 made two measured requests, used18346 tokens and stopped with the
+now-preserved neuraldeep_empty_response after list_files. Total build usage is
+36355 tokens and3 iterations. No implementation files changed; Trials still fail.
+
+An independent, bounded synthetic read-only transport experiment reproduced the
+failure with native CLI input_text-array tool results and a successful
+list/read/verification-token chain with text results. Model and High were fixed.
+All fixture bytes stayed unchanged, usage was measured and owned processes
+closed. Its26573 diagnostic tokens are separate from the delivery ledger; no
+new child implementation attempt or hidden iteration reset is claimed. This
+comparison supports the compatibility correction, not every future model reply.
+
+The scoped adapter fix joins only pure text tool-result blocks with LF, keeps
+every text block and its order, preserves the original transcript and all media,
+mixed or unknown shapes, and runs before normalized hashing and budget admission.
+Tool/model identity, accounting, protected paths and no-retry boundaries remain.
+Thirty targeted checks and four installed-CLI/synthetic-upstream cases pass,
+including native output-array normalization at real upstream dispatch. New paid
+requests for patch verification are zero. Final gates, exact installation
+approval, a new iteration/time amendment and real successful delivery/Trials
+remain open. Contract, Outcome and High are not requested again.
+
+### Earlier checkpoint before the 1da0a47 installation
 
 5ed052c is installed. Strict pages/chunks, operational health, admission and full
 post-activation self-test pass without warnings/regressions. The same chat sent
