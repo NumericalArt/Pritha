@@ -5,10 +5,12 @@ import { today } from "../../lib/date.mjs";
 const text = value => redactSensitiveText(String(value || "")).replace(/[\r\n]+/g, " ").slice(0, 2000);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
 export function apiProcessPortConfiguration(data) {
-  const declared = String(data.envExampleVariables || "").match(/\b([A-Z][A-Z0-9_]*_PORT)\s*=\s*(\d+)\b/);
+  const variables = String(data.envExampleVariables || "").trim();
+  const declared = variables.match(/\b([A-Z][A-Z0-9_]*_PORT)\s*=\s*(\d+)\b/);
   const port = declared ? Number(declared[2]) : 3000;
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("API process scaffold requires a valid declared port");
-  return { port, variable: declared?.[1] || `${slug(data.agentName).toUpperCase().replaceAll("-", "_")}_PORT` };
+  const variable = declared?.[1] || variables.match(/^[A-Z][A-Z0-9_]*_PORT$/)?.[0] || `${slug(data.agentName).toUpperCase().replaceAll("-", "_")}_PORT`;
+  return { port, variable };
 }
 
 export function apiProcessManifest(data) {

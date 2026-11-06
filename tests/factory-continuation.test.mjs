@@ -44,7 +44,7 @@ for(const scenario of scenarios)test(scenario.connectorId+': host continues afte
  assert.equal(f.pending().length,0);
  const edits=[{from:'- Service mode: none',to:'- Service mode: process'}];
  const declaredPort=draft.text.match(/^- `\.env\.example` variables:.*$/m)[0];
- const localPort='- `.env.example` variables: '+scenario.portVariable+'=3021';
+ const localPort='- `.env.example` variables: '+scenario.portVariable;
  if(declaredPort!==localPort)edits.push({from:declaredPort,to:localPort});
  const revised=edits.reduce((body,edit)=>body.replace(edit.from,edit.to),draft.text);
  assert.notEqual(revised,draft.text);
