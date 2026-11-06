@@ -7424,5 +7424,6 @@ button:active,
 .factory-chat-selector p, .codex-factory-context { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
 .factory-chat-selector p { margin: 0.55rem 0 0; }
 .codex-factory-context { display: grid; gap: 0.3rem; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-soft); overflow-wrap: anywhere; }
+.codex-factory-context code { white-space: pre-wrap; }
 .codex-admission-status { display:flex; flex-wrap:wrap; gap:0.3rem 1rem; padding:0.4rem 1rem; color:var(--text-muted); font-size:0.7rem; }
 .provider-parallel-limit { flex-basis:100%; color:var(--text-muted); font-size:0.7rem; }
