@@ -77,6 +77,21 @@ test('serialized asynchronous registry mutations do not lose writes across proce
     assert.equal(f.db.getIntent('counter').count,5);
   } finally { f.close(); }
 });
+test('opening an existing coordinator to read progress does not need the writer lock',async()=>{
+  const f=fixture();
+  try {
+    f.db.db.exec('BEGIN IMMEDIATE');
+    assert.equal(await child(f.stateRoot,"console.log(db.claims().length)"),'0');
+  } finally {f.db.db.exec('ROLLBACK');f.close();}
+});
+test('concurrent first opens initialize the whole schema and keep every distinct intent',async()=>{
+  const stateRoot=mkdtempSync(path.join(tmpdir(),'pritha-first-open-'));
+  try {
+    await Promise.all(Array.from({length:5},(_,i)=>child(stateRoot,`db.reserveIntent('first_${i}','same',{kind:'fixture'})`)));
+    const db=new ExecutionCoordinator({stateRoot});
+    try {assert.equal(db.listIntents({kind:'fixture'}).length,5);}finally{db.close();}
+  }finally{rmSync(stateRoot,{recursive:true,force:true});}
+});
 
 test('nested workspaces conflict across workers, but siblings and read-only ancestors coexist',async()=>{
   const f=fixture();

@@ -89,35 +89,57 @@ export class ExecutionCoordinator {
     this.file = privateDatabase(stateRoot, directory);
     this.db = new DatabaseSync(this.file);
     chmodSync(this.file, 0o600);
-    this.db.exec("PRAGMA busy_timeout=100;");
-    const hasSchema = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='execution_meta'").get();
-    if (hasSchema && this.db.prepare("SELECT value FROM execution_meta WHERE key='schema'").get()?.value !== "1") {
-      this.db.close();
-      throw new ExecutionConflict("execution_schema_unsupported");
-    }
-    this.db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;");
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS execution_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT OR IGNORE INTO execution_meta VALUES ('schema', '1');
-      CREATE TABLE IF NOT EXISTS execution_claims (
-        resource TEXT NOT NULL, owner TEXT NOT NULL, mode TEXT NOT NULL,
-        kind TEXT NOT NULL, pid INTEGER NOT NULL, process_stamp TEXT,
-        generation TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(resource, owner)
-      );
-      CREATE TABLE IF NOT EXISTS execution_intents (
-        key TEXT PRIMARY KEY, hash TEXT NOT NULL, kind TEXT NOT NULL,
-        state TEXT NOT NULL, revision INTEGER NOT NULL, value TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS execution_events (
-        sequence INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL
-      );
-    `);
-    if (this.db.prepare("SELECT value FROM execution_meta WHERE key='schema'").get()?.value !== "1") {
-      this.db.close();
-      throw new ExecutionConflict("execution_schema_unsupported");
-    }
-    this.db.prepare("INSERT OR IGNORE INTO execution_meta VALUES ('admission',?)").run(['primary','replica'].includes(process.env.PRITHA_INSTANCE_ROLE)?'paused':'enabled');
-    this.db.prepare("INSERT OR IGNORE INTO execution_meta VALUES ('capacity','3')").run();
+    const tables = () => this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('execution_meta','execution_claims','execution_intents','execution_events')").all();
+    const checked = () => {
+      const rows = tables();
+      if (!rows.some(row => row.name === 'execution_meta')) return false;
+      const meta = this.db.prepare("SELECT key,value FROM execution_meta WHERE key IN ('schema','admission','capacity')").all();
+      if (meta.find(row => row.key === 'schema')?.value !== "1") throw new ExecutionConflict("execution_schema_unsupported");
+      return rows.length === 4 && meta.length === 3;
+    };
+    // Normal opens, including progress reads, need no schema writes. Several
+    // first-time owners may race to set WAL; only initialization retries BUSY.
+    const deadline = Date.now() + 2000;
+    try {
+      this.db.exec("PRAGMA busy_timeout=200; PRAGMA synchronous=FULL;");
+      for (;;) {
+        let transaction = false;
+        try {
+          const ready = checked();
+          if (this.db.prepare("PRAGMA journal_mode").get().journal_mode !== 'wal') this.db.exec("PRAGMA journal_mode=WAL");
+          if (!ready) {
+            this.db.exec("BEGIN IMMEDIATE"); transaction = true;
+            if (!checked()) {
+              this.db.exec(`
+                CREATE TABLE IF NOT EXISTS execution_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                INSERT OR IGNORE INTO execution_meta VALUES ('schema', '1');
+                CREATE TABLE IF NOT EXISTS execution_claims (
+                  resource TEXT NOT NULL, owner TEXT NOT NULL, mode TEXT NOT NULL,
+                  kind TEXT NOT NULL, pid INTEGER NOT NULL, process_stamp TEXT,
+                  generation TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(resource, owner)
+                );
+                CREATE TABLE IF NOT EXISTS execution_intents (
+                  key TEXT PRIMARY KEY, hash TEXT NOT NULL, kind TEXT NOT NULL,
+                  state TEXT NOT NULL, revision INTEGER NOT NULL, value TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS execution_events (
+                  sequence INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL
+                );
+              `);
+              this.db.prepare("INSERT OR IGNORE INTO execution_meta VALUES ('admission',?)").run(['primary','replica'].includes(process.env.PRITHA_INSTANCE_ROLE)?'paused':'enabled');
+              this.db.prepare("INSERT OR IGNORE INTO execution_meta VALUES ('capacity','3')").run();
+            }
+            this.db.exec("COMMIT"); transaction = false;
+          }
+          break;
+        } catch (error) {
+          if (transaction) this.db.exec("ROLLBACK");
+          if (![5,6].includes(error.errcode) || Date.now() >= deadline) throw error;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+        }
+      }
+      this.db.exec("PRAGMA busy_timeout=100;");
+    } catch (error) { this.db.close(); throw error; }
   }
 
   admission() {
