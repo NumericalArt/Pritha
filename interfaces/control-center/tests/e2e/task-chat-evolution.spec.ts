@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
-import type { AttachmentView, TurnView } from "../../src/lib/codex-chat/types";
+import type { AttachmentView, ThreadDetail, TurnView } from "../../src/lib/codex-chat/types";
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { factoryMilestone } from "../../../../scripts/agents-mother/factory-milestone.mjs";
+import { deliveryExplanation } from "../../../../scripts/agents-mother/delivery-explanation.mjs";
 
 async function mockChat(page: Page, initiallyRestored = false) {
   const now = new Date().toISOString();
   let restored = initiallyRestored;
   let archived = false;
-  const control = { rejectSend: false, failUpload: false, deliveryResponse: { runs: [] } as unknown, inputModalities: ["text", "image"], sent: [] as Array<Record<string, unknown>> };
+  const control = { rejectSend: false, failUpload: false, factoryControl: undefined as ThreadDetail["factoryControl"], deliveryResponse: { runs: [] } as unknown, inputModalities: ["text", "image"], sent: [] as Array<Record<string, unknown>> };
   const uploads = new Map<string, AttachmentView>();
   let sentTurn: TurnView | null = null;
   const runtime = { preferredProvider: "auto", effectiveProvider: "desktop_bundled", availability: "ready", providers: [{ providerId: "desktop_bundled", label: "Test runtime", locationLabel: "Desktop bundled", protocol: "app_server", availability: "ready", capabilities: { fullChat: true, imageInput: true, fileMetadata: true }, stateIdentityHash: "new" }], models: [{ id: "test", inputModalities: control.inputModalities }], selected: { modelId: "test", sandboxMode: "read_only" } };
@@ -44,11 +46,42 @@ async function mockChat(page: Page, initiallyRestored = false) {
     const data = url.pathname.endsWith("/runtime") ? runtime
       : url.pathname.endsWith("/threads") ? { data: (url.searchParams.get("archived") === "true") === archived ? [thread()] : [], nextCursor: null }
       : url.pathname.endsWith("/history") ? { data: sentTurn ? [sentTurn] : [{ turnId: "turn_fixture", status: "completed", userMessage: { id: "user", markdown: "Original question" }, items: [{ id: "answer", kind: "assistant_message", status: "completed", message: { id: "answer", markdown: "Original answer", status: "completed" } }], startedAt: now, pendingRequestIds: [] }], olderCursor: null }
-      : { thread: thread(), streamUrl: "/api/codex-chat/v1/threads/chat_fixture/events", continuationState: thread().continuationState, pendingRequests: [], history: { state: restored ? "available" : "recovery_available", recoverable: !restored } };
+      : { thread: thread(), factoryControl: control.factoryControl, streamUrl: "/api/codex-chat/v1/threads/chat_fixture/events", continuationState: thread().continuationState, pendingRequests: [], history: { state: restored ? "available" : "recovery_available", recoverable: !restored } };
     return route.fulfill({ json: { apiVersion: "1", requestId: "fixture", data } });
   });
   return control;
 }
+
+for (const width of [1280, 390]) test(`factory progress explains expected implementation and a real stop at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  const control = await mockChat(page, true), errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  const state = { phase: "scaffolded", scaffoldRevision: "fixture-revision", running: { action: "deliver" } };
+  const ledger = { status: "building", phase: "implementation", iteration: 1, version: 1, blockers: [], budget: { tokens_used: 10, max_tokens: 100, max_iterations: 2, legacy_usage_unverified: false, unaccounted_attempts: [] } };
+  const show = (delivery: ReturnType<typeof deliveryExplanation>) => {
+    control.factoryControl = { available: true, slug: "fixture-agent", phase: state.phase, running: delivery.status === "building", documentsApproved: true,
+      builder: { provider: "codex", modelId: "fixture-model", effort: "low" }, delivery, milestone: factoryMilestone(state, delivery, null) };
+  };
+  show(deliveryExplanation(ledger));
+  await page.goto("/task-chat?chat=chat_fixture&group=my_chats");
+  const card = page.getByLabel("Создание агента", { exact: true });
+  await expect(card.getByRole("status")).toHaveText("Каркас готов. Реализую поведение агента");
+  await expect(card.getByRole("alert")).toHaveCount(0);
+  await expect(card).not.toContainText(/ошибк|не прошла|Нужно решение/i);
+  await card.screenshot({ path: `test-results/factory-implementation-${width}.png` });
+  show(deliveryExplanation({ ...ledger, status: "blocked", blockers: [{ code: "build_runtime_unavailable", summary: "PRIVATE_PROVIDER_ERROR", options: [{ id: "retry-after-upgrade" }, { id: "stop-run" }] }] }));
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(card).toContainText("Не удалось подключить выбранного сборщика.");
+  await expect(card).toContainText("Прита приостановила сборку. После восстановления подключения нужно повторить проверку доступности.");
+  await expect(card).not.toContainText(/PRIVATE_PROVIDER_ERROR|Реализую поведение/);
+  await card.screenshot({ path: `test-results/factory-blocked-${width}.png` });
+  show(deliveryExplanation({ ...ledger, status: "blocked", blockers: [{ code: "token_budget_exhausted", options: [{ id: "verify-only" }, { id: "extend-budget" }] }] }));
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(card).toContainText("Продолжение сборки ждёт вашего решения о бюджете.");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(control.sent).toEqual([]);
+  expect(errors).toEqual([]);
+});
 
 for (const width of [1280, 390]) {
   test(`Task Chat omits agent build controls and discovery at ${width}px`, async ({ page }) => {

@@ -4,8 +4,9 @@ export type DeliveryTask = { chatId: string; nativeThreadId: string; providerId:
 export type DeliveryBudgetChange = { mode: "add" | "set"; tokens: number; resume: boolean; addIterations?: number; addElapsedMs?: number };
 export type TaskDeliveryRequest = { runId: string; requestId: string; expectedRevision: string; action: "bind" | "verify" | "prepare_handoff" | "budget"; budget?: DeliveryBudgetChange; sourceTextHash?: string };
 export type DeliveryExplanation = {status:string;phase:string;version:number;iteration:number;acceptance:'pending'|'accepted';
+  lastFailureKind:'executor'|'trial'|null;
   budget:{tokensUsed:number;maxTokens:number;maxIterations:number;usageStatus:string;overrun:number};
-  blockers:Array<{code:string;title:string;question:string;options:Array<{id:string;label:string;effect:string}>}>};
+  blockers:Array<{code:string;title:string;question:string;explanation:string;nextStep:string;options:Array<{id:string;label:string;effect:string}>}>};
 export type TaskDeliveryView = {
   explanation:DeliveryExplanation|null;
   runId: string; agentId: string; agentName: string; status: string; specId: string;

@@ -1,1 +1,2 @@
 export function factoryVoiceDisplay(raw:string,turnComplete:boolean,product?:import('../../interfaces/control-center/src/lib/codex-chat/types').FactoryMilestone):{complete:boolean;status:string;ceiling:number};
+export function factoryMilestone(state:{phase?:string;outcomeApproval?:unknown;scaffoldRevision?:string;continuationPause?:string|null;running?:unknown}|null,delivery:import('./task-delivery.mjs').DeliveryExplanation|null,firstUse:unknown):import('../../interfaces/control-center/src/lib/codex-chat/types').FactoryMilestone;

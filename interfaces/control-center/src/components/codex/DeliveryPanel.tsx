@@ -9,19 +9,19 @@ const statusLabel: Record<string, string> = { created: "Создана", prepari
 type Explanation = NonNullable<TaskDeliveryView["explanation"]>;
 function RunExplanation({run,showAcceptance=true}:{run:Explanation;showAcceptance?:boolean}) {
   return <div aria-label="Состояние сборки">
-    {run.blockers.map(b=><div key={b.code}><strong>{b.title}</strong><p>{b.question}</p>
+    {run.blockers.map(b=><div key={b.code}><strong>{b.title}</strong><p>{b.explanation}</p><p>{b.nextStep}</p><p>{b.question}</p>
       <ul>{b.options.map(o=><li key={o.id}>{o.label}: {o.effect}</li>)}</ul></div>)}
     {showAcceptance && ["verified","awaiting_acceptance","accepted"].includes(run.status)?<p>{run.acceptance==="accepted"?"Результат принят пользователем.":"Автоматические проверки прошли. Ожидается ваша приёмка."}</p>:null}
     <p>Сборка: {run.budget.tokensUsed} / {run.budget.maxTokens} токенов · {run.iteration} / {run.budget.maxIterations} попыток.</p>
-    {run.budget.usageStatus!=="complete"?<p>Часть расхода ещё не установлена.</p>:null}
-    {run.budget.overrun>0?<p>Исполнитель превысил согласованный лимит на {run.budget.overrun} токенов.</p>:null}
+    {run.budget.usageStatus!=="complete"?<p>Часть расхода ещё не установлена. Перед новой сборкой Прите нужно подтвердить расход предыдущего вызова.</p>:null}
+    {run.budget.overrun>0?<p>Исполнитель превысил согласованный лимит на {run.budget.overrun} токенов. Прита сохраняет фактический расход. Новая сборка потребует отдельного решения о бюджете.</p>:null}
   </div>;
 }
 export function FactoryProgress({view}:{view:NonNullable<import("@/lib/codex-chat/types").ThreadDetail["factoryControl"]>}) {
-  if(!view.available)return <aside role="status">Не удалось подтвердить состояние сборки. Существующая задача сохранена.</aside>;
+  if(!view.available)return <aside role="status">Не удалось прочитать состояние сборки. Существующая задача сохранена. Перед продолжением нужно восстановить доступ к её состоянию.</aside>;
   const d=view.delivery;
   return <aside className="codex-factory-context" aria-label="Создание агента"><strong>{view.milestone.label} · {view.slug}</strong><span>Сборщик: {view.builder.provider} / {view.builder.modelId}</span>
-    {d?.blockers.length?null:<p>{view.milestone.summary}</p>}{d?<RunExplanation run={d} showAcceptance={false}/>:null}
+    {d?.blockers.length?null:<p role="status">{view.milestone.summary}</p>}{d?<RunExplanation run={d} showAcceptance={false}/>:null}
     {view.firstUse?<div><strong>Попробовать проверенную версию</strong><p>Каталог сборки: <code>{view.firstUse.directory}</code> · версия <code>{view.firstUse.commit.slice(0,12)}</code>. Основной проект обновляется отдельно.</p>
       {view.firstUse.commands.cli?<><pre>{view.firstUse.commands.cli}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.cli)}</code></p></>:null}
       <details><summary>Проверить по HTTP</summary><p>В каталоге сборки запустите сервер. Во втором терминале выполните запрос. Для остановки нажмите Ctrl+C.</p><pre>{view.firstUse.commands.server}</pre><pre>{view.firstUse.commands.http}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.http)}</code></p></details></div>:null}

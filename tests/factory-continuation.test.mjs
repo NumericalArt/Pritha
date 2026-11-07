@@ -8,6 +8,7 @@ import os from 'node:os';
 import {nextFactoryAction,factoryOperationId} from '../scripts/agents-mother/factory-continuation.mjs';
 import {readBoundFactoryProgress} from '../scripts/agents-mother/factory-progress.mjs';
 import {factoryMilestone,factoryVoiceDisplay} from '../scripts/agents-mother/factory-milestone.mjs';
+import {deliveryExplanation} from '../scripts/agents-mother/delivery-explanation.mjs';
 import {scenarios,productFactoryFixture,until} from './helpers/product-factory.mjs';
 
 test('Voice and Task Chat cannot turn the end of a controller reply into a completed product',()=>{
@@ -32,8 +33,34 @@ test('planner stops at authority and uncertainty boundaries without an effect',(
  assert.equal(plan({runId:'bound',hostVerifiedIteration:1},ledger).kind,'wait');
  assert.notEqual(factoryOperationId({...s,chatId:'a'},'deliver'),factoryOperationId({...s,chatId:'b'},'deliver'));
 });
+test('expected implementation, repair, and a real interruption stay distinct without changing execution state',()=>{
+ const state={phase:'scaffolded',scaffoldRevision:'baseline',outcomeApproval:{},running:{action:'deliver'}};
+ const ledger={status:'building',phase:'implementation',iteration:1,version:1,blockers:[],budget:{tokens_used:0,max_tokens:100,max_iterations:2,legacy_usage_unverified:false,unaccounted_attempts:[]}};
+ const before=structuredClone(ledger),show=(s=state,l=ledger)=>factoryMilestone(s,deliveryExplanation(l),null);
+ assert.equal(show().summary,'Каркас готов. Реализую поведение агента');
+ assert.equal(factoryVoiceDisplay('complete',true,show()).status,'running');
+ assert.match(show(state,{...ledger,iteration:0,phase:'repair'}).summary,/Подготавливаю реализацию/);
+ assert.match(show(state,{...ledger,iteration:2}).summary,/несоответствие.*Исправляю.*повторю проверку/);
+ assert.match(show(state,{...ledger,status:'verifying'}).summary,/Сверяю поведение/);
+ assert.match(show(state,{...ledger,phase:'repair',failure_history:[{trial_ids:['build-executor']}]}).summary,/вызов сборщика.*проверяет сохранённые файлы/);
+ assert.equal(show({...state,running:null}).kind,'reconcile');
+ assert.match(show(state,{...ledger,status:'cancelled'}).summary,/завершена без приёмки.*Для новой работы/);
+ assert.match(show(state,{...ledger,status:'paused'}).summary,/ждёт команды на продолжение/);
+ const blocked={...ledger,status:'blocked',blockers:[{code:'build_runtime_unavailable',summary:'secret-provider-log',options:[{id:'retry-after-upgrade'}]}]};
+ const view=show(state,blocked);
+ assert.equal(view.kind,'decision');assert.match(view.summary,/Не удалось подключить.*приостановила.*восстановления/);
+ assert.equal(factoryVoiceDisplay('complete',true,view).status,'waiting_for_operator');
+ assert.doesNotMatch(JSON.stringify(deliveryExplanation(blocked)),/secret-provider-log/);
+ for(const continuationPause of ['research_collect','scaffold','deliver','finish']){
+   const paused=show({...state,running:null,continuationPause});
+   assert.ok(['stopped','partial'].includes(paused.kind));assert.doesNotMatch(paused.summary,/Реализую|Исправляю/);
+ }
+ assert.match(show(state,{...blocked,blockers:[{code:'unknown-failure',summary:'private-log',options:[{id:'unknown-option'}]}]}).summary,/Причина пока не уточнена.*журнал/);
+ assert.deepEqual(ledger,before);
+});
 for(const scenario of scenarios)test(scenario.connectorId+': host continues after two decisions and hands off observed output from the exact revision',{timeout:120000},async t=>{
- const f=await productFactoryFixture(scenario,()=>{},{automate:true});t.after(()=>f.close());
+ const buildViews=[];
+ const f=await productFactoryFixture(scenario,event=>{if(event==='build-started')buildViews.push(f.progress());},{automate:true});t.after(()=>f.close());
  const call=async(a,args)=>{const v=await f.call(a,args);assert.equal(v.error,undefined,JSON.stringify(v));assert.notEqual(v.ok,false,JSON.stringify(v));assert.notEqual(v.continuationFailed,true,JSON.stringify(v));return v;};
  const brief=f.brief;
  brief.technical.preset='generic';
@@ -61,6 +88,9 @@ for(const scenario of scenarios)test(scenario.connectorId+': host continues afte
  const publish=await f.research();
  assert.equal(publish.continuationFailed,false,JSON.stringify(publish));assert.deepEqual(publish.continued,['scaffold','deliver','finish']);
  assert.equal(f.reviews.length,2);assert.equal(f.builds.length,1);
+ assert.equal(buildViews.length,1);assert.equal(buildViews[0].milestone.kind,'building');
+ assert.equal(buildViews[0].milestone.summary,'Каркас готов. Реализую поведение агента');
+ assert.deepEqual(buildViews[0].delivery.blockers,[]);
  const opts={root:f.root,stateRoot:f.stateRoot,agentParent:f.paths.parent,slug:f.paths.slug,target:f.paths.target,chatId:f.chatId,connectorId:scenario.connectorId,model:scenario.model};
  const before=fs.readFileSync(f.paths.file);const view=readBoundFactoryProgress(opts);
  assert.equal(view.delivery?.status,'verified',JSON.stringify(view));

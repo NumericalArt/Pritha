@@ -109,6 +109,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
   function implement(worktree) {
     assert.notEqual(worktree, paths.target);
     assert.match(worktree, /worktree$/);
+    emit('build-started');
     builds.push({ connectorId: scenario.connectorId, worktree });
     fs.appendFileSync(path.join(worktree,'README.md'),'\n'+Object.values(firstUseExamples(productTrial(),contractData(state().contract,{root}))).join('\n')+'\n');
     const operation = scenario.slug === 'headline-distiller'
