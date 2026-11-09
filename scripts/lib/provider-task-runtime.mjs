@@ -248,7 +248,7 @@ export class ProviderTaskRuntime {
     });
   }
   async launch(binding,active,text,attachments){
-    let journal,delivery;
+    let journal,delivery,completedResult;
     try{
       const factoryBudget=binding.workspace.factorySlug?new FactoryBudget({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,
         slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,chatId:binding.chatId,connectorId:this.connectorId}):null;
@@ -266,10 +266,10 @@ export class ProviderTaskRuntime {
       }
       const reservedAccounting=Boolean(factoryBudget && !(this.connectorId==='claude' && binding.executionConfig.authMode==='local-cli-session'));
       let nativeClock=Date.now(),hostCalls=0;
-      const nativeUsage=async value=>{const now=Date.now(),delta=hostCalls?0:now-nativeClock;nativeClock=now;
+      const nativeUsage=async (value,admit=true)=>{const now=Date.now(),delta=hostCalls?0:now-nativeClock;nativeClock=now;
         if(!factoryBudget || reservedAccounting)return;
         const tokens=value?.usage?.totalTokens;
-        await factoryBudget.native(active.turnId,'preparation',Number.isSafeInteger(tokens)?tokens:undefined,delta);factoryBudget.check();};
+        await factoryBudget.native(active.turnId,'preparation',Number.isSafeInteger(tokens)?tokens:undefined,delta);if(admit)factoryBudget.check();};
       const toolActivity=async phase=>{if(phase==='start'){await nativeUsage();hostCalls++;}else{hostCalls--;nativeClock=Date.now();}};
       const file=privateStateFile(this.stateRoot,path.join(this.privateRoot,this.connectorId,'attempts',active.turnId+'.jsonl'));
       journal=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
@@ -317,13 +317,13 @@ export class ProviderTaskRuntime {
         },
       });
       if(active.stopping)active.run.stop();
-      const result=await active.run.completion;
-      if(factoryBudget && !reservedAccounting)await nativeUsage(result);
+      const result=completedResult=await active.run.completion;
+      if(factoryBudget && !reservedAccounting)await nativeUsage(result,false);
       try{await this.options.recordUsage?.(binding,active,result);}catch{this.execution.updateIntent(active.key,{usageRecording:'failed'});}
       await delivery.hostAttachments?.close();await this.cleanupAttachmentDelivery(active.key,result.processTreeExited===true);
       this.finish(active,result);
     }catch(error){
-      const exited=error?.processTreeExited===true || (error?.processTreeExited!==false && !active.started && !active.run);
+      const exited=completedResult?.processTreeExited===true || error?.processTreeExited===true || (error?.processTreeExited!==false && !active.started && !active.run);
       await delivery?.hostAttachments?.close();await this.cleanupAttachmentDelivery(active.key,exited);
       this.finish(active,{ok:false,errorCode:safeCode(error),processTreeExited:exited});
     }finally{if(journal!==undefined)closeSync(journal);}

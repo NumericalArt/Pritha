@@ -62,6 +62,17 @@ test('preparation and child checkpoints share the same budget across a real runt
   await assert.rejects(f.runs[1].input.onBudgetCheckpoint({requests:[{...request(0),status:'reserved',reservedTokens:7_000_001}]}),{code:'factory_token_budget_exhausted'});
   assert.equal(budget.view().observedTokens,3_000_000);
 });
+test('an observed native budget stop retains confirmed process exit and releases the completed turn',async t=>{
+  const f=fixture(t,'claude');f.settings.authMode='local-cli-session';
+  const runtime=f.make(),binding=(await runtime.create(create())).binding;
+  await runtime.start(binding.chatId,message('native_budget_boundary'));await until(()=>f.runs.length===1);
+  const run=f.runs[0];assert.equal(run.input.tokenBudget,undefined);
+  await assert.rejects(run.input.onNativeUsage({usage:{totalTokens:10_000_000},usageKnown:true}),{code:'factory_token_budget_exhausted'});
+  run.resolve({ok:false,errorCode:'factory_token_budget_exhausted',processTreeExited:true,usage:{totalTokens:10_000_000},usageKnown:true});
+  await until(()=>runtime.active.size===0);
+  const intent=runtime.execution.listIntents({kind:'turn',chatId:binding.chatId,limit:10})[0];
+  assert.equal(intent.exitConfirmed,true);assert.equal(intent.errorCode,'factory_token_budget_exhausted');assert.equal(runtime.activeIntent(binding.chatId),null);
+});
 test('malformed intent, authority fields, existing targets and missing capabilities fail before chat creation',async t=>{
   const f=fixture(t),runtime=f.make(),base=create();
   for(const intent of [null,[],false,{action:'adopt',slug:'typed-child'},{action:'create-new-agent',slug:'../escape'},{action:'create-new-agent',slug:'/escape'},{...base.factoryIntent,provider:'openrouter'},{...base.factoryIntent,target:'/escape'},{...base.factoryIntent,approved:true}])await assert.rejects(runtime.create({...base,factoryIntent:intent}),{code:'chat_subject_invalid'});
