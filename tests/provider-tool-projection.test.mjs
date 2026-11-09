@@ -24,6 +24,7 @@ test('only approved host tools are projected; invalid historic calls preserve th
   assert.equal(projected.payload.input[0].name,allowedTools[0]);assert.equal(projected.payload.input[1].output,'original history');
   assert.deepEqual(projected.payload.tool_choice,{type:'function',name:allowedTools[0]});
   assert.deepEqual(wireCall(call(allowedTools[0]),projected.map),{...call('read_file'),namespace:'mcp__pritha'});
+  assert.deepEqual(wireCall({...call(allowedTools[0]),namespace:null},projected.map),{...call('read_file'),namespace:'mcp__pritha'});
   const legacy={...input,input:[{type:'function_call',namespace:'legacy',name:'shell',arguments:'private historical input'}]};
   const saved=structuredClone(legacy);assert.throws(()=>projectProviderToolRequest(legacy,allowedTools),{code:'provider_tool_identity_mismatch'});
   assert.deepEqual(legacy,saved);assert.equal(projectProviderToolRequest({tools:input.tools},[]).payload.tool_choice,'none');
@@ -116,6 +117,26 @@ test('failed durable receipts never release a NeuralDeep tool in JSON or SSE',as
 
 const metadataPrelude=()=>({type:'response.created',response:{id:'response_fixture',model:'qwen3.8-flash-next',status:'in_progress',output:[]}});
 const sse=event=>'data: '+JSON.stringify(event)+'\n\n';
+
+test('streaming tool placeholders are held until the complete declared identity and durable receipt arrive',async t=>{
+  for(const name of [undefined,null,'']){
+    const receipts=[];
+    const post=await fixture(t,{onRequest:event=>receipts.push(event),fetchImpl:async()=>new Response(
+      sse({type:'response.output_item.added',output_index:0,item:{...call(name),status:'in_progress',arguments:''}})
+      +sse({type:'response.completed',response:terminal([call(allowedTools[0])])})+'data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}})});
+    const result=await post(),body=await result.text();assert.equal(result.status,200);assert.match(body,/"name":"read_file"/);
+    assert.equal(receipts.length,1);assert.equal(receipts[0].usage.totalTokens,6);assert.equal(receipts[0].error,null);
+  }
+});
+test('complete qualified namespace calls resolve exactly; unknown complete calls remain refused and billed',async t=>{
+  for(const good of [true,false]){
+    const receipts=[];
+    const post=await fixture(t,{onRequest:event=>receipts.push(event),fetchImpl:async()=>response(terminal([{...call(good?'read_file':'PRIVATE_FOREIGN_TOOL'),namespace:'mcp__pritha'}]),'sse')});
+    const result=await post(),body=await result.text();assert.equal(result.status,good?200:502);
+    assert.equal(receipts[0].usage.totalTokens,6);
+    if(!good){assert.deepEqual(receipts[0].toolDiagnostic,{phase:'response-complete',reason:'undeclared',toolCount:1});assert.doesNotMatch(JSON.stringify(receipts),/PRIVATE_FOREIGN_TOOL/);assert.doesNotMatch(body,/"type":"function_call"/);}
+  }
+});
 
 test('provisional NeuralDeep model metadata holds all output until exact terminal identity and accounting pass',async t=>{
   const started=Promise.withResolvers(),finish=Promise.withResolvers(),receipts=[];

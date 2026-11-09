@@ -14,6 +14,7 @@ import { VoiceTopicBindings } from './voice-topic-bindings.mjs';
 import {resolveProviderAgentWorkspace} from './provider-agent-workspace.mjs';
 import {voiceFactoryPaths,prepareFactoryBinding,factoryDraftReceipt,readFactoryConversation} from '../agents-mother/voice-factory-state.mjs';
 import {factoryControlInput,runFactoryControl} from './provider-factory-control.mjs';
+import {FactoryBudget} from '../agents-mother/factory-budget.mjs';
 
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stamp=()=>new Date().toISOString();
@@ -249,6 +250,27 @@ export class ProviderTaskRuntime {
   async launch(binding,active,text,attachments){
     let journal,delivery;
     try{
+      const factoryBudget=binding.workspace.factorySlug?new FactoryBudget({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,
+        slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,chatId:binding.chatId,connectorId:this.connectorId}):null;
+      if(factoryBudget){
+        await factoryBudget.ensure();
+        for(const row of this.execution.listIntents({kind:'turn',chatId:binding.chatId,limit:1000})){
+          if(row.turnId===active.turnId || row.factoryBudgetRecorded || !row.turnId)continue;
+          const savedUsage=row.providerUsage || this.registry.turn(binding.chatId,row.turnId)?.usage;
+          const tokens=savedUsage?.totalTokens;
+          if(Number.isSafeInteger(tokens) && tokens>=0)await factoryBudget.observe('legacy:'+row.turnId,'preparation',{
+            observedTokens:tokens,chargedTokens:tokens,activeMs:0,usageKnown:row.providerUsageKnown===true || !row.providerUsage && row.state==='completed',source:'legacy-observation'});
+        }
+        factoryBudget.check();
+        this.execution.updateIntent(active.key,{factoryBudgetRecorded:true});
+      }
+      const reservedAccounting=Boolean(factoryBudget && !(this.connectorId==='claude' && binding.executionConfig.authMode==='local-cli-session'));
+      let nativeClock=Date.now(),hostCalls=0;
+      const nativeUsage=async value=>{const now=Date.now(),delta=hostCalls?0:now-nativeClock;nativeClock=now;
+        if(!factoryBudget || reservedAccounting)return;
+        const tokens=value?.usage?.totalTokens;
+        await factoryBudget.native(active.turnId,'preparation',Number.isSafeInteger(tokens)?tokens:undefined,delta);factoryBudget.check();};
+      const toolActivity=async phase=>{if(phase==='start'){await nativeUsage();hostCalls++;}else{hostCalls--;nativeClock=Date.now();}};
       const file=privateStateFile(this.stateRoot,path.join(this.privateRoot,this.connectorId,'attempts',active.turnId+'.jsonl'));
       journal=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
       const checked=await this.attachmentInput(binding,attachments.input,{phase:'dispatch',expected:attachments.receipt});
@@ -259,16 +281,18 @@ export class ProviderTaskRuntime {
       active.lease.assertOwned();
       if(active.controller.signal.aborted)throw failure('operator_cancel');
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
+        ...(reservedAccounting?{tokenBudget:factoryBudget.check().remainingTokens,onBudgetCheckpoint:snapshot=>factoryBudget.checkpoint(active.turnId,'preparation',snapshot)}:{}),
+        ...(!reservedAccounting && factoryBudget?{onNativeUsage:nativeUsage}:{}),
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
-        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact child. Read status first and resume the saved phase; never restart or ask again to approve an accepted document. For a new workflow prepare a complete brief and proposed build budget, obtain separate Contract and Outcome approvals, then continue canonical research, scaffold, bounded delivery and verification. For a deterministic local HTTP/CLI product set childModelProvider and childModelId to none with no repository adoption. The host supplies operation IDs. Consult continued results before selecting the next step. Read each research_status page with offset until nextOffset is null; select actual passages and publish your synthesis. Give the verified directory, first-use command and observed output. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
+        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact child. Read status first and resume the saved phase; never restart or ask again to approve an accepted document. Prioritize a working product and useful progress over token economy. Read workflowBudget and recommendedBuildBudget from status; absent an explicit smaller user limit, propose the generous stability defaults for all budgets. For a new workflow prepare a complete brief and proposed build budget, obtain separate Contract and Outcome approvals, then continue canonical research, scaffold, bounded delivery and verification. For a deterministic local HTTP/CLI product set childModelProvider and childModelId to none with no repository adoption. The host supplies operation IDs. Consult continued results before selecting the next step. Read each research_status page with offset until nextOffset is null; select actual passages and publish your synthesis. Give the verified directory, first-use command and observed output. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
         // The host pins the Voice search intent in this turn's hashed request,
         // including queued/resumed delivery. Never infer it from an assembled prompt.
         searchUserText:binding.origin==='voice'?(typeof attachments.input.voiceSearchText==='string'?attachments.input.voiceSearchText.slice(0,16000):'Do not browse.'):text,
         ...(binding.subject?{factorySubject:binding.subject}:{}),
         images:delivery.images || [],...(delivery.attachmentManifest?{attachmentManifest:delivery.attachmentManifest}:{}),signal:active.controller.signal,
         ...(delivery.hostAttachments?{hostAttachments:delivery.hostAttachments}:{}),
-        ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease,...(binding.workspace.factorySlug?{factory:{slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,agentParent:this.options.agentParent,preset:binding.executionConfig,model:binding.modelId,effort:binding.effortId}}:{})},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
+        ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease,...(!reservedAccounting && factoryBudget?{onToolActivity:toolActivity}:{}),...(binding.workspace.factorySlug?{factory:{slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,agentParent:this.options.agentParent,preset:binding.executionConfig,model:binding.modelId,effort:binding.effortId}}:{})},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
         beforeStart:async proof=>{
           active.lease.assertOwned();
           if(binding.profileIdentity && binding.profileIdentity!==proof.identity)throw failure('runtime_identity_mismatch');
@@ -279,20 +303,22 @@ export class ProviderTaskRuntime {
         onEvidence:evidence=>this.execution.updateIntent(active.key,{processProof:evidence}),
         onRawChunk:chunk=>appendFileSync(journal,chunk),
         onEvent:event=>this.handleEvent(binding,active,event),
-        beforeRequest:()=>{active.lease.assertOwned();if(active.controller.signal.aborted)throw failure('operator_cancel');return this.options.beforeRequest?.(binding,active);},
+        beforeRequest:()=>{active.lease.assertOwned();if(active.controller.signal.aborted)throw failure('operator_cancel');factoryBudget?.check();return this.options.beforeRequest?.(binding,active);},
         onProviderRequest:event=>{
           if(event.method==='POST' && event.path==='/v1/responses'){
             const row=this.execution.getIntent(active.key),count=(row.providerRequests || 0)+1;
-            const observed=event.usage && event.usageKnown!==false && Number.isSafeInteger(event.usage.inputTokens) && Number.isSafeInteger(event.usage.outputTokens);
+            const observed=event.upstreamAttempted===false || event.usage && event.usageKnown!==false && Number.isSafeInteger(event.usage.inputTokens) && Number.isSafeInteger(event.usage.outputTokens);
             const total={...(row.providerUsage || {inputTokens:0,outputTokens:0,cachedInputTokens:0,reasoningTokens:0,totalTokens:0})};
-            if(observed)for(const field of Object.keys(total))total[field]+=Number.isSafeInteger(event.usage[field])?event.usage[field]:0;
-            this.execution.updateIntent(active.key,{providerRequests:count,providerUsage:total,providerUsageKnown:row.providerUsageKnown!==false && Boolean(observed)});
+            if(observed)for(const field of Object.keys(total))total[field]+=Number.isSafeInteger(event.usage?.[field])?event.usage[field]:0;
+            this.execution.updateIntent(active.key,{providerRequests:count,providerUsage:total,providerUsageKnown:row.providerUsageKnown!==false && Boolean(observed),
+              lastProviderRequest:{status:event.status,upstreamAttempted:event.upstreamAttempted===true,durationMs:event.durationMs,errorCode:event.error?.code || null,...(event.toolDiagnostic?{toolDiagnostic:event.toolDiagnostic}:{})}});
           }
           this.options.onProviderRequest?.(binding,active,event);
         },
       });
       if(active.stopping)active.run.stop();
       const result=await active.run.completion;
+      if(factoryBudget && !reservedAccounting)await nativeUsage(result);
       try{await this.options.recordUsage?.(binding,active,result);}catch{this.execution.updateIntent(active.key,{usageRecording:'failed'});}
       await delivery.hostAttachments?.close();await this.cleanupAttachmentDelivery(active.key,result.processTreeExited===true);
       this.finish(active,result);

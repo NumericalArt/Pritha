@@ -1,4 +1,5 @@
 import {verifiedFirstUse} from './factory-first-use.mjs';
+import {FactoryBudget} from './factory-budget.mjs';
 import {localApiResearchSources,researchPage,supportsLocalApiContinuation} from './factory-continuation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -186,7 +187,8 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     }
     case 'deliver':case 'delivery_resume':case 'delivery_extend':case 'verify':case 'delivery_status':{
       approved();
-      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:state.buildConfiguration?.modelId || request.model,effort:state.buildConfiguration?.effort ?? request.effort,preset:request.preset,factoryParent:request.factoryParent}};
+      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:state.buildConfiguration?.modelId || request.model,effort:state.buildConfiguration?.effort ?? request.effort,preset:request.preset,factoryParent:request.factoryParent,
+        factoryBudget:{...options,agentParent:p.parent,slug:p.slug,target:p.target,chatId:state.chatId,connectorId:request.connectorId}}};
       let result;
       if(input.action==='deliver'){
         if(state.runId || state.phase!=='scaffolded')throw factoryFail('factory_delivery_already_started');
@@ -205,6 +207,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
           const choices=(current.state.blockers?.[0]?.options || []).map(option=>option.id).filter(id=>/^[a-z][a-z0-9-]{0,79}$/.test(id)).slice(0,8);
           throw Object.assign(factoryFail('factory_delivery_answer_required'),{message:'Delivery is blocked. Call factory_delivery_resume with the required answer parameter from the saved blocker options'+(choices.length?': '+choices.join(', '):'')+'. No runtime probe or build request was started.'});
         }
+        if(input.action==='delivery_extend')await new FactoryBudget(buildOptions.buildExecutorOptions.factoryBudget).extend(input.operation_id,{tokens:input.add_tokens || 0,activeMs:input.add_elapsed_ms || 0});
         result=input.action==='delivery_status'?current:await delivery.resumeDelivery(state.runId,{...buildOptions,hostOnly:input.action==='verify',...(input.answer?{answer:input.answer,answeredBy:'user'}:{}),...(input.action==='delivery_extend'?{answeredBy:'user',budgetRequestId:input.operation_id,expectedVersion:input.expected_version,addTokens:input.add_tokens || undefined,addIterations:input.add_iterations || undefined,addElapsedMs:input.add_elapsed_ms || undefined}:{})});
       }
       // resume/deliver return an execution result without runRoot. Re-observe

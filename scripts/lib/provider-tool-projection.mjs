@@ -1,4 +1,4 @@
-const failure=(code,status=400)=>Object.assign(new Error('The selected provider tool request could not complete.'),{code,status,statusCode:status});
+const failure=(code,status=400,toolDiagnostic)=>Object.assign(new Error('The selected provider tool request could not complete.'),{code,status,statusCode:status,...(toolDiagnostic?{toolDiagnostic}:{})});
 const object=value=>value!==null && typeof value==='object' && !Array.isArray(value);
 
 /** Flatten only this turn's host MCP tools for a provider; keep the inverse map
@@ -29,20 +29,30 @@ export function projectProviderToolRequest(input,allowed){
   const result={...input,tools:projection.tools};if(!result.tools.length)result.tool_choice='none';
   if(Array.isArray(result.input))result.input=result.input.map(item=>{
     if(item.type!=='function_call' || !item.namespace)return item;
-    const name=item.namespace+'__'+item.name;if(!projection.map.has(name))throw failure('provider_tool_identity_mismatch');
+    const name=item.namespace+'__'+item.name;if(!projection.map.has(name))throw failure('provider_tool_identity_mismatch',400,{phase:'request-history',reason:'undeclared',toolCount:projection.map.size});
     const {namespace,...rest}=item;return {...rest,name};
   });
   if(object(result.tool_choice) && result.tool_choice.type==='function'){
     const {namespace,name,...rest}=result.tool_choice,qualified=namespace?namespace+'__'+name:name;
-    if(!projection.map.has(qualified))throw failure('provider_tool_identity_mismatch');result.tool_choice={...rest,name:qualified};
+    if(!projection.map.has(qualified))throw failure('provider_tool_identity_mismatch',400,{phase:'request-choice',reason:'undeclared',toolCount:projection.map.size});result.tool_choice={...rest,name:qualified};
   }
   return {...projection,payload:result};
 }
 
-export function wireCall(item,map){
-  if(['custom_tool_call','local_shell_call'].includes(item?.type))throw failure('provider_tool_identity_mismatch',502);
+export function wireCall(item,map,{partial=false}={}){
+  const reject=reason=>{throw failure('provider_tool_identity_mismatch',502,{phase:partial?'response-partial':'response-complete',reason,toolCount:map.size});};
+  if(['custom_tool_call','local_shell_call'].includes(item?.type))reject('unsupported-type');
   if(item?.type!=='function_call')return item;
-  const target=map.get(item.name);if(!target)throw failure('provider_tool_identity_mismatch',502);
-  if(item.namespace!==undefined && item.namespace!==target.namespace)throw failure('provider_tool_identity_mismatch',502);
+  // A streaming bridge may introduce the call before it knows the function
+  // name. This placeholder is buffered, never executable. A complete item must
+  // still resolve to exactly one tool declared in this request.
+  if(partial && (item.name===undefined || item.name===null || item.name==='')){
+    if(item.namespace!=null && ![...map.values()].some(target=>target.namespace===item.namespace))reject('namespace');
+    return item;
+  }
+  const qualified=item.namespace?item.namespace+'__'+item.name:null;
+  const target=map.get(item.name) || (qualified?map.get(qualified):undefined);
+  if(!target)reject('undeclared');
+  if(item.namespace!=null && item.namespace!==target.namespace)reject('namespace');
   return {...item,...target};
 }

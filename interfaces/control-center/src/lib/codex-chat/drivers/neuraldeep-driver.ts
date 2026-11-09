@@ -33,7 +33,7 @@ export class NeuralDeepDriver implements TaskChatBackendDriver {
         const row=this.backend.core.execution.getIntent(attempt.key),snapshot=await this.service.snapshot(binding.modelId);
         recordNeuralDeepRun({stateRoot,privateRoot:path.join(privateRoot,'neuraldeep'),runId:attempt.turnId,source:'codex-chat',workloadId:binding.chatId,
           model:binding.modelId,sessionId:result.sessionId,profileIdentity:attempt.identity,status:result.ok?'completed':'failed',usage:row?.providerUsage,usageKnown:row?.providerUsageKnown===true,
-          providerRequests:row?.providerRequests || 0,cumulative:false,billing:snapshot.billing,startedAt:row?.createdAt,finishedAt:new Date().toISOString()});
+          providerRequests:row?.providerRequests || 0,cumulative:false,billing:snapshot.billing,providerError:result.providerError,startedAt:row?.createdAt,finishedAt:new Date().toISOString()});
       },
     },(modelId,preset)=>this.service.snapshot(modelId || preset?.modelId || getProviderSettings().providerPresets.neuraldeep.modelId));
   }

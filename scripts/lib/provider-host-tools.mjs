@@ -90,6 +90,10 @@ export class ProviderHostTools {
   resultPath(operationId){if(!validId(operationId))throw fail('provider_operation_id_invalid');return privateStateFile(this.options.stateRoot,path.join(this.options.privateRoot,'tool-results',hash(this.options.turnId),operationId+'.json'));}
   saved(operationId){const file=this.resultPath(operationId);if(!existsSync(file))throw fail('provider_tool_result_missing');try{return JSON.parse(this.read(file,20*1024*1024).toString('utf8'));}catch(error){throw error.code?error:fail('provider_tool_result_invalid');}}
   async call(name,input){
+    await this.options.onToolActivity?.('start');
+    try{return await this.callOwned(name,input);}finally{await this.options.onToolActivity?.('end');}
+  }
+  async callOwned(name,input){
     this.check();if(++this.calls>10000)throw fail('provider_tool_call_limit');
     if(this.factory){
       ({name,input}=normalizeFactoryToolCall(name,input));

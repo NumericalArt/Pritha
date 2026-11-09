@@ -86,7 +86,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
   const recordTree=(id,evidence)=>{trees.set(id,evidence);options.onEvidence?.(proof());};
   const stop=reason=>{stopReason ||= reason;controller.abort();options.cancelPendingApprovals?.();return owned?.stop('SIGTERM') || false;},abort=()=>stop('operator_cancel');
   const closeTools=async()=>{controller.abort();options.cancelPendingApprovals?.();const result=await hostTools?.close();await toolServer?.close();await searchHost?.close();return result?.processTreeExited!==false;};
-  const events=new ClaudeStreamState({model:options.model,sessionId,authMode,onEvent:async event=>{
+  const events=new ClaudeStreamState({model:options.model,sessionId,authMode,onUsage:native?options.onNativeUsage:undefined,onEvent:async event=>{
     if(event.type==='thread.started')atomicWriteFile(proofFile,JSON.stringify({version:1,identity,sessionId,model:options.model,cliVersion:cli.version,observedInit:true})+'\n');
     // The journal holds the same visible records as the UI, not private thinking.
     await options.onRawChunk?.(Buffer.from(JSON.stringify(event)+'\n'));await options.onEvent?.(event);
@@ -131,7 +131,7 @@ export async function startClaudeCodeRun(options,dependencies={}){
       for await(const line of readJsonlLines(owned.child.stdout,{maximumLineBytes:CLAUDE_IMAGE_LIMITS.requestBytes,onChunk:chunk=>{bytes+=chunk.length;if(bytes>128*1024*1024)throw fail('provider_output_limit');}})){
         if(!line.trim())continue;let event;try{event=JSON.parse(line);}catch{throw fail('provider_stream_malformed');}await events.accept(event);
       }
-    })().catch(error=>{parseError=/^(runtime_identity_mismatch|provider_[a-z_]+|cli_record_too_large)$/.test(error.code || '')?error.code:'provider_stream_failed';stop(parseError);});
+    })().catch(error=>{parseError=/^(runtime_identity_mismatch|factory_[a-z_]+|provider_[a-z_]+|cli_record_too_large)$/.test(error.code || '')?error.code:'provider_stream_failed';stop(parseError);});
     const diagnostic=(async()=>{let bytes=0;for await(const chunk of owned.child.stderr){bytes+=chunk.length;if(bytes>8*1024*1024){parseError='provider_output_limit';stop(parseError);break;}await options.onDiagnosticChunk?.(chunk);}})().catch(()=>{parseError='provider_stream_failed';stop(parseError);});
     owned.child.stdin.on('error',()=>{});owned.child.stdin.end(options.prompt);
     const completion=(async()=>{

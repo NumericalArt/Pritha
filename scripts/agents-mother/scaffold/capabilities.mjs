@@ -8,7 +8,7 @@ function interfaceName(value) {
   if (/telegram/.test(name)) return "telegram";
   if (/realtime|voice|голос/.test(name)) return "realtime-voice";
   if (/\bweb\b|browser/.test(name)) return "web";
-  if (/\bapi\b/.test(name)) return "api";
+  if (/\b(?:api|http|https)\b/.test(name)) return "api";
   return "custom";
 }
 

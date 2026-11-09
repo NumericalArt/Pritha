@@ -26,7 +26,7 @@ import { changeThreadGoalBudget, emptyGoalView, GoalControlError, readThreadGoal
 import { parseBudgetIntent } from "./budget-intent";
 import { listTaskDeliveries, normalizeTaskDeliveryBudgetRequest, performTaskDeliveryAction, readTaskDelivery, TaskDeliveryError, type TaskDeliveryRequest } from "../../../../../scripts/agents-mother/task-delivery.mjs";
 import type { DeliveryBudgetReceipt } from "./delivery-types";
-import { recordParentUsage } from "../../../../../scripts/agents-mother/phase-usage.mjs";
+import { recordParentUsage,readParentUsage } from "../../../../../scripts/agents-mother/phase-usage.mjs";
 import {
   asObject,
   itemIdFor,
@@ -1366,6 +1366,7 @@ export class CodexChatGateway {
         slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,model:binding.modelId || '',effort:binding.factoryEffortId,
         emit:()=>this.emit(chatId,'history.changed',{})});
       const connection = await this.runtime.connection(binding.providerId);
+      if(active.factory)await active.factory.admit(readParentUsage(binding,{root:this.root,stateRoot:this.store.stateRoot}).observedTokens ?? undefined);
       failureStage = "resume";
       const resumedModel = await connection.ensureThreadLoaded(binding.nativeThreadId);
       if (binding.modelId && resumedModel && binding.modelId !== resumedModel) throw new CodexChatGatewayError("runtime_identity_mismatch", "The native session reports a different model. Reconcile this thread before continuing.", 409);
@@ -1716,6 +1717,9 @@ export class CodexChatGateway {
       if (method === "thread/tokenUsage/updated" && nativeTurnId && usageAttempt) {
         const tokenUsage = asObject(params.tokenUsage), total = asObject(tokenUsage?.total);
         this.recordUsage(binding, { attemptId: usageAttempt, turnId: nativeTurnId, counterTotal: total?.totalTokens as number }, origin || null);
+        if(active?.factory && Number.isSafeInteger(total?.totalTokens) && await active.factory.observeUsage(total!.totalTokens as number)){
+          await this.controlTurn(binding.chatId,{action:'interrupt',expectedTurnId:nativeTurnId,clientMessageId:'factory-budget-'+hash(nativeTurnId).slice(0,24)});
+        }
         return; // Goal snapshots are intentionally never added to this counter.
       }
 

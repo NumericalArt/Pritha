@@ -60,6 +60,8 @@ for (const width of [1280, 390]) test(`factory progress explains expected implem
   const ledger = { status: "building", phase: "implementation", iteration: 1, version: 1, blockers: [], budget: { tokens_used: 10, max_tokens: 100, max_iterations: 2, legacy_usage_unverified: false, unaccounted_attempts: [] } };
   const show = (delivery: ReturnType<typeof deliveryExplanation>) => {
     control.factoryControl = { available: true, slug: "fixture-agent", phase: state.phase, running: delivery.status === "building", documentsApproved: true,
+      workflowBudget:{version:1,maxTokens:10000000,maxActiveMs:7200000,observedTokens:476526,chargedTokens:576526,remainingTokens:9423474,
+        activeMs:180000,remainingActiveMs:7020000,preparationTokens:400000,buildTokens:76526,usageKnown:false,uncertainAttempts:1,reservationTokens:100000,elapsedMs:800000,progressReview:false,warning:false,accounting:'request receipts'},
       builder: { provider: "codex", modelId: "fixture-model", effort: "low" }, delivery, milestone: factoryMilestone(state, delivery, null) };
   };
   show(deliveryExplanation(ledger));
@@ -68,6 +70,10 @@ for (const width of [1280, 390]) test(`factory progress explains expected implem
   await expect(card.getByRole("status")).toHaveText("Каркас готов. Реализую поведение агента");
   await expect(card.getByRole("alert")).toHaveCount(0);
   await expect(card).not.toContainText(/ошибк|не прошла|Нужно решение/i);
+  await card.getByText("Расход подготовки и сборки",{exact:true}).click();
+  await expect(card).toContainText(/476\s526 из 10\s000\s000 токенов/);
+  await expect(card).toContainText("Ожидание согласований не расходует активное время.");
+  await expect(card).toContainText("Часть расхода ещё не подтверждена.");
   await card.screenshot({ path: `test-results/factory-implementation-${width}.png` });
   show(deliveryExplanation({ ...ledger, status: "blocked", blockers: [{ code: "build_runtime_unavailable", summary: "PRIVATE_PROVIDER_ERROR", options: [{ id: "retry-after-upgrade" }, { id: "stop-run" }] }] }));
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));

@@ -214,7 +214,13 @@ export function createNeuralDeepAdapter(options = {}) {
     const transformResponseStream=raw=>{
       const value=transformStream?transformStream(raw):raw;if(!toolMapping)return value;
       return parseSseData(value).map(event=>{
-        if(event.item)event.item=wireCall(event.item,toolMapping);
+        // Billing evidence belongs to the provider response, including a
+        // complete response whose tool identity is rejected below.
+        if(['response.completed','response.incomplete','response.failed','response.cancelled'].includes(event.type)){
+          providerUsage=responsesUsage(JSON.stringify(event.response),'application/json');
+          responseSummary=responsesTerminalSummary(event.response,{eventType:event.type,outputLimit});
+        }
+        if(event.item)event.item=wireCall(event.item,toolMapping,{partial:event.type==='response.output_item.added'});
         if(event.response){
           const prelude=['response.created','response.in_progress'].includes(event.type);
           if(prelude && (pendingModelMetadata || event.response.model && !responseModelMatches(responsesPayload?.model,event.response.model))){
@@ -270,6 +276,7 @@ export function createNeuralDeepAdapter(options = {}) {
         // Identity belongs to the caller's request. A shrinking host response
         // cap must not turn an exact retry into a new payable request.
         requestHash = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+        dispatchHash = requestHash;
         if (options.prepareResponsesRequest) payload = await options.prepareResponsesRequest(payload,{requestHash});
         outputLimit = payload.max_output_tokens;
         body = Buffer.from(JSON.stringify(payload));
@@ -445,6 +452,7 @@ export function createNeuralDeepAdapter(options = {}) {
         requestHash: dispatchHash,
         upstreamAttempted,
         usage: providerUsage,
+        ...(error?.toolDiagnostic?{toolDiagnostic:error.toolDiagnostic}:{}),
         error: classifyNeuralDeepProviderError({
           status: Number.isInteger(error?.statusCode) ? error.statusCode : null,
           transportCode: cancellationReason || (error?.name === "AbortError" ? "provider_timeout" : error?.code),

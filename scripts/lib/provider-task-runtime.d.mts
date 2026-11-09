@@ -10,7 +10,7 @@ type Queued = Awaited<ReturnType<TaskChatBackend['queuedMessages']>>;
 export type ProviderAttempt = {chat:string;turnId:string;clientMessageId:string;key:string;identity:string|null};
 export class ProviderTaskError extends Error {code:string;status:number;retryable:false;constructor(code:string,message?:string,status?:number);}
 export type ProviderRunOptions = Record<string,any> & {root:string;stateRoot:string;privateRoot:string;cwd:string;model:string;timeoutMs:number;prompt:string;resume?:string;signal:AbortSignal};
-export type ProviderRunResult = {ok:boolean;processTreeExited:boolean;errorCode?:string|null;sessionId?:string|null;identity?:string;usage?:Record<string,number>|null};
+export type ProviderRunResult = {ok:boolean;processTreeExited:boolean;errorCode?:string|null;sessionId?:string|null;identity?:string;usage?:Record<string,number>|null;providerError?:any};
 export type ProviderLaunch = (options:ProviderRunOptions)=>Promise<{stop:()=>boolean;completion:Promise<ProviderRunResult>}>;
 export type ProviderAttachmentReceipt = {version:1;originals:Array<AttachmentView & {sha256:string}>};
 export type ProviderAttachmentDeliveryReceipt={protocol:string;chatId:string;turnId:string;nonce:string};

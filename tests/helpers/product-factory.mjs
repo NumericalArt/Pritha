@@ -13,6 +13,7 @@ import * as hostTools from '../../scripts/lib/provider-host-tools.mjs';
 import * as factoryTools from '../../scripts/lib/provider-factory-tools.mjs';
 import * as approvals from '../../scripts/lib/provider-approvals.mjs';
 import * as processSnapshot from '../../scripts/neuraldeep/process-snapshot.mjs';
+import * as factoryBudget from '../../scripts/agents-mother/factory-budget.mjs';
 import { ProviderTaskRuntime } from '../../scripts/lib/provider-task-runtime.mjs';
 import { ExecutionCoordinator } from '../../scripts/lib/execution-coordinator.mjs';
 import { atomicWriteFile } from '../../scripts/lib/atomic-file.mjs';
@@ -185,6 +186,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
       if (id.endsWith('/provider-factory-tools.mjs')) return factoryTools;
       if (id.endsWith('/provider-approvals.mjs')) return approvals;
       if (id.endsWith('/process-snapshot.mjs')) return processSnapshot;
+      if (id.endsWith('/factory-budget.mjs')) return factoryBudget;
       return require(id);
     }, module, module.exports);
     native = new module.exports.NativeFactoryTurn({ root, cwd: root, stateRoot, agentParent, privateRoot: path.join(stateRoot, 'codex-chat'),

@@ -120,7 +120,7 @@ function normalizeInterfaceName(value) {
   if (text.includes("codex")) return "codex-project";
   if (text.includes("cli")) return "cli";
   if (text.includes("web")) return "web";
-  if (text.includes("api")) return "api";
+  if (/\b(?:api|http|https)\b/.test(text)) return "api";
   return slug(text, "custom");
 }
 

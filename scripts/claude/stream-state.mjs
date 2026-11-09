@@ -27,9 +27,9 @@ export function claudeUsage(value){
 /** Only explicit public text and observed tool activity cross the UI boundary.
  * Partial token events and private thinking/signatures are intentionally not copied. */
 export class ClaudeStreamState {
-  constructor({model,sessionId,authMode='api-key',onEvent=()=>{}}){
+  constructor({model,sessionId,authMode='api-key',onEvent=()=>{},onUsage=()=>{}}){
     if(!CLAUDE_MODEL_ID.test(model || '') || !CLAUDE_SESSION_ID.test(sessionId || ''))fail('runtime_identity_mismatch');
-    this.model=model;this.expectedSession=sessionId;this.onEvent=onEvent;this.authMode=authMode;
+    this.model=model;this.expectedSession=sessionId;this.onEvent=onEvent;this.onUsage=onUsage;this.authMode=authMode;
     this.sessionId=null;this.messages=new Map();this.tools=new Map();this.results=new Map();
     this.result=null;this.errorCode=null;this.records=0;this.finished=false;
   }
@@ -82,6 +82,7 @@ export class ClaudeStreamState {
       const texts=message.content.filter(block=>block?.type==='text').map(block=>{if(typeof block.text!=='string')fail('provider_stream_malformed');return block.text;});
       if(texts.length){const text=texts.join('\n');if(text!==prior.text){prior.text=text;await this.event('item.completed',{id:'claude_message_'+message.id,type:'agent_message',text});}}
       this.messages.set(message.id,prior);
+      await this.onUsage(this.usage());
       for(const block of message.content){
         if(block?.type!=='tool_use')continue;
         if(!id(block.id) || !id(block.name) || !object(block.input))fail('provider_tool_record_invalid');

@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-11-06
+updated: 2026-11-09
 topics:
   - agent-engineering
   - agent-factory
@@ -906,6 +906,37 @@ application to the new target is permitted. It must exclude unrelated
 projects, credentials, paid model changes, publishing, and service changes.
 Evaluate Contract and Outcome separately against that scope, and record the
 profile as the authority for each decision. No such profile is active here.
+
+## Stability budget for the factory
+
+During stabilization, prefer enough capacity to finish and improve a working
+product. The host default is 10,000,000 tokens across preparation and build,
+two hours of active provider work, and a proposed build allowance of 24
+iterations within two hours. This applies to creation and subsequent work in
+the same factory conversation. Smaller limits explicitly accepted by the
+operator remain binding; new defaults do not amend existing Contracts.
+
+`workflow-budget.json` is private, bound to the original child and conversation.
+Request-based transports reserve against the shared balance before dispatch;
+completed receipts replace the reservation with measured usage. A resumed
+turn or builder never starts a fresh shared allowance. Codex and native Claude
+preparation use their observed counters, with a stop at an observed boundary;
+they cannot promise an exact per-request upper bound. Builder-specific
+accounting and protected verifier checks still apply.
+
+Count cached input as usage. Show observed tokens, outstanding reservations,
+preparation/build subtotals and active provider time separately. Approval
+waiting is excluded. Preserve pre-upgrade observations and identify their
+incomplete coverage; never relabel an unknown old charge as zero or measured.
+No request is repeated merely to recover a missing receipt.
+
+A large context or several useful iterations is not itself a failure. After
+substantial work without a changed artifact or phase, present a progress
+review signal to the controller. This signal does not stop useful work or
+change an accepted budget. Actual execution uncertainty, identity changes and
+protected evidence failures keep their existing recovery boundaries. Tune
+economic defaults later from recorded successful outcomes, token usage,
+active time and correction histories.
 
 ## Completion criteria
 

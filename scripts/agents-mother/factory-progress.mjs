@@ -5,6 +5,7 @@ import {deliveryExplanation} from './delivery-explanation.mjs';
 import {verifyOutcomeApproval} from './outcome-spec.mjs';
 
 import {factoryMilestone} from './factory-milestone.mjs';
+import {readFactoryBudget} from './factory-budget.mjs';
 
 /** Used by both thread adapters. No recovery, approvals, tools or model calls on read. */
 export function readBoundFactoryProgress(options) {
@@ -21,7 +22,7 @@ export function readBoundFactoryProgress(options) {
       delivery=deliveryExplanation(result.state);
       firstUse=verifiedFirstUse(p,state,result);
     }
-    return {available:true,slug:p.slug,phase:state?.phase || 'not-started',running:Boolean(state?.running),
+    return {available:true,slug:p.slug,phase:state?.phase || 'not-started',running:Boolean(state?.running),workflowBudget:readFactoryBudget(options),
       documentsApproved:Boolean(state?.contractApproval && state?.outcomeApproval),milestone:factoryMilestone(state,delivery,firstUse),
       builder:{provider:options.connectorId,modelId:state?.buildConfiguration?.modelId || options.model,effort:state?.buildConfiguration?.effort || options.effort || 'none'},delivery,firstUse};
   }catch{return {available:false,errorCode:'factory_evidence_unavailable'};}

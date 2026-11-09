@@ -140,7 +140,7 @@ export async function startNeuralDeepRun(options,dependencies={}){
       async prepareResponsesRequest(payload,context){const declared=Number.isSafeInteger(options.maxOutputTokens) && options.maxOutputTokens>0?options.maxOutputTokens:Infinity;
         const cap=Math.min(declared,neuralDeepExecutionProfile(options.model).applicationOutputCap);const prepared={...payload,max_output_tokens:Math.min(Number.isSafeInteger(payload.max_output_tokens) && payload.max_output_tokens>0 ? payload.max_output_tokens : cap,cap)};return budget?budget.begin(prepared,context):prepared;},
       beforeResponsesDispatch:options.beforeRequest,
-      onRequest:async event=>{if(event.error)providerError=event.error;await budget?.record(event);await options.onProviderRequest?.(event);},
+      onRequest:async event=>{if(event.error)providerError=event.error;try{await budget?.record(event);}finally{await options.onProviderRequest?.(event);}},
     });
     const args=buildCodexExecArgs({...options,cwd,toolServer,writableRoots:[temporary],baseUrl:`http://127.0.0.1:${server.address().port}/v1`});
     const env=providerProcessEnvironment({provider:'neuraldeep',root,stateRoot,codexHome,temporary,env:options.env || process.env});

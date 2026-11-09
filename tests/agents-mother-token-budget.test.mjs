@@ -20,11 +20,13 @@ function initContract(extraArgs = []) {
   return { root, stateRoot, contractPath: path.join(stateRoot, "agents", "contracts", contractName) };
 }
 
-test("non-interactive contracts default to a pending 1000000 token confirmation", () => {
+test("new contracts propose the generous stability profile without approving it", () => {
   const fixture = initContract();
   try {
     const text = readFileSync(fixture.contractPath, "utf8");
-    assert.match(text, /^- Build token budget: 1000000$/m);
+    assert.match(text, /^- Build token budget: 10000000$/m);
+    assert.match(text, /^- Build iteration budget: 24$/m);
+    assert.match(text, /^- Build elapsed budget ms: 7200000$/m);
     assert.match(text, /^- Build token budget confirmation: pending$/m);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });

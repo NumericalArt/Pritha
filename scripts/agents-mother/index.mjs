@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {FACTORY_STABILITY_BUDGET} from './factory-budget.mjs';
 import { resolvePrithaMemoryDatabase } from "../lib/state-files.mjs";
 import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
 import {privateAgentArtifactReference} from '../lib/authored-agent-memory.mjs';
@@ -561,9 +562,9 @@ ${bulletList(data.criticalWorkflows)}
 - Build Git mode: ${scalar(data.buildGitMode, "disposable-worktree")}
 - Build executor: ${scalar(data.buildExecutor, "codex-app-server")}
 - Trial backend policy: ${scalar(data.trialBackendPolicy, "local-or-app-server")}
-- Build iteration budget: ${scalar(data.buildIterationBudget, "6")}
-- Build elapsed budget ms: ${scalar(data.buildElapsedBudgetMs, "5400000")}
-- Build token budget: ${scalar(data.buildTokenBudget, "1000000")}
+- Build iteration budget: ${scalar(data.buildIterationBudget, String(FACTORY_STABILITY_BUDGET.buildIterations))}
+- Build elapsed budget ms: ${scalar(data.buildElapsedBudgetMs, String(FACTORY_STABILITY_BUDGET.buildElapsedMs))}
+- Build token budget: ${scalar(data.buildTokenBudget, String(FACTORY_STABILITY_BUDGET.maxTokens))}
 - Build token budget confirmation: ${scalar(data.buildTokenBudgetConfirmation, "pending")}
 - Repeated failure threshold: ${scalar(data.repeatedFailureThreshold, "3")}
 - Autonomous effects denied: push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation
@@ -818,9 +819,9 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   data.childModelId = options["child-model"] || "none";
   childProviderConfiguration(data);
   data.trialBackendPolicy = options["trial-backend-policy"] || "local-or-app-server";
-  data.buildIterationBudget = options["build-iterations"] || "6";
-  data.buildElapsedBudgetMs = options["build-elapsed-ms"] || "5400000";
-  data.buildTokenBudget = data.buildTokenBudget || options["build-token-budget"] || "1000000";
+  data.buildIterationBudget = options["build-iterations"] || String(FACTORY_STABILITY_BUDGET.buildIterations);
+  data.buildElapsedBudgetMs = options["build-elapsed-ms"] || String(FACTORY_STABILITY_BUDGET.buildElapsedMs);
+  data.buildTokenBudget = data.buildTokenBudget || options["build-token-budget"] || String(FACTORY_STABILITY_BUDGET.maxTokens);
   data.buildTokenBudgetConfirmation = data.buildTokenBudgetConfirmation || (
     options["build-token-budget"] && options["token-budget-confirmed-by"] === "user"
       ? "user"
@@ -870,7 +871,7 @@ export async function interview(options) {
       data.criticalWorkflows = listFromText(await ask(rl, "One realistic user journey (; separated)", options.workflows || "request result; review evidence; correct or accept"));
       data.outOfScope = await ask(rl, "What must V1 explicitly not do?", options["out-of-scope"] || "functions not required for the approved V1 outcome");
       data.sensitiveData = await ask(rl, "Sensitive data or consequential actions that change the design", options.sensitive || "none known yet");
-      data.buildTokenBudget = await ask(rl, "Build token budget (confirm 1000000 or enter another positive integer)", options["build-token-budget"] || "1000000");
+      data.buildTokenBudget = await ask(rl, "Build token budget (stability default 10000000; enter a positive integer)", options["build-token-budget"] || String(FACTORY_STABILITY_BUDGET.maxTokens));
       data.buildTokenBudgetConfirmation = "user";
       applyInterviewTechnicalProposal(data, options);
     } finally {

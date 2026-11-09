@@ -2,6 +2,12 @@ import { existsSync, lstatSync, realpathSync,constants,openSync,closeSync,fstatS
 import { createHash,randomUUID } from "node:crypto";
 import { execFileSync } from 'node:child_process';
 import path from "node:path";
+import {FactoryBudget} from './factory-budget.mjs';
+const workflowBudgetCode=code=>code==='factory_token_budget_exhausted'?'token_budget_exhausted':code==='factory_time_budget_exhausted'?'elapsed_budget_exhausted':code;
+function workflowRemaining(workflow){
+  if(!workflow)return Infinity;
+  try{return workflow.check().remainingTokens;}catch(error){throw new ExecutionBackendError(workflowBudgetCode(error.code),'The shared factory work allowance is exhausted. Recorded usage and work are preserved.');}
+}
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
 import { CodexAppServerConnection, ExecutionBackendError } from "./execution-backends.mjs";
 import {NeuralDeepProviderService} from '../neuraldeep/provider-service.mjs';
@@ -319,7 +325,15 @@ export class CodexAppServerBuildExecutor {
   async checkpoint(input, receipt) {
     const context = { projectRoot: input.worktree, stateRoot: input.stateRoot, root: input.root };
     const safe = sanitized(receipt, context);
-    try { await input.onCheckpoint?.(safe); }
+    try {
+      if(this.options.factoryBudget){
+        const budget=new FactoryBudget(this.options.factoryBudget),measured=Number.isSafeInteger(receipt.tokens_used);
+        await budget.observe('codex-build:'+receipt.run_id+':'+receipt.iteration,'build',{
+          observedTokens:measured?receipt.tokens_used:0,chargedTokens:measured?receipt.tokens_used:receipt.status==='prepared' || receipt.status==='not-started'?0:receipt.token_budget,
+          activeMs:Math.max(0,receipt.duration_ms || 0),usageKnown:measured || receipt.status==='not-started',source:'native-counter'});
+      }
+      await input.onCheckpoint?.(safe);
+    }
     catch {
       throw new ExecutionBackendError("executor_checkpoint_failed", "The host could not persist the build attempt checkpoint", { executorResult: safe });
     }
@@ -430,7 +444,9 @@ export class CodexAppServerBuildExecutor {
     const cwd = worktreeRoot(input.worktree);
     const timeoutMs = Number.isSafeInteger(input.timeoutMs) ? Math.min(Math.max(input.timeoutMs, 10_000), 3_600_000) : 900_000;
     const goalRequired = input.goalRequired !== false;
-    const tokenBudget = Number(input.tokenBudget);
+    const workflow=this.options.factoryBudget?new FactoryBudget(this.options.factoryBudget):null;
+    await workflow?.ensure();
+    const tokenBudget = Math.min(Number(input.tokenBudget),workflowRemaining(workflow));
     if (!Number.isSafeInteger(tokenBudget) || tokenBudget < 1) throw new ExecutionBackendError("token_budget_exhausted", "Build turn has no positive remaining token budget");
     const objective = bounded(input.goalObjective, 4_000);
     if (goalRequired && !objective) throw new ExecutionBackendError("goal_objective_invalid", "Build Goal objective is required");
@@ -576,7 +592,9 @@ export class ClaudeCodeBuildExecutor {
     }catch(error){return {backend:this.name,available:false,isolation:'unavailable',runtimeVersion:null,capabilities:{commandExec:false,threadStart:false,goal:false},error:/^[a-z_]+$/.test(error.code || '')?error.code:'build_runtime_unavailable'};}
   }
   async execute(input){
-    const context=this.context(input),cwd=this.isolated(input,context),tokenBudget=Number(input.tokenBudget);
+    const context=this.context(input),cwd=this.isolated(input,context),workflow=this.options.factoryBudget?new FactoryBudget(this.options.factoryBudget):null;
+    await workflow?.ensure();
+    const tokenBudget=Math.min(Number(input.tokenBudget),workflowRemaining(workflow));
     if(!Number.isSafeInteger(tokenBudget) || tokenBudget<1)throw new ExecutionBackendError('token_budget_exhausted','A positive build token budget is required.');
     if(typeof input.runId!=='string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(input.runId) || !Number.isSafeInteger(input.iteration) || input.iteration<1)throw new ExecutionBackendError('executor_input_invalid','A stable delivery run and iteration are required.');
     const key=this.connectorId+'-build:'+input.runId+':'+input.iteration,requestHash=createHash('sha256').update(JSON.stringify([cwd,input.plan,input.failures,input.protectedPaths,input.guidance,tokenBudget])).digest('hex');
@@ -609,18 +627,18 @@ export class ClaudeCodeBuildExecutor {
         const prompt=externalBuildPrompt(input,this.connectorId==='neuraldeep');
         let finalText='';
         run=await (this.options.launch || this.defaultLaunch)({...context,cwd,connectorId:this.connectorId,codexBin:this.options.codexBin,claudeBin:this.options.claudeBin,...receipt.model_policy,allowSearch:false,model:receipt.model_pinned,effort:receipt.effort_requested,authMode:'api-key',sandbox:'workspace-write',prompt,
-          timeoutMs:Number.isSafeInteger(input.timeoutMs)?Math.max(1000,Math.min(input.timeoutMs,3600000)):900000,maxTurns:Math.min(this.options.maxTurns || 32,128),tokenBudget,budgetId:receipt.budget_id,signal:controller.signal,
+          timeoutMs:Number.isSafeInteger(input.timeoutMs)?Math.max(1000,Math.min(input.timeoutMs,3600000)):3600000,maxTurns:Math.min(this.options.maxTurns || 128,128),tokenBudget,budgetId:receipt.budget_id,signal:controller.signal,
           hostExecutionContext:{coordinator,lease,chatId:'build_'+input.runId,turnId:receipt.attempt_id,protectedPaths:(input.protectedPaths || []).map(entry=>entry.path || entry)},
           approve:async request=>{lease.assertOwned();if(controller.signal.aborted)throw new ExecutionBackendError('operator_cancel','Build cancelled.');if(request.kind==='user_input')throw new ExecutionBackendError('build_operator_input_required','The build requires operator guidance.');return {decision:'accept'};},
           beforeStart:async proof=>{lease.assertOwned();started=true;receipt.status='dispatching';receipt.thread_id=proof.sessionId;receipt.profile_identity=proof.identity;receipt.thread_cleanup='pending';coordinator.updateIntent(key,{state:'dispatching',processProof:proof.evidence});await checkpoint();},
           onEvidence:proof=>coordinator.updateIntent(key,{processProof:proof}),
           beforeRequest:()=>{lease.assertOwned();if(controller.signal.aborted)throw new ExecutionBackendError('operator_cancel','Build cancelled.');},
-          onBudgetCheckpoint:async value=>{if(value.sessionId)receipt.thread_id=value.sessionId;receipt.tokens_used=value.usageKnown?value.tokensUsed:null;receipt.usage_status=value.requests.length?(value.usageKnown?'measured':'unknown'):'not-started';await checkpoint();},
+          onBudgetCheckpoint:async value=>{await workflow?.checkpoint(key,'build',value);if(value.sessionId)receipt.thread_id=value.sessionId;receipt.tokens_used=value.usageKnown?value.tokensUsed:null;receipt.usage_status=value.requests.length?(value.usageKnown?'measured':'unknown'):'not-started';await checkpoint();},
           onEvent:event=>{if(event.type==='item.completed' && event.item?.type==='agent_message')finalText=event.item.text;},
         });
         const result=await run.completion;exitConfirmed=result.processTreeExited===true;
         const accounting=result.budget,measured=accounting?.usageKnown===true && Number.isSafeInteger(accounting.tokensUsed);
-        const report=this.report(finalText),ok=result.ok && report!==null,errorCode=result.errorCode || (!report?'build_summary_invalid':null);
+        const report=this.report(finalText),ok=result.ok && report!==null,errorCode=workflowBudgetCode(result.errorCode) || (!report?'build_summary_invalid':null);
         receipt={...receipt,...(report || {summary:'The build returned no valid structured summary.',changed_files:[],remaining_risks:['Review the recorded tool results and independent Trials.']}),status:exitConfirmed?(ok?'completed':'failed'):'uncertain',turn_status:exitConfirmed?(ok?'completed':'interrupted'):'unknown',process_exited:exitConfirmed,
           model_observed:result.sessionId?result.model || receipt.model_pinned:null,provider_observed:result.sessionId?this.providerName:null,thread_id:result.sessionId || receipt.thread_id,
           thread_cleanup:exitConfirmed?'closed':'pending',tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':'unknown',duration_ms:Date.now()-began,error_code:errorCode,

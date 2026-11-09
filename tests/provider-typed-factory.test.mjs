@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {ProviderTaskRuntime} from '../scripts/lib/provider-task-runtime.mjs';
 import {ProviderHostTools} from '../scripts/lib/provider-host-tools.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact} from '../scripts/agents-mother/voice-factory-state.mjs';
+import {FactoryBudget} from '../scripts/agents-mother/factory-budget.mjs';
 
 const root=fs.realpathSync(fileURLToPath(new URL('../',import.meta.url)));
 const create=(id='typed_factory_create')=>({clientThreadId:id,source:'chat',factoryIntent:{action:'create-new-agent',slug:'typed-child'},workspace:{mode:'read-only'}});
@@ -46,6 +47,20 @@ test('subject context alone never grants factory authority',async t=>{
   await runtime.start(binding.chatId,message('context_only_turn'));await until(()=>f.runs.length===1);
   assert.equal(binding.workspace.factorySlug,undefined);assert.equal(f.runs[0].input.hostExecutionContext.factory,undefined);assert(!f.runs[0].host.definitions.some(tool=>tool.name==='factory_step'));
   await assert.rejects(f.runs[0].host.call('factory_step',{operation_id:'forged_factory_action',action:'status'}),{code:'provider_tool_unknown'});
+});
+test('preparation and child checkpoints share the same budget across a real runtime restart',async t=>{
+  const f=fixture(t,'neuraldeep'),runtime=f.make(),binding=(await runtime.create(create())).binding;
+  await runtime.start(binding.chatId,message('budget_parent_start'));await until(()=>f.runs.length===1);
+  const first=f.runs[0];assert.equal(first.input.tokenBudget,10_000_000);
+  const request=(tokens)=>({status:'measured',usage:{totalTokens:tokens},reservedTokens:tokens,createdAt:'2026-11-09T12:00:00.000Z',finishedAt:'2026-11-09T12:00:01.000Z'});
+  await first.input.onBudgetCheckpoint({requests:[request(1_000_000)]});
+  first.resolve({ok:true,processTreeExited:true});await until(()=>runtime.active.size===0);
+  const budget=new FactoryBudget({root,stateRoot:f.stateRoot,agentParent:f.agentParent,slug:'typed-child',chatId:binding.chatId,connectorId:'neuraldeep'});
+  await budget.checkpoint('builder-attempt','build',{requests:[request(2_000_000)]});
+  const restored=f.make();await restored.start(binding.chatId,message('budget_parent_resume'));await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.tokenBudget,7_000_000);
+  await assert.rejects(f.runs[1].input.onBudgetCheckpoint({requests:[{...request(0),status:'reserved',reservedTokens:7_000_001}]}),{code:'factory_token_budget_exhausted'});
+  assert.equal(budget.view().observedTokens,3_000_000);
 });
 test('malformed intent, authority fields, existing targets and missing capabilities fail before chat creation',async t=>{
   const f=fixture(t),runtime=f.make(),base=create();

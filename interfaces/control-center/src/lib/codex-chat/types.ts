@@ -207,7 +207,7 @@ export type PendingRequestView = {
 
 export type FactoryMilestone={kind:string;label:string;summary:string};
 export type ThreadDetail = {
-  factoryControl?:{available:false;errorCode:string}|{available:true;slug:string;phase:string;running:boolean;documentsApproved:boolean;milestone:FactoryMilestone;builder:{provider:string;modelId:string;effort:string};delivery:null|import('../../../../../scripts/agents-mother/task-delivery.mjs').DeliveryExplanation;firstUse?:null|{directory:string;commit:string;commands:{cli?:string;server:string;http:string};observed:{cli?:unknown;http:unknown}}};
+  factoryControl?:{available:false;errorCode:string}|{available:true;slug:string;phase:string;running:boolean;documentsApproved:boolean;workflowBudget?:import("../../../../../scripts/agents-mother/factory-budget.mjs").FactoryBudgetView;milestone:FactoryMilestone;builder:{provider:string;modelId:string;effort:string};delivery:null|import('../../../../../scripts/agents-mother/task-delivery.mjs').DeliveryExplanation;firstUse?:null|{directory:string;commit:string;commands:{cli?:string;server:string;http:string};observed:{cli?:unknown;http:unknown}}};
   voiceWorkflow?: {taskId:string;state:string;revision:number;question:string|null;questionId:string|null} | null;
   queued?: Array<{id:string;revision:number;state:string;text:string;clientMessageId:string;createdAt:string;reason:string|null;attachments?:AttachmentView[];attachmentsUnavailable?:boolean}>;
   controls?: {turnId:string;steer:boolean;interrupt:boolean} | null;

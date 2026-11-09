@@ -16,6 +16,7 @@ import {productExamples,validateProductTrial,reviewProductTrials} from '../agent
 import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,FACTORY_BUILD_EFFORTS,validateFactoryBuildEffort} from '../agents-mother/voice-factory-state.mjs';
 import {deliveryStatus} from '../agents-mother/delivery-loop.mjs';
 import {neuralDeepExecutionProfile} from '../neuraldeep/model-execution-profile.mjs';
+import {FactoryBudget,readFactoryBudget,FACTORY_STABILITY_BUDGET} from '../agents-mother/factory-budget.mjs';
 
 const actions=['status','read_artifact','init','write_draft','patch_draft','approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'];
 const readonly=new Set(['status','read_artifact']);
@@ -166,7 +167,8 @@ export class ProviderFactoryTools {
       const accepted=deliveryStatus==='accepted',phase=accepted && !state.running && ['awaiting-manual-acceptance','delivery-accepted'].includes(state.phase)?'accepted':state?.phase || 'not-started';
       const modelId=state?.buildConfiguration?.modelId || this.options.factory.model;
       const profile=this.options.connectorId==='neuraldeep'?neuralDeepExecutionProfile(modelId):null;
-      return {continuation:nextFactoryAction(state,ledger),delivery:ledger?deliveryExplanation(ledger):null,slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase,running:state?.running || null,
+      return {continuation:nextFactoryAction(state,ledger),workflowBudget:readFactoryBudget({...this.paths,chatId:this.options.chatId,connectorId:this.options.connectorId}),recommendedBuildBudget:FACTORY_STABILITY_BUDGET,
+        delivery:ledger?deliveryExplanation(ledger):null,slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase,running:state?.running || null,
         ...(state?.contract?{scaffoldCapability:scaffoldCapability(contractData(state.contract,{root:this.paths.root}))}:{}),
         artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',buildConfiguration:state?.buildConfiguration || null,
         buildExecution:{connectorId:this.options.connectorId,modelId,requestedEffort:state?.buildConfiguration?.effort ?? this.options.factory.effort ?? null,effortControl:profile?.effortControl || 'runtime-defined',supportedEfforts:profile?.effortControl==='documented'?profile.supportedEfforts:null},
@@ -247,11 +249,12 @@ export class ProviderFactoryTools {
       const current=validateFactoryDelivery(p,state,deliveryStatus(state.runId,{root:p.root,stateRoot:p.stateRoot})).state;
       if(current.status!=='blocked' || current.blockers.length!==1 || !['token_budget_exhausted','iteration_budget_exhausted','elapsed_budget_exhausted'].includes(current.blockers[0].code) || current.version!==input.expected_version || current.budget.legacy_usage_unverified!==false || current.budget.unaccounted_attempts.length)throw factoryFail('factory_budget_context_changed');
       const additions={tokens:input.add_tokens ?? 0,iterations:input.add_iterations ?? 0,elapsed_ms:input.add_elapsed_ms ?? 0};
+      const shared=readFactoryBudget({...p,chatId:this.options.chatId,connectorId:this.options.connectorId});
       for(const [key,max] of [['tokens',10000000],['iterations',100],['elapsed_ms',86400000]])if(!Number.isSafeInteger(additions[key]) || additions[key]<0 || additions[key]>max)throw factoryFail('factory_input_invalid');
       if(!Object.values(additions).some(Boolean))throw factoryFail('factory_input_invalid');
       if(current.budget.max_tokens+additions.tokens<=current.budget.tokens_used || current.budget.max_iterations+additions.iterations<=current.iteration
         || (!additions.elapsed_ms && Date.now()-Date.parse(current.created_at)>=current.budget.max_elapsed_ms))throw factoryFail('factory_budget_insufficient');
-      budgetReview={proposedLimits:{tokens:current.budget.max_tokens+additions.tokens,iterations:current.budget.max_iterations+additions.iterations,freshWindowMs:additions.elapsed_ms},runId:state.runId,expectedVersion:current.version,tokensUsed:current.budget.tokens_used,iterationsUsed:current.iteration,additions,previousLimits:{tokens:current.budget.max_tokens,iterations:current.budget.max_iterations,elapsedMs:current.budget.max_elapsed_ms},approvalScope:'exact budget additions and immediate continuation only; previous usage and accepted artifacts remain unchanged'};
+      budgetReview={sharedLimits:{tokens:shared.maxTokens+additions.tokens,activeMs:shared.maxActiveMs+additions.elapsed_ms},proposedLimits:{tokens:current.budget.max_tokens+additions.tokens,iterations:current.budget.max_iterations+additions.iterations,freshWindowMs:additions.elapsed_ms},runId:state.runId,expectedVersion:current.version,tokensUsed:current.budget.tokens_used,iterationsUsed:current.iteration,additions,previousLimits:{tokens:current.budget.max_tokens,iterations:current.budget.max_iterations,elapsedMs:current.budget.max_elapsed_ms},approvalScope:'exact additions to the build and shared workflow limits and immediate continuation only; previous usage and accepted artifacts remain unchanged'};
     }
     const reviewKind=input.action==='approve_contract'?'contract':input.action==='approve_outcome'?'outcome':null;
     const review=reviewKind?factoryArtifact(p,state,reviewKind):null;
@@ -303,6 +306,10 @@ export class ProviderFactoryTools {
       if(result.version!==1 || result.operationId!==input.operation_id || !result.state || result.state.revision!==next.revision)throw factoryFail('factory_result_invalid');
       // The worker owns only this bound context; a lost result keeps running set.
       const saved=validateVoiceFactory(p,{...result.state,running:null,...(state.continuationProfile?{continuationPause:result.ok?(input.action==='research_status'||input.action==='delivery_status'?state.continuationPause:null):input.action}: {})},o);atomicWriteFile(p.file,JSON.stringify(saved));
+      if(result.ok && !['research_status','delivery_status','scaffold_plan'].includes(input.action)){
+        const budget=new FactoryBudget({...p,chatId:o.chatId,connectorId:o.connectorId});
+        await budget.progress(JSON.stringify([saved.phase,...['contract','outcome','research','pattern'].filter(kind=>saved[kind]).map(kind=>factoryArtifact(p,saved,kind).sha256)]));
+      }
       return {status:result.ok?'completed':'failed',exitCode:done.code,output:JSON.stringify({ok:result.ok,...result.value,diagnostic:result.diagnostic || undefined,phase:saved.phase,manualAcceptance:result.value?.manualAcceptance || 'pending'})};
     }catch(error){
       owned?.stop();if(owned)exited=(await owned.completion).processTreeExited===true;else exited=error.processTreeExited!==false;

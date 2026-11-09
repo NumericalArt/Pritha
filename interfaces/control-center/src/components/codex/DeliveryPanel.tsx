@@ -19,9 +19,13 @@ function RunExplanation({run,showAcceptance=true}:{run:Explanation;showAcceptanc
 }
 export function FactoryProgress({view}:{view:NonNullable<import("@/lib/codex-chat/types").ThreadDetail["factoryControl"]>}) {
   if(!view.available)return <aside role="status">Не удалось прочитать состояние сборки. Существующая задача сохранена. Перед продолжением нужно восстановить доступ к её состоянию.</aside>;
-  const d=view.delivery;
+  const d=view.delivery,b=view.workflowBudget;
   return <aside className="codex-factory-context" aria-label="Создание агента"><strong>{view.milestone.label} · {view.slug}</strong><span>Сборщик: {view.builder.provider} / {view.builder.modelId}</span>
     {d?.blockers.length?null:<p role="status">{view.milestone.summary}</p>}{d?<RunExplanation run={d} showAcceptance={false}/>:null}
+    {b?<details><summary>Расход подготовки и сборки</summary><p>{b.observedTokens.toLocaleString('ru-RU')} из {b.maxTokens.toLocaleString('ru-RU')} токенов · активная работа {Math.ceil(b.activeMs/60000)} мин.</p>
+      <p>Подготовка: {b.preparationTokens.toLocaleString('ru-RU')} · сборка: {b.buildTokens.toLocaleString('ru-RU')}. Ожидание согласований не расходует активное время.</p>
+      {!b.usageKnown?<p>Часть расхода ещё не подтверждена. Зарезервировано дополнительно: {b.reservationTokens.toLocaleString('ru-RU')} токенов; старые неизвестные значения сохранены отдельно.</p>:null}
+      {b.progressReview?<p>Долго нет подтверждённого продвижения. Прите нужно сверить результат и изменить подход.</p>:null}</details>:null}
     {view.firstUse?<div><strong>Попробовать проверенную версию</strong><p>Каталог сборки: <code>{view.firstUse.directory}</code> · версия <code>{view.firstUse.commit.slice(0,12)}</code>. Основной проект обновляется отдельно.</p>
       {view.firstUse.commands.cli?<><pre>{view.firstUse.commands.cli}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.cli)}</code></p></>:null}
       <details><summary>Проверить по HTTP</summary><p>В каталоге сборки запустите сервер. Во втором терминале выполните запрос. Для остановки нажмите Ctrl+C.</p><pre>{view.firstUse.commands.server}</pre><pre>{view.firstUse.commands.http}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.http)}</code></p></details></div>:null}
