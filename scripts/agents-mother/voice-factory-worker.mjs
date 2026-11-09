@@ -16,7 +16,8 @@ import {prepareProductTrial,reviewProductTrials} from './factory-product-trial.m
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,validateFactoryBuildEffort} from './voice-factory-state.mjs';
 
 const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
-function draftHasSensitiveText(text,kind){
+function checkDraftSafety(text,kind){
+  if(Buffer.byteLength(text)>48000)throw Object.assign(factoryFail('factory_draft_unsafe'),{message:'The complete draft exceeds 48000 bytes. Shorten it and submit the complete draft with the current SHA-256. No draft was written.'});
   // These are canonical Outcome grammar, not credential assignments. Scan
   // their values and every other byte normally; never exempt arbitrary fields.
   const scanned=kind==='outcome'?text
@@ -24,7 +25,11 @@ function draftHasSensitiveText(text,kind){
     .replace(/^(#### Session):[ \t]+([a-z0-9][a-z0-9-]{0,79})[ \t]*$/gm,'$1 $2')
     // A valid declaration's separators are not IPv6 unspecified addresses.
     .replace(/^(- Verifier input: [A-Za-z0-9._/-]+) :: (sha256:[a-f0-9]{64}) :: ((?:host-reviewed|host-template):[a-z0-9][a-z0-9._/@ -]{2,511})$/gm,'$1 | $2 | $3'):text;
-  return redactSensitiveText(scanned)!==scanned;
+  const redacted=redactSensitiveText(scanned);
+  if(redacted!==scanned){
+    const before=scanned.split('\n'),lines=redacted.split('\n').flatMap((line,index)=>line===before[index]?[]:[index+1]).slice(0,12);
+    throw Object.assign(factoryFail('factory_draft_unsafe'),{message:'Draft privacy check rejected sensitive text near line(s) '+lines.join(', ')+'. Remove literal credentials and private addresses; describe a local listener as loopback-only and keep secrets as environment placeholders. Read your proposed text at those lines, correct it, and use write_draft with the current SHA-256. No draft was written; changing tools cannot bypass this check.'});
+  }
 }
 function draftMetadata(text,previous){
   const fm=parseFrontmatterData(text),keys=text.startsWith('---\n')?text.slice(4,text.indexOf('\n---\n',4)).split('\n').map(line=>/^([A-Za-z0-9_-]+):/.exec(line)?.[1]).filter(Boolean):[];
@@ -98,7 +103,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     case 'write_draft':{
       const row=factoryArtifact(p,state,input.artifact);if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
       const text=input.action==='patch_draft'?patchFactoryDraft(row.text,input):String(input.content),fm=draftMetadata(text,row.frontmatter);
-      if(Buffer.byteLength(text)>48000 || draftHasSensitiveText(text,input.artifact))throw factoryFail('factory_draft_unsafe');
+      checkDraftSafety(text,input.artifact);
       if(input.artifact==='contract'){
         if(state.outcome)throw factoryFail('factory_contract_revision_required');
         const candidate=path.join(p.directory,'candidate.md');atomicWriteFile(candidate,text);

@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { contractData, validateContract, SERVICE_MODES } from "../scripts/agents-mother/contract.mjs";
 import { scaffoldCapability } from "../scripts/agents-mother/scaffold/capabilities.mjs";
+import { apiProcessPortConfiguration } from "../scripts/agents-mother/scaffold/api-process.mjs";
 import { generatedAgentFiles } from "../scripts/agents-mother/scaffold/index.mjs";
 import { deriveExternalResearchTopics } from "../scripts/agents-mother/external-research-topics.mjs";
 
@@ -47,6 +48,19 @@ test("API process research requires Node HTTP evidence, never silently substitut
   assert.equal(topics.includes("openai-agents-sdk"), false);
   assert.ok(deriveExternalResearchTopics({ ...selected, toolSystem: "OpenAI Agents SDK" }).some(topic => topic.id === "openai-agents-sdk"));
   assert.ok(deriveExternalResearchTopics({ runtimeFamily: "api" }).some(topic => topic.id === "openai-agents-sdk"));
+});
+
+test('API port honors the named success criterion and rejects ambiguity before Contract approval', () => {
+  const data = { ...selected, agentName: 'Different Name', envExampleVariables: 'TBD', successCriteria: 'Port configurable via COUNSEL_PORT; CLI returns exact JSON.' };
+  assert.deepEqual(apiProcessPortConfiguration(data), { port: 3000, variable: 'COUNSEL_PORT' });
+  assert.deepEqual(scaffoldCapability(data).apiPort, { port: 3000, variable: 'COUNSEL_PORT' });
+  assert.deepEqual(apiProcessPortConfiguration({ ...data, envExampleVariables: 'EXPLICIT_PORT=3451' }), { port: 3451, variable: 'EXPLICIT_PORT' });
+  assert.deepEqual(apiProcessPortConfiguration({ ...data, successCriteria: 'Exact JSON.' }), { port: 3000, variable: 'DIFFERENT_NAME_PORT' });
+  for (const change of [{ successCriteria: 'Either COUNSEL_PORT or ANOTHER_PORT.' }, { envExampleVariables: 'COUNSEL_PORT=0' }, { envExampleVariables: 'COUNSEL_PORT=65536' }, { envExampleVariables: 'COUNSEL_PORT=unknown' }]) {
+    const result = scaffoldCapability({ ...data, ...change });
+    assert.equal(result.supported, false);
+    assert.equal(result.reason, 'api-process-port-invalid');
+  }
 });
 
 test("API files preserve process contract, planned endpoints and non-running structural readiness", t => {

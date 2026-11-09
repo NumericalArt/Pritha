@@ -59,7 +59,10 @@ export function validateProductTrial(trial, data) {
       const success=status===(kind==='cli'?0:200);
       if (!Number.isInteger(status) || !success && (kind==='cli'?status<1 || status>125:status<400 || status>499)) fail('factory_product_trial_invalid');
       if ((success || Object.hasOwn(check,'expected_json')) && (!check.expected_json || Array.isArray(check.expected_json) || typeof check.expected_json!=='object')) fail('factory_product_trial_invalid');
-      if (kind==='http' && (check.port_variable!==apiProcessPortConfiguration(data).variable || check.argv.length!==2 || check.argv[1]!=='scripts/server.mjs'
+      if (kind==='http' && check.port_variable!==capability.apiPort.variable) {
+        throw Object.assign(new Error('The HTTP Trial must use the Contract port variable.'), {code:'factory_product_trial_port_mismatch', expectedPortVariable:capability.apiPort.variable});
+      }
+      if (kind==='http' && (check.argv.length!==2 || check.argv[1]!=='scripts/server.mjs'
           || !/^\/[A-Za-z0-9/_-]{0,120}$/.test(check.path) || check.path.startsWith('//') || !check.input_json || Array.isArray(check.input_json) || typeof check.input_json!=='object')) fail('factory_product_trial_invalid');
       const signature=canonical(kind==='http'?[check.path,check.input_json]:check.argv);
       if(signatures.has(signature))fail('factory_product_trial_invalid');

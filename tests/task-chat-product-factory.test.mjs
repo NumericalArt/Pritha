@@ -131,6 +131,38 @@ test('product Trial rejects undeclared interfaces, unsafe commands and stale dra
   assert.equal(fs.existsSync(f.paths.target), false);
 });
 
+test('Task Chat preserves the accepted named port with a template env field and explains a mismatched HTTP Trial', { timeout: 30000 }, async t => {
+  const f = await productFactoryFixture(scenarios[1]);
+  t.after(() => f.close());
+  ok(await f.call('init', { brief: f.brief, build_token_budget: 10000 }));
+  const draft = f.artifact('contract');
+  const content = draft.text.replace(/^- `\.env\.example` variables:.*$/m, '- `.env.example` variables: TBD')
+    .replace(/^(- Success criteria:.*)$/m, '$1; Port configurable via YESNO_COUNSEL_PORT');
+  ok(await f.call('write_draft', { artifact: 'contract', expected_sha256: draft.sha256, content }));
+  assert.deepEqual(ok(await f.call('scaffold_plan')).capability.apiPort, { port: 3000, variable: 'YESNO_COUNSEL_PORT' });
+  const approving = f.call('approve_contract', { expected_sha256: f.artifact('contract').sha256 });
+  await until(() => f.pending().length === 1);
+  assert.equal(f.pending()[0].presentation.scaffoldCapability.apiPort.variable, 'YESNO_COUNSEL_PORT');
+  await f.answer(); ok(await approving);
+  const accepted = f.artifact('contract').sha256;
+  ok(await f.call('create_outcome'));
+  const expected_sha256 = f.artifact('outcome').sha256, trial = f.trial;
+  const wrong = structuredClone(trial);
+  wrong.http[0].port_variable = 'WRONG_PORT';
+  const rejected = await f.call('prepare_product_trial', { expected_sha256, trial: wrong });
+  assert.equal(rejected.error, 'factory_product_trial_port_mismatch');
+  assert.equal(rejected.field, 'trial.http[].port_variable');
+  assert.equal(rejected.expected, 'YESNO_COUNSEL_PORT');
+  assert.doesNotMatch(JSON.stringify(rejected), /WRONG_PORT/);
+  assert.equal(f.artifact('outcome').sha256, expected_sha256);
+  assert.equal(fs.existsSync(path.join(f.paths.directory, 'trial-inputs/verification/product.mjs')), false);
+  const result = ok(await f.call('prepare_product_trial', { expected_sha256, trial }));
+  assert.deepEqual(result.checks, trial);
+  assert.equal(f.artifact('contract').sha256, accepted);
+  assert.equal(f.state().outcomeApproval, undefined);
+  assert.equal(fs.existsSync(f.paths.target), false);
+});
+
 test('a legacy approved API smoke cannot start delivery without a reviewed product Trial', { timeout: 30000 }, async t => {
   const f = await productFactoryFixture(scenarios[1]);
   t.after(() => f.close());

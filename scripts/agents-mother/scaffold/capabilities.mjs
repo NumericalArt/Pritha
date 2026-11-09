@@ -1,3 +1,5 @@
+import { apiProcessPortConfiguration } from './api-process.mjs';
+
 const runtimeFamilies = new Set(["codex-native", "cli", "api", "local-model", "hybrid", "environment-specific"]);
 function interfaceName(value) {
   const name = String(value || "").trim().toLowerCase();
@@ -71,7 +73,10 @@ export function scaffoldCapability(data = {}) {
       || (data.repositoryAdoptionMode && data.repositoryAdoptionMode !== "none")) {
       return unsupported("api-process-combination-adapter-missing", "The API process adapter requires primary web/API, optional secondary CLI, no proactivity or repository adoption, and disabled/optional autostart.");
     }
-    return { ...base, supported: true, adapter: "api-process-v1", reason: "api-process-service-scaffold", nextAction: "Implement the approved HTTP service and managed lifecycle, then run independent Outcome Trials; no service starts during scaffold." };
+    let apiPort;
+    try { apiPort = apiProcessPortConfiguration(data); }
+    catch { return unsupported('api-process-port-invalid', 'Declare one API port variable in .env.example variables, with an optional port from 1 to 65535, before Contract approval.'); }
+    return { ...base, supported: true, adapter: "api-process-v1", apiPort, reason: "api-process-service-scaffold", nextAction: "Implement the approved HTTP service and managed lifecycle, then run independent Outcome Trials; no service starts during scaffold." };
   }
   if (!["codex-native", "cli"].includes(runtime)) return unsupported("runtime-adapter-missing", `Implement and review a ${runtime} scaffold adapter; the accepted contract is preserved.`);
   if (primary === "cli" && interfaces.length === 1 && noManagedOperations) {

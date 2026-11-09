@@ -352,6 +352,9 @@ test('normal factory patch tool is exact, replayable and cannot edit accepted do
   const fresh=f.artifact('outcome'),unsafe=fresh.text+'\npassword: synthetic-private-value\n';
   const failed=await f.call('patch_draft',{artifact:'outcome',expected_sha256:fresh.sha256,edits:[{from:fresh.text,to:unsafe}],expected_result_sha256:factoryHash(unsafe)});
   assert.equal(failed.status,'failed');assert.equal(JSON.parse(failed.text).error,'factory_draft_unsafe');assert.equal(f.artifact('outcome').text,content);
+  const diagnostic=JSON.parse(failed.text).diagnostic;
+  assert.match(diagnostic,/near line\(s\) \d+/);assert.match(diagnostic,/No draft was written/);
+  assert.doesNotMatch(diagnostic,/synthetic-private-value|password:/);
   await f.ok('approve_outcome',{expected_sha256:fresh.sha256});assert.equal(f.approvals.length,2);
   for(const artifact of ['contract','outcome']){
     const approved=f.artifact(artifact);await assert.rejects(f.call('patch_draft',{artifact,expected_sha256:approved.sha256,edits:[{from:approved.text,to:row.text}],expected_result_sha256:row.sha256}),{code:'factory_draft_changed'});assert.equal(f.artifact(artifact).sha256,approved.sha256);

@@ -8,8 +8,18 @@ export function apiProcessPortConfiguration(data) {
   const variables = String(data.envExampleVariables || "").trim();
   const declared = variables.match(/\b([A-Z][A-Z0-9_]*_PORT)\s*=\s*(\d+)\b/);
   const port = declared ? Number(declared[2]) : 3000;
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("API process scaffold requires a valid declared port");
-  const variable = declared?.[1] || variables.match(/^[A-Z][A-Z0-9_]*_PORT$/)?.[0] || `${slug(data.agentName).toUpperCase().replaceAll("-", "_")}_PORT`;
+  const invalid = () => { throw Object.assign(new Error("Declare one API port variable in .env.example variables, with an optional port from 1 to 65535."), { code: "api_process_port_invalid" }); };
+  if (!Number.isInteger(port) || port < 1 || port > 65535) invalid();
+  let variable = declared?.[1] || variables.match(/^[A-Z][A-Z0-9_]*_PORT$/)?.[0];
+  if (!variable) {
+    // The approved success criteria may already name the required variable even
+    // when the optional environment example is still a template placeholder.
+    // Use that exact declaration; never silently replace it with a generated name.
+    const named = [...new Set(String(data.successCriteria || "").match(/\b[A-Z][A-Z0-9_]*_PORT\b/g) || [])];
+    if (named.length > 1 || /\b[A-Z][A-Z0-9_]*_PORT\b/.test(variables)) invalid();
+    variable = named[0] || `${slug(data.agentName || "agent").toUpperCase().replaceAll("-", "_")}_PORT`;
+  }
+  if (!/^[A-Z][A-Z0-9_]{0,95}_PORT$/.test(variable)) invalid();
   return { port, variable };
 }
 
