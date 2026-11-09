@@ -113,8 +113,15 @@ export class HostResearch {
           try{
             let url=sourceUrls[topic.id] || state.recovery?.sources[topic.id] || topic.primaryUrls[attempt.attempts-1] || topic.primaryUrls[0];
             let service=this.service;
+            // A known primary URL needs no search/crawl subscription. Use the
+            // same DNS-pinned reader across model connectors; only discovery
+            // without a URL requires the configured search provider. Keep the
+            // NeuralDeep research permission switches effective for direct reads.
+            const direct=Boolean(url) && !service;
             if(this.connectorId==='neuraldeep' && !service)service=ownedService ||=new SearchService({codeRoot:this.root,stateRoot:this.stateRoot,environment:this.environment});
             const context={owner:'research_'+this.data.fingerprint,turn:topic.id,surface:'research',connectorId:this.connectorId,explicit:true,signal};
+            const assertReadAllowed=()=>{if(direct && service)service.allowed(context,service.store.settings());};
+            assertReadAllowed();
             if(!url){
               if(!service)fail('research_primary_url_required');
               attempt.stage='search';this.save(state);
@@ -124,18 +131,19 @@ export class HostResearch {
               url=primaryResult(found.sources,topic)?.url;
             }
             if(!url || !allowed(url,topic.primaryDomains))fail('research_primary_url_invalid');
-            attempt.url=publicUrl(url);attempt.stage='read';this.save(state);
+            const providerRead=service && !direct;
+            attempt.url=publicUrl(url);attempt.stage='read';attempt.readBackend=providerRead?'provider':'primary-direct';this.save(state);
             // Authority admits reviewed domains and their subdomains. Give the
             // exact admitted host to the stricter DNS-pinned reader; redirects
             // still cannot introduce a different unlisted subdomain.
             const readHosts=[...new Set([...topic.primaryDomains,new URL(attempt.url).hostname])];
-            const page=service?await bounded(()=>service.readPage({url:attempt.url,max_chars:20000},context),signal):await bounded(()=>this.reader(attempt.url,readHosts,signal),signal);
-            signal.throwIfAborted();this.assertAllowed();this.assertReport(state);
-            const item=service?page.sources?.find(source=>source.read===true && source.text && allowed(source.url,topic.primaryDomains)):page.items?.[0];
-            if(service && !page.ok)fail(page.error?.code||'research_read_failed');
+            const page=providerRead?await bounded(()=>service.readPage({url:attempt.url,max_chars:20000},context),signal):await bounded(()=>this.reader(attempt.url,readHosts,signal),signal);
+            signal.throwIfAborted();this.assertAllowed();assertReadAllowed();this.assertReport(state);
+            const item=providerRead?page.sources?.find(source=>source.read===true && source.text && allowed(source.url,topic.primaryDomains)):page.items?.[0];
+            if(providerRead && !page.ok)fail(page.error?.code||'research_read_failed');
             if(!item || !allowed(item.url,topic.primaryDomains))fail('research_page_not_read');
             const text=sourceText(item.text || item.content,topic.query);
-            const retrievedAt=service?item.retrieved_at:new Date().toISOString(),retrieved=Date.parse(retrievedAt);
+            const retrievedAt=providerRead?item.retrieved_at:new Date().toISOString(),retrieved=Date.parse(retrievedAt);
             if(!Number.isFinite(retrieved) || retrieved>Date.now()+300000 || Date.now()-retrieved>30*86400000)fail('research_source_stale');
             const source={id:hash([topic.id,item.url,hash(text)]).slice(0,24),topicId:topic.id,url:publicUrl(item.url),title:quarantineUntrustedInstructionText(String(item.title||'').slice(0,500)),text,contentHash:hash(text),query:topic.query,retrievedAt,publishedAt:safeDate(item.published_at)||'unknown',untrusted:true};
             if(passages(source).reduce((total,item)=>total+Buffer.byteLength(item.quote),0)<80)fail('research_passage_missing');

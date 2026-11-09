@@ -3,7 +3,7 @@ id: agents-mother-host-research
 type: workflow
 status: active
 created: 2026-11-01
-updated: 2026-11-04
+updated: 2026-11-09
 topics: [agent-engineering, external-research, source-evidence, recovery]
 tools: [Pritha, NeuralDeep, Node.js]
 sources:
@@ -36,12 +36,20 @@ confidence: high
    node scripts/pritha.mjs external-research <contract> --backend host --connector neuraldeep --phase collect
    ```
 
-   NeuralDeep использует host Search/Read и его ключ/лимиты. Для `codex`, `claude`
-   и `openrouter` доступны прямые чтения курируемых первичных URL или явно выбранных
-   URL из `--sources urls.json` (объект topic ID → public HTTPS URL). Автоматического
-   переключения на NeuralDeep нет. Для неизвестного authority или URL возвращается
+   Для всех model connectors курируемые первичные URL и явно выбранные URL из
+   `--sources urls.json` (объект topic ID → public HTTPS URL) читаются напрямую
+   через общий DNS-pinned reader. Ключ и crawl-квота модели для этого не нужны.
+   NeuralDeep host Search/Read используется только для discovery без выбранного
+   URL; его ключ, разрешения и лимиты сохраняются. Автоматического переключения
+   на другой поисковый провайдер нет. Для неизвестного authority или URL возвращается
    typed blocker; прежний manual research остаётся доступным. Local/offline не
    отправляет внешние запросы. Отсутствие обязательных тем не требует сети.
+   Reader записывается в checkpoint каждой попытки. Обновление reader не
+   обнуляет прежние ошибки, deadline или исчерпанные попытки; такой прогон
+   сохраняет обычную границу recovery. Source authority, redirects, quarantine,
+   точные passages, временная совместимость и общий evidence gate обязательны.
+   Для NeuralDeep прежние переключатели разрешения research проверяются и при
+   прямом чтении, до запроса и перед сохранением ответа; выключение не обходится.
 3. Проверить результат через тот же вызов с `--phase status`. Модель получает
    source IDs и до восьми отдельных passage IDs на страницу, суммарно не более
    2400 UTF-8 bytes. Полная страница и её hash остаются в private checkpoint.

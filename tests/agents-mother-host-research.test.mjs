@@ -25,8 +25,8 @@ function fixture(t,changes={}){
 test('local API research can read every topic in the Headline and YesNo plans without a search provider', async t => {
   const common = ['node-http-runtime', 'interface-runtime-security', 'operations-deployment',
     'declared-dependencies', 'pattern-api', 'pattern-voice-speech', 'pattern-codex', 'pattern-github-repository'];
-  for (const [connectorId, extraTopic] of [['codex', 'pattern-mcp-connector-permissions'], ['claude', 'pattern-agent-skills-evals']]) {
-    const topics = [...common, extraTopic].map(id => ({id, query: id.replaceAll('-', ' '), required: true}));
+  for (const [connectorId, extraTopics] of [['codex', ['pattern-mcp-connector-permissions']], ['claude', ['pattern-agent-skills-evals']], ['neuraldeep', ['pattern-launchd-cron','pattern-nextjs-react']]]) {
+    const topics = [...common, ...extraTopics].map(id => ({id, query: id.replaceAll('-', ' '), required: true}));
     const sourceUrls = localApiResearchSources(topics);
     const labels = new Map(Object.entries(sourceUrls).map(([id, url]) => [url, id.replaceAll('-', ' ')]));
     const reader = async url => ({items: [{url, content: 'This official reference describes '+labels.get(url)+' and its configuration and behavior in this isolated test.'}]});
@@ -35,6 +35,37 @@ test('local API research can read every topic in the Headline and YesNo plans wi
     assert.equal(result.status, 'collected');
     assert.deepEqual(result.sources.map(s => s.topicId), topics.map(t => t.id));
     assert.ok(result.topics.every(t => t.checkpoint.attempts === 1));
+    assert.ok(result.topics.every(t => t.checkpoint.readBackend === 'primary-direct'));
+    assert.deepEqual((await host.collect()).sources,result.sources);
+  }
+});
+
+test('NeuralDeep curated primary reads preserve failed and uncertain checkpoints without a crawl fallback',async t=>{
+  const selected={id:'node-http-runtime',query:'HTTP server lifecycle',required:true};
+  let reads=0;
+  const f=fixture(t,{topics:[selected],service:undefined,reader:async()=>{reads++;throw Object.assign(Error('blocked address'),{code:'url_blocked'});}});
+  await assert.rejects(f.host.collect(),{code:'url_blocked'});
+  await assert.rejects(new HostResearch(f.options).collect(),{code:'research_retry_required'});
+  await assert.rejects(f.host.collect({retryFailed:true}),{code:'url_blocked'});
+  await assert.rejects(f.host.collect({retryFailed:true}),{code:'research_source_limit'});
+  assert.equal(reads,2);assert.deepEqual(f.counts(),{searchCalls:0,readCalls:0});
+  assert.equal(f.host.status().sources.length,0);
+  const state=JSON.parse(readFileSync(f.host.file,'utf8'));state.topics[selected.id].status='started';writeFileSync(f.host.file,JSON.stringify(state));
+  await assert.rejects(new HostResearch(f.options).collect({retryFailed:true}),{code:'research_source_unconfirmed'});
+  assert.equal(reads,2);
+});
+
+test('NeuralDeep direct primary reading respects disabled research before and after a request',async t=>{
+  for(const during of [false,true]){
+    let reads=0,settings;
+    const f=fixture(t,{topics:[{id:'node-http-runtime',query:'HTTP server lifecycle',required:true}],service:undefined,reader:async url=>{
+      reads++;settings.configure({surfaces:{task_chat:true,voice:true,child:true,research:false}},settings.store.settings().revision);
+      return {items:[{url,text:'The HTTP server lifecycle has explicit request handling and response completion for every connection.'}]};
+    }});
+    settings=new SearchService({codeRoot:f.options.root,stateRoot:f.options.stateRoot,environment:{}});t.after(()=>settings.store.close());
+    if(!during)settings.configure({enabled:false},settings.store.settings().revision);
+    await assert.rejects(f.host.collect(),{code:during?'permission_denied':'disabled'});
+    assert.equal(reads,Number(during));assert.equal(f.host.status().sources.length,0);
   }
 });
 

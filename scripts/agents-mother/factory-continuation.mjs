@@ -11,6 +11,8 @@ const localApiPrimaryPages = {
   'declared-dependencies': 'https://nodejs.org/api/modules.md',
   'pattern-api': 'https://nodejs.org/api/url.md',
   'pattern-voice-speech': 'https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API',
+  'pattern-launchd-cron': 'https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html',
+  'pattern-nextjs-react': 'https://react.dev/learn',
   'pattern-codex': 'https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex',
   'pattern-github-repository': 'https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes',
   'pattern-agent-skills-evals': 'https://developers.openai.com/api/docs/guides/evals',
