@@ -219,3 +219,25 @@ test('only the verified publisher-qualified model ID is equivalent; another publ
     else{assert.equal(result.status,502);assert.match(body,/neuraldeep_model_identity_mismatch/);assert.doesNotMatch(body,/"type":"function_call"/);}
   }
 });
+
+test('Kimi catalog identity accepts its verified publisher identity for JSON and SSE without permitting another model',async t=>{
+  const requested='kimi-k3.1-pro';
+  for(const format of ['json','sse'])for(const returned of [requested,'moonshotai/'+requested,'other/'+requested,'moonshotai/kimi-k3','moonshotai/kimi-k2.6','moonshotai/moonshotai/'+requested]){
+    const receipts=[];
+    const post=await fixture(t,{onRequest:event=>receipts.push(event),fetchImpl:async()=>response(terminal([call(allowedTools[0])],{model:returned}),format)});
+    const result=await post({model:requested}),body=await result.text(),accepted=[requested,'moonshotai/'+requested].includes(returned);
+    assert.equal(result.status,accepted?200:502);assert.equal(receipts.length,1);assert.equal(receipts[0].usage.totalTokens,6);
+    if(accepted){assert.match(body,/"name":"read_file"/);assert.ok(body.includes('"model":"'+returned+'"'));assert.equal(receipts[0].error,null);}
+    else{assert.match(body,/neuraldeep_model_identity_mismatch/);assert.doesNotMatch(body,/"type":"function_call"/);}
+  }
+});
+
+test('Kimi publisher identity does not weaken tool or durable accounting checks or authorize other chats',async t=>{
+  for(const mode of ['foreign-tool','receipt','other-chat']){
+    const post=await fixture(t,{onRequest:()=>{if(mode==='receipt')throw Error('PRIVATE_RECEIPT_ERROR');},fetchImpl:async()=>response(terminal([call(mode==='foreign-tool'?'request_user_input':allowedTools[0])],{model:'moonshotai/kimi-k3.1-pro'}),'sse')});
+    const result=await post({model:mode==='other-chat'?'kimi-k3':'kimi-k3.1-pro'}),body=await result.text();
+    assert.equal(result.status,mode==='receipt'?503:502);
+    assert.match(body,/provider_tool_identity_mismatch|provider_receipt_failed|neuraldeep_model_identity_mismatch/);
+    assert.doesNotMatch(body,/"type":"function_call"|PRIVATE_RECEIPT_ERROR/);
+  }
+});
