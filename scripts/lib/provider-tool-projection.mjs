@@ -29,7 +29,10 @@ export function projectProviderToolRequest(input,allowed){
   const result={...input,tools:projection.tools};if(!result.tools.length)result.tool_choice='none';
   if(Array.isArray(result.input))result.input=result.input.map(item=>{
     if(item.type!=='function_call' || !item.namespace)return item;
-    const name=item.namespace+'__'+item.name;if(!projection.map.has(name))throw failure('provider_tool_identity_mismatch',400,{phase:'request-history',reason:'undeclared',toolCount:projection.map.size});
+    // Native compaction omits current tool declarations but retains completed
+    // calls in its history. Historical identity uses the host allowlist; only
+    // this request's declared map can authorize a new response-side call.
+    const name=item.namespace+'__'+item.name;if(item.namespace!=='mcp__pritha' || !allowed.includes(name))throw failure('provider_tool_identity_mismatch',400,{phase:'request-history',reason:'undeclared',toolCount:projection.map.size});
     const {namespace,...rest}=item;return {...rest,name};
   });
   if(object(result.tool_choice) && result.tool_choice.type==='function'){

@@ -46,6 +46,41 @@ test('NeuralDeep receives a required delivery blocker answer and returns it inta
   }
 });
 
+test('native compaction preserves authorized historical calls without granting current tools',()=>{
+  for(const tools of [undefined,[]]){
+    const input={tools,input:[{...call('read_file'),namespace:'mcp__pritha'},{type:'function_call_output',call_id:'call_fixture',output:'previous result'}],tool_choice:'auto'};
+    const original=structuredClone(input),projected=projectProviderToolRequest(input,allowedTools);
+    assert.deepEqual(input,original);assert.deepEqual(projected.tools,[]);assert.equal(projected.map.size,0);assert.equal(projected.payload.tool_choice,'none');
+    assert.deepEqual(projected.payload.input,[call(allowedTools[0]),original.input[1]]);
+    assert.throws(()=>wireCall(call(allowedTools[0]),projected.map),{code:'provider_tool_identity_mismatch'});
+    for(const denied of [{...call('read_file'),namespace:'foreign'},{...call('run_command'),namespace:'mcp__pritha'},{...call('pritha__read_file'),namespace:'mcp'}])
+      assert.throws(()=>projectProviderToolRequest({...input,input:[denied]},allowedTools),{code:'provider_tool_identity_mismatch'});
+  }
+});
+
+test('NeuralDeep compaction and subsequent tool turn use distinct execution maps and measured receipts',async t=>{
+  for(const format of ['json','sse']){
+    const receipts=[];let calls=0;
+    const post=await fixture(t,{onRequest:event=>receipts.push(event),fetchImpl:async(_url,request)=>{
+      calls++;const payload=JSON.parse(request.body);assert.equal(payload.input[0].name,allowedTools[0]);assert.equal(payload.input[0].namespace,undefined);
+      if(!payload.tools.length){assert.equal(payload.tool_choice,'none');return response(terminal([{type:'message',id:'summary_fixture',role:'assistant',content:[{type:'output_text',text:'Preserved summary'}]}]),format);}
+      assert.deepEqual(payload.tools.map(tool=>tool.name),[allowedTools[0]]);return response(terminal([call(allowedTools[0])]),format);
+    }});
+    const input=[{...call('read_file'),namespace:'mcp__pritha'},{type:'function_call_output',call_id:'call_fixture',output:'original'}];
+    const compact=await post({tools:[],input}),summary=await compact.text();assert.equal(compact.status,200);assert.match(summary,/Preserved summary/);assert.doesNotMatch(summary,/"type":"function_call"/);
+    const resumed=await post({input}),body=await resumed.text();assert.equal(resumed.status,200);assert.match(body,/"namespace":"mcp__pritha"/);assert.match(body,/"name":"read_file"/);
+    assert.equal(calls,2);assert.equal(receipts.length,2);assert.ok(receipts.every(r=>r.usage.totalTokens===6&&!r.error));
+  }
+});
+
+test('a tool-free compaction response cannot revive even an otherwise host-allowed tool',async t=>{
+  for(const format of ['json','sse']){
+    const post=await fixture(t,{fetchImpl:async()=>response(terminal([call(allowedTools[0])]),format)});
+    const result=await post({tools:[],input:[{...call('read_file'),namespace:'mcp__pritha'}]}),body=await result.text();
+    assert.match(body,/provider_tool_identity_mismatch/);assert.doesNotMatch(body,/"type":"function_call"/);
+  }
+});
+
 test('NeuralDeep projects initial and resumed calls without exposing builtin tools in JSON and SSE',async t=>{
   for(const format of ['json','sse']){
     const receipts=[];
