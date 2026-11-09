@@ -13,7 +13,7 @@ import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
 import {scaffoldCapability,assertScaffoldCapability} from './scaffold/capabilities.mjs';
 import {prepareProductTrial,reviewProductTrials} from './factory-product-trial.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,validateFactoryBuildEffort} from './voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,validateFactoryBuildEffort,inheritedFactoryBuildEffort} from './voice-factory-state.mjs';
 
 const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
 function checkDraftSafety(text,kind){
@@ -24,7 +24,10 @@ function checkDraftSafety(text,kind){
     .replace(/^(- Then exit code):[ \t]*([0-9]{1,3})[ \t]*$/gm,'$1 $2')
     .replace(/^(#### Session):[ \t]+([a-z0-9][a-z0-9-]{0,79})[ \t]*$/gm,'$1 $2')
     // A valid declaration's separators are not IPv6 unspecified addresses.
-    .replace(/^(- Verifier input: [A-Za-z0-9._/-]+) :: (sha256:[a-f0-9]{64}) :: ((?:host-reviewed|host-template):[a-z0-9][a-z0-9._/@ -]{2,511})$/gm,'$1 | $2 | $3'):text;
+    .replace(/^(- Verifier input: [A-Za-z0-9._/-]+) :: (sha256:[a-f0-9]{64}) :: ((?:host-reviewed|host-template):[a-z0-9][a-z0-9._/@ -]{2,511})$/gm,'$1 | $2 | $3')
+    // These exact Contract sentinel values declare the absence of MCP auth.
+    // Other values and all other credential assignments still undergo the scan.
+    :kind==='contract'?text.replace(/^(- Pending MCP auth):[ \t]+(none|not-applicable)[ \t]*$/gm,'$1 $2'):text;
   const redacted=redactSensitiveText(scanned);
   if(redacted!==scanned){
     const before=scanned.split('\n'),lines=redacted.split('\n').flatMap((line,index)=>line===before[index]?[]:[index+1]).slice(0,12);
@@ -192,7 +195,9 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     }
     case 'deliver':case 'delivery_resume':case 'delivery_extend':case 'verify':case 'delivery_status':{
       approved();
-      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:state.buildConfiguration?.modelId || request.model,effort:state.buildConfiguration?.effort ?? request.effort,preset:request.preset,factoryParent:request.factoryParent,
+      const buildModel=state.buildConfiguration?.modelId || request.model;
+      const buildEffort=state.buildConfiguration?.effort ?? inheritedFactoryBuildEffort(request.connectorId,buildModel,request.effort);
+      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:buildModel,effort:buildEffort,preset:request.preset,factoryParent:request.factoryParent,
         factoryBudget:{...options,agentParent:p.parent,slug:p.slug,target:p.target,chatId:state.chatId,connectorId:request.connectorId}}};
       let result;
       if(input.action==='deliver'){

@@ -8,7 +8,7 @@ import {execFileSync} from 'node:child_process';
 import {ProviderHostTools} from '../scripts/lib/provider-host-tools.mjs';
 import {factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs';
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft,validateFactoryBuildEffort} from '../scripts/agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft,validateFactoryBuildEffort,inheritedFactoryBuildEffort} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
 import {reconcileFactoryReceipt} from '../scripts/agents-mother/factory-receipt-recovery.mjs';
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
@@ -31,6 +31,53 @@ function fixture(t,connectorId='claude'){
   t.after(async()=>{controller.abort();await tools.close();lease.release();coordinator.close();fs.rmSync(directory,{recursive:true,force:true});});
   return {tools,options,p,coordinator,lease,controller,approvals,proofs,call,ok,state:()=>loadVoiceFactory(p,options),artifact:kind=>factoryArtifact(p,loadVoiceFactory(p,options),kind)};
 }
+test('invalid Contract enums return corrective evidence before any approval card',async t=>{
+  const f=fixture(t,'neuraldeep');await f.ok('init',{brief,build_token_budget:10000});
+  const initial=f.artifact('contract');
+  const invalid=initial.text.replace(/^- Runtime placement profile:.*$/m,'- Runtime placement profile: PRIVATE_INVALID_PROFILE')
+    .replace(/^- Multi-model routing requested:.*$/m,'- Multi-model routing requested: never');
+  await f.ok('write_draft',{artifact:'contract',expected_sha256:initial.sha256,content:invalid});
+  const revision=f.state().revision,draft=f.artifact('contract');
+  await assert.rejects(f.call('approve_contract',{expected_sha256:draft.sha256}),error=>{
+    const detail=factoryBriefErrorDetail(error);assert.equal(detail.error,'factory_contract_invalid');
+    assert.equal(detail.issues.length,2);assert.match(detail.issues[0],/Runtime placement profile/);
+    assert.match(detail.issues[1],/Multi-model routing requested/);assert.match(detail.hint,/No approval card/);
+    assert.doesNotMatch(JSON.stringify(detail),/PRIVATE_INVALID_PROFILE/);return true;
+  });
+  assert.equal(f.approvals.length,0);assert.equal(f.state().revision,revision);
+  assert.equal(f.artifact('contract').sha256,draft.sha256);assert.equal(f.state().contractApproval,undefined);
+  assert.equal(fs.existsSync(f.p.target),false);
+  const corrected=invalid.replace('PRIVATE_INVALID_PROFILE','deterministic-first').replace('- Multi-model routing requested: never','- Multi-model routing requested: no');
+  await f.ok('write_draft',{artifact:'contract',expected_sha256:draft.sha256,content:corrected});
+  await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});
+  assert.equal(f.approvals.length,1);assert.equal(f.artifact('contract').frontmatter.status,'accepted');
+});
+test('repeated scaffold inspection reads the latest draft without an execution receipt or revision change',async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});
+  const inspect=async()=>JSON.parse((await f.tools.call('factory_scaffold_plan',{})).content[0].text);
+  const revision=f.state().revision,first=await inspect(),draft=f.artifact('contract');
+  assert.equal(first.schema,'pritha-scaffold-preflight-v1');assert.equal(first.contractSha256,draft.sha256);
+  assert.equal(first.capability.supported,true);assert.equal(f.state().revision,revision);
+  const changed=draft.text.replace(/^- Runtime placement profile:.*$/m,'- Runtime placement profile: deterministic-local-node');
+  await f.ok('write_draft',{artifact:'contract',expected_sha256:draft.sha256,content:changed});
+  const changedRevision=f.state().revision,second=await inspect();
+  assert.notEqual(second.contractFingerprint,first.contractFingerprint);assert.notEqual(second.contractSha256,first.contractSha256);
+  assert.match(second.issues.join('\n'),/invalid Runtime placement profile/);
+  assert.equal(f.state().revision,changedRevision);assert.equal(f.approvals.length,0);
+  assert.equal(f.coordinator.listIntents({kind:'provider-tool'}).filter(row=>row.factoryAction==='scaffold_plan').length,0);
+});
+test('Contract MCP auth absence is accepted while real assignments and adjacent secrets remain rejected',async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});
+  for(const sentinel of ['none','not-applicable']){
+    const row=f.artifact('contract');await f.ok('write_draft',{artifact:'contract',expected_sha256:row.sha256,content:row.text+'\n- Pending MCP auth: '+sentinel+'\n'});
+  }
+  const safe=f.artifact('contract');
+  for(const line of ['- Pending MCP auth: synthetic-credential-value','- Pending MCP auth: none; api_key=synthetic-credential-value','- Pending MCP auth: none\napi_key=synthetic-credential-value']){
+    const result=await f.call('write_draft',{artifact:'contract',expected_sha256:safe.sha256,content:safe.text+'\n'+line+'\n'});
+    assert.equal(JSON.parse(result.text).error,'factory_draft_unsafe');assert.equal(f.artifact('contract').sha256,safe.sha256);
+  }
+  assert.equal(f.approvals.length,0);assert.equal(f.state().contractApproval,undefined);
+});
 test('a lost worker reply is recovered once from its receipt, only after its old lease and process are gone',async t=>{
   const f=fixture(t),id='original_worker_receipt';
   await f.ok('init',{operation_id:id,brief,build_token_budget:10000});
@@ -207,6 +254,30 @@ test('NeuralDeep build effort repair validates support before any provider reque
   assert.doesNotThrow(()=>validateFactoryBuildEffort('neuraldeep','gpt-oss-120b','high'));
   assert.throws(()=>validateFactoryBuildEffort('neuraldeep','gpt-oss-120b','xhigh'),error=>{assert.deepEqual(factoryBriefErrorDetail(error).supportedEfforts,['low','medium','high']);return error.code==='factory_build_effort_unsupported';});
   assert.throws(()=>validateFactoryBuildEffort('neuraldeep','gpt-oss-120b',{}),{code:'factory_input_invalid'});
+  assert.throws(()=>validateFactoryBuildEffort('neuraldeep','kimi-k3.1-pro','xhigh'),{code:'factory_build_effort_unsupported'});
+  assert.equal(inheritedFactoryBuildEffort('neuraldeep','kimi-k3.1-pro','xhigh'),'none');
+  assert.equal(inheritedFactoryBuildEffort('neuraldeep','qwen3.8-27b','xhigh'),'none');
+  assert.equal(inheritedFactoryBuildEffort('neuraldeep','gpt-oss-120b','high'),'high');
+  assert.equal(inheritedFactoryBuildEffort('codex','gpt-6-astra','xhigh'),'xhigh');
+  assert.equal(inheritedFactoryBuildEffort('claude','claude-sonnet-5-5','high'),'high');
+});
+test('Kimi builder inherits the parent wire default while its reviewed model, documents and budget stay fixed',async t=>{
+  const f=fixture(t,'neuraldeep');f.options.factory.model='kimi-k3.1-pro';f.options.factory.effort='xhigh';
+  await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});
+  assert.equal(f.approvals[0].presentation.buildEffort,'none');
+  await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const contract=f.artifact('contract').sha256,outcome=f.artifact('outcome').sha256,spec=f.artifact('outcome').frontmatter;
+  const observed=await f.call('status');assert.equal(observed.buildExecution.requestedEffort,'xhigh');assert.equal(observed.buildExecution.buildEffort,'none');assert.deepEqual(observed.buildExecution.supportedEfforts,['none']);
+  const operation_id='kimi_inherited_build',state={...f.state(),phase:'scaffolded',revision:f.state().revision+1,running:{operationId:operation_id,action:'deliver'}};
+  fs.writeFileSync(f.p.file,JSON.stringify(state));let options;
+  const result=()=>({state:{run_id:f.state().runId,source_project:f.p.target,spec:{id:spec.id,document_lock:spec.outcome_document_lock},status:'awaiting_acceptance',phase:'verify',blockers:[],iteration:1,budget:{remaining:9000}},worktree:{worktree:'/fixture/build'}});
+  await executeVoiceFactoryStep({root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:'neuraldeep',model:f.options.factory.model,effort:f.options.factory.effort,preset:f.options.factory.preset,state,input:{operation_id,action:'deliver'}},{delivery:{deliveryStatus:result,deliverOutcome:async(_outcome,_target,value)=>{
+    options=value;return result();
+  }}});
+  assert.equal(options.buildExecutorOptions.effort,'none');assert.equal(options.buildExecutorOptions.model,'kimi-k3.1-pro');
+  assert.equal(options.buildExecutorOptions.factoryBudget.chatId,f.options.chatId);
+  assert.equal(f.options.factory.effort,'xhigh');assert.equal(f.artifact('contract').sha256,contract);assert.equal(f.artifact('outcome').sha256,outcome);
+  assert.equal(f.approvals.length,2,'No extra effort review is needed for the same provider-default behavior.');
 });
 test('approved build effort persists into the same resumed run and cannot replace active or uncertain execution',{timeout:60000},async t=>{
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});

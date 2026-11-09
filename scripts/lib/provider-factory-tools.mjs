@@ -10,16 +10,17 @@ import {providerProcessEnvironment,createProviderTemporaryDirectory} from './pro
 import {resolvePrithaPython} from './python-runtime.mjs';
 import {spawnSupervisedCli} from '../neuraldeep/process-supervisor.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief,INTERVIEW_BRIEF_TEXT_FIELDS} from '../agents-mother/interview-brief.mjs';
-import {RUNTIME_FAMILIES,SERVICE_MODES,contractData} from '../agents-mother/contract.mjs';
+import {RUNTIME_FAMILIES,SERVICE_MODES,contractData,validateContract} from '../agents-mother/contract.mjs';
+import {redactSensitiveText,quarantineUntrustedInstructionText} from './redaction.mjs';
 import {scaffoldCapability,assertScaffoldCapability} from '../agents-mother/scaffold/capabilities.mjs';
 import {productExamples,validateProductTrial,reviewProductTrials} from '../agents-mother/factory-product-trial.mjs';
-import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,FACTORY_BUILD_EFFORTS,validateFactoryBuildEffort} from '../agents-mother/voice-factory-state.mjs';
+import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,FACTORY_BUILD_EFFORTS,validateFactoryBuildEffort,inheritedFactoryBuildEffort} from '../agents-mother/voice-factory-state.mjs';
 import {deliveryStatus} from '../agents-mother/delivery-loop.mjs';
 import {neuralDeepExecutionProfile} from '../neuraldeep/model-execution-profile.mjs';
 import {FactoryBudget,readFactoryBudget,FACTORY_STABILITY_BUDGET} from '../agents-mother/factory-budget.mjs';
 
 const actions=['status','read_artifact','init','write_draft','patch_draft','approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'];
-const readonly=new Set(['status','read_artifact']);
+const readonly=new Set(['status','read_artifact','scaffold_plan']);
 const workflowSteps=new Set(['init','write_draft','patch_draft','create_outcome','prepare_product_trial','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','verify','finish']);
 const textFields=Object.entries(INTERVIEW_BRIEF_TEXT_FIELDS);
 const briefTextPaths=new Set(textFields.flatMap(([group,keys])=>keys.map(key=>group+'.'+key)));
@@ -28,6 +29,9 @@ class FactoryBriefInputError extends Error {
 }
 class FactoryBriefValidationError extends Error {
   constructor(issues){super('The factory brief needs correction.');this.code='factory_brief_incomplete';this.issues=issues;}
+}
+class FactoryContractValidationError extends Error {
+  constructor(issues){super('The Contract needs correction before review.');this.code='factory_contract_invalid';this.issues=issues;}
 }
 class FactoryActionInputError extends Error {
   constructor(action,input){
@@ -41,6 +45,7 @@ class FactoryActionInputError extends Error {
   }
 }
 export function factoryBriefErrorDetail(error){
+  if(error instanceof FactoryContractValidationError)return {error:error.code,issues:error.issues.slice(0,20).map(issue=>quarantineUntrustedInstructionText(redactSensitiveText(issue)).slice(0,500)),hint:'Correct the draft with write_draft and its current SHA-256, then request Contract approval again. No approval card was created and no document was accepted.'};
   if(error?.code==='scaffold_adapter_unavailable' && error.capability)return {error:error.code,capability:error.capability,hint:'The draft cannot be approved with this interface/runtime combination. Revise the draft and read scaffold_plan before requesting Contract approval.'};
   if(error?.code==='factory_product_trial_port_mismatch' && /^[A-Z][A-Z0-9_]{0,95}_PORT$/.test(error.expectedPortVariable || ''))return {error:error.code,field:'trial.http[].port_variable',expected:error.expectedPortVariable,hint:'Use this exact Contract port variable in every HTTP case. Keep argv as ["node","scripts/server.mjs"], all distinct inputs and their exact expected_json. The Outcome and verifier were not changed.'};
   if(/^factory_(?:product_trial|trial_inputs)_/.test(error?.code || ''))return {error:error.code,hint:'Use prepare_product_trial with the exact draft Outcome hash and declarative HTTP/CLI requests and expected_json. Read the resulting Outcome and verifier before its separate approval. Structural smoke alone cannot approve an API product.'};
@@ -156,6 +161,11 @@ export class ProviderFactoryTools {
   }
   async read(input){
     this.validate(input);const state=this.state();
+    if(input.action==='scaffold_plan'){
+      const row=factoryArtifact(this.paths,state,'contract');
+      const {planScaffoldContract}=await import('../agents-mother/scaffold/index.mjs');
+      return {ok:true,...planScaffoldContract(row.file,{root:this.paths.root}),contractSha256:row.sha256,phase:state.phase};
+    }
     if(input.action==='status'){
       let deliveryStatus=null,ledger=null;
       if(state?.runId){
@@ -172,7 +182,7 @@ export class ProviderFactoryTools {
         delivery:ledger?deliveryExplanation(ledger):null,slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase,running:state?.running || null,
         ...(state?.contract?{scaffoldCapability:scaffoldCapability(contractData(state.contract,{root:this.paths.root}))}:{}),
         artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',buildConfiguration:state?.buildConfiguration || null,
-        buildExecution:{connectorId:this.options.connectorId,modelId,requestedEffort:state?.buildConfiguration?.effort ?? this.options.factory.effort ?? null,effortControl:profile?.effortControl || 'runtime-defined',supportedEfforts:profile?.effortControl==='documented'?profile.supportedEfforts:null},
+        buildExecution:{connectorId:this.options.connectorId,modelId,requestedEffort:state?.buildConfiguration?.effort ?? this.options.factory.effort ?? null,buildEffort:state?.buildConfiguration?.effort ?? inheritedFactoryBuildEffort(this.options.connectorId,modelId,this.options.factory.effort) ?? null,effortControl:profile?.effortControl || 'runtime-defined',supportedEfforts:profile?.supportedEfforts || null},
         ...(!state?.contract?{nextStep:{action:'init',requiredFields:['brief','build_token_budget'],optionalFields:['build_iteration_budget','build_elapsed_budget_ms'],hint:'Use the structured brief from this task. This creates only a private draft; document and budget approvals remain separate.'}}:{})};
     }
     if(input.action!=='read_artifact')throw factoryFail('factory_input_invalid');
@@ -235,7 +245,11 @@ export class ProviderFactoryTools {
     if(['create_outcome','approve_outcome','prepare_product_trial'].includes(input.action))requireFactoryApprovals(p,state,{outcome:false});
     if(['research','research_status','research_collect','research_recover','research_apply','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
     const data=state?.contract?contractData(state.contract,{root:p.root}):null;
-    if(input.action==='approve_contract')assertScaffoldCapability(data);
+    if(input.action==='approve_contract'){
+      assertScaffoldCapability(data);
+      const issues=validateContract(state.contract,{root:p.root,print:false});
+      if(issues.length)throw new FactoryContractValidationError(issues);
+    }
     if(input.action==='prepare_product_trial')validateProductTrial(input.trial,data);
     const trialInputs=input.action==='approve_outcome'?reviewProductTrials(p,factoryArtifact(p,state,'outcome'),data):null;
     if(input.action==='deliver')reviewProductTrials(p,factoryArtifact(p,state,'outcome'),data,{includeInputs:false});
@@ -266,7 +280,7 @@ export class ProviderFactoryTools {
         budgetMode:this.options.connectorId==='codex'?'native-goal':'request-reservation',permissions:data.userAuthorizationModel || '',secrets:data.secretsRequired || '',tokens:data.buildTokenBudget,iterations:data.buildIterationBudget,elapsedMs:data.buildElapsedBudgetMs}
         :{name:data.agentName,criteria:data.successCriteria,examples:trialInputs?.[0]?.path==='verification/product.mjs'?productExamples(trialInputs[0].content):[]},
 
-      ...(reviewKind==='contract'?{scaffoldCapability:scaffoldCapability(data),buildProvider:this.options.connectorId,buildModel:this.options.factory.model,childModelProvider:data.childModelProvider,childModelId:data.childModelId}:{}),
+      ...(reviewKind==='contract'?{scaffoldCapability:scaffoldCapability(data),buildProvider:this.options.connectorId,buildModel:this.options.factory.model,buildEffort:inheritedFactoryBuildEffort(this.options.connectorId,this.options.factory.model,this.options.factory.effort) ?? null,childModelProvider:data.childModelProvider,childModelId:data.childModelId}:{}),
       ...(trialInputs?.length?{trialInputs}:{}),
       beforeSha256:review.sha256,proposedContent:review.text,
     }

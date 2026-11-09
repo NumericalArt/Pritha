@@ -1529,9 +1529,9 @@ function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, op
   });
 }
 
-export function planScaffoldContract(contractPath) {
-  const data = contractData(contractPath);
-  const issues = validateContract(data.fullPath, { print: false });
+export function planScaffoldContract(contractPath, options = {}) {
+  const data = contractData(contractPath, options);
+  const issues = validateContract(data.fullPath, { ...options, print: false });
   return { schema: "pritha-scaffold-preflight-v1", readinessScope: "scaffold-capability-only", contractFingerprint: data.fingerprint,
     contractStatus: contractStatus(data), issues, capability: scaffoldCapability(data) };
 }

@@ -67,6 +67,13 @@ export function readFactoryConversation(options){
   return validateVoiceFactory(p,value,{chatId:value.chatId,connectorId:value.connectorId});
 }
 export const FACTORY_BUILD_EFFORTS=Object.freeze(['none','minimal','low','medium','high','xhigh','max','ultra','default']);
+export function inheritedFactoryBuildEffort(connectorId,modelId,requested){
+  // Native NeuralDeep preparation omits unsupported/ignored effort controls.
+  // Inherit that same provider-default behavior for the builder, rather than a
+  // raw selector value from another model. Explicit build decisions are separate.
+  if(connectorId==='neuraldeep' && neuralDeepExecutionProfile(modelId).effortControl!=='documented')return 'none';
+  return requested;
+}
 export function validateFactoryBuildEffort(connectorId,modelId,effort){
   if(!FACTORY_BUILD_EFFORTS.includes(effort))throw factoryFail('factory_input_invalid');
   normalizeProviderPreset(connectorId,{modelId,reasoningEffort:effort});
