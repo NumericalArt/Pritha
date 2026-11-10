@@ -520,8 +520,8 @@
       },
       {
         "path": "AGENTS.md",
-        "bytes": 1544,
-        "sha256": "57a7087051887e71d1ddc25b938dcc442dadda2c0d0ef52babd706612194cde9"
+        "bytes": 2347,
+        "sha256": "c7000b94098d4e29427bcf0b98330ceda6cdc6504b64aca967d88cf054a30fd9"
       },
       {
         "path": "delivery/outcome-lineage.json",

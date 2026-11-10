@@ -1,4 +1,5 @@
 import {readBoundFactoryProgress} from '../../scripts/agents-mother/factory-progress.mjs';
+import {managedFixtureHandler,installStopFixture} from './managed-stop-fixture.mjs';
 // Isolated Task Chat fixture. Factory workers, approvals, research gates,
 // scaffold, provider build executors and Trials are real. Provider responses
 // and primary-source page contents are synthetic and make no paid requests.
@@ -117,10 +118,14 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
       ? 'value => ({ headline: value.trim() })'
       : "value => ({ answer: value.startsWith('YES') ? 'YES' : 'NO', reason: value })";
     const cli = 'const run = ' + operation + ';\nconsole.log(JSON.stringify(run(process.argv[3])));\n';
-    const server = "import http from 'node:http';\nconst run = " + operation + ';\n'
-      + 'http.createServer((req,res) => { let body=""; req.on("data",chunk => body+=chunk); req.on("end",() => {res.setHeader("content-type","application/json");res.end(JSON.stringify(run(JSON.parse(body)[' + JSON.stringify(scenario.field) + '])));}); }).listen(Number(process.env[' + JSON.stringify(scenario.portVariable) + ']),"127.0.0.1");\n';
+    const server = "import http from 'node:http';\nconst run = " + operation + ';\n'+managedFixtureHandler()
+      + 'const server=http.createServer((req,res) => { if(managed(req,res,server))return; let body=""; req.on("data",chunk => body+=chunk); req.on("end",() => {res.setHeader("content-type","application/json");res.end(JSON.stringify(run(JSON.parse(body)[' + JSON.stringify(scenario.field) + '])));}); });server.listen(Number(process.env[' + JSON.stringify(scenario.portVariable) + ']),"127.0.0.1");\n';
     fs.writeFileSync(path.join(worktree, scenario.entrypoint), cli);
     fs.writeFileSync(path.join(worktree, 'scripts/server.mjs'), server);
+    installStopFixture(worktree,scenario.portVariable,{unsafe:scenario.unsafeFirstStop && builds.length===1});
+    const manifestFile=path.join(worktree,'operations/manifest.json'),manifest=JSON.parse(fs.readFileSync(manifestFile));
+    manifest.outcome_status='implemented';manifest.control_center_contract.status='implemented';manifest.blockers=[];
+    fs.writeFileSync(manifestFile,JSON.stringify(manifest,null,2)+'\n');
   }
 
   function executor(options) {

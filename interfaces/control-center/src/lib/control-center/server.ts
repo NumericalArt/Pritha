@@ -110,9 +110,11 @@ type OperationsManifest = {
   app_version?: string | number;
   assigned_version?: string | number;
   service_mode?: string;
+  outcome_status?: string;
   autostart?: string;
   control_center_managed?: boolean;
   control_center_contract?: {
+    status?: string;
     confirmation_required?: boolean;
   };
   service_label?: string;
@@ -2076,6 +2078,7 @@ function classifyRuntime(
   manifest: OperationsManifest | null,
   lifecycle: LifecycleMetadata,
 ): ControlCenterAgentControl["runtimeKind"] {
+  if (manifest?.outcome_status === "implementation-required" || manifest?.control_center_contract?.status === "implementation-required") return "scaffold";
   if (isExternalDeployment(record, manifest)) return "external_service";
   if (!folder && (lifecycle.profile.status === "ready" || lifecycle.contract.status === "ready")) return "scaffold";
   if (manifest?.local_upstream_url) return "web_service";
@@ -2128,6 +2131,10 @@ function buildAgentControl(
   const canExecuteStop = ownership === "managed" && commandReadiness.stop === "structured_executable";
 
   if (state === "missing" || runtimeKind === "scaffold") {
+    if (folder && runtimeKind === "scaffold") return {
+      ...base, primaryCardAction: "run_check", planAction: "check", label: "Подготовка агента",
+      reason: "В папке карточки пока каркас. Проверенная сборка должна быть применена перед запуском.",
+    };
     return {
       ...base,
       primaryCardAction: "restore_plan",
@@ -2304,7 +2311,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       primaryAction: legacyPlanAction(control),
       actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
-      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : noRuntimeRequired ? undefined : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
+      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : control.runtimeKind === "scaffold" && folder ? control.reason : noRuntimeRequired ? undefined : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
     },
     control,

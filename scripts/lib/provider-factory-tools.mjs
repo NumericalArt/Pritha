@@ -14,6 +14,7 @@ import {RUNTIME_FAMILIES,SERVICE_MODES,contractData,validateContract} from '../a
 import {redactSensitiveText,quarantineUntrustedInstructionText} from './redaction.mjs';
 import {scaffoldCapability,assertScaffoldCapability} from '../agents-mother/scaffold/capabilities.mjs';
 import {productExamples,validateProductTrial,reviewProductTrials} from '../agents-mother/factory-product-trial.mjs';
+import {localApplicationAuthorized} from '../agents-mother/factory-local-application-policy.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,validateVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,FACTORY_BUILD_EFFORTS,validateFactoryBuildEffort,inheritedFactoryBuildEffort} from '../agents-mother/voice-factory-state.mjs';
 import {deliveryStatus} from '../agents-mother/delivery-loop.mjs';
 import {neuralDeepExecutionProfile} from '../neuraldeep/model-execution-profile.mjs';
@@ -45,6 +46,7 @@ class FactoryActionInputError extends Error {
   }
 }
 export function factoryBriefErrorDetail(error){
+  if(error?.code==='factory_managed_stop_trial_required')return {error:error.code,hint:'Call prepare_product_trial to include the host-owned managed Stop verifier. Preserve both independent verifiers and review the updated Outcome before approval. Product JSON alone does not prove safe process ownership.'};
   if(error instanceof FactoryContractValidationError)return {error:error.code,issues:error.issues.slice(0,20).map(issue=>quarantineUntrustedInstructionText(redactSensitiveText(issue)).slice(0,500)),hint:'Correct the draft with write_draft and its current SHA-256, then request Contract approval again. No approval card was created and no document was accepted.'};
   if(error?.code==='scaffold_adapter_unavailable' && error.capability)return {error:error.code,capability:error.capability,hint:'The draft cannot be approved with this interface/runtime combination. Revise the draft and read scaffold_plan before requesting Contract approval.'};
   if(error?.code==='factory_product_trial_port_mismatch' && /^[A-Z][A-Z0-9_]{0,95}_PORT$/.test(error.expectedPortVariable || ''))return {error:error.code,field:'trial.http[].port_variable',expected:error.expectedPortVariable,hint:'Use this exact Contract port variable in every HTTP case. Keep argv as ["node","scripts/server.mjs"], all distinct inputs and their exact expected_json. The Outcome and verifier were not changed.'};
@@ -276,9 +278,10 @@ export class ProviderFactoryTools {
     const automaticContinuation=reviewKind==='contract' && this.host.driveEnabled() && supportsLocalApiContinuation(data);
     const presentation=review?{path:reviewKind+' · '+p.slug,approvalScope:reviewKind+' only',
       ...(automaticContinuation?{automaticContinuation:true}:{}),
+      ...(reviewKind==='outcome' && localApplicationAuthorized(review)?{localApplication:'fast-forward-after-verification'}:{}),
       overview:reviewKind==='contract'?{name:data.agentName,mission:data.primaryMission,interfaces:scaffoldCapability(data).interfaces,scope:data.targetFolder,
         budgetMode:this.options.connectorId==='codex'?'native-goal':'request-reservation',permissions:data.userAuthorizationModel || '',secrets:data.secretsRequired || '',tokens:data.buildTokenBudget,iterations:data.buildIterationBudget,elapsedMs:data.buildElapsedBudgetMs}
-        :{name:data.agentName,criteria:data.successCriteria,examples:trialInputs?.[0]?.path==='verification/product.mjs'?productExamples(trialInputs[0].content):[]},
+        :{name:data.agentName,criteria:data.successCriteria,examples:productExamples(trialInputs?.find(file=>file.path==='verification/product.mjs')?.content || '')},
 
       ...(reviewKind==='contract'?{scaffoldCapability:scaffoldCapability(data),buildProvider:this.options.connectorId,buildModel:this.options.factory.model,buildEffort:inheritedFactoryBuildEffort(this.options.connectorId,this.options.factory.model,this.options.factory.effort) ?? null,childModelProvider:data.childModelProvider,childModelId:data.childModelId}:{}),
       ...(trialInputs?.length?{trialInputs}:{}),

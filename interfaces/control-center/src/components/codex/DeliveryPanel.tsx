@@ -26,7 +26,7 @@ export function FactoryProgress({view}:{view:NonNullable<import("@/lib/codex-cha
       <p>Подготовка: {b.preparationTokens.toLocaleString('ru-RU')} · сборка: {b.buildTokens.toLocaleString('ru-RU')}. Ожидание согласований не расходует активное время.</p>
       {!b.usageKnown?<p>Часть расхода ещё не подтверждена. Зарезервировано дополнительно: {b.reservationTokens.toLocaleString('ru-RU')} токенов; старые неизвестные значения сохранены отдельно.</p>:null}
       {b.progressReview?<p>Долго нет подтверждённого продвижения. Прите нужно сверить результат и изменить подход.</p>:null}</details>:null}
-    {view.firstUse?<div><strong>Попробовать проверенную версию</strong><p>Каталог сборки: <code>{view.firstUse.directory}</code> · версия <code>{view.firstUse.commit.slice(0,12)}</code>. Основной проект обновляется отдельно.</p>
+    {view.firstUse?<div><strong>Попробовать проверенную версию</strong><p>{view.firstUse.disposition==='applied-local-project'?'Рабочая папка агента: ':'Каталог сборки: '}<code>{view.firstUse.directory}</code> · версия <code>{view.firstUse.commit.slice(0,12)}</code>. {view.firstUse.disposition==='applied-local-project'?<a href="/agents">Запустить из карточки агента</a>:'Основной проект обновляется отдельно.'}</p>
       {view.firstUse.commands.cli?<><pre>{view.firstUse.commands.cli}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.cli)}</code></p></>:null}
       <details><summary>Проверить по HTTP</summary><p>В каталоге сборки запустите сервер. Во втором терминале выполните запрос. Для остановки нажмите Ctrl+C.</p><pre>{view.firstUse.commands.server}</pre><pre>{view.firstUse.commands.http}</pre><p>Получено: <code>{JSON.stringify(view.firstUse.observed.http)}</code></p></details></div>:null}
     </aside>;

@@ -214,6 +214,10 @@ export async function checkCardReadiness(target, options = {}) {
   }
   const runtimeSelected = controlCenterRuntimeSelected(manifest);
   if (manifest) {
+    if (manifest.outcome_status === "implementation-required" || manifest.control_center_contract?.status === "implementation-required") {
+      blockers.push("The card still points to a scaffold; the verified implementation has not been applied to this project.");
+      nextActions.push("Complete independent product and managed Stop verification, then review and apply the verified candidate before starting from the card.");
+    }
     if (runtimeSelected) {
       if (!manifest.control_center_contract) blockers.push("operations/manifest.json is missing control_center_contract.");
       if (manifest.control_center_managed !== true) blockers.push("selected Control Center runtime must set control_center_managed=true.");

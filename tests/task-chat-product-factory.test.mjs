@@ -10,6 +10,39 @@ import { approveOutcomeSpec } from '../scripts/agents-mother/outcome-spec.mjs';
 const hash = text => createHash('sha256').update(text).digest('hex');
 const ok = result => { assert.equal(result.error, undefined, JSON.stringify(result)); assert.notEqual(result.ok, false, JSON.stringify(result)); return result; };
 
+test('factory automatically repairs unsafe Stop even after product JSON passes', {timeout:120000}, async t=>{
+  const f=await productFactoryFixture({...scenarios[1],unsafeFirstStop:true});t.after(()=>f.close());
+  ok(await f.call('init',{brief:f.brief,build_token_budget:10000,build_iteration_budget:3}));
+  const approve=async kind=>{const p=f.call('approve_'+kind,{expected_sha256:f.artifact(kind).sha256});await until(()=>f.pending().length===1);await f.answer();ok(await p);};
+  await approve('contract');ok(await f.call('create_outcome'));
+  ok(await f.call('prepare_product_trial',{expected_sha256:f.artifact('outcome').sha256,trial:f.trial}));
+  const full=f.artifact('outcome');
+  const missing=full.text.replace(/### Trial: managed-stop\n[\s\S]*?(?=### Trial:|## Demo script)/,'');
+  ok(await f.call('write_draft',{artifact:'outcome',expected_sha256:full.sha256,content:missing}));
+  assert.equal((await f.call('approve_outcome',{expected_sha256:f.artifact('outcome').sha256})).error,'factory_managed_stop_trial_required');
+  assert.equal(f.pending().length,0);
+  ok(await f.call('write_draft',{artifact:'outcome',expected_sha256:f.artifact('outcome').sha256,content:full.text}));
+  await approve('outcome');ok(await f.research());ok(await f.call('scaffold'));
+  const result=ok(await f.call('deliver'));
+  assert.equal(result.status,'verified',JSON.stringify(result));assert.equal(f.builds.length,2);
+  assert.equal(f.reviews.length,2,'Repair uses existing approvals without additional questions.');
+  const dir=path.join(f.stateRoot,'builds',f.scenario.slug,result.runId,'trial-results');
+  const results=fs.readdirSync(dir).filter(n=>n.endsWith('.json')).sort().map(n=>JSON.parse(fs.readFileSync(path.join(dir,n))));
+  const unsafe=results.find(r=>r.trials.find(t=>t.id==='product-http-cli')?.status==='passed' && r.trials.find(t=>t.id==='managed-stop')?.status==='failed');
+  assert.ok(unsafe,'Passing product JSON alone must never mark the agent verified.');
+  assert.match(unsafe.trials.find(t=>t.id==='managed-stop').execution.stderr,/Stop killed a foreign process/);
+  assert.equal(results.at(-1).verification_status,'verified');
+  const note=path.join(f.paths.target,'operator-note.txt');fs.writeFileSync(note,'preserve this');
+  const deferred=ok(await f.call('finish'));
+  assert.equal(deferred.localApplication.status,'pending');assert.equal(deferred.localApplication.reason,'source_has_changes');
+  assert.equal(fs.readFileSync(note,'utf8'),'preserve this');
+  assert.match(fs.readFileSync(path.join(f.paths.target,'scripts/server.mjs'),'utf8'),/implementation-required/);
+  fs.unlinkSync(note);
+  const applied=ok(await f.call('finish'));assert.equal(applied.localApplication.status,'applied');
+  assert.equal(applied.firstUse.directory,f.paths.target);assert.equal(applied.card.status,'ready');
+  assert.equal(f.reviews.length,2,'Local application is already explicitly authorized in the reviewed Outcome.');
+});
+
 for (const scenario of scenarios) test(`${scenario.name} via ${scenario.connectorId} Task Chat rejects unsupported Contract before approval and automatically builds after a stub fails`, { timeout: 120000 }, async t => {
   const f = await productFactoryFixture(scenario);
   t.after(() => f.close());
@@ -54,8 +87,9 @@ for (const scenario of scenarios) test(`${scenario.name} via ${scenario.connecto
   const approvingOutcome = f.call('approve_outcome', { expected_sha256: prepared.sha256 });
   await until(() => f.pending().length === 1);
   const review = f.pending()[0].presentation;
-  assert.equal(review.trialInputs[0].content, frozenVerifier);
-  assert.equal(review.trialInputs[0].sha256, prepared.verifier.sha256);
+  assert.equal(review.trialInputs.find(file=>file.path==='verification/product.mjs').content, frozenVerifier);
+  assert.equal(review.trialInputs.find(file=>file.path==='verification/product.mjs').sha256, prepared.verifier.sha256);
+  assert.equal(review.trialInputs.length,2,'The separate managed Stop verifier must be presented before approval.');
   await f.answer();
   ok(await approvingOutcome);
   assert.equal(f.reviews.length, 2);

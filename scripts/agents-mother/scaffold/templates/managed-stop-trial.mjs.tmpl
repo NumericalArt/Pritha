@@ -1,0 +1,117 @@
+// Host-owned verifier. Only live ChildProcess handles created here are killed
+// during cleanup. No PID read from the child project authorizes a signal.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
+import net from 'node:net';
+
+const root=fs.realpathSync(process.cwd()), state=path.join(root,'.state');
+const pidFile=path.join(state,'service.pid.json');
+const instance=randomUUID(), token=randomUUID();
+const canary=path.join(state,'stop-verifier-'+randomUUID());
+const children=new Set(), cases=[];
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const alive=run=>run.child.exitCode===null && run.child.signalCode===null;
+function start(args,env){
+  const child=spawn(process.execPath,args,{cwd:root,env,stdio:['ignore','pipe','pipe']});
+  const run={child,output:''}; children.add(run);
+  for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{
+    if(run.output.length+chunk.length>65536){if(alive(run))child.kill('SIGKILL');return;}
+    run.output+=chunk;
+  });
+  run.done=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',(code,signal)=>resolve({code,signal}));});
+  run.done.catch(()=>{});return run;
+}
+async function cleanup(run){
+  if(alive(run)){
+    run.child.kill('SIGTERM');
+    const timer=setTimeout(()=>{if(alive(run))run.child.kill('SIGKILL');},1000);
+    try{await run.done;}finally{clearTimeout(timer);}
+  }
+  children.delete(run);
+}
+async function unusedPort(){
+  const server=net.createServer();server.listen(0,'127.0.0.1');await once(server,'listening');
+  const port=server.address().port;await new Promise(resolve=>server.close(resolve));return port;
+}
+function read(file){
+  const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
+  try{const st=fs.fstatSync(fd);assert.ok(st.isFile() && st.nlink===1 && st.size<65536,'Expected a bounded regular state file');return fs.readFileSync(fd,'utf8');}finally{fs.closeSync(fd);}
+}
+function writeRecord(value){
+  const fd=fs.openSync(pidFile,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK,0o600);
+  try{assert.ok(fs.fstatSync(fd).isFile() && fs.fstatSync(fd).nlink===1);fs.ftruncateSync(fd,0);fs.writeFileSync(fd,typeof value==='string'?value:JSON.stringify(value));}finally{fs.closeSync(fd);}
+}
+async function health(port){
+  try{const r=await fetch('http://127.0.0.1:'+port+'/health',{signal:AbortSignal.timeout(400)});return r.ok?await r.json():null;}catch{return null;}
+}
+async function stop(env){
+  const run=start(['scripts/service-control.mjs','stop'],env);
+  const timer=setTimeout(()=>{if(alive(run))run.child.kill('SIGKILL');},8000);
+  try{const result=await run.done;assert.equal(result.signal,null,'Stop exceeded its deadline: '+run.output);return {...result,output:run.output};}
+  finally{clearTimeout(timer);await cleanup(run);}
+}
+
+let ownState=false, recordOwned=false;
+try{
+  const manifest=JSON.parse(read(path.join(root,'operations/manifest.json')));
+  assert.ok(manifest.outcome_status!=='implementation-required' && manifest.control_center_contract?.status!=='implementation-required','Implement the operations manifest before handing off the agent');
+  assert.equal(manifest.service_mode,'process');assert.equal(manifest.control_center_managed,true);
+  for(const action of ['start','stop'])assert.deepEqual(manifest[action+'_command']?.argv,['node','scripts/service-control.mjs',action],'Keep the reviewed managed command available in the card');
+  if(fs.existsSync(state)){assert.ok(fs.lstatSync(state).isDirectory() && !fs.lstatSync(state).isSymbolicLink(),'.state must be a real directory');}
+  else{fs.mkdirSync(state,{mode:0o700});ownState=true;}
+  assert.ok(!fs.existsSync(pidFile),'Refusing to overwrite an existing service record. Stop the test service first.');
+  fs.writeFileSync(canary,instance,{flag:'wx',mode:0o600});
+  const port=await unusedPort();
+  const env={PATH:process.env.PATH || '',LANG:'C.UTF-8',[managedStop.portVariable]:String(port)};
+  assert.equal((await stop(env)).code,0,'Stop without a record must be idempotent');cases.push('missing-record');
+  const server=start(['scripts/server.mjs','--managed-instance',instance],{...env,PRITHA_MANAGED_STOP_TOKEN:token});
+  const sentinel=start(['-e','setInterval(()=>{},1000)'],env);
+  let ready=false;
+  for(let i=0;i<100;i++){
+    assert.ok(alive(server),'Managed server exited before readiness: '+server.output);
+    if((await health(port))?.instance_id===instance){ready=true;break;}await sleep(25);
+  }
+  assert.ok(ready,'Managed server must expose its --managed-instance identity at /health');
+  assert.ok(!JSON.stringify(await health(port)).includes(token),'Health must not expose the private stop token');
+  const record={pid:server.child.pid,instance_id:instance,stop_token:token,project_root:root,
+    server_path:path.join(root,'scripts/server.mjs'),port,started_at:new Date().toISOString()};
+  recordOwned=true;
+  for(const [name,value] of [
+    ['malformed-record','{invalid'],
+    ['foreign-pid',{...record,pid:sentinel.child.pid}],
+    ['wrong-instance',{...record,instance_id:randomUUID()}],
+    ['wrong-token',{...record,stop_token:randomUUID()}],
+    ['wrong-project',{...record,project_root:path.dirname(root)}],
+  ]){
+    writeRecord(value);const before=read(pidFile), result=await stop(env);await sleep(50);
+    assert.ok(alive(sentinel),'Stop killed a foreign process in '+name);
+    assert.ok(alive(server),'Stop killed the server for an untrusted '+name);
+    assert.equal((await health(port))?.instance_id,instance,'Stop disrupted the owned service for '+name);
+    assert.notEqual(result.code,0,'Stop must reject '+name);
+    assert.equal(read(pidFile),before,'Rejected record must be preserved: '+name);
+    assert.equal(read(canary),instance,'Stop removed unrelated state');cases.push(name);
+  }
+  writeRecord(record);
+  const result=await stop(env);assert.equal(result.code,0,'Owned Stop failed: '+result.output);
+  for(let i=0;i<100 && alive(server);i++)await sleep(25);
+  assert.ok(!alive(server),'Stop returned success but left its server running');
+  assert.equal(await health(port),null,'Stop returned success but the listener remains');
+  assert.ok(!fs.existsSync(pidFile),'Successful Stop must remove its own record');
+  assert.ok(alive(sentinel),'Owned Stop killed another process');cases.push('owned-stop');
+  assert.equal((await stop(env)).code,0,'Repeated Stop must be idempotent');cases.push('repeated-stop');
+  writeRecord({...record,pid:sentinel.child.pid});
+  assert.notEqual((await stop(env)).code,0,'A stale record must not authorize stopping another live process');
+  assert.ok(alive(sentinel),'Stale record killed another process');cases.push('stale-record');
+  assert.equal(read(canary),instance,'Stop removed unrelated state');
+  console.log(JSON.stringify({type:'pritha-managed-stop-v1',status:'passed',cases}));
+}finally{
+  const cleaned=await Promise.allSettled([...children].map(cleanup));
+  if(recordOwned && fs.existsSync(pidFile))fs.unlinkSync(pidFile);
+  if(fs.existsSync(canary) && read(canary)===instance)fs.unlinkSync(canary);
+  if(ownState && fs.readdirSync(state).length===0)fs.rmdirSync(state);
+  const failed=cleaned.find(result=>result.status==='rejected');if(failed)throw failed.reason;
+}

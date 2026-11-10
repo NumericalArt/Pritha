@@ -10,11 +10,19 @@ import { preparedTrialInputFiles } from './prepared-trial-inputs.mjs';
 import { safeTrialInputPath } from './trial-input-declarations.mjs';
 import { scaffoldCapability } from './scaffold/capabilities.mjs';
 import { apiProcessPortConfiguration } from './scaffold/api-process.mjs';
+import {LOCAL_APPLICATION_POLICY,LOCAL_APPLICATION_TEXT} from './factory-local-application-policy.mjs';
 
 const verifierPath = 'verification/product.mjs';
 const provenance = 'host-template:api-cli-product-v2';
+const stopPath = 'verification/managed-stop.mjs';
+const stopProvenance = 'host-template:api-managed-stop-v1';
 const sha256 = content => createHash('sha256').update(content).digest('hex');
 const fail = code => { throw Object.assign(new Error('Prepare and review an independent HTTP/CLI product Trial before approving this Outcome.'), { code }); };
+
+export function managedStopVerifier(data) {
+  const template = fs.readFileSync(new URL('./scaffold/templates/managed-stop-trial.mjs.tmpl', import.meta.url), 'utf8');
+  return 'const managedStop = '+JSON.stringify({portVariable:apiProcessPortConfiguration(data).variable})+';\n'+template;
+}
 
 // Read data from our template prefix without evaluating verifier code.
 export function productExamples(content){
@@ -96,12 +104,14 @@ export function prepareProductTrial(paths, outcome, data, trial) {
   const firstUse=firstUseExamples(trial,data);
   const template = fs.readFileSync(new URL('./scaffold/templates/product-trial.mjs.tmpl', import.meta.url), 'utf8');
   const content = 'const checks = JSON.parse(' + JSON.stringify(JSON.stringify(trial)) + ');\nconst firstUse = '+JSON.stringify(firstUse)+';\n' + template;
+  const stopContent = managedStopVerifier(data);
   const targets = [...new Set(cases.map(check => check.argv[1]))];
   const trialSection=text=>text.match(/^## Trials\n([\s\S]*?)(?=^## Demo script$)/m)?.[1] || '';
   const blocks=text=>trialSection(text).split(/(?=^### Trial: )/m).map(b=>b.trim()).filter(Boolean);
   const generated=new Set(blocks(renderOutcomeSpecFromContract(data)));
   const keep=blocks(outcome.text).filter(b=>{
     if(b.startsWith('### Trial: product-http-cli\n') && b.includes(' :: '+provenance))return false;
+    if(b.startsWith('### Trial: managed-stop\n') && b.includes(' :: '+stopProvenance))return false;
     const ids=[...b.matchAll(/^- Covers: ([^\n]+)/gm)].map(m=>m[1]);
     return !generated.has(b) || !ids.length || !ids.every(id=>covers.includes(id));
   });
@@ -112,18 +122,30 @@ export function prepareProductTrial(paths, outcome, data, trial) {
     '- Isolation: none', '- When argv: ["node", "' + verifierPath + '"]', '- When cwd: .',
     '- Then exit code: 0', ...targets.map(target => '- Product target: ' + target),
     '- Verifier input: ' + verifierPath + ' :: sha256:' + sha256(content) + ' :: ' + provenance,
+    '- Timeout ms: 120000', '',
+    '### Trial: managed-stop', '',
+    '- Statement: Stop preserves foreign processes and unrelated state, rejects corrupted ownership records, stops its own server and permits repeated Stop.',
+    '- Kind: automated', '- Covers: '+(guide?.id || covers[0]), '- Isolation: none',
+    '- When argv: ["node", "'+stopPath+'"]', '- When cwd: .', '- Then exit code: 0',
+    '- Product target: scripts/service-control.mjs', '- Product target: scripts/server.mjs',
+    '- Verifier input: '+stopPath+' :: sha256:'+sha256(stopContent)+' :: '+stopProvenance,
     '- Timeout ms: 120000', '', ...keep.map(b=>b+'\n'), '',
   ].join('\n');
-  const next = outcome.text.replace(/## Trials\n[\s\S]*?(?=## Demo script)/, ()=>block);
+  let next = outcome.text.replace(/## Trials\n[\s\S]*?(?=## Demo script)/, ()=>block);
+  if(!/^local_application:/m.test(next))next=next.replace(/^---\n/,'---\nlocal_application: '+LOCAL_APPLICATION_POLICY+'\n');
+  if(!next.includes(LOCAL_APPLICATION_TEXT))next+='\n## Local application\n\n'+LOCAL_APPLICATION_TEXT+'\n';
   const validation = validateOutcomeSpecText(next, { root: paths.root });
   if (validation.issues.some(issue => !['OS015', 'OS016'].includes(issue.code))) fail('factory_product_trial_invalid');
   const inputRoot = privateStateDirectory(paths.stateRoot, path.join(paths.directory, 'trial-inputs'));
   const file = privateStateFile(paths.stateRoot, path.join(inputRoot, verifierPath));
   const previous = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
   atomicCompareAndSwapFile(file, previous, content);
+  const stopFile = privateStateFile(paths.stateRoot, path.join(inputRoot, stopPath));
+  atomicCompareAndSwapFile(stopFile, fs.existsSync(stopFile)?fs.readFileSync(stopFile,'utf8'):null, stopContent);
   atomicCompareAndSwapFile(outcome.file, outcome.text, next);
   return { artifact: 'outcome', sha256: sha256(next), verifier: { path: verifierPath, sha256: sha256(content), provenance },
-    checks: trial, next: 'Read the updated Outcome and request its separate approval. The displayed verifier executes only during approved Trials.' };
+    managedStopVerifier: {path:stopPath,sha256:sha256(stopContent),provenance:stopProvenance},
+    checks: trial, next: 'Read the updated Outcome and request its separate approval. Product and managed Stop verifiers execute only during approved Trials. The server must support --managed-instance and expose that identity at /health; Stop must validate the record against the actual process before stopping it.' };
 }
 
 // Reused before showing an approval and immediately before its effect. Existing
@@ -138,6 +160,15 @@ export function reviewProductTrials(paths, outcome, data, { includeInputs = true
     if (!targets.includes('scripts/server.mjs') || scaffoldCapability(data).interfaces.includes('cli')
         && !targets.includes(data.cliEntrypoint || 'scripts/agent-cli.mjs')) {
       fail('factory_product_trial_required');
+    }
+    // Existing approved evidence stays bound to its original document. Every
+    // new approval includes the independent ownership regression test.
+    if(outcome.frontmatter?.status==='draft'){
+      const stop=automated.find(t=>t.id==='managed-stop');
+      const expected=sha256(managedStopVerifier(data));
+      if(!stop || !stop.productTargets.includes('scripts/service-control.mjs')
+          || JSON.stringify(stop.argv)!==JSON.stringify(['node',stopPath]) || stop.cwd!=='.' || stop.thenExitCode!==0
+          || !stop.verifierInputs?.some(v=>v.path===stopPath && v.hash==='sha256:'+expected && v.provenance===stopProvenance))fail('factory_managed_stop_trial_required');
     }
   }
   if (!includeInputs) return [];

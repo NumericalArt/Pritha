@@ -1,4 +1,5 @@
 import {verifiedFirstUse} from './factory-first-use.mjs';
+import {applyVerifiedFactoryResult} from './factory-application.mjs';
 import {FactoryBudget} from './factory-budget.mjs';
 import {localApiResearchSources,researchPage,supportsLocalApiContinuation} from './factory-continuation.mjs';
 import fs from 'node:fs';
@@ -228,10 +229,11 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     }
     case 'finish':{
       approved();const result=observeDelivery();if(!['verified','awaiting_acceptance','accepted'].includes(result.state.status))throw factoryFail('factory_delivery_not_verified');
+      state.localApplication=applyVerifiedFactoryResult(p,state,result);
       const {rebuildRegistry}=dependencies.registry || await import('./registry.mjs');const {checkCardReadiness}=dependencies.cards || await import('./card-readiness.mjs');rebuildRegistry();
       const card=await checkCardReadiness(state.agentId,{...options,baseUrl:false});
       const accepted=result.state.status==='accepted';
-      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,manualAcceptance:accepted?'accepted':'pending',card,next:card.status!=='ready'?'Resolve the reported card configuration blockers.':accepted?'Result accepted. Application and publication retain their separate approval boundaries.':'Manual demonstration, live card check and user acceptance; no automatic merge, deployment or publication.'};state.phase=card.status==='ready'?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
+      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,localApplication:state.localApplication,manualAcceptance:accepted?'accepted':'pending',card,next:card.status!=='ready'?'Complete local application or resolve the reported card configuration blockers.':accepted?'Result accepted. Publication retains its separate approval boundary.':'The checked local project is ready for first use. Services remain stopped; final user acceptance is separate.'};state.phase=card.status==='ready'?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
     }
     default:throw factoryFail('factory_input_invalid');
   }

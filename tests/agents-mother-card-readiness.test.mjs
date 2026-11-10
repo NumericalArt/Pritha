@@ -212,6 +212,17 @@ test("card readiness exposes Outcome Spec and delivery as separate lifecycle sta
   assert.match(result.nextActions.join("\n"), /Continue the delivery lifecycle from awaiting_acceptance/);
 });
 
+test("card readiness rejects a real folder whose managed commands are still scaffold stubs", async () => {
+  const parent=mkdtempSync(path.join(os.tmpdir(),'pritha-card-stub-')),root=path.join(parent,'Pritha'),projectRoot=path.join(parent,'AlphaAgent');
+  mkdirSync(projectRoot,{recursive:true});
+  writeRegistry(root,['| AlphaAgent | fixture mission | api | web / CLI | local Mac | manual | contracts:1 |']);
+  writeContract(root,{name:'AlphaAgent',technicalSlug:'alpha-agent',targetFolder:projectRoot});
+  writeManifest(projectRoot,{outcome_status:'implementation-required'});
+  const result=await checkCardReadiness('alpha-agent',{root,baseUrl:false});
+  assert.notEqual(result.status,'ready');
+  assert.ok(result.blockers.some(text=>text.includes('card still points to a scaffold')));
+});
+
 test("card readiness normalizes executable manual_only action plans to ready", async () => {
   const parent = mkdtempSync(path.join(os.tmpdir(), "pritha-card-live-ready-"));
   const root = path.join(parent, "Pritha");

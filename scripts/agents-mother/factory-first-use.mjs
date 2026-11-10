@@ -30,6 +30,9 @@ export function verifiedFirstUse(p,s,result){
   const row=receipt.trials.find(t=>t.id===trial.id && t.status==='passed');
   let observed;try {observed=JSON.parse(row.execution.stdout.trim()).observed;}catch{return null;}
   if(!observed || Object.keys(cases).some(k=>!isDeepStrictEqual(observed[k],cases[k].find(c=>(c.expected_exit??0)===0 && (c.expected_status??200)===200).expected_json)))return null;
-  return {directory:dir,commit:fresh.current.head,commands:firstUseExamples(cases,data),observed,
-    disposition:'verified-worktree',acceptance:result.state.accepted_by==='user'?'accepted':'pending'};
+  const application=s.localApplication?.status==='applied' && s.localApplication.to===fresh.current.head;
+  if(application && !verifyTrialResultFreshness(receipt,p.target,{root:p.root,stateRoot:p.stateRoot,outcomeSpecPath:s.outcome}).ok)return null;
+  const applied=Boolean(application);
+  return {directory:applied?p.target:dir,commit:fresh.current.head,commands:firstUseExamples(cases,data),observed,
+    disposition:applied?'applied-local-project':'verified-worktree',acceptance:result.state.accepted_by==='user'?'accepted':'pending'};
 }

@@ -98,6 +98,11 @@ for(const scenario of scenarios)test(scenario.connectorId+': host continues afte
  assert.equal(readBoundFactoryProgress({...opts,chatId:'chat_foreign'}).available,false);
  assert.deepEqual(fs.readFileSync(f.paths.file),before);
  assert.ok(view.firstUse,JSON.stringify(publish.continuationResult));
+ assert.equal(f.state().localApplication.status,'applied',JSON.stringify(f.state().localApplication));
+ assert.equal(view.firstUse.directory,f.paths.target);
+ assert.equal(view.firstUse.disposition,'applied-local-project');
+ assert.equal(execFileSync('git',['rev-parse','HEAD'],{cwd:f.paths.target,encoding:'utf8'}).trim(),view.firstUse.commit);
+ assert.equal(f.state().phase,'awaiting-manual-acceptance');
  const portable=fs.mkdtempSync(path.join(os.tmpdir(),'pritha-clean-product-'));t.after(()=>fs.rmSync(portable,{force:true,recursive:true}));
  execFileSync('git',['clone','--quiet','--no-local','--no-checkout',view.firstUse.directory,portable]);
  execFileSync('git',['checkout','--quiet','--detach',view.firstUse.commit],{cwd:portable});
