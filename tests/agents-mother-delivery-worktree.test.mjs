@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -47,6 +47,32 @@ test("delivery coding uses a dedicated branch and leaves the active worktree unc
   assert.equal(git(prepared.worktree, ["status", "--porcelain"]), "");
   assert.equal(git(project, ["status", "--porcelain"]), "");
   assert.equal(readFileSync(path.join(project, "agent.mjs"), "utf8").includes("false"), true);
+});
+
+test("host verification checkpoint works without an operator Git identity or config mutation", t => {
+  const project = repository();
+  const runParent = mkdtempSync(path.join(os.tmpdir(), "pritha-worktree-identity-"));
+  t.after(() => { rmSync(runParent, {recursive:true,force:true}); rmSync(project, {recursive:true,force:true}); });
+  const runRoot = path.join(runParent, "run");
+  const prepared = prepareDeliveryWorktree(project, runRoot, "without-user-identity");
+  for (const key of ["user.name", "user.email"]) git(project, ["config", "--unset", key]);
+  git(project, ["config", "user.useConfigOnly", "true"]);
+  const before = git(project, ["config", "--local", "--list"]);
+  const globalConfig = path.join(runParent, "empty.gitconfig");
+  writeFileSync(globalConfig, "");
+  writeFileSync(path.join(prepared.worktree, "agent.mjs"), "export const ready = true;\n");
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_") && key !== "EMAIL"));
+  env.GIT_CONFIG_GLOBAL = globalConfig;
+  env.GIT_CONFIG_NOSYSTEM = "1";
+  const moduleUrl = new URL("../scripts/agents-mother/delivery-worktree.mjs", import.meta.url).href;
+  execFileSync(process.execPath, ["--input-type=module", "-e",
+    `import {commitVerifiedCheckpoint} from ${JSON.stringify(moduleUrl)}; commitVerifiedCheckpoint(process.argv[1]);`, runRoot],
+    {env, encoding:"utf8", stdio:["ignore","pipe","pipe"]});
+  assert.equal(git(prepared.worktree, ["status", "--porcelain"]), "");
+  assert.equal(git(prepared.worktree, ["log", "-1", "--format=%an <%ae>"]), "Pritha <pritha@local.invalid>");
+  assert.equal(git(project, ["config", "--local", "--list"]), before);
+  assert.equal(readFileSync(globalConfig, "utf8"), "");
+  assert.equal(readFileSync(path.join(project, "agent.mjs"), "utf8"), "export const ready = false;\n");
 });
 
 test("dirty cleanup is retained and marked cleanup_required without force removal", () => {

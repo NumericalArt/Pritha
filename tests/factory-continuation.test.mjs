@@ -86,7 +86,7 @@ for(const scenario of scenarios)test(scenario.connectorId+': host continues afte
  assert.deepEqual((await approve('outcome')).continued,['research','research_collect']);
  const page=await call('research_status',{offset:1});assert.equal(page.offset,1);assert.ok(page.sources[0].passages.length);
  const publish=await f.research();
- assert.equal(publish.continuationFailed,false,JSON.stringify(publish));assert.deepEqual(publish.continued,['scaffold','deliver','finish']);
+ assert.equal(publish.continuationFailed,false,JSON.stringify(publish));assert.deepEqual(publish.continued,['scaffold','deliver','finish'],JSON.stringify(f.progress()));
  assert.equal(f.reviews.length,2);assert.equal(f.builds.length,1);
  assert.equal(buildViews.length,1);assert.equal(buildViews[0].milestone.kind,'building');
  assert.equal(buildViews[0].milestone.summary,'Каркас готов. Реализую поведение агента');

@@ -381,7 +381,10 @@ export function commitVerifiedCheckpoint(runRoot, options = {}) {
   const status = git(worktree, ["status", "--porcelain=v1", "--untracked-files=all"]);
   if (status.trim()) {
     git(worktree, ["add", "-A"]);
-    git(worktree, ["commit", "-m", `Pritha verified outcome: ${metadata.run_id}`]);
+    // Host-owned checkpoints, like scaffold baselines, must work without an
+    // operator Git identity. Command-local settings leave user config intact.
+    git(worktree, ["-c", "user.name=Pritha", "-c", "user.email=pritha@local.invalid",
+      "commit", "-m", `Pritha verified outcome: ${metadata.run_id}`]);
   }
   const checkpoint = git(worktree, ["rev-parse", "HEAD"]).trim();
   const next = { ...metadata, verified_checkpoint: checkpoint, verified_at: options.verifiedAt || new Date().toISOString() };

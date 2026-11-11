@@ -80,12 +80,20 @@ test('post-exit cleanup resumes after partial deletion while preserving every or
   const empty=f.scope(chat);await empty.close();rmSync(path.join(empty.directory,'receipt.json'));assert.equal(await f.cleanup(empty),'complete');
 });
 
-for(const legacy of [false,true])test(`approved commands read only verified copies and cannot rewrite or rename them (${legacy?'legacy':'external'} state)`,{timeout:30000},async t=>{
+const commandBoundary=process.platform==='darwin'?'approved commands read only verified copies and cannot rewrite or rename them':'attachment commands fail closed without a supported OS sandbox';
+for(const legacy of [false,true])test(`${commandBoundary} (${legacy?'legacy':'external'} state)`,{timeout:30000},async t=>{
   const f=await fixture(t,{legacy}),chat=f.chat(),body=Buffer.from([0,255,4,128]),file=await f.attach(chat,body,'input.bin'),scope=f.scope(chat),read=await scope.read('attachment:'+file.id),snapshot=read.attachment.readOnlyPath;
   const privateCanary=path.join(f.privateRoot,'unrelated-secret.txt');writeFileSync(privateCanary,'MUST_NOT_READ');
   let approvals=0;const host=f.host(chat,scope,async()=>{approvals++;return {decision:'accept'};});
   const script=`const fs=require('fs'),crypto=require('crypto');const out={hash:crypto.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex')};for(const [name,run] of [['write',()=>fs.writeFileSync(process.argv[1],'changed')],['rename',()=>fs.renameSync(require('path').dirname(process.argv[1]),require('path').dirname(process.argv[1])+'-moved')],['original',()=>fs.readFileSync(process.argv[2])],['secret',()=>fs.readFileSync(process.argv[3])]]){try{run();out[name]='ESCAPED'}catch{out[name]='denied'}}console.log(JSON.stringify(out));`;
   const result=parsed(await host.call('run_command',{operation_id:'read_attachment_001',argv:[process.execPath,'-e',script,snapshot,file.file.filePath,privateCanary]}));
+  if(process.platform!=='darwin'){
+    assert.equal(result.status,'failed');assert.equal(result.text,'provider_sandbox_unavailable');assert.equal(approvals,1);
+    assert.deepEqual(readFileSync(snapshot),body);assert.deepEqual(readFileSync(file.file.filePath),body);
+    assert.equal(readFileSync(privateCanary,'utf8'),'MUST_NOT_READ');
+    assert.equal(existsSync(path.dirname(snapshot)+'-moved'),false);
+    return;
+  }
   assert.equal(result.status,'completed',JSON.stringify(result));const output=JSON.parse(result.text);assert.deepEqual(output,{hash:hash(body),write:'denied',rename:'denied',original:'denied',secret:'denied'});assert.equal(approvals,1);assert.deepEqual(readFileSync(file.file.filePath),body);
 });
 
