@@ -203,6 +203,10 @@ case "$1" in
       printf 'Finder display metadata\\n' > "$PRITHA_STATE_ROOT/.DS_Store"
       printf 'Finder display metadata\\n' > "$PRITHA_AGENT_PARENT/FixtureChild/.DS_Store"
     fi
+    if [ "$PRITHA_TEST_MUTATE_VM_STATE" = "1" ]; then
+      printf 'VM disk write\\n' >> "$PRITHA_AGENT_PARENT/FixtureChild/.runtime/vm/fixture/disk"
+      printf 'VM log write\\n' >> "$PRITHA_AGENT_PARENT/FixtureChild/.runtime/vm/fixture/ha.stderr.log"
+    fi
     exit 0
     ;;
 esac
@@ -316,8 +320,12 @@ test("instance update pins the target and preserves agent fingerprints through a
   const port = await freePort();
   let pid = null;
   try {
+    const vm = path.join(fixture.fixture, "agents/FixtureChild/.runtime/vm/fixture");
+    mkdirSync(vm, { recursive: true });
+    writeFileSync(path.join(vm, "disk"), "initial disk\n");
+    writeFileSync(path.join(vm, "ha.stderr.log"), "initial log\n");
     const target = git(fixture.remoteWork, "rev-parse", "HEAD");
-    const deployed = invoke(fixture, port, "good", target, false, true);
+    const deployed = invoke(fixture, port, "good", target, false, true, "", { PRITHA_TEST_MUTATE_VM_STATE: "1" });
     assert.equal(deployed.status, 0, deployed.stderr || deployed.stdout);
     const payload = JSON.parse(deployed.stdout);
     assert.equal(payload.status, "deployed");
@@ -332,6 +340,12 @@ test("instance update pins the target and preserves agent fingerprints through a
     assert.equal(payload.health.strict.payload.chunks.length, 1);
     assert.equal(payload.health.strict.payload.checks.find((item) => item.id === "health-contract").release.buildId, "candidate-build");
     assert.equal(payload.isolationMatch, true);
+    assert.deepEqual(payload.pre_isolation.child_agent_folders, payload.postIsolation.child_agent_folders);
+    assert.deepEqual(payload.postIsolation.child_agent_folders[0].fingerprint.mutable_vm_files, [
+      ".runtime/vm/fixture/disk", ".runtime/vm/fixture/ha.stderr.log",
+    ]);
+    assert.match(readFileSync(path.join(vm, "disk"), "utf8"), /VM disk write/);
+    assert.match(readFileSync(path.join(vm, "ha.stderr.log"), "utf8"), /VM log write/);
     assert.equal(payload.memoryDocuments, 1);
     assert.equal(payload.pre_isolation.agent_state.sha256, payload.postIsolation.agent_state.sha256);
     assert.equal(payload.pre_isolation.protected_state.sha256, payload.postIsolation.protected_state.sha256);
@@ -450,6 +464,71 @@ test("Finder exception protects other dotfiles and similarly named directories o
     mkdirSync(metadata);
     writeFileSync(path.join(metadata, "settings.json"), "{}");
     assert.notEqual(snapshot(), protectedFile);
+  } finally { rmSync(fixture.fixture, { recursive: true, force: true }); }
+});
+
+test("mutable child VM contents preserve configuration, file types and primary state checks", async () => {
+  const fixture = makeFixture();
+  const state = path.join(fixture.fixture, "state");
+  const agents = path.join(fixture.fixture, "agents");
+  const child = path.join(agents, "FixtureChild");
+  const vm = path.join(child, ".runtime/vm/fixture");
+  const disk = path.join(vm, "disk");
+  const port = await freePort();
+  mkdirSync(state);
+  mkdirSync(vm, { recursive: true });
+  writeFileSync(path.join(child, "AGENTS.md"), "# Fixture child\n");
+  const snapshot = () => {
+    const result = run(process.execPath, [path.join(fixture.checkout, "scripts/pritha-instance.mjs"), "status", "--json"], {
+      cwd: fixture.checkout,
+      env: { ...process.env, PRITHA_ROOT: fixture.checkout, TECHSCOPE_ROOT: fixture.checkout, PRITHA_STATE_ROOT: state, PRITHA_AGENT_PARENT: agents, PRITHA_INSTANCE_ID: "fixture", PRITHA_CONTROL_CENTER_PORT: String(port) },
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    return JSON.parse(result.stdout).isolation;
+  };
+  const childHash = () => snapshot().child_agent_folders[0].fingerprint.sha256;
+  try {
+    writeFileSync(disk, "disk contents");
+    writeFileSync(path.join(vm, "ha.stdout.log"), "log contents");
+    const original = childHash();
+    writeFileSync(disk, "different disk contents and size");
+    writeFileSync(path.join(vm, "ha.stdout.log"), "growing log contents");
+    assert.equal(childHash(), original);
+    for (const relative of ["agent.mjs", ".runtime/vm/fixture/config.yaml", ".runtime/vm/fixture/disk.backup", ".runtime/vm/fixture/other.log", ".runtime/disk"]) {
+      const file = path.join(child, relative);
+      writeFileSync(file, "first");
+      const first = childHash();
+      writeFileSync(file, "second");
+      assert.notEqual(childHash(), first, `${relative} contents must stay protected`);
+      rmSync(file);
+    }
+    const mode = statSync(disk).mode & 0o7777;
+    chmodSync(disk, mode ^ 0o100);
+    assert.notEqual(childHash(), original, "runtime file permissions must stay protected");
+    chmodSync(disk, mode);
+    rmSync(disk);
+    const missing = childHash();
+    assert.notEqual(missing, original, "removing a disk must stay detectable");
+    symlinkSync("first-target", disk);
+    const linked = childHash();
+    assert.notEqual(linked, original);
+    assert.deepEqual(snapshot().child_agent_folders[0].fingerprint.mutable_vm_files, [".runtime/vm/fixture/ha.stdout.log"]);
+    rmSync(disk);
+    symlinkSync("second-target", disk);
+    assert.notEqual(childHash(), linked, "symlink targets must stay protected");
+    rmSync(disk);
+    mkdirSync(disk);
+    assert.notEqual(childHash(), original, "a directory must not be treated as a mutable disk file");
+    writeFileSync(path.join(disk, "config.json"), "first");
+    const directory = childHash();
+    writeFileSync(path.join(disk, "config.json"), "second");
+    assert.notEqual(childHash(), directory);
+    const primaryDisk = path.join(state, ".runtime/vm/fixture/disk");
+    mkdirSync(path.dirname(primaryDisk), { recursive: true });
+    writeFileSync(primaryDisk, "first");
+    const primary = snapshot().protected_state.sha256;
+    writeFileSync(primaryDisk, "second");
+    assert.notEqual(snapshot().protected_state.sha256, primary, "the exception must not apply to primary state");
   } finally { rmSync(fixture.fixture, { recursive: true, force: true }); }
 });
 

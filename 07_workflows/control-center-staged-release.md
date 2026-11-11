@@ -3,7 +3,7 @@ id: control-center-staged-release
 type: workflow
 status: active
 created: 2026-08-27
-updated: 2026-11-02
+updated: 2026-11-11
 topics:
   - control-center
   - staged-release
@@ -129,6 +129,19 @@ instance, pages and chunks. It does not confuse the checkout's current Git HEAD
 with the identity of the restored compiled build. A missing build ID is detected
 before stopping the service. An unconfirmed managed stop still prevents swapping
 or restoring files under a live process.
+
+### Child VM files in isolation checks
+
+Child-project fingerprints allow content changes only in regular files matching
+`.runtime/vm/<vm>/disk`, `.runtime/vm/<vm>/ha.stdout.log` and
+`.runtime/vm/<vm>/ha.stderr.log`. Running VMs write these files independently of
+Control Center releases. Their paths, file types and permissions remain part of
+the fingerprint, so removal or replacement with a symlink or directory still
+fails isolation verification. Receipts list these paths in `mutable_vm_files`.
+
+This exception applies only to child-project fingerprints. It does not exclude
+the `.runtime` directory: source files, VM configuration, other runtime files,
+symlink targets, Pritha's protected state and agent registry retain their checks.
 
 ### An installed launchd profile changes
 

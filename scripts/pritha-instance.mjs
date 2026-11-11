@@ -119,6 +119,8 @@ const CHILD_PROJECT_EXCLUDED_DIRECTORIES = new Set([
   "node_modules",
 ]);
 
+const MUTABLE_CHILD_VM_FILE = /^\.runtime\/vm\/[^/]+\/(?:disk|ha\.(?:stdout|stderr)\.log)$/;
+
 const PROTECTED_STATE_EXCLUDED_DIRECTORIES = new Set([
   "audit",
   "cache",
@@ -150,10 +152,11 @@ async function fileDigest(filePath) {
   return hash.digest("hex");
 }
 
-async function directoryFingerprint(directory, excludedDirectories = new Set()) {
+async function directoryFingerprint(directory, excludedDirectories = new Set(), { mutableChildVmFiles = false } = {}) {
   const root = path.resolve(directory);
   const entries = [];
   const excluded = new Set();
+  const mutableVmFiles = [];
   async function visit(current, relative = "") {
     let stat;
     try { stat = lstatSync(current); } catch (error) {
@@ -165,6 +168,13 @@ async function directoryFingerprint(directory, excludedDirectories = new Set()) 
       return;
     }
     if (stat.isFile()) {
+      if (mutableChildVmFiles && MUTABLE_CHILD_VM_FILE.test(relative)) {
+        // Running VMs write these files independently of a Pritha release.
+        // Keep their presence, type and permissions protected; only contents vary.
+        entries.push({ path: relative, type: "file", content: "mutable-vm-runtime", mode: stat.mode & 0o7777 });
+        mutableVmFiles.push(relative);
+        return;
+      }
       entries.push({ path: relative || ".", type: "file", bytes: stat.size, sha256: await fileDigest(current) });
       return;
     }
@@ -190,6 +200,7 @@ async function directoryFingerprint(directory, excludedDirectories = new Set()) 
     entries: entries.length,
     ignored_regular_files: [".DS_Store"],
     excluded: [...excluded].sort((a, b) => a.localeCompare(b)),
+    ...(mutableChildVmFiles ? { mutable_vm_files: mutableVmFiles } : {}),
   };
 }
 
@@ -201,7 +212,7 @@ async function isolationSnapshot() {
     folders.push({
       name: entry.name,
       directory: canonicalExistingPath(entry.directory),
-      fingerprint: await directoryFingerprint(entry.directory, CHILD_PROJECT_EXCLUDED_DIRECTORIES),
+      fingerprint: await directoryFingerprint(entry.directory, CHILD_PROJECT_EXCLUDED_DIRECTORIES, { mutableChildVmFiles: true }),
     });
   }
   return {
