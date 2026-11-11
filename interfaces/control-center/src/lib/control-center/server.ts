@@ -2391,9 +2391,13 @@ function latestReports(root: string) {
 
 const statusReadCache = sharedProbeCache("control-center-status-v1", { ttlMs: 1_000, maxEntries: 8 });
 
+function controlCenterStatusCacheKey(root: string) {
+  return JSON.stringify([root, resolvePrithaStateRoot(root), resolvePrithaAgentParent(root), process.env.PRITHA_INSTANCE_ID, process.env.PRITHA_CONTROL_CENTER_PORT]);
+}
+
 export async function getControlCenterStatus(options: { freshIdentity?: boolean } = {}): Promise<ControlCenterStatus> {
   const root = resolvePrithaRoot();
-  const key = JSON.stringify([root, resolvePrithaStateRoot(root), resolvePrithaAgentParent(root), process.env.PRITHA_INSTANCE_ID, process.env.PRITHA_CONTROL_CENTER_PORT]);
+  const key = controlCenterStatusCacheKey(root);
   return statusReadCache.get(key, () => readControlCenterStatus(options), { fresh: options.freshIdentity });
 }
 
@@ -3276,14 +3280,21 @@ export async function runAgentRuntimeAction(
     return result;
   }
 
-  const execution = await executeStructuredAgentCommand({
-    action,
-    manifest,
-    command: validation.command,
-    cwd: validation.cwd,
-    env: validation.env,
-    timeoutMs: validation.timeoutMs,
-  });
+  let execution: Awaited<ReturnType<typeof executeStructuredAgentCommand>>;
+  try {
+    execution = await executeStructuredAgentCommand({
+      action,
+      manifest,
+      command: validation.command,
+      cwd: validation.cwd,
+      env: validation.env,
+      timeoutMs: validation.timeoutMs,
+    });
+  } finally {
+    // The UI refreshes immediately after an action, before the normal cache TTL.
+    // A failed command may also have changed the service's actual state.
+    statusReadCache.invalidate(controlCenterStatusCacheKey(status.root));
+  }
   const checks = plan.checks;
   const summary = countChecks(checks);
   const result: ControlCenterOperatorActionResult = {
