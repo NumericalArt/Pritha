@@ -41,5 +41,5 @@ export function QuoteReplyProvider({ chatId, enabled, onQuote, children }: { cha
 export function QuoteAnswer({ chatId, eligible, children }: { chatId: string; eligible: boolean; children: ReactNode }) {
   const body = useRef<HTMLDivElement>(null);
   const { selected, reply } = useContext(Context);
-  return <><div ref={body} {...(eligible ? { "data-quote-body": "", "data-quote-chat": chatId } : {})}>{children}</div>{eligible ? <button type="button" data-quote-button className="codex-text-action codex-quote-button" disabled={!selected || selected.source !== body.current} onMouseDown={event => event.preventDefault()} onClick={() => reply(body.current)}>Цитировать</button> : null}</>;
+  return <><div ref={body} {...(eligible ? { "data-quote-body": "", "data-quote-chat": chatId } : {})}>{children}</div>{eligible ? <button type="button" data-quote-button className="codex-text-action codex-quote-button" disabled={!selected || selected.source !== body.current} onMouseDown={event => event.preventDefault()} onClick={() => reply(body.current)}>Quote</button> : null}</>;
 }

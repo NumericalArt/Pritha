@@ -1223,7 +1223,7 @@ export function CodexChatPage() {
         setPendingForChat(delivery.chatId, null);
         updateDraftForChat(delivery.chatId, current => current.trim() === delivery.text ? "" : current);
         const result = response.data.receipts.find(receipt => receipt.requestId === delivery.clientMessageId);
-        setBudgetNotice({ chatId: delivery.chatId, text: `Сборка ${response.data.agentName}: подтверждённый расход ${response.data.budget.tokensUsed.toLocaleString("ru-RU")} / ${response.data.budget.maxTokens.toLocaleString("ru-RU")} токенов. ${result?.status === "failed" || result?.status === "interrupted" ? "Сохранённое действие требует сверки перед продолжением." : intent.resume ? "Продолжение этой сборки запрошено." : "Бюджет сверён; продолжение отдельно."}` });
+        setBudgetNotice({ chatId: delivery.chatId, text: `Build ${response.data.agentName}: confirmed usage ${response.data.budget.tokensUsed.toLocaleString("en-US")} / ${response.data.budget.maxTokens.toLocaleString("en-US")} tokens. ${result?.status === "failed" || result?.status === "interrupted" ? "The saved action must be reconciled before continuing." : intent.resume ? "Continuation of this build has been requested." : "Budget reconciled; continuation is a separate action."}` });
         return;
       }
       const response = await api<AcceptedTurn>(`/api/codex-chat/v1/threads/${encodeURIComponent(delivery.chatId)}/turns`, {
@@ -1317,7 +1317,7 @@ export function CodexChatPage() {
     const chatId = selectedChatId;
     const intent = parseBudgetIntent(text);
     if (intent.kind === "clarification" || ((intent.kind === "goal_budget" || intent.kind === "delivery_budget") && (!chatId || attachmentIds.length > 0))) {
-      setError({ message: intent.kind === "clarification" ? intent.message : "Выберите задачу с нужным бюджетом и отправьте команду без вложений.", source: "mutation", kind: "request_failed", chatId, retryable: false });
+      setError({ message: intent.kind === "clarification" ? intent.message : "Select the task with the intended budget and send the command without attachments.", source: "mutation", kind: "request_failed", chatId, retryable: false });
       return;
     }
     setBudgetNotice(null);
@@ -1601,8 +1601,8 @@ export function CodexChatPage() {
           </select>
         </label> : null}
         {!selectedChatId && workspaceChoices[newDraftId] ? <div className="codex-runtime-warning" role="status">
-          <span>В исходном проекте есть несохранённые в Git изменения. Отдельная рабочая копия будет создана из коммита <code>{workspaceChoices[newDraftId].slice(0,12)}</code>; эти изменения в неё не войдут.</span>
-          <button type="button" className="codex-button" onClick={()=>void sendMessage(workspaceChoices[newDraftId])}>Использовать этот коммит</button>
+          <span>The source project has uncommitted changes. A separate worktree will be created from commit <code>{workspaceChoices[newDraftId].slice(0,12)}</code>; those changes will not be included.</span>
+          <button type="button" className="codex-button" onClick={()=>void sendMessage(workspaceChoices[newDraftId])}>Use this commit</button>
         </div> : null}
         {visibleError ? (
           <div className="codex-error-banner">
@@ -1726,7 +1726,7 @@ export function CodexChatPage() {
               imageEditorRef.current = target; setImageEditor(target);
             }} restore={id => void attachmentDraft.restoreOriginal(draftKey, id)} />
             {attachmentDraft.notice ? <span role="status" className="codex-attachment-notice">{attachmentDraft.notice}</span> : null}
-            {!selectedChatId && !factorySelections[newDraftId] && newAgentRequest(draft)?<span role="status">Подготовлю предложение нового агента. Возможности и критерии готовности согласуем отдельно до сборки.</span>:null}
+            {!selectedChatId && !factorySelections[newDraftId] && newAgentRequest(draft)?<span role="status">I will prepare a proposal for a new agent. Capabilities and acceptance criteria will be reviewed separately before building.</span>:null}
             {imageCapabilityMissing ? <span role="status" className="codex-attachment-notice">Image support for the selected model is unavailable or unverified. Choose an image-capable model before sending.</span> : null}
             {fileCapabilityMissing?<span role="status" className="codex-attachment-notice">This provider does not support these attachments yet. Your files are preserved; choose a supported provider or remove the attachments.</span>:null}
             <div className="codex-composer-input">

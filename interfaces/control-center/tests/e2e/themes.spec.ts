@@ -6,12 +6,12 @@ test('theme selection survives navigation and reload, syncs tabs, and never writ
   await page.addInitScript(()=>localStorage.setItem('pritha-control-center-theme','dark'));
   await page.goto('/settings');await expect(page.locator('html')).toHaveAttribute('data-theme','classic');
   const radios=page.getByRole('radiogroup',{name:'Theme'}).getByRole('radio');await expect(radios).toHaveCount(3);
-  await page.getByRole('radio',{name:'Тёмная',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await page.getByRole('radio',{name:'Dark',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   expect(await page.evaluate(key=>localStorage.getItem(key),storageKey)).toBe('dark');
   await page.goto('/task-chat');await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
-  await page.goto('/settings');await expect(page.getByRole('radio',{name:'Тёмная',exact:true})).toHaveAttribute('aria-checked','true');
+  await page.goto('/settings');await expect(page.getByRole('radio',{name:'Dark',exact:true})).toHaveAttribute('aria-checked','true');
   const other=await context.newPage();await other.goto('/voice');await expect(other.locator('html')).toHaveAttribute('data-theme','dark');
-  await page.getByRole('radio',{name:'Светлая',exact:true}).click();await expect(other.locator('html')).toHaveAttribute('data-theme','light');
+  await page.getByRole('radio',{name:'Light',exact:true}).click();await expect(other.locator('html')).toHaveAttribute('data-theme','light');
   await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.evaluate(key=>localStorage.removeItem(key),storageKey);await expect(other.locator('html')).toHaveAttribute('data-theme','classic');
   await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','classic');

@@ -353,8 +353,8 @@
       },
       {
         "path": "07_workflows/agent-operating-workflow.md",
-        "bytes": 836,
-        "sha256": "55f11efe279f4477bf6d549befab5770eb5c7fcb40f48544ccfb8e2fd8bb9e81"
+        "bytes": 669,
+        "sha256": "66122032ac2ed5fbba2a78a35e2f2f79fc7d9c37f8351dbe7a206ac347f71c71"
       },
       {
         "path": "AGENTS.md",
@@ -373,13 +373,13 @@
       },
       {
         "path": "docs/user-training-guide.md",
-        "bytes": 1714,
-        "sha256": "4b07d4fe11af41cead90ea06825f413d6e2ac6d686bb5e2665595de1104e6eca"
+        "bytes": 1153,
+        "sha256": "b6f236d3c52428c254d7583ac0eaf687e423742e55943786442583451f5e9862"
       },
       {
         "path": "interfaces/cli/README.md",
-        "bytes": 583,
-        "sha256": "940414213cfba06aa0c024e09b3cfff7affc133e978d6013161dc98cd390cefb"
+        "bytes": 498,
+        "sha256": "7ff6425c3da7a42ba3b618fe48c2f8657177ad1d299210361334eb2b0b6e0887"
       },
       {
         "path": "interfaces/manifest.json",
@@ -388,8 +388,8 @@
       },
       {
         "path": "interfaces/README.md",
-        "bytes": 555,
-        "sha256": "39ece87890ea0ecad1ea6e4a0a745407c61ef38a2bcaba83c268c5598f5b2a39"
+        "bytes": 474,
+        "sha256": "38ae5a7620009ae5d6f0ca8837769ecf8d2613d617421959979c734ae50bafc1"
       },
       {
         "path": "memory/decisions/.gitkeep",
@@ -418,8 +418,8 @@
       },
       {
         "path": "README.md",
-        "bytes": 1325,
-        "sha256": "d9cf4a1871bc853564e89c1a8d02ebd36f3b39a62108bddd2deba5968b0d46be"
+        "bytes": 1179,
+        "sha256": "49bf0a69ce47f3198448c570f826d6cfe9d017df62a5e483da2640cf2d3566d5"
       },
       {
         "path": "scripts/agent-cli.mjs",
@@ -570,8 +570,8 @@
       },
       {
         "path": "README.md",
-        "bytes": 1722,
-        "sha256": "401d056e6b071b107119b2543dd730b843b9109b25bb371ac7a96f057d156b85"
+        "bytes": 1381,
+        "sha256": "30f2edb68b80088e6f498aee339a57ff97fb74ce5415b1ba10de30168e7ff397"
       },
       {
         "path": "scripts/agent-cli.mjs",
@@ -685,8 +685,8 @@
       },
       {
         "path": "workflows/user-training.md",
-        "bytes": 1417,
-        "sha256": "44169e40431ed808b3351a590a28d247cae9d1a473d9c23a5fa323d0ca49d8c4"
+        "bytes": 1076,
+        "sha256": "92a5180257cc81f56bdca96822519d3e2c68c446d94ed59b90d71f90095ace9c"
       }
     ],
     "markdown": [

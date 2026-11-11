@@ -2132,8 +2132,8 @@ function buildAgentControl(
 
   if (state === "missing" || runtimeKind === "scaffold") {
     if (folder && runtimeKind === "scaffold") return {
-      ...base, primaryCardAction: "run_check", planAction: "check", label: "Подготовка агента",
-      reason: "В папке карточки пока каркас. Проверенная сборка должна быть применена перед запуском.",
+      ...base, primaryCardAction: "run_check", planAction: "check", label: "Agent preparation",
+      reason: "The card project still contains a scaffold. Apply the verified build before starting.",
     };
     return {
       ...base,

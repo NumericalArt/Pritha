@@ -66,6 +66,6 @@ test("Control Center approval decisions create non-duplicating Realtime feedback
   assert.match(runtimeSource, /phase: "approval_rejected"/);
   assert.match(runtimeSource, /priority: "high"/);
   assert.match(runtimeSource, /speakable: false/);
-  assert.match(runtimeSource, /Approve получен в UI/);
-  assert.match(runtimeSource, /Reject получен в UI/);
+  assert.match(runtimeSource, /Approved in the UI/);
+  assert.match(runtimeSource, /Rejected in the UI/);
 });

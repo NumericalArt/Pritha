@@ -15,9 +15,9 @@ export function DraftAttachments({ items, locked, remove, retry, annotate, resto
     {item.view?.kind === "image" ? <img src={item.view.href} alt={item.view.name} /> : item.state === "uploading" ? <LoaderCircle size={20} className="spin" /> : <File size={20} />}
     <span>{item.file.name}<small>{item.state === "uploading" ? "Uploading…" : item.state === "error" ? item.error : "Ready"}</small></span>
     {item.state === "error" && !item.localFileMissing ? <button type="button" className="codex-text-action" disabled={locked} onClick={() => retry(item)}>Retry upload</button> : null}
-    {item.state === "ready" && item.view?.kind === "image" && ["image/png", "image/jpeg", "image/webp"].includes(item.view.mediaType) && annotate ? <button type="button" data-annotation-open className="codex-text-action" disabled={locked || Boolean(item.restoring)} onClick={event => annotate(item, event.currentTarget)}>Разметить</button> : null}
-    {item.original && restore ? <button type="button" className="codex-text-action" disabled={locked || Boolean(item.restoring)} onClick={() => restore(item.id)}>{item.restoring ? "Проверка оригинала…" : "Вернуть оригинал"}</button> : null}
-    {item.original ? <small>Размеченная копия</small> : null}
+    {item.state === "ready" && item.view?.kind === "image" && ["image/png", "image/jpeg", "image/webp"].includes(item.view.mediaType) && annotate ? <button type="button" data-annotation-open className="codex-text-action" disabled={locked || Boolean(item.restoring)} onClick={event => annotate(item, event.currentTarget)}>Annotate</button> : null}
+    {item.original && restore ? <button type="button" className="codex-text-action" disabled={locked || Boolean(item.restoring)} onClick={() => restore(item.id)}>{item.restoring ? "Checking original…" : "Restore original"}</button> : null}
+    {item.original ? <small>Annotated copy</small> : null}
     <button type="button" className="codex-text-action" aria-label={`Remove ${item.file.name}`} disabled={locked} onClick={() => remove(item.id)}><X size={16} /></button>
   </div>)}</div>;
 }

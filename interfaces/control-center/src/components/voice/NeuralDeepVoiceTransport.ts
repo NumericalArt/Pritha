@@ -143,8 +143,8 @@ export class NeuralDeepVoiceTransport implements VoiceEventChannel {
         code,
         message:
           code === "voice_no_speech"
-            ? "Речь не распознана. Попробуйте ещё раз."
-            : "Голосовой ответ прерван. Проверьте карточки задач перед повтором команды.",
+            ? "Speech was not recognized. Try again."
+            : "The voice response was interrupted. Check task cards before repeating the command.",
       },
     });
     this.finish();

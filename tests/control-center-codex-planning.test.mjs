@@ -87,7 +87,7 @@ test("Realtime Codex handoff waits for explicit full-brief confirmation", () => 
   assert.match(runtimeSource, /function codexTaskNeedsHandoffConfirmation\(args: CodexTaskArgs, task: Record<string, unknown>\)/);
   assert.match(runtimeSource, /function hasCodexHandoffConfirmation\(value: unknown\)/);
   assert.match(runtimeSource, /handoff_confirmation_required/);
-  assert.match(runtimeSource, /ТЗ полностью проговорено\? Передавать это в Codex\?/);
+  assert.match(runtimeSource, /Is the brief complete\? Shall I send it to Codex\?/);
   assert.match(runtimeSource, /brief is complete and ready for Codex/);
   assert.match(runtimeSource, /be proposal-first/);
   assert.match(runtimeSource, /ask only for missing product decisions/);

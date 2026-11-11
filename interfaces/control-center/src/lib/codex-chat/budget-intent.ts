@@ -6,7 +6,7 @@ export type BudgetIntent =
 
 const clarification: BudgetIntent = {
   kind: "clarification",
-  message: "Укажите объект и изменение бюджета: например, «добавь 100 000 токенов к бюджету этой задачи» или «установи бюджет сборки до 500 000 токенов». Для сборки выберите связанный run в панели; для продолжения добавьте «и продолжай». Лимиты аккаунта учитываются отдельно.",
+  message: "Specify which budget to change and by how much: for example, “add 100 000 tokens to this task budget” or “set this build budget to 500 000 tokens”. For a build, select the linked run in the panel; to resume, add “and continue”. Account limits are tracked separately.",
 };
 const taskBudget = "(?:бюджет(?:у)? (?:этой |текущей )?задачи|(?:бюджет(?:у)? )?goal)";
 const runId = "([A-Za-z0-9][A-Za-z0-9._-]{0,127})";

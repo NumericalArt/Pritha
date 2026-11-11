@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 
 for(const width of [1440,390])for(const factoryFailed of [false,true])test(`a blocked Voice task shows its cause and zero progress (${factoryFailed?'factory failure':'before dispatch'}) at ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:1000});
-  const reason=factoryFailed?'Создание черновика агента не подтверждено. Это не успешное создание агента.':'Задача ещё не запущена: в исходном проекте есть незакоммиченные изменения. Для нового агента отмените эту карточку и попросите создать отдельного нового агента.';
+  const reason=factoryFailed?'Creation of the agent draft is not confirmed. The agent has not been successfully created.':'The task has not started: the source project has uncommitted changes. For a new agent, cancel this card and request a separate new agent.';
   const snapshot={ok:true,task_id:'voice-blocked-fixture',short_id:'ABC',task:'Synthetic blocked Voice task',status:factoryFailed?'failed':'waiting_for_operator',phase:factoryFailed?'factory_draft_failed':'provider_dispatch_attention',complete:factoryFailed,
     connector_id:'claude',dispatch_state:factoryFailed?'completed':'reserved',error_code:factoryFailed?'factory_not_started':'workspace_dirty',factory_draft_failed:factoryFailed,progress_percent:0,progress_detail:{source:'before_dispatch',total_steps:0,completed_steps:0},
     operator_brief:reason,latest_voice_feedback:{voice_text:reason,phase:'provider_attention',priority:'high',requires_response:false},
@@ -15,8 +15,8 @@ for(const width of [1440,390])for(const factoryFailed of [false,true])test(`a bl
   await page.goto('/voice');
   const card=page.locator('.task-list-row:visible').filter({hasText:'Synthetic blocked Voice task'}).first();
   await expect(card).toBeVisible();await expect(card.getByText('0%',{exact:true})).toBeVisible();
-  if(factoryFailed){await expect(card).toContainText('черновика агента не подтверждено');await expect(card.getByText('failed',{exact:true})).toBeVisible();}
-  else{await expect(card).toContainText('незакоммиченные изменения');await expect(card).toContainText('отдельного нового агента');}
+  if(factoryFailed){await expect(card).toContainText('agent draft is not confirmed');await expect(card.getByText('failed',{exact:true})).toBeVisible();}
+  else{await expect(card).toContainText('uncommitted changes');await expect(card).toContainText('a separate new agent');}
   await expect(card.getByRole('button',{name:'Approve',exact:true})).toHaveCount(0);
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2)).toBe(true);
   if(factoryFailed)await expect(card.getByRole('button',{name:'Abort',exact:true})).toBeDisabled();

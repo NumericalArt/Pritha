@@ -95,7 +95,7 @@ async function attach(page: Page, name = "screenshot.png") {
   return buffer;
 }
 async function draw(page: Page, diagonal = false) {
-  const canvas = page.getByLabel("Холст разметки"); await expect(canvas).toBeVisible();
+  const canvas = page.getByLabel("Annotation canvas"); await expect(canvas).toBeVisible();
   const box = (await canvas.boundingBox())!;
   await page.mouse.move(box.x + box.width * .2, box.y + box.height * .5);
   await page.mouse.down(); await page.mouse.move(box.x + box.width * .8, box.y + box.height * (diagonal ? .8 : .5), { steps: 5 }); await page.mouse.up();
@@ -115,8 +115,8 @@ for (const historical of [false, true]) test(`quote ${historical ? "paged histor
   const composer = page.getByRole("textbox", { name: "Message Pritha" });
   await ready(page);
   await composer.fill("Keep my draft"); await selectAnswer(page);
-  await page.getByRole("button", { name: "Цитировать", exact: true }).click();
-  await expect(composer).toHaveValue(/Keep my draft\n\n> \*\*Из ответа Pritha:\*\*\n> Первая строка 🪷/);
+  await page.getByRole("button", { name: "Quote", exact: true }).click();
+  await expect(composer).toHaveValue(/Keep my draft\n\n> \*\*From Pritha’s reply:\*\*\n> Первая строка 🪷/);
   await expect(composer).toBeFocused();
   const saved = await composer.inputValue();
   await page.getByRole("button", { name: /Chat B/ }).click(); await expect(composer).toHaveValue("");
@@ -125,7 +125,7 @@ for (const historical of [false, true]) test(`quote ${historical ? "paged histor
 });
 test("quotes reject user text, cross-message selection and an oversized draft", async ({ page }) => {
   await fixture(page); await page.goto("/task-chat?chat=chat_A");
-  const button = page.getByRole("button", { name: "Цитировать", exact: true });
+  const button = page.getByRole("button", { name: "Quote", exact: true });
   await expect(button).toBeDisabled();
   await page.locator(".codex-user-message .codex-markdown").evaluate(element => { const range = document.createRange(); range.selectNodeContents(element); window.getSelection()!.addRange(range); document.dispatchEvent(new Event("selectionchange")); });
   await expect(button).toBeDisabled();
@@ -143,13 +143,13 @@ for (const width of [1280, 390]) test(`annotation exports real pixels, preserves
   await page.setViewportSize({ width, height: 900 });
   const f = await fixture(page); await page.goto("/task-chat?chat=chat_A");
   const original = await attach(page); const originalId = f.control.puts[0].id;
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page);
-  await page.getByRole("button", { name: "Отменить действие", exact: true }).click(); await expect(page.getByRole("button", { name: "Применить", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Повторить действие", exact: true }).click();
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page);
+  await page.getByRole("button", { name: "Undo", exact: true }).click(); await expect(page.getByRole("button", { name: "Apply", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
   await page.screenshot({ path: info.outputPath(`editor-open-${width}.png`), fullPage: true });
-  await page.getByRole("button", { name: "Применить", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Разметка изображения" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Image annotation" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Annotate", exact: true })).toBeFocused();
   const edited = f.control.puts.at(-1)!; expect(edited.id).not.toBe(originalId); expect(f.files.get(originalId)!.body.equals(original)).toBe(true);
   expect(edited.body.readUInt32BE(16)).toBe(160); expect(edited.body.readUInt32BE(20)).toBe(100);
   const pixels = await page.evaluate(async href => {
@@ -157,7 +157,7 @@ for (const width of [1280, 390]) test(`annotation exports real pixels, preserves
     return { middle: [...context.getImageData(80, 50, 1, 1).data], transparent: [...context.getImageData(2, 2, 1, 1).data] };
   }, `/api/codex-chat/v1/attachments/${edited.id}`);
   expect(pixels.middle[0]).toBeGreaterThan(200); expect(pixels.middle[1]).toBeLessThan(100); expect(pixels.transparent[3]).toBe(0);
-  await page.reload(); await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toBeVisible();
+  await page.reload(); await expect(page.getByRole("button", { name: "Restore original", exact: true })).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem("pritha.task-chat.attachments.v1"))).not.toContain("base64");
   await page.screenshot({ path: info.outputPath(`annotation-${width}.png`), fullPage: true });
   await page.getByRole("button", { name: "Send", exact: true }).click(); await expect.poll(() => f.control.sent.length).toBe(1);
@@ -166,45 +166,45 @@ for (const width of [1280, 390]) test(`annotation exports real pixels, preserves
 test("cancel, dirty confirmation and return original do not rewrite source bytes", async ({ page }) => {
   const f = await fixture(page); await page.goto("/task-chat?chat=chat_A"); await attach(page);
   const source = f.control.puts[0];
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page);
-  await page.getByRole("button", { name: "Отмена", exact: true }).click(); await expect(page.getByText("Закрыть без сохранения разметки?")).toBeVisible();
-  await page.getByRole("button", { name: "Продолжить редактирование" }).click();
-  await page.getByRole("dialog").press("Escape"); await page.getByRole("button", { name: "Закрыть без сохранения", exact: true }).click();
-  expect(f.control.puts).toHaveLength(1); await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeFocused();
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Вернуть оригинал", exact: true }).click(); await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click(); await expect(page.getByText("Close without saving annotations?")).toBeVisible();
+  await page.getByRole("button", { name: "Keep editing" }).click();
+  await page.getByRole("dialog").press("Escape"); await page.getByRole("button", { name: "Discard changes", exact: true }).click();
+  expect(f.control.puts).toHaveLength(1); await expect(page.getByRole("button", { name: "Annotate", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Restore original", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Restore original", exact: true }).click(); await expect(page.getByRole("button", { name: "Restore original", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Send", exact: true }).click(); await expect.poll(() => f.control.sent.length).toBe(1); expect(f.control.sent[0].attachments).toEqual([source.id]);
 });
 test("failed copy retries exact bytes and UUID, rejected send preserves the copy", async ({ page }) => {
   const f = await fixture(page); await page.goto("/task-chat?chat=chat_A"); await attach(page); f.control.editMode = "fail";
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click();
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(page.getByText("Synthetic upload failure", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(f.control.puts[1].id).toBe(f.control.puts[2].id); expect(f.control.puts[1].body.equals(f.control.puts[2].body)).toBe(true);
   f.control.rejectSend = true; await page.getByRole("button", { name: "Send", exact: true }).click(); await expect(page.getByText("Synthetic send rejection")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Restore original", exact: true })).toBeVisible();
   f.control.rejectSend = false; await page.getByRole("button", { name: "Send", exact: true }).click(); await expect.poll(() => f.control.sent.length).toBe(2);
   expect(f.control.sent[1].attachments).toEqual(f.control.sent[0].attachments);
 });
 test("reload during upload restores confirmed original, and missing original preserves edited copy", async ({ page }) => {
   const f = await fixture(page); await page.goto("/task-chat?chat=chat_A"); await attach(page); f.control.editMode = "hold";
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect.poll(() => f.control.held.length).toBe(1);
-  await page.reload(); await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toHaveCount(0);
-  f.control.editMode = "success"; await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click();
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect.poll(() => f.control.held.length).toBe(1);
+  await page.reload(); await expect(page.getByRole("button", { name: "Annotate", exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "Restore original", exact: true })).toHaveCount(0);
+  f.control.editMode = "success"; await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0); f.control.missingOriginal = true;
-  await page.getByRole("button", { name: "Вернуть оригинал", exact: true }).click(); await expect(page.getByText(/original is no longer available/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Restore original", exact: true }).click(); await expect(page.getByText(/original is no longer available/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Restore original", exact: true })).toBeEnabled();
 });
 test("editor Enter never sends, text supports Unicode, queue sends only after editor closes", async ({ page }) => {
   const f = await fixture(page); f.control.active = true; await page.goto("/task-chat?chat=chat_A"); await attach(page);
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page);
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page);
   await page.getByRole("dialog").press("Enter"); expect(f.control.sent).toHaveLength(0);
   await expect(page.getByRole("button", { name: "Queue" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "■ Stop", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Текст", exact: true }).click(); await page.getByLabel("Холст разметки").click({ position: { x: 20, y: 20 } });
-  await page.getByRole("textbox", { name: "Текст пометки" }).fill("Пометка 🪷"); await page.getByRole("textbox", { name: "Текст пометки" }).press("Enter"); expect(f.control.sent).toHaveLength(0);
-  await page.getByRole("button", { name: "Добавить текст", exact: true }).click(); await page.getByRole("button", { name: "Применить", exact: true }).click();
+  await page.getByRole("button", { name: "Text", exact: true }).click(); await page.getByLabel("Annotation canvas").click({ position: { x: 20, y: 20 } });
+  await page.getByRole("textbox", { name: "Annotation text" }).fill("Пометка 🪷"); await page.getByRole("textbox", { name: "Annotation text" }).press("Enter"); expect(f.control.sent).toHaveLength(0);
+  await page.getByRole("button", { name: "Add text", exact: true }).click(); await page.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0); await page.getByRole("button", { name: "Queue" }).click();
   await expect.poll(() => f.control.sent.length).toBe(1); expect(f.control.sent[0].attachments).toEqual([f.control.puts.at(-1)!.id]);
 });
@@ -215,7 +215,7 @@ test("replacement at ten attachments preserves count and ordering", async ({ pag
   await page.locator('input[type="file"]').setInputFiles(Array.from({ length: 10 }, (_, i) => ({ name: `image-${i}.png`, mimeType: "image/png", buffer })));
   const draft = page.getByLabel("Draft attachments"); await expect(draft.getByText("Ready", { exact: true })).toHaveCount(10);
   const original = [...f.control.puts];
-  await draft.getByRole("button", { name: "Разметить", exact: true }).nth(4).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click();
+  await draft.getByRole("button", { name: "Annotate", exact: true }).nth(4).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0); await expect(draft.getByText("Ready", { exact: true })).toHaveCount(10);
   await page.getByRole("button", { name: "Send", exact: true }).click(); await expect.poll(() => f.control.sent.length).toBe(1);
   // Upload completion order need not be the input order; match by source name.
@@ -226,20 +226,20 @@ test("reediting starts from the flattened copy and restores the first original",
   const f = await fixture(page); await page.goto("/task-chat?chat=chat_A"); await attach(page);
   const original = f.control.puts[0];
   for (let i = 0; i < 2; i++) {
-    await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page);
-    await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page);
+    await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
   }
   expect(new Set(f.control.puts.map(file => file.id)).size).toBe(3);
-  await page.reload(); await page.getByRole("button", { name: "Вернуть оригинал", exact: true }).click(); await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toHaveCount(0);
+  await page.reload(); await page.getByRole("button", { name: "Restore original", exact: true }).click(); await expect(page.getByRole("button", { name: "Restore original", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Send", exact: true }).click(); await expect.poll(() => f.control.sent.length).toBe(1); expect(f.control.sent[0].attachments).toEqual([original.id]);
 });
 
 test("unknown delivery freezes the edited attachment ID through exact replay", async ({ page }) => {
   const f = await fixture(page); await page.goto("/task-chat?chat=chat_A"); await attach(page);
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
   f.control.unknownSend = true; await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check and retry same message", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Annotate", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Check and retry same message", exact: true }).click(); await expect.poll(() => f.control.sent.length).toBe(2);
   expect(f.control.sent[1]).toEqual(f.control.sent[0]);
 });
@@ -248,9 +248,9 @@ test("pending queue locks its image and rejection unlocks editing", async ({ pag
   const f = await fixture(page); f.control.active = true; f.control.holdQueue = true;
   await page.goto("/task-chat?chat=chat_A"); await attach(page);
   await page.getByRole("button", { name: "Queue", exact: true }).click(); await expect.poll(() => f.control.queueRoutes.length).toBe(1);
-  await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Annotate", exact: true })).toBeDisabled();
   await f.control.queueRoutes[0].fulfill({ status: 409, json: { apiVersion: "1", error: { code: "queue_target_ended", requestId: "fixture", message: "Queue rejected", retryable: false } } });
-  await expect(page.getByRole("button", { name: "Разметить", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Annotate", exact: true })).toBeEnabled();
 });
 
 test("navigation cancels an in-flight edit and cannot replace a neighboring draft", async ({ page }) => {
@@ -259,7 +259,7 @@ test("navigation cancels an in-flight edit and cannot replace a neighboring draf
   await page.getByRole("textbox", { name: "Message Pritha" }).fill("Keep B");
   await page.getByRole("button", { name: /Chat A/ }).click(); await attach(page); f.control.editMode = "hold";
   const original = f.control.puts[0];
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect.poll(() => f.control.held.length).toBe(1);
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect.poll(() => f.control.held.length).toBe(1);
   // Force a programmatic navigation while the modal blocks ordinary pointer input.
   // This exercises the ownership guard rather than relying on the modal for safety.
   await page.getByRole("button", { name: /Chat B/ }).evaluate(button => (button as HTMLButtonElement).click());
@@ -267,7 +267,7 @@ test("navigation cancels an in-flight edit and cannot replace a neighboring draf
   await expect(page.getByRole("textbox", { name: "Message Pritha" })).toHaveValue("Keep B");
   await f.control.held[0].route.fulfill({ status: 201, json: { apiVersion: "1", requestId: "late", data: f.control.held[0].view } });
   await page.getByRole("button", { name: /Chat A/ }).click();
-  await expect(page.getByRole("button", { name: "Вернуть оригинал", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Restore original", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Send", exact: true }).click(); await expect.poll(() => f.control.sent.length).toBe(1); expect(f.control.sent[0].attachments).toEqual([original.id]);
 });
 
@@ -276,15 +276,15 @@ test("unsupported images and decoding failure preserve normal attachments", asyn
   await ready(page);
   await page.locator('input[type="file"]').setInputFiles([{ name: "movie.gif", mimeType: "image/gif", buffer: Buffer.from("GIF89a") }, { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("notes") }]);
   await expect(page.getByLabel("Draft attachments").getByText("Ready", { exact: true })).toHaveCount(2);
-  await expect(page.getByRole("button", { name: "Разметить", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Annotate", exact: true })).toHaveCount(0);
   await page.locator('input[type="file"]').setInputFiles({ name: "broken.png", mimeType: "image/png", buffer: Buffer.from("broken PNG") });
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await expect(page.getByRole("dialog").getByRole("status")).toContainText("static PNG");
-  await page.getByRole("button", { name: "Отмена", exact: true }).click(); await expect(page.getByLabel("Draft attachments").getByText("Ready", { exact: true })).toHaveCount(3);
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await expect(page.getByRole("dialog").getByRole("status")).toContainText("static PNG");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click(); await expect(page.getByLabel("Draft attachments").getByText("Ready", { exact: true })).toHaveCount(3);
 });
 
 test("annotation cannot bypass a text-only model capability gate", async ({ page }) => {
   const f = await fixture(page); f.control.modelImages = false; await page.goto("/task-chat?chat=chat_A"); await attach(page);
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
   await page.getByRole("textbox", { name: "Message Pritha" }).press("Enter"); expect(f.control.sent).toHaveLength(0);
 });
@@ -297,21 +297,21 @@ test("JPEG EXIF orientation is baked into exported PNG dimensions", async ({ pag
   const header = Buffer.alloc(4); header[0] = 255; header[1] = 225; header.writeUInt16BE(exif.length + 2, 2);
   const oriented = Buffer.concat([jpeg.subarray(0, 2), header, exif, jpeg.subarray(2)]);
   await page.locator('input[type="file"]').setInputFiles({ name: "rotated.jpg", mimeType: "image/jpeg", buffer: oriented });
-  await page.getByRole("button", { name: "Разметить", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Annotate", exact: true }).click(); await draw(page); await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
   const png = f.control.puts.at(-1)!.body; expect(png.readUInt32BE(16)).toBe(20); expect(png.readUInt32BE(20)).toBe(30);
 });
 
 test("rectangle and pen export visible marks with no viewport overflow in either theme", async ({ page }) => {
   const f = await fixture(page); await page.goto("/task-chat?chat=chat_A"); await attach(page);
-  for (const [tool, theme] of [["Прямоугольник", "light"], ["Перо", "dark"]]) {
+  for (const [tool, theme] of [["Rectangle", "light"], ["Pen", "dark"]]) {
     await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
-    await page.getByRole("button", { name: "Разметить", exact: true }).click();
+    await page.getByRole("button", { name: "Annotate", exact: true }).click();
     await page.getByRole("button", { name: tool, exact: true }).click();
-    await page.getByRole("combobox", { name: "Толщина", exact: true }).selectOption("3");
-    await draw(page, tool === "Прямоугольник");
+    await page.getByRole("combobox", { name: "Stroke width", exact: true }).selectOption("3");
+    await draw(page, tool === "Rectangle");
     expect(await page.getByRole("dialog").evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect(await page.getByRole("dialog").evaluate(element => getComputedStyle(element).backgroundColor)).toMatch(/^rgb\(/);
-    await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0);
     const redPixels = await page.evaluate(async href => {
       const image = new Image(); image.src = href; await image.decode(); const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
       const ctx = canvas.getContext("2d")!; ctx.drawImage(image, 0, 0); const bytes = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -326,13 +326,13 @@ test.describe("touch annotation", () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
   test("touch pointer draws a pen dot and the modal contains keyboard focus", async ({ page }) => {
     const f = await fixture(page); await page.goto("/task-chat?chat=chat_A"); await attach(page);
-    await page.getByRole("button", { name: "Разметить", exact: true }).click(); await page.getByRole("button", { name: "Перо", exact: true }).click();
-    const canvas = page.getByLabel("Холст разметки"); await expect(canvas).toBeVisible(); const box = (await canvas.boundingBox())!;
+    await page.getByRole("button", { name: "Annotate", exact: true }).click(); await page.getByRole("button", { name: "Pen", exact: true }).click();
+    const canvas = page.getByLabel("Annotation canvas"); await expect(canvas).toBeVisible(); const box = (await canvas.boundingBox())!;
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.getByRole("button", { name: "Применить", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Apply", exact: true })).toBeEnabled();
     await page.keyboard.press("Tab");
     expect(await page.getByRole("dialog").evaluate(element => element.contains(document.activeElement))).toBe(true);
-    await page.getByRole("button", { name: "Применить", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0); expect(f.control.puts).toHaveLength(2);
+    await page.getByRole("button", { name: "Apply", exact: true }).click(); await expect(page.getByRole("dialog")).toHaveCount(0); expect(f.control.puts).toHaveLength(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 });

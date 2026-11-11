@@ -63,9 +63,9 @@ function capabilityTone(status: CapabilityStatus | "pass" | "fail" | "unknown") 
 }
 
 const THEME_OPTIONS: Array<{id:ControlCenterTheme;label:string;appliedLabel:string;detail:string;icon:typeof Moon}> = [
-  {id:"classic",label:"Классическая",appliedLabel:"Classic",detail:"Deep control room",icon:Monitor},
-  {id:"dark",label:"Тёмная",appliedLabel:"Dark",detail:"Graphite and pastel accents",icon:Moon},
-  {id:"light",label:"Светлая",appliedLabel:"Light",detail:"Mineral green and blue",icon:Sun},
+  {id:"classic",label:"Classic",appliedLabel:"Classic",detail:"Deep control room",icon:Monitor},
+  {id:"dark",label:"Dark",appliedLabel:"Dark",detail:"Graphite and pastel accents",icon:Moon},
+  {id:"light",label:"Light",appliedLabel:"Light",detail:"Mineral green and blue",icon:Sun},
 ];
 
 function memoryIndexLabel(status?: ControlCenterStatus) {

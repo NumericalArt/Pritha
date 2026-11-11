@@ -14,8 +14,8 @@ test('scaffold manifest cannot expose executable Start even with a real folder a
   for(const status of [{outcome_status:'implementation-required'},{control_center_contract:{status:'implementation-required'}}]){
     const control=build({interface:'web'},{absolutePath:'/fixture'},{local_upstream_url:'http://127.0.0.1:3000',control_center_managed:true,...status},{},'alive','inactive',{});
     assert.equal(control.runtimeKind,'scaffold');assert.equal(control.ownership,'none');
-    assert.notEqual(control.executionMode,'executable');assert.equal(control.label,'Подготовка агента');
-    assert.match(control.reason,/каркас/);
+    assert.notEqual(control.executionMode,'executable');assert.equal(control.label,'Agent preparation');
+    assert.match(control.reason,/scaffold/);
   }
   const ready=build({interface:'web'},{absolutePath:'/fixture'},{local_upstream_url:'http://127.0.0.1:3000',control_center_managed:true,outcome_status:'implemented'},{},'alive','inactive',{});
   assert.equal(ready.runtimeKind,'web_service');assert.equal(ready.executionMode,'executable');

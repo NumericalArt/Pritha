@@ -1609,9 +1609,9 @@ export function VoiceControlPage({ status }: { status: ControlCenterStatus }) {
   return (
     <>
       {realtime.voiceDraftAvailable && <div className="settings-rowline" role="status">
-        <span>Достигнут предел записи. Отправьте сохранённый фрагмент или удалите его.</span>
-        <button className="outline-button" onClick={() => void realtime.resolveVoiceDraft(true)}>Отправить запись</button>
-        <button className="outline-button" onClick={() => void realtime.resolveVoiceDraft(false)}>Удалить запись</button>
+        <span>The recording limit has been reached. Send the saved segment or discard it.</span>
+        <button className="outline-button" onClick={() => void realtime.resolveVoiceDraft(true)}>Send recording</button>
+        <button className="outline-button" onClick={() => void realtime.resolveVoiceDraft(false)}>Discard recording</button>
       </div>}
       <div className="mobile-voice-screen">
         <MobileStatusChips status={realtime.status} />

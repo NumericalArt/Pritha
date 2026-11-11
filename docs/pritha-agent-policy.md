@@ -3,7 +3,7 @@ id: AGENTS
 type: artifact
 status: processed
 created: 2026-06-01
-updated: 2026-11-01
+updated: 2026-11-11
 topics:
   - privacy-preserving-intake
 tools:[]
@@ -558,6 +558,18 @@ Codex остается основной рабочей средой проект
 
 Если идея перспективная, но не зрелая, создать review или brief вместо стандарта.
 
-## Язык
+## Language
 
-Основной язык проекта: русский. Названия файлов держать в ASCII и kebab-case, чтобы они были удобны для CLI и Git.
+The primary project language is English. Use English for authored system UI,
+factory journals, status and error messages, action labels, generated project
+instructions, and new project documentation. A Russian user message or an
+older Russian document does not change this default. Explicit user language
+preferences still apply to conversational replies and requested artifacts.
+
+Preserve user-authored content, source quotations, historical records, and
+support for input in other languages. Keep explicit localization in its own
+language; a sidebar language preference does not translate server-generated
+factory messages. New default system messages must be authored in English at
+their source.
+
+Keep filenames in ASCII and kebab-case for convenient CLI and Git use.

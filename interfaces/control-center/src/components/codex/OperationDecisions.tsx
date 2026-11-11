@@ -15,7 +15,7 @@ export function OperationDecisions({ chatId, runId, disabled }: { chatId: string
     try {
       const result = await controlCenterRequest<OperationPlan>(`${url}?runId=${encodeURIComponent(runId)}&action=${action}`, {}, { timeoutMs: 30000 });
       if (mounted.current) { setPlan(result.data); setPending(result.data.pendingRequest); }
-    } catch (error) { if (mounted.current) setMessage(error instanceof ControlCenterRequestError ? error.message : "План пока недоступен."); }
+    } catch (error) { if (mounted.current) setMessage(error instanceof ControlCenterRequestError ? error.message : "The plan is currently unavailable."); }
     finally { busyRef.current = false; if (mounted.current) setBusy(false); }
   }
   async function decide(decision: "approve" | "cancel") {
@@ -26,23 +26,23 @@ export function OperationDecisions({ chatId, runId, disabled }: { chatId: string
       const { data } = await controlCenterRequest<OperationReceipt>(url, { method: "POST", body: JSON.stringify(request), headers: { "Idempotency-Key": request.requestId } }, { timeoutMs: 150000 });
       if (!mounted.current) return;
       if (data.status !== "started") { setPending(null); setPlan(null); }
-      setMessage(data.status === "completed" ? "Операция выполнена. Доступ с другого устройства проверьте отдельно." : data.status === "cancelled" ? "Операция отменена." : data.status === "started" ? "Выполнение ещё не подтверждено. Проверьте Operations; повтор не запустит действие заново." : "Операция завершилась с ошибкой. Проверьте Operations.");
+      setMessage(data.status === "completed" ? "Operation completed. Verify access from another device separately." : data.status === "cancelled" ? "Operation cancelled." : data.status === "started" ? "Execution is not yet confirmed. Check Operations; retrying will not run the action again." : "The operation failed. Check Operations.");
     } catch (error) {
       if (!mounted.current) return;
       if (error instanceof ControlCenterRequestError && error.httpStatus === 409 && error.code === "operation_plan_changed") { setPending(null); setPlan(null); }
-      setMessage(error instanceof ControlCenterRequestError ? error.message : "Ответ не получен. Проверьте сохранённое действие.");
+      setMessage(error instanceof ControlCenterRequestError ? error.message : "No response received. Check the saved action.");
     } finally { busyRef.current = false; if (mounted.current) setBusy(false); }
   }
-  return <section className="codex-operation-decisions" aria-label="Операции агента">
-    <p>Запуск и приватный доступ подтверждаются отдельно.</p>
+  return <section className="codex-operation-decisions" aria-label="Agent operations">
+    <p>Startup and private access require separate approval.</p>
     <div className="codex-goal-fields">
-      <button className="outline-button compact" disabled={disabled || busy || Boolean(pending)} onClick={() => void preview("start")}>План Start</button>
-      <button className="outline-button compact" disabled={disabled || busy || Boolean(pending)} onClick={() => void preview("tailscale-serve")}>План Tailscale Serve</button>
+      <button className="outline-button compact" disabled={disabled || busy || Boolean(pending)} onClick={() => void preview("start")}>Preview Start</button>
+      <button className="outline-button compact" disabled={disabled || busy || Boolean(pending)} onClick={() => void preview("tailscale-serve")}>Preview Tailscale Serve</button>
     </div>
     {plan ? <div className="codex-operation-card"><strong>{plan.label}</strong><p>{plan.summary}</p>{plan.reason ? <p>{plan.reason}</p> : null}
-      {pending ? <button className="outline-button compact" disabled={disabled || busy} onClick={() => void decide(pending.decision)}>Проверить сохранённое действие</button> : <div className="codex-goal-fields">
-        <button className="outline-button compact" disabled={disabled || busy || !plan.enabled} onClick={() => void decide("approve")}>Подтвердить {plan.label}</button>
-        <button className="outline-button compact" disabled={disabled || busy} onClick={() => void decide("cancel")}>Отмена</button>
+      {pending ? <button className="outline-button compact" disabled={disabled || busy} onClick={() => void decide(pending.decision)}>Check saved action</button> : <div className="codex-goal-fields">
+        <button className="outline-button compact" disabled={disabled || busy || !plan.enabled} onClick={() => void decide("approve")}>Approve {plan.label}</button>
+        <button className="outline-button compact" disabled={disabled || busy} onClick={() => void decide("cancel")}>Cancel</button>
       </div>}
     </div> : null}
     {message ? <p role="status">{message}</p> : null}
