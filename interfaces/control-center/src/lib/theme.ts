@@ -1,6 +1,6 @@
 export const CONTROL_CENTER_THEMES = ["classic", "dark", "light"] as const;
 export type ControlCenterTheme = (typeof CONTROL_CENTER_THEMES)[number];
-export const DEFAULT_THEME: ControlCenterTheme = "classic";
+export const DEFAULT_THEME: ControlCenterTheme = "dark";
 export const THEME_STORAGE_KEY = "pritha-control-center-theme-v2";
 export const THEME_CHANGED_EVENT = "pritha-theme-changed";
 
@@ -25,7 +25,7 @@ export function selectTheme(value:ControlCenterTheme) {
 
 // The legacy key is intentionally neither read nor written. Its dark meant Classic.
 export const themeInitScript = `(() => {
-  let theme = "classic";
+  let theme = ${JSON.stringify(DEFAULT_THEME)};
   try {
     const value = window.localStorage.getItem("pritha-control-center-theme-v2");
     if (["classic", "dark", "light"].includes(value)) theme = value;

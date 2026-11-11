@@ -4,7 +4,7 @@ const storageKey='pritha-control-center-theme-v2';
 test('theme selection survives navigation and reload, syncs tabs, and never writes runtime settings',async({page,context})=>{
   const mutations:string[]=[];page.on('request',req=>{if(req.method()==='POST')mutations.push(new URL(req.url()).pathname);});
   await page.addInitScript(()=>localStorage.setItem('pritha-control-center-theme','dark'));
-  await page.goto('/settings');await expect(page.locator('html')).toHaveAttribute('data-theme','classic');
+  await page.goto('/settings');await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   const radios=page.getByRole('radiogroup',{name:'Theme'}).getByRole('radio');await expect(radios).toHaveCount(3);
   await page.getByRole('radio',{name:'Тёмная',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   expect(await page.evaluate(key=>localStorage.getItem(key),storageKey)).toBe('dark');
@@ -13,23 +13,32 @@ test('theme selection survives navigation and reload, syncs tabs, and never writ
   const other=await context.newPage();await other.goto('/voice');await expect(other.locator('html')).toHaveAttribute('data-theme','dark');
   await page.getByRole('radio',{name:'Светлая',exact:true}).click();await expect(other.locator('html')).toHaveAttribute('data-theme','light');
   await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','light');
-  await page.evaluate(key=>localStorage.removeItem(key),storageKey);await expect(other.locator('html')).toHaveAttribute('data-theme','classic');
-  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','classic');
+  await page.evaluate(key=>localStorage.removeItem(key),storageKey);await expect(other.locator('html')).toHaveAttribute('data-theme','dark');
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   expect(await page.evaluate(()=>localStorage.getItem('pritha-control-center-theme'))).toBe('dark');
   expect(mutations.filter(url=>/settings|config|credentials|tasks/.test(url))).toEqual([]);
   await other.close();
 });
 
-for(const mode of ['invalid','blocked','no-attribute'] as const)test(`Classic fallback with ${mode}`,async({page})=>{
+for(const mode of ['invalid','blocked'] as const)test(`Graphite dark fallback with ${mode} storage`,async({page})=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(mode=>{
     if(mode === 'invalid')localStorage.setItem('pritha-control-center-theme-v2','system');
     if(mode === 'blocked')Object.defineProperty(window,'localStorage',{get(){throw new Error('Blocked by test');}});
   },mode);
-  await page.goto('/settings');await expect(page.locator('html')).toHaveAttribute('data-theme','classic');
-  if(mode === 'no-attribute')await page.evaluate(()=>delete document.documentElement.dataset.theme);
-  expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--bg-0').trim())).toBe('#060b14');
+  await page.goto('/settings');await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--bg-0').trim())).toBe('#0c1015');
   expect(errors).toEqual([]);
+});
+
+test('server-rendered pages start in graphite dark before JavaScript runs',async({browser,baseURL})=>{
+  const context=await browser.newContext({baseURL,javaScriptEnabled:false});
+  try {
+    const page=await context.newPage();
+    await page.goto('/settings');
+    await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+    await expect(page.locator('body')).toHaveCSS('background-image',/12, 16, 21/);
+  } finally {await context.close();}
 });
 
 for(const theme of ['dark','light'] as const)for(const width of [1440,1200,768,767,390,320])test(`${theme} surfaces and contrast at ${width}px`,async({page},info)=>{

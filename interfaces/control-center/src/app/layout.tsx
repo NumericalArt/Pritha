@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { AppShell } from "@/components/shell/AppShell";
 import "@/styles/globals.css";
-import { themeInitScript } from "@/lib/theme";
+import { DEFAULT_THEME, themeInitScript } from "@/lib/theme";
 import { ThemeSync } from "@/components/shell/ThemeSync";
 
 // AppShell reads the current instance's private status. Never bake that state
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme={DEFAULT_THEME} data-theme-preference={DEFAULT_THEME} suppressHydrationWarning>
       <head>
         <Script id="pritha-theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
