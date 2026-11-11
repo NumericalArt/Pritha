@@ -19,7 +19,7 @@ function fixture(t,environment={}){
 }
 test('private queries, offline contexts and original user denials fail before any provider call',async t=>{
   const f=fixture(t);
-  for(const query of ['inspect /fixture/code/file','look up /Users/fixture/private','api_key=PRIVATE_CANARY_123456789','https://example.com/?token=PRIVATE_CANARY_123456789'])assert.equal((await f.service.search({query},context)).error.code,'search_query_private');
+  for(const query of ['inspect /fixture/code/file',`look up ${path.join(os.homedir(),'pritha-private-search-fixture')}`,'api_key=PRIVATE_CANARY_123456789','https://example.com/?token=PRIVATE_CANARY_123456789'])assert.equal((await f.service.search({query},context)).error.code,'search_query_private');
   for(const change of [{offline:true},{connectorId:'local'},{privacy:'local-private'},{denied:true}])assert.equal((await f.service.search({query:'public'}, {...context,...change})).ok,false);
   for(const text of ['не ищи в интернете','do not browse','do not use search','без интернета'])assert.equal(searchIntent(text).denied,true);
   assert.equal(f.calls(),0);

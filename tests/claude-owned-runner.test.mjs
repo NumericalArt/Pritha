@@ -90,7 +90,7 @@ for(const [label,text,allowSearch,expectedCalls] of [['requested','Search public
     else assert.equal(response.result.isError,expectedCalls===0);
     if(expectedCalls){
       const result=JSON.parse(response.result.content[0].text);assert.equal(result.ok,true);assert.equal(result.sources[0].url,'https://example.com/source');
-      const privateQuery=await post(3,'tools/call',{name:'web_search',arguments:{query:'inspect /Users/fixture/private'}});
+      const privateQuery=await post(3,'tools/call',{name:'web_search',arguments:{query:`inspect ${path.join(os.homedir(),'pritha-private-search-fixture')}`}});
       assert.equal(privateQuery.result.isError,true);
     }
     return spawn(command,args,spawnOptions);

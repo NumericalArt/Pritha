@@ -1,6 +1,6 @@
 ---
 id: pritha-provider-convergence-deployment-2026-11-01
-type: agent-deployment-report
+type: review
 status: activated-awaiting-acceptance
 created: 2026-11-01
 updated: 2026-11-03
