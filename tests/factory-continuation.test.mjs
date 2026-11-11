@@ -14,8 +14,8 @@ import {scenarios,productFactoryFixture,until} from './helpers/product-factory.m
 test('Voice and Task Chat cannot turn the end of a controller reply into a completed product',()=>{
  const partial=factoryMilestone({phase:'card-blocked'},{status:'verified',blockers:[]},{commit:'tested'});
  assert.equal(partial.kind,'partial');assert.equal(factoryVoiceDisplay('complete',true,partial).complete,false);
- const blocked=factoryMilestone({}, {status:'blocked',blockers:[{code:'iteration_budget_exhausted',title:'Закончились попытки',question:'Продолжить?'}]},null);
- assert.match(blocked.summary,/попытки/);assert.equal(factoryVoiceDisplay('complete',true,blocked).status,'waiting_for_operator');assert.ok(factoryVoiceDisplay('complete',true,blocked).ceiling<100);
+ const blocked=factoryMilestone({}, {status:'blocked',blockers:[{code:'iteration_budget_exhausted',title:'Build attempts exhausted',question:'Continue?'}]},null);
+ assert.match(blocked.summary,/attempts/);assert.equal(factoryVoiceDisplay('complete',true,blocked).status,'waiting_for_operator');assert.ok(factoryVoiceDisplay('complete',true,blocked).ceiling<100);
  assert.equal(factoryVoiceDisplay('aborted',true,blocked).complete,true);
  // Both older accepted pilots still have this pre-acceptance factory phase.
  const accepted=factoryMilestone({phase:'awaiting-manual-acceptance'},{status:'accepted',acceptance:'accepted',blockers:[]},{commit:'tested'});
@@ -37,25 +37,25 @@ test('expected implementation, repair, and a real interruption stay distinct wit
  const state={phase:'scaffolded',scaffoldRevision:'baseline',outcomeApproval:{},running:{action:'deliver'}};
  const ledger={status:'building',phase:'implementation',iteration:1,version:1,blockers:[],budget:{tokens_used:0,max_tokens:100,max_iterations:2,legacy_usage_unverified:false,unaccounted_attempts:[]}};
  const before=structuredClone(ledger),show=(s=state,l=ledger)=>factoryMilestone(s,deliveryExplanation(l),null);
- assert.equal(show().summary,'Каркас готов. Реализую поведение агента');
+ assert.equal(show().summary,'The scaffold is ready. Implementing the agent behavior.');
  assert.equal(factoryVoiceDisplay('complete',true,show()).status,'running');
- assert.match(show(state,{...ledger,iteration:0,phase:'repair'}).summary,/Подготавливаю реализацию/);
- assert.match(show(state,{...ledger,iteration:2}).summary,/несоответствие.*Исправляю.*повторю проверку/);
- assert.match(show(state,{...ledger,status:'verifying'}).summary,/Сверяю поведение/);
- assert.match(show(state,{...ledger,phase:'repair',failure_history:[{trial_ids:['build-executor']}]}).summary,/вызов сборщика.*проверяет сохранённые файлы/);
+ assert.match(show(state,{...ledger,iteration:0,phase:'repair'}).summary,/Preparing to implement/);
+ assert.match(show(state,{...ledger,iteration:2}).summary,/mismatch.*Fixing.*verifying again/);
+ assert.match(show(state,{...ledger,status:'verifying'}).summary,/Checking the agent behavior/);
+ assert.match(show(state,{...ledger,phase:'repair',failure_history:[{trial_ids:['build-executor']}]}).summary,/builder call.*checking the saved files/);
  assert.equal(show({...state,running:null}).kind,'reconcile');
- assert.match(show(state,{...ledger,status:'cancelled'}).summary,/завершена без приёмки.*Для новой работы/);
- assert.match(show(state,{...ledger,status:'paused'}).summary,/ждёт команды на продолжение/);
+ assert.match(show(state,{...ledger,status:'cancelled'}).summary,/ended without acceptance.*New work/);
+ assert.match(show(state,{...ledger,status:'paused'}).summary,/waiting for a request to continue/);
  const blocked={...ledger,status:'blocked',blockers:[{code:'build_runtime_unavailable',summary:'secret-provider-log',options:[{id:'retry-after-upgrade'}]}]};
  const view=show(state,blocked);
- assert.equal(view.kind,'decision');assert.match(view.summary,/Не удалось подключить.*приостановила.*восстановления/);
+ assert.equal(view.kind,'decision');assert.match(view.summary,/could not be connected.*paused.*restoring/);
  assert.equal(factoryVoiceDisplay('complete',true,view).status,'waiting_for_operator');
  assert.doesNotMatch(JSON.stringify(deliveryExplanation(blocked)),/secret-provider-log/);
  for(const continuationPause of ['research_collect','scaffold','deliver','finish']){
    const paused=show({...state,running:null,continuationPause});
-   assert.ok(['stopped','partial'].includes(paused.kind));assert.doesNotMatch(paused.summary,/Реализую|Исправляю/);
+   assert.ok(['stopped','partial'].includes(paused.kind));assert.doesNotMatch(paused.summary,/Implementing|Fixing/);
  }
- assert.match(show(state,{...blocked,blockers:[{code:'unknown-failure',summary:'private-log',options:[{id:'unknown-option'}]}]}).summary,/Причина пока не уточнена.*журнал/);
+ assert.match(show(state,{...blocked,blockers:[{code:'unknown-failure',summary:'private-log',options:[{id:'unknown-option'}]}]}).summary,/cause is not yet known.*log/);
  assert.deepEqual(ledger,before);
 });
 for(const scenario of scenarios)test(scenario.connectorId+': host continues after two decisions and hands off observed output from the exact revision',{timeout:120000},async t=>{
@@ -89,7 +89,7 @@ for(const scenario of scenarios)test(scenario.connectorId+': host continues afte
  assert.equal(publish.continuationFailed,false,JSON.stringify(publish));assert.deepEqual(publish.continued,['scaffold','deliver','finish'],JSON.stringify(f.progress()));
  assert.equal(f.reviews.length,2);assert.equal(f.builds.length,1);
  assert.equal(buildViews.length,1);assert.equal(buildViews[0].milestone.kind,'building');
- assert.equal(buildViews[0].milestone.summary,'Каркас готов. Реализую поведение агента');
+ assert.equal(buildViews[0].milestone.summary,'The scaffold is ready. Implementing the agent behavior.');
  assert.deepEqual(buildViews[0].delivery.blockers,[]);
  const opts={root:f.root,stateRoot:f.stateRoot,agentParent:f.paths.parent,slug:f.paths.slug,target:f.paths.target,chatId:f.chatId,connectorId:scenario.connectorId,model:scenario.model};
  const before=fs.readFileSync(f.paths.file);const view=readBoundFactoryProgress(opts);

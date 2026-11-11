@@ -80,7 +80,7 @@ export async function providerVoiceTaskProjection(taskId: string) {
   const boundProduct = topic.workspace.factorySlug && topic.chatId
     ? await getCodexChatGateway().taskDeliveries(topic.chatId).then(v => 'factory' in v ? v.factory : null).catch(()=>null) : null;
   const product = boundProduct?.available && boundProduct.slug===topic.workspace.factorySlug ? boundProduct.milestone
-    : topic.workspace.factorySlug ? {kind:'reconcile',label:'Проверяю состояние',summary:'Проверяю сохранённое состояние создания агента. Повторный запуск не нужен.'} : null;
+    : topic.workspace.factorySlug ? {kind:'reconcile',label:'Checking state',summary:'Checking the saved agent build state. No restart is needed.'} : null;
   const resultText = receipt?.kind === 'turn' ? receipt.resultText || '' : '';
   return { task, topic, resultText, status: {
     status, phase: unknownExecution ? 'execution_unknown' : factoryFailed ? 'factory_draft_failed' : turn?.status || queue?.status || task.state, transport: 'task-chat', connector_id: topic.connectorId,

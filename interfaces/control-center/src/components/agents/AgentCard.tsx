@@ -9,7 +9,7 @@ import { AgentIcon } from "./AgentIcon";
 import { AgentResultReadiness } from "./AgentResultReadiness";
 
 function stateLabel(agent: AgentCardModel) {
-  if (agent.resultReadiness && agent.state !== "missing") return "Проект найден";
+  if (agent.resultReadiness && agent.state !== "missing") return "Project found";
   if (agent.state === "alive") return "Alive";
   if (agent.state === "missing") return "Missing";
   if (agent.state === "needs-check") return "Needs check";
@@ -17,8 +17,8 @@ function stateLabel(agent: AgentCardModel) {
 }
 
 function activityLabel(agent: AgentCardModel) {
-  if (agent.runtimeReadiness?.status === "not_applicable") return "По запросу";
-  if (agent.resultReadiness) return agent.healthStatus === "ok" ? "Health OK" : agent.healthStatus === "failed" ? "Нет ответа" : "Процесс не проверен";
+  if (agent.runtimeReadiness?.status === "not_applicable") return "On demand";
+  if (agent.resultReadiness) return agent.healthStatus === "ok" ? "Health OK" : agent.healthStatus === "failed" ? "No response" : "Process not checked";
   if (agent.activity === "active") return "Active";
   if (agent.activity === "inactive") return "Inactive";
   return "Unknown";

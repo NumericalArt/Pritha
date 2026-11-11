@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ chat
 export async function POST(request: Request, { params }: { params: Promise<{ chatId: string }> }) {
   try {
     const origin = request.headers.get("origin"), host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-    if (!origin || new URL(origin).host !== host) throw new CodexChatGatewayError("operation_origin_invalid", "Подтвердите операцию в этом Control Center.", 403);
+    if (!origin || new URL(origin).host !== host) throw new CodexChatGatewayError("operation_origin_invalid", "Approve the operation in this Control Center.", 403);
     const key = requireIdempotencyKey(request), body = await readJsonBody<OperationRequest>(request);
     if (body?.requestId !== key) throw new CodexChatGatewayError("idempotency_conflict", "Request identifiers must match.", 409);
     const { chatId } = await params;

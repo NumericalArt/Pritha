@@ -16,7 +16,7 @@ test('a reserved Voice workspace failure survives readback and reports zero exec
   assert.equal(status.error_code,'workspace_dirty');assert.equal(status.phase,'provider_dispatch_attention');assert.equal(status.updated_at,stored.updated_at);
   assert.equal(api.providerVoiceTaskFields(request,status).error_code,'workspace_dirty');
   const feedback=api.providerVoiceTaskFeedback('fixture',request,status);
-  assert.match(feedback.voice_text,/ещё не запущена/);assert.match(feedback.voice_text,/незакоммиченные/);assert.match(feedback.voice_text,/отдельного нового агента/);
+  assert.match(feedback.voice_text,/has not started/);assert.match(feedback.voice_text,/uncommitted/);assert.match(feedback.voice_text,/a separate new agent/);
   assert.equal(feedback.requires_response,false); // No answerable provider question exists before chat creation.
   const progress=api.codexTaskProgressMetrics({statusValue:status.status,complete:false,waitingForOperator:true,decisionRequired:false,resultAvailable:false,stale:false,plan:null,progress:[],notDispatched:status.dispatch_state==='reserved'});
   assert.equal(progress.percent,0);assert.equal(progress.detail.source,'before_dispatch');
@@ -35,7 +35,7 @@ test('confirmed dispatch, real questions and terminal results replace stale pref
 test('a finished model answer with no factory draft is reported as failed work with zero product progress',()=>{
   const status={status:'failed',phase:'factory_draft_failed',factory_draft_failed:true,error_code:'factory_not_started'};
   const feedback=api.providerVoiceTaskFeedback('fixture',{task_chat_connector:'claude'},status);
-  assert.match(feedback.voice_text,/не подтверждено/);assert.equal(feedback.requires_response,false);
+  assert.match(feedback.voice_text,/not confirmed/);assert.equal(feedback.requires_response,false);
   const progress=api.codexTaskProgressMetrics({statusValue:'failed',complete:true,waitingForOperator:false,progress:[],factoryDraftFailed:true});
   assert.equal(progress.percent,0);assert.equal(progress.detail.source,'factory_draft_missing');
 });

@@ -58,8 +58,8 @@ export async function planOperationDecision(task, runId, action, options) {
     } catch { fail("operation_receipt_invalid", "Recover the saved operation evidence first."); }
   }
   return { ...bound, planLock: hash(bound), pendingRequest, label: action === "start" ? "Start" : "Tailscale Serve",
-    summary: action === "start" ? "Запустить выбранный управляемый сервис агента." : `Открыть приватный доступ к сервису на порту ${port || "не задан"}. Доступ с другого устройства проверяется отдельно.`,
-    reason: enabled ? null : !verified ? "Сначала нужна проверка текущей канонической ревизии агента." : "Управляемая операция пока недоступна; проверьте Operations.",
+    summary: action === "start" ? "Start the selected managed agent service." : `Enable private access to the service on port ${port || "not set"}. Access from another device is verified separately.`,
+    reason: enabled ? null : !verified ? "Verify the current canonical agent revision first." : "The managed operation is currently unavailable; check Operations.",
   };
 }
 

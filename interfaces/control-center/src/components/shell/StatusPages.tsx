@@ -17,7 +17,7 @@ function iconForAgent(agent: ControlCenterAgent): AgentIconType {
 function deliveryLifecycleCard(agent: ControlCenterAgent): Pick<AgentCardModel, "lifecycleNote" | "lifecycleTone"> | null {
   if (agent.resultReadiness) {
     const run = agent.resultReadiness.run;
-    return { lifecycleNote: run ? `Сборка ${run.id} · ${run.status.replaceAll("_", " ")}` : "Нет актуального результата delivery", lifecycleTone: "muted" };
+    return { lifecycleNote: run ? `Build ${run.id} · ${run.status.replaceAll("_", " ")}` : "No current delivery result", lifecycleTone: "muted" };
   }
   const value = agent.lifecycle.delivery.status;
   if (value === "accepted") return { lifecycleNote: "Delivery accepted", lifecycleTone: "ok" };

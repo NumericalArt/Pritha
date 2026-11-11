@@ -3,7 +3,7 @@ id: pritha-agent-instructions-index
 type: workflow
 status: active
 created: 2026-11-02
-updated: 2026-11-02
+updated: 2026-11-11
 topics: [pritha, governance, instruction-routing, agent-harness]
 tools: [Codex, Node.js]
 sources: [docs/pritha-agent-policy.md]
@@ -37,6 +37,9 @@ Explicit user instructions take precedence over project guidelines.
 
 ## Always apply
 
+- English is the primary project language. Write system UI, factory journals,
+  status messages, and new project documentation in English. Preserve user
+  content and explicit language preferences; see the full policy's Language section.
 - Work in the selected instance. Resolve roots with `resolvePrithaRoot`, state
   with `resolvePrithaStateRoot`, and children with `resolvePrithaAgentParent`.
   Forward both compatible root aliases through `prithaRootEnvironment(root)`.

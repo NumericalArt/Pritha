@@ -2505,7 +2505,7 @@ async function handleWebSearch(args: WebSearchArgs = {}) {
       ok: false,
       status: "failed",
       error: "missing_query",
-      summary: "Нужен поисковый запрос.",
+      summary: "A search query is required.",
       backend: "searxng",
     };
   }
@@ -2571,7 +2571,7 @@ async function handleWebSearch(args: WebSearchArgs = {}) {
 async function handleRecentExternalResearch(args: RecentExternalResearchArgs = {}) {
   const root = resolvePrithaRoot();
   const query = compactText(args.query, 300);
-  if (!query) return { ok: false, status: "failed", error: "missing_query", summary: "Нужна тема поиска." };
+  if (!query) return { ok: false, status: "failed", error: "missing_query", summary: "A research topic is required." };
 
   const rejectedSources = rejectedRecentResearchSources(args.search_sources);
   if (rejectedSources.length) {
@@ -2583,7 +2583,7 @@ async function handleRecentExternalResearch(args: RecentExternalResearchArgs = {
       rejected_sources: rejectedSources,
       allowed_sources: Array.from(RECENT_RESEARCH_ALLOWED_SOURCES).sort(),
       summary:
-        "Этот голосовой инструмент пока работает только с публичными no-secret источниками. Для X, YouTube, cookies, paid APIs или private auth нужен отдельный UI approval path.",
+        "This voice tool currently supports only public sources that require no secrets. X, YouTube, cookies, paid APIs, or private authentication require a separate UI approval path.",
     };
   }
 
@@ -2626,7 +2626,7 @@ async function handleRecentExternalResearch(args: RecentExternalResearchArgs = {
       ok: false,
       status: error instanceof Error && error.message.includes("timed") ? "failed_timeout" : "failed",
       error: "recent_external_research_command_failed",
-      summary: "last30days research backend не смог завершить запрос.",
+      summary: "The last30days research backend could not complete the request.",
       stderr: redactSensitiveText(error instanceof Error ? error.message : String(error)),
     };
     await logPrivateEvent("recent_external_research_finished", { ok: false, query, error: output.error, status: output.status });
@@ -2656,7 +2656,7 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     : [];
   return [
     "You are Pritha, a Codex-native agent factory and knowledge assistant.",
-    "Speak with the operator in Russian unless they switch language.",
+    "Speak with the operator in English by default. Follow their explicit language preference or switch languages when they do.",
     "This is an experimental realtime voice interface. Keep answers concise, calm and operational.",
     `You have exactly ${toolNames.length} tools: ${formatToolNames(toolNames)}.`,
     "Use full_pritha_memory before answering questions about curated Pritha memory: standards, decisions, workflows, child-agent lineage, previous UI/realtime experiments, or stored project knowledge. Query-based search always runs the full retrieval path; do not ask whether the operator wants shallow or deep memory search.",
@@ -2681,10 +2681,10 @@ export function buildRealtimeInstructions(options: RealtimeSessionBuildOptions =
     "recent_external_research/last30days remains available in the backend but is intentionally not exposed as an active Realtime tool. Do not call it directly. For last-7/30-days community pulse checks, use run_codex_task or ask the operator to re-enable that tool.",
     "Use run_codex_task for implementation, codebase changes, deep repo analysis, reviews, or internet/current-source research. If internet is needed, set requires_internet=true. The saved task provider performs the work using its available tools; never promise network access or switch providers silently. A provider's sandboxed run_command has no network, but supplied web_search/read_page tools can provide bounded host search.",
     "run_codex_task has one public tool surface and uses the task default saved in Settings, including its provider, model and effort. Existing tasks keep their pinned settings. For Codex, the native deep transport chooses Codex App or CLI; external providers use their own hosted Task Chat execution. Native Codex App tasks first create or synthesize a plan, choose inline_progress or step_orchestrator by policy, and emit voice-safe semantic progress events.",
-    "When the operator asks to continue, resume, retry, fix, finish, or do the next step of prior Codex work, call run_codex_task normally and let the runtime resolve whether it continues a previous stopped task. If run_codex_task returns continuation_choice_required, ask only: \"Запускаем новую задачу или скажи короткий ID карточки.\" Do not list candidate tasks unless the operator asks. After the operator answers, call run_codex_task once with continue_task_id set to the chosen short card id or continuation_mode=force_new for a separate task, include an operator_confirmation note that the full brief was already confirmed, and do not repeat the task brief or ask for launch permission again.",
+    "When the operator asks to continue, resume, retry, fix, finish, or do the next step of prior Codex work, call run_codex_task normally and let the runtime resolve whether it continues a previous stopped task. If run_codex_task returns continuation_choice_required, ask only: \"Start a new task, or provide the short card ID.\" Do not list candidate tasks unless the operator asks. After the operator answers, call run_codex_task once with continue_task_id set to the chosen short card id or continuation_mode=force_new for a separate task, include an operator_confirmation note that the full brief was already confirmed, and do not repeat the task brief or ask for launch permission again.",
     "Do not silently bypass an existing waiting_for_operator, running, queued, or decision_required task. If run_codex_task says the matching task is waiting, active, or approval-gated, explain that status and use answer_codex_task, inspect_codex_task, or UI approval instead of creating a duplicate.",
     "Before calling run_codex_task for agent creation, agent improvement, agent fixes, workspace-write implementation, Control Center/Voice Control/memory/operations changes, or another large multi-step task, first collect a usable brief. For agent creation, be proposal-first: synthesize a concrete candidate and ask only for missing product decisions that change the final result, primary user, observable done conditions, main interface/journey, V1 non-goals, sensitive data or consequential approvals. Infer routine runtime, deployment, memory, tools, skills, MCP and test defaults as an editable Pritha proposal; ask about them only when the choice materially changes behavior, cost, privacy/security or an external dependency. Do not announce a fixed number of questions. Ask one concise question per turn, wait for the answer, then decide whether another question is necessary. Use zero or one question for simple tasks; use up to five total only for genuinely complex or risky tasks. Do not invent optional questions just to fill a quota.",
-    "Only after the brief is usable, summarize the intended task in one to three short points and ask a short direct confirmation question such as: \"ТЗ полностью проговорено? Передавать это в Codex?\" Wait for a direct positive answer that the brief is complete and ready for Codex. After this confirmation question, short confirmations like да, ок, подтверждаю, передавай, запускай, yes, ok or go ahead are enough.",
+    "Only after the brief is usable, summarize the intended task in one to three short points and ask a short direct confirmation question such as: \"Is the brief complete? Shall I send it to Codex?\" Wait for a direct positive answer that the brief is complete and ready for Codex. After this confirmation question, short confirmations like да, ок, подтверждаю, передавай, запускай, yes, ok or go ahead are enough.",
     "If the operator says they are not finished, says to wait, changes the scope, or continues adding requirements, do not call run_codex_task yet. Continue listening and update the draft brief.",
     "When you do call run_codex_task after that confirmation, pass operator_confirmation with a concise synthesized note that the operator confirmed by voice that the spoken task brief is complete and ready for Codex.",
     "Voice Control and Codex thread have the same implementation path through run_codex_task. Risky actions are not hard-blocked by voice; the runtime will hold service install, scheduler enablement, deployment, deletion, credential writes or danger-full-access requests as decision_required until the operator approves them in the UI task card.",
@@ -2744,7 +2744,7 @@ export function buildLiveSessionConfig(options: RealtimeSessionBuildOptions = {}
     tools: config.tools,
     backend: env("PRITHA_VOICE_BACKEND_MODEL", DEFAULT_LIVE_BACKEND),
     conversationInstructions: [
-      "You are Pritha, the operator's voice assistant. Speak Russian by default and use feminine grammatical self-reference. Keep replies natural and concise.",
+      "You are Pritha, the operator's voice assistant. Speak English by default and follow the operator’s explicit language preference or language switch. When speaking Russian, use feminine grammatical self-reference. Keep replies natural and concise.",
       "Delegate all requests for current facts, memory, tools, music, task execution or status to the backend. Never claim an action completed without a verified backend result. Ask clarifying questions when needed and respect corrections.",
       "Before starting a substantial Codex task, briefly summarize the usable brief and ask whether the operator has finished and wants it sent to Codex. Await that confirmation. Service changes and other approval-gated actions still require the existing UI approval.",
       "The backend knows Pritha's detailed workflows and permissions. Do not invent tools, task results, or approvals. A speech interruption does not mean backend work was cancelled. Never request secrets or read private paths or raw technical output aloud.",
@@ -3075,7 +3075,7 @@ export async function recordPrithaGoodStateSignal(args: GoodStateSignalArgs = {}
     status: saved.status,
     signal: saved,
     speakable_summary:
-      "Зафиксировала это как Good State alignment signal. Отдельное UI-подтверждение не нужно.",
+      "Recorded this as a Good State alignment signal. No separate UI confirmation is needed.",
   };
 }
 
@@ -4422,8 +4422,8 @@ function continuationChoiceResponse(resolution: CodexContinuationResolution, tas
     candidates,
     candidate_short_ids: candidates.map((candidate) => candidate.short_id).filter(Boolean),
     operator_note: candidates.length
-      ? "Ask one short question: \"Запускаем новую задачу или скажи короткий ID карточки.\" Do not list the candidate tasks unless the operator asks."
-      : "The requested previous Codex task was not found. Ask one short question: \"Запускаем новую задачу?\"",
+      ? "Ask one short question: \"Start a new task, or provide the short card ID.\" Do not list the candidate tasks unless the operator asks."
+      : "The requested previous Codex task was not found. Ask one short question: \"Start a new task?\"",
     expected_next_step:
       "After the operator answers, call run_codex_task once with continue_task_id set to the chosen 3-character short_id or continuation_mode=force_new. Include operator_confirmation that the full brief was already confirmed; do not repeat the brief or ask launch permission again.",
   };
@@ -4761,7 +4761,7 @@ function codexTaskHandoffConfirmationResult(args: CodexTaskArgs, task: Record<st
     status: "handoff_confirmation_required",
     error: "handoff_confirmation_required",
     operator_note:
-      "Before creating a Codex task, summarize the task and ask whether the full brief has been spoken. A short direct question such as \"ТЗ полностью проговорено? Передавать это в Codex?\" is enough.",
+      "Before creating a Codex task, summarize the task and ask whether the full brief has been spoken. A short direct question such as \"Is the brief complete? Shall I send it to Codex?\" is enough.",
     expected_next_step:
       "Wait for direct spoken confirmation that the brief is complete and ready for Codex. Short answers such as да, ок, подтверждаю, передавай or запускай are enough; then call run_codex_task again with synthesized operator_confirmation.",
   };
@@ -5506,7 +5506,7 @@ async function planCodexAppTask(
       phase: "plan_created",
       speakable: true,
       priority: "normal",
-      voice_text: `Я составила короткий план для Codex: ${plan.steps.length} шаг(а), выполнение в одном Codex turn.`,
+      voice_text: `I prepared a short plan for Codex: ${plan.steps.length} steps, executed in one Codex turn.`,
     });
     return plan;
   }
@@ -5538,7 +5538,7 @@ async function planCodexAppTask(
       phase: "plan_created",
       speakable: true,
       priority: "normal",
-      voice_text: `Codex составил план: ${plan.steps.length} шаг(а). Режим: ${plan.executionMode === "step_orchestrator" ? "step orchestrator" : "inline progress"}.`,
+      voice_text: `Codex prepared a plan: ${plan.steps.length} steps. Mode: ${plan.executionMode === "step_orchestrator" ? "step orchestrator" : "inline progress"}.`,
     });
     return plan;
   } catch (error) {
@@ -5557,7 +5557,7 @@ async function planCodexAppTask(
       phase: "planning_fallback",
       speakable: true,
       priority: "normal",
-      voice_text: `Не удалось получить отдельный Codex-план, поэтому я использую безопасный локальный план из ${plan.steps.length} шаг(а).`,
+      voice_text: `A separate Codex plan was unavailable, so I am using a safe local plan with ${plan.steps.length} steps.`,
     });
     return plan;
   }
@@ -5601,7 +5601,7 @@ async function runCodexStepOrchestrator(
       priority: "normal",
       step_id: step.id,
       step_title: step.title,
-      voice_text: `Codex начал шаг ${index + 1} из ${plan.steps.length}: ${step.title}.`,
+      voice_text: `Codex started step ${index + 1} of ${plan.steps.length}: ${step.title}.`,
     });
     const stepTask = {
       ...task,
@@ -5650,7 +5650,7 @@ async function runCodexStepOrchestrator(
         priority: "high",
         step_id: step.id,
         step_title: step.title,
-        voice_text: `Codex остановился на шаге ${index + 1}: ${step.title}. ${compactText(stepText || result.errors.join("; "), 360)}`,
+        voice_text: `Codex stopped at step ${index + 1}: ${step.title}. ${compactText(stepText || result.errors.join("; "), 360)}`,
       });
       return {
         requestId: String(task.id || randomUUID()),
@@ -5670,7 +5670,7 @@ async function runCodexStepOrchestrator(
       priority: "normal",
       step_id: step.id,
       step_title: step.title,
-      voice_text: `Codex завершил шаг ${index + 1} из ${plan.steps.length}: ${step.title}.`,
+      voice_text: `Codex completed step ${index + 1} of ${plan.steps.length}: ${step.title}.`,
     });
   }
 
@@ -5777,7 +5777,7 @@ async function startAdmittedVoiceTask(transport:"codex-app"|"codex-cli",task:Rec
       return enqueueVoiceAdmission(transport,task,paths,code);
     }
     if(code === "agent_workspace_target_required") {
-      const question="Как назвать папку создаваемого агента? Укажите одно имя латиницей (буквы, цифры, дефис). Задача получит доступ только к этой папке, а не ко всем соседним агентам.";
+      const question="What should the new agent folder be called? Provide one name using ASCII letters, digits, and hyphens. The task will have access only to this folder, not all sibling agents.";
       const requestPath=path.join(path.dirname(paths.statusPath),"request.json"),request=await readJsonFile(requestPath);
       await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:requestPath,value:{...request,workspace_question_agent:true}});
       await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:paths.statusPath,value:{status:"waiting_for_operator",phase:"agent_workspace_target_required",question,requires_operator_response:true,short_id:task.short_id}});
@@ -5785,7 +5785,7 @@ async function startAdmittedVoiceTask(transport:"codex-app"|"codex-cli",task:Rec
     }
     if(code === "workspace_dirty") {
       const view=await inspectTaskWorkspace(source);
-      const question=`В проекте есть незакоммиченные изменения. Для независимой рабочей копии можно использовать коммит ${view.baseRevision}. Ответьте полным hash этого коммита, чтобы продолжить; локальные изменения в копию не войдут.`;
+      const question=`The project has uncommitted changes. Commit ${view.baseRevision} can be used for an independent worktree. Reply with its full hash to continue; local changes will not be included.`;
       const requestPath=path.join(path.dirname(paths.statusPath),"request.json"),request=await readJsonFile(requestPath);
       await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:requestPath,value:{...request,workspace_question_base:view.baseRevision}});
       await atomicWritePrivateJson({stateRoot:resolvePrithaStateRoot(),filePath:paths.statusPath,value:{status:"waiting_for_operator",phase:"workspace_base_required",question,requires_operator_response:true,short_id:task.short_id}});
@@ -5905,7 +5905,7 @@ async function startCodexAppTask(
       phase: "mode_selected",
       speakable: true,
       priority: "normal",
-      voice_text: selectedMode === "step_orchestrator" ? "Для этой задачи включен step orchestrator: Codex будет выполнять план по шагам." : "Для этой задачи Codex пойдет одним выполнением с сохраненным планом.",
+      voice_text: selectedMode === "step_orchestrator" ? "The step orchestrator is enabled for this task: Codex will execute the plan step by step." : "Codex will execute this task in one run with the saved plan.",
     });
     if (plan.requiresOperatorInput && plan.operatorQuestions.length && settings.codexAskBeforeOrchestration && !boolValue(task.operator_question_answered)) {
       await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async()=>{
@@ -5959,7 +5959,7 @@ async function startCodexAppTask(
         speakable: true,
         priority: "high",
         requires_response: true,
-        voice_text: `Codex просит уточнение перед продолжением: ${question}`,
+        voice_text: `Codex needs clarification before continuing: ${question}`,
       });
       await progress({
         phase: "operator_question",
@@ -6033,7 +6033,7 @@ async function startCodexAppTask(
       phase: operatorQuestion ? "waiting_for_operator" : status === "complete" ? "completed" : "failed",
       speakable: true,
       priority: status === "complete" ? "normal" : "high",
-      voice_text: operatorQuestion ? operatorQuestion : status === "complete" ? "Codex завершил задачу, результат готов." : "Codex завершил задачу с ошибкой. Подробности доступны в карточке задачи.",
+      voice_text: operatorQuestion ? operatorQuestion : status === "complete" ? "Codex completed the task. The result is ready." : "The Codex task failed. Details are available in the task card.",
     });
     });
   })().catch(async (error) => {
@@ -6070,7 +6070,7 @@ async function startCodexAppTask(
         phase: "fallback_started",
         speakable: true,
         priority: "high",
-        voice_text: `Codex App остановился, поэтому я переключаю эту же задачу на Codex CLI и продолжаю работу. Причина: ${compactText(message, 360)}`,
+        voice_text: `Codex App stopped, so I am switching the same task to Codex CLI and continuing. Reason: ${compactText(message, 360)}`,
       });
       await appendFile(paths.stderrPath, `${finishedAt} Codex App transport failed: ${message}\n${finishedAt} Starting Codex CLI fallback for the same task.\n`, "utf8").catch(() => undefined);
       await nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
@@ -6122,7 +6122,7 @@ async function startCodexAppTask(
       phase: status,
       speakable: true,
       priority: "high",
-      voice_text: `Codex App завершился с ошибкой и fallback недоступен. Подробности доступны в карточке задачи. Причина: ${compactText(message, 360)}`,
+      voice_text: `Codex App failed and fallback is unavailable. Details are available in the task card. Reason: ${compactText(message, 360)}`,
     });
   }).finally(() => nativeExecutionCoordinator().withMutation(`voice-control:${taskId}`, async () => {
     if (activeCodexAppAbortHandles.get(taskId)?.controller === abortController) {
@@ -7055,8 +7055,8 @@ async function repairStaleCodexTaskStatus(
     speakable: true,
     voice_text:
       repairedStatus === "complete"
-        ? "Codex-задача завершилась, но статус был stale; я починила карточку по найденному результату."
-        : `Codex-задача остановилась без финального результата; я пометила ее как timeout. Причина: ${compactText(repaired.stale_reason, 180)}`,
+        ? "The Codex task completed, but its status was stale; I updated the card using the recovered result."
+        : `The Codex task stopped without a final result; I marked it as timed out. Reason: ${compactText(repaired.stale_reason, 180)}`,
     requires_response: false,
   });
   await logPrivateEvent("codex_task_stale_status_repaired", { task_id: id, status: repairedStatus, reason: repaired.stale_reason });
@@ -7083,10 +7083,10 @@ function providerVoiceTaskFeedback(id: string, request: Record<string, unknown> 
   if (!request?.task_chat_connector || !status || status.status !== 'waiting_for_operator' && !status.factory_draft_failed) return null;
   const question = compactText(status.question, 2000);
   const workspaceBlocked = status.dispatch_state === 'reserved' && status.error_code === 'workspace_dirty';
-  const reason = status.factory_draft_failed ? 'Ответ модели завершён, но создание черновика агента не подтверждено. Это не успешное создание агента. Откройте связанный Task Chat для причины и продолжения; Contract, Outcome Spec и бюджет всё ещё требуют отдельных одобрений.'
-    : workspaceBlocked ? 'Задача ещё не запущена: в исходном проекте есть незакоммиченные изменения. Для правки проекта создайте задачу в Task Chat и подтвердите коммит-основу рабочей копии. Если нужен новый агент, отмените эту карточку и попросите «создать отдельного нового агента»: сначала только Contract и отдельный Outcome Spec, без реализации до их одобрения.' : '';
-  const text = question || reason || (status.approval_in_task_chat ? 'Задача ожидает подтверждения действия в Task Chat. Откройте её карточку.'
-    : 'Задача не продолжилась автоматически. Откройте её карточку, чтобы проверить причину.');
+  const reason = status.factory_draft_failed ? 'The model reply is complete, but creation of the agent draft is not confirmed. The agent has not been successfully created. Open the linked Task Chat to review the cause and continue; the Contract, Outcome Spec, and budget still require separate approvals.'
+    : workspaceBlocked ? 'The task has not started: the source project has uncommitted changes. To edit the project, create a task in Task Chat and confirm the base commit for the worktree. For a new agent, cancel this card and request “create a separate new agent”: begin with a Contract and separate Outcome Spec, with implementation waiting for their approval.' : '';
+  const text = question || reason || (status.approval_in_task_chat ? 'The task is waiting for action approval in Task Chat. Open its card.'
+    : 'The task did not continue automatically. Open its card to check the cause.');
   return {task_id:id,timestamp:String(status.updated_at || request.created_at || ''),phase:question?'operator_question':'provider_attention',
     priority:'high',speakable:true,voice_text:text,requires_response:Boolean(question)};
 }
@@ -7761,7 +7761,7 @@ async function abortPrithaCodexTaskOwned(taskRef: string, reason?: unknown) {
     phase: stopStatus,
     priority: "high",
     speakable: true,
-    voice_text: stopStatus === "aborted" ? `Codex-задача #${shortId || id.slice(0, 8)} отменена.` : `Остановка Codex-задачи #${shortId || id.slice(0, 8)} запрошена. Жду подтверждения завершения.`,
+    voice_text: stopStatus === "aborted" ? `Codex task #${shortId || id.slice(0, 8)} cancelled.` : `Stop requested for Codex task #${shortId || id.slice(0, 8)}. Waiting for confirmation that it has ended.`,
     requires_response: false,
   });
   await logPrivateEvent("codex_task_abort", {
@@ -7931,7 +7931,7 @@ async function answerPrithaCodexTaskOwned(args: AnswerCodexTaskArgs) {
     phase: "operator_answer_received",
     priority: "normal",
     speakable: false,
-    voice_text: "Ответ получен, продолжаю ту же Codex-задачу.",
+    voice_text: "Answer received. Continuing the same Codex task.",
     requires_response: false,
   });
 
@@ -7957,7 +7957,7 @@ async function answerPrithaCodexTaskOwned(args: AnswerCodexTaskArgs) {
     ...(await getPrithaCodexTask(id)),
     answer_accepted: true,
     exec,
-    operator_note: "Ответ принят. Та же Codex-задача продолжена.",
+    operator_note: "Answer accepted. The same Codex task has resumed.",
   };
 }
 
@@ -8053,7 +8053,7 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
       phase: "approval_rejected",
       priority: "high",
       speakable: false,
-      voice_text: "Reject получен в UI. Codex-задача отменена до запуска.",
+      voice_text: "Rejected in the UI. The Codex task was cancelled before starting.",
       requires_response: false,
     });
     await logPrivateEvent("codex_task_approval_decision", { ok: true, task_id: id, action, status: "rejected" });
@@ -8079,7 +8079,7 @@ async function decidePrithaCodexTaskOwned(taskId: string, action: CodexTaskAppro
     phase: "approval_approved",
     priority: "high",
     speakable: false,
-    voice_text: "Approve получен в UI. Codex-задача запущена или поставлена в очередь.",
+    voice_text: "Approved in the UI. The Codex task has started or been queued.",
     requires_response: false,
   });
   if (nextRequest.task_chat_connector) {

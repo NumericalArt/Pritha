@@ -125,8 +125,8 @@ try {
       await until(() => f.pending().length === 1 || storyError);
       if (storyError) throw storyError;
       await page.reload();
-      await expect(page.getByText('1. Что создать и в каких пределах', { exact: true })).toBeVisible();
-      await page.getByText('Полный документ и условия проверки',{exact:true}).click();
+      await expect(page.getByText('1. What to build and within which limits', { exact: true })).toBeVisible();
+      await page.getByText('Full document and verification conditions',{exact:true}).click();
       await expect(page.locator('fieldset pre')).toContainText('scaffoldCapability');
       await expect(page.locator('fieldset pre')).toContainText('"supported": true');
       await expect(page.locator('fieldset pre')).toContainText('"cli"');
@@ -135,8 +135,8 @@ try {
       await until(() => f.pending().length === 1 && f.pending()[0].presentation.approvalScope === 'outcome only' || storyError);
       if (storyError) throw storyError;
       await page.reload();
-      await expect(page.getByText('2. Как проверить результат',{exact:true})).toBeVisible();
-      await page.getByText('Полный документ и условия проверки',{exact:true}).click();
+      await expect(page.getByText('2. How to verify the result',{exact:true})).toBeVisible();
+      await page.getByText('Full document and verification conditions',{exact:true}).click();
       await expect(page.locator('fieldset pre')).toContainText('trialInputs');
       await expect(page.locator('fieldset pre')).toContainText('verification/product.mjs');
       await page.getByRole('button', { name: 'Approve this request', exact: true }).click();

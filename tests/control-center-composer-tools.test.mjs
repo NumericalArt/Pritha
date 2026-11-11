@@ -21,13 +21,13 @@ const pixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQ
 
 test("quotes preserve draft whitespace, code, Unicode and every line without truncation", () => {
   const draft = "Keep my draft  ";
-  assert.equal(q.appendQuote(draft, "Привет 🪷\r\n```js\r\nx()\n```"), `${draft}\n\n> **Из ответа Pritha:**\n> Привет 🪷\n> \`\`\`js\n> x()\n> \`\`\`\n\n`);
+  assert.equal(q.appendQuote(draft, "Привет 🪷\r\n```js\r\nx()\n```"), `${draft}\n\n> **From Pritha’s reply:**\n> Привет 🪷\n> \`\`\`js\n> x()\n> \`\`\`\n\n`);
   assert.equal(q.appendQuote(draft, "  \n"), draft);
-  assert.equal(q.appendQuote("draft\n\n", "line"), "draft\n\n> **Из ответа Pritha:**\n> line\n\n");
+  assert.equal(q.appendQuote("draft\n\n", "line"), "draft\n\n> **From Pritha’s reply:**\n> line\n\n");
   const empty = q.appendQuote("", "x");
   assert.equal(q.appendQuote("a".repeat(64_000 - empty.length - 2), "x").length, 64_000);
   assert.throws(() => q.appendQuote("a".repeat(64_000 - empty.length - 1), "x"), /limit/);
-  assert.equal(q.appendQuote(q.appendQuote("", "first"), "second").match(/Из ответа/g).length, 2);
+  assert.equal(q.appendQuote(q.appendQuote("", "first"), "second").match(/From Pritha’s reply/g).length, 2);
 });
 test("image coordinates clamp and scale independently of viewport and DPR", () => {
   assert.deepEqual(a.imagePoint(110, 70, { left: 10, top: 20, width: 200, height: 100 }, 800, 400), { x: 400, y: 200 });

@@ -2,53 +2,53 @@ import {deliveryUsageStatus} from './delivery-ledger.mjs';
 
 // Project known causes and actual paused actions, never provider prose or logs.
 const reasons = {
-  token_budget_exhausted: ['Исчерпан бюджет сборки', 'Проверить уже сделанное или выделить дополнительный бюджет?', 'Оставшегося бюджета недостаточно для нового вызова сборщика.', 'Прита сохранила материалы и приостановила новые вызовы. Продолжение сборки ждёт вашего решения о бюджете.'],
-  iteration_budget_exhausted: ['Закончились попытки сборки', 'Проверить результат или разрешить ещё одну попытку?', 'Использованы все согласованные попытки сборки.', 'Прита сохранила результат. Новая попытка ждёт вашего разрешения.'],
-  elapsed_budget_exhausted: ['Истекло время сборки', 'Проверить результат или дать сборке больше времени?', 'Согласованное время сборки закончилось.', 'Прита сохранила материалы и приостановила сборку. Продолжение ждёт вашего решения о времени.'],
-  isolation_unavailable: ['Среда исполнения не готова', 'Восстановить среду исполнения или пересмотреть требования?', 'Среда не обеспечивает изоляцию, выбранную для этой сборки.', 'Прита остановила запуск команд. Продолжение ждёт восстановления среды или согласования новых требований.'],
-  goal_usage_unavailable: ['Расход пока не подтверждён', 'Как сверить сохранённую попытку?', 'Не удалось подтвердить расход предыдущего вызова сборщика.', 'Прита сохранила попытку и приостановила новые вызовы. Перед продолжением нужно сверить расход.'],
-  build_runtime_unavailable: ['Сборщик недоступен', 'Как восстановить выбранного исполнителя?', 'Не удалось подключить выбранного сборщика.', 'Прита приостановила сборку. После восстановления подключения нужно повторить проверку доступности.'],
-  verification_needs_implementation: ['Нужна доработка', 'Продолжить исправление или посмотреть результаты?', 'Проверка готовых файлов выявила несоответствие согласованному результату.', 'Прита сохранила результаты проверки. Исправление ждёт вашего решения о продолжении сборки.'],
-  verifier_modified: ['Проверочный файл изменился', 'Как восстановить одобренную проверку?', 'Сборщик изменил файл, по которому должен проверяться результат.', 'Прита остановила сборку. Продолжение ждёт восстановления одобренной проверки.'],
-  repeated_trial_failure: ['Исправление не помогло', 'Уточнить задачу или пересмотреть критерии?', 'Одна и та же проблема повторилась несколько раз.', 'Прита сохранила результаты и остановила повторные попытки. Для продолжения нужно уточнение задачи.'],
-  dirty_workspace: ['В проекте есть несохранённые изменения', 'Сохранить изменения или выбрать чистую копию?', 'Не удалось подготовить отдельное место для сборки из-за изменений в проекте.', 'Прита сохранила пользовательские файлы. Сборка ждёт разрешения этих изменений.'],
-  target_busy: ['Проект уже занят сборкой', 'Продолжить существующую сборку или остановить новую?', 'Для этого проекта уже выполняется другая сборка.', 'Прита приостановила новый запуск и ждёт выбора сборки для продолжения.'],
-  goal_api_unavailable: ['Контроль бюджета недоступен', 'Обновить среду или отдельно согласовать исключение?', 'Среда сборщика не поддерживает согласованный контроль бюджета.', 'Прита остановила запуск сборщика. Продолжение ждёт восстановления контроля или отдельного решения.'],
-  trial_input_missing: ['Не найден файл проверки', 'Восстановить проверку или пересмотреть критерии?', 'Не удалось найти файл, необходимый для согласованной проверки.', 'Прита приостановила сборку. Перед продолжением нужно восстановить проверку.'],
-  trial_input_provenance_mismatch: ['Проверка не совпадает с одобренной', 'Восстановить проверку или согласовать новую?', 'Файл проверки не соответствует версии, которую вы одобрили.', 'Прита приостановила сборку. Перед продолжением нужно восстановить одобренную версию.'],
-  checkpoint_commit_failed: ['Не удалось сохранить проверенную версию', 'Исправить настройки сохранения или остановить сборку?', 'Проверенный результат не удалось зафиксировать в истории проекта.', 'Прита сохранила рабочие файлы. Перед передачей результата нужно устранить причину и повторить проверку.'],
+  token_budget_exhausted: ['Build budget exhausted', 'Review the work so far or allocate more budget?', 'The remaining budget is insufficient for another builder call.', 'Pritha saved the work and paused new calls. Continuing the build requires your budget decision.'],
+  iteration_budget_exhausted: ['Build attempts exhausted', 'Review the result or allow another attempt?', 'All agreed build attempts have been used.', 'Pritha saved the result. Another attempt requires your approval.'],
+  elapsed_budget_exhausted: ['Build time expired', 'Review the result or allow more build time?', 'The agreed build time has expired.', 'Pritha saved the work and paused the build. Continuing requires your decision about more time.'],
+  isolation_unavailable: ['Execution environment not ready', 'Restore the environment or revise the requirements?', 'The environment does not provide the isolation selected for this build.', 'Pritha stopped command execution. Continuing requires a restored environment or approval of revised requirements.'],
+  goal_usage_unavailable: ['Usage not yet confirmed', 'How should the saved attempt be reconciled?', 'Usage from the previous builder call could not be confirmed.', 'Pritha saved the attempt and paused new calls. Usage must be reconciled before continuing.'],
+  build_runtime_unavailable: ['Builder unavailable', 'How should the selected builder be restored?', 'The selected builder could not be connected.', 'Pritha paused the build. After restoring the connection, check availability again.'],
+  verification_needs_implementation: ['Further work needed', 'Continue fixing the implementation or review the results?', 'Verification of the current files found a mismatch with the agreed outcome.', 'Pritha saved the verification results. Fixing the implementation requires your decision to continue the build.'],
+  verifier_modified: ['Verification file changed', 'How should the approved verification be restored?', 'The builder changed the file used to verify the result.', 'Pritha stopped the build. Continuing requires restoring the approved verification.'],
+  repeated_trial_failure: ['Fix did not resolve the issue', 'Clarify the task or revise the criteria?', 'The same issue occurred several times.', 'Pritha saved the results and stopped retrying. Continuing requires clarification of the task.'],
+  dirty_workspace: ['Project has uncommitted changes', 'Save the changes or select a clean copy?', 'A separate build workspace could not be prepared because the project has changes.', 'Pritha preserved the user files. The build is waiting for these changes to be resolved.'],
+  target_busy: ['Project already has an active build', 'Continue the existing build or stop the new one?', 'Another build is already running for this project.', 'Pritha paused the new run and is waiting for a choice of which build to continue.'],
+  goal_api_unavailable: ['Budget tracking unavailable', 'Update the environment or approve a separate exception?', 'The builder environment does not support the agreed budget tracking.', 'Pritha stopped the builder from starting. Continuing requires restored tracking or a separate decision.'],
+  trial_input_missing: ['Verification file missing', 'Restore the verification or revise the criteria?', 'A file required for the approved verification could not be found.', 'Pritha paused the build. Restore the verification before continuing.'],
+  trial_input_provenance_mismatch: ['Verification differs from the approved version', 'Restore the verification or approve a new version?', 'The verification file does not match the version you approved.', 'Pritha paused the build. Restore the approved version before continuing.'],
+  checkpoint_commit_failed: ['Could not save the verified version', 'Fix the save settings or stop the build?', 'The verified result could not be committed to the project history.', 'Pritha saved the working files. Resolve the cause and repeat verification before handoff.'],
 };
 const choices = {
-  'verify-only':['Проверить готовые файлы','Запустятся одобренные проверки без новой сборки.'],
-  'extend-budget':['Увеличить лимит','Потребуется отдельно одобрить прибавку; прежний расход сохранится.'],
-  'review-failures':['Посмотреть результаты','Сборка останется на паузе.'],
-  'inspect-worktree':['Посмотреть материалы сборки','Новая попытка не запустится.'],
-  'retry-accounting':['Сверить расход','Хост проверит запись исполнителя без повторной отправки.'],
-  'retry-after-upgrade':['Восстановить и повторить','После восстановления Прита проверит доступность выбранной среды.'],
-  'revise-contract':['Пересмотреть Contract','Изменённые требования потребуют нового решения.'],
-  'resume-build':['Продолжить сборку','Исполнитель будет работать в оставшихся пределах.'],
-  'revise-outcome':['Пересмотреть результат','Новые критерии потребуют отдельного одобрения.'],
-  'stop-run':['Остановить','Работа прекратится; материалы сохранятся.'],
-  'abandon':['Завершить попытку','Материалы и учтённый расход сохранятся.'],
-  'add-guidance':['Уточнить задачу','Уточнение поможет следующей попытке в пределах согласованного результата.'],
-  'retry':['Повторить шаг','После устранения причины повторится тот же шаг в согласованных пределах.'],
-  'replace-executor':['Изменить сборщика','Выбранного исполнителя потребуется согласовать и проверить.'],
-  'restore-verifier':['Восстановить проверку','Будет нужна точная версия одобренного файла проверки.'],
-  'discard-iteration':['Отменить изменения попытки','Можно восстановить последнюю сохранённую версию в отдельной папке сборки.'],
-  'fix-hook':['Исправить сохранение версии','После исправления настроек проекта потребуется повторная проверка.'],
-  'retry-after-clean':['Сохранить изменения и повторить','Сначала нужно сохранить или разобрать изменения в проекте.'],
-  'use-clean-clone':['Выбрать чистую копию','Для другой копии проекта потребуется отдельная сборка.'],
-  'resume-existing':['Продолжить существующую сборку','Новая попытка завершится; продолжение относится к уже запущенной сборке.'],
-  'stop-new-run':['Остановить новую сборку','Существующая сборка продолжит работу без изменений.'],
-  'repair-scaffold':['Восстановить файл проверки','Перед продолжением нужно восстановить проверку вне сборщика.'],
-  'continue-without-goal':['Разрешить одну попытку без контроля токенов','Требуется отдельное исключение; ограничения времени и числа попыток сохранятся.'],
+  'verify-only':['Verify current files','The approved checks will run without a new build.'],
+  'extend-budget':['Increase the limit','The increase requires separate approval; previous usage will be retained.'],
+  'review-failures':['Review results','The build will remain paused.'],
+  'inspect-worktree':['Inspect build files','No new attempt will start.'],
+  'retry-accounting':['Reconcile usage','The host will check the executor record without resubmitting the request.'],
+  'retry-after-upgrade':['Restore and retry','After recovery, Pritha will check the availability of the selected environment.'],
+  'revise-contract':['Revise the Contract','Changed requirements will require a new decision.'],
+  'resume-build':['Continue the build','The executor will work within the remaining limits.'],
+  'revise-outcome':['Revise the outcome','New criteria will require separate approval.'],
+  'stop-run':['Stop','Work will stop; the files will be retained.'],
+  'abandon':['End this attempt','The files and recorded usage will be retained.'],
+  'add-guidance':['Clarify the task','Clarification will guide the next attempt within the agreed outcome.'],
+  'retry':['Retry the step','After resolving the cause, the same step will be retried within the agreed limits.'],
+  'replace-executor':['Change the builder','The selected executor will require approval and verification.'],
+  'restore-verifier':['Restore verification','The exact approved verification file will be required.'],
+  'discard-iteration':['Discard attempt changes','The last saved version can be restored in the separate build workspace.'],
+  'fix-hook':['Fix version saving','After fixing the project settings, verification must run again.'],
+  'retry-after-clean':['Save changes and retry','First, save or resolve the project changes.'],
+  'use-clean-clone':['Select a clean copy','A different project copy will require a separate build.'],
+  'resume-existing':['Continue the existing build','The new attempt will end; continuation applies to the existing build.'],
+  'stop-new-run':['Stop the new build','The existing build will continue unchanged.'],
+  'repair-scaffold':['Restore the verification file','Restore the verification outside the builder before continuing.'],
+  'continue-without-goal':['Allow one attempt without token tracking','A separate exception is required; time and attempt limits will remain in place.'],
 };
 export function deliveryExplanation(s) {
   const blockers=s.blockers.slice(0,8).map(row=>{
     const known=Object.hasOwn(reasons,row.code);
-    const [title,question,explanation,nextStep]=known?reasons[row.code]:['Сборка приостановлена','Как продолжить эту сборку?','Не удалось завершить шаг сборки. Причина пока не уточнена.','Прита сохранила материалы и остановила новые попытки. Перед повтором нужно проверить журнал этого шага.'];
+    const [title,question,explanation,nextStep]=known?reasons[row.code]:['Build paused','How should this build continue?','The build step could not be completed. The cause is not yet known.','Pritha saved the work and stopped new attempts. Check the log for this step before retrying.'];
     return {code:row.code,title,question,explanation,nextStep,options:row.options.slice(0,5).map(({id})=>{
-      const [label,effect]=Object.hasOwn(choices,id)?choices[id]:['Уточнить вариант решения','Подробности доступны в сохранённом решении этой сборки.'];
+      const [label,effect]=Object.hasOwn(choices,id)?choices[id]:['Clarify this option','Details are available in the saved decision for this build.'];
       return {id,label,effect};
     })};
   });

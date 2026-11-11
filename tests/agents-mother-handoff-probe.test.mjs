@@ -13,7 +13,7 @@ test("handoff preserves authored project and profile, replays its guide and sepa
   const first = prepareAuthoredHandoff(f.project, f.options);
   assert.equal(first.status, "guide-prepared"); assert.equal(first.profileCreated, true);
   const text = readFileSync(first.reportPath, "utf8"), profile = readFileSync(first.profilePath, "utf8");
-  assert.match(text, /Приёмка: not_accepted/); assert.match(text, /CLI запускается по запросу/);
+  assert.match(text, /Acceptance: not_accepted/); assert.match(text, /CLI runs on demand/);
   assert.match(text, /Approved Outcome:/); assert.match(profile, /agent_id: readiness-fixture/);
   const mtime = statSync(first.reportPath).mtimeMs;
   const second = prepareAuthoredHandoff(f.project, f.options);
@@ -27,7 +27,7 @@ test("handoff preserves authored project and profile, replays its guide and sepa
 });
 
 test("handoff uses type-specific instructions and the authored first scenario", () => {
-  for (const [kind, expected] of [["one-shot-cli", /CLI/], ["service", /manager: launchd/], ["job-runner", /вручную/], ["tool-server", /consumer/], ["library", /импорта/], ["interactive-agent", /диалоговый/]]) {
+  for (const [kind, expected] of [["one-shot-cli", /CLI/], ["service", /manager: launchd/], ["job-runner", /manually/], ["tool-server", /consumer/], ["library", /import/], ["interactive-agent", /conversation/]]) {
     const text = firstScenarioForHandoff(kind, { data: { primaryInterface: "Codex CLI" }, plan: { demo: ["Run the authored exact first scenario"] }, manifest: { control_center_runtime: { manager: "launchd" } }, parsed: { headless: { trigger: "node scripts/main.mjs run examples/input.json", inputContract: "one JSON file", outputArtifacts: "result.json", failureVisibility: "0 success; 64 invalid input", observability: "stdout" } } });
     assert.match(text, expected); assert.match(text, /authored exact first scenario/); assert.match(text, /64 invalid input/);
   }
