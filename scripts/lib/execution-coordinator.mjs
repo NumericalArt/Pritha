@@ -138,7 +138,10 @@ export class ExecutionCoordinator {
           Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
         }
       }
-      this.db.exec("PRAGMA busy_timeout=100;");
+      // Concurrent writers can hold the lock through process-identity checks.
+      // Let SQLite wait briefly, including when releasing a completed mutation;
+      // an uncontended write stays immediate and the operation is never replayed.
+      this.db.exec("PRAGMA busy_timeout=2000;");
     } catch (error) { this.db.close(); throw error; }
   }
 

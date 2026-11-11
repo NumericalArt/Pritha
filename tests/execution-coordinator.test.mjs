@@ -12,11 +12,11 @@ function fixture() {
   const db = new ExecutionCoordinator({ stateRoot });
   return { stateRoot, db, close() { db.close(); rmSync(stateRoot, { recursive: true, force: true }); } };
 }
-function child(stateRoot, body) {
+function child(stateRoot, body, onOutput = () => {}) {
   const script = `import {ExecutionCoordinator} from ${JSON.stringify(moduleUrl)};const db=new ExecutionCoordinator({stateRoot:${JSON.stringify(stateRoot)}});${body};db.close();`;
   return new Promise((resolve, reject) => {
     const p = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['ignore','pipe','pipe'] });
-    let out='',err=''; p.stdout.on('data',d=>out+=d); p.stderr.on('data',d=>err+=d);
+    let out='',err=''; p.stdout.on('data',d=>{out+=d;onOutput(d.toString());}); p.stderr.on('data',d=>err+=d);
     p.on('error',reject);p.on('exit',code=>code===0?resolve(out.trim()):reject(new Error(err)));
   });
 }
@@ -76,6 +76,33 @@ test('serialized asynchronous registry mutations do not lose writes across proce
     await Promise.all(Array.from({length:5},()=>child(f.stateRoot,work)));
     assert.equal(f.db.getIntent('counter').count,5);
   } finally { f.close(); }
+});
+test('metadata release waits for a competing writer without repeating the mutation', async () => {
+  const f=fixture(); let blocker=Promise.resolve(), calls=0;
+  try {
+    const result=await f.db.withMutation('release-contention',async()=>{
+      calls++;
+      let acquired;
+      const ready=new Promise(resolve=>{acquired=resolve;});
+      blocker=child(f.stateRoot, `db.db.exec('BEGIN IMMEDIATE');console.log('locked');await new Promise(r=>setTimeout(r,400));db.db.exec('COMMIT')`,()=>acquired());
+      await Promise.race([ready,blocker.then(()=>{throw new Error('writer exited before signalling its lock');})]);
+      return 'written';
+    },{timeoutMs:2000});
+    await blocker;
+    assert.equal(result,'written');assert.equal(calls,1);assert.equal(f.db.claims().length,0);
+  } finally { await blocker;f.close(); }
+});
+test('a worker reserves its intent after a temporary writer releases the database',async()=>{
+  const f=fixture();let locked=false,writer=Promise.resolve();
+  try {
+    f.db.db.exec('BEGIN IMMEDIATE');locked=true;
+    writer=child(f.stateRoot,"console.log(db.reserveIntent('contended','same',{kind:'fixture'}).created)")
+      .then(value=>({value}),error=>({error}));
+    await new Promise(resolve=>setTimeout(resolve,400));
+    f.db.db.exec('ROLLBACK');locked=false;
+    const result=await writer;if(result.error)throw result.error;
+    assert.equal(result.value,'true');assert.equal(f.db.getIntent('contended').revision,1);
+  }finally{if(locked)f.db.db.exec('ROLLBACK');await writer;f.close();}
 });
 test('opening an existing coordinator to read progress does not need the writer lock',async()=>{
   const f=fixture();
