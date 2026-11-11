@@ -9,7 +9,7 @@ import { executionDirectory } from '../scripts/lib/execution-lifecycle.mjs';
 
 const script = path.resolve('scripts/pritha-state-migrate.mjs');
 function executable(file, source) { writeFileSync(file, source); chmodSync(file, 0o755); }
-function fixture(t) {
+function fixture(t, nodeArgs = []) {
   const base = mkdtempSync(path.join(os.tmpdir(), 'pritha-state-cli-'));
   const root = path.join(base, 'Code with spaces'), bin = path.join(base, 'bin'), home = path.join(base, 'home');
   for (const directory of [root, bin, home]) mkdirSync(directory);
@@ -19,10 +19,21 @@ function fixture(t) {
   const env = { PATH: `${bin}${path.delimiter}${process.env.PATH}`, HOME: home, PRITHA_ROOT: root,
     PRITHA_STATE_ROOT: root, PRITHA_INSTANCE_ID: 'migration-fixture', PRITHA_CONTROL_CENTER_PORT: '64621' };
   t.after(() => rmSync(base, { recursive: true, force: true }));
-  const run = (command, ...args) => spawnSync(process.execPath, [script, command, '--root', root, '--json', ...args], { cwd: root, env, encoding: 'utf8', timeout: 20_000 });
+  const run = (command, ...args) => spawnSync(process.execPath, [...nodeArgs, script, command, '--root', root, '--json', ...args], { cwd: root, env, encoding: 'utf8', timeout: 20_000 });
   return { root, bin, env, run };
 }
 function successful(result) { assert.equal(result.status, 0, result.stderr || result.stdout); return JSON.parse(result.stdout); }
+function failed(result) {
+  assert.equal(result.status, 2, result.stderr || result.stdout);
+  assert.equal(result.stdout.trim(), '');
+  // Node 22 may append its SQLite ExperimentalWarning to stderr. The CLI error
+  // is a single JSON line; runtime diagnostics are not part of that payload.
+  const records = result.stderr.split(/\r?\n/).filter(line => line.startsWith('{'));
+  assert.equal(records.length, 1, result.stderr);
+  const payload = JSON.parse(records[0]);
+  assert.equal(payload.ok, false);
+  return payload;
+}
 
 test('offline migration transaction passes 29 interruption, rollback, WAL and isolation cases', () => {
   const result = spawnSync('python3', [path.resolve('tests/python/test_pritha_state_migration.py'), '-v'], { encoding: 'utf8', timeout: 30_000 });
@@ -36,8 +47,8 @@ test('state CLI plan/status are read-only; apply pins the plan and requires --ye
   assert.equal(plan.ready, true); assert.equal(plan.actions.length, 1);
   assert.equal(successful(f.run('status')).status, 'idle');
   assert.deepEqual(readdirSync(f.root, { recursive: true }), before);
-  assert.equal(JSON.parse(f.run('apply', '--plan-hash', plan.plan_hash).stderr).error, 'explicit_yes_required');
-  assert.equal(JSON.parse(f.run('apply', '--yes').stderr).error, 'plan_hash_required');
+  assert.equal(failed(f.run('apply', '--plan-hash', plan.plan_hash)).error, 'explicit_yes_required');
+  assert.equal(failed(f.run('apply', '--yes')).error, 'plan_hash_required');
   const receipt = successful(f.run('apply', '--yes', '--plan-hash', plan.plan_hash));
   assert.equal(receipt.status, 'complete');
   assert.equal(successful(f.run('status', '--id', receipt.id)).status, 'complete');
@@ -54,19 +65,22 @@ test('loaded or unobservable service blocks migration before any private manifes
     executable(path.join(f.bin, 'launchctl'), `#!/bin/sh\nexit ${code}\n`);
     const plan = successful(f.run('plan'));
     assert.equal(plan.ready, false); assert.deepEqual(plan.runtime_blockers, [expected]);
-    assert.equal(JSON.parse(f.run('apply', '--yes', '--plan-hash', plan.plan_hash).stderr).error, expected);
+    assert.equal(failed(f.run('apply', '--yes', '--plan-hash', plan.plan_hash)).error, expected);
     assert.equal(existsSync(path.join(f.root, '.private')), false);
   }
 });
 
-test('active execution lease blocks migration without draining admission or altering task ownership', t => {
-  const f = fixture(t), db = new ExecutionCoordinator({ stateRoot: f.root, directory: executionDirectory(f.root, f.root) });
+test('active execution lease blocks migration without altering task ownership even with Node warnings', t => {
+  const warning = 'data:text/javascript,' + encodeURIComponent('process.emitWarning("migration fixture warning", "ExperimentalWarning")');
+  const f = fixture(t, ['--import', warning]), db = new ExecutionCoordinator({ stateRoot: f.root, directory: executionDirectory(f.root, f.root) });
   try {
     const lease = db.claim(['native:migration-fixture'], 'fixture-owner');
     const admission = db.admission();
     const plan = successful(f.run('plan'));
     assert.deepEqual(plan.runtime_blockers, ['active_or_unknown_executions']);
-    assert.equal(JSON.parse(f.run('apply', '--yes', '--plan-hash', plan.plan_hash).stderr).error, 'active_or_unknown_executions');
+    const blocked = f.run('apply', '--yes', '--plan-hash', plan.plan_hash);
+    assert.match(blocked.stderr, /ExperimentalWarning: migration fixture warning/);
+    assert.equal(failed(blocked).error, 'active_or_unknown_executions');
     assert.deepEqual(db.admission(), admission); lease.assertOwned(); lease.release();
     assert.equal(existsSync(path.join(f.root, '.private/state-migration')), false);
   } finally { db.close(); }
