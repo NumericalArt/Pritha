@@ -86,7 +86,7 @@ class BuildConnection {
   async waitForNotification() { return { method: 'turn/completed', params: { threadId: this.current.id, turn: this.current.turns[0] } }; }
 }
 
-export async function productFactoryFixture(scenario, emit = () => {}, {automate=false}={}) {
+export async function productFactoryFixture(scenario, emit = () => {}, {automate=false,childConnections}={}) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pritha-product-factory-')));
   const stateRoot = path.join(directory, 'state'), agentParent = path.join(directory, 'children');
   fs.mkdirSync(stateRoot); fs.mkdirSync(agentParent);
@@ -103,10 +103,16 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
     const coverage=validateOutcomeSpecText(artifact('outcome').text,{root}).coverage;
     const covers=coverage.filter(row=>row.statement==='Return the approved product JSON' || row.statement.replace(/\.$/,'')==='Working implementation of the approved V1 core functions').map(r=>r.id);
     const inputs=scenario.connectorId==='codex'?['  '+scenario.cliInput+'  ','  '+scenario.httpInput+'  ']:[scenario.cliInput,scenario.httpInput,'yes definitely?','  YES definitely?'];
-    return {
+    const trial={
       cli:inputs.map(value=>({argv:['node',scenario.entrypoint,scenario.flag,value],expected_json:scenario.result(value),covers})),
       http:inputs.slice().reverse().map(value=>({argv:['node','scripts/server.mjs'],port_variable:scenario.portVariable,path:scenario.route,input_json:{[scenario.field]:value},expected_json:scenario.result(value),covers}))
     };
+    if(scenario.httpOnly)delete trial.cli;
+    if(scenario.childProvider)for(const [kind,cases] of Object.entries(trial))for(const check of cases){
+      const value=kind==='cli'?check.argv[3]:check.input_json[scenario.field];
+      check.expected_json={answer:value+' __PRITHA_MODEL_TEXT__'};check.model_output=check.expected_json;
+    }
+    return trial;
   }
   function implement(worktree) {
     assert.notEqual(worktree, paths.target);
@@ -120,8 +126,11 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
     const cli = 'const run = ' + operation + ';\nconsole.log(JSON.stringify(run(process.argv[3])));\n';
     const server = "import http from 'node:http';\nconst run = " + operation + ';\n'+managedFixtureHandler()
       + 'const server=http.createServer((req,res) => { if(managed(req,res,server))return; let body=""; req.on("data",chunk => body+=chunk); req.on("end",() => {res.setHeader("content-type","application/json");res.end(JSON.stringify(run(JSON.parse(body)[' + JSON.stringify(scenario.field) + '])));}); });server.listen(Number(process.env[' + JSON.stringify(scenario.portVariable) + ']),"127.0.0.1");\n';
-    fs.writeFileSync(path.join(worktree, scenario.entrypoint), cli);
-    fs.writeFileSync(path.join(worktree, 'scripts/server.mjs'), server);
+    if(!scenario.httpOnly)fs.writeFileSync(path.join(worktree, scenario.entrypoint), cli);
+    fs.writeFileSync(path.join(worktree, 'scripts/server.mjs'), scenario.childProvider
+      ? "import http from 'node:http';import {readChildProvider,requestChildModel} from './lib/child-model-client.mjs';\n"+managedFixtureHandler()+
+        'const server=http.createServer(async(req,res)=>{if(managed(req,res,server))return;let body="";for await(const part of req)body+=part;const input=JSON.parse(body);try{const selected=readChildProvider(process.cwd());const response=await requestChildModel(selected.configuration,{messages:[{role:"user",content:input['+JSON.stringify(scenario.field)+']}]},selected);res.end(JSON.stringify(JSON.parse(response.content[0].text)));}catch(error){res.writeHead(503);res.end(JSON.stringify({error:error.code}));}});server.listen(Number(process.env['+JSON.stringify(scenario.portVariable)+']),"127.0.0.1");'
+      : server);
     installStopFixture(worktree,scenario.portVariable,{unsafe:scenario.unsafeFirstStop && builds.length===1});
     const manifestFile=path.join(worktree,'operations/manifest.json'),manifest=JSON.parse(fs.readFileSync(manifestFile));
     manifest.outcome_status='implemented';manifest.control_center_contract.status='implemented';manifest.blockers=[];
@@ -129,7 +138,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
   }
 
   function executor(options) {
-    const expected = scenario.connectorId === 'codex' ? 'codex-app-server' : 'claude-code';
+    const expected = scenario.connectorId === 'codex' ? 'codex-app-server' : scenario.connectorId==='claude'?'claude-code':scenario.connectorId;
     assert.equal(options.buildExecutor, expected);
     assert.equal(options.buildExecutorOptions.model, scenario.model);
     const service = { require: async () => ({ version: 'synthetic-claude-build', model: { id: scenario.model }, capabilities: { parallelLimit: 1 } }) };
@@ -157,7 +166,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
   }
   class FixtureHost extends hostTools.ProviderHostTools {
     constructor(options) {
-      super({...options,factoryContinuation:automate?'execute':'shadow'}); hosts.push(this);
+      super({...options,childConnections:childConnections || (()=>['openai','claude','neuraldeep','openrouter'].map(provider=>({provider,configured:true,status:'synthetic-fixture'}))),factoryContinuation:automate?'execute':'shadow'}); hosts.push(this);
       const execute = this.factory.execute.bind(this.factory);
       this.factory.execute = async (input, expected, automaticContinuation) => {
         if (!['deliver','research_collect'].includes(input.action)) return execute(input, expected, automaticContinuation);
@@ -168,7 +177,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
         const result = await executeVoiceFactoryStep({ root, stateRoot, agentParent, slug: paths.slug, chatId, connectorId: scenario.connectorId,
           model: scenario.model, effort: 'low', state: next, input }, { externalResearchContract:async(_contract,args)=>{
           const host=fixtureResearch();
-          return args.phase==='status'?host.status():host.collect({sourceUrls:args.sources?JSON.parse(fs.readFileSync(args.sources,'utf8')):{}});
+          return args.phase==='status'?host.status():host.collect({sourceUrls:args.sources?JSON.parse(fs.readFileSync(args.sources,'utf8')):{},automaticRecovery:args['automatic-recovery']===true});
         },delivery: { ...delivery,
           deliverOutcome: (spec, target, options) => delivery.deliverOutcome(spec, target, { ...options, buildExecutor: executor(options) }),
         } });
@@ -198,13 +207,13 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
       chatId, turnId, threadId: 'native_product', nativeTurnId: () => 'native_product_turn', lease, coordinator,
       slug: paths.slug, target: paths.target, model: scenario.model, effort: 'low', emit });
   } else {
-    runtime = new ProviderTaskRuntime({ connectorId: 'claude', root, stateRoot, agentParent, privateRoot: path.join(stateRoot, 'private', 'task-chat'),
+    runtime = new ProviderTaskRuntime({ connectorId: scenario.connectorId, root, stateRoot, agentParent, privateRoot: path.join(stateRoot, 'private', 'task-chat'),
       configuration: () => ({ modelId: scenario.model, reasoningEffort: 'low', timeoutMs: 900000, sandbox: 'read-only' }),
       preflight: async () => ({ tools: true, approvals: true }),
       launch: async input => {
         await input.beforeStart({ identity: 'b'.repeat(64), evidence: { fixture: true } });
         await input.onEvent({ type: 'thread.started', thread_id: '11111111-2222-4333-8444-555555555555' });
-        const host = new FixtureHost({ ...input, ...input.hostExecutionContext, connectorId: 'claude', onProcessEvidence() {} });
+        const host = new FixtureHost({ ...input, ...input.hostExecutionContext, connectorId: scenario.connectorId, onProcessEvidence() {} });
         let finish;
         const completion = new Promise(resolve => { finish = resolve; });
         run = { host, completion, finish, stop: () => finish({ ok: false, errorCode: 'operator_cancel', processTreeExited: true }) };
@@ -238,8 +247,8 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
     progress:()=>readBoundFactoryProgress({root,stateRoot,agentParent,slug:scenario.slug,target:paths.target,chatId,connectorId:scenario.connectorId,model:scenario.model}),
     brief: { identity: { name: scenario.name, slug: scenario.slug }, goal: 'Return the requested JSON through HTTP and CLI.', user: 'Local operator',
       successCriteria: ['HTTP and CLI return the approved JSON for the supplied input.'], coreFunctions: ['Return the approved product JSON'],
-      technical: { childModelProvider:'none',childModelId:'none',preset: 'llm-app', runtimeFamily: 'api', serviceMode: 'process', primaryInterface: 'web', secondaryInterfaces: 'CLI',
-        cliEntrypoint: scenario.entrypoint, port: '3021', portVariable: scenario.portVariable,
+      technical: { childModelProvider:scenario.childProvider || 'none',childModelId:scenario.childModel || 'none',...(scenario.childProvider?{childModelConnection:'pritha',childMaxOutputTokens:'256'}:{}),preset: 'llm-app', runtimeFamily: 'api', serviceMode: 'process', primaryInterface: 'web', secondaryInterfaces: scenario.httpOnly?'none':'CLI',
+        ...(scenario.httpOnly?{}:{cliEntrypoint:scenario.entrypoint}), port: '3021', portVariable: scenario.portVariable,
         repositoryResearchPolicy: 'not-applicable', repositoryAdoptionMode: 'none', repositoryResearchTopics: 'none', repositoryResearchWaiverReason: 'Synthetic product test uses only built-in Node modules.' } },
     get trial(){return productTrial();},
     async answer(request = pending()[0], input = {}) {

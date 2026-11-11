@@ -153,6 +153,7 @@ function NativeQuestion({chatId,request,refresh}:{chatId:string;request:PendingR
     {doc&&spec?<div><strong>{spec.name}</strong><p>{spec.mission || spec.criteria}</p>
       {doc==="Contract"?<><p>Interfaces: {spec.interfaces?.join(" + ")} · Directory: {spec.scope}</p>
         <p>Builder: {String(request.presentation.buildProvider)} / {String(request.presentation.buildModel)}. Model for the finished agent: {String(request.presentation.childModelId || "not required")}.</p>
+        {request.presentation.childModelConnection==='pritha'?<p>The agent will use the selected connection in Pritha, with up to {String(request.presentation.childMaxOutputTokens)} output tokens per request. The provider key stays in Pritha.</p>:null}
         {request.presentation.automaticContinuation===true?<p>After separate Outcome approval, the factory will verify the scaffold. If a product test finds a repairable issue, the factory will run the builder within the specified limits.</p>:null}
         <p>Permissions: {spec.permissions || "see document"}. Secrets: {spec.secrets || "see document"}.</p>
         <p>Build limits: {spec.tokens} tokens, {spec.iterations} attempts, {Math.ceil((spec.elapsedMs || 0)/60000)} min.</p>{spec.budgetMode==="native-goal"?<p>Codex records tokens when a request completes; the last request may exceed the limit. No new attempt will start beyond it.</p>:null}</>:

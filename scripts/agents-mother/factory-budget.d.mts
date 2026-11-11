@@ -6,7 +6,7 @@ export class FactoryBudget {
   constructor(options:FactoryBudgetOptions);
   view():FactoryBudgetView;
   check():FactoryBudgetView;
-  ensure():Promise<FactoryBudgetView>;
+  ensure(options?:{coordinator:{listIntents(options:Record<string,unknown>):Array<Record<string,any>>;claims():Array<{detail?:Record<string,any>}>}}):Promise<FactoryBudgetView>;
   checkpoint(id:string,phase:'preparation'|'build',snapshot:{requests:Array<Record<string,any>>}):Promise<FactoryBudgetView>;
   native(id:string,phase:'preparation'|'build',total?:number,activeDeltaMs?:number):Promise<FactoryBudgetView>;
   extend(operationId:string,addition:{tokens?:number;activeMs?:number}):Promise<FactoryBudgetView>;

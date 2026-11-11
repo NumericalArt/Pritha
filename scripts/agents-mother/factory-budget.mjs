@@ -26,6 +26,7 @@ function read(p){
     || !count(value.limits?.maxActiveMs) || value.limits.maxActiveMs<1 || !value.attempts || Array.isArray(value.attempts))throw fail('factory_budget_identity');
   for(const row of Object.values(value.attempts))if(!['preparation','build'].includes(row.phase) || !count(row.observedTokens) || !count(row.chargedTokens)
     || row.chargedTokens<row.observedTokens || !count(row.activeMs))throw fail('factory_budget_receipt_invalid');
+  if(value.handoffs!==undefined && (!Array.isArray(value.handoffs) || value.handoffs.some(row=>!row?.from?.chatId || !row?.to?.chatId || !Array.isArray(row.turns))))throw fail('factory_budget_receipt_invalid');
   return value;
 }
 function view(value){
@@ -66,7 +67,38 @@ export class FactoryBudget {
       }
     }
   }
-  async ensure(){return this.change(()=>{});}
+  async ensure({coordinator}={}){
+    if(!coordinator)return this.change(()=>{});
+    privateStateFile(this.p.stateRoot,this.p.file);
+    return withFileLock(this.p.file,()=>{
+      if(!fs.existsSync(this.p.file)){
+        const now=new Date().toISOString(),value={version:1,identity:this.p.identity,limits:{...FACTORY_STABILITY_BUDGET},attempts:{},createdAt:now,updatedAt:now};
+        atomicWriteFile(this.p.file,JSON.stringify(value)+'\n');return view(value);
+      }
+      const raw=JSON.parse(factoryRead(this.p.file,this.p.directory,8_000_000));
+      if(digest(raw.identity)===digest(this.p.identity))return view(read(this.p));
+      const prior=raw.identity;
+      if(!prior || !/^chat_[A-Za-z0-9_-]{1,160}$/.test(prior.chatId || '') || !['codex','claude','neuraldeep','openrouter','local'].includes(prior.connectorId)
+        || ['slug','target','stateRoot'].some(key=>prior[key]!==this.p.identity[key]) || Object.keys(prior).length!==5)throw fail('factory_budget_identity');
+      // Only an explicitly selected new factory chat may recover preparation
+      // that ended before init. Accepted documents and active/unknown work are
+      // never adopted. Keep every prior charge and prevent an old chat stealing
+      // the attempt back after a handoff.
+      const value=read({...this.p,identity:prior});
+      if(value.handoffs?.some(row=>row.from.chatId===this.p.identity.chatId))throw fail('factory_attempt_moved');
+      if(prior.chatId===this.p.identity.chatId || fs.existsSync(path.join(this.p.directory,'session.json')) || fs.existsSync(this.p.target)
+        || Object.values(value.attempts).some(row=>row.phase!=='preparation'))throw fail('factory_attempt_recovery_required');
+      const turns=coordinator.listIntents({kind:'turn',chatId:prior.chatId,limit:1000});
+      if(coordinator.claims().some(row=>row.detail?.chatId===prior.chatId)
+        || turns.some(row=>!['failed','interrupted','completed','cancelled','not_dispatched'].includes(row.state)))throw fail('factory_attempt_active');
+      if(!turns.length || turns.some(row=>row.exitConfirmed!==true && row.state!=='not_dispatched' && !(prior.connectorId==='codex' && row.state==='completed')))
+        throw fail('factory_attempt_recovery_required');
+      const at=new Date().toISOString();
+      value.handoffs=[...(value.handoffs || []),{from:prior,to:this.p.identity,at,reason:'confirmed-pre-init-exit',turns:turns.map(row=>row.turnId || row.id)}];
+      value.identity=this.p.identity;value.updatedAt=at;
+      atomicWriteFile(this.p.file,JSON.stringify(value)+'\n');return view(value);
+    });
+  }
   check(){const value=this.view();if(!value.remainingTokens)throw fail('factory_token_budget_exhausted');if(!value.remainingActiveMs)throw fail('factory_time_budget_exhausted');return value;}
   async observe(id,phase,data,{admission=false}={}){
     if(typeof id!=='string' || id.length>300 || !['preparation','build'].includes(phase))throw fail('factory_budget_receipt_invalid');
@@ -95,7 +127,7 @@ export class FactoryBudget {
   }
   async native(id,phase,total,activeDeltaMs=0){
     if(!['preparation','build'].includes(phase) || typeof id!=='string' || id.length>300 || total!==undefined && !count(total) || !count(activeDeltaMs))throw fail('factory_budget_receipt_invalid');
-    return this.change(value=>{const key=digest(id),prior=value.attempts[key];
+    return this.change(value=>{const key=digest(value.handoffs?.length?this.p.identity.chatId+':'+id:id),prior=value.attempts[key];
       if(prior && prior.phase!==phase || total!==undefined && total<(prior?.observedTokens || 0))throw fail('factory_budget_receipt_conflict');
       const tokens=total ?? prior?.observedTokens ?? 0;
       value.attempts[key]={phase,observedTokens:tokens,chargedTokens:tokens,activeMs:(prior?.activeMs || 0)+activeDeltaMs,

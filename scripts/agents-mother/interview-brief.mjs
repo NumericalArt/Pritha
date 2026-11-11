@@ -5,7 +5,7 @@ import { redactSensitiveText } from '../lib/redaction.mjs';
 
 export const INTERVIEW_BRIEF_SCHEMA_VERSION = 1;
 export const INTERVIEW_PRESETS = new Set(["generic", "local-feed", "llm-app"]);
-const technicalKeys = ["preset", "sourceFormat", "runtimeFamily", "serviceMode", "primaryInterface", "secondaryInterfaces", "cliEntrypoint", "childModelProvider", "childModelId", "runtimePlacementProfile", "repositoryResearchPolicy", "repositoryAdoptionMode", "repositoryResearchWaiverReason", "repositoryResearchTopics", "targetFolder", "port", "portVariable"];
+const technicalKeys = ["preset", "sourceFormat", "runtimeFamily", "serviceMode", "primaryInterface", "secondaryInterfaces", "cliEntrypoint", "childModelProvider", "childModelId", "childModelConnection", "childMaxOutputTokens", "runtimePlacementProfile", "repositoryResearchPolicy", "repositoryAdoptionMode", "repositoryResearchWaiverReason", "repositoryResearchTopics", "targetFolder", "port", "portVariable"];
 const designKeys = ["memoryModel", "storedData", "inputDataTypes", "sensitiveData", "riskNotes"];
 export const INTERVIEW_BRIEF_TEXT_FIELDS = Object.freeze({technical: Object.freeze(technicalKeys), design: Object.freeze(designKeys)});
 const clean = (value) => typeof value === "string" ? value.trim().replace(/\r\n?/g, "\n") : "";
@@ -169,6 +169,7 @@ export function interviewBriefOptions(value) {
     service: brief.technical.serviceMode, interface: brief.technical.primaryInterface, secondary: brief.technical.secondaryInterfaces,
     "cli-entrypoint": brief.technical.cliEntrypoint,
     "child-provider": brief.technical.childModelProvider, "child-model": brief.technical.childModelId,
+    "child-connection": brief.technical.childModelConnection, "child-max-output-tokens": brief.technical.childMaxOutputTokens,
     "runtime-placement": brief.technical.runtimePlacementProfile,
     "repository-policy": brief.technical.repositoryResearchPolicy, "repository-adoption": brief.technical.repositoryAdoptionMode,
     "repository-waiver": brief.technical.repositoryResearchWaiverReason, "repository-topics": brief.technical.repositoryResearchTopics,

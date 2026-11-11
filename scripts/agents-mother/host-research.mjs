@@ -16,6 +16,7 @@ import {applyExternalResearchEvidence} from './external-research.mjs';
 const hash=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 const fail=code=>{throw Object.assign(new Error('Host research needs review; collected evidence is preserved.'),{code});};
 const errorCode=error=>/^[a-z_]{1,80}$/.test(error?.code||'')?error.code:'source_unavailable';
+const recoverableSourceErrors=new Set(['source_not_found','source_http_unavailable','source_content_unsupported','source_page_too_large','source_unavailable','provider_unavailable','research_source_timeout','research_passage_missing','provider_timeout','ECONNRESET','ETIMEDOUT']);
 const read=(file,root)=>readBoundedRegularFile(file,{allowedRoots:[root],maxBytes:2*1024*1024}).text;
 function allowed(url,domains){try{const host=new URL(publicUrl(url)).hostname;return domains.some(d=>host===d || host.endsWith('.'+d));}catch{return false;}}
 function primaryResult(sources,topic){
@@ -62,7 +63,7 @@ export class HostResearch {
     const state=this.load();if(!state)return {status:'not-started',topics:this.topics,sources:[]};
     return {status:state.completed?'completed':state.sources.length===this.topics.length?'collected':'pending',deadlineAt:state.deadlineAt,recovery:state.recovery || null,topics:this.topics.map(topic=>({...topic,checkpoint:state.topics[topic.id] || null})),sources:state.sources.map(({text,query,...source})=>({...source,passages:passages({...source,text,query})}))};
   }
-  async collect({retryFailed=false,sourceUrls={},recoverFailed=false}={}){
+  async collect({retryFailed=false,sourceUrls={},recoverFailed=false,automaticRecovery=false}={}){
     this.assertAllowed();
     if(!sourceUrls || typeof sourceUrls!=='object' || Array.isArray(sourceUrls) || Object.keys(sourceUrls).some(id=>!this.topics.some(topic=>topic.id===id)))fail('research_sources_input_invalid');
     if(this.topics.some(topic=>!topic.primaryDomains.length))fail('research_source_authority_required');
@@ -94,24 +95,33 @@ export class HostResearch {
         retryFailed=true;
         this.save(state);
       }
-      state ||= {schema:'pritha-host-research-v1',binding:this.binding,reportHash:hash(this.report.text),deadlineAt:Date.now()+this.totalMs,topics:{},sources:[]};
+      state ||= {schema:'pritha-host-research-v1',binding:this.binding,reportHash:hash(this.report.text),deadlineAt:Date.now()+this.totalMs,topics:{},sources:[],...(automaticRecovery?{retryPolicy:'per-topic-v1',activeMs:0}:{})};
+      const automatic=state.retryPolicy==='per-topic-v1';
+      // The policy is pinned on the first collection. Older exhausted checkpoints
+      // cannot gain retries merely by running newer code. UI/model waiting does
+      // not consume the new policy's bounded source acquisition time.
+      if(automatic && (!Number.isFinite(state.activeMs) || state.activeMs<0))fail('research_checkpoint_invalid');
       if(state.publication)return this.status();this.assertReport(state);this.save(state);
       let ownedService;
       try{
         for(const topic of this.topics){
           this.assertAllowed();if(state.sources.some(source=>source.topicId===topic.id))continue;
           if(!topic.primaryDomains.length)fail('research_source_authority_required');
-          if(Date.now()>=state.deadlineAt)fail('research_deadline_exceeded');
+          for(;;){
+          const remaining=automatic?this.totalMs-state.activeMs:state.deadlineAt-Date.now();
+          if(remaining<=0)fail('research_deadline_exceeded');
           const prior=state.topics[topic.id];
           if(prior?.status==='started')fail('research_source_unconfirmed');
+          if(automatic && prior?.status==='failed' && prior.retryable!==true)fail('research_retry_required');
           const recovered=state.recovery?.previousTopics[topic.id];
-          const attemptLimit=recovered?.status==='failed'?recovered.attempts+2:2;
-          if(prior && (!retryFailed || prior.attempts>=attemptLimit))fail(prior.attempts>=attemptLimit?'research_source_limit':'research_retry_required');
-          const attempt=state.topics[topic.id]={attempts:(prior?.attempts||0)+1,status:'started',stage:'select',history:prior?[...(prior.history||[]),prior.error]:[]};this.save(state);
-          const controller=new AbortController(),timer=setTimeout(()=>controller.abort(Object.assign(new Error('Source deadline reached.'),{code:'research_source_timeout'})),Math.min(this.sourceMs,state.deadlineAt-Date.now()));
+          const attemptLimit=automatic?4:recovered?.status==='failed'?recovered.attempts+2:2;
+          if(prior && (!(retryFailed || automatic) || prior.attempts>=attemptLimit))fail(prior.attempts>=attemptLimit?'research_source_limit':'research_retry_required');
+          const attempt=state.topics[topic.id]={attempts:(prior?.attempts||0)+1,status:'started',stage:'select',history:prior?[...(prior.history||[]),prior.error]:[],failures:prior?[...(prior.failures||[]),{url:prior.url || null,error:prior.error,attempt:prior.attempts}]:[]};this.save(state);
+          const started=Date.now(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(Object.assign(new Error('Source deadline reached.'),{code:'research_source_timeout'})),Math.min(this.sourceMs,remaining));
           const signal=this.signal?AbortSignal.any([this.signal,controller.signal]):controller.signal;
           try{
-            let url=sourceUrls[topic.id] || state.recovery?.sources[topic.id] || topic.primaryUrls[attempt.attempts-1] || topic.primaryUrls[0];
+            const candidates=[...new Set([sourceUrls[topic.id],state.recovery?.sources[topic.id],...topic.primaryUrls].filter(Boolean))];
+            let url=automatic?candidates[(attempt.attempts-1)%candidates.length]:sourceUrls[topic.id] || state.recovery?.sources[topic.id] || topic.primaryUrls[attempt.attempts-1] || topic.primaryUrls[0];
             let service=this.service;
             // A known primary URL needs no search/crawl subscription. Use the
             // same DNS-pinned reader across model connectors; only discovery
@@ -148,8 +158,14 @@ export class HostResearch {
             const source={id:hash([topic.id,item.url,hash(text)]).slice(0,24),topicId:topic.id,url:publicUrl(item.url),title:quarantineUntrustedInstructionText(String(item.title||'').slice(0,500)),text,contentHash:hash(text),query:topic.query,retrievedAt,publishedAt:safeDate(item.published_at)||'unknown',untrusted:true};
             if(passages(source).reduce((total,item)=>total+Buffer.byteLength(item.quote),0)<80)fail('research_passage_missing');
             state.sources.push(source);attempt.status='completed';attempt.stage='complete';attempt.readReceipt=page.id || null;this.save(state);
-          }catch(error){attempt.status='failed';attempt.error=errorCode(error);this.save(state);throw error;}
-          finally{clearTimeout(timer);}
+          }catch(error){
+            const recoverable=recoverableSourceErrors.has(error.code);
+            attempt.status='failed';attempt.error=errorCode(error);attempt.retryable=recoverable && !this.signal?.aborted;this.save(state);
+            if(!automatic || !recoverable || attempt.attempts>=attemptLimit || this.signal?.aborted)throw error;
+          }
+          finally{clearTimeout(timer);if(automatic){state.activeMs+=Date.now()-started;this.save(state);}}
+          if(attempt.status==='completed')break;
+          }
         }
         return this.status();
       }finally{ownedService?.store.close();}

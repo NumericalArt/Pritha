@@ -23,9 +23,19 @@ function scoped(coordinator,chatId,input){
 export async function answerProviderRequest(coordinator,chatId,input){
   const row=scoped(coordinator,chatId,input),response=responseFor(row,input);
   const recorded=current=>current?.state==='answered' && current.revision-1===input.revision && current.responseHash===hash(response);
-  if(recorded(row))return {submitted:true,replayed:true};
+  if(recorded(row))return {submitted:true,replayed:true,...(row.resumeRequired?{resumeRequired:true}:{})};
   if(row.state!=='pending' || row.revision!==input.revision)throw failure('native_request_changed');
   const channel=executionChannelView(coordinator,'provider-answer:'+row.id);
+  if(row.durableDocument && !channel){
+    return coordinator.withMutation('provider-answer:'+row.id,async()=>{
+      const current=scoped(coordinator,chatId,input);
+      if(recorded(current))return {submitted:true,replayed:true,...(current.resumeRequired?{resumeRequired:true}:{})};
+      if(current.state!=='pending' || current.revision!==input.revision)throw failure('native_request_changed');
+      const resumeRequired=response.decision==='accept';
+      coordinator.updateIntent(current.key || 'provider-request:'+chatId+':'+current.turnId+':'+current.operationId,{state:'answered',responseHash:hash(response),response,clientMessageId:input.clientMessageId,resumeRequired},current.revision);
+      return {submitted:true,replayed:false,resumeRequired};
+    });
+  }
   try {
     if(!channel || channel.chatId!==chatId || channel.turnId!==row.turnId || channel.owner!==row.owner || channel.generation!==row.generation)throw failure('control_connection_expired');
     return await callExecutionChannel(coordinator,'provider-answer:'+row.id,input);
@@ -39,28 +49,35 @@ export async function answerProviderRequest(coordinator,chatId,input){
 export function pendingProviderRequests(coordinator,chatId){
   return coordinator.listIntents({kind:'provider-request',chatId,states:['pending','channel_unavailable'],limit:200}).map(row=>{
     const endpoint=executionChannelView(coordinator,'provider-answer:'+row.id);
-    const ready=row.state==='pending' && endpoint?.chatId===chatId && endpoint.turnId===row.turnId && endpoint.owner===row.owner && endpoint.generation===row.generation;
+    const ready=row.state==='pending' && (row.durableDocument || endpoint?.chatId===chatId && endpoint.turnId===row.turnId && endpoint.owner===row.owner && endpoint.generation===row.generation);
     return {requestId:row.id,chatId,turnId:row.turnId,itemId:null,kind:row.requestKind,
       title:row.requestKind==='user_input'?'Input needed':'Approval needed',reason:row.reason || null,expiresAt:row.expiresAt,resolved:false,presentation:{...row.presentation,revision:row.revision,state:ready?'pending':'channel_unavailable'}};
   });
 }
 export function expireProviderRequests(coordinator,chatId,turnId){
-  for(const row of coordinator.listIntents({kind:'provider-request',chatId,turnId,states:['connecting','pending','channel_unavailable'],limit:1000}))if(validId(row.operationId))coordinator.updateIntent('provider-request:'+chatId+':'+turnId+':'+row.operationId,{state:'expired'},row.revision);
+  for(const row of coordinator.listIntents({kind:'provider-request',chatId,turnId,states:['connecting','pending','channel_unavailable'],limit:1000}))if(validId(row.operationId) && !row.durableDocument)coordinator.updateIntent('provider-request:'+chatId+':'+turnId+':'+row.operationId,{state:'expired'},row.revision);
 }
 
 /** Permission answers authorize one exact host action. They do not execute it,
  * relax a sandbox, amend policies, or authorize another turn. */
 export class ProviderApprovalBroker {
   constructor({coordinator,chatId,turnId,lease,signal,emit=()=>{}}){Object.assign(this,{coordinator,chatId,turnId,lease,signal,emit});this.waiters=new Map();this.closed=false;}
-  async ask({operationId,kind,presentation,reason,timeoutMs=300000}){
+  async ask({operationId,kind,presentation,reason,timeoutMs=300000,durableDocument=false}){
     if(this.closed || this.signal?.aborted)throw failure('provider_request_expired');this.lease.assertOwned();
     if(!validId(operationId) || !['command_approval','file_change_approval','user_input'].includes(kind) || !presentation || typeof presentation!=='object' || Array.isArray(presentation)
         || Buffer.byteLength(JSON.stringify(presentation))>64000 || typeof reason!=='string' || reason.length>4000 || !Number.isSafeInteger(timeoutMs) || timeoutMs<1 || timeoutMs>600000)throw failure('native_answer_invalid');
     if(kind==='user_input' && (!Array.isArray(presentation.questions) || presentation.questions.length<1 || presentation.questions.length>3
         || presentation.questions.some(q=>!validId(q.id) || typeof q.question!=='string' || !q.question.trim() || q.question.length>2000 || q.isSecret===true)))throw failure('native_answer_invalid');
+    if(durableDocument && (kind!=='file_change_approval' || !['contract only','outcome only'].includes(presentation.approvalScope) || !/^[a-f0-9]{64}$/.test(presentation.beforeSha256 || '')))throw failure('native_answer_invalid');
+    const documentHash=durableDocument?hash({kind,presentation,reason}):null;
+    if(durableDocument){
+      const prior=this.coordinator.listIntents({kind:'provider-request',chatId:this.chatId,limit:1000}).filter(row=>row.durableDocument && row.documentHash===documentHash);
+      const answered=prior.find(row=>row.state==='answered');if(answered)return answered.response;
+      for(const row of prior.filter(row=>row.turnId!==this.turnId && ['pending','channel_unavailable'].includes(row.state)))this.coordinator.updateIntent('provider-request:'+this.chatId+':'+row.turnId+':'+row.operationId,{state:'superseded'},row.revision);
+    }
     const key='provider-request:'+this.chatId+':'+this.turnId+':'+operationId;
     const reserved=this.coordinator.reserveIntent(key,hash({kind,presentation,reason}),{kind:'provider-request',chatId:this.chatId,turnId:this.turnId,operationId,owner:this.lease.owner,generation:this.lease.generation,requestKind:kind,presentation,reason,
-      expiresAt:new Date(Date.now()+timeoutMs).toISOString()},{limit:{max:128,states:['pending','connecting']}});
+      expiresAt:durableDocument?'2099-01-01T00:00:00.000Z':new Date(Date.now()+timeoutMs).toISOString(),...(durableDocument?{durableDocument:true,documentHash}:{})},{limit:{max:128,states:['pending','connecting']}});
     if(reserved.intent.state==='answered')return reserved.intent.response;
     if(this.waiters.has(key))return this.waiters.get(key).promise;
     if(!reserved.created)throw failure('provider_request_expired');
@@ -69,7 +86,7 @@ export class ProviderApprovalBroker {
     const waiter={promise,resolve,reject,cleanup:null};this.waiters.set(key,waiter);
     const expire=(unavailable=false)=>{
       if(this.waiters.get(key)!==waiter)return;
-      const current=this.coordinator.getIntent(key);if(['connecting','pending'].includes(current?.state))this.coordinator.updateIntent(key,{state:unavailable===true?'channel_unavailable':'expired'},current.revision);
+      const current=this.coordinator.getIntent(key);if(['connecting','pending'].includes(current?.state))this.coordinator.updateIntent(key,{state:durableDocument?'pending':unavailable===true?'channel_unavailable':'expired'},current.revision);
       waiter.cleanup?.();this.waiters.delete(key);this.emit();reject(failure(unavailable===true?'control_channel_unavailable':'provider_request_expired'));
     };
     const timer=setTimeout(expire,timeoutMs);this.signal?.addEventListener('abort',expire,{once:true});

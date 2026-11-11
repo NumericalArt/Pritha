@@ -14,8 +14,8 @@ const code=ts.transpileModule(declarations.map(n=>n.getText(tree)).join('\n'),{
   compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022},
 }).outputText.replace(/^export /gm,'');
 
-function fixture(){
-  let root='/fixture/main',mode='ok',executions=0,reads=0;
+function fixture({scoped=false}={}){
+  let root='/fixture/main',mode='ok',executions=0,reads=0,issued=0,revoked=0;
   const running=new Map(),audits=[];
   // Freeze cache time: the next read must observe the action without waiting
   // for expiry. Only process execution and host diagnostics are fixtures.
@@ -30,7 +30,11 @@ function fixture(){
     operatorActionPhrase:()=> 'confirm',
     blockedOperatorActionResult:()=>({ok:false,status:'pending_confirmation'}),
     operationManifestForAgent:()=>({folder:{absolutePath:root+'/children/agent'},manifest:{}}),
-    validateStructuredOperationsCommand:()=>({ok:true,command:{argv:['fixture']},warnings:[]}),
+    approvedChildModel:()=>scoped?{configuration:{connection:'pritha'},contractHash:'fixture'}:null,
+    APP_PORT:3420,
+    issueChildModelConnection:()=>{issued++;return {PRITHA_CHILD_MODEL_URL:'http://127.0.0.1:3420/api/child-model',PRITHA_CHILD_MODEL_TOKEN:'synthetic'};},
+    revokeChildModelConnection:()=>{revoked++;},
+    validateStructuredOperationsCommand:()=>({ok:true,command:{argv:['fixture']},env:{FIXTURE_PORT:'3441'},warnings:[]}),
     executeStructuredAgentCommand:async({action})=>{
       executions++;running.set(root,action==='start');
       if(mode==='throw')throw Error('fixture execution error');
@@ -42,7 +46,7 @@ function fixture(){
     appendManualCheckAudit:(_status,result)=>audits.push(result),
   };
   const api=new Function(...Object.keys(context),code+'\nreturn {getControlCenterStatus,runAgentRuntimeAction};')(...Object.values(context));
-  return {...api,setRoot:r=>{root=r;},setMode:m=>{mode=m;},stats:()=>({reads,executions,audits:audits.length})};
+  return {...api,setRoot:r=>{root=r;},setMode:m=>{mode=m;},stats:()=>({reads,executions,issued,revoked,audits:audits.length})};
 }
 
 test('the first catalog read after Start and Stop observes the completed action',async()=>{
@@ -82,4 +86,15 @@ test('a rejected confirmation neither runs the command nor discards its fresh di
   const before=f.stats().reads,current=await f.getControlCenterStatus();
   assert.equal(current.childAgents[0].running,false);assert.equal(f.stats().executions,0);
   assert.equal(f.stats().reads,before);
+});
+
+test('failed Start, thrown execution and Stop revoke the scoped model connection',async()=>{
+  for(const mode of ['failed','throw']){
+    const f=fixture({scoped:true});f.setMode(mode);
+    if(mode==='throw')await assert.rejects(f.runAgentRuntimeAction('agent','start','confirm'),/fixture execution error/);
+    else assert.equal((await f.runAgentRuntimeAction('agent','start','confirm')).ok,false);
+    assert.equal(f.stats().issued,1);assert.equal(f.stats().revoked,1);
+  }
+  const f=fixture({scoped:true});await f.runAgentRuntimeAction('agent','stop','confirm');
+  assert.equal(f.stats().issued,0);assert.equal(f.stats().revoked,1);
 });

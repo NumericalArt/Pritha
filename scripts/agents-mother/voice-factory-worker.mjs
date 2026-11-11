@@ -152,6 +152,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     }
     case 'research_status':case 'research_collect':case 'research_recover':case 'research_apply':{
       approved();const phase=input.action.split('_')[1];const args={backend:'host',connector:request.connectorId,phase};
+      if(state.continuationProfile==='api-local-v1')args['automatic-recovery']=true;
       if(input.retry_failed===true)args['retry-failed']=true;
       let sources=input.sources;
       if(phase==='collect' && state.continuationProfile==='api-local-v1' && !sources){

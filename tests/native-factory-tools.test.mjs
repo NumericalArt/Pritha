@@ -69,10 +69,17 @@ test('native factory refuses foreign threads, turns, namespaces and tools before
   const guidance=JSON.parse(badAction.contentItems[0].text);assert.equal(guidance.action,'write_draft');assert.ok(guidance.requiredFields.includes('expected_sha256'));assert.match(guidance.hint,/not-started use init/);assert.equal(f.state(),null);
   const invalid=await f.call({action:'init',brief:{...brief,design:{inputDataTypes:['UTF-8']}},build_token_budget:10000});assert.equal(invalid.success,false);assert.match(invalid.contentItems[0].text,/brief.design.inputDataTypes/);assert.equal(f.state(),null);
 });
-test('closing a native turn cancels its pending approval without accepting the document',{timeout:10000},async t=>{
+test('closing a native turn preserves its document card and a later answer resumes the exact approval',{timeout:10000},async t=>{
   const f=fixture(t);await f.call({action:'init',brief,build_token_budget:10000});
   const pending=f.call({action:'approve_contract',expected_sha256:factoryArtifact(f.paths,f.state(),'contract').sha256});
   await until(()=>approvals.pendingProviderRequests(f.coordinator,'chat_native').length===1);
   assert.equal((await f.turn.close()).processTreeExited,true);assert.equal((await pending).success,false);
-  assert.equal(f.state().contractApproval,undefined);assert.equal(approvals.pendingProviderRequests(f.coordinator,'chat_native').length,0);
+  assert.equal(f.state().contractApproval,undefined);
+  const requests=approvals.pendingProviderRequests(f.coordinator,'chat_native');assert.equal(requests.length,1);
+  const request=requests[0];
+  const answer=await approvals.answerProviderRequest(f.coordinator,'chat_native',{requestId:request.requestId,revision:request.presentation.revision,clientMessageId:'late_native_answer',decision:'accept'});
+  assert.equal(answer.resumeRequired,true);assert.equal(f.state().contractApproval,undefined);
+  const resumed=f.make('turn_after_late_answer');
+  assert.equal((await f.call({action:'approve_contract',expected_sha256:factoryArtifact(f.paths,f.state(),'contract').sha256},resumed)).success,true);
+  assert.ok(f.state().contractApproval);assert.equal(approvals.pendingProviderRequests(f.coordinator,'chat_native').length,0);
 });

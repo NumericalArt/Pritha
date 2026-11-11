@@ -122,3 +122,35 @@ test('explicit factory control rejects authority, retargeting, attachments and q
   const ordinary=(await runtime.create({clientThreadId:'ordinary_control_scope',source:'chat',workspace:{mode:'read-only'}})).binding;
   await assert.rejects(runtime.start(ordinary.chatId,input),{code:'factory_control_invalid'});
 });
+
+test('a confirmed NeuralDeep failure before init can continue in a new chat with its original measured budget',async t=>{
+  const f=fixture(t,'neuraldeep'),runtime=f.make(),first=(await runtime.create(create('early_failure_first'))).binding;
+  await runtime.start(first.chatId,message('early_failure_message'));await until(()=>f.runs.length===1);
+  await f.runs[0].input.onBudgetCheckpoint({requests:[{status:'measured',usage:{totalTokens:16615},reservedTokens:16615,createdAt:'2026-11-11T12:00:00.000Z',finishedAt:'2026-11-11T12:00:01.000Z'}]});
+  f.runs[0].resolve({ok:false,errorCode:'neuraldeep_model_identity_mismatch',processTreeExited:true});await until(()=>runtime.active.size===0);
+  const next=(await runtime.create(create('early_failure_new_chat'))).binding;
+  await runtime.start(next.chatId,message('early_failure_new_message'));await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.tokenBudget,10_000_000-16615);
+  assert.equal(runtime.registry.turnsPage(first.chatId).data[0].status,'failed');
+  const paths=voiceFactoryPaths({root,stateRoot:f.stateRoot,agentParent:f.agentParent,slug:'typed-child'});
+  assert.equal(fs.existsSync(paths.file),false);assert.equal(fs.existsSync(paths.target),false);
+});
+
+test('answering a persisted Contract card resumes the provider chat once and applies the saved exact decision',{timeout:30000},async t=>{
+  const f=fixture(t),runtime=f.make(),binding=(await runtime.create(create('late_approval_create'))).binding;
+  await runtime.start(binding.chatId,message('late_approval_turn'));await until(()=>f.runs.length===1);
+  const run=f.runs[0],brief={identity:{name:'Typed Child',slug:'typed-child'},goal:'Count lines in a local text file.',user:'Local operator',successCriteria:['Returns the exact JSON line count.'],coreFunctions:['Count a selected file'],technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'A deterministic line counter needs no third-party repository.'}};
+  await run.host.call('factory_step',{operation_id:'late_approval_init',action:'init',brief,build_token_budget:10000});
+  const paths=voiceFactoryPaths({root,stateRoot:f.stateRoot,agentParent:f.agentParent,slug:'typed-child'});
+  const state=()=>loadVoiceFactory(paths,{chatId:binding.chatId,connectorId:'claude'}),sha=factoryArtifact(paths,state(),'contract').sha256;
+  const operation=run.host.call('factory_step',{operation_id:'late_approval_contract',action:'approve_contract',expected_sha256:sha}).catch(error=>error);
+  await until(()=>runtime.pendingRequests(binding.chatId).length===1);
+  run.input.cancelPendingApprovals();await run.host.close();await operation;
+  run.resolve({ok:false,errorCode:'provider_request_expired',processTreeExited:true});await until(()=>runtime.active.size===0);
+  const request=runtime.pendingRequests(binding.chatId)[0];assert.ok(request);assert.equal(state().contractApproval,undefined);
+  const answer={requestId:request.requestId,revision:request.presentation.revision,clientMessageId:'late_approval_answer',decision:'accept'};
+  assert.equal((await runtime.answerRequest(binding.chatId,answer)).resumeRequired,true);await until(()=>f.runs.length===2);
+  await runtime.answerRequest(binding.chatId,answer);assert.equal(f.runs.length,2);
+  const result=JSON.parse((await f.runs[1].host.call('factory_step',{operation_id:'late_approval_apply',action:'approve_contract',expected_sha256:sha})).content[0].text);
+  assert.equal(result.status,'completed',JSON.stringify(result));assert.ok(state().contractApproval);assert.equal(runtime.pendingRequests(binding.chatId).length,0);
+});

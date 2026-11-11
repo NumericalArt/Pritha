@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { controlCenterStatusForClient, getControlCenterAgent } from "@/lib/control-center/server";
 import { deliveryBudgetText } from "@/lib/control-center/delivery-state";
+import {AgentInteraction} from '@/components/agents/AgentInteraction';
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
           </a>
         ) : null}
       </section>
+      <AgentInteraction agentId={agent.id}/>
       <section className="agent-status-grid" aria-label="Agent readiness">
         {readinessRows.map(([label, value, detail]) => (
           <div className="agent-status-tile" key={label}>

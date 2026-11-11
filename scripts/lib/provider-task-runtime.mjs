@@ -253,7 +253,7 @@ export class ProviderTaskRuntime {
       const factoryBudget=binding.workspace.factorySlug?new FactoryBudget({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,
         slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,chatId:binding.chatId,connectorId:this.connectorId}):null;
       if(factoryBudget){
-        await factoryBudget.ensure();
+        await factoryBudget.ensure({coordinator:this.execution});
         for(const row of this.execution.listIntents({kind:'turn',chatId:binding.chatId,limit:1000})){
           if(row.turnId===active.turnId || row.factoryBudgetRecorded || !row.turnId)continue;
           const savedUsage=row.providerUsage || this.registry.turn(binding.chatId,row.turnId)?.usage;
@@ -359,7 +359,15 @@ export class ProviderTaskRuntime {
     const exited=result.processTreeExited===true;
     const status=!exited?'failed':active.stopping || result.errorCode==='operator_cancel'?'interrupted':result.ok?'completed':'failed';
     const code=exited ? result.errorCode || 'provider_runtime_failed' : 'provider_process_exit_unconfirmed';
-    const error=status==='failed'?{code,message:exited?(code==='provider_native_login_required'?'Claude Code needs you to sign in again. Open Settings → Providers → Claude Code → Local CLI session, complete sign-in, then continue this chat.':code==='neuraldeep_model_identity_mismatch'?'NeuralDeep returned a different model from the one selected for this chat. The response was stopped. Retry when the provider restores this model, or select another available model for a new chat; saved history and defaults are unchanged.':'The provider task stopped with an error. Its history has been saved.'):'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
+    const factoryMessages={
+      factory_attempt_active:'An earlier creation attempt is still running or awaiting reconciliation. Open its chat and stop or finish that attempt before continuing here.',
+      factory_attempt_moved:'This unfinished creation has continued in a newer chat. Open that chat to continue; its history and total usage are preserved.',
+      factory_attempt_recovery_required:'This name already has saved creation work. Continue in the original agent chat, or choose a new name for a separate agent.',
+      factory_budget_identity:'The saved creation belongs to another chat. Pritha preserved it. Continue in that chat or choose a new agent name; this is not a provider outage or an exhausted token budget.',
+      factory_token_budget_exhausted:'The shared creation budget has been used. Saved work is preserved; extend the task budget to continue.',
+      factory_time_budget_exhausted:'The agreed active creation time has been used. Saved work is preserved; extend the task time to continue.',
+    };
+    const error=status==='failed'?{code,message:exited?(factoryMessages[code] || (code==='provider_native_login_required'?'Claude Code needs you to sign in again. Open Settings → Providers → Claude Code → Local CLI session, complete sign-in, then continue this chat.':code==='neuraldeep_model_identity_mismatch'?'NeuralDeep returned a different model identity from the selected model. The response was stopped. Pritha preserved the attempt; retry this chat or select a model in a new chat.':'The provider task stopped with an error. Its history has been saved.')):'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
     const binding=this.require(active.chat);
     const factory=status==='completed' && binding.workspace.factorySlug
       ? factoryDraftReceipt({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug:binding.workspace.factorySlug,chatId:binding.chatId,connectorId:this.connectorId}) : undefined;
@@ -483,7 +491,16 @@ export class ProviderTaskRuntime {
   }
   changed(chat){this.execution.appendEvent({chatId:chat,connectorId:this.connectorId});}
   pendingRequests(chat){this.require(chat);return pendingProviderRequests(this.execution,chat);}
-  async answerRequest(chat,input){this.require(chat);return answerProviderRequest(this.execution,chat,input);}
+  async answerRequest(chat,input){
+    this.require(chat);const result=await answerProviderRequest(this.execution,chat,input);
+    if(result.resumeRequired){
+      const continuation={clientMessageId:'document_'+input.requestId,input:[{type:'text',text:'Continue this agent factory after the recorded document approval. Read factory status, apply the exact saved decision, and continue within the accepted Contract and Outcome. Do not ask again for an unchanged approved document.'}]};
+      try{await this.start(chat,continuation);}catch(error){
+        if(error.code==='turn_active' || error.code==='queue_waiting')await this.enqueue(chat,continuation);else throw error;
+      }
+    }
+    return result;
+  }
   emit(chat,event,payload={},refs={}){const record=this.registry.appendEvent(chat,event,payload,refs);this.changed(chat);return record;}
   subscribe(chat,send,close=null){
     this.require(chat);let cursor=this.registry.latestEventId(chat) || this.emit(chat,'connection.ready',{}).data.eventId,closed=false;

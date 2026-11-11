@@ -19,6 +19,20 @@ test('an exact approval crosses workers and replays its durable answer without a
   assert.equal((await answerProviderRequest(f.b,chat,input)).replayed,true);assert.equal(pendingProviderRequests(f.a,chat).length,0);
   await assert.rejects(answerProviderRequest(f.b,chat,{...input,decision:'decline'}),{code:'native_request_changed'});
 });
+test('factory document cards survive timeout and restart; exact saved answers resume without a second approval',async t=>{
+  const f=fixture(t),document={...request,kind:'file_change_approval',durableDocument:true,timeoutMs:30,presentation:{approvalScope:'contract only',beforeSha256:'a'.repeat(64),proposedContent:'reviewed document'}};
+  const pending=f.broker.ask(document);const expired=assert.rejects(pending,{code:'provider_request_expired'});
+  await ready(f.a);await expired;expireProviderRequests(f.b,chat,turn);
+  const row=pendingProviderRequests(f.b,chat)[0];assert.equal(row.presentation.state,'pending');
+  const input=answer(row),accepted=await answerProviderRequest(f.b,chat,input);
+  assert.equal(accepted.resumeRequired,true);
+  assert.equal((await answerProviderRequest(f.b,chat,input)).replayed,true);
+  const resumed=new ProviderApprovalBroker({coordinator:f.a,chatId:chat,turnId:'turn_resumed',lease:f.lease});t.after(()=>resumed.close());
+  assert.deepEqual(await resumed.ask({...document,operationId:'operation_002'}),{decision:'accept'});
+  const changed=resumed.ask({...document,operationId:'operation_003',presentation:{...document.presentation,beforeSha256:'b'.repeat(64)}});
+  const changedExpired=assert.rejects(changed,{code:'provider_request_expired'});await changedExpired;
+  assert.equal(pendingProviderRequests(f.b,chat).length,1);
+});
 test('wrong chat, revision, changed action and competing decisions cannot widen an approval',async t=>{
   const f=fixture(t),pending=f.broker.ask(request),row=await ready(f.a),input=answer(row);
   await assert.rejects(answerProviderRequest(f.b,'chat_other',input),{code:'native_request_not_found'});

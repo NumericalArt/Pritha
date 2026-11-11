@@ -54,7 +54,10 @@ import type {
 import { getPrithaRealtimeStatus } from "../realtime/pritha-runtime";
 import { runAsyncProbe, createProbeCache, sharedProbeCache } from "../../../../../scripts/lib/async-probe.mjs";
 import { credentialFilePath, normalizeCredentialTarget, readCredentialFile, updateCredentialFile } from "../../../../../scripts/lib/credential-store.mjs";
-import {childCredentialConfiguration, type ChildCredentialConfiguration} from '../../../../../scripts/lib/child-provider-configuration.mjs';
+import {childCredentialConfiguration,childProviderConfiguration, type ChildCredentialConfiguration} from '../../../../../scripts/lib/child-provider-configuration.mjs';
+import {issueChildModelConnection,revokeChildModelConnection,serveChildModel,type ChildModelGrant} from '../../../../../scripts/lib/child-model-broker.mjs';
+import {readPrithaChildCredential,prithaChildConnections} from '../../../../../scripts/lib/pritha-child-credentials.mjs';
+import {childInteractionDefinition,requestChildProduct} from '../../../../../scripts/lib/child-interaction.mjs';
 import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
 import { resolveToolServerManifest, toolServerLaunchEnvironment, toolServerRuntimeBinding } from "../../../../../scripts/agents-mother/tool-server-runtime.mjs";
 import { deliveryStateView } from "./delivery-state";
@@ -99,6 +102,7 @@ type OperationsCredentialDefinition = {
 };
 
 type OperationsManifest = {
+  scaffold_adapter?: string;
   agent_kind?: string;
   agent_id?: string;
   ui_port?: number;
@@ -702,6 +706,48 @@ function findProfile(_root: string, agent: RegistryRecord) {
 
 function findContract(_root: string, agent: RegistryRecord) {
   return agent.artifacts.find((artifact) => artifact.type === "agent-contract")?.path || null;
+}
+
+function approvedChildModel(root:string,agentId:string){
+  const record=findCatalogAgent(readAgentCatalog({root,fresh:true}),agentId);
+  const artifact=record?.artifacts.find(a=>a.type==='agent-contract' && a.fm.status==='accepted');
+  if(!record || !artifact || record.identityStatus==='conflict')return null;
+  const text=readCatalogArtifact(record,artifact.path,{root});
+  const configuration=childProviderConfiguration({childModelProvider:bodyFieldValue(text,'Child model provider') || 'none',childModelId:bodyFieldValue(text,'Child model ID'),childModelConnection:bodyFieldValue(text,'Child model connection'),childMaxOutputTokens:bodyFieldValue(text,'Child maximum output tokens')});
+  return configuration?{configuration,projectPath:record.projectPath,contractHash:createHash('sha256').update(text).digest('hex')}:null;
+}
+
+export async function runChildModelRequest(token:string,request:unknown,signal?:AbortSignal){
+  const root=resolvePrithaRoot(),stateRoot=resolvePrithaStateRoot(root);
+  return serveChildModel({root,stateRoot,token,request,signal,
+    validateGrant:(grant:ChildModelGrant)=>{
+      const approved=approvedChildModel(root,grant.agentId);
+      return Boolean(approved && approved.contractHash===grant.contractHash && approved.projectPath===grant.projectPath && JSON.stringify(approved.configuration)===JSON.stringify(grant.configuration));
+    },
+    readCredential:provider=>readPrithaChildCredential(provider,{root,stateRoot})});
+}
+
+async function childInteractionContext(agentId:string){
+  const {status,agent}=await getControlCenterAgent(agentId);if(!agent)return null;
+  const record=findCatalogAgent(readAgentCatalog({root:status.root}),agent.id);
+  const outcome=record?.artifacts.find(a=>a.type==='agent-outcome-spec' && a.fm.status==='approved');
+  if(!record?.projectPath || !outcome)return null;
+  const definition=childInteractionDefinition(record.projectPath,readCatalogArtifact(record,outcome.path,{root:status.root}));
+  if(!definition)return null;
+  const model=approvedChildModel(status.root,agent.id);
+  return {agent,definition,projectPath:record.projectPath,model:model?{provider:model.configuration.connectorId,model:model.configuration.modelId,connection:model.configuration.connection || 'child-owned'}:null};
+}
+export async function getAgentInteraction(agentId:string){
+  const context=await childInteractionContext(agentId);if(!context)return null;
+  const root=resolvePrithaRoot();
+  const connection=context.model?.connection==='pritha'?prithaChildConnections({root,stateRoot:resolvePrithaStateRoot(root)}).find(row=>row.provider===context.model?.provider):null;
+  return {examples:context.definition.examples,model:context.model,connection,running:context.agent.ui.activity==='active',verified:context.agent.resultReadiness?.verification.status==='verified'};
+}
+export async function runAgentInteraction(agentId:string,input:unknown,signal?:AbortSignal){
+  const context=await childInteractionContext(agentId);
+  if(!context || context.agent.resultReadiness?.verification.status!=='verified')throw Object.assign(Error(),{code:'agent_verification_required'});
+  if(context.agent.ui.activity!=='active' || !context.agent.operations.localUrl)throw Object.assign(Error(),{code:'agent_runtime_unavailable'});
+  return requestChildProduct({projectPath:context.projectPath,upstream:context.agent.operations.localUrl,definition:context.definition,input,signal});
 }
 
 function findOutcomeSpec(_root: string, agent: RegistryRecord) {
@@ -1621,8 +1667,10 @@ function hasShellMetacharacter(value: string) {
   return /[;&|<>`$\\\n\r]/.test(value);
 }
 
-function safeExecutionText(value: unknown, maxChars = 1_500) {
-  const text = String(value || "")
+function safeExecutionText(value: unknown, maxChars = 1_500, secrets: string[] = []) {
+  let raw=String(value || "");
+  for(const secret of secrets.filter(Boolean))raw=raw.replaceAll(secret,'[redacted]');
+  const text = raw
     .replace(/(?:sk|pk|rk)-[A-Za-z0-9_-]{12,}/g, "[redacted-key]")
     .replace(/([A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=)[^\s]+/gi, "$1[redacted]")
     .replace(/\s+/g, " ")
@@ -2298,6 +2346,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       startAvailable: Boolean(manifest?.start_command),
       stopAvailable: Boolean(manifest?.stop_command),
       localUrl,
+      ...(manifest?.scaffold_adapter==='api-process-v1' && resultReadiness.verification.status==='verified'?{interactionUrl:'/agents/'+encodeURIComponent(record.id)+'#try-agent'}:{}),
       healthcheckCommand: manifest?.healthcheck_command,
       issue: operations === "failed" ? "Manifest is missing required operation fields" : undefined,
     },
@@ -3126,14 +3175,16 @@ async function executeStructuredAgentCommand(params: {
   cwd: string;
   env: Record<string, string>;
   timeoutMs: number;
+  restrictedEnvironment?: boolean;
 }) {
   const argv = params.command.argv || [];
+  const output=(value:unknown)=>safeExecutionText(value,1500,[params.env.PRITHA_CHILD_MODEL_TOKEN]);
   const successExitCodes = Array.isArray(params.command.success_exit_codes) ? params.command.success_exit_codes : [0];
   if (params.command.background && params.action === "start") {
     const child = spawn(argv[0], argv.slice(1), {
       cwd: params.cwd,
       // Next augments ProcessEnv with NODE_ENV; a restricted child environment need not inherit it.
-      env: (params.manifest?.agent_kind === "tool-server" ? params.env : { ...process.env, ...params.env }) as NodeJS.ProcessEnv,
+      env: (params.restrictedEnvironment || params.manifest?.agent_kind === "tool-server" ? params.env : { ...process.env, ...params.env }) as NodeJS.ProcessEnv,
       detached: true,
       stdio: "ignore",
       shell: false,
@@ -3152,7 +3203,7 @@ async function executeStructuredAgentCommand(params: {
         signal: null,
         pid: child.pid,
         stdout: "",
-        stderr: safeExecutionText(spawnError.message),
+        stderr: output(spawnError.message),
         readiness: {
           status: "failed" as const,
           detail: "Process failed to spawn.",
@@ -3180,13 +3231,13 @@ async function executeStructuredAgentCommand(params: {
 
   const result = spawnSync(argv[0], argv.slice(1), {
     cwd: params.cwd,
-    env: (params.manifest?.agent_kind === "tool-server" ? params.env : { ...process.env, ...params.env }) as NodeJS.ProcessEnv,
+    env: (params.restrictedEnvironment || params.manifest?.agent_kind === "tool-server" ? params.env : { ...process.env, ...params.env }) as NodeJS.ProcessEnv,
     encoding: "utf8",
     timeout: params.timeoutMs,
     shell: false,
   });
   const exitOk = result.status !== null && successExitCodes.includes(result.status);
-  const stderr = safeExecutionText(result.stderr || result.error?.message || "");
+  const stderr = output(result.stderr || result.error?.message || "");
   const readiness =
     params.action === "start"
       ? await waitForRuntimeReadiness({ manifest: params.manifest, command: params.command, cwd: params.cwd, timeoutMs: Math.min(params.timeoutMs, 8_000) })
@@ -3208,7 +3259,7 @@ async function executeStructuredAgentCommand(params: {
     status: status as "running" | "stopped" | "failed" | "degraded",
     exitCode: result.status,
     signal: result.signal,
-    stdout: safeExecutionText(result.stdout),
+    stdout: output(result.stdout),
     stderr,
     readiness,
   };
@@ -3281,20 +3332,32 @@ export async function runAgentRuntimeAction(
   }
 
   let execution: Awaited<ReturnType<typeof executeStructuredAgentCommand>>;
+  const model=approvedChildModel(status.root,agent.id);
+  const scoped=model?.configuration.connection==='pritha';
+  let modelEnvironment:Record<string,string>={};
+  if(scoped && model){
+    if(action==='start')modelEnvironment=issueChildModelConnection({root:status.root,stateRoot:resolvePrithaStateRoot(status.root),agentId:agent.id,projectPath:folder.absolutePath,configuration:model.configuration,contractHash:model.contractHash,port:APP_PORT});
+    else revokeChildModelConnection({root:status.root,stateRoot:resolvePrithaStateRoot(status.root),agentId:agent.id});
+  }
   try {
     execution = await executeStructuredAgentCommand({
       action,
       manifest,
       command: validation.command,
       cwd: validation.cwd,
-      env: validation.env,
+      env: scoped?{...Object.fromEntries(['PATH','HOME','LANG','TMPDIR'].filter(k=>process.env[k]).map(k=>[k,process.env[k]!])),...Object.fromEntries(Object.entries(validation.env).filter(([k])=>k.endsWith('_PORT'))),...modelEnvironment}:validation.env,
       timeoutMs: validation.timeoutMs,
+      restrictedEnvironment:scoped,
     });
+  } catch(error) {
+    if(scoped)revokeChildModelConnection({root:status.root,stateRoot:resolvePrithaStateRoot(status.root),agentId:agent.id});
+    throw error;
   } finally {
     // The UI refreshes immediately after an action, before the normal cache TTL.
     // A failed command may also have changed the service's actual state.
     statusReadCache.invalidate(controlCenterStatusCacheKey(status.root));
   }
+  if(scoped && execution.status==='failed')revokeChildModelConnection({root:status.root,stateRoot:resolvePrithaStateRoot(status.root),agentId:agent.id});
   const checks = plan.checks;
   const summary = countChecks(checks);
   const result: ControlCenterOperatorActionResult = {

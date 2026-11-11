@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-11-09
+updated: 2026-11-11
 topics:
   - agent-engineering
   - agent-factory
@@ -883,8 +883,9 @@ The planner normally only reports its next step. When the operator enables
 `PRITHA_FACTORY_CONTINUATION=execute` on the selected instance, the Contract
 card identifies eligible local API children and explains the automatic build.
 The host checks the reviewed Contract, including any draft corrections.
-Approval records the profile for a supported API process with no child model,
-repository adoption, or autostart. Existing approvals retain their recorded
+Approval records the profile for a supported API process with either no child
+model or an explicitly selected Pritha model connection, no repository adoption,
+and no autostart. Existing approvals retain their recorded
 scope. Contract and Outcome are two separate operator decisions. Inside the
 same execution owner, the host can collect approved primary sources, request
 source-based synthesis, scaffold, run the approved Trials, commission the
@@ -893,10 +894,62 @@ One foreground session owns the work. Reading progress never resumes it.
 Stop, decline, uncertain execution or usage, and exhausted budgets stay
 effective after reload. A budget change is a separate exact decision.
 
-The result identifies the tested worktree and commit and shows a command and
-observed output when the protected evidence still matches it. Acceptance,
-application in the target checkout, and service startup are separate. A
+The result identifies the tested worktree and commit and shows the first-use
+form and observed output when the protected evidence still matches it. The
+approved local-application profile can apply that verified commit to the new
+child checkout; the agent card then offers **Try this agent**. The form uses the
+approved product endpoint and checks the running process identity before sending
+input. **Start agent and send** is one explicit operator action; merely opening
+the card starts no process or inference. Final acceptance and service startup
+remain separate from verification. A
 blocked management card must be identified even when product Trials pass.
+
+Contract and Outcome cards persist across a provider timeout or runtime restart.
+An exact document decision is stored on the host and can resume the same factory
+conversation without a second approval. Changed document bytes require a new
+decision. This persistence applies only to those two document actions, never to
+arbitrary command approvals or credential provisioning.
+
+### Child model connection
+
+The builder and the child's model are separate Contract selections. Codex,
+Claude Code, and NeuralDeep builders can generate a child using any supported
+configured API connection. Builder subscriptions do not supply child API keys.
+Before Contract review the host verifies the managed API/process adapter and
+reports whether the selected connection is configured in this Pritha instance.
+This metadata check makes no inference and does not establish paid access.
+
+For `childModelConnection: pritha`, provider credentials stay on the host. A card
+Start issues a random, agent-scoped local token bound to the accepted Contract,
+project, provider, model and output limit. The child receives only that connection
+and a restricted process environment. Stop and a failed Start revoke it. The
+new connection profile proposes 8,192 output tokens and allows up to three
+minutes per model request during stabilization; a smaller explicit Contract
+limit remains binding. These are ceilings, not requested answer lengths.
+The local broker checks the current binding before each request; redirects, silent
+model substitutions and ambiguous automatic retries are not allowed. Input,
+output and provider keys are not recorded in its usage receipt. Other instances
+and legacy child-owned credentials retain their existing scope.
+
+The protected LLM product Trial pins the generated client and configuration. For
+each input it supplies a fresh response through a local model responder and
+requires the product output to contain that fresh value. A constant offline
+answer cannot pass. The verifier checks the input sent to the model, call count,
+configured limits and selected error cases; starting the server must not call
+the model. The real Start command also runs up to an intercepted spawn boundary:
+it must launch its own Node server and forward the scoped model connection and
+port. This check creates no detached server; the independent product and Stop
+Trials exercise the server with owned process handles. The UI labels these as
+local connection/behavior verification, not a
+live model result. The operator's first submitted request exercises the actual
+selected API and exposes provider errors without repeating the request.
+
+The child configuration supports OpenAI, Anthropic, NeuralDeep and OpenRouter.
+The OpenAI text client uses Chat Completions with `store: false` and
+`max_completion_tokens`; the documented `gpt-4.1-mini` snapshot is the only
+OpenAI alias accepted by this profile. Sources checked 2026-11-11:
+[API reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
+and [model reference](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
 
 A possible future delegated profile needs separate policy adoption. Record
 its ID, version, signer, expiry and revocation, allowed new-child directory
@@ -917,6 +970,12 @@ the same factory conversation. Smaller limits explicitly accepted by the
 operator remain binding; new defaults do not amend existing Contracts.
 
 `workflow-budget.json` is private, bound to the original child and conversation.
+If an attempt ends before a Contract/session, target directory or builder exists,
+a new chat may take over the same child budget only after the coordinator proves
+the old turn finished and its process exited. The host records the handoff,
+preserves every observation and limit, and prevents the old chat from taking it
+back. Active, claimed or uncertain attempts cannot be transferred. This is
+recovery of a failed preparation, not a fresh allowance.
 Request-based transports reserve against the shared balance before dispatch;
 completed receipts replace the reservation with measured usage. A resumed
 turn or builder never starts a fresh shared allowance. Codex and native Claude

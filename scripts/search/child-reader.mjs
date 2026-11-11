@@ -46,7 +46,7 @@ export async function readChildPage(value, hosts, signal, depth = 0, dependencie
           )
         ) {
           res.resume();
-          reject(new SearchError("provider_unavailable"));
+          reject(new SearchError(res.statusCode===404 || res.statusCode===410 ? "source_not_found" : res.statusCode!==200 ? "source_http_unavailable" : "source_content_unsupported"));
           return;
         }
         let size = 0;

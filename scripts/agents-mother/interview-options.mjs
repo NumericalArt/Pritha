@@ -11,13 +11,14 @@ export function prepareInterviewOptions(input={}){
   const source=input.brief || input['from-brief'];let brief={};
   if(source){if(typeof source!=='string')throw new Error('Specify a brief file path');let text;try{text=readBoundedRegularFile(path.resolve(source),{maxBytes:128000}).text;}catch{throw new Error('Interview brief must be an accessible bounded regular file');}brief=interviewBriefOptions(parseInterviewBrief(text));}
   let options={...brief,...input},preset=options.preset || 'generic';
-  childProviderConfiguration({childModelProvider:options['child-provider'],childModelId:options['child-model']});
+  if(options['child-provider'] && options['child-provider']!=='none')options['child-connection'] ||= 'pritha';
+  childProviderConfiguration({childModelProvider:options['child-provider'],childModelId:options['child-model'],childModelConnection:options['child-connection'],childMaxOutputTokens:options['child-max-output-tokens']});
   if(!INTERVIEW_PRESETS.has(preset))throw new Error('Invalid interview preset. Expected: generic, local-feed, llm-app');
   if(options['source-format'] && !['json','rss','atom','mixed'].includes(options['source-format']))throw new Error('Invalid source format. Expected: json, rss, atom, mixed');
   if(preset!=='generic'){
     if(options.runtime && options.runtime!=='api' || options.service && options.service!=='process' || options.interface && !/^(web|api)$/i.test(options.interface))throw new Error('The selected preset requires api runtime, process service, and web/API interface');
     const base={runtime:'api',service:'process',interface:'web','runtime-placement':preset==='local-feed'?'deterministic-first':'hybrid','multi-model':'no','local-inference':'not-required','skill-needs':'none',
-      fallbacks:'none; preserve saved data and offer explicit retry',memory:preset==='llm-app'?'SQLite':'local durable JSON records',stored:'Product records and selections; no provider credentials',inputs:'Declared external sources and explicit UI input',sensitive:'Product history stays local; credentials use separate child provisioning'};
+      fallbacks:'none; preserve saved data and offer explicit retry',memory:preset==='llm-app'?'SQLite':'local durable JSON records',stored:'Product records and selections; no provider credentials',inputs:'Declared external sources and explicit UI input',sensitive:options['child-connection']==='pritha'?'Product history stays local; provider credentials remain in the selected Pritha instance':'Product history stays local; credentials use separate child provisioning'};
     if(preset==='local-feed')Object.assign(base,{'repository-policy':'not-applicable','repository-topics':'none','repository-waiver':'The local-feed preset uses standard HTTP and feed processing; repository discovery is unnecessary. Runtime, source API and operations evidence remain required.'});
     options={...base,...options};
   }

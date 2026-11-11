@@ -93,3 +93,17 @@ test("only declared canonical HTTPS UI origins pass and changing one invalidates
     assert.throws(()=>toolServerLaunchEnvironment(m,{env_allowlist:[name]},{}),{code:"tool_server_runtime_invalid"});
   }
 });
+
+test('actual managed API executor passes only the scoped model connection, never parent credentials',async t=>{
+  const folder=mkdtempSync(path.join(os.tmpdir(),'pritha-scoped-launch-'));t.after(()=>rmSync(folder,{recursive:true,force:true}));
+  writeFileSync(path.join(folder,'record-env.mjs'),'console.log(JSON.stringify(process.env));');
+  const old=process.env.PRITHA_TEST_SECRET_CANARY;process.env.PRITHA_TEST_SECRET_CANARY='parent-only';
+  t.after(()=>{if(old===undefined)delete process.env.PRITHA_TEST_SECRET_CANARY;else process.env.PRITHA_TEST_SECRET_CANARY=old;});
+  const env={PATH:process.env.PATH,PRITHA_CHILD_MODEL_URL:'http://127.0.0.1:3420/api/child-model',PRITHA_CHILD_MODEL_TOKEN:'a'.repeat(64),FIXTURE_PORT:'3440'};
+  const result=await production.executeStructuredAgentCommand({action:'start',manifest:{agent_kind:'service'},command:{argv:[process.execPath,'record-env.mjs']},cwd:folder,env,restrictedEnvironment:true,timeoutMs:1000});
+  assert.equal(result.status,'running');
+  // The UI redacts the token even though the process receives it.
+  assert.ok(!result.stdout.includes(env.PRITHA_CHILD_MODEL_TOKEN));assert.ok(!result.stdout.includes('parent-only'));
+  const output=JSON.parse(result.stdout);assert.equal(output.PRITHA_CHILD_MODEL_URL,env.PRITHA_CHILD_MODEL_URL);assert.equal(output.FIXTURE_PORT,env.FIXTURE_PORT);
+  assert.equal(output.PRITHA_TEST_SECRET_CANARY,undefined);assert.equal(output.OPENAI_API_KEY,undefined);
+});

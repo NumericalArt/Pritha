@@ -193,6 +193,7 @@ export type ControlCenterAgent = {
     relativePath?: string;
   };
   operations: {
+    interactionUrl?: string;
     status: CapabilityStatus;
     applicability?: OperationsApplicability;
     serviceMode?: string;

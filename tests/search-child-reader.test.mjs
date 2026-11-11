@@ -30,7 +30,9 @@ test('redirects revalidate the exact host and pin DNS; rejected pages expose typ
   assert.deepEqual(redirect.lookups,['nodejs.org','nodejs.org']);assert.equal(redirect.requests.length,2);
   const foreign=fixture([{status:302,headers:{location:'https://example.org/fs'}}]);await assert.rejects(foreign.read(),{code:'url_blocked'});assert.equal(foreign.requests.length,1);
   const privateDns=fixture([],{addresses:[{address:'127.0.0.1',family:4}]});await assert.rejects(privateDns.read(),{code:'url_blocked'});assert.equal(privateDns.requests.length,0);
-  await assert.rejects(fixture([{status:503}]).read(),{code:'provider_unavailable'});
+  await assert.rejects(fixture([{status:503}]).read(),{code:'source_http_unavailable'});
+  for(const status of [404,410])await assert.rejects(fixture([{status}]).read(),{code:'source_not_found'});
+  await assert.rejects(fixture([{headers:{'content-type':'application/octet-stream'}}]).read(),{code:'source_content_unsupported'});
 });
 
 test('article and main content preserve paragraphs without navigation and executable markup',async()=>{

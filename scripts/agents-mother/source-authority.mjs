@@ -2,6 +2,7 @@
 // repository. Canonical memory-topic aliases use the same bounded authorities;
 // a model-supplied URL never expands this allowlist.
 const authority={
+ 'openai-model-api':['developers.openai.com','platform.openai.com'],
  'anthropic-messages-api':['platform.claude.com','docs.anthropic.com'], 'openrouter-model-api':['openrouter.ai'],
  'node-http-runtime':['nodejs.org'], 'neuraldeep-model-api':['neuraldeep.ru','docs.neuraldeep.ru'],
  'openai-agents-sdk':['openai.github.io','platform.openai.com','developers.openai.com'],
@@ -45,9 +46,12 @@ const aliases={
 };
 // Curated public entry points, never URLs copied from operator text or a search snippet.
 const primaryUrls={
- 'anthropic-messages-api':['https://platform.claude.com/docs/en/api/messages/create'],
+ 'openai-model-api':['https://developers.openai.com/api/docs/guides/text','https://developers.openai.com/api/docs/models/gpt-4.1-mini'],
+ 'anthropic-messages-api':['https://platform.claude.com/docs/en/api/messages/create','https://platform.claude.com/docs/en/api/versioning'],
  'openrouter-model-api':['https://openrouter.ai/docs/api_reference/overview'],
  'node-http-runtime':['https://nodejs.org/api/http.md','https://nodejs.org/api/http.html'],
+ 'operations-deployment':['https://nodejs.org/api/process.md','https://nodejs.org/learn/command-line/how-to-read-environment-variables-from-nodejs'],
+ 'declared-dependencies':['https://nodejs.org/api/modules.md','https://nodejs.org/api/packages.md'],
  'neuraldeep-model-api':['https://neuraldeep.ru/llms-full.txt'],
  'interface-runtime-security':['https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html','https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/XSS'],
  'untrusted-input-security':['https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html'],

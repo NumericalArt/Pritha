@@ -7,6 +7,21 @@ import {validateOutcomeSpecText} from './outcome-spec.mjs';
 import {firstUseExamples,validateProductTrial} from './factory-product-trial.mjs';
 import {createHash} from 'node:crypto';
 
+function matchesModelExample(actual,expected){
+  let nonce;
+  const visit=(a,b)=>{
+    if(typeof b==='string' && b.includes('__PRITHA_MODEL_TEXT__')){
+      if(typeof a!=='string')return false;
+      const parts=b.split('__PRITHA_MODEL_TEXT__'),escape=text=>text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const match=new RegExp('^'+parts.map(escape).join('([a-f0-9]{40})')+'$').exec(a);
+      if(!match)return false;nonce ||= match[1];return match.slice(1).every(value=>value===nonce);
+    }
+    if(b && typeof b==='object')return a && typeof a==='object' && Array.isArray(a)===Array.isArray(b) && isDeepStrictEqual(Object.keys(a).sort(),Object.keys(b).sort()) && Object.keys(b).every(key=>visit(a[key],b[key]));
+    return isDeepStrictEqual(a,b);
+  };
+  return visit(actual,expected) && Boolean(nonce);
+}
+
 /** Only a v2 protected verifier can attest these command/output pairs. Render
  * no command supplied by product stdout. Older Outcomes retain their locks. */
 export function verifiedFirstUse(p,s,result){
@@ -28,11 +43,15 @@ export function verifiedFirstUse(p,s,result){
   const fresh=verifyTrialResultFreshness(receipt,dir,{root:p.root,stateRoot:p.stateRoot,outcomeSpecPath:s.outcome});
   if(!fresh.ok || !fresh.current?.head || fresh.current.dirty!==false)return null;
   const row=receipt.trials.find(t=>t.id===trial.id && t.status==='passed');
-  let observed;try {observed=JSON.parse(row.execution.stdout.trim()).observed;}catch{return null;}
-  if(!observed || Object.keys(cases).some(k=>!isDeepStrictEqual(observed[k],cases[k].find(c=>(c.expected_exit??0)===0 && (c.expected_status??200)===200).expected_json)))return null;
+  let demo;try {demo=JSON.parse(row.execution.stdout.trim());}catch{return null;}
+  const observed=demo.observed,modelProof=data.childModelConnection==='pritha';
+  if(modelProof && (demo.modelVerification!=='protected-local-responder' || demo.liveModelVerified!==false))return null;
+  if(!observed || Object.keys(cases).some(k=>!(modelProof?matchesModelExample:isDeepStrictEqual)(observed[k],cases[k].find(c=>(c.expected_exit??0)===0 && (c.expected_status??200)===200).expected_json)))return null;
   const application=s.localApplication?.status==='applied' && s.localApplication.to===fresh.current.head;
   if(application && !verifyTrialResultFreshness(receipt,p.target,{root:p.root,stateRoot:p.stateRoot,outcomeSpecPath:s.outcome}).ok)return null;
   const applied=Boolean(application);
   return {directory:applied?p.target:dir,commit:fresh.current.head,commands:firstUseExamples(cases,data),observed,
+    ...(applied && data.agentId?{interactionHref:'/agents/'+encodeURIComponent(data.agentId)+'#try-agent'}:{}),
+    ...(modelProof?{modelVerification:'protected-local-responder',liveModelVerified:false}:{}),
     disposition:applied?'applied-local-project':'verified-worktree',acceptance:result.state.accepted_by==='user'?'accepted':'pending'};
 }

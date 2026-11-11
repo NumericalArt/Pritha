@@ -51,7 +51,7 @@ export class NativeFactoryTurn {
       connectorId:'codex',chatId:o.chatId,turnId:o.turnId,lease:o.lease,coordinator:o.coordinator,sandbox:'read-only',signal:this.controller.signal,
       factory:{slug:o.slug,target:o.target,model:o.model,effort:o.effort,agentParent:o.agentParent},approve:(request:Parameters<ProviderApprovalBroker['ask']>[0])=>this.approvals.ask(request)});
   }
-  async admit(previousCounter?:number){await this.budget.ensure();await this.budget.native('native-parent','preparation',previousCounter);this.budget.check();this.clock=Date.now();}
+  async admit(previousCounter?:number){await this.budget.ensure({coordinator:this.options.coordinator});await this.budget.native('native-parent','preparation',previousCounter);this.budget.check();this.clock=Date.now();}
   async observeUsage(counter?:number){
     const now=Date.now(),delta=this.paused?0:now-this.clock;this.clock=now;
     const value=await this.budget.native('native-parent','preparation',counter,delta);

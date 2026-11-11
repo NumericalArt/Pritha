@@ -575,6 +575,8 @@ ${bulletList(data.criticalWorkflows)}
 - Runtime family: ${runtimeFamily}
 - Child model provider: ${scalar(data.childModelProvider, "none")}
 - Child model ID: ${scalar(data.childModelId, "none")}
+- Child model connection: ${scalar(data.childModelConnection, "child-owned")}
+- Child maximum output tokens: ${scalar(data.childMaxOutputTokens, "8192")}
 - Primary interface: ${primaryInterface}
 - Secondary interfaces: ${scalar(data.secondaryInterfaces, "none")}
 ${data.cliEntrypoint ? '- CLI entrypoint: ' + scalar(data.cliEntrypoint) + '\n' : ''}
@@ -596,7 +598,7 @@ ${data.cliEntrypoint ? '- CLI entrypoint: ' + scalar(data.cliEntrypoint) + '\n' 
 ${data.interviewPreset && data.interviewPreset!=='generic' ? `| Task class | Runtime class | Current candidate | Verified | Recheck before scaffold | Fallback | Eval fixture | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Product processing | deterministic Node.js | selected runtime; version pending research | pending | yes | preserve saved data | independent Outcome Trials | no model required for HTTP, validation or storage |
-${data.interviewPreset==='llm-app'?'| Product generation | explicitly selected provider API | pending separate provider/model configuration | pending | yes | explicit error and manual retry | contract-specific model evaluation | no inherited Pritha credentials |\n':''}` : `| Task class | Runtime class | Current candidate | Verified | Recheck before scaffold | Fallback | Eval fixture | Notes |
+${data.interviewPreset==='llm-app'?(data.childModelConnection==='pritha'?'| Product generation | selected Pritha API connection | provider/model recorded above | live request pending | yes | explicit error and manual retry | protected model-response Trial | provider key remains in Pritha; no child key provisioning |\n':'| Product generation | explicitly selected provider API | pending separate provider/model configuration | pending | yes | explicit error and manual retry | contract-specific model evaluation | no inherited Pritha credentials |\n'):''}` : `| Task class | Runtime class | Current candidate | Verified | Recheck before scaffold | Fallback | Eval fixture | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Planning | ${scalar(data.planningRuntime, "frontier-hosted")} | ${scalar(data.planningCandidate, "TBD current model")} | ${date} | yes | human/manual | ${scalar(data.planningEval, "TBD")} | architecture and workflow discovery |
 | Coding | ${scalar(data.codingRuntime, "Codex/frontier-hosted")} | ${scalar(data.codingCandidate, "TBD current model")} | ${date} | yes | human/manual | ${scalar(data.codingEval, "TBD")} | code changes and tests |
@@ -817,6 +819,8 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   data.buildExecutor = options["build-executor"] || "codex-app-server";
   data.childModelProvider = options["child-provider"] || "none";
   data.childModelId = options["child-model"] || "none";
+  data.childModelConnection = options["child-connection"] || "child-owned";
+  data.childMaxOutputTokens = options["child-max-output-tokens"] || "8192";
   childProviderConfiguration(data);
   data.trialBackendPolicy = options["trial-backend-policy"] || "local-or-app-server";
   data.buildIterationBudget = options["build-iterations"] || String(FACTORY_STABILITY_BUDGET.buildIterations);
@@ -1565,7 +1569,7 @@ export async function externalResearchContract(contractPath, options = {}) {
     const host=new HostResearch({root:ROOT,stateRoot:resolvePrithaStateRoot({root:ROOT}),data,report,patternLock:patternPack.lock,topics,connectorId:options.connector || 'codex'});
     const phase=options.phase || (hasInput?'apply':'collect');let result;
     if(phase==='status')result=host.status();
-    else if(phase==='collect' || phase==='recover')result=await host.collect({retryFailed:options['retry-failed']===true,recoverFailed:phase==='recover',sourceUrls:options.sources?readEvidenceInput(options.sources):{}});
+    else if(phase==='collect' || phase==='recover')result=await host.collect({retryFailed:options['retry-failed']===true,recoverFailed:phase==='recover',automaticRecovery:options['automatic-recovery']===true,sourceUrls:options.sources?readEvidenceInput(options.sources):{}});
     else if(phase==='apply' && hasInput)result=await host.publish(readEvidenceInput(options.input),{evaluateOverallGate:text=>researchGateDecisionForReport(data,text)});
     else throw new Error('Host research requires collect, status, recover with replacement sources, or apply with a selection input.');
     console.log(JSON.stringify(result,null,2));return result;

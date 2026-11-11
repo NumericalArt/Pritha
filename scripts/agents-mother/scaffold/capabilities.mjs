@@ -32,6 +32,10 @@ export function scaffoldCapability(data = {}) {
     primaryInterface: primary, interfaces, operationsSelected: !noManagedOperations, readinessScope: "scaffold-only" };
   const unsupported = (reason, nextAction) => ({ ...base, supported: false, adapter: null, reason, nextAction });
   if (!runtimeFamilies.has(runtime)) return unsupported("runtime-unknown", "Choose a supported runtime in a reviewed contract revision.");
+  if(data.childModelConnection==='pritha' && data.childModelProvider && data.childModelProvider!=='none'
+      && !(runtime==='api' && data.serviceMode==='process')) {
+    return unsupported('pritha-child-connection-adapter-missing', 'A child using the Pritha API connection requires the managed API process adapter. Choose web/API with process service mode before Contract approval.');
+  }
   if (data.cliEntrypoint && (runtime !== 'api' || data.serviceMode !== 'process' || !interfaces.includes('cli'))) {
     return unsupported('cli-entrypoint-adapter-missing', 'A selected CLI entrypoint currently requires API process runtime and a declared secondary CLI interface.');
   }

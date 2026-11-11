@@ -82,3 +82,36 @@ test('an approved extension changes both limits once and never clears recorded u
   assert.equal(budget.view().maxActiveMs,7_800_000);
   await assert.rejects(budget.extend('approved-extension-1',{tokens:3_000_000}),{code:'factory_budget_receipt_conflict'});
 });
+
+const stoppedCoordinator={listIntents:()=>[{turnId:'turn_failed',state:'failed',exitConfirmed:true}],claims:()=>[]};
+test('a new factory chat recovers a confirmed pre-init failure without resetting usage or limits',async t=>{
+  const {options,budget}=fixture(t);await budget.ensure();
+  await budget.native('native-parent','preparation',16615,2508);
+  await budget.extend('approved-extension',{tokens:1000});
+  const next=new FactoryBudget({...options,chatId:'chat_new',connectorId:'codex'});
+  await next.ensure({coordinator:stoppedCoordinator});
+  await next.native('native-parent','preparation',25,10);
+  assert.equal(next.view().observedTokens,16640);
+  assert.equal(next.view().maxTokens,10_001_000);
+  assert.equal(next.view().activeMs,2518);
+  await assert.rejects(budget.ensure({coordinator:stoppedCoordinator}),{code:'factory_attempt_moved'});
+  const saved=JSON.parse(fs.readFileSync(next.p.file,'utf8'));
+  assert.equal(saved.handoffs[0].from.chatId,options.chatId);
+  assert.deepEqual(saved.handoffs[0].turns,['turn_failed']);
+});
+test('pre-init recovery never adopts active, uncertain, scaffolded or accepted work',async t=>{
+  for(const scenario of ['active','claim','unknown','missing','session','target','build'])await t.test(scenario,async t=>{
+    const {options,budget}=fixture(t);await budget.ensure();
+    let coordinator=stoppedCoordinator;
+    if(scenario==='active')coordinator={...coordinator,listIntents:()=>[{state:'running'}]};
+    if(scenario==='claim')coordinator={...coordinator,claims:()=>[{detail:{chatId:options.chatId}}]};
+    if(scenario==='unknown')coordinator={...coordinator,listIntents:()=>[{state:'failed',exitConfirmed:false}]};
+    if(scenario==='missing')coordinator={...coordinator,listIntents:()=>[]};
+    if(scenario==='session')fs.writeFileSync(path.join(budget.p.directory,'session.json'),'{}');
+    if(scenario==='target')fs.mkdirSync(budget.p.target);
+    if(scenario==='build')await budget.native('build','build',10);
+    const next=new FactoryBudget({...options,chatId:'chat_new'});
+    await assert.rejects(next.ensure({coordinator}),{code:['active','claim'].includes(scenario)?'factory_attempt_active':'factory_attempt_recovery_required'});
+    assert.equal(budget.view().observedTokens,scenario==='build'?10:0);
+  });
+});

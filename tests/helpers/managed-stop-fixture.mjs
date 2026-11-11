@@ -26,9 +26,12 @@ export function installStopFixture(root,portVariable,{unsafe=false}={}){
       start_command:{argv:['node','scripts/service-control.mjs','start']},stop_command:{argv:['node','scripts/service-control.mjs','stop']}}));
   }
   fs.writeFileSync(path.join(root,'scripts/service-control.mjs'),`
-import fs from 'node:fs';import path from 'node:path';
+import fs from 'node:fs';import path from 'node:path';import {spawn} from 'node:child_process';
 const root=fs.realpathSync(process.cwd()),file=path.join(root,'.state/service.pid.json'),port=Number(process.env[${JSON.stringify(portVariable)}]);
 try{
+  if(process.argv[2]==='start'){
+    const child=spawn(process.execPath,['scripts/server.mjs'],{detached:true,stdio:'ignore',env:process.env});child.unref();process.exit(0);
+  }
   if(!fs.existsSync(file))process.exit(0);
   const before=fs.readFileSync(file,'utf8'),r=JSON.parse(before);
   if(r.project_root!==root || r.server_path!==path.join(root,'scripts/server.mjs') || r.port!==port)throw Error('record mismatch');

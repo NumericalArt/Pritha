@@ -16,6 +16,12 @@ for(const provider of ['neuraldeep','openrouter','anthropic'])test(`${provider}:
   writeFileSync(manifest, JSON.stringify({ local_upstream_url: "http://127.0.0.1:9", credentials: [{ name, label: label+" API key", provider, required: true, validation: "format", storage_target: "mvp/.env.local", browser_exposure: "server_only",provider_configuration:{base_url:baseUrl,model_id:modelId},note:'Selected model: '+modelId+'. API: '+baseUrl+'. Child-owned key only.' }] }));
   writeFileSync(env, "DATABASE_URL=synthetic-database-fixture\nASSISTANT_ENABLED=false\n", { mode: 0o600 });
   try {
+    // These fixture files are written outside the app's mutation API. Wait for
+    // its bounded status cache to observe them before rendering the first card.
+    await expect.poll(async()=>{
+      const status=await(await page.request.get('/api/status')).json();
+      return status.childAgents.find((agent:{name:string})=>agent.name==='Fixture Managed')?.credentials.definitions.some((definition:{name:string})=>definition.name===name);
+    },{timeout:10000,intervals:[100,250,500]}).toBe(true);
     for (const viewport of [{ width: 1440, height: 1080 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(viewport);
       await page.goto("/agents");

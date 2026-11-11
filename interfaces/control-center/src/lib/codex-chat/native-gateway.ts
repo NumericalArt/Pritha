@@ -745,7 +745,16 @@ export class CodexChatGateway {
     if(!validClientId(input.clientMessageId))throw new CodexChatGatewayError("invalid_request","A stable answer identifier is required.",400);
     const binding=await this.requireBinding(chatId);
     const hostRequest=this.store.execution.getIntentById(input.requestId);
-    if(hostRequest?.kind==='provider-request' && binding.workspace?.factorySlug)return answerProviderRequest(this.store.execution,chatId,input);
+    if(hostRequest?.kind==='provider-request' && binding.workspace?.factorySlug){
+      const result=await answerProviderRequest(this.store.execution,chatId,input);
+      if(result.resumeRequired){
+        const continuation:StartTurnInput={clientMessageId:'document_'+input.requestId,input:[{type:'text',text:'Continue this agent factory after the recorded document approval. Read factory status, apply the exact saved decision, and continue within the accepted Contract and Outcome. Do not ask again for an unchanged approved document.'}]};
+        try{await this.startTurn(chatId,continuation);}catch(error){
+          if((error as {code?:string}).code==='turn_active')await this.enqueueMessage(chatId,continuation);else throw error;
+        }
+      }
+      return result;
+    }
     const provider=(await this.runtime.provider(binding.providerId)).view;
     if(provider.stateIdentityHash!==binding.stateIdentityHash)throw new CodexChatGatewayError("runtime_identity_mismatch","The original request storage is unavailable.",409);
     return answerNativeRequest(binding.stateIdentityHash!,binding.nativeThreadId,input);

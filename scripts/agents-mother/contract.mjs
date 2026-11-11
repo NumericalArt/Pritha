@@ -208,7 +208,7 @@ export function validateContract(contractPath, options = {}) {
   if (!STATUS_VALUES.has(fm.status)) issues.push(`status must be one of: ${Array.from(STATUS_VALUES).join(", ")}`);
 
   const runtime = bodyValue(text, "Runtime family");
-  try{childProviderConfiguration({childModelProvider:bodyValue(text,'Child model provider') || 'none',childModelId:bodyValue(text,'Child model ID')});}
+  try{childProviderConfiguration({childModelProvider:bodyValue(text,'Child model provider') || 'none',childModelId:bodyValue(text,'Child model ID'),childModelConnection:bodyValue(text,'Child model connection'),childMaxOutputTokens:bodyValue(text,'Child maximum output tokens')});}
   catch{issues.push('invalid child model selection. Choose none, claude, neuraldeep or openrouter with an exact model ID.');}
   const runtimePlacement = bodyValue(text, "Runtime placement profile");
   const multiModelRouting = bodyValue(text, "Multi-model routing requested");
@@ -503,6 +503,8 @@ export function contractData(contractPath, options = {}) {
     buildExecutor: bodyValue(text, "Build executor") || "codex-app-server",
     childModelProvider: bodyValue(text, "Child model provider") || "none",
     childModelId: bodyValue(text, "Child model ID"),
+    childModelConnection: bodyValue(text, "Child model connection") || "child-owned",
+    childMaxOutputTokens: bodyValue(text, "Child maximum output tokens") || "8192",
     trialBackendPolicy: bodyValue(text, "Trial backend policy") || "local-or-app-server",
     buildIterationBudget: Number(bodyValue(text, "Build iteration budget") || 6),
     buildElapsedBudgetMs: Number(bodyValue(text, "Build elapsed budget ms") || 5_400_000),

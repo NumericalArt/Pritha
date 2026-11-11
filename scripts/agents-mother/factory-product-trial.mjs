@@ -11,6 +11,7 @@ import { safeTrialInputPath } from './trial-input-declarations.mjs';
 import { scaffoldCapability } from './scaffold/capabilities.mjs';
 import { apiProcessPortConfiguration } from './scaffold/api-process.mjs';
 import {LOCAL_APPLICATION_POLICY,LOCAL_APPLICATION_TEXT} from './factory-local-application-policy.mjs';
+import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
 
 const verifierPath = 'verification/product.mjs';
 const provenance = 'host-template:api-cli-product-v2';
@@ -43,6 +44,7 @@ function nodeCommand(argv) {
 }
 
 export function validateProductTrial(trial, data) {
+  const provider=childProviderConfiguration(data),llm=provider?.connection==='pritha';
   let json;
   try {
     json = JSON.stringify(trial);
@@ -59,19 +61,24 @@ export function validateProductTrial(trial, data) {
     const signatures = new Map(), outputs = new Set();
     for (const check of cases) {
       const fields = kind === 'cli' ? ['argv','expected_exit'] : ['argv','port_variable','path','input_json','expected_status'];
-      if (!check || Array.isArray(check) || Object.keys(check).some(key => ![...fields,'expected_json','covers'].includes(key))
+      if (!check || Array.isArray(check) || Object.keys(check).some(key => ![...fields,'expected_json','covers',...(llm?['model_output','model_error']:[])].includes(key))
           || !Array.isArray(check.covers) || !check.covers.length || check.covers.some(id=>typeof id!=='string' || id.length>200)) fail('factory_product_trial_invalid');
       nodeCommand(check.argv);
       if (kind==='cli' && check.argv[1] !== (data.cliEntrypoint || 'scripts/agent-cli.mjs')) fail('factory_product_trial_interfaces');
       const status=kind==='cli'?(check.expected_exit??0):(check.expected_status??200);
       const success=status===(kind==='cli'?0:200);
-      if (!Number.isInteger(status) || !success && (kind==='cli'?status<1 || status>125:status<400 || status>499)) fail('factory_product_trial_invalid');
+      if (!Number.isInteger(status) || !success && (kind==='cli'?status<1 || status>125:status<400 || status>(llm?599:499))) fail('factory_product_trial_invalid');
       if ((success || Object.hasOwn(check,'expected_json')) && (!check.expected_json || Array.isArray(check.expected_json) || typeof check.expected_json!=='object')) fail('factory_product_trial_invalid');
       if (kind==='http' && check.port_variable!==capability.apiPort.variable) {
         throw Object.assign(new Error('The HTTP Trial must use the Contract port variable.'), {code:'factory_product_trial_port_mismatch', expectedPortVariable:capability.apiPort.variable});
       }
       if (kind==='http' && (check.argv.length!==2 || check.argv[1]!=='scripts/server.mjs'
           || !/^\/[A-Za-z0-9/_-]{0,120}$/.test(check.path) || check.path.startsWith('//') || !check.input_json || Array.isArray(check.input_json) || typeof check.input_json!=='object')) fail('factory_product_trial_invalid');
+      if(llm){
+        if(success && (!JSON.stringify(check.expected_json).includes('__PRITHA_MODEL_TEXT__') || !JSON.stringify(check.model_output || '').includes('__PRITHA_MODEL_TEXT__')))fail('factory_product_trial_model_proof_required');
+        if(check.model_error!==undefined && (!['provider_pending_auth','provider_unavailable','provider_rate_limited','provider_timeout'].includes(check.model_error) || success || check.model_output!==undefined))fail('factory_product_trial_invalid');
+        if(check.model_output!==undefined && typeof check.model_output!=='string' && (!check.model_output || typeof check.model_output!=='object' || Array.isArray(check.model_output)))fail('factory_product_trial_invalid');
+      }
       const signature=canonical(kind==='http'?[check.path,check.input_json]:check.argv);
       if(signatures.has(signature))fail('factory_product_trial_invalid');
       signatures.set(signature,success);
@@ -90,6 +97,14 @@ export function firstUseExamples(trial,data){
     server:port.variable+'='+port.port+' node scripts/server.mjs',
     http:'curl -sS -H '+quote('Content-Type: application/json')+' --data '+quote(JSON.stringify(http.input_json))+' '+quote('http://127.0.0.1:'+port.port+http.path)};
 }
+export function productTrialVerifier(trial,data){
+  validateProductTrial(trial,data);
+  const firstUse=firstUseExamples(trial,data);
+  const template=fs.readFileSync(new URL('./scaffold/templates/product-trial.mjs.tmpl',import.meta.url),'utf8');
+  const provider=childProviderConfiguration(data);
+  const modelProof=provider?.connection==='pritha'?{configuration:provider,files:Object.fromEntries(['lib/child-model-client.mjs','lib/child-provider-configuration.mjs','lib/provider-http.mjs','claude/messages-client.mjs','claude/stream-state.mjs'].map(file=>['scripts/'+file,sha256(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'))]))}:null;
+  return 'const checks = JSON.parse('+JSON.stringify(JSON.stringify(trial))+');\nconst firstUse = '+JSON.stringify(firstUse)+';\nconst modelProof = '+JSON.stringify(modelProof)+';\n'+template;
+}
 export function prepareProductTrial(paths, outcome, data, trial) {
   validateProductTrial(trial, data);
   const checked = validateOutcomeSpecText(outcome.text, { root: paths.root });
@@ -101,9 +116,7 @@ export function prepareProductTrial(paths, outcome, data, trial) {
   if(checked.coverage.some(r=>covers.includes(r.id) && /\b(?:start\s*\/\s*stop|managed (?:start|stop|service)|autostart|launchd|telegram|deployment)\b/i.test(r.statement)))fail('factory_product_trial_coverage_invalid');
   const guide=checked.coverage.find(row=>row.statement.replace(/\.$/,'')==='Runnable project with a user guide and verification evidence');
   if(guide && !covers.includes(guide.id))covers.push(guide.id);
-  const firstUse=firstUseExamples(trial,data);
-  const template = fs.readFileSync(new URL('./scaffold/templates/product-trial.mjs.tmpl', import.meta.url), 'utf8');
-  const content = 'const checks = JSON.parse(' + JSON.stringify(JSON.stringify(trial)) + ');\nconst firstUse = '+JSON.stringify(firstUse)+';\n' + template;
+  const content=productTrialVerifier(trial,data);
   const stopContent = managedStopVerifier(data);
   const targets = [...new Set(cases.map(check => check.argv[1]))];
   const trialSection=text=>text.match(/^## Trials\n([\s\S]*?)(?=^## Demo script$)/m)?.[1] || '';
@@ -175,7 +188,13 @@ export function reviewProductTrials(paths, outcome, data, { includeInputs = true
   if (!checked.parsed.trials.some(trial => trial.verifierInputs || trial.productTargets)) return [];
   const inputRoot = privateStateDirectory(paths.stateRoot, path.join(paths.directory, 'trial-inputs'), { create: false });
   if (!inputRoot) fail('factory_trial_inputs_missing');
-  return preparedTrialInputFiles({ trials: checked.parsed.trials }, inputRoot).map(file => ({
+  const files=preparedTrialInputFiles({ trials: checked.parsed.trials }, inputRoot).map(file => ({
     path: file.path, sha256: sha256(file.content), content: file.content.toString('utf8'),
   }));
+  if(outcome.frontmatter?.status==='draft' && childProviderConfiguration(data)?.connection==='pritha'){
+    const content=files.find(file=>file.path===verifierPath)?.content;
+    let trial;try{trial=JSON.parse(JSON.parse(content?.match(/^const checks = JSON\.parse\(([^\n]+)\);\n/)?.[1]));}catch{fail('factory_product_trial_model_proof_required');}
+    if(content!==productTrialVerifier(trial,data))fail('factory_product_trial_model_proof_required');
+  }
+  return files;
 }

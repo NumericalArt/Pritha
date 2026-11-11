@@ -22,6 +22,34 @@ function fixture(t,changes={}){
   const host=new HostResearch(options);
   return {host,options,service,counts:()=>({searchCalls,readCalls}),selection:()=>({facts:host.status().sources.map(source=>({topicId:source.topicId,sourceId:source.id,passageId:source.passages[0].id,versionContext:'Realtime session API documentation version fixture v1, verified during this collection.',compatibility:'The documented session configuration is compatible with the selected runtime contract.',compatibilityStatus:'compatible'})),synthesis})};
 }
+test('automatic research recovers each topic separately and preserves source errors across an approval gap',async t=>{
+  const topics=['anthropic-messages-api','operations-deployment'].map(id=>({id,query:'configuration API runtime environment',required:true}));
+  const seen=[];
+  const f=fixture(t,{topics,connectorId:'claude',service:undefined,reader:async url=>{
+    seen.push(url);
+    if(url.includes('/messages/') || url.endsWith('process.md'))throw Object.assign(Error(),{code:url.includes('/messages/')?'source_page_too_large':'source_not_found'});
+    return {items:[{url,content:'The configuration API runtime environment has explicit request settings and response handling. Applications select credentials and server configuration in the runtime environment.'}]};
+  }});
+  const result=await f.host.collect({automaticRecovery:true});
+  assert.equal(result.status,'collected');assert.equal(seen.length,4);
+  assert.deepEqual(result.topics.map(t=>t.checkpoint.attempts),[2,2]);
+  assert.deepEqual(result.topics.map(t=>t.checkpoint.failures[0].error),['source_page_too_large','source_not_found']);
+  const saved=JSON.parse(readFileSync(f.host.file,'utf8'));saved.deadlineAt=1;writeFileSync(f.host.file,JSON.stringify(saved));
+  assert.equal((await new HostResearch(f.options).collect({automaticRecovery:true})).status,'collected');
+  assert.equal(seen.length,4);
+});
+test('automatic research is bounded and cannot renew an older or uncertain checkpoint',async t=>{
+  let calls=0;
+  const f=fixture(t,{topics:[{id:'node-http-runtime',query:'HTTP server runtime',required:true}],service:undefined,reader:async()=>{calls++;throw Object.assign(Error(),{code:'source_not_found'});}});
+  await assert.rejects(f.host.collect({automaticRecovery:true}),{code:'source_not_found'});
+  assert.equal(calls,4);
+  await assert.rejects(f.host.collect({automaticRecovery:true}),{code:'research_source_limit'});
+  const saved=JSON.parse(readFileSync(f.host.file,'utf8'));saved.topics['node-http-runtime'].status='started';writeFileSync(f.host.file,JSON.stringify(saved));
+  await assert.rejects(f.host.collect({automaticRecovery:true}),{code:'research_source_unconfirmed'});
+  const old=fixture(t,{topics:[{id:'node-http-runtime',query:'HTTP server runtime',required:true}],service:undefined,reader:async()=>{throw Object.assign(Error(),{code:'source_not_found'});}});
+  await assert.rejects(old.host.collect(),{code:'source_not_found'});
+  await assert.rejects(old.host.collect({automaticRecovery:true}),{code:'research_retry_required'});
+});
 test('local API research can read every topic in the Headline and YesNo plans without a search provider', async t => {
   const common = ['node-http-runtime', 'interface-runtime-security', 'operations-deployment',
     'declared-dependencies', 'pattern-api', 'pattern-voice-speech', 'pattern-codex', 'pattern-github-repository'];
@@ -234,4 +262,14 @@ test('recovery carries source choices for unreached topics without granting them
   await assert.rejects(new HostResearch(f.options).collect({retryFailed:true}),{code:'source_unavailable'});
   await assert.rejects(f.host.collect({retryFailed:true}),{code:'research_source_limit'});
   assert.equal(secondReads,2);assert.equal(f.host.status().topics[0].checkpoint.attempts,2);
+});
+
+test('automatic research cannot turn an unsafe or unknown failure into a retry after reload',async t=>{
+  for(const code of ['source_authority_denied','unexpected_reader_failure']){
+    let calls=0;
+    const f=fixture(t,{topics:[{id:'node-http-runtime',query:'HTTP server runtime',required:true}],connectorId:'codex',service:undefined,reader:async()=>{calls++;throw Object.assign(Error('rejected source'),{code});}});
+    await assert.rejects(f.host.collect({automaticRecovery:true}),{code});
+    await assert.rejects(new HostResearch(f.options).collect({automaticRecovery:true,retryFailed:true}),{code:'research_retry_required'});
+    assert.equal(calls,1);assert.equal(f.host.status().topics[0].checkpoint.attempts,1);
+  }
 });

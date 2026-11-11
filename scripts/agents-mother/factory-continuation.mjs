@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {deliveryUsageStatus} from './delivery-ledger.mjs';
 import {scaffoldCapability} from './scaffold/capabilities.mjs';
+import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
 
 // Start from an official page with relevant, readable passages. HostResearch
 // still checks each redirect, source authority, freshness and selected quote.
@@ -29,7 +30,8 @@ export function localApiResearchSources(topics) {
 }
 
 export function supportsLocalApiContinuation(contract) {
-  return contract.childModelProvider === 'none' && contract.childModelId === 'none'
+  let provider;try{provider=childProviderConfiguration(contract);}catch{return false;}
+  return (!provider || provider.connection==='pritha')
     && contract.repositoryAdoptionMode === 'none' && contract.autostart === 'disabled'
     && scaffoldCapability(contract).adapter === 'api-process-v1';
 }

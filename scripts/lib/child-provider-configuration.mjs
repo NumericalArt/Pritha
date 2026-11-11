@@ -1,4 +1,5 @@
 const providers=Object.freeze({
+  openai:{baseUrl:'https://api.openai.com/v1',keyName:'OPENAI_API_KEY',label:'OpenAI'},
   claude:{baseUrl:'https://api.anthropic.com/v1',keyName:'ANTHROPIC_API_KEY',label:'Anthropic'},
   neuraldeep:{baseUrl:'https://api.neuraldeep.ru/v1',keyName:'NEURALDEEP_API_KEY',label:'NeuralDeep'},
   openrouter:{baseUrl:'https://openrouter.ai/api/v1',keyName:'OPENROUTER_API_KEY',label:'OpenRouter'},
@@ -12,7 +13,22 @@ export function childProviderConfiguration(data={}){
   if(!provider || typeof modelId!=='string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$/.test(modelId)
     || connectorId==='claude' && !/^claude-[a-z0-9]+(?:-[a-z0-9]+)+$/.test(modelId)
     || connectorId==='openrouter' && !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._:/-]+$/.test(modelId))throw fail('child_provider_configuration_invalid');
+  const connection=data.childModelConnection || 'child-owned';
+  if(!['child-owned','pritha'].includes(connection))throw fail('child_provider_configuration_invalid');
+  if(connection==='pritha'){
+    const maxOutputTokens=Number(data.childMaxOutputTokens || 8192);
+    if(!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens<1 || maxOutputTokens>16384)throw fail('child_provider_configuration_invalid');
+    return {schema:'pritha-child-model-v2',connectorId,modelId,...provider,connection,maxOutputTokens,timeoutMs:180000,maxInputBytes:32768};
+  }
   return {schema:'pritha-child-model-v1',connectorId,modelId,...provider,maxOutputTokens:4096,timeoutMs:60000,credentialTarget:'.env.local'};
+}
+
+export function childModelIdentityMatches(provider,selected,returned){
+  if(returned===selected)return true;
+  // Explicit documented aliases only. Never accept an arbitrary prefix/model.
+  if(provider==='openai')return ({'gpt-4.1-mini':'gpt-4.1-mini-2025-04-14'})[selected]===returned;
+  if(provider==='neuraldeep')return ({'kimi-k3.1-pro':'moonshotai/kimi-k3.1-pro','gpt-oss-20b':'openai/gpt-oss-20b','gpt-oss-120b':'openai/gpt-oss-120b'})[selected]===returned;
+  return false;
 }
 
 export function childCredentialConfiguration(definition){

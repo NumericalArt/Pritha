@@ -168,6 +168,7 @@ export function AgentCard({
       ) : null}
 
       <AgentResultReadiness agent={agent} />
+      {agent.interactionUrl?<a className="agent-status-primary-link" href={agent.interactionUrl}>Try agent</a>:null}
 
       {agent.credentials?.total ? (
         <button

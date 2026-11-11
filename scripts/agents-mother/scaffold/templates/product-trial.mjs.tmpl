@@ -1,17 +1,88 @@
 // Host-owned Outcome verifier. Product build executors must preserve this file.
 import assert from 'node:assert/strict';
-import {readFileSync,openSync,closeSync,fstatSync,constants} from 'node:fs';
+import {readFileSync,writeFileSync,mkdtempSync,rmSync,existsSync,openSync,closeSync,fstatSync,constants} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import net from 'node:net';
 import { once } from 'node:events';
+import {randomBytes,createHash} from 'node:crypto';
 
 const timeoutMs = 10000;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const children = new Set();
+const proof=typeof modelProof==='undefined'?null:modelProof;
+let modelServer,modelEnvironment={},modelCase=null,modelCalls=0,modelErrors=[];
+const substitute=(value,nonce)=>JSON.parse(JSON.stringify(value).replaceAll('__PRITHA_MODEL_TEXT__',nonce));
+const activate=check=>{modelCalls=0;modelErrors=[];modelCase=proof?substitute(check,randomBytes(20).toString('hex')):check;return modelCase;};
+function assertModel(check){
+  if(!proof)return;
+  assert.deepEqual(modelErrors,[],'The model request must use the approved connection and input.');
+  assert.equal(modelCalls,check.model_output!==undefined || check.model_error!==undefined?1:0,'The product must make exactly the expected model calls; a fixed offline response is not a model result.');
+}
+async function prepareModel(){
+  if(!proof)return;
+  for(const [file,digest] of Object.entries(proof.files))assert.equal(createHash('sha256').update(readFileSync(file)).digest('hex'),digest,'Preserve the reviewed model client: '+file);
+  assert.deepEqual(JSON.parse(readFileSync('runtime/provider.json','utf8')),proof.configuration,'Preserve the approved provider configuration.');
+  const token=randomBytes(32).toString('hex');
+  modelServer=http.createServer(async(req,res)=>{
+    modelCalls++;
+    try{
+      assert.equal(req.method,'POST');assert.equal(req.url,'/api/child-model');assert.equal(req.headers.authorization,'Bearer '+token);
+      let text='';for await(const part of req){text+=part;if(Buffer.byteLength(text)>40000)throw Error('Model input too large');}
+      const body=JSON.parse(text),input=body.input;
+      assert.ok(modelCase && Array.isArray(input.messages) && input.messages.length);
+      assert.ok((input.maxTokens || proof.configuration.maxOutputTokens)<=proof.configuration.maxOutputTokens);
+      const userText=input.messages.filter(m=>m.role==='user').map(m=>m.content).join('\n');
+      const values=Object.values(modelCase.input_json || {}).filter(v=>typeof v==='string' && v.trim());
+      for(const value of values)assert.ok(userText.includes(value),'Pass the actual product input to the selected model.');
+      res.setHeader('content-type','application/json');
+      if(modelCase.model_error){res.writeHead(503);res.end(JSON.stringify({error:modelCase.model_error}));return;}
+      assert.notEqual(modelCase.model_output,undefined,'Unexpected model request for invalid input.');
+      const output=modelCase.model_output;
+      res.end(JSON.stringify({model:proof.configuration.modelId,content:[{type:'text',text:typeof output==='string'?output:JSON.stringify(output)}],usage:{inputTokens:10,outputTokens:5,totalTokens:15},usageKnown:true}));
+    }catch(error){modelErrors.push(error.message);res.writeHead(400);res.end(JSON.stringify({error:'provider_input_invalid'}));}
+  });
+  modelServer.listen(0,'127.0.0.1');await once(modelServer,'listening');
+  modelEnvironment={PRITHA_CHILD_MODEL_URL:'http://127.0.0.1:'+modelServer.address().port+'/api/child-model',PRITHA_CHILD_MODEL_TOKEN:token};
+}
+
+// Exercise the product's real Start command up to its process boundary. A
+// trusted preload intercepts spawn before it creates a detached server. The
+// separate product/Stop Trials exercise the server itself with owned handles.
+async function verifyManagedConnection(portVariable,port){
+  if(!proof)return;
+  assert.ok(!existsSync('.state/service.pid.json'),'Managed Start needs an unused trial project.');
+  const directory=mkdtempSync(path.join(os.tmpdir(),'pritha-start-proof-')),file=path.join(directory,'proof'),hook=path.join(directory,'hook.mjs'),nonce=randomBytes(24).toString('hex');
+  const expected={...modelEnvironment,[portVariable]:String(port)};
+  writeFileSync(hook,`import assert from 'node:assert/strict';import cp from 'node:child_process';import {syncBuiltinESMExports} from 'node:module';import {writeFileSync} from 'node:fs';import path from 'node:path';
+const expected=${JSON.stringify(expected)};
+cp.spawn=(command,args,options)=>{
+  assert.ok(command===process.execPath || command==='node','Managed Start must use a structured Node spawn.');
+  assert.ok(Array.isArray(args) && path.resolve(args[0])===path.resolve('scripts/server.mjs'),'Managed Start must launch its own server.');
+  assert.equal(options?.detached,true,'Managed Start must release its server after readiness.');
+  const env=options.env || process.env;
+  for(const [key,value] of Object.entries(expected))assert.equal(env[key],value,'Managed Start must preserve '+key);
+  writeFileSync(${JSON.stringify(file)},${JSON.stringify(nonce)},{flag:'wx',mode:0o600});
+  process.exit(0);
+};
+for(const name of ['spawnSync','exec','execSync','execFile','execFileSync','fork'])cp[name]=()=>{throw Error('Managed Start must use the reviewed structured spawn boundary.');};
+syncBuiltinESMExports();`,{mode:0o600});
+  let run;
+  try{
+    run=start(['node','--import',pathToFileURL(hook).href,'scripts/service-control.mjs','start'],{...process.env,...expected});
+    const timer=setTimeout(()=>run.child.kill('SIGKILL'),timeoutMs);
+    try{const result=await run.completion;assert.equal(result.code,0,'Managed Start dropped the approved model connection or failed: '+run.output.stderr);}
+    finally{clearTimeout(timer);}
+    assert.equal(readFileSync(file,'utf8'),nonce,'Managed Start must actually launch its server with the approved connection.');
+  }finally{if(run)await stop(run);rmSync(directory,{recursive:true,force:true});}
+}
 
 function start(argv, env = process.env) {
-  const child = spawn(process.execPath, argv.slice(1), { cwd: process.cwd(), env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const environment=proof?{...Object.fromEntries(Object.entries(env).filter(([k])=>!/(?:API_KEY|TOKEN|SECRET|PASSWORD)/.test(k))),...modelEnvironment}:env;
+  const child = spawn(process.execPath, argv.slice(1), { cwd: process.cwd(), env:environment, stdio: ['ignore', 'pipe', 'pipe'] });
   children.add(child);
   const output = { stdout: '', stderr: '' };
   for (const name of ['stdout', 'stderr']) child[name].setEncoding('utf8').on('data', chunk => {
@@ -83,31 +154,40 @@ function request(port, check) {
 }
 
 try {
+  await prepareModel();
   const demo={};
-  for (const check of checks.cli || []) {
+  for (const original of checks.cli || []) {
+    const check=activate(original);
     const run = start(check.argv);
     const timer = setTimeout(() => run.child.kill('SIGKILL'), timeoutMs);
     try {
       const result = await run.completion;
       assert.equal(result.code, check.expected_exit??0, 'CLI product failed for '+JSON.stringify(check.argv.slice(2))+'. ' + run.output.stderr);
       if(check.expected_json){const actual=JSON.parse(run.output.stdout);assert.deepEqual(actual,check.expected_json,'CLI product JSON differs for '+JSON.stringify(check.argv.slice(2)));if(result.code===0)demo.cli??=actual;}
+      assertModel(check);
     } finally { clearTimeout(timer); await stop(run); }
   }
   const port = await unusedPort();
   const first = checks.http[0];
+  modelCase=null;modelCalls=0;modelErrors=[];
   const run = start(first.argv, { ...process.env, [first.port_variable]: String(port) });
   try {
     await ready(run, port);
-    for(const check of checks.http){
+    if(proof){assert.equal(modelCalls,0,'Starting the server must not call the model before a user request.');assert.deepEqual(modelErrors,[]);}
+    for(const original of checks.http){
+      const check=activate(original);
       const result = await request(port, check);
       assert.equal(result.status,check.expected_status??200,'HTTP product status differs for '+JSON.stringify(check.input_json));
       if(check.expected_json){const actual=JSON.parse(result.text);assert.deepEqual(actual,check.expected_json,'HTTP product JSON differs for '+JSON.stringify(check.input_json));if(result.status===200)demo.http??=actual;}
+      assertModel(check);
     }
   } finally { await stop(run); }
+  await verifyManagedConnection(first.port_variable,port);
   const fd=openSync('README.md',constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
   let guide;try{const st=fstatSync(fd);assert.ok(st.isFile() && st.nlink===1 && st.size<=262144,'README.md must be a bounded project file');guide=readFileSync(fd,'utf8');}finally{closeSync(fd);}
   for(const command of Object.values(firstUse))assert.ok(guide.includes(command),'Document the verified first-use command in README.md: '+command);
-  console.log(JSON.stringify({type:'pritha-product-demo-v2',commands:firstUse,observed:demo}));
+  console.log(JSON.stringify({type:'pritha-product-demo-v2',commands:firstUse,observed:demo,...(proof?{modelVerification:'protected-local-responder',liveModelVerified:false}:{})}));
 } finally {
   for (const child of children) child.kill('SIGKILL');
+  if(modelServer){modelServer.closeAllConnections();await new Promise(resolve=>modelServer.close(resolve));}
 }
