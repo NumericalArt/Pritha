@@ -891,6 +891,34 @@ health, a constant response, and scaffold creation do not demonstrate delivery.
 Changing the Outcome or its protected verifier invalidates that review.
 Previously approved documents keep their original locks and limitations.
 
+For a new local API/process child, prefer `factory_propose` (or native
+`factory_step` with `action: propose`). The model supplies a complete brief,
+product input/output examples and proposed build limits in one request. Examples
+refer to one-based `brief.coreFunctions` indexes. Pritha supplies entrypoints,
+port variables, coverage IDs, protected verifiers and exact document hashes.
+It validates interface support, product examples and coverage before presenting
+the Contract. A malformed example leaves the same private draft available for
+correction; it does not allocate another child or ask the operator to repair JSON.
+
+With automatic continuation enabled, the controller presents the Contract card,
+then prepares and presents the separate Outcome card. It never accepts either
+decision itself. The model then reads the collected source passages and submits
+its applicability synthesis through `research_apply`; this is model work, not
+another operator confirmation. The existing controller proceeds through
+scaffold, product Trials, builder repair and verified local application.
+`factory_continue` resumes the saved phase and exact decisions after an
+interrupted preparation turn. Accepted documents, measured usage, Stop and
+decline retain their ordinary boundaries. It cannot turn an unknown execution
+into a safe retry or extend an approved budget.
+
+This route supports deterministic API children and Pritha-connected LLM children
+with no repository adoption or autostart. Existing factories and custom runtimes
+retain the lower-level tools. An explicit `write_draft` or `patch_draft` transfers
+the unapproved proposal back to that custom workflow, so the controller cannot
+overwrite the edited document. Changing a proposal's brief or limits requires
+that normal revision path; correcting product examples before Outcome approval
+keeps the original Contract and its decision.
+
 The planner normally only reports its next step. When the operator enables
 `PRITHA_FACTORY_CONTINUATION=execute` on the selected instance, the Contract
 card identifies eligible local API children and explains the automatic build.

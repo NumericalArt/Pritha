@@ -14,6 +14,7 @@ import {loadPrithaRuntimeEnv} from '../lib/env.mjs';
 import {normalizeInterviewBrief,validateInterviewBrief} from './interview-brief.mjs';
 import {scaffoldCapability,assertScaffoldCapability} from './scaffold/capabilities.mjs';
 import {prepareProductTrial,reviewProductTrials} from './factory-product-trial.mjs';
+import {validateProductProposal,compileProductProposal} from './factory-product-proposal.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryRead,factoryHash,factoryFail,requireFactoryApprovals,assertFactoryTargetAvailable,validateFactoryBudgetProposal,validateFactoryDelivery,patchFactoryDraft,validateFactoryBuildEffort,inheritedFactoryBuildEffort} from './voice-factory-state.mjs';
 
 const executors={codex:'codex-app-server',neuraldeep:'neuraldeep',claude:'claude-code',openrouter:'openrouter',local:'local'};
@@ -87,10 +88,23 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     return validateFactoryDelivery(p,state,delivery.deliveryStatus(state.runId,options));
   };
   switch(input.action){
-    case 'init':{
-      if(state.contract || fs.existsSync(p.target))throw factoryFail('factory_target_exists');
+    case 'propose':case 'init':{
+      if((state.contract || fs.existsSync(p.target)) && !(input.action==='propose' && state.preparation))throw factoryFail('factory_target_exists');
       validateFactoryBudgetProposal(input);
       const brief=normalizeInterviewBrief(input.brief);if(brief.identity.slug && brief.identity.slug!==p.slug)throw factoryFail('factory_subject_changed');
+      const requestHash=factoryHash([brief,input.build_token_budget,input.build_iteration_budget??null,input.build_elapsed_budget_ms??null]);
+      if(input.action==='propose')validateProductProposal(input.product,brief.coreFunctions);
+      if(state.preparation){
+        const row=factoryArtifact(p,state,'contract');
+        if(state.preparation.requestHash!==requestHash || (state.contractApproval?.reviewedSha256 || row.sha256)!==state.preparation.contractDraftSha256
+            || state.outcomeApproval && state.preparation.productHash!==factoryHash(input.product))throw factoryFail('factory_proposal_changed');
+        compileProductProposal(input.product,contract());
+        if(state.preparation.productHash!==factoryHash(input.product)){
+          state.preparation={...state.preparation,product:input.product,productHash:factoryHash(input.product),preparedOutcomeSha256:null};
+        }
+        if(!state.outcomeApproval && ['propose','prepare_product_trial'].includes(state.continuationPause))delete state.continuationPause;
+        value={proposalSaved:true,reused:true,next:'The host continues from the saved phase and reuses document decisions.'};break;
+      }
       brief.identity.slug=p.slug;brief.technical.targetFolder=p.target;
       const issues=validateInterviewBrief(brief,{requireComplete:true});if(issues.length)throw validationFailure(issues);
       // Recheck at the effect boundary; chat creation alone cannot reserve a path.
@@ -101,7 +115,18 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
         ...(input.build_elapsed_budget_ms!==undefined?{'build-elapsed-ms':String(input.build_elapsed_budget_ms)}:{}),
         'build-git-mode':'disposable-worktree',autostart:'disabled','target-folder':p.target,slug:p.slug});
       state.contract=result.contractPath;const data=contractData(state.contract,{root:p.root});state.agentId=data.agentId;state.agentName=data.agentName;state.phase='contract-draft';
+      if(input.action==='propose'){
+        state.preparation={version:1,requestHash,contractDraftSha256:factoryArtifact(p,state,'contract').sha256,product:input.product,productHash:factoryHash(input.product),preparedOutcomeSha256:null};
+        // Persist the draft identity before semantic preflight. A rejected
+        // example can be corrected in this proposal without orphaning the
+        // generated Contract or allocating a second child identity.
+        atomicWriteFile(p.file,JSON.stringify(state));
+        assertScaffoldCapability(data);compileProductProposal(input.product,data);
+      }
       value={artifact:'contract',sha256:factoryArtifact(p,state,'contract').sha256,scaffoldCapability:scaffoldCapability(data),next:'Read the contract and scaffold capability before requesting separate approve_contract with its exact hash.'};break;
+    }
+    case 'continue':{
+      contract();value={continuedFromSavedState:true,next:'The host owns the next technical step; pending document decisions remain separate.'};break;
     }
     case 'patch_draft':
     case 'write_draft':{
@@ -116,7 +141,11 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       }else if(input.artifact==='outcome'){
         if(fm.contract_path!==row.frontmatter.contract_path || fm.contract_fingerprint!==contract().fingerprint || fm.agent_slug!==row.frontmatter.agent_slug)throw factoryFail('factory_draft_identity_invalid');
       }else throw factoryFail('factory_artifact_boundary');
-      atomicCompareAndSwapFile(row.file,row.text,text);value={artifact:input.artifact,sha256:factoryHash(text)};break;
+      atomicCompareAndSwapFile(row.file,row.text,text);
+      // An explicit draft edit switches preparation back to the existing
+      // custom workflow. Never overwrite that edit with the saved proposal.
+      if(state.preparation)delete state.preparation;
+      value={artifact:input.artifact,sha256:factoryHash(text)};break;
     }
     case 'approve_contract':{
       const row=factoryArtifact(p,state,'contract');if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
@@ -136,7 +165,9 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     case 'prepare_product_trial':{
       requireFactoryApprovals(p,state,{outcome:false});const data=contract(),row=factoryArtifact(p,state,'outcome');
       if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
-      value=prepareProductTrial(p,row,data,input.trial);break;
+      value=prepareProductTrial(p,row,data,input.trial);
+      if(state.preparation)state.preparation.preparedOutcomeSha256=value.sha256;
+      break;
     }
     case 'approve_outcome':{
       requireFactoryApprovals(p,state,{outcome:false});contract();const row=factoryArtifact(p,state,'outcome');

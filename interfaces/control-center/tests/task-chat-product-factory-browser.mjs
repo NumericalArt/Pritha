@@ -63,14 +63,14 @@ try {
       items: finished ? [{ id: 'product_result', kind: 'assistant_message', status: 'completed', message: { id: 'product_result', markdown: resultMessage, status: 'completed' } }] : [],
       startedAt: now, pendingRequestIds: f.pending().map(request => request.requestId) });
     const workflow = async () => {
-      check(await f.call('init', { brief: f.brief, build_token_budget: 10000, build_iteration_budget: 2 }));
-      const plan = check(await f.call('scaffold_plan'));
-      assert.deepEqual(plan.capability.interfaces, ['web', 'cli']);
-      assert.equal(plan.capability.supported, true);
-      check(await f.call('approve_contract', { expected_sha256: f.artifact('contract').sha256 }));
-      assert.equal((await f.call('approve_outcome', { expected_sha256: f.artifact('outcome').sha256 })).error, 'factory_product_trial_required');
-      const prepared = check(await f.call('prepare_product_trial', { expected_sha256: f.artifact('outcome').sha256, trial: f.trial }));
-      check(await f.call('approve_outcome', { expected_sha256: prepared.sha256 }));
+      const inputs=[scenario.cliInput,scenario.httpInput].map(value=>scenario.connectorId==='codex'?'  '+value+'  ':value);
+      const product={
+        http:inputs.map(value=>({functions:[1],path:scenario.route,input_json:{[scenario.field]:value},expected_json:scenario.result(value)})),
+        cli:inputs.map(value=>({functions:[1],arguments:[scenario.flag,value],expected_json:scenario.result(value)})),
+      };
+      const proposal=check(await f.call('propose', { brief: f.brief, product, build_token_budget: 10000, build_iteration_budget: 2 }));
+      assert.equal(proposal.continuationFailed,false);
+      assert.deepEqual(proposal.continued,['approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_collect']);
       const synthesis=check(await f.research());
       assert.deepEqual(synthesis.continued,['scaffold','deliver','finish']);
       assert.equal(synthesis.continuationFailed,false);
@@ -144,7 +144,7 @@ try {
       if (storyError) throw storyError;
       await page.reload();
       await expect(page.getByText(resultMessage, { exact: true }).last()).toBeVisible();
-      await expect(page.getByText('Попробовать проверенную версию',{exact:true})).toBeVisible();
+      await expect(page.getByText('Try the verified version',{exact:true})).toBeVisible();
       await expect(page.locator('aside pre').first()).toContainText(scenario.entrypoint);
       assert.deepEqual(errors, []);
       assert.equal(f.reviews.length, 2);

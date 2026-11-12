@@ -66,7 +66,7 @@ test('native factory refuses foreign threads, turns, namespaces and tools before
   for(const extra of [{threadId:'foreign'},{turnId:'foreign'},{namespace:'foreign'},{tool:'run_command'}])await assert.rejects(f.turn.call({...base,...extra}),/factory_binding_changed/);
   assert.equal(f.state(),null);
   const badAction=await f.call({action:'write_draft',sources:{brief:'synthetic'}});assert.equal(badAction.success,false);
-  const guidance=JSON.parse(badAction.contentItems[0].text);assert.equal(guidance.action,'write_draft');assert.ok(guidance.requiredFields.includes('expected_sha256'));assert.match(guidance.hint,/not-started use init/);assert.equal(f.state(),null);
+  const guidance=JSON.parse(badAction.contentItems[0].text);assert.equal(guidance.action,'write_draft');assert.ok(guidance.requiredFields.includes('expected_sha256'));assert.match(guidance.hint,/propose with brief, product examples/);assert.equal(f.state(),null);
   const invalid=await f.call({action:'init',brief:{...brief,design:{inputDataTypes:['UTF-8']}},build_token_budget:10000});assert.equal(invalid.success,false);assert.match(invalid.contentItems[0].text,/brief.design.inputDataTypes/);assert.equal(f.state(),null);
 });
 test('closing a native turn preserves its document card and a later answer resumes the exact approval',{timeout:10000},async t=>{

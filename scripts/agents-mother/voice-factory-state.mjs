@@ -86,6 +86,12 @@ export function validateVoiceFactory(paths,value,{chatId,connectorId}){
   if(value.schema!=='pritha-voice-factory-v1' || value.chatId!==chatId || value.connectorId!==connectorId || value.slug!==paths.slug
       || value.target!==paths.target || value.stateRoot!==paths.stateRoot || !Number.isSafeInteger(value.revision))throw factoryFail('factory_binding_changed');
   for(const field of ['contract','outcome','research','pattern'])if(value[field] && (path.dirname(value[field])!==path.join(paths.memory,['research','pattern'].includes(field)?'research':'contracts') || !value[field].endsWith('.md')))throw factoryFail('factory_artifact_boundary');
+  const preparation=value.preparation;
+  if(preparation!==undefined && (!preparation || preparation.version!==1
+      || Object.keys(preparation).some(key=>!['version','requestHash','contractDraftSha256','product','productHash','preparedOutcomeSha256'].includes(key))
+      || ['requestHash','contractDraftSha256','productHash'].some(key=>!/^[a-f0-9]{64}$/.test(preparation[key] || ''))
+      || !preparation.product || typeof preparation.product!=='object' || Array.isArray(preparation.product) || factoryHash(preparation.product)!==preparation.productHash
+      || preparation.preparedOutcomeSha256!==null && !/^[a-f0-9]{64}$/.test(preparation.preparedOutcomeSha256 || '')))throw factoryFail('factory_proposal_changed');
   const config=value.buildConfiguration;
   if(config!==undefined && (!config || Object.keys(config).some(key=>!['connectorId','modelId','parentModelId','effort','operationId','approvedBy','approvedAt'].includes(key))
       || config.parentModelId!==undefined && (typeof config.parentModelId!=='string' || !/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/.test(config.parentModelId))

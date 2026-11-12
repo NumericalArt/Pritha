@@ -21,6 +21,7 @@ import { atomicWriteFile } from '../../scripts/lib/atomic-file.mjs';
 import { voiceFactoryPaths, loadVoiceFactory, factoryArtifact } from '../../scripts/agents-mother/voice-factory-state.mjs';
 import { executeVoiceFactoryStep } from '../../scripts/agents-mother/voice-factory-worker.mjs';
 import {firstUseExamples} from '../../scripts/agents-mother/factory-product-trial.mjs';
+import {compileProductProposal} from '../../scripts/agents-mother/factory-product-proposal.mjs';
 import {validateOutcomeSpecText} from '../../scripts/agents-mother/outcome-spec.mjs';
 import { contractData } from '../../scripts/agents-mother/contract.mjs';
 import { HostResearch } from '../../scripts/agents-mother/host-research.mjs';
@@ -100,6 +101,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
   function initMemory(){const memory=path.join(stateRoot,'memory');fs.mkdirSync(memory,{recursive:true});execFileSync('sqlite3',[path.join(memory,'pritha.sqlite')],{input:fs.readFileSync(path.join(root,'.memory/schema.sql'))});}
   if(automate)initMemory();
   function productTrial() {
+    if(state()?.preparation)return compileProductProposal(state().preparation.product,contractData(state().contract,{root}));
     const coverage=validateOutcomeSpecText(artifact('outcome').text,{root}).coverage;
     const covers=coverage.filter(row=>row.statement==='Return the approved product JSON' || row.statement.replace(/\.$/,'')==='Working implementation of the approved V1 core functions').map(r=>r.id);
     const inputs=scenario.connectorId==='codex'?['  '+scenario.cliInput+'  ','  '+scenario.httpInput+'  ']:[scenario.cliInput,scenario.httpInput,'yes definitely?','  YES definitely?'];

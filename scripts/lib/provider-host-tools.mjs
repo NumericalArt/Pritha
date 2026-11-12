@@ -52,13 +52,15 @@ export class ProviderHostTools {
   async runAndContinue(key,requestHash,name,input){
     const result=await this.execute(key,requestHash,name,input);
     if(!this.driveEnabled() || name!=='factory_step' || result.isError ||
-        !['approve_contract','approve_outcome','research','research_collect','research_apply','scaffold','deliver','verify','delivery_extend','delivery_resume'].includes(input.action))return result;
+        !['propose','continue','approve_contract','approve_outcome','prepare_product_trial','research','research_collect','research_apply','scaffold','deliver','verify','delivery_extend','delivery_resume'].includes(input.action))return result;
     const steps=[];let last;
     for(let n=0;n<8;n++){
       this.check();
       const next=this.factory.continuation();
       if(!next)break;
-      if(!this.factory.workflowAuthorized(next))throw fail('factory_authority_required');
+      // The controller may present a document decision, never accept it. The
+      // same durable approval broker below still waits for the exact user vote.
+      if(!this.factory.workflowAuthorized(next) && !(this.factory.state()?.preparation && ['approve_contract','approve_outcome'].includes(next.action)))throw fail('factory_authority_required');
       const nextKey='provider-tool:'+this.options.turnId+':'+next.operation_id;
       last=await this.execute(nextKey,hash(JSON.stringify([name,next])),name,next);
       steps.push(next.action);

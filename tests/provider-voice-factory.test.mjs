@@ -150,9 +150,9 @@ test('the actual MCP brief schema rejects a design array before approval and a c
   assert.equal(schema.properties.design.properties.inputDataTypes.type,'string');
   const tool=(await post('tools/list')).tools.find(row=>row.name==='factory_step').inputSchema;
   const status=JSON.parse((await post('tools/call',{name:'factory_step',arguments:{operation_id:'check-start-status',action:'status'}})).content[0].text);
-  assert.equal(status.nextStep.action,'init');assert.deepEqual(status.nextStep.requiredFields,['brief','build_token_budget']);
+  assert.equal(status.nextStep.action,'propose');assert.deepEqual(status.nextStep.requiredFields,['brief','product','build_token_budget']);
   const wrongAction=await post('tools/call',{name:'factory_step',arguments:{operation_id:'incorrect-draft-call',action:'write_draft',sources:{brief:'synthetic'},selection:{}}});
-  const guidance=JSON.parse(wrongAction.content[0].text);assert.equal(guidance.error,'factory_input_invalid');assert.deepEqual(guidance.requiredFields,['action','artifact','expected_sha256','content']);assert.match(guidance.hint,/init with brief/);
+  const guidance=JSON.parse(wrongAction.content[0].text);assert.equal(guidance.error,'factory_input_invalid');assert.deepEqual(guidance.requiredFields,['action','artifact','expected_sha256','content']);assert.match(guidance.hint,/propose with brief, product examples/);
   const shortId=await post('tools/call',{name:'factory_step',arguments:{operation_id:'draft1',action:'init',brief,build_token_budget:40000}});
   assert.match(JSON.parse(shortId.content[0].text).hint,/8–128/);assert.equal(f.state(),null);assert.equal(f.approvals.length,0);
   assert.equal(tool.properties.sources.additionalProperties.type,'string');
