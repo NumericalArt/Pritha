@@ -18,6 +18,12 @@ const verifierPath = 'verification/product.mjs';
 const provenance = 'host-template:api-cli-product-v2';
 const stopPath = 'verification/managed-stop.mjs';
 const stopProvenance = 'host-template:api-managed-stop-v1';
+export const PRODUCT_HOST_CHECKS = Object.freeze({
+  model_connection: 'Without a model connection, health remains available and a valid product request returns an explicit JSON service error without calling a model.',
+  managed_start: 'Managed Start forwards the approved model URL, token and port to its server without logging the connection.',
+  managed_stop: 'Managed Stop proves process ownership, preserves foreign processes and unrelated state, and supports repeated Stop without a model connection.',
+});
+const productCases = trial => [...(trial.http || []), ...(trial.cli || [])];
 const sha256 = content => createHash('sha256').update(content).digest('hex');
 const fail = code => { throw Object.assign(new Error('Prepare and review an independent HTTP/CLI product Trial before approving this Outcome.'), { code }); };
 
@@ -51,13 +57,19 @@ export function validateProductTrial(trial, data) {
     json = JSON.stringify(trial);
     parseBoundedJson(json, { maxBytes: 12000, maxDepth: 8, maxNodes: 500 });
   } catch { fail('factory_product_trial_invalid'); }
-  if (!trial || Array.isArray(trial) || Object.keys(trial).some(key => !['cli', 'http'].includes(key))
+  if (!trial || Array.isArray(trial) || Object.keys(trial).some(key => !['cli', 'http', 'host_checks'].includes(key))
       || (!trial.cli && !trial.http) || redactSensitiveText(json) !== json) fail('factory_product_trial_invalid');
   const capability = scaffoldCapability(data);
   if (capability.adapter !== 'api-process-v1' || !trial.http || capability.interfaces.includes('cli') !== Boolean(trial.cli)) {
     fail('factory_product_trial_interfaces');
   }
-  for (const [kind, cases] of Object.entries(trial)) {
+  if (trial.host_checks !== undefined && (!trial.host_checks || Array.isArray(trial.host_checks)
+      || typeof trial.host_checks !== 'object' || Object.entries(trial.host_checks).some(([kind,ids]) =>
+        !Object.hasOwn(PRODUCT_HOST_CHECKS,kind) || kind!=='managed_stop' && !llm
+        || !Array.isArray(ids) || !ids.length || ids.length>32 || ids.some(id=>typeof id!=='string' || !id || id.length>200)))) {
+    fail('factory_product_trial_coverage_invalid');
+  }
+  for (const [kind, cases] of Object.entries(trial).filter(([kind])=>kind==='cli' || kind==='http')) {
     if (!Array.isArray(cases) || cases.length < 2 || cases.length > 8) fail('factory_product_trial_variants_required');
     const signatures = new Map(), outputs = new Set();
     for (const check of cases) {
@@ -109,14 +121,18 @@ export function productTrialVerifier(trial,data){
 export function prepareProductTrial(paths, outcome, data, trial) {
   validateProductTrial(trial, data);
   const checked = validateOutcomeSpecText(outcome.text, { root: paths.root });
-  const cases=Object.values(trial).flat();
+  const cases=productCases(trial);
   const covers=[...new Set(cases.flatMap(c=>c.covers))];
-  if(covers.some(id=>!checked.coverage.some(row=>row.id===id)))fail('factory_product_trial_coverage_invalid');
+  const host=trial.host_checks || {};
+  if([...covers,...Object.values(host).flat()].some(id=>!checked.coverage.some(row=>row.id===id)))fail('factory_product_trial_coverage_invalid');
   // A JSON exchange cannot demonstrate process management or the delivery of another interface.
   // Keep such original obligations independent even if a proposed mapping mentions them.
   if(checked.coverage.some(r=>covers.includes(r.id) && /\b(?:start\s*\/\s*stop|managed (?:start|stop|service)|autostart|launchd|telegram|deployment)\b/i.test(r.statement)))fail('factory_product_trial_coverage_invalid');
+  for(const id of [...(host.model_connection || []),...(host.managed_start || [])])if(!covers.includes(id))covers.push(id);
   const guide=checked.coverage.find(row=>row.statement.replace(/\.$/,'')==='Runnable project with a user guide and verification evidence');
   if(guide && !covers.includes(guide.id))covers.push(guide.id);
+  const stopCovers=[...new Set([...(host.managed_stop || []),guide?.id || covers[0]])];
+  const allCovers=new Set([...covers,...stopCovers]);
   const content=productTrialVerifier(trial,data);
   const stopContent = managedStopVerifier(data);
   const targets = [...new Set(cases.map(check => check.argv[1]))];
@@ -127,11 +143,11 @@ export function prepareProductTrial(paths, outcome, data, trial) {
     if(b.startsWith('### Trial: product-http-cli\n') && b.includes(' :: '+provenance))return false;
     if(b.startsWith('### Trial: managed-stop\n') && b.includes(' :: '+stopProvenance))return false;
     const ids=[...b.matchAll(/^- Covers: ([^\n]+)/gm)].map(m=>m[1]);
-    return !generated.has(b) || !ids.length || !ids.every(id=>covers.includes(id));
+    return !generated.has(b) || !ids.length || !ids.every(id=>allCovers.has(id));
   });
   const block = [
     '## Trials', '', '### Trial: product-http-cli', '',
-    '- Statement: Each selected interface returns the approved JSON for different inputs, and the first-use commands are documented.',
+    '- Statement: Each selected interface returns the approved JSON for different inputs, and the first-use commands are documented.'+(childProviderConfiguration(data)?.connection==='pritha'?' The protected verifier also checks missing model connection, health, and Managed Start connection forwarding and log privacy.':''),
     '- Kind: automated', ...covers.map(id => '- Covers: ' + id),
     '- Isolation: none', '- When argv: ["node", "' + verifierPath + '"]', '- When cwd: .',
     '- Then exit code: 0', ...targets.map(target => '- Product target: ' + target),
@@ -139,7 +155,7 @@ export function prepareProductTrial(paths, outcome, data, trial) {
     '- Timeout ms: 120000', '',
     '### Trial: managed-stop', '',
     '- Statement: Stop preserves foreign processes and unrelated state, rejects corrupted ownership records, stops its own server and permits repeated Stop.',
-    '- Kind: automated', '- Covers: '+(guide?.id || covers[0]), '- Isolation: none',
+    '- Kind: automated', ...stopCovers.map(id=>'- Covers: '+id), '- Isolation: none',
     '- When argv: ["node", "'+stopPath+'"]', '- When cwd: .', '- Then exit code: 0',
     '- Product target: scripts/service-control.mjs', '- Product target: scripts/server.mjs',
     '- Verifier input: '+stopPath+' :: sha256:'+sha256(stopContent)+' :: '+stopProvenance,
@@ -159,7 +175,7 @@ export function prepareProductTrial(paths, outcome, data, trial) {
   atomicCompareAndSwapFile(outcome.file, outcome.text, next);
   return { artifact: 'outcome', sha256: sha256(next), verifier: { path: verifierPath, sha256: sha256(content), provenance },
     managedStopVerifier: {path:stopPath,sha256:sha256(stopContent),provenance:stopProvenance},
-    checks: trial, next: 'Read the updated Outcome and request its separate approval. Product and managed Stop verifiers execute only during approved Trials. The server must support --managed-instance and expose that identity at /health; Stop must validate the record against the actual process before stopping it.' };
+    checks: trial, hostChecks:PRODUCT_HOST_CHECKS, next: 'Read the updated Outcome and request its separate approval. Use trial.host_checks to bind model_connection, managed_start or managed_stop to their requiredCoverage IDs; do not claim lifecycle evidence using a JSON case alone. Product and managed Stop verifiers execute only during approved Trials. The server must support --managed-instance and expose that identity at /health; Stop must validate the record against the actual process before stopping it.' };
 }
 
 // Reused before showing an approval and immediately before its effect. Existing
@@ -196,6 +212,12 @@ export function reviewProductTrials(paths, outcome, data, { includeInputs = true
     const content=files.find(file=>file.path===verifierPath)?.content;
     let trial;try{trial=JSON.parse(JSON.parse(content?.match(/^const checks = JSON\.parse\(([^\n]+)\);\n/)?.[1]));}catch{fail('factory_product_trial_model_proof_required');}
     if(content!==productTrialVerifier(trial,data))fail('factory_product_trial_model_proof_required');
+    const guide=checked.coverage.find(row=>row.statement.replace(/\.$/,'')==='Runnable project with a user guide and verification evidence');
+    const host=trial.host_checks || {},covers=[...new Set([...productCases(trial).flatMap(c=>c.covers),...(host.model_connection || []),...(host.managed_start || []),...(guide?[guide.id]:[])])];
+    const stopCovers=[...new Set([...(host.managed_stop || []),guide?.id || covers[0]])];
+    const same=(actual,expected)=>Array.isArray(actual) && JSON.stringify([...new Set(actual)].sort())===JSON.stringify([...expected].sort());
+    if(!same(automated.find(t=>t.id==='product-http-cli')?.covers,covers)
+        || !same(automated.find(t=>t.id==='managed-stop')?.covers,stopCovers))fail('factory_product_trial_coverage_invalid');
   }
   return files;
 }

@@ -16,7 +16,7 @@ for(const [builder,provider,model] of [['codex','openai','gpt-4.1-mini'],['claud
   fs.mkdirSync(path.join(root,'verification'),{recursive:true});fs.writeFileSync(path.join(root,'verification/product.mjs'),productTrialVerifier(trial,data));
   fs.appendFileSync(path.join(root,'README.md'),'\n'+Object.values(firstUseExamples(trial,data)).join('\n'));
   const code=`import http from 'node:http';import {readChildProvider,requestChildModel} from './lib/child-model-client.mjs';
-  http.createServer(async(req,res)=>{let body='';for await(const part of req)body+=part;const input=JSON.parse(body);res.setHeader('content-type','application/json');
+  http.createServer(async(req,res)=>{if(req.url==='/health'){res.end(JSON.stringify({ok:true}));return;}let body='';for await(const part of req)body+=part;const input=JSON.parse(body);res.setHeader('content-type','application/json');
     if(!input.text){res.writeHead(400);res.end(JSON.stringify({error:'invalid_input'}));return;}
     try{const selected=readChildProvider(process.cwd());const result=await requestChildModel(selected.configuration,{system:'Transform the supplied input into JSON.',messages:[{role:'user',content:input.text}],maxTokens:256},selected);res.end(JSON.stringify(JSON.parse(result.content[0].text)));}
     catch(e){res.writeHead(503);res.end(JSON.stringify({error:e.code}));}
@@ -28,6 +28,12 @@ for(const [builder,provider,model] of [['codex','openai','gpt-4.1-mini'],['claud
   const result=run();assert.equal(result.status,0,result.stderr);
   assert.equal(JSON.parse(result.stdout).modelVerification,'protected-local-responder');
   assert.equal(JSON.parse(result.stdout).liveModelVerified,false);
+  assert.deepEqual(JSON.parse(result.stdout).hostChecks,['model_connection','managed_start']);
+  fs.writeFileSync(path.join(root,'scripts/server.mjs'),code.replace("if(req.url==='/health'){","if(req.url==='/health'){res.writeHead(process.env.PRITHA_CHILD_MODEL_URL?200:503);"));
+  const brokenHealth=run();assert.notEqual(brokenHealth.status,0);assert.match(brokenHealth.stderr,/Health must work without a model connection/);
+  fs.writeFileSync(path.join(root,'scripts/server.mjs'),code.replace('res.writeHead(503);',"res.writeHead(e.code==='pritha_connection_unavailable'?200:503);"));
+  const offlineSuccess=run();assert.notEqual(offlineSuccess.status,0);assert.match(offlineSuccess.stderr,/missing model connection must return an explicit service error/);
+  fs.writeFileSync(path.join(root,'scripts/server.mjs'),code);
   fs.writeFileSync(path.join(root,'scripts/service-control.mjs'),startCode.replace('env:process.env','env:{FIXTURE_PORT:process.env.FIXTURE_PORT}'));
   const lost=run();assert.notEqual(lost.status,0);assert.match(lost.stderr,/Managed Start must preserve PRITHA_CHILD_MODEL_URL/);
   fs.writeFileSync(path.join(root,'scripts/service-control.mjs'),startCode);

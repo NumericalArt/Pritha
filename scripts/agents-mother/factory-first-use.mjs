@@ -46,7 +46,7 @@ export function verifiedFirstUse(p,s,result){
   let demo;try {demo=JSON.parse(row.execution.stdout.trim());}catch{return null;}
   const observed=demo.observed,modelProof=data.childModelConnection==='pritha';
   if(modelProof && (demo.modelVerification!=='protected-local-responder' || demo.liveModelVerified!==false))return null;
-  if(!observed || Object.keys(cases).some(k=>!(modelProof?matchesModelExample:isDeepStrictEqual)(observed[k],cases[k].find(c=>(c.expected_exit??0)===0 && (c.expected_status??200)===200).expected_json)))return null;
+  if(!observed || ['cli','http'].filter(k=>cases[k]).some(k=>!(modelProof?matchesModelExample:isDeepStrictEqual)(observed[k],cases[k].find(c=>(c.expected_exit??0)===0 && (c.expected_status??200)===200).expected_json)))return null;
   const application=s.localApplication?.status==='applied' && s.localApplication.to===fresh.current.head;
   if(application && !verifyTrialResultFreshness(receipt,p.target,{root:p.root,stateRoot:p.stateRoot,outcomeSpecPath:s.outcome}).ok)return null;
   const applied=Boolean(application);

@@ -292,7 +292,10 @@ export class ProviderTaskRuntime {
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
         model:binding.modelId,effort:binding.effortId,timeoutMs:recovery?Math.max(1,deadline-Date.now()):binding.timeoutMs,resume:(recovery?this.require(active.chat).nativeThreadId:binding.nativeThreadId) || undefined,prompt:recovery
-          ?'Pritha host continuation: the last completed provider response contained no usable answer or tool call. Continue the saved factory in this same session. Read factory status first, keep the original brief and selected child model, and take the next valid step. Preserve accepted documents and completed operations; do not restart creation or bypass approval, evidence or verification checks.'
+          ?'Pritha host continuation: '+(result?.errorCode==='provider_tool_identity_mismatch'
+            ?'the last completed response requested an undeclared tool. The host rejected that call without executing it and recorded the response usage. Use only tools actually declared in this session; do not invent tool names or namespaces. '
+            :'the last completed provider response contained no usable answer or tool call. ')
+            +'Continue the saved factory in this same session. Read factory status first, keep the original brief and selected child model, and take the next valid step. Preserve accepted documents and completed operations; do not restart creation or bypass approval, evidence or verification checks.'
           :[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact child. Read status first and resume the saved phase; never restart or ask again to approve an accepted document. Prioritize a working product and useful progress over token economy. Read workflowBudget and recommendedBuildBudget from status; absent an explicit smaller user limit, propose the generous stability defaults for all budgets. For a new workflow prepare a complete brief and proposed build budget, obtain separate Contract and Outcome approvals, then continue canonical research, scaffold, bounded delivery and verification. For a deterministic local HTTP/CLI product set childModelProvider and childModelId to none with no repository adoption. The host supplies operation IDs. Consult continued results before selecting the next step. Read each research_status page with offset until nextOffset is null; select actual passages and publish your synthesis. Give the verified directory, first-use command and observed output. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
         // The host pins the Voice search intent in this turn's hashed request,
         // including queued/resumed delivery. Never infer it from an assembled prompt.
@@ -320,19 +323,20 @@ export class ProviderTaskRuntime {
             if(observed)for(const field of Object.keys(total))total[field]+=Number.isSafeInteger(event.usage?.[field])?event.usage[field]:0;
             this.execution.updateIntent(active.key,{providerRequests:count,providerUsage:total,providerUsageKnown:row.providerUsageKnown!==false && Boolean(observed),
               lastProviderRequest:{status:event.status,upstreamAttempted:event.upstreamAttempted===true,durationMs:event.durationMs,errorCode:event.error?.code || null,
-                emptyOutputRetrySafe:event.responseSummary?.emptyOutputRetrySafe===true,...(event.toolDiagnostic?{toolDiagnostic:event.toolDiagnostic}:{})}});
+                emptyOutputRetrySafe:event.responseSummary?.emptyOutputRetrySafe===true,rejectedToolRetrySafe:event.responseSummary?.rejectedToolRetrySafe===true,...(event.toolDiagnostic?{toolDiagnostic:event.toolDiagnostic}:{})}});
           }
           this.options.onProviderRequest?.(binding,active,event);
         },
       });
       if(active.stopping)active.run.stop();
       result=completedResult=await active.run.completion;
-      const row=this.connectorId==='neuraldeep' && binding.workspace.factorySlug && !result.ok && result.errorCode==='neuraldeep_empty_response'
+      const row=this.connectorId==='neuraldeep' && binding.workspace.factorySlug && !result.ok && ['neuraldeep_empty_response','provider_tool_identity_mismatch'].includes(result.errorCode)
         ?this.execution.getIntent(active.key):null;
       const resumable=row && result.processTreeExited===true
         && result.sessionId && result.sessionId===this.require(active.chat).nativeThreadId
         && result.budget?.usageKnown===true && row.providerUsageKnown===true
-        && row.lastProviderRequest?.errorCode==='neuraldeep_empty_response' && row.lastProviderRequest.emptyOutputRetrySafe===true
+        && row.lastProviderRequest?.errorCode===result.errorCode
+        && (result.errorCode==='neuraldeep_empty_response'?row.lastProviderRequest.emptyOutputRetrySafe===true:row.lastProviderRequest.rejectedToolRetrySafe===true)
         && !active.stopping && !active.controller.signal.aborted && !this.pendingRequests(active.chat).length
         && recovery<2 && deadline-Date.now()>1000;
       if(!resumable)break;
@@ -341,7 +345,8 @@ export class ProviderTaskRuntime {
       const recoveries=[...(row.providerRecoveries || []),{attempt:recovery,reason:result.errorCode,at:stamp(),processProof:row.processProof,processTreeExited:true,providerRequests:row.providerRequests}];
       this.execution.updateIntent(active.key,{state:'dispatching',providerRecoveries:recoveries});
       const item=this.registry.putItem(active.chat,active.turnId,{id:'provider_recovery_'+active.turnId+'_'+recovery,kind:'notice',tone:'info',status:'completed',startedAt:stamp(),completedAt:stamp(),
-        text:'The model returned an empty response. Pritha is continuing from the saved step (automatic continuation '+recovery+' of 2).'});
+        text:(result.errorCode==='provider_tool_identity_mismatch'?'The model requested an unavailable tool. Pritha blocked that call and is asking the model to use the available tools. ':'The model returned an empty response. ')
+          +'Pritha is continuing from the saved step (automatic continuation '+recovery+' of 2).'});
       this.emit(active.chat,'item.completed',{item},{turnId:active.turnId,itemId:item.id});
       appendFileSync(journal,JSON.stringify({type:'pritha.provider_continuation',attempt:recovery,reason:result.errorCode})+'\n');
       active.approvals?.close();
@@ -401,6 +406,10 @@ export class ProviderTaskRuntime {
       factory_budget_identity:'The saved creation belongs to another chat. Pritha preserved it. Continue in that chat or choose a new agent name; this is not a provider outage or an exhausted token budget.',
       factory_token_budget_exhausted:'The shared creation budget has been used. Saved work is preserved; extend the task budget to continue.',
       factory_time_budget_exhausted:'The agreed active creation time has been used. Saved work is preserved; extend the task time to continue.',
+      provider_usage_unconfirmed:'The request ended before its token usage could be confirmed. Pritha preserved the chat and its completed steps; automatic requests are paused until the usage record is reconciled. This is not an exhausted token budget.',
+      provider_tool_identity_mismatch:'The model requested a tool that is not available in this session. Pritha blocked that call without executing it. '
+        +(this.execution.getIntent(active.key).providerRecoveries?.length===2?'Two automatic continuations did not resolve the problem. ':'')
+        +'The saved factory and document approvals are preserved. Continue here to retry with the declared tools.',
       neuraldeep_empty_response:'The model completed a request without a usable answer or tool call. '
         +(code==='neuraldeep_empty_response' && this.execution.getIntent(active.key).providerRecoveries?.length===2?'Two automatic continuations also returned empty output. ':'')
         +'Pritha preserved this chat and its completed steps. Continue here to retry, or choose a stronger model for a new agent.',

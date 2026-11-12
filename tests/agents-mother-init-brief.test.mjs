@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,rmSync,existsSync,symlinkSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {parseInterviewBrief,serializeInterviewBrief,interviewBriefOptions} from '../scripts/agents-mother/interview-brief.mjs';
+import {parseInterviewBrief,serializeInterviewBrief,interviewBriefOptions,normalizeInterviewBrief} from '../scripts/agents-mother/interview-brief.mjs';
 import {prepareInterviewOptions} from '../scripts/agents-mother/interview-options.mjs';
 import {contractData,validateContract} from '../scripts/agents-mother/contract.mjs';
 import {apiProcessManifest} from '../scripts/agents-mother/scaffold/api-process.mjs';
@@ -21,6 +21,16 @@ test('Markdown headings/tables and JSON preserve complete brief decisions and re
   assert.equal(brief.identity.slug,'feed-board');assert.equal(brief.technical.runtimeFamily,'api');assert.equal(brief.sources.length,1);assert.deepEqual(brief.constraints,['Twenty items','Preserve data']);assert.deepEqual(parseInterviewBrief(serializeInterviewBrief(brief)),brief);
   assert.throws(()=>parseInterviewBrief('{SECRET_CANARY'),error=>!error.message.includes('SECRET_CANARY'));
   assert.throws(()=>parseInterviewBrief('{"sources":[{}]}'),/sources/);assert.throws(()=>parseInterviewBrief('{"schemaVersion":2}'),/schemaVersion/);
+});
+
+test('an explicitly HTTP-only brief removes its redundant server CLI field without choosing another interface',()=>{
+  const technical={runtimeFamily:'api',serviceMode:'process',primaryInterface:'web',secondaryInterfaces:'none',cliEntrypoint:'scripts/server.mjs'};
+  const normalized=normalizeInterviewBrief({technical});
+  assert.deepEqual(normalized.technical,{runtimeFamily:'api',serviceMode:'process',primaryInterface:'web',secondaryInterfaces:'none'});
+  assert.equal(technical.cliEntrypoint,'scripts/server.mjs');
+  for(const patch of [{secondaryInterfaces:'CLI'},{secondaryInterfaces:''},{cliEntrypoint:'scripts/echo.mjs'},{runtimeFamily:'cli'},{serviceMode:'none'}]){
+    const input={...technical,...patch};assert.deepEqual(normalizeInterviewBrief({technical:input}).technical,input);
+  }
 });
 test('from-brief writes valid private draft pair with correct process operations, port and native build policy',t=>{
   const f=fixture(t),result=f.run(['--from-brief',f.file]);assert.equal(result.status,0,result.stderr || result.stdout);

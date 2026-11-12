@@ -177,6 +177,18 @@ runtime blockers, but creation is not complete while the agent is missing from
    and includes the verifier's complete content and hash in the Outcome approval
    card. Preparation executes no command. Scaffold includes only the approved
    bytes in its Git baseline. Structural smoke alone cannot approve an API product.
+   Bind lifecycle requirements using `trial.host_checks`, whose `model_connection`,
+   `managed_start` and `managed_stop` arrays name the relevant `requiredCoverage`
+   IDs. These bind protected host checks; ordinary HTTP/CLI `covers` cannot claim
+   lifecycle evidence. For a Pritha-connected model the verifier also starts the
+   server without a connection, requires working health and an explicit product
+   service error, and checks Managed Start connection forwarding. The independent
+   Stop verifier proves ownership and repeated Stop without model credentials.
+   The host checks do not add product example cases or change the Contract.
+   Draft approval verifies both the original verifier bytes and their coverage
+   binding. Previously approved Outcomes keep their original evidence locks.
+   Local responder Trials prove model integration, not live provider quality;
+   their receipt explicitly retains `liveModelVerified: false`.
 4. Create a reusable `agent-pattern-pack` in instance-local
    `<PRITHA_STATE_ROOT>/agents/research/`, or gitignored
    `.private/agents/research/` when no external state root is configured.
@@ -1006,6 +1018,24 @@ output limit, uncertain exit or cancelled turn does not qualify. Successful
 responses and other transports keep their ordinary execution path. If recovery
 is exhausted, the chat explains the cause and preserves the saved creation for
 explicit continuation. This does not approve documents or bypass evidence gates.
+
+An undeclared partial tool call is withheld, never renamed or executed. The
+protected NeuralDeep stream continues reading within the existing time and size
+bounds, suppresses subsequent output, and records terminal usage before reporting
+the original tool refusal. A completed response with measured usage and the exact
+selected model may use the same two-continuation allowance to ask the model to
+use declared tools. The shared counter, deadline, lease and pending-approval
+checks remain unchanged. Truncated streams, unconfirmed usage, output limits,
+wrong model identity and failed durable accounting do not authorize a repeat.
+An old unknown receipt remains unknown; this fix does not invent its usage.
+
+When a brief explicitly selects API process, web/API and no secondary interface,
+`scripts/server.mjs` is the HTTP entrypoint, not a separate CLI. The host removes
+only this redundant CLI field before rendering a new draft. For an existing
+unapproved draft, `status`, `read_artifact` and `scaffold_plan` offer a hash-bound
+`draftRepair` patch. Applying it changes only that line; normal Contract review
+still follows. Custom entrypoints, selected CLI interfaces and accepted documents
+are never silently changed.
 
 A large context or several useful iterations is not itself a failure. After
 substantial work without a changed artifact or phase, present a progress

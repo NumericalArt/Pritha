@@ -366,10 +366,15 @@ export function createNeuralDeepAdapter(options = {}) {
           if(!response.headersSent){copyResponseHeaders(upstream,response,protectedBoundary);response.writeHead(upstream.status);}
           await writeResponseChunk(response,chunk,controller.signal);
         };
-        const normalizer=new ResponsesStreamNormalizer({maxBytes:responseLimit,transform:transformResponseStream,
+        const normalizer=new ResponsesStreamNormalizer({maxBytes:responseLimit,transform:transformResponseStream,deferToolRejection:protectedBoundary,
           onTerminal:event=>{
             providerUsage=responsesUsage(JSON.stringify(event.response),'application/json');
             responseSummary=responsesTerminalSummary(event.response,{eventType:event.type,outputLimit});
+            if(normalizer.rejectedTool && responseSummary){
+              responseSummary.rejectedToolRetrySafe=event.type==='response.completed' && responseSummary.status==='completed'
+                && !event.response?.error && !event.response?.incomplete_details && !responseSummary.outputLimitReached && providerUsage!==null
+                && typeof event.response?.model==='string' && responseModelMatches(responsesPayload?.model,event.response.model);
+            }
           },
           write:async chunk=>{
             if(pendingModelMetadata){

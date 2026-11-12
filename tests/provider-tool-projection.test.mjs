@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {projectProviderToolRequest,wireCall} from '../scripts/lib/provider-tool-projection.mjs';
 import {listenNeuralDeepAdapter,closeNeuralDeepAdapter} from '../scripts/neuraldeep/responses-adapter.mjs';
 import {PROVIDER_FACTORY_TOOLS} from '../scripts/lib/provider-factory-tools.mjs';
+import {ResponsesRequestBudget} from '../scripts/lib/responses-request-budget.mjs';
 
 const model='qwen3.8-27b',token='t'.repeat(48),allowedTools=['mcp__pritha__read_file','mcp__pritha__list_files'];
 const namespace=name=>({type:'namespace',name:'mcp__pritha',tools:[{type:'function',name,parameters:{type:'object'}}]});
@@ -152,6 +153,35 @@ test('failed durable receipts never release a NeuralDeep tool in JSON or SSE',as
 
 const metadataPrelude=()=>({type:'response.created',response:{id:'response_fixture',model:'qwen3.8-flash-next',status:'in_progress',output:[]}});
 const sse=event=>'data: '+JSON.stringify(event)+'\n\n';
+
+for(const mode of ['completed','truncated','malformed','unknown-usage','wrong-model','missing-model','incomplete','output-limit'])test('rejected partial tools drain only bounded billing evidence: '+mode,async t=>{
+  const receipts=[],budget=new ResponsesRequestBudget({tokenBudget:50000,checkpoint:async()=>{}});let requests=0;
+  const completed=terminal([call('PRIVATE_UNDECLARED_TOOL'),call(allowedTools[0])]);
+  if(mode==='unknown-usage')delete completed.usage;
+  if(mode==='wrong-model')completed.model='other-model';
+  if(mode==='missing-model')delete completed.model;
+  if(mode==='incomplete'){completed.status='incomplete';completed.incomplete_details={reason:'max_output_tokens'};}
+  if(mode==='output-limit')completed.usage={input_tokens:4,output_tokens:128};
+  const post=await fixture(t,{prepareResponsesRequest:(payload,context)=>budget.begin(payload,context),onRequest:async event=>{receipts.push(event);await budget.record(event);},fetchImpl:async()=>{
+    requests++;
+    const prefix=sse({type:'response.output_item.added',output_index:0,item:{...call('PRIVATE_UNDECLARED_TOOL'),status:'in_progress',arguments:''}})
+      +sse({type:'response.output_text.delta',output_index:1,delta:'PRIVATE_SUPPRESSED_TEXT'});
+    return new Response(prefix+(mode==='truncated'?'':mode==='malformed'?'data: INVALID_JSON\n\n'
+      :sse({type:'response.'+completed.status,response:completed})+'data: [DONE]\n\n'),{headers:{'content-type':'text/event-stream'}});
+  }});
+  const result=await post({input:'Use only the declared tools.',max_output_tokens:128}),body=await result.text();
+  assert.equal(result.status,502);assert.equal(requests,1);assert.equal(receipts.length,1);
+  assert.doesNotMatch(body,/"type":"function_call"|PRIVATE_SUPPRESSED_TEXT|PRIVATE_UNDECLARED_TOOL/);
+  assert.doesNotMatch(JSON.stringify(receipts),/PRIVATE_SUPPRESSED_TEXT|PRIVATE_UNDECLARED_TOOL/);
+  const known=!['truncated','malformed','unknown-usage'].includes(mode);
+  assert.equal(budget.snapshot().usageKnown,known);
+  assert.equal(receipts[0].responseSummary?.rejectedToolRetrySafe===true,mode==='completed');
+  if(known){
+    assert.equal(budget.snapshot().tokensUsed,mode==='output-limit'?132:6);
+    assert.equal(receipts[0].error.code,'provider_tool_identity_mismatch');
+    assert.equal(budget.snapshot().requests[0].responseDiagnostics.rejectedToolRetrySafe,mode==='completed');
+  }
+});
 
 test('streaming tool placeholders are held until the complete declared identity and durable receipt arrive',async t=>{
   for(const name of [undefined,null,'']){

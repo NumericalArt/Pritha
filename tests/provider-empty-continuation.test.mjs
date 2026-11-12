@@ -34,7 +34,7 @@ async function fixture(t,{connectorId='neuraldeep',factory=true}={}){
     const input=runs[index].input,tokens=100+index;
     if(input.onBudgetCheckpoint)await input.onBudgetCheckpoint({requests:[{status:'measured',reservedTokens:tokens,usage:{totalTokens:tokens},createdAt:'2026-11-12T10:00:00.000Z',finishedAt:'2026-11-12T10:00:01.000Z'}]});
     input.onProviderRequest({method:'POST',path:'/v1/responses',status:ok?200:502,upstreamAttempted:true,durationMs:1000,usageKnown,
-      usage:{inputTokens:tokens-10,outputTokens:10,cachedInputTokens:0,reasoningTokens:0,totalTokens:tokens},responseSummary:{emptyOutputRetrySafe:retrySafe},error:ok?null:{code:errorCode}});
+      usage:{inputTokens:tokens-10,outputTokens:10,cachedInputTokens:0,reasoningTokens:0,totalTokens:tokens},responseSummary:{emptyOutputRetrySafe:retrySafe,rejectedToolRetrySafe:retrySafe},error:ok?null:{code:errorCode}});
     input.cancelPendingApprovals(); // The real runner closes its tool/approval owner on exit.
     runs[index].resolve({ok,errorCode:ok?null:errorCode,sessionId,processTreeExited,budget:{usageKnown,tokensUsed:tokens}});
   };
@@ -75,6 +75,24 @@ test('repeated empty output stops after two continuations with useful diagnostic
   await until(()=>!f.runtime.active.size);
   assert.equal(f.runs.length,3);assert.equal(f.turn().status,'failed');assert.match(f.turn().error.message,/Two automatic continuations also returned empty output/);
   assert.equal(f.turn().usage.totalTokens,303);assert.equal(f.receipt().providerRecoveries.length,2);
+});
+
+test('a completed, billed rejected tool resumes the same model with a correction and shares the empty-response retry limit',async t=>{
+  const f=await fixture(t);
+  await f.settle(0,{errorCode:'provider_tool_identity_mismatch'});await until(()=>f.runs.length===2);
+  assert.equal(f.runs[1].input.resume,session);assert.equal(f.runs[1].input.model,'test-model');
+  assert.match(f.runs[1].input.prompt,/undeclared tool.*without executing.*only tools actually declared/s);
+  await f.settle(1);await until(()=>f.runs.length===3);
+  assert.match(f.runs[2].input.prompt,/no usable answer/);
+  await f.settle(2,{errorCode:'provider_tool_identity_mismatch'});await until(()=>!f.runtime.active.size);
+  assert.equal(f.runs.length,3);assert.equal(f.receipt().providerRecoveries.length,2);
+  assert.equal(f.turn().usage.totalTokens,303);assert.match(f.turn().error.message,/Two automatic continuations did not resolve/);
+  await until(()=>JSON.stringify(f.events).includes('blocked that call'));
+});
+
+for(const patch of [{usageKnown:false},{retrySafe:false},{processTreeExited:false},{sessionId:null}])test('a rejected tool without complete recovery evidence is never repeated: '+JSON.stringify(patch),async t=>{
+  const f=await fixture(t);await f.settle(0,{errorCode:'provider_tool_identity_mismatch',...patch});await until(()=>!f.runtime.active.size);
+  assert.equal(f.runs.length,1);assert.equal(f.receipt().providerRecoveries,undefined);
 });
 
 test('an unanswered document approval remains pending instead of launching a continuation',async t=>{

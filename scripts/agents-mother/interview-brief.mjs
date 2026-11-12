@@ -11,6 +11,10 @@ export const INTERVIEW_BRIEF_TEXT_FIELDS = Object.freeze({technical: Object.free
 const clean = (value) => typeof value === "string" ? value.trim().replace(/\r\n?/g, "\n") : "";
 const items = (value) => Array.isArray(value) ? value.map(clean).filter(Boolean) : clean(value).split(/\n|;/).map((item) => item.replace(/^\s*(?:[-*]|\d+\.)\s+/, "").trim()).filter(Boolean);
 
+export const redundantHttpEntrypoint = value => value.runtimeFamily==='api' && value.serviceMode==='process'
+  && /^(?:web|api)$/i.test(value.primaryInterface || '') && /^none$/i.test(value.secondaryInterfaces || '')
+  && value.cliEntrypoint==='scripts/server.mjs';
+
 /** The product brief is data, never an authorization event. */
 export function normalizeInterviewBrief(value = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Interview brief must be an object");
@@ -39,6 +43,9 @@ export function normalizeInterviewBrief(value = {}) {
     if (typeof value.technical[key] !== "string") throw new Error(`Interview brief technical.${key} must be text`);
     return [key, clean(value.technical[key])];
   }));
+  // The HTTP server is not a second CLI interface. Only remove this exact,
+  // redundant default when the brief explicitly selects HTTP without a CLI.
+  if(redundantHttpEntrypoint(technical))delete technical.cliEntrypoint;
   const design = Object.fromEntries(designKeys.filter((key) => value.design?.[key] !== undefined).map((key) => {
     if (typeof value.design[key] !== "string") throw new Error(`Interview brief design.${key} must be text`);
     return [key, clean(value.design[key])];

@@ -30,8 +30,8 @@ export async function writeResponseChunk(response,chunk,signal) {
 /** Only explicit public message deltas stream early. Tools and completion wait
  * for a valid terminal snapshot, end-of-body and durable request accounting. */
 export class ResponsesStreamNormalizer {
-  constructor({write,transform,onTerminal,maxBytes=32*1024*1024,maxFrameBytes=Math.min(maxBytes,8*1024*1024)}={}) {
-    Object.assign(this,{write,transform,onTerminal,maxBytes,maxFrameBytes});
+  constructor({write,transform,onTerminal,deferToolRejection=false,maxBytes=32*1024*1024,maxFrameBytes=Math.min(maxBytes,8*1024*1024)}={}) {
+    Object.assign(this,{write,transform,onTerminal,deferToolRejection,maxBytes,maxFrameBytes});
     this.decoder=new TextDecoder('utf-8',{fatal:true});this.buffer='';this.bytes=0;this.sequence=0;
     this.messages=new Map();this.source=[];this.terminal=null;this.responseId=null;this.done=false;this.events=0;this.trace=[];
   }
@@ -85,7 +85,23 @@ export class ResponsesStreamNormalizer {
     } catch {fail('neuraldeep_stream_malformed','The Responses stream contains a malformed event.');}
     // A host policy refusal is not a JSON decoding failure. Preserve its typed
     // code so the caller does not misclassify or retry a rejected tool/model.
-    if(this.transform)event=parseSseData(this.transform(frame(event)))[0];
+    if(!event || typeof event.type!=='string')fail('neuraldeep_stream_malformed','The Responses stream contains an invalid event.');
+    // A rejected partial tool has never been released to the caller. Keep
+    // draining this bounded response for its terminal usage, suppressing all
+    // further output. Do not turn our early rejection into unknown billing.
+    if(this.rejectedTool){
+      if(terminalTypes.has(event.type)){this.terminal=event;this.onTerminal?.(event);}
+      return;
+    }
+    if(this.transform){
+      try{event=parseSseData(this.transform(frame(event)))[0];}
+      catch(error){
+        if(this.deferToolRejection && error?.code==='provider_tool_identity_mismatch' && error.toolDiagnostic?.phase==='response-partial'){
+          this.rejectedTool=error;return;
+        }
+        throw error;
+      }
+    }
     if(!event || typeof event.type!=='string')fail('neuraldeep_stream_malformed','The Responses stream contains an invalid event.');
     this.record(event);
     if(terminalTypes.has(event.type)) {
@@ -153,6 +169,7 @@ export class ResponsesStreamNormalizer {
     try {this.buffer+=this.decoder.decode();}catch{fail('neuraldeep_stream_encoding','The Responses stream ends inside UTF-8.');}
     if(this.buffer.trim())fail('neuraldeep_stream_truncated','The Responses stream ends inside an event.');
     if(!this.terminal)fail('neuraldeep_stream_truncated','The Responses stream ended without a terminal event.');
+    if(this.rejectedTool)throw this.rejectedTool;
     const terminal=this.terminal;
     if(terminal.type!=='response.completed')return [{...terminal,response:{...terminal.response,
       output:(terminal.response?.output || []).filter(item=>['message','reasoning'].includes(item?.type))}}];

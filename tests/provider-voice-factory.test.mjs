@@ -66,6 +66,26 @@ test('repeated scaffold inspection reads the latest draft without an execution r
   assert.equal(f.state().revision,changedRevision);assert.equal(f.approvals.length,0);
   assert.equal(f.coordinator.listIntents({kind:'provider-tool'}).filter(row=>row.factoryAction==='scaffold_plan').length,0);
 });
+
+test('legacy HTTP-only drafts offer one exact repair before Contract approval and preserve its scope',async t=>{
+  const f=fixture(t,'neuraldeep'),apiBrief={...brief,technical:{...brief.technical,runtimeFamily:'api',serviceMode:'process',primaryInterface:'web',secondaryInterfaces:'none',cliEntrypoint:'scripts/server.mjs',port:'3021',portVariable:'FIXTURE_PORT'}};
+  await f.ok('init',{brief:apiBrief,build_token_budget:10000});
+  const initial=f.artifact('contract');assert.equal(contractData(initial.file,{root}).cliEntrypoint,'');
+  const legacy=initial.text+'\n- CLI entrypoint: scripts/server.mjs\n';
+  await f.ok('write_draft',{artifact:'contract',expected_sha256:initial.sha256,content:legacy});
+  const draft=f.artifact('contract'),revision=f.state().revision;
+  const plan=JSON.parse((await f.tools.call('factory_scaffold_plan',{})).content[0].text);
+  assert.equal(plan.capability.reason,'cli-entrypoint-adapter-missing');assert.equal(plan.draftRepair.capability.supported,true);
+  assert.equal(f.state().revision,revision);assert.equal(f.approvals.length,0);assert.equal(f.artifact('contract').sha256,draft.sha256);
+  const input=plan.draftRepair.input;
+  assert.equal(patchFactoryDraft(draft.text,input),legacy.replace('- CLI entrypoint: scripts/server.mjs\n',''));
+  await f.ok('patch_draft',input);
+  const corrected=f.artifact('contract');assert.equal(corrected.sha256,input.expected_result_sha256);
+  assert.equal(f.state().contractApproval,undefined);assert.equal(contractData(corrected.file,{root}).secondaryInterfaces,'none');
+  await f.ok('approve_contract',{expected_sha256:corrected.sha256});assert.equal(f.approvals.length,1);
+  const accepted=JSON.parse((await f.tools.call('factory_scaffold_plan',{})).content[0].text);
+  assert.equal(accepted.capability.supported,true);assert.equal(accepted.draftRepair,null);
+});
 test('Contract MCP auth absence is accepted while real assignments and adjacent secrets remain rejected',async t=>{
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});
   for(const sentinel of ['none','not-applicable']){
