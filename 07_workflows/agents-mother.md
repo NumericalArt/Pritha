@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-11-11
+updated: 2026-11-12
 topics:
   - agent-engineering
   - agent-factory
@@ -944,6 +944,13 @@ local connection/behavior verification, not a
 live model result. The operator's first submitted request exercises the actual
 selected API and exposes provider errors without repeating the request.
 
+The worker and the production Control Center must use identical original client
+source bytes for this proof. Keep their shared asset URLs literal so the
+production bundler preserves each file. The isolated production E2E suite loads
+the compiled approval host and checks worker-prepared Outcomes for all three
+builders, including the five distinct client hashes and scaffold contents.
+Source-only tests do not establish this compatibility.
+
 The child configuration supports OpenAI, Anthropic, NeuralDeep and OpenRouter.
 The OpenAI text client uses Chat Completions with `store: false` and
 `max_completion_tokens`; the documented `gpt-4.1-mini` snapshot is the only
@@ -988,6 +995,17 @@ preparation/build subtotals and active provider time separately. Approval
 waiting is excluded. Preserve pre-upgrade observations and identify their
 incomplete coverage; never relabel an unknown old charge as zero or measured.
 No request is repeated merely to recover a missing receipt.
+
+For NeuralDeep factory preparation, a completed, measured empty response may
+trigger at most two automatic continuations in the same native session and host
+turn. The host first confirms process exit, retains the workspace claim and
+history, and checks that no operator decision is pending. Every continuation
+uses the remaining shared budget and original turn deadline; its usage, process
+proof and notice are retained. A refusal, unknown output shape, missing usage,
+output limit, uncertain exit or cancelled turn does not qualify. Successful
+responses and other transports keep their ordinary execution path. If recovery
+is exhausted, the chat explains the cause and preserves the saved creation for
+explicit continuation. This does not approve documents or bypass evidence gates.
 
 A large context or several useful iterations is not itself a failure. After
 substantial work without a changed artifact or phase, present a progress

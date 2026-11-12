@@ -72,6 +72,7 @@ test('a classified empty response keeps its exact input error and measured usage
   const result=await run.completion;
   assert.equal(result.ok,false);assert.equal(result.errorCode,'neuraldeep_empty_response');assert.equal(result.providerError.class,'input');
   assert.equal(result.budget.tokensUsed,6);assert.equal(result.budget.usageKnown,true);assert.equal(result.processTreeExited,true);assert.equal(calls,1);
+  assert.equal(result.budget.requests[0].responseDiagnostics.emptyOutputRetrySafe,true);
   assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC_KEY|provider_input/);
 });
 

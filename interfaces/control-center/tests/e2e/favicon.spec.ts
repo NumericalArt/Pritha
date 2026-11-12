@@ -11,7 +11,13 @@ for(const theme of ['classic','dark','light'])test(`Pritha favicon stays availab
   for(const route of ['/','/agents','/voice','/task-chat','/codex','/settings','/dev']) {
     await page.goto(route);
     await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
-    for(const [rel,href] of assets)await expect(page.locator(`head link[rel="${rel}"]`)).toHaveAttribute('href',href);
+    for(const [rel,href] of assets){
+      const links=page.locator(`head link[rel="${rel}"]`);
+      // Next may briefly hoist streamed metadata alongside its initial tags.
+      // Wait for the unique settled tag; persistent duplicates must still fail.
+      await expect(links).toHaveCount(1);
+      await expect(links).toHaveAttribute('href',href);
+    }
   }
   for(const href of [...new Set(assets.map(([,href])=>href))]) {
     const response=await page.request.get(href);

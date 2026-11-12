@@ -14,6 +14,7 @@ function responseDiagnostics(value){
   const number=n=>Number.isSafeInteger(n) && n>=0 && n<=Number.MAX_SAFE_INTEGER?n:null;
   const outputItems=Object.fromEntries(['message','reasoning','function_call','custom_tool_call','local_shell_call','other'].map(key=>[key,number(value.outputItems?.[key])]));
   return {version:1,status:value.status,outputItems,terminalPublicText:value.terminalPublicText===true,
+    emptyOutputRetrySafe:value.emptyOutputRetrySafe===true,
     incompleteReason:value.incompleteReason==null?null:['max_output_tokens','content_filter'].includes(value.incompleteReason)?value.incompleteReason:'other',
     outputTokens:number(value.outputTokens),outputLimit:number(value.outputLimit),outputLimitReached:value.outputLimitReached===true,reasoningTokens:number(value.reasoningTokens)};
 }

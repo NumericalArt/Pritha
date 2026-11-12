@@ -86,7 +86,7 @@ class BuildConnection {
   async waitForNotification() { return { method: 'turn/completed', params: { threadId: this.current.id, turn: this.current.turns[0] } }; }
 }
 
-export async function productFactoryFixture(scenario, emit = () => {}, {automate=false,childConnections}={}) {
+export async function productFactoryFixture(scenario, emit = () => {}, {automate=false,childConnections,factoryToolsClass}={}) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pritha-product-factory-')));
   const stateRoot = path.join(directory, 'state'), agentParent = path.join(directory, 'children');
   fs.mkdirSync(stateRoot); fs.mkdirSync(agentParent);
@@ -167,6 +167,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
   class FixtureHost extends hostTools.ProviderHostTools {
     constructor(options) {
       super({...options,childConnections:childConnections || (()=>['openai','claude','neuraldeep','openrouter'].map(provider=>({provider,configured:true,status:'synthetic-fixture'}))),factoryContinuation:automate?'execute':'shadow'}); hosts.push(this);
+      if(factoryToolsClass)this.factory=new factoryToolsClass(this);
       const execute = this.factory.execute.bind(this.factory);
       this.factory.execute = async (input, expected, automaticContinuation) => {
         if (!['deliver','research_collect'].includes(input.action)) return execute(input, expected, automaticContinuation);

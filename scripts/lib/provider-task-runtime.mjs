@@ -280,12 +280,20 @@ export class ProviderTaskRuntime {
       if(delivery.receipt)this.execution.updateIntent(active.key,{attachmentDelivery:delivery.receipt,attachmentCleanup:'pending'});
       active.lease.assertOwned();
       if(active.controller.signal.aborted)throw failure('operator_cancel');
+      const deadline=Date.now()+binding.timeoutMs;
+      let recovery=0,result;
+      for(;;){
+      const attempt=recovery;
+      const accountingId=recovery?active.turnId+':empty-recovery:'+recovery:active.turnId;
+      completedResult=undefined;
       active.run=await this.options.launch({...binding.executionConfig,root:this.root,stateRoot:this.stateRoot,privateRoot:path.join(this.privateRoot,this.connectorId),cwd:binding.workspacePath,
-        ...(reservedAccounting?{tokenBudget:factoryBudget.check().remainingTokens,onBudgetCheckpoint:snapshot=>factoryBudget.checkpoint(active.turnId,'preparation',snapshot)}:{}),
+        ...(reservedAccounting?{tokenBudget:factoryBudget.check().remainingTokens,onBudgetCheckpoint:snapshot=>factoryBudget.checkpoint(accountingId,'preparation',snapshot)}:{}),
         ...(!reservedAccounting && factoryBudget?{onNativeUsage:nativeUsage}:{}),
         modelContextTokens:active.capabilities.contextTokens,maxOutputTokens:active.capabilities.outputTokens,
         reasoningControl:active.capabilities.reasoningControl,
-        model:binding.modelId,effort:binding.effortId,timeoutMs:binding.timeoutMs,resume:binding.nativeThreadId || undefined,prompt:[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact child. Read status first and resume the saved phase; never restart or ask again to approve an accepted document. Prioritize a working product and useful progress over token economy. Read workflowBudget and recommendedBuildBudget from status; absent an explicit smaller user limit, propose the generous stability defaults for all budgets. For a new workflow prepare a complete brief and proposed build budget, obtain separate Contract and Outcome approvals, then continue canonical research, scaffold, bounded delivery and verification. For a deterministic local HTTP/CLI product set childModelProvider and childModelId to none with no repository adoption. The host supplies operation IDs. Consult continued results before selecting the next step. Read each research_status page with offset until nextOffset is null; select actual passages and publish your synthesis. Give the verified directory, first-use command and observed output. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
+        model:binding.modelId,effort:binding.effortId,timeoutMs:recovery?Math.max(1,deadline-Date.now()):binding.timeoutMs,resume:(recovery?this.require(active.chat).nativeThreadId:binding.nativeThreadId) || undefined,prompt:recovery
+          ?'Pritha host continuation: the last completed provider response contained no usable answer or tool call. Continue the saved factory in this same session. Read factory status first, keep the original brief and selected child model, and take the next valid step. Preserve accepted documents and completed operations; do not restart creation or bypass approval, evidence or verification checks.'
+          :[text,delivery.prompt,binding.workspace.factorySlug?'Use factory_step for this exact child. Read status first and resume the saved phase; never restart or ask again to approve an accepted document. Prioritize a working product and useful progress over token economy. Read workflowBudget and recommendedBuildBudget from status; absent an explicit smaller user limit, propose the generous stability defaults for all budgets. For a new workflow prepare a complete brief and proposed build budget, obtain separate Contract and Outcome approvals, then continue canonical research, scaffold, bounded delivery and verification. For a deterministic local HTTP/CLI product set childModelProvider and childModelId to none with no repository adoption. The host supplies operation IDs. Consult continued results before selecting the next step. Read each research_status page with offset until nextOffset is null; select actual passages and publish your synthesis. Give the verified directory, first-use command and observed output. General workspace tools cannot write factory state. Final operator acceptance remains separate.':''].filter(Boolean).join('\n\n'),
         // The host pins the Voice search intent in this turn's hashed request,
         // including queued/resumed delivery. Never infer it from an assembled prompt.
         searchUserText:binding.origin==='voice'?(typeof attachments.input.voiceSearchText==='string'?attachments.input.voiceSearchText.slice(0,16000):'Do not browse.'):text,
@@ -295,14 +303,14 @@ export class ProviderTaskRuntime {
         ...(active.approvals?{hostExecutionContext:{coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease,...(!reservedAccounting && factoryBudget?{onToolActivity:toolActivity}:{}),...(binding.workspace.factorySlug?{factory:{slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,agentParent:this.options.agentParent,preset:binding.executionConfig,model:binding.modelId,effort:binding.effortId}}:{})},approve:request=>active.approvals.ask(request),cancelPendingApprovals:()=>active.approvals.close()}:{}),
         beforeStart:async proof=>{
           active.lease.assertOwned();
-          if(binding.profileIdentity && binding.profileIdentity!==proof.identity)throw failure('runtime_identity_mismatch');
+          if(binding.profileIdentity && binding.profileIdentity!==proof.identity || recovery && active.identity!==proof.identity)throw failure('runtime_identity_mismatch');
           active.identity=proof.identity;
           this.execution.updateIntent(active.key,{processProof:proof.evidence,profileIdentity:proof.identity});
           active.started=true;
         },
         onEvidence:evidence=>this.execution.updateIntent(active.key,{processProof:evidence}),
         onRawChunk:chunk=>appendFileSync(journal,chunk),
-        onEvent:event=>this.handleEvent(binding,active,event),
+        onEvent:event=>this.handleEvent(binding,active,event,attempt),
         beforeRequest:()=>{active.lease.assertOwned();if(active.controller.signal.aborted)throw failure('operator_cancel');factoryBudget?.check();return this.options.beforeRequest?.(binding,active);},
         onProviderRequest:event=>{
           if(event.method==='POST' && event.path==='/v1/responses'){
@@ -311,13 +319,36 @@ export class ProviderTaskRuntime {
             const total={...(row.providerUsage || {inputTokens:0,outputTokens:0,cachedInputTokens:0,reasoningTokens:0,totalTokens:0})};
             if(observed)for(const field of Object.keys(total))total[field]+=Number.isSafeInteger(event.usage?.[field])?event.usage[field]:0;
             this.execution.updateIntent(active.key,{providerRequests:count,providerUsage:total,providerUsageKnown:row.providerUsageKnown!==false && Boolean(observed),
-              lastProviderRequest:{status:event.status,upstreamAttempted:event.upstreamAttempted===true,durationMs:event.durationMs,errorCode:event.error?.code || null,...(event.toolDiagnostic?{toolDiagnostic:event.toolDiagnostic}:{})}});
+              lastProviderRequest:{status:event.status,upstreamAttempted:event.upstreamAttempted===true,durationMs:event.durationMs,errorCode:event.error?.code || null,
+                emptyOutputRetrySafe:event.responseSummary?.emptyOutputRetrySafe===true,...(event.toolDiagnostic?{toolDiagnostic:event.toolDiagnostic}:{})}});
           }
           this.options.onProviderRequest?.(binding,active,event);
         },
       });
       if(active.stopping)active.run.stop();
-      const result=completedResult=await active.run.completion;
+      result=completedResult=await active.run.completion;
+      const row=this.connectorId==='neuraldeep' && binding.workspace.factorySlug && !result.ok && result.errorCode==='neuraldeep_empty_response'
+        ?this.execution.getIntent(active.key):null;
+      const resumable=row && result.processTreeExited===true
+        && result.sessionId && result.sessionId===this.require(active.chat).nativeThreadId
+        && result.budget?.usageKnown===true && row.providerUsageKnown===true
+        && row.lastProviderRequest?.errorCode==='neuraldeep_empty_response' && row.lastProviderRequest.emptyOutputRetrySafe===true
+        && !active.stopping && !active.controller.signal.aborted && !this.pendingRequests(active.chat).length
+        && recovery<2 && deadline-Date.now()>1000;
+      if(!resumable)break;
+      active.lease.assertOwned();factoryBudget.check();
+      recovery++;
+      const recoveries=[...(row.providerRecoveries || []),{attempt:recovery,reason:result.errorCode,at:stamp(),processProof:row.processProof,processTreeExited:true,providerRequests:row.providerRequests}];
+      this.execution.updateIntent(active.key,{state:'dispatching',providerRecoveries:recoveries});
+      const item=this.registry.putItem(active.chat,active.turnId,{id:'provider_recovery_'+active.turnId+'_'+recovery,kind:'notice',tone:'info',status:'completed',startedAt:stamp(),completedAt:stamp(),
+        text:'The model returned an empty response. Pritha is continuing from the saved step (automatic continuation '+recovery+' of 2).'});
+      this.emit(active.chat,'item.completed',{item},{turnId:active.turnId,itemId:item.id});
+      appendFileSync(journal,JSON.stringify({type:'pritha.provider_continuation',attempt:recovery,reason:result.errorCode})+'\n');
+      active.approvals?.close();
+      if(active.capabilities.approvals===true)active.approvals=new ProviderApprovalBroker({coordinator:this.execution,chatId:active.chat,turnId:active.turnId,lease:active.lease,signal:active.controller.signal,emit:()=>this.emit(active.chat,'history.changed',{})});
+      active.run=null;active.started=false;
+      }
+      if(recovery)result={...result,usage:this.execution.getIntent(active.key).providerUsage};
       if(factoryBudget && !reservedAccounting)await nativeUsage(result,false);
       try{await this.options.recordUsage?.(binding,active,result);}catch{this.execution.updateIntent(active.key,{usageRecording:'failed'});}
       await delivery.hostAttachments?.close();await this.cleanupAttachmentDelivery(active.key,result.processTreeExited===true);
@@ -336,7 +367,7 @@ export class ProviderTaskRuntime {
     }
     this.execution.updateIntent(key,{attachmentCleanup:status});
   }
-  handleEvent(binding,active,event){
+  handleEvent(binding,active,event,recovery=0){
     if(active.finished)return;
     active.lease.assertOwned();
     if(event.type==='thread.started'){
@@ -347,6 +378,10 @@ export class ProviderTaskRuntime {
     if(['item.started','item.updated','item.completed'].includes(event.type)){
       const normalized=this.options.normalizeEvent?.(active,event,binding);
       if(normalized){
+        // Native CLI item numbers may restart at zero when the same session is
+        // resumed. Keep earlier output instead of overwriting its history item.
+        if(recovery){const id='continuation_'+recovery+'_'+normalized.item.id;
+          normalized.item={...normalized.item,id,...(normalized.item.message?{message:{...normalized.item.message,id}}:{})};}
         const item=this.registry.putItem(active.chat,active.turnId,normalized.item,normalized.originalText);
         this.emit(active.chat,event.type==='item.updated'?'item.started':event.type,{item},{turnId:active.turnId,itemId:item.id});
         if(event.type==='item.completed' && item.kind==='assistant_message')this.emit(active.chat,'message.completed',{message:item.message},{turnId:active.turnId,itemId:item.id});
@@ -366,6 +401,9 @@ export class ProviderTaskRuntime {
       factory_budget_identity:'The saved creation belongs to another chat. Pritha preserved it. Continue in that chat or choose a new agent name; this is not a provider outage or an exhausted token budget.',
       factory_token_budget_exhausted:'The shared creation budget has been used. Saved work is preserved; extend the task budget to continue.',
       factory_time_budget_exhausted:'The agreed active creation time has been used. Saved work is preserved; extend the task time to continue.',
+      neuraldeep_empty_response:'The model completed a request without a usable answer or tool call. '
+        +(code==='neuraldeep_empty_response' && this.execution.getIntent(active.key).providerRecoveries?.length===2?'Two automatic continuations also returned empty output. ':'')
+        +'Pritha preserved this chat and its completed steps. Continue here to retry, or choose a stronger model for a new agent.',
     };
     const error=status==='failed'?{code,message:exited?(factoryMessages[code] || (code==='provider_native_login_required'?'Claude Code needs you to sign in again. Open Settings → Providers → Claude Code → Local CLI session, complete sign-in, then continue this chat.':code==='neuraldeep_model_identity_mismatch'?'NeuralDeep returned a different model identity from the selected model. The response was stopped. Pritha preserved the attempt; retry this chat or select a model in a new chat.':'The provider task stopped with an error. Its history has been saved.')):'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
     const binding=this.require(active.chat);

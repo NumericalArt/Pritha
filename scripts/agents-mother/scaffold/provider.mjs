@@ -1,11 +1,11 @@
-import {readFileSync} from 'node:fs';
 import {childProviderConfiguration} from '../../lib/child-provider-configuration.mjs';
+import {childModelSourceFiles} from '../../lib/child-model-sources.mjs';
 
 /** Add only explicitly selected provider code; existing scaffolds stay unchanged. */
 export function withChildProvider(files,data){
   const config=childProviderConfiguration(data);if(!config)return files;
   const result=files.map(file=>({...file}));
-  for(const source of ['lib/child-model-client.mjs','lib/child-provider-configuration.mjs','lib/provider-http.mjs','claude/messages-client.mjs','claude/stream-state.mjs'])result.push({path:'scripts/'+source,content:readFileSync(new URL('../../'+source,import.meta.url),'utf8')});
+  result.push(...childModelSourceFiles());
   result.push({path:'runtime/provider.json',content:JSON.stringify(config,null,2)+'\n'});
   const managed=config.connection==='pritha';
   const env=result.find(file=>file.path==='.env.example');

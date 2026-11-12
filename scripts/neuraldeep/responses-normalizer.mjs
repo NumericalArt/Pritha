@@ -46,7 +46,15 @@ export function responsesTerminalSummary(response, { eventType, outputLimit } = 
   const reason = response.incomplete_details?.reason;
   const outputTokens = number(response.usage?.output_tokens);
   const limit = number(outputLimit);
+  // A refusal, unknown content shape, tool call or partial response is not an
+  // empty answer. Only this narrow, completed shape permits host continuation.
+  const emptyOutputRetrySafe = status === 'completed' && !response.error && reason == null
+    && neuralDeepUsageKnown(response.usage) && limit > 0 && outputTokens !== null && outputTokens < limit
+    && Array.isArray(response.output) && response.output.every(item => item?.type === 'reasoning'
+      || item?.type === 'message' && item.role === 'assistant' && Array.isArray(item.content)
+        && item.content.every(part => part?.type === 'output_text' && typeof part.text === 'string' && !part.text.trim()));
   return { version: 1, status, outputItems: counts, terminalPublicText: publicText,
+    emptyOutputRetrySafe,
     incompleteReason: reason == null ? null : ['max_output_tokens', 'content_filter'].includes(reason) ? reason : 'other',
     outputTokens, outputLimit: limit,
     outputLimitReached: limit > 0 && outputTokens !== null && outputTokens >= limit,

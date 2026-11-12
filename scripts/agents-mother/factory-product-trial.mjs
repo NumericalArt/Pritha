@@ -12,6 +12,7 @@ import { scaffoldCapability } from './scaffold/capabilities.mjs';
 import { apiProcessPortConfiguration } from './scaffold/api-process.mjs';
 import {LOCAL_APPLICATION_POLICY,LOCAL_APPLICATION_TEXT} from './factory-local-application-policy.mjs';
 import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
+import {childModelSourceFiles} from '../lib/child-model-sources.mjs';
 
 const verifierPath = 'verification/product.mjs';
 const provenance = 'host-template:api-cli-product-v2';
@@ -102,7 +103,7 @@ export function productTrialVerifier(trial,data){
   const firstUse=firstUseExamples(trial,data);
   const template=fs.readFileSync(new URL('./scaffold/templates/product-trial.mjs.tmpl',import.meta.url),'utf8');
   const provider=childProviderConfiguration(data);
-  const modelProof=provider?.connection==='pritha'?{configuration:provider,files:Object.fromEntries(['lib/child-model-client.mjs','lib/child-provider-configuration.mjs','lib/provider-http.mjs','claude/messages-client.mjs','claude/stream-state.mjs'].map(file=>['scripts/'+file,sha256(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'))]))}:null;
+  const modelProof=provider?.connection==='pritha'?{configuration:provider,files:Object.fromEntries(childModelSourceFiles().map(file=>[file.path,sha256(file.content)]))}:null;
   return 'const checks = JSON.parse('+JSON.stringify(JSON.stringify(trial))+');\nconst firstUse = '+JSON.stringify(firstUse)+';\nconst modelProof = '+JSON.stringify(modelProof)+';\n'+template;
 }
 export function prepareProductTrial(paths, outcome, data, trial) {
