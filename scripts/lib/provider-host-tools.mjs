@@ -52,7 +52,7 @@ export class ProviderHostTools {
   async runAndContinue(key,requestHash,name,input){
     const result=await this.execute(key,requestHash,name,input);
     if(!this.driveEnabled() || name!=='factory_step' || result.isError ||
-        !['propose','init','continue','approve_contract','approve_outcome','prepare_product_trial','research','research_decide','research_collect','research_apply','scaffold','deliver','verify','delivery_extend','delivery_resume'].includes(input.action))return result;
+        !['propose','init','continue','write_draft','patch_draft','approve_contract','approve_outcome','prepare_product_trial','research','research_decide','research_collect','research_apply','scaffold','deliver','verify','delivery_extend','delivery_resume'].includes(input.action))return result;
     const steps=[];let last;
     for(let n=0;n<8;n++){
       this.check();

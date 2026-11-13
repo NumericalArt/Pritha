@@ -51,7 +51,7 @@ import { CONTRACT_SCHEMA_VERSION, proposeAgentKind } from "./agent-kind.mjs";
 import { applyExternalResearchEvidence } from "./external-research.mjs";
 import { newestArtifactPathsFirst, writeUniqueArtifact } from "./artifact-selection.mjs";
 import { runLast30DaysBackend } from "./external-research-last30days.mjs";
-import { deriveExternalResearchTopics } from "./external-research-topics.mjs";
+import { deriveExternalResearchTopics, RESEARCH_TOPIC_POLICY } from "./external-research-topics.mjs";
 import { contractAllowsExternalResearchNotApplicable, researchGateDecisionForReport } from "./research-gate.mjs";
 import {
   buildAgentDevelopmentQuery,
@@ -1194,6 +1194,7 @@ verified: pending
 valid_for: pre-scaffold architecture validation
 temporal_status: unknown
 research_report_version: 2
+external_research_topic_policy: ${RESEARCH_TOPIC_POLICY}
 contract_fingerprint: ${data.fingerprint}
 research_gate_status: ${gate.researchGateStatus}
 memory_research_status: ${gate.memoryResearchStatus}
@@ -1559,7 +1560,9 @@ export async function externalResearchContract(contractPath, options = {}) {
   if (report && !patternPack) {
     throw new Error("The research report's exact pattern pack is missing, stale or tampered. Run `node scripts/pritha.mjs research <contract>` again.");
   }
-  const topics = deriveExternalResearchTopics(data, { patternPack });
+  const topics = deriveExternalResearchTopics(data, { patternPack,
+    topicPolicy:report?(parseFrontmatterData(report.text)?.external_research_topic_policy || "legacy"):RESEARCH_TOPIC_POLICY,
+  });
   const backend = String(options.backend || (options.input ? "manual" : "status")).trim() || "status";
   const hasInput = Boolean(options.input);
 

@@ -1,4 +1,4 @@
-import {hasCreationAuthority} from './factory-creation-authority.mjs';
+import {hasCreationAuthority,hasDelegatedContract} from './factory-creation-authority.mjs';
 // A finished controller turn is not a finished child. Both entry points use
 // this presentation from the same bound evidence; neither infers it from text.
 export function factoryMilestone(state,delivery,firstUse) {
@@ -10,7 +10,7 @@ export function factoryMilestone(state,delivery,firstUse) {
   if(delivery?.status==='failed')return at('stopped','Build interrupted','The build could not be completed. Pritha saved the work and stopped new attempts. Check the build log to establish the cause before continuing.');
   if(state?.continuationPause && !state.running){
     const step=state.continuationPause;
-    if(hasCreationAuthority(state) && ['research_collect','research_apply','research_recover'].includes(step))return at('building','Choosing implementation','An optional source could not be read. Pritha is reviewing the available information and choosing how to implement and test the agent.');
+    if(hasDelegatedContract(state) && ['research_collect','research_apply','research_recover'].includes(step))return at('building','Choosing implementation','An optional source could not be read. Pritha is reviewing the available information and choosing how to implement and test the agent.');
     if(['research','research_collect','research_apply','research_recover'].includes(step))return at('stopped','Research paused','Source verification could not be completed. Pritha saved the research and paused automatic continuation. Resolve the cause and confirm the sources before building.');
     if(step==='scaffold')return at('stopped','Scaffolding paused','The scaffold could not be completed. Pritha saved the approved documents and paused automatic continuation. Check this step in the log before retrying.');
     if(step==='finish')return at('partial','Handoff paused','Handoff preparation could not be completed. Pritha saved the build and verification results. Resolve the cause before completing the handoff.');
@@ -33,7 +33,7 @@ export function factoryMilestone(state,delivery,firstUse) {
     return at('building','Implementing','Implementing the agent. Next, it will be checked against the agreed examples.');
   }
   if(state?.phase==='scaffolded')return at('building','Scaffold ready','The scaffold is ready. Next comes implementation of the agent behavior and verification of the result.');
-  if(state?.phase==='research' && hasCreationAuthority(state))return at('building','Planning implementation','Pritha is using memory and relevant documentation to choose the implementation, then it will build and test the agent.');
+  if(state?.phase==='research' && hasDelegatedContract(state))return at('building','Planning implementation','Pritha is using memory and relevant documentation to choose the implementation, then it will build and test the agent.');
   if(state?.phase==='research')return at('building','Researching sources','Checking sources for the selected approach. Next, the agent scaffold will be prepared.');
   if(state?.outcomeApproval)return at('building','Building','The factory is building and verifying the agent within the agreed limits.');
   if(hasCreationAuthority(state))return at('building','Preparing the agent','Pritha is turning your request into an implementation plan and examples, then building the local agent.');

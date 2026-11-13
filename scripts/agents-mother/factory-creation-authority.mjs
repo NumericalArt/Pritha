@@ -18,6 +18,15 @@ export function hasCreationAuthority(state){
     && Object.keys(a).sort().join(',')==='chatId,connectorId,policy,requestId,target');
 }
 
+// A repairable draft does not revoke the request. Only a Contract actually
+// finalized by Pritha makes research advisory; custom user reviews stay valid.
+export function hasDelegatedContract(state){
+  const approval=state?.contractApproval;
+  return Boolean(hasCreationAuthority(state) && approval?.approvedBy==='pritha'
+    && approval.authorization && Object.keys(approval.authorization).length===5
+    && Object.entries(state.creationAuthority).every(([key,value])=>approval.authorization[key]===value));
+}
+
 // Outcome evidence must refer back to the host-owned creation request. A
 // document saying "approved_by: pritha" is insufficient, even with valid hashes.
 export function verifyCreationAuthority(authority,contract,specPath,options={}){

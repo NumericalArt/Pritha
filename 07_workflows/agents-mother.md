@@ -134,6 +134,18 @@ For a new supported local API child in Task Chat, use the model-led route:
    output and any unverified requirements. Explain whether model testing used a
    local responder or the real selected provider. Invite use and improvements.
 
+The creation request survives a repairable draft. Correcting a Contract keeps
+its product examples and lets the host resume preparation; it does not silently
+switch the session to the reviewed workflow. A profile outside the local scope
+still requires its actual user reviews. Proposals explicitly choose the child
+API provider and model, independently of the builder, or choose deterministic
+behavior. Missing model fields must not silently become a model-free agent.
+
+New research reports pin their topic derivation. Use selected runtime and
+interface choices; a local application does not imply local inference, and
+retrieved patterns cannot add an unselected Telegram interface or service.
+Existing reports retain their original topic derivation and evidence locks.
+
 This route is host-bound, local, without repository adoption or autostart. Model
 connections use existing Pritha credentials. It retains budgets, process
 ownership, protected verifiers and unrelated-work protection. Requests to change

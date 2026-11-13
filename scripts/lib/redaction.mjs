@@ -357,8 +357,15 @@ function redactSensitiveAssignments(value) {
   const genericAssignmentPattern = /(^|[\s{[(,;:])(["']?)([A-Za-z_][A-Za-z0-9_.-]{0,200})\2\s*([:=])\s*(?!\[REDACTED(?:_[A-Z]+)?\])(?:(['"])((?:\\.|(?!\5)[^\\]){0,10000})\5|([^,\s)\]}]+))/gim;
   return specificallyRedacted.replace(
     genericAssignmentPattern,
-    (match, prefix, keyQuote, key, separator, valueQuote) => {
+    (match, prefix, keyQuote, key, separator, valueQuote, quotedValue, bareValue) => {
       if (!isSensitiveUrlKey(key)) return match;
+      // PASS can be part of an agent namespace. A bounded numeric _PORT is
+      // configuration. Other credential names and values, and the stricter
+      // URL-key rules, retain their normal redaction.
+      const port = quotedValue ?? bareValue;
+      if (/^[A-Z][A-Z0-9_]{0,63}_PORT$/.test(key) && /^\d{1,5}$/.test(port)
+          && Number(port)>0 && Number(port)<=65535
+          && !isSensitiveUrlKey(key.split('_').filter(token=>token!=='PASS').join('_'))) return match;
       const renderedValue = valueQuote ? `${valueQuote}[REDACTED]${valueQuote}` : "[REDACTED]";
       return `${prefix}${keyQuote}${key}${keyQuote}${separator}${renderedValue}`;
     },

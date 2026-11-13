@@ -2,6 +2,8 @@ import { canonicalPatternResearchSeed, parsePatternPackSeeds } from "./pattern-r
 import { normalizeGitHubRepositoryUrl } from "../lib/github-repository-radar.mjs";
 import { scaffoldCapability } from "./scaffold/capabilities.mjs";
 
+export const RESEARCH_TOPIC_POLICY = "selected-capabilities-v2";
+
 function compact(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
@@ -65,14 +67,14 @@ function pushTopic(topics, id, topic, query, reason, extra = {}) {
   });
 }
 
-function addPatternDerivedTopics(topics, patternPack, { hybridEditor = false, headlessCli = false, contractText = '' } = {}) {
+function addPatternDerivedTopics(topics, patternPack, { hybridEditor = false, selectedOnly = false, contractText = '' } = {}) {
   const selectedSeeds=new Set(contractText.split(/[\n;]+/).map(canonicalPatternResearchSeed).filter(Boolean));
   const seeds = parsePatternPackSeeds(patternPack)
     .map((seed) => canonicalPatternResearchSeed(compact(seed)))
     .filter(Boolean)
     // A retrieved pattern is advisory, not permission to add an unselected
     // interface, service or dependency to a deterministic CLI contract.
-    .filter(seed=>!headlessCli || selectedSeeds.has(seed))
+    .filter(seed=>!selectedOnly || selectedSeeds.has(seed))
     // Retrieval matches are advisory. The narrow editor adapter cannot acquire
     // technologies that its reviewed capability boundary explicitly excludes.
     .filter((seed) => !hybridEditor || (/\b(codex cli|telegram|bot api|tailscale|sandbox|browser|node|eval|evaluation)\b/i.test(seed) && !/\b(realtime|webrtc|voice|speech|mcp|embeddings?|semantic|vector|rag|sqlite|next\.?js|react|launchd|cron)\b/i.test(seed)))
@@ -93,6 +95,9 @@ function addPatternDerivedTopics(topics, patternPack, { hybridEditor = false, he
 
 export function deriveExternalResearchTopics(data = {}, options = {}) {
   const text = combinedContractText(data);
+  // Unversioned saved research retains its original source requirements and
+  // checkpoint identity when the implementation changes.
+  const legacy = options.topicPolicy === "legacy";
   const topics = [];
   if(['openai','claude','neuraldeep','openrouter'].includes(data.childModelProvider)){
     const id={openai:'openai-model-api',claude:'anthropic-messages-api',neuraldeep:'neuraldeep-model-api',openrouter:'openrouter-model-api'}[data.childModelProvider];
@@ -104,6 +109,9 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
   const autostart = String(data.autostart || "disabled").trim();
   const proactiveMode = String(data.proactiveMode || "none").trim();
   const repositoryAdoptionMode = String(data.repositoryAdoptionMode || "none").trim();
+  const localApi = runtime === "api" && serviceMode === "process";
+  const selectedRuntimeText = legacy?text:[data.runtimePlacementProfile,data.toolSystem,data.dependencies].filter(Boolean).join("\n").toLowerCase();
+  const selectedInterfaces = legacy?text:[data.primaryInterface,data.secondaryInterfaces].filter(Boolean).join("\n").toLowerCase();
   const kind = typeof data.agentKind === "string" ? data.agentKind : data.agentKind?.kind;
   const toolServer = kind === "tool-server" && runtime === "cli" && /^(mcp(?:\s+stdio)?|stdio|tool-server|tool server)$/i.test(String(data.primaryInterface || "").trim());
   const hybridEditor = scaffoldCapability(data).adapter === "hybrid-editor-process-v1";
@@ -131,7 +139,10 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  if (runtime === "local-model" || /\b(ollama|lm studio|vllm|local inference|local model|quantization)\b/.test(text)) {
+  // Where the application runs does not determine where its model runs.
+  // Runtime choices and named dependencies are evidence; product prose such
+  // as "a local model-connected HTTP service" is not a local inference choice.
+  if (runtime === "local-model" || /\b(ollama|lm studio|vllm|local inference|local model|quantization)\b/.test(selectedRuntimeText)) {
     pushTopic(
       topics,
       "local-inference-runtime",
@@ -151,7 +162,7 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  if (telegramMode !== "none" || /\btelegram\b/.test(text)) {
+  if (telegramMode !== "none" || /\btelegram\b/.test(selectedInterfaces)) {
     pushTopic(
       topics,
       "telegram-bot-api",
@@ -261,7 +272,15 @@ export function deriveExternalResearchTopics(data = {}, options = {}) {
     );
   }
 
-  addPatternDerivedTopics(topics, options.patternPack || options.patternPackText, { hybridEditor, headlessCli:scaffoldCapability(data).adapter==='headless-cli-v1',contractText:text });
+  // A memory match is an implementation suggestion, not selection of an
+  // interface or background service. API products use their actual technical
+  // choices instead of mentions in missions, exclusions or generic patterns.
+  const selectedPatternText=localApi && !legacy?[data.runtimeFamily,data.primaryInterface,data.secondaryInterfaces,
+    data.telegramMode,data.childModelProvider,data.memoryModel,data.indexingSearchNeeds,
+    data.toolSystem,data.inputDataTypes,data.dependencies,data.serviceMode,data.proactiveMode].filter(Boolean).join("\n"):text;
+  addPatternDerivedTopics(topics, options.patternPack || options.patternPackText, {
+    hybridEditor,selectedOnly:localApi && !legacy || scaffoldCapability(data).adapter==='headless-cli-v1',contractText:selectedPatternText,
+  });
 
   return topics;
 }

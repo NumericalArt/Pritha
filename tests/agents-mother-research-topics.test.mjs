@@ -87,6 +87,29 @@ test("local inference contract derives runtime and memory topics", () => {
   assert.ok(topics.includes("memory-rag-storage"));
 });
 
+test('a local HTTP application using a hosted model does not select local inference',()=>{
+  const data={runtimeFamily:'api',serviceMode:'process',primaryInterface:'web',secondaryInterfaces:'none',
+    childModelProvider:'openai',childModelConnection:'pritha',childModelId:'gpt-4.1-mini',
+    primaryMission:'Create a small local model-connected HTTP service',runtimePlacementProfile:'hybrid',
+    toolSystem:'minimal structured CLI/script tools',dependencies:'Node.js built-ins'};
+  assert.ok(!ids(data).includes('local-inference-runtime'));
+  assert.ok(ids({...data,toolSystem:'Ollama local inference adapter'}).includes('local-inference-runtime'));
+});
+
+test('retrieved API patterns cannot select a disabled Telegram interface or unselected services',()=>{
+  const data={runtimeFamily:'api',serviceMode:'process',primaryInterface:'web',secondaryInterfaces:'none',
+    telegramMode:'none',autostart:'disabled',proactiveMode:'none',repositoryAdoptionMode:'none',
+    envExampleVariables:'MOOD_PASS_PORT=3082',dependencies:'Node.js built-ins',memoryModel:'none',
+    primaryMission:'Return a mood through HTTP. Telegram mode: none.'};
+  const patternPack={externalResearchSeeds:['telegram bot api','launchd cron','voice speech','semantic embeddings rag','api']};
+  const topics=deriveExternalResearchTopics(data,{patternPack}).map(t=>t.id);
+  for(const id of ['telegram-bot-api','pattern-telegram-bot-api','pattern-launchd-cron','pattern-voice-speech','pattern-semantic-embeddings-rag'])assert.ok(!topics.includes(id),id);
+  assert.ok(topics.includes('pattern-api'));
+  const legacy=deriveExternalResearchTopics({...data,primaryMission:'A local model-connected API; Telegram mode: none.'},{patternPack,topicPolicy:'legacy'}).map(t=>t.id);
+  for(const id of ['local-inference-runtime','telegram-bot-api','pattern-telegram-bot-api','pattern-launchd-cron'])assert.ok(legacy.includes(id),'Saved legacy reports retain '+id);
+  assert.ok(deriveExternalResearchTopics({...data,secondaryInterfaces:'Telegram',telegramMode:'primary-chat'},{patternPack}).some(t=>t.id==='telegram-bot-api'));
+});
+
 test("dependency and operations choices derive install and deployment topics", () => {
   const topics = ids({
     runtimeFamily: "codex-native",

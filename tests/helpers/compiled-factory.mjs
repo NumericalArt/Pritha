@@ -45,7 +45,7 @@ for(const [connectorId,model,childProvider,childModel] of [
   ['claude','claude-sonnet-5-5','claude','claude-haiku-4-5-20251001'],
   ['neuraldeep','kimi-k3.1-pro','neuraldeep','gpt-oss-20b'],
 ]){
-  const f=await productFactoryFixture({connectorId,model,childProvider,childModel,httpOnly:true,slug:'bundled-'+connectorId,name:'Bundled '+connectorId,field:'text',route:'/run',portVariable:'FIXTURE_PORT',cliInput:'first',httpInput:'second',result:text=>({answer:text})},()=>{},{automate:true,factoryToolsClass:FactoryTools,creationMode:modelLed?'model-led':'reviewed'});
+  const f=await productFactoryFixture({connectorId,model,childProvider,childModel,httpOnly:true,slug:'bundled-'+connectorId,name:'Bundled '+connectorId,field:'text',route:'/run',portVariable:modelLed?'BUNDLED_'+connectorId.toUpperCase()+'_PASS_PORT':'FIXTURE_PORT',cliInput:'first',httpInput:'second',result:text=>({answer:text})},()=>{},{automate:true,factoryToolsClass:FactoryTools,creationMode:modelLed?'model-led':'reviewed'});
   try{
     const call=async(action,args)=>{const result=await f.call(action,args);assert.equal(result.error,undefined,JSON.stringify(result));assert.notEqual(result.continuationFailed,true,JSON.stringify(result));return result;};
     const brief=f.brief;

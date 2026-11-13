@@ -1,4 +1,4 @@
-import {hasCreationAuthority} from './factory-creation-authority.mjs';
+import {hasCreationAuthority,hasDelegatedContract} from './factory-creation-authority.mjs';
 import {verifiedFirstUse} from './factory-first-use.mjs';
 import {applyVerifiedFactoryResult} from './factory-application.mjs';
 import {FactoryBudget} from './factory-budget.mjs';
@@ -117,8 +117,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
         ...(input.build_elapsed_budget_ms!==undefined?{'build-elapsed-ms':String(input.build_elapsed_budget_ms)}:{}),
         'build-git-mode':'disposable-worktree',autostart:'disabled','target-folder':p.target,slug:p.slug});
       state.contract=result.contractPath;
-      if(hasCreationAuthority(state) && !supportsLocalApiContinuation(contractData(state.contract,{root:p.root})))delete state.creationAuthority;
-      if(hasCreationAuthority(state)){
+      if(hasCreationAuthority(state) && supportsLocalApiContinuation(contractData(state.contract,{root:p.root}))){
         const draft=factoryRead(state.contract,p.memory);
         atomicCompareAndSwapFile(state.contract,draft,draft.replace(/^- Outcome approval policy: .+$/m,'- Outcome approval policy: request-delegated-local-v1'));
       }
@@ -139,27 +138,35 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     case 'patch_draft':
     case 'write_draft':{
       const row=factoryArtifact(p,state,input.artifact);if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
-      const text=input.action==='patch_draft'?patchFactoryDraft(row.text,input):String(input.content),fm=draftMetadata(text,row.frontmatter);
+      let text=input.action==='patch_draft'?patchFactoryDraft(row.text,input):String(input.content);
+      const fm=draftMetadata(text,row.frontmatter);
       checkDraftSafety(text,input.artifact);
       if(input.artifact==='contract'){
         if(state.outcome)throw factoryFail('factory_contract_revision_required');
         const candidate=path.join(p.directory,'candidate.md');atomicWriteFile(candidate,text);
-        try{const data=contractData(candidate,{root:p.root});contractIdentity(data,p,state,executor);if(data.buildTokenBudgetConfirmation!=='pending')throw factoryFail('factory_approval_not_authorized');}
+        try{const data=contractData(candidate,{root:p.root});contractIdentity(data,p,state,executor);if(data.buildTokenBudgetConfirmation!=='pending')throw factoryFail('factory_approval_not_authorized');
+          if(hasCreationAuthority(state) && supportsLocalApiContinuation(data))text=text.replace(/^- Outcome approval policy: .+$/m,'- Outcome approval policy: request-delegated-local-v1');
+        }
         finally{fs.rmSync(candidate,{force:true});}
       }else if(input.artifact==='outcome'){
         if(fm.contract_path!==row.frontmatter.contract_path || fm.contract_fingerprint!==contract().fingerprint || fm.agent_slug!==row.frontmatter.agent_slug)throw factoryFail('factory_draft_identity_invalid');
       }else throw factoryFail('factory_artifact_boundary');
       atomicCompareAndSwapFile(row.file,row.text,text);
-      // An explicit draft edit switches preparation back to the existing
-      // custom workflow. Never overwrite that edit with the saved proposal.
-      if(state.preparation)delete state.preparation;
+      // Recompile retained examples against a model-led Contract repair.
+      // Never regenerate that Contract from the old brief. Reviewed workflows
+      // and explicit Outcome edits keep their existing custom handoff.
+      if(state.preparation){
+        if(input.artifact==='contract' && hasCreationAuthority(state))state.preparation.contractDraftSha256=factoryHash(text);
+        else delete state.preparation;
+      }
       value={artifact:input.artifact,sha256:factoryHash(text)};break;
     }
     case 'approve_contract':{
       const row=factoryArtifact(p,state,'contract');if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
       const reviewed=contract();assertScaffoldCapability(reviewed);
       const delegated=hasCreationAuthority(state) && supportsLocalApiContinuation(reviewed);
-      const next=row.text.replace(/^status: draft$/m,'status: accepted').replace(/^- Build token budget confirmation: pending$/m,'- Build token budget confirmation: '+(delegated?'creation-request':'user'));
+      let next=row.text.replace(/^status: draft$/m,'status: accepted').replace(/^- Build token budget confirmation: pending$/m,'- Build token budget confirmation: '+(delegated?'creation-request':'user'));
+      if(delegated)next=next.replace(/^- Outcome approval policy: .+$/m,'- Outcome approval policy: request-delegated-local-v1');
       const candidate=path.join(p.directory,'candidate.md');atomicWriteFile(candidate,next);
       try{const issues=validateContract(candidate,{root:p.root,print:false});if(issues.length)throw validationFailure(issues);}finally{fs.rmSync(candidate,{force:true});}
       atomicCompareAndSwapFile(row.file,row.text,next);
@@ -188,12 +195,12 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       approveOutcomeSpec(state.outcome,{...options,approvedBy:delegated?'pritha':'user',...(delegated?{creationAuthority:state.creationAuthority}:{}),projectPath:fs.existsSync(p.target)?p.target:inputRoot});state.outcomeApproval={approvedBy:delegated?'pritha':'user',...(delegated?{authorization:state.creationAuthority}:{}),sha256:factoryArtifact(p,state,'outcome').sha256,reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
     }
     case 'research':{
-      approved();if(state.research || state.pattern)throw factoryFail('factory_research_already_started');const result=await researchContract(state.contract,{'github-mode':hasCreationAuthority(state) || request.connectorId==='local'?'registry-only':'auto'});
-      state.research=result.reportPath;state.pattern=result.patternPath;state.phase='research';state.researchStage='planned';value={artifacts:['research','pattern'],next:'Read research and pattern, collect current sources, then publish locked synthesis.'};break;
+      approved();if(state.research || state.pattern)throw factoryFail('factory_research_already_started');const result=await researchContract(state.contract,{'github-mode':hasDelegatedContract(state) || request.connectorId==='local'?'registry-only':'auto'});
+      state.research=result.reportPath;state.pattern=result.patternPath;state.phase='research';state.researchStage='planned';value={artifacts:['research','pattern'],next:hasDelegatedContract(state)?'Read the saved memory research, then research_decide with your implementation rationale or scaffold when ready. Consult primary sources only for concrete uncertainties; optional source failures do not prevent local implementation.':'Read research and pattern, collect current sources, then publish locked synthesis.'};break;
     }
     case 'research_decide':{
       approved();
-      if(!hasCreationAuthority(state) || !supportsLocalApiContinuation(contract()) || !state.research || !state.pattern || state.runId || fs.existsSync(p.target))throw factoryFail('factory_research_decision_unavailable');
+      if(!hasDelegatedContract(state) || !supportsLocalApiContinuation(contract()) || !state.research || !state.pattern || state.runId || fs.existsSync(p.target))throw factoryFail('factory_research_decision_unavailable');
       if(state.continuationPause && !['research_collect','research_apply','research_recover','research_decide'].includes(state.continuationPause))throw factoryFail('factory_step_unconfirmed');
       const note=typeof input.answer==='string'?input.answer.trim():'';
       if(!note || note.length>4000)throw factoryFail('factory_research_decision_required');
@@ -222,7 +229,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     case 'scaffold':{
       approved();if(fs.existsSync(p.target))throw factoryFail('factory_target_exists');
       const inputRoot=path.join(p.directory,'trial-inputs');
-      if(hasCreationAuthority(state) && !state.researchDecision){
+      if(hasDelegatedContract(state) && supportsLocalApiContinuation(contract()) && !state.researchDecision){
         if(state.continuationPause && !['research_collect','research_apply','research_recover','research_decide'].includes(state.continuationPause))throw factoryFail('factory_step_unconfirmed');
         state.researchDecision={actor:'pritha',note:'The model chose local implementation and behavioral verification using the available research.',operationId:input.operation_id,recordedAt:new Date().toISOString()};
       }

@@ -16,6 +16,8 @@ const providers=[['codex','gpt-6-astra','openai','gpt-4.1-mini'],['claude','clau
 test('proposal tools require product functions and distinguish missing functions from incorrect mappings',()=>{
   const schema=PROVIDER_FACTORY_TOOLS.find(tool=>tool.name==='factory_propose').inputSchema.properties.brief;
   assert.ok(schema.required.includes('coreFunctions'));assert.equal(schema.properties.coreFunctions.minItems,1);
+  assert.ok(schema.required.includes('technical'));
+  assert.deepEqual(schema.properties.technical.required,['childModelProvider','childModelId']);
   assert.ok(!PROVIDER_FACTORY_TOOLS.find(tool=>tool.name==='factory_init').inputSchema.properties.brief.required.includes('coreFunctions'),'custom draft creation stays unchanged');
   const product={http:[{functions:[1],path:'/run',input_json:{text:'hello'},expected_json:{answer:'hello'}}]};
   for(const [coreFunctions,expectedField,pattern] of [[[],'brief.coreFunctions',/List one to 32 product functions/],[['Echo text'],'product.http.0.functions',/one-based indexes/]]){

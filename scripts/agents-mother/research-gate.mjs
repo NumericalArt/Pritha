@@ -222,6 +222,7 @@ export function researchGateDecisionForReport(contractData, reportText) {
   }
 
   const requiredTopics = deriveExternalResearchTopics(contractData, {
+    topicPolicy: frontmatter.external_research_topic_policy || "legacy",
     patternPack: verifiedPatternPackPayload
       ? { externalResearchSeeds: verifiedPatternPackPayload.external_research_seeds || [] }
       : undefined,

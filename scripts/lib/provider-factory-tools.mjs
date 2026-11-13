@@ -1,4 +1,4 @@
-import {creationAuthority,hasCreationAuthority} from '../agents-mother/factory-creation-authority.mjs';
+import {creationAuthority,hasCreationAuthority,hasDelegatedContract} from '../agents-mother/factory-creation-authority.mjs';
 import {nextFactoryAction,factoryOperationId,supportsLocalApiContinuation} from '../agents-mother/factory-continuation.mjs';
 import {deliveryExplanation} from '../agents-mother/delivery-explanation.mjs';
 import {validateOutcomeSpecText} from '../agents-mother/outcome-spec.mjs';
@@ -85,8 +85,9 @@ const briefSchema={type:'object',properties:{
   technical:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.technical.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'For a local HTTP server with a CLI, use runtimeFamily=api, serviceMode=process, primaryInterface=api, secondaryInterfaces=CLI and the requested cliEntrypoint. For HTTP only, set secondaryInterfaces=none and omit cliEntrypoint; scripts/server.mjs is the HTTP server, not a CLI interface. A manually started HTTP server still uses process mode. For a standalone command use runtimeFamily=cli. Set childModelProvider and childModelId to none for deterministic code. For an LLM product select childModelProvider=openai, claude, neuraldeep or openrouter and its childModelId, independently of the builder. childModelConnection defaults to pritha; childMaxOutputTokens defaults to 8192 for stability; smaller explicit user limits remain binding. Use the existing Pritha connection, never set the provider to none and read parent keys. The host fixes the target, executor, Git isolation and autostart.'},
   design:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.design.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'Optional text settings. inputDataTypes is text, e.g. UTF-8 text file, not an array.'},
 },required:['identity','goal','user','successCriteria'],additionalProperties:false};
-const proposalBriefSchema={...briefSchema,required:[...briefSchema.required,'coreFunctions'],properties:{...briefSchema.properties,
+const proposalBriefSchema={...briefSchema,required:[...briefSchema.required,'coreFunctions','technical'],properties:{...briefSchema.properties,
   coreFunctions:{type:'array',minItems:1,maxItems:32,items:{type:'string',minLength:1},description:'Required numbered list of the intended product behaviors. This is separate from successCriteria; product examples refer to these entries using one-based indexes.'},
+  technical:{...briefSchema.properties.technical,required:['childModelProvider','childModelId']},
 }};
 briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMILIES];
 briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
@@ -206,7 +207,7 @@ export class ProviderFactoryTools {
         delivery:ledger?deliveryExplanation(ledger):null,slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase,running:state?.running || null,
         ...(state?.contract?{scaffoldCapability:scaffoldCapability(contractData(state.contract,{root:this.paths.root})),
           draftRepair:factoryDraftRepair(factoryArtifact(this.paths,state,'contract'),contractData(state.contract,{root:this.paths.root}),state)}:{}),
-        creationMode:hasCreationAuthority(state)?'model-led':'reviewed',artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',buildConfiguration:state?.buildConfiguration || null,
+        creationMode:(state?hasCreationAuthority(state) && (!state.contractApproval || hasDelegatedContract(state)):this.options.factory.creationMode==='model-led')?'model-led':'reviewed',artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',buildConfiguration:state?.buildConfiguration || null,
         buildExecution:{connectorId:this.options.connectorId,modelId,requestedEffort:state?.buildConfiguration?.effort ?? this.options.factory.effort ?? null,buildEffort:state?.buildConfiguration?.effort ?? inheritedFactoryBuildEffort(this.options.connectorId,modelId,this.options.factory.effort) ?? null,effortControl:profile?.effortControl || 'runtime-defined',supportedEfforts:profile?.supportedEfforts || null},
         nextStep:this.nextStep(state,ledger)};
     }
@@ -233,7 +234,7 @@ export class ProviderFactoryTools {
     const plan=nextFactoryAction(state,ledger);
     if(plan.kind==='step')return this.host.driveEnabled()?{owner:'pritha',action:'continue',stage:plan.action}:{owner:'model',action:plan.action};
     if(plan.reason==='outcome_decision' && hasCreationAuthority(state))return {owner:'model',action:'read_artifact',artifact:'outcome',then:'prepare_product_trial',hint:'Prepare meaningful examples, then finalize the Outcome under the saved creation request. No extra user document vote is needed.'};
-    if(plan.reason==='research_review')return {owner:'model',action:'read_artifact',artifact:'research',then:'research_decide',hint:'Use memory and your judgment. Collect primary sources only for concrete uncertainties; unavailable optional pages do not prevent implementation. Record your rationale in research_decide.answer, or call scaffold directly when ready to implement.'};
+    if(plan.reason==='research_review' || hasDelegatedContract(state) && state.phase==='research' && ['research_collect','research_apply','research_recover'].includes(state.continuationPause))return {owner:'model',action:'read_artifact',artifact:'research',then:'research_decide',hint:'Use memory and your judgment. Collect primary sources only for concrete uncertainties; unavailable optional pages do not prevent implementation. Record your rationale in research_decide.answer, or call scaffold directly when ready to implement.'};
     if(plan.reason==='source_selection')return {owner:'model',action:'research_status',then:'research_apply',hint:'Read all source pages, select real passages and explain their applicability. This is model work, not an operator decision.'};
     return {owner:['contract_decision','outcome_decision','manual_acceptance','delivery_decision'].includes(plan.reason)?'user':'pritha',reason:plan.reason};
   }
@@ -305,7 +306,10 @@ export class ProviderFactoryTools {
       if(brief.identity.slug && brief.identity.slug!==p.slug)throw factoryFail('factory_subject_changed');
       const issues=validateInterviewBrief(brief,{requireComplete:true});
       if(issues.length)throw new FactoryBriefValidationError(issues);
-      if(input.action==='propose')validateProductProposal(input.product,brief.coreFunctions);
+      if(input.action==='propose'){
+        for(const key of ['childModelProvider','childModelId'])if(!brief.technical[key])throw new FactoryProductProposalError('brief.technical.'+key,'Choose the child model explicitly from the user request, independently of the builder. For a model-connected product supply its API provider and model ID; use none only for an intentionally deterministic product. The existing Pritha connection is the default.');
+        validateProductProposal(input.product,brief.coreFunctions);
+      }
     }
     if(['approve_contract','approve_outcome','prepare_product_trial','write_draft','patch_draft'].includes(input.action)){
       const kind=['write_draft','patch_draft'].includes(input.action)?input.artifact:input.action==='approve_contract'?'contract':'outcome';

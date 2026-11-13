@@ -1168,7 +1168,9 @@ function formatScaffoldDecision(status, coverage, synthesis, repositoryBindingRe
 
 export function applyExternalResearchEvidence(reportMarkdown, contractData, input, options = {}) {
   input = redactStructuredText(boundedInputObject(input), options);
-  const topics = options.topics || deriveExternalResearchTopics(contractData, options);
+  const topics = options.topics || deriveExternalResearchTopics(contractData, {
+    ...options,topicPolicy:parseFrontmatterData(reportMarkdown)?.external_research_topic_policy || "legacy",
+  });
   const payload = boundedInputObject(input);
   const evidence = normalizeExternalResearchEvidence(payload, {
     ...options,
