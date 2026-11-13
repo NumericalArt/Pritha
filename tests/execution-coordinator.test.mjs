@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, statSync,symlinkSync,realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -12,8 +12,8 @@ function fixture() {
   const db = new ExecutionCoordinator({ stateRoot });
   return { stateRoot, db, close() { db.close(); rmSync(stateRoot, { recursive: true, force: true }); } };
 }
-function child(stateRoot, body, onOutput = () => {}) {
-  const script = `import {ExecutionCoordinator} from ${JSON.stringify(moduleUrl)};const db=new ExecutionCoordinator({stateRoot:${JSON.stringify(stateRoot)}});${body};db.close();`;
+function child(stateRoot, body, onOutput = () => {}, beforeOpen = '') {
+  const script = `import {ExecutionCoordinator} from ${JSON.stringify(moduleUrl)};${beforeOpen};const db=new ExecutionCoordinator({stateRoot:${JSON.stringify(stateRoot)}});${body};db.close();`;
   return new Promise((resolve, reject) => {
     const p = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['ignore','pipe','pipe'] });
     let out='',err=''; p.stdout.on('data',d=>{out+=d;onOutput(d.toString());}); p.stderr.on('data',d=>err+=d);
@@ -118,6 +118,28 @@ test('concurrent first opens initialize the whole schema and keep every distinct
     const db=new ExecutionCoordinator({stateRoot});
     try {assert.equal(db.listIntents({kind:'fixture'}).length,5);}finally{db.close();}
   }finally{rmSync(stateRoot,{recursive:true,force:true});}
+});
+
+test('a SQLite sidecar disappearing during the file check does not prevent task admission',async()=>{
+  const stateRoot=realpathSync(mkdtempSync(path.join(tmpdir(),'pritha-sidecar-race-'))),directory=path.join(stateRoot,'execution');mkdirSync(directory);
+  try{
+    const wal=path.join(directory,'execution.sqlite-wal');
+    const prelude=`import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+      fs.writeFileSync(${JSON.stringify(wal)},'');const original=fs.lstatSync;let removed=false;
+      fs.lstatSync=(file,...args)=>{if(file===${JSON.stringify(wal)}&&!removed){removed=true;fs.rmSync(file);}return original(file,...args);};syncBuiltinESMExports();`;
+    assert.equal(await child(stateRoot,"db.reserveIntent('after-wal-close','same',{kind:'fixture'});console.log(removed && db.listIntents({kind:'fixture'}).length===1)",undefined,prelude),'true');
+  }finally{rmSync(stateRoot,{recursive:true,force:true});}
+});
+
+test('database and sidecar dangling symlinks and directories are still refused before SQLite opens',()=>{
+  for(const suffix of ['','-wal','-shm'])for(const kind of ['symlink','directory']){
+    const stateRoot=mkdtempSync(path.join(tmpdir(),'pritha-sidecar-type-')),directory=path.join(stateRoot,'execution');mkdirSync(directory);
+    try{
+      const file=path.join(directory,'execution.sqlite'+suffix);
+      if(kind==='symlink')symlinkSync(path.join(stateRoot,'missing-private-target'),file);else mkdirSync(file);
+      assert.throws(()=>new ExecutionCoordinator({stateRoot}),{code:'execution_store_invalid_file'});
+    }finally{rmSync(stateRoot,{recursive:true,force:true});}
+  }
 });
 
 test('nested workspaces conflict across workers, but siblings and read-only ancestors coexist',async()=>{

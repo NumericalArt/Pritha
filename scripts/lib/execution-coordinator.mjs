@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, realpathSync } from "node:fs";
+import { chmodSync, lstatSync, mkdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
@@ -68,7 +68,13 @@ function privateDatabase(stateRoot, directory) {
   chmodSync(realTarget, 0o700);
   const file = path.join(realTarget, "execution.sqlite");
   for (const name of [file, `${file}-wal`, `${file}-shm`]) {
-    if (existsSync(name) && (!lstatSync(name).isFile() || lstatSync(name).isSymbolicLink())) {
+    // SQLite removes idle WAL/SHM files as other owners close. One lstat both
+    // validates present entries and tolerates that normal disappearance; an
+    // exists-then-stat pair races and also misses dangling symlinks.
+    let info;
+    try { info = lstatSync(name); }
+    catch (error) { if (error.code === "ENOENT") continue; throw error; }
+    if (!info.isFile() || info.isSymbolicLink()) {
       throw new ExecutionConflict("execution_store_invalid_file");
     }
   }
