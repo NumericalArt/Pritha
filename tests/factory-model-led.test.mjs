@@ -8,6 +8,7 @@ import {readDeliveryLedger} from '../scripts/agents-mother/delivery-ledger.mjs';
 import {deliveryStatus} from '../scripts/agents-mother/delivery-loop.mjs';
 import {hasCreationAuthority,hasDelegatedContract} from '../scripts/agents-mother/factory-creation-authority.mjs';
 import {nextFactoryAction} from '../scripts/agents-mother/factory-continuation.mjs';
+import {factoryMilestone} from '../scripts/agents-mother/factory-milestone.mjs';
 
 const providers=[['codex','gpt-6-astra','openai','gpt-4.1-mini'],['claude','claude-sonnet-5-5','claude','claude-haiku-4-5-20251001'],['neuraldeep','gpt-oss-120b','neuraldeep','gpt-oss-20b']];
 async function fixture(t,provider,extra={}){
@@ -70,6 +71,9 @@ test('a custom profile still requires its real user decision after retaining the
  assert.equal(f.state().contractApproval.approvedBy,'user');assert.equal(hasDelegatedContract(f.state()),false);
  assert.equal((await f.call('status')).creationMode,'reviewed');
  assert.equal(f.reviews.length,1);assert.equal(f.builds.length,0);
+ assert.equal((await f.call('create_outcome')).error,undefined);
+ assert.deepEqual((await f.call('status')).nextStep,{owner:'user',reason:'outcome_decision'});
+ assert.equal(factoryMilestone(f.state(),null,null).kind,'proposal');
  const custom={...f.state(),running:null,phase:'research',outcome:'custom-outcome',outcomeApproval:{approvedBy:'user'},research:'memory',pattern:'pattern',researchStage:'planned'};
  assert.equal(nextFactoryAction(custom).action,'research_collect');
 });

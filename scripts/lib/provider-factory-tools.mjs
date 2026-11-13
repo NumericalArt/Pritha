@@ -220,7 +220,7 @@ export class ProviderFactoryTools {
   nextStep(state,ledger){
     if(!state?.contract)return {owner:'model',action:'propose',requiredFields:['brief','product','build_token_budget'],optionalFields:['build_iteration_budget','build_elapsed_budget_ms'],alternative:'init for a custom non-API workflow',hint:'Describe behavior and examples once. The host prepares technical artifacts; new model-led local creation uses the original request without separate document questions. Existing/custom workflows retain their decisions.'};
     if(state.preparation || hasCreationAuthority(state)){
-      if(!supportsLocalApiContinuation(contractData(state.contract,{root:this.paths.root})))return {owner:'model',action:'read_artifact',artifact:'contract',reason:'factory_proposal_profile_unsupported',hint:'Use the custom draft tools for this runtime or adoption profile. The existing draft is preserved.'};
+      if(!state.contractApproval && !supportsLocalApiContinuation(contractData(state.contract,{root:this.paths.root})))return {owner:'model',action:'read_artifact',artifact:'contract',reason:'factory_proposal_profile_unsupported',hint:'Use the custom draft tools for this runtime or adoption profile. The existing draft is preserved.'};
       let plan;
       try{plan=this.planContinuation({shadow:true});}catch(error){
         if(error.code==='factory_proposal_changed' || /^factory_product_/.test(error.code || ''))return {owner:'model',action:'propose',reason:error.code,...(error.field?{field:error.field}:{}),hint:'Correct the saved proposal before asking for a decision. Preserve its brief and limits; do not edit accepted documents.'};
@@ -233,7 +233,7 @@ export class ProviderFactoryTools {
     }
     const plan=nextFactoryAction(state,ledger);
     if(plan.kind==='step')return this.host.driveEnabled()?{owner:'pritha',action:'continue',stage:plan.action}:{owner:'model',action:plan.action};
-    if(plan.reason==='outcome_decision' && hasCreationAuthority(state))return {owner:'model',action:'read_artifact',artifact:'outcome',then:'prepare_product_trial',hint:'Prepare meaningful examples, then finalize the Outcome under the saved creation request. No extra user document vote is needed.'};
+    if(plan.reason==='outcome_decision' && hasDelegatedContract(state))return {owner:'model',action:'read_artifact',artifact:'outcome',then:'prepare_product_trial',hint:'Prepare meaningful examples, then finalize the Outcome under the saved creation request. No extra user document vote is needed.'};
     if(plan.reason==='research_review' || hasDelegatedContract(state) && state.phase==='research' && ['research_collect','research_apply','research_recover'].includes(state.continuationPause))return {owner:'model',action:'read_artifact',artifact:'research',then:'research_decide',hint:'Use memory and your judgment. Collect primary sources only for concrete uncertainties; unavailable optional pages do not prevent implementation. Record your rationale in research_decide.answer, or call scaffold directly when ready to implement.'};
     if(plan.reason==='source_selection')return {owner:'model',action:'research_status',then:'research_apply',hint:'Read all source pages, select real passages and explain their applicability. This is model work, not an operator decision.'};
     return {owner:['contract_decision','outcome_decision','manual_acceptance','delivery_decision'].includes(plan.reason)?'user':'pritha',reason:plan.reason};

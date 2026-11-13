@@ -36,7 +36,7 @@ export function factoryMilestone(state,delivery,firstUse) {
   if(state?.phase==='research' && hasDelegatedContract(state))return at('building','Planning implementation','Pritha is using memory and relevant documentation to choose the implementation, then it will build and test the agent.');
   if(state?.phase==='research')return at('building','Researching sources','Checking sources for the selected approach. Next, the agent scaffold will be prepared.');
   if(state?.outcomeApproval)return at('building','Building','The factory is building and verifying the agent within the agreed limits.');
-  if(hasCreationAuthority(state))return at('building','Preparing the agent','Pritha is turning your request into an implementation plan and examples, then building the local agent.');
+  if(hasCreationAuthority(state) && (!state.contractApproval || hasDelegatedContract(state)))return at('building','Preparing the agent','Pritha is turning your request into an implementation plan and examples, then building the local agent.');
   return at('proposal','Clarifying the task','First, agree on the agent capabilities and the verification criteria in separate reviews.');
 }
 
