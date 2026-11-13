@@ -16,6 +16,7 @@ import {
   DELIVERY_ACTIVE_STATUSES,
   accountDeliveryExecutorResult as accountExecutorResult,
   budgetBlocker,
+  recordedDeliveryBudgetBlocker,
   deliveryUsageStatus,
   deliveryTokenPreflight,
   grantDeliveryBudget,
@@ -801,7 +802,8 @@ async function runDeliveryLoopLocked(input = {}) {
       // A model budget limits the next model turn. Already-approved, bounded
       // Trials can finish the existing result before requesting more budget.
       state = readDeliveryLedger(runRoot);
-      const beforeBuild = budgetBlocker(state);
+      const beforeBuild = budgetBlocker(state) || recordedDeliveryBudgetBlocker(runRoot,state)
+        || (input.hostOnly ? input.hostVerificationBudgetBlocker : null);
       if (beforeBuild) return blockDelivery(runRoot, plan, worktree, beforeBuild, input);
       if (input.hostOnly) return blockDelivery(runRoot, plan, worktree, blockerForError(new DeliveryLoopError("verification_needs_implementation", "The approved checks found remaining work; the result and evidence are preserved.")), input);
       const failureUpdate = recordDeliveryFailure(runRoot, failures, { modelLedRepair:plan.delivery_policy?.repair_policy==="model-led",eventType: "verification_failed",observationKey:failureObservation(runRoot,state,result) });
@@ -1103,8 +1105,10 @@ async function resumeDeliveryLocked(runId, options) {
   const planPath = path.join(status.runRoot, "trial-plan.json");
   const plan = JSON.parse(readFileSync(planPath, "utf8"));
   const hostOnly = options.hostOnly === true || options.answer === "verify-only";
-  const bound = policyBoundOptions(plan, { ...options, hostOnly });
   let state = status.state;
+  const hostVerificationBudgetBlocker=hostOnly && state.status==='blocked' && state.blockers.length===1
+    && ['token_budget_exhausted','iteration_budget_exhausted','elapsed_budget_exhausted'].includes(state.blockers[0].code)?state.blockers[0]:null;
+  const bound = policyBoundOptions(plan, { ...options, hostOnly, hostVerificationBudgetBlocker });
   if (hostOnly && !canHostVerifyDelivery(state)) {
     if (state.status === "blocked") return { state, worktree: status.worktree, blocked: true, reportPath: null };
     throw new DeliveryLoopError("delivery_not_verifiable", "This terminal run is preserved. A new result requires a new delivery run.");
@@ -1150,7 +1154,7 @@ async function resumeDeliveryLocked(runId, options) {
   if (hostOnly && ["blocked", "verified", "awaiting_acceptance"].includes(state.status)) {
     state = transitionDelivery(status.runRoot, "correcting", {
       eventType: "host_verification_requested", phase: "fresh_verification", nextAction: "verify_current_candidate",
-      payload: { previous_status: state.status, previous_trial_result: state.last_trial_result, model_turn: "not_requested" },
+      payload: { previous_status: state.status, previous_trial_result: state.last_trial_result, previous_budget_blocker:hostVerificationBudgetBlocker, model_turn: "not_requested" },
     }).state;
   }
   if (!hostOnly && state.last_trial_result?.path && worktree?.worktree) {

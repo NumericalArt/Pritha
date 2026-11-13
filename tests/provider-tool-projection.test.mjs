@@ -271,3 +271,25 @@ test('Kimi publisher identity does not weaken tool or durable accounting checks 
     assert.doesNotMatch(body,/"type":"function_call"|PRIVATE_RECEIPT_ERROR/);
   }
 });
+
+test('the observed Qwen noreason SSE alias releases tools after accounting and keeps the selected wire model',async t=>{
+  const requested='qwen3.6-35b-a3b-noreason',base='qwen3.6-35b-a3b';
+  for(const returned of [requested,base,'qwen3.8-27b','qwen3.6-fp8','qwen/'+base]){
+    const receipts=[];
+    const post=await fixture(t,{onRequest:event=>receipts.push(event),fetchImpl:async(_url,options)=>{
+      assert.equal(JSON.parse(options.body).model,requested);
+      const events=[{type:'response.created',response:{id:'response_fixture',model:returned,status:'in_progress',output:[]}},
+        {type:'response.completed',response:terminal([call(allowedTools[0])],{model:returned})}];
+      return new Response(events.map(sse).join('')+'data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});
+    }});
+    const result=await post({model:requested}),body=await result.text(),accepted=[requested,base].includes(returned);
+    assert.equal(result.status,accepted?200:502);assert.equal(receipts.length,1);assert.equal(receipts[0].usage.totalTokens,6);
+    if(accepted)assert.match(body,/"name":"read_file"/);
+    else{assert.match(body,/neuraldeep_model_identity_mismatch/);assert.doesNotMatch(body,/"type":"function_call"/);}
+  }
+  for(const mode of ['receipt','foreign-tool','different-request']){
+    const post=await fixture(t,{onRequest:()=>{if(mode==='receipt')throw Error('private accounting failure');},fetchImpl:async()=>response(terminal([call(mode==='foreign-tool'?'foreign_tool':allowedTools[0])],{model:base}),'sse')});
+    const result=await post({model:mode==='different-request'?'qwen3.8-27b-noreason':requested}),body=await result.text();
+    assert.equal(result.status,mode==='receipt'?503:502);assert.doesNotMatch(body,/"type":"function_call"/);
+  }
+});

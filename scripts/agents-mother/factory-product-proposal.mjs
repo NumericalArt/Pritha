@@ -5,14 +5,17 @@ import {parseBoundedJson} from '../lib/bounded-json.mjs';
 import {supportsLocalApiContinuation} from './factory-continuation.mjs';
 
 const object=value=>value!==null && typeof value==='object' && !Array.isArray(value);
-const fail=(field,message)=>{throw Object.assign(new Error(message),{code:'factory_product_proposal_invalid',field});};
+export class FactoryProductProposalError extends Error {
+  constructor(field,message){super(message);this.code='factory_product_proposal_invalid';this.field=field;}
+}
+const fail=(field,message)=>{throw new FactoryProductProposalError(field,message);};
 const fields=['functions','expected_json','model_output','model_error'];
 const hostChecks=['model_connection','managed_start','managed_stop'];
 
 /** Product examples refer to the brief's numbered functions. File names, ports,
  * coverage IDs, verifier bytes and approval hashes belong to the host. */
 export function validateProductProposal(product,coreFunctions){
-  if(!Array.isArray(coreFunctions) || !coreFunctions.length || coreFunctions.length>32)fail('brief.coreFunctions','List one to 32 product functions before preparing their examples.');
+  if(!Array.isArray(coreFunctions) || !coreFunctions.length || coreFunctions.length>32)fail('brief.coreFunctions','List one to 32 product functions in brief.coreFunctions; successCriteria is a separate field and does not supply this list.');
   try{parseBoundedJson(JSON.stringify(product),{maxBytes:12000,maxDepth:8,maxNodes:500});}catch{fail('product','Use a bounded JSON product proposal.');}
   if(!object(product) || Object.keys(product).some(key=>!['http','cli','host_checks'].includes(key)) || !Array.isArray(product.http))fail('product.http','Supply HTTP examples for this API process product.');
   const functions=(values,field)=>{

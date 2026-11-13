@@ -21,7 +21,7 @@ test('host reservations cap output before dispatch and measured receipts admit l
 });
 test('media, remote tools and stateful history cannot use a text-only reservation',async()=>{
   for(const patch of [{previous_response_id:'hidden'},{conversation:'hidden'},{input:[{role:'user',content:[{type:'input_image',image_url:'https://example.com/image'}]}]},{tools:[{type:'web_search'}]},{input:[{type:'reasoning',encrypted_content:'opaque'}]}]){
-    let checkpoints=0;const budget=new ResponsesRequestBudget({tokenBudget:50000,checkpoint:async()=>checkpoints++});await assert.rejects(budget.begin({...payload(),...patch}),{code:'provider_budget_input_unbounded'});assert.equal(checkpoints,0);
+    const snapshots=[];const budget=new ResponsesRequestBudget({tokenBudget:50000,checkpoint:async value=>snapshots.push(value)});await assert.rejects(budget.begin({...payload(),...patch}),{code:'provider_budget_input_unbounded'});assert.equal(snapshots.length,1);assert.deepEqual(snapshots[0].requests,[]);assert.equal(snapshots[0].errorCode,'provider_budget_input_unbounded');
   }
 });
 test('missing usage, duplicate requests, overshoot and durable-write failures close admission',async()=>{
@@ -34,10 +34,28 @@ test('missing usage, duplicate requests, overshoot and durable-write failures cl
     await assert.rejects(budget.begin({...payload(),input:'Do not repeat the ambiguous request'}));
   }
 });
-test('budget and model context refusals occur before a reservation can authorize a request',async()=>{
-  for(const options of [{tokenBudget:100},{tokenBudget:50000,contextTokens:9000}]){
-    let writes=0;const budget=new ResponsesRequestBudget({...options,checkpoint:async()=>writes++});await assert.rejects(budget.begin(payload()),{code:options.contextTokens?'provider_budget_model_context':'provider_budget_exhausted'});assert.equal(writes,0);
-  }
+test('a budget refusal is recorded before a reservation can authorize a request',async()=>{
+  const snapshots=[],budget=new ResponsesRequestBudget({tokenBudget:100,checkpoint:async value=>snapshots.push(value)});
+  await assert.rejects(budget.begin(payload()),{code:'provider_budget_exhausted'});
+  assert.equal(snapshots.length,1);assert.deepEqual(snapshots[0].requests,[]);assert.equal(snapshots[0].usageKnown,true);assert.equal(snapshots[0].tokensUsed,0);
+  assert.equal(snapshots[0].admissionFailure.upstreamAttempted,false);assert.equal(snapshots[0].admissionFailure.remainingTokens,100);assert.ok(snapshots[0].admissionFailure.shortfallTokens>0);
+});
+test('a conservative byte estimate does not masquerade as a measured model context limit',async()=>{
+  const snapshots=[],budget=new ResponsesRequestBudget({tokenBudget:50000,contextTokens:9000,checkpoint:async value=>snapshots.push(value)});
+  const request={...payload(),input:'ordinary words '.repeat(1000),max_output_tokens:1024};
+  await budget.begin(request,{requestHash:'original'});
+  const row=snapshots[0].requests[0];assert.ok(row.contextEstimate.estimatedTokens>9000);assert.equal(row.contextEstimate.enforcement,'advisory');assert.ok(row.reservedTokens<=50000);
+  await budget.record(event({usage:{input_tokens:2400,output_tokens:12,total_tokens:2412}}));
+  assert.equal(budget.snapshot().tokensUsed,2412);assert.equal(budget.snapshot().errorCode,null);
+});
+test('a later reservation refusal durably preserves measured spend and the unspent shortfall',async()=>{
+  const snapshots=[],budget=new ResponsesRequestBudget({tokenBudget:15000,checkpoint:async value=>snapshots.push(value)});
+  await budget.begin(payload(),{requestHash:'original'});await budget.record(event());
+  await assert.rejects(budget.begin({...payload(),input:'x'.repeat(14000)},{requestHash:'too-large'}),{code:'provider_budget_exhausted'});
+  const saved=snapshots.at(-1);assert.equal(saved.errorCode,'provider_budget_exhausted');assert.equal(saved.tokensUsed,400);assert.equal(saved.requests.length,1);assert.equal(saved.admissionFailure.remainingTokens,14600);
+  assert.equal(saved.admissionFailure.shortfallTokens,saved.admissionFailure.requiredTokens-14600);
+  const failed=new ResponsesRequestBudget({tokenBudget:100,checkpoint:async()=>{throw Error('disk full');}});
+  await assert.rejects(failed.begin(payload()),{code:'provider_budget_checkpoint_failed'});
 });
 for(const connectorId of ['neuraldeep','openrouter'])test(connectorId+': adapter holds completed tool output until async usage accounting is durable',{timeout:5000},async()=>{
   let release,started;const ready=new Promise(resolve=>started=resolve),gate=new Promise(resolve=>release=resolve),budget=new ResponsesRequestBudget({tokenBudget:50000,checkpoint:async value=>{if(value.usageKnown){started();await gate;}}});

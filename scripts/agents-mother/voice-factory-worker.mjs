@@ -2,6 +2,7 @@ import {hasCreationAuthority} from './factory-creation-authority.mjs';
 import {verifiedFirstUse} from './factory-first-use.mjs';
 import {applyVerifiedFactoryResult} from './factory-application.mjs';
 import {FactoryBudget} from './factory-budget.mjs';
+import {deliveryBudgetExtensionAllowed} from './delivery-ledger.mjs';
 import {localApiResearchSources,researchPage,supportsLocalApiContinuation} from './factory-continuation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -267,9 +268,8 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
         result=await delivery.deliverOutcome(state.outcome,p.target,{...buildOptions,runId:state.runId});
       }else{
         const current=observeDelivery();
-        if(input.action==='delivery_extend' && (current.state.version!==input.expected_version || current.state.status!=='blocked'
-          || current.state.blockers?.length!==1 || !['token_budget_exhausted','iteration_budget_exhausted','elapsed_budget_exhausted'].includes(current.state.blockers[0].code)
-          || current.state.budget.legacy_usage_unverified!==false || current.state.budget.unaccounted_attempts?.length!==0))throw factoryFail('factory_budget_context_changed');
+        if(input.action==='delivery_extend' && (current.state.version!==input.expected_version
+          || !deliveryBudgetExtensionAllowed(current.runRoot,current.state)))throw factoryFail('factory_budget_context_changed');
         if(input.action==='delivery_resume' && current.state.status==='blocked' && !(typeof input.answer==='string' && input.answer.trim())){
           const choices=(current.state.blockers?.[0]?.options || []).map(option=>option.id).filter(id=>/^[a-z][a-z0-9-]{0,79}$/.test(id)).slice(0,8);
           throw Object.assign(factoryFail('factory_delivery_answer_required'),{message:'Delivery is blocked. Call factory_delivery_resume with the required answer parameter from the saved blocker options'+(choices.length?': '+choices.join(', '):'')+'. No runtime probe or build request was started.'});

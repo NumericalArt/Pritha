@@ -30,8 +30,8 @@ export function providerToolErrorDetail(error){
     ? {error:error.code,field:'operation_id',minLength:8,maxLength:128,pattern:operation.pattern,hint:'Use a stable ID such as write-cli-01; keep it for an identical retry. This rejected call made no changes.'}:null;
 }
 export const PROVIDER_HOST_TOOL_DEFINITIONS=[
-  {name:'read_file',description:'Read a bounded UTF-8 window inside this task workspace or an attachment:<id> URI from this exact chat. Attachments are read-only; binary or large inputs return a verified snapshot path for an approved command. Workspace reads return the whole-file SHA-256 needed for a later edit.',inputSchema:schema({path:string,offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:24000}},['path']),annotations:{readOnlyHint:true}},
-  {name:'list_files',description:'List one workspace directory; secrets and runtime state are excluded.',inputSchema:schema({path:string},['path']),annotations:{readOnlyHint:true}},
+  {name:'read_file',description:'Read a bounded UTF-8 window inside this task workspace or an attachment:<id> URI from this exact chat. Workspace paths may be relative (preferred) or absolute within this workspace. Attachments are read-only; binary or large inputs return a verified snapshot path for an approved command. Workspace reads return the whole-file SHA-256 needed for a later edit.',inputSchema:schema({path:string,offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:24000}},['path']),annotations:{readOnlyHint:true}},
+  {name:'list_files',description:'List one workspace directory using a relative or workspace-local absolute path; secrets and runtime state are excluded.',inputSchema:schema({path:string},['path']),annotations:{readOnlyHint:true}},
   {name:'write_file',description:'Propose one exact file write for operator approval. expected_sha256 must match the current file or be null for a new file. Never grants access outside the task sandbox.',inputSchema:schema({operation_id:operation,path:string,expected_sha256:{type:['string','null']},content:string},['operation_id','path','expected_sha256','content'])},
   {name:'edit_file',description:'Propose one exact text replacement in a file, including large files. old_text must occur exactly once and expected_sha256 must match the whole file.',inputSchema:schema({operation_id:operation,path:string,expected_sha256:string,old_text:string,new_text:string},['operation_id','path','expected_sha256','old_text','new_text'])},
   {name:'run_command',description:'Propose an argv array for operator approval. The command runs in the task OS sandbox with no network and no host credentials. Use read_result to retrieve long output.',inputSchema:schema({operation_id:operation,argv:{type:'array',items:string,minItems:1,maxItems:64},timeout_ms:{type:'integer',minimum:1,maximum:120000}},['operation_id','argv'])},
@@ -42,7 +42,7 @@ export const PROVIDER_HOST_TOOL_DEFINITIONS=[
 /** All model-facing tools execute in this host, with a fixed workspace and an
  * immutable receipt. Model arguments never select a credential, root or policy. */
 export class ProviderHostTools {
-  constructor(options){this.options=options;this.cwd=realpathSync(options.cwd);this.pending=new Map();this.commands=new Set();this.serial=Promise.resolve();this.closed=false;this.exitConfirmed=true;this.calls=0;this.commandCount=0;
+  constructor(options){this.options=options;this.cwd=realpathSync(options.cwd);this.workspacePath=path.resolve(options.cwd);this.pending=new Map();this.commands=new Set();this.serial=Promise.resolve();this.closed=false;this.exitConfirmed=true;this.calls=0;this.commandCount=0;
     this.factory=options.factory?new ProviderFactoryTools(this):null;
     this.definitions=[...PROVIDER_HOST_TOOL_DEFINITIONS,...(options.search?.definitions || []),...(this.factory?PROVIDER_FACTORY_TOOLS:[])];
     if(options.protectedPaths!==undefined && (!Array.isArray(options.protectedPaths) || options.protectedPaths.length>256))throw fail('provider_tool_policy_invalid');
@@ -74,7 +74,15 @@ export class ProviderHostTools {
   }
   check(){if(this.closed || this.options.signal?.aborted)throw fail('operator_cancel');this.options.lease.assertOwned();}
   target(relative,{directory=false,missing=false}={}){
-    if(typeof relative!=='string' || relative.length>2048 || relative.startsWith('attachment:') || path.isAbsolute(relative) || relative.includes('\0') || relative.split(/[\\/]/).some((part,i,parts)=>part==='..' || denied(part) || publicExample(part) && (directory || i!==parts.length-1)))throw fail('provider_tool_path_denied');
+    if(typeof relative!=='string' || relative.length>2048 || relative.startsWith('attachment:') || relative.includes('\0') || relative.split(/[\\/]/).includes('..'))throw fail('provider_tool_path_denied');
+    if(path.isAbsolute(relative)){
+      // The prompt names the workspace by its absolute path. Accept that exact
+      // root (including its supplied alias), never an arbitrary realpath escape.
+      const root=[this.cwd,this.workspacePath].find(root=>relative===root || relative.startsWith(root+path.sep));
+      if(!root)throw fail('provider_tool_path_denied');
+      relative=path.relative(root,relative);
+    }
+    if(relative.split(/[\\/]/).some((part,i,parts)=>denied(part) || publicExample(part) && (directory || i!==parts.length-1)))throw fail('provider_tool_path_denied');
     const target=path.resolve(this.cwd,relative);if(target!==this.cwd && !target.startsWith(this.cwd+path.sep))throw fail('provider_tool_path_denied');
     let cursor=this.cwd;
     for(const part of path.relative(this.cwd,target).split(path.sep).filter(Boolean)){

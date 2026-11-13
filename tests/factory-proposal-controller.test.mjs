@@ -9,8 +9,24 @@ import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
 import {ProviderApprovalBroker,answerProviderRequest,pendingProviderRequests} from '../scripts/lib/provider-approvals.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {productFactoryFixture,until} from './helpers/product-factory.mjs';
+import {PROVIDER_FACTORY_TOOLS,factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs';
+import {validateProductProposal} from '../scripts/agents-mother/factory-product-proposal.mjs';
 
 const providers=[['codex','gpt-6-astra','openai','gpt-4.1-mini'],['claude','claude-sonnet-5-5','claude','claude-haiku-4-5-20251001'],['neuraldeep','gpt-oss-20b','neuraldeep','gpt-oss-20b']];
+test('proposal tools require product functions and distinguish missing functions from incorrect mappings',()=>{
+  const schema=PROVIDER_FACTORY_TOOLS.find(tool=>tool.name==='factory_propose').inputSchema.properties.brief;
+  assert.ok(schema.required.includes('coreFunctions'));assert.equal(schema.properties.coreFunctions.minItems,1);
+  assert.ok(!PROVIDER_FACTORY_TOOLS.find(tool=>tool.name==='factory_init').inputSchema.properties.brief.required.includes('coreFunctions'),'custom draft creation stays unchanged');
+  const product={http:[{functions:[1],path:'/run',input_json:{text:'hello'},expected_json:{answer:'hello'}}]};
+  for(const [coreFunctions,expectedField,pattern] of [[[],'brief.coreFunctions',/List one to 32 product functions/],[['Echo text'],'product.http.0.functions',/one-based indexes/]]){
+    const example=structuredClone(product);if(coreFunctions.length)example.http[0].functions=[0];
+    try{validateProductProposal(example,coreFunctions);assert.fail('expected a correction');}catch(error){
+      const detail=factoryBriefErrorDetail(error);assert.equal(detail.field,expectedField);assert.match(detail.hint,pattern);
+      if(!coreFunctions.length)assert.doesNotMatch(detail.hint,/one-based/);
+    }
+  }
+  assert.doesNotThrow(()=>validateProductProposal(product,['Echo text']));
+});
 async function fixture(t,provider=providers[0]){
   const [connectorId,model,childProvider,childModel]=provider;
   const f=await productFactoryFixture({connectorId,model,childProvider,childModel,httpOnly:true,slug:'proposal-'+connectorId,name:'Proposal '+connectorId,field:'text',route:'/run',portVariable:'FIXTURE_PORT',cliInput:'first',httpInput:'second',result:text=>({answer:text})},()=>{},{automate:true});

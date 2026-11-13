@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,chmodSync,symlinkSync,rmSync } from 'node:fs';
+import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,chmodSync,symlinkSync,linkSync,rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,25 @@ test('file changes during operator review invalidate that exact proposed write',
   const f=fixture(t);const file=path.join(f.cwd,'file');writeFileSync(file,'old');f.tools.options.approve=async()=>{writeFileSync(file,'concurrent');return {decision:'accept'};};
   const response=result(await f.tools.call('write_file',{operation_id:'write_fixture_001',path:'file',expected_sha256:hash('old'),content:'new'}));
   assert.equal(response.status,'failed');assert.equal(response.text,'provider_tool_file_changed');assert.equal(readFileSync(file,'utf8'),'concurrent');
+});
+test('workspace absolute paths support builder reads and edits without widening filesystem authority',async t=>{
+  const f=fixture(t),file=path.join(f.cwd,'server.mjs');writeFileSync(file,'stub');
+  assert.equal(result(await f.tools.call('read_file',{path:file})).sha256,hash('stub'));
+  assert.equal(result(await f.tools.call('read_file',{path:path.join(f.tools.cwd,'server.mjs')})).sha256,hash('stub'));
+  assert.ok(result(await f.tools.call('list_files',{path:f.cwd})).files.length);
+  assert.equal(result(await f.tools.call('edit_file',{operation_id:'absolute_edit_01',path:file,expected_sha256:hash('stub'),old_text:'stub',new_text:'implemented'})).status,'completed');
+  const newFile=path.join(f.cwd,'new.mjs');
+  const write={operation_id:'absolute_write_01',path:newFile,expected_sha256:null,content:'new'};
+  assert.equal(result(await f.tools.call('write_file',write)).status,'completed');
+  writeFileSync(path.join(f.cwd,'.env'),'private');symlinkSync(f.stateRoot,path.join(f.cwd,'escape'));linkSync(newFile,path.join(f.cwd,'linked'));
+  for(const candidate of [f.cwd+'-sibling/file',f.cwd+'/../workspace/server.mjs',path.join(f.cwd,'.env'),path.join(f.cwd,'escape/file'),path.join(f.cwd,'linked')]){
+    await assert.rejects(f.tools.call('read_file',{path:candidate}),{code:'provider_tool_path_denied'});
+  }
+  const protectedTools=new ProviderHostTools({...f.tools.options,protectedPaths:['server.mjs']});t.after(()=>protectedTools.close());
+  await assert.rejects(protectedTools.call('write_file',{...write,operation_id:'absolute_write_02',path:file,expected_sha256:hash('implemented')}),{code:'provider_protected_trial_input'});
+  f.tools.options.sandbox='read-only';
+  await assert.rejects(f.tools.call('write_file',{...write,operation_id:'absolute_write_03'}),{code:'provider_tool_write_denied'});
+  assert.equal(readFileSync(file,'utf8'),'implemented');
 });
 test('bounded exact edits support large files and refuse ambiguous matches and protected verifier writes',async t=>{
   const f=fixture(t),content='prefix\n'+'large content\n'.repeat(6000)+'unique END\n';writeFileSync(path.join(f.cwd,'large.txt'),content);writeFileSync(path.join(f.cwd,'verify.mjs'),'immutable');

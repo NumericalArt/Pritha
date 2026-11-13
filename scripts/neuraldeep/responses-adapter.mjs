@@ -24,7 +24,11 @@ const DEFAULT_RESPONSE_LIMIT = 32 * 1024 * 1024;
 // equivalence, not generic prefix stripping or permission to change models.
 const responseModelMatches=(requested,returned)=>returned===requested
   || ['gpt-oss-20b','gpt-oss-120b'].includes(requested) && returned==='openai/'+requested
-  || requested==='kimi-k3.1-pro' && returned==='moonshotai/kimi-k3.1-pro';
+  || requested==='kimi-k3.1-pro' && returned==='moonshotai/kimi-k3.1-pro'
+  // Observed 2026-11-13: this exact noreason route keeps its alias in JSON,
+  // but SSE reports the base model, including a terminal native tool call.
+  // Preserve the requested alias on the wire; do not strip arbitrary suffixes.
+  || requested==='qwen3.6-35b-a3b-noreason' && returned==='qwen3.6-35b-a3b';
 // NeuralDeep advertises a 900-second gateway deadline; allow its terminal response to arrive.
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 930_000;
 const upstreamDispatchers = new WeakMap();

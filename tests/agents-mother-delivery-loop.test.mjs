@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { FunctionBuildExecutor } from "../scripts/agents-mother/build-executors.mjs";
 import { ExecutionBackendError } from "../scripts/agents-mother/execution-backends.mjs";
-import { readDeliveryLedger, transitionDelivery } from "../scripts/agents-mother/delivery-ledger.mjs";
+import { readDeliveryLedger, transitionDelivery,deliveryBudgetExtensionAllowed,recordedDeliveryBudgetBlocker } from "../scripts/agents-mother/delivery-ledger.mjs";
 import {
   cleanupDeliveryRun,
   deliveryStatus,
@@ -650,14 +650,32 @@ test(`a user budget extension preserves resume guidance and the approved plan ($
 
 test('budget recovery does not count the unchanged scaffold as another failed repair',async()=>{
   const project=repository(),stateRoot=mkdtempSync(path.join(os.tmpdir(),'pritha-loop-interrupted-')),runRoot=path.join(stateRoot,'builds','fixture-agent','run-interrupted');let calls=0;
-  const executor={name:'fixture-budget-interruption',async execute({worktree,runId}){
+  const executor={name:'fixture-budget-interruption',async execute({worktree,runId,iteration,tokenBudget}){
     calls++;
-    if(calls===1)throw new ExecutionBackendError('token_budget_exhausted','request stopped before implementation',{executorResult:chargedResult({executor:this.name,run_id:runId,status:'failed',turn_status:'interrupted',process_exited:true,thread_id:'first-thread',tokens_used:100})});
+    if(calls===1)throw new ExecutionBackendError('token_budget_exhausted','request stopped before implementation',{executorResult:chargedResult({executor:this.name,run_id:runId,iteration,token_budget:tokenBudget,status:'failed',turn_status:'interrupted',process_exited:true,thread_id:'first-thread',tokens_used:100,error_code:'provider_budget_exhausted'})});
     writeFileSync(path.join(worktree,'implementation.txt'),'ready\n');return chargedResult({executor:this.name,run_id:runId,thread_id:'second-thread',tokens_used:80});
   },close(){}};
   const first=await runDeliveryLoop({plan:plan(),projectPath:project,runRoot,runId:'run-interrupted',buildExecutor:executor,trialBackend:'local',reportDir:false,budget:{maxTokens:120,maxIterations:2,repeatedFailureThreshold:2}});
   assert.equal(first.state.blockers[0].code,'token_budget_exhausted');assert.equal(first.state.consecutive_failure_count,1);
+  const verified=await resumeDelivery('run-interrupted',{root:project,stateRoot,allowDraft:true,hostOnly:true,buildExecutor:executor,trialBackend:'local',reportDir:false});
+  assert.equal(verified.state.blockers[0].code,'token_budget_exhausted');assert.equal(calls,1,'host verification must not dispatch another builder');
+  assert.equal(verified.state.budget.tokens_used,100);assert.ok(verified.state.blockers[0].options.some(option=>option.id==='extend-budget'));
+  // A pre-fix ledger may already have lost the reservation blocker. Only the
+  // exact latest, accounted receipt can recover it for a new explicit grant.
+  const legacy=transitionDelivery(runRoot,'blocked',{phase:'verification_needs_implementation',blockers:[{...verified.state.blockers[0],code:'verification_needs_implementation'}]}).state;
+  assert.equal(deliveryBudgetExtensionAllowed(runRoot,legacy),true);
+  for(const patch of [{status:'abandoned'},{iteration:2},{budget:{...legacy.budget,max_tokens:320}},{budget:{...legacy.budget,legacy_usage_unverified:true}},{budget:{...legacy.budget,unaccounted_attempts:[{reason:'usage_unavailable'}]}},{blockers:[{...legacy.blockers[0],code:'verifier_modified'}]}]){
+    assert.equal(deliveryBudgetExtensionAllowed(runRoot,{...legacy,...patch}),false);
+  }
+  const receiptFile=path.join(runRoot,legacy.executor_last_result),receipt=JSON.parse(readFileSync(receiptFile,'utf8'));
+  for(const patch of [{run_id:'different-run'},{iteration:2},{tokens_used:0},{process_exited:false},{thread_cleanup:'pending'},{error_code:'neuraldeep_model_identity_mismatch'}]){
+    writeFileSync(receiptFile,JSON.stringify({...receipt,...patch}));assert.equal(recordedDeliveryBudgetBlocker(runRoot,legacy),null);
+  }
+  writeFileSync(receiptFile,JSON.stringify(receipt));
+  const timeOnly=await amendDeliveryBudget('run-interrupted',{root:project,stateRoot,allowDraft:true,answeredBy:'user',budgetRequestId:'time-only-recovery',addElapsedMs:10000});
+  assert.equal(timeOnly.state.status,'blocked');assert.equal(timeOnly.state.blockers[0].code,'token_budget_exhausted','time alone cannot resolve a token reservation shortfall');
   await amendDeliveryBudget('run-interrupted',{root:project,stateRoot,allowDraft:true,answeredBy:'user',budgetRequestId:'budget-recovery-1',addTokens:200});
+  assert.equal(recordedDeliveryBudgetBlocker(runRoot,readDeliveryLedger(runRoot)),null,'an authorized extension supersedes the old shortfall');
   const second=await resumeDelivery('run-interrupted',{root:project,stateRoot,allowDraft:true,buildExecutor:executor,trialBackend:'local',reportDir:false});
   assert.equal(second.state.status,'verified');assert.equal(calls,2);assert.equal(second.state.budget.tokens_used,180);assert.equal(second.state.budget.max_iterations,2);assert.equal(second.state.failure_history.length,1);
 });

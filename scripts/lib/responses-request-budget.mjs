@@ -44,9 +44,9 @@ function assertText(payload){
 export class ResponsesRequestBudget {
   constructor({tokenBudget,checkpoint,contextTokens=null}){
     if(!Number.isSafeInteger(tokenBudget) || tokenBudget<1 || typeof checkpoint!=='function')throw fail('provider_budget_invalid');
-    this.tokenBudget=tokenBudget;this.checkpoint=checkpoint;this.contextTokens=contextTokens;this.rows=[];this.current=null;this.preparing=false;this.errorCode=null;
+    this.tokenBudget=tokenBudget;this.checkpoint=checkpoint;this.contextTokens=contextTokens;this.rows=[];this.current=null;this.preparing=false;this.errorCode=null;this.admissionFailure=null;
   }
-  snapshot(){const observed=this.rows.reduce((n,row)=>n+(row.usage?.totalTokens || 0),0),known=count(observed) && this.rows.every(row=>row.status==='measured');return {version:1,tokenBudget:this.tokenBudget,tokensUsed:known?observed:null,observedTokens:observed,usageKnown:known,errorCode:this.errorCode,requests:structuredClone(this.rows)};}
+  snapshot(){const observed=this.rows.reduce((n,row)=>n+(row.usage?.totalTokens || 0),0),known=count(observed) && this.rows.every(row=>row.status==='measured');return {version:1,tokenBudget:this.tokenBudget,tokensUsed:known?observed:null,observedTokens:observed,usageKnown:known,errorCode:this.errorCode,...(this.admissionFailure?{admissionFailure:{...this.admissionFailure}}:{}),requests:structuredClone(this.rows)};}
   async begin(payload,{requestHash}={}){
     if(this.preparing || this.current || this.errorCode)throw fail(this.errorCode || 'provider_request_unconfirmed');this.preparing=true;
     try{
@@ -55,13 +55,27 @@ export class ResponsesRequestBudget {
       if(!Number.isSafeInteger(payload.max_output_tokens) || payload.max_output_tokens<1)throw fail('provider_budget_invalid');
       const bytes=Buffer.byteLength(JSON.stringify(payload)),reserve=bytes+8192,available=this.tokenBudget-snapshot.tokensUsed-reserve-64;
       const output=Math.min(payload.max_output_tokens,32768,available);
-      if(output<Math.min(payload.max_output_tokens,1024))throw fail('provider_budget_exhausted');
-      if(this.contextTokens && Math.ceil(bytes/2)+8192+output>this.contextTokens)throw fail('provider_budget_model_context');
+      if(output<Math.min(payload.max_output_tokens,1024)){
+        const requiredTokens=reserve+64+Math.min(payload.max_output_tokens,1024),remainingTokens=this.tokenBudget-snapshot.tokensUsed;
+        this.admissionFailure={code:'provider_budget_exhausted',upstreamAttempted:false,remainingTokens,requiredTokens,shortfallTokens:requiredTokens-remainingTokens};
+        throw fail('provider_budget_exhausted');
+      }
+      // Byte estimates safely reserve spend, but are not model-token counts.
+      // Do not reject a conversation as over-context from this heuristic: the
+      // native runtime uses provider token usage for compaction and the selected
+      // model's configured context window. Keep the estimate as a diagnostic.
+      const contextEstimate=this.contextTokens?{estimatedTokens:Math.ceil(bytes/2)+8192+output,declaredLimit:this.contextTokens,basis:'utf8-bytes-divided-by-two',enforcement:'advisory'}:null;
       payload={...payload,max_output_tokens:output};
-      const row={sequence:this.rows.length+1,requestHash:requestHash || hash(payload),wireHash:hash(payload),status:'reserved',inputEstimate:bytes,estimateMargin:8192,maxOutputTokens:output,reservedTokens:reserve+output,usage:null,createdAt:new Date().toISOString()};
+      const row={sequence:this.rows.length+1,requestHash:requestHash || hash(payload),wireHash:hash(payload),status:'reserved',inputEstimate:bytes,estimateMargin:8192,maxOutputTokens:output,reservedTokens:reserve+output,...(contextEstimate?{contextEstimate}:{}),usage:null,createdAt:new Date().toISOString()};
       if(this.rows.some(prior=>prior.requestHash===row.requestHash))throw fail('provider_request_uncertain');
       this.rows.push(row);this.current=row;await this.checkpoint(this.snapshot());return payload;
-    }catch(error){this.errorCode=error.code || 'provider_budget_checkpoint_failed';throw fail(this.errorCode);}finally{this.preparing=false;}
+    }catch(error){
+      this.errorCode=error.code || 'provider_budget_checkpoint_failed';
+      // A refused request has no reservation or usage row. Persist its reason
+      // separately, so recovery can distinguish a local shortfall from dispatch.
+      if(!this.current)try{await this.checkpoint(this.snapshot());}catch{this.errorCode='provider_budget_checkpoint_failed';}
+      throw fail(this.errorCode);
+    }finally{this.preparing=false;}
   }
   async record(event){
     if(!this.current)return;

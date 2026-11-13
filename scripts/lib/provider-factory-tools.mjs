@@ -22,7 +22,8 @@ import {neuralDeepExecutionProfile} from '../neuraldeep/model-execution-profile.
 import {FactoryBudget,readFactoryBudget,FACTORY_STABILITY_BUDGET} from '../agents-mother/factory-budget.mjs';
 import {prithaChildConnections} from './pritha-child-credentials.mjs';
 import {factoryDraftRepair} from '../agents-mother/factory-draft-repair.mjs';
-import {PRODUCT_PROPOSAL_SCHEMA,validateProductProposal,compileProductProposal} from '../agents-mother/factory-product-proposal.mjs';
+import {PRODUCT_PROPOSAL_SCHEMA,FactoryProductProposalError,validateProductProposal,compileProductProposal} from '../agents-mother/factory-product-proposal.mjs';
+import {deliveryBudgetExtensionAllowed,recordedDeliveryBudgetBlocker} from '../agents-mother/delivery-ledger.mjs';
 
 const actions=['status','read_artifact','propose','continue','init','write_draft','patch_draft','approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_status','research_decide','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'];
 const readonly=new Set(['status','read_artifact','scaffold_plan']);
@@ -51,7 +52,7 @@ class FactoryActionInputError extends Error {
 }
 export function factoryBriefErrorDetail(error){
   if(error?.code==='factory_proposal_profile_unsupported')return {error:error.code,hint:'The structured controller supports local API/process children with no repository adoption or autostart and either no model or a Pritha connection. Continue this saved draft with read_artifact, write_draft and the custom approval workflow; do not create a second child.'};
-  if(error?.code==='factory_product_proposal_invalid')return {error:error.code,field:error.field,hint:'Correct product examples using one-based brief.coreFunctions indexes. The host supplies paths, ports, coverage IDs and approval hashes. No document was approved.'};
+  if(error instanceof FactoryProductProposalError)return {error:error.code,field:error.field,hint:error.message+' Correct this field in factory_propose, preserving the rest of the brief and limits. The host supplies paths, ports, coverage IDs and approval hashes. No document was approved.'};
   if(error?.code==='factory_proposal_changed')return {error:error.code,hint:'The saved brief or its limits changed. Read status and the current documents; preserve approved decisions. Use the existing draft revision tools for a changed Contract, or continue with the same proposal and corrected product examples before Outcome approval.'};
   if(error?.code==='factory_managed_stop_trial_required')return {error:error.code,hint:'Call prepare_product_trial to include the host-owned managed Stop verifier. Preserve both independent verifiers and review the updated Outcome before approval. Product JSON alone does not prove safe process ownership.'};
   if(error?.code==='factory_product_trial_coverage_invalid')return {error:error.code,hostChecks:PRODUCT_HOST_CHECKS,hint:'Use HTTP/CLI covers only for behavior exercised by those JSON cases. Bind lifecycle requirements through trial.host_checks: model_connection, managed_start and managed_stop each take requiredCoverage IDs for that protected host check. Read the Outcome again; never add an unsupported Covers claim.'};
@@ -84,6 +85,9 @@ const briefSchema={type:'object',properties:{
   technical:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.technical.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'For a local HTTP server with a CLI, use runtimeFamily=api, serviceMode=process, primaryInterface=api, secondaryInterfaces=CLI and the requested cliEntrypoint. For HTTP only, set secondaryInterfaces=none and omit cliEntrypoint; scripts/server.mjs is the HTTP server, not a CLI interface. A manually started HTTP server still uses process mode. For a standalone command use runtimeFamily=cli. Set childModelProvider and childModelId to none for deterministic code. For an LLM product select childModelProvider=openai, claude, neuraldeep or openrouter and its childModelId, independently of the builder. childModelConnection defaults to pritha; childMaxOutputTokens defaults to 8192 for stability; smaller explicit user limits remain binding. Use the existing Pritha connection, never set the provider to none and read parent keys. The host fixes the target, executor, Git isolation and autostart.'},
   design:{type:'object',properties:Object.fromEntries(INTERVIEW_BRIEF_TEXT_FIELDS.design.map(key=>[key,{type:'string'}])),additionalProperties:false,description:'Optional text settings. inputDataTypes is text, e.g. UTF-8 text file, not an array.'},
 },required:['identity','goal','user','successCriteria'],additionalProperties:false};
+const proposalBriefSchema={...briefSchema,required:[...briefSchema.required,'coreFunctions'],properties:{...briefSchema.properties,
+  coreFunctions:{type:'array',minItems:1,maxItems:32,items:{type:'string',minLength:1},description:'Required numbered list of the intended product behaviors. This is separate from successCriteria; product examples refer to these entries using one-based indexes.'},
+}};
 briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMILIES];
 briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
 briefSchema.properties.technical.properties.preset.enum=['generic','local-feed','llm-app'];
@@ -150,7 +154,7 @@ const actionDescriptions={
 PROVIDER_FACTORY_TOOL.description='Compatibility dispatcher. Prefer the dedicated factory_<action> tool so its required arguments are explicit. Read scaffold_plan before Contract approval. Before approving an API Outcome, use prepare_product_trial with its exact draft hash and declarative HTTP/CLI expected_json cases to prepare its protected product verifier. '+PROVIDER_FACTORY_TOOL.description;
 export const PROVIDER_FACTORY_TOOLS=[PROVIDER_FACTORY_TOOL,...Object.entries(actionTools).map(([name,action])=>({
   name,description:actionDescriptions[action] || 'Perform '+action+' only for the bound child. Read factory_status first; existing approval, evidence, identity and measured-budget gates remain mandatory. No acceptance, merge, publication or deployment is implied.',
-  inputSchema:{type:'object',properties:Object.fromEntries(['operation_id',...(fields[action] || [])].map(key=>[key,action==='delivery_resume' && key==='answer'?{...PROVIDER_FACTORY_TOOL.inputSchema.properties[key],minLength:1,description:'Exact operator-selected blocker option ID. Required to resolve the saved blocker; do not omit or send an empty string.'}:PROVIDER_FACTORY_TOOL.inputSchema.properties[key]])),required:[...(action==='delivery_resume'?['answer']:requiredFields[action] || [])],additionalProperties:false},
+  inputSchema:{type:'object',properties:Object.fromEntries(['operation_id',...(fields[action] || [])].map(key=>[key,action==='propose' && key==='brief'?proposalBriefSchema:action==='delivery_resume' && key==='answer'?{...PROVIDER_FACTORY_TOOL.inputSchema.properties[key],minLength:1,description:'Exact operator-selected blocker option ID. Required to resolve the saved blocker; do not omit or send an empty string.'}:PROVIDER_FACTORY_TOOL.inputSchema.properties[key]])),required:[...(action==='delivery_resume'?['answer']:requiredFields[action] || [])],additionalProperties:false},
   ...(readonly.has(action)?{annotations:{readOnlyHint:true}}:{}),
 }))];
 export function normalizeFactoryToolCall(name,input){
@@ -330,12 +334,13 @@ export class ProviderFactoryTools {
     }
     let budgetReview;
     if(input.action==='delivery_extend'){
-      const current=validateFactoryDelivery(p,state,deliveryStatus(state.runId,{root:p.root,stateRoot:p.stateRoot})).state;
-      if(current.status!=='blocked' || current.blockers.length!==1 || !['token_budget_exhausted','iteration_budget_exhausted','elapsed_budget_exhausted'].includes(current.blockers[0].code) || current.version!==input.expected_version || current.budget.legacy_usage_unverified!==false || current.budget.unaccounted_attempts.length)throw factoryFail('factory_budget_context_changed');
+      const delivery=validateFactoryDelivery(p,state,deliveryStatus(state.runId,{root:p.root,stateRoot:p.stateRoot})),current=delivery.state;
+      if(!deliveryBudgetExtensionAllowed(delivery.runRoot,current) || current.version!==input.expected_version)throw factoryFail('factory_budget_context_changed');
       const additions={tokens:input.add_tokens ?? 0,iterations:input.add_iterations ?? 0,elapsed_ms:input.add_elapsed_ms ?? 0};
       const shared=readFactoryBudget({...p,chatId:this.options.chatId,connectorId:this.options.connectorId});
       for(const [key,max] of [['tokens',10000000],['iterations',100],['elapsed_ms',86400000]])if(!Number.isSafeInteger(additions[key]) || additions[key]<0 || additions[key]>max)throw factoryFail('factory_input_invalid');
       if(!Object.values(additions).some(Boolean))throw factoryFail('factory_input_invalid');
+      if(!additions.tokens && recordedDeliveryBudgetBlocker(delivery.runRoot,current))throw factoryFail('factory_budget_insufficient');
       if(current.budget.max_tokens+additions.tokens<=current.budget.tokens_used || current.budget.max_iterations+additions.iterations<=current.iteration
         || (!additions.elapsed_ms && Date.now()-Date.parse(current.created_at)>=current.budget.max_elapsed_ms))throw factoryFail('factory_budget_insufficient');
       budgetReview={sharedLimits:{tokens:shared.maxTokens+additions.tokens,activeMs:shared.maxActiveMs+additions.elapsed_ms},proposedLimits:{tokens:current.budget.max_tokens+additions.tokens,iterations:current.budget.max_iterations+additions.iterations,freshWindowMs:additions.elapsed_ms},runId:state.runId,expectedVersion:current.version,tokensUsed:current.budget.tokens_used,iterationsUsed:current.iteration,additions,previousLimits:{tokens:current.budget.max_tokens,iterations:current.budget.max_iterations,elapsedMs:current.budget.max_elapsed_ms},approvalScope:'exact additions to the build and shared workflow limits and immediate continuation only; previous usage and accepted artifacts remain unchanged'};

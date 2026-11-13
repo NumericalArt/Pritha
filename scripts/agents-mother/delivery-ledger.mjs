@@ -11,6 +11,7 @@ import path from "node:path";
 import { atomicWriteFile, withFileLock } from "../lib/atomic-file.mjs";
 import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { redactFilesystemPaths } from "../lib/redaction.mjs";
+import { readBoundedRegularFile } from "../lib/safe-file-read.mjs";
 
 export const DELIVERY_LEDGER_SCHEMA = "pritha-delivery-ledger-v2";
 export const LEGACY_DELIVERY_LEDGER_SCHEMA = "pritha-delivery-ledger-v1";
@@ -437,6 +438,41 @@ export function recordDeliveryFailure(runRoot, failures, options = {}) {
   }, { ...options, eventType: "trial_failure_recorded", payload: { signature } });
 }
 
+const budgetPauseCodes=new Set(['token_budget_exhausted','iteration_budget_exhausted','elapsed_budget_exhausted']);
+
+/** Recover a reservation shortfall from the latest settled attempt, including
+ * older runs where host verification replaced it with a stub-test failure.
+ * A grant or a later attempt makes the old shortfall inapplicable. */
+export function recordedDeliveryBudgetBlocker(runRoot,state){
+  if(deliveryUsageStatus(state.budget)!=='complete' || !Number.isSafeInteger(state.iteration) || state.iteration<1)return null;
+  const reference=state.executor_last_result;
+  if(reference!==`executor/iteration-${String(state.iteration).padStart(3,'0')}.json`)return null;
+  let receipt;
+  try{receipt=parseBoundedJson(readBoundedRegularFile(path.join(runRoot,reference),{maxBytes:2_000_000,allowedRoots:[runRoot]}).text,{maxBytes:2_000_000,maxDepth:32,maxNodes:30000});}catch{return null;}
+  const accounted=state.budget.accounted_turns.find(row=>row.executor_result===reference && row.thread_id===receipt.thread_id && row.turn_id===receipt.turn_id);
+  if(receipt.schema!=='pritha-build-executor-result-v2' || receipt.run_id!==state.run_id || receipt.iteration!==state.iteration
+    || receipt.status!=='failed' || receipt.turn_status!=='interrupted' || receipt.process_exited!==true || !['closed','archived'].includes(receipt.thread_cleanup)
+    || receipt.usage_status!=='measured' || !accounted || accounted.tokens_used!==receipt.tokens_used
+    || !['provider_budget_exhausted','token_budget_exhausted'].includes(receipt.error_code)
+    || !Number.isSafeInteger(receipt.token_budget) || receipt.token_budget<1
+    || receipt.token_budget!==state.budget.max_tokens-state.budget.tokens_used+receipt.tokens_used)return null;
+  return typedBlocker({code:'token_budget_exhausted',
+    summary:'The remaining authorized tokens cannot cover the next provider request reservation. Existing work and measured usage are preserved.',
+    question:'How should Pritha continue after the next request no longer fits the authorized budget?',
+    options:[
+      {id:'extend-budget',label:'Continue this run',effect:'Authorize additional budget for the same worktree and approved outcome.'},
+      {id:'verify-only',label:'Verify existing work',effect:'Run approved Trials without another model request.'},
+      {id:'review-failures',label:'Review evidence',effect:'Inspect the saved request and Trial evidence without spending tokens.'},
+      {id:'stop-run',label:'Stop run',effect:'Abandon this run while preserving its evidence.'},
+    ],evidence_refs:[reference,'ledger:budget.accounted_turns']});
+}
+
+export function deliveryBudgetExtensionAllowed(runRoot,state){
+  return state.status==='blocked' && state.blockers.length===1 && deliveryUsageStatus(state.budget)==='complete'
+    && (budgetPauseCodes.has(state.blockers[0].code)
+      || state.blockers[0].code==='verification_needs_implementation' && recordedDeliveryBudgetBlocker(runRoot,state)!==null);
+}
+
 export function budgetBlocker(state, now = Date.now()) {
   const elapsed = now - Date.parse(state.created_at);
   if (deliveryUsageStatus(state.budget) !== "complete") {
@@ -549,8 +585,8 @@ export function grantDeliveryBudget(runRoot, input = {}) {
       ...current.budget, ...after,
       amendments: [...current.budget.amendments, { request_id: requestId, request_hash: requestHash, approved_by: "user", approved_at: new Date(now).toISOString(), additions, ...(hasTarget ? { token_target: input.setTokens } : {}), before, after, applied_version: current.version + 1 }],
     };
-    const recoverable = current.status === "blocked" && ["token_budget_exhausted", "iteration_budget_exhausted", "elapsed_budget_exhausted"].includes(current.blockers[0]?.code);
-    const remaining = budgetBlocker({ ...current, budget }, now);
+    const recoverable = deliveryBudgetExtensionAllowed(runRoot,current);
+    const remaining = budgetBlocker({ ...current, budget }, now) || (recoverable ? recordedDeliveryBudgetBlocker(runRoot,{...current,budget}) : null);
     return {
       ...current, budget,
       ...(recoverable ? remaining
