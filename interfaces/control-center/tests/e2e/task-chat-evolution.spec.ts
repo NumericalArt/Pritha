@@ -52,6 +52,27 @@ async function mockChat(page: Page, initiallyRestored = false) {
   return control;
 }
 
+for (const width of [1280, 390]) test(`model-led creation shows autonomous recovery and a usable result at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:900});
+  const control=await mockChat(page,true);
+  const state={chatId:'chat_fixture',connectorId:'codex',target:'/workspace/fixture-agent',phase:'research',running:null,continuationPause:'research_collect',
+    creationAuthority:{policy:'model-led-local-v1',chatId:'chat_fixture',connectorId:'codex',target:'/workspace/fixture-agent',requestId:'creation_fixture'}};
+  control.factoryControl={available:true,slug:'fixture-agent',phase:'research',running:false,documentsApproved:true,builder:{provider:'codex',modelId:'fixture-model',effort:'low'},delivery:null,milestone:factoryMilestone(state,null,null)};
+  await page.goto('/task-chat?chat=chat_fixture&group=my_chats');
+  await expect(page.getByText('Choosing implementation · fixture-agent',{exact:true})).toBeVisible();
+  await expect(page.getByText('Research paused',{exact:false})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Approve',exact:true})).toHaveCount(0);
+  const firstUse={directory:'/workspace/fixture-agent',commit:'a'.repeat(40),disposition:'applied-local-project' as const,interactionHref:'/agents/fixture-agent#try-agent',modelVerification:'protected-local-responder' as const,liveModelVerified:false as const,
+    commands:{server:'node scripts/server.mjs',http:'curl http://localhost/example'},observed:{http:{answer:'YES'}},unverifiedRequirements:['Explain unusual input in the user guide']};
+  control.factoryControl={...control.factoryControl,phase:'awaiting-manual-acceptance',milestone:factoryMilestone({...state,continuationPause:null},null,firstUse),firstUse};
+  await page.reload();
+  await expect(page.getByRole('link',{name:'Open the agent and send input'})).toBeVisible();
+  await page.getByText('Verified files and commands',{exact:true}).click();
+  await expect(page.getByText('Explain unusual input in the user guide',{exact:true})).toBeVisible();
+  await expect(page.getByText('The protected local model-connection checks passed.',{exact:false})).toBeVisible();
+  await page.screenshot({path:`/tmp/pritha-model-led-${width}.png`,fullPage:true});
+});
+
 for (const width of [1280, 390]) test(`factory progress explains expected implementation and a real stop at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 });
   const control = await mockChat(page, true), errors: string[] = [];

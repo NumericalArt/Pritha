@@ -1,3 +1,4 @@
+import {hasCreationAuthority} from './factory-creation-authority.mjs';
 // A finished controller turn is not a finished child. Both entry points use
 // this presentation from the same bound evidence; neither infers it from text.
 export function factoryMilestone(state,delivery,firstUse) {
@@ -9,6 +10,7 @@ export function factoryMilestone(state,delivery,firstUse) {
   if(delivery?.status==='failed')return at('stopped','Build interrupted','The build could not be completed. Pritha saved the work and stopped new attempts. Check the build log to establish the cause before continuing.');
   if(state?.continuationPause && !state.running){
     const step=state.continuationPause;
+    if(hasCreationAuthority(state) && ['research_collect','research_apply','research_recover'].includes(step))return at('building','Choosing implementation','An optional source could not be read. Pritha is reviewing the available information and choosing how to implement and test the agent.');
     if(['research','research_collect','research_apply','research_recover'].includes(step))return at('stopped','Research paused','Source verification could not be completed. Pritha saved the research and paused automatic continuation. Resolve the cause and confirm the sources before building.');
     if(step==='scaffold')return at('stopped','Scaffolding paused','The scaffold could not be completed. Pritha saved the approved documents and paused automatic continuation. Check this step in the log before retrying.');
     if(step==='finish')return at('partial','Handoff paused','Handoff preparation could not be completed. Pritha saved the build and verification results. Resolve the cause before completing the handoff.');
@@ -17,7 +19,7 @@ export function factoryMilestone(state,delivery,firstUse) {
   if(state?.phase==='card-blocked' && state.localApplication?.status==='manual')return at('review','Ready to apply','The build is verified. Applying it to the agent project requires approval before it can be launched from the card.');
   if(state?.phase==='card-blocked' && state.localApplication?.reason==='source_has_changes')return at('partial','Your changes are preserved','The build is verified. The project has local changes; Pritha preserved them and is waiting for a decision about applying the build.');
   if(state?.phase==='card-blocked')return at('partial','Management card not ready',firstUse?'The agent interfaces are verified. You can try the indicated build. Pritha is waiting for the management card settings to be fixed.':'The build passed verification. Pritha is waiting for the management card settings to be fixed.');
-  if(firstUse?.disposition==='applied-local-project')return at('review','Ready to launch','The verified version is in the project folder. The agent can be launched from its card. Acceptance is a separate decision.');
+  if(firstUse?.disposition==='applied-local-project')return at('review','Ready to launch','The checked version is in the project folder. Launch it from its card, try it and ask for any improvements.');
   if(['verified','awaiting_acceptance','accepted'].includes(delivery?.status))return at('review','Verified',firstUse?'The verified version is ready for a first run. Acceptance is a separate decision.':'Verification results are recorded. The command for the current version is not yet confirmed.');
   if(delivery?.status==='verifying')return at('verifying','Verifying',delivery.iteration===0?'The scaffold is ready. Checking which features still need implementation.':'The implementation is ready for verification. Checking the agent behavior against the agreed examples.');
   // These are real delivery stages, not a reinterpretation of a failed turn.
@@ -31,8 +33,10 @@ export function factoryMilestone(state,delivery,firstUse) {
     return at('building','Implementing','Implementing the agent. Next, it will be checked against the agreed examples.');
   }
   if(state?.phase==='scaffolded')return at('building','Scaffold ready','The scaffold is ready. Next comes implementation of the agent behavior and verification of the result.');
+  if(state?.phase==='research' && hasCreationAuthority(state))return at('building','Planning implementation','Pritha is using memory and relevant documentation to choose the implementation, then it will build and test the agent.');
   if(state?.phase==='research')return at('building','Researching sources','Checking sources for the selected approach. Next, the agent scaffold will be prepared.');
   if(state?.outcomeApproval)return at('building','Building','The factory is building and verifying the agent within the agreed limits.');
+  if(hasCreationAuthority(state))return at('building','Preparing the agent','Pritha is turning your request into an implementation plan and examples, then building the local agent.');
   return at('proposal','Clarifying the task','First, agree on the agent capabilities and the verification criteria in separate reviews.');
 }
 

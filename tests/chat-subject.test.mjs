@@ -24,5 +24,5 @@ test('every external harness carries the same subject separately from the author
   assert.equal(JSON.parse(nd.find(value=>value.startsWith('developer_instructions=')).slice('developer_instructions='.length)),expected);
   const claude=buildClaudeExecArgs({model:'claude-sonnet-4-6',sessionId:'12345678-1234-1234-1234-123456789012',factorySubject});
   assert(claude[claude.indexOf('--append-system-prompt')+1].endsWith(expected));assert.equal(claude[claude.indexOf('--tools')+1],'');
-  assert.match(expected,/separate approvals and a passing gate/);assert.match(expected,/not approval/);assert.match(expected,/private agent memory/);
+  assert.match(expected,/recorded document and research policy/);assert.match(expected,/not approval/);assert.match(expected,/private agent memory/);
 });

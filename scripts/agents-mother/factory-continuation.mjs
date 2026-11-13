@@ -1,3 +1,4 @@
+import {hasCreationAuthority} from './factory-creation-authority.mjs';
 import {createHash} from 'node:crypto';
 import {deliveryUsageStatus} from './delivery-ledger.mjs';
 import {scaffoldCapability} from './scaffold/capabilities.mjs';
@@ -63,6 +64,10 @@ export function nextFactoryAction(s,ledger) {
   }
   if(s.phase==='outcome-approved' && !s.research && !s.pattern)return step('research');
   if(s.phase==='research' && s.research && s.pattern){
+    if(hasCreationAuthority(s)){
+      if(s.researchStage==='advisory-reviewed' && s.researchDecision)return step('scaffold');
+      return wait('research_review');
+    }
     if(s.researchStage==='planned')return step('research_collect');
     if(s.researchStage==='published')return step('scaffold');
     return wait('source_selection');

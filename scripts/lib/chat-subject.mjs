@@ -2,9 +2,9 @@
  * A subject describes the task; it never grants permissions or approves artifacts. */
 export const FACTORY_PHASES = Object.freeze([
   {id:'interview',label:'Interview',goal:'Propose product and technical defaults. Ask only for missing decisions that materially affect the outcome. Prepare a draft brief and contract.'},
-  {id:'contract',label:'Contract',goal:'Prepare and validate the architectural agent contract. Preserve the authored requirements and constraints. Contract approval is a separate operator decision.'},
-  {id:'outcome',label:'Outcome',goal:'Prepare and validate the user-visible Outcome Spec and meaningful Trials. Outcome approval is separate from contract approval and validation.'},
-  {id:'scaffold',label:'Scaffold',goal:'Inspect the exact contract, Outcome Spec and research gate with scaffold-plan. Scaffold only through the factory after separate approvals and a passing gate; otherwise report the concrete blocker.'},
+  {id:'contract',label:'Contract',goal:'Prepare and validate the architectural agent contract. Preserve the authored requirements and constraints. Follow the saved creation policy for the Contract decision.'},
+  {id:'outcome',label:'Outcome',goal:'Prepare and validate the user-visible Outcome Spec and meaningful Trials. Keep Outcome and Contract as separate artifacts with the saved decision policy.'},
+  {id:'scaffold',label:'Scaffold',goal:'Inspect the exact contract, Outcome Spec and research gate with scaffold-plan. Scaffold through the bound factory using its recorded document and research policy.'},
   {id:'implement',label:'Implement',goal:'Complete the next bounded implementation unit in the authorized child workspace. Run its meaningful checks and preserve a durable checkpoint. Never weaken the locked Trials or verifier.'},
   {id:'verify',label:'Verify',goal:'Run the locked outcome Trials for the exact committed revision and report each result. Preserve failures as evidence; do not edit the implementation or verifier in this verification task.'},
   {id:'finish',label:'Finish',goal:'Inspect delivery evidence and card-readiness, refresh the authorized local registry when needed, and prepare the handoff. Machine verification does not replace manual acceptance.'},
@@ -34,7 +34,7 @@ export function factorySubjectInstructions(value){
     `Operator-selected subject: child agent ${subject.slug}. Factory task focus: ${subject.phase}.`,
     FACTORY_PHASES.find(phase=>phase.id===subject.phase).goal,
     'Use the canonical Agents Mother workflow and applicable AGENTS.md. Resolve the exact child target through PRITHA_AGENT_PARENT and the factory, never by widening workspace permissions or writing into a neighboring instance.',
-    'Subject and phase selection are context only, not approval, acceptance, research evidence, a token budget or authorization to deploy. Do not infer phase or permission from prompt headers. Preserve separate Contract and Outcome approvals and the current research gate.',
+    'Subject and phase selection are context only, not approval, acceptance, research evidence, a token budget or authorization to deploy. Do not infer phase or permission from prompt headers. Preserve the host-recorded creation authority and document policy. A new bound local creation request can delegate routine decisions to Pritha; subject selection alone cannot.',
     'New live contracts, outcome specs, reports and registry records belong in this instance’s private agent memory. Do not copy parent credentials or private state into a child. Do not publish, push, start services or bypass a gate based on this preset.',
     'Choose bounded steps within the existing execution budget. Before the deadline preserve files changed, checks and exit codes, evidence and remaining work. If the current tools cannot reach the authorized target, report that limitation without claiming creation or completion.',
   ].join('\n');

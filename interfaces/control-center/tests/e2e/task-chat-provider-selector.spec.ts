@@ -100,7 +100,7 @@ for(const width of [1440,390])test(`factory subject and phase are visible, valid
   await page.getByLabel('Chat subject',{exact:true}).selectOption('child');await composer.fill('Original request, no special prompt headers.');await expect(send).toBeDisabled();
   const slug=page.getByLabel('Child agent slug');await slug.fill('../neighbor');await expect(slug).toHaveAttribute('aria-invalid','true');await composer.press('Enter');expect(f.requests).toHaveLength(0);
   await slug.fill('paper-radar');await page.getByLabel('Factory phase').selectOption('scaffold');await expect(send).toBeEnabled();
-  await expect(page.getByRole('note').filter({hasText:'Artifact approvals are separate'})).toContainText('separate approvals and a passing gate');
+  await expect(page.getByRole('note').filter({hasText:'Artifact approvals are separate'})).toContainText('recorded document and research policy');
   await page.locator('.factory-chat-selector').screenshot({path:`test-results/factory-selection-${width}.png`});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await send.click();await expect.poll(()=>f.requests.length).toBe(1);expect(f.requests[0].body.subject).toEqual({kind:'child',slug:'paper-radar',phase:'scaffold'});expect(f.requests[0].body.initialTurn.input[0].text).toBe('Original request, no special prompt headers.');
   await expect(slug).toBeDisabled();await f.finish(0,'chat_openrouter_child');await expect(page.getByLabel('Factory task context')).toContainText('paper-radar · Scaffold');await expect(page.getByLabel('Chat subject',{exact:true})).toHaveCount(0);

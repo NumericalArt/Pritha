@@ -1,3 +1,4 @@
+import {verifyCreationAuthority} from '../../../../../scripts/agents-mother/factory-creation-authority.mjs';
 import { resolvePrithaMemoryDatabase } from "../pritha-paths";
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
@@ -610,7 +611,7 @@ function currentContractFingerprint(text: string) {
 
 function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackContractPath: string | null, outcomeText: string): { valid: boolean; reason?: string; approvalId?: string } {
   const outcomeFront = frontmatter(outcomeText);
-  if (scalarValue(outcomeFront, "outcome_spec_status") !== "approved" || scalarValue(outcomeFront, "approved_by") !== "user") {
+  if (scalarValue(outcomeFront, "outcome_spec_status") !== "approved" || !["user","pritha"].includes(scalarValue(outcomeFront, "approved_by") || "")) {
     return { valid: false, reason: "Outcome Spec is not independently approved" };
   }
   const semanticLock = scalarValue(outcomeFront, "outcome_semantic_lock");
@@ -655,7 +656,8 @@ function outcomeApprovalIntegrity(root: string, outcomePath: string, fallbackCon
     && event.contract_fingerprint === contractFingerprint
     && event.semantic_lock === semanticLock
     && event.document_lock === documentLock
-    && event.approved_by === "user"
+    && event.approved_by === scalarValue(outcomeFront,"approved_by")
+    && (event.approved_by === "user" || event.approved_by === "pritha" && verifyCreationAuthority(event.creation_authority,{fullPath:boundContractPath,technicalSlug:bodyFieldValue(contractText,"Technical slug"),targetFolder:bodyFieldValue(contractText,"Target folder")},outcomePath,{root,stateRoot:resolvePrithaStateRoot(root)}))
     && typeof event.approval_id === "string" && event.approval_id.length > 0
   ));
   return matched

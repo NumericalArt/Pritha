@@ -804,7 +804,7 @@ async function runDeliveryLoopLocked(input = {}) {
       const beforeBuild = budgetBlocker(state);
       if (beforeBuild) return blockDelivery(runRoot, plan, worktree, beforeBuild, input);
       if (input.hostOnly) return blockDelivery(runRoot, plan, worktree, blockerForError(new DeliveryLoopError("verification_needs_implementation", "The approved checks found remaining work; the result and evidence are preserved.")), input);
-      const failureUpdate = recordDeliveryFailure(runRoot, failures, { eventType: "verification_failed",observationKey:failureObservation(runRoot,state,result) });
+      const failureUpdate = recordDeliveryFailure(runRoot, failures, { modelLedRepair:plan.delivery_policy?.repair_policy==="model-led",eventType: "verification_failed",observationKey:failureObservation(runRoot,state,result) });
       state = failureUpdate.state;
       if (state.status === "blocked") {
         const reportPath = emitDeliveryReport(state, plan, worktree, input);
@@ -872,7 +872,7 @@ async function runDeliveryLoopLocked(input = {}) {
           remainingIterations: Math.max(0, state.budget.max_iterations - state.iteration),
           worktree: worktree.worktree,
           plan,
-          failures: sanitize(failures, { projectRoot: worktree.worktree, stateRoot: input.stateRoot, root: input.root }),
+          failures: sanitize([...(state.consecutive_failure_count>=state.budget.repeated_failure_threshold && plan.delivery_policy?.repair_policy==="model-led"?[{id:"repair-strategy",status:"feedback",message:"The same checks still fail. Review the observed diagnostics, identify the faulty assumption and change the implementation approach. Do not weaken tests or ask the user to debug. The remaining time, tokens and iteration budget still apply."}]:[]),...failures], { projectRoot: worktree.worktree, stateRoot: input.stateRoot, root: input.root }),
           protectedPaths: protectedInputs.entries,
           timeoutMs: Math.min(input.executorTimeoutMs || 900000,remainingElapsedMs),
           stateRoot: input.stateRoot,
@@ -910,7 +910,7 @@ async function runDeliveryLoopLocked(input = {}) {
           return blockDelivery(runRoot, plan, worktree, blockerForError(error), input);
         }
         const synthetic = [{ id: "build-executor", assertions: [], error: { code: error.code || "executor_failed" } }];
-        const failure = recordDeliveryFailure(runRoot, synthetic, { eventType: "build_executor_failed" });
+        const failure = recordDeliveryFailure(runRoot, synthetic, { modelLedRepair:plan.delivery_policy?.repair_policy==="model-led",eventType: "build_executor_failed" });
         if (failure.state.status === "blocked") {
           const reportPath = emitDeliveryReport(failure.state, plan, worktree, input);
           return { state: failure.state, worktree, reportPath, blocked: true };

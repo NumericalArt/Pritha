@@ -414,7 +414,7 @@ export function recordDeliveryFailure(runRoot, failures, options = {}) {
       consecutive_failure_count: count,
       failure_history: repeatedObservation?current.failure_history:[...(current.failure_history || []), entry].slice(-20),
     };
-    if (count < threshold) {
+    if (count < threshold || options.modelLedRepair===true) {
       return { ...base, status: "building", phase: "repair", next_action: "repair_latest_trial_failures", blockers: [] };
     }
     return {

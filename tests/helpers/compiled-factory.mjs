@@ -11,6 +11,7 @@ import {generatedAgentFiles} from '../../scripts/agents-mother/scaffold/index.mj
 // Run in a disposable process against the actual production artifact. Loading
 // source TypeScript or mocking the HTTP response would miss asset URL rewrites.
 const dist=path.resolve(process.argv[2]);
+const modelLed=process.argv[3]==='--model-led';
 const require=createRequire(import.meta.url);
 const chunkRoot=path.join(dist,'server/chunks');
 const runtime=require(path.join(chunkRoot,'[turbopack]_runtime.js'))('compiled-factory-regression');
@@ -44,7 +45,7 @@ for(const [connectorId,model,childProvider,childModel] of [
   ['claude','claude-sonnet-5-5','claude','claude-haiku-4-5-20251001'],
   ['neuraldeep','kimi-k3.1-pro','neuraldeep','gpt-oss-20b'],
 ]){
-  const f=await productFactoryFixture({connectorId,model,childProvider,childModel,httpOnly:true,slug:'bundled-'+connectorId,name:'Bundled '+connectorId,field:'text',route:'/run',portVariable:'FIXTURE_PORT',cliInput:'first',httpInput:'second',result:text=>({answer:text})},()=>{},{automate:true,factoryToolsClass:FactoryTools});
+  const f=await productFactoryFixture({connectorId,model,childProvider,childModel,httpOnly:true,slug:'bundled-'+connectorId,name:'Bundled '+connectorId,field:'text',route:'/run',portVariable:'FIXTURE_PORT',cliInput:'first',httpInput:'second',result:text=>({answer:text})},()=>{},{automate:true,factoryToolsClass:FactoryTools,creationMode:modelLed?'model-led':'reviewed'});
   try{
     const call=async(action,args)=>{const result=await f.call(action,args);assert.equal(result.error,undefined,JSON.stringify(result));assert.notEqual(result.continuationFailed,true,JSON.stringify(result));return result;};
     const brief=f.brief;
@@ -52,14 +53,15 @@ for(const [connectorId,model,childProvider,childModel] of [
     brief.technical.cliEntrypoint='scripts/server.mjs';
     const product={http:['first','second'].map(text=>({functions:[1],path:'/run',input_json:{text},expected_json:{answer:text+' __PRITHA_MODEL_TEXT__'},model_output:{answer:text+' __PRITHA_MODEL_TEXT__'}}))};
     product.http.push({functions:[1],path:'/run',input_json:{text:'   '},expected_status:400,expected_json:{error:'invalid_text'}});
+    if(modelLed)product.http=[{functions:[1],path:'/run',input_json:{text:'first'},expected_json:{answer:'YES'},model_output:{answer:'YES'}},product.http.at(-1)];
     const proposal=call('propose',{brief,product,build_token_budget:10000,build_iteration_budget:2});
     const pending=async kind=>{
       await Promise.race([until(()=>f.pending().length===1),proposal.then(result=>assert.fail('Stopped before '+kind+': '+JSON.stringify(result)))]);
       assert.equal(f.pending()[0].presentation.approvalScope,kind+' only');
     };
-    await pending('contract');
+    if(!modelLed)await pending('contract');else await proposal;
     assert.equal((await call('scaffold_plan')).capability.supported,true);
-    await f.answer();await pending('outcome');
+    if(!modelLed){await f.answer();await pending('outcome');}
     const trial=f.trial;
     const data=contractData(f.state().contract,{root:f.root});
     // This compiled review regenerates and compares the complete verifier,
@@ -77,14 +79,14 @@ for(const [connectorId,model,childProvider,childModel] of [
       assert.equal(createHash('sha256').update(content).digest('hex'),digest);
     }
     const before=f.artifact('outcome').sha256;
-    await f.answer();await proposal;
-    assert.equal(f.reviews[1].presentation.beforeSha256,before,'The original Outcome must reach its approval card without repair');
-    const finished=await f.research();
+    if(!modelLed)await f.answer();await proposal;
+    if(!modelLed)assert.equal(f.reviews[1].presentation.beforeSha256,before,'The original Outcome must reach its approval card without repair');
+    const finished=modelLed?await f.call('research_decide',{answer:'Use memory and the existing local API adapter; implement the enum result and verify its model calls and process lifecycle.'}):await f.research();
     assert.equal(finished.continuationFailed,false,JSON.stringify(finished));
     assert.deepEqual(finished.continued,['scaffold','deliver','finish']);
     assert.equal(f.state().phase,'awaiting-manual-acceptance');
     assert.equal(f.builds.length,1,'A failed scaffold Trial must start the builder automatically');
-    assert.equal(f.reviews.length,2);
-    console.log(JSON.stringify({connectorId,compiledOutcomeApproval:true,structuredProposal:true,reviewedOriginalOutcome:true,distinctClientSources:5,scaffoldSourcesMatch:true,lifecycleCoverage:true,httpExamples:3,automaticBuild:true,paidRequests:0}));
+    assert.equal(f.reviews.length,modelLed?0:2);
+    console.log(JSON.stringify({connectorId,modelLed,documentQuestions:f.reviews.length,decisionActor:f.artifact('outcome').frontmatter.approved_by,compiledOutcomeApproval:true,structuredProposal:true,reviewedOriginalOutcome:true,distinctClientSources:5,scaffoldSourcesMatch:true,lifecycleCoverage:true,httpExamples:product.http.length,automaticBuild:true,paidRequests:0}));
   }finally{await f.close();}
 }

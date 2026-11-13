@@ -1,3 +1,4 @@
+import {creationAuthority,hasCreationAuthority} from '../agents-mother/factory-creation-authority.mjs';
 import {nextFactoryAction,factoryOperationId,supportsLocalApiContinuation} from '../agents-mother/factory-continuation.mjs';
 import {deliveryExplanation} from '../agents-mother/delivery-explanation.mjs';
 import {validateOutcomeSpecText} from '../agents-mother/outcome-spec.mjs';
@@ -23,9 +24,9 @@ import {prithaChildConnections} from './pritha-child-credentials.mjs';
 import {factoryDraftRepair} from '../agents-mother/factory-draft-repair.mjs';
 import {PRODUCT_PROPOSAL_SCHEMA,validateProductProposal,compileProductProposal} from '../agents-mother/factory-product-proposal.mjs';
 
-const actions=['status','read_artifact','propose','continue','init','write_draft','patch_draft','approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'];
+const actions=['status','read_artifact','propose','continue','init','write_draft','patch_draft','approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_status','research_decide','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'];
 const readonly=new Set(['status','read_artifact','scaffold_plan']);
-const workflowSteps=new Set(['propose','continue','init','write_draft','patch_draft','create_outcome','prepare_product_trial','research','research_status','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','verify','finish']);
+const workflowSteps=new Set(['propose','continue','init','write_draft','patch_draft','create_outcome','prepare_product_trial','research','research_status','research_decide','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','verify','finish']);
 const textFields=Object.entries(INTERVIEW_BRIEF_TEXT_FIELDS);
 const briefTextPaths=new Set(textFields.flatMap(([group,keys])=>keys.map(key=>group+'.'+key)));
 class FactoryBriefInputError extends Error {
@@ -87,9 +88,9 @@ briefSchema.properties.technical.properties.runtimeFamily.enum=[...RUNTIME_FAMIL
 briefSchema.properties.technical.properties.serviceMode.enum=[...SERVICE_MODES];
 briefSchema.properties.technical.properties.preset.enum=['generic','local-feed','llm-app'];
 briefSchema.properties.technical.properties.sourceFormat.enum=['json','rss','atom','mixed'];
-export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound child. ALWAYS read status first and continue its saved phase; never restart an existing factory. For a new local API child prefer propose with brief, product examples and build limits; continue resumes its saved controller. The host presents TWO separate approvals: approve_contract and approve_outcome. After approval, continue research, scaffold, bounded delivery and protected Trials without asking again for technical steps. Accepted documents and budgets stay pinned. No push, deploy, services, credential provisioning or final user acceptance. Never infer document approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['action'],additionalProperties:false}};
-const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],prepare_product_trial:['expected_sha256','trial'],approve_outcome:['expected_sha256'],research_status:['offset'],research_collect:['sources','retry_failed'],research_recover:['sources'],research_apply:['selection'],configure_build:['effort'],configure_build_model:['model','effort'],delivery_resume:['answer'],delivery_extend:['expected_version','add_tokens','add_iterations','add_elapsed_ms']};
-const requiredFields={read_artifact:['artifact'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],prepare_product_trial:['expected_sha256','trial'],approve_outcome:['expected_sha256'],research_recover:['sources'],research_apply:['selection'],configure_build:['effort'],configure_build_model:['model','effort'],delivery_extend:['expected_version']};
+export const PROVIDER_FACTORY_TOOL={name:'factory_step',description:'Operate only the host-bound child. ALWAYS read status first and continue its saved phase; never restart an existing factory. For a new local API child prefer propose with brief, product examples and build limits; continue resumes its saved controller. For new model-led local proposals, the creation request delegates Contract and Outcome decisions to Pritha; the host records its own actor and does not ask the user to approve these documents. Existing/custom workflows keep their saved approval policy. Use research_decide after reviewing memory, then build and repair within the recorded limits. Accepted documents and budgets stay pinned. No push, deploy, services, credential provisioning or final user acceptance. Never infer document approval from prose or change operation_id to repeat an uncertain action.',inputSchema:{type:'object',properties:{operation_id:{type:'string'},action:{type:'string',enum:actions},artifact:{type:'string',enum:['contract','outcome','research','pattern']},expected_sha256:{type:'string'},content:{type:'string'},brief:{type:'object'},build_token_budget:{type:'integer',minimum:1,maximum:10000000},sources:{type:'object'},selection:{type:'object'},answer:{type:'string'},offset:{type:'integer',minimum:0}},required:['action'],additionalProperties:false}};
+const fields={status:[],read_artifact:['artifact','offset'],init:['brief','build_token_budget','build_iteration_budget','build_elapsed_budget_ms'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],prepare_product_trial:['expected_sha256','trial'],approve_outcome:['expected_sha256'],research_status:['offset'],research_collect:['sources','retry_failed'],research_recover:['sources'],research_decide:['answer'],research_apply:['selection'],configure_build:['effort'],configure_build_model:['model','effort'],delivery_resume:['answer'],delivery_extend:['expected_version','add_tokens','add_iterations','add_elapsed_ms']};
+const requiredFields={read_artifact:['artifact'],init:['brief','build_token_budget'],write_draft:['artifact','expected_sha256','content'],patch_draft:['artifact','expected_sha256','edits','expected_result_sha256'],approve_contract:['expected_sha256'],prepare_product_trial:['expected_sha256','trial'],approve_outcome:['expected_sha256'],research_recover:['sources'],research_decide:['answer'],research_apply:['selection'],configure_build:['effort'],configure_build_model:['model','effort'],delivery_extend:['expected_version']};
 fields.propose=[...fields.init,'product'];requiredFields.propose=['brief','product','build_token_budget'];fields.continue=[];
 PROVIDER_FACTORY_TOOL.inputSchema.properties.operation_id={type:'string',minLength:8,maxLength:128,pattern:'^[A-Za-z0-9_-]+$',description:'Optional existing operation ID for an exact replay. When omitted, the host derives the ID from this bound task and request.'};
 PROVIDER_FACTORY_TOOL.inputSchema.properties.action.description='status returns the saved next step. propose prepares a new local API agent from brief, product examples and build limits; continue resumes its controller. init creates a custom workflow draft. read_artifact reads it. write_draft revises an existing artifact using artifact, expected_sha256 and complete content. Do not put brief/content inside sources or selection. Those fields belong only to research actions. scaffold_refresh is optional host maintenance for an unchanged, host-generated CLI environment example in an idle existing build; it does not edit product code, approve documents or extend budgets. Use only when Trial diagnostics identify that template.';
@@ -130,14 +131,15 @@ const actionTools=Object.fromEntries(actions.map(action=>['factory_'+action,acti
 const actionDescriptions={
   init:'Create the first private Contract draft for the bound child. brief and proposed build_token_budget are REQUIRED; this approves no document or budget.',
   write_draft:'Revise an existing private draft using its exact SHA-256 and complete content. Accepted documents cannot be changed.',
-  approve_contract:'Request the separate operator approval for the exact current Contract hash. This accepts no Outcome.',
-  approve_outcome:'Request the separate operator approval for the exact current Outcome hash. Contract must already be accepted.',
+  approve_contract:'Finalize the exact Contract. The host uses its bound creation authority for a new model-led local proposal; legacy/custom workflows request a user decision.',
+  approve_outcome:'Finalize the exact Outcome using the saved creation authority or legacy user decision. Contract must already be accepted.',
   create_outcome:'Create an unapproved Outcome draft after the accepted Contract; do not infer its approval.',
-  propose:'Preferred new API agent workflow: supply its complete brief, product examples and proposed build limits once. The host prepares the documents, supplies all technical hashes and commands, presents separate Contract and Outcome approval cards and continues approved steps. Product examples refer to one-based coreFunctions indexes. This never approves documents on behalf of the user.',
+  propose:'Preferred new API agent workflow: supply its complete brief, product examples and proposed build limits once. The host prepares the documents, supplies all technical hashes and commands, records model-owned document decisions for standard local creation and continues the saved workflow. Product examples refer to one-based coreFunctions indexes. The audit records Pritha as the decision maker, never a user vote.',
   continue:'Advance this saved factory through the next host-owned steps. Reuse the existing proposal and approvals. No document hashes or commands are needed. If product reasoning or research synthesis is needed, status identifies that model task.',
   prepare_product_trial:'Prepare a host-template HTTP/CLI product verifier before a child exists and update the exact draft Outcome. Supply its expected_sha256 and trial cases. Review the resulting Outcome and verifier in the separate approve_outcome card. The verifier checks real requests and rejects a scaffold stub; preparation executes nothing.',
   scaffold_plan:'Inspect the exact draft or accepted Contract capability before approval or research. Unsupported interface/runtime combinations cannot be approved. This creates no child or service.',
   patch_draft:'Make up to eight exact literal edits to a still-unapproved Contract or Outcome. Use this for a small correction instead of rewriting the whole document. Requires its current hash and exact resulting hash; ambiguous edits, hash mismatch and accepted artifacts are rejected without writing.',
+  research_decide:'After reading memory research, state your implementation decision and remaining uncertainties in answer. For a model-led local agent you may build now and verify behavior, or first consult relevant primary sources. Missing optional source pages are feedback, not a user approval. This grants no repository adoption, new credentials or services.',
   configure_build_model:'Request separate explicit approval for the NeuralDeep builder model and effort on the SAME idle, accounted run. Parent chat/provider, accepted documents, verifier and previous usage stay unchanged. This does not grant budget or execute a build.',
   delivery_extend:'Request explicit approval for exact additional budget, then immediately continue the SAME idle, accounted run under one delivery lease. expected_version is required. No previous usage is reset; documents and verifier remain protected.',
   configure_build:'Request explicit operator approval for a supported implementation effort on the SAME provider and model. Use this to repair an unsupported inherited effort without changing the immutable chat binding. No model request, document approval, budget extension or usage reset occurs. Saved uncertain or active builds must be resolved first.',
@@ -200,7 +202,7 @@ export class ProviderFactoryTools {
         delivery:ledger?deliveryExplanation(ledger):null,slug:this.paths.slug,target:this.paths.target,revision:state?.revision || 0,phase,running:state?.running || null,
         ...(state?.contract?{scaffoldCapability:scaffoldCapability(contractData(state.contract,{root:this.paths.root})),
           draftRepair:factoryDraftRepair(factoryArtifact(this.paths,state,'contract'),contractData(state.contract,{root:this.paths.root}),state)}:{}),
-        artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',buildConfiguration:state?.buildConfiguration || null,
+        creationMode:hasCreationAuthority(state)?'model-led':'reviewed',artifacts:Object.fromEntries(['contract','outcome','research','pattern'].filter(kind=>state?.[kind]).map(kind=>{const row=factoryArtifact(this.paths,state,kind);return [kind,{sha256:row.sha256,status:row.frontmatter.status}];})),runId:state?.runId || null,deliveryStatus,manualAcceptance:accepted?'accepted':'pending',buildConfiguration:state?.buildConfiguration || null,
         buildExecution:{connectorId:this.options.connectorId,modelId,requestedEffort:state?.buildConfiguration?.effort ?? this.options.factory.effort ?? null,buildEffort:state?.buildConfiguration?.effort ?? inheritedFactoryBuildEffort(this.options.connectorId,modelId,this.options.factory.effort) ?? null,effortControl:profile?.effortControl || 'runtime-defined',supportedEfforts:profile?.supportedEfforts || null},
         nextStep:this.nextStep(state,ledger)};
     }
@@ -211,8 +213,8 @@ export class ProviderFactoryTools {
   }
   isRead(input){return readonly.has(input?.action);}
   nextStep(state,ledger){
-    if(!state?.contract)return {owner:'model',action:'propose',requiredFields:['brief','product','build_token_budget'],optionalFields:['build_iteration_budget','build_elapsed_budget_ms'],alternative:'init for a custom non-API workflow',hint:'Describe behavior and examples once. The host prepares technical artifacts and presents two separate decisions; no document is approved by this request.'};
-    if(state.preparation){
+    if(!state?.contract)return {owner:'model',action:'propose',requiredFields:['brief','product','build_token_budget'],optionalFields:['build_iteration_budget','build_elapsed_budget_ms'],alternative:'init for a custom non-API workflow',hint:'Describe behavior and examples once. The host prepares technical artifacts; new model-led local creation uses the original request without separate document questions. Existing/custom workflows retain their decisions.'};
+    if(state.preparation || hasCreationAuthority(state)){
       if(!supportsLocalApiContinuation(contractData(state.contract,{root:this.paths.root})))return {owner:'model',action:'read_artifact',artifact:'contract',reason:'factory_proposal_profile_unsupported',hint:'Use the custom draft tools for this runtime or adoption profile. The existing draft is preserved.'};
       let plan;
       try{plan=this.planContinuation({shadow:true});}catch(error){
@@ -220,12 +222,14 @@ export class ProviderFactoryTools {
         throw error;
       }
       if(plan?.kind==='step'){
-        if(!this.host.driveEnabled()){const {kind,revision,operationId,...input}=plan;return {owner:'model',...input,hint:'Automatic continuation is disabled. Invoke this exact saved step; document approval still waits for the user.'};}
-        return {owner:'pritha',action:'continue',stage:plan.action,hint:'The host supplies exact parameters and uses the saved decisions. A document approval still waits for the user.'};
+        if(!this.host.driveEnabled()){const {kind,revision,operationId,...input}=plan;return {owner:'model',...input,hint:'Automatic continuation is disabled. Invoke this exact saved step; document decisions follow the saved creation policy.'};}
+        return {owner:'pritha',action:'continue',stage:plan.action,hint:'The host supplies exact parameters and uses the saved decisions. Document decisions follow the saved creation policy.'};
       }
     }
     const plan=nextFactoryAction(state,ledger);
     if(plan.kind==='step')return this.host.driveEnabled()?{owner:'pritha',action:'continue',stage:plan.action}:{owner:'model',action:plan.action};
+    if(plan.reason==='outcome_decision' && hasCreationAuthority(state))return {owner:'model',action:'read_artifact',artifact:'outcome',then:'prepare_product_trial',hint:'Prepare meaningful examples, then finalize the Outcome under the saved creation request. No extra user document vote is needed.'};
+    if(plan.reason==='research_review')return {owner:'model',action:'read_artifact',artifact:'research',then:'research_decide',hint:'Use memory and your judgment. Collect primary sources only for concrete uncertainties; unavailable optional pages do not prevent implementation. Record your rationale in research_decide.answer, or call scaffold directly when ready to implement.'};
     if(plan.reason==='source_selection')return {owner:'model',action:'research_status',then:'research_apply',hint:'Read all source pages, select real passages and explain their applicability. This is model work, not an operator decision.'};
     return {owner:['contract_decision','outcome_decision','manual_acceptance','delivery_decision'].includes(plan.reason)?'user':'pritha',reason:plan.reason};
   }
@@ -236,6 +240,10 @@ export class ProviderFactoryTools {
     if(!supportsLocalApiContinuation(data))return null;
     if(s.contractApproval){
       requireFactoryApprovals(this.paths,s,{outcome:Boolean(s.outcomeApproval)});
+    }
+    if(hasCreationAuthority(s) && !s.preparation && !s.contractApproval && !s.running && !s.continuationPause){
+      const contract=factoryArtifact(this.paths,s,'contract');
+      return {kind:'step',action:'approve_contract',expected_sha256:contract.sha256,revision:s.revision,operationId:factoryOperationId(s,'approve_contract')};
     }
     if(s.preparation && !s.outcomeApproval && !s.running && !s.continuationPause){
       const contract=factoryArtifact(this.paths,s,'contract');
@@ -267,6 +275,8 @@ export class ProviderFactoryTools {
     // prepare/worker still enforce accepted document locks before execution,
     // research gates, target ownership and measured build budgets. Arbitrary
     // shell/file tools and operator answers receive no authority from this.
+    const state=this.state();
+    if(['approve_contract','approve_outcome'].includes(input.action) && hasCreationAuthority(state) && supportsLocalApiContinuation(contractData(state.contract,{root:this.paths.root})))return true;
     return workflowSteps.has(input.action) || input.action==='delivery_resume' && !input.answer;
   }
   prepare(input){
@@ -301,7 +311,7 @@ export class ProviderFactoryTools {
       if(input.action==='patch_draft')patchFactoryDraft(row.text,input);
     }
     if(['create_outcome','approve_outcome','prepare_product_trial'].includes(input.action))requireFactoryApprovals(p,state,{outcome:false});
-    if(['research','research_status','research_collect','research_recover','research_apply','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
+    if(['research','research_status','research_decide','research_collect','research_recover','research_apply','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'].includes(input.action))requireFactoryApprovals(p,state);
     const data=state?.contract?contractData(state.contract,{root:p.root}):null;
     if(input.action==='approve_contract'){
       assertScaffoldCapability(data);
@@ -355,6 +365,7 @@ export class ProviderFactoryTools {
     this.prepare(input);if(factoryHash(this.state())!==factoryHash(expected))throw factoryFail('factory_context_changed');
     privateStateDirectory(p.stateRoot,p.directory);
     const state=expected || {schema:'pritha-voice-factory-v1',slug:p.slug,chatId:o.chatId,connectorId:o.connectorId,stateRoot:p.stateRoot,target:p.target,phase:'draft',revision:0};
+    if(!expected && ['propose','init'].includes(input.action) && o.factory.creationMode==='model-led')state.creationAuthority=creationAuthority(state,input.operation_id);
     const work=privateStateDirectory(p.stateRoot,path.join(p.directory,'operations',randomUUID()));
     const requestFile=privateStateFile(p.stateRoot,path.join(work,'request.json')),resultFile=path.join(work,'result.json');
     const previous=fs.existsSync(p.file)?factoryRead(p.file,p.directory):null;

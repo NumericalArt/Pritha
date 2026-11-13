@@ -51,7 +51,7 @@ function nodeCommand(argv) {
 }
 
 export function validateProductTrial(trial, data) {
-  const provider=childProviderConfiguration(data),llm=provider?.connection==='pritha';
+  const provider=childProviderConfiguration(data),llm=provider?.connection==='pritha',modelLed=data.outcomeApprovalPolicy==='request-delegated-local-v1';
   let json;
   try {
     json = JSON.stringify(trial);
@@ -70,7 +70,7 @@ export function validateProductTrial(trial, data) {
     fail('factory_product_trial_coverage_invalid');
   }
   for (const [kind, cases] of Object.entries(trial).filter(([kind])=>kind==='cli' || kind==='http')) {
-    if (!Array.isArray(cases) || cases.length < 2 || cases.length > 8) fail('factory_product_trial_variants_required');
+    if (!Array.isArray(cases) || cases.length < (modelLed?1:2) || cases.length > 8) fail('factory_product_trial_variants_required');
     const signatures = new Map(), outputs = new Set();
     for (const check of cases) {
       const fields = kind === 'cli' ? ['argv','expected_exit'] : ['argv','port_variable','path','input_json','expected_status'];
@@ -88,7 +88,7 @@ export function validateProductTrial(trial, data) {
       if (kind==='http' && (check.argv.length!==2 || check.argv[1]!=='scripts/server.mjs'
           || !/^\/[A-Za-z0-9/_-]{0,120}$/.test(check.path) || check.path.startsWith('//') || !check.input_json || Array.isArray(check.input_json) || typeof check.input_json!=='object')) fail('factory_product_trial_invalid');
       if(llm){
-        if(success && (!JSON.stringify(check.expected_json).includes('__PRITHA_MODEL_TEXT__') || !JSON.stringify(check.model_output || '').includes('__PRITHA_MODEL_TEXT__')))fail('factory_product_trial_model_proof_required');
+        if(success && (check.model_output===undefined || !modelLed && (!JSON.stringify(check.expected_json).includes('__PRITHA_MODEL_TEXT__') || !JSON.stringify(check.model_output || '').includes('__PRITHA_MODEL_TEXT__'))))fail('factory_product_trial_model_proof_required');
         if(check.model_error!==undefined && (!['provider_pending_auth','provider_unavailable','provider_rate_limited','provider_timeout'].includes(check.model_error) || success || check.model_output!==undefined))fail('factory_product_trial_invalid');
         if(check.model_output!==undefined && typeof check.model_output!=='string' && (!check.model_output || typeof check.model_output!=='object' || Array.isArray(check.model_output)))fail('factory_product_trial_invalid');
       }
@@ -97,7 +97,7 @@ export function validateProductTrial(trial, data) {
       signatures.set(signature,success);
       if(success)outputs.add(canonical(check.expected_json));
     }
-    if([...signatures.values()].filter(Boolean).length<2 || outputs.size<2)fail('factory_product_trial_variants_required');
+    if([...signatures.values()].filter(Boolean).length<(modelLed?1:2) || !modelLed && outputs.size<2)fail('factory_product_trial_variants_required');
   }
 }
 
@@ -143,7 +143,7 @@ export function prepareProductTrial(paths, outcome, data, trial) {
     if(b.startsWith('### Trial: product-http-cli\n') && b.includes(' :: '+provenance))return false;
     if(b.startsWith('### Trial: managed-stop\n') && b.includes(' :: '+stopProvenance))return false;
     const ids=[...b.matchAll(/^- Covers: ([^\n]+)/gm)].map(m=>m[1]);
-    return !generated.has(b) || !ids.length || !ids.every(id=>allCovers.has(id));
+    return !generated.has(b) || data.outcomeApprovalPolicy!=="request-delegated-local-v1" && (!ids.length || !ids.every(id=>allCovers.has(id)));
   });
   const block = [
     '## Trials', '', '### Trial: product-http-cli', '',

@@ -20,7 +20,7 @@ export function validateProductProposal(product,coreFunctions){
   };
   for(const kind of ['http','cli']){
     const cases=product[kind];if(cases===undefined)continue;
-    if(!Array.isArray(cases) || cases.length<2 || cases.length>8)fail('product.'+kind,'Supply two to eight examples for each selected interface.');
+    if(!Array.isArray(cases) || cases.length<1 || cases.length>8)fail('product.'+kind,'Supply one to eight examples for each selected interface.');
     for(const [i,check] of cases.entries()){
       const allowed=[...fields,...(kind==='http'?['path','input_json','expected_status']:['arguments','expected_exit'])];
       if(!object(check) || Object.keys(check).some(key=>!allowed.includes(key)))fail('product.'+kind+'.'+i,'Use declarative product input and expected JSON, not commands or paths to verifiers.');
@@ -54,7 +54,7 @@ export function compileProductProposal(product,data){
     for(const name of checks){trial.host_checks ||= {};trial.host_checks[name]=[...new Set([...(trial.host_checks[name] || []),id(index+1)])];}
   }
   const covered=new Set([...Object.values(trial).filter(Array.isArray).flatMap(cases=>cases.flatMap(c=>c.covers)),...Object.values(trial.host_checks || {}).flat()]);
-  if(data.coreFunctions.some((_,i)=>!covered.has(id(i+1))))fail('product.functions','Every product function needs a behavioral example or a supported host check before Contract approval.');
+  if(data.outcomeApprovalPolicy!=="request-delegated-local-v1" && data.coreFunctions.some((_,i)=>!covered.has(id(i+1))))fail('product.functions','Every product function needs a behavioral example or a supported host check before Contract approval.');
   // The implementation deliverable is demonstrated by the approved product
   // examples; the prepared verifier separately binds the user guide and Stop.
   trial.http[0].covers.push(coverageId('deliverable','Working implementation of the approved V1 core functions',0));
@@ -66,7 +66,7 @@ const jsonObject={type:'object',additionalProperties:true};
 const functions={type:'array',minItems:1,maxItems:32,items:{type:'integer',minimum:1,maximum:32},description:'One-based indexes of brief.coreFunctions exercised by this example. No hashes or generated coverage IDs.'};
 const common={functions,expected_json:jsonObject,model_output:{anyOf:[{type:'string'},jsonObject]},model_error:{type:'string'}};
 export const PRODUCT_PROPOSAL_SCHEMA={type:'object',additionalProperties:false,required:['http'],properties:{
-  http:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,required:['functions','path','input_json','expected_json'],properties:{...common,path:{type:'string'},input_json:jsonObject,expected_status:{type:'integer',minimum:200,maximum:599}}}},
-  cli:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,required:['functions','arguments','expected_json'],properties:{...common,arguments:{type:'array',items:{type:'string'}},expected_exit:{type:'integer',minimum:0,maximum:125}}}},
+  http:{type:'array',minItems:1,maxItems:8,items:{type:'object',additionalProperties:false,required:['functions','path','input_json','expected_json'],properties:{...common,path:{type:'string'},input_json:jsonObject,expected_status:{type:'integer',minimum:200,maximum:599}}}},
+  cli:{type:'array',minItems:1,maxItems:8,items:{type:'object',additionalProperties:false,required:['functions','arguments','expected_json'],properties:{...common,arguments:{type:'array',items:{type:'string'}},expected_exit:{type:'integer',minimum:0,maximum:125}}}},
   host_checks:{type:'object',additionalProperties:false,properties:Object.fromEntries(hostChecks.map(name=>[name,functions]))},
-},description:'Product examples only. For each selected interface include two distinct successful inputs with different expected JSON and requested invalid-input cases. For a Pritha-connected LLM include model_output and __PRITHA_MODEL_TEXT__ in both model_output and expected_json for each success. The host supplies commands, the selected port, coverage IDs and protected verifiers. Lifecycle requirements may use host_checks with coreFunctions indexes.'};
+},description:'Product examples only. Choose examples that demonstrate the intended behavior, including relevant invalid inputs. Model-led local creation accepts one or more successful examples and enum-only model output. Include model_output for each successful LLM case; __PRITHA_MODEL_TEXT__ is optional randomized proof where the product supports free text. Legacy workflows retain their two-variant nonce proof. The host supplies commands, the selected port, coverage IDs and protected verifiers. Lifecycle requirements may use host_checks with coreFunctions indexes.'};

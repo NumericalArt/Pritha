@@ -9,7 +9,7 @@ export function FactoryChatSelector({value=DEFAULT_FACTORY_SELECTION,disabled,ca
     {value.createNew?<>
       {!canCreate && <p role="alert">Agent creation is unavailable for this provider. Select a ready provider with command approvals, or turn off Create new agent to continue a regular chat.</p>}
       <label>New agent slug<input aria-label="New agent slug" value={value.slug} maxLength={64} placeholder="paper-radar" aria-invalid={Boolean(error)} aria-describedby="factory-subject-description" disabled={disabled} onChange={event=>onChange({...value,slug:event.currentTarget.value})}/></label>
-      <p id="factory-subject-description" role="note">{error || 'Describe the result you want. Pritha will prepare a Contract and a separate Outcome Spec for your approval before creating the project. An existing project cannot be adopted here.'}</p>
+      <p id="factory-subject-description" role="note">{error || 'Describe the result you want. For a new local agent, Pritha plans, builds and checks it within this request. It asks only for missing product choices or additional permissions. You can try the result and request improvements. Existing projects use their own chat.'}</p>
     </>:<>
       <div className="factory-chat-fields">
         <label>Subject<select aria-label="Chat subject" disabled={disabled} value={value.kind} onChange={event=>onChange({...value,kind:event.currentTarget.value as DraftFactorySelection['kind']})}><option value="self">Pritha</option><option value="child">Child agent</option></select></label>

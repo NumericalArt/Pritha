@@ -324,8 +324,8 @@ export function validateContract(contractPath, options = {}) {
   if (rawBuildTokenBudget) {
     const value = Number(rawBuildTokenBudget);
     if (!Number.isSafeInteger(value) || value < 1) issues.push("Build token budget must be a positive JavaScript-safe integer compatible with App Server int64");
-    if (!new Set(["user", "pending", "legacy-default"]).has(buildTokenConfirmation)) {
-      issues.push("Build token budget confirmation must be user, pending, or legacy-default");
+    if (!new Set(["user", "creation-request", "pending", "legacy-default"]).has(buildTokenConfirmation)) {
+      issues.push("Build token budget confirmation must be user, creation-request, pending, or legacy-default");
     }
     const contractStatus = String(fm.status || "").toLowerCase();
     const autonomousBuild = (buildExecutor || "codex-app-server") !== "manual";

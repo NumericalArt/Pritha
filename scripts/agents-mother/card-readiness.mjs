@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { latestOutcomeSpecForContract } from "./outcome-spec.mjs";
+import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "./outcome-spec.mjs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
 import { resolvePrithaRoot } from "../lib/paths.mjs";
@@ -26,7 +26,7 @@ function evidencePaths(root, record) {
   };
 }
 
-function artifactSummary(root, relativePath) {
+function artifactSummary(root, relativePath, options={}) {
   try {
     const text = readFileSync(path.resolve(root, relativePath), "utf8");
     const fm = parseFrontmatterData(text) || {};
@@ -36,7 +36,7 @@ function artifactSummary(root, relativePath) {
       status: fm.outcome_spec_status || fm.status || "unknown",
       path: relativePath,
       updated: fm.updated || fm.created || "unknown",
-      approved: fm.type === "agent-outcome-spec" && fm.approved_by === "user" && fm.outcome_spec_status === "approved",
+      approved: fm.type === "agent-outcome-spec" && fm.outcome_spec_status === "approved" && (fm.approved_by === "user" || fm.approved_by === "pritha" && verifyOutcomeApproval(path.resolve(root,relativePath),{...options,root}).ok),
     };
   } catch {
     return null;
@@ -50,8 +50,8 @@ function latestArtifact(artifacts, type) {
 }
 
 function deliveryLifecycle(root, evidence, contractPath, options = {}) {
-  const contracts = evidence.contracts.map((filePath) => artifactSummary(root, filePath)).filter(Boolean);
-  const reports = evidence.reports.map((filePath) => artifactSummary(root, filePath)).filter(Boolean);
+  const contracts = evidence.contracts.map((filePath) => artifactSummary(root, filePath, options)).filter(Boolean);
+  const reports = evidence.reports.map((filePath) => artifactSummary(root, filePath, options)).filter(Boolean);
   const selected = contractPath ? latestOutcomeSpecForContract(contractPath, { ...options, root }) : null;
   const outcome = selected ? contracts.find(item => path.resolve(root, item.path) === path.resolve(root, selected.path))
     : latestArtifact(contracts, "agent-outcome-spec");

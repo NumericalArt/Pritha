@@ -17,7 +17,9 @@ const root = path.join(temporary, "source");
 const state = path.join(temporary, "state");
 let active;
 function stop(child, signal = "SIGTERM") {
-  if (!child?.pid) return;
+  // A completed child's PID may already belong to another process group.
+  // Never send cleanup signals using an exited process's stale identity.
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
   try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== "ESRCH") throw error; }
 }
 

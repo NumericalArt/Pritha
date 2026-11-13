@@ -87,7 +87,7 @@ class BuildConnection {
   async waitForNotification() { return { method: 'turn/completed', params: { threadId: this.current.id, turn: this.current.turns[0] } }; }
 }
 
-export async function productFactoryFixture(scenario, emit = () => {}, {automate=false,childConnections,factoryToolsClass}={}) {
+export async function productFactoryFixture(scenario, emit = () => {}, {automate=false,childConnections,factoryToolsClass,creationMode='reviewed'}={}) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pritha-product-factory-')));
   const stateRoot = path.join(directory, 'state'), agentParent = path.join(directory, 'children');
   fs.mkdirSync(stateRoot); fs.mkdirSync(agentParent);
@@ -133,7 +133,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
       ? "import http from 'node:http';import {readChildProvider,requestChildModel} from './lib/child-model-client.mjs';\n"+managedFixtureHandler()+
         'const server=http.createServer(async(req,res)=>{if(managed(req,res,server))return;let body="";for await(const part of req)body+=part;const input=JSON.parse(body);if(typeof input['+JSON.stringify(scenario.field)+']!=="string" || !input['+JSON.stringify(scenario.field)+'].trim()){res.writeHead(400);res.end(JSON.stringify({error:"invalid_text"}));return;}try{const selected=readChildProvider(process.cwd());const response=await requestChildModel(selected.configuration,{messages:[{role:"user",content:input['+JSON.stringify(scenario.field)+']}]},selected);res.end(JSON.stringify(JSON.parse(response.content[0].text)));}catch(error){res.writeHead(503);res.end(JSON.stringify({error:error.code}));}});server.listen(Number(process.env['+JSON.stringify(scenario.portVariable)+']),"127.0.0.1");'
       : server);
-    installStopFixture(worktree,scenario.portVariable,{unsafe:scenario.unsafeFirstStop && builds.length===1});
+    installStopFixture(worktree,scenario.portVariable,{unsafe:scenario.unsafeFirstStop && builds.length===1 || builds.length<=(scenario.unsafeStopIterations || 0)});
     const manifestFile=path.join(worktree,'operations/manifest.json'),manifest=JSON.parse(fs.readFileSync(manifestFile));
     manifest.outcome_status='implemented';manifest.control_center_contract.status='implemented';manifest.blockers=[];
     fs.writeFileSync(manifestFile,JSON.stringify(manifest,null,2)+'\n');
@@ -168,7 +168,7 @@ export async function productFactoryFixture(scenario, emit = () => {}, {automate
   }
   class FixtureHost extends hostTools.ProviderHostTools {
     constructor(options) {
-      super({...options,childConnections:childConnections || (()=>['openai','claude','neuraldeep','openrouter'].map(provider=>({provider,configured:true,status:'synthetic-fixture'}))),factoryContinuation:automate?'execute':'shadow'}); hosts.push(this);
+      super({...options,factory:{...options.factory,creationMode},childConnections:childConnections || (()=>['openai','claude','neuraldeep','openrouter'].map(provider=>({provider,configured:true,status:'synthetic-fixture'}))),factoryContinuation:automate?'execute':'shadow'}); hosts.push(this);
       if(factoryToolsClass)this.factory=new factoryToolsClass(this);
       const execute = this.factory.execute.bind(this.factory);
       this.factory.execute = async (input, expected, automaticContinuation) => {

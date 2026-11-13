@@ -1,3 +1,4 @@
+import {hasCreationAuthority} from './factory-creation-authority.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
@@ -86,6 +87,7 @@ export function validateVoiceFactory(paths,value,{chatId,connectorId}){
   if(value.schema!=='pritha-voice-factory-v1' || value.chatId!==chatId || value.connectorId!==connectorId || value.slug!==paths.slug
       || value.target!==paths.target || value.stateRoot!==paths.stateRoot || !Number.isSafeInteger(value.revision))throw factoryFail('factory_binding_changed');
   for(const field of ['contract','outcome','research','pattern'])if(value[field] && (path.dirname(value[field])!==path.join(paths.memory,['research','pattern'].includes(field)?'research':'contracts') || !value[field].endsWith('.md')))throw factoryFail('factory_artifact_boundary');
+  if(value.creationAuthority!==undefined && !hasCreationAuthority(value))throw factoryFail('factory_creation_authority_changed');
   const preparation=value.preparation;
   if(preparation!==undefined && (!preparation || preparation.version!==1
       || Object.keys(preparation).some(key=>!['version','requestHash','contractDraftSha256','product','productHash','preparedOutcomeSha256'].includes(key))

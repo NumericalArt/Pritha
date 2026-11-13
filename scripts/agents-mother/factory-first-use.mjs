@@ -29,7 +29,8 @@ export function verifiedFirstUse(p,s,result){
   const ref=result.state.last_trial_result,dir=result.worktree?.worktree;
   if(!dir || !result.runRoot || dir!==path.join(result.runRoot,'worktree') || !/^trial-results\/verification-\d+\.json$/.test(ref?.path))return null;
   const spec=factoryArtifact(p,s,'outcome');
-  const trial=validateOutcomeSpecText(spec.text,{root:p.root}).parsed.trials.find(t=>t.id==='product-http-cli');
+  const checked=validateOutcomeSpecText(spec.text,{root:p.root});
+  const trial=checked.parsed.trials.find(t=>t.id==='product-http-cli');
   const verifier=trial?.verifierInputs?.find(v=>v.path==='verification/product.mjs' && v.provenance==='host-template:api-cli-product-v2');
   if(!verifier)return null;
   const content=factoryRead(path.join(dir,verifier.path),dir,128000);
@@ -46,11 +47,15 @@ export function verifiedFirstUse(p,s,result){
   let demo;try {demo=JSON.parse(row.execution.stdout.trim());}catch{return null;}
   const observed=demo.observed,modelProof=data.childModelConnection==='pritha';
   if(modelProof && (demo.modelVerification!=='protected-local-responder' || demo.liveModelVerified!==false))return null;
-  if(!observed || ['cli','http'].filter(k=>cases[k]).some(k=>!(modelProof?matchesModelExample:isDeepStrictEqual)(observed[k],cases[k].find(c=>(c.expected_exit??0)===0 && (c.expected_status??200)===200).expected_json)))return null;
+  if(!observed || ['cli','http'].filter(k=>cases[k]).some(k=>{
+    const expected=cases[k].find(c=>(c.expected_exit??0)===0 && (c.expected_status??200)===200).expected_json;
+    const nonceRequired=modelProof && (data.outcomeApprovalPolicy!=='request-delegated-local-v1' || JSON.stringify(expected).includes('__PRITHA_MODEL_TEXT__'));
+    return !(nonceRequired?matchesModelExample:isDeepStrictEqual)(observed[k],expected);
+  }))return null;
   const application=s.localApplication?.status==='applied' && s.localApplication.to===fresh.current.head;
   if(application && !verifyTrialResultFreshness(receipt,p.target,{root:p.root,stateRoot:p.stateRoot,outcomeSpecPath:s.outcome}).ok)return null;
   const applied=Boolean(application);
-  return {directory:applied?p.target:dir,commit:fresh.current.head,commands:firstUseExamples(cases,data),observed,
+  return {unverifiedRequirements:checked.coverage.filter(row=>!row.covered).map(row=>row.statement),directory:applied?p.target:dir,commit:fresh.current.head,commands:firstUseExamples(cases,data),observed,
     ...(applied && data.agentId?{interactionHref:'/agents/'+encodeURIComponent(data.agentId)+'#try-agent'}:{}),
     ...(modelProof?{modelVerification:'protected-local-responder',liveModelVerified:false}:{}),
     disposition:applied?'applied-local-project':'verified-worktree',acceptance:result.state.accepted_by==='user'?'accepted':'pending'};

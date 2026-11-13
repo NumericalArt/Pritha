@@ -38,7 +38,7 @@ test('host developer instructions name only declared functions and preserve enfo
   const value=args.find(item=>item.startsWith('developer_instructions=')),instructions=JSON.parse(value.slice(value.indexOf('=')+1));
   for(const name of definitions.map(tool=>tool.name))assert.ok(instructions.includes('mcp__pritha__'+name));
   assert.match(instructions,/does not expose the built-in apply_patch/);assert.match(instructions,/saved workflow/);assert.match(instructions,/grants no write/);
-  assert.match(instructions,/Operator-selected subject: child agent fixture-child/);assert.match(instructions,/Preserve separate Contract and Outcome approvals/);
+  assert.match(instructions,/Operator-selected subject: child agent fixture-child/);assert.match(instructions,/Preserve the host-recorded creation authority and document policy/);
   assert.doesNotMatch(instructions,/mcp__pritha__write_file/);assert.ok(args.includes('sandbox_mode="read-only"'));assert.ok(args.includes('approval_policy="never"'));
   assert.equal(providerToolInstructions([]),'');assert.doesNotMatch(providerToolInstructions([{name:'bad; injected instruction'}]),/injected/);
 });

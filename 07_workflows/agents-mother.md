@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-11-12
+updated: 2026-11-13
 topics:
   - agent-engineering
   - agent-factory
@@ -117,6 +117,33 @@ alone. Use `11_agents/reports/2026-05-29-funny-teacher-pritha-reference-example.
 when comparing a future voice or learning agent against proven lineage evidence.
 
 ## Core rule
+
+For a new supported local API child in Task Chat, use the model-led route:
+
+1. Read factory status, then `propose` the behavior, examples and bounded build
+   limits. The host records the creation request and its own document decisions;
+   the standard route asks no Contract or Outcome confirmation questions.
+2. Read the saved memory research. Consult primary sources for concrete
+   uncertainties when useful, then `research_decide` with the implementation
+   rationale and remaining unknowns. A fixed external-topic checklist is not a
+   prerequisite to local construction.
+3. Let the factory scaffold, build, test and repair. Repeated failing assertions
+   go to the builder with an instruction to reconsider its approach. They do not
+   create an operator question merely because a counter reached a threshold.
+4. Present the checked local agent with its first-use instructions, observed
+   output and any unverified requirements. Explain whether model testing used a
+   local responder or the real selected provider. Invite use and improvements.
+
+This route is host-bound, local, without repository adoption or autostart. Model
+connections use existing Pritha credentials. It retains budgets, process
+ownership, protected verifiers and unrelated-work protection. Requests to change
+those boundaries require a real decision. The host never records a user vote
+that did not happen. See
+[the model-led creation decision](../05_decisions/2026-11-13-model-led-local-agent-creation.md).
+
+The following detailed reviewed workflow remains applicable to older sessions
+and profiles outside that scope.
+
 
 Do not scaffold a new agent directly from a vague idea. First turn the idea into
 a concrete proposal, then create two separately approved and locked artifacts:

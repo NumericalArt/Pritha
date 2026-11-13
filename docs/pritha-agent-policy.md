@@ -288,6 +288,34 @@ Markdown-файлы являются canonical authored knowledge и главн�
 
 ## Agents Mother
 
+### Model-led local creation (2026-11-13)
+
+The operator requested minimal routine confirmations and model-owned production
+of working agents. For a **new host-bound local API proposal**, this rule takes
+precedence over the separate document approvals and external-research checklist
+below. The host records creation-request authority, finalizes the Contract and
+Outcome with `approved_by: pritha`, and preserves the exact request binding and
+document versions. These are Pritha decisions, not fabricated user approvals.
+
+The model reviews memory, chooses whether additional primary research is useful,
+and records its implementation rationale. Optional source failures do not block
+local implementation. Product examples, lifecycle tests and their diagnostics
+support the build/repair loop; repeated failure signatures do not require a user
+to debug the agent. Time, tokens, actual results and unchanged execution
+boundaries remain observable. Uncovered requirements and unavailable sources
+remain visible rather than receiving invented evidence.
+
+This default is limited to the supported local API process adapter, no repository
+adoption, no autostart, and either deterministic behavior or an existing Pritha
+model connection. It does not authorize additional credentials, changed spending
+limits, unrelated projects, publication or service activation. Existing sessions
+keep their decisions and evidence; custom profiles retain explicit reviews.
+The user can try the checked local result and request improvements before final
+acceptance. See
+[the implementation decision](../05_decisions/2026-11-13-model-led-local-agent-creation.md).
+
+### Reviewed/custom creation workflow
+
 Pritha может создавать и развивать новых агентов по техническому заданию
 пользователя. Перед созданием нового агента обязательно оформить
 `agent-contract`: назначение, пользователь, функции v1, отложенные функции,

@@ -1,3 +1,4 @@
+import {supportsLocalApiContinuation} from '../factory-continuation.mjs';
 import { renderScaffoldTemplate } from "./template.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -1279,6 +1280,7 @@ function researchGateStatusLabel(research) {
 }
 
 function researchGateResultLabel(research) {
+  if(research.advisoryDecision)return "advisory";
   if (research?.status !== "found") return "missing";
   if (research.gate?.ok) return "pass";
   return research.gate?.status || "pending";
@@ -1286,7 +1288,7 @@ function researchGateResultLabel(research) {
 
 function researchGateReasons(research) {
   const reasons = research?.gate?.reasons || [];
-  return reasons.length ? reasons.join(", ") : "none";
+  return (reasons.length ? reasons.join(", ") : "none")+(research.advisoryDecision?"; model decision: "+research.advisoryDecision:"");
 }
 
 function scaffoldReportMarkdown(data, projectRoot, createdFiles, smokeResult, options = {}) {
@@ -1562,7 +1564,9 @@ export function scaffoldContract(contractPath, options = {}) {
     status: "pending",
     reasons: ["research_report_missing"],
   };
-  if (!researchGate.ok && !options["allow-pending-external-verification"]) {
+  const advisoryResearch=outcomeApproval.ok && outcomeApproval.event?.approved_by==="pritha" && supportsLocalApiContinuation(data);
+  if(advisoryResearch)research.advisoryDecision=options.factoryResearchDecision || "Model-owned local implementation; external evidence remains advisory.";
+  if (!researchGate.ok && !advisoryResearch && !options["allow-pending-external-verification"]) {
     throw new Error(`External research gate is ${researchGate.status}. Complete Pritha memory research, external evidence and synthesis before scaffold. Reasons: ${researchGate.reasons.join(", ") || "unknown"}. Use --allow-pending-external-verification only for an explicit experimental scaffold.`);
   }
   const experimentalOverrides = [

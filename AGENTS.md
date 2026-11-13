@@ -3,7 +3,7 @@ id: pritha-agent-instructions-index
 type: workflow
 status: active
 created: 2026-11-02
-updated: 2026-11-11
+updated: 2026-11-13
 topics: [pritha, governance, instruction-routing, agent-harness]
 tools: [Codex, Node.js]
 sources: [docs/pritha-agent-policy.md]
@@ -68,11 +68,15 @@ Explicit user instructions take precedence over project guidelines.
   `serve --yes`, `off --yes` and `tailscale up` need separate explicit user approval
   immediately before the action. Peer access stays unverified until a trusted
   peer device opens the private URL; keep real endpoints and auth keys private.
-- Agent creation is proposal-first. Write an `agent-contract` and a separate
-  `agent-outcome-spec`; obtain their separate approvals. Accepted Contract,
-  approved Outcome, memory research and required current primary evidence precede
-  scaffold/delivery. Preserve identities, protected verifiers and measured budgets.
-  Do not infer permission to merge, deploy, publish or provision secrets.
+- Agent creation is model-led for a new host-bound local API proposal. The
+  creation request delegates routine Contract/Outcome decisions to Pritha;
+  record the actor as Pritha, not a user vote. Use memory and model judgment;
+  external topic coverage and repeated test failures are feedback for research
+  and repair. Ask only for missing product choices or additional authority.
+  Existing/custom workflows retain their saved approval policy. Preserve
+  identities, protected verifiers and measured budgets. Creation never grants
+  permission to deploy, publish, enable services or provision secrets. Read
+  `05_decisions/2026-11-13-model-led-local-agent-creation.md` for exact scope.
 - Repository research/adoption, skills, native hooks and external runtimes have
   additional approval/pinning/license/isolation rules: read the full Agents Mother
   policy and relevant workflow before using them. Discovery never authorizes

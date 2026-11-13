@@ -28,7 +28,7 @@ export function FactoryProgress({view}:{view:NonNullable<import("@/lib/codex-cha
       {b.progressReview?<p>No progress has been confirmed for some time. Pritha needs to review the result and adjust the approach.</p>:null}</details>:null}
     {view.firstUse?<div><strong>Try the verified version</strong><p>{view.firstUse.interactionHref?<a href={view.firstUse.interactionHref}>Open the agent and send input</a>:view.firstUse.disposition==='applied-local-project'?<a href="/agents">Launch from the agent card</a>:'The main project is updated separately.'}</p>
       {view.firstUse.modelVerification?<p>The protected local model-connection checks passed. Try the selected live model in the agent form to assess its answers.</p>:null}
-      <details><summary>Verified files and commands</summary><p>Folder: <code>{view.firstUse.directory}</code> · version <code>{view.firstUse.commit.slice(0,12)}</code>.</p>
+      <details><summary>Verified files and commands</summary>{view.firstUse.unverifiedRequirements?.length?<div><p>These requirements are not covered by the automated checks:</p><ul>{view.firstUse.unverifiedRequirements.map((text,index)=><li key={index}>{text}</li>)}</ul></div>:null}<p>Folder: <code>{view.firstUse.directory}</code> · version <code>{view.firstUse.commit.slice(0,12)}</code>.</p>
       {view.firstUse.commands.cli?<><pre>{view.firstUse.commands.cli}</pre><p>Observed: <code>{JSON.stringify(view.firstUse.observed.cli)}</code></p></>:null}
       <pre>{view.firstUse.commands.server}</pre><pre>{view.firstUse.commands.http}</pre><p>Observed in the protected trial: <code>{JSON.stringify(view.firstUse.observed.http)}</code></p></details></div>:null}
     </aside>;

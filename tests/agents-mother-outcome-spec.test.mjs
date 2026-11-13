@@ -183,7 +183,7 @@ test("approval cannot be self-issued under a different actor label", () => {
   const { root, stateRoot, specPath } = fixture();
   assert.throws(
     () => approveOutcomeSpec(specPath, { root, stateRoot, approvedBy: "executor" }),
-    /explicit --approved-by user/,
+    /user decision or a host-bound creation request/,
   );
 });
 

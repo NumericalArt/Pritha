@@ -1,3 +1,5 @@
+import {verifyCreationAuthority} from './factory-creation-authority.mjs';
+import {supportsLocalApiContinuation} from './factory-continuation.mjs';
 import { sha256Text as sha256 } from "../lib/hash.mjs";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
@@ -404,13 +406,13 @@ export function validateOutcomeSpecText(text, options = {}) {
   }
 
   const coverage = buildOutcomeCoverage(parsed, contract);
-  if (coverage.some((entry) => !entry.covered)) {
+  if (coverage.some((entry) => !entry.covered) && contract?.outcomeApprovalPolicy!=="request-delegated-local-v1") {
     issues.push(issue("OS013", `uncovered required outcomes: ${coverage.filter((entry) => !entry.covered).map((entry) => entry.id).join(", ")}`, "Trials.Covers"));
   }
 
   if (status === "approved") {
     if (contract && contract.fm.status !== "accepted") issues.push(issue("OS019", "approved Outcome Spec requires an accepted agent contract", "frontmatter.contract_path"));
-    if (fm.approved_by !== "user" || missing(fm.approved_at)) issues.push(issue("OS016", "approved spec requires approved_by user and approved_at", "frontmatter.approved_by"));
+    if (!(["user","pritha"].includes(fm.approved_by)) || missing(fm.approved_at)) issues.push(issue("OS016", "approved spec requires an attributed approval actor and approved_at", "frontmatter.approved_by"));
     if (fm.outcome_semantic_lock !== outcomeSemanticLock(parsed) || fm.outcome_document_lock !== outcomeDocumentLock(text)) {
       issues.push(issue("OS015", "approved spec locks are missing or stale", "frontmatter.outcome_*_lock"));
     }
@@ -747,7 +749,8 @@ export function verifyOutcomeApproval(specPath, options = {}) {
     && candidate.contract_fingerprint === fm.contract_fingerprint
     && candidate.semantic_lock === fm.outcome_semantic_lock
     && candidate.document_lock === fm.outcome_document_lock
-    && candidate.approved_by === "user"
+    && candidate.approved_by === fm.approved_by
+    && (candidate.approved_by === "user" || candidate.approved_by === "pritha" && verifyCreationAuthority(candidate.creation_authority,validation.contract,fullPath,{...options,root}))
   )) || null;
   if (!event) reasons.push("approval_evidence_missing_or_stale");
   return { ok: reasons.length === 0, reasons: [...new Set(reasons)], event, validation };
@@ -756,7 +759,7 @@ export function verifyOutcomeApproval(specPath, options = {}) {
 export function approveOutcomeSpec(specPath, options = {}) {
   const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
   const approvedBy = String(options.approvedBy || "").trim();
-  if (approvedBy !== "user") throw new Error("Outcome approval requires explicit --approved-by user");
+  if (!["user","pritha"].includes(approvedBy)) throw new Error("Outcome approval requires a user decision or a host-bound creation request");
   const fullPath = path.resolve(root, specPath);
   const original = readFileSync(fullPath, "utf8");
   const current = parseOutcomeSpecText(original);
@@ -765,6 +768,7 @@ export function approveOutcomeSpec(specPath, options = {}) {
     if (existing.ok) return { path: fullPath, text: original, event: existing.event, evidencePath: approvalEvidencePath({ ...options, root }), unchanged: true };
   }
   const validation = validateOutcomeSpecText(original, { root });
+  if(approvedBy==="pritha" && (!supportsLocalApiContinuation(validation.contract) || !verifyCreationAuthority(options.creationAuthority,validation.contract,fullPath,{...options,root})))throw new Error("Outcome delegation requires the exact host-bound local creation request");
   const blocking = validation.issues.filter((entry) => !["OS015", "OS016"].includes(entry.code));
   if (blocking.length) throw new Error(`Outcome Spec is not ready for approval:\n- ${blocking.map((entry) => `${entry.code} ${entry.message}`).join("\n- ")}`);
   if (!validation.contract || validation.contract.fm.status !== "accepted") {
@@ -783,7 +787,7 @@ export function approveOutcomeSpec(specPath, options = {}) {
     updated: approvedAt.slice(0, 10),
     outcome_semantic_lock: semanticLock,
     outcome_document_lock: "pending",
-    approved_by: "user",
+    approved_by: approvedBy,
     approved_at: approvedAt,
     review_status: "accepted",
   });
@@ -802,9 +806,10 @@ export function approveOutcomeSpec(specPath, options = {}) {
     contract_fingerprint: fm.contract_fingerprint,
     semantic_lock: semanticLock,
     document_lock: documentLock,
-    approved_by: "user",
+    approved_by: approvedBy,
     approved_at: approvedAt,
   };
+  if(approvedBy==="pritha")event.creation_authority=options.creationAuthority;
   const evidencePath = appendApprovalEvent(event, { ...options, root });
   return { path: fullPath, text: next, event, evidencePath, unchanged: false };
 }
@@ -871,6 +876,7 @@ export function approvedTrialPlan(specPath, options = {}) {
       max_tokens: validation.contract?.buildTokenBudget || 1_000_000,
       token_budget_source: validation.contract?.buildTokenBudgetSource || "legacy-default",
       repeated_failure_threshold: validation.contract?.repeatedFailureThreshold || 3,
+      ...(approval.event?.approved_by==="pritha"?{repair_policy:"model-led"}:{}),
       autonomous_effects_denied: validation.contract?.autonomousEffectsDenied || "push, merge, deployment, service enablement, secret provisioning, Outcome Spec mutation, verifier mutation",
       acceptance_policy: validation.contract?.acceptancePolicy || "verified is distinct from accepted",
     },
