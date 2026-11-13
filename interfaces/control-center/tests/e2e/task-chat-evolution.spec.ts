@@ -55,8 +55,9 @@ async function mockChat(page: Page, initiallyRestored = false) {
 for (const width of [1280, 390]) test(`model-led creation shows autonomous recovery and a usable result at ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:900});
   const control=await mockChat(page,true);
+  const authority={policy:'model-led-local-v1',chatId:'chat_fixture',connectorId:'codex',target:'/workspace/fixture-agent',requestId:'creation_fixture'};
   const state={chatId:'chat_fixture',connectorId:'codex',target:'/workspace/fixture-agent',phase:'research',running:null,continuationPause:'research_collect',
-    creationAuthority:{policy:'model-led-local-v1',chatId:'chat_fixture',connectorId:'codex',target:'/workspace/fixture-agent',requestId:'creation_fixture'}};
+    creationAuthority:authority,contractApproval:{approvedBy:'pritha',authorization:{...authority}}};
   control.factoryControl={available:true,slug:'fixture-agent',phase:'research',running:false,documentsApproved:true,builder:{provider:'codex',modelId:'fixture-model',effort:'low'},delivery:null,milestone:factoryMilestone(state,null,null)};
   await page.goto('/task-chat?chat=chat_fixture&group=my_chats');
   await expect(page.getByText('Choosing implementation · fixture-agent',{exact:true})).toBeVisible();
