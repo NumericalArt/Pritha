@@ -477,7 +477,8 @@ id: ${data.artifactId || `${date}-${agentSlug}-agent-contract`}
 type: agent-contract
 contract_schema_version: ${CONTRACT_SCHEMA_VERSION}
 agent_kind: ${agentKind}
-agent_id: agent-${createHash("sha256").update(data.artifactId || `${date}-${agentSlug}-agent-contract`).digest("hex").slice(0, 24)}
+agent_id: ${data.agentId || 'agent-'+createHash("sha256").update(data.artifactId || `${date}-${agentSlug}-agent-contract`).digest("hex").slice(0, 24)}
+${data.factoryRevisionOf?`factory_revision_of: ${JSON.stringify(data.factoryRevisionOf)}\n`:''}${data.factoryProposalRevision?`factory_proposal_revision: ${data.factoryProposalRevision}\n`:''}
 ${data.initRequestFingerprint?`init_request_fingerprint: ${data.initRequestFingerprint}\n`:''}status: draft
 created: ${date}
 updated: ${date}
@@ -857,7 +858,7 @@ function applyInterviewTechnicalProposal(data, options = {}) {
   return data;
 }
 
-export async function interview(options) {
+export async function interview(options, artifactOptions = {}) {
   options=prepareInterviewOptions(options);
   ensureDirs();
   const interactive = Boolean(process.stdin.isTTY && !options["no-input"]);
@@ -894,7 +895,7 @@ export async function interview(options) {
     applyInterviewTechnicalProposal(data, options);
   }
 
-  const {contractPath:outPath,outcomePath,reused}=createInterviewArtifacts(data,{contractOnly:Boolean(options['contract-only']),idempotent:Boolean(options.brief || options['from-brief'])});
+  const {contractPath:outPath,outcomePath,reused}=createInterviewArtifacts(data,{contractOnly:Boolean(options['contract-only']),idempotent:Boolean(options.brief || options['from-brief']),...artifactOptions});
   console.log(`${reused?'Reused':'Created'}: ${path.relative(ROOT,outPath)}`);
   if(outcomePath)console.log(`Proposed Outcome Spec: ${path.relative(ROOT,outcomePath)}`);
 
@@ -908,12 +909,25 @@ export async function interview(options) {
   return {contractPath:outPath,outcomePath,reused};
 }
 
-export function createInterviewArtifacts(data,{contractOnly=false,idempotent=true}={}){
+export function createInterviewArtifacts(data,{contractOnly=false,idempotent=true,revisionOf=null,expectedSha256=null}={}){
   mkdirSync(CONTRACT_DIR,{recursive:true});
   const stable=value=>Array.isArray(value)?value.map(stable):value && typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(key=>value[key]!==undefined).map(key=>[key,stable(value[key])])):value;
   const fingerprint='sha256:'+createHash('sha256').update(JSON.stringify(stable(data))).digest('hex'),date=today();
   return withFileLock(path.join(CONTRACT_DIR,'.init'),()=>{
-    const prior=idempotent?readdirSync(CONTRACT_DIR).filter(name=>/-agent-contract(?:-\d+)?\.md$/.test(name)).map(name=>contractData(path.join(CONTRACT_DIR,name),{root:ROOT})).filter(item=>item.fm.status!=='superseded' && (item.technicalSlug===data.technicalSlug || item.targetFolder===data.targetFolder)):[];
+    const contracts=readdirSync(CONTRACT_DIR).filter(name=>/-agent-contract(?:-\d+)?\.md$/.test(name)).map(name=>contractData(path.join(CONTRACT_DIR,name),{root:ROOT}));
+    // A model-owned preparation revision keeps the prior artifact byte-for-byte.
+    // Its successor points back to that exact artifact; agent identity is stable.
+    if(revisionOf){
+      const previous=contracts.find(item=>item.fullPath===revisionOf);
+      if(!previous || createHash('sha256').update(previous.text).digest('hex')!==expectedSha256
+          || previous.technicalSlug!==data.technicalSlug || previous.targetFolder!==data.targetFolder || previous.agentName!==data.agentName)throw new Error('Factory Contract revision identity changed');
+      const successors=contracts.filter(item=>item.fm.factory_revision_of===previous.fm.id);
+      if(successors.length>1 || successors.some(item=>item.fm.init_request_fingerprint!==fingerprint))throw new Error('Factory Contract revision changed before it was recorded');
+      const contractPath=successors[0]?.fullPath || writeUniqueArtifact(path.join(CONTRACT_DIR,`${date}-${data.technicalSlug}-agent-contract.md`),({artifactId})=>contractMarkdown({...data,date,artifactId,agentId:previous.agentId,initRequestFingerprint:fingerprint,factoryRevisionOf:previous.fm.id,factoryProposalRevision:(Number(previous.fm.factory_proposal_revision)||0)+1})).path;
+      return {contractPath,outcomePath:null,reused:successors.length>0};
+    }
+    const replaced=new Set(contracts.map(item=>item.fm.factory_revision_of).filter(Boolean));
+    const prior=idempotent?contracts.filter(item=>item.fm.status!=='superseded' && !replaced.has(item.fm.id) && (item.technicalSlug===data.technicalSlug || item.targetFolder===data.targetFolder)):[];
     if(prior.length>1)throw new Error('Multiple active contracts exist for this target; resolve their identities before retrying init');
     if(prior.length && prior[0].fm.init_request_fingerprint!==fingerprint)throw new Error('Init differs from the saved target contract; revise the existing draft explicitly');
     const contractPath=prior[0]?.fullPath || writeUniqueArtifact(path.join(CONTRACT_DIR,`${date}-${data.technicalSlug || slug(data.agentName)}-agent-contract.md`),({artifactId})=>contractMarkdown({...data,date,artifactId,initRequestFingerprint:idempotent?fingerprint:undefined})).path;

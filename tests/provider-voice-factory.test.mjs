@@ -426,6 +426,7 @@ test('literal draft corrections preserve Unicode and exact trailing bytes and re
   for(const edits of [[],Array(9).fill({from:'А',to:'Б'}),[{from:'',to:'x'}],[{from:'absent',to:'x'}],[{from:'А',to:'x',path:'foreign'}],[{from:'А',to:'x'.repeat(48001)}]])assert.throws(()=>patchFactoryDraft(text,{...input,edits}));
   assert.throws(()=>patchFactoryDraft('aaa',{edits:[{from:'aa',to:'x'}],expected_result_sha256:factoryHash('xa')}),{code:'factory_patch_not_unique'});
   assert.throws(()=>patchFactoryDraft(text,{...input,expected_result_sha256:'0'.repeat(64)}),{code:'factory_patch_hash_mismatch'});
+  assert.equal(patchFactoryDraft(text,{edits:input.edits}),expected,'The host computes a result hash without delegating hashing to the model');
   const correction=factoryBriefErrorDetail({code:'factory_patch_hash_mismatch',message:'do not echo synthetic-private-value'});assert.equal(correction.error,'factory_patch_hash_mismatch');assert.match(correction.hint,/No draft was written/);assert.doesNotMatch(JSON.stringify(correction),/synthetic-private-value/);
 });
 
@@ -434,7 +435,7 @@ test('normal factory patch tool is exact, replayable and cannot edit accepted do
   const row=f.artifact('outcome'),from='## Demo script\n\n',to=from+'Review the exact CLI output before final acceptance.\n\n',content=row.text.replace(from,to);
   assert.notEqual(content,row.text);
   const input={operation_id:'patch-outcome-exact-01',artifact:'outcome',expected_sha256:row.sha256,edits:[{from,to}],expected_result_sha256:factoryHash(content)},before=f.state().revision;
-  const definition=f.tools.definitions.find(tool=>tool.name==='factory_patch_draft');assert.deepEqual(definition.inputSchema.required,['artifact','expected_sha256','edits','expected_result_sha256']);assert.equal(definition.inputSchema.properties.content,undefined);
+  const definition=f.tools.definitions.find(tool=>tool.name==='factory_patch_draft');assert.deepEqual(definition.inputSchema.required,['artifact','expected_sha256','edits']);assert.equal(definition.inputSchema.properties.content,undefined);
   await assert.rejects(f.tools.call('factory_patch_draft',{...input,operation_id:'patch-outcome-wrong-hash',expected_result_sha256:'0'.repeat(64)}),{code:'factory_patch_hash_mismatch'});
   assert.equal(f.state().revision,before);assert.equal(f.artifact('outcome').text,row.text);
   const first=await f.tools.call('factory_patch_draft',input);assert.equal(JSON.parse(first.content[0].text).status,'completed');assert.equal(f.artifact('outcome').text,content);

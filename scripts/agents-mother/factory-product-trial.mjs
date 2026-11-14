@@ -7,6 +7,7 @@ import { parseBoundedJson } from '../lib/bounded-json.mjs';
 import { redactSensitiveText } from '../lib/redaction.mjs';
 import { renderOutcomeSpecFromContract, validateOutcomeSpecText } from './outcome-spec.mjs';
 import { preparedTrialInputFiles } from './prepared-trial-inputs.mjs';
+import {factoryTrialInputRoot} from './factory-proposal-revision.mjs';
 import { safeTrialInputPath } from './trial-input-declarations.mjs';
 import { scaffoldCapability } from './scaffold/capabilities.mjs';
 import { apiProcessPortConfiguration } from './scaffold/api-process.mjs';
@@ -166,7 +167,7 @@ export function prepareProductTrial(paths, outcome, data, trial) {
   if(!next.includes(LOCAL_APPLICATION_TEXT))next+='\n## Local application\n\n'+LOCAL_APPLICATION_TEXT+'\n';
   const validation = validateOutcomeSpecText(next, { root: paths.root });
   if (validation.issues.some(issue => !['OS015', 'OS016'].includes(issue.code))) fail('factory_product_trial_invalid');
-  const inputRoot = privateStateDirectory(paths.stateRoot, path.join(paths.directory, 'trial-inputs'));
+  const inputRoot = privateStateDirectory(paths.stateRoot, factoryTrialInputRoot(paths,data));
   const file = privateStateFile(paths.stateRoot, path.join(inputRoot, verifierPath));
   const previous = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
   atomicCompareAndSwapFile(file, previous, content);
@@ -203,7 +204,7 @@ export function reviewProductTrials(paths, outcome, data, { includeInputs = true
   }
   if (!includeInputs) return [];
   if (!checked.parsed.trials.some(trial => trial.verifierInputs || trial.productTargets)) return [];
-  const inputRoot = privateStateDirectory(paths.stateRoot, path.join(paths.directory, 'trial-inputs'), { create: false });
+  const inputRoot = privateStateDirectory(paths.stateRoot, factoryTrialInputRoot(paths,data), { create: false });
   if (!inputRoot) fail('factory_trial_inputs_missing');
   const files=preparedTrialInputFiles({ trials: checked.parsed.trials }, inputRoot).map(file => ({
     path: file.path, sha256: sha256(file.content), content: file.content.toString('utf8'),

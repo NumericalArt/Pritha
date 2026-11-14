@@ -62,6 +62,14 @@ for(const [connectorId,model,childProvider,childModel] of [
     if(!modelLed)await pending('contract');else await proposal;
     assert.equal((await call('scaffold_plan')).capability.supported,true);
     if(!modelLed){await f.answer();await pending('outcome');}
+    if(modelLed && connectorId==='neuraldeep'){
+      const previous=f.artifact('contract'),outcome=f.artifact('outcome'),identity=f.state().agentId;
+      brief.technical.port='3093';brief.technical.childMaxOutputTokens='1024';
+      const revised=await call('propose',{brief,product,build_token_budget:10000,build_iteration_budget:2});
+      assert.equal(revised.revised,true);assert.equal(f.state().agentId,identity);
+      assert.equal(fs.readFileSync(previous.file,'utf8'),previous.text);assert.equal(fs.readFileSync(outcome.file,'utf8'),outcome.text);
+      const status=await call('status');assert.equal(status.contractSettings.apiPort.port,3093);assert.equal(status.contractSettings.childMaxOutputTokens,1024);
+    }
     const trial=f.trial;
     const data=contractData(f.state().contract,{root:f.root});
     // This compiled review regenerates and compares the complete verifier,

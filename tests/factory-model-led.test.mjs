@@ -9,6 +9,10 @@ import {deliveryStatus} from '../scripts/agents-mother/delivery-loop.mjs';
 import {hasCreationAuthority,hasDelegatedContract} from '../scripts/agents-mother/factory-creation-authority.mjs';
 import {nextFactoryAction} from '../scripts/agents-mother/factory-continuation.mjs';
 import {factoryMilestone} from '../scripts/agents-mother/factory-milestone.mjs';
+import {contractData} from '../scripts/agents-mother/contract.mjs';
+import {factoryHash} from '../scripts/agents-mother/voice-factory-state.mjs';
+import {FactoryBudget} from '../scripts/agents-mother/factory-budget.mjs';
+import {factoryTrialInputRoot} from '../scripts/agents-mother/factory-proposal-revision.mjs';
 
 const providers=[['codex','gpt-6-astra','openai','gpt-4.1-mini'],['claude','claude-sonnet-5-5','claude','claude-haiku-4-5-20251001'],['neuraldeep','gpt-oss-120b','neuraldeep','gpt-oss-20b']];
 async function fixture(t,provider,extra={}){
@@ -71,6 +75,10 @@ test('a custom profile still requires its real user decision after retaining the
  assert.equal(f.state().contractApproval.approvedBy,'user');assert.equal(hasDelegatedContract(f.state()),false);
  assert.equal((await f.call('status')).creationMode,'reviewed');
  assert.equal(f.reviews.length,1);assert.equal(f.builds.length,0);
+ const correction=structuredClone(f.input);correction.brief.technical.childModelConnection='pritha';
+ assert.equal((await f.call('status')).proposalRevision.available,false);
+ assert.equal((await f.call('propose',correction)).error,'factory_target_exists');
+ assert.equal(f.state().contractApproval.approvedBy,'user');
  assert.equal((await f.call('create_outcome')).error,undefined);
  assert.deepEqual((await f.call('status')).nextStep,{owner:'user',reason:'outcome_decision'});
  assert.equal(factoryMilestone(f.state(),null,null).kind,'proposal');
@@ -146,4 +154,91 @@ test('a model repairs an unsupported draft without losing its creation request o
  const built=await f.call('research_decide',{answer:'Use the existing Pritha model connection and the local API adapter. Build and check the behavior from the retained examples.'});
  assert.equal(built.continuationFailed,false,JSON.stringify(built));assert.equal(f.builds.length,1);
  assert.equal(f.state().phase,'awaiting-manual-acceptance');
+});
+
+test('NeuralDeep corrects an accepted preparation proposal and builds the same child without another question',{timeout:120000},async t=>{
+ const f=await fixture(t,providers[2]);
+ const incomplete=structuredClone(f.input);
+ delete incomplete.brief.technical.port;delete incomplete.brief.technical.childMaxOutputTokens;
+ delete incomplete.brief.technical.repositoryResearchPolicy;delete incomplete.product.http[0].model_output;
+ incomplete.brief.technical.targetFolder=f.paths.target+'/scripts/server.mjs?ignored-path';
+ assert.equal((await f.call('propose',incomplete)).error,'factory_product_trial_model_proof_required');
+ const firstDraft=f.artifact('contract');
+ // Compatibility with receipts written before host-owned values were canonicalized.
+ const legacy=f.state();legacy.preparation.requestHash=factoryHash([incomplete.brief,incomplete.build_token_budget,incomplete.build_iteration_budget,null]);fs.writeFileSync(f.paths.file,JSON.stringify(legacy));
+ incomplete.brief.technical.targetFolder=f.paths.target;
+ assert.equal((await f.call('propose',incomplete)).error,'factory_product_trial_model_proof_required','A corrected host-owned path is not a changed proposal');
+ assert.equal(f.artifact('contract').sha256,firstDraft.sha256);
+ await f.call('approve_contract',{expected_sha256:firstDraft.sha256});
+ assert.equal(f.state().contractApproval.approvedBy,'pritha');
+ await f.call('create_outcome');
+ const originalContract=f.artifact('contract'),originalOutcome=f.artifact('outcome'),authority=f.state().creationAuthority;
+ await new FactoryBudget({...f.paths,chatId:f.chatId,connectorId:'neuraldeep'}).observe('original-preparation','preparation',{observedTokens:12345,chargedTokens:16000,activeMs:5000,usageKnown:false});
+ const budgetFile=path.join(f.paths.directory,'workflow-budget.json'),budget=JSON.parse(fs.readFileSync(budgetFile));
+ f.input.brief.technical.port='3093';f.input.brief.technical.childMaxOutputTokens='1024';
+ const result=await f.call('propose',f.input);
+ assert.equal(result.error,undefined,JSON.stringify(result));assert.equal(result.continuationFailed,false,JSON.stringify(result));
+ assert.equal(result.revised,true);assert.equal(f.state().phase,'research');assert.equal(f.state().agentId,originalContract.frontmatter.agent_id);
+ assert.notEqual(f.artifact('contract').file,originalContract.file);assert.notEqual(f.artifact('outcome').file,originalOutcome.file);
+ assert.equal(fs.readFileSync(originalContract.file,'utf8'),originalContract.text);assert.equal(fs.readFileSync(originalOutcome.file,'utf8'),originalOutcome.text);
+ assert.deepEqual(f.state().creationAuthority,authority);const afterBudget=JSON.parse(fs.readFileSync(budgetFile));assert.deepEqual(afterBudget.attempts,budget.attempts);assert.deepEqual(afterBudget.limits,budget.limits);
+ const status=await f.call('status');assert.equal(status.contractSettings.apiPort.port,3093);assert.equal(status.contractSettings.childMaxOutputTokens,1024);
+ assert.equal(status.contractSettings.repositoryResearchPolicy,'not-applicable');assert.equal(f.reviews.length,0);
+ const history=fs.readdirSync(path.join(f.paths.directory,'proposal-history')).filter(name=>!name.endsWith('-brief.json'));
+ assert.equal(history.length,1);const receipt=JSON.parse(fs.readFileSync(path.join(f.paths.directory,'proposal-history',history[0])));
+ assert.equal(receipt.artifacts.contract.sha256,originalContract.sha256);assert.equal(receipt.state.contractApproval.approvedBy,'pritha');
+ const built=await f.call('research_decide',{answer:'The corrected port and response limit match the request. Implement the local API and verify model transport, validation and managed Start/Stop.'});
+ assert.equal(built.continuationFailed,false,JSON.stringify(built));assert.equal(f.builds.length,1);assert.equal(f.state().phase,'awaiting-manual-acceptance');
+ assert.equal((await f.call('status')).proposalRevision.available,false);assert.equal(f.reviews.length,0);
+});
+
+test('pre-scaffold corrections version approved verifiers while preserving prior evidence and budgets',{timeout:120000},async t=>{
+ const f=await fixture(t,providers[0]);
+ assert.equal((await f.call('propose',f.input)).continuationFailed,false);
+ const originalState=f.state(),originalContract=f.artifact('contract'),originalOutcome=f.artifact('outcome');
+ const originalInputs=factoryTrialInputRoot(f.paths,contractData(originalContract.file,{root:f.root}));
+ const verifierFile=path.join(originalInputs,'verification/product.mjs'),verifier=fs.readFileSync(verifierFile,'utf8');
+ const increase=structuredClone(f.input);increase.build_token_budget++;
+ assert.equal((await f.call('propose',increase)).error,'factory_proposal_budget_changed');
+ assert.equal(f.artifact('contract').sha256,originalContract.sha256);
+ const corrected=structuredClone(f.input);corrected.product.http[0].expected_json={answer:'NO'};corrected.product.http[0].model_output={answer:'NO'};
+ const revised=await f.call('propose',corrected);
+ assert.equal(revised.error,undefined,JSON.stringify(revised));assert.equal(revised.continuationFailed,false,JSON.stringify(revised));
+ assert.equal(fs.readFileSync(verifierFile,'utf8'),verifier);assert.equal(fs.readFileSync(originalContract.file,'utf8'),originalContract.text);
+ assert.equal(fs.readFileSync(originalOutcome.file,'utf8'),originalOutcome.text);
+ const nextInputs=factoryTrialInputRoot(f.paths,contractData(f.state().contract,{root:f.root}));assert.notEqual(nextInputs,originalInputs);
+ assert.notEqual(factoryHash(fs.readFileSync(path.join(nextInputs,'verification/product.mjs'),'utf8')),factoryHash(verifier));
+ assert.equal(f.state().agentId,originalState.agentId);assert.equal(f.state().outcomeApproval.approvedBy,'pritha');assert.equal(f.reviews.length,0);
+ const stable=f.state().contract;assert.equal((await f.call('propose',corrected)).error,undefined);assert.equal(f.state().contract,stable);
+ const built=await f.call('research_decide',{answer:'Use the corrected example and execute the protected verifiers from this proposal version.'});
+ assert.equal(built.continuationFailed,false,JSON.stringify(built));assert.equal(f.state().phase,'awaiting-manual-acceptance');assert.equal(f.builds.length,1);
+});
+
+test('a modified accepted Contract cannot be legitimized through a new proposal',{timeout:30000},async t=>{
+ const f=await fixture(t,providers[2]);assert.equal((await f.call('propose',f.input)).continuationFailed,false);
+ const row=f.artifact('contract');fs.writeFileSync(row.file,row.text+'\nUnexpected external edit.\n');
+ const changed=structuredClone(f.input);changed.brief.technical.port='3093';
+ const rejected=await f.call('propose',changed);
+ assert.equal(rejected.error,'factory_contract_approval_required');assert.equal(f.state().contract,row.file);assert.equal(f.builds.length,0);
+});
+
+test('incremental model-led preparation can switch to a corrected complete proposal before scaffold',{timeout:30000},async t=>{
+ const f=await fixture(t,providers[1]),{product,...input}=f.input;
+ assert.equal((await f.call('init',input)).continuationFailed,false);
+ const previous=f.artifact('contract');assert.equal((await f.call('status')).proposalRevision.available,true);
+ const corrected=structuredClone(f.input);corrected.brief.technical.port='3094';
+ const result=await f.call('propose',corrected);
+ assert.equal(result.error,undefined,JSON.stringify(result));assert.equal(result.continuationFailed,false,JSON.stringify(result));
+ assert.equal(result.revised,true);assert.equal(f.state().phase,'research');assert.equal(f.reviews.length,0);
+ assert.equal(fs.readFileSync(previous.file,'utf8'),previous.text);assert.equal(f.state().agentId,previous.frontmatter.agent_id);
+});
+
+test('a draft edit cannot manufacture host-owned proposal lineage or verifier storage',{timeout:15000},async t=>{
+ const f=await fixture(t,providers[2]),incomplete=structuredClone(f.input);delete incomplete.product.http[0].model_output;
+ assert.equal((await f.call('propose',incomplete)).error,'factory_product_trial_model_proof_required');
+ const row=f.artifact('contract');
+ for(const field of ['factory_revision_of: unrelated-contract','factory_proposal_revision: 7']){
+   const result=await f.call('patch_draft',{artifact:'contract',expected_sha256:row.sha256,edits:[{from:'status: draft',to:field+'\nstatus: draft'}]});
+   assert.equal(result.error,'factory_draft_identity_invalid');assert.equal(f.artifact('contract').sha256,row.sha256);
+ }
 });

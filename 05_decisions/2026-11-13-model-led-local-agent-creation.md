@@ -3,7 +3,7 @@ id: 2026-11-13-model-led-local-agent-creation
 type: decision
 status: accepted
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-14
 topics: [pritha, agents-mother, autonomous-delivery, agent-evals]
 tools: [Pritha, Node.js]
 sources:
@@ -88,9 +88,38 @@ There is no weaker-model-only branch on the strong-model path.
 The alternative of removing all tests would make completion claims less useful.
 The selected approach removes preparation gates and routine questions while
 retaining observable behavior as repair feedback. Remaining limitations include
-unsupported adapters, custom integration permissions and revision of an already
-locked product specification. They must be reported honestly rather than hidden
+unsupported adapters, custom integration permissions and revision after child
+construction has begun. They must be reported honestly rather than hidden
 behind a successful controller turn.
+
+## Preparation corrections
+
+Before scaffold, Pritha may correct its own proposal in the same host-bound
+conversation by resubmitting the complete brief and examples. This includes a
+Contract or Outcome it already finalized under the creation request. The host
+creates successor artifacts with the same agent identity, records the prior
+state and approvals, and keeps the old documents and verifier files unchanged.
+It then performs the ordinary document and product preparation steps on the new
+version. No user document vote is invented and no second creation task is needed.
+
+This applies only before a child folder, scaffold or delivery run exists, with
+unchanged build limits and the original creation authority. Actual user-reviewed
+decisions and custom workflows cannot be silently superseded. Unknown technical
+steps remain subject to reconciliation. The accumulated workflow usage,
+including uncertain reservations, is retained. A corrected proposal grants no
+new service, secret, repository adoption or publication permission.
+
+Host-owned target paths do not participate as model choices in proposal
+identity. Existing receipts compare their saved bound brief and actual limits;
+they are not rewritten. Explicit requested ports and response limits belong in
+the model's structured brief. Omitted repository research defaults to local
+implementation for this profile. Status exposes the effective settings and
+whether proposal revision is available, so assumptions can be corrected without
+adding a second review step to complete proposals.
+
+Small draft patches still require the exact source hash and unambiguous literal
+edits. The host computes the result hash; a caller may optionally supply one as
+an additional check. Protected or accepted files cannot be patched directly.
 
 ## Verification
 
