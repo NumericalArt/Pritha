@@ -8,6 +8,7 @@ import {readDeliveryLedger} from '../scripts/agents-mother/delivery-ledger.mjs';
 import {deliveryStatus} from '../scripts/agents-mother/delivery-loop.mjs';
 import {hasCreationAuthority,hasDelegatedContract} from '../scripts/agents-mother/factory-creation-authority.mjs';
 import {nextFactoryAction} from '../scripts/agents-mother/factory-continuation.mjs';
+import {readAgentCatalog} from '../scripts/agents-mother/identity.mjs';
 import {factoryMilestone} from '../scripts/agents-mother/factory-milestone.mjs';
 import {contractData} from '../scripts/agents-mother/contract.mjs';
 import {factoryHash} from '../scripts/agents-mother/voice-factory-state.mjs';
@@ -179,6 +180,8 @@ test('NeuralDeep corrects an accepted preparation proposal and builds the same c
  const result=await f.call('propose',f.input);
  assert.equal(result.error,undefined,JSON.stringify(result));assert.equal(result.continuationFailed,false,JSON.stringify(result));
  assert.equal(result.revised,true);assert.equal(f.state().phase,'research');assert.equal(f.state().agentId,originalContract.frontmatter.agent_id);
+ const catalog=()=>readAgentCatalog({...f.paths,agentParent:f.paths.parent,fresh:true}).agents;
+ assert.equal(catalog().length,1);assert.equal(catalog()[0].identityStatus,'identified');assert.equal(catalog()[0].projectPath,null);assert.equal(catalog()[0].contractSource,f.state().contract);assert.deepEqual(catalog()[0].diagnostics,['project-planned-not-created']);
  assert.notEqual(f.artifact('contract').file,originalContract.file);assert.notEqual(f.artifact('outcome').file,originalOutcome.file);
  assert.equal(fs.readFileSync(originalContract.file,'utf8'),originalContract.text);assert.equal(fs.readFileSync(originalOutcome.file,'utf8'),originalOutcome.text);
  assert.deepEqual(f.state().creationAuthority,authority);const afterBudget=JSON.parse(fs.readFileSync(budgetFile));assert.deepEqual(afterBudget.attempts,budget.attempts);assert.deepEqual(afterBudget.limits,budget.limits);
@@ -190,6 +193,7 @@ test('NeuralDeep corrects an accepted preparation proposal and builds the same c
  const built=await f.call('research_decide',{answer:'The corrected port and response limit match the request. Implement the local API and verify model transport, validation and managed Start/Stop.'});
  assert.equal(built.continuationFailed,false,JSON.stringify(built));assert.equal(f.builds.length,1);assert.equal(f.state().phase,'awaiting-manual-acceptance');
  assert.equal((await f.call('status')).proposalRevision.available,false);assert.equal(f.reviews.length,0);
+ assert.equal(catalog().length,1);assert.equal(catalog()[0].identityStatus,'identified');assert.equal(catalog()[0].projectPath,f.paths.target);assert.equal(catalog()[0].contractSource,f.state().contract);
 });
 
 test('pre-scaffold corrections version approved verifiers while preserving prior evidence and budgets',{timeout:120000},async t=>{
@@ -210,6 +214,11 @@ test('pre-scaffold corrections version approved verifiers while preserving prior
  assert.notEqual(factoryHash(fs.readFileSync(path.join(nextInputs,'verification/product.mjs'),'utf8')),factoryHash(verifier));
  assert.equal(f.state().agentId,originalState.agentId);assert.equal(f.state().outcomeApproval.approvedBy,'pritha');assert.equal(f.reviews.length,0);
  const stable=f.state().contract;assert.equal((await f.call('propose',corrected)).error,undefined);assert.equal(f.state().contract,stable);
+ const draftCorrection=structuredClone(corrected);draftCorrection.brief.technical.port='3094';delete draftCorrection.product.http[0].model_output;
+ assert.equal((await f.call('propose',draftCorrection)).error,'factory_product_trial_model_proof_required');
+ const draftAgent=readAgentCatalog({...f.paths,agentParent:f.paths.parent,fresh:true}).agents[0];
+ assert.equal(draftAgent.identityStatus,'identified');assert.equal(draftAgent.contractSource,f.state().contract);assert.deepEqual(draftAgent.diagnostics,['project-planned-not-created']);
+ corrected.brief.technical.port='3094';assert.equal((await f.call('propose',corrected)).continuationFailed,false);
  const built=await f.call('research_decide',{answer:'Use the corrected example and execute the protected verifiers from this proposal version.'});
  assert.equal(built.continuationFailed,false,JSON.stringify(built));assert.equal(f.state().phase,'awaiting-manual-acceptance');assert.equal(f.builds.length,1);
 });

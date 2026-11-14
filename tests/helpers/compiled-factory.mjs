@@ -39,6 +39,7 @@ async function compiled(marker,predicate){
 }
 const FactoryTools=await compiled('factory_child_connection_missing',value=>value.prototype?.validate && value.prototype?.execute && value.prototype?.read);
 const review=await compiled('const checks = JSON.parse(',value=>value.length===3 && value.toString().includes('includeInputs'));
+const catalog=await compiled('project-planned-not-created',value=>value.toString().includes('agent-parent-unavailable'));
 
 for(const [connectorId,model,childProvider,childModel] of [
   ['codex','gpt-6-astra','openai','gpt-4.1-mini'],
@@ -69,6 +70,9 @@ for(const [connectorId,model,childProvider,childModel] of [
       assert.equal(revised.revised,true);assert.equal(f.state().agentId,identity);
       assert.equal(fs.readFileSync(previous.file,'utf8'),previous.text);assert.equal(fs.readFileSync(outcome.file,'utf8'),outcome.text);
       const status=await call('status');assert.equal(status.contractSettings.apiPort.port,3093);assert.equal(status.contractSettings.childMaxOutputTokens,1024);
+      const agents=catalog({...f.paths,agentParent:f.paths.parent,fresh:true}).agents;
+      assert.equal(agents.length,1);assert.equal(agents[0].identityStatus,'identified');assert.equal(agents[0].projectPath,null);
+      assert.equal(agents[0].contractSource,f.state().contract);assert.deepEqual(agents[0].diagnostics,['project-planned-not-created']);
     }
     const trial=f.trial;
     const data=contractData(f.state().contract,{root:f.root});

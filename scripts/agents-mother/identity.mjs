@@ -7,6 +7,7 @@ import { parseBoundedJson } from "../lib/bounded-json.mjs";
 import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStateRoot, resolvePrithaRoot, isPrithaCodeCheckout } from "../lib/paths.mjs";
 import { CHILD_AGENT_TYPES } from "../lib/child-agent-artifacts.mjs";
 import { readAgentKind, operationsApplicability } from "./agent-kind.mjs";
+import {hasCreationAuthority,hasDelegatedContract} from './factory-creation-authority.mjs';
 
 // Identity is attribution, never proof of approval, verification or ownership of
 // a running process. Those decisions still require their host-owned receipts.
@@ -203,6 +204,40 @@ function isUncreatedFactory(group, context) {
       && !item.projectRef && ["draft","approved"].includes(item.fm.status)));
 }
 
+function currentFactoryArtifacts(group,context){
+  const contracts=group.artifacts.filter(item=>item.type==='agent-contract');
+  if(contracts.length<2 || !group.agentId)return group.artifacts;
+  const byId=new Map(contracts.map(item=>[item.fm.id,item]));
+  if(byId.size!==contracts.length)return group.artifacts;
+  const replaced=new Set(contracts.map(item=>item.fm.factory_revision_of).filter(Boolean));
+  const heads=contracts.filter(item=>!replaced.has(item.fm.id));
+  if(heads.length!==1)return group.artifacts;
+  const head=heads[0],visited=new Set();let cursor=head;
+  while(cursor){
+    if(visited.has(cursor) || cursor.agentId!==group.agentId || cursor.name!==head.name || cursor.projectRef!==head.projectRef)return group.artifacts;
+    visited.add(cursor);
+    if(!cursor.fm.factory_revision_of)break;
+    const parent=byId.get(cursor.fm.factory_revision_of);
+    if(!parent || Number(cursor.fm.factory_proposal_revision)!==(Number(parent.fm.factory_proposal_revision)||0)+1)return group.artifacts;
+    cursor=parent;
+  }
+  if(visited.size!==contracts.length)return group.artifacts;
+  const text=safeText(head.path,context.memoryRoot),slug=bodyValue(text,'Technical slug');
+  if(!/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug))return group.artifacts;
+  let state;
+  try{state=parseBoundedJson(safeText(path.join(context.memoryRoot,'voice-factory',slug,'session.json'),context.memoryRoot,100000),{maxBytes:100000,maxDepth:12,maxNodes:1000});}
+  catch{return group.artifacts;}
+  const expected=head.fm.status==='accepted' && hasDelegatedContract(state)?state.contractApproval?.sha256
+    :head.fm.status==='draft' && hasCreationAuthority(state) && !state.contractApproval?state.preparation?.contractDraftSha256:null;
+  if(!expected || state.schema!=='pritha-voice-factory-v1' || state.slug!==slug || state.agentId!==group.agentId || state.agentName!==head.name
+      || state.contract!==head.path || canonical(state.stateRoot || '')!==canonical(context.stateRoot)
+      || state.target!==projectReferencePath(head.projectRef,context) || expected!==createHash('sha256').update(text).digest('hex'))return group.artifacts;
+  // Keep all artifacts in the catalog's audit view. Only current attribution
+  // and the planned-project diagnostic use this host-bound lineage head.
+  const historical=new Set(contracts.filter(item=>item!==head).map(item=>item.path));
+  return group.artifacts.filter(item=>!historical.has(item.path) && !(item.type==='agent-outcome-spec' && historical.has(item.contractPath) && item.agentId===group.agentId && !item.projectRef));
+}
+
 function assemble(artifacts, folders, rows, context, diagnostics) {
   const groups = new Map();
   const contractGroups = new Map();
@@ -261,8 +296,9 @@ function assemble(artifacts, folders, rows, context, diagnostics) {
   const sorted = (items) => [...items].sort((a, b) => `${b.updated}:${b.path}`.localeCompare(`${a.updated}:${a.path}`));
   for (const group of groups.values()) {
     group.artifacts = sorted(group.artifacts);
-    const profile = group.artifacts.find((item) => item.type === "child-agent-profile");
-    const contract = group.artifacts.find((item) => item.type === "agent-contract");
+    const currentArtifacts=currentFactoryArtifacts(group,context),currentGroup={...group,artifacts:currentArtifacts};
+    const profile = currentArtifacts.find((item) => item.type === "child-agent-profile");
+    const contract = currentArtifacts.find((item) => item.type === "agent-contract");
     group.name = profile?.name || contract?.name || group.name || group.agentId || "Unclassified agent";
     // Report titles and registry rows cannot replace authored product purpose.
     group.mission = profile?.mission || contract?.mission || "";
@@ -280,7 +316,7 @@ function assemble(artifacts, folders, rows, context, diagnostics) {
     if (paths.length > 1) group.diagnostics.push("conflicting-project-paths");
     else if (paths.length === 1) group.projectPath = paths[0];
     else if (selected.some(({ item }) => !logicalProjectRef(item.projectRef))) {
-      group.diagnostics.push(isUncreatedDraft(group, context) || isUncreatedFactory(group, context) ? "project-planned-not-created" : "project-path-outside-or-missing");
+      group.diagnostics.push(isUncreatedDraft(currentGroup, context) || isUncreatedFactory(currentGroup, context) ? "project-planned-not-created" : "project-path-outside-or-missing");
     } else {
       const matching = folders.filter((folder) => group.aliases.includes(agentAlias(folder.name)));
       if (matching.length === 1) { group.projectPath = matching[0].path; group.diagnostics.push("legacy-folder-attribution"); }
