@@ -12,6 +12,7 @@ import { resolvePrithaMemoryDatabase } from "../pritha-paths";
 import { DEFAULT_VOICE_MODEL, normalizeVoiceModel, type VoiceModel } from "./voice-settings";
 import { LIVE_MODEL, isLiveModel, liveSessionConfig, DEFAULT_LIVE_BACKEND } from "./live-session";
 import { runtimeProbe } from "../../../../../scripts/lib/runtime-probe.mjs";
+import { runAsyncProbe } from "../../../../../scripts/lib/async-probe.mjs";
 import { RuntimeSettingsStore, mergeLegacyRuntimeSettings } from "../../../../../scripts/lib/runtime-settings-store.mjs";
 import { registerExecutionChannel, callExecutionChannel, executionChannelView } from "../../../../../scripts/lib/execution-channel.mjs";
 import { prepareAgentWorkspaceTarget, scopedAgentWorkspace, inspectTaskWorkspace, prepareTaskWorkspace, verifyTaskWorkspace, type TaskWorkspace } from "../../../../../scripts/lib/task-workspace.mjs";
@@ -22,7 +23,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, 
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "../pritha-paths";
+import { resolvePrithaAgentMemoryRoot, resolvePrithaAgentParent, resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot, prithaRootEnvironment } from "../pritha-paths";
 import { atomicWritePrivateJson } from "../private-json";
 import {
   codexCliConfigEntries,
@@ -784,15 +785,44 @@ function markdownFallbackSearch(query: string, limit: number): MemorySearchRow[]
   return rows.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path)).slice(0, limit);
 }
 
-function memoryStats() {
-  if (!existsSync(memoryDbPath()) || !sqliteCliAvailable()) return [];
-  return sqliteJson(`
+const MEMORY_STATS_SQL = `
 SELECT 'documents' AS name, COUNT(*) AS count FROM documents
 UNION ALL SELECT 'chunks', COUNT(*) FROM chunks
 UNION ALL SELECT 'entities', COUNT(*) FROM entities
 UNION ALL SELECT 'relations', COUNT(*) FROM relations
 UNION ALL SELECT 'embeddings', COUNT(*) FROM embeddings;
-`);
+`;
+
+function memoryStats() {
+  if (!existsSync(memoryDbPath()) || !sqliteCliAvailable()) return [];
+  return sqliteJson(MEMORY_STATS_SQL);
+}
+
+// Counts are optional page diagnostics. A concurrent index writer must not
+// block the event loop or make Agents, Settings and Task Chat fail to render.
+// Actual memory tools retain their strict query and evidence behavior.
+async function memoryStatus(root: string) {
+  const database = memoryDbPath(root), sqlite = existsSync(database);
+  const result = await runAsyncProbe("sqlite3", sqlite
+    ? ["-readonly", "-json", "-cmd", ".timeout 200", database, MEMORY_STATS_SQL]
+    : ["--version"], { cwd: root, env: { ...process.env, ...prithaRootEnvironment(root) }, policy: "runtimeRead" });
+  const unavailable = {
+    sqlite,
+    sqlite_cli: !result.error && result.status !== null && result.status !== 127,
+    stats: [] as unknown[],
+    stats_status: "unavailable" as "ready" | "missing" | "unavailable",
+  };
+  if (result.status !== 0 || result.error) return unavailable;
+  if (!sqlite) return { ...unavailable, stats_status: "missing" as const };
+  try {
+    const rows = JSON.parse(result.stdout);
+    const names = ["documents", "chunks", "entities", "relations", "embeddings"];
+    if (!Array.isArray(rows) || rows.length !== names.length || !names.every(name =>
+      rows.filter(row => row?.name === name && Number.isSafeInteger(row.count) && row.count >= 0).length === 1)) return unavailable;
+    return { ...unavailable, stats: rows as unknown[], stats_status: "ready" as const };
+  } catch {
+    return unavailable;
+  }
 }
 
 function recentItems(limit = 8) {
@@ -8171,7 +8201,7 @@ export async function handlePrithaRealtimeTool(name: string, args: Record<string
 export async function getPrithaRealtimeStatus() {
   const config = buildRealtimeSessionConfig();
   const root = resolvePrithaRoot();
-  const [codex,codexApp] = await Promise.all([codexAvailable(),codexAppAvailable()]);
+  const [codex,codexApp,memory] = await Promise.all([codexAvailable(),codexAppAvailable(),memoryStatus(root)]);
   const runtimeSettings = getPrithaRuntimeSettings();
   const last30days = realtimeLast30DaysStatus(root);
   return {
@@ -8188,11 +8218,7 @@ export async function getPrithaRealtimeStatus() {
     tools: config.tools.map((tool) => tool.name),
     openai_key_configured: Boolean(env("OPENAI_API_KEY")),
     realtime_base_url: realtimeBaseUrl(),
-    memory: {
-      sqlite: existsSync(memoryDbPath(root)),
-      sqlite_cli: sqliteCliAvailable(),
-      stats: existsSync(memoryDbPath(root)) && sqliteCliAvailable() ? memoryStats() : [],
-    },
+    memory,
     codex: {
       mode: codexMode(),
       primary_transport: runtimeSettings.deepTaskPrimaryTransport,

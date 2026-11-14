@@ -3,7 +3,7 @@ id: control-center-staged-release
 type: workflow
 status: active
 created: 2026-08-27
-updated: 2026-11-11
+updated: 2026-11-14
 topics:
   - control-center
   - staged-release
@@ -26,7 +26,7 @@ superseded_by: []
 freshness_status: current
 source_published: 2026-08-27
 source_updated: 2026-09-23
-source_version: control-center-staged-release-v5; approved interactive profile migration after build swap
+source_version: control-center-staged-release-v6; memory-index writer contention checks
 retrieved: 2026-08-27
 verified: 2026-09-23
 valid_for: Pritha Control Center production and fleet releases
@@ -117,6 +117,12 @@ well. When correcting authored metadata, compare the agent catalog before and
 after the edit: a syntactically valid `subject.id` can still introduce a second
 identity for an existing project. Preserve the identifier from its accepted
 contract and verify that its project binding remains unique.
+
+Pages must also remain available while the memory index is being rebuilt. The
+disposable candidate browser test holds a SQLite writer lock while opening
+Agents and reading status, then checks recovery after releasing it. Optional
+statistics may be unavailable; their read must stay bounded and must not turn
+the page into an HTTP 500 or change the strict behavior of memory tools.
 
 If any check fails, boot out the current service, restore the displaced build
 and previous private service state, restart that instance, verify rollback
