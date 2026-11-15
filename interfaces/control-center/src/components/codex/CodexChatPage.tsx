@@ -22,6 +22,7 @@ import {FACTORY_PHASES,type ChatSubject,type FactoryIntent} from '../../../../..
 import {FactoryProgress} from "./DeliveryPanel";
 import {FactoryChatSelector} from './FactoryChatSelector';
 import {PROVIDER_LABELS,type ProviderConnectorId} from '@/lib/settings/provider-profile';
+import {factoryChatModelAdvice} from '@/lib/codex-chat/factory-model-advice';
 import {NewChatProviderSelector} from './NewChatProviderSelector';
 import { AttachmentLinks, DraftAttachments } from "./ChatAttachments";
 import { TaskChatControls, type TaskChatComposerHandle } from "./TaskChatControls";
@@ -1606,7 +1607,10 @@ export function CodexChatPage() {
           const id=newDraftIdRef.current;if(selectedChatIdRef.current || pendingNewChatDeliveriesRef.current[id])return;
           const next={...factorySelectionsRef.current,[id]:selection};factorySelectionsRef.current=next;setFactorySelections(next);delete creationIdsRef.current[id];setError(null);
           setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
-        }}/>:displayedThread?.subject && !displayedDetail?.factoryControl?.available?<div className="codex-factory-context" aria-label="Factory task context"><strong>Child: {displayedThread.subject.slug} · {FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.label}</strong><span>{FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.goal}</span></div>:null}
+        }}/>:null}
+        {!selectedChatId && factorySelections[newDraftId]?.createNew && factoryChatModelAdvice(providerSelections[newDraftId]?.connectorId, providerSelections[newDraftId]?.modelId)
+          ?<p className="codex-runtime-warning" role="alert" data-testid="factory-model-advice">{factoryChatModelAdvice(providerSelections[newDraftId]?.connectorId, providerSelections[newDraftId]?.modelId)}</p>:null}
+        {selectedChatId && displayedThread?.subject && !displayedDetail?.factoryControl?.available?<div className="codex-factory-context" aria-label="Factory task context"><strong>Child: {displayedThread.subject.slug} · {FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.label}</strong><span>{FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.goal}</span></div>:null}
         {!selectedChatId && !factorySelections[newDraftId]?.createNew ? <label className="codex-runtime-warning codex-workspace-choice">Workspace
           <select aria-label="New chat workspace" value={workspaceMode} disabled={Boolean(pendingNewChatDelivery)} onChange={event=>setWorkspaceModes(current=>({...current,[newDraftId]:event.target.value as "isolated"|"configured"|"read-only"}))}>
             <option value="isolated">Isolated workspace · parallel tasks</option>

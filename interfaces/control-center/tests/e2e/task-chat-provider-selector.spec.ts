@@ -10,7 +10,7 @@ async function fixture(page:Page,claudeAlias=false,nativeFactoryReady=false,neur
   const runtime=(url:URL)=>{
     const saved=rows.find(row=>row.chatId===url.searchParams.get('chatId')),connectorId=(saved?.runtime.connectorId || url.searchParams.get('connectorId') || defaultProvider) as keyof typeof presets,preset=presets[connectorId];
     const requestedModelId=saved?.runtime.modelId || url.searchParams.get('modelId') || preset.modelId,images=claudeAlias && connectorId==='claude',modelId=images && requestedModelId==='sonnet'?'claude-sonnet-5-5':requestedModelId,effortId=saved?.effortId || url.searchParams.get('effortId') || preset.reasoningEffort,providerId=connectorId==='codex'?'desktop_bundled':connectorId+'_runtime';
-    const models=(connectorId==='openrouter'?['vendor/alpha','vendor/beta']:[images?'claude-sonnet-5-5':preset.modelId]).map(id=>({id,label:id,effortIds:connectorId==='openrouter'?['default','high']:['medium','high'],defaultEffortId:preset.reasoningEffort,serviceTierIds:connectorId==='codex'?['standard','fast']:[],inputModalities:images?['text','image']:['text']}));
+    const models=(connectorId==='openrouter'?['vendor/alpha','vendor/beta']:connectorId==='neuraldeep'?[preset.modelId,'gpt-oss-120b']:[images?'claude-sonnet-5-5':preset.modelId]).map(id=>({id,label:id,effortIds:connectorId==='openrouter'?['default','high']:['medium','high'],defaultEffortId:preset.reasoningEffort,serviceTierIds:connectorId==='codex'?['standard','fast']:[],inputModalities:images?['text','image']:['text']}));
     return {connectorId,availability:'ready',preferredProvider:providerId,effectiveProvider:providerId,effectiveProtocol:connectorId==='codex'?'app_server':'exec_resume',fallbackEnabled:false,probedAt:now,models,selected:{modelId,effortId,serviceTierId:connectorId==='codex'?url.searchParams.get('serviceTierId') || 'standard':null,sandboxMode:'read_only',approvalMode:'on_request'},providers:[{providerId,label:connectorId,locationLabel:connectorId,protocol:'app_server',availability:'ready',capabilities:{fullChat:true,factoryTools:connectorId==='codex' && nativeFactoryReady,commandApprovals:approvalReady,fileMetadata:connectorId==='codex' || images,imageInput:images,steerTurn:false,interruptTurn:true}}]};
   };
   const envelope=(data:any)=>({apiVersion:'1',requestId:'fixture',data});
@@ -141,6 +141,12 @@ for(const connectorId of ['codex','neuraldeep'])test(`new agent intent survives 
   // The NeuralDeep preset says xhigh; this model offers medium and high, so the draft uses high.
   await expect(page.getByLabel('New chat reasoning',{exact:true})).toHaveValue(connectorId==='neuraldeep'?'high':'medium');
   await page.getByLabel('Create new agent',{exact:true}).check();await page.getByLabel('New agent slug').fill('provider-counter');
+  // A model that could not call the factory tools is named before the chat exists (2026-11-15).
+  if(connectorId==='neuraldeep'){
+    const advice=page.getByTestId('factory-model-advice');await expect(advice).toHaveCount(0);
+    await page.getByLabel('New chat model',{exact:true}).selectOption('gpt-oss-120b');await expect(advice).toContainText('gpt-oss-120b has not reliably called Pritha\'s factory tools');
+    await page.getByLabel('New chat model',{exact:true}).selectOption('nd-fixture');await expect(advice).toHaveCount(0);
+  }
   await page.locator('.codex-composer textarea').fill('Create a separate local counter agent.');await page.getByRole('button',{name:'Send',exact:true}).click();
   await expect.poll(()=>f.requests.length).toBe(1);const body=f.requests[0].body;
   expect(body.connectorId).toBe(connectorId);expect(body.factoryIntent).toEqual({action:'create-new-agent',slug:'provider-counter'});expect(body.workspace).toEqual({mode:'read-only'});
