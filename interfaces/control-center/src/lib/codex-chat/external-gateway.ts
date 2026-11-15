@@ -56,7 +56,7 @@ export class ExternalChatGateway implements TaskChatBackend {
   startTurn:TaskChatBackend['startTurn']=async(chat,input,options)=>{
     try{return await this.core.start(chat,input,options);}
     catch(error){
-      if(options?.fromQueue || (error as {code?:string})?.code!=='capacity_full')throw error;
+      if(options?.fromQueue || !['capacity_full','provider_slots_full'].includes(String((error as {code?:string})?.code)))throw error;
       await this.core.enqueue(chat,input,{waitForCapacity:true});
       return {accepted:{turn:null,queued:'waiting_for_capacity' as const,streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events'},replayed:false};
     }

@@ -13,7 +13,9 @@ export const LOCAL_DISCOVERY_ENDPOINTS=Object.freeze(['http://127.0.0.1:11434/v1
 const messages={provider_pending_auth:'Connect the selected provider in Settings.',provider_model_unavailable:'Select a model from this server’s current catalog.',provider_tools_unverified:'The selected model has not declared tool support.',provider_protocol_unverified:'This model server has not declared the required Responses protocol.',provider_effort_unavailable:'The selected model does not declare this reasoning setting. Choose one of its supported values.',provider_runtime_unavailable:'A compatible installed Codex CLI is required.',provider_sandbox_unavailable:'A verified host sandbox is required.',provider_billing_required:'The current key budget is exhausted.',provider_rate_limited:'The provider currently limits new requests.',provider_local_cloud_model:'This model uses a remote backend and cannot run in Local offline mode.',provider_offline_unverified:'This local server is reachable, but its network isolation has not been verified.',provider_unavailable:'The selected provider is temporarily unavailable.'};
 Object.assign(messages,{provider_local_configuration_invalid:'Review the private Local server manifest before running this model.',provider_local_configuration_mismatch:'The selected Local model or source differs from its private server configuration.',provider_local_binary_changed:'The installed Local server changed. Review and configure it again.',provider_local_process_unverified:'A Local model process needs ownership or exit verification before another task can start.'});
 messages.provider_local_startup_timeout='The local model did not finish loading in time. Try again when this Mac has less CPU work.';
-function capabilities(connectorId){return {steer:false,interrupt:true,approvals:true,tools:false,attachments:{files:false,images:false},usage:'observed',resume:true,sandbox:'host-enforced',offline:false};}
+// Local owns one inference server at a time (owned-local-server.mjs holds an exclusive
+// lease), so a second Local task waits for the slot instead of failing on the lease.
+function capabilities(connectorId){return {steer:false,interrupt:true,approvals:true,tools:false,attachments:{files:false,images:false},usage:'observed',resume:true,sandbox:'host-enforced',offline:false,...(connectorId==='local'?{parallelLimit:1}:{})};}
 function result(connectorId,status,code,extra={}){return {connectorId,status,version:null,checkedAt:new Date().toISOString(),capabilities:capabilities(connectorId),models:[],account:null,shortlist:[],endpoint:null,error:code?{code,message:messages[code] || messages.provider_unavailable}:null,...extra};}
 function statusFor(code){return code==='provider_pending_auth'?'pending-auth':code==='provider_rate_limited'?'rate-limited':code==='provider_billing_required'?'billing-required':'error';}
 function modelFailure(model,preset){
@@ -41,7 +43,9 @@ export class CompatibleProviderService {
       if(!key)return result('openrouter','not-configured','provider_pending_auth');
     }
     const identity=createHash('sha256').update(JSON.stringify([preset,key])).digest('hex'),saved=this.cache.get(identity);
-    if(saved && Date.now()-saved.at<15000)return saved.result;
+    // A failed check is kept only briefly: a transient result must not refuse the
+    // next 15 seconds of requests (a Local task failed this way under load, 2026-11-15).
+    if(saved && Date.now()-saved.at<(saved.result.status==='ready'?15000:2000))return saved.result;
     if(this.pending.has(identity))return this.pending.get(identity);
     const pending=this.probe(preset,key).then(value=>{this.cache.clear();this.cache.set(identity,{at:Date.now(),result:value});return value;}).finally(()=>this.pending.delete(identity));
     this.pending.set(identity,pending);return pending;
@@ -76,7 +80,13 @@ export class CompatibleProviderService {
     if(!endpoint)return {models:[],endpoint:null,discovery:await this.discover(),code:'provider_model_unavailable'};
     let config;try{config=(this.options.localConfiguration || readLocalServerConfiguration)(this.options,preset);}catch(error){if(error.code!=='provider_offline_unverified')throw error;}
     if(config){
-      const active=await (this.options.inspectLocalServer || inspectOwnedLocalServer)(this.options,config);
+      let active;
+      try{active=await (this.options.inspectLocalServer || inspectOwnedLocalServer)(this.options,config);}
+      catch(error){
+        // A task's own server is still loading its model: the runtime is in use, not broken.
+        if(error.code==='provider_local_starting')return {models:[{...config.model,source:'owned-local',cloud:false,inputModalities:['text']}],endpoint,account:null,offlineVerified:true,busy:true};
+        throw error;
+      }
       if(active)return {models:[active],endpoint,account:null,offlineVerified:true};
       const server=await (this.options.startLocalServer || startOwnedLocalServer)({...this.options,timeoutMs:LOCAL_SERVER_PROBE_TIMEOUT_MS},config);
       const result=await server.close();if(!result.processTreeExited)throw Object.assign(new Error('Local process needs review.'),{code:'provider_local_process_unverified'});

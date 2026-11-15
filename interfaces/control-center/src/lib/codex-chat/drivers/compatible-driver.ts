@@ -24,7 +24,9 @@ export class CompatibleDriver implements TaskChatBackendDriver {
     this.backend=new ExternalChatGateway(attachments,{connectorId,root,stateRoot,privateRoot,executionDirectory,
       configuration:()=>({...getProviderSettings().providerPresets[connectorId],sandbox:getPrithaRuntimeSettings().codexSandbox==='read-only'?'read-only':'workspace-write'}),
       preflight:async binding=>(await this.service.require(binding.executionConfig!)).capabilities,
-      beforeRequest:binding=>this.service.require(binding.executionConfig),
+      // A Local task verifies its own inference server before every request; the shared
+      // readiness check could see another server's lease and refuse the request (2026-11-15).
+      beforeRequest:connectorId==='local'?undefined:binding=>this.service.require(binding.executionConfig),
       attachmentTransport:hostFileAttachmentTransport({stateRoot,privateRoot:path.join(privateRoot,connectorId),snapshot:binding=>this.service.require(binding.executionConfig)}),
       launch:async options=>{
         const dispatcher=new Agent({headersTimeout:options.timeoutMs,bodyTimeout:options.timeoutMs});

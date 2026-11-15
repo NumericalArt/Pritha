@@ -76,3 +76,26 @@ test('Local preserves selected IPv6 endpoint, verifies native tool metadata, rej
     assert(seen.every(url=>url.startsWith('http://[::1]:11434/')));
   }
 });
+
+// Under parallel load a Local task's own server was still loading when a status
+// check ran; the check reported an error, cached it for 15 seconds, and the
+// task's first request was refused with 503 (2026-11-15).
+test('Local reports a loading task server as in use, runs one task at a time and keeps a failure only briefly',async()=>{
+  const config={identity:'fixture-identity',model:{id:'local-model',tools:true,responses:true,contextTokens:32768,outputTokens:1024,efforts:['default']}};
+  let state='starting',inspections=0,started=0;
+  const service=new CompatibleProviderService({...options,connectorId:'local',readCredential:()=>{throw new Error('Local reads no credential');},
+    localConfiguration:()=>config,
+    inspectLocalServer:async()=>{inspections++;if(state==='starting')throw Object.assign(new Error(),{code:'provider_local_starting'});if(state==='broken')throw Object.assign(new Error(),{code:'provider_local_process_unverified'});return {...config.model,source:'owned-local',cloud:false,inputModalities:['text']};},
+    startLocalServer:async()=>{started++;throw new Error('a busy server must not be probed with a second one');}});
+  const localPreset={...preset,modelId:'local-model',baseUrl:'http://127.0.0.1:1234/v1'};
+  const busy=await service.snapshot(localPreset);
+  assert.equal(busy.status,'ready');assert.equal(busy.capabilities.parallelLimit,1);assert.equal(started,0);
+  state='broken';
+  const second=new CompatibleProviderService({...service.options});
+  const failed=await second.snapshot(localPreset);assert.notEqual(failed.status,'ready');
+  state='ready';
+  assert.notEqual((await second.snapshot(localPreset)).status,'ready','a failure is reused for a moment');
+  await new Promise(resolve=>setTimeout(resolve,2100));
+  assert.equal((await second.snapshot(localPreset)).status,'ready','and then checked again');
+  assert.ok(inspections>=3);
+});

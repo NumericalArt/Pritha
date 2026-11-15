@@ -200,7 +200,7 @@ test('provider parallel slots supplement global capacity and release only after 
   a.execution.setAdmission(true,4);
   const one=(await a.create(create('parallel_thread_1'))).binding.chatId,two=(await b.create(create('parallel_thread_2'))).binding.chatId;
   await a.start(one,message('parallel_message_1'));await until(()=>f.runs.length===1);
-  await assert.rejects(b.start(two,message('parallel_message_2')),{code:'provider_rate_limited'});
+  await assert.rejects(b.start(two,message('parallel_message_2')),{code:'provider_slots_full'});
   f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>a.active.size===0);
   await b.start(two,message('parallel_message_2'));await until(()=>f.runs.length===2);
 });

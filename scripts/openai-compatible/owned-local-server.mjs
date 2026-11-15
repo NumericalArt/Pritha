@@ -68,7 +68,9 @@ async function listenerOwned(port,evidence){
 }
 export async function inspectOwnedLocalServer(options,config){
   let receipt;try{receipt=JSON.parse(boundedFile(activePath(options),64000,true));}catch(error){if(error.code==='ENOENT')return null;throw fail('provider_local_process_unverified');}
-  if(receipt.identity!==config.identity || !receipt.model)throw fail('provider_local_process_unverified');
+  if(receipt.identity!==config.identity)throw fail('provider_local_process_unverified');
+  // The lease is written before the model loads and gains its model once ready.
+  if(!receipt.model)throw fail(receipt.ownerPid && processSnapshot().some(row=>row.pid===receipt.ownerPid && row.started===receipt.ownerStarted)?'provider_local_starting':'provider_local_process_unverified');
   await listenerOwned(receipt.port,receipt.evidence);
   return receipt.model;
 }

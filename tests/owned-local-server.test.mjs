@@ -70,7 +70,11 @@ res.end(JSON.stringify({data:[{id:'fixture-local'}]}));}).listen(Number(process.
 
 test('a slow owned model can finish loading after ten seconds without losing its isolation lease',{skip:process.platform!=='darwin',timeout:45000},async t=>{
   const f=fixture(t),config=delayedModel(f,11000);
-  const server=await startOwnedLocalServer({...f.options,timeoutMs:30000},config);t.after(()=>server.close());
+  const starting=startOwnedLocalServer({...f.options,timeoutMs:30000},config);
+  // While the model loads, its lease says "starting", never "unverified" (2026-11-15).
+  await new Promise(resolve=>setTimeout(resolve,2000));
+  await assert.rejects(inspectOwnedLocalServer(f.options,config),{code:'provider_local_starting'});
+  const server=await starting;t.after(()=>server.close());
   assert.equal(server.model.id,'fixture-local');
   assert.equal((await inspectOwnedLocalServer(f.options,config)).id,'fixture-local');
   assert.equal((await server.close()).processTreeExited,true);

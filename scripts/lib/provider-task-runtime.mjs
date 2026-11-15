@@ -241,7 +241,8 @@ export class ProviderTaskRuntime {
           if(!Number.isSafeInteger(limit) || limit<1 || limit>64)throw failure('provider_limits_unknown');
           let slot=false;
           for(let i=0;i<limit && !slot;i++)slot=this.execution.extend(lease.owner,lease.generation,['provider-slot:'+this.connectorId+':'+i]);
-          if(!slot)throw failure('provider_rate_limited','This provider has no free parallel execution slot.');
+          // A full provider slot is a wait like a full task capacity, not an upstream rate limit.
+          if(!slot)throw failure('provider_slots_full','This provider runs a limited number of tasks at a time; this message waits for its slot.');
         }
         lease.assertOwned();
         const {turn,created}=this.registry.reserveTurn(chat,{clientMessageId:input.clientMessageId,text,request:input,attachments:attachments.receipt.originals});
@@ -549,7 +550,7 @@ export class ProviderTaskRuntime {
       const queuedKey=queueKey(chat,row.input.clientMessageId);
       this.execution.updateIntent(queuedKey,{state:'dispatching'},row.revision);
       try{await this.start(chat,row.input,{fromQueue:queuedKey});this.execution.updateIntent(queuedKey,{state:'delivered'});}
-      catch(error){const code=safeCode(error);this.execution.updateIntent(queuedKey,{state:['turn_active','capacity_full','workspace_busy','execution_draining','execution_metadata_busy'].includes(code)?'queued':code==='fallback_confirmation_required'?'unknown':'blocked',reason:code});}
+      catch(error){const code=safeCode(error);this.execution.updateIntent(queuedKey,{state:['turn_active','capacity_full','provider_slots_full','workspace_busy','execution_draining','execution_metadata_busy'].includes(code)?'queued':code==='fallback_confirmation_required'?'unknown':'blocked',reason:code});}
       this.changed(chat);
     });
   }
@@ -560,7 +561,7 @@ export class ProviderTaskRuntime {
     if(result.resumeRequired){
       const continuation={clientMessageId:'document_'+input.requestId,input:[{type:'text',text:'Continue this agent factory after the recorded document approval. Read factory status, apply the exact saved decision, and continue within the accepted Contract and Outcome. Do not ask again for an unchanged approved document.'}]};
       try{await this.start(chat,continuation);}catch(error){
-        if(error.code==='turn_active' || error.code==='queue_waiting')await this.enqueue(chat,continuation);else if(error.code==='capacity_full')await this.enqueue(chat,continuation,{waitForCapacity:true});else throw error;
+        if(error.code==='turn_active' || error.code==='queue_waiting')await this.enqueue(chat,continuation);else if(['capacity_full','provider_slots_full'].includes(error.code))await this.enqueue(chat,continuation,{waitForCapacity:true});else throw error;
       }
     }
     return result;
