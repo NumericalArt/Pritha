@@ -842,6 +842,7 @@ export type ControlCenterStatus = {
 
 export type ControlCenterDiagnostics = {
   status: ControlCenterStatus;
+  console: import("./dev-console").DeveloperConsole;
   modules: Array<{
     id: string;
     label: string;

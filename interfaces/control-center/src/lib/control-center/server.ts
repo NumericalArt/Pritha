@@ -62,6 +62,7 @@ import {childInteractionDefinition,requestChildProduct} from '../../../../../scr
 import { projectAgentCardIdentity } from "../../../../../scripts/agents-mother/card-projection.mjs";
 import { resolveToolServerManifest, toolServerLaunchEnvironment, toolServerRuntimeBinding } from "../../../../../scripts/agents-mother/tool-server-runtime.mjs";
 import { deliveryStateView } from "./delivery-state";
+import { readDeveloperConsole } from "./dev-console";
 import { readAgentCatalog, findCatalogAgent, currentAgentMission, readCatalogArtifact, readIdentityEvidence, agentOperationsApplicability, type CatalogAgent } from "../../../../../scripts/agents-mother/identity.mjs";
 
 import { outcomeDocumentLock as currentOutcomeDocumentLock } from "../../../../../scripts/agents-mother/outcome-lock.mjs";
@@ -4401,8 +4402,10 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
     type: report.type as "self_test" | "evolution" | "audit" | "recovery" | "registry",
   }));
 
+  const developerConsole = readDeveloperConsole(status, stateRoot);
   return {
     status: controlCenterStatusForClient(status),
+    console: developerConsole,
     modules: moduleList(status),
     registry: status.allRegistryAgents.map(agentToRegistryRow),
     folders: status.childAgents.map(agentToFolderRow),
@@ -4417,8 +4420,9 @@ export async function getControlCenterDiagnostics(): Promise<ControlCenterDiagno
       node: process.version,
       appPort: APP_PORT,
       dataPath: stateRoot,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      git: "unavailable",
+      // Times shown to the user are Central European (machine clocks differ).
+      timezone: "Europe/Berlin",
+      git: developerConsole.release?.commit || "unavailable",
     },
     voiceDiagnostics: {
       connection: status.voice.realtime === "ready" ? "good" : "unknown",

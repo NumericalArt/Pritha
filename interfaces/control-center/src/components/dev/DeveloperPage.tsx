@@ -1,17 +1,12 @@
 import {
-  Box,
   ChevronRight,
-  Clock3,
-  Code2,
   Copy,
   Database,
   FileText,
-  Folder,
   Info,
   Link,
   Mic,
   Orbit,
-  Play,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -21,13 +16,12 @@ import {
 import { PageHeader } from "@/components/shell/PageHeader";
 import type { CapabilityStatus, ControlCenterDiagnostics } from "@/lib/control-center/types";
 import { SnapshotOperationsPanel } from "./SnapshotOperationsPanel";
+import { AttentionPanel, BuildsPanel, ReleasePanel } from "./DeveloperConsolePanels";
 
 type DeveloperPageProps = {
   data: ControlCenterDiagnostics;
 };
 
-type RegistryRow = ControlCenterDiagnostics["registry"][number];
-type FolderScanRow = ControlCenterDiagnostics["folders"][number];
 
 function moduleStatusLabel(status: CapabilityStatus) {
   if (status === "not_installed") return "Not installed";
@@ -48,18 +42,6 @@ function ModuleIcon({ id }: { id: string }) {
   return <Link {...props} />;
 }
 
-function StatusPill({ status }: { status: RegistryRow["status"] }) {
-  const label = status === "needs_check" ? "Needs check" : status[0].toUpperCase() + status.slice(1);
-  return <span className={`status-pill ${status}`}>{label}</span>;
-}
-
-function folderStatusLabel(status: FolderScanRow["status"]) {
-  if (status === "ok") return "OK";
-  if (status === "not_found") return "Not found";
-  if (status === "manifest_issue") return "Manifest issue";
-  return "Ignored";
-}
-
 function SystemReadinessPanel({ data }: DeveloperPageProps) {
   const selfTest = data.status.selfTest;
   return (
@@ -68,9 +50,7 @@ function SystemReadinessPanel({ data }: DeveloperPageProps) {
         <h2>System Readiness (modules)</h2>
         <div className="panel-actions">
           <span title={selfTest.createdAt}>Last self-test: {selfTest.ageLabel}</span>
-          <button className="outline-button small" type="button" aria-disabled="true" title="Run from CLI: node scripts/self-test.mjs">
-            CLI Self-test
-          </button>
+          <code title="Run in a terminal">node scripts/self-test.mjs</code>
         </div>
       </div>
       <div className="module-row">
@@ -85,111 +65,6 @@ function SystemReadinessPanel({ data }: DeveloperPageProps) {
             </span>
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function RegistrySummaryPanel({ data }: DeveloperPageProps) {
-  return (
-    <section className="dev-panel registry-panel">
-      <div className="panel-heading-row">
-        <div>
-          <h2>Registry Summary</h2>
-          <p>Parsed from the current instance registry</p>
-        </div>
-        <button className="outline-button small" type="button">
-          View Raw
-        </button>
-      </div>
-      <div className="table-scroll">
-        <table className="registry-table">
-          <thead>
-            <tr>
-              <th>Agent</th>
-              <th>Version</th>
-              <th>Mission</th>
-              <th>Interface</th>
-              <th>Deployment</th>
-              <th>Status</th>
-              <th>Updated</th>
-              <th aria-label="Details" />
-            </tr>
-          </thead>
-          <tbody>
-            {data.registry.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <span className={`registry-dot ${row.status}`} />
-                  {row.agent}
-                </td>
-                <td title={row.versionSource ? `Source: ${row.versionSource}` : "Assigned version unavailable"}>{row.version}</td>
-                <td>{row.mission}</td>
-                <td>{row.interface}</td>
-                <td>{row.deployment}</td>
-                <td>
-                  <StatusPill status={row.status} />
-                </td>
-                <td>{row.updated}</td>
-                <td>
-                  <ChevronRight size={16} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-function DiscoveredFoldersPanel({ data }: DeveloperPageProps) {
-  return (
-    <section className="dev-panel folders-panel">
-      <div className="panel-heading-row">
-        <div>
-          <h2>Discovered Sibling Folders</h2>
-          <p>Scanned in workspace root</p>
-        </div>
-        <button className="outline-button small" type="button" disabled>
-          Rescan
-        </button>
-      </div>
-      <div className="folder-list">
-        {data.folders.map((folder) => (
-          <div className="folder-row" key={folder.path}>
-            <Folder size={17} />
-            <strong>{folder.path}</strong>
-            <span className={`folder-status ${folder.status}`}>{folderStatusLabel(folder.status)}</span>
-            <time>{folder.updated || "-"}</time>
-          </div>
-        ))}
-      </div>
-      <div className="scan-path">Scan path: /Users/&lt;user&gt;/Pritha</div>
-    </section>
-  );
-}
-
-function RecentLogsPanel({ data }: DeveloperPageProps) {
-  return (
-    <section className="dev-panel logs-panel">
-      <div className="panel-heading-row">
-        <h2>Recent Logs <span>(last 100 lines)</span></h2>
-        <button className="outline-button small" type="button">
-          View Full Logs
-        </button>
-      </div>
-      <div className="log-box" role="log" aria-label="Recent system logs">
-        {data.logs.map((line) => (
-          <div className="log-line" key={`${line.time}-${line.message}`}>
-            <span>[{line.time}]</span> <span className={`log-level ${line.level.toLowerCase()}`}>{line.level}</span> {line.message}
-          </div>
-        ))}
-      </div>
-      <div className="log-filters">
-        <span className="filter-on">☑ INFO</span>
-        <span className="filter-on warn">☑ WARN</span>
-        <span className="filter-off">☐ ERROR</span>
       </div>
     </section>
   );
@@ -340,9 +215,6 @@ function LatestReportsCard({ data }: DeveloperPageProps) {
           <ScrollText size={17} />
           Latest Reports
         </h2>
-        <button className="chip-button" type="button" aria-disabled="true">
-          Open Folder
-        </button>
       </div>
       <div className="reports-list">
         {data.reports.map((report) => (
@@ -354,10 +226,20 @@ function LatestReportsCard({ data }: DeveloperPageProps) {
           </div>
         ))}
       </div>
-      <button className="view-all-link" type="button">
-        View All Reports →
-      </button>
     </section>
+  );
+}
+
+// Less used tools stay available, folded away from the answers above them.
+function MoreDiagnostics({ data }: DeveloperPageProps) {
+  return (
+    <details className="dev-more" data-testid="dev-more">
+      <summary>Modules, snapshots, voice and memory</summary>
+      <SystemReadinessPanel data={data} />
+      <SnapshotOperationsPanel agents={data.status.childAgents} />
+      <VoiceDiagnosticsCard data={data} />
+      <MemoryIndexCard data={data} />
+    </details>
   );
 }
 
@@ -365,38 +247,30 @@ export function DeveloperPage({ data }: DeveloperPageProps) {
   return (
     <>
       <div className="dev-desktop-content">
-        <PageHeader title="Developer (Read-only)" subtitle="Diagnostics and internal state for advanced users." variant="dev" showCodexButton status={data.status} />
+        <PageHeader title="Developer" subtitle="What is installed, what the factory is doing and what needs you. Read-only." variant="dev" showCodexButton status={data.status} />
         <div className="dev-layout">
           <main className="dev-main">
-            <SystemReadinessPanel data={data} />
-            <RegistrySummaryPanel data={data} />
-            <SnapshotOperationsPanel agents={data.status.childAgents} />
-            <div className="dev-two-columns">
-              <DiscoveredFoldersPanel data={data} />
-              <RecentLogsPanel data={data} />
-            </div>
+            <BuildsPanel data={data.console} />
             <WarningsPanel data={data} />
+            <MoreDiagnostics data={data} />
           </main>
           <aside className="dev-rail">
+            <ReleasePanel data={data.console} />
+            <AttentionPanel data={data.console} />
             <EnvironmentCard data={data} />
-            <VoiceDiagnosticsCard data={data} />
-            <MemoryIndexCard data={data} />
             <LatestReportsCard data={data} />
           </aside>
         </div>
       </div>
       <div className="mobile-dev-screen">
         <h1 className="mobile-page-title">Developer</h1>
-        <SystemReadinessPanel data={data} />
-        <RegistrySummaryPanel data={data} />
-        <SnapshotOperationsPanel agents={data.status.childAgents} />
-        <DiscoveredFoldersPanel data={data} />
-        <RecentLogsPanel data={data} />
+        <ReleasePanel data={data.console} />
+        <AttentionPanel data={data.console} />
+        <BuildsPanel data={data.console} />
         <WarningsPanel data={data} />
         <EnvironmentCard data={data} />
-        <VoiceDiagnosticsCard data={data} />
-        <MemoryIndexCard data={data} />
         <LatestReportsCard data={data} />
+        <MoreDiagnostics data={data} />
       </div>
     </>
   );

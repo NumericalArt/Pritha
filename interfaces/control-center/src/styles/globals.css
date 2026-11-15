@@ -2240,6 +2240,42 @@ a {
   border-color: var(--red-border);
 }
 
+.primary-action-button.danger {
+  background: var(--accent-red);
+  border-color: var(--red-border);
+  color: var(--text-on-accent);
+}
+
+.agent-removal-confirm {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-removal-confirm p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.agent-removal-confirm label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.agent-removal-confirm input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.agent-removal-confirm button {
+  justify-self: start;
+}
+
 .outline-button:disabled,
 button[aria-disabled="true"] {
   cursor: default;
@@ -4700,6 +4736,139 @@ button[aria-disabled="true"] {
 
 .dev-panel {
   padding: 18px;
+}
+
+.dev-console-panel h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dev-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 16px;
+  margin: 12px 0 0;
+}
+
+.dev-facts.compact {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-top: 8px;
+}
+
+.dev-facts div {
+  min-width: 0;
+}
+
+.dev-facts dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dev-facts dd {
+  margin: 2px 0 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.dev-checks,
+.dev-build-failures,
+.dev-attention {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.dev-checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.dev-mark.ok { color: var(--accent-green); }
+.dev-mark.warn { color: var(--accent-orange); }
+.dev-mark.bad { color: var(--accent-red); }
+
+.dev-build-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.dev-build {
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.dev-build.stuck {
+  border-color: var(--orange-border);
+}
+
+.dev-build header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dev-build-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.dev-build-chat {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.dev-build-blocker,
+.dev-build-failures li {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.dev-build-run {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.dev-attention li {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.dev-attention strong {
+  color: var(--text-primary);
+  margin-right: 6px;
+}
+
+.dev-empty {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+}
+
+.dev-more {
+  display: grid;
+  gap: 14px;
+}
+
+.dev-more > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 6px 0;
 }
 
 .panel-heading-row p {
@@ -7433,5 +7602,6 @@ button:active,
 .factory-chat-selector p { margin: 0.55rem 0 0; }
 .codex-factory-context { display: grid; gap: 0.3rem; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-soft); overflow-wrap: anywhere; }
 .codex-factory-context code { white-space: pre-wrap; }
+.codex-factory-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.2rem 0 0.4rem; }
 .codex-admission-status { display:flex; flex-wrap:wrap; gap:0.3rem 1rem; padding:0.4rem 1rem; color:var(--text-muted); font-size:0.7rem; }
 .provider-parallel-limit { flex-basis:100%; color:var(--text-muted); font-size:0.7rem; }

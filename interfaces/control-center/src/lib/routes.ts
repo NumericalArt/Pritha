@@ -5,7 +5,7 @@ export const desktopNavItems = [
   { href: "/voice", label: "Voice", icon: Mic },
   { href: "/task-chat", label: "Task Chat", icon: MessageSquareCode },
   { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/dev", label: "Dev (Read-only)", icon: Code2 },
+  { href: "/dev", label: "Dev", icon: Code2 },
 ] as const;
 
 export const mobileNavItems = [

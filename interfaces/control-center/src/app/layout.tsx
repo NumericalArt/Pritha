@@ -12,17 +12,18 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Pritha Control Center",
   description: "Local control center for Pritha and child agents.",
-  icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/pritha-logo.png",
-  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" data-theme={DEFAULT_THEME} data-theme-preference={DEFAULT_THEME} suppressHydrationWarning>
       <head>
+        {/* Icons live in the root head, rendered once. As metadata they were
+            hoisted again while a page streamed, and /agents kept two icon tags
+            under load (2026-11-15). */}
+        <link rel="icon" href="/favicon.png" />
+        <link rel="shortcut icon" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/pritha-logo.png" />
         <Script id="pritha-theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>

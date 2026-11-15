@@ -96,7 +96,10 @@ export class ProviderChatRegistry {
         userMessage:{id:`item_${randomUUID().replaceAll('-','')}`,role:'user',markdown:input.text,status:'completed',createdAt:stamp,...(input.attachments?.length?{attachments:input.attachments}: {})}};
       this.history.putTurn(chatId,turn);
       this.history.putReceipt(chatId,input.clientMessageId,'message',{clientMessageId:input.clientMessageId,requestHash,turnId,startedAt:stamp});
-      this.mutate(chatId,current=>({...current,preview:(input.text || input.attachments.map(file=>file.name).join(', ')).slice(0,500),updatedAt:stamp}));
+      // Provider chats kept "New task chat" forever, so the list showed a column
+      // of identical names (2026-11-15). The first message names the chat, as in Codex chats.
+      const named=current=>current.title && current.title!=='New task chat'?current.title:(String(input.text || '').replace(/\s+/g,' ').trim().slice(0,72) || current.title);
+      this.mutate(chatId,current=>({...current,title:named(current),preview:(input.text || input.attachments.map(file=>file.name).join(', ')).slice(0,500),updatedAt:stamp}));
       return {turn:this.history.turn(chatId,turnId),created:true};
     });
   }

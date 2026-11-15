@@ -1154,6 +1154,22 @@ protected evidence failures keep their existing recovery boundaries. Tune
 economic defaults later from recorded successful outcomes, token usage,
 active time and correction histories.
 
+## Removing an agent
+
+The agent's action panel offers "Remove agent…". Only children built by the
+factory qualify; their project carries `delivery/outcome-lineage.json` with
+schema `pritha-child-outcome-lineage-v1`. A folder without it is the user's
+own project, and Pritha refuses to remove it. A running service, a running
+factory step or an executing build blocks removal until it is stopped.
+
+The plan lists what moves: the project folder, the agent's memory documents,
+its factory session, build runs and their target claims, and its proposal.
+Removal needs the unchanged plan hash and the typed phrase `REMOVE <name>`.
+Everything moves into `archive/agents/<name>-<time>/` under the state root
+with a `manifest.json`, and the registry is rebuilt without the agent. Nothing
+is deleted. `node scripts/agents-mother/agent-removal.mjs restore <archive> --yes`
+moves it back if none of its places is taken again. Task Chat histories stay.
+
 ## Completion criteria
 
 An Agents Mother run is complete only when:

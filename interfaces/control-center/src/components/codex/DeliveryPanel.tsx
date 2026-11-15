@@ -7,22 +7,25 @@ import type { DeliveryBudgetChange, TaskDeliveryRequest, TaskDeliveryView } from
 
 const statusLabel: Record<string, string> = { created: "Created", preparing: "Preparation", building: "Building agent", correcting: "Ready to continue", paused: "Paused", blocked: "Needs attention", verifying: "Verifying", verified: "Verified", awaiting_acceptance: "Awaiting acceptance", accepted: "Accepted", failed: "Needs review", abandoned: "Ended without a result", cancelled: "Cancelled" };
 type Explanation = NonNullable<TaskDeliveryView["explanation"]>;
-function RunExplanation({run,showAcceptance=true}:{run:Explanation;showAcceptance?:boolean}) {
+// A choice is the user's words to Pritha, not a host shortcut: it fills the
+// message box, the user adds details such as amounts, and Pritha acts on it.
+function RunExplanation({run,showAcceptance=true,onChoose}:{run:Explanation;showAcceptance?:boolean;onChoose?:(text:string)=>void}) {
   return <div aria-label="Build status">
     {run.blockers.map(b=><div key={b.code}><strong>{b.title}</strong><p>{b.explanation}</p><p>{b.nextStep}</p><p>{b.question}</p>
-      <ul>{b.options.map(o=><li key={o.id}>{o.label}: {o.effect}</li>)}</ul></div>)}
+      {onChoose?<div className="codex-factory-choices">{b.options.map(o=><button key={o.id} type="button" className="outline-button compact" title={o.effect} onClick={()=>onChoose(`${o.label}: `)}>{o.label}</button>)}</div>
+        :<ul>{b.options.map(o=><li key={o.id}>{o.label}: {o.effect}</li>)}</ul>}</div>)}
     {showAcceptance && ["verified","awaiting_acceptance","accepted"].includes(run.status)?<p>{run.acceptance==="accepted"?"The user accepted the result.":"Automated checks passed. Awaiting your acceptance."}</p>:null}
-    <p>Build: {run.budget.tokensUsed} / {run.budget.maxTokens} tokens · {run.iteration} / {run.budget.maxIterations} attempts.</p>
+    <p>Build: {run.budget.tokensUsed.toLocaleString("en-US")} / {run.budget.maxTokens.toLocaleString("en-US")} tokens · {run.iteration} / {run.budget.maxIterations} attempts.</p>
     {run.budget.usageStatus!=="complete"?<p>Some usage is still unknown. Pritha must confirm usage from the previous call before another build.</p>:null}
     {run.budget.reservedUsage?<p>This total includes a request that was stopped before the provider reported its usage. It is counted at the amount reserved for it, so the real charge may be lower.</p>:null}
     {run.budget.overrun>0?<p>The builder exceeded the agreed limit by {run.budget.overrun} tokens. Pritha retains the actual usage. Another build requires a separate budget decision.</p>:null}
   </div>;
 }
-export function FactoryProgress({view}:{view:NonNullable<import("@/lib/codex-chat/types").ThreadDetail["factoryControl"]>}) {
+export function FactoryProgress({view,onChoose}:{view:NonNullable<import("@/lib/codex-chat/types").ThreadDetail["factoryControl"]>;onChoose?:(text:string)=>void}) {
   if(!view.available)return <aside role="status">Build status could not be read. The existing task is preserved. Restore access to its state before continuing.</aside>;
   const d=view.delivery,b=view.workflowBudget;
   return <aside className="codex-factory-context" aria-label="Building agent"><strong>{view.milestone.label} · {view.slug}</strong><span>Builder: {view.builder.provider} / {view.builder.modelId}</span>
-    {d?.blockers.length?null:<p role="status">{view.milestone.summary}</p>}{d?<RunExplanation run={d} showAcceptance={false}/>:null}
+    {d?.blockers.length?null:<p role="status">{view.milestone.summary}</p>}{d?<RunExplanation run={d} showAcceptance={false} onChoose={onChoose}/>:null}
     {b?<details><summary>Preparation and build usage</summary><p>{b.observedTokens.toLocaleString('en-US')} of {b.maxTokens.toLocaleString('en-US')} tokens · active work {Math.ceil(b.activeMs/60000)} min.</p>
       <p>Preparation: {b.preparationTokens.toLocaleString('en-US')} · build: {b.buildTokens.toLocaleString('en-US')}. Waiting for approvals does not count as active time.</p>
       {!b.usageKnown?<p>Some usage is not yet confirmed. Additional reservation: {b.reservationTokens.toLocaleString('en-US')} tokens; earlier unknown usage is retained separately.</p>:null}

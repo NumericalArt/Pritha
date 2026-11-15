@@ -6,7 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {ProviderHostTools} from '../scripts/lib/provider-host-tools.mjs';
-import {factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs';
+import {factoryBriefErrorDetail,PROVIDER_FACTORY_TOOLS} from '../scripts/lib/provider-factory-tools.mjs';
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft,validateFactoryBuildEffort,inheritedFactoryBuildEffort} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
@@ -462,6 +462,11 @@ test('a budget request after the time window ended is told to add time, before a
   const detail=factoryBriefErrorDetail(refused);
   assert.deepEqual(detail.requiredFields,['add_elapsed_ms']);assert.equal(detail.timeWindowEnded,true);
   assert.match(detail.hint,/add_elapsed_ms is required/);assert.match(detail.hint,/do not report the extension as done/);
+  // The shape gpt-oss-120b sent: fields of other actions, none of the budget fields.
+  const malformed=await f.call('delivery_extend',{expected_version:blocked.version,retry_failed:false,sources:{},trial:{}}).catch(error=>error);
+  assert.match(factoryBriefErrorDetail(malformed).hint,/^Nothing was requested\. Call factory_delivery_extend with expected_version plus the add_tokens/);
+  const schema=PROVIDER_FACTORY_TOOLS.find(tool=>tool.name==='factory_delivery_extend').inputSchema.properties;
+  for(const field of ['add_tokens','add_iterations','add_elapsed_ms'])assert.match(schema[field].description,/delivery_extend only/,field);
   let presented;f.options.approve=async req=>{presented=req.presentation.budgetReview;return {decision:'decline'};};
   assert.equal((await f.call('delivery_extend',{expected_version:blocked.version,add_tokens:2000,add_elapsed_ms:60000})).status,'declined');
   assert.deepEqual(presented.additions,{tokens:2000,iterations:0,elapsed_ms:60000});

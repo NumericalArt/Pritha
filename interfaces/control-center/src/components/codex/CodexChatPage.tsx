@@ -261,12 +261,24 @@ function ActivityItem({ item, chatId, completed }: { item: ChatItemView; chatId:
   return <ActivityAction item={item} />;
 }
 
+// Older chats kept a default name; their first message is a better one.
+const DEFAULT_THREAD_TITLES = new Set(["New task chat", "New Codex chat"]);
+function threadDisplay(thread: Pick<ThreadSummary, "title" | "preview" | "runtime">) {
+  const derived = DEFAULT_THREAD_TITLES.has(thread.title) && Boolean(thread.preview?.trim());
+  const connector = thread.runtime?.connectorId as ProviderConnectorId | undefined;
+  return {
+    title: derived ? thread.preview.replace(/\s+/g, " ").trim().slice(0, 72) : thread.title,
+    detail: derived ? (connector && PROVIDER_LABELS[connector]) || connector || "" : thread.preview,
+  };
+}
+
 function ThreadRow({ thread, active, onSelect, onArchive, busy }: { thread: ThreadSummary; active: boolean; onSelect: () => void; onArchive: () => void; busy: boolean }) {
+  const display = threadDisplay(thread);
   return (
     <div className="codex-thread-entry"><button className={`codex-thread-row ${active ? "active" : ""}`} type="button" onClick={onSelect}>
-      <span className="codex-thread-title">{thread.title}</span>
+      <span className="codex-thread-title">{display.title}</span>
       <span className="codex-thread-meta">
-        <span>{thread.status === "active" ? "Working" : thread.preview || "No messages yet"}</span>
+        <span>{thread.status === "active" ? "Working" : display.detail || "No messages yet"}</span>
         <time>{relativeTime(thread.updatedAt)}</time>
       </span>
       {thread.taskLinks.length ? <span className="codex-thread-task-links">{thread.taskLinks.slice(-3).map((link) => `#${link.shortId || link.taskId.slice(-6)}`).join(" · ")}</span> : null}
@@ -1562,11 +1574,13 @@ export function CodexChatPage() {
           <button className="codex-icon-button codex-history-open" type="button" aria-label="Open chat history" onClick={() => setDrawerOpen(true)}><Menu size={19} /></button>
           <div className="codex-conversation-heading">
             <div className="codex-title-line">
-              <h1>{displayedThread?.title || (selectedChatId ? "Opening thread…" : "Task Chat")}</h1>
+              <h1>{displayedThread ? threadDisplay(displayedThread).title : selectedChatId ? "Opening thread…" : "Task Chat"}</h1>
               <span className={`codex-runtime-pill ${backendOffline || threadUnavailable ? "unavailable" : runtime?.availability || "unavailable"}`}>{threadUnavailable ? "Thread unavailable" : backendOffline ? "Offline" : runtime?.availability === "ready" ? "Ready" : runtime?.availability || "Checking"}</span>
             </div>
             <p>
-              Pritha · {PROVIDER_LABELS[displayedThread?.runtime.connectorId || runtime?.connectorId || 'codex']} · {runtime?.selected.modelId || displayedThread?.runtime.modelId || "Task runtime"} · {effectiveProvider?.locationLabel || "Resolving runtime"}
+              Pritha · {PROVIDER_LABELS[displayedThread?.runtime.connectorId || runtime?.connectorId || 'codex']} · {runtime?.selected.modelId || displayedThread?.runtime.modelId || "Task runtime"}
+              {/* The location repeated the provider for API runtimes ("NeuralDeep · … · Neuraldeep"). */}
+              {effectiveProvider?.locationLabel && effectiveProvider.locationLabel.toLowerCase() !== String(PROVIDER_LABELS[displayedThread?.runtime.connectorId || runtime?.connectorId || 'codex'] || "").toLowerCase() ? ` · ${effectiveProvider.locationLabel}` : effectiveProvider ? "" : " · Resolving runtime"}
               {effectiveProvider?.protocol === "app_server" ? " · App Server" : ""}
               {runtime?.selected.sandboxMode ? ` · ${runtime.selected.sandboxMode.replaceAll("_", " ")}` : ""}
             </p>
@@ -1592,7 +1606,7 @@ export function CodexChatPage() {
           const id=newDraftIdRef.current;if(selectedChatIdRef.current || pendingNewChatDeliveriesRef.current[id])return;
           const next={...factorySelectionsRef.current,[id]:selection};factorySelectionsRef.current=next;setFactorySelections(next);delete creationIdsRef.current[id];setError(null);
           setWorkspaceChoices(current=>{const next={...current};delete next[id];return next;});saveSessionRef.current();
-        }}/>:displayedThread?.subject?<div className="codex-factory-context" aria-label="Factory task context"><strong>Child: {displayedThread.subject.slug} · {FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.label}</strong><span>{FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.goal}</span></div>:null}
+        }}/>:displayedThread?.subject && !displayedDetail?.factoryControl?.available?<div className="codex-factory-context" aria-label="Factory task context"><strong>Child: {displayedThread.subject.slug} · {FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.label}</strong><span>{FACTORY_PHASES.find(phase=>phase.id===displayedThread.subject?.phase)?.goal}</span></div>:null}
         {!selectedChatId && !factorySelections[newDraftId]?.createNew ? <label className="codex-runtime-warning codex-workspace-choice">Workspace
           <select aria-label="New chat workspace" value={workspaceMode} disabled={Boolean(pendingNewChatDelivery)} onChange={event=>setWorkspaceModes(current=>({...current,[newDraftId]:event.target.value as "isolated"|"configured"|"read-only"}))}>
             <option value="isolated">Isolated workspace · parallel tasks</option>
@@ -1615,7 +1629,7 @@ export function CodexChatPage() {
           </div>
         ) : null}
 
-        {displayedDetail?.factoryControl?<FactoryProgress view={displayedDetail.factoryControl}/>:null}
+        {displayedDetail?.factoryControl?<FactoryProgress view={displayedDetail.factoryControl} onChoose={text=>setDraft(current=>current.trim()?current:text)}/>:null}
         {displayedDetail ? <div className="codex-task-controls"><GoalBudgetPanel key={displayedDetail.thread.chatId} chatId={displayedDetail.thread.chatId} refreshKey={goalRevision}
           active={displayedDetail.thread.status === "active" || Boolean(displayedDetail.activeTurnId) || sending}
           editable={!displayedDetail.thread.archived && displayedDetail.continuationState === "continuation_enabled"} />

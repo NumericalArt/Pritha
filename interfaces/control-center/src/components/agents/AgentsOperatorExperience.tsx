@@ -49,6 +49,32 @@ type PanelState = {
   error?: string;
 };
 
+type RemovalPlanView = {
+  removable: boolean;
+  planHash: string;
+  confirmationPhrase: string;
+  blockers: Array<{ code: string; message: string }>;
+  moves: Array<{ kind: string; label: string }>;
+};
+
+type RemovalState = {
+  open: boolean;
+  loading: boolean;
+  running: boolean;
+  phrase: string;
+  plan?: RemovalPlanView;
+  error?: string;
+  done?: { moved: number; archive: string };
+};
+
+const REMOVAL_KIND_LABELS: Record<string, string> = { project: "project folder", memory: "documents", factory: "factory session", build: "build records", proposal: "proposal" };
+
+function removalSummary(moves: RemovalPlanView["moves"]) {
+  const counts = new Map<string, number>();
+  for (const move of moves) counts.set(move.kind, (counts.get(move.kind) || 0) + 1);
+  return [...counts].map(([kind, count]) => `${count} ${REMOVAL_KIND_LABELS[kind] || kind}`).join(", ");
+}
+
 type CredentialMessage = {
   tone: "ok" | "warn" | "error";
   text: string;
@@ -171,6 +197,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<ControlCenterOperatorAction>("check");
   const [panel, setPanel] = useState<PanelState>({ loading: false, running: false });
+  const [removal, setRemoval] = useState<RemovalState>({ open: false, loading: false, running: false, phrase: "" });
   const [agentView, setAgentView] = useState<AgentView>("active");
   const [createPlanOpen, setCreatePlanOpen] = useState(false);
   const [createPlanCopyStatus, setCreatePlanCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
@@ -194,11 +221,43 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
     setSelectedAgentId(agent.id);
     setSelectedAction(getPrimaryAction(agent));
     setPanel({ loading: true, running: false });
+    setRemoval({ open: false, loading: false, running: false, phrase: "" });
   }
 
   function closeAction() {
     setSelectedAgentId(null);
     setPanel({ loading: false, running: false });
+    setRemoval({ open: false, loading: false, running: false, phrase: "" });
+  }
+
+  async function loadRemovalPlan(agentId: string) {
+    setRemoval({ open: true, loading: true, running: false, phrase: "" });
+    try {
+      const response = await fetch(`/api/agents/${agentId}/remove`, { cache: "no-store" });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json?.message || json?.error || `HTTP ${response.status}`);
+      setRemoval({ open: true, loading: false, running: false, phrase: "", plan: json as RemovalPlanView });
+    } catch (error) {
+      setRemoval({ open: true, loading: false, running: false, phrase: "", error: error instanceof Error ? error.message : "Removal plan unavailable" });
+    }
+  }
+
+  async function runRemoval() {
+    if (!selectedAgent || !removal.plan?.removable || removal.phrase.trim() !== removal.plan.confirmationPhrase) return;
+    setRemoval((current) => ({ ...current, running: true, error: undefined }));
+    try {
+      const response = await fetch(`/api/agents/${selectedAgent.id}/remove`, {
+        method: "POST", cache: "no-store", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ planHash: removal.plan.planHash, confirmation: removal.phrase.trim() }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json?.message || json?.error || `HTTP ${response.status}`);
+      setRemoval((current) => ({ ...current, running: false, done: { moved: json.moved, archive: json.archive } }));
+      window.dispatchEvent(new Event("pritha:status-refresh"));
+      router.refresh();
+    } catch (error) {
+      setRemoval((current) => ({ ...current, running: false, error: error instanceof Error ? error.message : "Removal failed" }));
+    }
   }
 
   function openCredentials(agent: AgentCardModel) {
@@ -601,6 +660,54 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
                 <div className="operator-safety-note muted">
                   <Activity size={17} />
                   <span>{panel.plan.risks[0]}</span>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="operator-action-section agent-removal" data-testid="agent-removal">
+              <h3>Remove agent</h3>
+              {removal.done ? (
+                <div className="operator-action-message ok">
+                  Removed. {removal.done.moved} items moved to {removal.done.archive}; they can be restored from there.
+                </div>
+              ) : !removal.open ? (
+                <button className="outline-button compact danger" type="button" onClick={() => void loadRemovalPlan(selectedAgent.id)}>
+                  <Trash2 size={16} />
+                  Remove agent…
+                </button>
+              ) : removal.loading ? (
+                <div className="operator-empty">Checking what belongs to this agent…</div>
+              ) : removal.error && !removal.plan ? (
+                <div className="operator-action-message error">{removal.error}</div>
+              ) : removal.plan && !removal.plan.removable ? (
+                <div className="operator-plan-list warn">
+                  {removal.plan.blockers.map((blocker) => <div key={blocker.code}>{blocker.message}</div>)}
+                </div>
+              ) : removal.plan ? (
+                <div className="agent-removal-confirm">
+                  <p>
+                    Moves {removalSummary(removal.plan.moves)} into Pritha&apos;s archive. Nothing is deleted, and the agent can be restored from the archive.
+                  </p>
+                  <label>
+                    <span>Type <code>{removal.plan.confirmationPhrase}</code> to confirm</span>
+                    <input
+                      type="text"
+                      value={removal.phrase}
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(event) => setRemoval((current) => ({ ...current, phrase: event.target.value }))}
+                    />
+                  </label>
+                  {removal.error ? <div className="operator-action-message error">{removal.error}</div> : null}
+                  <button
+                    className="primary-action-button compact danger"
+                    type="button"
+                    disabled={removal.running || removal.phrase.trim() !== removal.plan.confirmationPhrase}
+                    onClick={() => void runRemoval()}
+                  >
+                    <Trash2 size={16} />
+                    {removal.running ? "Removing…" : "Remove"}
+                  </button>
                 </div>
               ) : null}
             </section>

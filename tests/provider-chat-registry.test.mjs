@@ -25,6 +25,18 @@ test('all external providers keep permanent creation, model and session bindings
     assert.throws(()=>b.require('chat_otherprovider_1234'),{code:'thread_not_found'});
   }
 });
+test('a default-named chat takes its name from the first message and keeps a chosen name',t=>{
+  const f=fixture(t),a=f.open();
+  const unnamed=a.create({...f.input,clientThreadId:'client-thread-unnamed',request:{source:'chat',clientThreadId:'client-thread-unnamed'},title:undefined}).binding.chatId;
+  assert.equal(a.require(unnamed).title,'New task chat');
+  a.reserveTurn(unnamed,{clientMessageId:'message-name-0001',text:'  Create Berth Call:\n a cargo announcement agent that names the berth for each delivery. ',request:{n:1}});
+  assert.equal(a.require(unnamed).title,'Create Berth Call: a cargo announcement agent that names the berth for e');
+  a.reserveTurn(unnamed,{clientMessageId:'message-name-0002',text:'Something else entirely',request:{n:2}});
+  assert.equal(a.require(unnamed).title,'Create Berth Call: a cargo announcement agent that names the berth for e','a later message does not rename it');
+  const named=a.create(f.input).binding.chatId;
+  a.reserveTurn(named,{clientMessageId:'message-name-0003',text:'Hello',request:{n:3}});
+  assert.equal(a.require(named).title,'Original');
+});
 test('turn receipts and full original Unicode survive replay and duplicate requests cannot change text',t=>{
   const f=fixture(t),a=f.open(),b=f.open(),chatId=a.create(f.input).binding.chatId;
   const text='Точная исходная строка. '.repeat(1000),input={clientMessageId:'message-fixture-123',text,request:{text}};
