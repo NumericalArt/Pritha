@@ -154,6 +154,11 @@ export class ExecutionCoordinator {
   admission() {
     return {enabled:this.db.prepare("SELECT value FROM execution_meta WHERE key='admission'").get()?.value==='enabled',capacity:Number(this.db.prepare("SELECT value FROM execution_meta WHERE key='capacity'").get()?.value || 3)};
   }
+  /** True when every task slot is taken, so a refused claim means "wait", not "this chat is busy". */
+  capacityFull() {
+    const count = Number(this.db.prepare("SELECT COUNT(DISTINCT owner) AS count FROM execution_claims WHERE kind='turn'").get().count);
+    return count >= this.admission().capacity;
+  }
   setAdmission(enabled,capacity=this.admission().capacity) {
     if(!Number.isSafeInteger(capacity) || capacity<1 || capacity>16)throw new ExecutionConflict('execution_capacity_invalid');
     return this.transaction(()=>{

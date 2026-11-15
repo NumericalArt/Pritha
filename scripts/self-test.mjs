@@ -8,6 +8,7 @@ import process from "node:process";
 import { loadPrithaRuntimeEnv } from "./lib/env.mjs";
 import { resolvePrithaStatePath, resolvePrithaStateRoot, resolvePrithaRoot } from "./lib/paths.mjs";
 import { resolvePrithaPython } from "./lib/python-runtime.mjs";
+import { archivedMemoryDocumentsSince, documentDropFinding } from "./lib/memory-document-drop.mjs";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = resolvePrithaRoot({ cwd: DEFAULT_ROOT });
@@ -231,13 +232,11 @@ function runSelfTest() {
       message: "self-test rebuilt memory but failed to restore embeddings",
     });
   }
-  if (!dryRun && previous?.memory_stats?.documents != null && currentStats.documents < previous.memory_stats.documents) {
-    regressions.push({
-      id: "document-count-drop",
-      severity: "critical",
-      message: `document count dropped from ${previous.memory_stats.documents} to ${currentStats.documents}`,
-    });
+  if (!dryRun && previous?.memory_stats?.documents != null) {
+    const finding = documentDropFinding(previous.memory_stats.documents, currentStats.documents, archivedMemoryDocumentsSince(STATE_ROOT, previous.created_at));
+    if (finding) (finding.kind === "warning" ? warnings : regressions).push({ id: finding.id, severity: finding.severity, message: finding.message });
   }
+
   const failedJobs = queue.json?.failed || [];
   if (failedJobs.length > 0) {
     regressions.push({

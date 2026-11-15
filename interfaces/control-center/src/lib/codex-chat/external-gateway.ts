@@ -52,7 +52,15 @@ export class ExternalChatGateway implements TaskChatBackend {
     await this.core.reconcile(chat);const binding=this.core.require(chat),thread=this.summary(binding),active=this.core.activeIntent(chat),control=executionChannelView(this.core.execution,'provider-control:'+chat);
     return {thread,factoryControl:factoryControlView(this.core,binding),activeTurnId:active?.turnId || null,controls:control?{turnId:String(control.turnId),steer:control.steer===true,interrupt:control.interrupt===true}:null,pendingRequests:this.core.pendingRequests(chat),queued:await this.core.queued(chat),streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events',continuationState:thread.continuationState,history:{state:'available',code:null,recoverable:false}};
   };
-  startTurn:TaskChatBackend['startTurn']=(chat,input,options)=>this.core.start(chat,input,options);
+  // A direct send that finds every task slot busy waits in this chat's queue instead of failing.
+  startTurn:TaskChatBackend['startTurn']=async(chat,input,options)=>{
+    try{return await this.core.start(chat,input,options);}
+    catch(error){
+      if(options?.fromQueue || (error as {code?:string})?.code!=='capacity_full')throw error;
+      await this.core.enqueue(chat,input,{waitForCapacity:true});
+      return {accepted:{turn:null,queued:'waiting_for_capacity' as const,streamUrl:'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events'},replayed:false};
+    }
+  };
   queuedMessages:TaskChatBackend['queuedMessages']=async chat=>this.core.queued(chat);
   enqueueMessage:TaskChatBackend['enqueueMessage']=(...args)=>this.core.enqueue(...args);
   cancelQueued:TaskChatBackend['cancelQueued']=(...args)=>this.core.cancelQueued(...args);

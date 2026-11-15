@@ -47,6 +47,14 @@ state-root соседней Pritha. Control Center требует Node.js ≥22.
 - «Send after completion» фиксирует текст, настройки и вложения для очереди.
   Редактирование черновика после этого не изменяет уже принятую запись. Чтобы изменить
   её, отменить ещё не отправленную запись и добавить новую.
+- Waiting for a free task slot (2026-11-15). When all task slots are busy, a new
+  chat's first message, or a message in an idle chat, is no longer refused with
+  `turn_active`. Both runtimes accept it into that chat's queue as
+  `waiting_for_capacity`, and the UI shows "Waiting for a free task slot". The
+  queue starts it on its own when a slot frees up. A later message in the same
+  chat queues behind it. The slot counter's "queued" figure includes these
+  messages. A brand-new Codex chat keeps the fact that its native thread has no
+  turn yet, so the dispatch from the queue does not try to read it.
 - Вопросы/approvals привязаны к request ID и revision. Voice-вопрос отвечает исходной
   задаче; он не создаёт новый чат или новый workflow.
 - Stop означает запрос остановки. «stopping» сохраняется до подтверждения завершения.

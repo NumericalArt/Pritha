@@ -89,6 +89,8 @@ type ActiveAttempt = ActiveAttemptSnapshot & {
 type EventSubscriber = { send: (event: ChatEventRecord) => void; close: (() => void) | null };
 
 const MAX_EVENTS_PER_CHAT = 10_000;
+// A queued message whose chat has nothing running waits only for a free task slot.
+const CAPACITY_WAIT = "capacity";
 
 function hash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -313,17 +315,17 @@ export class CodexChatGateway {
     return Promise.all(rows.map(async row => {
       const ids: string[] = row.input.attachments || [];
       const files = await Promise.all(ids.map(id => this.attachments.resolve(id).then(file=>file.view).catch(()=>null)));
-      return {id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || null,
+      return {id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || (row.predecessorKey===CAPACITY_WAIT?"waiting_for_capacity":null),
         attachments:files.filter((file): file is AttachmentView => file !== null), attachmentsUnavailable:files.some(file=>file === null)};
     }));
   }
 
-  async enqueueMessage(chatId: string, input: StartTurnInput) {
+  async enqueueMessage(chatId: string, input: StartTurnInput, options: { waitForCapacity?: boolean; freshNativeThread?: boolean } = {}) {
     if(Object.hasOwn(input,'factoryAction'))throw new CodexChatGatewayError('factory_control_unsupported','This native runtime uses its existing factory tools.',422);
     if(['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
-    return this.store.execution.withMutation(`queue-admission:${chatId}`,()=>this.enqueueMessageOwned(chatId,input));
+    return this.store.execution.withMutation(`queue-admission:${chatId}`,()=>this.enqueueMessageOwned(chatId,input,options));
   }
-  private async enqueueMessageOwned(chatId: string, input: StartTurnInput) {
+  private async enqueueMessageOwned(chatId: string, input: StartTurnInput, options: { waitForCapacity?: boolean; freshNativeThread?: boolean } = {}) {
     const binding=await this.requireBinding(chatId), text=validatedTurnText(input);
     if(binding.workspace?.factorySlug && (input.settings?.effortId && input.settings.effortId!==binding.factoryEffortId || input.settings?.modelId && input.settings.modelId!==binding.modelId))throw new CodexChatGatewayError('runtime_identity_mismatch','This factory keeps its original model and reasoning settings.',409);
     if (binding.archived) throw new CodexChatGatewayError("chat_archived","Restore this chat before queuing a message.",409);
@@ -335,13 +337,13 @@ export class CodexChatGateway {
     const resource=createHash("sha256").update(nativeKey).digest("hex");
     const voiceOwner=this.store.execution.claims().find(row=>row.resource===resource && row.kind === "voice-workflow");
     const direct=this.store.execution.listIntents({kind:"turn",states:["running","dispatching","unknown"],limit:1000}).find(row=>row.chatId===chatId);
-    const predecessorKey=priorQueue ? `turn:${chatId}:${priorQueue.input.clientMessageId}` : voiceOwner ? `voice-workflow:${voiceOwner.detail.taskId}` : direct ? `turn:${chatId}:${direct.clientMessageId}` : null;
+    const predecessorKey=priorQueue ? `turn:${chatId}:${priorQueue.input.clientMessageId}` : voiceOwner ? `voice-workflow:${voiceOwner.detail.taskId}` : direct ? `turn:${chatId}:${direct.clientMessageId}` : options.waitForCapacity ? CAPACITY_WAIT : null;
     const key=`queued:${chatId}:${input.clientMessageId}`;
     const existing=this.store.execution.getIntent(key);
     if (!existing && !predecessorKey) throw new CodexChatGatewayError("queue_target_ended","The preceding task ended. Send this draft as a new turn when ready.",409);
     const prepared=await this.prepareAttachmentInput(input,binding.providerId);
     if (prepared.files.length) await this.attachments.retain(input.attachments || []);
-    const {intent,created}=this.store.execution.reserveIntent(key,hash(input),{kind:"queued-message",chatId,input,predecessorKey,nativeThreadId:binding.nativeThreadId,stateIdentityHash:binding.stateIdentityHash,continueVoice:Boolean(voiceOwner)},{initialState:"queued",limit:{max:128,scopeField:"chatId",scopeMax:16,states:["queued","dispatching","unknown","blocked"]}});
+    const {intent,created}=this.store.execution.reserveIntent(key,hash(input),{kind:"queued-message",chatId,input,predecessorKey,nativeThreadId:binding.nativeThreadId,stateIdentityHash:binding.stateIdentityHash,continueVoice:Boolean(voiceOwner),...(options.waitForCapacity && options.freshNativeThread?{freshNativeThread:true}:{})},{initialState:"queued",limit:{max:128,scopeField:"chatId",scopeMax:16,states:["queued","dispatching","unknown","blocked"]}});
     if (created) this.store.execution.updateIntent(key,{state:"queued"},intent.revision);
     this.scheduleQueues();
     return this.queuedMessages(chatId);
@@ -362,25 +364,28 @@ export class CodexChatGateway {
       const queued=this.store.execution.listIntents({kind:"queued-message",states:["queued"],limit:1000}).find(row=>row.chatId===chatId);
       if (!queued) return;
       let predecessorKey=queued.predecessorKey;
-      let predecessor=this.store.execution.getIntent(predecessorKey);
+      let predecessor=predecessorKey===CAPACITY_WAIT?null:this.store.execution.getIntent(predecessorKey);
       for(let depth=0;!predecessor && predecessorKey.startsWith("turn:") && depth<32;depth++) {
         const cancelled=this.store.execution.getIntent(`queued:${predecessorKey.slice(5)}`);
         if(cancelled?.state!=="cancelled")break;
         predecessorKey=cancelled.predecessorKey;
-        predecessor=this.store.execution.getIntent(predecessorKey);
+        predecessor=predecessorKey===CAPACITY_WAIT?null:this.store.execution.getIntent(predecessorKey);
       }
-      if (!predecessor || predecessor.state !== "completed") return;
+      // A message that waits for a free slot has no turn to follow; it goes when a slot opens.
+      const waitsForCapacity=predecessorKey===CAPACITY_WAIT;
+      if (!waitsForCapacity && (!predecessor || predecessor.state !== "completed")) return;
+      if (waitsForCapacity && this.store.execution.capacityFull()) return;
       const binding=await this.requireBinding(chatId);
       if (binding.archived || binding.nativeThreadId !== queued.nativeThreadId || binding.stateIdentityHash !== queued.stateIdentityHash) return;
       const key=`queued:${chatId}:${queued.input.clientMessageId}`;
       this.store.execution.updateIntent(key,{state:"dispatching"},queued.revision);
       try {
         if (queued.continueVoice) await this.store.patch(chatId,{continuationEnabled:true,continuationEnabledAt:new Date().toISOString()});
-        await this.startTurn(chatId,queued.input,{fromQueue:key});
+        await this.startTurn(chatId,queued.input,{fromQueue:key,...(queued.freshNativeThread===true?{freshlyCreatedNativeThread:true}:{})});
         this.store.execution.updateIntent(key,{state:"delivered"});
       } catch(error) {
         const code=(error as {code?:string}).code;
-        this.store.execution.updateIntent(key,{state:["turn_active","workspace_busy","execution_draining","execution_metadata_busy"].includes(code || "") ? "queued" : code === "fallback_confirmation_required" ? "unknown" : "blocked",reason:code || "execution_unavailable"});
+        this.store.execution.updateIntent(key,{state:["turn_active","capacity_full","workspace_busy","execution_draining","execution_metadata_busy"].includes(code || "") ? "queued" : code === "fallback_confirmation_required" ? "unknown" : "blocked",reason:code || "execution_unavailable"});
       }
     });
   }
@@ -1234,7 +1239,18 @@ export class CodexChatGateway {
     };
   }
 
+  /** A direct send that finds every slot busy waits in the queue instead of failing. */
   async startTurn(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean; fromQueue?: string } = {}): Promise<{ accepted: AcceptedTurn; replayed: boolean }> {
+    try { return await this.startTurnNow(chatId, input, options); }
+    catch (error) {
+      if (options.fromQueue || (error as { code?: string }).code !== "capacity_full") throw error;
+      // A brand-new native thread cannot be read before its first turn; keep that for the dispatch.
+      await this.enqueueMessage(chatId, input, { waitForCapacity: true, freshNativeThread: options.freshlyCreatedNativeThread === true });
+      return { accepted: { turn: null, queued: "waiting_for_capacity", streamUrl: `/api/codex-chat/v1/threads/${encodeURIComponent(chatId)}/events` }, replayed: false };
+    }
+  }
+
+  private async startTurnNow(chatId: string, input: StartTurnInput, options: { freshlyCreatedNativeThread?: boolean; fromQueue?: string } = {}): Promise<{ accepted: AcceptedTurn; replayed: boolean }> {
     if(Object.hasOwn(input,'factoryAction'))throw new CodexChatGatewayError('factory_control_unsupported','This native runtime uses its existing factory tools.',422);
     if(['subject','factoryIntent','workspace'].some(key=>Object.hasOwn(input,key)))throw new CodexChatGatewayError('runtime_identity_mismatch','This chat retains its original subject and factory phase.',409);
     let binding = await this.requireBinding(chatId);
@@ -1338,7 +1354,9 @@ export class CodexChatGateway {
       `task-chat:${chatId}:${input.clientMessageId}`,
       { coordinator: this.store.execution, kind: "turn", capacity: this.store.execution.admission().capacity, resources:[`chat-binding:${chatId}`], detail: { chatId, intentKey, connectorId:'codex' } },
     );
-    if (!releaseLease) throw new CodexChatGatewayError("turn_active", "This task thread already has an active turn.", 409, true);
+    if (!releaseLease) throw this.store.execution.capacityFull()
+      ? new CodexChatGatewayError("capacity_full", "All task slots are busy. This message waits for a free slot.", 409, true)
+      : new CodexChatGatewayError("turn_active", "This task thread already has an active turn.", 409, true);
     try {
       if(binding.workspace)await verifyTaskWorkspace(binding.workspace);
       const workspace = binding.workspace || {cwd:typeof native.cwd === "string" ? native.cwd : this.root};

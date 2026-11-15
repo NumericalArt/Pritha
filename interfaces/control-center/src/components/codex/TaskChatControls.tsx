@@ -112,7 +112,7 @@ export function TaskChatControls({canSend, canEditDraft, chatId, detail, draft, 
     {detail.voiceWorkflow && <VoiceQuestion key={`${id}:${detail.voiceWorkflow.questionId || "running"}`} chatId={id} workflow={detail.voiceWorkflow} refresh={() => refresh(id)} />}
     {detail.pendingRequests.map(request => <NativeQuestion key={request.requestId} chatId={id} request={request} refresh={() => refresh(id)} />)}
     {detail.queued?.map(request => <div className="codex-inline-notice info codex-queued-message" key={request.id}>
-      <span>{request.state === "queued" ? "Queued" : request.state} · {request.text.slice(0,160)}{request.attachments?.length ? ` · ${request.attachments.length} file(s)` : ""}{request.reason ? ` · ${request.reason}` : ""}</span>
+      <span>{request.state === "queued" ? (request.reason === "waiting_for_capacity" ? "Waiting for a free task slot" : "Queued") : request.state} · {request.text.slice(0,160)}{request.attachments?.length ? ` · ${request.attachments.length} file(s)` : ""}{request.reason && request.reason !== "waiting_for_capacity" ? ` · ${request.reason}` : ""}</span>
       {["queued", "blocked"].includes(request.state) && <>
         <button className="codex-text-action" type="button" disabled={locked || !canEditDraft || request.attachmentsUnavailable || Boolean(editing.current[request.id])} onClick={() => void cancel(request, true)}>Edit</button>
         <button className="codex-text-action" type="button" disabled={locked} onClick={() => void cancel(request)}>Cancel</button>

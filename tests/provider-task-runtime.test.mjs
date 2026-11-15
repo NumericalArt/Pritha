@@ -114,7 +114,7 @@ test('providers use the same admission capacity, workspace claims and managed dr
   nd.execution.setAdmission(true,1);
   const n=(await nd.create(create())).binding.chatId,c=(await claude.create(create())).binding.chatId;
   await nd.start(n,message('capacity_message_1'));await until(()=>f.runs.length===1);
-  await assert.rejects(claude.start(c,message('capacity_message_2')),{code:'turn_active'});
+  await assert.rejects(claude.start(c,message('capacity_message_2')),{code:'capacity_full'});
   f.runs[0].resolve({ok:true,processTreeExited:true});await until(()=>nd.active.size===0);
   const holder=nd.execution.claim(['workspace:'+nd.root],'native-fixture',{kind:'turn',mode:'write'});
   nd.execution.setAdmission(true,3);
@@ -122,6 +122,33 @@ test('providers use the same admission capacity, workspace claims and managed dr
   holder.release();nd.execution.setAdmission(false);
   await assert.rejects(claude.start(c,message('capacity_message_2')),{code:'execution_draining'});
   assert.equal(f.runs.length,1);
+});
+
+// With every slot busy a new chat's first message was refused (2026-11-15).
+// It now waits for a free slot, keeps its place, and the next message in the
+// same chat queues behind it.
+test('a message that finds every slot busy waits for a free slot and then runs in order',async t=>{
+  const f=fixture(t),nd=f.make(),claude=f.make('claude');
+  nd.execution.setAdmission(true,1);
+  const n=(await nd.create(create('slot_holder_thread'))).binding.chatId,c=(await claude.create(create('slot_waiter_thread'))).binding.chatId;
+  await nd.start(n,message('slot_holder_1'));await until(()=>f.runs.length===1);
+  await assert.rejects(claude.start(c,message('slot_waiter_1')),{code:'capacity_full'});
+  await assert.rejects(claude.enqueue(c,message('slot_waiter_1')),{code:'queue_target_ended'},'an ordinary queue still needs a task to follow');
+  const waiting=await claude.enqueue(c,message('slot_waiter_1'),{waitForCapacity:true});
+  assert.equal(waiting.length,1);assert.equal(waiting[0].state,'queued');assert.equal(waiting[0].reason,'waiting_for_capacity');
+  const behind=await claude.enqueue(c,message('slot_waiter_2'));
+  assert.equal(behind.length,2);assert.equal(behind[1].reason,null);
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  assert.equal(f.runs.length,1,'nothing starts while the only slot is taken');
+  f.runs[0].resolve({ok:true,processTreeExited:true});
+  await until(()=>f.runs.length===2);
+  assert.equal(claude.registry.history.receipt(c,'slot_waiter_1').kind,'message');
+  assert.equal(claude.registry.history.receipt(c,'slot_waiter_2'),null,'the second message waits for the first to finish');
+  f.runs[1].resolve({ok:true,processTreeExited:true});
+  await until(()=>f.runs.length===3);
+  assert.equal(claude.registry.history.receipt(c,'slot_waiter_2').kind,'message');
+  f.runs[2].resolve({ok:true,processTreeExited:true});
+  await until(async()=>(await claude.queued(c)).length===0);
 });
 
 test('queue ordering, cancellation revisions and dispatch receipts remain exact across workers',async t=>{

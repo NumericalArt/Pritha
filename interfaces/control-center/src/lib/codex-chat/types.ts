@@ -267,7 +267,9 @@ export type HistoryItemsPage = { data: ChatItemView[]; nextCursor: string | null
 export type HistoryContentPage = { text: string; nextCursor: string | null; complete: boolean };
 
 export type AcceptedTurn = {
-  turn: TurnView;
+  /** Null while the message waits for a free task slot; it then appears in the chat's queue. */
+  turn: TurnView | null;
+  queued?: "waiting_for_capacity";
   streamUrl: string;
 };
 

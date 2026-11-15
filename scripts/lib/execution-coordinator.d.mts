@@ -5,6 +5,7 @@ export type ExecutionLease = { owner: string; generation: string; assertOwned():
 export class ExecutionCoordinator {
   readonly file: string;
   admission():{enabled:boolean;capacity:number};
+  capacityFull():boolean;
   setAdmission(enabled:boolean,capacity?:number):{enabled:boolean;capacity:number};
   constructor(options: { stateRoot: string; directory?: string });
   reserveIntent(key: string, hash: string, value: Record<string, unknown>, options?: {initialState?: "reserved" | "queued";limit?: {max:number;states:string[];scopeField?:string;scopeMax?:number}}): { created: boolean; intent: ExecutionIntent };

@@ -48,7 +48,7 @@ export class ProviderTaskRuntime {
   pendingRequests(chatId:string):ThreadDetail['pendingRequests'];
   answerRequest:TaskChatBackend['answerRequest'];
   queued(chatId:string):Promise<Queued>;
-  enqueue(chatId:string,input:StartTurnInput):Promise<Queued>;
+  enqueue(chatId:string,input:StartTurnInput,options?:{waitForCapacity?:boolean}):Promise<Queued>;
   cancelQueued(chatId:string,id:string,revision:number):Promise<Queued>;
   reconcile(chatId:string):Promise<void>;
   scheduleQueues():void;

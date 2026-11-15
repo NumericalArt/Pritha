@@ -36,6 +36,8 @@ export class ProviderTaskError extends Error { constructor(code,message='The pro
 const failure=(code,message,status)=>new ProviderTaskError(code,message,status);
 const queueKey=(chat,client)=>'provider-queued:'+chat+':'+client;
 const turnKey=(chat,client)=>'turn:'+chat+':'+client;
+// A queued message whose chat has nothing running waits only for a free task slot.
+const CAPACITY_WAIT='capacity';
 const channelKey=chat=>'provider-control:'+chat;
 const streamUrl=chat=>'/api/codex-chat/v1/threads/'+encodeURIComponent(chat)+'/events';
 
@@ -224,7 +226,8 @@ export class ProviderTaskRuntime {
       const attachments=await this.attachmentInput(binding,input,{phase:'turn',expected:queue?.attachmentReceipt || intent.attachmentReceipt,retain:true});
       if(attachments.files.length && !intent.attachmentReceipt)intent=this.execution.updateIntent(key,{attachmentReceipt:attachments.receipt},intent.revision);
       const lease=this.execution.claim(['provider-thread:'+this.registry.scope+':'+chat,'chat-binding:'+chat],key,{kind:'turn',capacity:this.execution.admission().capacity,detail:{chatId:chat,connectorId:this.connectorId,intentKey:key}});
-      if(!lease)throw failure('turn_active','Execution capacity or this task is already reserved.');
+      // All slots taken is a wait, not a conflict: the caller queues the message for a free slot.
+      if(!lease)throw this.execution.capacityFull()?failure('capacity_full','All task slots are busy. This message waits for a free slot.'):failure('turn_active','Execution capacity or this task is already reserved.');
       let accepted=false;
       try{
         const policy=taskWorkspaceResources(binding.workspace,binding.executionConfig.sandbox);
@@ -491,19 +494,20 @@ export class ProviderTaskRuntime {
           return JSON.stringify({...view,sha256})===JSON.stringify(saved[index])?view:null;
         }catch{return null;}
       }));
-      return {id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || null,
+      return {id:row.id,revision:row.revision,state:row.state,text:row.input.input[0].text,clientMessageId:row.input.clientMessageId,createdAt:row.createdAt,reason:row.reason || (row.predecessorKey===CAPACITY_WAIT?'waiting_for_capacity':null),
         attachments:files.filter(Boolean),attachmentsUnavailable:files.some(file=>!file)};
     }));
   }
-  async enqueue(chat,input){
+  async enqueue(chat,input,{waitForCapacity=false}={}){
     if(Object.hasOwn(input || {},'factoryAction'))throw failure('factory_control_queue_denied','Run an agent action after the current turn completes.',400);
     return this.execution.withMutation('provider-admission:'+chat,async()=>{
       const binding=this.require(chat);this.validateTurn(binding,input);
       const key=queueKey(chat,input.clientMessageId),prior=this.execution.getIntent(key);
       if(!prior){
         const tail=this.queuedRows(chat).at(-1),direct=this.activeIntent(chat);
-        if(!tail && !direct)throw failure('queue_target_ended','The preceding task ended. Send this draft as a new turn.');
-        const predecessorKey=tail?turnKey(chat,tail.input.clientMessageId):turnKey(chat,direct.clientMessageId);
+        if(!tail && !direct && !waitForCapacity)throw failure('queue_target_ended','The preceding task ended. Send this draft as a new turn.');
+        // With nothing to follow in this chat, the message waits only for a free task slot.
+        const predecessorKey=tail?turnKey(chat,tail.input.clientMessageId):direct?turnKey(chat,direct.clientMessageId):CAPACITY_WAIT;
         const attachments=await this.attachmentInput(binding,input,{phase:'queue',retain:true});
         this.execution.reserveIntent(key,hash(input),{kind:'provider-queued-message',connectorId:this.connectorId,chatId:chat,input,predecessorKey,...(attachments.files.length?{attachmentReceipt:attachments.receipt}:{})},{initialState:'queued',limit:{max:128,scopeField:'chatId',scopeMax:16,states:waitingStates}});
       }else if(prior.hash!==hash(input))throw failure('idempotency_conflict');
@@ -533,17 +537,19 @@ export class ProviderTaskRuntime {
   async drainQueue(chat){
     return this.execution.withMutation('provider-queue-drain:'+chat,async()=>{
       const row=this.queuedRows(chat).find(item=>item.state==='queued');if(!row)return;
-      let key=row.predecessorKey,predecessor=this.execution.getIntent(key);
-      for(let depth=0;!predecessor && depth<32;depth++){
+      let key=row.predecessorKey,predecessor=key===CAPACITY_WAIT?null:this.execution.getIntent(key);
+      for(let depth=0;key!==CAPACITY_WAIT && !predecessor && depth<32;depth++){
         const cancelled=this.execution.getIntent('provider-queued:'+key.slice(5));
         if(cancelled?.state!=='cancelled')break;
-        key=cancelled.predecessorKey;predecessor=this.execution.getIntent(key);
+        key=cancelled.predecessorKey;predecessor=key===CAPACITY_WAIT?null:this.execution.getIntent(key);
       }
-      if(predecessor?.state!=='completed' || this.require(chat).archived)return;
+      const waitsForCapacity=key===CAPACITY_WAIT;
+      if((!waitsForCapacity && predecessor?.state!=='completed') || this.require(chat).archived)return;
+      if(waitsForCapacity && this.execution.capacityFull())return;
       const queuedKey=queueKey(chat,row.input.clientMessageId);
       this.execution.updateIntent(queuedKey,{state:'dispatching'},row.revision);
       try{await this.start(chat,row.input,{fromQueue:queuedKey});this.execution.updateIntent(queuedKey,{state:'delivered'});}
-      catch(error){const code=safeCode(error);this.execution.updateIntent(queuedKey,{state:['turn_active','workspace_busy','execution_draining','execution_metadata_busy'].includes(code)?'queued':code==='fallback_confirmation_required'?'unknown':'blocked',reason:code});}
+      catch(error){const code=safeCode(error);this.execution.updateIntent(queuedKey,{state:['turn_active','capacity_full','workspace_busy','execution_draining','execution_metadata_busy'].includes(code)?'queued':code==='fallback_confirmation_required'?'unknown':'blocked',reason:code});}
       this.changed(chat);
     });
   }
@@ -554,7 +560,7 @@ export class ProviderTaskRuntime {
     if(result.resumeRequired){
       const continuation={clientMessageId:'document_'+input.requestId,input:[{type:'text',text:'Continue this agent factory after the recorded document approval. Read factory status, apply the exact saved decision, and continue within the accepted Contract and Outcome. Do not ask again for an unchanged approved document.'}]};
       try{await this.start(chat,continuation);}catch(error){
-        if(error.code==='turn_active' || error.code==='queue_waiting')await this.enqueue(chat,continuation);else throw error;
+        if(error.code==='turn_active' || error.code==='queue_waiting')await this.enqueue(chat,continuation);else if(error.code==='capacity_full')await this.enqueue(chat,continuation,{waitForCapacity:true});else throw error;
       }
     }
     return result;

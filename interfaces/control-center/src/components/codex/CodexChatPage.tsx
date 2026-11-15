@@ -1042,7 +1042,8 @@ export function CodexChatPage() {
   const visibleThreads = useMemo(() => threads.filter((thread) => thread.group === activeGroup && thread.archived === showArchived), [activeGroup, threads, showArchived]);
 
   const displayedDetail = selectionChanging ? null : detail;
-  const hasActiveTurn = Boolean(displayedDetail?.activeTurnId || displayedDetail?.controls || displayedDetail?.thread.status === "active") || displayedTurns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
+  // A message waiting for a free slot keeps the chat busy, so the next one queues behind it.
+  const hasActiveTurn = Boolean(displayedDetail?.activeTurnId || displayedDetail?.controls || displayedDetail?.thread.status === "active") || Boolean(displayedDetail?.queued?.some(row => row.state === "queued" || row.state === "dispatching")) || displayedTurns.some((turn) => turn.status === "queued" || turn.status === "in_progress" || turn.status === "waiting_for_approval" || turn.status === "waiting_for_input");
   const workingLabel = displayedTurns.some(turn => turn.status === "waiting_for_approval" || turn.status === "waiting_for_input") ? null
     : displayedTurns.some(turn => turn.status === "in_progress") ? "Pritha is working"
     : displayedTurns.some(turn => turn.status === "queued") ? "In queue" : null;
@@ -1247,7 +1248,10 @@ export function CodexChatPage() {
       setPendingForChat(delivery.chatId, null);
       attachmentDraft.clear(delivery.chatId, delivery.attachments);
       updateDraftForChat(delivery.chatId, (current) => current.trim() === delivery.text ? "" : current);
-      if (selectedChatIdRef.current === delivery.chatId) setTurns((rows) => upsertTurn(rows, response.data.turn));
+      const acceptedTurn = response.data.turn;
+      if (acceptedTurn && selectedChatIdRef.current === delivery.chatId) setTurns((rows) => upsertTurn(rows, acceptedTurn));
+      // Every task slot was busy: the message waits in this chat's queue and starts by itself.
+      if (!acceptedTurn && selectedChatIdRef.current === delivery.chatId) void loadThreadDetail(delivery.chatId);
       void refreshThreads();
     } catch (cause) {
       if (deliveryMayBeUnknown(cause) || (budgetCommand && cause instanceof ControlCenterRequestError && ["turn_active", "delivery_running", "delivery_unconfirmed"].includes(cause.code))) {
@@ -1303,7 +1307,7 @@ export function CodexChatPage() {
         selectedByGroupRef.current.my_chats = nextDetail.thread.chatId;
         setSelectedChatId(nextDetail.thread.chatId);
         setDetail(nextDetail);
-        setTurns([accepted.turn]);
+        setTurns(accepted.turn ? [accepted.turn] : []);
         setDrawerOpen(false);
         window.history.replaceState(null, "", `/task-chat?group=my_chats&chat=${encodeURIComponent(nextDetail.thread.chatId)}`);
       }
